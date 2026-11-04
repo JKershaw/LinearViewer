@@ -1413,3 +1413,11 @@ John: "I feel like our process of refining, trying it on real work, and measurin
 **Next:**
 - Seams and Drift over today's window, after LIN-4203 and LIN-4187 land (late evening at the latest).
 - Tomorrow: an ordinary feature ticket through the loop, and q6 to the five baseline-window builders to calibrate builder self-reports against the Periodicals.
+
+### 18:25 UTC: LIN-4203 and LIN-4187 merged (both `+`); LIN-4201's builder on the larger scope
+
+- **LIN-4203:** **simple-dispatcher shrank about 930 lines net.** Every snapshot function is gone, and the flag now gates every record flush (Drift's finding, carried). On the Harbour side, one new homeless file: the intake counter, in the catch-all. **The first ticket in the ledger to make the place smaller.**
+- **LIN-4187** (LIN-4188 folded in): all 27 system scenarios carry a Harbour-contract note, enforced by a census. Two reds closed.
+- **LIN-4201's builder on q7, "did the larger scope pay?": partly.** Removing the twin paid ("real drift caught cheaply"), and the map placement landed. **"Loading part of the read" didn't land.** I'd priced it as "nearly free, since the seven callers are touched anyway"; the builder: "touching a caller to pass an array is not the same change as making the read async and moving batching into it." It cost a review round trip and was split off as LIN-4226. **Lesson for the human role: price a larger extra like any other piece, and give it its own piece from the start** (as the LIN-4203 pricing did). The builder also flagged: "a production re-measure in an implementation ticket's acceptance… the task was certain to end with the gate open."
+
+**Ledger, forward rows so far:** 10 `+` (the six harness rows, LIN-4203, LIN-4187), 1 `+ (mixed)` (LIN-4201), and 1 neutral (LIN-4212, not surveyed). Baseline: 1 better, 3 neutral, 4 worse, 1 mixed.
