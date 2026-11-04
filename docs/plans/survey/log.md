@@ -1495,3 +1495,18 @@ Whether tasks can finish with the codebase **cleaner than they started**. The lo
 2. **q6 to the five baseline-window builders,** to see whether a builder's own account of the place matches what the Periodicals measured (if it does, the ledger gets cheap).
 3. **LIN-4233** (the park-status fix) and **LIN-4234** (the erasure gap), through the loop.
 4. **Open for you:** the mixed-model label ruling on LIN-4195 (proposed: `cost-dominant`); LIN-4210 (the halt poll); LIN-4214 (stale behind LIN-4203's fix, probably closeable).
+
+## 4 Nov, about 21:10 UTC: overnight, until the token cap or John's morning
+
+John: "happy to continue until either I'm awake in the morning, or we hit the token cap… we generated a fair number of follow ups which we could use."
+
+**Improvements to try, from today's lessons:**
+1. **Global v2 adds one general question:** "What else in the codebase would have to learn about what it adds or removes (lists, registries, inventories, docs), and would anything notice if it didn't?" Three of Drift run 2's gaps are exactly this (the erasure inventory, the stale snapshot prose, hand-kept script lists), and the earlier global view missed them. It passes the generality test.
+   - **Backtest:** v2 at LIN-4203's forward-trial base (`5334c81a7` / SD `67ff5c3b1`), same ticket text.
+   - **Hit criterion, before dispatch:** it names the account-erasure inventory (or "the wipe/erasure list") as something the new intake collection must join. Bonus: it names the user-visible or agent-catalog text describing `[usage]`.
+2. **Use the tidy-after:** LIN-4234 (the erasure gap) becomes LIN-4203's tidy-after, with the larger option.
+3. **Survey every ticket we start**, follow-ups included. Skip the step-back when the voices converge.
+4. **My scope rule:** a larger extra gets its own piece and its own price.
+5. **In the morning:** a fresh agent scores the ledger rows blind, as a second scorer.
+
+**Docket:** the v2 backtest; LIN-4234 and LIN-4233 through the loop; then an ordinary feature ticket if tokens allow.
