@@ -1650,3 +1650,15 @@ Each is its own piece, with a stop-and-say rule on 5 and 6. Autopilot `84fa12ad`
 - **Two general lessons from its q2 and q4:**
   - **Guards on different axes collide.** Before adding a name anywhere new, find every check that keys on that name. That's a question for the Survey ("what checks would see this change?"), not a Harbour rule.
   - **The broad option behind the "derived census" row:** each collection declared once, with all its facts, and opening an undeclared name fails. Today the facts sit in four tables. Added to the tally.
+
+### 23:55 UTC: a deploy-gate ruling on LIN-4233; both piece builders on the larger scope
+- **The ruling:** `lin4233-deploy-gate`. Close-out holds Done until simple-dispatcher's deploy lands; the host is still at `bf499a4`, `main` at `07c88f7`.
+  - **Proposed: `close-now`.** The fix only acts with `SD_TOOL_ACTIVITY_RELAY` on, which defaults off, so deploying changes nothing live.
+  - **Flagged for John:** the host hasn't followed `main` since tonight's restart. The deploy follower may not have come back.
+- **Both builders say the larger scope paid** (LIN-4239: the proof through Harbour's real reader caught a fixture trap and a retry-budget exposure; LIN-4240: the extra skip cases were "nearly free" and closed the race).
+- **Both name the same cost:** prose about the joint state written before the sibling landed, then rewritten after. That's two follow-up PRs on simple-dispatcher (#327, #328) of comment churn. **Lesson for splitting across pieces (general): let the prose that describes the joint state land once, with the last piece. Earlier pieces say only what they change.**
+- **The same broad option named twice in one night, in two different vocabularies:**
+  - LIN-4234's builder: each collection declared once with its facts;
+  - LIN-4240's builder: each feedback kind declared once with its role.
+
+  Both are *a vocabulary whose facts are scattered across the readers and guards that each keep a copy*. That's the pattern behind tonight's three tickets (erasure, urlkey classes, park reading). Added to the tally as its own row, beside the collection row.
