@@ -1017,3 +1017,32 @@ Each session went back to a fresh worktree at its own base and read nothing late
 | The other ten | no change |
 
 A builder or reviewer could read this table in seconds. It would have shown LIN-4177's homeless hub on the day it merged.
+
+### 07:57 UTC: the global offshoot backtest, scored against the criteria logged before dispatch
+
+| Ticket @ base | What the global offshoot said about the place | Score |
+|---|---|---|
+| LIN-4176 @ `9e397e6be` | "**No home in the map.** Cost files are split between Runs and LLM; `row-usage` and `lineage-membership` sit in the catch-all." Done the obvious way, "one more file lands in the catch-all". Better at this task's cost: "**A Costs area in `areas.json`**", and the read owns fetch, window and population | **Hit** on the homeless hub. **Miss** on the read-back: it didn't predict that Runs and LLM would import the new owner back |
+| LIN-4168 @ `048c3319a` | Where it lands (`routes/test.js`, the `server.js` wiring, a 45-name factory destructure) and what the obvious way adds (a 46th dependency, a second hand-kept list, three seams untouched). Better: holders register at construction, **the registry in `lib/` not `routes/`, created before the router mount**, plus a guard test over module-level Maps | **Hit** on placement and on what the obvious way adds. It didn't mention the map's catch-all |
+| LIN-4195 @ `723052153` | "**None of the new cost modules has an area** in `areas.json`, so they all fall under Other features." "This task is largely a deletion." Extending `llm-call-log` with no new shape is wrong; its own collection; pricing should read the record's unit, not the harness name | **Hit** |
+
+**What we learn.**
+- **From the base, the global view sees the place-level consequence the local and step-back views mostly didn't.** All three proposed a home for the costs code on the map, cheaply and inside the task. No Survey suggested it, and no builder did it, so the hub went to the catch-all three tickets running.
+- **It does not see second-order coupling.** It didn't predict that consumers in Runs and LLM would import the new owner back. That shows up only when you run the map at merge, which is exactly the place change's job. So the two cover each other: forecast from the base, measure at merge.
+- **It stays out of the drill.** Each answer was about the place, with the task as context. Every one split "this task can carry" from "not this task's", unprompted by anything but question 3.
+- **A caution.** "Give it a home in `areas.json`" is a guide edit. It's legitimate when the area is real, but it's also the cheapest way to move the numbers. The Seams periodical counts guide effects separately, and we should too.
+
+## 4 Nov, about 08:00 UTC: forward trial 1, rebuild 2's pieces 4 and 6 through the full loop
+
+John: "we're at the try-anything-and-see-if-it-works stage… only once we have a reliable system should we finalise it."
+
+**The tickets.**
+- **LIN-4201** (piece 4: the cost read sums request records) and **LIN-4203** (piece 6: stop posting snapshots; remove the runner's snapshot path). Both are Todo and wait on the gate (LIN-4200).
+- They are real, upcoming, in the area where the backtest found the hub, and largely deletions. So the place change at merge should be measurable.
+
+**The loop, v0.**
+1. open-0 and the global offshoot, as separate fresh agents, at today's `main`.
+2. The step-back, as a follow-up to the open-0 session, with the global answer pasted in as "what another agent, looking at the place, said".
+3. The step-back's choice is written onto the ticket: what to do, what it should leave behind, and what the map should look like after.
+4. The build, as usual, when the gate allows.
+5. The place change at merge, sent to the builder. If the place got worse, ask for the tidy-after in the same lineage.
