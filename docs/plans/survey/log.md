@@ -1004,3 +1004,16 @@ Each session went back to a fresh worktree at its own base and read nothing late
 - **LIN-4195 @ `723052153`:** it says the per-request store and intake add another module beside `dispatch-store` and the cost read, with Runs ↔ Costs crossings, or that the snapshot path will run alongside it. A hit is a prediction about the place, not about the figure.
 
 **A miss** is an answer that only restates the task's local difficulty, which would make it the drill by other means again.
+
+**The per-task place change works** (`experiments/place-change/place-change.mjs <repo> <base> <head> <areas guide>`, wrapping `seams.mjs`). Run per commit over the window:
+
+| Commit | Place change |
+|---|---|
+| LIN-4168 | +5 cross-area imports; **2 new files with no home** (`key-state`, `key-state-holders`) |
+| LIN-4177 | +7; **2 with no home** (`cost-read`, `cost-format`); LLM↔Other and Other↔Runs grew; Agent↔Runs and LLM↔Runs shrank by one each |
+| LIN-4178 | +11; **1 with no home** (`founder-lookup`); Pages↔Other 2/6→5/6, Other↔Runs grew |
+| LIN-4179 | +7; Pages↔Other →8/6, LLM↔Other grew; Other↔Runs shrank by 2 |
+| LIN-4198 | +5; new files with a home (Runs); three Runs knots grew by one |
+| The other ten | no change |
+
+A builder or reviewer could read this table in seconds. It would have shown LIN-4177's homeless hub on the day it merged.
