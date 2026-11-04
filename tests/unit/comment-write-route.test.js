@@ -753,6 +753,35 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — settled-ruling guard
     assert.strictEqual(providerCalls.createComment.length, 1, 'and writes no comment for it');
   });
 
+  // LIN-4241: the `target` check in secondSubmission. A different submission id on a DIFFERENT, unsettled ruling is
+  // not a second tab on the first ruling: it is a fresh answer (200 deduped by the ruling-blind key, loop-2 stamped).
+  test('LIN-4241 second-submission refusal is per ruling: a different attempt id on a different, unsettled ruling is not refused', async () => {
+    const { provider, calls: providerCalls } = makeFakeProvider();
+    const settled = new Set();
+    const stamps = [];
+    let copyFailuresLeft = 1;
+    const store = {
+      async isDecisionSettled(itemId) { return settled.has(itemId); },
+      async markDecisionAnswered(itemId) {
+        if (itemId === 'copy-1' && copyFailuresLeft > 0) { copyFailuresLeft -= 1; return null; }
+        if (settled.has(itemId)) return { success: false, alreadySettled: true };
+        settled.add(itemId);
+        stamps.push(itemId);
+        return { success: true, feedbackCount: 1 };
+      },
+    };
+    const app = buildApp({ provider, dispatchQueueStore: store });
+    const text = 'Option C (second-submission target witness)';
+
+    const first = await postComment(app, ISSUE_ID, { body: text, decisionLoopId: 'loop-1', decisionLoopIds: ['copy-1'], decisionId: 'd-1', answerAttemptId: 'X' });
+    assert.strictEqual(first.status, 201, 'attempt X: primary stamped, copy failed');
+    const other = await postComment(app, ISSUE_ID, { body: text, decisionLoopId: 'loop-2', decisionId: 'd-2', answerAttemptId: 'Y' });
+    assert.strictEqual(other.status, 200, 'loop-2 is a different, unsettled ruling: not a second tab on loop-1');
+    assert.strictEqual(other.body.deduped, true);
+    assert.ok(settled.has('loop-2'), 'loop-2 is stamped');
+    assert.strictEqual(providerCalls.createComment.length, 1, 'one comment in total');
+  });
+
   // LIN-4241: the scan row's own copy-failed retry. The primary loop and the scan row land on attempt 1, a copy fails,
   // so the identical retry finds the row already answered by its own earlier attempt. That is this request's landed
   // stamp, not "answered elsewhere": the retry is 200 deduped, and the copy is stamped.
