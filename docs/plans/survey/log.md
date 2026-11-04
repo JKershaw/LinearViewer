@@ -1633,3 +1633,20 @@ Each is its own piece, with a stop-and-say rule on 5 and 6. Autopilot `84fa12ad`
   - it found an `.mjs` blind spot, fixed at close-out.
 - **For John (operator checks the close-out couldn't run, no production access):** were any Full wipes executed between LIN-4203's deploy (17:18 UTC) and this one (23:03)? If so, delete the `usage-snapshot-intake` documents for the wiped keys. Also a dry run of `erase-account.mjs` and `dry-run-urlkey-duplicates.mjs` on the real database, to confirm the new row shows up.
 - After-questions q1–q7 sent to its builder (`f0228592`).
+
+### 23:30 UTC: LIN-4240 merged (`+`); LIN-4234's builder on the larger scope
+- **LIN-4240** (`279dcb0a`, Harbour, LIN-4233's larger extra):
+  - `parseParkedWait` now decides on the newest *state-bearing* entry, skipping tool, usage and resources entries, `[ticket]` markers and stamps, through one predicate;
+  - the stale "latest entry decides" wording is rewritten in four places;
+  - the cross-process residual that LIN-4239 named is closed;
+  - not shared with `findWakeEvent`'s scan (the scope said "if they can").
+
+  The larger extra the global view had called "its own ticket" landed cleanly as its own piece in 20 minutes. After-questions sent to both piece builders.
+- **LIN-4234's builder, q7 (did the larger scope pay?):** mostly.
+  - The shared helper paid. So did the census, as cheap insurance.
+  - Piece 3 was rightly stopped.
+  - **The cost was classifying the two collections in the urlkey guard.** It collided with a guard on a different axis: LIN-4198's single-reader census string-matches `'request-usage'`. That forced a judgement call (two allow-list entries) the row-only fix would never have touched. "It should have gone as its own small ticket that settled the LIN-4198 question on purpose."
+  - **open-0 had said exactly this:** "file the urlkey-holders gap as a sibling, rather than letting it change the counts inside this ticket." I overrode it to go larger. **Lesson for the human role: when a voice says "separate", it is usually pricing a coupling you can't see. Err larger in *pieces*, not by folding in what a voice said to keep apart.**
+- **Two general lessons from its q2 and q4:**
+  - **Guards on different axes collide.** Before adding a name anywhere new, find every check that keys on that name. That's a question for the Survey ("what checks would see this change?"), not a Harbour rule.
+  - **The broad option behind the "derived census" row:** each collection declared once, with all its facts, and opening an undeclared name fails. Today the facts sit in four tables. Added to the tally.
