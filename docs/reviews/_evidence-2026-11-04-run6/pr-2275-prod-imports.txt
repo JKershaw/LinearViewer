@@ -1,0 +1,17 @@
+# PR #2275 (LIN-4226) production import lines changed, read 2026-11-04T18:39Z at head 911513a2dd5fe25bfd28259e2be6e6cf7d98509c. Not merged; read only.
+lib/kpi-stats.js: +import { lineageRecords } from './cost-read.js';
+lib/model-routing-history.js: +import { readCost } from './cost-read.js';
+lib/model-routing-spend.js: -import { readCost, readCalls } from './cost-read.js';
+lib/model-routing-spend.js: +import { readCalls } from './cost-read.js';
+lib/render-session.js: -import { buildRunView, stepKindWord, computeSupersededLoopIds } from './run-view.js';
+lib/render-session.js: +import { stepKindWord, computeSupersededLoopIds } from './run-view.js';
+lib/run-paragraph-hook.js: -import { buildRunView, runLineageAnchors } from './run-view.js';
+lib/run-paragraph-hook.js: +import { buildRunView } from './run-view.js';
+lib/terminal-marked-task-cost.js: -import { groupDispatchLineages, evidenceCountOf, OUTCOME_WINDOW_DAYS } from './dispatch-lineage.js';
+lib/terminal-marked-task-cost.js: +import { evidenceCountOf, OUTCOME_WINDOW_DAYS } from './dispatch-lineage.js';
+lib/terminal-marked-task-cost.js: -import { lineageRecords, lineageFigure } from './cost-read.js';
+lib/terminal-marked-task-cost.js: +import { lineageFigure } from './cost-read.js';
+routes/dashboard.js: -import { buildRunView, runLineageAnchors } from '../lib/run-view.js';
+routes/dashboard.js: +import { buildRunView } from '../lib/run-view.js';
+routes/proxy-compute.js: -import { readCost, appCallsOf, anchorsOfRows } from '../lib/cost-read.js';
+routes/proxy-compute.js: +import { readCost, appCallsOf } from '../lib/cost-read.js';
