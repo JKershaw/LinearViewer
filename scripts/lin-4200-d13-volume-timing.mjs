@@ -271,7 +271,8 @@ async function historyAnchors(db, since, urlKey) {
 
 async function measureProduction(db, urlKey, now, reps, taskAnchor) {
   const since = readHorizonStart(now);
-  const store = new RequestUsageStore({ collection: db.collection(REQUEST_USAGE_COLLECTION) });
+  // LIN-4212: the store reads the lineage members from dispatch-history, so it is built with that handle.
+  const store = new RequestUsageStore({ collection: db.collection(REQUEST_USAGE_COLLECTION), historyCollection: db.collection('dispatch-history') });
   const volume = await readWorkspaceVolume(db, urlKey, now);
   const windowAnchors = await historyAnchors(db, since, urlKey);
   const recordAnchors = [...new Set((await db.collection(REQUEST_USAGE_COLLECTION).distinct('rootItemId', { urlKey })).map(String))];
@@ -325,7 +326,8 @@ async function measureScratch(scratchClient, prodRecords, steadyRecords, reps, s
     if (batch.length === BATCH) { await col.insertMany(batch, { ordered: false }); inserted += batch.length; batch = []; }
   }
   if (batch.length) { await col.insertMany(batch, { ordered: false }); inserted += batch.length; }
-  const store = new RequestUsageStore({ collection: col });
+  // LIN-4212: the scratch db also holds dispatch-history, the member read's source. The scratch seeding of matching history rows is beat 3's job.
+  const store = new RequestUsageStore({ collection: col, historyCollection: db.collection('dispatch-history') });
   const explain = await explainListForAnchors(col, 'scratch', anchors);
   const timing = await timeReps(`scratch records-sum path, ${inserted} records, ${lineages} lineages`, reps, async () => {
     const recs = await store.listForAnchors('scratch', anchors);

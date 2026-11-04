@@ -312,10 +312,13 @@ describe('LIN-4212 W12: a body cannot choose the lineage [guard]', () => {
   test('a body naming another itemId and rootItemId is stored and read under the posting row only', async () => {
     const ds = dispatchStore();
     const rootId = await mintRoot(ds);
-    const otherRoot = await mintRoot(ds);
     const wakeId = await mintAndTakeWake(ds, rootId, DISPATCH);
     await latch(ds, wakeId, rootId, DISPATCH);
-    const forged = { ...rec('f1', { inputTokens: 5 }), itemId: otherRoot, rootItemId: otherRoot };
+    // A real taken row of ANOTHER lineage (OTHER), so the forged itemId names a genuine member row.
+    const OTHER = 'other-lineage';
+    await history.insertOne({ _id: 'other-row', urlKey: URL_KEY, status: 'taken', abort: false, rootItemId: OTHER, takenByTokenLabel: 'other-label', takenByTokenId: null });
+    await store.upsertRecords({ urlKey: URL_KEY, rootItemId: OTHER, itemId: 'other-row', records: [rec('o-own', { inputTokens: 2 })], now: NOW });
+    const forged = { ...rec('f1', { inputTokens: 5 }), itemId: 'other-row', rootItemId: OTHER };
 
     const outcome = await post(ds, wakeId, DISPATCH, [forged]);
     assert.deepEqual(outcome.body.applied, ['f1']);
@@ -324,7 +327,7 @@ describe('LIN-4212 W12: a body cannot choose the lineage [guard]', () => {
     assert.equal(doc.itemId, wakeId, 'the stored itemId is the posting row, not the body');
     assert.equal(doc.rootItemId, rootId, 'the stored stamp is the posting row\'s anchor, not the body');
     assert.deepEqual(requestIdsOf(await store.listForAnchors(URL_KEY, [rootId])), ['f1']);
-    assert.deepEqual(await store.listForAnchors(URL_KEY, [otherRoot]), [], 'the forged lineage does not read it');
+    assert.deepEqual(requestIdsOf(await store.listForAnchors(URL_KEY, [OTHER])), ['o-own'], 'the other lineage does not gain the forged record');
   });
 });
 
