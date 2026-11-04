@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * LIN-4178: time the KPI path's founder lookup (lib/founder-lookup.js) on a seeded real MongoDB.
+ * LIN-4178: time the KPI path's founder lookup (lineageIdentityOfRows, lib/dispatch-store.js) on a seeded real MongoDB.
  *
  *   node scripts/lin4178-founder-timing.mjs --uri mongodb://127.0.0.1:27017 [--workspaces 50] [--lineages 400]
  *
@@ -9,14 +9,14 @@
  * one in ten has a founder older than the window with an in-window cross-issue follow-up (the horizon
  * straddler, LIN-4148). Then it times the two reads `/kpis` makes:
  *   1. the horizon read of the dispatch history (`loadDispatchHistory`, the aggregation it already runs);
- *   2. the founder lookup over the lineages that read returned (`lookupFounderRows`).
+ *   2. the founder lookup over the lineages that read returned (`lineageIdentityOfRows`).
  * It prints both timings, the query count and the row counts. The database is dropped afterwards.
  */
 import { MongoClient } from 'mongodb';
 import { performance } from 'node:perf_hooks';
 import { ensureIndexes } from '../lib/db-indexes.js';
 import { loadDispatchHistory } from '../lib/kpi-stats.js';
-import { lookupFounderRows, FOUNDER_BATCH_SIZE } from '../lib/founder-lookup.js';
+import { lineageIdentityOfRows, LINEAGE_IDENTITY_BATCH_SIZE } from '../lib/dispatch-store.js';
 import { readHorizonStart } from '../lib/read-horizon.js';
 
 const arg = (name, fallback) => {
@@ -96,7 +96,7 @@ try {
   let queries = 0;
   const countingCollection = c => ({ find: (q, o) => { queries += 1; return c.find(q, o); } });
   t0 = performance.now();
-  const founders = await lookupFounderRows({ dispatchHistory: countingCollection(dispatchHistory), dispatchQueue: countingCollection(dispatchQueue) }, rows);
+  const founders = await lineageIdentityOfRows([countingCollection(dispatchHistory), countingCollection(dispatchQueue)], rows);
   const lookupMs = performance.now() - t0;
 
   // The narrowed variant (the plan's fallback): only anchors whose EARLIEST fetched member is a follow-up.
@@ -114,14 +114,14 @@ try {
   }
   const narrowRows = [...earliest.values()].filter(r => r.followUpTo).flatMap(r => byAnchor.get(r.rootItemId));
   t0 = performance.now();
-  const narrowFounders = await lookupFounderRows({ dispatchHistory, dispatchQueue }, narrowRows);
+  const narrowFounders = await lineageIdentityOfRows({ dispatchHistory, dispatchQueue }, narrowRows);
   const narrowMs = performance.now() - t0;
 
   const anchors = new Set(rows.map(r => r.rootItemId).filter(Boolean));
   console.log(JSON.stringify({
     workspaces, lineagesPerWorkspace, seededHistoryRows: history.length, seededQueueRows: queue.length,
     horizonHistoryRows: fetched.length, queueRows: queued.length, anchors: anchors.size,
-    batchSize: FOUNDER_BATCH_SIZE, findQueries: queries, founderRows: founders.length,
+    batchSize: LINEAGE_IDENTITY_BATCH_SIZE, findQueries: queries, founderRows: founders.length,
     horizonReadMs: Math.round(readMs), founderLookupMs: Math.round(lookupMs),
     narrowedAnchors: new Set(narrowRows.map(r => r.rootItemId)).size, narrowedFounderRows: narrowFounders.length,
     narrowedFounderLookupMs: Math.round(narrowMs),

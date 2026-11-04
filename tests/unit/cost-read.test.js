@@ -17,9 +17,13 @@ import { fileURLToPath } from 'node:url';
 import { runReplay } from '../fixtures/cost-replay/harness.js';
 import { buildCorpus } from '../fixtures/cost-replay/corpus.js';
 import { diffReplay } from '../fixtures/cost-replay/diff.js';
-import { readCost } from '../../lib/cost-read.js';
+import { readCost as readCost__unplumbed } from '../../lib/cost-read.js';
 import { formatUsd } from '../../lib/cost-format.js';
 import { DispatchQueueStore, LINEAGE_IDENTITY_PROJECTION, UnboundedHistoryReadError } from '../../lib/dispatch-store.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const readCost = withRequestRows(readCost__unplumbed, 0, { requestRows: [] });
+
 
 const GOLDENS = fileURLToPath(new URL('../fixtures/cost-replay/goldens.json', import.meta.url));
 const CHANGES = fileURLToPath(new URL('../fixtures/cost-replay/expected-changes.json', import.meta.url));

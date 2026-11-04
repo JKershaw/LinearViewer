@@ -45,10 +45,15 @@ import assert from 'node:assert/strict';
 import { installHermeticLinearTransport } from '../fixtures/hermetic-linear.js';
 installHermeticLinearTransport();
 import express from 'express';
-import { createProxyRoutes } from '../../routes/proxy.js';
-import { createDashboardRoutes } from '../../routes/dashboard.js';
+import { createProxyRoutes as createProxyRoutes__unplumbed } from '../../routes/proxy.js';
+import { createDashboardRoutes as createDashboardRoutes__unplumbed } from '../../routes/dashboard.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const createProxyRoutes = withRequestRows(createProxyRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+const createDashboardRoutes = withRequestRows(createDashboardRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+
 
 // HTML-significant and, since LIN-1118, a VALID sessionId: non-empty, under 128
 // chars, no C0 control characters, not the reserved `__meta__`. Every character

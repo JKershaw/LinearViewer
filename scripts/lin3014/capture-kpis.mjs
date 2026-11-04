@@ -50,18 +50,19 @@ function recordingCollection(name, reads) {
  * @param {Function} collectKpiStats - lib/kpi-stats.js's real export
  * @returns {Object} the captured {op, pipeline|filter/projection} per collection name
  */
-export async function captureKpiReads(collectKpiStats, lookupFounderRows) {
+export async function captureKpiReads(collectKpiStats, lineageIdentityOfRows) {
   const reads = {};
   const collections = Object.fromEntries(
     KPI_STATS_COLLECTION_NAMES.map((name) => [name, recordingCollection(name, reads)])
   );
   // LIN-4178: the founder lookup is passed (collectKpiStats needs it), over inert collections: its own
-  // read shape is pinned in tests/unit/founder-lookup.test.js, and the recording stubs keep one read per
+  // read shape is pinned in tests/unit/lineage-identity-read.test.js, and the recording stubs keep one read per
   // collection name, so a second read here would overwrite the captured `dispatchHistory` aggregate.
   const inert = { find: () => ({ toArray: async () => [] }) };
-  const lineageIdentity = rows => lookupFounderRows({ dispatchHistory: inert, dispatchQueue: inert }, rows);
+  const lineageIdentity = rows => lineageIdentityOfRows([inert, inert], rows);
   try {
-    await collectKpiStats(collections, { lineageIdentity, milestoneFunnelDeps: emptyMilestoneFunnelDeps() });
+    // LIN-4201: the request records likewise (none: inert), so the collector reaches its reads.
+    await collectKpiStats(collections, { lineageIdentity, requestRows: async () => [], milestoneFunnelDeps: emptyMilestoneFunnelDeps() });
   } catch {
     // Expected: the recording stubs return empty arrays/0, which downstream
     // aggregation/derivation code may not tolerate. Only the READ SHAPES
@@ -106,8 +107,8 @@ async function main() {
     return;
   }
   const { collectKpiStats } = await import(pathToFileURL(join(repoRoot, 'lib', 'kpi-stats.js')));
-  const { lookupFounderRows } = await import(pathToFileURL(join(repoRoot, 'lib', 'founder-lookup.js')));
-  const pick = await captureKpiReads(collectKpiStats, lookupFounderRows);
+  const { lineageIdentityOfRows } = await import(pathToFileURL(join(repoRoot, 'lib', 'dispatch-store.js')));
+  const pick = await captureKpiReads(collectKpiStats, lineageIdentityOfRows);
   for (const [name, read] of Object.entries(pick)) {
     const shape = read?.op === 'aggregate' ? `${read.pipeline.length} stage(s): ${Object.keys(read.pipeline[0] || {})}` : JSON.stringify(read);
     console.log(name, read?.op, shape);

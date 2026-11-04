@@ -8,8 +8,12 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeEffortReadout } from '../../lib/effort-readout.js';
+import { computeEffortReadout as computeEffortReadout__unplumbed } from '../../lib/effort-readout.js';
 import { renderEffortReadoutPage } from '../../lib/render-effort-readout.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const computeEffortReadout = withRequestRows(computeEffortReadout__unplumbed, 0, { requestRows: [] });
+
 
 const ASOF = '2026-09-05T16:00:00.000Z';
 

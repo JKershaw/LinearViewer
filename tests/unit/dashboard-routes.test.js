@@ -16,7 +16,7 @@ import { test, describe, before } from 'node:test';
 import assert from 'node:assert';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
-import { createDashboardRoutes, buildTestSummary, buildTestSessionSummary, deriveSessionStatus, deriveSessionDecisions } from '../../routes/dashboard.js';
+import { createDashboardRoutes as createDashboardRoutes__unplumbed, buildTestSummary, buildTestSessionSummary, deriveSessionStatus, deriveSessionDecisions } from '../../routes/dashboard.js';
 import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
@@ -27,6 +27,10 @@ import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { extractEmbeddedData, embeddedDataText } from '../helpers/embedded-data.js';
 import { REAP_INACTIVITY_MS } from '../../lib/unanswered-decisions.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const createDashboardRoutes = withRequestRows(createDashboardRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+
 
 // A timestamp safely past the record window (SD's 7-day REAP_INACTIVITY_MS), so the fixture is `gone`.
 const PAST_REAP_WINDOW_ISO = () => new Date(Date.now() - REAP_INACTIVITY_MS - 24 * 60 * 60 * 1000).toISOString();

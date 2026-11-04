@@ -223,6 +223,14 @@
     "disposition": "registered",
     "holder": "workspace-issues-memo"
   },
+  "lib/workspace-kpis-cache.js::entries": {
+    "disposition": "registered",
+    "holder": "workspace-kpis-cache"
+  },
+  "lib/workspace-kpis-cache.js::inflight": {
+    "disposition": "registered",
+    "holder": "workspace-kpis-cache"
+  },
   "lib/workspace-token-cache.js::entries": {
     "disposition": "registered",
     "holder": "workspace-token"
@@ -370,6 +378,10 @@
   "server.js::rejectedCredentialRegistry": {
     "disposition": "delegated",
     "to": "lib/rejected-credentials.js::scopeAttempts"
+  },
+  "server.js::requestUsageLoader": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level). LIN-4201: a stateless wrapper over the request-usage store's listForAnchors."
   },
   "server.js::resolveWorkspaceUrlKey": {
     "disposition": "not-state",

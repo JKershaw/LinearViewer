@@ -16,12 +16,17 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import crypto from 'node:crypto';
-import { createDashboardRoutes } from '../../routes/dashboard.js';
-import { renderSessionPage } from '../../lib/render-session.js';
+import { createDashboardRoutes as createDashboardRoutes__unplumbed } from '../../routes/dashboard.js';
+import { renderSessionPage as renderSessionPage__unplumbed } from '../../lib/render-session.js';
 import { RunProposalsStore } from '../../lib/run-proposals-store.js';
 import { getSessionsForWorkspace } from '../../lib/pipeline-loops.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const createDashboardRoutes = withRequestRows(createDashboardRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+const renderSessionPage = withRequestRows(renderSessionPage__unplumbed, 1, { requestRows: [] });
+
 
 const URL_KEY = 'acme';
 const RUN_ID = '11111111-2222-4333-8444-555555555555';

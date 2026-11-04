@@ -334,18 +334,49 @@ export function buildLin4197Corpus() {
  * its own corpus, so its figures are not mixed with the existing corpus's aggregates or with each other.
  */
 export function lin4197StageCorpus(key) {
-  const { rows } = buildLin4197Corpus();
+  const { rows, records } = buildLin4197Corpus();
   const row = rows.find((r) => r._id === `l4197:${key}`);
   if (!row) throw new Error(`no LIN-4197 stage ${key}`);
-  return { history: [row], queue: [], calls: [], effective: buildCorpus().effective };
+  // LIN-4201: the stage's own request records, keyed by its anchor (the row that posted them). Each stage's records
+  // and its snapshot describe the same transcript at the same point, so a stage read from records and read from its
+  // snapshot differ only where the read itself changes (the LIN-4201 change list). The replay reads them only when
+  // asked (`runReplay(corpus, { readRecords: true })`); without that the stage is exactly the recorded baseline.
+  return { history: [row], queue: [], calls: [], effective: buildCorpus().effective, requestRecords: { [row._id]: records[row._id] } };
+}
+
+/**
+ * LIN-4201: change list item (e), the records-only lineage. A session killed before its first Stop posts no `[usage]`
+ * snapshot (the runner posts only at Stop), so before the cutover its lineage is no-telemetry; its request records are
+ * posted at the reap/cancel flush (LIN-4195 D10). The records are the killed-before-stop stage's (the same
+ * transcript), so the oracle is that stage's. It carries an issue (`LIN-42`), so the issue route (S1) and the /kpis
+ * per-ticket shares (S11, review note 1) see it. Kept out of LIN4197_CASES, which is a pinned copy of the runner's corpus.
+ */
+export const LIN4201_RECORDS_ONLY = Object.freeze({
+  id: 'l4201:records-only',
+  issueIdentifier: 'LIN-42',
+  records: LIN4197_CASES['killed-before-stop/final'].records,
+  oracleUsd: LIN4197_CASES['killed-before-stop/final'].oracleUsd,
+});
+
+/** LIN-4201: the records-only lineage as a replay corpus: one taken, done row with NO `[usage]` entry, and its records. */
+export function recordsOnlyCorpus() {
+  const at = new Date(NOW_MS - 60 * 1000);
+  const row = {
+    _id: LIN4201_RECORDS_ONLY.id, urlKey: 'acme', rootItemId: LIN4201_RECORDS_ONLY.id, issueIdentifier: LIN4201_RECORDS_ONLY.issueIdentifier,
+    kind: 'implementation', promptName: 'implementation', status: 'taken', abort: false, target: 'cli', harness: 'claude-code',
+    dispatchedAt: at, resolvedAt: at,
+    feedback: [{ kind: 'terminal', timestamp: at.toISOString(), message: '[done] fixture' }],
+  };
+  return { history: [row], queue: [], calls: [], effective: buildCorpus().effective, requestRecords: { [row._id]: LIN4201_RECORDS_ONLY.records } };
 }
 
 /**
  * LIN-4197 (beat 4): the mixed-harness control, review note 9 on LIN-4195 (comment eedab867). Each lineage holds a
  * claude-code `[usage]` snapshot (the shape the runner posts today) AND an opencode delta row, and the claude-code
- * transcript's per-request records sit beside it as `requestRecords`. No store serves request records yet, so the
- * read path sees only the snapshot and the delta; the records are the oracle's input and nothing else. The
- * assertions that pin the current behaviour are in tests/unit/cost-lin4197-replay.test.js.
+ * transcript's per-request records sit beside it as `requestRecords`, keyed by the lineage anchor (the claude-code
+ * row that posted them). Before LIN-4201 no store served them, so the read path saw only the snapshot and the delta.
+ * `runReplay(corpus, { readRecords: true })` serves them through the replay's loader (LIN-4201); without it the
+ * control is exactly the recorded baseline. tests/unit/cost-lin4197-replay.test.js pins both.
  */
 export function buildMixedHarnessControl() {
   const claudeCodeRecords = {

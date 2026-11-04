@@ -10,11 +10,15 @@ import assert from 'node:assert/strict';
 import { modelChangeLines, jobWords } from '../../lib/components/model-change-lines.js';
 import { modelsBody } from '../../lib/render-settings-models.js';
 import { emptyTable, effectiveTable, AGENT_JOB_IDS, HARBOUR_JOB_IDS } from '../../lib/model-routing.js';
-import { agentSpendByJob, harbourSpendByJob } from '../../lib/model-routing-spend.js';
+import { agentSpendByJob as agentSpendByJob__unplumbed, harbourSpendByJob } from '../../lib/model-routing-spend.js';
 import { DEFAULT_MODEL, getModelDisplayName } from '../../lib/openrouter.js';
 import { SURFACES } from '../../lib/llm-jobs.js';
 import { actorLabel } from '../../lib/render-settings-workspace.js';
 import { FORMER_MEMBER } from '../../lib/workspace-change-log.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const agentSpendByJob = withRequestRows(agentSpendByJob__unplumbed, 1, { requestRows: [] });
+
 
 const AGENT = SURFACES.AGENT_SESSION;
 

@@ -41,15 +41,10 @@ import { pathToFileURL } from 'node:url';
 import { lineageRecords, lineageFigure } from '../lib/cost-read.js';
 import { RequestUsageStore } from '../lib/request-usage-store.js';
 import { lastUsageEntry } from '../lib/row-usage.js';
+import { USAGE_TOKEN_FIELDS } from '../lib/request-usage-vocabulary.js';
 import { priceRequest, resolveWorkerModelId, promptTokensOf } from '../lib/model-pricing.js';
 
-export const TOKEN_FIELDS = Object.freeze([
-  'inputTokens',
-  'outputTokens',
-  'cacheCreationInputTokens',
-  'cacheCreation1hInputTokens',
-  'cacheReadInputTokens'
-]);
+export const TOKEN_FIELDS = USAGE_TOKEN_FIELDS;
 
 const SYNTHETIC_MODEL = '<synthetic>';
 const CENT_EPSILON = 0.005;
@@ -559,7 +554,9 @@ async function main(argv) {
     const perWorkspace = {};
     for (const urlKey of urlKeys) {
       const { usageDocs, rows, windowRowCount, postingRows, records } = await readWorkspace(db, urlKey, windowStart);
-      const lineages = lineageRecords({ fetchedRows: rows, identityRows: rows });
+      // LIN-4201: the snapshot side of the comparison, so it is read with NO records on purpose (`requestRows: []`):
+      // with records the read would fold them, and the measurement would compare records with records.
+      const lineages = lineageRecords({ fetchedRows: rows, identityRows: rows, requestRows: [] });
       const byAnchor = new Map();
       for (const record of records) {
         const list = byAnchor.get(record.rootItemId) || [];

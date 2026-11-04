@@ -8,7 +8,8 @@
  */
 import { Router } from 'express';
 import { graphqlErrorExtra, graphqlErrorDetail } from '../lib/proxy-graphql-errors.js';
-import { readCost, appCallsOf } from '../lib/cost-read.js';
+import { readCost, appCallsOf, anchorsOfRows } from '../lib/cost-read.js';
+import { requireRequestUsageLoader } from '../lib/request-usage-loader.js';
 import { anchorOf, isMember } from '../lib/lineage-membership.js';
 import { resolveChatCredential, isAiUnavailable } from '../lib/chat-request.js';
 import { resolveRecommendation } from '../lib/recommend-recurse.js';
@@ -35,6 +36,7 @@ import { badRequest, jsonError, keepaliveError, notFound } from '../lib/errors.j
  * @param {Object} deps.briefCacheStore - Brief cache storage instance
  * @param {Object} deps.taskSnapshotStore - Task-history snapshot storage instance
  * @param {Object} deps.dispatchQueueStore - Dispatch queue storage instance
+ * @param {Object} deps.requestUsageLoader - the request-usage loader (lib/request-usage-loader.js); `/cost` throws without it (LIN-4201)
  * @param {Object} deps.llmCallLogStore - Per-LLM-call metadata log
  * @param {Function} deps.getWorkspaceOpenRouterKey - Function to get OpenRouter API key from workspace sessions
  * @param {Function} [deps.getWorkspaceNorthStar] - Function(urlKey, accountId) resolving the proxy
@@ -69,6 +71,7 @@ export function createComputeRoutes({
   briefCacheStore,
   taskSnapshotStore,
   dispatchQueueStore,
+  requestUsageLoader,
   llmCallLogStore,
   getWorkspaceOpenRouterKey,
   getWorkspaceNorthStar,
@@ -716,9 +719,15 @@ export function createComputeRoutes({
       // LIN-4147 / LIN-4177: report only the lineages whose true issue is this one, and only those
       // with a member in the window. Fetched usage rows: the siblings, then the own rows (the pool
       // order the fold has always read).
+      const fetchedRows = [...[...siblingRowsByAnchor.values()].flat(), ...ownRows];
+      // LIN-4201: the request records of every lineage the read sees, by anchor (the one loader). A lineage with
+      // records reads them; one without reads its snapshots (lib/cost-read.js `lineageUsageOf`).
+      const requestRows = await requireRequestUsageLoader(requestUsageLoader, 'GET /api/proxy/cost')
+        .forAnchors(req.proxyUrlKey, anchorsOfRows(fetchedRows));
       const result = readCost({
-        fetchedRows: [...[...siblingRowsByAnchor.values()].flat(), ...ownRows],
+        fetchedRows,
         identityRows,
+        requestRows,
         appSummary,
         issueIdentifier: identifier,
         windowStart: since

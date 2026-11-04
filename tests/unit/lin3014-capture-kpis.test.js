@@ -11,10 +11,10 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { collectKpiStats } from '../../lib/kpi-stats.js';
 import { captureKpiReads } from '../../scripts/lin3014/capture-kpis.mjs';
-import { lookupFounderRows } from '../../lib/founder-lookup.js';
+import { lineageIdentityOfRows } from '../../lib/dispatch-store.js';
 
 test('LIN-3014 captureKpiReads: captures the real dispatchHistory/proxyEvents/reportHistory read shapes', async () => {
-  const captured = await captureKpiReads(collectKpiStats, lookupFounderRows);
+  const captured = await captureKpiReads(collectKpiStats, lineageIdentityOfRows);
   assert.strictEqual(captured.dispatchHistory.op, 'aggregate');
   assert.ok(Array.isArray(captured.dispatchHistory.pipeline) && captured.dispatchHistory.pipeline.length >= 1);
   assert.ok(captured.dispatchHistory.pipeline.some(s => s.$project), 'the pipeline must carry the $project kpi-stats.js builds (FRESH_DIGEST cond lives inside it)');
@@ -27,7 +27,7 @@ test('LIN-3014 captureKpiReads: captures the real dispatchHistory/proxyEvents/re
 });
 
 test('LIN-3014 captureKpiReads: the captured dispatchHistory pipeline carries a FRESH_DIGEST $cond usable by measure.template.js', () => {
-  return captureKpiReads(collectKpiStats, lookupFounderRows).then((captured) => {
+  return captureKpiReads(collectKpiStats, lineageIdentityOfRows).then((captured) => {
     const project = captured.dispatchHistory.pipeline.find(s => s.$project).$project;
     assert.ok(project.feedbackCount?.$cond, 'measure.template.js reads FRESH = the $project stage\'s feedbackCount.$cond[0]');
     assert.strictEqual(Array.isArray(project.feedbackCount.$cond), true);

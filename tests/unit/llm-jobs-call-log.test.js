@@ -14,15 +14,20 @@ import { test, describe, before, after, beforeEach, afterEach, mock } from 'node
 import assert from 'node:assert/strict';
 import { setLlmCallRecorder, setFetchImpl } from '../../lib/openrouter.js';
 import { LlmCallLogStore } from '../../lib/llm-call-log.js';
-import { createDashboardRoutes } from '../../routes/dashboard.js';
+import { createDashboardRoutes as createDashboardRoutes__unplumbed } from '../../routes/dashboard.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
 import { InMemoryRunParagraphStore } from '../../lib/run-paragraph-store.js';
 import { createSessionSummaryPrecompute } from '../../lib/session-materializer-precompute.js';
-import { createRunParagraphPrecompute } from '../../lib/run-paragraph-hook.js';
+import { createRunParagraphPrecompute as createRunParagraphPrecompute__unplumbed } from '../../lib/run-paragraph-hook.js';
 import { generateFeedbackTitle } from '../../lib/feedback-title.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { JOB_IDS } from '../../lib/llm-jobs.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const createDashboardRoutes = withRequestRows(createDashboardRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+const createRunParagraphPrecompute = withRequestRows(createRunParagraphPrecompute__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+
 
 const URL_KEY = 'ws-a';
 const NOW_ISO = new Date().toISOString();

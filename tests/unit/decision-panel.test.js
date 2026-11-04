@@ -14,7 +14,11 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { decisionPanel, decisionSuggestions, routingWords } from '../../lib/components/decision-panel.js';
 import { DISPATCH_EFFORT_LEVELS } from '../../lib/dispatch-validation.js';
-import { typicalByModel } from '../../lib/model-routing-spend.js';
+import { typicalByModel as typicalByModel__unplumbed } from '../../lib/model-routing-spend.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const typicalByModel = withRequestRows(typicalByModel__unplumbed, 1, { requestRows: [] });
+
 
 const NUMBERS = { testid: 'models-spend-bug', heading: 'Last 30 days', runs: 2, priced: 2, unpriced: 0, noTelemetry: 0, spendUsd: 1.5, typicalUsd: 0.75, share: 0.5 };
 const LISTS = {

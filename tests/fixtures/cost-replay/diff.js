@@ -8,6 +8,10 @@
  * item's `rootItemId` (lineage sessions), else its `id` (job rows), else its `kind` (per-kind rows), else
  * its `model`. The path names the key (`S1.LIN-42.body.workerSessions.P.costUsd`); a repeated key in one
  * list is named by its occurrence (`<key>#2`). Any other array compares by index.
+ *
+ * `tolerance` (LIN-4201, default 0: exact): two numbers within it are equal. The records-first read sums requests
+ * priced one by one where the snapshot read priced one total, so a figure that is unchanged in value can differ in
+ * its last bits; the LIN-4201 change list compares to 1e-9, the same bound its control states.
  */
 
 const KEY_FIELDS = ['rootItemId', 'id', 'kind', 'model'];
@@ -37,10 +41,11 @@ function byKey(list) {
   return out;
 }
 
-function walk(a, b, path, out) {
+function walk(a, b, path, out, tolerance) {
   if (a === b) return;
+  if (tolerance > 0 && typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) <= tolerance) return;
   if (isKeyedList(a) || isKeyedList(b)) {
-    walk(Array.isArray(a) ? byKey(a) : a, Array.isArray(b) ? byKey(b) : b, path, out);
+    walk(Array.isArray(a) ? byKey(a) : a, Array.isArray(b) ? byKey(b) : b, path, out, tolerance);
     return;
   }
   const aObj = a !== null && typeof a === 'object';
@@ -53,13 +58,13 @@ function walk(a, b, path, out) {
   for (const key of keys) {
     const next = path ? `${path}.${key}` : key;
     if (!(key in a) || !(key in b)) out.push(next);
-    else walk(a[key], b[key], next, out);
+    else walk(a[key], b[key], next, out, tolerance);
   }
 }
 
 /** Every differing path between two replay outputs, in key order. */
-export function diffReplay(golden, current) {
+export function diffReplay(golden, current, { tolerance = 0 } = {}) {
   const out = [];
-  walk(golden, current, '', out);
+  walk(golden, current, '', out, tolerance);
   return out;
 }

@@ -14,10 +14,14 @@ import { renderTaskTrack } from '../../lib/render-task-page.js';
 import { enrichLoop, isTerminalLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { deriveFollowUpDispatch } from '../../lib/follow-up-dispatch.js';
 import { runStatusMeta, renderStepFace } from '../../lib/render-run-steps.js';
-import { buildRunView } from '../../lib/run-view.js';
+import { buildRunView as buildRunView__unplumbed } from '../../lib/run-view.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { getLoopsForWorkspace } from '../../lib/pipeline-loops.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const buildRunView = withRequestRows(buildRunView__unplumbed, 1, { requestRows: [] });
+
 
 const CLOSED_AT = '2026-08-02T00:00:00.000Z';
 const STAMP = { at: CLOSED_AT, by: null, reason: 'handed-on' };

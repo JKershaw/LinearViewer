@@ -15,14 +15,21 @@ import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { lineageRecords, lineageFigure, lineageFigureOf } from '../../lib/cost-read.js';
-import { computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-cost.js';
+import { lineageRecords as lineageRecords__unplumbed, lineageFigure, lineageFigureOf as lineageFigureOf__unplumbed } from '../../lib/cost-read.js';
+import { computeTerminalMarkedTaskCost as computeTerminalMarkedTaskCost__unplumbed } from '../../lib/terminal-marked-task-cost.js';
 import { windowedSpend } from '../../lib/weekly-budget.js';
 import { groupDispatchLineages } from '../../lib/dispatch-lineage.js';
 import { fmtUsd } from '../../lib/render-run-steps.js';
-import { collectKpiStats, toPublicKpis } from '../../lib/kpi-stats.js';
-import { lookupFounderRows } from '../../lib/founder-lookup.js';
+import { collectKpiStats as collectKpiStats__unplumbed, toPublicKpis } from '../../lib/kpi-stats.js';
+import { lineageIdentityOfRows } from '../../lib/dispatch-store.js';
 import { runReplay, matches } from '../fixtures/cost-replay/harness.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const lineageRecords = withRequestRows(lineageRecords__unplumbed, 0, { requestRows: [] });
+const lineageFigureOf = withRequestRows(lineageFigureOf__unplumbed, 1, { requestRows: [] });
+const computeTerminalMarkedTaskCost = withRequestRows(computeTerminalMarkedTaskCost__unplumbed, 2, { requestRows: [] });
+const collectKpiStats = withRequestRows(collectKpiStats__unplumbed, 1, { requestRows: async () => [] });
+
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = new Date('2026-11-03T12:00:00.000Z');
@@ -168,8 +175,8 @@ describe('W4 (part): S1 and S13 agree on every lineage both price (plan N2 / W4)
 describe('the founder lookup stays off the public path', () => {
   test('kpi-stats.js takes the lookup as an injected function and does not import the founder lookup', async () => {
     const source = await readFile(fileURLToPath(new URL('../../lib/kpi-stats.js', import.meta.url)), 'utf8');
-    assert.doesNotMatch(source, /from '\.\/founder-lookup\.js'/, 'no import of the lookup module');
-    assert.doesNotMatch(source, /lookupFounderRows\(/, 'no call of the lookup');
+    assert.doesNotMatch(source, /from '\.\/dispatch-store\.js'/, 'no import of the store module');
+    assert.doesNotMatch(source, /lineageIdentityOfRows\(/, 'no call of the lookup');
     assert.match(source, /lineageIdentity/, 'the lookup arrives as an injected dependency');
   });
 });
@@ -204,7 +211,7 @@ describe('the /kpis founder wiring (LIN-4178 review finding 2): the production l
   test('with the lookup, the straddler is credited to LIN-42: the card counts two tickets and sums the cost once', async () => {
     const seen = [];
     const lineageIdentity = async rows => {
-      const found = await lookupFounderRows({ dispatchHistory: collection(HISTORY), dispatchQueue: collection(QUEUE) }, rows);
+      const found = await lineageIdentityOfRows([collection(HISTORY), collection(QUEUE)], rows);
       seen.push(...found);
       return found;
     };
@@ -221,13 +228,13 @@ describe('the /kpis founder wiring (LIN-4178 review finding 2): the production l
   });
 
   test('the public page carries no identifier the lookup supplied', async () => {
-    const lineageIdentity = rows => lookupFounderRows({ dispatchHistory: collection(HISTORY), dispatchQueue: collection(QUEUE) }, rows);
+    const lineageIdentity = rows => lineageIdentityOfRows([collection(HISTORY), collection(QUEUE)], rows);
     const stats = await collectKpiStats(bag(), { lineageIdentity, now: NOW, milestoneFunnelDeps: {} });
     assert.doesNotMatch(JSON.stringify(toPublicKpis(stats)), /LIN-42|LIN-99/);
   });
 
   test('server.js wires the lookup over the same two collections the test mirrors', async () => {
     const server = await readFile(fileURLToPath(new URL('../../server.js', import.meta.url)), 'utf8');
-    assert.match(server, /lineageIdentity: rows => lookupFounderRows\(\{ dispatchHistory: dispatchHistoryCollection, dispatchQueue: dispatchQueueCollection \}, rows\)/);
+    assert.match(server, /lineageIdentity: rows => lineageIdentityOfRows\(\[dispatchHistoryCollection, dispatchQueueCollection\], rows\)/);
   });
 });

@@ -270,7 +270,7 @@ async function productionCollectors(db) {
   const { CloseOutEventsStore } = await import('../lib/close-out-events-store.js');
   const { collectKpiStats } = await import('../lib/kpi-stats.js');
   const { collectWorkspaceKpis } = await import('../lib/workspace-kpi-stats.js');
-  const { lookupFounderRows } = await import('../lib/founder-lookup.js');
+  const { lineageIdentityOfRows } = await import('../lib/dispatch-store.js');
   const c = name => db.collection(name);
   const dispatchQueue = c('dispatch-queue');
   const dispatchHistory = c('dispatch-history');
@@ -291,14 +291,18 @@ async function productionCollectors(db) {
     dispatchQueue,
     dispatchHistory
   };
-  const lineageIdentity = rows => lookupFounderRows({ dispatchHistory, dispatchQueue }, rows);
+  const lineageIdentity = rows => lineageIdentityOfRows([dispatchHistory, dispatchQueue], rows);
+  // LIN-4201: the collectors require the request records (the one loader). Since then these timings are the
+  // records-first collectors, records load included: the "today" figures of the LIN-4200 run predate that.
+  const { requestUsageLoader } = await import('../lib/request-usage-loader.js');
+  const loader = requestUsageLoader(new RequestUsageStore({ collection: c(REQUEST_USAGE_COLLECTION), historyCollection: dispatchHistory }));
   return {
-    kpi: (now) => collectKpiStats(collections, { now, dbBackend: 'mongodb', milestoneFunnelDeps, lineageIdentity }),
+    kpi: (now) => collectKpiStats(collections, { now, dbBackend: 'mongodb', milestoneFunnelDeps, lineageIdentity, requestRows: rows => loader.forRows(rows) }),
     workspace: (urlKey, now) => collectWorkspaceKpis({
       collections: { dispatchQueue, dispatchHistory, proxyEvents: collections.proxyEvents, agentStatus: collections.agentStatus,
         reportHistory: collections.reportHistory, customPrompts: collections.customPrompts, closeOutEvents: closeOuts,
         kpiDailyRollup },
-      urlKey, now
+      urlKey, now, requestUsageLoader: loader
     })
   };
 }

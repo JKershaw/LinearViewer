@@ -10,11 +10,15 @@ import assert from 'node:assert/strict';
 import { modelsBody, agentOptions, jobLabel } from '../../lib/render-settings-models.js';
 import { getModelDisplayName } from '../../lib/openrouter.js';
 import { emptyTable, effectiveTable, applyChangesToTable, AGENT_JOB_IDS, HARBOUR_JOB_IDS } from '../../lib/model-routing.js';
-import { agentSpendByJob, harbourSpendByJob } from '../../lib/model-routing-spend.js';
+import { agentSpendByJob as agentSpendByJob__unplumbed, harbourSpendByJob } from '../../lib/model-routing-spend.js';
 import { DEFAULT_MODEL } from '../../lib/openrouter.js';
 import { SURFACES } from '../../lib/llm-jobs.js';
 import { decisionPanel, fieldName } from '../../lib/components/decision-panel.js';
 import { spendBar } from '../../lib/components/settings-spend-bar.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const agentSpendByJob = withRequestRows(agentSpendByJob__unplumbed, 1, { requestRows: [] });
+
 
 const URL_KEY = 'acme';
 const AVAILABLE = [{ id: 'openai/gpt-5.4-mini', name: 'GPT-5.4 Mini' }];

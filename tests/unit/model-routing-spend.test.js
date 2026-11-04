@@ -6,7 +6,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { agentSpendByJob, harbourSpendByJob, byJobSpend, totalSpend, shareOf, spendByEffectiveModel } from '../../lib/model-routing-spend.js';
+import { agentSpendByJob as agentSpendByJob__unplumbed, harbourSpendByJob, byJobSpend, totalSpend, shareOf, spendByEffectiveModel } from '../../lib/model-routing-spend.js';
 import { summariseRouting, summariseSpend, fit } from '../../lib/model-routing-summary.js';
 import { AGENT_JOB_IDS, HARBOUR_JOB_IDS } from '../../lib/model-routing.js';
 import { STATE_MAX_LENGTH } from '../../lib/settings-areas.js';
@@ -172,7 +172,12 @@ describe('spend totals and attribution (LIN-3952 item 1, 5)', () => {
 
 // LIN-3962: the per-model typical cost the decision panel shows beside a suggested model, and the one
 // reported model of an alias's family (the only way to know what an alias ran as).
-import { typicalByModel, reportedModelForFamily } from '../../lib/model-routing-spend.js';
+import { typicalByModel as typicalByModel__unplumbed, reportedModelForFamily } from '../../lib/model-routing-spend.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const agentSpendByJob = withRequestRows(agentSpendByJob__unplumbed, 1, { requestRows: [] });
+const typicalByModel = withRequestRows(typicalByModel__unplumbed, 1, { requestRows: [] });
+
 
 describe('typicalByModel (LIN-3962)', () => {
   test('a job that ran on one model gets one row, with that model\'s typical cost', () => {

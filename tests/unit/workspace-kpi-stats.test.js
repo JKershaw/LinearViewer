@@ -12,10 +12,14 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { collectWorkspaceKpis } from '../../lib/workspace-kpi-stats.js';
+import { collectWorkspaceKpis as collectWorkspaceKpis__unplumbed } from '../../lib/workspace-kpi-stats.js';
 import { buildDispatchByDay, loadDispatchHistory, loadProxyBins, tallyLabels, windowsAt } from '../../lib/kpi-stats.js';
 import { MAX_REPORTS_PER_WORKSPACE } from '../../lib/report-history-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const collectWorkspaceKpis = withRequestRows(collectWorkspaceKpis__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+
 
 const NOW = new Date('2026-06-10T12:00:00.000Z');
 const A = 'ws-alpha';

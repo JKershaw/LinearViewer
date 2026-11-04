@@ -89,13 +89,15 @@ const uuidForUrlKey = (key) => {
  * @param {Object} options.dispatchHistoryCollection - Raw dispatch-history collection (LIN-3002: /kpis aggregation-failure fault injection)
  * @param {Object} options.proxyEventsCollection - Raw proxy-events collection (LIN-3002: /kpis aggregation-failure fault injection)
  * @param {Function} options.resetKpiCache - Resets lib/kpi-page.js's cache (LIN-3002; server.js wires it)
+ * @param {Function} [options.clearWorkspaceKpis] - `(urlKey) => void`: drops one workspace's cached KPIs page read
+ *   (lib/workspace-kpis-cache.js, LIN-4201), so a seam that rewrites the rollup is seen on the next load
  * @param {Object|null} [options.emailTransport] - The capture email transport (LIN-1892), or null when email sign-in isn't in capture mode
  * @param {Object|null} [options.commentDedupe] - In-process comment dedupe cache (LIN-3198 reset seam), or null when not wired
  * @param {Object|null} [options.decisionStampDedupe] - In-process decision-stamp dedupe cache (LIN-3198), or null
  * @param {Object|null} [options.taskModeStore] - Task-mode event store (LIN-2942), for /test/clear-task-mode-events
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null, clearWorkspaceKpis = () => {} }) {
   const router = Router();
 
   // ── Connection-backed fixture variants (LIN-3124 PR3 checkpoint F, T27) ────
@@ -681,6 +683,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         { $set: { done, failed: 0, aborted: 0, dispatches: 0 } },
         { upsert: true }
       )
+      clearWorkspaceKpis(urlKey)
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })
@@ -694,6 +697,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       if (!kpiDailyRollupCollection) return res.status(500).json({ error: 'kpiDailyRollupCollection not wired' })
       if (!req.query.urlKey) return res.status(400).json({ error: 'urlKey is required' })
       await kpiDailyRollupCollection.deleteMany({ urlKey: req.query.urlKey })
+      clearWorkspaceKpis(req.query.urlKey)
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })

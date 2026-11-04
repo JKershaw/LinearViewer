@@ -18,8 +18,12 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildCorpus, NOW_MS } from '../fixtures/cost-replay/corpus.js';
 import { groupDispatchLineages, OUTCOME_WINDOW_DAYS } from '../../lib/dispatch-lineage.js';
-import { terminalMarkedTaskCostDetail } from '../../lib/terminal-marked-task-cost.js';
+import { terminalMarkedTaskCostDetail as terminalMarkedTaskCostDetail__unplumbed } from '../../lib/terminal-marked-task-cost.js';
 import { readHorizonStart } from '../../lib/read-horizon.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const terminalMarkedTaskCostDetail = withRequestRows(terminalMarkedTaskCostDetail__unplumbed, 2, { requestRows: [] });
+
 
 const now = new Date(NOW_MS);
 const DAY = 24 * 60 * 60 * 1000;

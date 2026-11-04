@@ -4,7 +4,8 @@
     "recordedAt": "Harbour 72305215 (main), recorded on feat/lin-4197-cost-corpus with the beat 3 corpus and the beat 4 fixture changes; no production code differs from 72305215. Corpus data copied from simple-dispatcher 7a2d83c00485add17e0e15e00be8d3e609a537e6.",
     "baseline": "Recorded BEFORE any read change. Piece 4 (the records-first cutover) must be diffed against these values; each case note says where the read path differs from its oracle, and those differences are the baseline, not defects to fix here.",
     "mustNotBeRegenerated": "Do not regenerate or edit this file to make a later production change pass. A change to any value here is a reviewed change to this baseline, with the reason stated.",
-    "fields": "existingCorpusAtHead: runReplay over the existing corpus at this commit (the same output goldens.json holds, re-run here; goldens.json itself is the LIN-4177 baseline and is not re-recorded). replay: runReplay output over the stage (S1 to S13, mixedHarness). summary.readRunPageUsd: S13 cost for the stage's lineage (null when withheld). summary.readModelsSpendUsd / readModelsUnpriced: S5 for the implementation job (priced spend, and the count of unpriced runs). oracleUsd: the LIN-4197 beat 1 oracle (each record priced alone with computeUsageCostUsd, shared ids once). differenceUsd: readRunPageUsd minus oracleUsd (null when the read withholds the figure)."
+    "recordsOnlyAddition": "LIN-4201 added one section, recordsOnly (change list item (e)): a lineage killed before its first Stop, so it has request records and NO [usage] snapshot. It was recorded at Harbour eb44eff9 (main, the read path before LIN-4201), so its values are the before. Every other section is byte-identical to the LIN-4197 recording.",
+    "fields": "recordsOnly: runReplay output over that lineage, its summary and oracle (as a case). existingCorpusAtHead: runReplay over the existing corpus at this commit (the same output goldens.json holds, re-run here; goldens.json itself is the LIN-4177 baseline and is not re-recorded). replay: runReplay output over the stage (S1 to S13, mixedHarness). summary.readRunPageUsd: S13 cost for the stage's lineage (null when withheld). summary.readModelsSpendUsd / readModelsUnpriced: S5 for the implementation job (priced spend, and the count of unpriced runs). oracleUsd: the LIN-4197 beat 1 oracle (each record priced alone with computeUsageCostUsd, shared ids once). differenceUsd: readRunPageUsd minus oracleUsd (null when the read withholds the figure)."
   },
   "existingCorpusAtHead": {
     "S1": {
@@ -52345,6 +52346,1048 @@
         "mixedHarness": {
           "lineages": []
         }
+      }
+    }
+  },
+  "recordsOnly": {
+    "note": "LIN-4201 (e): the killed-before-stop transcript's records with no [usage] snapshot (nothing posts before the first Stop). Before the cutover the read has nothing to read: no-telemetry on every surface, run page not reported. Oracle $0.0381 (the killed-before-stop stage's).",
+    "oracleUsd": 0.0381,
+    "summary": {
+      "readRunPageUsd": null,
+      "readModelsSpendUsd": 0,
+      "readModelsUnpriced": 0,
+      "oracleUsd": 0.0381,
+      "differenceUsd": null
+    },
+    "replay": {
+      "S1": {
+        "LIN-1": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-1",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-2": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-2",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-3": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-3",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-4": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-4",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-6": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-6",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-7": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-7",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-8": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-8",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-9": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-9",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-10": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-10",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-11": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-11",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-12": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-12",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-13": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-13",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-14": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-14",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-15": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-15",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-16": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-16",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-17": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-17",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-18": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-18",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-42": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-42",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 1,
+            "unreadableCount": 0,
+            "noLineage": false,
+            "workerSessions": [
+              {
+                "rootItemId": "l4201:records-only",
+                "kind": "implementation",
+                "dispatchedAt": "2026-11-03T11:59:00.000Z",
+                "harness": null,
+                "model": null,
+                "effort": null,
+                "costUsd": null,
+                "durationMs": 0
+              }
+            ],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        },
+        "LIN-99": {
+          "status": 200,
+          "body": {
+            "identifier": "LIN-99",
+            "pricedUsd": 0,
+            "totalUsd": null,
+            "unpriced": [],
+            "noTelemetryCount": 0,
+            "unreadableCount": 0,
+            "noLineage": true,
+            "workerSessions": [],
+            "appCalls": {
+              "calls": 0,
+              "costUsd": 0,
+              "unpricedCalls": 0,
+              "byFeature": []
+            },
+            "window": {
+              "days": 30,
+              "appCallsSince": "2026-10-04T12:00:00.000Z"
+            }
+          }
+        }
+      },
+      "S2": {
+        "totalCalls": 0,
+        "totalTokens": 0,
+        "lastCallAt": null,
+        "latencyByFeatureModel": [],
+        "pricedUsd": 0,
+        "unpricedCalls": 0,
+        "totalUsd": null,
+        "complete": false,
+        "byFeature": []
+      },
+      "S3": {
+        "totalCalls": 0,
+        "totalTokens": 0,
+        "lastCallAt": null,
+        "latencyByFeatureModel": [],
+        "pricedUsd": 0,
+        "unpricedCalls": 0,
+        "totalUsd": null,
+        "complete": false,
+        "byFeature": []
+      },
+      "S4": {
+        "calls": 0,
+        "pricedCalls": 0,
+        "meanUsd": null,
+        "unknown": true
+      },
+      "S5": {
+        "total": 1,
+        "rows": 1,
+        "truncated": false,
+        "jobs": [
+          {
+            "id": "implementation",
+            "runs": 1,
+            "priced": 0,
+            "unpriced": 0,
+            "noTelemetry": 1,
+            "spendUsd": 0,
+            "typicalUsd": null,
+            "models": []
+          },
+          {
+            "id": "review",
+            "runs": 0,
+            "priced": 0,
+            "unpriced": 0,
+            "noTelemetry": 0,
+            "spendUsd": 0,
+            "typicalUsd": null,
+            "models": []
+          },
+          {
+            "id": "wake",
+            "runs": 0,
+            "priced": 0,
+            "unpriced": 0,
+            "noTelemetry": 0,
+            "spendUsd": 0,
+            "typicalUsd": null,
+            "models": []
+          },
+          {
+            "id": "custom",
+            "runs": 0,
+            "priced": 0,
+            "unpriced": 0,
+            "noTelemetry": 0,
+            "spendUsd": 0,
+            "typicalUsd": null,
+            "models": []
+          }
+        ]
+      },
+      "S6": {
+        "implementation": [],
+        "review": [],
+        "wake": [],
+        "custom": []
+      },
+      "S7": [
+        {
+          "id": "proxy-x",
+          "runs": 0,
+          "priced": 0,
+          "unpriced": 0,
+          "noTelemetry": 0,
+          "spendUsd": 0,
+          "typicalUsd": null,
+          "models": []
+        },
+        {
+          "id": "review",
+          "runs": 0,
+          "priced": 0,
+          "unpriced": 0,
+          "noTelemetry": 0,
+          "spendUsd": 0,
+          "typicalUsd": null,
+          "models": []
+        },
+        {
+          "id": "scan",
+          "runs": 0,
+          "priced": 0,
+          "unpriced": 0,
+          "noTelemetry": 0,
+          "spendUsd": 0,
+          "typicalUsd": null,
+          "models": []
+        }
+      ],
+      "S8": [],
+      "S9": {
+        "implementation": {
+          "spend": {
+            "id": "implementation",
+            "runs": 1,
+            "priced": 0,
+            "unpriced": 0,
+            "noTelemetry": 1,
+            "spendUsd": 0,
+            "typicalUsd": null,
+            "models": []
+          },
+          "typicals": []
+        },
+        "review": {
+          "spend": {
+            "id": "review",
+            "runs": 0,
+            "priced": 0,
+            "unpriced": 0,
+            "noTelemetry": 0,
+            "spendUsd": 0,
+            "typicalUsd": null,
+            "models": []
+          },
+          "typicals": []
+        },
+        "wake": {
+          "spend": {
+            "id": "wake",
+            "runs": 0,
+            "priced": 0,
+            "unpriced": 0,
+            "noTelemetry": 0,
+            "spendUsd": 0,
+            "typicalUsd": null,
+            "models": []
+          },
+          "typicals": []
+        },
+        "custom": {
+          "spend": {
+            "id": "custom",
+            "runs": 0,
+            "priced": 0,
+            "unpriced": 0,
+            "noTelemetry": 0,
+            "spendUsd": 0,
+            "typicalUsd": null,
+            "models": []
+          },
+          "typicals": []
+        }
+      },
+      "S10": {
+        "perKind": [
+          {
+            "kind": "implementation",
+            "sessionCount": 1,
+            "costUsd": null,
+            "costAggregation": "sum",
+            "costPricedCount": 0,
+            "costUnpricedCount": 1,
+            "costUnit": "lineage",
+            "durationMs": 0,
+            "durationAggregation": "mean",
+            "durationCoveredCount": 1,
+            "durationMissingCount": 0,
+            "effort": null,
+            "effortAggregation": "count",
+            "rows": [
+              {
+                "harness": null,
+                "model": null,
+                "effort": null,
+                "sessionCount": 1,
+                "costUsd": null,
+                "costPricedCount": 0,
+                "durationMs": 0,
+                "durationCoveredCount": 1
+              }
+            ],
+            "survival": {
+              "state": "unavailable_provider"
+            },
+            "survivalUnit": "issue",
+            "excluded": {},
+            "inFlight": {}
+          }
+        ],
+        "population": {
+          "liveCount": 0,
+          "liveBound": "ttl",
+          "historyCount": 1,
+          "historyTotal": 1,
+          "historyBound": "row-limit",
+          "historyTruncated": false
+        },
+        "completeness": {
+          "issuesInCorpus": 1,
+          "skipped": 0,
+          "complete": true
+        },
+        "notes": {
+          "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (GATE_DUE_MARKER is a plan-phase description-text marker); they are not rendered for the review pair, which has no `review due:` analogue.",
+          "orchestrationKinds": "Orchestration-step kinds (autopilot, wake, custom, periodical) are excluded from survival by construction, not because they were never measured.",
+          "noGatePairKinds": "A kind with no defined next-gate pair (e.g. plan-review, review, close-out) still reports cost/duration/effort; it has no survival concept, which is distinct from \"not yet instrumented\".",
+          "denominatorsNotComparable": "The plan card's survival rate pools verdict tiers a/b/c; the implementation card's pools tiers a/b only (tier-c count shown beside it) — the two rates are not directly comparable.",
+          "siblingCompleteness": "Lineage siblings are derived in-memory from this same bounded read (no third store call); a lineage whose sibling rows fall outside the 200-row history window is right-censored, not mis-scored — see population.historyTruncated.",
+          "costUnit": "Duration and effort are counted per dispatch LINEAGE (anchor-attributed), the same population cost draws from — but the three do not aggregate the same way: cost is the SUM of the kind's priced lineages, duration is the MEAN of the lineages with a resolved terminal duration, and effort is a COUNT of lineages at each reported level. Survival, by contrast, is per ISSUE: a kind with N lineages on one issue reports N sessions but 1 survival row. A lineage missing a column's input (no [usage] telemetry, an unpriced model, or no terminal marker) is excluded from that column's aggregate while still counting toward sessionCount — see each card's own coverage footnote for how many lineages contributed to cost/duration.",
+          "harnessModelRows": "Per-card rows split the kind's lineages by their REALISED harness, model and effort — the values the run itself stamped on its [usage] telemetry, never the dispatch row's requested fields. A \"—\" cell means the run reported no value there: opencode posts no effort field by design, so its rows read \"—\" for effort rather than disappearing, and backfill lineages with no telemetry at all read \"—\" for all three columns.",
+          "walkKindBlindness": "The reused verdict walk keeps only plan-review spine rows and never reads bug rows (an off-spine investigation, not a gate step), so bug rows are invisible to survival while still reporting cost, duration and effort here. That is why they show a card but no gate figure.",
+          "survivalUnavailable": "This workspace's provider does not serve issue comments, so no gate verdict can be resolved. The survival columns report unavailable rather than zero; cost, duration and effort are unaffected.",
+          "gateFieldsUnavailable": "No per-issue description could be read, so plan-review due/honoured are omitted rather than reported as zero (they are derived from description text).",
+          "effortShipEmpty": "The effort column is empty: none of the runs in this corpus reported a realised effort value. It reads the SAME telemetry field either way, so the column fills for any run that does report one."
+        }
+      },
+      "S11": {
+        "windowDays": 30,
+        "pricedTicketCount": 0,
+        "pricedTicketCostUsd": null,
+        "closeOutLineageShare": 0,
+        "evidenceLinkedShare": 0,
+        "opencodeSummedShare": null,
+        "unknownHarnessShare": 1,
+        "pricedLineageShare": null,
+        "attributableLineageShare": 1,
+        "captureRateShare": 0
+      },
+      "S12": {
+        "generatedAt": "2026-11-03T12:00:00.000Z",
+        "activity": {
+          "last7": {
+            "agentActions": 0,
+            "dispatches": 1,
+            "autopilotRuns": 0,
+            "feedbackNotes": 1
+          },
+          "last30": {
+            "agentActions": 0,
+            "dispatches": 1,
+            "autopilotRuns": 0,
+            "feedbackNotes": 1
+          }
+        },
+        "funnel": {
+          "dispatched": 1,
+          "taken": 1,
+          "reported": 1,
+          "completed": 0,
+          "medianWaitMinutes": 0
+        },
+        "mergeTime": {
+          "n": 0,
+          "medianHours": null,
+          "p90Hours": null
+        },
+        "kinds": [
+          {
+            "label": "implementation",
+            "count": 1
+          }
+        ],
+        "daily": {
+          "days": [
+            "2026-10-05",
+            "2026-10-06",
+            "2026-10-07",
+            "2026-10-08",
+            "2026-10-09",
+            "2026-10-10",
+            "2026-10-11",
+            "2026-10-12",
+            "2026-10-13",
+            "2026-10-14",
+            "2026-10-15",
+            "2026-10-16",
+            "2026-10-17",
+            "2026-10-18",
+            "2026-10-19",
+            "2026-10-20",
+            "2026-10-21",
+            "2026-10-22",
+            "2026-10-23",
+            "2026-10-24",
+            "2026-10-25",
+            "2026-10-26",
+            "2026-10-27",
+            "2026-10-28",
+            "2026-10-29",
+            "2026-10-30",
+            "2026-10-31",
+            "2026-11-01",
+            "2026-11-02",
+            "2026-11-03"
+          ],
+          "dispatches": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "autopilotRuns": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "agentActions": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "done": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "runsByKind": {
+            "weeks": [
+              "2026-10-07",
+              "2026-10-14",
+              "2026-10-21",
+              "2026-10-28"
+            ],
+            "kinds": [
+              {
+                "label": "implementation",
+                "counts": [
+                  0,
+                  0,
+                  0,
+                  1
+                ]
+              }
+            ]
+          },
+          "cost": {
+            "perDay": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              null
+            ],
+            "pricedCount": 0,
+            "lineageCount": 1
+          },
+          "doneTotal": null
+        },
+        "stored": {
+          "customPrompts": 0,
+          "roadmapReports": 0,
+          "roadmapReportsCap": 20
+        },
+        "empty": false
+      },
+      "S13": {
+        "runId": "replay-main",
+        "title": "LIN-1",
+        "steps": [
+          {
+            "lineageId": "l4201:records-only",
+            "kind": "implementation",
+            "status": "done",
+            "terminalStatus": "done",
+            "finished": true,
+            "iteration": null,
+            "model": null,
+            "tier": "not reported",
+            "summary": "implementation · done",
+            "loops": [
+              {
+                "loopId": "l4201:records-only",
+                "lineageId": "l4201:records-only",
+                "kind": "implementation",
+                "status": "taken",
+                "terminalStatus": "done",
+                "dispatchedAt": "2026-11-03T11:59:00.000Z",
+                "feedback": [
+                  {
+                    "kind": "terminal",
+                    "timestamp": "2026-11-03T11:59:00.000Z",
+                    "message": "[done] fixture"
+                  }
+                ]
+              }
+            ],
+            "loopCosts": [
+              {
+                "loopId": "l4201:records-only",
+                "status": "not-reported",
+                "usd": null,
+                "label": "not reported"
+              }
+            ],
+            "cost": {
+              "status": "not-reported",
+              "usd": null,
+              "label": "not reported",
+              "finalLoopId": null
+            }
+          }
+        ],
+        "progress": {
+          "mode": "state",
+          "reached": null,
+          "total": null,
+          "label": "the step's own state"
+        },
+        "next": null,
+        "cost": {
+          "status": "not-reported",
+          "usd": null,
+          "label": "not reported"
+        },
+        "time": {
+          "activeMs": 0,
+          "wall": {
+            "start": null,
+            "end": null,
+            "ms": null
+          }
+        },
+        "waiting": {
+          "active": false,
+          "since": null,
+          "ms": null,
+          "loopId": null
+        }
+      },
+      "mixedHarness": {
+        "lineages": []
       }
     }
   },

@@ -13,9 +13,13 @@ import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_MODEL, AVAILABLE_MODELS } from '../../lib/openrouter.js';
 import { jobModelResolver, resolveAiOperationModel } from '../../lib/workspace-preferences.js';
-import { resolvePrecomputeCredential, createRunParagraphPrecompute } from '../../lib/run-paragraph-hook.js';
+import { resolvePrecomputeCredential, createRunParagraphPrecompute as createRunParagraphPrecompute__unplumbed } from '../../lib/run-paragraph-hook.js';
 import { createSessionSummaryPrecompute, createMaterializerPrecompute } from '../../lib/session-materializer-precompute.js';
 import { routingFixture } from './helpers/routing-fakes.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const createRunParagraphPrecompute = withRequestRows(createRunParagraphPrecompute__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+
 
 const URL_KEY = 'ws-d2';
 const CURATED = AVAILABLE_MODELS.find((m) => m.id !== DEFAULT_MODEL).id;
