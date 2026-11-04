@@ -181,3 +181,27 @@ None is 46, so the 3 Nov baseline came from an unrecorded location. Until that's
 
 ---
 
+
+# Rebuild 2 forecast (open-0)
+
+## Survey open-0: LIN-4195 @ 723052153
+
+Read at Harbour `723052153`, runner `cc2650a6d`.
+
+**Why it will be difficult**
+
+1. **"Last entry" lives in storage, not only in the fold.** Rebuild 1 put the fold in one place, but what callers fetch is still "the row's last `kind:'usage'` entry": `usageStateOf` (`lib/cost-read.js`), the KPI `$last` projection (`lib/kpi-stats.js:460`) and the digest's frozen `kpiUsageEntry` (`lib/digest-feedback.js:394`). Records kept elsewhere must be fetched and joined by every caller, not changed in one place.
+2. **The current channel can't carry the records.** A feedback message is capped at 2000 chars (`lib/dispatch-feedback-validation.js:18`, `SD:feedback.js:6`). Non-terminal posts get one attempt with no retry, and an unknown `kind` is dropped silently. One Haiku session made 486 requests. That needs a batch endpoint, and Harbour must ship it before the runner posts to it.
+3. **The runner chose snapshots on purpose.** `SD:hook.js:410-422` explains why: a delta cursor on a fire-and-forget POST under-reports forever. Records stay safe only if Harbour upserts by message id and the runner re-sends anything not acknowledged. Streamed messages grow across lines (LIN-3229), so "posting again changes nothing" has to mean a per-field max, not insert-if-absent.
+4. **Pricing keys on harness, not on record kind.** `isRunningTotal` is `harness !== 'opencode'` (`lib/row-usage.js:21`). A per-request record tagged `claude-code` still prices Haiku over 100k to null. `computeUsageCostUsd` also returns null when every token count is 0, so a `<synthetic>` record would mark its whole lineage as not fully priced.
+5. **The cutover can double-count.** Sessions in flight at deploy, and lineages resumed across it, will hold both snapshots and records. A rule has to pick one per lineage. It holds only if the new runner sends the whole transcript backlog, not from a cursor seeded at the end.
+6. **A killed session has no transcript path.** The Stop hook writes `transcriptPath`, so a session killed before its first Stop has none. `reapers.js` never reads transcripts, and nothing in the runner reads `subagents/`.
+7. **The call log isn't "no new shape".** `llm-call-log` holds prompt/completion/total tokens and billed cost, with no cache split, and about 42 sites read it as "Harbour's calls". Putting worker rows in it means filtering at every one of those sites.
+8. **The witness needs transcripts.** The replay corpus (`tests/fixtures/cost-replay/`) is dispatch rows carrying snapshots. A before/after on the same input needs transcripts, run through the runner's old fold. The live measure needs the runner host's transcripts as its denominator.
+
+**What I'd do first**
+
+1. Decide where records live and what Harbour accepts: a batch endpoint, an upsert-by-max on `requestId`, and a record kind that pricing reads instead of harness. Ship it accepting but unread, with the cutover rule written down.
+2. Build a transcript corpus covering Haiku over 100k, a subagent, mixed models, a `<synthetic>` tail, a session killed before Stop, and one resumed across the deploy. Record "before" by running today's runner fold over it, with a change list that must see every listed difference.
+3. Only then switch the runner, and the read last.
+

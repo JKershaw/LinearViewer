@@ -678,3 +678,53 @@ The fix followed the Survey's reading: pin the clone root into the run root, kee
 **LIN-4182 and LIN-4183 kicked off 00:34**, now that the baseline is clean. Their before/after comparisons start from 0 failures.
 
 **Costs:** LIN-4178 (piece 2) is Done and deployed (`0dc1620e`). S11–S13 now read from `lib/cost-read.js`. LIN-4179 (piece 3) is in progress. The builders of pieces 1 and 2 will be asked once LIN-4176's lineage ends. With records now kept 7 days (LIN-4164), there's no hurry, and waiting keeps to the rule (never follow up inside a running lineage; LIN-4166's parked-worker caveat).
+
+## 4 Nov, about 01:30 UTC: rebuild 1 done, five builders' answers, rebuild 2 surveyed and started
+
+### Rebuild 1 (LIN-4176) is Done
+
+Three pieces: LIN-4177 (#2261, `10b2c82f`), LIN-4178 (#2262, `0dc1620e`), LIN-4179 (#2263, `72305215`).
+- **What it built:** one cost read (`lib/cost-read.js`) with a founder lookup (which settles LIN-4148); one figure rule ("priced sum plus coverage, never $0 for unknown"); one USD formatter; census, agreement and parity tests.
+- **What it deleted:** six engines and folds.
+- **Live after deploy:** `/cost` returns `null` plus `unpriced: ["claude-haiku-5-5"]` and a partial priced sum where it used to say $0. The re-sweep read 227 of 227 issues, losing no figure and putting no lineage under two issues.
+- **Not run:** three checks need an operator (a production-store tally, cold `/kpis` timing, a signed-in browser check). They're on the PR.
+- The **note after rebuild 1** is posted on LIN-3936, in the stream's format.
+
+**Against its Survey.** "'One read' has to answer different questions over different populations … that is the real design work." That held: the plan's W4 ("every surface agrees") was dropped because the surfaces count different populations by design, and the run page still windows differently (LIN-4191). "Capture each surface's output … as the 'before'" became the goldens for S1–S13, which every builder relied on. Two plan-review rounds, three PRs; the Survey had said "consider two PRs".
+
+**The bar's "follow-ups listed, not filed" was ignored again.** Close-out filed LIN-4191 to LIN-4194, as tidy 5's did. A bar line hasn't reached the close-out stage in two tickets running. The note on LIN-3936 asks whether the line belongs at all, rather than adding a stronger one.
+
+### Five builders' answers (round-3 questions, all sent with `subscription:'none'` at 01:22, all answered within about 4 minutes)
+
+- **LIN-4177 (piece 1):** "The core read was not the hard part. The hard part was proving it." Goldens at the base, seven surface shapes (it wrote a Mongo-style matcher), stubs that couldn't express a founder outside the window. *If the area were how you'd want it:* "One cost module with a store adapter and thin surface callers, plus a replay harness already in the tree … add the founder lookup to the adapter and show the replay diff."
+- **LIN-4178 (piece 2):** "the work was making tests that could actually fail." **The replay's change list only *allowed* differences and never *required* them, so a reverted fix still passed.** A witness's corpus lacked the case it depended on. *First:* run the reviewer's mutations against the new tests before writing more, and check that the corpus holds each case. *If:* "the change list would be a two-way spec with after-values."
+- **LIN-4179 (piece 3):** "The cost arithmetic was the easy part … the change got stuck in the plumbing around it." The browser scripts have no module graph, so "one formatter" became a copy plus a parity test, touching six pages and a byte golden. "'One formatter' forced a visible choice nobody had made" (`$0.00` against `$0.0000`). *If:* "An hour's work: the formatter would already be one importable module."
+- **LIN-4182 (one flag parser):** "It mostly wasn't [difficult]. The plan had already done the hard part: it established that both idioms follow one rule, so the helper could be dumb." **That's the Survey's finding, credited by the builder.** The real bind: four `watch-restart` fixtures copy `instance-guard.js` alone, so adding a require broke them, found by a full-suite failure. *If:* "The helper should have appeared when the second boolean flag was written. Every 'same idiom as X, copied verbatim' comment was a note that it hadn't."
+- **LIN-4183 (one Stop-hook driver):** proving the migration kept every check; the builder wrote a wire comparator, which caught one real drift. "The change bound on `hook.js` having no seams." *If:* **"Give `main()` a seam: `main({ input, fetch, tokenFor, exit, stateFile })`. The test driver would then be ten lines."** The Survey's warnings about load-bearing defaults were "exactly right and worth the warning". It got wrong which file was the divergent one.
+
+**Reading across the five.**
+- **Proving costs more than changing.** Every Costs builder said so. The Survey's "capture the before first" was the right preparation, and the builders' lessons sharpen it: the before must be a *two-way* spec, and the corpus must *contain* each case.
+- **"If the area were how you'd want it" always names one owner or one seam:** one cost module plus adapter, a two-way change list, one importable formatter, a helper at the second flag, a seam on `main()`. That's now ten of ten builders asked, across both repos. The new question gives the clearest view yet of what the mess costs: each answer sizes the ticket at a fraction of what it became.
+- **Forecasts that did the census before the work were credited** (LIN-4182's "the plan had already done the hard part", LIN-4183's warnings "exactly right").
+
+### One ruling for John
+
+LIN-4182 asked: run `npm run test:mutation` against the LinearViewer checkout? It edits that checkout's source. This is the hazard LIN-4180's Survey named, and the builder rightly asked rather than ran it. LIN-4182 is already Done; the ruling only decides whether that witness gets run. LIN-4180's close-out ran it safely against a throwaway copy, and LIN-4182's builder said it "isn't a routine check". The friction is clear, and a likely next small ticket would have the mutation runner make its own throwaway copy of Harbour.
+
+### Rebuild 2 (LIN-4195): one record per model request, summed
+
+Written against the bar, with rebuild 1's lesson folded in: "Done when" now says the change list is two-way, and that the recorded inputs hold each case a witness depends on.
+
+**Its Survey (open-0, at Harbour `723052153` and runner `cc2650a6d`)** named eight binds:
+1. "last entry" lives in storage and in three fetch paths, not only the fold;
+2. **the feedback channel can't carry records** (2000-character cap, one try, unknown kinds dropped silently; one Haiku session made 486 requests);
+3. **the runner chose snapshots on purpose**, because a delta on a fire-and-forget post under-reports forever, so this needs upsert-by-max on request id plus re-send;
+4. **pricing keys on harness, not record kind**, so Haiku would still price to null;
+5. cutover double-counting;
+6. a session killed before its first Stop has no transcript path;
+7. the call log is read as "Harbour's calls" at about 42 sites;
+8. the witness needs a *transcript* corpus, not the snapshot replay.
+
+*Do first:* decide where records live and what Harbour accepts, and ship it accepted but unread; then the transcript corpus with the hard cases; then the runner; then the read, last.
+
+**Acted on:** all of that went onto the ticket, plus "park a piece rather than guess; John answers rulings in the morning". Kicked off 01:27.
