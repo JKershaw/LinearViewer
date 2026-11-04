@@ -23,7 +23,7 @@ Mostly held. The window moved one ruling's worth of code (the cost rebuild and t
 1. **The halt poll still fails open on a cold cache, and it is now ticketed.** `halt-poll-cold-cache-fail-open` is unchanged in code and wider than the 11-03 reading: SD also reads an absent halt as "none", by design. **Minted as LIN-4210** (child of LIN-3449, Backlog). Its behaviour line reads **needs John's ruling (LIN-3024)**; I did not pick an answer.
 2. **The runner contract is worse.** `runner-contract-semantics-cross-repo` (MEDIUM, worsened): the two usage calls that landed in the window (`POST /api/dispatch/usage/:itemId` and `POST /api/proxy/runner/usage/:id`) have no row in either contract file. The counts are still 38 (Harbour) and 34 (SD). The four `store` rows are still unpinned. On a 404, SD's claude-code flush resends and the kit stops. Homes: LIN-3624 (comment posted), LIN-3823 (report-only, see below).
 3. **The one cost read and one USD formatter held, and that is an improvement, not a resolution.** USD lines went from 12 (10-23) to 5 (11-03) to one server home plus one browser twin pinned by `tests/unit/cost-format-parity.test.js`. The durations (×4) and the elapsed pair are untouched.
-4. **The usage relay flag is only partly a rollback.** `SD_WORKER_USAGE_RELAY` gates the Stop-hook snapshot and the opencode relay, but **five record-flush seams ignore it** (`dispatcher.js:478,1175`, the injected default at `:616`, and `reapers.js:1894,3989`). New, LOW-MEDIUM. **Not minted:** LIN-4195 (costs rebuild 2, In Progress) records "L1 (relay flag off) is closed" in its description. That is the costs run's own ruling on this flag, and it does not match the source. The finding is in this report for that owner.
+4. **The usage relay flag is only partly a rollback.** `SD_WORKER_USAGE_RELAY` gates the Stop-hook snapshot and the opencode relay, but **five record-flush seams ignore it** (`dispatcher.js:478,1175`, the injected default at `:616`, and `reapers.js:1894,3989`). New, LOW-MEDIUM. **Not minted:** LIN-4195 (costs rebuild 2, In Progress) records "L1 (relay flag off) is closed" in its description. That is the costs run's own statement on this flag, and it does not match the source. This run sent no message to that owner; the question is listed under For John below.
 5. **Every Drift follow-up is still unmoved.** LIN-4156, 4157, 4158 and the six 10-23 children (LIN-3822, 3835, 3836, 1496, 3736, 3624) are Backlog with no code change in the window. `coherence-loop-stalled` stays MEDIUM (process). The 11-03 batch question was answered **parent-all** (LIN-3449 comment, 2026-11-03 07:15 and 07:39 UTC); the batch itself has not run.
 6. **Census reproduced.** Both 11-03 readings reproduced exactly (below). Under the HEAD guide, the window reads 565 groups / 106 `mustRule` / 309 table / 3 gone. The guide edit moved **zero** groups, so there is no guide-driven movement. One `mustRule` group is new (`state == 'failed'`, which gained a third area through `lib/task-page-loader.js:648`).
 7. **Import graph: no new SCC and no upward edge.** 493 nodes, 2,026 edges, the same two SCCs with the same members, 0 upward edges, 53 route→route. The window's new cost-read module reaches into the existing graph and does not close a cycle.
@@ -132,7 +132,7 @@ Ordered by severity, then by the 11-03 order. Severity uses 11-03's scale. Each 
 ## Sibling hand-offs (recorded, not double-flagged)
 
 - **Seams & Tangles** (LIN-4152, Done; run 5 LIN-4208 In Progress and owns `docs/reviews/_evidence-2026-11-04/`, which this run does not use): F5 `routes-as-libraries` is cross-linked; the file-level SCCs and route→route edges stay here.
-- **Cost Tracking** (`cost-tracking-review-2026-11-02.md`, LIN-4126) and the costs rebuild (LIN-4177/4178/4179, LIN-4195 and children): the cost read and the USD formatter are the costs run's; Drift grades only the copies that survived. The relay-flag finding is handed to LIN-4195's owner; this run posted nothing on any costs ticket.
+- **Cost Tracking** (`cost-tracking-review-2026-11-02.md`, LIN-4126) and the costs rebuild (LIN-4177/4178/4179, LIN-4195 and children): the cost read and the USD formatter are the costs run's; Drift grades only the copies that survived. The relay-flag finding is not handed off by message: this run posted nothing on any costs ticket, and the question is listed under For John.
 - **Test-Run Provenance** (LIN-4125): nothing handed here.
 - **Security** owns trust boundaries. The `f6b4862c` (LIN-3849) token-mint gate removal is **still unpicked by a Security ticket**: LIN-3849 is Done, and `routes/proxy-tokens-admin.js` no longer checks `getFeatureFlags(req.session).proxy`. Repeated here as the hand-off. Not graded.
 - **Stability** owns the halt fault path. Drift keeps the duplication half (LIN-4210 is the fault decision's ticket).
@@ -190,7 +190,7 @@ The 11-03 counting rule, reproduced by script on the 11-03 ledger: **68 graded d
 - **LIN-4210** (child of LIN-3449, kind:follow-up, Backlog): "Halt poll on a cold cache: decide what 'no halt' means when the store read fails (needs John's ruling, LIN-3024)". One decision; the behaviour line reads **needs John's ruling** and does not choose. Home: `lib/poll-halt.js` `readHaltForPoll` with `lib/workspace-halt.js`; tests in `tests/unit/workspace-halt-store.test.js`. Search before minting, by phrase: "halt poll cold cache", "poll halt cold cache", "halt cold cache fail open", "readHaltForPoll", "last known halt", "getLastKnownHalt". Results: only Done tickets (LIN-3024, LIN-2994, LIN-2995, LIN-3026, LIN-3027, LIN-4115), LIN-3415 (a different halt route question, Backlog) and LIN-3511 (a kit re-arm issue). No open ticket names the cold-cache decision. The report is the source for the rest.
 
 **Considered and not minted:**
-- **Usage relay flag, five ungated seams (LOW-MEDIUM).** Search: "WORKER_USAGE_RELAY", "usage relay flag", "SD_WORKER_USAGE_RELAY", "usage relay rollback", "relay flag record", "usage records flag gate", "flushRequestUsage". Results: LIN-4127 (Done; the flag itself), **LIN-4195** (In Progress; its description states "L1 (relay flag off) is closed"), LIN-4201 (Todo; cost read), LIN-4203 (Todo; re-documents the flag as the records flag, does not gate the five seams). The costs run has recorded the question as closed, so a Drift ticket would contradict an active owner. Not minted; the finding is here for the owner. This is the one place the report disagrees with an open ticket, and I left the disagreement for the owner to settle.
+- **Usage relay flag, five ungated seams (LOW-MEDIUM).** Search: "WORKER_USAGE_RELAY", "usage relay flag", "SD_WORKER_USAGE_RELAY", "usage relay rollback", "relay flag record", "usage records flag gate", "flushRequestUsage". Results: LIN-4127 (Done; the flag itself), **LIN-4195** (In Progress; its description states "L1 (relay flag off) is closed"), LIN-4201 (Todo; cost read), LIN-4203 (Todo; re-documents the flag as the records flag, does not gate the five seams). The costs run has recorded the question as closed, so a Drift ticket would contradict an active owner. Not minted; it is listed under For John. This is the one place the report disagrees with an open ticket, and the disagreement is for John to settle.
 - **Usage-records contract row.** Existing homes are LIN-3624 (commented) and LIN-3823 (no drift label; report only).
 - **Reap window.** Existing home LIN-2201 (Backlog; parent LIN-1721, an operator-decision epic with label `front:rulings`, so not confirmed drift-owned). Report only; the stale citation and the 7 d value are recorded here.
 - **Vocabulary, lineage twins, task-page residue, the formatter residue, cost-fold partition.** Each stays in the report: the first two have their consumers in the costs work and the rest are below the mint bar.
@@ -205,6 +205,11 @@ The 11-03 counting rule, reproduced by script on the 11-03 ledger: **68 graded d
 - **"Reply & continue" after 24 h** continues on a fresh clone (LIN-4164 product question). Recorded, not graded.
 - **Security hand-off `f6b4862c`.** Repeated above; no ticket.
 
+## For John (neither blocks the report)
+
+- **(a) Halt poll on a cold cache (LIN-4210, LIN-3024).** Fail closed for a stop the runner has seen, or keep LIN-3024's availability choice and pin it as a contract row. Ticket is filed; the behaviour line reads "needs John's ruling".
+- **(b) Usage relay flag and record posting (SD, LOW-MEDIUM here).** `SD_WORKER_USAGE_RELAY` is documented as the rollback for the usage relay. Five record-flush seams (`dispatcher.js:478,1175`, the default at `:616`, `reapers.js:1894,3989`) post regardless of it. LIN-4195 records "L1 (relay flag off) is closed". Question: should record posting follow the flag, or is the flag now only the snapshot switch? The second read would grade this MEDIUM; this report keeps LOW-MEDIUM because the records are the cost truth LIN-4195 is building, so a partial rollback costs little in data, but the documented rollback is partial. Not a ticket, pending that ruling.
+
 ## Ticket trend
 
 | edition | minted | still Backlog and unmoved at the next run | notes |
@@ -215,7 +220,40 @@ The 11-03 counting rule, reproduced by script on the 11-03 ledger: **68 graded d
 
 ## Adversarial second-read (Tier 2)
 
-*(Filled in below after the reader returns.)*
+- **Tier:** 2, a fresh-context sub-agent (general-purpose) with no memory of the report-writing turn. Tier 1 (a separate session) was not available here.
+- **Inputs given:** the report path (the working-tree file at the time), both SHA pairs (`015aa4c6..5334c81a`, `cf6369d..502901c`), the window bounds, and the open 11-03 items (the halt-poll ruling, the Security hand-off `f6b4862c`, the unmoved 10-23 follow-ups). It was told to check source at HEAD and to look outside the report's areas. It was **not** given the report's ranking or the research pointers.
+- **Question (verbatim):** "What is the largest item in this window that this report missed or misfiled?"
+- **Reader's full answer:**
+
+> 1. **Largest missed or misfiled item:** the `SD_WORKER_USAGE_RELAY` gap (report #4 and #9). The report grades it LOW-MEDIUM and says it was handed to the LIN-4195 owner, but nothing was sent. I found nothing in the window larger than the report's top finding.
+>
+> 2. **Severity:** I would rate it MEDIUM, one band above the report. The flag is the documented rollback for the default-on relay (LIN-4127, SD README line 202). The SD hook's own comment says the flag rolls back the record flush (`hook.js:1859`). With the flag at 0, the Stop-hook path stops but the claude-code request-record flush still posts on fail, cancel, stall and reap, so the rollback is partial for the new usage traffic. Not High: no data loss or auth impact seen.
+>
+> 3. **Evidence** (SD at 502901c; LinearViewer at 5334c81a):
+>    - Ungated record-flush call sites: `dispatcher.js:478` (fail), `:1175` (cancel), default `flushUsage = flushRequestUsageDetached` at `:616`, `reapers.js:1894` (stall) and `:3989` (reap). `request-usage-flush.js:276-277` has no flag check.
+>    - Gated counterparts: `hook.js:1860` (`if (WORKER_USAGE_RELAY && session ...)`) and `opencode-runner.js:674` (`if (!workerUsageRelay ...) return`).
+>    - Hand-off wording: report lines 135 and 201. Line 135 says the finding "is handed to LIN-4195's owner"; line 201 says "None on LIN-4195".
+>    - Checked and clean: the `requestUsageStore` wiring (`server.js:849, 2570, 3220`); the `readTakenForUsage` ownership rule; the SD `toWireRecord` field names against `USAGE_TOKEN_FIELDS`; the `task-cost` removal, where `tests/fixtures/task-cost-adapter.js` is a documented shim. The LIN-3849 mint-gate removal is documented in `docs/architecture/source-map.md:128`, so it is policy, not drift.
+>
+> 4. **Why missed or misfiled:** The report graded the item against LIN-4195's description ("L1 closed") rather than the code, then kept it report-only. Its own hand-off sentence describes a delivery that never happened, so the item has no live owner.
+>
+> 5. **Confidence:** High on the five ungated seams, which I read directly. Medium on the severity. Not verified: the LIN-4195 description (I did not query Linear) and the kit's 404 handling (`runner.mjs:709`). Settle by reading LIN-4195 and deciding whether record posting is meant to follow the flag.
+>
+> 6. **Verdict: AGREE.** Nothing I checked (LIN-4171 resume guard, LIN-4165 assistant-text default, the usage routes, the kpi privacy boundary, the `task-cost` removal) exceeds the report's top MEDIUM-HIGH item. The relay item is under-rated and its hand-off is not real.
+
+- **Response (fixed in place):**
+  - The reader is right that the hand-off sentence described a delivery that did not happen. Fixed: the report now says no message was sent, and the question is under For John.
+  - The reader's severity view (MEDIUM) is recorded as dissent. This report keeps LOW-MEDIUM, for the reason in For John (b): records are LIN-4195's cost basis, so a partial rollback costs little in data, though the documented rollback is partial.
+  - I verified the LIN-4195 text myself (quoted in Findings #9) since the reader did not.
+- **Largest-item answer differs from the report's top-ranked finding:** **YES.** The top-ranked finding is `resume-model-effort-cross-repo` (MEDIUM-HIGH); the reader's largest item is the relay gap.
+- **Verdict:** **AGREE.** No item the reader judged larger than the top finding was missed or misfiled. The relay item is the largest it found: LOW-MEDIUM here, MEDIUM by its reading.
+- **Disposition:** fixed in place (hand-off wording corrected; For John entry added; severity dissent recorded, not silently changed).
+
+**Three required fields (posted together on the task):**
+
+Adversarial second-read verdict: AGREE
+Differed from top finding: YES
+Disposition: fixed in place
 
 ## Census ruling table (the 106 `mustRule` groups, HEAD guide)
 
