@@ -117,7 +117,8 @@ describe('INVENTORY completeness (Done-when 5)', () => {
   test('the rule (LIN-4234): a new constant-named collection under lib/ joins the universe; a commented one does not', () => {
     const sources = {
       literalTexts: [],
-      constantTexts: ["export const FOO_COLLECTION = 'foo-bar';\n/* export const BAZ_COLLECTION = 'baz'; */\n// export const QUX_COLLECTION = 'qux';"]
+      // BAZ sits inside a block comment on lines that START with `export const`: only the comment strip rejects it.
+      constantTexts: ["export const FOO_COLLECTION = 'foo-bar';\n/*\nexport const BAZ_COLLECTION = 'baz';\n*/\n// export const QUX_COLLECTION = 'qux';"]
     };
     const { names } = collectionNames({ sources });
     assert.ok(names.has('foo-bar'), 'a constant under lib/ is read');
