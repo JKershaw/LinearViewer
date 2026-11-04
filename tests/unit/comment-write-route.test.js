@@ -71,6 +71,9 @@ function makeFakeDispatchQueueStore(overrides = {}) {
       if (overrides.markDecisionAnswered) return overrides.markDecisionAnswered(itemId, urlKey, decisionId);
       return { success: true, feedbackCount: 1 };
     },
+    // LIN-4241: the settled-ruling pre-check. Default: not settled, so each
+    // scenario keeps exercising the path it was written for.
+    async isDecisionSettled() { return overrides.isDecisionSettled ? overrides.isDecisionSettled() : false; },
   };
   return { store, calls };
 }
@@ -113,6 +116,8 @@ function makeFakeTaskDecisionsStore(overrides = {}) {
       const record = await store.markOutcome({ urlKey, issueId, id, outcome: 'answered' });
       return { record, firstStampWins: !!record && record.firstStampWins !== false, unretried: false };
     },
+    // LIN-4241: the scan-row pre-check. Default: no row outcome yet (unstamped).
+    async readOutcome() { return overrides.readOutcome ? overrides.readOutcome() : { outcome: null }; },
   };
   return { store, calls };
 }
@@ -411,6 +416,154 @@ describe('POST /workspace/:urlKey/api/comments/:issueId (LIN-2154)', () => {
     assert.strictEqual(humanResult.status, 201);
     assert.notStrictEqual(humanResult.body.comment.id, agentResult.body.comment.id);
     assert.strictEqual(calls.createComment.length, 2);
+  });
+});
+
+// =============================================================================
+// LIN-4241: the settled-ruling guard on the comment route. A ruling already
+// answered or dismissed is refused 409 `ruling-settled`: no comment is written
+// for a settled ruling, and an answer that loses a race gets no run (the client
+// dispatches only on a 2xx). Only the PRIMARY loop decides; a stamped copy never
+// blocks.
+// =============================================================================
+describe('POST /workspace/:urlKey/api/comments/:issueId — settled-ruling guard (LIN-4241)', () => {
+  // A stateful stand-in for the loop store: an item is settled once any decision
+  // on it is answered or dismissed. Mirrors the real store's contract: the
+  // pre-check reads, the stamp is a check-and-set that reports `alreadySettled`.
+  function makeSettlingStore({ settledItems = [] } = {}) {
+    const settled = new Set(settledItems);
+    const calls = { markDecisionAnswered: [] };
+    return {
+      settled,
+      calls,
+      store: {
+        async isDecisionSettled(itemId) { return settled.has(itemId); },
+        async markDecisionAnswered(itemId, urlKey, decisionId) {
+          calls.markDecisionAnswered.push({ itemId, urlKey, decisionId });
+          if (settled.has(itemId)) return { success: false, alreadySettled: true };
+          settled.add(itemId);
+          return { success: true, feedbackCount: 1 };
+        },
+      },
+    };
+  }
+
+  const RULING_SETTLED_ERROR = 'This ruling was already answered or dismissed.';
+
+  test('a second answer to a settled ruling is refused 409 ruling-settled: no comment written, no stamp added', async () => {
+    const { provider, calls: providerCalls } = makeFakeProvider();
+    const { store, settled, calls: stampCalls } = makeSettlingStore({ settledItems: ['loop-1'] });
+    const app = buildApp({ provider, dispatchQueueStore: store });
+
+    const { status, body } = await postComment(app, ISSUE_ID, { body: 'a late answer', decisionLoopId: 'loop-1', decisionId: 'd-1' });
+
+    assert.strictEqual(status, 409);
+    assert.strictEqual(body.code, 'ruling-settled');
+    assert.strictEqual(body.error, RULING_SETTLED_ERROR);
+    assert.strictEqual(providerCalls.createComment.length, 0, 'the refused answer writes no comment');
+    assert.strictEqual(stampCalls.markDecisionAnswered.length, 0, 'and adds no stamp');
+    assert.ok(settled.has('loop-1'));
+  });
+
+  test('a first answer lands 201; a second, different answer to the same ruling is refused and writes no second comment', async () => {
+    const { provider, calls: providerCalls } = makeFakeProvider();
+    const { store, calls: stampCalls } = makeSettlingStore();
+    const app = buildApp({ provider, dispatchQueueStore: store });
+
+    const first = await postComment(app, ISSUE_ID, { body: 'first answer', decisionLoopId: 'loop-1', decisionId: 'd-1' });
+    const second = await postComment(app, ISSUE_ID, { body: 'second answer', decisionLoopId: 'loop-1', decisionId: 'd-1' });
+
+    assert.strictEqual(first.status, 201);
+    assert.strictEqual(second.status, 409);
+    assert.strictEqual(second.body.code, 'ruling-settled');
+    assert.strictEqual(providerCalls.createComment.length, 1, 'only the first answer wrote a comment');
+    assert.strictEqual(stampCalls.markDecisionAnswered.length, 1, 'only the first answer stamped');
+  });
+
+  test('concurrent answers to one ruling: both pass the pre-check, the stamp CAS lets exactly one win; one 201 (the one run), one 409', async () => {
+    const { provider, calls: providerCalls } = makeFakeProvider();
+    // Hold both pre-checks until both requests have read "not settled", so both
+    // reach the stamp and the stamp's check-and-set decides the winner. Without
+    // the barrier the requests can serialize and the race is never exercised.
+    const settled = new Set();
+    const stamps = [];
+    let checked = 0;
+    let release;
+    const bothChecked = new Promise((resolve) => { release = resolve; });
+    const store = {
+      async isDecisionSettled(itemId) {
+        const isSettled = settled.has(itemId);
+        checked++;
+        if (checked === 2) release();
+        if (!isSettled) await bothChecked;
+        return settled.has(itemId);
+      },
+      async markDecisionAnswered(itemId) {
+        stamps.push(itemId);
+        if (settled.has(itemId)) return { success: false, alreadySettled: true };
+        settled.add(itemId);
+        return { success: true, feedbackCount: 1 };
+      },
+    };
+    const app = buildApp({ provider, dispatchQueueStore: store });
+
+    let timer;
+    const results = await Promise.race([
+      Promise.all([
+        postComment(app, ISSUE_ID, { body: 'answer A', decisionLoopId: 'loop-1', decisionId: 'd-1' }),
+        postComment(app, ISSUE_ID, { body: 'answer B', decisionLoopId: 'loop-1', decisionId: 'd-1' }),
+      ]),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('both pre-checks never reached the barrier')), 5000); }),
+    ]).finally(() => clearTimeout(timer));
+
+    assert.strictEqual(checked, 2, 'both requests reached the pre-check');
+    assert.strictEqual(stamps.length, 2, 'both requests reached the stamp');
+    assert.deepStrictEqual(results.map(r => r.status).sort(), [201, 409], 'exactly one answer is accepted; the other is refused');
+    assert.strictEqual(results.filter(r => r.status === 201).length, 1, 'one 201 means one run is dispatched by the client');
+    assert.strictEqual(settled.size, 1, 'the ruling is stamped exactly once');
+    // The race loser's comment already existed when its stamp lost (the
+    // documented trade-off: the comment is durable, the run is suppressed).
+    assert.strictEqual(providerCalls.createComment.length, 2);
+
+    // The loser retries with identical text (a double press). The comment
+    // dedupe cache holds its comment, so this is a dedupe hit. It must still
+    // refuse: a 200 here would dispatch a run for a settled ruling.
+    const loserIndex = results.findIndex(r => r.status === 409);
+    const loserBody = ['answer A', 'answer B'][loserIndex];
+    const retry = await postComment(app, ISSUE_ID, { body: loserBody, decisionLoopId: 'loop-1', decisionId: 'd-1' });
+    assert.strictEqual(retry.status, 409, 'an identical retry of the race loser is refused, not deduped into a 200');
+    assert.strictEqual(retry.body.code, 'ruling-settled');
+    assert.strictEqual(providerCalls.createComment.length, 2, 'the retry writes no further comment');
+  });
+
+  test('primary vs copy: a stamped copy does not block a primary answer, and the copy\'s already-stamped result counts as landed', async () => {
+    const { provider } = makeFakeProvider();
+    const { store, settled, calls: stampCalls } = makeSettlingStore({ settledItems: ['copy-1'] });
+    const app = buildApp({ provider, dispatchQueueStore: store });
+
+    const { status, body } = await postComment(app, ISSUE_ID, {
+      body: 'answer to a joined ruling', decisionLoopId: 'loop-1', decisionLoopIds: ['copy-1'], decisionId: 'd-1'
+    });
+
+    assert.strictEqual(status, 201, 'the primary is not settled, so a stamped copy must not refuse the request');
+    assert.deepStrictEqual(stampCalls.markDecisionAnswered.map(c => c.itemId), ['loop-1', 'copy-1'], 'every copy is still stamped');
+    assert.ok(settled.has('loop-1'));
+  });
+
+  test('a scan (task-bound) row already answered or dismissed is refused 409 ruling-settled before the comment', async () => {
+    for (const outcome of ['answered', 'dismissed']) {
+      const { provider, calls: providerCalls } = makeFakeProvider();
+      const { store: taskDecisionsStore } = makeFakeTaskDecisionsStore({ readOutcome: () => ({ outcome }) });
+      const app = buildApp({ provider, taskDecisionsStore });
+
+      const { status, body } = await postComment(app, ISSUE_ID, {
+        body: `late scan answer (${outcome})`, taskDecisionId: 'scan-1', taskDecisionIssueId: '66666666-6666-6666-6666-666666666666'
+      });
+
+      assert.strictEqual(status, 409, `a row already ${outcome} is settled`);
+      assert.strictEqual(body.code, 'ruling-settled');
+      assert.strictEqual(providerCalls.createComment.length, 0, 'no comment for a settled scan row');
+    }
   });
 });
 
@@ -838,6 +991,7 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — ruling-write cache i
           };
         },
         async markDecisionAnswered() { discharged = true; return { success: true, feedbackCount: 3 }; },
+        async isDecisionSettled() { return discharged; },
       },
     };
   }
@@ -849,6 +1003,7 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — ruling-write cache i
       async listUnansweredForWorkspaces() { return []; }, // this half's write is exercised in isolation below
       async listNewestScanPerTask() { return {}; },
       async markOutcome(args) { calls.push(args); return { ...args, outcomeAt: new Date().toISOString() }; },
+      async readOutcome() { return null; }, // LIN-4241 pre-check: row not yet read as settled
       // LIN-2889: stampDecisionAnswers now calls answer(), not markOutcome()
       // directly — delegate so `calls` still records the underlying stamp
       // attempt, keeping this witness's "the write actually reached the
@@ -1001,6 +1156,7 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — ruling-write cache i
         async listUnansweredForWorkspaces() { return []; },
         async listNewestScanPerTask() { return {}; },
         async answer() { answerCalls++; return answerResult; },
+        async readOutcome() { return null; }, // LIN-4241 pre-check: row not yet read as settled
       };
       const app = buildCrossRouterApp({ dispatchQueueStore, taskDecisionsStore, sessionsFeedCache: createSessionsFeedCache() });
 

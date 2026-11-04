@@ -24,6 +24,7 @@ import { jsonError, keepaliveError, replyStoreFault } from '../lib/errors.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { collectUnansweredDecisions, openDecisionLoopIds, parseStampLoopIds, STAMP_LOOP_IDS_MESSAGE } from '../lib/unanswered-decisions.js';
 import { attachStandingSuggestions } from '../lib/dismissal-suggestions-store.js';
+import { RULING_SETTLED_REFUSAL } from '../lib/ruling-settled.js';
 import { connectedWorkspaces, liveOnAnchor } from './dashboard-session-state.js';
 
 // ─── Filtered rulings feed (LIN-1728 Phase 2) ─────────────────────────────────
@@ -216,7 +217,15 @@ function dismissSpec({ dispatchQueueStore }) {
     validate: (body) => validateLoopDecision(body)
       ?? (parseStampLoopIds(body.decisionLoopIds) === null ? STAMP_LOOP_IDS_MESSAGE : null),
     run: async (workspace, { decisionLoopId, decisionId, decisionLoopIds }) => {
+      // LIN-4241: a stale dismissal is refused before anything is stamped. The
+      // client sends the "proceed on your best judgment" follow-up only after a 2xx,
+      // so this refusal is what keeps that run from starting.
+      if (await dispatchQueueStore.isDecisionSettled(decisionLoopId, workspace.urlKey, decisionId)) {
+        return { fail: RULING_SETTLED_REFUSAL };
+      }
       const stamped = await dispatchQueueStore.markDecisionAnswered(decisionLoopId, workspace.urlKey, decisionId, 'dismissed');
+      // LIN-4241: the CAS lost to an answer or dismissal that landed in between.
+      if (stamped?.alreadySettled) return { fail: RULING_SETTLED_REFUSAL };
       if (!stamped) return { fail: [404, 'No matching ruling to dismiss'] };
       for (const loopId of parseStampLoopIds(decisionLoopIds)) {
         if (loopId === decisionLoopId) continue;
@@ -314,9 +323,9 @@ function answerSpec({ taskDecisionsStore }) {
       if (firstStampWins) {
         return { ok: { success: true } };
       }
+      // LIN-4241: an answered or dismissed row is settled, not a generic conflict.
       if (record.outcome === 'answered' || record.outcome === 'dismissed') {
-        const label = record.outcome === 'dismissed' ? 'dismissed' : 'answered';
-        return { fail: [409, `This ruling was already ${label}`, { code: 'ALREADY_TERMINAL' }] };
+        return { fail: RULING_SETTLED_REFUSAL };
       }
       // Leftover self-resolved state: reachable only through the genuinely
       // rare case answer()'s narrowed catch still lets through — a second,

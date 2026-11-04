@@ -822,6 +822,7 @@ describe('POST /api/dashboard/rulings/dismiss (LIN-2225)', () => {
       dispatchQueueStore: {
         async listItems() { return []; },
         async listHistory() { return { items: [] }; },
+        async isDecisionSettled() { return false; }, // LIN-4241 pre-check: not settled unless a test says so
         ...dispatchQueueStoreOverrides
       },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
@@ -880,6 +881,43 @@ describe('POST /api/dashboard/rulings/dismiss (LIN-2225)', () => {
     assert.equal(res.statusCode, 404);
   });
 
+  // LIN-4241 witness: a stale dismissal of an answered or dismissed ruling is
+  // refused 409 ruling-settled before anything is stamped. The client sends the
+  // "proceed on your best judgment" follow-up only after a 2xx, so refusing here
+  // is what keeps that run from starting.
+  test('LIN-4241: a dismiss of an already-settled ruling 409s ruling-settled, stamps nothing', async () => {
+    let stamped = false;
+    const router = makeDismissRouter({
+      async isDecisionSettled() { return true; },
+      async markDecisionAnswered() { stamped = true; return { success: true, feedbackCount: 2 }; }
+    });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/dismiss');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionLoopId: 'loop-1', decisionId: 'd-1' };
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.jsonBody.code, 'ruling-settled');
+    assert.equal(res.jsonBody.error, 'This ruling was already answered or dismissed.');
+    assert.equal(stamped, false, 'no second stamp on a settled ruling');
+  });
+
+  // LIN-4241 witness: the CAS lost to an answer that landed between the pre-check
+  // and the stamp. The store reports alreadySettled; the route must say settled,
+  // not 404 "no matching ruling" and not a 200.
+  test('LIN-4241: a dismiss that loses the stamp CAS to a settling write 409s ruling-settled, not 200 or 404', async () => {
+    const router = makeDismissRouter({
+      async markDecisionAnswered() { return { success: false, alreadySettled: true }; }
+    });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/dismiss');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionLoopId: 'loop-1', decisionId: 'd-1' };
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.jsonBody.code, 'ruling-settled');
+  });
+
   test('500 when the store throws, never propagates the raw error', async () => {
     const router = makeDismissRouter({ async markDecisionAnswered() { throw new Error('store down'); } });
     const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/dismiss');
@@ -899,6 +937,7 @@ describe('POST /api/dashboard/rulings/reverse-withdrawal (LIN-2891/LIN-3035)', (
       dispatchQueueStore: {
         async listItems() { return []; },
         async listHistory() { return { items: [] }; },
+        async isDecisionSettled() { return false; }, // LIN-4241 pre-check: not settled unless a test says so
         ...dispatchQueueStoreOverrides
       },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
@@ -1141,7 +1180,9 @@ describe('POST /api/dashboard/rulings/answer (LIN-2754 Track B)', () => {
   // write) from "an earlier, already-completed write" (firstStampWins:
   // false, record.outcome === 'answered'), never from the outcome string or
   // a timestamp comparison alone (LIN-2889 F1).
-  test('Witness 14: firstStampWins: false with outcome "answered" (an earlier, already-completed answer) 409s ALREADY_TERMINAL and does not report success', async () => {
+  // LIN-4241: an answered row is settled. It is refused with the one shared
+  // settled-ruling refusal (code `ruling-settled`), not a generic conflict.
+  test('Witness 14: firstStampWins: false with outcome "answered" (an earlier, already-completed answer) 409s ruling-settled and does not report success', async () => {
     const router = makeAnswerRouter({
       async answer() {
         return { record: { outcome: 'answered' }, firstStampWins: false, unretried: false };
@@ -1153,15 +1194,14 @@ describe('POST /api/dashboard/rulings/answer (LIN-2754 Track B)', () => {
     await handler(req, res);
 
     assert.equal(res.statusCode, 409);
-    assert.equal(res.jsonBody.code, 'ALREADY_TERMINAL');
-    assert.equal(res.jsonBody.error, 'This ruling was already answered');
+    assert.equal(res.jsonBody.code, 'ruling-settled');
+    assert.equal(res.jsonBody.error, 'This ruling was already answered or dismissed.');
     assert.notEqual(res.statusCode, 200);
     assert.notDeepEqual(res.jsonBody, { success: true });
   });
 
-  // C2: the 409 wording names the actual terminal outcome instead of always
-  // claiming "already answered" on a dismissed row.
-  test('firstStampWins: false with outcome "dismissed" 409s ALREADY_TERMINAL, worded "already dismissed"', async () => {
+  // LIN-4241: a dismissed row is settled too — the same refusal, the same code.
+  test('firstStampWins: false with outcome "dismissed" 409s ruling-settled with the same settled wording', async () => {
     const router = makeAnswerRouter({
       async answer() {
         return { record: { outcome: 'dismissed' }, firstStampWins: false, unretried: false };
@@ -1173,8 +1213,8 @@ describe('POST /api/dashboard/rulings/answer (LIN-2754 Track B)', () => {
     await handler(req, res);
 
     assert.equal(res.statusCode, 409);
-    assert.equal(res.jsonBody.code, 'ALREADY_TERMINAL');
-    assert.equal(res.jsonBody.error, 'This ruling was already dismissed');
+    assert.equal(res.jsonBody.code, 'ruling-settled');
+    assert.equal(res.jsonBody.error, 'This ruling was already answered or dismissed.');
   });
 
   // F1's required test: a leftover self-resolved record (the rare stacked-
@@ -6073,7 +6113,7 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
     const { store, reads } = countingHistoryStore(() => [decisionItem('loop-1', 'LIN-99', 'd-99')]);
     const router = createDashboardRoutes({
       workspaceFromUrl: (req, res, next) => next(),
-      dispatchQueueStore: { ...store, async markDecisionAnswered() { return { success: true, feedbackCount: 1 }; } },
+      dispatchQueueStore: { ...store, async isDecisionSettled() { return false; }, async markDecisionAnswered() { return { success: true, feedbackCount: 1 }; } },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
       freeTierStore: { async tryUse() { return { allowed: true }; } },
@@ -6108,6 +6148,7 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
             discharged ? [{ kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-99', outcome: 'dismissed' }), timestamp: new Date().toISOString() }] : []);
           return { items: withFreshDigests([item]) };
         },
+        async isDecisionSettled() { return discharged; },
         async markDecisionAnswered() { discharged = true; return { success: true, feedbackCount: 2 }; }
       },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
@@ -6177,9 +6218,9 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
   // LIN-2889 close-out ledger L2: the negative half of "clear only on genuine
   // success". Both 409 non-success branches changed nothing this call can
   // claim, so the next poll must still be served from the warm cache.
-  // Mutation M9 (clear on 409 ALREADY_TERMINAL) fails the first case.
+  // Mutation M9 (clear on 409 ruling-settled) fails the first case.
   for (const [label, answerResult, expectedCode] of [
-    ['409 ALREADY_TERMINAL (lost the terminal race)', { record: { outcome: 'answered' }, firstStampWins: false, unretried: false }, 'ALREADY_TERMINAL'],
+    ['409 ruling-settled (lost the settled race)', { record: { outcome: 'answered' }, firstStampWins: false, unretried: false }, 'ruling-settled'],
     ['409 RETRY_REQUIRED (leftover self-resolved)', { record: { outcome: 'self-resolved' }, firstStampWins: false, unretried: false }, 'RETRY_REQUIRED'],
   ]) {
     test(`LIN-2889 L2: answer ${label} does NOT invalidate the rulings cache`, async () => {
@@ -6733,6 +6774,7 @@ describe('POST /api/dashboard/rulings/dismiss — joined-copy stamps (LIN-3959)'
       dispatchQueueStore: {
         async listItems() { return []; },
         async listHistory() { return { items: [] }; },
+        async isDecisionSettled() { return false; }, // LIN-4241 pre-check: not settled
         async markDecisionAnswered(itemId, urlKey, decisionId, outcome) {
           calls.push({ itemId, urlKey, decisionId, outcome });
           return stampResult(itemId);
