@@ -22,7 +22,7 @@ John's tipping point (4 Nov): when a task, on average, leaves the codebase even 
 | LIN-4202 runner-kit records | no change | `usage-relay-flag-partial` (new, SD side) | n/a | **−** (small) |
 | UI operator's four (LIN-4106, 4107, 4110, 4040) | no change | `task-page-state-outside-owner`: borderline | n/a | 0 |
 
-**The baseline ratio:** 1 better, 4 neutral, 5 worse (counting LIN-4177 as mixed). On average, a task in this window left the place a little worse, including the careful, surveyed consolidations.
+**The baseline ratio, by row:** 1 better (LIN-4173), 3 neutral (LIN-4166, LIN-4179, and one row for the UI operator's four), 4 worse (LIN-4168, LIN-4178, LIN-4198, LIN-4202), 1 mixed (LIN-4177). On average, a task in this window left the place a little worse, including the careful, surveyed consolidations.
 
 ## Forward rows (the loop with the place view)
 
