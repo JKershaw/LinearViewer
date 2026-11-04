@@ -15,9 +15,10 @@ import { DEFAULT_MODEL } from '../../lib/openrouter.js';
 import { SURFACES } from '../../lib/llm-jobs.js';
 import { decisionPanel, fieldName } from '../../lib/components/decision-panel.js';
 import { spendBar } from '../../lib/components/settings-spend-bar.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
+import { agentSpendByJobOf } from '../fixtures/cost-read-cores.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const agentSpendByJob = withRequestRows(agentSpendByJob__unplumbed, 1, { requestRows: [] });
+const agentSpendByJob = agentSpendByJobOf;
 
 
 const URL_KEY = 'acme';

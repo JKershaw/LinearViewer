@@ -20,9 +20,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderSessionPage as renderSessionPage__unplumbed, renderPrLine } from '../../lib/render-session.js';
 import { prStateCopy } from '../../lib/pr-state-copy.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
+import { renderSessionPageOf } from '../fixtures/cost-read-cores.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const renderSessionPage = withRequestRows(renderSessionPage__unplumbed, 1, { requestRows: [] });
+const renderSessionPage = renderSessionPageOf;
 
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

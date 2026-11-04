@@ -22,9 +22,9 @@ setRunControlsResolver(async () => ({ runControls: true, runSetup: false }));
 import { InMemoryRunParagraphStore } from '../../lib/run-paragraph-store.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { findRouteLayer } from './lib/route-layer.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const createDashboardRoutes = withRequestRows(createDashboardRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+const createDashboardRoutes = withDefaults(createDashboardRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
 
 
 before(() => { process.env.NODE_ENV = 'test'; });

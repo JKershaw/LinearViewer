@@ -14,9 +14,10 @@ import { summariseRouting, summariseSpend } from '../../lib/model-routing-summar
 import { getModelDisplayName, DEFAULT_MODEL } from '../../lib/openrouter.js';
 import { modelChangeLines } from '../../lib/components/model-change-lines.js';
 import { SURFACES } from '../../lib/llm-jobs.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
+import { agentSpendByJobOf } from '../fixtures/cost-read-cores.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const agentSpendByJob = withRequestRows(agentSpendByJob__unplumbed, 1, { requestRows: [] });
+const agentSpendByJob = agentSpendByJobOf;
 
 
 const URL_KEY = 'acme';

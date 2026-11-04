@@ -13,19 +13,13 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
-import {
-  collectKpiStats as collectKpiStats__unplumbed, categorizeProxyEvent, PROXY_PHASES,
-  ACTIVITY_WINDOW_DAYS, HOURLY_WINDOW_HOURS, FREE_TIER_WINDOW_DAYS,
-  OUTCOME_WINDOW_WEEKS, loadDispatchHistory
-} from '../../lib/kpi-stats.js';
-import {
-  OUTCOME_WINDOW_DAYS, usageOf, evidenceCountOf, ticketMarkerEntriesOf, groupDispatchLineages
-} from '../../lib/dispatch-lineage.js';
+import { collectKpiStats as collectKpiStats__unplumbed, categorizeProxyEvent, PROXY_PHASES, ACTIVITY_WINDOW_DAYS, HOURLY_WINDOW_HOURS, FREE_TIER_WINDOW_DAYS, OUTCOME_WINDOW_WEEKS, loadDispatchHistory } from '../../lib/kpi-stats.js';
+import { OUTCOME_WINDOW_DAYS, usageOf, evidenceCountOf, ticketMarkerEntriesOf, groupDispatchLineages } from '../../lib/dispatch-lineage.js';
 import { __internal as TERMINAL_INTERNAL } from '../../lib/dispatch-terminal.js';
 import { __internal as SESSION_TELEMETRY_INTERNAL } from '../../lib/session-telemetry.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const collectKpiStats = withRequestRows(collectKpiStats__unplumbed, 1, { requestRows: async () => [] });
+const collectKpiStats = withDefaults(collectKpiStats__unplumbed, 1, { requestSource: NO_REQUEST_RECORDS });
 
 
 // LIN-4178: no founder lookup: the fetched rows stand in for it (the pre-LIN-4178 behaviour).

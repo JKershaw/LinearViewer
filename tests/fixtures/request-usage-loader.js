@@ -1,15 +1,15 @@
 /**
- * Test plumbing for the required request records (LIN-4201).
+ * Test plumbing for the request-usage loader (LIN-4201, LIN-4226).
  *
- * Since LIN-4201 the cost read, its callers and the route factories that reach it REQUIRE the request records (or the
- * loader that reads them) and throw without them. Tests written before records existed read snapshot-only lineages:
- * for them "no records" is the true input, so they are wrapped once per file with `withRequestRows`, which passes it
- * explicitly. No assertion changes. A test that passes `requestRows: undefined` itself still reaches the throw.
+ * The route factories and the async cost entries REQUIRE a request source (the loader) and throw without one. Tests
+ * that read snapshot-only lineages pass the named no-records source, NO_REQUEST_RECORDS, by name: `withDefaults` sets
+ * it on the argument they would otherwise be missing, and a test's own keys win. A synchronous pure core takes its
+ * records as an argument instead (tests/fixtures/cost-read-cores.js). No assertion changes with the wrapper.
  */
 import { requestUsageLoader } from '../../lib/request-usage-loader.js';
 
-/** A loader over a store that holds no request records. */
-export const NO_REQUEST_RECORDS = requestUsageLoader({ listForAnchors: async () => [] });
+/** The no-records source now lives in the loader (LIN-4226, plan decision (d)); re-exported so tests keep one import. */
+export { NO_REQUEST_RECORDS } from '../../lib/request-usage-loader.js';
 
 /**
  * A loader over a fixed set of records, read the way the real store answers: the records whose (current-anchor)
@@ -37,7 +37,7 @@ export function loaderOver(records) {
  * @param {number} index
  * @param {Object} defaults
  */
-export function withRequestRows(fn, index, defaults) {
+export function withDefaults(fn, index, defaults) {
   return (...args) => {
     const next = [...args];
     while (next.length <= index) next.push(undefined);

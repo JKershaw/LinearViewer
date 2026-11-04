@@ -49,10 +49,10 @@ import { createProxyRoutes as createProxyRoutes__unplumbed } from '../../routes/
 import { createDashboardRoutes as createDashboardRoutes__unplumbed } from '../../routes/dashboard.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const createProxyRoutes = withRequestRows(createProxyRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
-const createDashboardRoutes = withRequestRows(createDashboardRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+const createProxyRoutes = withDefaults(createProxyRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+const createDashboardRoutes = withDefaults(createDashboardRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
 
 
 // HTML-significant and, since LIN-1118, a VALID sessionId: non-empty, under 128

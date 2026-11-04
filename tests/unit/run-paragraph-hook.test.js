@@ -15,10 +15,11 @@ import assert from 'node:assert';
 import { createRunParagraphPrecompute as createRunParagraphPrecompute__unplumbed, resolvePrecomputeCredential } from '../../lib/run-paragraph-hook.js';
 import { InMemoryRunParagraphStore } from '../../lib/run-paragraph-store.js';
 import { buildRunView as buildRunView__unplumbed } from '../../lib/run-view.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
+import { buildRunViewOf } from '../fixtures/cost-read-cores.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const createRunParagraphPrecompute = withRequestRows(createRunParagraphPrecompute__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
-const buildRunView = withRequestRows(buildRunView__unplumbed, 1, { requestRows: [] });
+const createRunParagraphPrecompute = withDefaults(createRunParagraphPrecompute__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+const buildRunView = buildRunViewOf;
 
 
 const URL_KEY = 'ws-hook';

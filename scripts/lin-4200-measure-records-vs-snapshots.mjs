@@ -39,6 +39,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { lineageRecords, lineageFigure } from '../lib/cost-read.js';
+import { NO_REQUEST_RECORDS } from '../lib/request-usage-loader.js';
 import { RequestUsageStore } from '../lib/request-usage-store.js';
 import { lastUsageEntry } from '../lib/row-usage.js';
 import { USAGE_TOKEN_FIELDS } from '../lib/request-usage-vocabulary.js';
@@ -554,9 +555,10 @@ async function main(argv) {
     const perWorkspace = {};
     for (const urlKey of urlKeys) {
       const { usageDocs, rows, windowRowCount, postingRows, records } = await readWorkspace(db, urlKey, windowStart);
-      // LIN-4201: the snapshot side of the comparison, so it is read with NO records on purpose (`requestRows: []`):
-      // with records the read would fold them, and the measurement would compare records with records.
-      const lineages = lineageRecords({ fetchedRows: rows, identityRows: rows, requestRows: [] });
+      // LIN-4201 / LIN-4226: the snapshot side of the comparison, so it is read with NO records on purpose (the named
+      // no-records source, scoped to this workspace): with records the read would fold them, and the measurement would
+      // compare records with records.
+      const lineages = await lineageRecords({ fetchedRows: rows, identityRows: rows, requestSource: NO_REQUEST_RECORDS, urlKey });
       const byAnchor = new Map();
       for (const record of records) {
         const list = byAnchor.get(record.rootItemId) || [];

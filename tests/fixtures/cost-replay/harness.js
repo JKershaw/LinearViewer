@@ -12,7 +12,7 @@
  *  - S3  Ship's Biscuit's Weather line: the same calls read (routes/ship-biscuit.js).
  *  - S4  Observation's scan estimate: `listInHorizon(urlKey, {feature: 'scan'})` then `scanEstimateOf`, in the
  *        shape the page reads (routes/dashboard-feed.js); it is S7's scan `typicalUsd`.
- *  - S5  `readModelsHistory` (the 30-day read, capped) and its `identityRows`, then `agentSpendByJob`.
+ *  - S5  `readModelsHistory` (the 30-day read, capped; LIN-4226: its `workerSessions`), then `agentSpendByJob`.
  *  - S6  `typicalByModel` per job (the decision panel's per-model typicals).
  *  - S7  Settings › Models' Harbour spend per job: `listInHorizon`, then `harbourSpendByJob`.
  *  - S8  `spendByEffectiveModel` over the agent and Harbour-call spend.
@@ -29,7 +29,8 @@
 import express from 'express';
 import { createProxyRoutes } from '../../../routes/proxy.js';
 import { LlmCallLogStore } from '../../../lib/llm-call-log.js';
-import { callsSurfaceOf } from '../../../lib/cost-read.js';
+import { callsSurfaceOf, lineageRecords } from '../../../lib/cost-read.js';
+import { groupDispatchLineages } from '../../../lib/dispatch-lineage.js';
 import { readModelsHistory } from '../../../lib/model-routing-history.js';
 import { agentSpendByJob, typicalByModel, harbourSpendByJob, spendByEffectiveModel, scanEstimateOf } from '../../../lib/model-routing-spend.js';
 import { computeEffortReadout } from '../../../lib/effort-readout.js';
@@ -39,7 +40,7 @@ import { readHorizonStart } from '../../../lib/read-horizon.js';
 import { computeTerminalMarkedTaskCost } from '../../../lib/terminal-marked-task-cost.js';
 import { collectWorkspaceKpis } from '../../../lib/workspace-kpi-stats.js';
 import { lineageIdentityOfRows } from '../../../lib/dispatch-store.js';
-import { buildRunView, runLineageAnchors } from '../../../lib/run-view.js';
+import { buildRunView } from '../../../lib/run-view.js';
 import { NO_REQUEST_RECORDS, loaderOver } from '../request-usage-loader.js';
 import { buildCorpus, NOW_MS, REPLAY_ISSUES, REPLAY_JOBS } from './corpus.js';
 
@@ -317,12 +318,13 @@ export async function runReplay(corpusOverride, { readRecords = false } = {}) {
     out.S4 = scanEstimateOf(await llmStore.listInHorizon(URL_KEY, { feature: 'scan' }));
 
     // S5 / S6 / S8 / S9 share the 30-day models read, capped at its own row limit. The read carries the
-    // founder lookup for its own lineages (`identityRows`), exactly as the Models page's route passes it.
+    // founder lookup for its own lineages, and the cost read over them (LIN-4226: the page carries the read's
+    // `workerSessions`; the spend readers take those, as the Settings and decision routes do).
     const history = await readModelsHistory(store, URL_KEY, requestUsageLoader);
-    const { identityRows, requestRows } = history;
+    const { workerSessions } = history;
     const callDocs = corpus.calls.filter(c => c.urlKey === URL_KEY && toMs(c.timestamp) >= toMs(readHorizonStart(now)));
 
-    const agentSpend = agentSpendByJob(history.items, { jobs: AGENT_JOBS, identityRows, requestRows });
+    const agentSpend = agentSpendByJob(workerSessions, { jobs: AGENT_JOBS });
     out.S5 = {
       total: history.total,
       rows: history.items.length,
@@ -330,7 +332,7 @@ export async function runReplay(corpusOverride, { readRecords = false } = {}) {
       jobs: agentSpend,
     };
 
-    out.S6 = Object.fromEntries(AGENT_JOBS.map(job => [job, typicalByModel(history.items, { job, identityRows, requestRows })]));
+    out.S6 = Object.fromEntries(AGENT_JOBS.map(job => [job, typicalByModel(workerSessions, { job })]));
 
     // S7: Harbour-call spend per job, over the calls in the horizon (the store's own read).
     const horizonCalls = await llmStore.listInHorizon(URL_KEY);
@@ -340,8 +342,8 @@ export async function runReplay(corpusOverride, { readRecords = false } = {}) {
     out.S8 = spendByEffectiveModel([...agentSpend, ...harbourSpend], corpus.effective);
 
     out.S9 = Object.fromEntries(AGENT_JOBS.map(kind => [kind, {
-      spend: agentSpendByJob(history.items, { jobs: [kind], identityRows, requestRows })[0],
-      typicals: typicalByModel(history.items, { job: kind, identityRows, requestRows }),
+      spend: agentSpendByJob(workerSessions, { jobs: [kind] })[0],
+      typicals: typicalByModel(workerSessions, { job: kind }),
     }]));
 
     // S10: the effort read-out's cost columns over the 200 newest resolved history rows. Its identity is
@@ -349,8 +351,8 @@ export async function runReplay(corpusOverride, { readRecords = false } = {}) {
     const liveRows = await store.listItems(URL_KEY, {});
     const historyRows = (await store.listHistory(URL_KEY, { limit: 200 })).items;
     const effortIdentity = await store.lineageIdentityRows(URL_KEY, { anchors: anchorsOf([...liveRows, ...historyRows]) });
-    const effortRequestRows = await requestUsageLoader.forAnchors(URL_KEY, anchorsOf([...liveRows, ...historyRows]));
-    out.S10 = computeEffortReadout({
+    // LIN-4226: the read loads the records itself, through the source (no preload here).
+    out.S10 = await computeEffortReadout({
       liveRows,
       historyRows,
       historyTotal: historyRows.length,
@@ -359,7 +361,8 @@ export async function runReplay(corpusOverride, { readRecords = false } = {}) {
       survivalAvailable: false,
       gateFieldsAvailable: false,
       identityRows: effortIdentity,
-      requestRows: effortRequestRows,
+      requestSource: requestUsageLoader,
+      urlKey: URL_KEY,
     });
 
     // S11: the public KPI's cost per finished ticket. Production feeds it the rows `loadDispatchHistory`
@@ -371,14 +374,23 @@ export async function runReplay(corpusOverride, { readRecords = false } = {}) {
       fakeCollection(corpus.history, scalar),
       fakeCollection(corpus.queue, scalar),
     ], horizonRows);
-    out.S11 = computeTerminalMarkedTaskCost(horizonRows, now, { identityRows: founders, requestRows: await requestUsageLoader.forRows(horizonRows, { urlKey: URL_KEY }) });
+    // LIN-4226: the lineage records come from the one cost read, through the source (scoped to this workspace, as the
+    // harness always read them); the terminal figures take them.
+    const s11CostLineages = await lineageRecords({
+      fetchedRows: horizonRows,
+      identityRows: founders,
+      requestSource: requestUsageLoader,
+      urlKey: URL_KEY,
+      outcomes: groupDispatchLineages(horizonRows),
+    });
+    out.S11 = computeTerminalMarkedTaskCost(horizonRows, now, { costLineages: s11CostLineages });
 
     // S12: the workspace KPIs' cost per day (and the rest of the dashboard's figures).
     out.S12 = await collectWorkspaceKpis({ collections: workspaceKpiCollections(corpus), urlKey: URL_KEY, now, requestUsageLoader });
 
     // S13: the run page's loops for one session, grouped by lineage, with each lineage's cost.
     const runSession = { sessionId: 'replay-main', seedIssue: 'LIN-1', loops: sessionLoops(corpus) };
-    out.S13 = buildRunView(runSession, { now, requestRows: await requestUsageLoader.forAnchors(URL_KEY, runLineageAnchors(runSession)) });
+    out.S13 = await buildRunView(runSession, { now, requestSource: requestUsageLoader, urlKey: URL_KEY });
 
     // The mixed-harness tally over the whole 30-day window (uncapped), as the plan asks.
     const windowRows = (await store.listHistory(URL_KEY, { since: readHorizonStart(now) })).items;

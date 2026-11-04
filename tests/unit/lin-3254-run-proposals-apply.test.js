@@ -22,10 +22,11 @@ import { RunProposalsStore } from '../../lib/run-proposals-store.js';
 import { getSessionsForWorkspace } from '../../lib/pipeline-loops.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
+import { renderSessionPageOf } from '../fixtures/cost-read-cores.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const createDashboardRoutes = withRequestRows(createDashboardRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
-const renderSessionPage = withRequestRows(renderSessionPage__unplumbed, 1, { requestRows: [] });
+const createDashboardRoutes = withDefaults(createDashboardRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+const renderSessionPage = renderSessionPageOf;
 
 
 const URL_KEY = 'acme';

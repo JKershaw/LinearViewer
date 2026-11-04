@@ -23,12 +23,13 @@ import { fmtUsd } from '../../lib/render-run-steps.js';
 import { collectKpiStats as collectKpiStats__unplumbed, toPublicKpis } from '../../lib/kpi-stats.js';
 import { lineageIdentityOfRows } from '../../lib/dispatch-store.js';
 import { runReplay, matches } from '../fixtures/cost-replay/harness.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
+import { lineageFigureOfOf, lineageRecordsOf, terminalMarkedTaskCostOf } from '../fixtures/cost-read-cores.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const lineageRecords = withRequestRows(lineageRecords__unplumbed, 0, { requestRows: [] });
-const lineageFigureOf = withRequestRows(lineageFigureOf__unplumbed, 1, { requestRows: [] });
-const computeTerminalMarkedTaskCost = withRequestRows(computeTerminalMarkedTaskCost__unplumbed, 2, { requestRows: [] });
-const collectKpiStats = withRequestRows(collectKpiStats__unplumbed, 1, { requestRows: async () => [] });
+const lineageRecords = lineageRecordsOf;
+const lineageFigureOf = lineageFigureOfOf;
+const computeTerminalMarkedTaskCost = terminalMarkedTaskCostOf;
+const collectKpiStats = withDefaults(collectKpiStats__unplumbed, 1, { requestSource: NO_REQUEST_RECORDS });
 
 
 const DAY = 24 * 60 * 60 * 1000;

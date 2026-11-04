@@ -14,10 +14,10 @@ import { buildDoneTotal, collectKpiStats as collectKpiStats__unplumbed, loadDone
 import { collectWorkspaceKpis as collectWorkspaceKpis__unplumbed } from '../../lib/workspace-kpi-stats.js';
 import { ROLLUP_MARKER_ID, createKpiDailyRollupRun } from '../../lib/kpi-daily-rollup.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const collectKpiStats = withRequestRows(collectKpiStats__unplumbed, 1, { requestRows: async () => [] });
-const collectWorkspaceKpis = withRequestRows(collectWorkspaceKpis__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+const collectKpiStats = withDefaults(collectKpiStats__unplumbed, 1, { requestSource: NO_REQUEST_RECORDS });
+const collectWorkspaceKpis = withDefaults(collectWorkspaceKpis__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
 
 
 // LIN-4178: no founder lookup: the fetched rows stand in for it (the pre-LIN-4178 behaviour).

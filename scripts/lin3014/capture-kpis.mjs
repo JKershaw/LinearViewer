@@ -19,6 +19,7 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { EJSON } from 'bson';
+import { NO_REQUEST_RECORDS } from '../../lib/request-usage-loader.js';
 
 // LIN-4178: no founder lookup: the fetched rows stand in for it (the pre-LIN-4178 behaviour).
 
@@ -61,8 +62,8 @@ export async function captureKpiReads(collectKpiStats, lineageIdentityOfRows) {
   const inert = { find: () => ({ toArray: async () => [] }) };
   const lineageIdentity = rows => lineageIdentityOfRows([inert, inert], rows);
   try {
-    // LIN-4201: the request records likewise (none: inert), so the collector reaches its reads.
-    await collectKpiStats(collections, { lineageIdentity, requestRows: async () => [], milestoneFunnelDeps: emptyMilestoneFunnelDeps() });
+    // LIN-4201 / LIN-4226: the request records likewise (none: the named no-records source), so the collector reaches its reads.
+    await collectKpiStats(collections, { lineageIdentity, requestSource: NO_REQUEST_RECORDS, milestoneFunnelDeps: emptyMilestoneFunnelDeps() });
   } catch {
     // Expected: the recording stubs return empty arrays/0, which downstream
     // aggregation/derivation code may not tolerate. Only the READ SHAPES

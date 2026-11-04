@@ -2505,8 +2505,9 @@ const kpiPage = createKpiPage({
     // LIN-4178: the founder lookup over the raw dispatch collections (batched per urlKey). The public
     // path gets its output only; the query lives in lib/dispatch-store.js (lineageIdentityOfRows).
     lineageIdentity: rows => lineageIdentityOfRows([dispatchHistoryCollection, dispatchQueueCollection], rows),
-    // LIN-4201: the request records of the same rows' lineages, grouped by each row's urlKey (the one loader).
-    requestRows: rows => requestUsageLoader.forRows(rows),
+    // LIN-4201 / LIN-4226: the request records of the same rows' lineages, through the one loader. The cost read makes
+    // ONE instance-wide load (no urlKey: each row carries its own).
+    requestSource: requestUsageLoader,
     // LIN-2952: the milestone-funnel aggregate's own deps (stores + the dispatch
     // collections), passed in OPTIONS so the aggregate never re-reads through
     // `collections.dispatchHistory`.

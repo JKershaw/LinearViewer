@@ -17,9 +17,9 @@ import express from 'express';
 import { createDispatchRoutes as createDispatchRoutes__unplumbed } from '../../routes/dispatch.js';
 import { emptyTable } from '../../lib/model-routing.js';
 import { stubLineageIdentity } from '../fixtures/lineage-identity.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const createDispatchRoutes = withRequestRows(createDispatchRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+const createDispatchRoutes = withDefaults(createDispatchRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
 
 
 // A `[usage]` feedback entry, as the runner posts it. `costUsd` pins a price; omit it to be unpriced.

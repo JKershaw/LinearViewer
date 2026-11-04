@@ -15,9 +15,10 @@ import { DEFAULT_MODEL, getModelDisplayName } from '../../lib/openrouter.js';
 import { SURFACES } from '../../lib/llm-jobs.js';
 import { actorLabel } from '../../lib/render-settings-workspace.js';
 import { FORMER_MEMBER } from '../../lib/workspace-change-log.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
+import { agentSpendByJobOf } from '../fixtures/cost-read-cores.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const agentSpendByJob = withRequestRows(agentSpendByJob__unplumbed, 1, { requestRows: [] });
+const agentSpendByJob = agentSpendByJobOf;
 
 
 const AGENT = SURFACES.AGENT_SESSION;
