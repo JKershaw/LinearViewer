@@ -138,7 +138,26 @@ describe('inline-literal copies stay in sync with the helper (LIN-3037)', () => 
       `expected exactly 3 literal occurrences (one module-level declaration of 3 kinds), got ${occurrences.length}: ${JSON.stringify(occurrences)}`);
   });
 
-  test('both parseHeartbeats and parseParkedWait reference the same shared stamp-check helper', () => {
+  // LIN-4240: parseParkedWait now walks past a wider set (`_isNonStateEntry`),
+  // which itself delegates the stamp check to `_isStampEntry`. The stamp check
+  // is still shared, just one level down, so this test follows that chain.
+  test('parseParkedWait reaches the stamp check through the shared skip predicate (LIN-4240)', () => {
+    const predicateStart = sessionTelemetrySource.indexOf('const _isNonStateEntry = ');
+    const predicateEnd = sessionTelemetrySource.indexOf('\n};', predicateStart);
+    assert.ok(predicateStart !== -1 && predicateEnd !== -1, '_isNonStateEntry found');
+    const predicateBody = sessionTelemetrySource.slice(predicateStart, predicateEnd);
+    const parkedWaitStart = sessionTelemetrySource.indexOf('export function parseParkedWait(');
+    const parkedWaitEnd = sessionTelemetrySource.indexOf('\n}', parkedWaitStart);
+    const parkedWaitBody = sessionTelemetrySource.slice(parkedWaitStart, parkedWaitEnd);
+    assert.strictEqual(extractKindOccurrences(predicateBody).length, 0,
+      '_isNonStateEntry must not carry its own decision-* literal — it must use the shared stamp-check helper');
+    assert.match(predicateBody, /_isStampEntry\(/, '_isNonStateEntry must call the shared stamp-check helper');
+    assert.match(parkedWaitBody, /_isNonStateEntry\(/, 'parseParkedWait must walk past entries via the skip predicate');
+    assert.strictEqual(extractKindOccurrences(parkedWaitBody).length, 0,
+      'parseParkedWait must not carry its own decision-* literal');
+  });
+
+  test('parseHeartbeats and parseParkedWait carry no decision-* literal of their own (LIN-4240: parseParkedWait checked in the test above)', () => {
     const heartbeatsStart = sessionTelemetrySource.indexOf('export function parseHeartbeats(');
     const heartbeatsEnd = sessionTelemetrySource.indexOf('\n}', heartbeatsStart);
     const parkedWaitStart = sessionTelemetrySource.indexOf('export function parseParkedWait(');
@@ -154,6 +173,5 @@ describe('inline-literal copies stay in sync with the helper (LIN-3037)', () => 
     assert.strictEqual(extractKindOccurrences(parkedWaitBody).length, 0,
       'parseParkedWait must not carry its own decision-* literal — it must use the shared module-level set');
     assert.match(heartbeatsBody, /_isStampEntry\(/, 'parseHeartbeats must call the shared stamp-check helper');
-    assert.match(parkedWaitBody, /_isStampEntry\(/, 'parseParkedWait must call the shared stamp-check helper');
   });
 });
