@@ -14,6 +14,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { collectionNames } from '../helpers/collection-names.js';
 import {
   buildErasureSeed, seedDb, snapshotDb, PERSON, BYSTANDER, WORKSPACES, SENTINELS
 } from '../fixtures/erasure-seed.js';
@@ -79,15 +80,13 @@ async function expectErasure(promise, code) {
 // Done-when 5: INVENTORY names every collection the app can open
 // ---------------------------------------------------------------------------
 
-function walkLiterals(path) {
-  return [...readFileSync(join(ROOT, path), 'utf8').matchAll(/collection\(\s*['"]([A-Za-z0-9_.-]+)['"]\s*\)/g)].map((m) => m[1]);
-}
-
-/** The universe: server.js literals + the two constant-named collections + INDEX_SPECS + the three script tables. */
+/**
+ * The universe every guard reads (LIN-4234): the literals and the `*_COLLECTION` constants under lib/**,
+ * both derived from code by tests/helpers/collection-names.js (no hand-added names), plus INDEX_SPECS and
+ * the three script tables.
+ */
 function collectionUniverse() {
-  const names = new Set(walkLiterals('server.js'));
-  names.add(readFileSync(join(ROOT, 'lib/email-auth.js'), 'utf8').match(/MAGIC_LINK_COLLECTION\s*=\s*['"]([^'"]+)['"]/)[1]);
-  names.add(readFileSync(join(ROOT, 'lib/task-share-store.js'), 'utf8').match(/TASK_SHARE_COLLECTION\s*=\s*['"]([^'"]+)['"]/)[1]);
+  const names = new Set(collectionNames().names);
   for (const s of INDEX_SPECS) names.add(s.collection);
   for (const s of [...URLKEY_SOURCES, ...ACTOR_SOURCES, ...UNENUMERATED_SOURCES]) names.add(s.collection);
   return names;
@@ -107,11 +106,32 @@ describe('INVENTORY completeness (Done-when 5)', () => {
     assert.deepStrictEqual(missingFrom(without), ['workspace-halt']);
   });
 
-  // LIN-4198 adds one INDEX_SPECS collection (the per-request usage store), so the bound moves 56 -> 57.
-  // Bump it only when a collection is added, with its ticket here, never to make a drift pass.
-  test('the universe is the 57 names the plan bounded (funnel-events retired by LIN-3632 is not in it)', () => {
+  // LIN-4234: a constant-named collection (usage-snapshot-intake, opened as db.collection(CONST) in server.js) is
+  // in the universe through the derived constants, so dropping its row must turn the guard red.
+  test('mutation check (LIN-4234): dropping the usage-snapshot-intake row turns the completeness check red', () => {
+    const without = INVENTORY.filter((r) => r.collection !== 'usage-snapshot-intake');
+    assert.deepStrictEqual(missingFrom(without), ['usage-snapshot-intake']);
+  });
+
+  // The rule, not only the instance: a new `*_COLLECTION` constant under lib/ joins the universe with no list edit.
+  test('the rule (LIN-4234): a new constant-named collection under lib/ joins the universe; a commented one does not', () => {
+    const sources = {
+      literalTexts: [],
+      constantTexts: ["export const FOO_COLLECTION = 'foo-bar';\n/* export const BAZ_COLLECTION = 'baz'; */\n// export const QUX_COLLECTION = 'qux';"]
+    };
+    const { names } = collectionNames({ sources });
+    assert.ok(names.has('foo-bar'), 'a constant under lib/ is read');
+    assert.ok(!names.has('baz') && !names.has('qux'), 'a commented-out declaration is not a collection');
+  });
+
+  // LIN-4198 adds one INDEX_SPECS collection (the per-request usage store): 56 -> 57.
+  // LIN-4234 moves the bound 57 -> 59: usage-snapshot-intake (its INVENTORY row, added here) and `shares`
+  // (lib/drop-shares-collection.js, retired, already a `leave` row). `shares` enters because the derived
+  // universe reads every `*_COLLECTION` constant under lib/, and it was the one INVENTORY name the old guard
+  // could not see. Bump only when a collection is added, with its ticket here, never to make a drift pass.
+  test('the universe is the 59 names the derived rule gives (funnel-events retired by LIN-3632 is not in it)', () => {
     const universe = collectionUniverse();
-    assert.strictEqual(universe.size, 57);
+    assert.strictEqual(universe.size, 59);
     assert.ok(!universe.has('funnel-events'));
     assert.ok(!INVENTORY.some((r) => r.collection === 'funnel-events'), 'LIN-3632: no lib module may name the retired collection');
   });
