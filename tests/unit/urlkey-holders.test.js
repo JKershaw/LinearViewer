@@ -5,7 +5,7 @@
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
-import { mkdtempSync, rmSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
@@ -16,6 +16,7 @@ import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
 import { URLKEY_SOURCES, ACTOR_SOURCES, UNENUMERATED_SOURCES } from '../../scripts/dry-run-urlkey-duplicates.mjs';
+import { collectionNames, unnamedOpenings, knownConstantNames } from '../helpers/collection-names.js';
 
 const T1 = new Date('2026-08-01T00:00:00.000Z');
 const T2 = new Date('2026-09-01T00:00:00.000Z');
@@ -167,6 +168,10 @@ const COLLECTION_CLASSES = {
   'model-routing': 'C', 'model-routing-log': 'C', 'model-routing-presets': 'BC',
   // LIN-3846: urlKey field; actor.id may be a token label, so not an actor source.
   'workspace-change-log': 'C',
+  // LIN-4234: both carry a top-level urlKey and were in neither this table nor URLKEY_SOURCES before, so the
+  // no-holder count could not see them. request-usage: one document per model request (lib/request-usage-store.js).
+  // usage-snapshot-intake: one counter document per workspace per UTC day (lib/usage-snapshot-intake.js).
+  'request-usage': 'C', 'usage-snapshot-intake': 'C',
   // The only C members NOT read; the report names them (UNENUMERATED_SOURCES) so the count is never read as complete.
   'run-summary-cache': 'C-named', 'session-summary-cache': 'C-named',
   // No urlKey at all.
@@ -174,34 +179,33 @@ const COLLECTION_CLASSES = {
   'harbour-feedback-tokens': 'N', 'scheduler-locks': 'N', 'email-magic-links': 'N', 'shares': 'N'
 };
 
-function walk(dir, out = []) {
-  for (const name of readdirSync(dir)) {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) walk(path, out);
-    else if (name.endsWith('.js')) out.push(path);
-  }
-  return out;
-}
-
 describe('class guard: every collection is classified', () => {
-  const files = [join(ROOT, 'server.js'), ...walk(join(ROOT, 'lib')), ...walk(join(ROOT, 'routes'))];
-  const literal = new Set();
-  for (const f of files) {
-    for (const m of readFileSync(f, 'utf8').matchAll(/collection\(\s*['"]([A-Za-z0-9_.-]+)['"]\s*\)/g)) literal.add(m[1]);
-  }
-  // Constant-named collections a literal regex cannot see.
-  const constants = [
-    ['lib/email-auth.js', /MAGIC_LINK_COLLECTION\s*=\s*['"]([^'"]+)['"]/],
-    ['lib/drop-shares-collection.js', /SHARES_COLLECTION\s*=\s*['"]([^'"]+)['"]/]
-  ].map(([f, re]) => readFileSync(join(ROOT, f), 'utf8').match(re)[1]);
+  // LIN-4234: the universe is read from the one shared helper (tests/helpers/collection-names.js): literals in
+  // server.js, lib/** and routes/**, plus the value of every `*_COLLECTION` constant under lib/**. Nothing is
+  // hand-added here, so a constant-named collection cannot be missed by this table and seen by the erasure guard.
+  const { names: universe } = collectionNames();
 
   test('no collection the app opens is missing from the table', () => {
-    const missing = [...literal, ...constants].filter(c => !(c in COLLECTION_CLASSES));
+    const missing = [...universe].filter(c => !(c in COLLECTION_CLASSES));
     assert.deepStrictEqual(missing, [], `unclassified collection(s): ${missing}. Classify each as holder (H), actor (B), urlKey-bearing (C) or key-less (N), and wire H/B/C into the dry-run.`);
   });
 
   test('the planted unclassified collection is caught', () => {
     assert.ok(['mystery-store'].filter(c => !(c in COLLECTION_CLASSES)).length > 0);
+  });
+
+  // LIN-4234 census: the literal scan above reads `collection('name')` only. A `db.collection(<identifier>)` in
+  // server.js is read only when the identifier is an imported *_COLLECTION constant; anything else is a hole.
+  test('census (LIN-4234): every non-literal collection(...) in server.js is an imported *_COLLECTION constant', () => {
+    const server = readFileSync(join(ROOT, 'server.js'), 'utf8');
+    assert.deepStrictEqual(unnamedOpenings(server, knownConstantNames()), []);
+  });
+
+  test('the census is not vacuous (LIN-4234): a local const, or an inline expression, opened by identifier is caught', () => {
+    const planted = "const name = 'x';\nconst store = db.collection(name);\nconst other = db.collection('a' + b);\n"
+      + "import { USAGE_SNAPSHOT_INTAKE_COLLECTION } from './lib/usage-snapshot-intake.js';\n"
+      + 'db.collection(USAGE_SNAPSHOT_INTAKE_COLLECTION);\n';
+    assert.deepStrictEqual(unnamedOpenings(planted, knownConstantNames()), ['name', "'a' + b"]);
   });
 
   test('the dry-run sources agree with the table, and every C/B entry is actually wired', () => {

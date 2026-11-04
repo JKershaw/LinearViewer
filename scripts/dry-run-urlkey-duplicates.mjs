@@ -85,7 +85,10 @@ export const URLKEY_SOURCES = Object.freeze([
     // which the field branch would count as an actor account. Presets hold account ids only.
     'model-routing-log', 'model-routing-presets',
     // LIN-3846. Like the routing log, not in ACTOR_SOURCES: actor.id may be a token label.
-    'workspace-change-log'
+    'workspace-change-log',
+    // LIN-4234. Both carry a top-level urlKey (lib/request-usage-store.js, lib/usage-snapshot-intake.js), so the
+    // no-holder count reads them with distinct('urlKey'). Neither holds an account field: not in ACTOR_SOURCES.
+    'request-usage', 'usage-snapshot-intake'
   ].map(collection => ({ collection, shape: 'field', field: 'urlKey' })),
   { collection: 'local-issues', shape: 'field', field: 'scope' },
   { collection: 'workspace-halt', shape: 'id' },
