@@ -146,7 +146,8 @@ describe('source constraints (D6 and the source-scanning censuses)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Class guard: every collection the app opens is classified.
+// Class guard: every collection the app opens is classified. Names come from the one shared
+// helper (tests/helpers/collection-names.js, LIN-4234), not a list maintained here.
 // ---------------------------------------------------------------------------
 // H holder store; B actor store; C urlKey-bearing (read by the dry-run's no-holder
 // count); N carries no urlKey (reason given).
