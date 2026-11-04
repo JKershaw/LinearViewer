@@ -1510,3 +1510,20 @@ John: "happy to continue until either I'm awake in the morning, or we hit the to
 5. **In the morning:** a fresh agent scores the ledger rows blind, as a second scorer.
 
 **Docket:** the v2 backtest; LIN-4234 and LIN-4233 through the loop; then an ordinary feature ticket if tokens allow.
+
+## 4 Nov, about 21:20 UTC: John's steer for overnight (before compaction)
+
+- **Try without routing the Periodicals**, "as if in a repo where they can't be assumed".
+  - From now on: don't add Periodicals findings to tickets.
+  - The global offshoot runs on **the code alone**: a variant of v2 that drops "whatever records this codebase keeps about its own shape" and says not to read review or periodical reports.
+  - Compare the place outcomes with today's routed tickets.
+  - LIN-4234 and LIN-4233's Surveys, already in flight, used v2 with records. Their scope calls tonight add no routed findings. New Surveys from here use the code-only variant.
+- **Err on the side of larger tidies** in my scope calls, still pricing each larger extra as its own piece.
+- **He agrees with the other recommendations:**
+  - global v2's "who else must learn about it";
+  - LIN-4234 as LIN-4203's tidy-after, large;
+  - Survey every ticket we start;
+  - skip the step-back when the voices converge;
+  - a blind second scorer in the morning;
+  - an ordinary feature ticket through the loop.
+- He'll compact this session for headroom. **Everything needed to carry on is in this log, `place-ledger.md`, `broad-options.md`, `prompt.md` and the `global-offshoot-prompt*.md` files.** Scratchpad: `check.sh`, and `ft5/` for LIN-4234/4233. The proxy token is `.tok3` (valid to 5 Nov 17:11 UTC).
