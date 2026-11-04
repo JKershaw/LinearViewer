@@ -206,9 +206,26 @@ describe('W6: a caller makes exactly one request-records load (witness 4, per ca
     lineageIdentityRows: async () => rows.map(r => ({ _id: r._id, rootItemId: r.rootItemId, status: r.status, kind: r.kind, issueIdentifier: r.issueIdentifier, dispatchedAt: r.dispatchedAt })),
   });
 
+  // The route reads its 30-day horizon from the wall clock, so this witness's fixtures are stamped from Date.now(): the
+  // fixed-date fixtures above would fall out of that horizon under the clock-shift arm (LIN-3949), and the figure would
+  // be withheld for the wrong reason.
+  const liveAt = (daysAgo) => new Date(Date.now() - daysAgo * DAY).toISOString();
+  const liveSnapshotRow = () => ({
+    _id: 'root-1', id: 'root-1', rootItemId: 'root-1', urlKey: FAKE_ACME, status: 'taken', kind: 'implementation',
+    issueIdentifier: 'LIN-42', issueId: 'issue-42', dispatchedAt: liveAt(2),
+    feedback: [
+      { kind: 'usage', timestamp: liveAt(2), message: `[usage] ${JSON.stringify({ harness: 'claude-code', model: 'claude-opus-5-5', inputTokens: 10, costUsd: 4.9 })}` },
+      { message: '[done] landed', timestamp: liveAt(1.9) },
+    ],
+  });
+  const liveRecords = [
+    { rootItemId: 'root-1', itemId: 'root-1', requestId: 'm1', at: liveAt(2), harness: 'claude-code', model: 'claude-opus-5-5', effort: 'high', inputTokens: 10, costUsd: 0.1 },
+    { rootItemId: 'root-1', itemId: 'root-1', requestId: 'm2', at: liveAt(1.95), harness: 'claude-code', model: 'claude-opus-5-5', effort: 'high', inputTokens: 10, costUsd: 0.2 },
+  ];
+
   test('GET /api/proxy/cost makes exactly one records load and shows the records figure', async () => {
-    const loader = loaderOver(RECORDS);
-    const app = buildApp({ dispatchQueueStore: storeFor([{ ...snapshotRow(), urlKey: FAKE_ACME }]), requestUsageLoader: loader });
+    const loader = loaderOver(liveRecords);
+    const app = buildApp({ dispatchQueueStore: storeFor([liveSnapshotRow()]), requestUsageLoader: loader });
     const res = await call(app, 'GET', '/api/proxy/cost/LIN-42');
     assert.equal(res.status, 200);
     close(res.body.totalUsd, 0.3);
