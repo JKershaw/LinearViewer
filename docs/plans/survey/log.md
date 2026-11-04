@@ -1263,3 +1263,29 @@ It came to "about half a session of hand-checking per relay ticket, about five t
 **LIN-4212 merged (`eb44eff9`) without a Survey.** Place change: none (1262 → 1262, no new files, no pair moved); production +167 / −26. Ledger: 0.
 
 **A pattern worth keeping:** the pricing follow-up is the step that turns "not this task's" into a decision. It can come out as "do it first", "fold it in", or "its own ticket, now queued". Each is better than "someday".
+
+## 4 Nov, about 11:25 UTC: the second pricing (the shared heavy-test harness), and forward trial 2
+
+**The pricing answer** (`21451574`, a fresh agent at simple-dispatcher `502901c`), the tally row named four times:
+- **The absence has cost about 1.5–2 builder sessions and about 1,500 lines of single-caller infrastructure.** LIN-4180, LIN-4181 and LIN-4196 each built a piece. The hidden costs:
+  - by-hand clean-`main` baselines (three times, once wrong);
+  - a guard made vacuous by an env pin;
+  - `NODE_OPTIONS` leaking into nested runs;
+  - LIN-4186 drifting red unnoticed "because nobody ran the tier";
+  - process-group stop now three ways.
+- **Building it now costs about half a session** (~300 lines plus tests). Every claim gets a check that can fail: a sentinel file proves "couldn't run" never starts a test; a grandchild-pid check; a census forbidding ad-hoc group kills.
+- **Its choice: build it now, small**, before the six tier tickets in Backlog. "Folding it into the next task has been tried three times; each time it was 'not this task's'."
+- **Its own rule for changing its mind:** if no tier task is scheduled for a fortnight, leave it. If the next triage starts with a by-hand clean-`main` diff, add a scripted `--baseline` mode.
+
+**My call as the human:** build it now, the smallest version **plus the scripted baseline**. LIN-4187 and LIN-4188 are clean-`main` system-test reds, and their triage starts exactly with that by-hand diff. Then **run LIN-4187 on the new harness**, with LIN-4186 (the same kind of ticket, before the harness) as the comparison. Filed as **LIN-4219** (Backlog, High). This is the first time a tally row became its own task on price.
+
+**Forward trial 2: LIN-4219 through the whole loop, with two arms.**
+- Two independent open-0 agents (arms A and B) and one global v1, all at `502901c`.
+- **Arm A** gets the step-back with the global view; **arm B** the same step-back without it.
+- Same ticket, same base, so the difference in choice is the global voice's contribution. Docket item 3.
+- It's also the first simple-dispatcher-only ticket through the global voice. Simple-dispatcher has no area map, so we see whether the place view works from the code and docs alone. Docket item 4.
+
+**Prediction, before the answers:**
+- Both arms choose about the same middle option (the ticket is already a consolidation).
+- The global view adds placement points arm B lacks: where the harness lives, and which existing copies it must delete in the same change.
+- The global answer is thinner on "how the place is now" than on Harbour, because simple-dispatcher keeps no area map and no Periodicals record of its own shape.
