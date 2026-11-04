@@ -62,6 +62,7 @@ import {
   canPost,
   wakeRootFrom,
   sumTranscriptUsage,
+  transcriptRequestRecords,
   usageMessage,
   subagentModelFor,
   handoffMessage,
@@ -1221,7 +1222,9 @@ async function fakeHarbour() {
     watch: new Map(),
     watchFail: new Map(), // id -> HTTP status the dispatch read answers instead (LIN-3676: 500 is unreadable, 404 is gone)
     watchReads: [], // every id the dispatch read was asked for
-    promptOverride: new Map()
+    promptOverride: new Map(),
+    usage: [], // LIN-4202: every POST /api/proxy/runner/usage/:id, { itemId, records }
+    usageStatus: null // LIN-4202: when set, the usage route answers this HTTP status instead
   };
   const json = (res, status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
   const server = http.createServer(async (req, res) => {
@@ -1263,6 +1266,13 @@ async function fakeHarbour() {
       if (!state.history.has(m[1])) return json(res, 404, { error: 'not taken' });
       state.feedback.push({ itemId: m[1], body: JSON.parse(raw) });
       return json(res, 200, { success: true });
+    }
+    if (req.method === 'POST' && (m = url.pathname.match(/^\/api\/proxy\/runner\/usage\/(.+)$/))) {
+      if (state.usageStatus) return json(res, state.usageStatus, { error: 'injected' });
+      if (!state.history.has(m[1])) return json(res, 404, { error: 'not taken' });
+      const { records } = JSON.parse(raw);
+      state.usage.push({ itemId: m[1], records });
+      return json(res, 200, { applied: records.map((r) => r.requestId), rejected: [] });
     }
     if (req.method === 'GET' && (m = url.pathname.match(/^\/api\/proxy\/dispatch\/([^/]+)\/prompt$/))) {
       const it = state.queue.find((i) => i.id === m[1]) || state.history.get(m[1]);
@@ -1438,6 +1448,45 @@ describe('commands (against a fake Harbour)', () => {
     assert.equal(post.body.kind, 'usage');
     assert.equal(post.body.rootItemId, itemId);
     assert.equal(parseUsage([{ kind: 'usage', message: post.body.message }]).model, 'claude-opus-5-5');
+  });
+
+  test('LIN-4202: usage also posts the transcript\'s per-request records to the runner-token route, after the snapshot', TIMEOUT, async () => {
+    const itemId = harbour.state.takes.at(-1);
+    const feedbackBefore = harbour.state.feedback.length;
+    const usageBefore = harbour.state.usage.length;
+    const r = await run(['usage', 'agent-1']);
+    // The snapshot is posted exactly as before: one kind:'usage' feedback, same message.
+    assert.equal(harbour.state.feedback.length, feedbackBefore + 1);
+    const snapshot = harbour.state.feedback.at(-1);
+    assert.equal(snapshot.body.message, usageMessage(sumTranscriptUsage(readFileSync(FIXTURE, 'utf8').split('\n'))));
+    // And the records, one call, to this item.
+    assert.equal(harbour.state.usage.length, usageBefore + 1);
+    const sent = harbour.state.usage.at(-1);
+    assert.equal(sent.itemId, itemId);
+    const expected = transcriptRequestRecords(readFileSync(FIXTURE, 'utf8').split('\n'), { agent: 'agent-1' }).records;
+    assert.ok(expected.length > 0);
+    assert.deepEqual(sent.records, expected);
+    assert.equal(r.records.found, expected.length);
+    assert.equal(r.records.applied, expected.length);
+    assert.equal(r.records.failedBatches, 0);
+  });
+
+  test('LIN-4202: a failing record post leaves the snapshot post and the command result alone', TIMEOUT, async () => {
+    for (const status of [500, 404]) {
+      harbour.state.usageStatus = status;
+      try {
+        const feedbackBefore = harbour.state.feedback.length;
+        const r = await run(['usage', 'agent-1']);
+        assert.equal(harbour.state.feedback.length, feedbackBefore + 1, `snapshot still posted on ${status}`);
+        assert.equal(harbour.state.feedback.at(-1).body.kind, 'usage');
+        assert.equal(r.usage.model, 'claude-opus-5-5');
+        assert.equal(r.records.posted, 0);
+        if (status === 404) assert.equal(r.records.notTaken, true);
+        else assert.deepEqual(r.records.errors, ['HTTP 500']);
+      } finally {
+        harbour.state.usageStatus = null;
+      }
+    }
   });
 
   test('feedback [done] posts with rootItemId, marks the row done and stops its broker', TIMEOUT, async () => {

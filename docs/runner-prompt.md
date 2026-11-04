@@ -177,9 +177,10 @@ subagent to add `--unix-socket <path>` to every curl. Its value wins over any
    For `BLOCKED:` with a `DECISION:` line, first post its JSON object as written, from the `{`,
    as `runner feedback <id> decision '<the JSON>'`; Harbour reads it as a ruling (the same
    `decision_id` again is safe: the last wins). Then the marker.
-2. `runner usage <agentId>`: the `[usage]` line, from the subagent's own transcript. It carries
-   the **realised** `harness` and `model` (what actually ran, never what the item asked for).
-   With no readable transcript it posts the harness alone, which reads unpriced, never $0.
+2. `runner usage <agentId>`: the `[usage]` line and per-request records, from the subagent's own
+   transcript. It carries the **realised** `harness` and `model` (what actually ran, never what
+   the item asked for). With no readable transcript it posts the harness alone, which reads
+   unpriced, never $0.
 3. The marker: `DONE:` → `runner feedback <id> status "[done] <summary>"`; `FAILED:` →
    `"[failed] <why>"`; `BLOCKED:` → `"[blocked] <what it needs>"`. `[blocked]` is not terminal:
    it wakes the parent and reads as waiting on a human, and a follow-up continues the subagent.
