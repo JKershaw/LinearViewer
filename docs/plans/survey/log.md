@@ -744,3 +744,23 @@ The mutation runner edits a Harbour checkout's source. That has now cost a Surve
 **Acted on:** all of that went onto the ticket, with "decide early, and say which" on the dispatcher-checkout scope. Kicked off 01:31.
 
 **A note on the Survey's reach:** this is the fourth ticket where open-0 found that the thing being protected (a guard, a score, a baseline) could be *silently* wrong. LIN-4181's guard was made vacuous by an env pin. LIN-4178's change list allowed and never required. LIN-4180's "it runs" wasn't "it passes". Here, a mutation score could be fake. A pattern for the discussion: *does the check you're relying on actually fail when it should?*
+
+## 4 Nov, 02:10 UTC: rebuild 2's plan follows the Survey's order
+
+LIN-4195's plan was **approved in one plan-review round** and split into seven pieces, one PR each:
+
+| Piece | Ticket | Repo | Blocked by |
+|---|---|---|---|
+| 0 · corpus and baseline goldens | LIN-4197 (in progress) | both | — |
+| 1 · Harbour intake, store, per-record pricing | LIN-4198 | Harbour | 0 |
+| 2 · runner posts claude-code records; Stop/reap/cancel flush; subagents | LIN-4199 | runner | 1 (deployed) |
+| 3 · live measurement gate (records against snapshots, volume) | LIN-4200 | Harbour | 2 |
+| 4 · the read sums records; cutover | LIN-4201 | Harbour | 3 |
+| 5 · opencode and runner-kit post records | LIN-4202 | both | 1 |
+| 6 · stop posting snapshots; re-measure; final report-back | LIN-4203 | both | 4, 5 |
+
+**Against the Survey:** the plan's chain *is* the Survey's "do first" order, with two refinements. The Survey's step 2 (the transcript corpus) moved to the front as piece 0. And a **live measurement gate** (piece 3) sits between the runner switch and the read switch. Pieces 0 to 2 "move no figure". Plan review confirmed the pricing premise the Survey named ("`isRunningTotal` keys on the reported harness … D5 targets the actual cause"). Its eleven review notes include several the Survey raised: the reap flush at the terminal transition, lines without `message.id`, mixed harness. Note 10, "the label change is John's call", is named in pieces 4 and 6, as asked ("park a piece rather than guess").
+
+Seven pieces in a strict chain is a long night's work. Piece 2 needs piece 1 *deployed*, and piece 3 needs live traffic. The morning may find it part-way, which is fine: each piece is verified before the next starts.
+
+**LIN-4196** (mutation runner copy): plan review done, building.
