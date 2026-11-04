@@ -1527,3 +1527,46 @@ John: "happy to continue until either I'm awake in the morning, or we hit the to
   - a blind second scorer in the morning;
   - an ordinary feature ticket through the loop.
 - He'll compact this session for headroom. **Everything needed to carry on is in this log, `place-ledger.md`, `broad-options.md`, `prompt.md` and the `global-offshoot-prompt*.md` files.** Scratchpad: `check.sh`, and `ft5/` for LIN-4234/4233. The proxy token is `.tok3` (valid to 5 Nov 17:11 UTC).
+
+## 4 Nov, about 21:50 UTC: overnight, first moves
+
+### The global v2 backtest (LIN-4203 @ `5334c81a7`), scored against the criterion logged at 21:10
+- **Main criterion: missed.** It doesn't name the account-erasure inventory.
+- **Bonus: hit.** It names the `[usage]` wording in `runner-prompt.md` and `runner.mjs` (Drift's `usage-snapshot-prose-residue`, which v1 missed). It also names other docs and comments that describe the snapshot, and a real risk the earlier views didn't: the realised harness/model/effort labels come only from `[usage]`, so moving only the money would silently drift `captureRateShare` and `unknownHarness`.
+- **Why the miss isn't the question's fault:** the intake counter was not in the ticket. It came from the step-back (see 08:00, "B plus an intake counter"), after the global view ran. The question never saw the thing that had to join the inventory.
+- **The lesson, general enough for any codebase:** *ask "who else must learn about it" of the scope that was chosen, not only of the ticket.* The step-back and the human's call add things; nobody looks at what they add. Tonight I ask it myself, as the human, in each scope's "at merge" list. If it earns its keep, it becomes one line in the step-back or the scope.
+
+### LIN-4234 and LIN-4233: scope calls (larger, no routed findings)
+Both pairs of voices converged, so no step-back.
+- **LIN-4234 (erasure gap, LIN-4203's tidy-after):** "collection names come from one source for every guard". Three pieces:
+  1. the row, plus the universe derived from `lib/` constants (57 → 59, `shares` included);
+  2. one shared helper for both the erasure guard and the urlkey-holders guard (open-0 found the second guard misses `request-usage` too), plus a census on `db.collection(<identifier>)`;
+  3. `INVENTORY` imports each store's constant (stop after 2 if it doesn't pay).
+
+  open-0 proposed filing piece 2 as a sibling. **I folded it in (larger).**
+  **Not added:** the stale `[usage]` prose. It's a Drift finding, and the steer says not to route those.
+- **LIN-4233 (park status last):** the hook-side fix as a table rule (every posting row that isn't status-first ends in `S`), with a scheduled-wakeup defer row added to the golden, proved with Harbour's own reader. **Plus, larger, its own piece in Harbour:** `parseParkedWait` scans back past non-status entries, the way `findWakeEvent` does. That way a park read no longer depends on cross-process ordering, and Harbour has one way of reading a park instead of two. The global view had named this as "not this task's, its own ticket".
+- Both moved to Todo; autopilot started (`7d4d8c32`, `8b60e611`).
+
+### The code-only global variant
+`global-offshoot-prompt-v2-code.md`: v2, with "what to read" changed to the code, its tests and its how-to docs, and no reviews, audits, reports or maps of its shape. This is "as if in a repo where they can't be assumed". Its first use is the ordinary feature ticket below.
+
+### The ordinary feature ticket: LIN-4144 (Home's "Waiting on you" follows open rulings without a reload)
+It's new behaviour, not a consolidation. It lands beside an existing 5s badge poll (`public/common.js`) and the typed-answer keeper (`public/prompt-section.js`), so "leave in two places" (a second poll) is the obvious risk. Surveys at `476d9ad47`: open-0 `52c957eb`, global code-only `4a1904d5`.
+
+**What would count as the place view earning its keep here, written before reading:**
+- it names the existing poll as the thing to reuse or extend (not a second timer);
+- it names the stale-card / double-answer risk, and the settled-ruling guard (LIN-4142) as its partner;
+- at merge, the place-change reading shows no new homeless file and no second poll.
+
+### q6 to the five baseline-window builders
+Sent to LIN-4168, 4177, 4178, 4179 and 4198, in their own sessions. The question is blind: what did your change leave behind; better, worse or the same?
+
+**Calibration, written before reading:** a builder's account "matches" if it names the same thing the ledger and Drift put against the ticket:
+- LIN-4168: the holder registry with no home;
+- LIN-4177: the cost hub with no home;
+- LIN-4178: the founder-lookup twin;
+- LIN-4179: neutral, USD to one home;
+- LIN-4198: two readers of the record vocabulary.
+
+If 4 or more of 5 match, a builder's q6 is a cheap stand-in for the place reading. If 2 or fewer match, the Periodical stays the only film.
