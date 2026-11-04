@@ -1194,3 +1194,16 @@ The rule for these: carry what you cheaply can, and name in the close-out what y
 **Hit criterion, written before dispatch:** the answer names `lineageIdentityRows` (or "the founder lookup already in `dispatch-store`") as the existing home, and warns that a raw-collection adapter would be a second copy, or loses the bounded-read guard. A general "watch for duplication" is a miss.
 
 **Caveat:** LIN-4178's description is read as it is now, and it may have been edited after work began.
+
+### 10:50 UTC: the twin backtest, scored. Both versions hit, so the blind spot was the level, not the prompt
+
+| Version | What it said about the founder lookup, from `10b2c82fb` | Score |
+|---|---|---|
+| **v0** (unchanged) | "**A second founder lookup.** The KPI path has raw collections, not `DispatchQueueStore`. The easy move is to copy `lineageIdentityRows`' query, projection and dedupe into kpi-stats, which leaves two lookups free to drift." Better: "One identity query over raw collections, with the store method delegating to it." | **Hit** |
+| **v1** (+ "leave in two places") | "*A second copy of the founder lookup.* `lineageIdentityRows` lives on `DispatchQueueStore` (`dispatch-store.js:1935`)… the 'raw-collection adapter' restates that query." Same fix: one function over the two collections; the store delegates | **Hit**, with more line references |
+
+Both also predicted a second copy, "`joinCostLineages` reborn twice" (S11 and S12 each inlining the outcome × cost join), and the shape traps the replay is blind to: KPI rows carry `usageEntry`, not `feedback`, and run-page loops have no `status`/`rootItemId`.
+
+**What this tells us.** The global offshoot missed the twin earlier because it ran on **LIN-4176, the parent**, whose ticket talked about "one read". The copy was invited by **LIN-4178, the piece**: "add the raw-collection adapter for the founder lookup". Run on the piece's own text, even v0 sees it. So the place view has to run where the specifics are, **per piece, at the moment the piece starts**. That's the same gap LIN-4212 showed this morning: rebuild 1's three pieces and LIN-4212 all started without their own Survey.
+
+**Consequence for the design (to test, not settled):** the Survey belongs at the start of every ticket that will change code, including breakdown children and tickets filed mid-lineage, not just the tickets we file. Until there's a real stage, I Survey the next pieces by hand before they start (as with LIN-4201 and LIN-4203). v1's extra clause stays: it cost nothing and added line references.
