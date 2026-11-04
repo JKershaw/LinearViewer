@@ -37,4 +37,5 @@ node scripts/code-shape/census-review.mjs . <commit> <previous> \
 - `res-status-count.txt`: `res.status(` counts at `015aa4c6`, `5334c81a` and `d7ceb373`. 275 covers routes/ plus server.js; 250 covers routes/ alone.
 - `stale-ground.txt`: `git diff --numstat` and `git log` for the files the task names as "no diff in the window", in both repos.
 - `linear-search-beat3.txt`: the Linear `/search` phrases and hits used for the duplicate-ticket check (the report's Follow-ups table).
+- `linear-search-beat4.txt`: the searches run before minting LIN-4234 (the account-erasure inventory gap found by the adversarial second-read).
 - `notes-beat1.md` and `notes-beat2.md`: the grounding and seam-reading notes the report was written from. Where a note and the report differ, the report is the corrected reading.

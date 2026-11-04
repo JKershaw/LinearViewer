@@ -1,0 +1,81 @@
+## "account erasure": 50 hits
+   LIN-3704 Backlog | What host backups, Resend and server logs keep after a deletion request
+   LIN-3696 Backlog | Self-service account deletion in Settings, standard or full wipe
+   LIN-3836 Backlog | Workspace-removal token revocation covers merged-alias accounts: accountIdsFor reads the account group
+   LIN-3797 Done | Test Coverage Gap Review (periodical run): delta vs 2026-06-25 baseline — verify the LIN-672 fixes assert their defects,
+   LIN-3736 Backlog | Seams: move stableStringify/hashContext from lib/recap-cache.js down to plumbing
+   LIN-3702 Backlog | Prepare the unique urlKey index on the workspace registry, held for John's yes
+   LIN-3872 Done | Move: the issue-read routes (GET /api/comments/:issueId, GET /api/detail/:issueId, GET /api/image) out of createWorkspac
+   LIN-3708 Done | Area map: lib/account-erasure.js belongs with the operator data tools, not Auth (unties Auth<>Runs knot)
+## "erasure inventory": 50 hits
+   LIN-3853 Done | Model routing · 2 — One settings store for every job (job settings, group defaults, presets, change log); both surfaces 
+   LIN-3423 Done | Deletion by request, two levels: operator runbook, scripts, accurate privacy page
+   LIN-3854 Done | Model routing · 3 — Proxy: read the model table; write it behind one workspace setting (off by default), with reasons an
+   LIN-3776 Done | Security Review (periodical run): delta vs 2026-10-18 — verify the LIN-3642/3634/3635 fixes, post-Railway-incident crede
+   LIN-3708 Done | Area map: lib/account-erasure.js belongs with the operator data tools, not Auth (unties Auth<>Runs knot)
+   LIN-3173 Done | Check: independent check of the wake inventory and the browser-flake census
+   LIN-3172 Done | Paper: the wake inventory — every path that wakes a supervisor, and what each wake leads to
+   LIN-3215 Done | LIN-3201 Step 0: inventory sweeps, mutant baseline and exact before-number (no pin changes)
+## "INVENTORY completeness": 50 hits
+   LIN-3892 Todo | UI sweep: bring every kept page onto the shared pieces, one page at a time, then review the whole stylesheet
+   LIN-953 Done | Full UI audit & theme improvements
+   LIN-1994 Backlog | transcript-spend: --sample publishes complete: true over a deliberately partial artifact
+   LIN-3173 Done | Check: independent check of the wake inventory and the browser-flake census
+   LIN-3172 Done | Paper: the wake inventory — every path that wakes a supervisor, and what each wake leads to
+   LIN-1935 Done | Workspace repo inventory seam (known repos = repo= lines + default; swap-in point for LIN-1010)
+   LIN-2077 Done | SD: completion-unconfirmed sessions can idle indefinitely — no reaper covers the ask-once-no-answer shape
+   LIN-3215 Done | LIN-3201 Step 0: inventory sweeps, mutant baseline and exact before-number (no pin changes)
+## "usage-snapshot-intake erasure": 50 hits
+   LIN-4195 In Progress | Costs rebuild 2: one record per model request, summed
+   LIN-4203 Done | Costs rebuild 2 · piece 6: stop posting [usage] snapshots; remove the runner snapshot path
+   LIN-4232 In Progress | Drift & Coherence Review (trend vs 2026-11-04): a very quiet window (8 LinearViewer + 8 SD commits, the records-first co
+   LIN-4231 Done | Seams & Tangles Review (periodical run 6): area knots, dependency direction, ways in, rebuild readiness and change coupl
+   LIN-4198 Done | Costs rebuild 2 · piece 1: Harbour request-usage intake, store and per-record pricing (nothing reads it yet)
+   LIN-4150 Backlog | Survey spikes: record (don't dispatch or plan)
+   LIN-3948 Backlog | Runner: post a final cumulative [usage] snapshot at session end and reap, so one-turn and killed claude-code sessions st
+   LIN-2022 Backlog | Task-snapshot capture is unwired at the proxy brief/recap seams, so close-out's archive-before-prune step can never veri
+## "erasure collection": 50 hits
+   LIN-3853 Done | Model routing · 2 — One settings store for every job (job settings, group defaults, presets, change log); both surfaces 
+   LIN-4198 Done | Costs rebuild 2 · piece 1: Harbour request-usage intake, store and per-record pricing (nothing reads it yet)
+   LIN-3702 Backlog | Prepare the unique urlKey index on the workspace registry, held for John's yes
+   LIN-3700 Done | Write each workspace's urlKey to the registry when it is created or bound
+   LIN-3708 Done | Area map: lib/account-erasure.js belongs with the operator data tools, not Auth (unties Auth<>Runs knot)
+   LIN-3776 Done | Security Review (periodical run): delta vs 2026-10-18 — verify the LIN-3642/3634/3635 fixes, post-Railway-incident crede
+   LIN-3423 Done | Deletion by request, two levels: operator runbook, scripts, accurate privacy page
+   LIN-3724 Done | KPI daily rollup, part A: per-workspace daily records, daily job and backfill script
+## "collection universe": 50 hits
+   LIN-238 Done | Universal "get next task" prompt
+   LIN-165 Done | Change "more" prompts
+   LIN-3811 Done | dispatch-history: the 30-day read window has no index — split index rollout from boot and declare {urlKey, dispatchedAt}
+   LIN-4198 Done | Costs rebuild 2 · piece 1: Harbour request-usage intake, store and per-record pricing (nothing reads it yet)
+   LIN-1625 Done | Path P0.1 · Derive cost-per-verified-task from existing capture
+   LIN-3381 Done | LIN-2954 S1.1: urlKey holders module and read-only duplicate dry-run
+   LIN-1360 Done | Improve initial session setup process to be more trustworthy.
+   LIN-953 Done | Full UI audit & theme improvements
+## "account-erasure.js": 50 hits
+   LIN-3836 Backlog | Workspace-removal token revocation covers merged-alias accounts: accountIdsFor reads the account group
+   LIN-3797 Done | Test Coverage Gap Review (periodical run): delta vs 2026-06-25 baseline — verify the LIN-672 fixes assert their defects,
+   LIN-3696 Backlog | Self-service account deletion in Settings, standard or full wipe
+   LIN-3736 Backlog | Seams: move stableStringify/hashContext from lib/recap-cache.js down to plumbing
+   LIN-3765 Done | Integration & Surface Maturity Review (periodical run, fourth) — trend vs the 2026-09-26 run across the rebuild wave: di
+   LIN-3708 Done | Area map: lib/account-erasure.js belongs with the operator data tools, not Auth (unties Auth<>Runs knot)
+   LIN-3702 Backlog | Prepare the unique urlKey index on the workspace registry, held for John's yes
+   LIN-3872 Done | Move: the issue-read routes (GET /api/comments/:issueId, GET /api/detail/:issueId, GET /api/image) out of createWorkspac
+## "lockstep erasure": 50 hits
+   LIN-3708 Done | Area map: lib/account-erasure.js belongs with the operator data tools, not Auth (unties Auth<>Runs knot)
+   LIN-4198 Done | Costs rebuild 2 · piece 1: Harbour request-usage intake, store and per-record pricing (nothing reads it yet)
+   LIN-3776 Done | Security Review (periodical run): delta vs 2026-10-18 — verify the LIN-3642/3634/3635 fixes, post-Railway-incident crede
+   LIN-3836 Backlog | Workspace-removal token revocation covers merged-alias accounts: accountIdsFor reads the account group
+   LIN-3702 Backlog | Prepare the unique urlKey index on the workspace registry, held for John's yes
+   LIN-3704 Backlog | What host backups, Resend and server logs keep after a deletion request
+   LIN-3521 Backlog | Two copies of applyCloseOutState (public/close-out.js, public/session.js): one implementation, one test
+   LIN-3736 Backlog | Seams: move stableStringify/hashContext from lib/recap-cache.js down to plumbing
+## "erasure guard": 50 hits
+   LIN-3872 Done | Move: the issue-read routes (GET /api/comments/:issueId, GET /api/detail/:issueId, GET /api/image) out of createWorkspac
+   LIN-3700 Done | Write each workspace's urlKey to the registry when it is created or bound
+   LIN-3708 Done | Area map: lib/account-erasure.js belongs with the operator data tools, not Auth (unties Auth<>Runs knot)
+   LIN-3836 Backlog | Workspace-removal token revocation covers merged-alias accounts: accountIdsFor reads the account group
+   LIN-4198 Done | Costs rebuild 2 · piece 1: Harbour request-usage intake, store and per-record pricing (nothing reads it yet)
+   LIN-3696 Backlog | Self-service account deletion in Settings, standard or full wipe
+   LIN-4212 Done | Request records posted by a wake row are stranded under the wake's own id (records-sum read would drop them)
+   LIN-3423 Done | Deletion by request, two levels: operator runbook, scripts, accurate privacy page

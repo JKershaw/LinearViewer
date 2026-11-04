@@ -1,6 +1,6 @@
 # Drift & Coherence Review — 2026-11-04, run 2 (trend vs 2026-11-04)
 
-**Ticket:** LIN-4232. **Previous edition:** `docs/reviews/drift-coherence-review-2026-11-04.md` (LIN-4209, PR #2271, merge `f5bc752c`). Both editions are dated 2026-11-04, so this one is named `-run2`, and its evidence lives in `docs/reviews/_evidence-2026-11-04-run2/`. **Follow-ups minted:** none yet (see Follow-ups).
+**Ticket:** LIN-4232. **Previous edition:** `docs/reviews/drift-coherence-review-2026-11-04.md` (LIN-4209, PR #2271, merge `f5bc752c`). Both editions are dated 2026-11-04, so this one is named `-run2`, and its evidence lives in `docs/reviews/_evidence-2026-11-04-run2/`. **Follow-up minted:** LIN-4234 (under LIN-3449). Dated comments were added to LIN-4214 and LIN-2798 (see Follow-ups).
 
 **Review-only.** This edition adds only this report and its evidence folder. No code, config, guide or ticket intent was changed in either repo.
 
@@ -26,7 +26,7 @@
 
 ## Headline
 
-A very quiet window, and three 11-04 rows resolved inside it. Nothing new rises above LOW.
+A very quiet window, and three 11-04 rows resolved inside it. One new item is LOW-MEDIUM; the adversarial second-read found it, and it is fixed in place here. Everything else new is LOW or borderline.
 
 1. **`usage-relay-flag-partial` is resolved in code**, without its ticket.
    - SD now checks `SD_WORKER_USAGE_RELAY` once, inside `flushRequestUsage` (`request-usage-flush.js:114`). All five seams 11-04 named reach that check: fail, abort-cancel, forced-resume cancel, stall and reap.
@@ -35,16 +35,19 @@ A very quiet window, and three 11-04 rows resolved inside it. Nothing new rises 
    - `lineage-identity-read-twins`: `founder-lookup.js` was folded into one store query, `dispatch-store.js:311-318`.
    - `cost-fold-partition-restated`: `countedRowsOf` is the one partition, read at `cost-read.js:88`.
    - **`usage-record-vocabulary-two-readers` improved:** the Harbour token-field list has one home, and the lane split is now documented as deliberate.
-3. **Two LOW items are new or worse, both left behind by the cutover:**
+3. **New, LOW-MEDIUM: `erasure-inventory-lockstep-gap`.** LIN-4203's workspace-keyed `usage-snapshot-intake` collection is not in the account-erasure `INVENTORY` (`lib/account-erasure.js:124-170`), so a Full wipe leaves its documents behind.
+   - The completeness guard cannot see it. `server.js:461` opens it through a constant, and it has no index spec. The guard (`tests/unit/account-erasure.test.js:87-95`) reads only literal names, two hand-added constants, `INDEX_SPECS` and the script tables.
+   - Minted as **LIN-4234**. The first draft missed it; the second-read found it.
+4. **Two LOW items are new or worse, both left behind by the cutover:**
    - `usage-snapshot-prose-residue` (new): one user-visible disclosure string, one agent-catalog line, one doc line and about six comments still describe the retired `[usage]` snapshot as live.
    - `cache-module-family` (worsened, now graded LOW): `workspace-kpis-cache.js` is a second keyed stale-while-revalidate cache, and it repeats the unconditional post-await write that LIN-2798 already describes for its sibling.
-4. **The cross-repo contract is unchanged at MEDIUM.**
+5. **The cross-repo contract is unchanged at MEDIUM.**
    - Counts are 38 (Harbour) against 34 (SD), with no row for either usage call.
    - The 404 handling is still split (SD's claude-code path resends; the kit and opencode stop).
    - The snapshot bridge is gone, so one sub-item resolved.
-5. **The top of the ledger is unchanged in code.** `resume-model-effort-cross-repo` and `credential-decision-multiplicity` stay MEDIUM-HIGH. `halt-poll-cold-cache-fail-open` stays MEDIUM (LIN-4210; John's ruling, not chosen here). Every cited file has a 0-line diff.
-6. **`coherence-loop-stalled` stays MEDIUM, with a new kind of evidence.** All 17 open Drift follow-ups are unmoved. The loop's newest ticket (LIN-4214) went stale *behind* code its owner fixed elsewhere. That is the same cause as "unmoved": the loop's tickets are not where owners look.
-7. **Instruments reproduce and the window barely registers.**
+6. **The top of the ledger is unchanged in code.** `resume-model-effort-cross-repo` and `credential-decision-multiplicity` stay MEDIUM-HIGH. `halt-poll-cold-cache-fail-open` stays MEDIUM (LIN-4210; John's ruling, not chosen here). Every cited file has a 0-line diff.
+7. **`coherence-loop-stalled` stays MEDIUM, with a new kind of evidence.** All 17 previously open Drift follow-ups are unmoved. The loop's newest ticket (LIN-4214) went stale *behind* code its owner fixed elsewhere. That is the same cause as "unmoved": the loop's tickets are not where owners look.
+8. **Instruments reproduce and the window barely registers.**
    - The census at both commits, under one guide: 566 groups / 106 `mustRule` / 307 table / 1 gone. **0 `mustRule` groups moved**, and the set is identical to 11-04's.
    - Import graph: 497 nodes, 2,042 edges, the same two SCCs, 0 upward edges, 53 route→route.
    - `res.status(` is 275, unchanged.
@@ -125,15 +128,16 @@ Ordered by severity, then by the 11-04 order. Each entry is re-read at HEAD; cit
 | 8 | `coherence-loop-stalled` | MEDIUM (process) | unchanged, new datum | No Drift follow-up moved. LIN-4214 went stale behind code fixed under LIN-4203. 17 open Drift follow-ups. |
 | 9 | `usage-record-vocabulary-two-readers` | LOW-MEDIUM | **improved** | Token fields have one Harbour home (`request-usage-vocabulary.js:15-21`) with a pinned kit copy. Lane is declared once (`:28`), and the open/closed split is documented as deliberate (`:23-27`). A record's lane is read by nothing. SD's copies are unpinned. |
 | 10 | `lineage-anchor-rules-three` | LOW-MEDIUM | **improved** (4 → 3) | The founder read is now the store's own query, leaving the three anchor rules (`lineage-membership.js:27`, `dispatch-lineage-status.js:69`, `dispatch-store.js:367`). |
-| 11 | `cache-module-family` | LOW (was ungraded) | **worsened (+1)** | 8 `lib/*-cache.js` (was 7). `workspace-kpis-cache.js` is a second keyed stale-while-revalidate cache beside `sessions-feed-cache.js`, and it repeats the LIN-2798 clear-race shape. |
-| 12 | `usage-snapshot-prose-residue` | LOW | **new** | Text still describes the retired `[usage]` snapshot as live, including one user-visible disclosure (`effort-readout.js:596`) and the agent catalog (`proxy-instructions.js:385-387`). |
-| 13 | `completeness-precedence-restated` | borderline (not graded) | **new** | unreadable > unpriced > complete is written three times (`row-usage.js:116-118`, `cost-read.js:171-174`, `request-usage-fold.js:103`). |
+| 11 | `erasure-inventory-lockstep-gap` | LOW-MEDIUM | **new** (found by the second-read) | The `usage-snapshot-intake` collection (LIN-4203) is not in `INVENTORY` (`lib/account-erasure.js:124-170`), so a Full wipe (`:904-911`) leaves it. The completeness guard (`tests/unit/account-erasure.test.js:87-95`) cannot see a constant-named collection that has no index spec (`server.js:461`). **Minted LIN-4234.** |
+| 12 | `cache-module-family` | LOW (was ungraded) | **worsened (+1)** | 8 `lib/*-cache.js` (was 7). `workspace-kpis-cache.js` is a second keyed stale-while-revalidate cache beside `sessions-feed-cache.js`, and it repeats the LIN-2798 clear-race shape. |
+| 13 | `usage-snapshot-prose-residue` | LOW | **new** | Text still describes the retired `[usage]` snapshot as live, including one user-visible disclosure (`effort-readout.js:596`) and the agent catalog (`proxy-instructions.js:385-387`). |
+| 14 | `completeness-precedence-restated` | borderline (not graded) | **new** | unreadable > unpriced > complete is written three times (`row-usage.js:116-118`, `cost-read.js:171-174`, `request-usage-fold.js:103`). |
 | — | `usage-relay-flag-partial` | resolved (was LOW-MEDIUM) | **resolved** | All five seams reach `request-usage-flush.js:114`. Residual: LIN-4214 is open with its acceptance partly met. |
 | — | `lineage-identity-read-twins` | resolved (was LOW-MEDIUM) | **resolved** | One query, `findLineageIdentity` (`dispatch-store.js:311-318`), behind both entrances. |
 | — | `cost-fold-partition-restated` | resolved (was LOW) | **resolved** | `countedRowsOf` (`row-usage.js:80-101`) is the one partition; `cost-read.js:88` reads it. |
 | — | Everything else | as 11-04 | unchanged or held | Each row was checked by its own cited files (see the ledger). The rest of the 11-04 rows are unchanged: `reap-window-constant-cross-repo`, `task-page-state-outside-owner`, `routes-error-envelope-fragmentation` (275), `vendor-script-list-restated`, `lib-import-cycles` and others. `key-state-residue` is held, and `unit-census-convention-split` unchanged. |
 
-**Resolved in this window:** 3 (`usage-relay-flag-partial`, `lineage-identity-read-twins`, `cost-fold-partition-restated`). **Improved:** 2. **Worsened:** 1. **New:** 1 graded LOW plus 1 borderline.
+**Resolved in this window:** 3 (`usage-relay-flag-partial`, `lineage-identity-read-twins`, `cost-fold-partition-restated`). **Improved:** 2. **Worsened:** 1. **New:** 1 graded LOW-MEDIUM (second-read), 1 graded LOW, and 1 borderline.
 
 ### Detail: the moved rows
 
@@ -175,9 +179,28 @@ Ordered by severity, then by the 11-04 order. Each entry is re-read at HEAD; cit
 - **SD is in step but unpinned.** SD's `TOKEN_FIELDS` (`request-usage.js:13-19`) uses the same five names, and opencode's four-name subset (`opencode-request-records.js:22`) is documented. SD's lane values (`api`, `subscription`, `openrouter`) are all inside `USAGE_LANES`. Nothing pins SD's copies to Harbour's list.
 - **The legacy compatibility is a deliberate bridge, not a second reader.** `usage-snapshot-intake.js` counts old posts (`:27-34`) and parses no fields. The legacy fold it serves is marked "Delete 30 days after LIN-4203 deploys (not before 2026-12-04)" (`row-usage.js:24-26`, `cost-read.js:108-110`).
 
+**`erasure-inventory-lockstep-gap` → new, LOW-MEDIUM** (found by the adversarial second-read; verified here at `d7ceb373`).
+- **What was added.** LIN-4203 added a collection keyed by workspace: `usage-snapshot-intake`, with `_id` `${urlKey}:${day}` and fields `{urlKey, day, count, lastAt}` (`lib/usage-snapshot-intake.js:13`, `:27-34`). `server.js:42,461` opens it as `db.collection(USAGE_SNAPSHOT_INTAKE_COLLECTION)`.
+- **It is not in the erasure inventory.** `lib/account-erasure.js` `INVENTORY` (`:124`) does not list it. Its two siblings are listed, each with a reason beside it: `kpi-daily-rollup` (`:163-164`, counts that "would outlive their source") and `request-usage` (`:166-168`, LIN-4198). A Full wipe deletes `INVENTORY` rows only (`:904-911`). The dry run names unlisted collections (`:729-730`, `:1047`) but deletes nothing.
+- **The guard has the blind spot that let it through.** The completeness test builds its universe (`tests/unit/account-erasure.test.js:87-95`) from:
+  - `server.js` calls of the form `collection('literal')` (`:82-84`);
+  - two hand-added constant-named collections (`:89-90`);
+  - `INDEX_SPECS`;
+  - the script tables.
+
+  `usage-snapshot-intake` is none of these: it has a constant name, no index spec and no hand-add. So the test stays green, and so does its bound of 57 (`:112-114`).
+- **Why Drift.** The collection list is one decision held in three places: the app's wiring, `INVENTORY`, and the guard's universe. The guard exists to make that lockstep mechanical, and a naming pattern sidesteps it.
+  - **Scope of the gap:** only this one collection escapes. I listed every non-literal `collection(` call in `server.js`, `lib/` and `routes/`. The others are covered by an index spec (`request-usage`), by the guard's two hand-added constants, or by a drop module (`shares`).
+- **Why LOW-MEDIUM, not higher.**
+  - The data is counts plus a urlKey.
+  - The collection fills only while an old runner still posts `[usage]`.
+  - The dry run does surface the name.
+  - But erasure is a promise to the user, and the guard's blind spot outlasts this one collection.
+- **Ticket:** minted **LIN-4234** (Backlog, `kind:follow-up`, under LIN-3449). No existing ticket names it (searches under Follow-ups).
+
 **`cache-module-family` → worsened (+1), now graded LOW.** 11-04 counted seven `lib/*-cache.js`; there are eight at HEAD.
 - **What the new one repeats.** `lib/workspace-kpis-cache.js` (LIN-4201) is a keyed stale-while-revalidate cache with single-flight (`:28-60`). It names `lib/kpi-page.js:26-47` (global, unkeyed) as its model and imports only `KPI_CACHE_MS`. The repo already had a keyed SWR cache with one background refresh: `lib/sessions-feed-cache.js:35-95`. The fresh / serve-stale-and-refresh / cold-await / keep-last-good rule is now written three times.
-- **The concrete cost.** LIN-2798 (Backlog since 2026-09-12, 0 comments) records that `sessions-feed-cache` re-inserts after its await without checking that a `clear()` landed in between. `workspace-kpis-cache.js:38` has the same shape (`entries.set(urlKey, …)` after `await collect(urlKey)`), and its `clear()` (`:57`) is the key-state holder's seed reset. By reading, a clear during a cold fill is undone in the new copy too. Its callers are the test seed seams (`routes/test.js:686,700`, `key-state-holders.js`), so the exposure is a test-time race, like LIN-2798.
+- **The concrete cost.** LIN-2798 (Backlog since 2026-09-12, 0 comments) records that `sessions-feed-cache` re-inserts after its await without checking that a `clear()` landed in between. `workspace-kpis-cache.js:38` has the same shape (`entries.set(urlKey, …)` after `await collect(urlKey)`), and its `clear()` (`:57`) is the key-state holder's seed reset. By reading, a clear during an in-flight fill is undone in the new copy too. Unlike `sessions-feed-cache`, that includes the background refresh of a stale entry, and its `.finally` (`:40`) also drops any newer in-flight promise. Its callers are the test seed seams (`routes/test.js:686,700`, `key-state-holders.js`), so the exposure is a test-time race, like LIN-2798.
 - **What it does follow:** the family's shape (a factory, an injected clock, `clear({urlKey})`) and the key-state registration. It forks the logic, not the shape.
 
 **`usage-snapshot-prose-residue` → new, LOW.** The snapshot path is gone, but text in files the cutover touched still describes it as live. Cost: an operator reading the effort page, or an agent reading the catalog, is told how a retired path works.
@@ -185,6 +208,9 @@ Ordered by severity, then by the 11-04 order. Each entry is re-read at HEAD; cit
 - **Agent-facing:** `lib/proxy-instructions.js:385-387` ("cumulative worker usage snapshots would otherwise be multiply-counted").
 - **Doc:** `docs/proxy-integration.md:1238-1240` ("reports a *cumulative* usage snapshot on every Stop"). The same file was edited at `:1196` by `d7ceb373`.
 - **Comments:** `effort-readout.js:58-59`, `model-routing-spend.js:5-6` and `:58` ("posted no [usage]"), `request-usage-vocabulary.js:4` ("the per-lineage snapshot a runner posts"), and SD `request-usage-flush.js:3-8` ("Three callers").
+- **Added after the second-read:**
+  - `docs/architecture/source-map.md:191` still gives `run-view` as `buildRunView(session, { now })`, and its cost as "last valid `[usage]` per lineage". `requestRows` is now required. The window edited `source-map.md` three times without touching this line.
+  - SD `request-usage.js:163-164` says lane values "must match Harbour's USAGE_LANES whitelist exactly; a mismatch silently reads back as null". That holds only for the retired snapshot parser: the record intake keeps any lane, and nothing reads it.
 - The `lib/task-cost.js` comment residue Seams handed over (N8) went from 3 to 2: `runner.mjs:768` was removed by LIN-4203, and `model-routing-spend.js:5` and `wall-clock-summary.js:97` remain.
 - **Clean:** `docs/runner-prompt.md`, SD `docs/module-map.md`, SD `README.md:202` and `config.js:1335-1344`.
 
@@ -205,7 +231,7 @@ Ordered by severity, then by the 11-04 order. Each entry is re-read at HEAD; cit
 |---|---|---|---|---|---|
 | Runner contract table | `lib/runner-kit/contract.json` 38 rows, 0-line diff | — | `test/fixtures/runner-contract.json` 34 rows, 0-line diff | **unchanged**; four `store` rows unpinned; no usage row | `runner-contract-semantics-cross-repo` MEDIUM (#4) |
 | **Per-request usage records** | `POST /api/dispatch/usage/:itemId` (`routes/dispatch.js:1668`, consumer dispatch token) and `POST /api/proxy/runner/usage/:id`, both into `request-usage-intake.js`; cap `USAGE_MAX_RECORDS_PER_CALL = 100` (`:36`) | `runnerUsage` (`runner.mjs:901`), `USAGE_RECORDS_PER_CALL = 100` (`:656`); on 404 it stops (`:679`) | `postRecordsWithLedger` (`request-usage-flush.js:141`), `MAX_RECORDS_PER_POST = 100` (`request-usage.js:22`); claude-code resends on 404 (`stopOnNotTaken = false`, `:154,196`), opencode stops (`:260`) | **unchanged: no contract row either side; 404 split** | The cap is pinned within each repo (kit = intake by `tests/unit/lin-4202-runner-kit-records.test.js:162`; SD = 100 by `test/request-usage-ledger.test.js:18-19`), not across repos. 11-04 had this "unconfirmed"; it is now confirmed, and the code is unchanged. |
-| `[usage]` snapshot (bridge) | legacy fold reads old rows only (`row-usage.js:24-26`); intake counts legacy posts (`usage-snapshot-intake.js`, `dispatch-store.js:3732-3738`) | **removed**: `sumTranscriptUsage` and `usageMessage` deleted; `usage` posts records only (`runner.mjs:1269-1272`); `runner-prompt.md:180-191` matches | **removed**: `postUsageSnapshot`, `walkUsage`, `postUsageFeedback`, `usageDelta` and `fetchSessionRollup` gone; docs past tense | **resolved** (11-04 item 5, "two vocabularies on the wire") | Prose residue on the Harbour side, see #12 |
+| `[usage]` snapshot (bridge) | legacy fold reads old rows only (`row-usage.js:24-26`); intake counts legacy posts (`usage-snapshot-intake.js`, `dispatch-store.js:3732-3738`) | **removed**: `sumTranscriptUsage` and `usageMessage` deleted; `usage` posts records only (`runner.mjs:1269-1272`); `runner-prompt.md:180-191` matches | **removed**: `postUsageSnapshot`, `walkUsage`, `postUsageFeedback`, `usageDelta` and `fetchSessionRollup` gone; docs past tense | **resolved** (11-04 item 5, "two vocabularies on the wire") | Prose residue on the Harbour side, see #13 |
 | Usage relay flag | n/a | n/a | `config.js:1345` (`envFlag(…, true)`) checked once at `request-usage-flush.js:114`; opencode `opencode-runner.js:591` | **agree with their own docs** | `usage-relay-flag-partial` resolved |
 | Record fields (model / effort / harness / lane / tokens) | `TEXT_FIELDS` (`request-usage-intake.js:41`); `USAGE_TOKEN_FIELDS` one home; lane stored and unread | `effort: null` (`runner.mjs:717`), no `lane`; token copy pinned | claude-code sends `effort` and `lane` (`request-usage.js:144-155`); opencode `lane: 'openrouter'` (`opencode-request-records.js:46`) | **names agree; values in `USAGE_LANES`; SD copies unpinned** | #9 improved |
 | No transcript | — | posts nothing (was a harness-only snapshot); the item reads "no reported usage" (`runner-prompt.md:182-183`) | — | documented behaviour change | noise |
@@ -220,15 +246,15 @@ Ordered by severity, then by the 11-04 order. Each entry is re-read at HEAD; cit
 - **Seams & Tangles** (run 5 `seams-tangles-review-2026-11-04.md`, LIN-4208; run 6 LIN-4231 In Progress): two map-hygiene items for the area guide.
   - `lib/usage-snapshot-intake.js` (LIN-4203, added after the LIN-4201 guide edit) **has no area**. It falls to the catch-all "Other features", which I checked by resolving the HEAD guide.
   - `task-cost|` is still in the "Runs & dispatch" pattern (`areas.json:24`) and matches nothing (their N8).
-  - Route→route stays at 53 and is cross-linked. Comment hygiene that Seams N8 handed to Drift is in #12.
+  - Route→route stays at 53 and is cross-linked. Comment hygiene that Seams N8 handed to Drift is in #13.
 - **Code Quality** (`code-quality-review-2026-11-04.md`, LIN-4207): F-hidden-dup stays cross-linked to `mock-ai-builder-copies` (unchanged; builders at `routes/proxy-compute.js:113,154,194`).
 - **Stability** (`stability-review-2026-11-04.md`, LIN-4206): owns the halt fault path. `poll-halt.js` is untouched again. Drift keeps the duplication half (LIN-4210).
 - **Costs rebuild** (LIN-4195 and its children; LIN-4226 In Progress): owns the cost read and the flag.
   - The hand-threaded `requestRows` / `requestUsageLoader` parameter beside `identityRows` (routes `dashboard`, `dashboard-effort`, `dispatch`, `proxy-compute`, `settings`, `workspace-kpis`) is already being reworked by LIN-4226 ("loading becomes part of the read"), so it is not graded here.
   - The legacy-fold deletion is the costs run's named follow-up (see the observation above).
-- **Documentation:** the doc and catalog lines in #12 sit with Documentation by default. LIN-3484 (Backlog, "Proxy instructions: bring statements about changed mechanisms up to date") is a general sweep of `proxy-instructions.js` that would cover `:385-387`. LIN-4194 (Backlog) covers `docs/plans/costs.md`, not the lines named here.
+- **Documentation:** the doc and catalog lines in #13 sit with Documentation by default. LIN-3484 (Backlog, "Proxy instructions: bring statements about changed mechanisms up to date") is a general sweep of `proxy-instructions.js` that would cover `:385-387`. LIN-4194 (Backlog) covers `docs/plans/costs.md`, not the lines named here.
 - **Test Coverage:** the per-seam flag-off test (LIN-4214 acceptance 1) and the one-way contract pin (38 vs 34).
-- **Security:** nothing in the window.
+- **Security / privacy:** the erasure inventory gap (#11, LIN-4234) touches the deletion promise. Drift owns the lockstep and the guard's blind spot. The erasure policy and runbook stay with Security and the LIN-3423 owners, so this is cross-linked, not double-flagged.
 
 **Survey place-ledger cross-links** (`docs/plans/survey/place-ledger.md` on `claude/cool-rubin-6acj5j` at `2cc0d1fd`, read-only):
 - `usage-relay-flag-partial` resolved → the LIN-4203 row ("the flag gates every record flush (Drift #9 carried)"). Agrees; this review adds that LIN-4214 is still open behind it.
@@ -249,7 +275,7 @@ The description's scope was a starting point and was widened to everything the w
     - Readers that thread `requestRows`: `effort-readout`, `kpi-stats`, `model-routing-{history,spend}`, `render-session`, `run-paragraph-hook`, `run-view` and `workspace-kpi-stats`; routes `dashboard-effort`, `dashboard`, `dispatch`, `proxy-compute`, `proxy`, `settings` and `workspace-kpis`.
     - Wiring: `server.js`, `db-indexes.js` and the new `workspace-kpis-cache`.
     - Deleted: `founder-lookup.js`.
-    - Rows: #9–#13 and the three resolved rows. The rest is plumbing behind one loader (`request-usage-loader.js:1-11`).
+    - Rows: #9–#14 and the three resolved rows. The rest is plumbing behind one loader (`request-usage-loader.js:1-11`).
     - `db-indexes.js` keeps an unread index with a named retirement ticket (LIN-4217): held. `REQUEST_ROWS_BATCH_SIZE = 500` (`request-usage-loader.js:28`) restates `LINEAGE_IDENTITY_BATCH_SIZE` (`dispatch-store.js:298`) by comment rather than import: noise, as these are two independent query bounds.
   - **Test-state: 2 files.** `key-state-holders.js` and `routes/test.js` → `key-state-residue`, held.
   - **Runner kit: 1 file.** `runner.mjs` → the usage path only. No halt, marker, heartbeat or vocabulary change.
@@ -272,18 +298,22 @@ The description's scope was a starting point and was widened to everything the w
   - the record-poster search;
   - the lane-reader search.
 
-  The layer set is complete for the window's production change. SD's two heavy-tier docs were read at section level only.
+  **Correction after the second-read.** The first draft called the layer set complete. It was not.
+  - The draft read `usage-snapshot-intake.js` only for its vocabulary and its area placement.
+  - It did not check the repo's other lockstep for a new collection: the account-erasure `INVENTORY` and its completeness guard.
+  - The search that surfaces such a miss was run after the second-read: every non-literal `collection(` call, compared with `INVENTORY`. It finds exactly one gap (#11).
+  - With that search added, the layer set is complete for the window's production change. SD's two heavy-tier docs were read at section level only.
 
 ## LIN-3490 places-per-decision reading
 
 The 11-04 counting rule, unchanged: it excludes sub-rows, resolved rows, `—` rows, informational rows, the process row and the documented exclusions. 11-04 read 73 graded (2 Medium-High, 5 Medium, 26 Low-Medium, 40 Low).
 
-**11-04b: 72 graded** = 73 − 3 resolved + 2 newly graded.
+**11-04b: 73 graded** = 73 − 3 resolved + 3 newly graded.
 - Resolved (graded at 11-04): `usage-relay-flag-partial` (Low-Medium), `lineage-identity-read-twins` (Low-Medium), `cost-fold-partition-restated` (Low).
-- Newly graded: `usage-snapshot-prose-residue` (new, Low), and `cache-module-family` (was `—`, now Low).
+- Newly graded: `erasure-inventory-lockstep-gap` (new, Low-Medium), `usage-snapshot-prose-residue` (new, Low), and `cache-module-family` (was `—`, now Low).
 - Not counted: `completeness-precedence-restated` (borderline), `key-state-residue` and `unit-census-convention-split` (informational), and `coherence-loop-stalled` (process).
 - Band moves among rows graded in both editions: none. (`lineage-anchor-rules-three` improved 4 → 3 and stays Low-Medium.)
-- **Bands:** 2 Medium-High, 5 Medium, 24 Low-Medium, 41 Low.
+- **Bands:** 2 Medium-High, 5 Medium, 25 Low-Medium, 41 Low.
 
 **Like-for-like?** Yes, under the one HEAD guide. The guide edit moves 0 `mustRule` groups (W1 and W2 share the same 106), so the reading compares directly with 11-04's.
 
@@ -301,7 +331,7 @@ The 11-04 counting rule, unchanged: it excludes sub-rows, resolved rows, `—` r
 | lane declarations / readers | `USAGE_LANES` once; readers: snapshot parser only | 2 declarations | 1 declaration; record lane has 0 readers | `grep lane` over `lib routes public` |
 | `lib/*-cache.js` modules | brief, recap, run-summary, session-summary, sessions-feed, task-done, workspace-token, **workspace-kpis** | 7 | **8** | `git ls-tree` at both SHAs |
 | keyed SWR implementations | `sessions-feed-cache.js`, `workspace-kpis-cache.js` (+ global `kpi-page.js`) | 1 (+1) | **2 (+1)** | reading each cache's `get` |
-| `[usage]` prose describing the snapshot as live | `effort-readout.js:58-59,596`, `model-routing-spend.js:5-6,58`, `proxy-instructions.js:385-387`, `request-usage-vocabulary.js:4`, `docs/proxy-integration.md:1238-1240`, SD `request-usage-flush.js:3-8` | — | 7 files (1 user-visible, 1 agent-facing) | `git grep -E "\[usage\]\|usage snapshot\|…"`, legacy-reader comments excluded by reading |
+| `[usage]` prose describing the snapshot as live | `effort-readout.js:58-59,596`, `model-routing-spend.js:5-6,58`, `proxy-instructions.js:385-387`, `request-usage-vocabulary.js:4`, `docs/proxy-integration.md:1238-1240`, `docs/architecture/source-map.md:191`, SD `request-usage-flush.js:3-8`, SD `request-usage.js:163-164` | — | 9 files (1 user-visible, 1 agent-facing) | `git grep -E "\[usage\]\|usage snapshot\|…"`, legacy-reader comments excluded by reading |
 | `lib/task-cost.js` comment residue | `model-routing-spend.js:5`, `wall-clock-summary.js:97` | 3 (Seams N8) | 2 | `git grep lib/task-cost.js` |
 | lineage identity reads | `findLineageIdentity` | 2 | **1** | `git grep "LINEAGE_IDENTITY_PROJECTION"` |
 | anchor rules | `anchorOf`, `anchorFor`, `groupAnchorFor` | 4 | 3 | `git grep` |
@@ -312,34 +342,52 @@ The 11-04 counting rule, unchanged: it excludes sub-rows, resolved rows, `—` r
 | halt consumers failing open on an absent halt | kit, SD | 2 of 2 | 2 of 2 | 0-line diffs |
 | halt word maps | 4 | 4 | 4 | 0-line diffs |
 | reap-window copies | SD 2 windows, Harbour 1, 0 pins | same | same | `config.js:586-598` unmoved |
-| open Drift follow-ups (Backlog) | listed under Ticket trend | 16 named | **17** | the API, per ticket |
+| collections the app opens vs erasure `INVENTORY` | the guard's universe (57 names) plus `usage-snapshot-intake`, which is outside it | 0 unlisted | **1 unlisted** (`usage-snapshot-intake`); the guard is blind to constant-named collections without an index spec | non-literal `collection(` calls across `server.js`, `lib/` and `routes/`, compared with `INVENTORY` |
+| open Drift follow-ups (Backlog) | listed under Ticket trend | 16 named | **17** before this run; **18** with LIN-4234 | the API, per ticket |
 | TODO / FIXME / XXX / HACK | 8 raw, 0 real | 8 / 0 | 8 / 0 | `git grep` |
 
 **Unbounded** (not executed, or production data):
 - how often any host runs with `SD_WORKER_USAGE_RELAY=0`;
 - how many legacy `[usage]` posts the counter has seen since deploy;
+- whether `usage-snapshot-intake` holds any documents in production yet (the erasure gap's live reach);
 - whether the effort-page disclosure is read by anyone;
 - the frequency of a clear during a cold fill in either keyed cache;
 - everything 11-04 listed as unbounded (cold halt cache × store fault, `assistant-text` volume, lineages without `rootItemId`, e2e use of the side-reset routes).
 
 ## Follow-ups
 
-**To be completed after beat 4** (after the adversarial second-read). Nothing is minted in this draft. Candidates, with the existing-ticket search done now so that beat 4 can mint or decline without redoing it:
+**What was done (beat 4, 2026-11-04).** The decision was made after the adversarial second-read. John pre-approved up to about three follow-ups. The bar was "highest severity, no existing home, likely to be worked".
 
-| candidate | severity | search phrases (Linear `/search`) | hits that matter | current lean |
+**Minted (1):**
+- **LIN-4234**: "Account erasure: the usage-snapshot-intake collection (LIN-4203) is not in INVENTORY, and the completeness guard cannot see constant-named collections".
+  - Filed under LIN-3449 with `kind:follow-up`, in the default state (Backlog).
+  - The description gives the problem, why it matters, acceptance, file anchors, and an "Unvalidated idea".
+  - **Why it clears the bar.** It is the window's largest new item (LOW-MEDIUM). It breaks a user-facing promise (Full erasure), it is a one-row fix plus a guard change with a clear test, and no existing ticket names it.
+  - Search phrases (beat 4): "account erasure", "erasure inventory", "INVENTORY completeness", "usage-snapshot-intake erasure", "erasure collection", "collection universe", "account-erasure.js", "lockstep erasure", "erasure guard". The hits were related but different: LIN-3696 (self-service deletion), LIN-3704 (backups after deletion), LIN-3423 (Done, the erasure runbook), LIN-3708 (Done, area map) and LIN-3836.
+
+**Dated comments on existing tickets (evidence only; no description, intent, state or acceptance changed):**
+- **LIN-4214** (comment `6309ae8c`). It records:
+  - what LIN-4203 landed: the check at `request-usage-flush.js:114`, with all five seams traced to it;
+  - which acceptance items are met: behaviour, flag-on behaviour and comments;
+  - what is not: the per-seam flag-off test for fail, cancel and stall, and the ungated exports at `:285`.
+
+  Closing it against LIN-4203 is left to the costs owner.
+- **LIN-2798** (comment `3f9e1b72`). It records that `lib/workspace-kpis-cache.js:37-40,57` repeats this ticket's clear-race shape, including on stale refresh, and that a fix should cover both modules or share the logic.
+
+**Considered and not minted:**
+
+| candidate | severity | search phrases (Linear `/search`) | hits that matter | outcome |
 |---|---|---|---|---|
-| `usage-relay-flag-partial` residual (per-seam flag-off tests; ungated exports) | residual on a resolved row | "WORKER_USAGE_RELAY", "flag off seam test", "record flush gate", "postRecordsWithLedger", "LIN-4214" | **LIN-4214** (Backlog, 0 comments) is the exact home | **do not mint.** LIN-4214 already names the per-seam test. At most a dated comment on LIN-4214 recording what landed and what acceptance item (1) still lacks |
-| `cache-module-family`: second keyed SWR cache, repeating the clear race | LOW | "stale-while-revalidate", "workspace-kpis-cache", "sessions-feed-cache", "kpi cache", "single-flight" | **LIN-2798** (Backlog since 2026-09-12, 0 comments, no parent): the same race in `sessions-feed-cache` | **do not mint.** At most a comment on LIN-2798 noting that a second copy now carries the shape (`workspace-kpis-cache.js:38,57`) |
-| `usage-snapshot-prose-residue` | LOW | "snapshot prose", "stale usage comment", "effort readout usage", "proxy-instructions usage", "task-cost comment" | LIN-3484 (Backlog, proxy-instructions general sweep); LIN-4194 (Backlog, `docs/plans/costs.md` only); LIN-883 (Backlog, an unrelated stale-comment ticket) | **lean no-mint.** Below the bar: a doc and comment sweep with one user-visible string. LIN-4226 (In Progress) is editing these readers now. Record in the report only |
+| `usage-relay-flag-partial` residual (per-seam flag-off tests; ungated exports) | residual on a resolved row | "WORKER_USAGE_RELAY", "flag off seam test", "record flush gate", "postRecordsWithLedger", "LIN-4214" | **LIN-4214** (Backlog), the exact home | not minted; dated comment on LIN-4214 |
+| `cache-module-family`: a second keyed SWR cache repeating the clear race | LOW | "stale-while-revalidate", "workspace-kpis-cache", "sessions-feed-cache", "kpi cache", "single-flight" | **LIN-2798** (Backlog since 2026-09-12): the same race in `sessions-feed-cache` | not minted; dated comment on LIN-2798 |
+| `usage-snapshot-prose-residue` | LOW | "snapshot prose", "stale usage comment", "effort readout usage", "proxy-instructions usage", "task-cost comment" | LIN-3484 (Backlog, proxy-instructions sweep); LIN-4194 (Backlog, `docs/plans/costs.md` only); LIN-883 (unrelated) | not minted: below the bar (a doc and comment sweep with one user-visible string), and LIN-4226 is editing these readers now. Report only |
 | `completeness-precedence-restated` | borderline | "completeness precedence" | none relevant | report only |
-| legacy-fold deletion (not before 2026-12-04) | observation | "legacy fold", "snapshot fold", "2026-12-04", "delete legacy", "usageStateOf", "countedRowsOf", "usage snapshot counter", "usage-snapshot-intake" | none filed; named "listed, not filed" in LIN-4195's 17:07 comment and its description | not Drift's to mint: the costs owner has it |
-| contract rows for the usage calls | MEDIUM row, unchanged | "usage contract row", "runner contract usage" | LIN-3624 (Backlog, commented 11-04), LIN-3449 | existing home; no mint |
+| legacy-fold deletion (not before 2026-12-04) | observation | "legacy fold", "snapshot fold", "2026-12-04", "delete legacy", "usageStateOf", "countedRowsOf", "usage snapshot counter", "usage-snapshot-intake" | none filed; named "listed, not filed" in LIN-4195 (17:07 comment and description) | not Drift's: the costs owner holds it |
+| contract rows for the usage calls | MEDIUM row, unchanged | "usage contract row", "runner contract usage" | LIN-3624 (Backlog), LIN-3449 | existing home; not minted |
 
 **Reasoning on the bar.**
-- No new or worsened item is above LOW.
-- The Backlog already holds 17 unmoved Drift-family tickets (`coherence-loop-stalled`). The newest of them was fixed elsewhere while it sat untouched.
-- Both LOW candidates already have an existing ticket naming the same defect class (LIN-4214, LIN-2798).
-- Applying "err toward under-creating", the expected beat-4 outcome is **zero minted**, with at most dated comments on LIN-4214 and LIN-2798. The second-read may change that.
+- The Backlog held 17 unmoved Drift-family tickets (`coherence-loop-stalled`), and the newest of them was fixed elsewhere while it sat untouched. So each LOW item with an existing home got a comment there, not a new ticket.
+- Only the erasure gap had no home and a user-facing cost, so only it was minted. The open count is now 18.
 
 ## For John (none blocks the report)
 
@@ -357,24 +405,140 @@ State fetched from the workspace API at this run, compared by diff with the 11-0
 | LIN-3822 / 3835 / 3836 / 1496 / 3736 | Backlog, parent 3449 | same; comments 3 / 1 / 1 / 6 / 3, last 11-03 07:30 | none |
 | LIN-3624 | Backlog, parent 3449, "five comments", then commented | 6 comments, last 11-04 08:41 | +1, the 11-04 run's own; nothing since |
 | LIN-3823 / 3636 / 3649 / 3843 / 3979 / 4151 | Backlog, **no parent** | same; comments 2 / 7 / 3 / 1 / 2 / 2, last 11-03 07:30 | none; still unparented |
-| **LIN-4214** | not mentioned ("not minted") | **Backlog, parent 3449, `kind:follow-up`, 0 comments; created 11-04 08:48Z by the LIN-4209 retrospective audit** | new; fix landed under LIN-4203, ticket untouched |
-| LIN-3449 | Todo, 41 children, 21 comments | Todo, **43 children**, 22 comments | +LIN-4210, +LIN-4214; +1 comment, the 11-04 log entry |
+| **LIN-4214** | not mentioned ("not minted") | **Backlog, parent 3449, `kind:follow-up`; created 11-04 08:48Z by the LIN-4209 retrospective audit; 0 comments before this run, +1 dated evidence comment from this run** | new; fix landed under LIN-4203; ticket state unchanged |
+| LIN-3449 | Todo, 41 children, 21 comments | Todo, **44 children**, 22 comments | +LIN-4210, +LIN-4214, +LIN-4234 (this run); +1 comment, the 11-04 log entry |
+| **LIN-4234** | — | **minted this run**: Backlog, parent 3449, `kind:follow-up` | new (erasure inventory gap, #11) |
+| LIN-2798 | (not tracked) | Backlog, no parent; +1 dated comment from this run | evidence comment (cache family) |
 | LIN-4195 | In Progress | In Progress, 9 children, 16 comments | 8 comments since; final piece-6 report at 17:07. Description unedited ("L1 … closed") |
 | LIN-4200 / 4212 / 4201 / 4203 | (gate) / — / Todo / Todo | Done 08:46 / 11:14 / 16:38 / 17:45 | all Done |
 | LIN-4226 | — | In Progress (piece 4b) | new in the costs run |
 
-**Open Drift follow-ups, Backlog and unmoved: 17**, not the 16 the task description listed: LIN-4210, 4156, 4157, 4158, the six 10-23 tickets, the six unparented ones, and LIN-4214.
+**Open Drift follow-ups, Backlog and unmoved: 17** before this run, not the 16 the task description listed: LIN-4210, 4156, 4157, 4158, the six 10-23 tickets, the six unparented ones, and LIN-4214. **18** with LIN-4234.
 
 | edition | minted | still Backlog and unmoved at the next run | notes |
 |---|---|---|---|
 | 10-23 | six (LIN-3822, 3835, 3836, 1496, 3736, 3624) | all six | parent-all ruled 11-03 |
 | 11-03 | LIN-4156, 4157, 4158 | all three (0 comments) | parented under LIN-3449 |
 | 11-04 | LIN-4210 (+ LIN-4214 by its retrospective audit) | both (0 comments) | LIN-4214's code was fixed under LIN-4203 |
-| 11-04b | to be decided in beat 4 | — | lean: zero |
+| 11-04b | **LIN-4234** (erasure inventory gap) | — | plus dated comments on LIN-4214 and LIN-2798 |
 
 ## Adversarial Second-Read
 
-**To be completed in beat 4.** A fresh-context reader (Tier 1 or Tier 2; this session's own re-read does not count) will answer: "What is the largest item in this window that this report missed or misfiled?" The tier, the question, the reader's answer in full, and the three fields (`Adversarial second-read verdict`, `Differed from top finding`, `Disposition`) will be recorded here. None of them is filled in this draft.
+- **Tier: 2.** A fresh-context sub-agent (Agent tool, general-purpose) with no memory of the report-writing turns. Tier 1 (a wholly separate session) was not available from inside this run.
+- **What it was given:**
+  - the question;
+  - the two clone paths and the measured ranges (LinearViewer `5334c81a..d7ceb373`, SD `502901c..d8d186c`);
+  - the report's path on the PR branch;
+  - the instruction to form its own view from the window's diffs first (both repos, the usage-records cluster, the runner kit, the contract files), only then read the report and compare, and to verify at least five citations of its own choosing.
+
+  It was **not** given the notes files, the candidate list, the verdicts, the follow-up lean, or any conclusion.
+- **Question (verbatim):** "What is the largest item in this window that this report missed or misfiled?"
+- **Reader's answer, in full:**
+
+> I found one real miss. It's new in this window and the report doesn't mention it anywhere, though it doesn't outrank the report's top-ranked carried rows.
+>
+> **Largest missed or misfiled item**
+>
+> The new `usage-snapshot-intake` collection (LIN-4203) was never added to the account-erasure `INVENTORY`. The test that is supposed to catch exactly this is blind to it.
+>
+> - LIN-4203 creates a urlKey-keyed collection: documents with `_id` `${urlKey}:${day}` holding `{urlKey, day, count, lastAt}`.
+> - `lib/account-erasure.js` `INVENTORY` doesn't list it. The previous collection in this cluster, `request-usage` (LIN-4198), was added under the lockstep rule and pinned by a test (`lin-4198-request-usage-store.test.js:287`).
+> - The completeness guard (`tests/unit/account-erasure.test.js:82-103`) builds its list of collections in three ways:
+>   - by matching quoted names in `server.js` calls of the form `collection('name')`;
+>   - from `INDEX_SPECS`;
+>   - from the script tables.
+> - `server.js` opens the new collection through a constant, `db.collection(USAGE_SNAPSHOT_INTAKE_COLLECTION)`, and it has no index spec. So the guard never sees it, and the test still passes with its hard-coded "57 names" bound.
+> - Consequence:
+>   - A Full erasure deletes only `INVENTORY` rows (`account-erasure.js:908-910`), so a wiped workspace's counter documents survive.
+>   - The dry run would list it under "collections in the database that INVENTORY does not name" (`:730-731`, `:1047`), but nothing deletes it.
+>   - The collection only fills when an old runner posts `[usage]`, which is exactly the situation this window expects (unupgraded SD hosts).
+> - Where the report touches this file, it only notes that it "has no area" in the code-shape guide (a map-hygiene hand-off). It doesn't cover the erasure lockstep, and it states "Security: nothing in the window."
+>
+> **Evidence** (LinearViewer `d7ceb373`)
+> - `lib/usage-snapshot-intake.js:13` (collection name), `:27-34` (urlKey-keyed upsert).
+> - `server.js:42`, `:461`: opened through the constant, not a literal.
+> - `lib/account-erasure.js:120-188`: `INVENTORY` has `request-usage` (`:166-168`) but not `usage-snapshot-intake`.
+> - `lib/account-erasure.js:908-910`: the Full wipe deletes `INVENTORY` rows only.
+> - `tests/unit/account-erasure.test.js:82-93`: the guard's collection list (`walkLiterals` regex `collection\(\s*['"]…['"]\s*\)`). `:107-110`: universe pinned at 57.
+> - `lib/db-indexes.js`: no spec for the collection.
+>
+> **Severity I would give it: LOW-MEDIUM**
+> - It is a convention-fragmentation case: a lockstep rule with an executable guard, sidestepped by a naming pattern. It has a concrete compliance consequence: erasure leaves workspace-keyed data behind.
+> - It also leaves a lasting blind spot. Any future collection opened through a constant and without an index spec will slip past the guard the same way.
+> - I don't rate it higher because the data is counts plus urlKey only, and the dry run does surface the name.
+> - It is above every new or worsened row in the report (all LOW), which contradicts the headline "Nothing new rises above LOW".
+>
+> **Does my answer differ from the report's top-ranked finding?** YES. Row 1 is `resume-model-effort-cross-repo`, a carried MEDIUM-HIGH row. My item doesn't displace it; it is missing from the table entirely.
+>
+> **Citation spot-check** (all read with `git show` at `d7ceb373` / `d8d186c`)
+>
+> | Citation | Result |
+> |---|---|
+> | `dispatch-store.js:311-318` (`findLineageIdentity`) | holds |
+> | SD `request-usage-flush.js:114` (`if (!WORKER_USAGE_RELAY) return NOTHING;`) | holds |
+> | `cost-read.js:88` (calls `countedRowsOf`) | holds |
+> | `request-usage-vocabulary.js:15-21` and `:28` | holds |
+> | `workspace-kpis-cache.js:38` (set after await) and `:57` (`clear`) | holds |
+> | SD `config.js:1345` | holds |
+> | SD `opencode-runner.js:591` | holds |
+> | `routes/dispatch.js:1668` (usage route) | holds |
+> | `effort-readout.js:596` | holds |
+> | `proxy-instructions.js:385-387` | holds |
+> | Contract rows: 38 vs 34 | holds |
+> | `row-usage.js:116-118` and `request-usage-fold.js:103` | holds |
+>
+> **Anything else in the report I found wrong** (all minor)
+> - The `usage-snapshot-prose-residue` list (#12) is incomplete:
+>   - `docs/architecture/source-map.md:191` still describes `run-view` cost as "last valid `[usage]` per lineage" and gives the signature as `buildRunView(session, { now })`. `requestRows` is now required and the function throws without it. That line was not touched by the window's source-map edit.
+>   - SD `request-usage.js` says lane values "must match Harbour's USAGE_LANES whitelist exactly; a mismatch silently reads back as null". That is no longer true for records: the intake keeps any lane and nothing reads it.
+> - Otherwise I agree with its own calls:
+>   - three rows resolved;
+>   - `cache-module-family` worsened, including the clear race;
+>   - the contract stays MEDIUM with no usage row;
+>   - a record's lane is read by nothing, which my own grep confirmed.
+>
+> **Verdict: DISAGREE.** A new erasure-lockstep gap with a guard blind spot landed in this window and is missing from the report. It is a real miss above every new LOW item, though it doesn't reorder the carried MEDIUM-HIGH and MEDIUM rows.
+>
+> **Confidence:** high that the gap exists (I read the inventory, the delete loop, the guard test and the server wiring). I did not:
+> - run the erasure tests or the guard;
+> - check production for whether `usage-snapshot-intake` has any documents yet;
+> - verify the report's census, import-graph or Linear-ticket claims;
+> - read the SD heavy-tier harness files beyond their diff stats.
+
+**Response (judged by this session, then verified at `d7ceb373`).**
+- **The miss is real.** I checked every link:
+  - `INVENTORY` (`lib/account-erasure.js:124-170`) has `request-usage` (`:166-168`) and not `usage-snapshot-intake`.
+  - The Full wipe loop is `:904-911`.
+  - The guard's universe (`tests/unit/account-erasure.test.js:87-95`) reads `server.js` literals, `MAGIC_LINK_COLLECTION` and `TASK_SHARE_COLLECTION` by hand (`:89-90`), `INDEX_SPECS` and the script tables.
+  - `server.js:461` opens the collection through a constant.
+  - `lib/db-indexes.js` has no spec for it.
+  - Listing every non-literal `collection(` call shows this is the **only** collection that escapes.
+
+  The reader's line numbers differ by a few lines in places (`:908-910` for the loop, `:82-103` for the guard). The substance holds.
+- **Severity: agreed, LOW-MEDIUM.** The first draft's headline ("Nothing new rises above LOW") and its scope claim ("layer set complete") were wrong.
+- **The two minor prose items are real and verified** (`source-map.md:191`, SD `request-usage.js:163-164`).
+- **The reader's 12 citation checks all hold.** This session's own 14-citation check (beat 3) also held.
+
+**What changed in the report (fixed in place):**
+- New finding #11 `erasure-inventory-lockstep-gap` (LOW-MEDIUM), with a detail section.
+- The headline is corrected and a new item 3 added.
+- The Scope section carries a correction note naming the missed lockstep and the search that now covers it.
+- Two sites added to `usage-snapshot-prose-residue`.
+- Security / privacy cross-link added.
+- New class row (collections vs `INVENTORY`).
+- LIN-3490 reading moves from 72 to 73 graded (25 Low-Medium).
+- New ledger row 124.
+- Follow-up **LIN-4234** minted.
+- Ticket trend updated.
+- Census rulings are unaffected: the gap is not a census group, since the guard's universe is a test-side list.
+
+**Three required fields:**
+
+Adversarial second-read verdict: DISAGREE
+Differed from top finding: YES
+Disposition: fixed in place
+
+(The verdict is the reader's, recorded as given. "Differed" is YES because the reader's largest item, the erasure gap, is not the report's top-ranked finding, `resume-model-effort-cross-repo`. The disposition is fixed in place because the miss was added to the report and ticketed in this run, with nothing left for another owner to rule on.)
 
 ## Census ruling table (the 106 `mustRule` groups, HEAD guide)
 
@@ -805,7 +969,7 @@ Status is against `5334c81a` under the one HEAD guide.
 
 ## Compact trend ledger
 
-Carried from the 11-04 ledger: every 11-04 row keeps its stable name and order (121 rows, none re-keyed or dropped). Columns through `delta vs 11-03` are copied verbatim from 11-04 (its `11-04 (this run)` column is renamed `11-04`). This run adds `11-04b (this run)` (state at `d7ceb373` / `d8d186c`, judged on each row's own cited files and lines) and `delta vs 11-04`. Rows 122-123 are new this edition. The severity column is the current severity (resolved rows read `resolved`; `cache-module-family` is newly graded `low`). Of the 121 carried rows: 96 unchanged, 19 held, 2 improved, 1 worsened, 3 resolved; none retired. Total 123 rows (121 carried + 2 new), counted programmatically.
+Carried from the 11-04 ledger: every 11-04 row keeps its stable name and order (121 rows, none re-keyed or dropped). Columns through `delta vs 11-03` are copied verbatim from 11-04 (its `11-04 (this run)` column is renamed `11-04`). This run adds `11-04b (this run)` (state at `d7ceb373` / `d8d186c`, judged on each row's own cited files and lines) and `delta vs 11-04`. Rows 122-124 are new this edition (row 124 was added after the adversarial second-read). The severity column is the current severity (resolved rows read `resolved`; `cache-module-family` is newly graded `low`). Of the 121 carried rows: 96 unchanged, 19 held, 2 improved, 1 worsened, 3 resolved; none retired. Total 124 rows (121 carried + 3 new), counted programmatically.
 
 | finding | severity | 06-25 | 07-12 | 08-29 | 2026-09-26 | 2026-10-11 | 10-11 post-batch | 10-12 post-batch-3 | 10-18 | 10-19 | 10-23 | 11-03 (this run) | delta vs 10-23 | 11-04 | delta vs 11-03 | 11-04b (this run) | delta vs 11-04 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -912,7 +1076,7 @@ Carried from the 11-04 ledger: every 11-04 row keeps its stable name and order (
 | `resume-model-effort-cross-repo` | medium-high | — | — | — | — | — | — | — | — | — | — | Harbour fills a blank follow-up model/effort from the routing table (dispatch-factory.js:634-645) and stamps it on the row (:1176,1180); no anchor tier for model or effort (:535-541). SD reads a row value as explicit (harnesses.js:598-605). Executed: a person's reply on a sonnet/medium table resumed an opus/high session as sonnet/medium. LIN-3830 ruling defeated. Ticket LIN-4156 minted. | new | Harbour routing-table fill still at dispatch-factory.js:635-646 and :1181; no model/effort anchor tier (:536-542); SD harnesses.js:598-605 unchanged. | unchanged | dispatch-factory.js, follow-up-dispatch.js, SD harnesses.js all 0-line diff; LIN-4156 Backlog, 0 comments | unchanged |
 | `halt-word-map-copies` | medium | — | — | — | — | — | — | — | — | — | — | Mode to word map written x4 (render.js:222; render-settings-workspace.js:33,85; settings-areas.js:69-72; workspace-change-log.js:138). On a halt-store fault, routes/settings.js:176-184 returns unknown, and Settings shows Running / Runner ready. Ticket LIN-4157 minted. | new | Mode-to-word maps unchanged at render.js:222, render-settings-workspace.js:33,85, settings-areas.js:69-72, workspace-change-log.js:138; routes/settings.js readHaltMode fault path now :177-185. | unchanged | The four map files 0-line diff; routes/settings.js touched by usage-records wiring only; LIN-4157 Backlog | unchanged |
 | `home-next-answer-split` | medium | — | — | — | — | — | — | — | — | — | — | triage is decided only at home-view.js:33 (as backlog); state-map.js has no triage branch (To Do), task-state.js:118-120 gives no word, task-order.js:163 ranks it ?? 1. The deck top task (home-pipeline.js:67-68) and Up next (upNextOf, home-view.js:412) rank differently; Up next counts in-deck blockers only (:414-416). Ticket LIN-4158 minted; LIN-4151 updated for readiness and ranking. | new | Triage handled only at home-view.js:33; task-order.js:163 ranks it ?? 1; Up next in-deck blocker count at home-view.js:414-416; cited lines unmoved. | unchanged | home-view.js, task-order.js, providers/state-map.js 0-line diff; LIN-4158 Backlog | unchanged |
-| `coherence-loop-stalled` | medium (process) | — | — | — | — | — | — | — | — | — | — | Process row, not a code finding. No 10-23 follow-up has landed (LIN-3822, 3835, 3836, 1496, 3736, 3624 all Backlog). LIN-3449 now lists them as children (38 children, against 32 at research time); its cycle dispatches children only after a proposal and John's go, last activity 10-23 22:04Z. | new | Process row, not a code finding; no source site to verify at HEAD. | held | No Drift follow-up moved. New datum: LIN-4214 (minted 11-04 08:48Z) was fixed by its owner's LIN-4203 without the loop ticket being touched; Backlog Drift-family count 17 | unchanged |
+| `coherence-loop-stalled` | medium (process) | — | — | — | — | — | — | — | — | — | — | Process row, not a code finding. No 10-23 follow-up has landed (LIN-3822, 3835, 3836, 1496, 3736, 3624 all Backlog). LIN-3449 now lists them as children (38 children, against 32 at research time); its cycle dispatches children only after a proposal and John's go, last activity 10-23 22:04Z. | new | Process row, not a code finding; no source site to verify at HEAD. | held | No Drift follow-up moved. New datum: LIN-4214 (minted 11-04 08:48Z) was fixed by its owner's LIN-4203 without the loop ticket being touched; Backlog Drift-family count 17 (18 with LIN-4234, minted this run) | unchanged |
 | `settings-run-setup-rebuilt` | low-medium | — | — | — | — | — | — | — | — | — | — | routes/settings.js:244-252,379 rebuilds runSetup with its own ownerOf (:132-137) and no catch on the token-store read, where run-controls.js:79-89 fails closed. | new | routes/settings.js rebuilds runSetup at :381 with own ownerOf (:133-138) and an unwrapped token-store Promise.all (:245-253); run-controls.js fails closed. | unchanged | runSetup at routes/settings.js:381 and ownerOf :133 unmoved (window hunks are usage-records wiring only) | unchanged |
 | `settings-preset-systems` | low-medium | — | — | — | — | — | — | — | — | — | — | render-settings.js:707-711 renders Dispatch presets (free-text effort; preset writes at routes/dispatch.js:1228,1260 have no runnable check) beside Routing presets (render-settings-models.js:309-336). LIN-3979 updated. | new | Dispatch presets render at render-settings.js:711-715 beside routing presets (render-settings-models.js:309-336); preset writes at routes/dispatch.js:1229,1261. | unchanged | Preset writes routes/dispatch.js:1221,1278 (shifted); render files 0-line diff | unchanged |
 | `routes-as-library` | low-medium | — | — | — | — | — | — | — | — | — | — | route to route static edges 26 to 53 (walker K). routes/dashboard-session-state.js imports only lib/ and exports settleWithConcurrency (:43), used by routes/workspace-api-scan.js:18. Seams F5 (LIN-4152) owns the area view. | new | Cited edges unchanged: routes/dashboard-session-state.js:43 exports settleWithConcurrency, imported by routes/workspace-api-scan.js:18; edge count not re-walked. | unchanged | cited files 0-line diff in the window | unchanged |
@@ -930,5 +1094,6 @@ Carried from the 11-04 ledger: every 11-04 row keeps its stable name and order (
 | `cost-fold-partition-restated` | resolved | — | — | — | — | — | — | — | — | — | — | — | new (costs work) | cost-read.js:63-86 restates the snapshot/delta partition of row-usage.js:71-77. | new | countedRowsOf (row-usage.js:80-101) is the one partition; cost-read.js:88 reads it | resolved |
 | `key-state-residue` | informational | — | — | — | — | — | — | — | — | — | — | — | new (not graded) | Mock rule restated at key-state-holders.js:48 (census G0006, real); side resets routes/test.js:937,1710. Only test-side. | new | New workspace-kpis-cache registered as a key-state holder; routes/test.js:686,700 invalidate it after rollup writes (not a side reset) | held |
 | `unit-census-convention-split` | informational | — | — | — | — | — | — | — | — | — | — | — | new (not graded) | Per-feature unit censuses use 4 allowlist shapes and no shared helper (LIN-4168 census test). Answered: informational. | new | No new allowlist shape (existing censuses extended; one equality pin added) | unchanged |
-| `usage-snapshot-prose-residue` | low | — | — | — | — | — | — | — | — | — | — | — | — | — | — | Text still describing the retired [usage] snapshot as live: effort-readout.js:596 (user-visible disclosure), proxy-instructions.js:385-387 (agent catalog), docs/proxy-integration.md:1238-1240, comments effort-readout.js:58-59, model-routing-spend.js:5-6,58, request-usage-vocabulary.js:4, SD request-usage-flush.js:3-8; lib/task-cost.js comment residue 3 → 2 | new |
+| `usage-snapshot-prose-residue` | low | — | — | — | — | — | — | — | — | — | — | — | — | — | — | Text still describing the retired [usage] snapshot as live: effort-readout.js:596 (user-visible disclosure), proxy-instructions.js:385-387 (agent catalog), docs/proxy-integration.md:1238-1240, comments effort-readout.js:58-59, model-routing-spend.js:5-6,58, request-usage-vocabulary.js:4, SD request-usage-flush.js:3-8, docs/architecture/source-map.md:191, SD request-usage.js:163-164 (last two added after the second-read); lib/task-cost.js comment residue 3 → 2 | new |
 | `completeness-precedence-restated` | borderline (not graded) | — | — | — | — | — | — | — | — | — | — | — | — | — | — | unreadable > unpriced > complete written at row-usage.js:116-118, cost-read.js:171-174 (combineFolds), request-usage-fold.js:103 (no unreadable state); census table group completeness == complete grew to 3 files | new |
+| `erasure-inventory-lockstep-gap` | low-medium | — | — | — | — | — | — | — | — | — | — | — | — | — | — | usage-snapshot-intake (LIN-4203, urlKey-keyed) missing from INVENTORY (lib/account-erasure.js:124-170); Full wipe deletes INVENTORY only (:904-911); completeness guard (tests/unit/account-erasure.test.js:87-95) blind to a constant-named collection without an index spec (server.js:461); only such gap; found by the second-read; minted LIN-4234 | new |
