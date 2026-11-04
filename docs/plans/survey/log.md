@@ -1359,3 +1359,11 @@ LIN-4201 is still in progress. LIN-4221 (exit codes and pre-flight) is in progre
 
 - **LIN-4224** (`86bde97`) merged: `npm run test:baseline`, plus a docs table of which skip rule applies to which tier. **All five harness pieces have now merged, all `+`.** The parent LIN-4219 is in final review. Then LIN-4187, on the harness.
 - **LIN-4201 waits on John to run the production gate himself.** He chose `operator-runs-gate`. The answer was delivered to the agent session, which has no `MONGODB_URI`, so the steps are on LIN-4201 for him. **A gap in the rulings loop:** an answer naming a *person* gets dispatched to an *agent*. The ruling should say where its answer goes.
+
+### 15:55 UTC: the production gate goes back to an agent
+
+John asked whether he's actually needed. He isn't. LIN-4200's session ran the same script on production this morning: the Railway CLI was logged in, an SSH key was registered after his ruling, and `MONGODB_URI` was derived at run time through the tunnel. LIN-4201's session is on the same machine and didn't know. That path is also how the root password reached a transcript. The cleaner fix is a read-only Mongo user, or a read-only proxy route (costs decision 10). John: "whatever is going to be easiest to land is best."
+
+So I sent LIN-4201's close-out session (`795899f6`, follow-up `41c42f3b`) the LIN-4200 path, with strict credential handling: the URI goes into the environment inside one command and is never echoed, written or posted; stop if it can't be done without it appearing. Then the gate per John's criterion, the IXSCAN check, GO or NO-GO on the ticket, and on GO, close-out merges pinned to `a878966c`.
+
+**The pattern, a fourth time:** builders don't know the tools this machine gives them (the Railway CLI for deploys, for Mongo, for the gate). A short, standing "what this machine can do" note in the runner's prompt would stop most of these.
