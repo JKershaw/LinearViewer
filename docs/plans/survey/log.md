@@ -1449,3 +1449,49 @@ John: "I feel like our process of refining, trying it on real work, and measurin
   - **All four findings we routed into LIN-4201 and LIN-4203 were resolved or improved.** The 17 earlier Drift follow-ups, pushed as Backlog tickets, are all unmoved. **Pull worked where push sat**, in one window.
   - **The routed fix also orphaned a ticket:** LIN-4214 (the relay-flag residual, filed by an audit) went stale behind the fix LIN-4203 made. Drift: "the loop's tickets are not where owners look."
   - **New defects our tickets left:** the erasure gap from LIN-4203 (LIN-4234), stale snapshot prose, and a second cache copy from LIN-4201. The task-level view and the place change didn't catch these, which is why the Periodical is still needed as the film.
+
+## Summary for the morning (4 Nov, 21:00 UTC), for John
+
+### What we were testing
+Whether tasks can finish with the codebase **cleaner than they started**. The loop:
+1. **Two Survey voices before work:** local (open-0) and the place (global).
+2. **A step-back** that sets out a range of options with prices.
+3. **The human's scope call** (Claude in that role today, choosing large where the price supports it).
+4. **The build.**
+5. **A place reading at merge**, into a ledger.
+6. **The Periodicals as independent checks.**
+
+### The ledger (`place-ledger.md`)
+
+| | Better | Mixed | Neutral | Worse |
+|---|--:|--:|--:|--:|
+| **Baseline** (3–4 Nov, before the place view) | 1 | 1 | 3 | 4 |
+| **Through the loop** (4 Nov) | 10 | 1 | 1 (LIN-4212, not surveyed) | 0 |
+
+- **The better rows:** the six harness rows (LIN-4219 and its pieces), LIN-4203 (the first to make the codebase smaller), LIN-4187 (two reds closed; all 27 scenarios carry a contract note), LIN-4218 (one outcome table for every Stop relay) and LIN-4226.
+- **The mixed row:** LIN-4201. Its fair comparison is rebuild 1's pieces from the day before, which scored − and −/+.
+- **Independent checks:**
+  - **Seams run 6 agrees with the map column**, with the caution that LIN-4201's map gain was largely its guide edit.
+  - **Drift run 2 confirms the copies column:** all four findings routed into in-flight tasks were resolved or improved, while all 17 pushed follow-ups sit.
+  - **Both also found new small gaps our tickets left:** an erasure inventory gap (LIN-4234), stale prose, and a second cache copy.
+
+### What we learned
+1. **The place view sees what the task view doesn't**, at the right level. On backtests it named the homeless hub and the founder-lookup twin from the base, but only when run on the piece, not the parent. On simple-dispatcher it worked without any area map.
+2. **The step-back with good questions does most of the work.** In the A/B, the place view changed what went into the choice, not which option was chosen. Its effect was about the size of the difference between two separate runs.
+3. **Pricing turns "not this task's" into a decision:** do it first, fold it in, or its own ticket now. Two tally rows were priced, filed and landed on the same day (the harness; the Stop sequence).
+4. **Routing the Periodicals' findings into in-flight tasks works; pushing them as tickets doesn't.** 4 of 4 routed were resolved; 17 of 17 pushed are unmoved.
+5. **Letting the Survey run tests makes it see more.** Two real defects were found before work began: LIN-4187's cause, and LIN-4218's latent park bug (LIN-4233).
+6. **Choosing large pays when the extra is priced as its own piece.** LIN-4201's builder: removing the twin paid; "loading part of the read" was mispriced as free and split off (it then landed as LIN-4226).
+7. **The Periodical is still needed as the film.** The task-level view missed the erasure gap and the stale prose; Drift caught them.
+8. **The guard for the prompts is generality, not length:** would the sentence make sense on a codebase that isn't Harbour?
+
+### Caveats
+- Every forward ticket was a consolidation or a rebuild. **No ordinary feature ticket has been through the loop yet.**
+- I scored the rows, against criteria logged in advance.
+- It's one day.
+
+### Next (with your nod)
+1. **An ordinary feature ticket through the loop.** That's the tipping-point test on the work that matters.
+2. **q6 to the five baseline-window builders,** to see whether a builder's own account of the place matches what the Periodicals measured (if it does, the ledger gets cheap).
+3. **LIN-4233** (the park-status fix) and **LIN-4234** (the erasure gap), through the loop.
+4. **Open for you:** the mixed-model label ruling on LIN-4195 (proposed: `cost-dominant`); LIN-4210 (the halt poll); LIN-4214 (stale behind LIN-4203's fix, probably closeable).
