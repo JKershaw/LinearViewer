@@ -46,6 +46,8 @@ import { computeUrlKeyDuplicateReport } from '../../scripts/dry-run-urlkey-dupli
 
 // LIN-4178: no founder lookup: the fetched rows stand in for it (the pre-LIN-4178 behaviour).
 const NO_FOUNDERS = async () => [];
+// LIN-4201: the twins are snapshot rows with no request records, so the records function answers none, on purpose.
+const NO_REQUEST_RECORDS = async () => [];
 
 const uri = process.env.MONGODB_TEST_URI;
 if (!uri && process.env.CI) {
@@ -1941,11 +1943,11 @@ describe(
           // --- full /kpis output, ONE row per side, so the equality below is non-vacuous ---
           const freshOnlyCollection = freshCollection('lin3012-l1-fresh-only');
           await freshOnlyCollection.insertOne(freshDoc);
-          const freshStats = await collectKpiStats(buildKpiStatsCollections(freshOnlyCollection), { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: {} });
+          const freshStats = await collectKpiStats(buildKpiStatsCollections(freshOnlyCollection), { lineageIdentity: NO_FOUNDERS, requestRows: NO_REQUEST_RECORDS, now: NOW, milestoneFunnelDeps: {} });
 
           const legacyOnlyCollection = freshCollection('lin3012-l1-legacy-only');
           await legacyOnlyCollection.insertOne(legacyDoc);
-          const legacyStats = await collectKpiStats(buildKpiStatsCollections(legacyOnlyCollection), { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: {} });
+          const legacyStats = await collectKpiStats(buildKpiStatsCollections(legacyOnlyCollection), { lineageIdentity: NO_FOUNDERS, requestRows: NO_REQUEST_RECORDS, now: NOW, milestoneFunnelDeps: {} });
 
           assert.strictEqual(freshStats.totals.dispatches, 1, `${shape.name}: fresh-only run must be non-vacuous (1 dispatch)`);
           assert.strictEqual(legacyStats.totals.dispatches, 1, `${shape.name}: legacy-only run must be non-vacuous (1 dispatch)`);
