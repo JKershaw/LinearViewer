@@ -325,6 +325,145 @@ describe('parseParkedWait (LIN-2244)', () => {
   });
 });
 
+// LIN-4240: parseParkedWait decides on the newest STATE-BEARING entry, not the
+// literal newest one. Trailing relays from any process (tool activity,
+// usage, resources, [ticket] markers, decision stamps) must not hide a park.
+describe('parseParkedWait skips non-state entries (LIN-4240)', () => {
+  const PARK = '[working · verifying] a scheduled wakeup still pending.';
+  const STAMP = JSON.stringify({ decision_id: 'd-1', reason: 'unrelated' });
+
+  // Witness 1
+  test('park, then kind:tool → still parked', () => {
+    const feedback = [
+      { message: PARK, timestamp: 't1' },
+      { kind: 'tool', message: 'Read lib/session-telemetry.js', timestamp: 't2' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1' });
+  });
+
+  // Witness 2
+  test('park, then kind:usage → still parked', () => {
+    const feedback = [
+      { message: PARK, timestamp: 't1' },
+      { kind: 'usage', message: '{"model":"x","inputTokens":10}', timestamp: 't2' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1' });
+  });
+
+  test('park, then a legacy UNTAGGED [usage] line → still parked', () => {
+    const feedback = [
+      { message: PARK, timestamp: 't1' },
+      { message: '[usage] claude-opus 1200 in / 300 out', timestamp: 't2' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1' });
+  });
+
+  test('park, then kind:resources → still parked', () => {
+    const feedback = [
+      { message: PARK, timestamp: 't1' },
+      { kind: 'resources', message: '[resources] {"cpu":0.4}', timestamp: 't2' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1' });
+  });
+
+  // Witness 3
+  test('park, then a tool, then a decision stamp → still parked', () => {
+    const feedback = [
+      { message: PARK, timestamp: 't1' },
+      { kind: 'tool', message: 'Bash npm test', timestamp: 't2' },
+      { kind: 'decision-withdrawn', message: STAMP, timestamp: 't3' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1' });
+  });
+
+  // Witness 4: the reaper's exact [ticket] shape (kind:'status', message-matched)
+  test('park, then {kind:status, [ticket] LIN-1 done} → still parked', () => {
+    const feedback = [
+      { message: PARK, timestamp: 't1' },
+      { kind: 'status', message: '[ticket] LIN-1 done', timestamp: 't2' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1' });
+  });
+
+  // Witness 5
+  test('park, a tool relay, another park → one run, since at the FIRST park', () => {
+    const feedback = [
+      { message: PARK, timestamp: 't1' },
+      { kind: 'tool', message: 'Read a.js', timestamp: 't2' },
+      { message: PARK, timestamp: 't3' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't3' });
+  });
+
+  test('park, a ticket marker, another park → one run, since at the FIRST park', () => {
+    const feedback = [
+      { message: PARK, timestamp: 't1' },
+      { kind: 'status', message: '[ticket] LIN-1 started', timestamp: 't2' },
+      { message: PARK, timestamp: 't3' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't3' });
+  });
+
+  // Witness 6 guards: these must hold before AND after the change.
+  test('guard: park, assistant-text, park → two runs (since at the second park)', () => {
+    const feedback = [
+      { message: PARK, timestamp: 't1' },
+      { kind: 'assistant-text', message: 'Waiting on CI, will check again.', timestamp: 't2' },
+      { message: PARK, timestamp: 't3' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't3', latest: 't3' });
+  });
+
+  test('guard: park, then [done] → not parked', () => {
+    const feedback = [
+      { message: PARK, timestamp: 't1' },
+      { kind: 'status', message: '[done] Task completed', timestamp: 't2' },
+    ];
+    assert.equal(parseParkedWait(feedback), null);
+  });
+
+  test('guard: park, then an untagged [working] heartbeat → not parked', () => {
+    const feedback = [
+      { message: PARK, timestamp: 't1' },
+      { message: '[working] 6 tools/32s · alive', timestamp: 't2' },
+    ];
+    assert.equal(parseParkedWait(feedback), null);
+  });
+
+  test('guard: park, then a [ticket] marker, then [done] → not parked', () => {
+    const feedback = [
+      { message: PARK, timestamp: 't1' },
+      { kind: 'status', message: '[ticket] LIN-1 done', timestamp: 't2' },
+      { kind: 'status', message: '[done] Task completed', timestamp: 't3' },
+    ];
+    assert.equal(parseParkedWait(feedback), null);
+  });
+
+  test('guard: a [ticket]-looking line TICKET_PREFIX does not match is state-bearing → not parked', () => {
+    const feedback = [
+      { message: PARK, timestamp: 't1' },
+      { kind: 'status', message: '[ticket] LIN-1 frobnicated', timestamp: 't2' },
+    ];
+    assert.equal(parseParkedWait(feedback), null);
+  });
+
+  test('guard: park, then a refusal → not parked (refusal stays decisive)', () => {
+    const feedback = [
+      { message: PARK, timestamp: 't1' },
+      { kind: 'refusal', message: 'I cannot continue with this.', timestamp: 't2' },
+    ];
+    assert.equal(parseParkedWait(feedback), null);
+  });
+
+  test('guard: park, then a heartbeat that still mentions the wakeup → still parked, latest advanced', () => {
+    const feedback = [
+      { message: PARK, timestamp: 't1' },
+      { kind: 'heartbeat', message: '[working · verifying] verifying in background (scheduled wakeup) · idle 2m · next heartbeat in ≤1m', timestamp: 't2' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't2' });
+  });
+});
+
 describe('parseModel', () => {
   test('omitted (null) when no runner emission exists', () => {
     const feedback = [

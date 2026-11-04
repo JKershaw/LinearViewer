@@ -181,7 +181,9 @@ function runTelemetry(l) {
     // CI poll) — distinct from both "working" and "blocked on a human"
     // (the `decision`/waiting fields below). null when not currently
     // parked; never inferred from staleness, only from the run's own
-    // latest feedback text (lib/session-telemetry.js's parseParkedWait).
+    // feedback: its newest state-bearing entry, with tool/usage/resources
+    // relays, [ticket] markers and decision stamps walked past (LIN-4240;
+    // lib/session-telemetry.js's parseParkedWait).
     parkedWait: l.telemetry?.parkedWait || null,
     // LIN-2184 (H5): carry the loop's own build-time decision facts (LIN-2182
     // / H3, routes/dashboard.js:570's rollup reads the SAME fields from this
