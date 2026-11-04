@@ -1408,14 +1408,7 @@ This is the runtime witness LIN-4164 deferred. **Asking a builder days later wor
 
 John: "I feel like our process of refining, trying it on real work, and measuring from time to time, is pretty good. The risk is the prompts becoming lists, rules added, but that's something fairly easy to mitigate… I'd be happy to just keep running as we have, until we're confident." He's not too concerned about the test-line growth ("tests are a whole other topic"). He's happy for the Periodicals to run to help track. He agreed the next real test is an ordinary feature ticket through the loop.
 
-**The guard against prompts becoming lists.** Word counts of each prompt as of today, excluding the ticket text:
-- open-0: 134;
-- global v1: 272;
-- step-back with the place view: 273;
-- the builder's after-questions (q1–q5): 179, plus q6/q7 when used;
-- pricing: 329, including its evidence.
-
-A new question must **replace** one or **earn its place with evidence** logged here. If these counts creep, that's the warning.
+**The guard against prompts becoming lists** (John, 17:55: "Happy for prompts to expand, I'm just adding a counterbalance to the temptation to make it a big list of rules, which end up over specialising on Harbour's shape"). The risk is specificity, not length: lessons from Harbour hardening into rules ("check `areas.json`", "add a census", "watch the relay flag"), until the prompt is a checklist shaped like Harbour. That would over-guide, as v2's menu did, and fail on a differently built codebase. **The test for any new sentence: would it make sense on a codebase that isn't Harbour?** If yes, it's a question at the level of the idea, and it can go in ("what would now exist in two places?", "does the check you rely on actually fail?"). If no, it belongs in the codebase's own records (docs, map, reviews, the ticket), which the prompts already read as evidence. The prompt stays general; the place supplies the specifics. Today's simple-dispatcher trial (no map, same prompts, the place still found) is a small sign this holds. Today's word counts, for reference only: open-0 134, global v1 272, step-back 273, after-questions 179, pricing 329.
 
 **Next:**
 - Seams and Drift over today's window, after LIN-4203 and LIN-4187 land (late evening at the latest).
