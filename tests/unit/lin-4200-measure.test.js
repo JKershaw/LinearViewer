@@ -127,6 +127,8 @@ describe('same-Stop race (the final request missed by the snapshot walk)', () =>
     assert.equal(r.toCent, true);
     assert.equal(r.agrees, false);
     assert.equal(r.sameStopRace, true);
+    // RULING lin4200-to-cent-rule: the race class is excluded from the to-the-cent subset.
+    assert.equal(r.toCentSubset, false);
   });
 
   test('a gap whose final line led the snapshot by a minute is NOT the race (unexplained)', () => {
@@ -139,6 +141,8 @@ describe('same-Stop race (the final request missed by the snapshot walk)', () =>
     );
     assert.equal(r.agrees, false);
     assert.equal(r.sameStopRace, false);
+    // Outside the class, so it stays in the subset: it is unexplained, not silently dropped.
+    assert.equal(r.toCentSubset, true);
   });
 
   test('a gap that is NOT exactly the last record is not the race, even when posted close in time', () => {
@@ -152,6 +156,7 @@ describe('same-Stop race (the final request missed by the snapshot walk)', () =>
     );
     assert.equal(r.agrees, false);
     assert.equal(r.sameStopRace, false);
+    assert.equal(r.toCentSubset, true);
   });
 });
 

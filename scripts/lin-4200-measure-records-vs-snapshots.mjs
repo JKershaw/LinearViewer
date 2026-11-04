@@ -172,6 +172,9 @@ export function classifyLineage({ lineage, records }) {
   const lagMs = lastRecordAtMs !== null && snapshotAtMs !== null ? snapshotAtMs - lastRecordAtMs : null;
   const sameStopRace = toCent && agrees === false && gapIsLastRecord && lagMs !== null
     && lagMs >= 0 && lagMs <= RACE_WINDOW_MS;
+  // RULING lin4200-to-cent-rule (John, 08:05Z): exclude the same-Stop race class from to-the-cent, and count it.
+  // Exclusion is limited to the named class. Any other disagreement stays in the subset, so it is unexplained.
+  const toCentSubset = toCent && !sameStopRace;
   // Requests whose first transcript line predates the deploy: a lineage resumed across it, or a pre-deploy
   // transcript the first post walked.
   const preDeployRecords = records.filter(record => {
@@ -198,6 +201,7 @@ export function classifyLineage({ lineage, records }) {
     lastRecordAt: lastRecordMs === null ? null : new Date(lastRecordMs).toISOString(),
     snapshotAt: snapshotAtMs === null ? null : new Date(snapshotAtMs).toISOString(),
     toCent,
+    toCentSubset,
     agrees,
     sameStopRace,
     lagMs,
@@ -377,15 +381,16 @@ async function main(argv) {
         orphanRecordAnchors: orphans.size,
         orphanRecordCount: [...orphans.values()].reduce((s, n) => s + n, 0),
         toCent: {
-          eligible: results.filter(r => r.toCent).length,
-          agree: results.filter(r => r.toCent && r.agrees).length,
-          sameStopRace: results.filter(r => r.sameStopRace).length,
-          unexplained: results.filter(r => r.toCent && r.agrees === false && !r.sameStopRace),
-          disagreements: results.filter(r => r.toCent && !r.agrees)
+          eligibleBeforeRuling: results.filter(r => r.toCent).length,
+          sameStopRaceClass: results.filter(r => r.sameStopRace).map(r => ({ anchor: r.anchor, lagMs: r.lagMs, tokenGap: r.tokenDiff })),
+          subset: results.filter(r => r.toCentSubset).length,
+          agree: results.filter(r => r.toCentSubset && r.agrees).length,
+          unexplained: results.filter(r => r.toCentSubset && r.agrees === false),
+          disagreements: results.filter(r => r.toCentSubset && !r.agrees)
         },
         tail: results.filter(r => r.recordsAfterSnapshot).map(r => ({
           anchor: r.anchor, tailExcessTokens: r.tailExcessTokens, tailExcessCostUsd: r.tailExcessCostUsd,
-          toCentEligible: r.toCent
+          toCentSubset: r.toCentSubset
         })),
         d7Residue: results.filter(r => r.d7Residue).map(r => r.anchor),
         shares: sharesOf(results),
