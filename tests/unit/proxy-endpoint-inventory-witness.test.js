@@ -599,6 +599,13 @@ const ROWS = [
     run: () => call(runnerApp(), 'POST', '/api/proxy/runner/feedback/00000000-0000-4000-8000-000000000000', { body: {} }),
   },
   {
+    // LIN-4198: the shared usage intake judges the body before the ownership read or any store is touched.
+    group: 'L', method: 'POST', url: '/api/proxy/runner/usage/00000000-0000-4000-8000-000000000000', expect: 400,
+    note: 'the shared usage intake validates the body before the ownership read or any store is touched',
+    expectBody: { error: 'records is required and must be an array' },
+    run: () => call(runnerApp(), 'POST', '/api/proxy/runner/usage/00000000-0000-4000-8000-000000000000', { body: {} }),
+  },
+  {
     group: 'L', method: 'POST', url: '/api/proxy/runner/heartbeat', expect: 400,
     note: 'LIN-1952: the shared heartbeat parser runs before the store is touched',
     expectBody: { error: 'Invalid heartbeat: schema 1 with consumerKind, instanceId, sentAt and intervalMs (1000-3600000) is required' },

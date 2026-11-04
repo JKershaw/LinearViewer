@@ -5,6 +5,7 @@
  *   GET  /api/proxy/runner/poll
  *   POST /api/proxy/runner/take/:id
  *   POST /api/proxy/runner/feedback/:id
+ *   POST /api/proxy/runner/usage/:id   (LIN-4198, lib/request-usage-intake.js)
  *   POST /api/proxy/runner/heartbeat   (LIN-1952, lib/consumer-heartbeat-ingest.js)
  *
  * Mount shape (F2). `routes/proxy.js` mounts this factory PATH-LESS, like the
@@ -44,11 +45,13 @@ import { createHeartbeatIngest } from '../lib/consumer-heartbeat-ingest.js';
 import { isRunnerTarget } from '../lib/runner-owner-gate.js';
 import { SESSION_TARGETS } from '../lib/dispatch-targets.js';
 import { publicOrigin } from '../lib/public-origin.js';
+import { postUsage } from '../lib/request-usage-intake.js';
 
 const POLL_ROUTE = '/api/proxy/runner/poll';
 const TAKE_ROUTE = '/api/proxy/runner/take/:id';
 const FEEDBACK_ROUTE = '/api/proxy/runner/feedback/:id';
 const HEARTBEAT_ROUTE = '/api/proxy/runner/heartbeat';
+const USAGE_ROUTE = '/api/proxy/runner/usage/:id';
 
 /**
  * @param {Object} deps
@@ -75,6 +78,7 @@ export function createProxyRunnerRoutes({
   workspaceHaltStore,
   sessionsFeedCache = null,
   consumerHeartbeatStore = null,
+  requestUsageStore = null,
   haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS
 }) {
   const router = Router();
@@ -237,6 +241,42 @@ export function createProxyRunnerRoutes({
       logEvent(req, FEEDBACK_ROUTE, 500);
       console.error('Runner feedback error:', err.message);
       jsonError(res, 500, 'Failed to post feedback');
+    }
+  });
+
+  /**
+   * POST /api/proxy/runner/usage/:id (LIN-4198, D3): per-request usage records for an item
+   * the runner took. The runner twin of POST /api/dispatch/usage/:itemId, through the same
+   * shared intake (lib/request-usage-intake.js). Ownership is the feedback rule, keyed on
+   * the taking runner token's id, so a bearer that did not take the item gets a 404.
+   * The path-scoped gate above already requires the `take` grant.
+   */
+  router.post(USAGE_ROUTE, async (req, res) => {
+    const { id } = req.params;
+
+    if (!UUID_REGEX.test(id)) {
+      logEvent(req, USAGE_ROUTE, 400);
+      return badRequest.json(res, 'Invalid item ID format');
+    }
+
+    try {
+      const outcome = await postUsage({
+        dispatchQueueStore,
+        store: requestUsageStore,
+        itemId: id,
+        urlKey: req.proxyUrlKey,
+        tokenLabel: req.proxyTokenLabel,
+        takenByTokenId: req.proxyTokenId,
+        body: req.body
+      });
+      logEvent(req, USAGE_ROUTE, outcome.status);
+      return res.status(outcome.status).json(outcome.body);
+    } catch (err) {
+      // LIN-3805 precedent: a store fault is a retryable 503, never a final answer.
+      if (replyStoreFault(res, err, { logEvent: (status) => logEvent(req, USAGE_ROUTE, status) })) return;
+      logEvent(req, USAGE_ROUTE, 500);
+      console.error('Runner usage error:', err.message);
+      jsonError(res, 500, 'Failed to post usage');
     }
   });
 

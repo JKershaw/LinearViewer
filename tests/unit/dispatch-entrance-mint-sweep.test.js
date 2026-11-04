@@ -373,7 +373,9 @@ const SESSION_TABLE = {
   'POST /api/dispatch/broker-token': { kinds: ['plain-bootstrap', 'declared-bootstrap'], reason: 'LIN-3135 refire broker: grant-less inline mint, or the declared re-mint through the helper' },
   'POST /api/dispatch/take/:itemId': { kinds: ['none'], reason: 'runner take' },
   'POST /api/dispatch/heartbeat': { kinds: ['none'], reason: 'LIN-1952 consumer heartbeat: writes only to the consumer-heartbeats store, mints nothing' },
-  'POST /api/dispatch/feedback/:itemId': { kinds: ['declared-bootstrap'], reason: 'the wake callback built here mints through provisionResumeCredential when addFeedback invokes it; covered by lin-3134-wake-declared.test.js' }
+  'POST /api/dispatch/feedback/:itemId': { kinds: ['declared-bootstrap'], reason: 'the wake callback built here mints through provisionResumeCredential when addFeedback invokes it; covered by lin-3134-wake-declared.test.js' },
+  // LIN-4198: the usage intake writes records only; it mints no credential of any kind.
+  'POST /api/dispatch/usage/:itemId': { kinds: ['none'], reason: 'LIN-4198 usage intake: records to the request-usage store, no credential minted' }
 };
 
 const PROXY_E_TABLE = {
@@ -394,10 +396,10 @@ const KINDS = ['none', 'plain-bootstrap', 'declared-bootstrap', 'dispatch-token'
 const DRIVEN_KINDS = ['plain-bootstrap', 'declared-bootstrap', 'dispatch-token'];
 
 describe('LIN-3601 mint sweep — the table', () => {
-  test('the session router enumerates 29 routes (LIN-3962 adds the decision panel), each with one row naming its mint kinds and a reason', async () => {
+  test('the session router enumerates 30 routes (LIN-3962 adds the decision panel; LIN-4198 adds POST /api/dispatch/usage/:itemId), each with one row naming its mint kinds and a reason', async () => {
     const w = await makeWorld();
     const routes = enumerateRoutes(w.sessionRouter());
-    assert.equal(routes.length, 29);
+    assert.equal(routes.length, 30);
     const keys = routes.map(r => `${r.method} ${r.path}`);
     assert.deepEqual(keys.filter(k => !SESSION_TABLE[k]), [], 'an enumerated route without a row');
     assert.deepEqual(Object.keys(SESSION_TABLE).filter(k => !keys.includes(k)), [], 'a row for a route that is not enumerated');

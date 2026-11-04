@@ -50,6 +50,13 @@ path is best-effort under degradation; the degraded-mode path is the proxy verb 
   key, omitted when unset; the runner honours it)
 - `POST /api/dispatch/take/:itemId` - Atomically claim an item
 - `POST /api/dispatch/feedback/:itemId` - Post feedback on a taken item
+- `POST /api/dispatch/usage/:itemId` - Post per-request usage records for a taken item (LIN-4198;
+  body `{records: [...]}`, at most 100 per call; the runner-token twin is `POST /api/proxy/runner/usage/:id`).
+  **Auth deviation from feedback, on purpose:** this route accepts the consumer dispatch token only and
+  refuses the single-use Harbour OS feedback token (401, and the refusal does not spend the token). Feedback
+  accepts that token first; the token is spent by its first successful call, and a runner posts usage in
+  batches against one item, so the second batch would be refused. Pinned by
+  `tests/unit/lin-4198-usage-routes.test.js` and recorded beside the route in `routes/dispatch.js`.
 - `POST /api/dispatch/heartbeat` - Consumer heartbeat (LIN-1952): host load and session counts, 204 or 400.
   The same handler answers `POST /api/proxy/runner/heartbeat` (runner `take` gate). Stored in
   `consumer-heartbeats` (one replaced doc per workspace + instance, 15 min expiry, 20 per workspace),
@@ -57,6 +64,27 @@ path is best-effort under degradation; the degraded-mode path is the proxy verb 
 
 Items expire after 24 hours. Tokens are workspace-scoped. New dispatch tokens expire after 90 days (`expiresAt`); older rows keep working until expired; they can be revoked, and are revoked with the workspace by the account that made them.
 Feedback is append-only, **retained for the life of the project**, and requires strict token ownership.
+
+**Per-request usage (LIN-4198, piece 1 of LIN-4195).** A model request is one record in the
+`request-usage` collection (`lib/request-usage-store.js`), keyed `{urlKey, rootItemId, requestId}`
+(unique; `{urlKey, rootItemId}` declared beside it in `lib/db-indexes.js`, see the note there). Intake is
+`lib/request-usage-intake.js`, shared by `POST /api/dispatch/usage/:itemId` and `POST /api/proxy/runner/usage/:id`.
+- **Identity and metadata**: `rootItemId` is taken from the taken row through `anchorOf` and is never read from
+  the body. `itemId` and `issueIdentifier` are stored from that row. Metadata (`harness`, `model`, `effort`,
+  `lane`, `agent`, `at`) is set once, on insert.
+- **Counts grow only**: the five token counters and an optional native `costUsd` are merged with `$max`, so a
+  repost of a streamed message grows the record and a smaller repost never shrinks it. Reposting the same request
+  leaves one document.
+- **Limits**: at most 100 records per call (a larger call is refused whole, 400). A record is judged on its own:
+  a missing `requestId`, an over-long id, a non-finite or negative number, or a prompt size over 2,000,000 tokens
+  (input + cache-read + cache-write) is rejected with a reason, and the rest of the call still applies. A record
+  whose five token counts are all zero is accepted and reported as applied, but not stored.
+- **No stored price.** Pricing happens at read, per record: `priceRequest` in `lib/model-pricing.js` takes the
+  record's own prompt size through the tier rates, whatever `harness` says (a cumulative-total guard does not apply
+  to a single request). A finite native `costUsd` on the record wins over the read-time price (the same precedence
+  as `lib/session-telemetry.js`).
+- **Readers**: nothing reads the collection yet except the intake route and `listForAnchors` (a minimal projection);
+  `listForAnchors` has no caller until the cost read in piece 4.
 
 A dispatch item may carry an optional `followUpTo` field (the `id` of an earlier dispatch) to resume that
 session as a follow-up instead of starting fresh (cli/web only, same workspace; LIN-415). Harbour

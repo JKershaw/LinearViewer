@@ -400,6 +400,7 @@ describe('dispatch router (token lane and session lane)', () => {
         // Real misses first: 404 stays 404, an empty queue/history stays an empty 200.
         assert.equal((await sendJson(base, 'POST', `/api/dispatch/take/${ID}`, auth)).status, 404);
         assert.equal((await sendJson(base, 'POST', `/api/dispatch/feedback/${ID}`, auth, { message: 'm' })).status, 404);
+        assert.equal((await sendJson(base, 'POST', `/api/dispatch/usage/${ID}`, auth, { records: [] })).status, 404, 'LIN-4198: usage on an item this token did not take is a 404');
         assert.deepEqual((await (await sendJson(base, 'GET', '/api/dispatch/poll', auth)).json()).items, []);
         assert.equal((await sendJson(base, 'DELETE', `/workspace/${URL_KEY}/api/dispatch/${ID}`)).status, 404);
         assert.equal((await sendJson(base, 'PATCH', `/workspace/${URL_KEY}/api/dispatch/${ID}/trim`, {}, { maxTasks: 1 })).status, 404);
@@ -408,6 +409,8 @@ describe('dispatch router (token lane and session lane)', () => {
           ['poll', 'GET', '/api/dispatch/poll', auth, undefined, queue, 'find'],
           ['take', 'POST', `/api/dispatch/take/${ID}`, auth, undefined, queue, 'findOneAndDelete'],
           ['feedback', 'POST', `/api/dispatch/feedback/${ID}`, auth, { message: 'm' }, history, 'findOneAndUpdate'],
+          // LIN-4198: the ownership read is the first store touch; a fault there is the retryable 503.
+          ['usage', 'POST', `/api/dispatch/usage/${ID}`, auth, { records: [] }, history, 'findOne'],
           ['list', 'GET', `/workspace/${URL_KEY}/api/dispatch`, {}, undefined, queue, 'find'],
           ['count', 'GET', `/workspace/${URL_KEY}/api/dispatch/count`, {}, undefined, queue, 'countDocuments'],
           ['history', 'GET', `/workspace/${URL_KEY}/api/dispatch/history`, {}, undefined, history, 'find'],
@@ -586,6 +589,7 @@ describe('proxy runner and proxy dispatch routes', () => {
           ['runner poll', 'GET', '/api/proxy/runner/poll', undefined, queue, 'find'],
           ['runner take', 'POST', `/api/proxy/runner/take/${ID}`, undefined, queue, 'findOneAndDelete'],
           ['runner feedback', 'POST', `/api/proxy/runner/feedback/${ID}`, { message: 'm' }, history, 'findOneAndUpdate'],
+          ['runner usage', 'POST', `/api/proxy/runner/usage/${ID}`, { records: [] }, history, 'findOne'],
           ['dispatch list', 'GET', '/api/proxy/dispatch', undefined, queue, 'find'],
           ['dispatch status', 'GET', `/api/proxy/dispatch/${ID}`, undefined, queue, 'findOne'],
           ['dispatch prompt', 'GET', `/api/proxy/dispatch/${ID}/prompt`, undefined, queue, 'findOne']
@@ -762,6 +766,7 @@ describe('the contract is stated where callers read it', () => {
     const covered = new Set([
       // dispatch router: token lane, session lane, enqueue
       'GET /api/dispatch/poll', 'POST /api/dispatch/take/:itemId', 'POST /api/dispatch/feedback/:itemId',
+      'POST /api/dispatch/usage/:itemId',
       'POST /api/dispatch/broker-token',
       'POST /workspace/:urlKey/api/dispatch',
       'GET /workspace/:urlKey/api/dispatch', 'GET /workspace/:urlKey/api/dispatch/count',
@@ -769,6 +774,7 @@ describe('the contract is stated where callers read it', () => {
       'PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim',
       // proxy runner and dispatch
       'GET /api/proxy/runner/poll', 'POST /api/proxy/runner/take/:id', 'POST /api/proxy/runner/feedback/:id',
+      'POST /api/proxy/runner/usage/:id',
       'POST /api/proxy/dispatch', 'POST /api/proxy/recommend-and-dispatch',
       'GET /api/proxy/dispatch', 'GET /api/proxy/dispatch/:id', 'GET /api/proxy/dispatch/:id/prompt'
     ]);

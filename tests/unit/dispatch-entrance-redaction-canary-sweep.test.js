@@ -142,8 +142,8 @@ describe('LIN-3601 redaction canary sweep — session routes (routes/dispatch.js
     assert.match(canary, /^hbp_[A-Za-z0-9_-]{43}$/);
   });
 
-  test('enumerates exactly 29 session routes (LIN-3833 added the read-only preview; LIN-3962 the decision panel)', () => {
-    assert.equal(routes.length, 29);
+  test('enumerates exactly 30 session routes (LIN-3833 added the read-only preview; LIN-3962 the decision panel; LIN-4198 the usage intake)', () => {
+    assert.equal(routes.length, 30);
   });
 
   for (const route of routes) {
