@@ -851,3 +851,9 @@ Seven pieces in a strict chain is a long night's work. Piece 2 needs piece 1 *de
 
 - **About 20:10 UTC:** the first finished session passes the 24 h clone window. A follow-up then is LIN-4164's live re-clone check.
 - **About 7 Nov:** rebuild 2's gate has its 3 days of records, if you choose to wait.
+
+## 4 Nov, about 07:15 UTC: John's rulings
+
+- **LIN-4196: hold the PR until the `harbour-halt` test is green, then get the score.** That test is LIN-4186 (High), with LIN-4185 (`halt-mechanism`, High, possibly the same cause), both filed by LIN-4181's close-out. Fixing them is what unblocks an honest mutation score.
+- **Rebuild 2's gate (LIN-4195/LIN-4200): "Accept a shorter window size, and you can use the railway cli to access mongo."** The builders didn't know the Railway CLI reaches the production database. That's the same gap as LIN-4167 (builders don't know the CLI is there). The gate can now run, on a shorter window.
+- LIN-4182's mutation question: handled.
