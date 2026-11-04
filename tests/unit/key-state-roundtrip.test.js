@@ -34,10 +34,11 @@ function issue(identifier) {
  * nothing; the probe that follows is what tells whether it held anything.
  */
 function fillers(instances, now) {
-  const { taskFacts, workspaceIssuesMemo, sessionsFeedCache, taskDoneCaches, workspaceTokenCache, rejectedCredentialRegistry, refreshOnResolveGate, installationTokenFor } = instances;
+  const { taskFacts, workspaceIssuesMemo, sessionsFeedCache, taskDoneCaches, workspaceTokenCache, rejectedCredentialRegistry, refreshOnResolveGate, installationTokenFor, workspaceKpisCache } = instances;
   return {
     'task-facts': (urlKey) => taskFacts.holder.write(urlKey, { stateIssues: [issue('LIN-OLD')] }),
     'workspace-issues-memo': (urlKey) => workspaceIssuesMemo.set({ id: `ws-${urlKey}`, urlKey }, [issue('LIN-1')]),
+    'workspace-kpis-cache': async (urlKey) => { await workspaceKpisCache.get(urlKey); },
     'sessions-feed': async (urlKey) => { await sessionsFeedCache.get(sessionsFeedCache.keyFor([{ urlKey }]), async () => ({ rows: [] })); },
     'task-done:dashboard': async (urlKey) => { await taskDoneCaches.dashboard.get(`${urlKey}::LIN-1`, async () => true); },
     'task-done:dispatch-guard': async (urlKey) => { await taskDoneCaches.dispatchGuard.get(`${urlKey}::LIN-1`, async () => false); },

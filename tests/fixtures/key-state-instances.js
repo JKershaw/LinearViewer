@@ -15,6 +15,7 @@ import { createWorkspaceTokenCache } from '../../lib/workspace-token-cache.js';
 import { createRejectedCredentialRegistry } from '../../lib/rejected-credentials.js';
 import { createRefreshOnResolveGate } from '../../lib/refresh-on-resolve-gate.js';
 import { createInstallationTokenResolver } from '../../lib/connection-credential.js';
+import { createWorkspaceKpisCache } from '../../lib/workspace-kpis-cache.js';
 import { fakeGitHub, connection, OWNER as LOOKUP_OWNER, NOW as LOOKUP_NOW } from './lin-3285-seam.js';
 import { createKeyState } from '../../lib/key-state.js';
 import { registerKeyStateHolders } from '../../lib/key-state-holders.js';
@@ -46,6 +47,8 @@ export function buildKeyStateInstances({ fetchAndPrepareProjects = async () => (
     rejectedCredentialRegistry: createRejectedCredentialRegistry({ now }),
     refreshOnResolveGate: createRefreshOnResolveGate({ now }),
     installationTokenFor,
+    // LIN-4201: the workspace KPIs page's cache, over a stub read (the real one is collectWorkspaceKpis).
+    workspaceKpisCache: createWorkspaceKpisCache({ collect: async (urlKey) => ({ urlKey }), now }),
   };
 }
 

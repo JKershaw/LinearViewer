@@ -40,7 +40,7 @@ import { computeTerminalMarkedTaskCost } from '../../../lib/terminal-marked-task
 import { collectWorkspaceKpis } from '../../../lib/workspace-kpi-stats.js';
 import { lookupFounderRows } from '../../../lib/founder-lookup.js';
 import { buildRunView, runLineageAnchors } from '../../../lib/run-view.js';
-import { NO_REQUEST_RECORDS } from '../request-usage-loader.js';
+import { NO_REQUEST_RECORDS, loaderOver } from '../request-usage-loader.js';
 import { buildCorpus, NOW_MS, REPLAY_ISSUES, REPLAY_JOBS } from './corpus.js';
 
 // The S1 route is served in-process through proxyLimiter (routes/proxy.js), which skips only when NODE_ENV is
@@ -271,20 +271,31 @@ function sessionLoops(corpus) {
 }
 
 /**
+ * The corpus's request records as the store's loader returns them (LIN-4201): `corpus.requestRecords` maps a lineage
+ * anchor (the row that posted them) to its records. Each is stamped with that anchor as `rootItemId` (the posting
+ * row's CURRENT anchor, as listForAnchors relabels), the posting row as `itemId`, the workspace, and the producer's
+ * harness: every corpus record is a claude-code transcript's.
+ */
+export function requestRecordsOf(corpus) {
+  return Object.entries(corpus.requestRecords || {}).flatMap(([anchor, records]) =>
+    records.map(record => ({ harness: 'claude-code', ...record, rootItemId: anchor, itemId: anchor, urlKey: URL_KEY })));
+}
+
+/**
  * Run every replayed surface over a fresh corpus. Pure except for the in-memory fakes. `corpusOverride`
  * runs the same surfaces over another corpus of the same shape (the S1 = S5 witness uses a sub-selection).
+ * `readRecords` (LIN-4201): serve the corpus's request records through the loader. Off, the loader holds none, and
+ * every surface reads exactly what it read before the cutover (the recorded baselines).
  */
-export async function runReplay(corpusOverride) {
+export async function runReplay(corpusOverride, { readRecords = false } = {}) {
   const realNow = Date.now;
   Date.now = () => NOW_MS;
   try {
     const corpus = corpusOverride ?? buildCorpus();
     const store = makeDispatchStore(corpus);
     const callCollection = makeCallCollection(corpus);
-    // LIN-4201: every surface reads its request records through the one loader, as production does. The replay's
-    // loader holds no records yet: feeding it the corpus's request records is the replay change (LIN-4201 beat 3),
-    // so until then each surface reads exactly the snapshots it read before and the goldens do not move.
-    const requestUsageLoader = NO_REQUEST_RECORDS;
+    // LIN-4201: every surface reads its request records through the one loader, as production does.
+    const requestUsageLoader = readRecords ? loaderOver(requestRecordsOf(corpus)) : NO_REQUEST_RECORDS;
     const app = buildCostApp(store, callCollection, requestUsageLoader);
     const llmStore = new LlmCallLogStore({ collection: callCollection });
     const now = new Date(NOW_MS);

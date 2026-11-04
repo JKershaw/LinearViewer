@@ -223,6 +223,14 @@
     "disposition": "registered",
     "holder": "workspace-issues-memo"
   },
+  "lib/workspace-kpis-cache.js::entries": {
+    "disposition": "registered",
+    "holder": "workspace-kpis-cache"
+  },
+  "lib/workspace-kpis-cache.js::inflight": {
+    "disposition": "registered",
+    "holder": "workspace-kpis-cache"
+  },
   "lib/workspace-token-cache.js::entries": {
     "disposition": "registered",
     "holder": "workspace-token"

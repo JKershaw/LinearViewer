@@ -150,7 +150,7 @@ import { renderAuditPage } from './lib/render-audit.js'
 import { renderPrivacyPolicy, renderTermsOfService } from './lib/render-legal.js'
 import { renderStyleguide } from './lib/render-styleguide.js'
 import { renderKpisPage } from './lib/render-kpis.js'
-import { createWorkspaceKpisRoutes } from './routes/workspace-kpis.js'
+import { createWorkspaceKpisRoutes, workspaceKpisCacheFor } from './routes/workspace-kpis.js'
 import { renderTemplatesPage } from './lib/render-templates.js'
 import { collectKpiStats, toPublicKpis } from './lib/kpi-stats.js'
 import { lookupFounderRows } from './lib/founder-lookup.js'
@@ -1214,7 +1214,7 @@ if (process.env.NODE_ENV === 'test') {
   // additive, test-only seam so a spec can inject a rejecting aggregate() on
   // the exact two collections /kpis' loaders read, without touching /kpis'
   // own route logic. See routes/test.js's kpis-fail-next-aggregate handler.
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState: (ctx) => keyState.resetKey(ctx), observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => kpiPage.reset(mode), workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore, taskShareCollection: db.collection('task_share_links'), kpiDailyRollupCollection }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState: (ctx) => keyState.resetKey(ctx), observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => kpiPage.reset(mode), workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore, taskShareCollection: db.collection('task_share_links'), kpiDailyRollupCollection, clearWorkspaceKpis: (urlKey) => workspaceKpisCache.clear({ urlKey }) }))
 }
 
 // =============================================================================
@@ -2581,7 +2581,11 @@ app.use(createTaskModeRoutes({ taskModeStore, accountStore, workspaceFromUrl }))
 app.use(createMilestoneFunnelRoutes({ taskModeStore, accountStore, accountWorkspaceStore, dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, closeOutEventsStore, workspaceFromUrl }))
 
 // Workspace KPIs page (LIN-3689): one workspace's counts, next to Settings
-app.use(createWorkspaceKpisRoutes({ workspaceFromUrl, requestUsageLoader, collections: { dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, proxyEvents: proxyEventsCollection, agentStatus: agentStatusCollection, reportHistory: reportHistoryCollection, customPrompts: customPromptsCollection, closeOutEvents: db.collection('close-out-events'), kpiDailyRollup: kpiDailyRollupCollection } }))
+// LIN-4201: the workspace KPIs read loads the window's request records, so the page is served from a per-workspace
+// stale-while-revalidate cache (60 s, as /kpis), registered as per-key state below.
+const workspaceKpisCollections = { dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, proxyEvents: proxyEventsCollection, agentStatus: agentStatusCollection, reportHistory: reportHistoryCollection, customPrompts: customPromptsCollection, closeOutEvents: db.collection('close-out-events'), kpiDailyRollup: kpiDailyRollupCollection }
+const workspaceKpisCache = workspaceKpisCacheFor({ collections: workspaceKpisCollections, requestUsageLoader })
+app.use(createWorkspaceKpisRoutes({ workspaceFromUrl, requestUsageLoader, workspaceKpisCache, collections: workspaceKpisCollections }))
 
 // The ONE PR-state store (LIN-3311): the LIN-3251 cache,
 // sliding 36/h GitHub budget and PR-state cache. The dashboard router
@@ -3292,6 +3296,7 @@ registerKeyStateHolders(keyState, {
   rejectedCredentialRegistry,
   refreshOnResolveGate,
   installationTokenFor,
+  workspaceKpisCache,
 });
 const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, taskDecisionsStore, shelvedRulingsStore, taskFacts: { read: taskFacts.read }, gatherTaskStates })
 // LIN-3833 / LIN-4016: Home's row states, assembled once for all three Home routes (lib/home-row-states.js): one lean

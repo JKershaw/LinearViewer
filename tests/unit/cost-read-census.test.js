@@ -5,7 +5,10 @@
  *
  * It fails when a file under lib/, routes/, public/ or server.js:
  *  - imports a lineage fold helper (`foldLineageUsage`, `groupLineageMembership`, `readUsageEntry`, `readRowUsage`,
- *    `lastUsageEntry`, `usageOf`) and is not one of the listed readers;
+ *    `lastUsageEntry`, `usageOf`) and is not one of the listed readers. LIN-4201 broadens this to EVERY reader of
+ *    snapshot usage outside the legacy fold (review notes 1-2): `usageStateOf`, `isRunningTotal`, `countedRowsOf`,
+ *    `parseUsage`, `buildRunTelemetry`, and the record fold `foldRequestUsage`, each with its users named;
+ *  - reads a run's `telemetry.usage` outside the module that builds it (LIN-4201: a snapshot reader no import names);
  *  - calls a retired cost function (`buildTaskCost`, `joinCostLineages`, `reduceLineageCost`, `summarize`,
  *    `summarizeByIssue`, `summarizeByFeature`) anywhere, or calls `windowedSpend` / `listInHorizon` outside its list;
  *  - formats a dollar figure by hand (`$` + `toFixed` on the same line) outside the one formatter (lib/cost-format.js,
@@ -24,17 +27,40 @@ const SCANNED_DIRS = ['lib', 'routes', 'public'];
 const SCANNED_FILES = ['server.js'];
 
 /** The lineage fold helpers, and which files may import each one (the readers that own a lineage fact). */
-export const FOLD_HELPERS = ['foldLineageUsage', 'groupLineageMembership', 'readUsageEntry', 'readRowUsage', 'lastUsageEntry', 'usageOf'];
+export const FOLD_HELPERS = [
+  'foldLineageUsage', 'groupLineageMembership', 'readUsageEntry', 'readRowUsage', 'lastUsageEntry', 'usageOf',
+  // LIN-4201: the rest of the snapshot-usage readers, and the record fold.
+  'usageStateOf', 'isRunningTotal', 'countedRowsOf', 'parseUsage', 'buildRunTelemetry', 'foldRequestUsage',
+];
 export const FOLD_IMPORTERS = {
-  // The one cost read: it composes the three decisions (membership, the fold, the usage reader).
-  'lib/cost-read.js': ['foldLineageUsage', 'groupLineageMembership', 'readUsageEntry', 'readRowUsage'],
+  // The one cost read: it composes the three decisions (membership, the fold, the usage reader), and makes the
+  // records-or-snapshots decision (LIN-4201 `lineageUsageOf`): the record fold and the snapshot partition are read
+  // there and nowhere else. `usageStateOf` is its own export and has no importer: the /kpis harness shares read the
+  // record's `harnessReading` instead (LIN-4201 review note 1).
+  'lib/cost-read.js': ['foldLineageUsage', 'groupLineageMembership', 'readUsageEntry', 'readRowUsage', 'countedRowsOf', 'foldRequestUsage'],
+  // The snapshot pricing guard (model-pricing.js:421): a running total that crosses a long-context tier prices to
+  // null. A legacy-fold-only reader: a request record is priced by `priceRequest`, which skips the guard (D5).
+  'lib/model-pricing.js': ['isRunningTotal'],
   // The outcome seam (`usageOf`) and the usage reader (`lastUsageEntry`) that the decisions are built on.
   'lib/dispatch-lineage.js': ['lastUsageEntry'],
   'lib/session-telemetry.js': ['lastUsageEntry'],
   // The digest's `kpiUsageEntry` is the named copy of "which entry is a row's usage" (a query cannot call JS). Pinned
-  // against lastUsageEntry by tests/unit/cost-read-usage-parity.test.js.
-  'lib/digest-feedback.js': ['usageOf', 'evidenceCountOf'],
+  // against lastUsageEntry by tests/unit/cost-read-usage-parity.test.js. It feeds the /kpis aggregation's
+  // `usageEntry` (lib/kpi-stats.js:460), the legacy fold's input, and nothing else: legacy-fold-only, kept.
+  // `buildRunTelemetry` puts a non-lean run's parsed `[usage]` on `telemetry.usage`: informational, no cost figure reads
+  // it (the persisted digest drops it, the lean/non-lean exemption in scripts/lin3014/lib/exemptions.mjs), kept.
+  'lib/digest-feedback.js': ['usageOf', 'evidenceCountOf', 'buildRunTelemetry'],
 };
+
+/**
+ * LIN-4201: files that may read a run's `telemetry.usage` (the parsed snapshot buildRunTelemetry attaches). Only the
+ * module that builds it; a cost figure is read through lib/cost-read.js, never from a loop's telemetry.
+ * `buildSessionTelemetry` is NOT a usage reader: a session carries no usage since LIN-4136 (session-telemetry.js
+ * `_assembleTelemetry`, `withUsage` false), so it is not listed and is left in place (its runtime, metrics, artifacts
+ * and model feed lib/pipeline-loops.js `_assembleSession`).
+ */
+export const TELEMETRY_USAGE_ALLOW = ['lib/session-telemetry.js'];
+const TELEMETRY_USAGE = /\btelemetry\??\.usage\b/;
 
 /** Calls that must sit only in the listed files (the readers and their named callers). */
 export const CALL_ALLOW = {
@@ -97,6 +123,11 @@ export function censusProblems(files) {
       if (isCommentLine(line)) return;
       const where = `${file}:${index + 1}`;
 
+      // 1b. A loop's parsed snapshot read off its telemetry (LIN-4201).
+      if (TELEMETRY_USAGE.test(line) && !TELEMETRY_USAGE_ALLOW.includes(file)) {
+        problems.push(`${where} reads telemetry.usage: a cost figure is read through lib/cost-read.js, not a loop's telemetry`);
+      }
+
       // 2. Retired cost functions, anywhere in code.
       for (const name of RETIRED) {
         if (new RegExp(`\\b${name}\\b`).test(line)) problems.push(`${where} uses ${name}, which is retired: its arithmetic lives in lib/cost-read.js`);
@@ -147,6 +178,29 @@ describe('the cost census (LIN-4179 W8)', () => {
     assert.match(problems[0], /routes\/new-surface\.js imports groupLineageMembership/);
   });
 
+  test('LIN-4201: a new reader of snapshot usage is named, each helper on its own', () => {
+    for (const helper of ['usageStateOf', 'isRunningTotal', 'countedRowsOf', 'parseUsage', 'buildRunTelemetry', 'foldRequestUsage']) {
+      const problems = censusProblems([{ path: 'lib/new-reader.js', text: `import { ${helper} } from './somewhere.js';\n` }]);
+      assert.equal(problems.length, 1, helper);
+      assert.match(problems[0], new RegExp(`lib/new-reader\\.js imports ${helper}`));
+    }
+  });
+
+  test('LIN-4201: the listed users stay allowed, and only for what they are listed for', () => {
+    assert.deepEqual(censusProblems([{ path: 'lib/model-pricing.js', text: "import { isRunningTotal } from './row-usage.js';\n" }]), []);
+    assert.equal(censusProblems([{ path: 'lib/model-pricing.js', text: "import { countedRowsOf } from './row-usage.js';\n" }]).length, 1);
+    // The /kpis harness shares no longer read snapshots themselves (review note 1).
+    assert.equal(censusProblems([{ path: 'lib/terminal-marked-task-cost.js', text: "import { usageStateOf } from './cost-read.js';\n" }]).length, 1);
+    assert.equal(censusProblems([{ path: 'lib/terminal-marked-task-cost.js', text: "import { isRunningTotal } from './row-usage.js';\n" }]).length, 1);
+  });
+
+  test('LIN-4201: reading a loop\'s telemetry.usage outside session-telemetry.js is named', () => {
+    const problems = censusProblems([{ path: 'lib/render-x.js', text: 'const cost = loop.telemetry?.usage?.costUsd;\n' }]);
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /reads telemetry\.usage/);
+    assert.deepEqual(censusProblems([{ path: 'lib/session-telemetry.js', text: '    if (usage) telemetry.usage = usage;\n' }]), []);
+  });
+
   test('a call to a retired cost function is named, wherever it sits', () => {
     const problems = censusProblems([{ path: 'lib/anything.js', text: 'const x = await store.summarizeByIssue(urlKey, id);\n' }]);
     assert.ok(problems.some(p => /summarizeByIssue/.test(p)), problems.join('\n'));
@@ -176,5 +230,15 @@ describe('the cost census (LIN-4179 W8)', () => {
 
   test('a comment that names a retired function is not a violation', () => {
     assert.deepEqual(censusProblems([{ path: 'lib/x.js', text: ' * joinCostLineages is gone.\n// summarizeByIssue(x) used to fold cost.\n' }]), []);
+  });
+});
+
+describe('LIN-4201: buildSessionTelemetry is not a usage reader (kept, not deleted)', async () => {
+  const { buildSessionTelemetry } = await import('../../lib/session-telemetry.js');
+  test('a session built from loops that posted [usage] carries no usage', () => {
+    const feedback = [{ kind: 'usage', message: `[usage] ${JSON.stringify({ model: 'claude-opus-5-5', inputTokens: 10, costUsd: 1 })}` }];
+    const telemetry = buildSessionTelemetry({ loops: [{ feedback }, { feedback }] });
+    assert.equal('usage' in telemetry, false);
+    assert.equal(JSON.stringify(telemetry).includes('costUsd'), false);
   });
 });

@@ -55,6 +55,10 @@ describe('LIN-4197 sibling goldens equal a live recording', () => {
     assert.deepEqual(diffReplay(golden.mixedHarnessControl, live.mixedHarnessControl), []);
   });
 
+  test('LIN-4201: the records-only lineage (change list item (e)) matches its recorded golden, recorded at eb44eff9', () => {
+    assert.deepEqual(diffReplay(golden.recordsOnly, live.recordsOnly), []);
+  });
+
   test('every recorded case carries the oracle figure from the fixture', () => {
     for (const key of Object.keys(LIN4197_CASES)) {
       assert.equal(golden.cases[key].oracleUsd, LIN4197_CASES[key].oracleUsd, key);
@@ -79,7 +83,10 @@ describe('LIN-4197 mixed-harness control: the control\'s oracle is the records p
   });
 });
 
-describe('LIN-4197 mixed-harness control: what the CURRENT read path does (pinned; piece 4 changes this deliberately)', () => {
+// LIN-4201: these pins are the BEFORE (the replay with no request records, `recordLin4197()`), kept as they were. The
+// after, with records read, is asserted in tests/unit/lin-4201-replay-change-list.test.js (mh-haiku reads its oracle,
+// mh-sonnet does not move) and in the last test of this block.
+describe('LIN-4197 mixed-harness control: what the read path does WITHOUT request records (the before; pinned)', () => {
   const control = live.mixedHarnessControl.replay;
   const step = (root) => control.S13.steps.find((s) => s.lineageId === root);
 
@@ -117,13 +124,19 @@ describe('LIN-4197 mixed-harness control: what the CURRENT read path does (pinne
     assert.deepEqual(control.mixedHarness.lineages, ['mh-haiku', 'mh-sonnet']);
   });
 
-  test('the request records are not read by the current read path: removing them leaves the replay unchanged', async () => {
-    // No store serves request records yet, so the claude-code side comes from the snapshot alone. This is the
-    // assertion piece 4 flips: once records are read, this test fails and that change is reviewed as the cutover.
+  test('LIN-4201 (the flip piece 0 asked for): the records are read once served, so removing them changes the replay', async () => {
+    // Before LIN-4201 no store served request records and this test asserted that removing them changed nothing.
+    // The cutover reads them: served (`readRecords`), the control differs from its records-free run, and the
+    // records-free run is still exactly the pinned before.
     const withRecords = buildMixedHarnessControl();
     const withoutRecords = { ...withRecords };
     delete withoutRecords.requestRecords;
     assert.ok(withRecords.requestRecords, 'the control carries records');
     assert.deepEqual(await runReplay(withoutRecords), control);
+    assert.deepEqual(await runReplay(withoutRecords, { readRecords: true }), control, 'no records to serve: unchanged');
+    const read = await runReplay(withRecords, { readRecords: true });
+    assert.notDeepEqual(read, control);
+    const step = read.S13.steps.find((s) => s.lineageId === 'mh-haiku');
+    close(step.cost.usd, LIN4197_MIXED_CONTROL['mh-haiku'].oracleUsd, 'mh-haiku with records read');
   });
 });

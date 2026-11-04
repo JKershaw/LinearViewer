@@ -230,3 +230,54 @@ describe('the run page places a record figure on purpose', () => {
     close(view.steps[0].cost.usd, 0.4);
   });
 });
+
+describe('review note 1: the /kpis harness shares read a record lineage from its records', async () => {
+  const { computeTerminalMarkedTaskCost } = await import('../../lib/terminal-marked-task-cost.js');
+  const done = (hoursAgo) => ({ message: '[done] landed', timestamp: at(hoursAgo) });
+  const asOf = new Date(NOW);
+
+  test('a record-only lineage has a known harness and is not delta-summed', () => {
+    const rows = [row('r1', 'r1', 5, [done(4.9)])];
+    const figures = computeTerminalMarkedTaskCost(rows, asOf, { requestRows: [rec('r1', 'm1', 5, { costUsd: 0.2 })] });
+    assert.equal(figures.unknownHarnessShare, 0);
+    assert.equal(figures.opencodeSummedShare, 0);
+  });
+
+  test('the same lineage with no records is unknown-harness, as before', () => {
+    const figures = computeTerminalMarkedTaskCost([row('r1', 'r1', 5, [done(4.9)])], asOf, { requestRows: [] });
+    assert.equal(figures.unknownHarnessShare, 1);
+    assert.equal(figures.opencodeSummedShare, null);
+  });
+
+  test('records beside a counted opencode delta: delta-summed, as the figure is', () => {
+    const rows = [row('r1', 'r1', 6, [snapshot(6, { harness: 'opencode', costUsd: 0.25 })]), row('r2', 'r1', 5, [done(4.9)])];
+    const figures = computeTerminalMarkedTaskCost(rows, asOf, { requestRows: [rec('r1', 'm1', 5, { costUsd: 0.2 })] });
+    assert.equal(figures.opencodeSummedShare, 1);
+    assert.equal(figures.unknownHarnessShare, 0);
+  });
+
+  test('a claude-code snapshot set aside by records is not what makes the lineage known or summed', () => {
+    const rows = [row('r1', 'r1', 6, [snapshot(6, { harness: 'claude-code', costUsd: 3 }), done(5.9)])];
+    const figures = computeTerminalMarkedTaskCost(rows, asOf, { requestRows: [rec('r1', 'm1', 5, { costUsd: 0.2 })] });
+    assert.equal(figures.opencodeSummedShare, 0);
+    close(figures.pricedTicketCostUsd, 0.2);
+  });
+});
+
+describe('a lineage that counts records and another harness\'s snapshots is labelled by its cost-dominant part', () => {
+  test('an opencode delta that outweighs the records keeps naming the lineage', () => {
+    const rows = [row('r1', 'r1', 6, [snapshot(6, { harness: 'opencode', model: 'openrouter/qwen-3', costUsd: 0.25 })])];
+    const session = sessionOf(readCost({ fetchedRows: rows, requestRows: [rec('r1', 'm1', 5, { costUsd: 0.04 })] }), 'r1');
+    assert.equal(session.harness, 'opencode');
+    assert.equal(session.model, 'openrouter/qwen-3');
+    close(session.costUsd, 0.29);
+  });
+
+  test('records that outweigh the delta name it', () => {
+    const rows = [row('r1', 'r1', 6, [snapshot(6, { harness: 'opencode', model: 'openrouter/qwen-3', costUsd: 0.01 })])];
+    const session = sessionOf(readCost({ fetchedRows: rows, requestRows: [rec('r1', 'm1', 5, { costUsd: 0.5, effort: 'max' })] }), 'r1');
+    assert.equal(session.harness, 'claude-code');
+    assert.equal(session.model, 'claude-opus-5-5');
+    assert.equal(session.effort, 'max');
+  });
+});

@@ -83,3 +83,13 @@ describe('the loader is required', () => {
     assert.equal(requireRequestUsageLoader(loader, 'x'), loader);
   });
 });
+
+describe('volume (LIN-4201 beat 3: found by the steady-state timing run)', () => {
+  test('a quarter of a million records come back without overflowing the call stack', async () => {
+    const big = Array.from({ length: 250_000 }, (_, i) => ({ rootItemId: 'r1', requestId: `m${i}` }));
+    const store = { listForAnchors: async () => big };
+    const loader = requestUsageLoader(store);
+    assert.equal((await loader.forAnchors('acme', ['r1'])).length, big.length);
+    assert.equal((await loader.forRows([{ urlKey: 'acme', rootItemId: 'r1' }])).length, big.length);
+  });
+});
