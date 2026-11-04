@@ -1046,3 +1046,37 @@ John: "we're at the try-anything-and-see-if-it-works stage… only once we have 
 3. The step-back's choice is written onto the ticket: what to do, what it should leave behind, and what the map should look like after.
 4. The build, as usual, when the gate allows.
 5. The place change at merge, sent to the builder. If the place got worse, ask for the tidy-after in the same lineage.
+
+### 08:01 UTC: forward trial 1, open-0 and global answers (all four on LIN-4150)
+
+**LIN-4201 (records-first read).**
+- **open-0** found the proving traps:
+  - the replay drops `records`, so most of the change list can't differ yet;
+  - fixture records carry no `harness`;
+  - `/kpis` has no `urlKey`;
+  - async loaders reach sync readers;
+  - the census is narrower than asked.
+
+  Its "do first": make the replay serve records, and write the expected diff as a failing test before any production code.
+- **global** found the place-level points:
+  - the read **still has no area** (catch-all), and its loader sits in Runs;
+  - the obvious way gives **two folds**, the shape last week removed;
+  - **seven callers opening the store would hollow out the LIN-4198 census** (four allowed files become eleven).
+
+  Better, at this task's cost: **one async loader beside the pure read**, passed in the way `lineageIdentity` reaches `collectKpiStats`. That keeps the census at one new file, puts the cross-workspace `/kpis` case in one place, and gives the cost read an area. Not this task's: retiring the snapshot fold ("the real payoff").
+
+**LIN-4203 (stop the snapshots).**
+- **open-0** found:
+  - the preconditions belong to other tickets (piece 4's records path; piece 3's script);
+  - snapshots also feed the `/kpis` harness share, the effort read-out and `parkedWait`;
+  - runner-kit's "harness known, unpriced" post means something;
+  - some pinned tests are witnesses to keep, not delete;
+  - the flag outlives the snapshot.
+
+  Its "do first": check piece 4 landed and moved `harnessReadingOf`; get a ruling on runner-kit's case.
+- **global:** "the area is at its largest now, and this piece is where it shrinks."
+  - **What is left with no home or the wrong name:** `WORKER_USAGE_RELAY` gates only the records but is documented as the snapshot flag; `runner-prompt.md` still lists `[usage]`.
+  - **Better:** rename or re-document the flag in the same PR, keep the `walkUsage` goldens as a frozen "before" fixture, and mark the marker as "read for old rows only".
+  - **Not this task's:** `hook.js`'s 7 copies of the post-at-Stop sequence, and the opencode runner's size.
+
+**First observation.** The two views barely overlap, and they agree where they do (`harnessReadingOf`, `buildSessionTelemetry` left alone, goldens as witnesses). open-0 is about *proving* the change; global is about *where it leaves things*. That's the split we hoped for: two voices, not one view said twice.
