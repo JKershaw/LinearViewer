@@ -42,3 +42,12 @@ John's tipping point (4 Nov): when a task, on average, leaves the codebase even 
 | LIN-4187 (+ LIN-4188 folded in) | simple-dispatcher: **27 of 27 system scenarios carry a Harbour-contract note**, enforced by `system-contract-census`; the assertion re-stated as Harbour's current contract | tests +286 / −57; non-test ±6 | ruled drift; the larger scope landed, LIN-4188 included | **+** the next drift reads "Harbour changed X"; two reds closed in one ticket |
 
 **Seams run 6 (LIN-4231, 4 Nov evening, `5334c81a..d7ceb373`) as a check on the rows above:** "most of what moved on the map is the guide, not the code". LIN-4201's map improvement was largely its guide edit (the cost read given a home). The real code growth was two F1 edges, +0/+1 by runtime dependency. One file without a home (`usage-snapshot-intake.js`). No knot opened or closed. That agrees with LIN-4201's `+ (mixed)` and LIN-4203's homeless-file note.
+
+**Drift run 2 (LIN-4232, 4 Nov evening, trend vs 11-04) as a check on the copies column:**
+- **All four Periodicals findings routed into LIN-4201 and LIN-4203 are resolved or improved:** `usage-relay-flag-partial` resolved (LIN-4203); `lineage-identity-read-twins` resolved (LIN-4201); `cost-fold-partition-restated` resolved (LIN-4201); `usage-record-vocabulary-two-readers` improved (LIN-4201). Against that, **all 17** earlier Drift follow-ups, pushed as Backlog tickets, are unmoved.
+- **New, left by our tickets:**
+  - LIN-4203's `usage-snapshot-intake` collection is missing from the account-erasure inventory (`erasure-inventory-lockstep-gap`, LOW-MEDIUM, minted LIN-4234), so a full wipe leaves its documents;
+  - `usage-snapshot-prose-residue` (LOW), stale strings describing the retired snapshot;
+  - `cache-module-family` worsened (LOW): LIN-4201's `workspace-kpis-cache.js` is a second keyed cache, repeating a known write pattern.
+- **Census flat:** 0 `mustRule` groups moved. **Import graph:** no new cycle, 0 upward edges.
+- **Effect on the rows:** LIN-4203 stays `+`, with one new gap noted (erasure). LIN-4201 stays `+ (mixed)`, with one LOW copy noted (cache).

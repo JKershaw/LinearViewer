@@ -1441,3 +1441,11 @@ John: "I feel like our process of refining, trying it on real work, and measurin
 - **LIN-4226** (`c55f0fb3`): the pulled-too-early extra from LIN-4201, now as its own piece. The read loads through a `requestSource` passed in once. F1 +1 edge.
 - **Seams run 6** (LIN-4231) **independently agrees** with my LIN-4201 and LIN-4203 rows, and adds the honest caution: "most of what moved on the map is the guide, not the code". The cost read's home was a guide edit; the code growth was two F1 edges, +0/+1 by runtime dependency. Drift is still running.
 - **Forward ledger now:** 10 `+` (six harness rows, LIN-4203, LIN-4187, LIN-4218, LIN-4226 small), 1 `+ (mixed)` (LIN-4201), 1 neutral (LIN-4212, not surveyed). Baseline: 1 / 3 neutral / 4 worse / 1 mixed.
+
+### 20:55 UTC: Drift run 2 confirms the routing; rebuild 2 Done; one ruling proposed
+
+- **LIN-4195 (Costs rebuild 2) is Done.** One ruling is open on it (how to label a lineage that ran several models). I proposed `cost-dominant`: it answers where the money went, and it's what's live now.
+- **Drift run 2 (LIN-4232)** checked the copies column independently:
+  - **All four findings we routed into LIN-4201 and LIN-4203 were resolved or improved.** The 17 earlier Drift follow-ups, pushed as Backlog tickets, are all unmoved. **Pull worked where push sat**, in one window.
+  - **The routed fix also orphaned a ticket:** LIN-4214 (the relay-flag residual, filed by an audit) went stale behind the fix LIN-4203 made. Drift: "the loop's tickets are not where owners look."
+  - **New defects our tickets left:** the erasure gap from LIN-4203 (LIN-4234), stale snapshot prose, and a second cache copy from LIN-4201. The task-level view and the place change didn't catch these, which is why the Periodical is still needed as the film.
