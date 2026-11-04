@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import { anchorOf, groupLineageMembership, isMember } from '../../lib/lineage-membership.js';
 import { groupDispatchLineages } from '../../lib/dispatch-lineage.js';
 import { lineageRecords } from '../../lib/cost-read.js';
-import { buildTaskCost } from '../../lib/task-cost.js';
+import { buildTaskCost } from '../fixtures/task-cost-adapter.js';
 import { computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-cost.js';
 import { windowedSpend } from '../../lib/weekly-budget.js';
 

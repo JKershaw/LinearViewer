@@ -422,9 +422,11 @@
   // rounds to 2) — restated here rather than imported, since this file is a
   // browser IIFE with no module graph to lib/, the same reason every other
   // vocabulary/prefix restatement in this codebase exists.
+  // LIN-4179: the one browser formatter (public/cost-format.js). Per-turn amounts keep 4 decimals under $1; an unknown
+  // cost is a dash, never $0.00.
   function formatCost(cost) {
-    var n = (typeof cost === 'number' && isFinite(cost)) ? cost : 0;
-    return '$' + n.toFixed(n > 0 && n < 1 ? 4 : 2);
+    var words = window.CostFormat.formatUsd(cost, { fine: true });
+    return words === null ? '\u2014' : words;
   }
 
   // A single turn's meta line: tokens and cost, read straight off the final

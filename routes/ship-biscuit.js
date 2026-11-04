@@ -29,6 +29,8 @@ import { jsonError, keepaliveError, serviceUnavailable } from '../lib/errors.js'
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { buildEditionModel, windowRange } from '../lib/ship-biscuit.js';
+import { callsSurfaceOf } from '../lib/cost-read.js';
+import { readHorizonStart } from '../lib/read-horizon.js';
 import { buildEditorMessages, parseEditorResponse, assessEditorOutcome, buildQuietEdition, buildMockEdition } from '../lib/prompts/ship-biscuit-editor.js';
 import { DEFAULT_MODEL, streamChat, resolveReasoningBudget } from '../lib/openrouter.js';
 import { resolveChatCredential, checkFreeTierGate, freeTierRefusalBlock } from '../lib/chat-request.js';
@@ -152,7 +154,10 @@ export function createShipBiscuitRoutes({
         // lower bound as the status read, so no window-ceiling drift. Store miss/empty
         // degrades to { items: [] } exactly like the other reads (guards LIN-1185).
         taskSnapshotStore ? taskSnapshotStore.listByWorkspace(workspace.urlKey, { since: range.since }).catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
-        llmCallLogStore ? llmCallLogStore.summarize(workspace.urlKey).catch(() => null) : Promise.resolve(null),
+        // Weather: the calls read over the fixed 30-day horizon (review F6 is a product call; the window stays a parameter here).
+        llmCallLogStore
+          ? Promise.resolve().then(() => llmCallLogStore.listInHorizon(workspace.urlKey, { since: readHorizonStart() })).then(callsSurfaceOf).catch(() => null)
+          : Promise.resolve(null),
         // Latest saved roadmap report (LIN-1212). getLatest returns the newest report
         // regardless of window; buildEditionModel window-filters it by generatedAt so a
         // stale report never flips a quiet edition loud. Store miss/error degrades to

@@ -17,6 +17,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
+import { loadCostFormat } from '../fixtures/browser-cost-format.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
@@ -148,6 +149,7 @@ function makeSandbox({ fetchImpl, scanCostEstimate, postScanImpl } = {}) {
   };
   sandbox.window.window = sandbox.window;
   vm.createContext(sandbox);
+  loadCostFormat(sandbox); // LIN-4179: the shared browser formatter, loaded before the page script, as the page does
   vm.runInContext(SRC, sandbox, { filename: 'observation.js' });
   sandbox.__nodes = nodes;
   vm.runInContext(`observationData = { urlKey: "acme", scanCostEstimate: ${JSON.stringify(scanCostEstimate ?? null)} };`, sandbox);
@@ -767,10 +769,10 @@ test.describe('formatDueScanCostEstimate — honest unknown, never $0.00 for it 
     assert.equal(formatDueScanCostEstimate(undefined, 5), 'est. unknown');
   });
 
-  test('a priced row averaging exactly zero renders est. $0.00, unknown:false — distinct from the unknown state', () => {
+  test('a priced row averaging exactly zero renders est. $0.0000 (fine: a real zero), unknown:false — distinct from the unknown state', () => {
     const sandbox = makeSandbox();
     const { formatDueScanCostEstimate } = sandbox.module.exports;
-    assert.equal(formatDueScanCostEstimate({ calls: 3, pricedCalls: 3, meanUsd: 0, unknown: false }, 5), 'est. $0.00');
+    assert.equal(formatDueScanCostEstimate({ calls: 3, pricedCalls: 3, meanUsd: 0, unknown: false }, 5), 'est. $0.0000');
   });
 
   test('a normal priced mean renders meanUsd × selectedCount', () => {
@@ -806,7 +808,7 @@ test.describe('formatDueScanCostEstimate — honest unknown, never $0.00 for it 
     const { paintDuePage, toggleDueSelection } = sandbox.module.exports;
     paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], 2, { append: false });
     const estimateEl = sandbox.__nodes.get('obs-due-selected-cost');
-    assert.equal(estimateEl.textContent, 'est. $0.00', 'zero selected: meanUsd × 0');
+    assert.equal(estimateEl.textContent, 'est. $0.0000', 'zero selected: meanUsd × 0');
     toggleDueSelection('a', true);
     toggleDueSelection('b', true);
     assert.equal(estimateEl.textContent, 'est. $0.0400');

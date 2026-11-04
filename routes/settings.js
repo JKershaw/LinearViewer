@@ -33,6 +33,7 @@ import { mergeChangeLog, ChangeLogError, UNKNOWN_VALUE } from '../lib/workspace-
 import { DEFAULT_MODEL, getModelDisplayName, resolveFreeTierModel } from '../lib/openrouter.js';
 import { AGENT_JOB_IDS, HARBOUR_JOB_IDS, effectiveTable, resolveAgentFromTable, prefillDefaults } from '../lib/model-routing.js';
 import { agentSpendByJob, harbourSpendByJob, typicalByModel, spendByEffectiveModel } from '../lib/model-routing-spend.js';
+import { callsSurfaceOf } from '../lib/cost-read.js';
 import { summariseRouting, summariseSpend } from '../lib/model-routing-summary.js';
 import { runnableGuard } from '../lib/model-routing-edit.js';
 import { readModelsHistory } from '../lib/model-routing-history.js';
@@ -273,7 +274,8 @@ export function createSettingsRouter(deps) {
     let llmStats = null;
     let providerContextSummary = null;
     if (bodyAreaId === 'health') {
-      llmStats = await llmCallLogStore.summarize(workspace.urlKey);
+      // Settings › Health's calls: the window's docs, summed by the one calls read (LIN-4179); a null cost stays unpriced.
+      llmStats = callsSurfaceOf(llmCallLogStore?.listInHorizon ? await llmCallLogStore.listInHorizon(workspace.urlKey) : []);
       // Provider-context disclosure (LIN-2357): a null providerUi on a recorded
       // prompt trace as counts + a coverage basis.
       providerContextSummary = await promptTraceStore.summarizeProviderContext(

@@ -5830,8 +5830,8 @@ describe('GET /workspace/:urlKey/observation — scan cost estimate wiring + asy
     assert.strictEqual(data.scanCostEstimate, null, 'an unwired store degrades to null (renders as "unknown"), never a fabricated number');
   });
 
-  test('llmCallLogStore.summarizeByFeature rejects: the page still renders with unknown:true, never $0.00', async () => {
-    const llmCallLogStore = { async summarizeByFeature() { throw new Error('boom'); } };
+  test('llmCallLogStore.listInHorizon rejects: the page still renders with unknown:true, never $0.00', async () => {
+    const llmCallLogStore = { async listInHorizon() { throw new Error('boom'); } };
     const router = makeObservationRouter({ llmCallLogStore });
     const handler = getHandler(router, 'get', '/workspace/:urlKey/observation');
     const { req, res } = makeReqRes({
@@ -5846,9 +5846,11 @@ describe('GET /workspace/:urlKey/observation — scan cost estimate wiring + asy
     assert.strictEqual(data.scanCostEstimate, null, 'the retained .catch(() => null) degrades a rejected read to null, rendered client-side as "unknown"');
   });
 
-  test('llmCallLogStore.summarizeByFeature resolves: the estimate is threaded through unmodified', async () => {
+  test('llmCallLogStore.listInHorizon resolves: the scan estimate is the scan feature\'s typical call (LIN-4179)', async () => {
+    // Four priced scan calls at $0.05 and one call of another feature, which the scan estimate must not read.
+    const scan = { feature: 'scan', model: 'm', cost: 0.05 };
     const estimate = { calls: 4, pricedCalls: 4, meanUsd: 0.05, unknown: false };
-    const llmCallLogStore = { async summarizeByFeature() { return estimate; } };
+    const llmCallLogStore = { async listInHorizon(urlKey, filters) { assert.equal(filters.feature, 'scan'); return [scan, scan, scan, scan]; } };
     const router = makeObservationRouter({ llmCallLogStore });
     const handler = getHandler(router, 'get', '/workspace/:urlKey/observation');
     const { req, res } = makeReqRes({

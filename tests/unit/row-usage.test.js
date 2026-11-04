@@ -8,7 +8,7 @@ import { parseUsage, readRowUsage } from '../../lib/session-telemetry.js';
 import { groupDispatchLineages } from '../../lib/dispatch-lineage.js';
 import { computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-cost.js';
 import { lineageRecords, lineageFigure } from '../../lib/cost-read.js';
-import { buildTaskCost } from '../../lib/task-cost.js';
+import { buildTaskCost } from '../fixtures/task-cost-adapter.js';
 import { windowedSpend } from '../../lib/weekly-budget.js';
 import { buildRunView } from '../../lib/run-view.js';
 import { foldLineageUsage } from '../../lib/row-usage.js';

@@ -131,11 +131,11 @@
       options: {
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: function (item) { return item.parsed.y > 0 && item.parsed.y < 0.005 ? '<$0.01' : '$' + item.parsed.y.toFixed(2); } } }
+          tooltip: { callbacks: { label: function (item) { return window.CostFormat.formatUsd(item.parsed.y) ?? '\u2014'; } } }
         },
         scales: {
           x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
-          y: { beginAtZero: true, grid: { color: tools.ink.grid }, ticks: { callback: function (v) { return '$' + Number(v).toFixed(2); } } }
+          y: { beginAtZero: true, grid: { color: tools.ink.grid }, ticks: { callback: function (v) { return window.CostFormat.formatUsd(Number(v)) ?? ''; } } }
         }
       }
     };

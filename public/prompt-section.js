@@ -1422,8 +1422,10 @@
       const defaultWhat = (preview && preview.words && preview.words.model) || 'Claude Code, the default';
       const defaultFrom = (preview && (sourceWordOf('model', preview) || sourceWordOf('harness', preview))) || 'from Models';
       const nums = state.run.panelNumbers;
+      // LIN-4179: the typical figure through the one browser formatter (public/cost-format.js).
+      const typicalWords = typeof nums?.typicalUsd === 'number' ? window.CostFormat.formatUsd(nums.typicalUsd) : null;
       const numbersText = nums && !nums.unavailable && nums.runs != null
-        ? `${nums.runs} ${nums.runs === 1 ? 'run' : 'runs'} in the last 30 days${typeof nums.typicalUsd === 'number' ? `, about $${nums.typicalUsd.toFixed(2)} each` : ''}`
+        ? `${nums.runs} ${nums.runs === 1 ? 'run' : 'runs'} in the last 30 days${typicalWords !== null ? `, about ${typicalWords} each` : ''}`
         : null;
       const defaultCard = `<button class="btn opened-task-card" data-action="run-default" data-testid="run-default" aria-pressed="${!d.presetId && !explicit ? 'true' : 'false'}">`
         + `<span class="opened-task-card-title">Default for ${esc(stepLabel)}</span>`

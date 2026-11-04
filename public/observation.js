@@ -3986,8 +3986,11 @@ function formatDueScanCostEstimate(estimate, selectedCount) {
   if (!estimate || estimate.unknown || typeof estimate.meanUsd !== 'number' || !Number.isFinite(estimate.meanUsd)) {
     return 'est. unknown';
   }
+  // LIN-4179: the one browser formatter (public/cost-format.js, loaded before this file). A per-call estimate keeps
+  // 4 decimals under $1; null (unknown) is the same "est. unknown", never a dollar figure.
   const total = estimate.meanUsd * selectedCount;
-  return `est. $${total.toFixed(total > 0 && total < 1 ? 4 : 2)}`;
+  const words = window.CostFormat.formatUsd(total, { fine: true });
+  return words === null ? 'est. unknown' : `est. ${words}`;
 }
 
 // LIN-2706 §B.8: over-ceiling refusal. CONSUMES checkBulkScanSelection /

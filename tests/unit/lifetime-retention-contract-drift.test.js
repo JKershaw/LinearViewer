@@ -97,11 +97,11 @@ describe('lifetime-retention stale-language reconciliation (LIN-3163 Finding 1)'
       'the no-limit read returns the full retained set');
   });
 
-  test('llm-call-log summarize names the 30-day read window, not a non-expired window', () => {
+  test('llm-call-log listInHorizon names the 30-day read horizon, not a non-expired window', () => {
     assert.doesNotMatch(LLM_CALL_LOG, /non-expired/,
-      'the call log is lifetime-retained; the aggregate reads a fixed 30-day horizon');
-    assert.match(LLM_CALL_LOG, /30-day read window/,
-      'the summarize window is a READ horizon, not a retention bound');
+      'the call log is lifetime-retained; the read covers a fixed 30-day horizon');
+    assert.match(LLM_CALL_LOG, /30-day read horizon/,
+      'the listInHorizon window is a READ horizon, not a retention bound');
   });
 
   test('proxy-events listEvents comment no longer claims an in-memory non-expired read', () => {

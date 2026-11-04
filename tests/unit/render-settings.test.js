@@ -14,6 +14,7 @@ import { getProvider } from '../../lib/providers/registry.js';
 // (`getProvider(b.provider)?.ui?.displayName || b.provider`) against a real
 // singleton, not a hand-typed stand-in.
 import '../../lib/providers/jira/index.js';
+import { callsSurfaceOf } from '../../lib/cost-read.js';
 
 const BASE = { urlKey: 'acme', workspaces: [], currentModel: 'openai/gpt-5.4-mini', availableModels: [] };
 
@@ -30,19 +31,14 @@ describe('renderSettingsPage — AI usage section', () => {
   });
 
   test('renders totals, formatted cost, tokens, and per-feature breakdown', () => {
-    const html = renderSettingsPage('Acme', {
-      ...BASE,
-      llmStats: {
-        totalCalls: 3,
-        totalCost: 0.035,
-        totalTokens: 12345,
-        lastCallAt: '2026-06-15T20:00:00.000Z',
-        byFeature: [
-          { feature: 'recommend', calls: 2, cost: 0.03 },
-          { feature: 'brief', calls: 1, cost: 0.005 }
-        ]
-      }
-    });
+    // The surface is built by the one calls read (LIN-4179), so the test cannot drift from its shape.
+    const at = new Date('2026-06-15T20:00:00.000Z');
+    const llmStats = callsSurfaceOf([
+      { feature: 'recommend', model: 'm', cost: 0.02, totalTokens: 4000, timestamp: at },
+      { feature: 'recommend', model: 'm', cost: 0.01, totalTokens: 4000, timestamp: at },
+      { feature: 'brief', model: 'm', cost: 0.005, totalTokens: 4345, timestamp: at },
+    ]);
+    const html = renderSettingsPage('Acme', { ...BASE, llmStats });
     assert.match(html, /\$0\.0350/);          // small total → 4 decimals
     assert.match(html, /12,345/);             // tokens with thousands separator
     assert.match(html, />By feature · recommend</);
@@ -53,11 +49,22 @@ describe('renderSettingsPage — AI usage section', () => {
   });
 
   test('formats totals over $1 with 2 decimals', () => {
-    const html = renderSettingsPage('Acme', {
-      ...BASE,
-      llmStats: { totalCalls: 1, totalCost: 2.5, totalTokens: 0, byFeature: [{ feature: 'recap', calls: 1, cost: 2.5 }] }
-    });
+    const llmStats = callsSurfaceOf([{ feature: 'recap', model: 'm', cost: 2.5, totalTokens: 0, timestamp: new Date('2026-06-15T20:00:00.000Z') }]);
+    const html = renderSettingsPage('Acme', { ...BASE, llmStats });
     assert.match(html, /\$2\.50/);
+  });
+
+  test('a partly priced workspace names its unpriced calls, and never reads the sum as a complete total (LIN-4179)', () => {
+    const at = new Date('2026-06-15T20:00:00.000Z');
+    const llmStats = callsSurfaceOf([
+      { feature: 'scan', model: 'm', cost: 0.03, timestamp: at },
+      { feature: 'scan', model: 'm', cost: null, timestamp: at },
+      { feature: 'review', model: 'm', cost: null, timestamp: at },
+    ]);
+    const html = renderSettingsPage('Acme', { ...BASE, llmStats });
+    assert.match(html, /\$0\.0300, 2 not priced/);
+    assert.match(html, /2 calls · \$0\.0300, 1 not priced/);
+    assert.match(html, /1 call · not priced/);
   });
 
   test('does not throw when llmStats is omitted', () => {

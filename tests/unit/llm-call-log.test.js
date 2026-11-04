@@ -5,11 +5,14 @@
  *
  * Covers the append-only record contract: every call is stored with the
  * captured metadata, non-numeric fields are coerced to null, and recording never
- * throws (fire-and-forget). Summary reads are covered further down.
+ * throws (fire-and-forget). The reads are covered further down: the store returns
+ * docs (`listInHorizon`), the call telemetry that is not cost is pure (`callTelemetryOf`),
+ * and every cost figure is the one calls read (`readCalls`, lib/cost-read.js, LIN-4179).
  */
 import { test, describe, beforeEach, before, after } from 'node:test';
 import assert from 'node:assert';
-import { LlmCallLogStore } from '../../lib/llm-call-log.js';
+import { LlmCallLogStore, callTelemetryOf } from '../../lib/llm-call-log.js';
+import { readCalls, appCallsOf, callsSurfaceOf } from '../../lib/cost-read.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
 // Minimal in-memory mock of the MongoDB/MangoDB collection surface.
@@ -126,348 +129,168 @@ describe('LlmCallLogStore.record', () => {
   });
 });
 
-describe('LlmCallLogStore.summarize', () => {
-  let store;
+describe('LlmCallLogStore.listInHorizon (LIN-4179: docs only, filtered)', () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const ago = (days) => new Date(Date.now() - days * DAY_MS);
   let collection;
+  let store;
 
   beforeEach(() => {
     collection = createMockCollection();
-    store = new LlmCallLogStore({ collection });
-  });
-
-  test('totals calls/cost/tokens and breaks down by feature (busiest first)', async () => {
-    await store.record({ urlKey: 'acme', feature: 'recommend', cost: 0.01, totalTokens: 100 });
-    await store.record({ urlKey: 'acme', feature: 'recommend', cost: 0.02, totalTokens: 200 });
-    await store.record({ urlKey: 'acme', feature: 'brief', cost: 0.005, totalTokens: 50 });
-    await store.record({ urlKey: 'other', feature: 'recap', cost: 1, totalTokens: 999 }); // different workspace
-
-    const s = await store.summarize('acme');
-    assert.strictEqual(s.totalCalls, 3);
-    assert.ok(Math.abs(s.totalCost - 0.035) < 1e-9);
-    assert.strictEqual(s.totalTokens, 350);
-    assert.strictEqual(s.byFeature[0].feature, 'recommend'); // busiest first
-    assert.strictEqual(s.byFeature[0].calls, 2);
-    assert.ok(Math.abs(s.byFeature[0].cost - 0.03) < 1e-9);
-    assert.strictEqual(s.byFeature[1].feature, 'brief');
-    assert.ok(s.lastCallAt);
-  });
-
-  test('records missing cost/tokens are skipped, not counted as zero understatement', async () => {
-    await store.record({ urlKey: 'acme', feature: 'recommend', cost: 0.01, totalTokens: 100 });
-    await store.record({ urlKey: 'acme', feature: 'task-chat' }); // no cost/tokens reported
-    const s = await store.summarize('acme');
-    assert.strictEqual(s.totalCalls, 2);
-    assert.ok(Math.abs(s.totalCost - 0.01) < 1e-9);
-    assert.strictEqual(s.totalTokens, 100);
-  });
-
-  test('empty for unknown workspace, missing urlKey, or no collection', async () => {
-    const empty = { totalCalls: 0, totalCost: 0, totalTokens: 0, byFeature: [], lastCallAt: null, latencyByFeatureModel: [] };
-    assert.deepStrictEqual(await store.summarize('nope'), empty);
-    assert.deepStrictEqual(await store.summarize(), empty);
-    assert.deepStrictEqual(await new LlmCallLogStore({}).summarize('acme'), empty);
-  });
-
-  test('aggregates durationMs by feature × model with count/p50Ms/p90Ms/maxMs (nearest-rank)', async () => {
-    // Deterministic 10-value array: 100,200,...,1000ms, sorted ascending already.
-    const durations = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000];
-    for (const durationMs of durations) {
-      await store.record({ urlKey: 'acme', feature: 'recommend', model: 'openai/gpt-5.4-mini', durationMs });
-    }
-    const s = await store.summarize('acme');
-    assert.strictEqual(s.latencyByFeatureModel.length, 1);
-    const row = s.latencyByFeatureModel[0];
-    assert.strictEqual(row.feature, 'recommend');
-    assert.strictEqual(row.model, 'openai/gpt-5.4-mini');
-    assert.strictEqual(row.count, 10);
-    // Nearest-rank, 1-indexed ceiling: p50 -> index ceil(0.5*10)-1=4 -> 500; p90 -> ceil(0.9*10)-1=8 -> 900.
-    assert.strictEqual(row.p50Ms, 500);
-    assert.strictEqual(row.p90Ms, 900);
-    assert.strictEqual(row.maxMs, 1000);
-  });
-
-  test('missing durationMs is skipped from the latency group, not counted as zero or as a call', async () => {
-    await store.record({ urlKey: 'acme', feature: 'recommend', model: 'openai/gpt-5.4-mini', durationMs: 1000 });
-    await store.record({ urlKey: 'acme', feature: 'recommend', model: 'openai/gpt-5.4-mini' }); // no durationMs
-    const s = await store.summarize('acme');
-    assert.strictEqual(s.totalCalls, 2); // summarize()'s own count still includes both
-    assert.strictEqual(s.latencyByFeatureModel.length, 1);
-    const row = s.latencyByFeatureModel[0];
-    assert.strictEqual(row.count, 1);
-    assert.strictEqual(row.p50Ms, 1000);
-    assert.strictEqual(row.maxMs, 1000);
-  });
-
-  test('a feature/model group where every call lacks durationMs produces no row', async () => {
-    await store.record({ urlKey: 'acme', feature: 'brief', model: 'anthropic/claude-opus-5' }); // no durationMs
-    const s = await store.summarize('acme');
-    assert.strictEqual(s.totalCalls, 1);
-    assert.deepStrictEqual(s.latencyByFeatureModel, []);
-  });
-
-  test('groups by (feature, model) pair, not feature alone', async () => {
-    await store.record({ urlKey: 'acme', feature: 'recommend', model: 'openai/gpt-5.4-mini', durationMs: 100 });
-    await store.record({ urlKey: 'acme', feature: 'recommend', model: 'anthropic/claude-opus-5', durationMs: 5000 });
-    const s = await store.summarize('acme');
-    assert.strictEqual(s.latencyByFeatureModel.length, 2);
-    const pairs = s.latencyByFeatureModel.map(r => `${r.feature}|${r.model}`).sort();
-    assert.deepStrictEqual(pairs, ['recommend|anthropic/claude-opus-5', 'recommend|openai/gpt-5.4-mini']);
-  });
-
-  test('rows sort descending by p90Ms, ties broken by feature then model', async () => {
-    await store.record({ urlKey: 'acme', feature: 'recap', model: 'model-a', durationMs: 100 });
-    await store.record({ urlKey: 'acme', feature: 'brief', model: 'model-b', durationMs: 5000 });
-    await store.record({ urlKey: 'acme', feature: 'brief', model: 'model-a', durationMs: 5000 }); // tie on p90Ms with above
-    const s = await store.summarize('acme');
-    assert.strictEqual(s.latencyByFeatureModel.length, 3);
-    // Two 5000ms rows outrank the 100ms row; among the tie, feature 'brief' is equal so model breaks it: 'model-a' < 'model-b'.
-    assert.deepStrictEqual(
-      s.latencyByFeatureModel.map(r => `${r.feature}|${r.model}`),
-      ['brief|model-a', 'brief|model-b', 'recap|model-a']
+    collection._docs.push(
+      { _id: 'a', urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'proxy-x', cost: 0.2, timestamp: ago(2) },
+      { _id: 'b', urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'review', cost: null, timestamp: ago(3) },
+      { _id: 'c', urlKey: 'acme', issueIdentifier: 'LIN-2', feature: 'scan', cost: 0.05, timestamp: ago(1) },
+      { _id: 'old', urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'proxy-x', cost: 0.9, timestamp: ago(60) },
+      { _id: 'other', urlKey: 'beta', issueIdentifier: 'LIN-1', feature: 'proxy-x', cost: 0.5, timestamp: ago(1) },
     );
-  });
-});
-
-describe('LlmCallLogStore.summarizeByIssue', () => {
-  let store;
-  let collection;
-
-  beforeEach(() => {
-    collection = createMockCollection();
     store = new LlmCallLogStore({ collection });
   });
 
-  test('filters by both urlKey and issueIdentifier', async () => {
-    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'recommend', cost: 0.01 });
-    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-2', feature: 'recommend', cost: 0.02 }); // other issue
-    await store.record({ urlKey: 'other', issueIdentifier: 'LIN-1', feature: 'recommend', cost: 0.03 }); // other workspace
+  const ids = (docs) => docs.map(d => d._id).sort();
 
-    const s = await store.summarizeByIssue('acme', 'LIN-1');
-    assert.strictEqual(s.calls, 1);
-    assert.ok(Math.abs(s.costUsd - 0.01) < 1e-9);
+  test('returns the workspace docs inside the 30-day horizon, raw: a null cost stays null', async () => {
+    const docs = await store.listInHorizon('acme');
+    assert.deepStrictEqual(ids(docs), ['a', 'b', 'c']);
+    assert.strictEqual(docs.find(d => d._id === 'b').cost, null);
   });
 
-  test('groups by feature (busiest first)', async () => {
-    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'recommend', cost: 0.01 });
-    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'recommend', cost: 0.02 });
-    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'brief', cost: 0.005 });
-
-    const s = await store.summarizeByIssue('acme', 'LIN-1');
-    assert.strictEqual(s.calls, 3);
-    assert.strictEqual(s.byFeature[0].feature, 'recommend');
-    assert.strictEqual(s.byFeature[0].calls, 2);
-    assert.ok(Math.abs(s.byFeature[0].costUsd - 0.03) < 1e-9);
-    assert.strictEqual(s.byFeature[1].feature, 'brief');
+  test('filters by issue identifier', async () => {
+    assert.deepStrictEqual(ids(await store.listInHorizon('acme', { issueIdentifier: 'LIN-1' })), ['a', 'b']);
   });
 
-  test('a null cost is counted in unpricedCalls, never folded to 0', async () => {
-    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'recap', cost: 0.01 });
-    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'recap' }); // no cost reported
+  test('filters by feature', async () => {
+    assert.deepStrictEqual(ids(await store.listInHorizon('acme', { feature: 'scan' })), ['c']);
+  });
 
-    const s = await store.summarizeByIssue('acme', 'LIN-1');
-    assert.strictEqual(s.calls, 2);
+  test('an explicit since is the lower bound (the Biscuit window is a parameter)', async () => {
+    const since = ago(2.5);
+    assert.deepStrictEqual(ids(await store.listInHorizon('acme', { since })), ['a', 'c']);
+  });
+
+  test('empty for a missing urlKey, a missing store collection, or an empty issue or feature filter', async () => {
+    assert.deepStrictEqual(await store.listInHorizon(undefined), []);
+    assert.deepStrictEqual(await new LlmCallLogStore({}).listInHorizon('acme'), []);
+    assert.deepStrictEqual(await store.listInHorizon('acme', { issueIdentifier: '' }), []);
+    assert.deepStrictEqual(await store.listInHorizon('acme', { feature: null }), []);
+  });
+
+  test('a collection error is logged and reads as no calls, never thrown (the page still renders)', async () => {
+    const flaky = new LlmCallLogStore({ collection: { find() { throw new Error('boom'); } } });
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+      assert.deepStrictEqual(await flaky.listInHorizon('acme'), []);
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  test('the store has no cost fold left: its summary methods are gone (LIN-4179)', () => {
+    for (const name of ['summarize', 'summarizeByIssue', 'summarizeByFeature']) {
+      assert.strictEqual(typeof LlmCallLogStore.prototype[name], 'undefined', `${name} must be deleted from the store`);
+    }
+  });
+});
+
+describe('callTelemetryOf: the call telemetry that is not cost (pure)', () => {
+  const doc = (over) => ({ urlKey: 'acme', feature: 'proxy-x', model: 'm1', timestamp: new Date('2026-11-01T00:00:00Z'), ...over });
+
+  test('counts calls and sums finite tokens; a missing token count adds nothing', () => {
+    const t = callTelemetryOf([doc({ totalTokens: 10 }), doc({ totalTokens: null }), doc({ totalTokens: 5 })]);
+    assert.strictEqual(t.totalCalls, 3);
+    assert.strictEqual(t.totalTokens, 15);
+  });
+
+  test('lastCallAt is the latest timestamp, or null with no calls', () => {
+    const t = callTelemetryOf([doc({ timestamp: new Date('2026-11-01T00:00:00Z') }), doc({ timestamp: new Date('2026-11-02T00:00:00Z') })]);
+    assert.strictEqual(t.lastCallAt, '2026-11-02T00:00:00.000Z');
+    assert.strictEqual(callTelemetryOf([]).lastCallAt, null);
+  });
+
+  test('latency is nearest-rank per (feature, model); a call with no duration is in no group', () => {
+    const docs = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(ms => doc({ durationMs: ms * 100 }));
+    docs.push(doc({ durationMs: null }));
+    const [row] = callTelemetryOf(docs).latencyByFeatureModel;
+    assert.deepStrictEqual({ feature: row.feature, model: row.model, count: row.count, p50Ms: row.p50Ms, p90Ms: row.p90Ms, maxMs: row.maxMs },
+      { feature: 'proxy-x', model: 'm1', count: 10, p50Ms: 500, p90Ms: 900, maxMs: 1000 });
+  });
+
+  test('latency rows sort by p90 descending, then feature, then model', () => {
+    const rows = callTelemetryOf([
+      doc({ feature: 'b', model: 'm', durationMs: 100 }),
+      doc({ feature: 'a', model: 'm', durationMs: 100 }),
+      doc({ feature: 'c', model: 'm', durationMs: 900 }),
+    ]).latencyByFeatureModel;
+    assert.deepStrictEqual(rows.map(r => r.feature), ['c', 'a', 'b']);
+  });
+});
+
+describe('readCalls: the calls figure (LIN-4179, the figure rule)', () => {
+  const doc = (feature, cost) => ({ feature, model: 'm1', cost });
+
+  test('a null cost is counted as unpriced, never added as 0', () => {
+    const f = readCalls([doc('scan', 0.03), doc('scan', null), doc('review', 0)]);
+    assert.strictEqual(f.calls, 3);
+    assert.strictEqual(f.pricedCalls, 2);
+    assert.strictEqual(f.unpricedCalls, 1);
+    assert.strictEqual(f.pricedUsd, 0.03);
+    assert.strictEqual(f.complete, false);
+    assert.strictEqual(f.totalUsd, null, 'a partly priced sum publishes no total');
+  });
+
+  test('a complete zero is a real total of $0, distinct from no data', () => {
+    const zero = readCalls([doc('review', 0)]);
+    assert.strictEqual(zero.complete, true);
+    assert.strictEqual(zero.totalUsd, 0);
+    const none = readCalls([]);
+    assert.strictEqual(none.calls, 0);
+    assert.strictEqual(none.complete, false, 'no calls is no data, not a complete zero');
+    assert.strictEqual(none.totalUsd, null);
+  });
+
+  test('byFeature is busiest first, with each feature\'s priced sum and unpriced count', () => {
+    const f = readCalls([doc('review', null), doc('scan', 0.05), doc('scan', 0.03), doc('scan', null)]);
+    assert.deepStrictEqual(f.byFeature.map(r => r.feature), ['scan', 'review']);
+    assert.deepStrictEqual(f.byFeature[0], { feature: 'scan', calls: 3, pricedCalls: 2, unpricedCalls: 1, pricedUsd: 0.08 });
+  });
+});
+
+describe('appCallsOf and callsSurfaceOf: the wire shape and the surfaces (LIN-4179)', () => {
+  test('appCallsOf is the S1 wire shape: calls, costUsd (the priced sum), unpricedCalls, byFeature (feature, calls, costUsd)', () => {
+    const app = appCallsOf([
+      { feature: 'proxy-x', model: 'm', cost: 0.2 },
+      { feature: 'review', model: 'm', cost: null },
+    ]);
+    assert.deepStrictEqual(Object.keys(app), ['calls', 'costUsd', 'unpricedCalls', 'byFeature']);
+    assert.deepStrictEqual(app, {
+      calls: 2,
+      costUsd: 0.2,
+      unpricedCalls: 1,
+      byFeature: [
+        { feature: 'proxy-x', calls: 1, costUsd: 0.2 },
+        { feature: 'review', calls: 1, costUsd: 0 },
+      ],
+    });
+  });
+
+  test('appCallsOf over no calls is the literal zero shape (never the no-data carrier)', () => {
+    assert.deepStrictEqual(appCallsOf([]), { calls: 0, costUsd: 0, unpricedCalls: 0, byFeature: [] });
+  });
+
+  test('callsSurfaceOf is Health\'s and the Weather line\'s figure: the calls read and the telemetry, with the unpriced count', () => {
+    const s = callsSurfaceOf([{ feature: 'scan', model: 'm', cost: 0.04, totalTokens: 7, timestamp: new Date('2026-11-01T00:00:00Z') }, { feature: 'scan', model: 'm', cost: null, totalTokens: 3, timestamp: new Date('2026-11-02T00:00:00Z') }]);
+    assert.strictEqual(s.totalCalls, 2);
+    assert.strictEqual(s.totalTokens, 10);
+    assert.strictEqual(s.lastCallAt, '2026-11-02T00:00:00.000Z');
+    assert.strictEqual(s.pricedUsd, 0.04);
     assert.strictEqual(s.unpricedCalls, 1);
-    assert.ok(Math.abs(s.costUsd - 0.01) < 1e-9); // the unpriced call contributes nothing, not 0-as-priced
-  });
-
-  test('empty for unknown issue, missing args, or no collection', async () => {
-    const empty = { calls: 0, costUsd: 0, unpricedCalls: 0, byFeature: [] };
-    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'recommend', cost: 0.01 });
-    assert.deepStrictEqual(await store.summarizeByIssue('acme', 'LIN-999'), empty);
-    assert.deepStrictEqual(await store.summarizeByIssue('acme'), empty);
-    assert.deepStrictEqual(await store.summarizeByIssue(undefined, 'LIN-1'), empty);
-    assert.deepStrictEqual(await new LlmCallLogStore({}).summarizeByIssue('acme', 'LIN-1'), empty);
-  });
-
-  // LIN-3161 (LIN-3157 A1): the additive `since` timestamp bound.
-  function pushRow(overrides) {
-    collection._docs.push({
-      _id: overrides._id, urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'recommend',
-      cost: overrides.cost, timestamp: overrides.timestamp, expiresAt: overrides.expiresAt
-    });
-  }
-
-  test('a `since` bound excludes a row older than it even when its expiresAt is still live (LIN-3161)', async () => {
-    const now = Date.now();
-    const future = new Date(now + 365 * 24 * 60 * 60 * 1000);
-    // Outside the 30-day read window, but with a still-live stamped expiry —
-    // the exact shape lifetime retention would produce.
-    pushRow({ _id: 'old', cost: 5, timestamp: new Date(now - 40 * 24 * 60 * 60 * 1000), expiresAt: future });
-    // Inside the window.
-    pushRow({ _id: 'new', cost: 0.01, timestamp: new Date(now - 24 * 60 * 60 * 1000), expiresAt: future });
-
-    const since = new Date(now - 30 * 24 * 60 * 60 * 1000);
-    const s = await store.summarizeByIssue('acme', 'LIN-1', { since });
-    assert.strictEqual(s.calls, 1);
-    assert.ok(Math.abs(s.costUsd - 0.01) < 1e-9);
-  });
-
-  test('omitting `since` keeps the pre-existing behaviour (every live-expiry row counts) (LIN-3161)', async () => {
-    const now = Date.now();
-    pushRow({ _id: 'old', cost: 5, timestamp: new Date(now - 40 * 24 * 60 * 60 * 1000), expiresAt: new Date(now + 365 * 24 * 60 * 60 * 1000) });
-    const s = await store.summarizeByIssue('acme', 'LIN-1');
-    assert.strictEqual(s.calls, 1);
-    assert.ok(Math.abs(s.costUsd - 5) < 1e-9);
-  });
-
-  test('A2 removes the expiresAt predicate: an in-window row with a past stamped expiry is counted (LIN-3162)', async () => {
-    const now = Date.now();
-    // Inside any `since` window, but its stamped expiry has already passed.
-    // A1 kept the `expiresAt` predicate alongside `since`; A2 removes it, so the
-    // read is keyed on `timestamp` alone and this row is now counted.
-    pushRow({ _id: 'expired', cost: 9, timestamp: new Date(now - 24 * 60 * 60 * 1000), expiresAt: new Date(now - 24 * 60 * 60 * 1000) });
-    const since = new Date(now - 30 * 24 * 60 * 60 * 1000);
-    const s = await store.summarizeByIssue('acme', 'LIN-1', { since });
-    assert.strictEqual(s.calls, 1);
+    assert.strictEqual(s.totalUsd, null);
+    assert.strictEqual(s.complete, false);
   });
 });
 
-describe('LlmCallLogStore.summarizeByFeature (LIN-2702)', () => {
-  let store;
-  let collection;
-
-  beforeEach(() => {
-    collection = createMockCollection();
-    store = new LlmCallLogStore({ collection });
-  });
-
-  test('zero rows in window -> unknown:true, meanUsd:null, calls:0', async () => {
-    const s = await store.summarizeByFeature('acme', 'scan');
-    assert.deepStrictEqual(s, { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true });
-  });
-
-  test('rows present but all unpriced -> unknown:true, meanUsd:null, but calls still reports the row count', async () => {
-    await store.record({ urlKey: 'acme', feature: 'scan' }); // no cost reported
-    await store.record({ urlKey: 'acme', feature: 'scan' }); // no cost reported
-
-    const s = await store.summarizeByFeature('acme', 'scan');
-    assert.strictEqual(s.calls, 2); // "2 unpriced calls" stays distinguishable from "no calls"
-    assert.strictEqual(s.pricedCalls, 0);
-    assert.strictEqual(s.meanUsd, null);
-    assert.strictEqual(s.unknown, true);
-  });
-
-  // The single most important test in the ticket: cost:0 rows are genuinely
-  // priced (Number.isFinite(0) is true), so a window that is all real zeros
-  // must report a known $0.00, never the unknown carrier.
-  test('priced rows averaging exactly zero -> meanUsd:0, unknown:false (never unknown)', async () => {
-    await store.record({ urlKey: 'acme', feature: 'scan', cost: 0 });
-    await store.record({ urlKey: 'acme', feature: 'scan', cost: 0 });
-
-    const s = await store.summarizeByFeature('acme', 'scan');
-    assert.strictEqual(s.calls, 2);
-    assert.strictEqual(s.pricedCalls, 2);
-    assert.strictEqual(s.meanUsd, 0);
-    assert.strictEqual(s.unknown, false);
-  });
-
-  test('mixed priced/unpriced -> mean computed over priced rows only, not calls', async () => {
-    await store.record({ urlKey: 'acme', feature: 'scan', cost: 0.02 });
-    await store.record({ urlKey: 'acme', feature: 'scan', cost: 0.04 });
-    await store.record({ urlKey: 'acme', feature: 'scan' }); // unpriced
-
-    const s = await store.summarizeByFeature('acme', 'scan');
-    assert.strictEqual(s.calls, 3);
-    assert.strictEqual(s.pricedCalls, 2);
-    // Dividing by calls (3) would give 0.02; dividing by pricedCalls (2) gives 0.03.
-    assert.ok(Math.abs(s.meanUsd - 0.03) < 1e-9);
-    assert.strictEqual(s.unknown, false);
-  });
-
-  test('rows older than the read horizon are excluded from the window (aged-out-only -> unknown)', async () => {
-    const now = Date.now();
-    // LIN-3162 A2: the window is bounded on `timestamp` (the shared read
-    // horizon), not on the expiry stamp. The guarantee is unchanged — an
-    // aged-out row is excluded and a window with no live rows is `unknown`.
-    collection._docs.push({
-      _id: 'aged-out', urlKey: 'acme', feature: 'scan', cost: 0.05,
-      timestamp: new Date(now - 40 * 24 * 60 * 60 * 1000), expiresAt: new Date(now - 24 * 60 * 60 * 1000)
-    });
-
-    const s = await store.summarizeByFeature('acme', 'scan');
-    assert.deepStrictEqual(s, { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true });
-  });
-
-  test('feature scoping: a different feature or a different urlKey is excluded', async () => {
-    await store.record({ urlKey: 'acme', feature: 'scan', cost: 0.01 });
-    await store.record({ urlKey: 'acme', feature: 'recommend', cost: 99 }); // other feature
-    await store.record({ urlKey: 'other', feature: 'scan', cost: 99 }); // other workspace
-
-    const s = await store.summarizeByFeature('acme', 'scan');
-    assert.strictEqual(s.calls, 1);
-    assert.ok(Math.abs(s.meanUsd - 0.01) < 1e-9);
-  });
-
-  test('guard: missing urlKey, missing feature, or no collection all return the unknown shape', async () => {
-    const empty = { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true };
-    await store.record({ urlKey: 'acme', feature: 'scan', cost: 0.01 });
-    assert.deepStrictEqual(await store.summarizeByFeature(undefined, 'scan'), empty);
-    assert.deepStrictEqual(await store.summarizeByFeature('acme', undefined), empty);
-    assert.deepStrictEqual(await new LlmCallLogStore({}).summarizeByFeature('acme', 'scan'), empty);
-  });
-
-  test('catch path: a collection error returns the unknown shape, never meanUsd:0', async () => {
-    const flaky = new LlmCallLogStore({
-      collection: { find() { throw new Error('mongo down'); } }
-    });
-    const s = await flaky.summarizeByFeature('acme', 'scan');
-    assert.deepStrictEqual(s, { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true });
-  });
-});
-
-// Unintended-side-effect coverage (LIN-2702): summarize() and
-// summarizeByIssue() must not have moved when the same rows are also read by
-// summarizeByFeature() — the new honest-unknown convention must not leak into
-// the two methods that deliberately do not use it.
-describe('summarize()/summarizeByIssue() are unaffected by summarizeByFeature (LIN-2702)', () => {
-  let store;
-  let collection;
-
-  beforeEach(() => {
-    collection = createMockCollection();
-    store = new LlmCallLogStore({ collection });
-  });
-
-  test('summarize() empty case still carries totalCost:0 with no `unknown` key', async () => {
-    const s = await store.summarize('acme');
-    assert.deepStrictEqual(s, { totalCalls: 0, totalCost: 0, totalTokens: 0, byFeature: [], lastCallAt: null, latencyByFeatureModel: [] });
-    assert.strictEqual('unknown' in s, false);
-  });
-
-  test('summarizeByIssue() empty case is still the literal zero shape, not the unknown carrier', async () => {
-    const s = await store.summarizeByIssue('acme', 'LIN-1');
-    assert.deepStrictEqual(s, { calls: 0, costUsd: 0, unpricedCalls: 0, byFeature: [] });
-    assert.strictEqual('unknown' in s, false);
-  });
-
-  test('summarize() and summarizeByIssue() are unchanged over rows summarizeByFeature also reads', async () => {
-    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'scan', cost: 0.02 });
-    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'scan' }); // unpriced
-
-    const byFeature = await store.summarizeByFeature('acme', 'scan');
-    assert.strictEqual(byFeature.pricedCalls, 1);
-
-    const summary = await store.summarize('acme');
-    assert.strictEqual(summary.totalCalls, 2);
-    assert.ok(Math.abs(summary.totalCost - 0.02) < 1e-9); // unpriced row folds to 0 here, unlike summarizeByFeature
-    assert.strictEqual(summary.byFeature[0].feature, 'scan');
-    assert.strictEqual(summary.byFeature[0].calls, 2);
-
-    const byIssue = await store.summarizeByIssue('acme', 'LIN-1');
-    assert.strictEqual(byIssue.calls, 2);
-    assert.strictEqual(byIssue.unpricedCalls, 1);
-    assert.ok(Math.abs(byIssue.costUsd - 0.02) < 1e-9);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// C4 #7 (treatment H, permanent): summarize()/summarizeByFeature() read the
-// reporting window keyed on `timestamp`, replacing the expiry-stamp predicate.
-// Real engine, because the witness is that a >30-day row with a live stamped
-// expiry is excluded and a no-expiresAt row inside the window is counted.
-// ---------------------------------------------------------------------------
-
-describe('LlmCallLogStore summaries key on the read horizon (real MangoDB tmpdir, LIN-3162 A2)', () => {
+describe('LlmCallLogStore listInHorizon keys on the read horizon (real MangoDB tmpdir, LIN-3162 A2)', () => {
   const DAY_MS = 24 * 60 * 60 * 1000;
   let harness;
   let raw;
@@ -487,32 +310,38 @@ describe('LlmCallLogStore summaries key on the read horizon (real MangoDB tmpdir
     store = new LlmCallLogStore({ collection: raw });
   });
 
-  test('summarize() counts a no-expiresAt row inside the horizon and hides a >30d row with a live stamp (A2)', async () => {
+  test('the workspace read counts a no-expiresAt row inside the horizon and hides a >30d row with a live stamp (A2)', async () => {
     const now = Date.now();
     await raw.insertOne({ _id: 'no-stamp', urlKey: 'acme', feature: 'recommend', cost: 0.01, totalTokens: 10, timestamp: new Date(now - 5 * DAY_MS) });
     await raw.insertOne({ _id: 'old-live', urlKey: 'acme', feature: 'recommend', cost: 5, totalTokens: 500, timestamp: new Date(now - 40 * DAY_MS), expiresAt: new Date(now + 365 * DAY_MS) });
 
-    const s = await store.summarize('acme');
-    assert.strictEqual(s.totalCalls, 1, 'only the in-horizon row counts');
-    assert.ok(Math.abs(s.totalCost - 0.01) < 1e-9, 'the >30d row must not be folded in');
+    const figure = callsSurfaceOf(await store.listInHorizon('acme'));
+    assert.strictEqual(figure.totalCalls, 1, 'only the in-horizon row counts');
+    assert.ok(Math.abs(figure.pricedUsd - 0.01) < 1e-9, 'the >30d row must not be folded in');
+    assert.strictEqual(figure.totalTokens, 10);
   });
 
-  test('summarizeByFeature() counts a no-expiresAt row inside the horizon and hides a >30d row with a live stamp (A2)', async () => {
+  test('the feature read counts a no-expiresAt row inside the horizon and hides a >30d row with a live stamp (A2)', async () => {
     const now = Date.now();
     await raw.insertOne({ _id: 'no-stamp', urlKey: 'acme', feature: 'scan', cost: 0.02, timestamp: new Date(now - 5 * DAY_MS) });
     await raw.insertOne({ _id: 'old-live', urlKey: 'acme', feature: 'scan', cost: 5, timestamp: new Date(now - 40 * DAY_MS), expiresAt: new Date(now + 365 * DAY_MS) });
 
-    const s = await store.summarizeByFeature('acme', 'scan');
-    assert.strictEqual(s.calls, 1);
-    assert.strictEqual(s.pricedCalls, 1);
-    assert.ok(Math.abs(s.meanUsd - 0.02) < 1e-9);
-    assert.strictEqual(s.unknown, false);
+    const docs = await store.listInHorizon('acme', { feature: 'scan' });
+    assert.deepStrictEqual(docs.map(d => d._id), ['no-stamp']);
+    const figure = readCalls(docs);
+    assert.strictEqual(figure.calls, 1);
+    assert.strictEqual(figure.pricedCalls, 1);
+    assert.ok(Math.abs(figure.pricedUsd / figure.pricedCalls - 0.02) < 1e-9);
+  });
+
+  test('the issue read takes a since bound from the caller and reads through the same horizon default (LIN-3161)', async () => {
+    const now = Date.now();
+    await raw.insertOne({ _id: 'in', urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'proxy-x', cost: 0.1, timestamp: new Date(now - 3 * DAY_MS) });
+    await raw.insertOne({ _id: 'before-since', urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'proxy-x', cost: 0.2, timestamp: new Date(now - 10 * DAY_MS) });
+    const docs = await store.listInHorizon('acme', { issueIdentifier: 'LIN-1', since: new Date(now - 5 * DAY_MS) });
+    assert.deepStrictEqual(docs.map(d => d._id), ['in']);
   });
 });
-
-// ---------------------------------------------------------------------------
-// LIN-3163 (B): lifetime retention — the llm-call-log evictor is deleted.
-// ---------------------------------------------------------------------------
 
 describe('LlmCallLogStore.cleanup is removed (LIN-3163 B)', () => {
   test('the evictor no longer exists — lifetime retention, no cleanup method', () => {
