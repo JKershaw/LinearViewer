@@ -1434,3 +1434,10 @@ John: "I feel like our process of refining, trying it on real work, and measurin
 
     Step-back skipped again (the voices converged). Moved to Todo; autopilot `ee2a8571`.
   - **Note:** this is the second time today the Survey found a real defect before work began (after LIN-4187's cause). Being allowed to run tests makes the forecast see more.
+
+### 19:35 UTC: LIN-4218 and LIN-4226 merged (both `+`); Seams run 6 agrees
+
+- **LIN-4218** (`bf499a4`): one `STOP_OUTCOMES` table and one `runStopOutcome` for every Stop relay; `betweenTextAndStatus` gone; non-test lines flat; a large characterization golden. It **landed as one PR, not the pieces** the scope asked for. To ask the builder why.
+- **LIN-4226** (`c55f0fb3`): the pulled-too-early extra from LIN-4201, now as its own piece. The read loads through a `requestSource` passed in once. F1 +1 edge.
+- **Seams run 6** (LIN-4231) **independently agrees** with my LIN-4201 and LIN-4203 rows, and adds the honest caution: "most of what moved on the map is the guide, not the code". The cost read's home was a guide edit; the code growth was two F1 edges, +0/+1 by runtime dependency. Drift is still running.
+- **Forward ledger now:** 10 `+` (six harness rows, LIN-4203, LIN-4187, LIN-4218, LIN-4226 small), 1 `+ (mixed)` (LIN-4201), 1 neutral (LIN-4212, not surveyed). Baseline: 1 / 3 neutral / 4 worse / 1 mixed.
