@@ -1139,3 +1139,34 @@ I collected every "right direction, not this task's" from the 15 step-backs, plu
 - **The Periodicals:** Seams & Tangles (LIN-4208) is in close-out; the other three are writing their reports.
 - **LIN-4200** is re-measuring under the to-the-cent ruling. LIN-4201 and LIN-4203 are Todo.
 - **Rulings:** none open.
+
+## 4 Nov, about 09:50 UTC: the Periodicals are in, scored against the 07:45 prediction
+
+All four merged between 08:24 and 08:40: Seams & Tangles (LIN-4208), Code Quality (LIN-4207), Stability (LIN-4206) and Drift & Coherence (LIN-4209). Seams and Drift share our window exactly (`015aa4c6..5334c81a`). Code Quality and Stability measured from late October.
+
+| Predicted | What the Periodicals found | Verdict |
+|---|---|---|
+| **Seams: about flat; any movement someone else's** | "**Placement hiding growth.**" The catch-all went 12 → 17 files, all five new ones ours. "**The window's largest item is a new hub, `lib/cost-read.js`**: 9 cross-area importers from 5 areas, and bidirectional reach into Runs and LLM." Watched, not ticketed, because LIN-4195/LIN-4201 are in flight | **Wrong**, as my scripted run already showed. The Periodical and `place-change.mjs` agree to the file and the count |
+| **Drift: down a little where we consolidated; nothing else moves because of us** | USD formatting improved: 12 → 5 → one home plus a pinned browser twin. Census flat (106 `mustRule`; the guide edit moved zero groups). But **new rows created by our own window:** `lineage-identity-read-twins` (`founder-lookup.js` repeats a `dispatch-store` query without its guard; LIN-4178), `cost-fold-partition-restated` (`cost-read` restates `row-usage`'s partition), `usage-record-vocabulary-two-readers`, `key-state-residue`, and `usage-relay-flag-partial` (five record-flush seams ignore the relay flag; LIN-4195 says it's closed) | **Half right.** The consolidation we aimed for held, and in doing it we made several new small copies |
+| **Code Quality: the same or bigger** | "Did simplification keep up with feature growth? **No.**" +4,172 decision points over 163 production commits; retirements −430. The top units worsened: `prompt-section.js init` (1,994 lines), SD `runStallFailsafe`, and new, `dispatch-store addFeedback` (448 lines, 67 DP). Their owner tickets are all **Backlog, unstarted**. Mints: zero | **Right** |
+| **The Periodicals' follow-ups will name things no Survey named** | **One** follow-up was minted across all four (LIN-4210, the halt poll cold-cache fail-open, needing John's ruling). The rest were "watch", a comment, or "for John". Drift: "every Drift follow-up is still unmoved" (`coherence-loop-stalled`) | **Right, but thin.** The top-down channel mostly doesn't produce work, and what it does produce sits |
+
+**Stability (advisory):** "Not yet settled. Nothing is spiralling, but the rate of change has not settled." CI wall time has risen in every window since September (4.9 → 8.23 min), mostly from suite growth (runtime tests +17% since 23 Oct).
+
+### What this tells us about closing the gap
+
+1. **Push alone doesn't land.** The Periodicals see the place accurately, and the measures agree across instruments, but their findings go nowhere. Follow-ups sit in Backlog. Owner tickets for the worst units are never started. Findings in in-flight areas are "watched" or left "for John". Drift says so of its own loop.
+2. **Our consolidations were locally right, and still added small copies and a hub.** Neither the Survey nor the builders saw that until it merged. The global offshoot saw the hub from the base. Nobody saw the twins.
+3. **The missing wire is routing.** Four of Drift's new rows, plus Seams' hub, sit exactly in the ground LIN-4201 and LIN-4203 are about to rewire. Code Quality's `addFeedback` finding sits in LIN-4166's area, and `runStallFailsafe` in LIN-4164's. Tasks went through those areas and didn't carry them, because nothing told them.
+
+### Experiment: route the Periodicals' findings into the in-flight tasks (09:50)
+
+Added to LIN-4201 and LIN-4203, under their Survey section, as "From the Periodicals (top-down, 4 Nov), in this task's ground":
+- **LIN-4201:** the founder-lookup twin, the `lane` vocabulary split, the restated partition, and the catch-all hub. Each carries its natural home in this piece's shape: the one loader, the one decision function, the one vocabulary.
+- **LIN-4203:** the relay-flag finding. **It changes one of its own at-merge checks.** "Re-document the flag as the records flag" is wrong if five flush seams ignore it, so the task must decide first: gate the flush everywhere, or retire the flag.
+
+The rule for these: carry what you cheaply can, and name in the close-out what you don't. **What we'll look at:** whether the builder carries them, and whether the place change and the next Drift reading show the twins gone.
+
+**Also open, with my proposals posted (suggest-answer):**
+- **LIN-4212** (record lineage): read by posting row, F. No migration; it keeps D14 open.
+- **The gate's pass criterion:** "explained is enough", on condition the explanation check is shown failing on a planted mismatch.
