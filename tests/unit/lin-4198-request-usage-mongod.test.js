@@ -4,8 +4,10 @@
  * MangoDB restates the unique index and serialises writers, so it cannot show the
  * concurrent-insert race this store exists to survive. The witnesses here need a
  * real server: posting a request twice, a larger and a smaller repost, and two
- * concurrent batches with the same ids (which lose inserts to the unique index
- * and must come out as one document each, holding the largest values).
+ * concurrent batches with the same ids. The last witness proves the outcome: one
+ * document per id, holding the largest values. It does not exercise the store's
+ * E11000 retry: mongod >= 4.2 retries same-key upserts server-side, so that retry
+ * is pinned by the unit test (lin-4198-request-usage-store.test.js), not by this file.
  *
  * Skips locally unless MONGODB_TEST_URI is set; fails hard in CI when it is not
  * (precedent: tests/unit/mongo-smoke.test.js, tests/unit/cost-read-usage-parity.test.js).
