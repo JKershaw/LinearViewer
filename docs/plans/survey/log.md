@@ -1607,3 +1607,20 @@ Each is its own piece, with a stop-and-say rule on 5 and 6. Autopilot `84fa12ad`
   - three test-only exports;
   - hand-pinned counts and allow-lists in three tickets.
 - **Verdict:** 3 is between the thresholds (4+ = stand-in; 2 or fewer = film only). **q6 is a cheap, good source for the copies column and the tally, not a stand-in for the balance.** It is blind to the map, and kind to its own work. Keep asking it at merge; keep the Periodical as the film.
+
+### 23:05 UTC: LIN-4234 merged, and LIN-4233's first piece (LIN-4239); both `+`, with no routed findings
+- **LIN-4234** (`950113b1`), pieces 1 and 2 as scoped:
+  - one helper is the single source of collection names for both guards; four hand-added names are deleted;
+  - both guards now see `request-usage` and `usage-snapshot-intake`;
+  - a census catches `db.collection(<non-constant>)`;
+  - the map didn't move, and there are no new production files.
+  - **"Who else must learn" was applied by the builder from the scope's at-merge list:** `source-map.md` and the class-guard header updated, the runbook checked and rightly left.
+  - **One small debit:** the LIN-4198 single-reader census's allow-list grew by two entries, which is the hand-kept-list pattern from the q6 answers.
+  - Piece 3 (`INVENTORY` imports constants) isn't in the merge. The close-out is running; I'll ask why.
+- **LIN-4239** (`796bc9d`, simple-dispatcher), LIN-4233's first piece, exactly as scoped:
+  - the exception is deleted and the rule stated once, so F1 uses it rather than a third copy;
+  - a scheduled-wakeup row is added to the golden;
+  - the proof imports Harbour's own `parseParkedWait`, red before the swap and green after;
+  - the comments say what still holds.
+  - The Harbour reader is the sibling LIN-4240.
+- **The first two rows with no Periodicals routing are both `+`.** Both came from their own Surveys, the larger scope and the at-merge list. Too few to call, but no sign yet that routing was what made the difference.
