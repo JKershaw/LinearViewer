@@ -174,11 +174,15 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
 /** Every call of a reader that now requires records, and the argument name each call must carry. */
 export const REQUIRED_ARG = {
-  readCost: 'requestRows', lineageRecords: 'requestRows', lineageFigureOf: 'requestRows', buildRunView: 'requestRows',
-  buildView: 'requestRows', computeTerminalMarkedTaskCost: 'requestRows', terminalMarkedTaskCostDetail: 'requestRows',
-  computeEffortReadout: 'requestRows', agentSpendByJob: 'requestRows', typicalByModel: 'requestRows',
-  collectKpiStats: 'requestRows', collectWorkspaceKpis: 'requestUsageLoader', readModelsHistory: 'requestUsageLoader',
+  // LIN-4226: the read entries take the source they load from (`requestSource`); the terminal-cost helpers take the
+  // lineage records their caller loaded (`costLineages`). Injected loaders keep their dependency name.
+  readCost: 'requestSource', lineageRecords: 'requestSource', buildRunView: 'requestSource', buildView: 'requestSource',
+  computeEffortReadout: 'requestSource', collectKpiStats: 'requestSource',
+  computeTerminalMarkedTaskCost: 'costLineages', terminalMarkedTaskCostDetail: 'costLineages',
+  collectWorkspaceKpis: 'requestUsageLoader', readModelsHistory: 'requestUsageLoader',
 };
+// `lineageFigureOf` is the synchronous per-lineage figure over records its caller passes (LIN-4226, plan-review note 1):
+// it loads nothing, so it is not a required-source entry and is not in this table.
 /**
  * Route factories whose routes reach the read, the dep each must be given where it is mounted, and the module the
  * factory comes from (a same-named factory from another module, e.g. routes/proxy-dispatch.js's
@@ -233,7 +237,10 @@ export function wiringProblems(files) {
         const deps = Object.fromEntries(Object.entries(REQUIRED_DEP)
           .filter(([name, { module }]) => importsFrom(file, text, name, module))
           .map(([name, { dep }]) => [name, dep]));
-        for (const [table, kind] of [[REQUIRED_ARG, 'argument'], [deps, 'dependency']]) {
+        // lib/cost-read.js is the read's own module: its entries delegate their parameters (`lineageRecords(params)`),
+        // so the argument rule applies to callers, and the read's own pass-through is held by its witnesses instead.
+        const argumentTable = file === 'lib/cost-read.js' ? {} : REQUIRED_ARG;
+        for (const [table, kind] of [[argumentTable, 'argument'], [deps, 'dependency']]) {
           for (const [name, required] of Object.entries(table)) {
             for (const match of line.matchAll(new RegExp(`(?<![\\w.])${name}\\s*\\(`, 'g'))) {
               if (/(function|async function)\s*$/.test(line.slice(0, match.index))) continue; // the definition
@@ -280,9 +287,9 @@ describe('census: every production call passes the records (LIN-4201)', () => {
       }
     }
     for (const site of [
-      'routes/proxy-compute.js#readCost', 'lib/model-routing-spend.js#readCost', 'lib/effort-readout.js#readCost',
-      'lib/terminal-marked-task-cost.js#lineageRecords', 'lib/workspace-kpi-stats.js#lineageRecords', 'lib/run-view.js#lineageFigureOf',
-      'routes/dashboard.js#buildRunView', 'lib/render-session.js#buildRunView', 'lib/run-paragraph-hook.js#buildView',
+      'routes/proxy-compute.js#readCost', 'lib/model-routing-history.js#readCost', 'lib/effort-readout.js#readCost',
+      'lib/kpi-stats.js#lineageRecords', 'lib/workspace-kpi-stats.js#lineageRecords',
+      'routes/dashboard.js#buildRunView', 'lib/run-paragraph-hook.js#buildView',
       'routes/settings.js#readModelsHistory', 'routes/dispatch.js#readModelsHistory', 'routes/dashboard-effort.js#computeEffortReadout',
       'lib/kpi-stats.js#computeTerminalMarkedTaskCost', 'routes/workspace-kpis.js#collectWorkspaceKpis', 'server.js#collectKpiStats',
       'server.js#createProxyRoutes', 'server.js#createDispatchRoutes', 'server.js#createDashboardRoutes', 'server.js#createSettingsRouter',
@@ -298,12 +305,12 @@ describe('census: every production call passes the records (LIN-4201)', () => {
   test('a call without the records is named', () => {
     const problems = wiringProblems([{ path: 'lib/new-surface.js', text: 'const x = readCost({ fetchedRows: rows, identityRows });\n' }]);
     assert.equal(problems.length, 1);
-    assert.match(problems[0], /lib\/new-surface\.js:1 calls readCost without the required argument requestRows/);
+    assert.match(problems[0], /lib\/new-surface\.js:1 calls readCost without the required argument requestSource/);
   });
 
   test('a multi-line call is read to its closing parenthesis', () => {
-    const ok = 'const x = readCost({\n  fetchedRows,\n  requestRows,\n});\n';
-    const bad = 'const x = readCost({\n  fetchedRows,\n});\nconst requestRows = [];\n';
+    const ok = 'const x = readCost({\n  fetchedRows,\n  requestSource,\n});\n';
+    const bad = 'const x = readCost({\n  fetchedRows,\n});\nconst requestSource = [];\n';
     assert.deepEqual(wiringProblems([{ path: 'lib/a.js', text: ok }]), []);
     assert.equal(wiringProblems([{ path: 'lib/b.js', text: bad }]).length, 1);
   });

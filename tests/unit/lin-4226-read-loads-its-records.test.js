@@ -19,6 +19,7 @@ import { readModelsHistory } from '../../lib/model-routing-history.js';
 import { collectKpiStats } from '../../lib/kpi-stats.js';
 import { requestUsageLoader } from '../../lib/request-usage-loader.js';
 import { loaderOver } from '../fixtures/request-usage-loader.js';
+import { buildApp, call, ACME as FAKE_ACME } from './lib/proxy-fake-deps.js';
 
 const ACME = 'acme-lin-4226';
 const DAY = 24 * 3600 * 1000;
@@ -194,6 +195,24 @@ describe('W5: /kpis makes one batched, instance-wide load', () => {
   });
 });
 
+describe('W6: a caller makes exactly one request-records load (witness 4, per caller)', () => {
+  // Mutation-checked at beat 3: a route that preloads and also passes the source makes two loads, and this turns red.
+  const storeFor = (rows) => ({
+    listItems: async () => [],
+    listHistory: async () => ({ items: rows, total: rows.length }),
+    lineageIdentityRows: async () => rows.map(r => ({ _id: r._id, rootItemId: r.rootItemId, status: r.status, kind: r.kind, issueIdentifier: r.issueIdentifier, dispatchedAt: r.dispatchedAt })),
+  });
+
+  test('GET /api/proxy/cost makes exactly one records load and shows the records figure', async () => {
+    const loader = loaderOver(RECORDS);
+    const app = buildApp({ dispatchQueueStore: storeFor([{ ...snapshotRow(), urlKey: FAKE_ACME }]), requestUsageLoader: loader });
+    const res = await call(app, 'GET', '/api/proxy/cost/LIN-42');
+    assert.equal(res.status, 200);
+    close(res.body.totalUsd, 0.3);
+    assert.equal(loader.calls.length, 1, `one load: ${JSON.stringify(loader.calls)}`);
+  });
+});
+
 describe('W4: the Models page reads once and carries the workerSessions the spend reads', () => {
   // Fails at HEAD: the page returns requestRows and identityRows, and no workerSessions.
   test('readModelsHistory returns workerSessions from one load, and no requestRows', async () => {
@@ -215,6 +234,7 @@ describe('W4: the Models page reads once and carries the workerSessions the spen
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 /** The only files that may call the loader's forAnchors/forRows: the loader, the read, and the run view's one load. */
 const LOAD_ALLOW = ['lib/request-usage-loader.js', 'lib/cost-read.js', 'lib/run-view.js'];
+const HARNESS = 'tests/fixtures/cost-replay/harness.js';
 const isCommentLine = (line) => /^\s*(\*|\/\/|\/\*)/.test(line);
 
 /** Every production source file, plus the replay harness (the replay is a caller too). */
@@ -244,9 +264,15 @@ function hitsOf(files, pattern) {
 }
 
 describe('census (LIN-4226): one load per read entry, and no preloaded records', () => {
-  // Fails at HEAD: server.js:2506, the route and dashboard callers, scripts and the replay harness all load for themselves.
-  test('forAnchors and forRows are called only in the loader, the read and the run view\'s one load', () => {
-    const files = scannedFiles().filter(({ path: file }) => !LOAD_ALLOW.includes(file));
+  // Production code: no caller loads records for itself (LIN-4226 beat 3). Fails at HEAD on the 11 caller sites.
+  test('production code: forAnchors and forRows are called only in the loader, the read and the run view\'s one load', () => {
+    const files = scannedFiles().filter(({ path: file }) => !LOAD_ALLOW.includes(file) && file !== HARNESS);
+    assert.deepEqual(hitsOf(files, /\.(forAnchors|forRows)\s*\(/), []);
+  });
+
+  // The replay harness is a caller too; it stays red until beat 4 migrates it (its S10/S11/S13 loads).
+  test('the replay harness: no direct forAnchors or forRows call (beat 4)', () => {
+    const files = scannedFiles().filter(({ path: file }) => file === HARNESS);
     assert.deepEqual(hitsOf(files, /\.(forAnchors|forRows)\s*\(/), []);
   });
 

@@ -45,7 +45,7 @@ import { dispatchSessionFollowUp } from '../lib/follow-up-dispatch.js';
 import { dispatchQueueLimiter } from './dispatch.js';
 import { renderObservationPage as renderObservationPageImpl } from '../lib/render-observation.js';
 import { renderSessionPage } from '../lib/render-session.js';
-import { buildRunView, runLineageAnchors } from '../lib/run-view.js';
+import { buildRunView } from '../lib/run-view.js';
 import { requireRequestUsageLoader } from '../lib/request-usage-loader.js';
 import { pointReadSession as pointReadSessionFor, readSessionById } from '../lib/dispatch-session-read.js';
 import { resolveIssueBinding } from '../lib/workspace.js';
@@ -689,11 +689,10 @@ export function createDashboardRoutes(deps) {
     const anchorLoop = findAnchorLoop(session) || (session.loops && session.loops[0]) || null;
     const anchorIssueTitle = (anchorLoop && anchorLoop.issueTitle) || null;
 
-    // The run view model is built ONCE here (the renderer only formats it). LIN-4201: with the request records of
-    // the session's lineages (the one loader), so a lineage with records shows its records figure.
-    const requestRows = await requireRequestUsageLoader(requestUsageLoader, 'run page')
-      .forAnchors(urlKey, runLineageAnchors(session));
-    const runView = buildRunView(session, { now, requestRows });
+    // The run view model is built ONCE here (the renderer only formats it). LIN-4201 / LIN-4226: buildRunView loads the
+    // session's lineages' request records through the one loader, so a lineage with records shows its records figure.
+    const requestSource = requireRequestUsageLoader(requestUsageLoader, 'run page');
+    const runView = await buildRunView(session, { now, requestSource, urlKey });
 
     // The stored run paragraph (LIN-3253, S3): ONE read-only lookup, never a
     // generation. A miss — or an unwired store — renders nothing.

@@ -297,7 +297,7 @@ async function productionCollectors(db) {
   const { requestUsageLoader } = await import('../lib/request-usage-loader.js');
   const loader = requestUsageLoader(new RequestUsageStore({ collection: c(REQUEST_USAGE_COLLECTION), historyCollection: dispatchHistory }));
   return {
-    kpi: (now) => collectKpiStats(collections, { now, dbBackend: 'mongodb', milestoneFunnelDeps, lineageIdentity, requestRows: rows => loader.forRows(rows) }),
+    kpi: (now) => collectKpiStats(collections, { now, dbBackend: 'mongodb', milestoneFunnelDeps, lineageIdentity, requestSource: loader }),
     workspace: (urlKey, now) => collectWorkspaceKpis({
       collections: { dispatchQueue, dispatchHistory, proxyEvents: collections.proxyEvents, agentStatus: collections.agentStatus,
         reportHistory: collections.reportHistory, customPrompts: collections.customPrompts, closeOutEvents: closeOuts,

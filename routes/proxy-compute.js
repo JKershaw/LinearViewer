@@ -8,7 +8,7 @@
  */
 import { Router } from 'express';
 import { graphqlErrorExtra, graphqlErrorDetail } from '../lib/proxy-graphql-errors.js';
-import { readCost, appCallsOf, anchorsOfRows } from '../lib/cost-read.js';
+import { readCost, appCallsOf } from '../lib/cost-read.js';
 import { requireRequestUsageLoader } from '../lib/request-usage-loader.js';
 import { anchorOf, isMember } from '../lib/lineage-membership.js';
 import { resolveChatCredential, isAiUnavailable } from '../lib/chat-request.js';
@@ -720,14 +720,14 @@ export function createComputeRoutes({
       // with a member in the window. Fetched usage rows: the siblings, then the own rows (the pool
       // order the fold has always read).
       const fetchedRows = [...[...siblingRowsByAnchor.values()].flat(), ...ownRows];
-      // LIN-4201: the request records of every lineage the read sees, by anchor (the one loader). A lineage with
-      // records reads them; one without reads its snapshots (lib/cost-read.js `lineageUsageOf`).
-      const requestRows = await requireRequestUsageLoader(requestUsageLoader, 'GET /api/proxy/cost')
-        .forAnchors(req.proxyUrlKey, anchorsOfRows(fetchedRows));
-      const result = readCost({
+      // LIN-4201 / LIN-4226: the read loads the request records of every lineage it sees, through the one loader
+      // (lib/cost-read.js `lineageRecords`). A lineage with records reads them; one without reads its snapshots.
+      const requestSource = requireRequestUsageLoader(requestUsageLoader, 'GET /api/proxy/cost');
+      const result = await readCost({
         fetchedRows,
         identityRows,
-        requestRows,
+        requestSource,
+        urlKey: req.proxyUrlKey,
         appSummary,
         issueIdentifier: identifier,
         windowStart: since

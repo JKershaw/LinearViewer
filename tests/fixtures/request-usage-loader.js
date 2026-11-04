@@ -8,8 +8,8 @@
  */
 import { requestUsageLoader } from '../../lib/request-usage-loader.js';
 
-/** A loader over a store that holds no request records. */
-export const NO_REQUEST_RECORDS = requestUsageLoader({ listForAnchors: async () => [] });
+/** The no-records source now lives in the loader (LIN-4226, plan decision (d)); re-exported so tests keep one import. */
+export { NO_REQUEST_RECORDS } from '../../lib/request-usage-loader.js';
 
 /**
  * A loader over a fixed set of records, read the way the real store answers: the records whose (current-anchor)
