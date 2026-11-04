@@ -321,6 +321,10 @@ test('NEW write site (deliverRulingDispatch, the defensive downgrade/dispatch pa
 
 // ── NEW: the card's answer is the Rulings tab's answer ──────────────────────
 
+// LIN-4241: the card's `answerAttemptId` is its own per-submission id, the one deliberate divergence from the Rulings
+// tab (unconverted, so it sends none). Parity is asserted on everything else: the same anchor, text and scan pair.
+const withoutAttemptId = ({ answerAttemptId, ...rest }) => rest;
+
 // Verbatim shape of the Rulings tab's task-bound comment write
 // (public/observation.js, the `task-bound` branch of the ruling-reply path):
 //   postComment(targetUrlKey, anchor.issueId || anchor.issueIdentifier, prompt,
@@ -344,7 +348,7 @@ test('NEW differential: a task-bound free-text answer sends the same comment req
   const [comment] = h.commentCalls();
   assert.ok(comment, 'the card writes its comment');
   assert.equal(comment.url, tab.url);
-  assert.deepEqual(comment.body, tab.body);
+  assert.deepEqual(withoutAttemptId(comment.body), tab.body);
 });
 
 test('NEW differential: a task-bound option press sends the same comment request as the Rulings tab', async () => {
@@ -357,7 +361,7 @@ test('NEW differential: a task-bound option press sends the same comment request
   const [comment] = h.commentCalls();
   assert.ok(comment, 'the card writes its comment');
   assert.equal(comment.url, tab.url);
-  assert.deepEqual(comment.body, tab.body);
+  assert.deepEqual(withoutAttemptId(comment.body), tab.body);
 });
 
 test('NEW differential: a stray record_on on a scan row never redirects the comment off the anchor (the Rulings tab never does)', async () => {
@@ -376,7 +380,7 @@ test('NEW differential: a stray record_on on a scan row never redirects the comm
   const [comment] = h.commentCalls();
   assert.ok(comment, 'the card writes its comment');
   assert.equal(comment.url, tab.url, 'the comment lands on the anchor, not on LIN-9');
-  assert.deepEqual(comment.body, tab.body);
+  assert.deepEqual(withoutAttemptId(comment.body), tab.body);
 });
 
 // ── NEW: dismissal of a scan row goes to the scan route ─────────────────────

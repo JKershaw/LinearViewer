@@ -596,6 +596,204 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — settled-ruling guard
     assert.strictEqual(stamps.length, 4, 'once every stamp has landed, a further identical retry does not stamp again');
   });
 
+  // LIN-4241 review finding 1: the dedupe key is text-only, so a second tab that answers the same ruling with the
+  // same choice text lands on the dedupe hit. The client's per-card `answerAttemptId` separates it from a retry.
+  test('LIN-4241 second tab (same text, copy failed on the first): a different submission is refused 409 before any stamp; the first submission\'s own retry still lands 200', async () => {
+    const { provider, calls: providerCalls } = makeFakeProvider();
+    const settled = new Set();
+    const stamps = [];
+    let copyFailuresLeft = 1;
+    const store = {
+      async isDecisionSettled(itemId) { return settled.has(itemId); },
+      async markDecisionAnswered(itemId) {
+        stamps.push(itemId);
+        if (itemId === 'copy-1' && copyFailuresLeft > 0) { copyFailuresLeft -= 1; return null; }
+        if (settled.has(itemId)) return { success: false, alreadySettled: true };
+        settled.add(itemId);
+        return { success: true, feedbackCount: 1 };
+      },
+    };
+    const app = buildApp({ provider, dispatchQueueStore: store });
+    const answer = (answerAttemptId) => ({ body: 'Option A (copy-failed witness)', decisionLoopId: 'loop-1', decisionLoopIds: ['copy-1'], decisionId: 'd-1', answerAttemptId });
+
+    const tab1 = await postComment(app, ISSUE_ID, answer('tab-1'));
+    assert.strictEqual(tab1.status, 201, 'tab 1 answers: primary stamped, copy failed');
+
+    const tab2 = await postComment(app, ISSUE_ID, answer('tab-2'));
+    assert.strictEqual(tab2.status, 409, 'tab 2 picks the same option: a second answer to a settled ruling');
+    assert.strictEqual(tab2.body.code, 'ruling-settled');
+    assert.deepStrictEqual(stamps, ['loop-1', 'copy-1'], 'the refused second answer adds no stamp, not even to the copy');
+    assert.strictEqual(providerCalls.createComment.length, 1, 'and writes no second comment');
+
+    const tab1Retry = await postComment(app, ISSUE_ID, answer('tab-1'));
+    assert.strictEqual(tab1Retry.status, 200, 'tab 1\'s own identical retry is a genuine retry, not a second answer');
+    assert.strictEqual(tab1Retry.body.deduped, true);
+    assert.deepStrictEqual(stamps, ['loop-1', 'copy-1', 'loop-1', 'copy-1'], 'the retry stamps the copy it is owed');
+    assert.ok(settled.has('copy-1'));
+    assert.strictEqual(providerCalls.createComment.length, 1);
+  });
+
+  test('LIN-4241 second tab after a full landing: a different submission to the settled ruling is 409; a resend of the same submission is 200 deduped with no stamp', async () => {
+    const { provider, calls: providerCalls } = makeFakeProvider();
+    const { store, calls: stampCalls } = makeSettlingStore();
+    const app = buildApp({ provider, dispatchQueueStore: store });
+    const answer = (answerAttemptId) => ({ body: 'Option A (full-landing witness)', decisionLoopId: 'loop-1', decisionId: 'd-1', answerAttemptId });
+
+    assert.strictEqual((await postComment(app, ISSUE_ID, answer('tab-1'))).status, 201);
+
+    const tab2 = await postComment(app, ISSUE_ID, answer('tab-2'));
+    assert.strictEqual(tab2.status, 409);
+    assert.strictEqual(tab2.body.code, 'ruling-settled');
+
+    const resend = await postComment(app, ISSUE_ID, answer('tab-1'));
+    assert.strictEqual(resend.status, 200, 'a resend of the landed submission (its 201 was lost) completes as a retry');
+    assert.strictEqual(resend.body.deduped, true);
+    assert.strictEqual(providerCalls.createComment.length, 1, 'one comment for the ruling');
+    assert.strictEqual(stampCalls.markDecisionAnswered.length, 1, 'one stamp for the ruling; the refused and the resent requests add none');
+  });
+
+  // Finding 2: the same-submission race. Two identical requests in flight (one card, a double press) both miss the
+  // dedupe cache and reach the stamp. Only one may win; the loser must not read the winner's marker as its own.
+  test('LIN-4241 race: two identical-text answers in flight → exactly one 201 and one 409, for two different submissions and for one resubmitted card', async () => {
+    for (const [a, b] of [['tab-1', 'tab-2'], ['tab-1', 'tab-1']]) {
+      let creates = 0;
+      const { provider, calls: providerCalls } = makeFakeProvider({
+        // The second comment write lands only after the first request has stamped, so the loser's stamp runs
+        // after the winner's marker is set. That is the window the isRetry gate has to hold shut.
+        createComment: async (issueId, body) => {
+          creates += 1;
+          if (creates === 2) await new Promise((resolve) => setTimeout(resolve, 25));
+          return { success: true, comment: { id: `race-${creates}`, body, createdAt: new Date().toISOString(), user: { name: 'Fake' } } };
+        },
+      });
+      const settled = new Set();
+      let checked = 0;
+      let release;
+      const bothChecked = new Promise((resolve) => { release = resolve; });
+      const store = {
+        async isDecisionSettled(itemId) {
+          const isSettled = settled.has(itemId);
+          checked++;
+          if (checked === 2) release();
+          if (!isSettled) await bothChecked;
+          return settled.has(itemId);
+        },
+        async markDecisionAnswered(itemId) {
+          if (settled.has(itemId)) return { success: false, alreadySettled: true };
+          settled.add(itemId);
+          return { success: true, feedbackCount: 1 };
+        },
+      };
+      const app = buildApp({ provider, dispatchQueueStore: store });
+      const answer = (answerAttemptId) => ({ body: `Option ${a}-${b} (race witness)`, decisionLoopId: 'loop-1', decisionId: 'd-1', answerAttemptId });
+
+      const results = await Promise.all([postComment(app, ISSUE_ID, answer(a)), postComment(app, ISSUE_ID, answer(b))]);
+
+      assert.deepStrictEqual(results.map(r => r.status).sort(), [201, 409], `attempts ${a}/${b}: one answer is accepted, the other refused`);
+      assert.strictEqual(settled.size, 1, `attempts ${a}/${b}: the ruling is stamped once`);
+      assert.strictEqual(providerCalls.createComment.length, 2, 'both comments were in flight before either finished (the documented race trade-off)');
+    }
+  });
+
+  test('LIN-4241 second tab on a scan (task-bound) row: a different submission with the same text is 409 with no second stamp; the first submission\'s resend is 200 deduped', async () => {
+    const { provider, calls: providerCalls } = makeFakeProvider();
+    const rows = new Map();
+    const { store: taskDecisionsStore, calls: taskCalls } = makeFakeTaskDecisionsStore({
+      // The real store's first-stamp-wins answer(): the first call stamps the row, later calls report it already answered.
+      async answer({ id }) {
+        const existing = rows.get(id);
+        if (existing) return { record: existing, firstStampWins: false, unretried: false };
+        const record = { id, outcome: 'answered' };
+        rows.set(id, record);
+        return { record, firstStampWins: true, unretried: false };
+      },
+    });
+    const app = buildApp({ provider, taskDecisionsStore });
+    const answer = (answerAttemptId) => ({
+      body: 'Scan reply (second-tab witness)', taskDecisionId: 'scan-1', taskDecisionIssueId: '66666666-6666-6666-6666-666666666666', answerAttemptId
+    });
+
+    assert.strictEqual((await postComment(app, ISSUE_ID, answer('tab-1'))).status, 201);
+
+    const tab2 = await postComment(app, ISSUE_ID, answer('tab-2'));
+    assert.strictEqual(tab2.status, 409, 'a second tab answering the scan row is refused, not deduped into a run');
+    assert.strictEqual(tab2.body.code, 'ruling-settled');
+    assert.strictEqual(taskCalls.answer.length, 1, 'the refused second answer does not stamp the row');
+    assert.strictEqual(providerCalls.createComment.length, 1);
+
+    const resend = await postComment(app, ISSUE_ID, answer('tab-1'));
+    assert.strictEqual(resend.status, 200);
+    assert.strictEqual(resend.body.deduped, true);
+    assert.strictEqual(taskCalls.answer.length, 1, 'the resend re-stamps nothing: the row is already answered by this submission');
+  });
+
+  // LIN-4241: the settle marker belongs to ONE ruling. Ruling 1 landed with its copy failed, and ruling 2 (a different
+  // loop) carries the same reply text and is already settled by another write. Ruling 2 must be refused, not read as
+  // ruling 1's own retry and answered 200.
+  test('LIN-4241 marker is per ruling: a same-text answer to a different, already-settled ruling is 409, not a retry of another ruling\'s landed stamp', async () => {
+    const { provider, calls: providerCalls } = makeFakeProvider();
+    const settled = new Set(['loop-2']);
+    let copyFailuresLeft = 1;
+    const store = {
+      async isDecisionSettled(itemId) { return settled.has(itemId); },
+      async markDecisionAnswered(itemId) {
+        if (itemId === 'copy-1' && copyFailuresLeft > 0) { copyFailuresLeft -= 1; return null; }
+        if (settled.has(itemId)) return { success: false, alreadySettled: true };
+        settled.add(itemId);
+        return { success: true, feedbackCount: 1 };
+      },
+    };
+    const app = buildApp({ provider, dispatchQueueStore: store });
+    const text = 'Option B (per-ruling marker witness)';
+
+    assert.strictEqual((await postComment(app, ISSUE_ID, { body: text, decisionLoopId: 'loop-1', decisionLoopIds: ['copy-1'], decisionId: 'd-1' })).status, 201);
+    const other = await postComment(app, ISSUE_ID, { body: text, decisionLoopId: 'loop-2', decisionId: 'd-2' });
+    assert.strictEqual(other.status, 409, 'loop-2 is settled elsewhere: the answer is refused');
+    assert.strictEqual(other.body.code, 'ruling-settled');
+    assert.strictEqual(providerCalls.createComment.length, 1, 'and writes no comment for it');
+  });
+
+  // LIN-4241: the scan row's own copy-failed retry. The primary loop and the scan row land on attempt 1, a copy fails,
+  // so the identical retry finds the row already answered by its own earlier attempt. That is this request's landed
+  // stamp, not "answered elsewhere": the retry is 200 deduped, and the copy is stamped.
+  test('LIN-4241 retry witness (scan row + copy failed): the identical retry is 200 deduped, not 409, and stamps the copy', async () => {
+    const { provider, calls: providerCalls } = makeFakeProvider();
+    const settled = new Set();
+    let copyFailuresLeft = 1;
+    const dispatchQueueStore = {
+      async isDecisionSettled(itemId) { return settled.has(itemId); },
+      async markDecisionAnswered(itemId) {
+        if (itemId === 'copy-1' && copyFailuresLeft > 0) { copyFailuresLeft -= 1; return null; }
+        if (settled.has(itemId)) return { success: false, alreadySettled: true };
+        settled.add(itemId);
+        return { success: true, feedbackCount: 1 };
+      },
+    };
+    const rows = new Map();
+    const { store: taskDecisionsStore, calls: taskCalls } = makeFakeTaskDecisionsStore({
+      async answer({ id }) {
+        const existing = rows.get(id);
+        if (existing) return { record: existing, firstStampWins: false, unretried: false };
+        const record = { id, outcome: 'answered' };
+        rows.set(id, record);
+        return { record, firstStampWins: true, unretried: false };
+      },
+    });
+    const app = buildApp({ provider, dispatchQueueStore, taskDecisionsStore });
+    const payload = {
+      body: 'Scan reply (copy-failed witness)', decisionLoopId: 'loop-1', decisionLoopIds: ['copy-1'], decisionId: 'd-1',
+      taskDecisionId: 'scan-2', taskDecisionIssueId: '66666666-6666-6666-6666-666666666666'
+    };
+
+    assert.strictEqual((await postComment(app, ISSUE_ID, payload)).status, 201, 'attempt 1: primary and scan row stamped, copy failed');
+    const retry = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(retry.status, 200, 'the retry is this submission\'s own landed stamp, not a second answer');
+    assert.strictEqual(retry.body.deduped, true);
+    assert.ok(settled.has('copy-1'), 'the retry stamps the copy');
+    assert.strictEqual(providerCalls.createComment.length, 1, 'no second comment');
+    assert.strictEqual(taskCalls.answer.length, 2, 'the scan row is re-attempted on the retry, as the copy-failed loop primary is');
+  });
+
   test('a scan (task-bound) row already answered or dismissed is refused 409 ruling-settled before the comment', async () => {
     for (const outcome of ['answered', 'dismissed']) {
       const { provider, calls: providerCalls } = makeFakeProvider();

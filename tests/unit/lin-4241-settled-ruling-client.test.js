@@ -74,6 +74,7 @@ async function flush() { for (let i = 0; i < 16; i++) await new Promise((r) => s
  */
 function makeSandbox(cards, responses) {
   const requests = [];
+  const sent = []; // { url, body } per fetch, for the tests that read what was posted
   const sandbox = {
     module: { exports: {} },
     window: {
@@ -92,8 +93,9 @@ function makeSandbox(cards, responses) {
     setTimeout() {},
     console,
   };
-  sandbox.fetch = (url) => {
+  sandbox.fetch = (url, init) => {
     requests.push(String(url));
+    sent.push({ url: String(url), body: init && init.body });
     const hit = Object.keys(responses).find((frag) => String(url).includes(frag));
     const { status, data } = hit ? responses[hit] : { status: 200, data: { success: true, comment: { id: 'c-1' } } };
     return Promise.resolve({ ok: status >= 200 && status < 300, status, json: () => Promise.resolve(data) });
@@ -103,7 +105,7 @@ function makeSandbox(cards, responses) {
   sandbox.window.api = async () => ({});
   sandbox.window.dispatchPrompt = async () => ({ id: 'run-1' });
   vm.runInContext(QUESTION_CARDS_JS_SRC, sandbox, { filename: 'question-cards.js' });
-  return { sandbox, requests };
+  return { sandbox, requests, sent };
 }
 
 const SETTLED = { status: 409, data: { error: 'This ruling was already answered or dismissed.', code: 'ruling-settled' } };
@@ -171,4 +173,40 @@ test('control: a generic server failure on dismiss is still "dismiss failed" —
   assert.equal(f.events.length, 0, 'a failed dismiss announces nothing');
   assert.equal(f.card.parentNode !== null, true, 'the card stays on the page');
   assert.match(f.feedback.textContent, /dismiss failed/);
+});
+
+// LIN-4241 review finding 1 (client half): the card sends one submission id. A resend from the same card (its first
+// comment write failed) reuses it, so the server reads the resend as a retry. Another card for the same ruling, the
+// second tab, gets its own id, so the server can refuse it as a second answer.
+test('answer carries one submission id per card: a resend from the same card reuses it; a second card for the same ruling gets its own', async () => {
+  const f1 = loopCard();
+  const f2 = loopCard();
+  const { sandbox, sent } = makeSandbox([f1.card, f2.card], {});
+  const realFetch = sandbox.fetch;
+  let commentCalls = 0;
+  sandbox.fetch = (url, init) => {
+    if (String(url).includes('/api/comments/') && commentCalls++ === 0) {
+      realFetch(url, init); // recorded, then the first comment write fails
+      return Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({ error: 'boom' }) });
+    }
+    return realFetch(url, init);
+  };
+  sandbox.module.exports.initQuestionCards();
+
+  f1.textarea.value = 'Yes, go ahead';
+  f1.btn.click();
+  await flush();
+  f1.textarea.value = 'Yes, go ahead';
+  f1.btn.click(); // resend from the same card
+  await flush();
+  f2.textarea.value = 'Yes, go ahead';
+  f2.btn.click(); // the other card, for the same ruling
+  await flush();
+
+  const ids = sent.filter((s) => s.url.includes('/api/comments/')).map((s) => JSON.parse(s.body).answerAttemptId);
+  assert.equal(ids.length, 3, 'three comment writes: the failed press, the resend, the other card');
+  assert.equal(typeof ids[0], 'string');
+  assert.ok(ids[0].length > 0, 'the id is present on the wire');
+  assert.equal(ids[1], ids[0], 'a resend from the same card carries the same submission id');
+  assert.notEqual(ids[2], ids[0], 'the other card carries its own submission id');
 });

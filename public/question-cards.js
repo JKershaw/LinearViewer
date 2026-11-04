@@ -242,6 +242,12 @@
   // failure: the card leaves and the page says the ruling was answered elsewhere. Keyed on the code, never the wording.
   var RULING_SETTLED_CODE = 'ruling-settled';
   var ANSWERED_ELSEWHERE_COPY = 'Answered elsewhere';
+  // LIN-4241: a fresh id for one card's answer (the server's `answerAttemptId`). randomUUID where the browser has it;
+  // the fallback only needs to be unique per card within one page.
+  function newAnswerAttemptId() {
+    if (typeof crypto !== 'undefined' && crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    return 'a-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+  }
   function removeAnsweredElsewhere(card) {
     if (!card) return;
     announceRulingGone(card, ANSWERED_ELSEWHERE_COPY);
@@ -352,8 +358,12 @@
         // (lib/render-session.js) exactly as the Rulings tab's row carries it.
         var effect = card.dataset.effect || 'resume';
 
+        // LIN-4241: one submission id per card. Every retry of this card's answer reuses it, so the server
+        // reads a resend as the same answer; another tab's answer to the same ruling carries its own id and is refused.
+        var answerAttemptId = newAnswerAttemptId();
         var opts = {
           urlKey: card.dataset.urlKey,
+          answerAttemptId: answerAttemptId,
           followUpTo: card.dataset.loopId,
           target: card.dataset.target === 'web' ? 'web' : 'cli',
           // Force for a resumable decision (blocked-live or freshly terminal) or
