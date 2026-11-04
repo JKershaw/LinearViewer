@@ -23,6 +23,9 @@ import { buildApp, call, ACME as FAKE_ACME } from './lib/proxy-fake-deps.js';
 import express from 'express';
 import { createDashboardRoutes } from '../../routes/dashboard.js';
 import { registerProvider } from '../../lib/providers/registry.js';
+import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
+import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
+import { InMemoryRunParagraphStore } from '../../lib/run-paragraph-store.js';
 
 const ACME = 'acme-lin-4226';
 const DAY = 24 * 3600 * 1000;
@@ -130,6 +133,23 @@ describe('W2: the guards: a missing source, the old shape, and a missing urlKey 
     );
   });
 
+  // Close-out fix 2 (plan witness 2). Red when the `if (!urlKey) throw` in lib/run-view.js is deleted (mutation M14):
+  // without it a missing urlKey would silently give the run page no records.
+  test('buildRunView without a urlKey throws a TypeError that names it', async () => {
+    await assert.rejects(
+      buildRunView({ loops: [] }, { requestSource: loaderOver([]) }),
+      { name: 'TypeError', message: /buildRunView: urlKey is required/ }
+    );
+  });
+
+  // Close-out fix 5b. Red when the both-given guard in lib/cost-read.js is removed (mutation M15).
+  test('readCost given both urlKey and instanceWide: true throws: a read is one or the other', async () => {
+    await assert.rejects(
+      readCost({ fetchedRows: [snapshotRow()], identityRows: [], requestSource: loaderOver(RECORDS), urlKey: ACME, instanceWide: true }),
+      { name: 'TypeError', message: /not both/ }
+    );
+  });
+
   // Fails at HEAD: renderSessionPage builds the view itself and throws "buildRunView: requestRows is required".
   test('renderSessionPage requires runView for a live session; it does not build the view itself', () => {
     const session = { sessionId: 's1', seedIssue: 'LIN-1', loops: [] };
@@ -230,6 +250,60 @@ describe('W6: a caller makes exactly one request-records load (witness 4, per ca
     assert.equal(res.status, 200);
     close(res.body.totalUsd, 0.3);
     assert.equal(loader.calls.length, 1, `one load: ${JSON.stringify(loader.calls)}`);
+  });
+
+  // LIN-4226 close-out fix 1 (plan witness 4, the run page). Must go red when routes/dashboard.js passes
+  // `requestSource: NO_REQUEST_RECORDS` instead of the loader (mutation M13d): the page would then show the $4.90 snapshot.
+  test('the run page makes exactly one records load and shows the records figure', async () => {
+    const nowIso = new Date().toISOString();
+    const history = [
+      { id: 'sess-run', kind: 'autopilot', issueIdentifier: 'LIN-4226', issueTitle: 'Title', promptName: 'autopilot', prompt: 'p', dispatchedAt: nowIso, resolvedAt: nowIso, status: 'taken' },
+      {
+        id: 'w-run', sessionId: 'sess-run', issueIdentifier: 'LIN-4227', issueTitle: 'Title', promptName: 'implementation', prompt: 'p',
+        dispatchedAt: nowIso, resolvedAt: nowIso, status: 'taken',
+        feedback: [
+          { kind: 'usage', timestamp: nowIso, message: `[usage] ${JSON.stringify({ harness: 'claude-code', model: 'claude-opus-5-5', inputTokens: 10, costUsd: 4.9 })}` },
+          { message: '[done] landed', timestamp: nowIso },
+        ],
+      },
+    ];
+    const records = [
+      { rootItemId: 'w-run', itemId: 'w-run', requestId: 'm1', at: nowIso, harness: 'claude-code', model: 'claude-opus-5-5', effort: 'high', inputTokens: 10, costUsd: 0.1 },
+      { rootItemId: 'w-run', itemId: 'w-run', requestId: 'm2', at: nowIso, harness: 'claude-code', model: 'claude-opus-5-5', effort: 'high', inputTokens: 10, costUsd: 0.2 },
+    ];
+    const loader = loaderOver(records);
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: history }; } },
+      agentStatusStore: { async listStatus() { return { items: [
+        { id: 'as-sess-run', dispatchId: 'sess-run', taskIdentifier: 'LIN-4226', action: 'autopilot', status: 'completed', summary: 'done', timestamp: nowIso },
+        { id: 'as-w-run', dispatchId: 'w-run', taskIdentifier: 'LIN-4227', action: 'implementation', status: 'completed', summary: 'done', timestamp: nowIso },
+      ] }; } },
+      observationSessionsStore: null,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      runParagraphStore: new InMemoryRunParagraphStore(),
+      requestUsageLoader: loader,
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+    });
+    const layer = router.stack.find(l => l.route?.path === '/workspace/:urlKey/observation/session/:sessionId' && l.route.methods.get);
+    assert.ok(layer, 'the run page route is registered');
+    const handler = layer.route.stack[layer.route.stack.length - 1].handle;
+    const req = { session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }], features: {} }, workspace: { urlKey: 'ws-a' }, params: { urlKey: 'ws-a', sessionId: 'sess-run' }, query: {}, body: {}, protocol: 'http', get: () => 'localhost' };
+    const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(b) { this.jsonBody = b; return this; }, redirect() { return this; }, send(b) { this.sentBody = b; return this; }, end(b) { this.endedWith = b; return this; }, set() { return this; }, setHeader() {}, type() { return this; } };
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(loader.calls.length, 1, `one load: ${JSON.stringify(loader.calls)}`);
+    assert.equal(loader.calls[0].urlKey, 'ws-a');
+    assert.deepEqual([...loader.calls[0].anchors].sort(), ['sess-run', 'w-run'], 'the load asks for every lineage on the page (the anchor loop and its worker)');
+    const html = res.sentBody;
+    assert.match(html, /data-testid="session-step-summary">[^<]*· \$0\.30</, 'the worker step shows the records figure');
+    assert.ok(!html.includes('$4.90'), 'the $4.90 snapshot figure is not shown');
   });
 });
 
@@ -362,10 +436,13 @@ describe('census (LIN-4226): one load per read entry, and no preloaded records',
     assert.deepEqual(hitsOf(files, /\brequestRows\b/), []);
   });
 
-  // Passes at HEAD, and says nothing yet: the pure cores do not exist until the change adds them. Kept so the rule is
-  // live once they do: no production module may import a *OverRecords core.
+  // No production module may import a *OverRecords core (the pure cores exist: lib/cost-read.js and lib/run-view.js
+  // export them for tests and for their own entries). Matches the import statement over the file's whole text.
   test('no production module imports a pure *OverRecords core', () => {
-    const files = scannedFiles();
-    assert.deepEqual(hitsOf(files, /import\s*\{[^}]*\b\w+OverRecords\b[^}]*\}/), []);
+    // Close-out fix 5a: read each file's WHOLE text, so an import written across several lines is caught too (M12b).
+    const importsOverRecords = scannedFiles()
+      .filter(({ text }) => /import\s*\{[^}]*\b\w+OverRecords\b[^}]*\}\s*from/.test(text))
+      .map(({ path: file }) => file);
+    assert.deepEqual(importsOverRecords, []);
   });
 });

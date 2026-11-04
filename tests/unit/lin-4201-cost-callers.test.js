@@ -20,7 +20,7 @@ import { agentSpendByJob, typicalByModel } from '../../lib/model-routing-spend.j
 import { computeEffortReadout } from '../../lib/effort-readout.js';
 import { computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-cost.js';
 import { terminalMarkedTaskCostOf } from '../fixtures/cost-read-cores.js';
-import { runLineageAnchors } from '../../lib/run-view.js';
+import { buildRunView } from '../../lib/run-view.js';
 import { collectKpiStats } from '../../lib/kpi-stats.js';
 import { collectWorkspaceKpis } from '../../lib/workspace-kpi-stats.js';
 import { createRunParagraphPrecompute } from '../../lib/run-paragraph-hook.js';
@@ -148,15 +148,14 @@ describe('the run paragraph precompute (S13\'s third entry path)', () => {
   test('builds the run view from the session lineages\' records', async () => {
     // LIN-4226: the hook hands the view the source and the urlKey; the view loads the lineages' records through it.
     const loader = loaderOver(RECORDS);
-    let seen;
     let handed;
     const precompute = createRunParagraphPrecompute({
       runParagraphStore: { get: async () => null, put: async () => {} },
       requestUsageLoader: loader,
+      // The REAL view: it does the load, so `loader.calls` below checks the hook's contract, not a fake's own load.
       buildView: async (s, opts) => {
         handed = { source: opts.requestSource, urlKey: opts.urlKey };
-        seen = await opts.requestSource.forAnchors(opts.urlKey, runLineageAnchors(s));
-        return { steps: [] };
+        return buildRunView(s, opts);
       },
       generateParagraph: async () => ({ paragraph: 'p', model: 'm' }),
       logger: { error: () => {} },
@@ -165,7 +164,6 @@ describe('the run paragraph precompute (S13\'s third entry path)', () => {
     assert.equal(handed.source, loader);
     assert.equal(handed.urlKey, ACME);
     assert.deepEqual(loader.calls, [{ urlKey: ACME, anchors: ['root-1', 'other'] }]);
-    assert.deepEqual(seen, RECORDS);
   });
 
   test('without the loader it logs and writes nothing (no paragraph from a snapshot-only view)', async () => {
