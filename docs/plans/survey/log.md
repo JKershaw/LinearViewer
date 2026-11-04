@@ -880,3 +880,58 @@ Seven pieces in a strict chain is a long night's work. Piece 2 needs piece 1 *de
 - **Code Quality (big functions):** the same or bigger. None of our tickets touched the big units it promoted (`runStallFailsafe`, `createDispatchItem`, the POST dispatch handler).
 - **The Periodicals' follow-ups** will name things no Survey named, because no Survey was asked about those areas.
 - **The step-back answers** will describe the area well (where the change sits in a knot or a scattered decision) and lay out a real range. For most tickets the chosen option will still be the narrow one, plus a preparation, and the session will say the broad option isn't pulled by this task. Two or three will choose a medium option (consolidate the thing this task touches) that their first forecast didn't name. If so, the nudge reaches altitude without becoming a mandate, and the range of options is where it pays.
+
+### 07:40–08:00 UTC: sent, and the first reading (scripted, LinearViewer)
+
+**Sent.**
+- **13 step-back follow-ups**, one to each open-0 Survey session, quiet (`subscription:'none'`), each standing at its own base. The ids are in the scratchpad (`alt/stepback.tsv`), and the template is below.
+- **The four Periodicals:** autopilot `8b6aeda3` (maxTasks 4), whose goal is limited to Seams & Tangles, Drift & Coherence, Code Quality and Stability, with follow-ups allowed.
+
+**The step-back question** (sent verbatim, with `{TICKET}` and `{BASE}` filled in):
+
+> Your forecast looked at this task up close. Now step back, and look at the part of the codebase it sits in and the codebase around that.
+> 1. What is that wider area like, and how much of this task's difficulty comes from the area rather than from the task itself?
+> 2. Set out the ways you could go about this task, from the narrowest (just do the task) to the broadest (change the area so that tasks like this one become easy). For each, say roughly what it would cost, what it would leave behind for the next task here, and what could go wrong.
+> 3. Which would you choose for this task? Is that different from what you said first, and why?
+
+**Scripted before-and-after: LinearViewer `015aa4c6` → `5334c81a7`.**
+- The window is **15 commits**. Eleven are ours (Costs rebuild 1 and its pieces LIN-4177/78/79, rebuild 2's pieces 0, 1 and 5, LIN-4173, LIN-4168, LIN-4166) or the Periodicals' reports. Four are the UI operator's (LIN-4106, LIN-4107, LIN-4110, LIN-4040). So this side of the window is nearly all our own work.
+- The tool is `scripts/code-shape/seams.mjs` from `main`, with `main`'s guide at both commits.
+
+| | Base | Main |
+|---|--:|--:|
+| Files in scope | 528 | 536 |
+| Cross-area imports | 1227 | **1262** (+35) |
+| Two-way pairs / knot group | 12 / one of 9 | 12 / one of 9 |
+| "Other features" (the catch-all) | 12 files | **17 files** |
+
+**Prediction 1 was wrong.** I said the area map would stay about flat and that any movement would be someone else's. It moved, and the movement is ours. All 8 new production files came from our tickets:
+- `cost-read`, `cost-format`, `request-usage-intake`/`-store` and `founder-lookup` (Costs);
+- `key-state`, `key-state-holders` and `workspace-issues-memo` (LIN-4168).
+
+No pattern in the guide names any of them, so all of them fell into the catch-all. The grown knots are their imports:
+- **Pages ↔ Other: 2/6 → 8/6.** Six render files now import the one formatter.
+- **Other ↔ Runs: 6/12 → 9/15.** `cost-read` reads `dispatch-terminal` and `session-telemetry`, and `run-view`, `weekly-budget` and `terminal-marked-task-cost` read `cost-read` back.
+- **LLM ↔ Other: 1/1 → 4/2.**
+
+**The guide experiment.** I gave the costs code a named area: `^lib/(cost-*|request-usage-*|task-cost)\.js$`.
+- The old owner, `task-cost.js`, had 3 importers from 3 areas.
+- The new owners have **19 importers** from 5 areas (`cost-read` 9, `cost-format` 7, `request-usage-intake` 3).
+- The new owner also reads from Runs, LLM and Platform, and Runs and LLM read it back. So **Costs ↔ Runs went 2/1 → 2/5**, and a new **Costs ↔ LLM 2/2** knot appeared.
+
+The consolidation did what it said: one read instead of six engines, and the old `task-cost.js` deleted. Seen from the map, it made a new hub, filed under no named area, with two-way knots to the two areas it sits between.
+
+**Lines.** These are production lines (`lib`, `routes`, `public`, `server.js`) per commit; *net* is added minus deleted.
+
+| Ticket | What it says it does | Prod + / − | Net |
+|---|---|--:|--:|
+| LIN-4177/78/79 | one cost read, six engines deleted | +1023 / −646 | **+377** |
+| LIN-4168 | one reset for a key's test state | +520 / −48 | **+472** |
+| LIN-4198, LIN-4202 | new capability (per-request records) | +724 / −24 | +700 |
+| UI operator's four | | +411 / −314 | +97 |
+
+- Every consolidation in the window added more production code than it removed.
+- The preparations left large fixtures: LIN-4197's corpus is +54k test lines, and LIN-4177's is +44k.
+- Lines aren't cleanliness. Drift's places-per-decision is the measure for that, and it's still to come. But "delete the copies in the same change" happened, and the one owner came out bigger than the copies it replaced.
+
+**What this says about the drill question (first reading).** Our consolidations were locally right: one owner, copies deleted, every builder pleased. Globally, the place got a new hub with no named home and two new two-way couplings. Neither the Surveys nor the builders mentioned the map, because nobody asked them about it. That's John's worry exactly: the tidy pulled by the task cleaned the task's own area and tangled the wider one. The step-back answers will show whether a nudge would have seen it.
