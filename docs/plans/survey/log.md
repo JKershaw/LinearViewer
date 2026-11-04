@@ -1213,3 +1213,18 @@ Both also predicted a second copy, "`joinCostLineages` reborn twice" (S11 and S1
 John: "there's a point… where the ratio tips: when a task truly does (on average) leave the codebase in a better place once finished, even a little, we're in a really strong place. Even if we rely on things like periodicals when we want to improve not tied to a ticket."
 
 That makes the goal a per-task balance we can measure. I started `docs/plans/survey/place-ledger.md`: one row per merged ticket, with map change, copies, what it carried, and a balance with its reason. **Baseline (the window before the place view), by row: 1 better, 3 neutral, 4 worse, 1 mixed.** Every forward ticket through the loop gets a row at merge. The tipping point is when the running average turns positive.
+
+## 4 Nov, about 11:05 UTC: more work for the task, less for the future (the pricing question)
+
+John: "we're fighting a natural urge to just land the work. The best path may be a big chunk of refactoring then the small change. More work for the task, less work in future for the global."
+
+**The reading.** The step-backs resolved this the same way 12 of 13 times: a middle option, with the broad one deferred as "the right direction, but not this task's". That's the land-the-work urge again, this time as scope caution. It's a pricing question, not a scope question. Refactor first when it costs less than what its absence keeps costing. Both prices are now within reach:
+- the tally gives how many tasks paid for the absence;
+- the builders' "if this area were how you'd want it" says how much smaller each task would have been;
+- the meter, once it reads records, gives tokens.
+
+Following Beck, and our own lesson that proving costs more than changing, the refactor should be **its own piece, sequenced first**, with its own witness, not folded into the task.
+
+**First test: LIN-4203 and the seven Stop sites.** LIN-4203 removes the snapshot post from all seven Stop sites in `hook.js`. Its Survey deferred "one Stop sequence". The tally has three tasks paying for that absence (LIN-4165, LIN-4183, LIN-4203). I sent LIN-4203's Survey session a read-only pricing follow-up (`20e955b2`) with the other tasks' evidence. It asks what the absence has cost, what one sequence would cost done first as its own piece (and what that piece would prove), and whether it would do it first, fold it in, or leave it.
+
+**What would count:** a reasoned price on both sides, and a choice that follows from them. If it says "do it first", that's a proposal for John (a new piece 0 before LIN-4203), not something I file on my own.
