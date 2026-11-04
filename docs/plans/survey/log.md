@@ -857,3 +857,26 @@ Seven pieces in a strict chain is a long night's work. Piece 2 needs piece 1 *de
 - **LIN-4196: hold the PR until the `harbour-halt` test is green, then get the score.** That test is LIN-4186 (High), with LIN-4185 (`halt-mechanism`, High, possibly the same cause), both filed by LIN-4181's close-out. Fixing them is what unblocks an honest mutation score.
 - **Rebuild 2's gate (LIN-4195/LIN-4200): "Accept a shorter window size, and you can use the railway cli to access mongo."** The builders didn't know the Railway CLI reaches the production database. That's the same gap as LIN-4167 (builders don't know the CLI is there). The gate can now run, on a shorter window.
 - LIN-4182's mutation question: handled.
+
+## 4 Nov, about 07:45 UTC: is the Survey a drill by other means?
+
+**John's question.** We've measured whether the Survey makes a task land well. We haven't measured whether the work is cleaning the codebase, or only preparing the drill's target area. Agents lean towards the drill, so the Survey may be the drill by other means. If it is, a small nudge might be enough to make it look at the bigger picture, and the "range of options" idea (not yet explored) comes into play once it sees both the local and the global. John approved letting the Periodicals file follow-ups: that's the top-down "push" beside the Survey's bottom-up "pull", and the gap between them is what the Survey should close in its own way.
+
+**The evidence so far leans his way.**
+- Every acted-on "do first" was a preparation for *this* change (a baseline, an inventory, a corpus, a witness order). Apart from the odd test, a preparation leaves the material as it found it.
+- The cleaning that happened came from tickets that were themselves cleanups, from the builders' after-answers: six cost engines deleted, 16 flag sites down to one, one Stop-hook driver, one test reset. No Survey on a feature ticket has yet caused a tidy.
+- The precedent (`experiments/periodicals-before-after/`): the first half of October's rebuild round (rebuilds 1A–4) rebuilt five files and left every area-level number unchanged.
+
+**Baseline.** The Periodicals already measured the codebase just before round 2: Seams & Tangles (LIN-4152) and Drift & Coherence (LIN-4153), both at LinearViewer `015aa4c6` and simple-dispatcher `cf6369d` (3 Nov, morning). Round 2 was filed that afternoon. So a fresh run of the same Periodicals is a before-and-after of everything since, ours and other people's.
+
+**Three things, run in parallel.**
+1. **Periodicals, top down.** Seams & Tangles, Drift & Coherence, Code Quality and Stability, each run as its template says, filing follow-ups.
+2. **Scripted before-and-after.** `seams.mjs` at `015aa4c6` and at today's `main` under one guide. Every moved link is traced to its file pairs, then to a ticket: ours or someone else's.
+3. **The step-back spike.** A follow-up to each of the 13 open-0 Survey sessions, still read-only and still standing at its own base. It asks the session to look at the wider area and then lay out options from narrowest to broadest, each with its cost and what it leaves for the next task. Same session, same base, with the nudge as the only change. The question is whether the nudge changes the choice, not just the description.
+
+**Prediction, written before any of it runs.**
+- **Seams (area map):** about flat. Our tickets were mostly in simple-dispatcher, and the LinearViewer ones (costs) were within-area. Any movement on the map will be someone else's.
+- **Drift (decisions in several places):** down a little where our tickets consolidated: the cost figure, simple-dispatcher's env flags, its Stop-hook driving and its test resets. Nothing else moves because of us.
+- **Code Quality (big functions):** the same or bigger. None of our tickets touched the big units it promoted (`runStallFailsafe`, `createDispatchItem`, the POST dispatch handler).
+- **The Periodicals' follow-ups** will name things no Survey named, because no Survey was asked about those areas.
+- **The step-back answers** will describe the area well (where the change sits in a knot or a scattered decision) and lay out a real range. For most tickets the chosen option will still be the narrow one, plus a preparation, and the session will say the broad option isn't pulled by this task. Two or three will choose a medium option (consolidate the thing this task touches) that their first forecast didn't name. If so, the nudge reaches altitude without becoming a mandate, and the range of options is where it pays.
