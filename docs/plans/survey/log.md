@@ -1106,3 +1106,11 @@ Both step-back sessions got the global agent's answer pasted in, with "evidence 
   - net production lines **down**: the first piece in the window that should shrink the place.
 
 **Running cost of the loop for one ticket:** three Survey agents before the build (open-0, global, step-back). I haven't measured their cost against a build beat yet. The meter will give the real figure once records-first reading lands, which is this very ticket.
+
+### 08:10 UTC: how we handle rulings from now on
+
+John: "add recommendations to rulings, then I can approve." Harbour has a route for this: `POST /api/proxy/rulings/{decisionId}/suggest-answer` (`optionId`, a reason of at most 500 characters, `decisionLoopId`). It records a proposal only. John discharges it by pressing "answer as proposed".
+
+From now on, each check reads `GET /rulings` and posts a proposed answer, with its reason, on every open ruling where I have a recommendation. Free-text rulings, which have no options, get the recommendation in the update to John instead.
+
+When he asked, nothing was open: he had already answered the rulings above, including the gate's to-the-cent rule (08:05) and the Mongo credential rotation raised on LIN-4195 (07:42).
