@@ -1243,3 +1243,23 @@ John: "It's *my* call. Eventually a task is chosen, surveyed, and the user decid
 **Mechanism to try:** the Survey session ends with a `DECISION:` block, which Harbour turns into a ruling, and I post a suggested answer on it. If that doesn't work for a custom dispatch, the options go to John in my update instead.
 
 **Focus:** show the process works. How it lands in Harbour as a real stage comes after that.
+
+## 4 Nov, about 11:20 UTC: Claude plays the human, and chooses large
+
+John: "I'm happy, for the sake of this process, for you to play the role of the human. If you can choose a large enough option, we may get the improvements we're looking for (even if it takes a big piece of work to land it)."
+
+**The pricing answer (LIN-4203, `20e955b2`).** It set a real price on the missing Stop sequence:
+- one shipped miss (LIN-1293 wired 3 of 6 outcomes; LIN-1312 fixed it);
+- a copy tax: LIN-1700, LIN-4165 (8 sites), LIN-2423 and LIN-1425 each touched every case;
+- avoidance: LIN-4199 put its flush before the switch "because the switch was too costly to enter".
+
+It came to "about half a session of hand-checking per relay ticket, about five times in four months". Done first, the refactor would buy LIN-4203 almost nothing, since the seven snapshot lines are identical. Folded in, it mixes a refactor with a behaviour change, so a moved post couldn't be traced. Its choice was **leave it: not first, not folded in; do it as its own ticket, golden first.** It also said what would change its mind.
+
+**My calls as the human, choosing the larger option where the price supports it:**
+- **LIN-4201: larger than the step-back's B.** Loading becomes part of the read: callers pass a cost source once, pulled in because the task pays for the seven caller edits anyway. The routed copies are removed, not named: the founder-lookup twin, the restated partition, and one `lane`/token vocabulary. The cost code gets a real area. Proving still comes first, and the work may split into pieces if proving needs it. The snapshot fold stays, since pre-deploy lineages still need it.
+- **LIN-4203:** the recommended shape plus the intake counter. **The flag must mean one thing:** gate every flush, or be retired.
+- **The one Stop sequence: filed as LIN-4218** (Backlog), sequenced after LIN-4203, with a characterization golden first that must be shown to fail when one post moves. It's the first tally row to be priced and filed. It goes through the full loop when LIN-4203 lands.
+
+**LIN-4212 merged (`eb44eff9`) without a Survey.** Place change: none (1262 → 1262, no new files, no pair moved); production +167 / −26. Ledger: 0.
+
+**A pattern worth keeping:** the pricing follow-up is the step that turns "not this task's" into a decision. It can come out as "do it first", "fold it in", or "its own ticket, now queued". Each is better than "someday".

@@ -28,5 +28,7 @@ John's tipping point (4 Nov): when a task, on average, leaves the codebase even 
 
 | Ticket | Map | Copies | Carried | Balance |
 |---|---|---|---|---|
-| LIN-4201 (records-first read) | *pending merge* | | 4 routed Periodicals findings; tally row "a home for the cost code" | |
-| LIN-4203 (stop snapshots) | *pending merge* | | routed "relay flag partial" | |
+| LIN-4212 (records read by posting row; **no Survey**: filed and started mid-lineage) | no change (1262 → 1262; no new files, no pair moved) | prod +167 / −26; Drift not yet re-read | nothing routed | **0** |
+| LIN-4201 (records-first read) | *pending merge* | | **scope decided large:** loading part of the read; remove the founder-lookup twin and the restated partition; one vocabulary; a home on the map | |
+| LIN-4203 (stop snapshots) | *pending merge* | | scope: recommended shape + the flag means one thing; the Stop sequence filed as LIN-4218, after it | |
+| LIN-4218 (one Stop sequence) | *not started; after LIN-4203* | | the tally's "one Stop tail" row (three namings), priced | |
