@@ -1380,3 +1380,17 @@ So I sent LIN-4201's close-out session (`795899f6`, follow-up `41c42f3b`) the LI
 
   Ledger: **+ (mixed).** It's the first costs ticket on the positive side. The baseline window's equivalents (LIN-4177, LIN-4178) were − and −/+. The builder has been asked q1–q6 plus **q7: did the larger scope pay for itself**, and which parts landed as asked (`77d4be68`).
 - **LIN-4219 Done** (`7d515d3`). LIN-4187 is surveyed at `7d515d3` (open-0 and global, then a step-back). **Protocol change:** this Survey may run `npm run test:baseline` or the one named system test, because the harness makes running cheap and safe. Before, forecasts ran nothing. We'll see whether running changes what the forecast can see.
+
+### 17:30 UTC: LIN-4187 on the new harness, surveyed by running, ruled and kicked off
+
+- **Both Surveys found the cause by running the one test alone on the new harness** (the protocol change): Harbour LIN-3983 (`d3f67854`) deliberately moved the Sessions view to the 24-hour recency rule, so the test guards a retired contract. **"Cause unknown" became "cause known" before work began.** The harness paid for itself on its first task. For comparison, LIN-4186 (before the harness) spent most of its time finding its cause.
+- **Global added two things:** LIN-4188 is probably the same cause, and no scenario records which Harbour contract it pins.
+- **I skipped the step-back.** The two voices agreed, the range was clear, and tokens are short today. Noted as a deviation.
+- **My calls as the human.** Ruled drift (LIN-3983 was deliberate). Scope large, on price: three of LIN-4181's four "cause unknown" reds turned out to be contract drift. So:
+  - re-state the assertion as the new contract;
+  - one session-finding helper for both scenarios;
+  - LIN-4188 in scope if the same change greens it;
+  - move all the leftovers together;
+  - **a contract note on every system scenario, with a census.**
+
+  Written onto LIN-4187, moved to Todo, autopilot `db707eb2`.
