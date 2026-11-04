@@ -1394,3 +1394,12 @@ So I sent LIN-4201's close-out session (`795899f6`, follow-up `41c42f3b`) the LI
   - **a contract note on every system scenario, with a census.**
 
   Written onto LIN-4187, moved to Todo, autopilot `db707eb2`.
+
+### 17:40 UTC: LIN-4164's re-clone path, witnessed live
+
+I sent a quiet follow-up (`8e46e5fc`) to LIN-4167's round-2 v2 Survey session (`3039732b`). It finished at 17:18 on 3 Nov and hadn't been touched since, so it was past the 24 h clone window but inside the 7-day record window.
+- **It resumed.** "Resuming session 8b624508… Session resumed", with 1,457 minutes idle.
+- **The folder was re-created at the same path**, one second after dispatch: `…/simple-dispatcher-workspaces/8b624508-…`, with its `LinearViewer/` clone created at 17:36:06. "Yesterday's checkout" was gone.
+- **The fresh clone is at today's `main`** (`d7ceb373`), not the session's original commit. That's as designed, and it's Drift's 11-04 inference (`reap-window-constant-cross-repo`) confirmed: after 24 h, "Reply & continue" carries on in a fresh clone. Uncommitted work from before would be lost.
+
+This is the runtime witness LIN-4164 deferred. **Asking a builder days later works.**
