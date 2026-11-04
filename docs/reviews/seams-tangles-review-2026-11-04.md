@@ -65,6 +65,14 @@ Stable names are those of run 4 §11. Severity and trend are against run 4.
 
 The findings are ranked by what changes the dependency graph, not by where the file sits. N6 (`cost-read.js`) is the window's largest item: it is the one new node that reaches into two areas and is reached from five, and no area owns it. N1 (the catch-all) is the map frame that holds it and the twelve older tangles; it is High as a map. F1 is the largest change to an existing knot. The order below is N6, N1, F1, then the rest.
 
+### N6 — `hub:cost-read.js` · **Medium–High, watch, ranked first** · **new**
+
+- *Why it ranks first.* It is the only new file in the window that imports from two areas and is imported from five, so it creates bidirectional reach (Runs ↔ Other, LLM ↔ Other) that the committed map cannot attribute to any area. Its placement is contestable: under the committed guide it is Other (so Other → LLM 1 → 2 is `cost-read → llm-call-log`), and under P1b it is Runs (Runs → LLM +1 by the same edge). Either filing is a map choice; neither makes the edge go away.
+
+- Nine cross-area importers from five areas: `effort-readout`, `model-routing-spend`, `run-view`, `terminal-marked-task-cost`, `weekly-budget`, `workspace-kpi-stats` (Reports), `routes/proxy-compute` (Agent API), `routes/settings`, `routes/ship-biscuit` (Web routes). Outbound: `dispatch-terminal.js` and `session-telemetry.js` (Runs), `llm-call-log.js` (LLM), `utils/time.js` (Platform).
+- It is bidirectional with Runs, as `task-cost.js` was. Its replacement is in flight: LIN-4200 (In Progress, the measure-before-switch gate) and LIN-4201 (Todo, the records-first cutover that threads `requestRows` through every caller). Expect `request-usage-store`'s importers to grow from one to about seven next run.
+- **Not a finding yet.** Judge it as a map fact after LIN-4201 lands. No ticket.
+
 ### N1 — `knot:other-features-catch-all(lib first-match)` · **High as a map, Medium as code** · **worsened, 12 → 17 files**
 
 - **Size.** Under the HEAD guide's first-match, the catch-all holds 17 files at `5334c81a`: the run-4 twelve (`dashboard-refresh`, `home-pipeline`, `home-row-states`, `home-rows`, `home-view`, `lineage-membership`, `live-anchor`, `row-usage`, `ruling-standing`, `subtree-index`, `task-facts-holder`, `task-state`) and the five new ones (`cost-format`, `cost-read`, `founder-lookup`, `key-state`, `key-state-holders`). The count was checked by enumerating the guide's first-match over `git ls-tree`: 12 and 17, matching the tool.
@@ -88,18 +96,10 @@ The findings are ranked by what changes the dependency graph, not by where the f
   - Runs → LLM +1 under P1b: `cost-read.js → llm-call-log.js` (LIN-4179, `72305215`). On the HEAD guide it is Other → LLM (1 → 2), which is why the series does not show it as Runs → LLM.
 - **Reading.** Model routing and the cost read reach across LLM and Runs, as in run 4. The real growth is two edges in the Runs → LLM direction and one in the other, all attributed by `git log -S` on each import (the other new cross-area edges in this report are not attributed). No follow-up targets F1 directly: the cost read is in flight under LIN-4195, and a ticket now would aim at a moving target.
 
-### N6 — `hub:cost-read.js` · **Medium–High, watch, ranked first** · **new**
-
-- *Why it ranks first.* It is the only new file in the window that imports from two areas and is imported from five, so it creates bidirectional reach (Runs ↔ Other, LLM ↔ Other) that the committed map cannot attribute to any area. Its placement is contestable: under the committed guide it is Other (so Other → LLM 1 → 2 is `cost-read → llm-call-log`), and under P1b it is Runs (Runs → LLM +1 by the same edge). Either filing is a map choice; neither makes the edge go away.
-
-- Nine cross-area importers from five areas: `effort-readout`, `model-routing-spend`, `run-view`, `terminal-marked-task-cost`, `weekly-budget`, `workspace-kpi-stats` (Reports), `routes/proxy-compute` (Agent API), `routes/settings`, `routes/ship-biscuit` (Web routes). Outbound: `dispatch-terminal.js` and `session-telemetry.js` (Runs), `llm-call-log.js` (LLM), `utils/time.js` (Platform).
-- It is bidirectional with Runs, as `task-cost.js` was. Its replacement is in flight: LIN-4200 (In Progress, the measure-before-switch gate) and LIN-4201 (Todo, the records-first cutover that threads `requestRows` through every caller). Expect `request-usage-store`'s importers to grow from one to about seven next run.
-- **Not a finding yet.** Judge it as a map fact after LIN-4201 lands. No ticket.
-
 ### N8 — `map hygiene: deleted task-cost module still named` · **Low** · **new**
 
 - `scripts/code-shape/areas.json:24` (the "Runs & dispatch" pattern) still lists `task-cost|`, a module deleted by LIN-4177. It matches nothing now. Harmless to the counts, but a reader of the guide will think the module exists.
-- Five `lib/` comments still cite the deleted `lib/task-cost.js`: `dispatch-lineage.js:4` and `:76`, `model-routing-spend.js:5`, `wall-clock-summary.js:97`, and `runner-kit/runner.mjs:768`. Two test files keep the old name in prose or filename: `tests/unit/task-cost.test.js` (it now tests the fixture adapter over `cost-read`) and the gate-prose test's describe title (`lin-2253-instructions-cost-gate-prose.test.js:67`). The gate test reads `lib/cost-read.js` and passes.
+- Three `lib/` comments still cite the deleted `lib/task-cost.js`: `model-routing-spend.js:5`, `wall-clock-summary.js:97`, and `runner-kit/runner.mjs:768`. `dispatch-lineage.js:4` and `:76` are not among them: they name the live `terminal-marked-task-cost`, which matches `task-cost` only as a substring. Two test files keep the old name in prose or filename: `tests/unit/task-cost.test.js` (it now tests the fixture adapter over `cost-read`) and the gate-prose test's describe title (`lin-2253-instructions-cost-gate-prose.test.js:67`). The gate test reads `lib/cost-read.js` and passes.
 - No live import of the deleted module remains (`git grep` at `5334c81a`). Proposal: when cost-read is placed, drop `task-cost|` from the pattern in the same edit (§7). Comment hygiene is Drift's (decisions held in several places) and is not ticketed here.
 
 ### N7 — `door:request-usage-intake` · **Low, healthy** · **new**
@@ -273,7 +273,7 @@ Checked against code and Linear state, read 2026-11-04. None were changed by thi
 - **Reader on the report:** the report covers the item as N6 and inside N1, and its counts (9 `cost-read` importers, 7 `cost-format` importers, 17 catch-all files) match. But the report ranked the catch-all first and the hub "Medium, watch", its P1b proposal treats the placement as settled, and it omitted the stale `task-cost` references. The reader also noted that §10 was an unfilled placeholder.
 - **Verdict: DISAGREE.** The reader's answer differs from the report's top-ranked finding: the report led with the catch-all, and the reader's largest item is the hub inside it.
 - **Differed from top finding: YES.** The reader's answer (`cost-read`) differs from the report's top-ranked finding (N1, the catch-all as a whole), before this fix.
-- **Disposition: fixed in place.** Changes made: N6 (`cost-read`) is now ranked first, with its placement stated as contestable and not as settled; a ranking note explains the order; N8 (stale `task-cost` alias and comments) is added as a Low map-hygiene finding; the headline names the hub as the window's largest item; this section replaces the placeholder. The reader's four-comment count is corrected to five in `lib/`, and two test names are added. I did not verify the reader's "four comments" claim beyond `git grep`; the five listed here are from that grep.
+- **Disposition: fixed in place.** Changes made: N6 (`cost-read`) is now ranked first, with its placement stated as contestable and not as settled; a ranking note explains the order; N8 (stale `task-cost` alias and comments) is added as a Low map-hygiene finding; the headline names the hub as the window's largest item; this section replaces the placeholder. The reader's "four comments" is three in `lib/` plus one test file (`tests/unit/lin-2253-instructions-cost-gate-prose.test.js:6`); the reader counted that test. (An earlier draft said five; two of those were `terminal-marked-task-cost` matched as a substring, removed at close-out.)
 
 ## 11. Trend ledger
 
@@ -284,7 +284,7 @@ Stable names carry forward from run 4. Delta is against run 4 (`015aa4c6`). Seve
 | N1 `knot:other-features-catch-all` | High map / Medium code | 12 files; Other↔Runs 6/12; Pages↔Other 2/6; LLM↔Other 1/1 | 17 files; 9/15; 8/6; 4/2 | **worsened** (placement and code, §3) |
 | F1 `knot:agents-chat<->runs` | High | 27/34 | 26/35 (placed: 28/34 → 29/36) | **grew, hidden by catch-all** |
 | N6 `hub:cost-read.js` | Medium–High, watch (ranked first) | — | 9 in, 5 areas | **new** (in flight, LIN-4195) |
-| N8 `map hygiene: deleted task-cost` | Low | — | `task-cost\|` alias in Runs pattern; 5 `lib/` comments | **new** |
+| N8 `map hygiene: deleted task-cost` | Low | — | `task-cost\|` alias in Runs pattern; 3 `lib/` comments | **new** |
 | N7 `door:request-usage-intake` | Low, healthy | — | 1 intake, 2 doors | **new** |
 | F6 `knot:browser-window-globals` | Medium | 52 / 99 | 52 / 100 | +1 (`window.CostFormat`) |
 | F2 `knot:runs<->page-renderers(render-swipe)` | retired | retired | retired | unchanged |
@@ -306,7 +306,7 @@ Stable names carry forward from run 4. Delta is against run 4 (`015aa4c6`). Seve
 
 ## Measurement notes (where the research did not hold when re-read)
 
-1. **The research said "`routes/dispatch.js` → Runs edge (intake door) is an Agent API / Web routes → Runs edge".** `routes/dispatch.js` is in Runs; the edge is intra-area. Only `proxy-runner` crosses.
+1. **The ticket's mint-time grounding said "`routes/dispatch.js` → Runs edge (intake door) is an Agent API / Web routes → Runs edge"; the research comment had already corrected it.** `routes/dispatch.js` is in Runs; the edge is intra-area. Only `proxy-runner` crosses.
 2. **The research's F1 figure after the placed map (28/34 → 29/36) reproduced.** The HEAD-guide figure (26/35) also reproduced. Both are reported.
 3. **The research's Agent API ↔ Runs under P1b (43/10 → 44/10) reproduced.** It is 42/10 on the HEAD guide, because the `task-cost` → `cost-read` replacement in `proxy-compute.js` moves its edge from Runs to Other and the new `proxy-runner → intake` edge offsets it.
 4. **The research's change-coupling figures reproduced exactly (899/398/76/5123 → 874/400/76/5273).**
