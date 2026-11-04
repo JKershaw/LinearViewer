@@ -1,0 +1,827 @@
+{
+ "cluster_files": {
+  "lib/home-pipeline.js": {
+   "lines_at_f25aa127": 0,
+   "lines_at_HEAD": 141,
+   "touches_total": 5,
+   "burst": 0,
+   "tail": 5,
+   "early": 0
+  },
+  "lib/home-row-states.js": {
+   "lines_at_f25aa127": 0,
+   "lines_at_HEAD": 104,
+   "touches_total": 4,
+   "burst": 0,
+   "tail": 4,
+   "early": 0
+  },
+  "lib/home-rows.js": {
+   "lines_at_f25aa127": 0,
+   "lines_at_HEAD": 160,
+   "touches_total": 5,
+   "burst": 0,
+   "tail": 5,
+   "early": 0
+  },
+  "lib/home-view.js": {
+   "lines_at_f25aa127": 0,
+   "lines_at_HEAD": 576,
+   "touches_total": 7,
+   "burst": 0,
+   "tail": 7,
+   "early": 0
+  },
+  "lib/render-task-page.js": {
+   "lines_at_f25aa127": 781,
+   "lines_at_HEAD": 1013,
+   "touches_total": 16,
+   "burst": 6,
+   "tail": 10,
+   "early": 0
+  },
+  "lib/render.js": {
+   "lines_at_f25aa127": 784,
+   "lines_at_HEAD": 1151,
+   "touches_total": 23,
+   "burst": 11,
+   "tail": 12,
+   "early": 0
+  },
+  "lib/task-board-view.js": {
+   "lines_at_f25aa127": 0,
+   "lines_at_HEAD": 334,
+   "touches_total": 11,
+   "burst": 3,
+   "tail": 8,
+   "early": 0
+  },
+  "lib/task-page-loader.js": {
+   "lines_at_f25aa127": 993,
+   "lines_at_HEAD": 1535,
+   "touches_total": 20,
+   "burst": 9,
+   "tail": 11,
+   "early": 0
+  },
+  "public/app.js": {
+   "lines_at_f25aa127": 1849,
+   "lines_at_HEAD": 2116,
+   "touches_total": 13,
+   "burst": 6,
+   "tail": 7,
+   "early": 0
+  },
+  "public/prompt-section.js": {
+   "lines_at_f25aa127": 1479,
+   "lines_at_HEAD": 2867,
+   "touches_total": 23,
+   "burst": 11,
+   "tail": 12,
+   "early": 0
+  },
+  "public/task-page.js": {
+   "lines_at_f25aa127": 675,
+   "lines_at_HEAD": 799,
+   "touches_total": 7,
+   "burst": 3,
+   "tail": 4,
+   "early": 0
+  },
+  "routes/task-page.js": {
+   "lines_at_f25aa127": 161,
+   "lines_at_HEAD": 298,
+   "touches_total": 13,
+   "burst": 5,
+   "tail": 8,
+   "early": 0
+  }
+ },
+ "pairs": [
+  {
+   "a": "public/run-control.css",
+   "b": "public/task-page.css",
+   "n_both": 5,
+   "lift": 24.8
+  },
+  {
+   "a": "public/swipe.css",
+   "b": "public/task-page.css",
+   "n_both": 5,
+   "lift": 21.7
+  },
+  {
+   "a": "public/settings.css",
+   "b": "routes/settings.js",
+   "n_both": 5,
+   "lift": 19.29
+  },
+  {
+   "a": "lib/render-settings.js",
+   "b": "routes/settings.js",
+   "n_both": 6,
+   "lift": 18.94
+  },
+  {
+   "a": "lib/render-settings.js",
+   "b": "lib/render-settings-you.js",
+   "n_both": 6,
+   "lift": 18.94
+  },
+  {
+   "a": "lib/task-board-view.js",
+   "b": "lib/task-state.js",
+   "n_both": 5,
+   "lift": 18.41
+  },
+  {
+   "a": "routes/task-page.js",
+   "b": "lib/task-state.js",
+   "n_both": 5,
+   "lift": 15.58
+  },
+  {
+   "a": "lib/render-task-page.js",
+   "b": "public/task-page.js",
+   "n_both": 7,
+   "lift": 15.19
+  },
+  {
+   "a": "lib/render-settings.js",
+   "b": "public/settings.css",
+   "n_both": 6,
+   "lift": 14.73
+  },
+  {
+   "a": "routes/task-page.js",
+   "b": "public/task-page.js",
+   "n_both": 5,
+   "lift": 13.35
+  },
+  {
+   "a": "lib/render-styleguide.js",
+   "b": "public/observation.css",
+   "n_both": 6,
+   "lift": 12.79
+  },
+  {
+   "a": "lib/dispatch-entrance.js",
+   "b": "lib/dispatch-factory.js",
+   "n_both": 5,
+   "lift": 12.66
+  },
+  {
+   "a": "lib/task-page-loader.js",
+   "b": "lib/task-state.js",
+   "n_both": 6,
+   "lift": 12.15
+  },
+  {
+   "a": "routes/task-page.js",
+   "b": "lib/task-board-view.js",
+   "n_both": 7,
+   "lift": 11.9
+  },
+  {
+   "a": "lib/render-styleguide.js",
+   "b": "public/styleguide.css",
+   "n_both": 6,
+   "lift": 10.96
+  },
+  {
+   "a": "lib/render-task-page.js",
+   "b": "public/task-page.css",
+   "n_both": 5,
+   "lift": 10.85
+  },
+  {
+   "a": "lib/render-task-page.js",
+   "b": "routes/task-page.js",
+   "n_both": 9,
+   "lift": 10.51
+  },
+  {
+   "a": "lib/task-page-loader.js",
+   "b": "lib/task-board-view.js",
+   "n_both": 9,
+   "lift": 9.94
+  },
+  {
+   "a": "lib/task-page-loader.js",
+   "b": "routes/task-page.js",
+   "n_both": 10,
+   "lift": 9.35
+  },
+  {
+   "a": "lib/task-page-loader.js",
+   "b": "lib/render-task-page.js",
+   "n_both": 12,
+   "lift": 9.11
+  },
+  {
+   "a": "public/prompt-section.js",
+   "b": "public/task-page.js",
+   "n_both": 6,
+   "lift": 9.06
+  },
+  {
+   "a": "public/style.css",
+   "b": "public/stage-track.css",
+   "n_both": 6,
+   "lift": 9.0
+  },
+  {
+   "a": "public/prompt-section.js",
+   "b": "routes/task-page.js",
+   "n_both": 11,
+   "lift": 8.94
+  },
+  {
+   "a": "public/prompt-section.js",
+   "b": "lib/components/decision-panel.js",
+   "n_both": 5,
+   "lift": 8.8
+  },
+  {
+   "a": "public/prompt-section.js",
+   "b": "lib/task-state.js",
+   "n_both": 5,
+   "lift": 8.8
+  },
+  {
+   "a": "lib/task-page-loader.js",
+   "b": "public/task-page.js",
+   "n_both": 5,
+   "lift": 8.68
+  },
+  {
+   "a": "public/app.js",
+   "b": "routes/task-page.js",
+   "n_both": 6,
+   "lift": 8.63
+  },
+  {
+   "a": "public/prompt-section.js",
+   "b": "lib/render-task-page.js",
+   "n_both": 13,
+   "lift": 8.58
+  },
+  {
+   "a": "lib/render-styleguide.js",
+   "b": "public/settings.css",
+   "n_both": 6,
+   "lift": 8.53
+  },
+  {
+   "a": "public/app.js",
+   "b": "lib/render-settings.js",
+   "n_both": 5,
+   "lift": 8.5
+  },
+  {
+   "a": "public/app.js",
+   "b": "lib/task-board-view.js",
+   "n_both": 5,
+   "lift": 8.5
+  },
+  {
+   "a": "lib/render-task-page.js",
+   "b": "lib/task-board-view.js",
+   "n_both": 6,
+   "lift": 8.28
+  },
+  {
+   "a": "lib/render.js",
+   "b": "public/app.js",
+   "n_both": 10,
+   "lift": 8.13
+  },
+  {
+   "a": "lib/render.js",
+   "b": "public/swipe.css",
+   "n_both": 6,
+   "lift": 7.92
+  },
+  {
+   "a": "public/style.css",
+   "b": "public/styleguide.css",
+   "n_both": 6,
+   "lift": 7.71
+  },
+  {
+   "a": "lib/render.js",
+   "b": "lib/home-view.js",
+   "n_both": 5,
+   "lift": 7.55
+  },
+  {
+   "a": "lib/render.js",
+   "b": "lib/dashboard-refresh.js",
+   "n_both": 5,
+   "lift": 7.55
+  },
+  {
+   "a": "public/style.css",
+   "b": "public/observation.css",
+   "n_both": 5,
+   "lift": 7.5
+  },
+  {
+   "a": "public/prompt-section.js",
+   "b": "lib/task-page-loader.js",
+   "n_both": 14,
+   "lift": 7.4
+  },
+  {
+   "a": "lib/render.js",
+   "b": "routes/task-page.js",
+   "n_both": 9,
+   "lift": 7.31
+  },
+  {
+   "a": "routes/dispatch.js",
+   "b": "lib/dispatch-entrance.js",
+   "n_both": 5,
+   "lift": 7.23
+  },
+  {
+   "a": "public/style.css",
+   "b": "lib/render-styleguide.js",
+   "n_both": 15,
+   "lift": 7.11
+  },
+  {
+   "a": "lib/proxy-instructions.js",
+   "b": "lib/dispatch-store.js",
+   "n_both": 8,
+   "lift": 6.75
+  },
+  {
+   "a": "public/prompt-section.js",
+   "b": "lib/task-board-view.js",
+   "n_both": 7,
+   "lift": 6.72
+  },
+  {
+   "a": "lib/render.js",
+   "b": "lib/task-board-view.js",
+   "n_both": 7,
+   "lift": 6.72
+  },
+  {
+   "a": "routes/dispatch.js",
+   "b": "public/app.js",
+   "n_both": 5,
+   "lift": 6.68
+  },
+  {
+   "a": "public/style.css",
+   "b": "public/task-page.css",
+   "n_both": 5,
+   "lift": 6.43
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "lib/settings-areas.js",
+   "n_both": 6,
+   "lift": 6.07
+  },
+  {
+   "a": "public/style.css",
+   "b": "public/settings.css",
+   "n_both": 6,
+   "lift": 6.0
+  },
+  {
+   "a": "lib/render-styleguide.js",
+   "b": "public/common.js",
+   "n_both": 6,
+   "lift": 5.9
+  },
+  {
+   "a": "public/prompt-section.js",
+   "b": "public/app.js",
+   "n_both": 7,
+   "lift": 5.69
+  },
+  {
+   "a": "lib/proxy-instructions.js",
+   "b": "lib/dispatch-entrance.js",
+   "n_both": 5,
+   "lift": 5.63
+  },
+  {
+   "a": "public/style.css",
+   "b": "public/swipe.css",
+   "n_both": 5,
+   "lift": 5.62
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "public/app.js",
+   "n_both": 12,
+   "lift": 5.61
+  },
+  {
+   "a": "lib/task-page-loader.js",
+   "b": "public/common.js",
+   "n_both": 6,
+   "lift": 5.61
+  },
+  {
+   "a": "public/style.css",
+   "b": "public/app.js",
+   "n_both": 8,
+   "lift": 5.54
+  },
+  {
+   "a": "lib/dispatch-store.js",
+   "b": "routes/dispatch.js",
+   "n_both": 5,
+   "lift": 5.42
+  },
+  {
+   "a": "lib/render.js",
+   "b": "lib/render-task-page.js",
+   "n_both": 8,
+   "lift": 5.28
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "lib/render-settings-you.js",
+   "n_both": 6,
+   "lift": 5.21
+  },
+  {
+   "a": "public/prompt-section.js",
+   "b": "lib/render.js",
+   "n_both": 11,
+   "lift": 5.05
+  },
+  {
+   "a": "server.js",
+   "b": "lib/dashboard-refresh.js",
+   "n_both": 7,
+   "lift": 4.96
+  },
+  {
+   "a": "server.js",
+   "b": "lib/settings-areas.js",
+   "n_both": 6,
+   "lift": 4.96
+  },
+  {
+   "a": "server.js",
+   "b": "lib/feature-defaults.js",
+   "n_both": 6,
+   "lift": 4.96
+  },
+  {
+   "a": "lib/proxy-instructions.js",
+   "b": "routes/dispatch.js",
+   "n_both": 5,
+   "lift": 4.82
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "lib/render.js",
+   "n_both": 18,
+   "lift": 4.75
+  },
+  {
+   "a": "public/style.css",
+   "b": "lib/render.js",
+   "n_both": 12,
+   "lift": 4.7
+  },
+  {
+   "a": "lib/task-page-loader.js",
+   "b": "public/app.js",
+   "n_both": 5,
+   "lift": 4.67
+  },
+  {
+   "a": "server.js",
+   "b": "public/app.js",
+   "n_both": 12,
+   "lift": 4.58
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "public/swipe.css",
+   "n_both": 6,
+   "lift": 4.56
+  },
+  {
+   "a": "public/prompt-section.js",
+   "b": "routes/dispatch.js",
+   "n_both": 6,
+   "lift": 4.53
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "lib/render-settings.js",
+   "n_both": 8,
+   "lift": 4.42
+  },
+  {
+   "a": "server.js",
+   "b": "routes/test.js",
+   "n_both": 8,
+   "lift": 4.41
+  },
+  {
+   "a": "server.js",
+   "b": "lib/model-routing.js",
+   "n_both": 7,
+   "lift": 4.34
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "public/run-control.css",
+   "n_both": 5,
+   "lift": 4.34
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "public/task-page.css",
+   "n_both": 5,
+   "lift": 4.34
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "public/task-page.js",
+   "n_both": 5,
+   "lift": 4.34
+  },
+  {
+   "a": "lib/task-page-loader.js",
+   "b": "routes/dispatch.js",
+   "n_both": 5,
+   "lift": 4.34
+  },
+  {
+   "a": "lib/render.js",
+   "b": "lib/task-page-loader.js",
+   "n_both": 8,
+   "lift": 4.23
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "public/common.js",
+   "n_both": 9,
+   "lift": 4.21
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "routes/task-page.js",
+   "n_both": 9,
+   "lift": 4.21
+  },
+  {
+   "a": "public/style.css",
+   "b": "public/common.js",
+   "n_both": 6,
+   "lift": 4.15
+  },
+  {
+   "a": "public/style.css",
+   "b": "lib/task-board-view.js",
+   "n_both": 5,
+   "lift": 4.09
+  },
+  {
+   "a": "public/prompt-section.js",
+   "b": "public/common.js",
+   "n_both": 5,
+   "lift": 4.06
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "public/settings.css",
+   "n_both": 6,
+   "lift": 4.05
+  },
+  {
+   "a": "public/style.css",
+   "b": "lib/task-page-loader.js",
+   "n_both": 9,
+   "lift": 4.05
+  },
+  {
+   "a": "lib/render-styleguide.js",
+   "b": "lib/render-task-page.js",
+   "n_both": 5,
+   "lift": 4.0
+  },
+  {
+   "a": "public/style.css",
+   "b": "lib/render-task-page.js",
+   "n_both": 7,
+   "lift": 3.94
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "lib/render-styleguide.js",
+   "n_both": 12,
+   "lift": 3.84
+  },
+  {
+   "a": "lib/task-page-loader.js",
+   "b": "lib/render-styleguide.js",
+   "n_both": 6,
+   "lift": 3.84
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "public/style.css",
+   "n_both": 17,
+   "lift": 3.83
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "lib/render-task-page.js",
+   "n_both": 10,
+   "lift": 3.8
+  },
+  {
+   "a": "lib/render.js",
+   "b": "routes/dispatch.js",
+   "n_both": 5,
+   "lift": 3.77
+  },
+  {
+   "a": "server.js",
+   "b": "lib/render.js",
+   "n_both": 17,
+   "lift": 3.67
+  },
+  {
+   "a": "server.js",
+   "b": "routes/task-chat.js",
+   "n_both": 5,
+   "lift": 3.54
+  },
+  {
+   "a": "server.js",
+   "b": "lib/render-settings-you.js",
+   "n_both": 5,
+   "lift": 3.54
+  },
+  {
+   "a": "public/style.css",
+   "b": "public/prompt-section.js",
+   "n_both": 9,
+   "lift": 3.52
+  },
+  {
+   "a": "server.js",
+   "b": "routes/task-page.js",
+   "n_both": 9,
+   "lift": 3.43
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "public/prompt-section.js",
+   "n_both": 13,
+   "lift": 3.43
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "lib/task-page-loader.js",
+   "n_both": 11,
+   "lift": 3.34
+  },
+  {
+   "a": "public/prompt-section.js",
+   "b": "lib/render-styleguide.js",
+   "n_both": 6,
+   "lift": 3.34
+  },
+  {
+   "a": "server.js",
+   "b": "lib/render-settings.js",
+   "n_both": 7,
+   "lift": 3.16
+  },
+  {
+   "a": "server.js",
+   "b": "lib/dispatch-factory.js",
+   "n_both": 5,
+   "lift": 3.1
+  },
+  {
+   "a": "server.js",
+   "b": "public/llms.txt",
+   "n_both": 24,
+   "lift": 2.98
+  },
+  {
+   "a": "public/prompt-section.js",
+   "b": "routes/workspace-api.js",
+   "n_both": 5,
+   "lift": 2.78
+  },
+  {
+   "a": "lib/render.js",
+   "b": "lib/render-styleguide.js",
+   "n_both": 5,
+   "lift": 2.78
+  },
+  {
+   "a": "server.js",
+   "b": "public/settings.css",
+   "n_both": 5,
+   "lift": 2.76
+  },
+  {
+   "a": "public/llms.txt",
+   "b": "lib/task-board-view.js",
+   "n_both": 5,
+   "lift": 2.76
+  },
+  {
+   "a": "server.js",
+   "b": "lib/task-board-view.js",
+   "n_both": 6,
+   "lift": 2.71
+  },
+  {
+   "a": "server.js",
+   "b": "public/common.js",
+   "n_both": 7,
+   "lift": 2.67
+  },
+  {
+   "a": "server.js",
+   "b": "lib/dispatch-store.js",
+   "n_both": 8,
+   "lift": 2.48
+  },
+  {
+   "a": "server.js",
+   "b": "routes/dispatch.js",
+   "n_both": 7,
+   "lift": 2.48
+  },
+  {
+   "a": "server.js",
+   "b": "lib/db-indexes.js",
+   "n_both": 6,
+   "lift": 2.48
+  },
+  {
+   "a": "server.js",
+   "b": "public/prompt-section.js",
+   "n_both": 11,
+   "lift": 2.37
+  },
+  {
+   "a": "server.js",
+   "b": "lib/task-page-loader.js",
+   "n_both": 9,
+   "lift": 2.23
+  },
+  {
+   "a": "server.js",
+   "b": "lib/dispatch-entrance.js",
+   "n_both": 5,
+   "lift": 2.07
+  },
+  {
+   "a": "server.js",
+   "b": "routes/proxy.js",
+   "n_both": 5,
+   "lift": 1.91
+  },
+  {
+   "a": "server.js",
+   "b": "lib/render-task-page.js",
+   "n_both": 6,
+   "lift": 1.86
+  },
+  {
+   "a": "server.js",
+   "b": "public/style.css",
+   "n_both": 10,
+   "lift": 1.84
+  },
+  {
+   "a": "server.js",
+   "b": "lib/render-styleguide.js",
+   "n_both": 7,
+   "lift": 1.83
+  },
+  {
+   "a": "server.js",
+   "b": "routes/workspace-api.js",
+   "n_both": 7,
+   "lift": 1.83
+  }
+ ],
+ "regime_counts": {
+  "tail": 87,
+  "burst": 144,
+  "early": 12
+ }
+}

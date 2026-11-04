@@ -1,0 +1,394 @@
+@@C@@67ff5c3b1252d3671cb7ae5f315d9614ea164c87|2026-11-04T07:41:45Z|LIN-4186, LIN-4185: the halt system tests follow LIN-4079 (a follow-up to a CANCELLED session is refused) (#316)
+
+23	21	test/system/halt-mechanism.test.js
+14	5	test/system/harbour-halt.test.js
+@@C@@765289d46e42e757283e27e08fe56284cd6792eb|2026-11-04T05:24:03Z|LIN-4202: opencode per-request usage records behind an unwired seam (LIN-4195 piece 5, runner half; posting waits on LIN-4199) (#315)
+
+11	2	docs/module-map.md
+56	0	opencode-request-records.js
+80	1	opencode-runner.js
+68	6	request-usage-flush.js
+5	0	request-usage.js
+32	0	test/fixtures/opencode-session/claude-code-fingerprints-golden.json
+282	0	test/fixtures/opencode-session/messages.json
+134	0	test/fixtures/opencode-session/snapshot-golden.json
+650	0	test/lin-4202-opencode-records.test.js
+5	1	test/opencode-runner.test.js
+@@C@@9478e1c534279e7877750d8032798ac35b92b883|2026-11-04T04:59:21Z|LIN-4199: runner posts per-request usage records for claude-code (snapshots still posted) (#314)
+
+10	0	config.js
+13	1	dispatcher.js
+6	1	docs/module-map.md
+2	0	feedback.js
+27	14	hook.js
+9	0	reapers.js
+218	0	request-usage-flush.js
+178	0	request-usage.js
+1	1	test/helpers/fresh-config.js
+40	0	test/helpers/request-usage-lines.js
+1	1	test/lin-3043-stop-sweep.test.js
+23	0	test/request-usage-corpus.test.js
+80	0	test/request-usage-ledger.test.js
+178	0	test/request-usage-stop.test.js
+103	0	test/request-usage-terminal.test.js
+173	0	test/request-usage-transitions.test.js
+71	0	test/request-usage-walk.test.js
+206	0	test/request-usage-wiring.test.js
+4	2	test/transcript.test.js
+8	2	transcript.js
+@@C@@b6fc9ab7eba52ba36d176461853700ef082eddce|2026-11-04T02:30:28Z|LIN-4197: transcript corpus, per-request records, and walkUsage baseline goldens (piece 0) (#312)
+
+8	0	test/fixtures/transcript-corpus/haiku-over-100k/final/hk100-session.jsonl
+6	0	test/fixtures/transcript-corpus/killed-before-stop/final/killed-session.jsonl
+8	0	test/fixtures/transcript-corpus/mixed-model/final/mixed-session.jsonl
+6	0	test/fixtures/transcript-corpus/reap-tail/atReap/reap-tail-session.jsonl
+4	0	test/fixtures/transcript-corpus/reap-tail/atStop/reap-tail-session.jsonl
+491	0	test/fixtures/transcript-corpus/request-records.json
+5	0	test/fixtures/transcript-corpus/resumed-across-deploy/earlier/resumed-session.jsonl
+9	0	test/fixtures/transcript-corpus/resumed-across-deploy/later/resumed-session.jsonl
+7	0	test/fixtures/transcript-corpus/subagent-shared-message/final/sub-shared-session.jsonl
+4	0	test/fixtures/transcript-corpus/subagent-shared-message/final/sub-shared-session/subagents/agent-a1b2c3d4.jsonl
+8	0	test/fixtures/transcript-corpus/synthetic-tail/final/synthetic-tail-session.jsonl
+336	0	test/fixtures/transcript-corpus/walkusage-goldens.json
+46	0	test/helpers/transcript-corpus-build.js
+130	0	test/helpers/transcript-corpus-oracle.mjs
+101	0	test/helpers/transcript-corpus-walk.js
+161	0	test/transcript-corpus.test.js
+@@C@@cc2650a6dc0c1139ba54a4c6f55c31f751728b17|2026-11-04T01:10:14Z|LIN-4183: one shared way for a test to drive the Stop hook (#311)
+
+8	0	docs/testing-and-ci.md
+25	88	test/close-on-done-runtime.test.js
+19	138	test/decision-emission.test.js
+22	147	test/decision-selfcheck-drop.test.js
+19	143	test/decision-suppression.test.js
+58	209	test/decision-withdrawal.test.js
+131	0	test/fresh-config-drive-stop.test.js
+201	1	test/helpers/fresh-config.js
+63	0	test/hook-driver-census.test.js
+9	111	test/refusal-feedback.test.js
+6	94	test/worker-usage-default.test.js
+@@C@@2f7b94325b9c23dfc81cfd015d0c016c13d48a7c|2026-11-04T00:53:33Z|LIN-4182: one on/off parser for SD_* boolean flags (env-flag.js) (#310)
+
+31	52	config.js
+6	1	docs/module-map.md
+41	0	env-flag.js
+2	5	instance-guard.js
+4	3	oplog.js
+3	2	resource-metrics.js
+63	0	test/env-flag-guard.test.js
+163	0	test/env-flag-sites.test.js
+99	0	test/env-flag.test.js
+1	0	test/watch-restart-process.test.js
+1	0	test/watch-restart-signal.test.js
+1	0	test/watch-restart-stop.test.js
+1	0	test/watch-restart.test.js
+@@C@@11a12797ba8db852efe91ef5294a0c6297b30955|2026-11-04T00:20:04Z|LIN-4181: clean main gives a clean npm test on the runner host (#309)
+
+6	1	config.js
+42	6	docs/testing-and-ci.md
+53	1	test/git-launch-probe.test.js
+27	4	test/isolate-run.js
+41	1	test/isolate-run.test.js
+4	22	test/leak-trap.js
+39	0	test/protected-paths.js
+82	0	test/system/harness-reap.test.js
+3	0	test/system/harness/harbour.js
+43	0	test/system/harness/reap.js
+7	5	test/workspace-clones.test.js
+@@C@@0992f39eba794e676e0588e6f5a13cffa79e038f|2026-11-03T22:59:20Z|LIN-4180: the system suite says plainly when it can't find Harbour (#308)
+
+4	2	docs/testing-and-ci.md
+1	1	package.json
+233	0	test/harbour-locate.test.js
+6	2	test/system/README.md
+121	0	test/system/harness/harbour-locate.js
+19	2	test/system/harness/harbour.js
+11	1	test/system/mutation/run-mutations.js
+74	0	test/system/run-system.js
+@@C@@600f1be1cee58e72330d61f26a9fa0f804205447|2026-11-03T21:50:43Z|LIN-4127: worker usage relay on by default (SD_WORKER_USAGE_RELAY) (#307)
+
+2	2	README.md
+11	5	config.js
+3	2	hook.js
+5	4	opencode-runner.js
+2	2	test/resource-relay.test.js
+151	0	test/worker-usage-default.test.js
+19	12	test/worker-usage-relay.test.js
+@@C@@5379817316074cd1ca1e105c7b3e21247f03e86e|2026-11-03T20:09:02Z|LIN-4172: split terminal reap — clone pass at 24h, record pass at 7d (#306)
+
+38	7	config.js
+21	1	dispatcher.js
+2	1	docs/module-map.md
+32	4	docs/session-lifecycle.md
+2	1	followup.js
+3	3	hook.js
+2	2	phases.js
+96	73	reapers.js
+2	1	test/blocked-reap.test.js
+6	3	test/cleanup-liveness-gate.test.js
+85	2	test/cycle-cost-witness.test.js
+2	2	test/liveness-gate.test.js
+1	1	test/phases.test.js
+96	0	test/post-trim-resume.test.js
+49	0	test/process-followup.test.js
+181	0	test/reap-two-pass.test.js
+75	0	test/reap-windows-config.test.js
+@@C@@0c2bdd4883314fc214f8e271bff7ed8d5e74ded9|2026-11-03T19:09:32Z|LIN-4171: re-clone the workspace on resume when the recorded folder is gone (#305)
+
+4	0	dispatcher.js
+1	1	docs/testing-and-ci.md
+40	2	executors.js
+63	0	experiments/lin-4171-resume-timing.js
+151	0	experiments/lin-4171-resume-witness.js
+32	18	test/build-claude-command.test.js
+1	0	test/fixtures/lin4171-fresh-prep.txt
+143	0	test/lin4171-characterization.test.js
+87	0	test/lin4171-dispatcher-wiring.test.js
+221	0	test/lin4171-resume-guard-exec.test.js
+85	0	test/lin4171-resume-guard.test.js
+100	0	test/lin4171-resume-strictness.test.js
+@@C@@c3b9ca892b4e2331da6007060a4d7a8cdc8cd916|2026-11-03T18:48:15Z|LIN-4165: no duplicate assistant-text when a pre-flush turn lands after a thinking line (#304)
+
+17	4	hook.js
+124	0	test/assistant-text-flush-offset.test.js
+22	1	transcript.js
+@@C@@a7e51734452348fea9cd2bae4ef5e6cc1f486856|2026-11-03T18:23:46Z|LIN-4165: send every assistant text reply to Harbour (relay on by default) (#302)
+
+2	2	README.md
+8	6	config.js
+3	0	dispatcher.js
+84	29	hook.js
+204	61	test/assistant-text-relay.test.js
+21	4	test/decision-selfcheck-drop.test.js
+2	2	test/decision-withdrawal.test.js
+41	0	test/lin-4165-assistant-text-relay.test.js
+40	0	test/zero-tool-done-guard-runtime.test.js
+@@C@@6060e4f772142f73f8eecfbdb776de087c25170c|2026-11-03T18:17:21Z|test: read REAP_INACTIVITY_MS instead of hard-coding 6h (LIN-4170) (#303)
+
+10	9	test/cleanup-liveness-gate.test.js
+13	13	test/cleanup-no-window-close.test.js
+2	1	test/lin3431-characterization.test.js
+4	1	test/liveness-gate.test.js
+@@C@@cf6369dfdf0a04140a1aeac9a347eea685ca51c7|2026-11-01T17:08:34Z|LIN-4082: a person's force:true follow-up can revive a CANCELLED session (#301)
+
+20	5	dispatcher.js
+3	1	docs/module-map.md
+21	4	docs/session-lifecycle.md
+32	6	followup.js
+81	0	test/followup.test.js
+213	0	test/lin-4082-person-revive.test.js
+@@C@@4db66b3eab83e4c54183ab69a189a8ddc6c0b136|2026-11-01T14:53:29Z|LIN-4077: tests stay out of the checkout's state/ and the shared temp folder (#300)
+
+2	0	CLAUDE.md
+1	0	README.md
+5	4	config.js
+5	1	docs/module-map.md
+39	0	docs/testing-and-ci.md
+14	6	e2e-smoke.js
+2	1	executors.js
+4	3	harnesses.js
+2	1	oplog.js
+2	2	package.json
+2	1	resource-metrics.js
+2	1	signal-guard.js
+23	0	state-dir.js
+2	1	state-store.js
+6	5	terminal-driver.js
+9	1	test/e2e-smoke.test.js
+26	21	test/fast-fail-watchdog.test.js
+9	4	test/hold-backstop-logging.test.js
+0	20	test/isolate-local-halt.js
+0	23	test/isolate-resource-metrics.js
+101	0	test/isolate-run.js
+163	0	test/isolate-run.test.js
+6	1	test/launch-breaker-production-wiring.test.js
+226	0	test/leak-trap.js
+242	0	test/leak-trap.test.js
+17	12	test/lin-3043-stop-sweep.test.js
+6	1	test/pending-child-relay.test.js
+6	1	test/reaper-terminal-retry-budget.test.js
+52	47	test/stall-failsafe.test.js
+186	0	test/state-dir.test.js
+2	2	test/system/credential-rearm.test.js
+4	2	test/system/follow-up-resume-race.test.js
+4	3	test/system/follow-up-resume.test.js
+2	1	test/system/halt-mechanism.test.js
+1	1	test/system/harbour-halt.test.js
+4	2	test/system/launch-failure.test.js
+5	3	test/system/launch-pacing.test.js
+1	1	test/system/local-halt.test.js
+1	1	test/system/mutation/run-mutations.js
+3	1	test/system/reaper-failsafe.test.js
+4	1	test/watch-restart.test.js
+9	2	test/workspace-path-overrides.test.js
+4	2	test/workspace-prep.test.js
+@@C@@bd6d2cf9e7a42717996a8689fda9dd0a5ad0eeb0|2026-11-01T14:41:01Z|LIN-4079: a follow-up never resumes a CANCELLED session (#299)
+
+27	1	dispatcher.js
+17	0	followup.js
+58	1	test/followup.test.js
+98	41	test/lin-3043-stop-sweep.test.js
+138	0	test/lin-4079-resume-guard.test.js
+116	0	test/process-followup.test.js
+@@C@@e71c1dfce18bb05d2ddf40aaf612a36cc6a65bc8|2026-10-31T10:10:44Z|LIN-1453: launch diagnosis reports the observed buffer, not an unchecked race (#298)
+
+4	1	terminal-driver.js
+8	2	test/build-launch-applescript.test.js
+1	1	test/launch-watchdog.test.js
+@@C@@7d1d34c5f23a50e4c2445763d175bfeeb4712815|2026-10-31T08:41:14Z|LIN-796: a second dispatcher refuses to start beside a live one (#297)
+
+11	0	README.md
+13	0	dispatcher.js
+12	0	docs/deployment.md
+13	1	docs/module-map.md
+245	0	instance-guard.js
+4	0	test/fixtures/write-own-pidfile.js
+224	0	test/instance-guard-process.test.js
+252	0	test/instance-guard.test.js
+1	0	test/watch-restart-process.test.js
+2	0	test/watch-restart-signal.test.js
+158	0	test/watch-restart-stop.test.js
+2	0	test/watch-restart.test.js
+50	10	watch-restart.sh
+@@C@@2bad478136297962b180da17940ca1771d243e34|2026-10-31T03:50:07Z|LIN-2478: a missing item id cannot throw inside a dispatcher log line (#296)
+
+5	5	dispatcher.js
+7	1	format.js
+149	0	test/lin-2478-missing-id-log-sites.test.js
+@@C@@bef27da780d271544ce8b71d6231117d08da32d1|2026-10-31T03:21:02Z|LIN-2469: dispatched claude sessions run with DISABLE_AUTOUPDATER=1 (#295)
+
+12	12	e2e-smoke.js
+13	1	executors.js
+38	11	test/build-claude-command.test.js
+7	4	test/e2e-smoke.test.js
+@@C@@ef772bab30a6d3ef01c599ce338667122bd18932|2026-10-31T02:56:06Z|LIN-1819: resource-metrics sink is switchable and bounded (#294)
+
+2	0	README.md
+7	6	config.js
+6	4	dispatcher.js
+6	0	docs/module-map.md
+2	2	package.json
+2	1	reapers.js
+101	5	resource-metrics.js
+2	0	test/helpers/dispatcher-process-fixture.js
+23	0	test/isolate-resource-metrics.js
+173	0	test/resource-metrics.test.js
+52	0	test/resource-relay.test.js
+@@C@@51458c441e9adece694e62bcbc974f309dab9d30|2026-10-31T02:14:18Z|LIN-3233: process tests run their dispatcher against private files, not the checkout's (#293)
+
+3	0	README.md
+17	2	config.js
+4	3	dispatcher.js
+2	3	feedback.js
+14	58	test/git-launch-probe-process.test.js
+85	0	test/helpers/dispatcher-process-fixture.js
+27	93	test/root-skip-permissions-process.test.js
+140	0	test/workspace-path-overrides.test.js
+@@C@@fe36992536317b98077b20c27eda5e32930386c4|2026-10-31T01:12:55Z|LIN-3437: an abort wins over a late follow-up inject (#292)
+
+88	51	hook.js
+336	0	test/abort-wins-followup-inject.test.js
+185	0	test/abort-wins-hold-arm-runtime.test.js
+57	0	test/system/mutation/run-mutations.js
+@@C@@dfed89324d52dc1ff8122e274acf5c9e77965b7f|2026-10-30T23:36:29Z|LIN-3229: walkUsage takes each message's per-field max, not its first snapshot (#291)
+
+24	0	test/fixtures/streamed-usage-subagent.jsonl
+30	0	test/transcript.test.js
+54	22	transcript.js
+@@C@@b8c0b408d052fb260bb10ad055b8e962b7d40221|2026-10-30T23:16:29Z|LIN-3047: a malformed 200 poll body from one workspace is a failed poll, not a crash (#290)
+
+17	0	queue.js
+155	0	test/lin-3047-malformed-poll-body.test.js
+@@C@@873148088deaada6ffe9ce3ecd8c2b51c813b5f9|2026-10-30T22:22:20Z|LIN-3234: npm test is green on the host whether or not SD_WORKER_USAGE_RELAY is set (#289)
+
+7	33	test/assistant-text-relay.test.js
+7	0	test/decision-emission.test.js
+7	0	test/decision-selfcheck-drop.test.js
+7	0	test/decision-withdrawal.test.js
+18	14	test/feedback-metadata.test.js
+76	0	test/helpers/fresh-config.js
+4	1	test/opencode-runner.test.js
+18	20	test/opencode-telemetry-relay.test.js
+6	41	test/resource-relay.test.js
+17	52	test/ticket-marker-relay.test.js
+7	0	test/tool-activity-relay-seams.test.js
+6	40	test/tool-activity-relay.test.js
+7	40	test/worker-usage-relay.test.js
+@@C@@f05534043914f7d8d6d7301e686d6f1eba76ad46|2026-10-30T16:31:12Z|LIN-4030: hook bookkeeping is not activity for the stall clock (#288)
+
+1	1	docs/session-lifecycle.md
+20	2	heartbeat.js
+9	4	reapers.js
+71	0	test/heartbeat.test.js
+51	0	test/pending-child-relay.test.js
+118	0	test/stall-failsafe.test.js
+@@C@@10ec1f9315b1ac7083c0e15a57dd083dd810c662|2026-10-29T23:46:32Z|LIN-4027: wake tests and docs follow Harbour's leaf [pending] wake (#287)
+
+4	3	docs/session-lifecycle.md
+3	3	hook.js
+4	2	reapers.js
+2	1	subscription.js
+2	2	test/e2e-smoke.test.js
+8	7	test/parent-gated-pending-wake-trade.test.js
+4	3	test/pending-child-relay.test.js
+4	4	test/system/mutation/run-mutations.js
+2	2	test/system/pending-child-relay.test.js
+20	3	test/system/wake-invariants.test.js
+@@C@@955349da3dbed17eb352e53fd40df7ed8bac586a|2026-10-24T23:23:59+01:00|LIN-3905: re-ask a quiet EXECUTING session before the 60-minute failsafe (#285)
+
+10	0	README.md
+37	1	config.js
+6	1	dispatcher.js
+2	1	docs/module-map.md
+5	0	docs/session-lifecycle.md
+29	6	reapers.js
+59	0	test/executing-quiet-stall.test.js
+141	1	test/stall-failsafe.test.js
+2	2	test/system/fast-fail-watchdog.test.js
+2	2	test/system/mutation/run-mutations.js
+@@C@@ef288531dad589222cf0cae25e92f40b81554719|2026-10-24T18:52:51+01:00|LIN-3857: opencode resolves effort to null and the launch says it was not applied (PR 1/3) (#284)
+
+9	1	dispatcher.js
+5	3	executors.js
+38	1	harnesses.js
+40	0	test/executors.test.js
+39	0	test/harnesses.test.js
+9	0	test/process-followup.test.js
+17	0	test/process-item.test.js
+4	2	test/routing-row-atomic.test.js
+@@C@@ce8c5c7fac63dbec08c705226c76b2d4a835fc7d|2026-10-24T01:36:28+01:00|LIN-3830: cold resumes and stall re-fires continue on the session's own model and effort (#283)
+
+19	9	dispatcher.js
+27	0	harnesses.js
+21	9	reapers.js
+31	0	test/harnesses.test.js
+14	0	test/opencode-native-resume.test.js
+64	0	test/resume-model-writeback.test.js
+63	0	test/routing-row-atomic.test.js
+41	4	test/stall-failsafe.test.js
+@@C@@1a6da96eb4ce2e37efd6b1d8b613fcb2fc5f408a|2026-10-23T21:59:49+01:00|LIN-3809: re-copy runner-kit contract.json (LIN-3699 auth rows) and drive the auth area (#282)
+
+140	0	test/fixtures/runner-contract.json
+31	3	test/runner-contract.test.js
+@@C@@17987904365b6b73c3f4f1b1aeb02abfce897e9e|2026-10-23T15:40:40+01:00|LIN-3746: doc enumeration census guards + stale BLOCKED comments (#281)
+
+1	1	README.md
+2	1	config.js
+2	2	docs/deployment.md
+38	0	docs/module-map.md
+4	4	docs/session-lifecycle.md
+1	1	docs/substrate.md
+3	2	docs/testing-and-ci.md
+10	5	phases.js
+4	3	reapers.js
+38	0	test/doc-enumeration-census.test.js
+80	0	test/module-map-census.test.js
+57	0	test/phases-doc-census.test.js
+@@C@@e2b4dccd6204dfac406e19b4b071460e0cc69c09|2026-10-23T13:19:02+01:00|LIN-3759: relay a parked child's PENDING-EXTERNAL report to its parked parent (#280)
+
+16	0	docs/session-lifecycle.md
+193	21	reapers.js
+3	0	test/parent-gated-pending-wake-trade.test.js
+387	0	test/pending-child-relay.test.js
+57	0	test/system/mutation/run-mutations.js
+108	0	test/system/pending-child-relay.test.js
