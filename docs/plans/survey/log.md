@@ -1403,3 +1403,20 @@ I sent a quiet follow-up (`8e46e5fc`) to LIN-4167's round-2 v2 Survey session (`
 - **The fresh clone is at today's `main`** (`d7ceb373`), not the session's original commit. That's as designed, and it's Drift's 11-04 inference (`reap-window-constant-cross-repo`) confirmed: after 24 h, "Reply & continue" carries on in a fresh clone. Uncommitted work from before would be lost.
 
 This is the runtime witness LIN-4164 deferred. **Asking a builder days later works.**
+
+## 4 Nov, about 17:50 UTC: how we carry on
+
+John: "I feel like our process of refining, trying it on real work, and measuring from time to time, is pretty good. The risk is the prompts becoming lists, rules added, but that's something fairly easy to mitigate… I'd be happy to just keep running as we have, until we're confident." He's not too concerned about the test-line growth ("tests are a whole other topic"). He's happy for the Periodicals to run to help track. He agreed the next real test is an ordinary feature ticket through the loop.
+
+**The guard against prompts becoming lists.** Word counts of each prompt as of today, excluding the ticket text:
+- open-0: ~110;
+- global v1: ~250;
+- step-back with the place view: ~280;
+- the builder's after-questions (q1–q5): ~200, plus q6/q7 when used;
+- pricing: ~350, including its evidence.
+
+A new question must **replace** one or **earn its place with evidence** logged here. If these counts creep, that's the warning.
+
+**Next:**
+- Seams and Drift over today's window, after LIN-4203 and LIN-4187 land (late evening at the latest).
+- Tomorrow: an ordinary feature ticket through the loop, and q6 to the five baseline-window builders to calibrate builder self-reports against the Periodicals.
