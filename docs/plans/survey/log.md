@@ -1207,3 +1207,9 @@ Both also predicted a second copy, "`joinCostLineages` reborn twice" (S11 and S1
 **What this tells us.** The global offshoot missed the twin earlier because it ran on **LIN-4176, the parent**, whose ticket talked about "one read". The copy was invited by **LIN-4178, the piece**: "add the raw-collection adapter for the founder lookup". Run on the piece's own text, even v0 sees it. So the place view has to run where the specifics are, **per piece, at the moment the piece starts**. That's the same gap LIN-4212 showed this morning: rebuild 1's three pieces and LIN-4212 all started without their own Survey.
 
 **Consequence for the design (to test, not settled):** the Survey belongs at the start of every ticket that will change code, including breakdown children and tickets filed mid-lineage, not just the tickets we file. Until there's a real stage, I Survey the next pieces by hand before they start (as with LIN-4201 and LIN-4203). v1's extra clause stays: it cost nothing and added line references.
+
+## 4 Nov, about 11:00 UTC: the tipping point, and the place ledger
+
+John: "there's a point… where the ratio tips: when a task truly does (on average) leave the codebase in a better place once finished, even a little, we're in a really strong place. Even if we rely on things like periodicals when we want to improve not tied to a ticket."
+
+That makes the goal a per-task balance we can measure. I started `docs/plans/survey/place-ledger.md`: one row per merged ticket, with map change, copies, what it carried, and a balance with its reason. **Baseline (the window before the place view): 1 better, 4 neutral, 5 worse.** Every forward ticket through the loop gets a row at merge. The tipping point is when the running average turns positive.
