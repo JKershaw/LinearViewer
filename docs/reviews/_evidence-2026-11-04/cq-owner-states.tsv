@@ -1,0 +1,33 @@
+# Owner and carried-ticket states read from Linear during this run (live state; titles as they stand, not edited)
+id	state	title
+LIN-3546	Backlog	Decompose public/prompt-section.js init (822-line closure, doubled since 09-26)
+LIN-3741	Backlog	Decompose lib/runner-kit/runner.mjs runCommand + waitLoop (characterization tests first)
+LIN-3544	Backlog	Decompose simple-dispatcher reapers.js runStallFailsafe (950-line plan/apply/log monolith, 145 branch points, 35 commits in 90d)
+LIN-2398	Backlog	Decompose lib/dispatch-store.js (2,178 lines, 31 methods; addFeedback 288 lines on the dispatch hot path)
+LIN-1249	Backlog	Decompose server.js (2542-line app-entry: 29 routes + 17 helpers)
+LIN-2246	Done	Decompose routes/workspace-api.js (4,388 lines, 36 endpoints, 24 in-closure helpers) by URL group
+LIN-3742	Done	Rebuild: design-first rebuild of routes/dashboard.js createDashboardRoutes into flat routes/dashboard-*.js route modules (run page excluded, LIN-3349)
+LIN-4124	Backlog	UI round 3 · follow-up: remove the dead isLanding branches in renderPage (lib/render.js)
+LIN-4160	Backlog	prompt-section re-fires an identical run preview GET on every incomplete state re-read
+LIN-3512	Backlog	Second PromptSection mount of the same issue keeps a stale run-quota count after a press in the other mount
+LIN-2470	Backlog	SD: runStallFailsafe's terminal-health memo lacks the shape guard its dispatcher sibling has (LIN-2446 review F3)
+LIN-2568	Backlog	SD: opencode directExecuting resume can still be overwritten by the generic stall-refire else-arm (sibling of LIN-2339, opencode-only)
+LIN-3076	Backlog	SD: guard the three pre-existing sentinel-arm terminal writes in opencode-runner.js to the LIN-2556 invariant
+LIN-2679	Backlog	SD: the declined opencode finalize leaves a stale serverPid for the backstop to SIGTERM (+2 LIN-2556 review one-liners)
+LIN-4008	Backlog	UI finish: the pages a new user meets are clean, consistent and obvious (goal, order and log)
+LIN-4040	Done	UI round 3: Home and the run control (three buttons, facts not estimates, waiting on you first)
+LIN-4013	Backlog	UI finish 5: tidy the task page and Observation
+LIN-4014	Backlog	UI finish 6: tidy Live Console and Landing
+LIN-3490	In Progress	Charter: the UI passage (periodicals, tidy-ups, and a Theseus loop on the UI), from 23 Oct
+LIN-4207	ERR	[Errno 2] No such file or directory: '/private/tmp/claude-504/-Users-autopilot-development-simple-dispatcher-workspaces-e5e9014f-64f5-4c8b-82c4-ce5bdef0fa1a/e5e9014f-64f5-4c8b-82c4-ce5bdef0fa1a/scratchpad/i-LIN-4207.json'
+LIN-4152	Done	Seams & Tangles Review (periodical run 4): area knots, dependency direction, ways in, rebuild readiness and first change-coupling read — delta vs 2026
+LIN-4154	Backlog	Seams: move fmtDuration out of lib/render-run-steps.js so task-state and task-page-loader stop importing a renderer
+LIN-4155	Backlog	Seams: move applyDefaultDispatchHarness out of lib/proxy-preamble.js so model routing stops importing Agent API
+LIN-3549	Done	Code shape: Harbour detects and corrects tangles, seams and size as a standard capability
+LIN-3628	Done	Code-shape kit: bring the Theseus instruments (census, shape, verbatim share, perturbation probe) beside seams.mjs, tested and generic
+LIN-3550	Done	Add the Seams & Tangles periodical: how Harbour's areas depend on each other, and how ready each is to refactor or rebuild
+LIN-3629	Done	Drift & Coherence Review runs the census: rule on the top 25 decision groups by places x change and on any group spanning 3 or more areas, add repeate
+LIN-3740	Done	Code Quality Review (periodical run) — complexity, duplication & maintainability at HEAD, after the rebuild wave
+LIN-3517	Done	Code Quality Review — test estate (trial for LIN-3449): complexity, duplication & maintainability of the tests at HEAD
+LIN-4178	Done	Costs rebuild 1.2: /kpis, workspace KPIs and the run page on the cost read
+LIN-3881	Done	Census clone detector pairs live handlers with their pinned replicas under experiments/rebuild-rung7/replay/pinned/

@@ -1,0 +1,28 @@
+# Verbatim shared-line counts (scripts/code-shape/verbatim.mjs), same commit on both sides, per pair
+# matched = new-side lines found word for word in the old side; longest run = consecutive verbatim lines (semicolon-normalised figure is equal in every row)
+[9b2955cc] public/kpis.js -> public/workspace-kpis.js : 90 new / 191 old lines, 65 matched (72.2% new, 34% old), longest run 13; semicolons normalised 72.2%
+[9b2955cc] lib/render-kpis.js -> lib/render-workspace-kpis.js : 141 new / 183 old lines, 11 matched (7.8% new, 6% old), longest run 3; semicolons normalised 7.8%
+[9b2955cc] public/kpis.css -> public/escalation-kpis.css : 97 new / 180 old lines, 49 matched (50.5% new, 27.2% old), longest run 9; semicolons normalised 50.5%
+[9b2955cc] routes/proxy.js -> routes/workspace-api.js : 1578 new / 419 old lines, 52 matched (3.3% new, 12.4% old), longest run 6; semicolons normalised 3.3%
+[9b2955cc] routes/proxy.js -> routes/workspace-api-issue-write.js : not both present at this commit
+[9b2955cc] routes/proxy-compute.js -> routes/task-chat.js : 319 new / 832 old lines, 52 matched (16.3% new, 6.3% old), longest run 27; semicolons normalised 16.3%
+[9b2955cc] routes/proxy-compute.js -> lib/workspace-api-mocks.js : 186 new / 832 old lines, 9 matched (4.8% new, 1.1% old), longest run 3; semicolons normalised 4.8%
+[9b2955cc] routes/task-chat.js -> lib/workspace-api-mocks.js : 186 new / 319 old lines, 8 matched (4.3% new, 2.5% old), longest run 3; semicolons normalised 4.3%
+[5334c81a] public/kpis.js -> public/workspace-kpis.js : 90 new / 191 old lines, 65 matched (72.2% new, 34% old), longest run 13; semicolons normalised 72.2%
+[5334c81a] lib/render-kpis.js -> lib/render-workspace-kpis.js : 137 new / 183 old lines, 11 matched (8% new, 6% old), longest run 3; semicolons normalised 8%
+[5334c81a] public/kpis.css -> public/escalation-kpis.css : 97 new / 180 old lines, 50 matched (51.5% new, 27.8% old), longest run 9; semicolons normalised 51.5%
+[5334c81a] routes/proxy.js -> routes/workspace-api.js : 383 new / 428 old lines, 19 matched (5% new, 4.4% old), longest run 2; semicolons normalised 5%
+[5334c81a] routes/proxy.js -> routes/workspace-api-issue-write.js : 271 new / 428 old lines, 23 matched (8.5% new, 5.4% old), longest run 6; semicolons normalised 8.5%
+[5334c81a] routes/proxy-compute.js -> routes/task-chat.js : 325 new / 840 old lines, 52 matched (16% new, 6.2% old), longest run 27; semicolons normalised 16%
+[5334c81a] routes/proxy-compute.js -> lib/workspace-api-mocks.js : 189 new / 840 old lines, 9 matched (4.8% new, 1.1% old), longest run 3; semicolons normalised 4.8%
+[5334c81a] routes/task-chat.js -> lib/workspace-api-mocks.js : 189 new / 325 old lines, 8 matched (4.2% new, 2.5% old), longest run 3; semicolons normalised 4.2%
+# UUID short-circuit copies (git grep, HEAD 5334c81a): the decision 'a bare UUID passes through, a symbolic ref is listed and matched'
+routes/proxy.js:1248:    if (UUID_REGEX.test(localRef)) return localRef;
+routes/proxy.js:1255:    if (UUID_REGEX.test(localRef)) return localRef;
+routes/proxy.js:1270:    if (UUID_REGEX.test(localRef)) return localRef;
+routes/proxy.js:1277:    if (UUID_REGEX.test(localRef)) return localRef;
+routes/workspace-api-issue-write.js:166:  if (UUID_REGEX.test(localRef)) return localRef;
+# Stale mirror comments (git grep, HEAD 5334c81a)
+routes/proxy-compute.js:108:   * Build a mock recommendation context from test fixtures (mirrors lib/workspace-api-mocks.js).
+routes/task-chat.js:59: * (mirrors buildMockRecapContext in lib/workspace-api-mocks.js). Returns null when
+routes/workspace-api-issue-write.js:157:// Input-side symbolic-ref resolution, mirroring the proxy write path
