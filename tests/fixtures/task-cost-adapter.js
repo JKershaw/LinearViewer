@@ -18,13 +18,16 @@ import { isMember } from '../../lib/lineage-membership.js';
  * @param {Object} [params.appSummary]
  * @param {string} [params.issueIdentifier]
  * @param {Array<Object>} [params.identityRows]  the founder lookup's scalar rows, when the caller has one
+ * @param {Array<Object>} [params.requestRows]  the lineages' request records (LIN-4201). The tests that pin lineage
+ *   behaviour through this adapter read snapshot-only lineages, so it passes [] unless the caller gives records.
  */
-export function buildTaskCost({ ownRows = [], siblingRowsByAnchor = new Map(), appSummary, issueIdentifier, identityRows } = {}) {
+export function buildTaskCost({ ownRows = [], siblingRowsByAnchor = new Map(), appSummary, issueIdentifier, identityRows, requestRows = [] } = {}) {
   const siblings = [...siblingRowsByAnchor.values()].flat();
   const ownMembers = ownRows.filter(row => row && isMember(row));
   return readCost({
     fetchedRows: [...siblings, ...ownRows],
     identityRows: identityRows ?? [],
+    requestRows,
     appSummary,
     issueIdentifier,
     selectAnchors: anchorsOfRows(ownMembers),

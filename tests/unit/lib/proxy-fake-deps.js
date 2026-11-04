@@ -17,6 +17,7 @@
  */
 import express from 'express';
 import { createProxyRoutes } from '../../../routes/proxy.js';
+import { NO_REQUEST_RECORDS } from '../../fixtures/request-usage-loader.js';
 
 export const ACME = 'acme';
 
@@ -58,6 +59,8 @@ export function makeFakeProvider() {
 }
 
 export const BASE_DEPS = () => ({
+  // LIN-4201: the request-records loader the cost route requires; these fakes hold no records.
+  requestUsageLoader: NO_REQUEST_RECORDS,
   proxyTokenStore: {
     validateToken: async () => ({ tokenId: 't1', urlKey: ACME, label: 'test', scope: 'readWrite', createdBy: 'u1' }),
     // fixture:LIN-3136: the writer holds the dispatch grant (overrides the stub above)

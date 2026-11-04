@@ -15,14 +15,21 @@ import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { lineageRecords, lineageFigure, lineageFigureOf } from '../../lib/cost-read.js';
-import { computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-cost.js';
+import { lineageRecords as lineageRecords__unplumbed, lineageFigure, lineageFigureOf as lineageFigureOf__unplumbed } from '../../lib/cost-read.js';
+import { computeTerminalMarkedTaskCost as computeTerminalMarkedTaskCost__unplumbed } from '../../lib/terminal-marked-task-cost.js';
 import { windowedSpend } from '../../lib/weekly-budget.js';
 import { groupDispatchLineages } from '../../lib/dispatch-lineage.js';
 import { fmtUsd } from '../../lib/render-run-steps.js';
-import { collectKpiStats, toPublicKpis } from '../../lib/kpi-stats.js';
+import { collectKpiStats as collectKpiStats__unplumbed, toPublicKpis } from '../../lib/kpi-stats.js';
 import { lookupFounderRows } from '../../lib/founder-lookup.js';
 import { runReplay, matches } from '../fixtures/cost-replay/harness.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const lineageRecords = withRequestRows(lineageRecords__unplumbed, 0, { requestRows: [] });
+const lineageFigureOf = withRequestRows(lineageFigureOf__unplumbed, 1, { requestRows: [] });
+const computeTerminalMarkedTaskCost = withRequestRows(computeTerminalMarkedTaskCost__unplumbed, 2, { requestRows: [] });
+const collectKpiStats = withRequestRows(collectKpiStats__unplumbed, 1, { requestRows: async () => [] });
+
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = new Date('2026-11-03T12:00:00.000Z');

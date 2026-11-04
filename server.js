@@ -132,6 +132,7 @@ import { createTaskModeRoutes } from './routes/task-mode.js'
 import { createPipelineMergeRecorder, createSessionWorkspaceIdResolver } from './lib/close-out-merges.js'
 import { createProxyRoutes, commentDedupe } from './routes/proxy.js'
 import { requestUsageStoreFor } from './lib/request-usage-intake.js'
+import { requestUsageLoader as createRequestUsageLoader } from './lib/request-usage-loader.js'
 import { createProxyDefaultRoute } from './lib/settings-proxy-default.js'
 import { createCopyFirstCardRoute } from './lib/settings-copy-first-card.js'
 import { createMilestoneFunnelRoutes } from './routes/milestone-funnel.js'
@@ -576,8 +577,13 @@ const runParagraphStore = new RunParagraphStore({
 // LIN-3856 (D2): both precomputes resolve their model from the routing store, with the
 // free-tier clamp applied when the credential is the shared free key.
 const precomputeResolveModel = jobModelResolver(workspacePreferencesStore)
+// LIN-4198: per-request usage records (POST .../usage). Built by lib/request-usage-intake.js so this file never names the collection.
+const requestUsageStore = requestUsageStoreFor(db)
+// LIN-4201: the one request-records loader every cost reader is given (lib/request-usage-loader.js). Built once, here.
+const requestUsageLoader = createRequestUsageLoader(requestUsageStore)
 const precomputeRunParagraph = createRunParagraphPrecompute({
   runParagraphStore,
+  requestUsageLoader,
   isTerminal: sessionIsTerminal,
   resolveModel: precomputeResolveModel,
   freeTierStore // LIN-3875: the hourly free-tier gate on the shared free key
@@ -845,8 +851,6 @@ const observerStateStore = new ObserverStateStore({ collection: observerStateCol
 // 15 min expiry, cap 20 per workspace. Written by POST /api/dispatch/heartbeat
 // and POST /api/proxy/runner/heartbeat, read by GET /api/proxy/heartbeats.
 const consumerHeartbeatStore = new ConsumerHeartbeatStore({ collection: db.collection('consumer-heartbeats') })
-// LIN-4198: per-request usage records (POST .../usage). Built by lib/request-usage-intake.js so this file never names the collection.
-const requestUsageStore = requestUsageStoreFor(db)
 
 // Read-only shadow action log (LIN-2132, P1-5): logs what the sweep's
 // diagnosis WOULD have relayed, in the incumbent's own marker/comment
@@ -2498,6 +2502,8 @@ const kpiPage = createKpiPage({
     // LIN-4178: the founder lookup over the raw dispatch collections (batched per urlKey). The public
     // path gets its output only; the query lives in lib/founder-lookup.js.
     lineageIdentity: rows => lookupFounderRows({ dispatchHistory: dispatchHistoryCollection, dispatchQueue: dispatchQueueCollection }, rows),
+    // LIN-4201: the request records of the same rows' lineages, grouped by each row's urlKey (the one loader).
+    requestRows: rows => requestUsageLoader.forRows(rows),
     // LIN-2952: the milestone-funnel aggregate's own deps (stores + the dispatch
     // collections), passed in OPTIONS so the aggregate never re-reads through
     // `collections.dispatchHistory`.
@@ -2567,7 +2573,7 @@ function workspaceFromUrl(req, res, next) {
 }
 
 // Mount dispatch routes (requires workspaceFromUrl middleware)
-app.use(createDispatchRoutes({ installationTokenFor, dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, workspaceOwnerCheck, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache, taskModeStore, freeTierStore, accountStore, consumerHeartbeatStore, requestUsageStore }))
+app.use(createDispatchRoutes({ installationTokenFor, dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, workspaceOwnerCheck, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache, taskModeStore, freeTierStore, accountStore, consumerHeartbeatStore, requestUsageStore, requestUsageLoader }))
 
 // Task-mode routes (LIN-2942): the ladder's client-side press record and the
 // per-account per-task mode read.
@@ -2575,7 +2581,7 @@ app.use(createTaskModeRoutes({ taskModeStore, accountStore, workspaceFromUrl }))
 app.use(createMilestoneFunnelRoutes({ taskModeStore, accountStore, accountWorkspaceStore, dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, closeOutEventsStore, workspaceFromUrl }))
 
 // Workspace KPIs page (LIN-3689): one workspace's counts, next to Settings
-app.use(createWorkspaceKpisRoutes({ workspaceFromUrl, collections: { dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, proxyEvents: proxyEventsCollection, agentStatus: agentStatusCollection, reportHistory: reportHistoryCollection, customPrompts: customPromptsCollection, closeOutEvents: db.collection('close-out-events'), kpiDailyRollup: kpiDailyRollupCollection } }))
+app.use(createWorkspaceKpisRoutes({ workspaceFromUrl, requestUsageLoader, collections: { dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, proxyEvents: proxyEventsCollection, agentStatus: agentStatusCollection, reportHistory: reportHistoryCollection, customPrompts: customPromptsCollection, closeOutEvents: db.collection('close-out-events'), kpiDailyRollup: kpiDailyRollupCollection } }))
 
 // The ONE PR-state store (LIN-3311): the LIN-3251 cache,
 // sliding 36/h GitHub budget and PR-state cache. The dashboard router
@@ -3217,7 +3223,7 @@ const recordPipelineMerge = createPipelineMergeRecorder({
   installationTokenFor,
   resolveWorkspaceId: createSessionWorkspaceIdResolver({ sessionsCollection })
 })
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore, requestUsageStore }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore, requestUsageStore, requestUsageLoader }))
 
 // LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
 // runner prompt to fetch and verify against its sha256 pins (routes/runner-kit.js).
@@ -3243,7 +3249,7 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // LIN-4168: the dashboard’s touched-task done cache, built here (not by the router’s default) so the key-state registry
 // can reach the same instance the feed reads.
 const dashboardTaskDoneCache = createTaskDoneCache();
-app.use(createDashboardRoutes({ installationTokenFor, workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, taskDoneCache: dashboardTaskDoneCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck }))
+app.use(createDashboardRoutes({ installationTokenFor, workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, taskDoneCache: dashboardTaskDoneCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck, requestUsageLoader }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 // LIN-2966: taskDecisionsStore + shelvedRulingsStore thread the
@@ -4142,7 +4148,7 @@ app.use(createSettingsRouter({
   getWorkspaceFeatures, setWorkspaceFeature, getModelCatalog, shouldMockAi, AVAILABLE_MODELS,
   getProvider, getProviderForWorkspace, getBindingsForWorkspace, getBindingCredentials, isActiveBinding,
   dispatchPresetsStore, proxyTokenStore, dispatchTokenStore, proxyEventStore, workspaceHaltStore,
-  workspaceChangeLogStore, modelRoutingStore, workspaceOwnerCheck, dispatchStore: dispatchQueueStore
+  workspaceChangeLogStore, modelRoutingStore, workspaceOwnerCheck, dispatchStore: dispatchQueueStore, requestUsageLoader
 }))
 
 // POST /settings/workspace-features (periodic reviews, agents-can-change-models) lives in routes/settings.js

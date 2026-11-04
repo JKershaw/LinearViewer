@@ -371,6 +371,10 @@
     "disposition": "delegated",
     "to": "lib/rejected-credentials.js::scopeAttempts"
   },
+  "server.js::requestUsageLoader": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level). LIN-4201: a stateless wrapper over the request-usage store's listForAnchors."
+  },
   "server.js::resolveWorkspaceUrlKey": {
     "disposition": "not-state",
     "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."

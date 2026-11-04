@@ -1,7 +1,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { deriveSessionWaiting } from '../../routes/dashboard.js';
-import { renderSessionPage } from '../../lib/render-session.js';
+import { renderSessionPage as renderSessionPage__unplumbed } from '../../lib/render-session.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const renderSessionPage = withRequestRows(renderSessionPage__unplumbed, 1, { requestRows: [] });
+
 
 // LIN-1478 beat 1: characterization/agreement coverage for the supersede logic,
 // written BEFORE `lib/loop-supersede.js` exists. `routes/dashboard.js`'s

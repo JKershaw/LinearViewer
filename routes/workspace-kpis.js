@@ -22,14 +22,15 @@ import { requestFeatureFlags } from '../lib/run-controls.js';
  * @param {Object} deps.collections - dispatchQueue, dispatchHistory, proxyEvents,
  *   agentStatus, reportHistory, customPrompts, closeOutEvents, kpiDailyRollup
  * @param {() => Date} [deps.now]
+ * @param {Object} deps.requestUsageLoader - the request-usage loader (LIN-4201); the cost read requires its records
  */
-export function createWorkspaceKpisRoutes({ workspaceFromUrl, collections, now = () => new Date() }) {
+export function createWorkspaceKpisRoutes({ workspaceFromUrl, collections, now = () => new Date(), requestUsageLoader }) {
   const router = Router();
 
   router.get('/workspace/:urlKey/kpis', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     try {
-      const stats = await collectWorkspaceKpis({ collections, urlKey: workspace.urlKey, now: now() });
+      const stats = await collectWorkspaceKpis({ collections, urlKey: workspace.urlKey, now: now(), requestUsageLoader });
       res.send(renderWorkspaceKpisPage(workspace.name || workspace.urlKey, {
         urlKey: workspace.urlKey,
         workspaces: req.session.workspaces || [],

@@ -12,7 +12,7 @@ import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readRunEvidence } from '../../lib/run-evidence.js';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
-import { createDashboardRoutes } from '../../routes/dashboard.js';
+import { createDashboardRoutes as createDashboardRoutes__unplumbed } from '../../routes/dashboard.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
 import { setRunControlsResolver } from '../../lib/run-controls.js';
@@ -22,6 +22,10 @@ setRunControlsResolver(async () => ({ runControls: true, runSetup: false }));
 import { InMemoryRunParagraphStore } from '../../lib/run-paragraph-store.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { findRouteLayer } from './lib/route-layer.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const createDashboardRoutes = withRequestRows(createDashboardRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+
 
 before(() => { process.env.NODE_ENV = 'test'; });
 

@@ -39,7 +39,8 @@ import { readHorizonStart } from '../../../lib/read-horizon.js';
 import { computeTerminalMarkedTaskCost } from '../../../lib/terminal-marked-task-cost.js';
 import { collectWorkspaceKpis } from '../../../lib/workspace-kpi-stats.js';
 import { lookupFounderRows } from '../../../lib/founder-lookup.js';
-import { buildRunView } from '../../../lib/run-view.js';
+import { buildRunView, runLineageAnchors } from '../../../lib/run-view.js';
+import { NO_REQUEST_RECORDS } from '../request-usage-loader.js';
 import { buildCorpus, NOW_MS, REPLAY_ISSUES, REPLAY_JOBS } from './corpus.js';
 
 // The S1 route is served in-process through proxyLimiter (routes/proxy.js), which skips only when NODE_ENV is
@@ -158,7 +159,7 @@ export function makeCallCollection(corpus) {
 }
 
 /** The Express app `/api/proxy/cost/:identifier` is served from (the route test's harness shape). */
-export function buildCostApp(store, callCollection) {
+export function buildCostApp(store, callCollection, requestUsageLoader) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -171,6 +172,7 @@ export function buildCostApp(store, callCollection) {
     recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: store,
+    requestUsageLoader,
     llmCallLogStore: new LlmCallLogStore({ collection: callCollection }),
     workspaceFromUrl: (req, res, next) => next(),
     freeTierStore: { tryUse: async () => ({ allowed: true }) },
@@ -279,7 +281,11 @@ export async function runReplay(corpusOverride) {
     const corpus = corpusOverride ?? buildCorpus();
     const store = makeDispatchStore(corpus);
     const callCollection = makeCallCollection(corpus);
-    const app = buildCostApp(store, callCollection);
+    // LIN-4201: every surface reads its request records through the one loader, as production does. The replay's
+    // loader holds no records yet: feeding it the corpus's request records is the replay change (LIN-4201 beat 3),
+    // so until then each surface reads exactly the snapshots it read before and the goldens do not move.
+    const requestUsageLoader = NO_REQUEST_RECORDS;
+    const app = buildCostApp(store, callCollection, requestUsageLoader);
     const llmStore = new LlmCallLogStore({ collection: callCollection });
     const now = new Date(NOW_MS);
     const out = {};
@@ -301,11 +307,11 @@ export async function runReplay(corpusOverride) {
 
     // S5 / S6 / S8 / S9 share the 30-day models read, capped at its own row limit. The read carries the
     // founder lookup for its own lineages (`identityRows`), exactly as the Models page's route passes it.
-    const history = await readModelsHistory(store, URL_KEY);
-    const identityRows = history.identityRows;
+    const history = await readModelsHistory(store, URL_KEY, requestUsageLoader);
+    const { identityRows, requestRows } = history;
     const callDocs = corpus.calls.filter(c => c.urlKey === URL_KEY && toMs(c.timestamp) >= toMs(readHorizonStart(now)));
 
-    const agentSpend = agentSpendByJob(history.items, { jobs: AGENT_JOBS, identityRows });
+    const agentSpend = agentSpendByJob(history.items, { jobs: AGENT_JOBS, identityRows, requestRows });
     out.S5 = {
       total: history.total,
       rows: history.items.length,
@@ -313,7 +319,7 @@ export async function runReplay(corpusOverride) {
       jobs: agentSpend,
     };
 
-    out.S6 = Object.fromEntries(AGENT_JOBS.map(job => [job, typicalByModel(history.items, { job, identityRows })]));
+    out.S6 = Object.fromEntries(AGENT_JOBS.map(job => [job, typicalByModel(history.items, { job, identityRows, requestRows })]));
 
     // S7: Harbour-call spend per job, over the calls in the horizon (the store's own read).
     const horizonCalls = await llmStore.listInHorizon(URL_KEY);
@@ -323,8 +329,8 @@ export async function runReplay(corpusOverride) {
     out.S8 = spendByEffectiveModel([...agentSpend, ...harbourSpend], corpus.effective);
 
     out.S9 = Object.fromEntries(AGENT_JOBS.map(kind => [kind, {
-      spend: agentSpendByJob(history.items, { jobs: [kind], identityRows })[0],
-      typicals: typicalByModel(history.items, { job: kind, identityRows }),
+      spend: agentSpendByJob(history.items, { jobs: [kind], identityRows, requestRows })[0],
+      typicals: typicalByModel(history.items, { job: kind, identityRows, requestRows }),
     }]));
 
     // S10: the effort read-out's cost columns over the 200 newest resolved history rows. Its identity is
@@ -332,6 +338,7 @@ export async function runReplay(corpusOverride) {
     const liveRows = await store.listItems(URL_KEY, {});
     const historyRows = (await store.listHistory(URL_KEY, { limit: 200 })).items;
     const effortIdentity = await store.lineageIdentityRows(URL_KEY, { anchors: anchorsOf([...liveRows, ...historyRows]) });
+    const effortRequestRows = await requestUsageLoader.forAnchors(URL_KEY, anchorsOf([...liveRows, ...historyRows]));
     out.S10 = computeEffortReadout({
       liveRows,
       historyRows,
@@ -341,6 +348,7 @@ export async function runReplay(corpusOverride) {
       survivalAvailable: false,
       gateFieldsAvailable: false,
       identityRows: effortIdentity,
+      requestRows: effortRequestRows,
     });
 
     // S11: the public KPI's cost per finished ticket. Production feeds it the rows `loadDispatchHistory`
@@ -352,13 +360,14 @@ export async function runReplay(corpusOverride) {
       dispatchHistory: fakeCollection(corpus.history, scalar),
       dispatchQueue: fakeCollection(corpus.queue, scalar),
     }, horizonRows);
-    out.S11 = computeTerminalMarkedTaskCost(horizonRows, now, { identityRows: founders });
+    out.S11 = computeTerminalMarkedTaskCost(horizonRows, now, { identityRows: founders, requestRows: await requestUsageLoader.forRows(horizonRows, { urlKey: URL_KEY }) });
 
     // S12: the workspace KPIs' cost per day (and the rest of the dashboard's figures).
-    out.S12 = await collectWorkspaceKpis({ collections: workspaceKpiCollections(corpus), urlKey: URL_KEY, now });
+    out.S12 = await collectWorkspaceKpis({ collections: workspaceKpiCollections(corpus), urlKey: URL_KEY, now, requestUsageLoader });
 
     // S13: the run page's loops for one session, grouped by lineage, with each lineage's cost.
-    out.S13 = buildRunView({ sessionId: 'replay-main', seedIssue: 'LIN-1', loops: sessionLoops(corpus) }, { now });
+    const runSession = { sessionId: 'replay-main', seedIssue: 'LIN-1', loops: sessionLoops(corpus) };
+    out.S13 = buildRunView(runSession, { now, requestRows: await requestUsageLoader.forAnchors(URL_KEY, runLineageAnchors(runSession)) });
 
     // The mixed-harness tally over the whole 30-day window (uncapped), as the plan asks.
     const windowRows = (await store.listHistory(URL_KEY, { since: readHorizonStart(now) })).items;

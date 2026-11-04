@@ -8,11 +8,15 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { lineageRecords } from '../../lib/cost-read.js';
+import { lineageRecords as lineageRecords__unplumbed } from '../../lib/cost-read.js';
 import {
   classifyLineage, modelsOf, oplogCounters, requestRecordAudit, readWorkspace, sharesOf, tokenSums, recordCostUsd,
   oplogCrossCheck, parseFlushes
 } from '../../scripts/lin-4200-measure-records-vs-snapshots.mjs';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const lineageRecords = withRequestRows(lineageRecords__unplumbed, 0, { requestRows: [] });
+
 
 const HAIKU = 'claude-haiku-5-5';
 const NOW_ISO = '2026-11-04T05:00:00.000Z';

@@ -16,10 +16,15 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { anchorOf, groupLineageMembership, isMember } from '../../lib/lineage-membership.js';
 import { groupDispatchLineages } from '../../lib/dispatch-lineage.js';
-import { lineageRecords } from '../../lib/cost-read.js';
+import { lineageRecords as lineageRecords__unplumbed } from '../../lib/cost-read.js';
 import { buildTaskCost } from '../fixtures/task-cost-adapter.js';
-import { computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-cost.js';
+import { computeTerminalMarkedTaskCost as computeTerminalMarkedTaskCost__unplumbed } from '../../lib/terminal-marked-task-cost.js';
 import { windowedSpend } from '../../lib/weekly-budget.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const lineageRecords = withRequestRows(lineageRecords__unplumbed, 0, { requestRows: [] });
+const computeTerminalMarkedTaskCost = withRequestRows(computeTerminalMarkedTaskCost__unplumbed, 2, { requestRows: [] });
+
 
 // LIN-4178: the lineage records of the one cost read (joinCostLineages is gone).
 const lineageRecordsOf = rows => lineageRecords({ fetchedRows: rows, identityRows: [], outcomes: groupDispatchLineages(rows) });

@@ -212,3 +212,11 @@ describe('foldRequestUsage: review note 3, a record lineage is never incomplete'
     }
   });
 });
+
+describe('foldRequestUsage: the row a record figure sits on', () => {
+  test('lastItemId is the latest record\'s posting row (the run page places the figure by it)', () => {
+    const fold = foldRequestUsage([rec('a', 9, { itemId: 'wake-2' }), rec('z', 1, { itemId: 'root-1' })]);
+    assert.equal(fold.lastItemId, 'wake-2');
+    assert.equal(foldRequestUsage([]).lastItemId, null);
+  });
+});

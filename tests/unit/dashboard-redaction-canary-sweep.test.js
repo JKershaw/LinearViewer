@@ -40,7 +40,7 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createDashboardRoutes } from '../../routes/dashboard.js';
+import { createDashboardRoutes as createDashboardRoutes__unplumbed } from '../../routes/dashboard.js';
 import { setFetchImpl } from '../../lib/openrouter.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
@@ -48,6 +48,10 @@ import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { guardNetwork } from '../fixtures/network-guard.js';
 import { enumerateRoutes, sampleUrl, appAround, request, makeCanary, SAMPLE_UUID } from './lib/entrance-route-sweep.js';
 import { stubLineageIdentity } from '../fixtures/lineage-identity.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const createDashboardRoutes = withRequestRows(createDashboardRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+
 
 const NOW_ISO = new Date().toISOString();
 const WORKER_ID = '22222222-3333-4444-8555-666666666666';

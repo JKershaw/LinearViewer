@@ -14,7 +14,7 @@ process.env.NODE_ENV = 'test';
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { createSettingsRouter } from '../../routes/settings.js';
+import { createSettingsRouter as createSettingsRouter__unplumbed } from '../../routes/settings.js';
 import { WorkspaceChangeLogStore } from '../../lib/workspace-change-log.js';
 import { WorkspaceHaltStore } from '../../lib/workspace-halt.js';
 import { getWorkspaceFeatures, setWorkspaceFeature, resolveWorkspaceModel } from '../../lib/workspace-preferences.js';
@@ -23,6 +23,10 @@ import { getProvider, getProviderForWorkspace } from '../../lib/providers/regist
 import '../../lib/providers/index.js';
 import { memoryCollection, routingFixture } from './helpers/routing-fakes.js';
 import { stubLineageIdentity } from '../fixtures/lineage-identity.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const createSettingsRouter = withRequestRows(createSettingsRouter__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+
 
 const COPY = "Only this workspace's owner can act on its runner.";
 const OWNER = 'acct-owner';

@@ -8,7 +8,11 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { usageOf, evidenceCountOf, ticketMarkerEntriesOf, groupDispatchLineages } from '../../lib/dispatch-lineage.js';
 import { groupLineageMembership } from '../../lib/lineage-membership.js';
-import { computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-cost.js';
+import { computeTerminalMarkedTaskCost as computeTerminalMarkedTaskCost__unplumbed } from '../../lib/terminal-marked-task-cost.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const computeTerminalMarkedTaskCost = withRequestRows(computeTerminalMarkedTaskCost__unplumbed, 2, { requestRows: [] });
+
 
 const NOW = new Date('2026-06-10T12:00:00.000Z');
 function daysAgo(n) {

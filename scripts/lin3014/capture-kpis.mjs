@@ -61,7 +61,8 @@ export async function captureKpiReads(collectKpiStats, lookupFounderRows) {
   const inert = { find: () => ({ toArray: async () => [] }) };
   const lineageIdentity = rows => lookupFounderRows({ dispatchHistory: inert, dispatchQueue: inert }, rows);
   try {
-    await collectKpiStats(collections, { lineageIdentity, milestoneFunnelDeps: emptyMilestoneFunnelDeps() });
+    // LIN-4201: the request records likewise (none: inert), so the collector reaches its reads.
+    await collectKpiStats(collections, { lineageIdentity, requestRows: async () => [], milestoneFunnelDeps: emptyMilestoneFunnelDeps() });
   } catch {
     // Expected: the recording stubs return empty arrays/0, which downstream
     // aggregation/derivation code may not tolerate. Only the READ SHAPES

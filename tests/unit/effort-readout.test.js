@@ -14,11 +14,15 @@ import {
   partitionPopulation,
   buildIssueCorpus,
   tierAbSurvival,
-  computeEffortReadout,
+  computeEffortReadout as computeEffortReadout__unplumbed,
   ORCHESTRATION_KINDS,
   NOT_INSTRUMENTED_KINDS,
 } from '../../lib/effort-readout.js';
 import { computePlanReviewRoundTrips } from '../../lib/plan-review-round-trips.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const computeEffortReadout = withRequestRows(computeEffortReadout__unplumbed, 0, { requestRows: [] });
+
 
 const ASOF = '2026-09-05T16:00:00.000Z';
 

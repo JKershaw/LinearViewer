@@ -1,6 +1,10 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderSessionPage } from '../../lib/render-session.js';
+import { renderSessionPage as renderSessionPage__unplumbed } from '../../lib/render-session.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const renderSessionPage = withRequestRows(renderSessionPage__unplumbed, 1, { requestRows: [] });
+
 
 // LIN-1003: the dedicated per-session page renderer. Pure (data) → HTML on the
 // shared shell; the route does all reads and hands this a plain data object.

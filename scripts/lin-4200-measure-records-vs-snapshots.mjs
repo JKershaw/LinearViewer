@@ -559,7 +559,9 @@ async function main(argv) {
     const perWorkspace = {};
     for (const urlKey of urlKeys) {
       const { usageDocs, rows, windowRowCount, postingRows, records } = await readWorkspace(db, urlKey, windowStart);
-      const lineages = lineageRecords({ fetchedRows: rows, identityRows: rows });
+      // LIN-4201: the snapshot side of the comparison, so it is read with NO records on purpose (`requestRows: []`):
+      // with records the read would fold them, and the measurement would compare records with records.
+      const lineages = lineageRecords({ fetchedRows: rows, identityRows: rows, requestRows: [] });
       const byAnchor = new Map();
       for (const record of records) {
         const list = byAnchor.get(record.rootItemId) || [];

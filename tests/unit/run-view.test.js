@@ -1,6 +1,10 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildRunView, tierOf, SPINE } from '../../lib/run-view.js';
+import { buildRunView as buildRunView__unplumbed, tierOf, SPINE } from '../../lib/run-view.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const buildRunView = withRequestRows(buildRunView__unplumbed, 1, { requestRows: [] });
+
 
 // LIN-3250 (S1 of LIN-2948) — the pure run view model: runId/title/steps/progress/
 // next/tierOf (beat 1) plus honest cost, time and waiting clocks (beat 2).

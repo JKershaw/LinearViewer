@@ -11,8 +11,12 @@ process.env.NODE_ENV = 'test';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { createWorkspaceKpisRoutes } from '../../routes/workspace-kpis.js';
+import { createWorkspaceKpisRoutes as createWorkspaceKpisRoutes__unplumbed } from '../../routes/workspace-kpis.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const createWorkspaceKpisRoutes = withRequestRows(createWorkspaceKpisRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+
 
 const NOW = new Date('2026-06-10T12:00:00.000Z');
 const harness = createMangoTmpdir('lin-3689-ws-kpis-routes-');

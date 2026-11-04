@@ -280,7 +280,7 @@ const queryText = (value) => (typeof value === 'string' && value.trim() ? value 
  *   closed with OWNER_CHECK_UNAVAILABLE. Never consulted on the verify path.
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null, taskModeStore = null, freeTierStore = null, accountStore = null, consumerHeartbeatStore = null, closeOut = null, installationTokenFor = null, requestUsageStore = null }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null, taskModeStore = null, freeTierStore = null, accountStore = null, consumerHeartbeatStore = null, closeOut = null, installationTokenFor = null, requestUsageStore = null, requestUsageLoader = null }) {
   const router = Router();
 
   // =========================================================================
@@ -686,15 +686,15 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           urlKey: workspace.urlKey, kind, model: null, harness: choice.harness, effort: null, preset: null, anchor: null,
           workspacePreferencesStore, ...settle
         }),
-        readModelsHistory(dispatchQueueStore, workspace.urlKey).catch((err) => {
+        readModelsHistory(dispatchQueueStore, workspace.urlKey, requestUsageLoader).catch((err) => {
           console.error('Decision panel history read error:', err.message);
           return null;
         }),
         getModelCatalog({ mock: shouldMockAi(workspace) }).catch(() => [])
       ]);
       // A failed read says so. It never reads as "no runs": that would be a false figure about the store.
-      const spend = history ? agentSpendByJob(history.items, { jobs: [kind], identityRows: history.identityRows })[0] : null;
-      const typicals = history ? typicalByModel(history.items, { job: kind, identityRows: history.identityRows }) : [];
+      const spend = history ? agentSpendByJob(history.items, { jobs: [kind], identityRows: history.identityRows, requestRows: history.requestRows })[0] : null;
+      const typicals = history ? typicalByModel(history.items, { job: kind, identityRows: history.identityRows, requestRows: history.requestRows }) : [];
       // The blank option stays short (a 390px select clips a long one); what it resolves to reads on a hint line under the field.
       // LIN-3987: what it resolves to is said in words (routingWords), so the hint and the heading never print an id.
       const follow = 'From Models';

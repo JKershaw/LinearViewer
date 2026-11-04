@@ -10,7 +10,11 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { collectKpiStats } from '../../lib/kpi-stats.js';
+import { collectKpiStats as collectKpiStats__unplumbed } from '../../lib/kpi-stats.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const collectKpiStats = withRequestRows(collectKpiStats__unplumbed, 1, { requestRows: async () => [] });
+
 
 // LIN-4178: no founder lookup: the fetched rows stand in for it (the pre-LIN-4178 behaviour).
 const NO_FOUNDERS = async () => [];

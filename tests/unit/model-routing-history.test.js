@@ -6,8 +6,12 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readModelsHistory, MODELS_HISTORY_CAP } from '../../lib/model-routing-history.js';
+import { readModelsHistory as readModelsHistory__unplumbed, MODELS_HISTORY_CAP } from '../../lib/model-routing-history.js';
 import { stubLineageIdentity } from '../fixtures/lineage-identity.js';
+import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
+const readModelsHistory = (store, urlKey, loader = NO_REQUEST_RECORDS) => readModelsHistory__unplumbed(store, urlKey, loader);
+
 
 function fakeStore(items = []) {
   const calls = [];
@@ -44,6 +48,7 @@ describe('readModelsHistory: one window and one cap for both pages', () => {
   });
 
   test('no store answers an empty read, never a throw', async () => {
-    assert.deepEqual(await readModelsHistory(null, 'acme'), { items: [], total: 0, identityRows: [] });
+    // LIN-4201: the shape gains `requestRows` (the lineages' request records), empty with no store.
+    assert.deepEqual(await readModelsHistory(null, 'acme'), { items: [], total: 0, identityRows: [], requestRows: [] });
   });
 });
