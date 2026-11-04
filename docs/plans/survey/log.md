@@ -1349,3 +1349,8 @@ LIN-4219's pieces 1 (`childEnv`, LIN-4220, `52d2c3d`) and 4 (group stop, LIN-422
 - **Ledger: the first two `+` rows**, both from a tally row that was priced and then given its own ticket. The change is test infrastructure only (+2,353 / −107 lines, mostly characterization and census tests), so the place gained guards and owners, and the files grew.
 
 LIN-4201 is still in progress. LIN-4221 (exit codes and pre-flight) is in progress; LIN-4222 (ports) and LIN-4224 (baseline) are Todo.
+
+### 14:35 UTC: harness pieces 2 and 3 merged (both `+`); a ruling on LIN-4201's production gate
+
+- **LIN-4221** (`90bbf82`): one exit-code table imported by both runners and the harness, a pre-flight, and a gap report. **LIN-4222** (`3330526`): **zero literal ports left** across 35 system-test files; ports are OS-assigned through `ports.js`. That's the broad option the scope pulled in, and it landed. Ledger: four `+` rows from LIN-4219 so far, with only the baseline piece (LIN-4224) to go.
+- **LIN-4201's PR is approved and green, and held at the production gate.** The worker says "no session here has" production access. But LIN-4200's own session ran the same script on production through the Railway CLI after John registered the SSH key. That's the **third time a builder didn't know a tool it has** (after LIN-4167 and LIN-4200). The same path leaked the Mongo root password this morning, so I proposed `operator-runs-gate`. My reason gives John the choice: an agent session on that path (never printing the URI), or he runs it.
