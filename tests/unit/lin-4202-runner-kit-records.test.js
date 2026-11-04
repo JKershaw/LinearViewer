@@ -13,8 +13,8 @@
  *    with neither is skipped and counted, never given an invented id;
  *  - posting is batched at 100, a 404 stops, a failed batch does not stop the others, and none
  *    of it throws (postRequestRecords);
- *  - re-posting is idempotent against the REAL intake and store (postUsage + RequestUsageStore
- *    over MangoDB): the stored set and its priced sum do not change, and a grown transcript grows;
+ *  - re-posting is idempotent against the REAL intake and store (postUsage + the intake's
+ *    requestUsageStoreFor, over MangoDB): the stored set and its priced sum do not change, and a grown transcript grows;
  *  - the `[usage]` snapshot fold is unchanged: sumTranscriptUsage over every runner-kit fixture
  *    equals the golden recorded from the unmodified function at origin/main 9cc5ff9c.
  *
