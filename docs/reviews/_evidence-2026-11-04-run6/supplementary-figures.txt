@@ -1,0 +1,164 @@
+# Supplementary figures, Seams & Tangles run 6 (LIN-4231)
+repo HEAD at generation: d7ceb373444f9efbc027656132352d247535aa5e; measured commits 5334c81a7207b9f2cc85ca429a2c6b18e1635c0e and d7ceb373444f9efbc027656132352d247535aa5e
+
+## S0. Window facts
+d7ceb373 2026-11-04T17:18:18Z LIN-4203: runner-kit stops posting [usage]; intake counts legacy snapshots (#2274)
+2ee4e600 2026-11-04T16:34:14Z LIN-4201: the cost read sums request records (records-first cutover, LIN-4195 piece 4) (#2273)
+eb44eff9 2026-11-04T11:02:20Z LIN-4212: read request records by their posting row, not the wake's stamp (#2272)
+230cc2c2 2026-11-04T08:44:49Z LIN-4200: records-vs-snapshots measurement and D13 timing (LIN-4195 piece 3) (#2267)
+f5bc752c 2026-11-04T08:40:52Z Drift & Coherence Review 2026-11-04 (LIN-4209) (#2271)
+57b22b92 2026-11-04T08:30:25Z LIN-4206: Stability Review run 4 (2026-11-04), delta vs 2026-10-21 (#2269)
+1403d52d 2026-11-04T08:29:48Z LIN-4207: Code quality review 2026-11-04 (docs-only) (#2270)
+e439f637 2026-11-04T08:24:45Z LIN-4208: Seams & Tangles review, run 5 (2026-11-04) (#2268)
+- 33 files changed, 1049 insertions(+), 288 deletions(-)
+- D	lib/founder-lookup.js
+- A	lib/request-usage-fold.js
+- A	lib/request-usage-loader.js
+- A	lib/request-usage-vocabulary.js
+- A	lib/usage-snapshot-intake.js
+- A	lib/workspace-kpis-cache.js
+- numstat 189	31	lib/cost-read.js
+- numstat 15	59	lib/runner-kit/runner.mjs
+- numstat 2	2	routes/proxy.js
+- 5334c81a: lib/cost-read.js lines 434
+- d7ceb373: lib/cost-read.js lines 592
+
+## S1. lib/ -> routes/ imports
+- 5334c81a guide old-5334c81a: edge-dump lib->routes 0; git grep 0
+- 5334c81a guide head-d7ceb373: edge-dump lib->routes 0; git grep 0
+- d7ceb373 guide old-5334c81a: edge-dump lib->routes 0; git grep 0
+- d7ceb373 guide head-d7ceb373: edge-dump lib->routes 0; git grep 0
+
+## S2. route -> route file edges (run 5 definition: edge dumps, from routes/ to routes/)
+- 5334c81a: 53 (cross-area 3)
+- d7ceb373: 53 (cross-area 3)
+
+## S3. F7 dead named lib imports in routes/proxy.js (run 4 heuristic: named imports from ../lib/, identifier not found outside the import statement)
+- 5334c81a: named lib imports 96, unused 45
+- d7ceb373: named lib imports 96, unused 45
+
+## S4. F6 browser globals and the cost-format script lists
+- 5334c81a: window.X = in public/ 100; in public/common.js 52 (strict =[^=] 48); /cost-format.js script-list lines 6: lib/render-flight-companion.js, lib/render-observation.js, lib/render-swipe.js, lib/render-task-page.js, lib/render-workspace-kpis.js, lib/render.js
+- d7ceb373: window.X = in public/ 100; in public/common.js 52 (strict =[^=] 48); /cost-format.js script-list lines 6: lib/render-flight-companion.js, lib/render-observation.js, lib/render-swipe.js, lib/render-task-page.js, lib/render-workspace-kpis.js, lib/render.js
+- public/ files changed in window: 0
+
+## S5. N8: the deleted task-cost module still named
+- 5334c81a: guide alias task-cost| present=True; comment refs 3
+    lib/model-routing-spend.js:5: * Both readers keep the rule the rest of the app keeps (lib/task-cost.js, LIN-1086): a run whose
+    lib/runner-kit/runner.mjs:768: * `[usage]` counts once in lib/task-cost.js.
+    lib/wall-clock-summary.js:97:  // `lib/task-cost.js`'s `buildTaskCost`, which merges a whole lineage's
+- d7ceb373: guide alias task-cost| present=True; comment refs 2
+    lib/model-routing-spend.js:5: * Both readers keep the rule the rest of the app keeps (lib/task-cost.js, LIN-1086): a run whose
+    lib/wall-clock-summary.js:97:  // `lib/task-cost.js`'s `buildTaskCost`, which merges a whole lineage's
+
+## S6. Carried anchors (HEAD)
+- lib/render-run-steps.js:258:export function fmtDuration(ms) {
+- lib/render-task-page.js:58:import { renderContextPanel, fmtDuration } from './render-run-steps.js';
+- lib/task-page-loader.js:50:import { fmtDuration } from './render-run-steps.js';
+- lib/task-state.js:22:import { fmtDuration } from './render-run-steps.js';
+- lib/proxy-preamble.js:152:export function applyDefaultDispatchHarness(resolvedHarness) {
+- lib/tree.js:189:export { selectFocusSubtask, computeFrontierFacts, compareByIdentifier } from './recommendation-facts.js'
+- lib/recommendation-facts.js:226:export function parentNextOf(children, own = null) {
+- lib/providers/jira/index.js:104:import { parentNextOf } from '../../recommendation-facts.js'
+- lib/providers/linear/index.js:29:import { parentNextOf } from '../../recommendation-facts.js'
+- lib/providers/local/index.js:40:import { parentNextOf } from '../../recommendation-facts.js'
+- lib/proxy-ref-resolver.js:80:export class RefResolutionError extends Error {
+- lib/proxy-wire.js:285:export function collectIssueAttachments({ description, comments, formalAttachmentNodes } = {}) {
+- lib/recap-cache.js:27:export function stableStringify(value) {
+- lib/recap-cache.js:94:export function hashContext(context) {
+- lib/run-summary-cache.js:32:export function stableStringify(value) {
+- server.js:142:import { createTestRoutes, installTestTokenLinearTransport } from './routes/test.js'
+- server.js:136:import { requestUsageLoader as createRequestUsageLoader } from './lib/request-usage-loader.js'
+- server.js:586:const requestUsageLoader = createRequestUsageLoader(requestUsageStore)
+- server.js:589:  requestUsageLoader,
+- server.js:2509:    requestRows: rows => requestUsageLoader.forRows(rows),
+- server.js:2579:app.use(createDispatchRoutes({ installationTokenFor, dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenSt
+- server.js:2590:const workspaceKpisCache = workspaceKpisCacheFor({ collections: workspaceKpisCollections, requestUsageLoader })
+- server.js:2591:app.use(createWorkspaceKpisRoutes({ workspaceFromUrl, requestUsageLoader, workspaceKpisCache, collections: workspaceKpisCollections }))
+- server.js:3233:app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, di
+- server.js:3259:app.use(createDashboardRoutes({ installationTokenFor, workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterial
+- lib/cost-read.js:33: * total. Pure: no store, clock or network.
+- lib/request-usage-loader.js:90:export function requireRequestUsageLoader(loader, caller) {
+- server.js:1215:  installTestTokenLinearTransport()
+- lib/dispatch-store.js:59:import { countUsageSnapshotPost } from './usage-snapshot-intake.js';
+- lib/dispatch-store.js:3736:          await countUsageSnapshotPost(this.usageSnapshotCollection, { urlKey });
+- server.js:42:import { USAGE_SNAPSHOT_INTAKE_COLLECTION } from './lib/usage-snapshot-intake.js'
+- server.js:136:import { requestUsageLoader as createRequestUsageLoader } from './lib/request-usage-loader.js'
+- server.js:461:  usageSnapshotCollection: db.collection(USAGE_SNAPSHOT_INTAKE_COLLECTION),
+- server.js:585:// LIN-4201: the one request-records loader every cost reader is given (lib/request-usage-loader.js). Built once, here.
+- server.js:586:const requestUsageLoader = createRequestUsageLoader(requestUsageStore)
+
+## S7. lib Runs -> server-rendered pages edges, and catch-all -> pages edges (HEAD guide)
+- 5334c81a: Runs->Pages 8: lib/live-console.js->lib/timeline-zoom.js, lib/task-page-loader.js->lib/render-run-steps.js, lib/task-stack.js->lib/tree.js, routes/dispatch.js->lib/components/decision-panel.js, routes/live-console.js->lib/render-live-console.js, routes/live-console.js->lib/render.js, routes/runner-setup.js->lib/render-runner-setup.js, routes/runner-setup.js->lib/render.js
+- d7ceb373: Runs->Pages 8: lib/live-console.js->lib/timeline-zoom.js, lib/task-page-loader.js->lib/render-run-steps.js, lib/task-stack.js->lib/tree.js, routes/dispatch.js->lib/components/decision-panel.js, routes/live-console.js->lib/render-live-console.js, routes/live-console.js->lib/render.js, routes/runner-setup.js->lib/render-runner-setup.js, routes/runner-setup.js->lib/render.js
+
+## S8. F1 (LLM <-> Runs) edges that touch the cost family (HEAD guide, d7ceb373)
+- LLM & prompts -> Runs & dispatch: 30 edges, cost-family 5: lib/model-pricing.js->lib/row-usage.js, lib/model-routing-history.js->lib/lineage-membership.js, lib/model-routing-history.js->lib/request-usage-loader.js, lib/model-routing-spend.js->lib/cost-read.js, lib/scan.js->lib/session-telemetry.js
+- Runs & dispatch -> LLM & prompts: 37 edges, cost-family 6: lib/cost-read.js->lib/llm-call-log.js, lib/request-usage-fold.js->lib/model-pricing.js, lib/request-usage-intake.js->lib/model-pricing.js, lib/session-telemetry.js->lib/model-pricing.js, routes/dispatch.js->lib/model-routing-history.js, routes/dispatch.js->lib/model-routing-spend.js
+
+## S9. The over-broad workspace- pattern: files it puts in Auth that are named workspace-*, and workspace-api-mocks importers (HEAD)
+- lib/workspace-api-mocks.js area: Auth, accounts & workspaces; importers 6: routes/workspace-api-audit.js, routes/workspace-api-feedback.js, routes/workspace-api-prompts.js, routes/workspace-api-scan.js, routes/workspace-api-steps.js, routes/workspace-api.js
+- lib/workspace-kpis-cache.js area under old guide at d7ceb373: Auth, accounts & workspaces; under HEAD guide: Reports & operator tools
+
+## S10. Scripts outside the tool scope that import lib/ (LIN-4200, HEAD)
+- scripts/lin-4200-d13-volume-timing.mjs: request-usage-store.js, lineage-membership.js, model-pricing.js, read-horizon.js, kpi-stats.js
+- scripts/lin-4200-measure-records-vs-snapshots.mjs: cost-read.js, request-usage-store.js, row-usage.js, request-usage-vocabulary.js, model-pricing.js
+
+## S11. Change-coupling window overlap (from cochange JSON and the commit lists in this folder)
+- windows 2026-09-05T05:23:59.000Z..2026-11-04T05:23:59.000Z and 2026-09-05T17:18:18.000Z..2026-11-04T17:18:18.000Z: overlap 59.504 of 60 days (99.17%)
+- commits 874 vs 854 (match cochange changes 874 / 854); shared 846; only 5334c81a 28; only d7ceb373 8
+
+## S12. No-link change-coupling pairs: which commits drive Agent API + Reports and Agent API + Other (HEAD guide, d7ceb373 window)
+- Agent API (proxy) + Reports & operator tools: 13 commits
+    2ee4e600 LIN-4201: the cost read sums request records (records-first cutover, LIN-4195 pie
+    9cc5ff9c LIN-4198: request-usage intake, store and per-request pricing (LIN-4195 piece 1) 
+    46b43b3b LIN-4147: one answer to which rows belong to a lineage (#2246)
+    30db2052 LIN-4129: remove cost code that nothing reads (#2234)
+    343d34ec LIN-3827: retire stale landing-status comments (#2146)
+    9f7acff7 LIN-3846: Settings is a page per area, built from three kinds of row (#2099)
+    143788ae LIN-3854: proxy model routing: reads, and writes behind one workspace setting (#2
+    ec9eed17 LIN-3805: dispatch store fault answers a retryable 503, never 404/401/empty 200 (
+    a9f81290 LIN-3703: rebuild the public /kpis page design-first, with a small-count floor (#
+    d8c14f6d LIN-3618: 90-day dispatch token lifetime, expire ownerless tokens (#1992)
+    3bcf6e2e LIN-3454: shared toEpochMs + migrate the 12 callers that already return null (#18
+    b8b0c5a7 Merge pull request #1653 from JKershaw/lin-3163-lifetime-retention-flip
+    fe541ee9 Merge pull request #1642 from JKershaw/lin-3161-read-horizon
+- Agent API (proxy) + Other features: 14 commits
+    2ee4e600 LIN-4201: the cost read sums request records (records-first cutover, LIN-4195 pie
+    72305215 LIN-4179: Harbour calls on the cost read, one USD formatter, census and agreement
+    10b2c82f LIN-4177: one cost read; /cost, Models and effort run on it (#2261)
+    30db2052 LIN-4129: remove cost code that nothing reads (#2234)
+    2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#21
+    159b6822 LIN-3438: retire H0 ifParked (revert + 400 + temporary withhold) (#1816)
+    8e407057 LIN-3436: ifParked contract, consumer capability, delivery gate, runner-kit parke
+    993c3923 LIN-3366: ticket-closed closer (seams, sweep, decision withdrawal) (#1796)
+    dcfbf7fa Merge pull request #1759 from JKershaw/feat/lin-3325-remove-share-links
+    84599242 Merge pull request #1751 from JKershaw/feat/lin-3300-one-path
+    d933496f Merge pull request #1714 from JKershaw/lin-3243-share-store-snapshot
+    a0854d18 Merge pull request #1531 from JKershaw/lin-2968-agent-turn-rename
+    321848e1 LIN-2625: Flight Companion playbook memory (#1418)
+    4b3bfb3d LIN-2620: proxy turn endpoint for the Flight Companion, propose-only (#1413)
+
+## S13. Simple Dispatcher module format (outside seams.mjs)
+- simple-dispatcher origin/main d8d186c07113d6e61e3489e38f1210d0b0624cad: dispatcher.js require( lines 35; import/export lines 0; package.json "type": None
+
+## S14. Survey place ledger rows this report cross-links (read only)
+- origin/claude/cool-rubin-6acj5j = 2cc0d1fd002ca606a3cd109c63c352aa93cd7b8c
+    place-ledger.md:32: | LIN-4201 (records-first read) | Same guide on both sides (the merge's): +8 cross-area imports, no new pair; Other↔Runs shrank; **LLM↔Runs (the High F1 knot) +
+    place-ledger.md:33: | LIN-4203 (stop snapshots) | Harbour: +2 cross-area imports; **one new file without a home** (`lib/usage-snapshot-intake.js`, the intake counter, in the catch-
+
+## S15. Entry files / files / internal imports per area, each combination (seams.areas)
+| area | 5334c81axold-5334c81a | 5334c81axhead-d7ceb373 | d7ceb373xold-5334c81a | d7ceb373xhead-d7ceb373 |
+| Agent API (proxy) | 13/32 int 45 | 13/32 int 45 | 13/32 int 45 | 13/32 int 45 |
+| Auth, accounts & workspaces | 57/64 int 115 | 57/64 int 115 | 58/65 int 115 | 57/64 int 115 |
+| Front end: browser code | 0/43 int 0 | 0/43 int 0 | 0/43 int 0 | 0/43 int 0 |
+| Front end: server-rendered pages | 53/91 int 287 | 53/91 int 287 | 53/91 int 287 | 53/91 int 287 |
+| LLM & prompts | 69/78 int 68 | 69/78 int 68 | 69/78 int 68 | 69/78 int 68 |
+| Other features | 16/17 int 8 | 13/14 int 6 | 16/17 int 8 | 13/14 int 6 |
+| Platform & plumbing | 23/25 int 2 | 23/25 int 2 | 23/25 int 2 | 23/25 int 2 |
+| Providers (Linear, GitHub, Jira, local) | 31/36 int 40 | 31/36 int 40 | 31/36 int 40 | 31/36 int 40 |
+| Reports & operator tools | 5/7 int 3 | 5/7 int 3 | 5/7 int 3 | 6/8 int 3 |
+| Runs & dispatch | 89/102 int 166 | 92/105 int 181 | 92/105 int 169 | 93/108 int 187 |
+| Task model | 2/2 int 1 | 2/2 int 1 | 2/2 int 1 | 2/2 int 1 |
+| Web routes (pages & workspace API) | 22/38 int 31 | 22/38 int 31 | 22/38 int 31 | 22/38 int 31 |
+| Wiring (server.js) | 0/1 int 0 | 0/1 int 0 | 0/1 int 0 | 0/1 int 0 |

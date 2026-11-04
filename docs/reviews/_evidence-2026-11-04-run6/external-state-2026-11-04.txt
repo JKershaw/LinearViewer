@@ -1,0 +1,33 @@
+# External state read for the run 6 report (LIN-4231), 2026-11-04T18:39Z
+## Linear (via the workspace proxy, GET /issues/<id>)
+- LIN-4154 | Backlog | parent LIN-3490 | comments 0 | Seams: move fmtDuration out of lib/render-run-steps.js so task-state and task-page-loader stop impor
+- LIN-4155 | Backlog | parent LIN-3820 | comments 0 | Seams: move applyDefaultDispatchHarness out of lib/proxy-preamble.js so model routing stops importin
+- LIN-3922 | Backlog | parent None | comments 1 | Retire the lib/tree.js re-export of the focus-child picker (repoint two eval scripts and three unit 
+- LIN-3923 | Backlog | parent None | comments 1 | Decide the 'LLM & prompts ⇄ Providers' knot (now 11/4): do the context-shaping caps and focus-child 
+- LIN-4193 | Backlog | parent LIN-3936 | comments 2 | Rename or absorb lib/weekly-budget.js and name the cost modules into a code-shape area
+- LIN-4195 | In Progress | parent LIN-3936 | comments 16 | Costs rebuild 2: one record per model request, summed
+- LIN-4226 | In Progress | parent LIN-4195 | comments 6 | Costs rebuild 2 · piece 4b: the cost read loads its request records (loading becomes part of the rea
+- LIN-3736 | Backlog | parent LIN-3449 | comments 3 | Seams: move stableStringify/hashContext from lib/recap-cache.js down to plumbing
+- LIN-3737 | Backlog | parent None | comments 1 | Seams: move collectIssueAttachments out of lib/proxy-wire.js to a provider-neutral module
+- LIN-3738 | Backlog | parent None | comments 1 | Seams: move dispatch credential provisioning (lib/proxy-preamble.js) out of the Agent API area
+- LIN-3555 | Backlog | parent None | comments 1 | Seams: move RefResolutionError to a provider-neutral module
+- LIN-2600 | Backlog | parent LIN-2601 | comments 0 | LIN-679 cleanup: remove the 53 dead named lib/* imports left in routes/proxy.js by the sub-router mi
+- LIN-4201 | Done | parent LIN-4195 | comments 17 | Costs rebuild 2 · piece 4: the cost read sums request records (records-first cutover)
+- LIN-4203 | Done | parent LIN-4195 | comments 3 | Costs rebuild 2 · piece 6: stop posting [usage] snapshots; remove the runner snapshot path
+- LIN-4200 | Done | parent LIN-4195 | comments 13 | Costs rebuild 2 · piece 3: measure records vs snapshots on live data (gate for the read switch)
+- LIN-4212 | Done | parent LIN-4195 | comments 14 | Request records posted by a wake row are stranded under the wake's own id (records-sum read would dr
+- LIN-4176 | Done | parent LIN-3936 | comments 14 | Costs rebuild 1: one cost read that every surface asks
+- LIN-4179 | Done | parent LIN-4176 | comments 6 | Costs rebuild 1.3: Harbour calls on the cost read, one USD formatter, census and agreement
+- LIN-3720 | Done | parent None | comments 4 | Area map: decide the area for the 12 lib/ files still in 'Other features'
+- LIN-4028 | In Progress | parent None | comments 5 | Routing: a recorded ruling that sets a task's model is ignored by recommend-and-dispatch
+- LIN-4232 | In Progress | parent None | comments 0 | Drift & Coherence Review (trend vs 2026-11-04): a very quiet window (8 LinearViewer + 8 SD commits, 
+## GitHub (gh pr view)
+- #2185 OPEN updated 2026-10-30T09:15:48Z head 762b8abc | LIN-4028: a recorded routing ruling pins the model and effort recommend-and-dispatch runs on
+- #2275 OPEN updated 2026-11-04T18:33:13Z head 911513a2 | LIN-4226: the cost read loads its own request records (LIN-4195 piece 4b)
+## Linear, further reads
+- LIN-4197 | Done | parent LIN-4195 | Costs rebuild 2 · piece 0: transcript corpus and baseline goldens (both repos, no production change)
+- LIN-4198 | Done | parent LIN-4195 | Costs rebuild 2 · piece 1: Harbour request-usage intake, store and per-record pricing (nothing reads
+- LIN-4199 | Done | parent LIN-4195 | Costs rebuild 2 · piece 2: runner posts per-request records for claude-code (snapshots still posted)
+- LIN-4202 | Done | parent LIN-4195 | Costs rebuild 2 · piece 5: opencode and runner-kit post per-request records
+- LIN-4193 comment 2026-11-04T08:07:18.894Z: 'From the Seams & Tangles run 5 review (LIN-4208, report: https://github.com/JKershaw/LinearViewer/blob/42f2730'
+- LIN-4193 comment 2026-11-04T08:25:05.482Z: 'Correction to my earlier comment from the Seams & Tangles run 5 review (LIN-4208, merged report: https://githu'
