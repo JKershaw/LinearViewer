@@ -1182,3 +1182,15 @@ The rule for these: carry what you cheaply can, and name in the close-out what y
   Builders do notice the place when asked. Nobody had asked before.
 - **Q4 ("if the area were how you'd want it")** was "one 'run this test command against a private copy of the trees' primitive, shared by the system suite and the mutation gate". That is the tally's shared-harness row, **now named four times** (LIN-4180, LIN-4181, LIN-4196 step-back, LIN-4196 builder). By the tally's own rule, it's a candidate to file with the evidence.
 - **Q2 matches the forecast's "do first"** (a baseline first). The builder's version: "that would have shown the `harbour-halt` red and the preload interaction at the start".
+
+## 4 Nov, about 10:35 UTC: can the global offshoot see the small copies? (backtest on LIN-4178)
+
+**Gap noted first.** LIN-4212 (record lineage) was filed by the gate's worker and started by its autopilot within minutes, so it ran with no Survey. A ticket filed mid-lineage skips the loop. A real Survey stage would need to sit where tickets are *started*, not where we file them.
+
+**The blind spot.** The global offshoot saw the hub from the base, but not the small copies Drift found afterwards. The clearest of these: `lib/founder-lookup.js` (LIN-4178) repeats `dispatch-store.lineageIdentityRows` (LIN-4177, already on `main` at LIN-4178's base `10b2c82fb`), and the copy skips the bounded-read guard and fault mapping. LIN-4178's ticket asked for "the raw-collection adapter for the founder lookup", which is how the copy was invited.
+
+**The test.** Run v0 (unchanged) and v1 at `10b2c82fb` on LIN-4178's ticket text. v1 adds one clause to question 2: "…or leave in two places (a second copy of something the codebase already has)?"
+
+**Hit criterion, written before dispatch:** the answer names `lineageIdentityRows` (or "the founder lookup already in `dispatch-store`") as the existing home, and warns that a raw-collection adapter would be a second copy, or loses the bounded-read guard. A general "watch for duplication" is a miss.
+
+**Caveat:** LIN-4178's description is read as it is now, and it may have been edited after work began.
