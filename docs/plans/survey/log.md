@@ -1367,3 +1367,16 @@ John asked whether he's actually needed. He isn't. LIN-4200's session ran the sa
 So I sent LIN-4201's close-out session (`795899f6`, follow-up `41c42f3b`) the LIN-4200 path, with strict credential handling: the URI goes into the environment inside one command and is never echoed, written or posted; stop if it can't be done without it appearing. Then the gate per John's criterion, the IXSCAN check, GO or NO-GO on the ticket, and on GO, close-out merges pinned to `a878966c`.
 
 **Correction (John, 16:00 and 16:05): not a fault, and not a design either.** Railway (and hosting generally) isn't integrated through Harbour yet, so agents aren't told about it. That's just the current state. John is relaxed about it: an agent finding it on its own is fine, and an agent pausing to ask is fine too. So the "builders don't know their tools" notes (LIN-4167, LIN-4200, LIN-4201) describe the current setup, not a lesson to act on. How hosting services fit into Harbour is for later.
+
+### 17:10 UTC: LIN-4201 merged, the first costs-chain ticket through the whole loop; LIN-4219 Done; LIN-4187 surveyed
+
+- **LIN-4201** (`2ee4e600`) merged after the agent ran the production gate. Read with the merge's own guide on both sides (a lesson: `place-change.mjs` must take the guide from the commits it compares, not from my branch):
+  - **the twin is gone** (`founder-lookup.js` deleted);
+  - one loader, the only new importer of the store;
+  - one vocabulary module; one fold;
+  - **the cost read has a real home** in Runs, beside its store;
+  - no new knot, and Other↔Runs shrank;
+  - but **LLM↔Runs grew by two edges**: the hub's reach into LLM now sits inside that existing knot.
+
+  Ledger: **+ (mixed).** It's the first costs ticket on the positive side. The baseline window's equivalents (LIN-4177, LIN-4178) were − and −/+. The builder has been asked q1–q6 plus **q7: did the larger scope pay for itself**, and which parts landed as asked (`77d4be68`).
+- **LIN-4219 Done** (`7d515d3`). LIN-4187 is surveyed at `7d515d3` (open-0 and global, then a step-back). **Protocol change:** this Survey may run `npm run test:baseline` or the one named system test, because the harness makes running cheap and safe. Before, forecasts ran nothing. We'll see whether running changes what the forecast can see.
