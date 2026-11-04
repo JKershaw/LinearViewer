@@ -1080,3 +1080,29 @@ John: "we're at the try-anything-and-see-if-it-works stage… only once we have 
   - **Not this task's:** `hook.js`'s 7 copies of the post-at-Stop sequence, and the opencode runner's size.
 
 **First observation.** The two views barely overlap, and they agree where they do (`harnessReadingOf`, `buildSessionTelemetry` left alone, goldens as witnesses). open-0 is about *proving* the change; global is about *where it leaves things*. That's the split we hoped for: two voices, not one view said twice.
+
+### 08:10 UTC: forward trial 1, the step-backs with the place view, and the tickets written
+
+Both step-back sessions got the global agent's answer pasted in, with "evidence to weigh, not instructions; check what you rely on".
+- **They checked it.** LIN-4201's step-back confirmed the census already reserves "its own file" for piece 4, and **found a third entry path** to `buildRunView` the global agent missed (`run-paragraph-hook.js:66`). LIN-4203's step-back **corrected one line reference** (`lane` is added at flush, `:144`, not `:74`). So the place view was weighed, not swallowed.
+- **Both chose the middle option, and absorbed the place view's cheap moves into it.**
+  - **LIN-4201: B**, one loader and one decision. Its merge checks include "the cost code has a home: `cost-read`, `row-usage` and the loader go into Runs & dispatch".
+  - **LIN-4203: B plus an intake counter.** "The deletion is only safe if its boundary can be checked." It lists exactly what's gone, what has one owner, and a legacy-marked census of snapshot readers.
+- **The new question 3 ("say plainly what the place should look like once it's done… so someone can check it at merge") worked.** Both gave a checkable list of files gone, single owners, where new code lives, and which tests flip. That list is the contract the place change can be judged against at merge.
+- **Question 4 gave a short, concrete list of what is "not this task's"**, mostly agreeing with the global agent's "better still". It's written onto the tickets as "list in the close-out, don't file", ready for the tally of broad options.
+
+**Written onto LIN-4201 and LIN-4203** as "How to go about it (from a Survey before work began)", with the "at merge" checks. Their state was not changed: LIN-4195's autopilot runs them after the gate. One ruling is named for John on LIN-4203 (runner-kit's no-transcript case; the Survey recommends `no-usage`).
+
+**What to check at merge**, with `experiments/place-change/place-change.mjs` and by reading:
+- **LIN-4201:**
+  - the catch-all loses `cost-read`/`row-usage` (or the guide gains a home for them);
+  - exactly one new file names the store;
+  - no new two-way area link;
+  - one decision function.
+- **LIN-4203:**
+  - the runner's snapshot functions are gone;
+  - the flag is re-documented;
+  - the census lists the legacy readers;
+  - net production lines **down**: the first piece in the window that should shrink the place.
+
+**Running cost of the loop for one ticket:** four agents (open-0, global, step-back, plus the build). The three Survey agents together cost less than one build beat. The meter will give the real figure once records-first reading lands, which is this very ticket.
