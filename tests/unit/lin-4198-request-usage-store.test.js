@@ -315,7 +315,11 @@ describe('census: nothing outside the store reads the collection', () => {
     // LIN-4212: the redaction census names the store as a classified call site (a table key); it reads nothing itself.
     'tests/unit/lin-3384-redaction-census.test.js',
     // LIN-4212 (beat 3): the measure script's tests name the collection in a fake database; they read nothing from the store.
-    'tests/unit/lin-4200-measure.test.js'
+    'tests/unit/lin-4200-measure.test.js',
+    // LIN-4234: the dry run's key-universe count (URLKEY_SOURCES, `distinct('urlKey')`) and the urlkey-holders class
+    // table name the collection. Neither reads a record for a figure: a no-holder count and a classification.
+    'scripts/dry-run-urlkey-duplicates.mjs',
+    'tests/unit/urlkey-holders.test.js'
   ]);
   const SCANNED_DIRS = ['lib', 'routes', 'scripts', 'tests', 'server.js'];
   const SKIP = new Set(['node_modules', 'experiments', 'public']);
