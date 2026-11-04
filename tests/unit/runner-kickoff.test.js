@@ -51,7 +51,6 @@ describe('what the served prompt must do (each bullet has an anchor)', () => {
     ['a followUpTo item continues the same subagent', /followUpTo[^\n]*same subagent/i],
     ['tokens kept away from subagents (the broker)', /--unix-socket/, /never (?:give|hand|pass)[^.\n]*token/i],
     ['[handoff] per subagent', /\[handoff\] item /],
-    ['[usage] with the realised harness and model', /\[usage\] \{/, /realised/i],
     ['terminal markers', /\[done\]/, /\[failed\]/, /\[blocked\]/],
     ['its own watchdog', /watchdog/i, /\[blocked\] stalled/],
     ['N1: background wait plus re-arm, /loop fallback', /`runner wait`/, /run_in_background/, /re-arm/i, /\/loop/],

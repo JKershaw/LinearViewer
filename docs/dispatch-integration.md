@@ -1013,8 +1013,8 @@ default/precedence chain applies (see the default-tier bullet below). See LIN-26
 - **Inert until the runner reads it.** A server-side `effort` is a no-op until the (external)
   consumer reads `item.effort` and passes it along; a `null` value preserves today's default
   behaviour, so existing runners are unaffected.
-- **Surfaces on `/cost`.** When a runner reports its usage back via a `[usage]` feedback entry
-  carrying `effort`, it is parsed alongside `model`/`harness` and surfaced per worker session
+- **Surfaces on `/cost`.** When a runner reports its usage back (per-request records since LIN-4203; the
+  legacy `[usage]` feedback entry carried `effort` and is still read from old rows), it is parsed alongside `model`/`harness` and surfaced per worker session
   on `GET /api/proxy/issues/:identifier/cost` (`workerSessions[].effort`), next to a derived
   `workerSessions[].durationMs` for that session. As with everything else on this field, an
   absent value reads `null`, never an error.

@@ -1192,9 +1192,10 @@ GET /api/proxy/cost/{identifier}          (alias)
 
 Returns a task's total cost in **API-equivalent USD** (LIN-1775), joining two sources:
 
-- **Worker dispatch usage** — the cumulative `[usage]` telemetry the runner posts per
-  session (LIN-1425), priced via the static rate card (LIN-1495) when the harness
-  reports no native cost (`claude-code`).
+- **Worker dispatch usage** — the per-request usage records the runner posts per model
+  request (LIN-4195), priced at read per record. The cumulative `[usage]` snapshot of LIN-1425 is
+  retired (LIN-4203) and read only from old rows; the static rate card (LIN-1495) prices it when the
+  harness reports no native cost (`claude-code`).
 - **App-side LLM calls** — OpenRouter calls this app itself makes on the task's behalf
   (e.g. `recommend`), from the llm-call-log.
 

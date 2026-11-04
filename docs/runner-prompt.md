@@ -177,10 +177,10 @@ subagent to add `--unix-socket <path>` to every curl. Its value wins over any
    For `BLOCKED:` with a `DECISION:` line, first post its JSON object as written, from the `{`,
    as `runner feedback <id> decision '<the JSON>'`; Harbour reads it as a ruling (the same
    `decision_id` again is safe: the last wins). Then the marker.
-2. `runner usage <agentId>`: the `[usage]` line and per-request records, from the subagent's own
-   transcript. It carries the **realised** `harness` and `model` (what actually ran, never what
-   the item asked for). With no readable transcript it posts the harness alone, which reads
-   unpriced, never $0.
+2. `runner usage <agentId>`: posts the subagent's per-request usage records, from its own
+   transcript. Each record carries the **realised** `harness` and `model` (what actually ran, never
+   what the item asked for). With no readable transcript it posts nothing, so the item reads as having
+   no reported usage, never $0.
 3. The marker: `DONE:` → `runner feedback <id> status "[done] <summary>"`; `FAILED:` →
    `"[failed] <why>"`; `BLOCKED:` → `"[blocked] <what it needs>"`. `[blocked]` is not terminal:
    it wakes the parent and reads as waiting on a human, and a follow-up continues the subagent.
@@ -188,7 +188,7 @@ subagent to add `--unix-socket <path>` to every curl. Its value wins over any
 
 `runner feedback <id> <kind> <message>`: `kind` is one of {{FEEDBACK_ENTRY_KINDS}}; you need
 `status`, `recap`, `decision`. Every post carries the lineage's first item as `rootItemId`, so a
-subagent's cumulative usage counts once however many wakes it runs.
+subagent's usage records count once however many wakes it runs (the per-request key dedupes them).
 
 **Abort rows.** An item with `abort: true` names a session to cancel. `runner take` handles the
 abort row itself: a running target is stopped and gets `[aborted] Cancelled running session <id8> (running).`,
@@ -258,7 +258,6 @@ let running subagents finish or stop them, and report:
 DECISION: {"decision_id":"keep-schema","question":"Which schema do we keep?","options":[{"id":"a","label":"Schema A"},{"id":"b","label":"Schema B"}],"recommended":"a"}
 [handoff] item 0f3a9c2e-1b4d-4e8f-9a7b-2c6d8e0f1a3b → subagent a1b2c3d4 (new)
 [handoff] item 7c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f → subagent a1b2c3d4 (continued from 0f3a9c2e-1b4d-4e8f-9a7b-2c6d8e0f1a3b)
-[usage] {"schema":1,"harness":"claude-code","model":"claude-opus-5-5","inputTokens":130,"outputTokens":1050,"cacheCreationInputTokens":1500,"cacheCreation1hInputTokens":200,"cacheReadInputTokens":12300}
 [done] Added the runner prompt route; tests green.
 [failed] The migration needs a database this machine can't reach.
 [failed] enqueue blocked: DISPATCH_GRANT_REQUIRED
@@ -274,6 +273,6 @@ DECISION: {"decision_id":"keep-schema","question":"Which schema do we keep?","op
 [skipped] refused: taken item differs from the confirmed poll (prompt)
 ```
 
-`[handoff]` and `recap` are status only; `[usage]` is `kind: usage`; `[done]`, `[failed]`,
+`[handoff]` and `recap` are status only; `[done]`, `[failed]`,
 `[aborted]` and `[skipped]` end an item (`[skipped]` wakes no one); `[blocked]` wakes the parent
 without ending the item.
