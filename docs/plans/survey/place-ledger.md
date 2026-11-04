@@ -32,3 +32,4 @@ John's tipping point (4 Nov): when a task, on average, leaves the codebase even 
 | LIN-4201 (records-first read) | *pending merge* | | **scope decided large:** loading part of the read; remove the founder-lookup twin and the restated partition; one vocabulary; a home on the map | |
 | LIN-4203 (stop snapshots) | *pending merge* | | scope: recommended shape + the flag means one thing; the Stop sequence filed as LIN-4218, after it | |
 | LIN-4218 (one Stop sequence) | *not started; after LIN-4203* | | the tally's "one Stop tail" row (three namings), priced | |
+| LIN-4219 (heavy-test harness) | *building* | | the tally's shared-harness row (four namings), priced; scope: the union of both step-backs, in 5 pieces | |
