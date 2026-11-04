@@ -1289,3 +1289,40 @@ It came to "about half a session of hand-checking per relay ticket, about five t
 - Both arms choose about the same middle option (the ticket is already a consolidation).
 - The global view adds placement points arm B lacks: where the harness lives, and which existing copies it must delete in the same change.
 - The global answer is thinner on "how the place is now" than on Harbour, because simple-dispatcher keeps no area map and no Periodicals record of its own shape.
+
+### 11:45 UTC: forward trial 2, the A/B result, my scope call, and the kickoff
+
+**The three Surveys at `502901c`** agreed on where LIN-4219 binds:
+- the nested environment's preloads, which clear one way here and stay another way there;
+- the pre-flight missing the killers if it sits only in `run-system.js`;
+- four mismatched process-group stops;
+- about 25 unowned ports;
+- the baseline brushing the out-of-scope sandbox.
+
+open-0 A and B differed in emphasis. A wanted the env policy table first; B wanted `nestedRunEnv` first. Both are the same first step.
+
+**The A/B on the global voice** (same ticket, same base, two independent open-0 sessions; A's step-back had the place view, B's didn't):
+
+| | Arm A (with the place view) | Arm B (without) |
+|---|---|---|
+| Option chosen | **B:** one harness, an owner per policy | **B:** one tier module, plus C's env sites in the unit tier |
+| Checked the place view? | Yes: confirmed four stop paths and the hand-built `NODE_OPTIONS`; the view **corrected its forecast** (killers bypass `run-system.js`). Ran its own probe: `node --test` turns `exit(78)` into 1, so "couldn't run" needs a side channel | n/a |
+| Distinct contributions | a port registry; the pre-flight placed in `systemSuite`/`startHarbour`; an exit-code table; witnesses moved into `npm test` | three env intents (descendant, probe, run); **corrected the ticket** (the vacuous guard is already patched); sorted-JSON baseline with `--against`; a sync group stop for `reap.js` |
+| At-merge list | Specific and checkable | Specific and checkable |
+| "Not this task's" | `run-mutations.js` split, test-infra map, CI second checkout, per-killer env classification | scheduled or Mac runs of the tier, pinned Harbour, OS-assigned ports, `e2e-smoke.js` |
+
+**Against my prediction.**
+- *Both choose about the same middle option:* right.
+- *The global view adds placement points:* right, but small: the port owner and where the pre-flight sits.
+- *The global answer thinner without a map:* **wrong.** On simple-dispatcher, with no area map, the global agent read the code and docs and gave a full place picture (four stop paths, five env sites, 25 ports, three entry points, and two skip rules that contradict each other). **The place view doesn't depend on Harbour's map.**
+
+**What we learn (one ticket, so tentative).** The global voice changed the **contents** of the choice, not the **option**. Its effect was about the size of the run-to-run difference between two independent open-0 sessions. Arm B, without the place view, found things arm A didn't. So the step-back with good questions (what the place looks like at merge, and what's not this task's) does most of the work. The place view's value is in specific placement and in **correcting the forecast**. That cost one agent and paid for itself here. Whether that holds on a ticket where the obvious way tangles the place (LIN-4176's hub) is the open question: there, the backtest says the global view mattered.
+
+**My scope call as the human: the union of both arms, large, in five pieces**, each proven with its own run of the tier:
+1. env first;
+2. exit codes and a pre-flight with a side channel;
+3. ports with one owner, preferring OS-assigned (B's broad option, pulled in because the 25 files are touched anyway);
+4. one group stop, with a sync variant;
+5. the scripted baseline.
+
+Written onto LIN-4219 with its at-merge checks, moved to **Todo**, autopilot kicked off (`e3934b14`). LIN-4187 follows on the new harness.
