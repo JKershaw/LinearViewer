@@ -153,7 +153,7 @@ import { renderKpisPage } from './lib/render-kpis.js'
 import { createWorkspaceKpisRoutes, workspaceKpisCacheFor } from './routes/workspace-kpis.js'
 import { renderTemplatesPage } from './lib/render-templates.js'
 import { collectKpiStats, toPublicKpis } from './lib/kpi-stats.js'
-import { lookupFounderRows } from './lib/founder-lookup.js'
+import { lineageIdentityOfRows } from './lib/dispatch-store.js'
 import { createKpiPage } from './lib/kpi-page.js'
 import { renderSettingsPage } from './lib/render-settings.js'
 import { renderPromptsPage } from './lib/render-prompts.js'
@@ -2500,8 +2500,8 @@ const kpiPage = createKpiPage({
   }, {
     dbBackend: process.env.MONGODB_URI ? 'mongodb' : 'mangodb',
     // LIN-4178: the founder lookup over the raw dispatch collections (batched per urlKey). The public
-    // path gets its output only; the query lives in lib/founder-lookup.js.
-    lineageIdentity: rows => lookupFounderRows({ dispatchHistory: dispatchHistoryCollection, dispatchQueue: dispatchQueueCollection }, rows),
+    // path gets its output only; the query lives in lib/dispatch-store.js (lineageIdentityOfRows).
+    lineageIdentity: rows => lineageIdentityOfRows([dispatchHistoryCollection, dispatchQueueCollection], rows),
     // LIN-4201: the request records of the same rows' lineages, grouped by each row's urlKey (the one loader).
     requestRows: rows => requestUsageLoader.forRows(rows),
     // LIN-2952: the milestone-funnel aggregate's own deps (stores + the dispatch

@@ -41,15 +41,10 @@ import { pathToFileURL } from 'node:url';
 import { lineageRecords, lineageFigure } from '../lib/cost-read.js';
 import { RequestUsageStore } from '../lib/request-usage-store.js';
 import { lastUsageEntry } from '../lib/row-usage.js';
+import { USAGE_TOKEN_FIELDS } from '../lib/request-usage-vocabulary.js';
 import { priceRequest, resolveWorkerModelId, promptTokensOf } from '../lib/model-pricing.js';
 
-export const TOKEN_FIELDS = Object.freeze([
-  'inputTokens',
-  'outputTokens',
-  'cacheCreationInputTokens',
-  'cacheCreation1hInputTokens',
-  'cacheReadInputTokens'
-]);
+export const TOKEN_FIELDS = USAGE_TOKEN_FIELDS;
 
 const SYNTHETIC_MODEL = '<synthetic>';
 const CENT_EPSILON = 0.005;

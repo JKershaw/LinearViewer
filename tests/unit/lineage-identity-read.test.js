@@ -1,13 +1,13 @@
 /**
- * LIN-4178: the founder lookup over the raw collections (lib/founder-lookup.js).
+ * LIN-4178: the lineage identity read over the raw collections (lineageIdentityOfRows, lib/dispatch-store.js).
  *
- * Run with: node --test tests/unit/founder-lookup.test.js
+ * Run with: node --test tests/unit/lineage-identity-read.test.js
  */
 process.env.NODE_ENV = 'test';
 
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { lookupFounderRows, FOUNDER_BATCH_SIZE } from '../../lib/founder-lookup.js';
+import { lineageIdentityOfRows, LINEAGE_IDENTITY_BATCH_SIZE } from '../../lib/dispatch-store.js';
 import { LINEAGE_IDENTITY_PROJECTION } from '../../lib/dispatch-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
@@ -24,12 +24,12 @@ function recordingCollection(rows) {
   };
 }
 
-describe('lookupFounderRows: the query shape', () => {
+describe('lineageIdentityOfRows: the query shape', () => {
   test('one query per urlKey and batch, over both collections, always with urlKey and the identity projection', async () => {
-    const anchors = Array.from({ length: FOUNDER_BATCH_SIZE + 3 }, (_, i) => `a${i}`);
+    const anchors = Array.from({ length: LINEAGE_IDENTITY_BATCH_SIZE + 3 }, (_, i) => `a${i}`);
     const history = recordingCollection([]);
     const queue = recordingCollection([]);
-    await lookupFounderRows({ dispatchHistory: history, dispatchQueue: queue }, [
+    await lineageIdentityOfRows([history, queue], [
       ...anchors.map(rootItemId => ({ urlKey: 'ws-1', rootItemId })),
       { urlKey: 'ws-2', rootItemId: 'b0' },
     ]);
@@ -37,7 +37,7 @@ describe('lookupFounderRows: the query shape', () => {
       assert.equal(collection.calls.length, 3, 'ws-1 in two batches, ws-2 in one');
       for (const { query, opts } of collection.calls) {
         assert.ok(typeof query.urlKey === 'string', 'every query names its workspace (the index leads with urlKey)');
-        assert.ok(query.rootItemId.$in.length <= FOUNDER_BATCH_SIZE, 'a batch is at most FOUNDER_BATCH_SIZE anchors');
+        assert.ok(query.rootItemId.$in.length <= LINEAGE_IDENTITY_BATCH_SIZE, 'a batch is at most LINEAGE_IDENTITY_BATCH_SIZE anchors');
         assert.deepEqual(opts.projection, LINEAGE_IDENTITY_PROJECTION);
         assert.equal('since' in query, false, 'never windowed by time');
         assert.equal(opts.limit, undefined, 'never capped');
@@ -47,7 +47,7 @@ describe('lookupFounderRows: the query shape', () => {
 
   test('an anchor is looked up once per workspace however many rows name it', async () => {
     const history = recordingCollection([]);
-    await lookupFounderRows({ dispatchHistory: history }, [
+    await lineageIdentityOfRows([history], [
       { urlKey: 'ws', rootItemId: 'r' }, { urlKey: 'ws', rootItemId: 'r' }, { urlKey: 'ws', rootItemId: 'r' },
     ]);
     assert.equal(history.calls.length, 1);
@@ -56,22 +56,22 @@ describe('lookupFounderRows: the query shape', () => {
 
   test('rows without a urlKey or a rootItemId are not looked up, and no rows means no read', async () => {
     const history = recordingCollection([]);
-    await lookupFounderRows({ dispatchHistory: history }, [{ rootItemId: 'r' }, { urlKey: 'ws' }, null]);
+    await lineageIdentityOfRows([history], [{ rootItemId: 'r' }, { urlKey: 'ws' }, null]);
     assert.equal(history.calls.length, 0);
-    assert.deepEqual(await lookupFounderRows({ dispatchHistory: history }, []), []);
+    assert.deepEqual(await lineageIdentityOfRows([history], []), []);
     assert.equal(history.calls.length, 0);
   });
 
   test('a founder in both collections is returned once, and a missing collection is skipped', async () => {
     const founder = { _id: 'f', urlKey: 'ws', rootItemId: 'f', issueIdentifier: 'LIN-42', kind: 'implementation', status: 'taken', abort: false, dispatchedAt: new Date() };
-    const found = await lookupFounderRows({ dispatchHistory: recordingCollection([founder]), dispatchQueue: recordingCollection([founder]) }, [{ urlKey: 'ws', rootItemId: 'f' }]);
+    const found = await lineageIdentityOfRows([recordingCollection([founder]), recordingCollection([founder])], [{ urlKey: 'ws', rootItemId: 'f' }]);
     assert.equal(found.length, 1);
-    const onlyHistory = await lookupFounderRows({ dispatchHistory: recordingCollection([founder]) }, [{ urlKey: 'ws', rootItemId: 'f' }]);
+    const onlyHistory = await lineageIdentityOfRows([recordingCollection([founder])], [{ urlKey: 'ws', rootItemId: 'f' }]);
     assert.equal(onlyHistory.length, 1);
   });
 });
 
-describe('lookupFounderRows on a real engine: a workspace never reads another workspace\'s founders', () => {
+describe('lineageIdentityOfRows on a real engine: a workspace never reads another workspace\'s founders', () => {
   const harness = createMangoTmpdir('lin-4178-founder-');
   before(() => harness.connect());
   after(() => harness.close());
@@ -88,7 +88,7 @@ describe('lookupFounderRows on a real engine: a workspace never reads another wo
     ]);
     await queue.insertOne({ _id: 'q-a', urlKey: 'ws-a', rootItemId: 'queued-a', issueIdentifier: 'LIN-Q', kind: 'implementation', status: 'queued', abort: false, dispatchedAt: at });
 
-    const found = await lookupFounderRows({ dispatchHistory: history, dispatchQueue: queue }, [
+    const found = await lineageIdentityOfRows([history, queue], [
       { urlKey: 'ws-a', rootItemId: 'shared' },
       { urlKey: 'ws-a', rootItemId: 'queued-a' },
     ]);

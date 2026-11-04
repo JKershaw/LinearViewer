@@ -38,7 +38,7 @@ import { isRunningTotal } from '../../../lib/row-usage.js';
 import { readHorizonStart } from '../../../lib/read-horizon.js';
 import { computeTerminalMarkedTaskCost } from '../../../lib/terminal-marked-task-cost.js';
 import { collectWorkspaceKpis } from '../../../lib/workspace-kpi-stats.js';
-import { lookupFounderRows } from '../../../lib/founder-lookup.js';
+import { lineageIdentityOfRows } from '../../../lib/dispatch-store.js';
 import { buildRunView, runLineageAnchors } from '../../../lib/run-view.js';
 import { NO_REQUEST_RECORDS, loaderOver } from '../request-usage-loader.js';
 import { buildCorpus, NOW_MS, REPLAY_ISSUES, REPLAY_JOBS } from './corpus.js';
@@ -364,13 +364,13 @@ export async function runReplay(corpusOverride, { readRecords = false } = {}) {
 
     // S11: the public KPI's cost per finished ticket. Production feeds it the rows `loadDispatchHistory`
     // reads on the 30-day horizon (kpi-stats.js readSources), and the founder lookup over those lineages
-    // (lib/founder-lookup.js, over the raw collections). The baseline (9e397e6b) was recorded on the same
+    // (lib/dispatch-store.js lineageIdentityOfRows, over the raw collections). The baseline (9e397e6b) was recorded on the same
     // horizon-filtered rows; an unfiltered corpus is not what `/kpis` sees.
     const horizonRows = [...corpus.history, ...corpus.queue].filter(r => toMs(r.dispatchedAt) >= toMs(readHorizonStart(now)));
-    const founders = await lookupFounderRows({
-      dispatchHistory: fakeCollection(corpus.history, scalar),
-      dispatchQueue: fakeCollection(corpus.queue, scalar),
-    }, horizonRows);
+    const founders = await lineageIdentityOfRows([
+      fakeCollection(corpus.history, scalar),
+      fakeCollection(corpus.queue, scalar),
+    ], horizonRows);
     out.S11 = computeTerminalMarkedTaskCost(horizonRows, now, { identityRows: founders, requestRows: await requestUsageLoader.forRows(horizonRows, { urlKey: URL_KEY }) });
 
     // S12: the workspace KPIs' cost per day (and the rest of the dashboard's figures).
