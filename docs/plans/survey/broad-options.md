@@ -18,7 +18,8 @@ Sources: the 13 step-backs of round 2/3/QoL (07:38, 4 Nov) and the two forward-t
 | **One shared transcript fold** across simple-dispatcher and runner-kit | LIN-4203 (step-back), LIN-4195 (area: "the per-message fold exists once in each repo") | One place that turns a transcript into requests |
 | **A shared harness for the heavy test tier**: prerequisites declared and checked once, a private Harbour (and dispatcher) per run | LIN-4180 (C), LIN-4196 (C, and its builder's "if the area were how you'd want it": one "run this test command against a private copy of the trees" primitive), LIN-4181 (C: one `paths.js` owning every root). **Four namings. Priced, filed as LIN-4219 and landed (4 Nov): five pieces, all `+` in the place ledger. LIN-4187 then found its cause before work began, on the new harness** | "Won't start in my sandbox" closed; the next mutation or system task routine |
 | **Instance-wide reads vs stores keyed by workspace** | LIN-4201 (step-back), LIN-4201 *(global)* | Settled once, before it comes up again |
-
+| **Census and allow-lists derived from the code, not hand-kept** (a generated census, collection names from constants, route counts read rather than pinned) | LIN-4168 q6 (the 97-entry census edited by hand), LIN-4179 q6 (the `listInHorizon` allow-list re-lists surfaces), LIN-4198 q6 (route counts pinned in three files; a census that matches text), LIN-4234 (both voices: the erasure universe assembled by hand from four sources) | A new thing can't be missed by the guard that exists to catch it. **LIN-4234's scope pulls the collection-names part** |
+| **One shared in-memory collection fake for tests** | LIN-4177 q6 (the replay's `fakeCollection` beside `memoryCollection`), LIN-4178 q6 (a third in the `/kpis` test) | One fake that knows Mongo's semantics, instead of three that each know some |
 | **Loading as part of the cost read** (callers pass a cost source once) | LIN-4201 step-back (4), my larger scope on LIN-4201 | The next input to the read touches no caller |
 | ↳ **Pulled too early.** It didn't land in LIN-4201: "touching a caller to pass an array is not the same change as making the read async". Split off as LIN-4226, which then **landed as its own piece** the same evening (`c55f0fb3`). Lesson: price a pulled extra like any other piece | | |
 | **A record of which outside contract each test pins** | LIN-4187 global ("what it lacks is any record of which Harbour contract each scenario relies on"), and three of LIN-4181's four "cause unknown" reds turning out to be contract drift | The next drift reads "Harbour changed X" |
@@ -38,6 +39,9 @@ Sources: the 13 step-backs of round 2/3/QoL (07:38, 4 Nov) and the two forward-t
 - **Cut `opencode-runner.js`'s size** (1,966 lines). LIN-4203 *(global)*.
 - **Mutant anchors checked by `npm test`.** LIN-4196 (C, "cheap and outside this ticket").
 - **One process-group termination helper.** LIN-4196's builder: `groupAlive`/`stopGroup` in `run-mutations.js` is "another ad-hoc copy, beside `reapers.js` and several tests".
+
+- **One rulings reduction for the badge and Home** (they count differently today). LIN-4144 (open-0 and global).
+- **The Home-wide live repaint** (Running follows rulings, not only Waiting). LIN-4144 (global); its piece 5 carries the on-change part.
 
 ## How this is meant to be used (to test, not yet settled)
 

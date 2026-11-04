@@ -1573,3 +1573,37 @@ If 4 or more of 5 match, a builder's q6 is a cheap stand-in for the place readin
 
 ### 22:05 UTC: the runner stopped claiming work at 21:01:39
 Every dispatch since 21:03 is still `queued`: the LIN-4234 and LIN-4233 autopilots, the LIN-4144 Surveys and the five q6s. Harbour flags each one: "No consumer has polled this workspace since 2026-11-04T21:01:39Z". That was just after the 20:55 batch finished. Nothing on Harbour's side is wrong. The dispatcher host stopped polling, and `watch-restart.sh` doesn't relaunch a dead dispatcher (by design, LIN-2446). I can't reach the host from this session. The queue will drain when a runner polls again. Checks continue; nothing else is dispatched until it does.
+
+### 22:30 UTC: the runner is back (John restarted it at about 22:20); LIN-4144 surveyed and scoped; q6 scored
+
+**LIN-4144's Surveys, against the criteria logged at 21:50** (global was code only):
+- **Reuse the existing poll, not a second timer: hit** (global: "drive it from the badge's tick instead of starting a second interval").
+- **Stale-card double answer and the settled-ruling guard: hit**, from both voices. open-0 found no guard exists at all.
+- **Beyond the criteria:**
+  - **Both** found the tangle I hadn't predicted. A ruling also moves its task out of Running, so a section-only repaint leaves a task shown twice or nowhere, and no test would notice.
+  - **The code-only global** found two copies the obvious way would make: a third card renderer, and a third keep-if-typing reconcile.
+  - **It also applied "who else must learn" unprompted:** `llms.txt` and the LIN-4114 E2E both describe a section fixed after load.
+  - **Without reports or maps it still saw the place.** That is the second sign (after simple-dispatcher) that the records aren't what make it work.
+
+**Scope (the voices converged; no step-back), larger:**
+1. the settled-ruling guard first (LIN-4142 folded in);
+2. a narrow server fragment from Home's own reduction;
+3. one shared keyed card merge in `question-cards.js`;
+4. ride the badge's tick;
+5. Home stays consistent when the Waiting set changes (one full read on change);
+6. optional: Observation's reconcile onto the shared merge.
+
+Each is its own piece, with a stop-and-say rule on 5 and 6. Autopilot `84fa12ad`.
+
+**q6 from the five baseline-window builders, against the 21:50 calibration: 3 of 5 match.**
+- **Matched:** LIN-4178 names the founder-lookup twin; LIN-4179 the lib/public `formatUsd` pair held by a parity test; LIN-4198 two checks of native `costUsd` precedence (the vocabulary's two readers).
+- **Missed:** LIN-4168 and LIN-4177. Both ledger items were *no home on the area map*. The builders saw the same files as "one clear owner". A builder doesn't see the map.
+- **Balance:**
+  - The builders say better 4 times and about the same once. The ledger says − three times, −/+ once and 0 once.
+  - **Builders judge against the ticket's own before-state, and are systematically kinder than the place reading.**
+- **What q6 is good for:** copies. It found more small second copies than Drift did:
+  - three in-memory collection fakes (named by both LIN-4177 and LIN-4178);
+  - a copied `bulkWriteWithRetry`;
+  - three test-only exports;
+  - hand-pinned counts and allow-lists in three tickets.
+- **Verdict:** 3 is between the thresholds (4+ = stand-in; 2 or fewer = film only). **q6 is a cheap, good source for the copies column and the tally, not a stand-in for the balance.** It is blind to the map, and kind to its own work. Keep asking it at merge; keep the Periodical as the film.
