@@ -142,6 +142,32 @@ export function sumRecordsByLineage(records) {
   return { lineages: byAnchor.size, records: records.length, unpriced };
 }
 
+/** Host (loopback names normalised) and port of a mongodb URI. The port defaults to 27017. */
+export function hostPortOf(uri) {
+  const m = /^mongodb(?:\+srv)?:\/\/(?:[^@/]*@)?([^/?#]+)/.exec(uri || '');
+  if (!m) throw new Error('not a mongodb URI');
+  const [rawHost, rawPort] = m[1].split(':');
+  const host = rawHost.toLowerCase();
+  return { host: host === 'localhost' ? '127.0.0.1' : host, port: Number(rawPort || 27017) };
+}
+
+/**
+ * The scratch guard (review finding 6). Scratch writes are refused unless the target is loopback, on exactly
+ * `scratchPort`, and is not the production target (MONGODB_URI's host:port, loopback names normalised).
+ */
+export function assertScratchTarget({ scratchUri, prodUri, scratchPort = 27017 }) {
+  const scratch = hostPortOf(scratchUri);
+  if (scratch.host !== '127.0.0.1') throw new Error(`scratch writes refused: host ${scratch.host} is not loopback`);
+  if (scratch.port !== scratchPort) throw new Error(`scratch writes refused: port ${scratch.port} is not --scratch-port ${scratchPort}`);
+  if (prodUri) {
+    const prod = hostPortOf(prodUri);
+    if (prod.host === scratch.host && prod.port === scratch.port) {
+      throw new Error('scratch writes refused: the scratch target equals MONGODB_URI');
+    }
+  }
+  return scratch;
+}
+
 // ---------- measurement (the only I/O) ----------
 
 const round = (ms) => Math.round(ms * 10) / 10;
@@ -231,11 +257,16 @@ async function productionCollectors(db) {
 }
 
 async function historyAnchors(db, since, urlKey) {
-  const rows = await db.collection('dispatch-history').aggregate([
-    { $match: { urlKey, dispatchedAt: { $gte: since } } },
-    { $group: { _id: { $ifNull: ['$rootItemId', '$_id'] } } }
-  ]).toArray();
-  return rows.map(r => String(r._id));
+  // Both collections: a row lives in exactly one of them, so the union is the window's full set of lineages.
+  const anchors = new Set();
+  for (const name of ['dispatch-history', 'dispatch-queue']) {
+    const rows = await db.collection(name).aggregate([
+      { $match: { urlKey, dispatchedAt: { $gte: since } } },
+      { $group: { _id: { $ifNull: ['$rootItemId', '$_id'] } } }
+    ]).toArray();
+    for (const r of rows) anchors.add(String(r._id));
+  }
+  return [...anchors];
 }
 
 async function measureProduction(db, urlKey, now, reps, taskAnchor) {
@@ -312,6 +343,14 @@ async function main(argv) {
   }, []));
   const uri = process.env.MONGODB_URI;
   if (!uri) throw new Error('MONGODB_URI is not set (read-only production URI, never written to a file)');
+  // Validate the scratch target BEFORE any read or write (review finding 6).
+  const scratchPort = args['scratch-port'] !== undefined ? Number(args['scratch-port']) : 27017;
+  if (args['scale-local']) {
+    const scratchUri = process.env.MONGODB_SCRATCH_URI;
+    if (!scratchUri) throw new Error('MONGODB_SCRATCH_URI is required for --scale-local');
+    if (!Number.isInteger(scratchPort)) throw new Error('--scratch-port must be an integer');
+    assertScratchTarget({ scratchUri, prodUri: uri, scratchPort });
+  }
   const { MongoClient } = await import('mongodb');
   const now = new Date();
   const reps = Number(process.env.LIN4200_REPS || 5);
@@ -321,16 +360,18 @@ async function main(argv) {
   let report;
   try {
     const db = client.db(process.env.LIN4200_DB || 'linear-viewer');
-    const urlKey = (await db.collection(REQUEST_USAGE_COLLECTION).distinct('urlKey'))[0];
+    // --url-key (review minor): explicit when more than one workspace holds records; never an arbitrary first.
+    const keys = await db.collection(REQUEST_USAGE_COLLECTION).distinct('urlKey');
+    const explicit = typeof args['url-key'] === 'string' ? args['url-key'] : null;
+    if (explicit && !keys.includes(explicit)) throw new Error(`--url-key ${explicit} has no records`);
+    if (!explicit && keys.length !== 1) throw new Error(`${keys.length} workspaces hold records; pass --url-key`);
+    const urlKey = explicit ?? keys[0];
     report = { generatedAt: now.toISOString(), urlKey, production: await measureProduction(db, urlKey, now, reps, taskAnchor) };
   } finally {
     await client.close();
   }
   if (args['scale-local']) {
     const scratchUri = process.env.MONGODB_SCRATCH_URI;
-    if (!scratchUri) throw new Error('MONGODB_SCRATCH_URI is required for --scale-local');
-    const host = new URL(scratchUri.replace(/^mongodb(\+srv)?:/, 'http:')).hostname;
-    if (host !== '127.0.0.1' && host !== 'localhost') throw new Error(`scratch writes are refused for host ${host}`);
     const prodClient = new MongoClient(uri, { readPreference: 'primary' });
     await prodClient.connect();
     let prodRecords;

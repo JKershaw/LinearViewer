@@ -10,7 +10,8 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { lineageRecords } from '../../lib/cost-read.js';
 import {
-  classifyLineage, modelsOf, oplogCounters, orphanAnchors, sharesOf, tokenSums, recordCostUsd
+  classifyLineage, modelsOf, oplogCounters, orphanAnchors, sharesOf, tokenSums, recordCostUsd,
+  oplogCrossCheck, parseFlushes
 } from '../../scripts/lin-4200-measure-records-vs-snapshots.mjs';
 
 const HAIKU = 'claude-haiku-5-5';
@@ -121,7 +122,7 @@ describe('same-Stop race (the final request missed by the snapshot walk)', () =>
       [row({ id: 'a', rootItemId: 'L1', usage: SNAP })],
       [
         rec({ requestId: 'm1', at: '2026-11-04T05:40:00.000Z', input: 1000, output: 500 }),
-        rec({ requestId: 'm2', at: '2026-11-04T05:59:59.800Z', updatedAt: '2026-11-04T06:00:00.100Z', input: 200, output: 130 })
+        rec({ requestId: 'm2', at: '2026-11-04T05:59:59.800Z', updatedAt: '2026-11-04T05:59:59.900Z', input: 200, output: 130 })
       ]
     );
     assert.equal(r.toCent, true);
@@ -136,7 +137,7 @@ describe('same-Stop race (the final request missed by the snapshot walk)', () =>
       [row({ id: 'a', rootItemId: 'L1', usage: SNAP })],
       [
         rec({ requestId: 'm1', at: '2026-11-04T05:40:00.000Z', input: 1000, output: 500 }),
-        rec({ requestId: 'm2', at: '2026-11-04T05:59:00.000Z', updatedAt: '2026-11-04T06:00:00.100Z', input: 200, output: 130 })
+        rec({ requestId: 'm2', at: '2026-11-04T05:59:00.000Z', updatedAt: '2026-11-04T05:59:30.000Z', input: 200, output: 130 })
       ]
     );
     assert.equal(r.agrees, false);
@@ -150,8 +151,8 @@ describe('same-Stop race (the final request missed by the snapshot walk)', () =>
       [row({ id: 'a', rootItemId: 'L1', usage: SNAP })],
       [
         rec({ requestId: 'm1', at: '2026-11-04T05:40:00.000Z', input: 1000, output: 500 }),
-        rec({ requestId: 'm2', at: '2026-11-04T05:59:59.800Z', updatedAt: '2026-11-04T06:00:00.100Z', input: 200, output: 130 }),
-        rec({ requestId: 'm3', at: '2026-11-04T05:59:00.000Z', updatedAt: '2026-11-04T06:00:00.100Z', input: 0, output: 7 })
+        rec({ requestId: 'm2', at: '2026-11-04T05:59:59.800Z', updatedAt: '2026-11-04T05:59:59.900Z', input: 200, output: 130 }),
+        rec({ requestId: 'm3', at: '2026-11-04T05:59:00.000Z', updatedAt: '2026-11-04T05:59:59.900Z', input: 0, output: 7 })
       ]
     );
     assert.equal(r.agrees, false);
@@ -272,3 +273,73 @@ describe('to-the-cent subset: model mismatch with equal tokens', () => {
     assert.equal(r.toCent, false);
   });
 });
+
+describe('coverage by post time (review finding 1)', () => {
+  test('a record first written before the snapshot but posted after it lands in the tail, not the subset', () => {
+    // at 05:59:59.800 <= snapshot 06:00:00.000 < updatedAt 06:00:00.100: the snapshot cannot include a record
+    // posted after it, so the excess is the late record, and it is counted as a late post.
+    const r = classify(
+      [row({ id: 'a', rootItemId: 'L1', usage: SNAP })],
+      [
+        rec({ requestId: 'm1', at: '2026-11-04T05:40:00.000Z', input: 1000, output: 500 }),
+        rec({ requestId: 'm2', at: '2026-11-04T05:59:59.800Z', updatedAt: '2026-11-04T06:00:00.100Z', input: 200, output: 130 })
+      ]
+    );
+    assert.equal(r.recordsAfterSnapshot, true);
+    assert.equal(r.toCent, false);
+    assert.equal(r.toCentSubset, false);
+    assert.equal(r.sameStopRace, false);
+    assert.equal(r.lateRacePost, true);
+    assert.equal(r.tailGeqSnapshot, true);
+    assert.equal(r.tailEqualsLatePosts, true);
+    assert.equal(r.tailExcessTokens.inputTokens, 200);
+    assert.equal(r.tailExcessTokens.outputTokens, 130);
+  });
+
+  test('equal tokens with a different snapshot cost do not agree (the to-the-cent half of the rule)', () => {
+    const rows = [row({ id: 'a', rootItemId: 'L1', usage: SNAP })];
+    const [lineage] = lineageRecords({ fetchedRows: rows, identityRows: rows });
+    lineage.fold = { ...lineage.fold, costUsd: 999 }; // the snapshot's dollars differ; its tokens are equal
+    const r = classifyLineage({
+      lineage,
+      records: [rec({ requestId: 'm1', at: '2026-11-04T05:40:00.000Z', input: 1000, output: 500 })]
+    });
+    assert.equal(r.toCent, true);
+    assert.equal(r.tokenDiff.inputTokens, 0);
+    assert.equal(r.tokenDiff.outputTokens, 0);
+    assert.equal(r.agrees, false);
+    assert.equal(r.toCentSubset, true); // it is not the race class, so it is reported as unexplained
+  });
+});
+
+describe('oplog cross-check (review finding 4)', () => {
+  const flush = (ts, posted, reason) => JSON.stringify({ ts, event: 'request-usage.flush', sessionId: 'S1', reason, posted });
+  const oplog = [
+    flush('2026-11-04T05:02:00.600Z', 32, 'stop'),
+    flush('2026-11-04T05:02:04.400Z', 1, 'stop'),
+    flush('2026-11-04T05:02:07.600Z', 1, 'reap')
+  ];
+
+  test('late posts match the trailing stop and reap flushes by time; an unmatched post is reported', () => {
+    const out = oplogCrossCheck({
+      lineages: [{ anchor: 'L1', latePostMs: [Date.parse('2026-11-04T05:02:04.900Z'), Date.parse('2026-11-04T05:02:08.000Z'), Date.parse('2026-11-04T06:00:00.000Z')] }],
+      oplogLines: oplog,
+      anchorOfSession: { S1: 'L1' } // the runner state maps the runner session to its lineage anchor
+    });
+    const lin = out.perLineage[0];
+    assert.equal(lin.trailingStopPosts, 1);
+    assert.equal(lin.reapPosts, 1);
+    assert.equal(lin.matchedLate, 2);
+    assert.equal(lin.matchedStop, 1);
+    assert.equal(lin.matchedReap, 1);
+    assert.equal(lin.unmatchedLate, 1);
+    assert.equal(out.totals.unmatchedLate, 1);
+  });
+
+  test('parseFlushes keeps only request-usage.flush events and their reason', () => {
+    const events = parseFlushes([...oplog, JSON.stringify({ ts: '2026-11-04T05:03:00.000Z', event: 'unrelated' })]);
+    assert.equal(events.length, 3);
+    assert.deepEqual(events.map(e => e.reason), ['stop', 'stop', 'reap']);
+  });
+});
+

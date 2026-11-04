@@ -8,7 +8,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   percentileOf, distributionOf, bucketCountsOf, summarizeExplain, fitLinear, projectMs,
-  steadyStateRecordsOf, sumRecordsByLineage
+  steadyStateRecordsOf, sumRecordsByLineage, hostPortOf, assertScratchTarget
 } from '../../scripts/lin-4200-d13-volume-timing.mjs';
 
 describe('volume distribution', () => {
@@ -100,3 +100,25 @@ describe('records-sum path', () => {
     assert.equal(out.unpriced, 1);
   });
 });
+
+describe('scratch guard (review finding 6)', () => {
+  test('a loopback scratch on the requested port is accepted, and the port defaults to 27017', () => {
+    assert.deepEqual(hostPortOf('mongodb://127.0.0.1:27017'), { host: '127.0.0.1', port: 27017 });
+    assert.deepEqual(hostPortOf('mongodb://localhost'), { host: '127.0.0.1', port: 27017 });
+    assert.equal(assertScratchTarget({ scratchUri: 'mongodb://127.0.0.1:27017', prodUri: 'mongodb://127.0.0.1:27018/?x=1', scratchPort: 27017 }).port, 27017);
+  });
+
+  test('a non-loopback scratch host is refused', () => {
+    assert.throws(() => assertScratchTarget({ scratchUri: 'mongodb://db.example.com:27017', scratchPort: 27017 }), /not loopback/);
+  });
+
+  test('a scratch port other than --scratch-port is refused', () => {
+    assert.throws(() => assertScratchTarget({ scratchUri: 'mongodb://127.0.0.1:27019', scratchPort: 27017 }), /not --scratch-port/);
+  });
+
+  test('a scratch target equal to MONGODB_URI is refused, including the localhost alias', () => {
+    assert.throws(() => assertScratchTarget({ scratchUri: 'mongodb://127.0.0.1:27017', prodUri: 'mongodb://127.0.0.1:27017', scratchPort: 27017 }), /equals MONGODB_URI/);
+    assert.throws(() => assertScratchTarget({ scratchUri: 'mongodb://127.0.0.1:27017', prodUri: 'mongodb://localhost:27017', scratchPort: 27017 }), /equals MONGODB_URI/);
+  });
+});
+

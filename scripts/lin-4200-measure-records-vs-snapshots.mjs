@@ -122,8 +122,23 @@ export function snapshotAtMsOf(lineage) {
 }
 
 /**
- * Classify one lineage. `lineage` is one lineageRecords() record (its fold is the legacy snapshot read);
- * `records` are the request-usage docs for its anchor. Returns plain facts, no judgement.
+ * COVERAGE IS DEFINED BY POST TIME (review finding 1, LIN-4200).
+ *
+ * A record is covered by the snapshot only when it was posted to Harbour no later than the snapshot itself:
+ * `updatedAt <= snapshotAt`. The snapshot is written after its own walk of the transcript, so a record posted
+ * after the snapshot cannot be claimed to be inside it. The first transcript line's time (`at`) says when a
+ * request was written, not when anything could have read it, so it does not decide coverage. This matches the
+ * plan's intent: a lineage is compared with its snapshot only when the snapshot is provably at least as late as
+ * every record it is compared with. `updatedAt` is the store's latest post that touched a record (`$max`), so a
+ * record that grew after the snapshot also counts as posted after it.
+ *
+ * The same-walk race (RULING lin4200-to-cent-rule) is still identified from the first-line timing: the final
+ * request's first line leads the snapshot by at most RACE_WINDOW_MS, and the gap is exactly that request. It is
+ * excluded from to-the-cent only when it was posted by the snapshot. A late post with the same shape is a tail
+ * record, counted in the tail, and is not excluded.
+ *
+ * `lineage` is one lineageRecords() record (its fold is the legacy snapshot read); `records` are the
+ * request-usage docs for its anchor. Returns plain facts, no judgement.
  */
 export function classifyLineage({ lineage, records }) {
   const fold = lineage.fold;
@@ -135,16 +150,21 @@ export function classifyLineage({ lineage, records }) {
   const models = modelsOf(records);
   const oneModel = models.size === 1 && snapshotModel !== null
     && models.has(resolveWorkerModelId(snapshotModel) ?? snapshotModel);
-  const recordMs = records.map(record => msOf(record.at)).filter(Number.isFinite);
-  const lastRecordMs = recordMs.length > 0 ? Math.max(...recordMs) : null;
-  const recordTokens = tokenSums(records);
   const recordBacked = records.length > 0;
   const snapshotOnly = !recordBacked && fold.completeness !== 'no-usage';
+  const recordTokens = tokenSums(records);
   const recordCost = recordCostUsd(records);
   const snapshotCostUsd = fold.costUsd;
 
-  const lastRecordBeforeSnapshot = lastRecordMs !== null && snapshotAtMs !== null && lastRecordMs <= snapshotAtMs;
-  const toCent = recordBacked && snapshotPriced && !subagents && oneModel && lastRecordBeforeSnapshot;
+  // Coverage by post time. A record posted after the snapshot is a tail record.
+  const latePosts = snapshotAtMs === null ? [] : records.filter(record => {
+    const posted = msOf(record.updatedAt);
+    return posted !== null && posted > snapshotAtMs;
+  });
+  const lastPostedMs = records.map(record => msOf(record.updatedAt)).filter(Number.isFinite);
+  const latestPostMs = lastPostedMs.length > 0 ? Math.max(...lastPostedMs) : null;
+  const noLatePosts = recordBacked && snapshotAtMs !== null && latePosts.length === 0;
+  const toCent = recordBacked && snapshotPriced && !subagents && oneModel && noLatePosts;
 
   let tokenDiff = null;
   let costDiff = null;
@@ -152,45 +172,60 @@ export function classifyLineage({ lineage, records }) {
   if (snapshotTokens) {
     tokenDiff = Object.fromEntries(TOKEN_FIELDS.map(f => [f, recordTokens[f] - (snapshotTokens[f] ?? 0)]));
   }
+  if (tokenDiff !== null && recordCost.costUsd !== null && snapshotCostUsd !== null) {
+    costDiff = recordCost.costUsd - snapshotCostUsd;
+  }
   if (toCent) {
+    // Both halves of the rule: equal tokens AND equal dollars to the cent. Equal tokens alone is not agreement.
     const tokensEqual = TOKEN_FIELDS.every(f => tokenDiff[f] === 0);
-    costDiff = recordCost.costUsd === null || snapshotCostUsd === null ? null : recordCost.costUsd - snapshotCostUsd;
     agrees = tokensEqual && costDiff !== null && Math.abs(costDiff) < CENT_EPSILON;
   }
 
-  // The same-Stop race: the snapshot walked the transcript before the lineage's final request reached
-  // disk. The gap is exactly that one request, and its first line led the snapshot by at most RACE_WINDOW_MS.
-  // Reported as its own class, never as agreement and never as an unexplained gap.
+  // The same-walk race, by first-line timing (the ruling's named class).
   const lastRecord = records.length > 0
     ? [...records].sort((a, b) => (msOf(a.at) ?? 0) - (msOf(b.at) ?? 0))[records.length - 1]
     : null;
-  // The race is about the final line's timing vs the snapshot walk: the line was written moments before the
-  // snapshot was taken. Its post time is not used: a later flush may post it seconds after the snapshot.
   const lastRecordAtMs = lastRecord ? msOf(lastRecord.at) : null;
   const gapIsLastRecord = tokenDiff !== null && lastRecord !== null
     && TOKEN_FIELDS.every(f => tokenDiff[f] === tokenValue(lastRecord, f));
   const lagMs = lastRecordAtMs !== null && snapshotAtMs !== null ? snapshotAtMs - lastRecordAtMs : null;
-  const sameStopRace = toCent && agrees === false && gapIsLastRecord && lagMs !== null
-    && lagMs >= 0 && lagMs <= RACE_WINDOW_MS;
-  // RULING lin4200-to-cent-rule (John, 08:05Z): exclude the same-Stop race class from to-the-cent, and count it.
-  // Exclusion is limited to the named class. Any other disagreement stays in the subset, so it is unexplained.
+  const withinRaceWindow = lagMs !== null && lagMs >= 0 && lagMs <= RACE_WINDOW_MS;
+  const sameStopRace = toCent && agrees === false && gapIsLastRecord && withinRaceWindow;
+  // RULING lin4200-to-cent-rule: exclude the TRUE same-walk race from to-the-cent, and count it. Nothing else.
   const toCentSubset = toCent && !sameStopRace;
-  // Requests whose first transcript line predates the deploy: a lineage resumed across it, or a pre-deploy
-  // transcript the first post walked.
+
+  // The former race class (before the post-time fix), split for the review: a late post has the same timing and
+  // gap shape but was posted after the snapshot. A true race is the same shape posted by the snapshot.
+  const lastRecordBeforeSnapshotByAt = lastRecordAtMs !== null && snapshotAtMs !== null && lastRecordAtMs <= snapshotAtMs;
+  const formerEligible = recordBacked && snapshotPriced && !subagents && oneModel && lastRecordBeforeSnapshotByAt;
+  const formerRaceShape = formerEligible && gapIsLastRecord && withinRaceWindow;
+  const recordsAfterSnapshot = latePosts.length > 0;
+  const lateRacePost = recordsAfterSnapshot && gapIsLastRecord && withinRaceWindow;
+
+  // Tail: records posted after the snapshot. Checked, not assumed: records >= snapshot per field, and the excess
+  // should equal exactly the late-posted records (in tokens and in dollars).
+  const lateTokens = tokenSums(latePosts);
+  const lateCostUsd = recordCostUsd(latePosts).costUsd;
+  const tailExcessTokens = recordsAfterSnapshot && tokenDiff ? tokenDiff : null;
+  const tailGeqSnapshot = recordsAfterSnapshot && tokenDiff !== null && TOKEN_FIELDS.every(f => tokenDiff[f] >= 0);
+  const tailEqualsLatePosts = recordsAfterSnapshot && tokenDiff !== null && TOKEN_FIELDS.every(f => tokenDiff[f] === lateTokens[f]);
+  const tailExcessCostUsd = recordsAfterSnapshot && costDiff !== null ? costDiff : null;
+  // Dollars are compared for single-model lineages only. A mixed-model snapshot prices its whole cumulative total at
+  // its last model (the change-(b) effect on the replay list: records price each request at its own model), so its
+  // dollar gap is that intended difference, not a tail check.
+  const tailCostEqualsLatePosts = oneModel && tailExcessCostUsd !== null && lateCostUsd !== null
+    ? Math.abs(tailExcessCostUsd - lateCostUsd) < CENT_EPSILON : null;
+  const d7Residue = recordBacked && tokenDiff !== null && TOKEN_FIELDS.some(f => tokenDiff[f] < 0);
+
   const preDeployRecords = records.filter(record => {
     const ms = msOf(record.at);
     return ms !== null && ms < DEPLOY_MS;
   }).length;
 
-  const recordsAfterSnapshot = recordBacked && snapshotAtMs !== null && lastRecordMs > snapshotAtMs;
-  const d7Residue = recordBacked && tokenDiff !== null && TOKEN_FIELDS.some(f => tokenDiff[f] < 0);
-  const tailExcessTokens = recordsAfterSnapshot && tokenDiff ? tokenDiff : null;
-  const tailExcessCostUsd = recordsAfterSnapshot && recordCost.costUsd !== null && snapshotCostUsd !== null
-    ? recordCost.costUsd - snapshotCostUsd : null;
-
   return {
     anchor: lineage.anchor,
     issueIdentifier: lineage.issueIdentifier ?? null,
+    sessionIds: [...new Set((lineage.members || []).map(m => m.sessionId).filter(v => typeof v === 'string' && v))],
     klass: recordBacked ? 'record-backed' : snapshotOnly ? 'snapshot-only' : 'no-usage',
     snapshotPriced,
     snapshotCompleteness: fold.completeness,
@@ -198,19 +233,28 @@ export function classifyLineage({ lineage, records }) {
     models: [...models],
     oneModel,
     snapshotModel,
-    lastRecordAt: lastRecordMs === null ? null : new Date(lastRecordMs).toISOString(),
+    lastRecordAt: lastRecordAtMs === null ? null : new Date(lastRecordAtMs).toISOString(),
+    lastPostedAt: latestPostMs === null ? null : new Date(latestPostMs).toISOString(),
     snapshotAt: snapshotAtMs === null ? null : new Date(snapshotAtMs).toISOString(),
     toCent,
     toCentSubset,
     agrees,
     sameStopRace,
+    lateRacePost,
+    formerRaceShape,
     lagMs,
     preDeployRecords,
     tokenDiff,
     costDiff,
     recordsAfterSnapshot,
+    latePostMs: latePosts.map(record => msOf(record.updatedAt)),
+    latePostCount: latePosts.length,
     tailExcessTokens,
     tailExcessCostUsd,
+    lateCostUsd,
+    tailGeqSnapshot,
+    tailEqualsLatePosts,
+    tailCostEqualsLatePosts,
     d7Residue,
     recordTokens: recordBacked ? recordTokens : null,
     snapshotTokens,
@@ -223,6 +267,93 @@ export function classifyLineage({ lineage, records }) {
     incomplete: lineage.incomplete,
     fullRecordCount: records.length
   };
+}
+
+/** Parse the runner oplog's request-usage.flush events (one per flush), keeping only what the cross-check uses. */
+export function parseFlushes(oplogLines) {
+  const out = [];
+  for (const line of oplogLines) {
+    if (!line || !line.trim()) continue;
+    let event;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (event.event !== 'request-usage.flush') continue;
+    const ts = msOf(event.ts);
+    if (ts === null) continue;
+    out.push({ ts, sessionId: event.sessionId ?? null, reason: event.reason ?? null, posted: event.posted || 0 });
+  }
+  return out;
+}
+
+/**
+ * Cross-check Harbour's late posts against the runner oplog, per lineage (its sessions). A late post should match a
+ * flush that posted at least one record within `toleranceMs` of the post time. Reports the trailing flushes after
+ * each session's first stop flush, by reason, and the late posts that no flush accounts for.
+ */
+export function oplogCrossCheck({ lineages, oplogLines, anchorOfSession, toleranceMs = 5000 }) {
+  // The oplog names the RUNNER session only. Its anchor comes from the runner's session state (rootItemId),
+  // passed as `anchorOfSession` (session id -> rootItemId). The Harbour row sessionId is a different identifier
+  // and is not used: the join through it found no sessions at all.
+  const flushes = parseFlushes(oplogLines);
+  const byAnchor = new Map();
+  for (const f of flushes) {
+    const anchor = f.sessionId ? anchorOfSession?.[f.sessionId] : null;
+    if (!anchor) continue;
+    const list = byAnchor.get(anchor) || [];
+    list.push(f);
+    byAnchor.set(anchor, list);
+  }
+  const perLineage = [];
+  const totals = { lineagesChecked: 0, latePosts: 0, matchedLate: 0, matchedReap: 0, matchedStop: 0, unmatchedLate: 0,
+    reapFlushesAfterFirstStop: 0, stopFlushesAfterFirstStop: 0 };
+  for (const lin of lineages) {
+    const events = (byAnchor.get(lin.anchor) || []).slice().sort((a, b) => a.ts - b.ts);
+    const firstStop = events.find(e => e.reason === 'stop') || null;
+    const after = firstStop ? events.filter(e => e.ts > firstStop.ts && e.posted > 0) : [];
+    const reapAfter = after.filter(e => e.reason === 'reap').length;
+    const stopAfter = after.filter(e => e.reason === 'stop').length;
+    // A late post is a trailing flush: the session's first stop flush carries the snapshot's own records, so only
+    // flushes after it are candidates (a session with no stop flush considers all its flushes). The nearest one in
+    // time, within the tolerance, is the match.
+    const candidates = events.filter(e => e.posted > 0 && (firstStop === null || e.ts > firstStop.ts));
+    let matched = 0;
+    let matchedReap = 0;
+    let matchedStop = 0;
+    const unmatched = [];
+    for (const p of lin.latePostMs || []) {
+      let hit = null;
+      let best = Infinity;
+      for (const e of candidates) {
+        const d = Math.abs(e.ts - p);
+        if (d <= toleranceMs && d < best) {
+          best = d;
+          hit = e;
+        }
+      }
+      if (hit) {
+        matched += 1;
+        if (hit.reason === 'reap') matchedReap += 1;
+        else if (hit.reason === 'stop') matchedStop += 1;
+      } else {
+        unmatched.push(p);
+      }
+    }
+    if ((lin.latePostMs || []).length > 0 || events.length > 0) totals.lineagesChecked += 1;
+    totals.latePosts += (lin.latePostMs || []).length;
+    totals.matchedLate += matched;
+    totals.matchedReap += matchedReap;
+    totals.matchedStop += matchedStop;
+    totals.unmatchedLate += unmatched.length;
+    totals.reapFlushesAfterFirstStop += reapAfter;
+    totals.stopFlushesAfterFirstStop += stopAfter;
+    perLineage.push({ anchor: lin.anchor, flushes: events.length,
+      trailingStopPosts: stopAfter, reapPosts: reapAfter, latePosts: (lin.latePostMs || []).length,
+      matchedLate: matched, matchedReap, matchedStop, unmatchedLate: unmatched.length });
+  }
+  return { totals, perLineage };
 }
 
 /** Request records whose anchor has no member row (they belong to no lineage the read can see). */
@@ -272,7 +403,7 @@ export function sharesOf(results) {
  */
 export function oplogCounters(lines, sinceMs = -Infinity) {
   const out = { flushEvents: 0, posted: 0, rejected: 0, failed: 0, deferred: 0, skippedNoRequestId: 0,
-    errorEvents: 0, skipReasons: {} };
+    errorEvents: 0, skipReasons: {}, byReason: {} };
   for (const line of lines) {
     if (!line || !line.trim()) continue;
     let event;
@@ -286,6 +417,7 @@ export function oplogCounters(lines, sinceMs = -Infinity) {
     if (event.event === 'request-usage.error') out.errorEvents += 1;
     if (event.event !== 'request-usage.flush') continue;
     out.flushEvents += 1;
+    if (event.reason) out.byReason[event.reason] = (out.byReason[event.reason] || 0) + 1;
     out.posted += event.posted || 0;
     out.rejected += event.rejected || 0;
     out.failed += event.failed || 0;
@@ -349,6 +481,7 @@ async function main(argv) {
   const windowStartIso = process.env.LIN4200_WINDOW_START || '2026-11-04T04:59:21Z';
   const windowStart = new Date(windowStartIso);
   const oplogPath = process.env.LIN4200_OPLOG || '/Users/autopilot/development/simple-dispatcher/state/oplog.jsonl';
+  const runnerStatePath = process.env.LIN4200_RUNNER_STATE || '/Users/autopilot/development/simple-dispatcher/state/sessions.json';
   const client = new MongoClient(uri, { readPreference: 'primary' });
   await client.connect();
   try {
@@ -379,19 +512,44 @@ async function main(argv) {
           windowRowCount
         },
         orphanRecordAnchors: orphans.size,
+        // Records whose anchor no dispatch row carries (in either collection): they are invisible to the lineage read.
+        orphans: [...orphans.entries()].map(([anchor, n]) => {
+          const ats = usageDocs.filter(d => d.rootItemId === anchor).map(d => msOf(d.at)).filter(Number.isFinite);
+          return { anchor, records: n, firstAt: new Date(Math.min(...ats)).toISOString(), lastAt: new Date(Math.max(...ats)).toISOString() };
+        }),
         orphanRecordCount: [...orphans.values()].reduce((s, n) => s + n, 0),
+        // Coverage by post time (updatedAt). toCent counts lineages with no record posted after the snapshot.
         toCent: {
-          eligibleBeforeRuling: results.filter(r => r.toCent).length,
+          eligible: results.filter(r => r.toCent).length,
+          // The former race class (first-line timing, pre-fix), split: true same-walk races (posted by the snapshot,
+          // excluded by the ruling) and late posts (posted after it, counted in the tail).
+          formerRaceShape: results.filter(r => r.formerRaceShape).length,
+          formerRaceShapeTrueRace: results.filter(r => r.formerRaceShape && !r.recordsAfterSnapshot).length,
+          formerRaceShapeLatePost: results.filter(r => r.formerRaceShape && r.recordsAfterSnapshot).length,
           sameStopRaceClass: results.filter(r => r.sameStopRace).map(r => ({ anchor: r.anchor, lagMs: r.lagMs, tokenGap: r.tokenDiff })),
           subset: results.filter(r => r.toCentSubset).length,
           agree: results.filter(r => r.toCentSubset && r.agrees).length,
           unexplained: results.filter(r => r.toCentSubset && r.agrees === false),
           disagreements: results.filter(r => r.toCentSubset && !r.agrees)
         },
-        tail: results.filter(r => r.recordsAfterSnapshot).map(r => ({
-          anchor: r.anchor, tailExcessTokens: r.tailExcessTokens, tailExcessCostUsd: r.tailExcessCostUsd,
-          toCentSubset: r.toCentSubset
-        })),
+        tail: {
+          lineages: results.filter(r => r.recordsAfterSnapshot).length,
+          latePosts: results.reduce((s, r) => s + r.latePostCount, 0),
+          lateRacePostShape: results.filter(r => r.lateRacePost).length,
+          geqViolations: results.filter(r => r.recordsAfterSnapshot && !r.tailGeqSnapshot).map(r => r.anchor),
+          tokenExcessEqualsLatePosts: results.filter(r => r.recordsAfterSnapshot).every(r => r.tailEqualsLatePosts),
+          dollarExcessEqualsLatePosts: results.filter(r => r.recordsAfterSnapshot && r.oneModel).every(r => r.tailCostEqualsLatePosts === true),
+          totalTailTokens: TOKEN_FIELDS.reduce((acc, f) => { acc[f] = results.reduce((s, r) => s + (r.tailExcessTokens?.[f] ?? 0), 0); return acc; }, {}),
+          totalTailCostUsd: results.filter(r => r.recordsAfterSnapshot && r.oneModel).reduce((s, r) => s + (r.tailExcessCostUsd ?? 0), 0),
+          mixedModelTailCostDiffUsd: results.filter(r => r.recordsAfterSnapshot && !r.oneModel).reduce((s, r) => s + (r.tailExcessCostUsd ?? 0), 0),
+          mixedModelTailLineages: results.filter(r => r.recordsAfterSnapshot && !r.oneModel).length,
+          perLineage: results.filter(r => r.recordsAfterSnapshot).map(r => ({
+            anchor: r.anchor, sessionIds: r.sessionIds, latePostCount: r.latePostCount, lastPostedAt: r.lastPostedAt,
+            snapshotAt: r.snapshotAt, tailExcessTokens: r.tailExcessTokens, tailExcessCostUsd: r.tailExcessCostUsd,
+            lateCostUsd: r.lateCostUsd, tailGeqSnapshot: r.tailGeqSnapshot, tailEqualsLatePosts: r.tailEqualsLatePosts,
+            tailCostEqualsLatePosts: r.tailCostEqualsLatePosts
+          }))
+        },
         d7Residue: results.filter(r => r.d7Residue).map(r => r.anchor),
         shares: sharesOf(results),
         cases: caseClassesOf(results, usageDocs, lineages),
@@ -399,6 +557,16 @@ async function main(argv) {
       };
     }
     const oplogLines = readFileSync(oplogPath, 'utf8').split('\n');
+    const runnerState = JSON.parse(readFileSync(runnerStatePath, 'utf8')).sessions || {};
+    const anchorOfSession = Object.fromEntries(Object.entries(runnerState).filter(([, v]) => v && v.rootItemId)
+      .map(([id, v]) => [id, String(v.rootItemId)]));
+    for (const w of Object.values(perWorkspace)) {
+      const cross = oplogCrossCheck({ lineages: w.lineages, oplogLines, anchorOfSession });
+      w.oplogCrossCheck = cross;
+      w.cases.classes.reapTail = cross.totals.matchedReap > 0
+        ? `present (${cross.totals.matchedReap} late posts matched to reap flushes)`
+        : 'UNMEASURED (no late post matched a reap flush)';
+    }
     const report = {
       generatedAt: new Date().toISOString(),
       oplog: oplogCounters(oplogLines, windowStart.getTime()),
