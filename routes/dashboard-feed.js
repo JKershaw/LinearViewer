@@ -24,6 +24,7 @@ import { armKeepalive } from '../lib/http-keepalive.js';
 import { toEpochMs } from '../lib/utils/time.js';
 import { stageLabel, ORCHESTRATION_KINDS } from '../lib/run-view.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
+import { scanEstimateOf } from '../lib/model-routing-spend.js';
 import { findAnchorLoop, childLoops } from '../lib/session-summary.js';
 import { STALE_AFTER_MS, WORKSPACE_FANOUT_CONCURRENCY, settleWithConcurrency, isStandaloneSession, deriveSessionStatus, deriveSessionWaiting, waitingLoops, loopActivityMs, peakToolCount, deriveFeedStatusLine, connectedWorkspaces } from './dashboard-session-state.js';
 
@@ -650,9 +651,12 @@ function observationPage({ llmCallLogStore, renderObservationPage, getDeployInfo
   return async (req, res) => {
     const workspace = req.workspace;
     try {
-      const scanCostEstimate = llmCallLogStore
-        ? await llmCallLogStore.summarizeByFeature(workspace.urlKey, 'scan').catch(() => null)
+      // Observation's scan estimate (plan S4): the scan job's typical call, read by the one calls read (LIN-4179).
+      // A rejected read degrades to null (the page shows "unknown"), as it always has.
+      const scanCallDocs = llmCallLogStore
+        ? await llmCallLogStore.listInHorizon(workspace.urlKey, { feature: 'scan' }).catch(() => null)
         : null;
+      const scanCostEstimate = scanCallDocs ? scanEstimateOf(scanCallDocs) : null;
       const html = renderObservationPage(
         {
           workspaces: connectedWorkspaces(req.session)

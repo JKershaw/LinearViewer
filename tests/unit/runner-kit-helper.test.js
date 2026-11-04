@@ -75,7 +75,7 @@ import {
 import { isHeartbeatStale as brokerIsHeartbeatStale, credentialStore } from '../../lib/runner-kit/broker.mjs';
 import { findTerminalFeedback, findWakeEvent } from '../../lib/dispatch-terminal.js';
 import { parseUsage } from '../../lib/session-telemetry.js';
-import { buildTaskCost } from '../../lib/task-cost.js';
+import { buildTaskCost } from '../fixtures/task-cost-adapter.js';
 import { HALT_MODES } from '../../lib/workspace-halt.js';
 import { NOBODY_LISTENING_MS } from '../../lib/consumer-poll-warning.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';

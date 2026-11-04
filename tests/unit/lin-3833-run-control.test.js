@@ -19,6 +19,7 @@ import { offeredTargetsFor } from '../../lib/dispatch-targets.js';
 import { HARNESSES_WITHOUT_EFFORT } from '../../lib/model-routing.js';
 import { escapeHtml } from '../../lib/utils/html.js';
 import { serverSessions, serverRow } from '../fixtures/task-decision.js';
+import { loadCostFormat } from '../fixtures/browser-cost-format.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
@@ -144,6 +145,7 @@ function load({ opened = null, previewFor = () => null, panelFor = serverPanel, 
     console,
   };
   vm.createContext(sandbox);
+  loadCostFormat(sandbox); // LIN-4179: the shared browser formatter, loaded before the page script, as the page does
   vm.runInContext(SRC, sandbox, { filename: 'prompt-section.js' });
   return { PromptSection: sandbox.window.PromptSection, calls };
 }

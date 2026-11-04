@@ -1,5 +1,5 @@
 {
-  "note": "LIN-4177: the change list. Each entry names one intended difference from the baseline goldens: a=cap (LIN-4148), b=horizon straddler credited to its true issue, c=true base kind, d=incomplete lineages show no figure. LIN-4178 adds the KPI path and run page: d also reaches S11, S12 and S13 (the same narrow incomplete rule, and the S12/S13 display fixes). Anything else that differs is a defect (W9). The workerSessions[].dispatchedAt decision is option (ii): the fetched earliest member's time is kept (no entry: no replay line moves). The S11 baseline was re-recorded at 9e397e6b over the horizon-filtered rows /kpis actually reads (LIN-4178): the first golden was recorded on unfiltered rows.",
+  "note": "LIN-4177: the change list. Each entry names one intended difference from the baseline goldens: a=cap (LIN-4148), b=horizon straddler credited to its true issue, c=true base kind, d=incomplete lineages show no figure. LIN-4178 adds the KPI path and run page: d also reaches S11, S12 and S13 (the same narrow incomplete rule, and the S12/S13 display fixes). Anything else that differs is a defect (W9). The workerSessions[].dispatchedAt decision is option (ii): the fetched earliest member's time is kept (no entry: no replay line moves). The S11 baseline was re-recorded at 9e397e6b over the horizon-filtered rows /kpis actually reads (LIN-4178): the first golden was recorded on unfiltered rows. LIN-4179 adds the calls population: S2 and S3 stop counting a null call cost as $0 (d): the priced sum keeps its value ($0.33), and the unpriced count (2) and the withheld total (totalUsd null) say so. S4 is value-identical (no entry: the scan estimate is S7's scan typicalUsd, shaped as before). S1's appCalls wire, S7, and every other surface are unchanged by LIN-4179.",
   "changes": [
     {
       "path": "S1.LIN-99.body.workerSessions.P",
@@ -135,6 +135,66 @@
       "path": "S13.steps.implementation#8",
       "change": "d",
       "reason": "The complete $0 lineage 'zr' shows $0.00 on the run page, not 'not reported' (LIN-4178 S13 display fix). Its unpriced and unreadable neighbours still withhold."
+    },
+    {
+      "path": "S2.totalCost",
+      "change": "d",
+      "reason": "LIN-4179 (d), S2: The workspace calls total is the priced sum under pricedUsd now; the old key is gone. Its value is unchanged ($0.33): the two unpriced calls were already counted as nothing, now they are named."
+    },
+    {
+      "path": "S2.pricedUsd",
+      "change": "d",
+      "reason": "LIN-4179 (d), S2: The priced sum of the workspace calls ($0.33 over the five priced calls). Same figure as the old totalCost."
+    },
+    {
+      "path": "S2.unpricedCalls",
+      "change": "d",
+      "reason": "LIN-4179 (d), S2: Two calls have no cost (c2 on review, c9 on scan). They were summed as $0 before; they are counted here and shown as 'not priced'."
+    },
+    {
+      "path": "S2.totalUsd",
+      "change": "d",
+      "reason": "LIN-4179 (d), S2: Not complete (two calls unpriced), so no total is published: null, not the partial 0.33 (d)."
+    },
+    {
+      "path": "S2.complete",
+      "change": "d",
+      "reason": "LIN-4179 (d), S2: False: the call set is not fully priced, so Health and the Weather line show the priced sum with its gap."
+    },
+    {
+      "path": "S2.byFeature",
+      "change": "d",
+      "reason": "LIN-4179 (d), S2: Each feature row carries its priced sum and unpriced count: review shows 1 call priced at $0 and 1 not priced, where it showed 2 calls at $0."
+    },
+    {
+      "path": "S3.totalCost",
+      "change": "d",
+      "reason": "LIN-4179 (d), S3: The workspace calls total is the priced sum under pricedUsd now; the old key is gone. Its value is unchanged ($0.33): the two unpriced calls were already counted as nothing, now they are named."
+    },
+    {
+      "path": "S3.pricedUsd",
+      "change": "d",
+      "reason": "LIN-4179 (d), S3: The priced sum of the workspace calls ($0.33 over the five priced calls). Same figure as the old totalCost."
+    },
+    {
+      "path": "S3.unpricedCalls",
+      "change": "d",
+      "reason": "LIN-4179 (d), S3: Two calls have no cost (c2 on review, c9 on scan). They were summed as $0 before; they are counted here and shown as 'not priced'."
+    },
+    {
+      "path": "S3.totalUsd",
+      "change": "d",
+      "reason": "LIN-4179 (d), S3: Not complete (two calls unpriced), so no total is published: null, not the partial 0.33 (d)."
+    },
+    {
+      "path": "S3.complete",
+      "change": "d",
+      "reason": "LIN-4179 (d), S3: False: the call set is not fully priced, so Health and the Weather line show the priced sum with its gap."
+    },
+    {
+      "path": "S3.byFeature",
+      "change": "d",
+      "reason": "LIN-4179 (d), S3: Each feature row carries its priced sum and unpriced count: review shows 1 call priced at $0 and 1 not priced, where it showed 2 calls at $0."
     }
   ]
 }

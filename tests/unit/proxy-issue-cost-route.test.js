@@ -247,13 +247,13 @@ describe('GET /api/proxy/issues/:identifier/cost — response shape', () => {
     // LIN-3163 (LIN-3157 B): the call log is lifetime-retained and no longer
     // exposes a `ttl`. The published /cost window is derived from the shared
     // 30-day READ_HORIZON_DAYS (LIN-3161), never from a store retention value.
-    // summarizeByIssue is stubbed because a bare construction leaves
-    // this.collection undefined.
+    // listInHorizon is stubbed because a bare construction leaves this.collection undefined. The two priced
+    // calls below are the app-call figure the route publishes (LIN-4179: the docs, summed by the one read).
     const llmCallLogStore = new LlmCallLogStore();
-    llmCallLogStore.summarizeByIssue = async (urlKey, identifier) => {
+    llmCallLogStore.listInHorizon = async (urlKey, filters) => {
       assert.equal(urlKey, 'acme');
-      assert.equal(identifier, 'LIN-42');
-      return { calls: 2, costUsd: 0.05, unpricedCalls: 0, byFeature: [{ feature: 'recommend', calls: 2, costUsd: 0.05 }] };
+      assert.equal(filters.issueIdentifier, 'LIN-42');
+      return [{ feature: 'recommend', model: 'm', cost: 0.02 }, { feature: 'recommend', model: 'm', cost: 0.03 }];
     };
     const { app } = buildApp({ history: [row()], llmCallLogStore });
     const { status, body } = await get(app, '/api/proxy/issues/LIN-42/cost');
@@ -329,7 +329,7 @@ describe('GET /api/proxy/issues/:identifier/cost — 30-day read horizon (LIN-31
     // published window — the route derives it from READ_HORIZON_DAYS. Before
     // A1 this read `window.days === 365`.
     const lifetimeStore = new LlmCallLogStore({ ttl: 365 * 24 * 60 * 60 });
-    lifetimeStore.summarizeByIssue = async () => ({ calls: 0, costUsd: 0, unpricedCalls: 0, byFeature: [] });
+    lifetimeStore.listInHorizon = async () => [];
     const { app } = buildApp({ history: [row()], llmCallLogStore: lifetimeStore });
     const { status, body } = await get(app, '/api/proxy/issues/LIN-42/cost');
 
@@ -339,12 +339,12 @@ describe('GET /api/proxy/issues/:identifier/cost — 30-day read horizon (LIN-31
     assert.ok(Math.abs(ageMs - HORIZON_MS) < 5000, `expected appCallsSince ~30d ago, got ${Math.round(ageMs / 86400000)} days`);
   });
 
-  test('the horizon `since` reaches both listHistory calls and summarizeByIssue', async () => {
+  test('the horizon `since` reaches both listHistory calls and listInHorizon (LIN-4179)', async () => {
     let summarizeOpts = null;
     const store = new LlmCallLogStore();
-    store.summarizeByIssue = async (urlKey, identifier, opts = {}) => {
-      summarizeOpts = opts;
-      return { calls: 0, costUsd: 0, unpricedCalls: 0, byFeature: [] };
+    store.listInHorizon = async (urlKey, filters = {}) => {
+      summarizeOpts = filters;
+      return [];
     };
     const { app, historyCalls } = buildApp({ history: [row()], llmCallLogStore: store });
     await get(app, '/api/proxy/issues/LIN-42/cost');
@@ -360,9 +360,9 @@ describe('GET /api/proxy/issues/:identifier/cost — 30-day read horizon (LIN-31
       assert.ok(call.since instanceof Date, `${label} call must carry a Date since`);
       assert.ok(call.since.getTime() >= lo && call.since.getTime() <= hi, `${label} since must be ~30d ago`);
     }
-    assert.ok(summarizeOpts, 'summarizeByIssue must be called');
-    assert.ok(summarizeOpts.since instanceof Date, 'summarizeByIssue must receive a Date since');
-    assert.ok(summarizeOpts.since.getTime() >= lo && summarizeOpts.since.getTime() <= hi, 'summarizeByIssue since must be ~30d ago');
+    assert.ok(summarizeOpts, 'listInHorizon must be called');
+    assert.ok(summarizeOpts.since instanceof Date, 'listInHorizon must receive a Date since');
+    assert.ok(summarizeOpts.since.getTime() >= lo && summarizeOpts.since.getTime() <= hi, 'listInHorizon since must be ~30d ago');
   });
 });
 
@@ -398,5 +398,36 @@ describe('GET /api/proxy/issues/:identifier/cost — only lineages that count un
     // The two rows' usage entries are running totals, so the lineage shows the last one ($3), once.
     assert.equal(founder.body.pricedUsd, 3);
     assert.equal(founder.body.workerSessions.length, 1);
+  });
+
+  test('LIN-4148: a founder the sibling read truncates is still the lineage\'s issue, and the lineage is counted once', async () => {
+    // The founder (LIN-42) is the oldest row of its lineage, so a newest-first cap on the sibling read drops it and keeps
+    // the follow-up (LIN-99). The founder lookup (lineageIdentityRows) is uncapped, so the lineage keeps its true issue.
+    const root = row({ id: 'R', rootItemId: 'R', issueIdentifier: 'LIN-42', kind: 'implementation', dispatchedAt: ts('10:00'), feedback: [usageEntry({ costUsd: 5, rootItemId: 'R' })] });
+    const followUp = row({ id: 'F', rootItemId: 'R', issueIdentifier: 'LIN-99', kind: 'review', dispatchedAt: ts('11:00'), feedback: [usageEntry({ costUsd: 3, rootItemId: 'R', timestamp: ts('11:00') })] });
+    const history = [root, followUp];
+    const identity = stubLineageIdentity(() => history);
+    const truncating = {
+      listItems: async () => [],
+      listHistory: async (urlKey, opts = {}) => {
+        if (opts.rootItemId && opts.rootItemId.$in) return { items: [followUp], total: 2 };
+        const items = opts.issueIdentifier ? history.filter(r => r.issueIdentifier === opts.issueIdentifier) : history;
+        return { items, total: items.length };
+      },
+      lineageIdentityRows: identity,
+    };
+
+    // The follow-up's own issue does not own the lineage: the founder is truncated out of its sibling read, and the
+    // fetch alone would credit LIN-99 (the double count LIN-4148 names).
+    const other = await get(buildApp({ dispatchQueueStore: truncating }).app, '/api/proxy/issues/LIN-99/cost');
+    assert.equal(other.status, 200);
+    assert.equal(other.body.noLineage, true, 'LIN-99 is not credited with the lineage');
+    assert.deepEqual(other.body.workerSessions, []);
+
+    // The founder's issue gets the whole lineage, once: the last running total ($3), not $5 + $3.
+    const founder = await get(buildApp({ dispatchQueueStore: truncating }).app, '/api/proxy/issues/LIN-42/cost');
+    assert.equal(founder.status, 200);
+    assert.equal(founder.body.workerSessions.length, 1, 'the lineage is counted once');
+    assert.equal(founder.body.pricedUsd, 3);
   });
 });

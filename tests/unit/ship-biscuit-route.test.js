@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createShipBiscuitRoutes } from '../../routes/ship-biscuit.js';
+import { formatEditionContext } from '../../lib/ship-biscuit.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROUTE_SRC = readFileSync(join(__dirname, '../../routes/ship-biscuit.js'), 'utf8');
@@ -127,7 +128,7 @@ describe('ship-biscuit generate survives H12 via the flushed keepalive branch (L
       getDeployInfo: () => ({}),
       observationSessionsStore: { async findByWorkspace() { await gate; return { sessions: [] }; } },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
-      llmCallLogStore: { async summarize() { return null; } },
+      llmCallLogStore: { async listInHorizon() { return []; } },
       taskSnapshotStore: { async listByWorkspace() { return { items: [] }; } },
       shipBiscuitHistoryStore: { async save(_urlKey, edition) { return { id: 'ed-1', ...edition }; } }
     });
@@ -195,7 +196,7 @@ describe('ship-biscuit generate threads the latest roadmap report into the editi
     getDeployInfo: () => ({}),
     observationSessionsStore: { async findByWorkspace() { return { sessions: [] }; } },
     agentStatusStore: { async listStatus() { return { items: [] }; } },
-    llmCallLogStore: { async summarize() { return null; } },
+    llmCallLogStore: { async listInHorizon() { return []; } },
     taskSnapshotStore: { async listByWorkspace() { return { items: [] }; } },
     shipBiscuitHistoryStore: { async save(_urlKey, edition) { return { id: 'ed-1', ...edition }; } },
   });
@@ -298,7 +299,7 @@ describe('ship-biscuit generate 429s a free-tier denial with the exact error + f
         getDeployInfo: () => ({}),
         observationSessionsStore: { async findByWorkspace() { return { sessions: [] }; } },
         agentStatusStore: { async listStatus() { return { items: [] }; } },
-        llmCallLogStore: { async summarize() { return null; } },
+        llmCallLogStore: { async listInHorizon() { return []; } },
         taskSnapshotStore: { async listByWorkspace() { return { items: [] }; } },
         // An in-window roadmap report makes the window non-quiet, so the handler
         // reaches the one paid call (and its free-tier gate).
@@ -332,6 +333,65 @@ describe('ship-biscuit generate 429s a free-tier denial with the exact error + f
       for (const k of keys) {
         if (prev[k] === undefined) delete process.env[k]; else process.env[k] = prev[k];
       }
+    }
+  });
+});
+
+describe('ship-biscuit Weather reads the calls through cost-read (LIN-4179, change d)', () => {
+  test('a null call cost is counted as not priced, never as $0, and the 30-day horizon is passed', async () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'test';
+    try {
+      const reads = [];
+      const saved = [];
+      const report = {
+        id: 'rep-1', generatedAt: new Date().toISOString(), northStar: 'Ship faster',
+        narrative: { digest: 'Steady progress.', technical: null, product: null },
+        orientation: [{ identifier: 'LIN-9', bearing: 'toward', reason: 'core path', archived: false }],
+      };
+      const router = createShipBiscuitRoutes({
+        workspaceFromUrl: (req, res, next) => next(),
+        freeTierStore: { async tryUse() { return { allowed: true }; } },
+        workspacePreferencesStore: null,
+        getOpenRouterSource: () => 'oauth',
+        getDeployInfo: () => ({}),
+        observationSessionsStore: { async findByWorkspace() { return { sessions: [] }; } },
+        agentStatusStore: { async listStatus() { return { items: [] }; } },
+        llmCallLogStore: {
+          async listInHorizon(urlKey, opts) {
+            reads.push({ urlKey, opts });
+            return [
+              { feature: 'review', cost: 0.33, timestamp: new Date(), totalTokens: 10 },
+              { feature: 'scan', cost: null, timestamp: new Date(), totalTokens: 5 },
+            ];
+          },
+        },
+        taskSnapshotStore: { async listByWorkspace() { return { items: [] }; } },
+        reportHistoryStore: { async getLatest() { return report; } },
+        shipBiscuitHistoryStore: { async save(_urlKey, edition) { saved.push(edition); return { id: 'ed-1', ...edition }; } },
+      });
+      const handler = getRouteHandler(router, 'post', '/workspace/:urlKey/api/ship-biscuit/generate');
+      const res = makeFlushRes();
+      await handler({
+        workspace: { urlKey: 'ws-a', name: 'Alpha', provider: 'local' },
+        session: { features: { shipBiscuit: true } },
+        body: {},
+      }, res);
+
+      assert.equal(res.statusCode, 200);
+      assert.equal(reads.length, 1, 'the route read the calls once');
+      assert.equal(reads[0].urlKey, 'ws-a');
+      assert.ok(reads[0].opts?.since instanceof Date, 'the read is bounded by a `since` horizon');
+      const weather = saved[0]?.weather;
+      assert.ok(weather, 'the edition carries the Weather figure');
+      assert.equal(weather.totalCalls, 2);
+      assert.equal(weather.unpricedCalls, 1, 'the null-cost call is counted as not priced');
+      assert.equal(weather.pricedUsd, 0.33, 'the null cost adds nothing to the priced sum');
+      // The editor context line the model is given (formatEditionContext is what buildEditorMessages sends).
+      assert.match(formatEditionContext({ ...saved[0], counts: { sessions: 0, status: 0, tasks: 0, roadmap: 0, total: 0 }, sources: [], isQuiet: false, windowDays: 7, generatedAt: saved[0].since }),
+        /By the numbers: 2 AI call\(s\), \$0\.3300, 1 not priced, 15 token\(s\)\./);
+    } finally {
+      process.env.NODE_ENV = prev;
     }
   });
 });

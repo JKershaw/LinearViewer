@@ -21,6 +21,7 @@ import {
   DEFAULT_WINDOW,
   MAX_WINDOW
 } from '../../lib/ship-biscuit.js';
+import { callsSurfaceOf } from '../../lib/cost-read.js';
 
 const NOW = Date.UTC(2026, 6, 9, 12, 0, 0); // 2026-07-09T12:00:00Z, fixed clock
 
@@ -129,10 +130,22 @@ describe('buildEditionModel — quiet window honesty', () => {
   test('weather (llm stats) alone does NOT make a window loud', () => {
     const m = buildEditionModel({
       window: 'week', now: NOW, sessions: [], agentStatusItems: [],
-      llmStats: { totalCalls: 5, totalCost: 0.02, totalTokens: 1234, byFeature: [] }
+      llmStats: callsSurfaceOf([1, 2, 3, 4, 5].map(() => ({ feature: 'recap', model: 'm', cost: 0.004, totalTokens: 10, timestamp: NOW })))
     });
     assert.strictEqual(m.isQuiet, true, 'numbers are a sidebar, not news');
     assert.ok(m.weather, 'weather is still attached for the by-the-numbers strip');
+    assert.strictEqual(m.weather.totalCalls, 5);
+  });
+
+  test('the by-the-numbers line names the unpriced calls, and never reads them as $0 (LIN-4179)', () => {
+    const llmStats = callsSurfaceOf([
+      { feature: 'scan', model: 'm', cost: 0.03, totalTokens: 100, timestamp: NOW },
+      { feature: 'review', model: 'm', cost: null, totalTokens: 50, timestamp: NOW },
+    ]);
+    // A quiet window's grounding text stops before the numbers (existing behaviour), so the window carries one session.
+    const m = buildEditionModel({ window: 'week', now: NOW, sessions: [sessionAt('in', 2)], agentStatusItems: [], llmStats });
+    const text = formatEditionContext(m);
+    assert.match(text, /By the numbers: 2 AI call\(s\), \$0\.0300, 1 not priced, 150 token\(s\)\./);
   });
 });
 

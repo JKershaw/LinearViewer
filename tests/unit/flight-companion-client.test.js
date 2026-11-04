@@ -22,6 +22,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { loadCostFormat } from '../fixtures/browser-cost-format.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLIENT_SRC = readFileSync(join(__dirname, '../../public/flight-companion.js'), 'utf8');
@@ -509,7 +510,7 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
   // the real render's server-rendered TRUE initial value (a fresh tab has
   // spent nothing).
   const stripTabTotalEl = new FakeElement('span');
-  stripTabTotalEl.textContent = '0 check-ins · $0.00 this tab';
+  stripTabTotalEl.textContent = '0 check-ins · $0.0000 this tab';
   // LIN-2623 beat 3 / LIN-3363 S2: the model combobox. `modelSelectEl` is the
   // HIDDEN committed input (`.value` = committed id, '' = current default);
   // the list holds option rows shaped like the server render (data-id,
@@ -608,6 +609,7 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
     sessionStorage: storage,
   };
   vm.createContext(sandbox);
+  loadCostFormat(sandbox); // LIN-4179: the shared browser formatter, loaded before the page script, as the page does
   // readSSEStream first, same context — mirrors production's script order
   // (common.js, then flight-companion.js) so both share one realm.
   vm.runInContext(READ_SSE_STREAM_SRC, sandbox, { filename: 'common.js (readSSEStream slice)' });
@@ -758,15 +760,15 @@ describe('flight-companion.js — pure helpers (no DOM/timers)', () => {
   });
 
   // LIN-2621 beat 3
-  test('formatCost: small amounts keep 4 decimals, larger totals round to 2 (mirrors lib/render-settings.js\'s own formatCost)', () => {
+  test('formatCost: the one browser formatter, fine (LIN-4179): 4 decimals under $1, a zero reads $0.0000, an unknown is a dash', () => {
     const { exports: m } = loadClient();
     assert.strictEqual(m.formatCost(0.00042), '$0.0004');
     assert.strictEqual(m.formatCost(0.5), '$0.5000');
     assert.strictEqual(m.formatCost(1), '$1.00');
     assert.strictEqual(m.formatCost(12.3), '$12.30');
-    assert.strictEqual(m.formatCost(0), '$0.00');
-    assert.strictEqual(m.formatCost(undefined), '$0.00', 'a non-numeric input degrades to $0.00, never NaN');
-    assert.strictEqual(m.formatCost(NaN), '$0.00');
+    assert.strictEqual(m.formatCost(0), '$0.0000');
+    assert.strictEqual(m.formatCost(undefined), '\u2014', 'an unknown cost is a dash, never a dollar figure');
+    assert.strictEqual(m.formatCost(NaN), '\u2014');
   });
 
   test('formatTurnMeta: tokens + cost, reading exactly what the usage payload carries', () => {
@@ -789,7 +791,7 @@ describe('flight-companion.js — pure helpers (no DOM/timers)', () => {
 
   test('formatTabTotal: the ticket\'s own literal template, applied as-is', () => {
     const { exports: m } = loadClient();
-    assert.strictEqual(m.formatTabTotal(0, 0), '0 check-ins · $0.00 this tab');
+    assert.strictEqual(m.formatTabTotal(0, 0), '0 check-ins · $0.0000 this tab');
     assert.strictEqual(m.formatTabTotal(1, 0.00042), '1 check-in · $0.0004 this tab');
     assert.strictEqual(m.formatTabTotal(5, 1.2), '5 check-ins · $1.20 this tab');
   });
@@ -1642,7 +1644,7 @@ describe('flight-companion.js — LIN-2621 beat 3: per-turn cost + the running "
     const { exports: m } = loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { usage: { total_tokens: 5, cost: 0.5 } })]),
     });
-    assert.strictEqual(m.getTabTotalText(), '0 check-ins · $0.00 this tab');
+    assert.strictEqual(m.getTabTotalText(), '0 check-ins · $0.0000 this tab');
     m.autoWakeTick();
     await flush();
     assert.strictEqual(m.getTabTotalText(), '1 check-in · $0.5000 this tab');
@@ -2713,6 +2715,7 @@ function loadChatUI(doc) {
   sandbox.window.renderSurface = function () { return '<div class="chat-msg__body"></div>'; };
   sandbox.window.escapeHtml = function (s) { return s == null ? '' : String(s); };
   vm.createContext(sandbox);
+  loadCostFormat(sandbox); // LIN-4179: the shared browser formatter, loaded before the page script, as the page does
   // LIN-2987: chat.js's isPinnedToBottom moved to common.js and chat.js now
   // delegates to window.isPinnedToBottom, both at its two internal call
   // sites and in its ChatUI.isPinnedToBottom export — so the real predicate

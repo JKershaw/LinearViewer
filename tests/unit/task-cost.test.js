@@ -9,7 +9,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildTaskCost } from '../../lib/task-cost.js';
+import { buildTaskCost } from '../fixtures/task-cost-adapter.js';
 
 // A `[usage]` feedback entry. `costUsd` is embedded directly in the payload
 // (parseUsagePayload prefers a native cost over deriving one), so tests can

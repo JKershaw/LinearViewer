@@ -8,7 +8,7 @@
  */
 import { Router } from 'express';
 import { graphqlErrorExtra, graphqlErrorDetail } from '../lib/proxy-graphql-errors.js';
-import { readCost } from '../lib/cost-read.js';
+import { readCost, appCallsOf } from '../lib/cost-read.js';
 import { anchorOf, isMember } from '../lib/lineage-membership.js';
 import { resolveChatCredential, isAiUnavailable } from '../lib/chat-request.js';
 import { resolveRecommendation } from '../lib/recommend-recurse.js';
@@ -708,9 +708,10 @@ export function createComputeRoutes({
         }
       }
 
-      const appSummary = llmCallLogStore
-        ? await llmCallLogStore.summarizeByIssue(req.proxyUrlKey, identifier, { since })
-        : { calls: 0, costUsd: 0, unpricedCalls: 0, byFeature: [] };
+      // The issue's calls in the window (LIN-4179): the store returns docs, the one read sums them.
+      const appSummary = appCallsOf(llmCallLogStore
+        ? await llmCallLogStore.listInHorizon(req.proxyUrlKey, { issueIdentifier: identifier, since })
+        : []);
 
       // LIN-4147 / LIN-4177: report only the lineages whose true issue is this one, and only those
       // with a member in the window. Fetched usage rows: the siblings, then the own rows (the pool
