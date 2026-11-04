@@ -1326,3 +1326,17 @@ open-0 A and B differed in emphasis. A wanted the env policy table first; B want
 5. the scripted baseline.
 
 Written onto LIN-4219 with its at-merge checks, moved to **Todo**, autopilot kicked off (`e3934b14`). LIN-4187 follows on the new harness.
+
+## 4 Nov, about 11:50 UTC: pace for the rest of the run
+
+John: "No rush… we may hit a token limit, but it resets tomorrow morning."
+
+**Plan to "settled":**
+- Two chains, in parallel:
+  - Costs: LIN-4201, then LIN-4203, then LIN-4218 (with its full loop when LIN-4203 lands);
+  - the harness: LIN-4219's five pieces, then LIN-4187 on the harness, with LIN-4186 as the comparison.
+- Each merge gets its place change, a ledger row and the builder's answers (q1–q6).
+- Then a fresh Seams and Drift reading over the new window.
+- **The discussion is tomorrow morning**, with a partial read possible from LIN-4201 alone.
+
+**To save tokens:** check-ins every ~75 minutes, lean (rulings, merges, at-merge readings). Surveys, pricing and the Periodicals rerun happen only when a merge calls for them. If the limit hits, scheduled check-ins resume from this log.
