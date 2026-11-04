@@ -15,7 +15,7 @@ Sources: the 13 step-backs of round 2/3/QoL (07:38, 4 Nov) and the two forward-t
 | **Settings as one described list** (name, type, default, bounds, what `0` means), read through one reader, re-readable instead of fixed at require time | LIN-4127 (C, D), LIN-4182 (B's numbers ticket, C), LIN-4183 (E: config at require time is "the real cost of this area") | Adding a setting is one entry; tests stop reloading `config.js` |
 | **An acknowledged outbox for runner → Harbour posts** | LIN-4165 (D: feedback outbox), LIN-4195 (C: typed telemetry channel, an outbox) | Volume stops being a risk for any relay; no fire-and-forget under-reporting |
 | **One shared transcript fold** across simple-dispatcher and runner-kit | LIN-4203 (step-back), LIN-4195 (area: "the per-message fold exists once in each repo") | One place that turns a transcript into requests |
-| **A shared harness for the heavy test tier**: prerequisites declared and checked once, a private Harbour (and dispatcher) per run | LIN-4180 (C), LIN-4196 (C), LIN-4181 (C: one `paths.js` owning every root) | "Won't start in my sandbox" closed; the next mutation or system task routine |
+| **A shared harness for the heavy test tier**: prerequisites declared and checked once, a private Harbour (and dispatcher) per run | LIN-4180 (C), LIN-4196 (C, and its builder's "if the area were how you'd want it": one "run this test command against a private copy of the trees" primitive), LIN-4181 (C: one `paths.js` owning every root). **Four namings: candidate to file with the evidence** | "Won't start in my sandbox" closed; the next mutation or system task routine |
 | **Instance-wide reads vs stores keyed by workspace** | LIN-4201 (step-back), LIN-4201 *(global)* | Settled once, before it comes up again |
 
 ## Named once (watch)
@@ -31,6 +31,7 @@ Sources: the 13 step-backs of round 2/3/QoL (07:38, 4 Nov) and the two forward-t
 - **Check whether stored run paragraphs keep pre-cutover figures.** LIN-4201 (step-back).
 - **Cut `opencode-runner.js`'s size** (1,966 lines). LIN-4203 *(global)*.
 - **Mutant anchors checked by `npm test`.** LIN-4196 (C, "cheap and outside this ticket").
+- **One process-group termination helper.** LIN-4196's builder: `groupAlive`/`stopGroup` in `run-mutations.js` is "another ad-hoc copy, beside `reapers.js` and several tests".
 
 ## How this is meant to be used (to test, not yet settled)
 

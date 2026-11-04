@@ -1170,3 +1170,15 @@ The rule for these: carry what you cheaply can, and name in the close-out what y
 **Also open, with my proposals posted (suggest-answer):**
 - **LIN-4212** (record lineage): read by posting row, F. No migration; it keeps D14 open.
 - **The gate's pass criterion:** "explained is enough", on condition the explanation check is shown failing on a planted mismatch.
+
+### 09:55 UTC: LIN-4196's builder answers, with the new place question
+
+- **Q6 works without a map.** Asked "what did your change leave behind in the wider codebase", the builder named:
+  - one new file with no obvious home (`test/helpers/tree-hash.js`);
+  - **a new copy** (process-group termination, now in `run-mutations.js` beside `reapers.js` and several tests);
+  - one thing simpler (one way to find Harbour again);
+  - the residue: mid-run environment failures still count as kills, and fixed ports clash between parallel runs.
+
+  Builders do notice the place when asked. Nobody had asked before.
+- **Q4 ("if the area were how you'd want it")** was "one 'run this test command against a private copy of the trees' primitive, shared by the system suite and the mutation gate". That is the tally's shared-harness row, **now named four times** (LIN-4180, LIN-4181, LIN-4196 step-back, LIN-4196 builder). By the tally's own rule, it's a candidate to file with the evidence.
+- **Q2 matches the forecast's "do first"** (a baseline first). The builder's version: "that would have shown the `harbour-halt` red and the preload interaction at the start".
