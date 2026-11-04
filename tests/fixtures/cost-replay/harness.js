@@ -42,6 +42,13 @@ import { lookupFounderRows } from '../../../lib/founder-lookup.js';
 import { buildRunView } from '../../../lib/run-view.js';
 import { buildCorpus, NOW_MS, REPLAY_ISSUES, REPLAY_JOBS } from './corpus.js';
 
+// The S1 route is served in-process through proxyLimiter (routes/proxy.js), which skips only when NODE_ENV is
+// 'test'. The replay freezes Date.now for each run, so the limiter's 60-per-minute window never rolls over, and a
+// second runReplay() in the same process would be answered 429. Every replay caller is a test or the recorder,
+// so this is the environment they run in (cost-read.test.js sets the same thing). It does not change any value:
+// a fresh process gives identical output with or without it (LIN-4197 beat 4).
+process.env.NODE_ENV = 'test';
+
 export const URL_KEY = 'acme';
 const AGENT_JOBS = REPLAY_JOBS.filter(j => j !== 'proxy-x');
 const HARBOUR_JOBS = ['proxy-x'];

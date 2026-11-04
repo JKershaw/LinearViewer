@@ -328,3 +328,50 @@ export function buildLin4197Corpus() {
   });
   return { rows, records };
 }
+
+/**
+ * LIN-4197 (beat 4): one stage of the LIN-4197 corpus on its own, in the replay corpus shape. Each stage runs in
+ * its own corpus, so its figures are not mixed with the existing corpus's aggregates or with each other.
+ */
+export function lin4197StageCorpus(key) {
+  const { rows } = buildLin4197Corpus();
+  const row = rows.find((r) => r._id === `l4197:${key}`);
+  if (!row) throw new Error(`no LIN-4197 stage ${key}`);
+  return { history: [row], queue: [], calls: [], effective: buildCorpus().effective };
+}
+
+/**
+ * LIN-4197 (beat 4): the mixed-harness control, review note 9 on LIN-4195 (comment eedab867). Each lineage holds a
+ * claude-code `[usage]` snapshot (the shape the runner posts today) AND an opencode delta row, and the claude-code
+ * transcript's per-request records sit beside it as `requestRecords`. No store serves request records yet, so the
+ * read path sees only the snapshot and the delta; the records are the oracle's input and nothing else. The
+ * assertions that pin the current behaviour are in tests/unit/cost-lin4197-replay.test.js.
+ */
+export function buildMixedHarnessControl() {
+  const claudeCodeRecords = {
+    'mh-haiku': LIN4197_CASES['haiku-over-100k/final'].records,
+    'mh-sonnet': LIN4197_CASES['resumed-across-deploy/later'].records,
+  };
+  const done = (at) => ({ kind: 'terminal', timestamp: at.toISOString(), message: '[done] fixture' });
+  const dispatch = ({ id, issue, at, feedback }) => ({
+    _id: id, urlKey: 'acme', rootItemId: id.replace(/-2$/, ''), issueIdentifier: issue, kind: 'implementation', promptName: 'implementation',
+    status: 'taken', abort: false, target: 'cli', harness: null, dispatchedAt: at, resolvedAt: at, feedback: [...feedback, done(at)],
+  });
+  const history = [
+    dispatch({ id: 'mh-haiku', issue: 'LIN-6', at: ago(3), feedback: [usage(LIN4197_CASES['haiku-over-100k/final'].snapshot, ago(3))] }),
+    dispatch({ id: 'mh-haiku-2', issue: 'LIN-6', at: ago(2), feedback: [usage({ harness: 'opencode', model: OPENCODE_MODEL, costUsd: LIN4197_MIXED_CONTROL_OPENCODE_USD }, ago(2))] }),
+    dispatch({ id: 'mh-sonnet', issue: 'LIN-7', at: ago(3), feedback: [usage(LIN4197_CASES['resumed-across-deploy/later'].snapshot, ago(3))] }),
+    dispatch({ id: 'mh-sonnet-2', issue: 'LIN-7', at: ago(2), feedback: [usage({ harness: 'opencode', model: OPENCODE_MODEL, costUsd: LIN4197_MIXED_CONTROL_OPENCODE_USD }, ago(2))] }),
+  ];
+  return { history, queue: [], calls: [], effective: buildCorpus().effective, requestRecords: claudeCodeRecords };
+}
+
+/**
+ * LIN-4197 (beat 4): the oracle for each control lineage. claudeCodeOracleUsd is each record priced alone
+ * (computeUsageCostUsd, LIN-4126 method); opencodeUsd is the delta row's own native cost; oracleUsd is their sum.
+ */
+export const LIN4197_MIXED_CONTROL_OPENCODE_USD = 0.25;
+export const LIN4197_MIXED_CONTROL = {
+  'mh-haiku': { claudeCodeOracleUsd: 0.0255, opencodeUsd: LIN4197_MIXED_CONTROL_OPENCODE_USD, oracleUsd: 0.2755 },
+  'mh-sonnet': { claudeCodeOracleUsd: 0.03945, opencodeUsd: LIN4197_MIXED_CONTROL_OPENCODE_USD, oracleUsd: 0.28945 },
+};
