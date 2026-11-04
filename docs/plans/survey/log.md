@@ -1114,3 +1114,18 @@ John: "add recommendations to rulings, then I can approve." Harbour has a route 
 From now on, each check reads `GET /rulings` and posts a proposed answer, with its reason, on every open ruling where I have a recommendation. Free-text rulings, which have no options, get the recommendation in the update to John instead.
 
 When he asked, nothing was open: he had already answered the rulings above, including the gate's to-the-cent rule (08:05) and the Mongo credential rotation raised on LIN-4195 (07:42).
+
+### 08:15 UTC: the tally of broad options (`docs/plans/survey/broad-options.md`)
+
+I collected every "right direction, not this task's" from the 15 step-backs, plus the global offshoot's "better still" lists, grouped by what each would change.
+
+- **8 broad options were named by more than one task.** One of them (a home on the map for the cost code) is already **pulled**: it's in LIN-4201's at-merge checks.
+- **The strongest recurrences:**
+  - one Stop tail in `hook.js` (LIN-4165, LIN-4203, LIN-4183);
+  - settings as one described list, re-readable rather than fixed at require time (LIN-4127, LIN-4182, LIN-4183);
+  - a shared harness for the heavy test tier (LIN-4180, LIN-4196, LIN-4181).
+
+  Each came from tasks that, at the time, each looked like a one-off.
+- **This is the push/pull meeting point John described.** No Periodical proposed these: they came bottom-up, from tasks paying for their absence. The rows give the Periodicals' top-down findings something to be checked against.
+
+**Next test:** give the global offshoot the tally rows for the area its task lands in, and see whether the task carries part of one.
