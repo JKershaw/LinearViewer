@@ -935,3 +935,43 @@ The consolidation did what it said: one read instead of six engines, and the old
 - Lines aren't cleanliness. Drift's places-per-decision is the measure for that, and it's still to come. But "delete the copies in the same change" happened, and the one owner came out bigger than the copies it replaced.
 
 **What this says about the drill question (first reading).** Our consolidations were locally right: one owner, copies deleted, every builder pleased. Globally, the place got a new hub with no named home and two new two-way couplings. Neither the Surveys nor the builders mentioned the map, because nobody asked them about it. That's John's worry exactly: the tidy pulled by the task cleaned the task's own area and tangled the wider one. The step-back answers will show whether a nudge would have seen it.
+
+### 07:38 UTC: the step-back answers (13 of 13, all posted on LIN-4150)
+
+Each session went back to a fresh worktree at its own base and read nothing later. Each did the work: 31+ tool calls, 3,400–4,200 characters, several redrafted to fit the word limit.
+
+**At altitude: yes, every time.** Every answer described the area in facts, and put "most" or "about two-thirds" of the difficulty on the area rather than the task. They named:
+- a file's size and the history that grew it;
+- orderings that live only in prose;
+- state nobody owns;
+- copies across repos;
+- three idioms for one thing.
+
+**The range of options: yes, every time.** Each laid out three to five options, from narrowest to broadest, with cost, what it leaves behind, and risk. The broad options were real ones: an outbox, a settings registry, a per-workspace state container, a typed telemetry channel, a shared sandbox-checkout primitive.
+
+| Ticket | First answer (forecast) | Step-back choice | Changed? |
+|---|---|---|---|
+| LIN-4127 | settle the parse rule; witness by careful manual procedure | **B:** also record where the flag's value came from, so the witness is one oplog row | yes |
+| LIN-4164 | measure disk, raise the constant, mirror Harbour | **B + cheap half of D:** a startup check for the timer ordering; file the cross-repo "how long is resumable" contract on its own | a little |
+| LIN-4165 | default on, check every exit path | **A + B's Harbour half:** Harbour readers key on `kind`, not position; chatter yields to `[done]` | a little |
+| LIN-4166 | test first, read the flag from `doc` | **A, named for what the row *is*,** so the "aside" concept can grow without a rename | a little |
+| LIN-4167 | A vs B (token in CI), John to choose | **a + d:** answer plainly, and add a **no-secret "did it go live" check** that goes red on any stall | **yes: a new option** |
+| LIN-4168 | registry plus a test comparing it to the inventory | **B, with structural registration** (`keyedHolder` registers itself; a guard flags unregistered maps) | yes |
+| LIN-4176 | inventory and golden capture, then one read | **B, with the read's input shaped like the coming ledger,** behind an adapter, so rebuild 2 swaps the adapter and not the readers | yes |
+| LIN-4180 | one resolver plus a pre-flight | **B, built so C can grow:** use production's sibling rule; delete the bad default; **fail, never skip** | a little |
+| LIN-4181 | baseline table, one canonical place to run | **A + a census test:** the acceptance becomes "location stops mattering" | **yes** |
+| LIN-4182 | table test of today's behaviour, then the parser | **B:** the module's home is the main decision; file numbers separately | a little |
+| LIN-4183 | B (helper plus ~11 copies) | **D:** B, plus remove two of the five global patches that the area had already outgrown | **yes** |
+| LIN-4195 | decide the home and intake first | **B + an outbox:** an acknowledged sender, its own collection | sharpened |
+| LIN-4196 | baseline; copy "outside the shared temp roots" | **B:** the copy goes *inside* a run root the runner owns, under its siblings' rules | **yes** |
+
+**Against my prediction.** I said most would still choose the narrow option and two or three a medium one. That was too pessimistic. **Twelve of 13 chose a middle option that leaves something for the next task**, and 6 of those changed their choice in substance. The pattern is consistent: the broad option is "the right direction, but its own ticket". So stepping back produces both a better-placed local choice and a named top-down follow-up.
+
+**The place-level finding was in sight.** LIN-4176's step-back opens with "Cost has no home of its own. It is a passenger on dispatch", which is exactly what the seams map shows today (the new owner is in the catch-all, with two-way knots to Runs and LLM). It offered C, "give cost its own area first", and declined it as too broad. LIN-4164's step-back names Harbour's hard-coded copy of the 6 h number; LIN-4173 later made it one exported copy.
+
+**The range brings choices to the floor.** LIN-4167 is the clearest case. John's choice was between a token in CI and keeping it manual. The step-back found a third option he wasn't offered: a check with no secret that turns any stall red. That fits his ruling ("grit in the gears warrants human attention"), since it makes the grit visible without removing the human.
+
+**Caveats.**
+- This is a second pass in the same session, with its own forecast in view, so question 3 invites revision.
+- The answers are hypothetical: the tickets are done. Whether the middle option pays has to be tested forward.
+- Cost: each answer took about 18k output tokens and re-read about 2M cached tokens.
