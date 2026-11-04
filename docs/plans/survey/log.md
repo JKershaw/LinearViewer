@@ -1421,3 +1421,16 @@ John: "I feel like our process of refining, trying it on real work, and measurin
 - **LIN-4201's builder on q7, "did the larger scope pay?": partly.** Removing the twin paid ("real drift caught cheaply"), and the map placement landed. **"Loading part of the read" didn't land.** I'd priced it as "nearly free, since the seven callers are touched anyway"; the builder: "touching a caller to pass an array is not the same change as making the read async and moving batching into it." It cost a review round trip and was split off as LIN-4226. **Lesson for the human role: price a larger extra like any other piece, and give it its own piece from the start** (as the LIN-4203 pricing did). The builder also flagged: "a production re-measure in an implementation ticket's acceptance… the task was certain to end with the gate open."
 
 **Ledger, forward rows so far:** 8 `+` (the six harness rows, LIN-4203, LIN-4187), 1 `+ (mixed)` (LIN-4201), and 1 neutral (LIN-4212, not surveyed). Baseline: 1 better, 3 neutral, 4 worse, 1 mixed.
+
+### 18:45 UTC: LIN-4218 surveyed, scoped and kicked off; the Periodicals are running
+
+- **Seams and Drift over today's window** are running (autopilot `62fd32d1`, hand-minted as before).
+- **LIN-4218 (one Stop sequence)**, surveyed at `d8d186c` with open-0 and global, both of which ran the unit tests.
+  - **Both independently found a latent bug, by running it:** with tool activity relayed, defer, blocked and failed post tool activity *after* the status that's meant to be last, so Harbour's `parseParkedWait` would miss the park. The flag is off by default, so it's not live today.
+  - **My calls as the human:**
+    - preserve the bug in the refactor, named as an exception, and **file the fix separately as LIN-4233** (the pricing lesson: don't mix a refactor with a behaviour change);
+    - **go larger**, as both voices recommended: decision/withdraw becomes a slot (three copies and `betweenTextAndStatus` deleted), and the usage flush becomes slot 0;
+    - **pieces, golden first**, with a sensitivity proof.
+
+    Step-back skipped again (the voices converged). Moved to Todo; autopilot `ee2a8571`.
+  - **Note:** this is the second time today the Survey found a real defect before work began (after LIN-4187's cause). Being allowed to run tests makes the forecast see more.
