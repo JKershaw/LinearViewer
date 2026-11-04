@@ -1105,4 +1105,4 @@ Both step-back sessions got the global agent's answer pasted in, with "evidence 
   - the census lists the legacy readers;
   - net production lines **down**: the first piece in the window that should shrink the place.
 
-**Running cost of the loop for one ticket:** four agents (open-0, global, step-back, plus the build). The three Survey agents together cost less than one build beat. The meter will give the real figure once records-first reading lands, which is this very ticket.
+**Running cost of the loop for one ticket:** three Survey agents before the build (open-0, global, step-back). I haven't measured their cost against a build beat yet. The meter will give the real figure once records-first reading lands, which is this very ticket.
