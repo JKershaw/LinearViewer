@@ -38,7 +38,6 @@ const at = (message, kind = 'status') => [{ message, kind, timestamp: '2026-09-2
 const CLASSES = [
   { prefix: 'DECISION:', terminal: null, wake: null, decision: true },
   { prefix: '[handoff]', terminal: null, wake: null },
-  { prefix: '[usage]', terminal: null, wake: null, usage: true },
   { prefix: '[done]', terminal: 'done', wake: 'done' },
   { prefix: '[failed]', terminal: 'failed', wake: 'failed' },
   { prefix: '[aborted]', terminal: 'aborted', wake: 'aborted' },
@@ -76,8 +75,11 @@ describe('the prompt\'s markers block', () => {
     }
   });
 
-  test('the [usage] example parses with kind:\'usage\': harness claude-code and a realised model', () => {
-    const usage = lines.find((l) => l.startsWith('[usage]'));
+  // LIN-4203 (LIN-4195 piece 6): the prompt no longer carries a [usage] line. The example stays here as a fixture,
+  // because the parser still reads a legacy [usage] row (the fold keeps old rows, D8).
+  const LEGACY_USAGE_FIXTURE = '[usage] {"schema":1,"harness":"claude-code","model":"claude-opus-5-5","inputTokens":130,"outputTokens":1050,"cacheCreationInputTokens":1500,"cacheCreation1hInputTokens":200,"cacheReadInputTokens":12300}';
+  test('a legacy [usage] row parses with kind:\'usage\': harness claude-code and a realised model', () => {
+    const usage = LEGACY_USAGE_FIXTURE;
     const parsed = parseUsage(at(usage, 'usage'));
     assert.equal(parsed.harness, 'claude-code');
     assert.equal(parsed.model, 'claude-opus-5-5');

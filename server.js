@@ -39,6 +39,7 @@ import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
 import { WorkspaceHaltStore } from './lib/workspace-halt.js'
 import { readHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from './lib/poll-halt.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
+import { USAGE_SNAPSHOT_INTAKE_COLLECTION } from './lib/usage-snapshot-intake.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
 import { CollectiveCharactersStore } from './lib/collective-characters-store.js'
 import { CollectivePresetsStore } from './lib/collective-presets-store.js'
@@ -456,6 +457,8 @@ const dispatchQueueStore = new DispatchQueueStore({
   collection: dispatchQueueCollection,
   historyCollection: dispatchHistoryCollection,
   wakeShadowCollection,
+  // LIN-4203: counts the legacy [usage] snapshot posts an old runner still sends (accepted, never rejected).
+  usageSnapshotCollection: db.collection(USAGE_SNAPSHOT_INTAKE_COLLECTION),
   ttl: 24 * 60 * 60 // 24 hours
 })
 // LIN-4080: the wake-mint gate reads the operator halt (`stop` only) through this

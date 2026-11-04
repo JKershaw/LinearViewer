@@ -15,8 +15,8 @@
  *    of it throws (postRequestRecords);
  *  - re-posting is idempotent against the REAL intake and store (postUsage + the intake's
  *    requestUsageStoreFor, over MangoDB): the stored set and its priced sum do not change, and a grown transcript grows;
- *  - the `[usage]` snapshot fold is unchanged: sumTranscriptUsage over every runner-kit fixture
- *    equals the golden recorded from the unmodified function at origin/main 9cc5ff9c.
+ *  - the retired `[usage]` snapshot fold (LIN-4203 deleted sumTranscriptUsage) has no test now; its golden
+ *    (recorded at origin/main 9cc5ff9c) stays as frozen data.
  *
  * The command-level wiring (the `usage` command posts both, and a record failure leaves the
  * snapshot post and the command's result alone) is in tests/unit/runner-kit-helper.test.js.
@@ -33,7 +33,6 @@ import { MangoClient } from '@jkershaw/mangodb';
 import {
   transcriptRequestRecords,
   postRequestRecords,
-  sumTranscriptUsage,
   TRANSCRIPT_TOKEN_FIELDS,
   USAGE_RECORDS_PER_CALL,
   RUNNER_HARNESS
@@ -139,10 +138,8 @@ describe('LIN-4202 records walk: the rules piece 0\'s data cannot prove', () => 
     const { records, skipped } = transcriptRequestRecords(lines);
     assert.deepEqual(records.map((r) => [r.requestId, r.outputTokens]), [['req_top', 30], ['msg_both', 5]]);
     assert.equal(skipped.noId, 1);
-    // The snapshot's rule is unchanged until piece 6: every id-less line is its own message, so it
-    // counts both req_top lines (100 + 100) and the line with no id at all (999). The records fold
-    // the two req_top lines into one request and post nothing for the id-less line.
-    assert.equal(sumTranscriptUsage(lines).inputTokens, 100 + 100 + 999 + 5);
+    // The retired snapshot (LIN-4203) counted both req_top lines and the line with no id at all. The records
+    // fold the two req_top lines into one request and post nothing for the id-less line.
   });
 
   test('non-assistant, usage-less and unparsable lines are ignored', () => {
@@ -267,12 +264,3 @@ describe('LIN-4202 re-posting against the real intake and store changes nothing 
   });
 });
 
-describe('LIN-4202: the [usage] snapshot fold is unchanged (golden from origin/main 9cc5ff9c)', () => {
-  for (const [group, dir] of [['transcriptCorpus', CORPUS_DIR], ['runnerKit', KIT_FIXTURES]]) {
-    test(`${group}: sumTranscriptUsage over every fixture equals the golden`, () => {
-      const files = readdirSync(dir).filter((f) => f.endsWith('.jsonl')).sort();
-      assert.deepEqual(files, Object.keys(GOLDEN[group]).sort());
-      for (const f of files) assert.deepEqual(sumTranscriptUsage(linesOf(join(dir, f))), GOLDEN[group][f], f);
-    });
-  }
-});

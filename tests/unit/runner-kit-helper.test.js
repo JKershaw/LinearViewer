@@ -13,7 +13,7 @@
  *     which is terminal but never a wake.
  *   - haltAction / haltSweep, resolveFollowUp (N4 stop parity), abortAction
  *     (B5), recoverAction (B4, plus NB3's re-login), watchdogAction and
- *     isHeartbeatStale (N1), sumTranscriptUsage and subagentModelFor (NB5),
+ *     isHeartbeatStale (N1) and subagentModelFor (NB5),
  *     and feedbackBody (NB1: every post carries the lineage's rootItemId).
  *
  * Every marker is checked against the real parsers (lib/dispatch-terminal.js,
@@ -61,9 +61,7 @@ import {
   dispatchEvidence,
   canPost,
   wakeRootFrom,
-  sumTranscriptUsage,
   transcriptRequestRecords,
-  usageMessage,
   subagentModelFor,
   handoffMessage,
   feedbackBody,
@@ -137,6 +135,10 @@ function ledgerWith(rows) {
 }
 
 const fb = (message, kind = 'status') => [{ message, kind, timestamp: new Date(NOW).toISOString() }];
+
+// LIN-4203: the retired `[usage]` snapshot shape, rebuilt as a fixture. It feeds the LEGACY fold (D8: old rows
+// still read as they did), so the kit no longer produces it but the cost reads that still parse it are pinned here.
+const legacySnapshotMessage = (usage) => `[usage] ${JSON.stringify({ schema: 1, ...usage })}`;
 
 describe('constants', () => {
   test('the other-consumer window is named and no wider than Harbour\'s own "nobody is listening" limit', () => {
@@ -850,148 +852,6 @@ describe('isHeartbeatStale (N1, shared with the broker)', () => {
   test('sleep gap', () => assert.equal(isHeartbeatStale(NOW - MAX - 1, NOW, MAX, 60 * 60_000), false));
 });
 
-describe('sumTranscriptUsage and [usage] (NB5: the realised model)', () => {
-  const lines = readFileSync(FIXTURE, 'utf8').split('\n');
-
-  test('sums each message once (repeated blocks share an id) and picks the model with the most output', () => {
-    const u = sumTranscriptUsage(lines);
-    assert.deepEqual(u, {
-      harness: 'claude-code',
-      model: 'claude-opus-5-5',
-      inputTokens: 130,
-      outputTokens: 1050,
-      cacheCreationInputTokens: 1500,
-      cacheCreation1hInputTokens: 200,
-      cacheReadInputTokens: 12300
-    });
-  });
-
-  test('round-trips through parseUsage with harness and the realised model', () => {
-    const msg = usageMessage(sumTranscriptUsage(lines));
-    assert.ok(msg.startsWith('[usage] {'));
-    assert.ok(msg.length <= 2000);
-    const parsed = parseUsage([{ kind: 'usage', message: msg }]);
-    assert.equal(parsed.harness, 'claude-code');
-    assert.equal(parsed.model, 'claude-opus-5-5');
-    assert.equal(parsed.outputTokens, 1050);
-  });
-
-  test('no readable transcript: harness only, which reads unpriced, never a false $0', () => {
-    const u = sumTranscriptUsage([]);
-    assert.deepEqual(u, { harness: 'claude-code' });
-    const parsed = parseUsage([{ kind: 'usage', message: usageMessage(u) }]);
-    assert.equal(parsed.harness, 'claude-code');
-    assert.equal(parsed.costUsd, null);
-  });
-
-  test('the realised model wins over the item\'s requested one', () => {
-    const msg = usageMessage(sumTranscriptUsage(lines), { requestedModel: 'claude-sonnet-5-5' });
-    assert.equal(parseUsage([{ kind: 'usage', message: msg }]).model, 'claude-opus-5-5');
-  });
-});
-
-describe('sumTranscriptUsage on the LIN-3098 witness subagent (LIN-3212)', () => {
-  // Redacted copy of the real agent-a010f7d2462c56e56.jsonl behind the witness's `output 8`.
-  const lines = readFileSync(join(ROOT, 'tests', 'fixtures', 'runner-kit', 'subagent-report.jsonl'), 'utf8').split('\n');
-  const assistant = lines.filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.type === 'assistant');
-
-  test('reproduces the witness [usage] exactly', () => {
-    assert.deepEqual(sumTranscriptUsage(lines), {
-      harness: 'claude-code',
-      model: 'claude-opus-5-5',
-      inputTokens: 4,
-      outputTokens: 8,
-      cacheCreationInputTokens: 28668,
-      cacheCreation1hInputTokens: 0,
-      cacheReadInputTokens: 26344
-    });
-  });
-
-  test('every line is an unfinished (message_start) snapshot, and repeats are identical', () => {
-    // No line ever got its final usage (stop_reason stays null), so the transcript
-    // itself under-records output; no per-id fold (first, last or max) can recover it.
-    assert.ok(assistant.every((e) => e.message.stop_reason === null));
-    const usageById = new Map();
-    for (const e of assistant) {
-      const usage = JSON.stringify(e.message.usage);
-      if (usageById.has(e.message.id)) assert.equal(usage, usageById.get(e.message.id));
-      else usageById.set(e.message.id, usage);
-    }
-    assert.equal(usageById.size, 2);
-  });
-});
-
-describe('sumTranscriptUsage folds repeated snapshots per message.id (LIN-3212)', () => {
-  // Redacted copy of a real subagent transcript (agent-a71d290649df73567.jsonl,
-  // Claude Code 2.1.286, this host). Shape A: the report message is written across
-  // several lines sharing one message.id while the streamed usage grows
-  // (`output_tokens` 4 → 4 → 535). Keeping the FIRST snapshot under-counts it.
-  const lines = readFileSync(join(ROOT, 'tests', 'fixtures', 'runner-kit', 'subagent-streamed.jsonl'), 'utf8').split('\n');
-  const assistant = lines.filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.type === 'assistant');
-
-  test('keeps the largest snapshot per repeated message.id, not the first', () => {
-    assert.deepEqual(sumTranscriptUsage(lines), {
-      harness: 'claude-code',
-      model: 'claude-sonnet-5-5',
-      inputTokens: 6,
-      outputTokens: 1108,
-      cacheCreationInputTokens: 11490,
-      cacheCreation1hInputTokens: 0,
-      cacheReadInputTokens: 66045
-    });
-  });
-
-  test('the fixture really is shape A: a repeated id whose later snapshot is larger', () => {
-    const byId = new Map();
-    for (const e of assistant) {
-      if (!e.message.id) continue;
-      if (!byId.has(e.message.id)) byId.set(e.message.id, []);
-      byId.get(e.message.id).push(e.message.usage.output_tokens);
-    }
-    const growing = [...byId.values()].find((outs) => new Set(outs).size > 1);
-    assert.ok(growing, 'expected at least one message.id with differing snapshots');
-    assert.equal(growing[0], 4); // first-wins would record this
-    assert.equal(Math.max(...growing), 535); // max-per-id records this
-  });
-
-  test('takes the MAX of each field, not the last snapshot, and a line with no id is its own message', () => {
-    // Synthetic (review 2363ff88, ledger items 3 and 4): the real fixture is
-    // monotonic, so last-wins passes it. Here msg_a's fields peak on different
-    // snapshots, so first-wins, last-wins and max all disagree.
-    const line = (id, [input, output, cacheCreation, cacheCreation1h, cacheRead]) => JSON.stringify({
-      type: 'assistant',
-      message: {
-        ...(id ? { id } : {}),
-        model: 'claude-sonnet-5-5',
-        usage: {
-          input_tokens: input,
-          output_tokens: output,
-          cache_creation_input_tokens: cacheCreation,
-          cache_creation: { ephemeral_1h_input_tokens: cacheCreation1h },
-          cache_read_input_tokens: cacheRead
-        }
-      }
-    });
-    const u = sumTranscriptUsage([
-      line('msg_a', [10, 4, 500, 200, 1000]),
-      line('msg_a', [12, 300, 500, 200, 900]),
-      line('msg_a', [11, 250, 0, 0, 1200]), // later and lower on input, output and cache creation
-      line('msg_b', [3, 50, 0, 0, 100]),
-      line(null, [2, 7, 0, 0, 0]),
-      line(null, [2, 7, 0, 0, 0]) // identical, but no id: a second message, not a repeat
-    ]);
-    assert.deepEqual(u, {
-      harness: 'claude-code',
-      model: 'claude-sonnet-5-5',
-      inputTokens: 12 + 3 + 2 + 2,
-      outputTokens: 300 + 50 + 7 + 7,
-      cacheCreationInputTokens: 500,
-      cacheCreation1hInputTokens: 200,
-      cacheReadInputTokens: 1200 + 100
-    });
-  });
-});
-
 describe('subagentModelFor (NB5: map model onto the subagent, ignore effort)', () => {
   const rows = [
     [null, null],
@@ -1109,8 +969,8 @@ describe('NB1 against the real store and buildTaskCost: kickoff + two wakes coun
       // (claude-opus-5-5 stays unpriced until LIN-3094).
       const usage = { harness: 'claude-code', model: PRICED_MODEL, ...snapshots[i] };
       const body = tagged
-        ? feedbackBody(ledger, id, 'usage', usageMessage(usage))
-        : { message: usageMessage(usage), kind: 'usage' };
+        ? feedbackBody(ledger, id, 'usage', legacySnapshotMessage(usage))
+        : { message: legacySnapshotMessage(usage), kind: 'usage' };
       const res = await store.addFeedback(id, urlKey, body, 'runner', null, { takenByTokenId: tokenId });
       assert.ok(res, 'feedback accepted');
     }
@@ -1119,7 +979,7 @@ describe('NB1 against the real store and buildTaskCost: kickoff + two wakes coun
     return buildTaskCost({ ownRows: rows });
   }
 
-  const costOf = (snap) => parseUsage([{ kind: 'usage', message: usageMessage({ harness: 'claude-code', model: PRICED_MODEL, ...snap }) }]).costUsd;
+  const costOf = (snap) => parseUsage([{ kind: 'usage', message: legacySnapshotMessage({ harness: 'claude-code', model: PRICED_MODEL, ...snap }) }]).costUsd;
 
   test('tagged (the runner): one worker session, costed once at the last cumulative snapshot', TIMEOUT, async () => {
     const cost = await runLineage({ tagged: true });
@@ -1438,29 +1298,18 @@ describe('commands (against a fake Harbour)', () => {
     assert.equal(post.body.rootItemId, itemId);
   });
 
-  test('usage posts the realised model from the subagent transcript, kind usage, with rootItemId', TIMEOUT, async () => {
+  // LIN-4203 (LIN-4195 piece 6): the kit no longer posts a [usage] snapshot. The transcript goes up as
+  // per-request records only, to the runner-token route, after the subagent's own row is taken.
+  test('usage posts no kind:usage snapshot; the transcript goes up as per-request records', TIMEOUT, async () => {
     const itemId = harbour.state.takes.at(-1);
     const dir = join(home, 'transcripts', 'proj', 'sess', 'subagents');
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'agent-agent-1.jsonl'), readFileSync(FIXTURE));
-    await run(['usage', 'agent-1']);
-    const post = harbour.state.feedback.at(-1);
-    assert.equal(post.body.kind, 'usage');
-    assert.equal(post.body.rootItemId, itemId);
-    assert.equal(parseUsage([{ kind: 'usage', message: post.body.message }]).model, 'claude-opus-5-5');
-  });
-
-  test('LIN-4202: usage also posts the transcript\'s per-request records to the runner-token route, after the snapshot', TIMEOUT, async () => {
-    const itemId = harbour.state.takes.at(-1);
     const feedbackBefore = harbour.state.feedback.length;
     const usageBefore = harbour.state.usage.length;
     const r = await run(['usage', 'agent-1']);
-    // The snapshot is posted exactly as before: one kind:'usage' feedback, same message.
-    assert.equal(harbour.state.feedback.length, feedbackBefore + 1);
-    const snapshot = harbour.state.feedback.at(-1);
-    assert.equal(snapshot.body.message, usageMessage(sumTranscriptUsage(readFileSync(FIXTURE, 'utf8').split('\n'))));
-    // And the records, one call, to this item.
-    assert.equal(harbour.state.usage.length, usageBefore + 1);
+    assert.equal(harbour.state.feedback.length, feedbackBefore, 'no kind:usage feedback is posted');
+    assert.equal(harbour.state.usage.length, usageBefore + 1, 'one records call');
     const sent = harbour.state.usage.at(-1);
     assert.equal(sent.itemId, itemId);
     const expected = transcriptRequestRecords(readFileSync(FIXTURE, 'utf8').split('\n'), { agent: 'agent-1' }).records;
@@ -1469,17 +1318,16 @@ describe('commands (against a fake Harbour)', () => {
     assert.equal(r.records.found, expected.length);
     assert.equal(r.records.applied, expected.length);
     assert.equal(r.records.failedBatches, 0);
+    assert.equal(r.usage, undefined, 'the command result carries no snapshot');
   });
 
-  test('LIN-4202: a failing record post leaves the snapshot post and the command result alone', TIMEOUT, async () => {
+  test('LIN-4203: a failing record post is reported in the result, and still no snapshot is posted', TIMEOUT, async () => {
     for (const status of [500, 404]) {
       harbour.state.usageStatus = status;
       try {
         const feedbackBefore = harbour.state.feedback.length;
         const r = await run(['usage', 'agent-1']);
-        assert.equal(harbour.state.feedback.length, feedbackBefore + 1, `snapshot still posted on ${status}`);
-        assert.equal(harbour.state.feedback.at(-1).body.kind, 'usage');
-        assert.equal(r.usage.model, 'claude-opus-5-5');
+        assert.equal(harbour.state.feedback.length, feedbackBefore, `no snapshot on ${status}`);
         assert.equal(r.records.posted, 0);
         if (status === 404) assert.equal(r.records.notTaken, true);
         else assert.deepEqual(r.records.errors, ['HTTP 500']);
@@ -1488,7 +1336,6 @@ describe('commands (against a fake Harbour)', () => {
       }
     }
   });
-
   test('feedback [done] posts with rootItemId, marks the row done and stops its broker', TIMEOUT, async () => {
     const itemId = harbour.state.takes.at(-1);
     const socket = JSON.parse(readFileSync(join(home, 'acme', 'ledger.json'), 'utf8')).items[itemId].socket;
