@@ -1,0 +1,56 @@
+## LinearViewer 5334c81a..d7ceb373 — files named 'no diff in the window'
+lib/dispatch-factory.js: numstat='none' commits=0
+lib/follow-up-dispatch.js: numstat='none' commits=0
+lib/errors.js: numstat='none' commits=0
+lib/workspace.js: numstat='none' commits=0
+lib/poll-halt.js: numstat='none' commits=0
+lib/workspace-halt.js: numstat='none' commits=0
+lib/home-view.js: numstat='none' commits=0
+lib/task-order.js: numstat='none' commits=0
+lib/providers/state-map.js: numstat='none' commits=0
+lib/runner-kit/contract.json: numstat='none' commits=0
+
+## LinearViewer files named as changed (claimed size)
+6	7	docs/runner-prompt.md
+189	31	lib/cost-read.js
+10	3	lib/request-usage-intake.js
+15	59	lib/runner-kit/runner.mjs
+6	9	lib/session-telemetry.js
+4	4	routes/dispatch.js
+2	2	scripts/code-shape/areas.json
+
+## Other cited-row files (for later beats): numstat over window
+lib/render.js: none
+lib/render-settings-workspace.js: none
+lib/settings-areas.js: none
+lib/workspace-change-log.js: none
+public/session.js: none
+lib/render-task-page.js: none
+public/task-page.js: none
+lib/unanswered-decisions.js: none
+lib/dispatch-store.js: 75	4	lib/dispatch-store.js
+lib/row-usage.js: 34	7	lib/row-usage.js
+routes/proxy-runner.js: none
+lib/dispatch-validation.js: none
+lib/consumer-heartbeat.js: none
+lib/dispatch-wake.js: none
+lib/vendor-assets.js: none
+lib/key-state-holders.js: 10	1	lib/key-state-holders.js
+routes/test.js: 5	1	routes/test.js
+routes/dashboard-session-state.js: none
+lib/lineage-membership.js: none
+lib/dispatch-lineage-status.js: none
+
+## SD 502901c..d8d186c — files named 'no diff in the window'
+harnesses.js: numstat='none' commits=0
+dispatcher.js: numstat='none' commits=0
+reapers.js: numstat='none' commits=0
+subscription.js: numstat='none' commits=0
+halt.js: numstat='none' commits=0
+followup.js: numstat='none' commits=0
+host-heartbeat.js: numstat='none' commits=0
+queue.js: numstat='none' commits=0
+auth-stop.js: numstat='none' commits=0
+SD contract fixture:
+  no contract fixture diff
+runner-contract.json
