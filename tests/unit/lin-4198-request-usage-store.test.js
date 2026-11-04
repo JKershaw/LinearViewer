@@ -248,21 +248,21 @@ describe('listForAnchors — the one loader', () => {
     assert.deepEqual(await store.listForAnchors('ws-a', [null, '', 7]), []);
   });
 
-  test('projects only the fields the read needs: no issueIdentifier, updatedAt or _id (itemId is returned for the relabel, LIN-4212)', async () => {
+  test('projects only the fields the read needs: no issueIdentifier or _id (itemId for the relabel, updatedAt for coverage, LIN-4212)', async () => {
     const [row] = await store.listForAnchors('ws-a', ['root-1']);
     assert.equal('itemId' in row, true, 'the read keys on the posting row, so itemId is returned');
+    assert.equal('updatedAt' in row, true, 'the post-time coverage read needs updatedAt');
     assert.equal('issueIdentifier' in row, false);
-    assert.equal('updatedAt' in row, false);
     assert.equal('_id' in row, false);
     assert.equal('urlKey' in row, false, 'urlKey is the query key, not returned');
-    for (const f of ['rootItemId', 'requestId', 'itemId', 'harness', 'model', 'effort', 'lane', 'agent', 'at', ...USAGE_TOKEN_FIELDS]) {
+    for (const f of ['rootItemId', 'requestId', 'itemId', 'updatedAt', 'harness', 'model', 'effort', 'lane', 'agent', 'at', ...USAGE_TOKEN_FIELDS]) {
       assert.ok(f in row, `${f} is needed by the read`);
     }
   });
 
   test('the projection constant names exactly the fields above', () => {
     const included = Object.entries(LIST_PROJECTION).filter(([, v]) => v === 1).map(([k]) => k).sort();
-    assert.deepEqual(included, ['agent', 'at', 'costUsd', 'effort', 'harness', 'itemId', 'lane', 'model', 'requestId', 'rootItemId', ...USAGE_TOKEN_FIELDS].sort());
+    assert.deepEqual(included, ['agent', 'at', 'costUsd', 'effort', 'harness', 'itemId', 'lane', 'model', 'requestId', 'rootItemId', 'updatedAt', ...USAGE_TOKEN_FIELDS].sort());
     assert.equal(LIST_PROJECTION._id, 0);
   });
 });
@@ -311,7 +311,9 @@ describe('census: nothing outside the store reads the collection', () => {
     // LIN-4212: the wake-posted lineage witnesses drive the store and the shared intake (both allowed) against real mongod.
     'tests/unit/lin-4212-wake-records-stranded.test.js',
     // LIN-4212: the redaction census names the store as a classified call site (a table key); it reads nothing itself.
-    'tests/unit/lin-3384-redaction-census.test.js'
+    'tests/unit/lin-3384-redaction-census.test.js',
+    // LIN-4212 (beat 3): the measure script's tests name the collection in a fake database; they read nothing from the store.
+    'tests/unit/lin-4200-measure.test.js'
   ]);
   const SCANNED_DIRS = ['lib', 'routes', 'scripts', 'tests', 'server.js'];
   const SKIP = new Set(['node_modules', 'experiments', 'public']);
@@ -383,7 +385,12 @@ describe('LIN-4198 registers: code-shape area, source map, endpoint catalogue, a
     assert.match(doc, /Auth deviation from feedback, on purpose/);
     assert.match(doc, /largest|\$max/);
     assert.match(doc, /No stored price/);
-    assert.match(doc, /nothing reads the collection yet except the intake route and `listForAnchors`/);
+    assert.match(doc, /the intake route, and `listForAnchors`/);
+    // LIN-4212: the read rule, the informational stamp and the history dependency are stated in the doc.
+    assert.match(doc, /A record belongs to the lineage its posting row \*\*currently\*\* belongs to/);
+    assert.match(doc, /\*\*informational stamp\*\*: nothing reads by it/);
+    assert.match(doc, /no fallback\s+to the stamp/);
+    assert.match(doc, /`dispatch-history` is not pruned on\s+its own/);
   });
 
   test('the db-indexes reason on the lookup index says why it is kept beside the unique key', () => {

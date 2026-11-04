@@ -14,7 +14,8 @@
  *    the excess is reported (tokens, and dollars when both sides price).
  *  - the D7 residue: lineages where the record token sum is below the snapshot on any token field.
  *  - the share of runner work priceable from snapshots vs from records (token-weighted and by lineage).
- *  - record-backed vs snapshot-only lineage counts; orphan records (no member row for their anchor).
+ *  - record-backed vs snapshot-only lineage counts; the request-record audit (orphan records: no posting row for their
+ *    itemId; duplicates before and after the loader; records stamped at a wake; phantom wake-only lineages).
  *  - the runner oplog's request-usage.flush counters (posted, rejected, failed, skipped.noRequestId).
  *  - the case classes the sample does NOT contain, reported as UNMEASURED.
  *
@@ -38,6 +39,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { lineageRecords, lineageFigure } from '../lib/cost-read.js';
+import { RequestUsageStore } from '../lib/request-usage-store.js';
 import { lastUsageEntry } from '../lib/row-usage.js';
 import { priceRequest, resolveWorkerModelId, promptTokensOf } from '../lib/model-pricing.js';
 
@@ -356,14 +358,65 @@ export function oplogCrossCheck({ lineages, oplogLines, anchorOfSession, toleran
   return { totals, perLineage };
 }
 
-/** Request records whose anchor has no member row (they belong to no lineage the read can see). */
-export function orphanAnchors(usageDocs, anchorsWithMemberRows) {
-  const orphans = new Map();
+/**
+ * The request-record audit (LIN-4212, plan-review notes 2 and 3). Pure over what the read fetched.
+ *
+ *   orphan records        a raw record whose `itemId` has no posting row in dispatch-history. The
+ *                         loader's own rule: the member source is dispatch-history alone.
+ *   stamped at a wake     a raw record whose stored stamp is its posting row's own id, and that row is a
+ *                         wake. Informational: nothing reads by the stamp, and the loader relabels it.
+ *   split requests        raw documents of one request that resolve to the same current lineage (a re-post
+ *                         split, one document per stamp). Reported raw, before the read.
+ *   duplicate after read  loader records that repeat a (rootItemId, requestId). Must be 0.
+ *   phantom lineages      lineages whose only members are wake rows (a wake that never latched).
+ *
+ * `folded` is the loader's output (`listForAnchors`), `lineages` the lineageRecords output.
+ */
+export function requestRecordAudit({ usageDocs, postingRows, folded, lineages }) {
+  const postingOf = new Map(postingRows.map(row => [String(row._id), row]));
+  const orphanByItem = new Map();
+  let orphanRecords = 0;
+  let stampedAtWakeId = 0;
+  const perRequest = new Map();
   for (const doc of usageDocs) {
-    if (anchorsWithMemberRows.has(doc.rootItemId)) continue;
-    orphans.set(doc.rootItemId, (orphans.get(doc.rootItemId) || 0) + 1);
+    const itemId = doc.itemId === null || doc.itemId === undefined ? null : String(doc.itemId);
+    const posting = itemId === null ? undefined : postingOf.get(itemId);
+    if (!posting) {
+      orphanRecords += 1;
+      const entry = orphanByItem.get(itemId) || { itemId, stamp: doc.rootItemId ?? null, records: 0 };
+      entry.records += 1;
+      orphanByItem.set(itemId, entry);
+      continue;
+    }
+    if (posting.kind === 'wake' && String(doc.rootItemId) === String(posting._id)) stampedAtWakeId += 1;
+    const key = `${posting.rootItemId}\u0000${doc.requestId}`;
+    perRequest.set(key, (perRequest.get(key) || 0) + 1);
   }
-  return orphans;
+  let splitRequests = 0;
+  let splitRawDocs = 0;
+  for (const count of perRequest.values()) {
+    if (count > 1) { splitRequests += 1; splitRawDocs += count - 1; }
+  }
+  const seen = new Set();
+  let duplicateAfterRead = 0;
+  for (const record of folded) {
+    const key = `${record.rootItemId}\u0000${record.requestId}`;
+    if (seen.has(key)) duplicateAfterRead += 1;
+    seen.add(key);
+  }
+  const phantomLineages = lineages.filter(l => l.members.length > 0 && l.members.every(m => m.kind === 'wake')).length;
+  return {
+    rawRecords: usageDocs.length,
+    orphanRecords,
+    orphanPostingRows: orphanByItem.size,
+    orphans: [...orphanByItem.values()],
+    stampedAtWakeId,
+    splitRequests,
+    splitRawDocs,
+    duplicateAfterRead,
+    foldedRecords: folded.length,
+    phantomLineages
+  };
 }
 
 /** Token-weighted and count shares. Snapshot side: snapshot tokens. Record side: record tokens. */
@@ -451,23 +504,37 @@ export function caseClassesOf(results, records, lineages) {
 
 // ---------- Mongo read (the only I/O) ----------
 
-async function readWorkspace(db, urlKey, windowStart) {
+// READ ONLY: every call below is a find(). The record side is the loader (RequestUsageStore.listForAnchors),
+// the same code LIN-4201's cost read calls, so the measurement tests the real read, not a copy of it.
+export async function readWorkspace(db, urlKey, windowStart) {
   const usageDocs = await db.collection('request-usage')
     .find({ urlKey }, { projection: { _id: 0 } }).toArray();
-  const recordAnchors = new Set(usageDocs.map(d => d.rootItemId));
+  // The posting rows of the stored records, from dispatch-history alone (the loader's member source).
+  const itemIds = [...new Set(usageDocs.filter(d => d.itemId !== null && d.itemId !== undefined).map(d => String(d.itemId)))];
+  const postingRows = itemIds.length === 0 ? [] : await db.collection('dispatch-history')
+    .find({ urlKey, _id: { $in: itemIds } }, { projection: { _id: 1, rootItemId: 1, kind: 1 } }).toArray();
   const windowFilter = { urlKey, dispatchedAt: { $gte: windowStart }, status: 'taken' };
   const windowRows = [
     ...await db.collection('dispatch-queue').find(windowFilter, { projection: { _id: 1, rootItemId: 1 } }).toArray(),
     ...await db.collection('dispatch-history').find(windowFilter, { projection: { _id: 1, rootItemId: 1 } }).toArray()
   ];
-  const anchors = new Set([...recordAnchors, ...windowRows.map(r => String(r.rootItemId || r._id))]);
+  // Lineage anchors are the CURRENT anchors of the window's rows and of the posting rows (never the stored stamp).
+  const anchors = new Set([
+    ...windowRows.map(r => String(r.rootItemId || r._id)),
+    ...postingRows.map(r => String(r.rootItemId || r._id))
+  ]);
   const anchorList = [...anchors];
   const anchorQuery = { urlKey, $or: [{ rootItemId: { $in: anchorList } }, { _id: { $in: anchorList } }] };
   const rows = [
     ...await db.collection('dispatch-queue').find(anchorQuery).toArray(),
     ...await db.collection('dispatch-history').find(anchorQuery).toArray()
   ];
-  return { usageDocs, rows, windowRowCount: windowRows.length };
+  const store = new RequestUsageStore({
+    collection: db.collection('request-usage'),
+    historyCollection: db.collection('dispatch-history')
+  });
+  const records = await store.listForAnchors(urlKey, anchorList);
+  return { usageDocs, rows, windowRowCount: windowRows.length, postingRows, records };
 }
 
 async function main(argv) {
@@ -491,17 +558,16 @@ async function main(argv) {
       : await db.collection('request-usage').distinct('urlKey');
     const perWorkspace = {};
     for (const urlKey of urlKeys) {
-      const { usageDocs, rows, windowRowCount } = await readWorkspace(db, urlKey, windowStart);
+      const { usageDocs, rows, windowRowCount, postingRows, records } = await readWorkspace(db, urlKey, windowStart);
       const lineages = lineageRecords({ fetchedRows: rows, identityRows: rows });
       const byAnchor = new Map();
-      for (const doc of usageDocs) {
-        const list = byAnchor.get(doc.rootItemId) || [];
-        list.push(doc);
-        byAnchor.set(doc.rootItemId, list);
+      for (const record of records) {
+        const list = byAnchor.get(record.rootItemId) || [];
+        list.push(record);
+        byAnchor.set(record.rootItemId, list);
       }
       const results = lineages.map(lineage => classifyLineage({ lineage, records: byAnchor.get(lineage.anchor) || [] }));
-      const memberAnchors = new Set(lineages.map(l => l.anchor));
-      const orphans = orphanAnchors(usageDocs, memberAnchors);
+      const requestRecords = requestRecordAudit({ usageDocs, postingRows, folded: records, lineages });
       const recordTimes = usageDocs.map(d => msOf(d.at)).filter(Number.isFinite);
       perWorkspace[urlKey] = {
         window: {
@@ -511,13 +577,8 @@ async function main(argv) {
           recordCount: usageDocs.length,
           windowRowCount
         },
-        orphanRecordAnchors: orphans.size,
-        // Records whose anchor no dispatch row carries (in either collection): they are invisible to the lineage read.
-        orphans: [...orphans.entries()].map(([anchor, n]) => {
-          const ats = usageDocs.filter(d => d.rootItemId === anchor).map(d => msOf(d.at)).filter(Number.isFinite);
-          return { anchor, records: n, firstAt: new Date(Math.min(...ats)).toISOString(), lastAt: new Date(Math.max(...ats)).toISOString() };
-        }),
-        orphanRecordCount: [...orphans.values()].reduce((s, n) => s + n, 0),
+        // Records whose itemId has no posting row in dispatch-history: the loader drops them, and they are reported here.
+        requestRecords,
         // Coverage by post time (updatedAt). toCent counts lineages with no record posted after the snapshot.
         toCent: {
           eligible: results.filter(r => r.toCent).length,

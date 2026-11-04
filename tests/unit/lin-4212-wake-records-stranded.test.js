@@ -371,3 +371,15 @@ describe('LIN-4212 guard: the loader issues no query for an empty anchor list or
     assert.equal(rawSpy.calls.length + histSpy.calls.length, 0);
   });
 });
+
+describe('LIN-4212 W4b: the fold keeps the latest updatedAt (the post-time coverage read depends on it)', () => {
+  test('a split request folds to the latest updatedAt of its documents, in either input order', () => {
+    const early = { rootItemId: 'R', requestId: 'm', itemId: 'row-a', at: new Date('2026-11-04T08:00:00Z'), updatedAt: new Date('2026-11-04T08:01:00Z'), outputTokens: 1 };
+    const late = { rootItemId: 'R', requestId: 'm', itemId: 'row-b', at: new Date('2026-11-04T08:00:00Z'), updatedAt: new Date('2026-11-04T08:09:00Z'), outputTokens: 2 };
+    assert.equal(typeof usageStoreModule.oneRecordPerRequest, 'function', 'oneRecordPerRequest must be exported');
+    const forward = usageStoreModule.oneRecordPerRequest([early, late]);
+    const backward = usageStoreModule.oneRecordPerRequest([late, early]);
+    assert.equal(forward[0].updatedAt.getTime(), new Date('2026-11-04T08:09:00Z').getTime());
+    assert.deepEqual(backward, forward);
+  });
+});

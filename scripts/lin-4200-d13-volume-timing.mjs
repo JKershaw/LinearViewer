@@ -5,17 +5,20 @@
  *
  * WHAT IT MEASURES
  *  1. Record volume: per-lineage distribution (min, median, p95, max), and records per UTC day and hour.
- *  2. explain('executionStats') on the exact query RequestUsageStore.listForAnchors issues (lib/request-usage-store.js,
- *     LIST_PROJECTION), for three anchor sets: one task, the 30-day /kpis-sized dispatch anchors, and the lineages
- *     that have records. Confirms the declared {urlKey, rootItemId} index is used (IXSCAN, no COLLSCAN) and records
- *     keysExamined, docsExamined, nReturned.
+ *  2. explain('executionStats') on the two queries RequestUsageStore.listForAnchors issues (LIN-4212): the member
+ *     rows from dispatch-history (rootItemId in anchors), then the records by {urlKey, itemId} (LIST_PROJECTION), for
+ *     three anchor sets: one task, the 30-day /kpis-sized dispatch anchors, and the lineages that have records.
+ *     Confirms each index is used (IXSCAN, no COLLSCAN) and records keysExamined, docsExamined, nReturned. The stamped
+ *     read (the pre-LIN-4212 shape, {urlKey, rootItemId}) is explained beside them for the delta.
  *  3. Wall times on live production data, with repetitions:
  *     (a) today's /kpis (collectKpiStats) and workspace KPIs (collectWorkspaceKpis), the real collectors, fed the
  *         production collection handles and the same stores server.js constructs;
  *     (b) the records-sum path piece 4 would add for the same windows: listForAnchors + priceRequest per record,
  *         summed per lineage (the D6 contract, minimal form).
  *  4. A steady-state projection. Production has too little volume for it, so the records-sum path is timed on a
- *     SCRATCH copy at steady-state volume (see --scale-local below), and the projection's basis is printed.
+ *     SCRATCH copy at steady-state volume (see --scale-local below), and the projection's basis is printed. Each
+ *     scratch point also times the stamped read on the same data, and reports the loader's percentage delta
+ *     (the LIN-4212 target: within +10% at steady-state volume).
  *
  * READ-ONLY against production. The only writes are to a scratch database on a LOCAL mongod (127.0.0.1), created
  * by --scale-local and dropped at the end. The script refuses a scratch write to any non-loopback host.
@@ -34,6 +37,7 @@
 import { writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { RequestUsageStore, LIST_PROJECTION, REQUEST_USAGE_COLLECTION } from '../lib/request-usage-store.js';
+import { anchorOf } from '../lib/lineage-membership.js';
 import { priceRequest } from '../lib/model-pricing.js';
 import { readHorizonStart } from '../lib/read-horizon.js';
 import { ACTIVITY_WINDOW_DAYS } from '../lib/kpi-stats.js';
@@ -118,6 +122,12 @@ export function projectMs(fit, records) {
   return fit.a + fit.b * records;
 }
 
+/** Percentage change from `base` to `next` (positive = slower). Null when `base` is not a positive number. */
+export function deltaPctOf(base, next) {
+  if (!(base > 0) || !Number.isFinite(next)) return null;
+  return round(((next - base) / base) * 100);
+}
+
 /**
  * Steady-state records in a window: the observed records per hour since a start, scaled to the window.
  * It assumes the rate holds; the caller states that as the projection's basis.
@@ -186,27 +196,64 @@ export async function timeReps(label, reps, fn) {
   return { label, reps, timesMs: times.map(round), medianMs: round(median), maxMs: round(sorted[sorted.length - 1]), last };
 }
 
-/** The exact explain for listForAnchors' query shape (the store's own query, LIST_PROJECTION). */
-async function explainListForAnchors(collection, urlKey, anchors) {
+/**
+ * The explain pair for the two-step read the loader issues (LIN-4212): the member rows from dispatch-history
+ * (`rootItemId in anchors`, projection {_id, rootItemId}), then the records by itemId (LIST_PROJECTION). Both are
+ * explained on the handles the loader uses; `stampedRecords` is the pre-LIN-4212 read shape, kept for the delta.
+ */
+async function explainListForAnchors(db, urlKey, anchors) {
   const ids = [...new Set(anchors)];
-  const explain = await collection
+  const history = db.collection('dispatch-history');
+  const records = db.collection(REQUEST_USAGE_COLLECTION);
+  const memberExplain = await history
+    .find({ urlKey, rootItemId: { $in: ids } }, { projection: { _id: 1, rootItemId: 1 } })
+    .explain('executionStats');
+  const memberIds = (await history.find({ urlKey, rootItemId: { $in: ids } }, { projection: { _id: 1 } }).toArray()).map(r => String(r._id));
+  const recordExplain = await records
+    .find({ urlKey, itemId: { $in: memberIds } }, { projection: LIST_PROJECTION })
+    .explain('executionStats');
+  const stampedExplain = await records
     .find({ urlKey, rootItemId: { $in: ids } }, { projection: LIST_PROJECTION })
     .explain('executionStats');
-  return { anchorCount: ids.length, ...summarizeExplain(explain) };
+  return {
+    anchorCount: ids.length,
+    memberRows: memberIds.length,
+    members: summarizeExplain(memberExplain),
+    records: summarizeExplain(recordExplain),
+    stampedComparison: summarizeExplain(stampedExplain)
+  };
 }
 
-async function readWorkspaceVolume(db, urlKey, now) {
+/**
+ * The record lineages of a workspace, from the POSTING rows: the current anchor of each dispatch-history row that
+ * a stored record names by itemId. Never the stored stamp (that is the bug LIN-4212 fixes).
+ */
+async function recordLineageAnchors(db, urlKey) {
+  const itemIds = (await db.collection(REQUEST_USAGE_COLLECTION).distinct('itemId', { urlKey })).map(String);
+  if (itemIds.length === 0) return [];
+  const postingRows = await db.collection('dispatch-history')
+    .find({ urlKey, _id: { $in: itemIds } }, { projection: { _id: 1, rootItemId: 1 } }).toArray();
+  return [...new Set(postingRows.map(r => anchorOf(r)))];
+}
+
+/**
+ * Volume of the workspace's records. The raw documents give the total, the per-day and per-hour buckets and the
+ * deploy split. The lineage sizes come from the records the loader returns (`records`, folded and relabelled),
+ * not from a raw count on the stored stamp.
+ */
+async function readWorkspaceVolume(db, urlKey, now, records) {
   const ru = db.collection(REQUEST_USAGE_COLLECTION);
-  const rows = await ru.find({ urlKey }, { projection: { _id: 0, rootItemId: 1, requestId: 1, at: 1, agent: 1, model: 1 } }).toArray();
+  const rows = await ru.find({ urlKey }, { projection: { _id: 0, at: 1 } }).toArray();
   const perLineage = new Map();
+  for (const r of records) perLineage.set(r.rootItemId, (perLineage.get(r.rootItemId) || 0) + 1);
   const instants = [];
   for (const r of rows) {
-    perLineage.set(r.rootItemId, (perLineage.get(r.rootItemId) || 0) + 1);
     const ms = new Date(r.at).getTime();
     if (Number.isFinite(ms)) instants.push(ms);
   }
   return {
     records: rows.length,
+    foldedRecords: records.length,
     perLineage: distributionOf([...perLineage.values()]),
     perDay: bucketCountsOf(instants, 'day'),
     perHour: bucketCountsOf(instants, 'hour'),
@@ -273,13 +320,14 @@ async function measureProduction(db, urlKey, now, reps, taskAnchor) {
   const since = readHorizonStart(now);
   // LIN-4212: the store reads the lineage members from dispatch-history, so it is built with that handle.
   const store = new RequestUsageStore({ collection: db.collection(REQUEST_USAGE_COLLECTION), historyCollection: db.collection('dispatch-history') });
-  const volume = await readWorkspaceVolume(db, urlKey, now);
+  const recordAnchors = await recordLineageAnchors(db, urlKey);
+  const recordsOfAnchors = await store.listForAnchors(urlKey, recordAnchors);
+  const volume = await readWorkspaceVolume(db, urlKey, now, recordsOfAnchors);
   const windowAnchors = await historyAnchors(db, since, urlKey);
-  const recordAnchors = [...new Set((await db.collection(REQUEST_USAGE_COLLECTION).distinct('rootItemId', { urlKey })).map(String))];
   const explains = {
-    oneTask: await explainListForAnchors(db.collection(REQUEST_USAGE_COLLECTION), urlKey, [taskAnchor]),
-    kpiWindow: await explainListForAnchors(db.collection(REQUEST_USAGE_COLLECTION), urlKey, windowAnchors),
-    recordLineages: await explainListForAnchors(db.collection(REQUEST_USAGE_COLLECTION), urlKey, recordAnchors)
+    oneTask: await explainListForAnchors(db, urlKey, [taskAnchor]),
+    kpiWindow: await explainListForAnchors(db, urlKey, windowAnchors),
+    recordLineages: await explainListForAnchors(db, urlKey, recordAnchors)
   };
   const collectors = await productionCollectors(db);
   const timings = {
@@ -287,6 +335,10 @@ async function measureProduction(db, urlKey, now, reps, taskAnchor) {
     workspaceKpis: await timeReps('today workspace KPIs (collectWorkspaceKpis)', reps, () => collectors.workspace(urlKey, now)),
     recordsSumKpiWindow: await timeReps('records-sum path, 30-day window anchors', reps, async () => {
       const recs = await store.listForAnchors(urlKey, windowAnchors);
+      return sumRecordsByLineage(recs);
+    }),
+    stampedKpiWindow: await timeReps('stamped read, 30-day window anchors (pre-LIN-4212 shape, comparison only)', reps, async () => {
+      const recs = await db.collection(REQUEST_USAGE_COLLECTION).find({ urlKey, rootItemId: { $in: windowAnchors } }, { projection: LIST_PROJECTION }).toArray();
       return sumRecordsByLineage(recs);
     }),
     recordsSumOneTask: await timeReps('records-sum path, one task', reps, async () => {
@@ -305,37 +357,55 @@ function summarizeLast(value) {
   return { keys: Object.keys(value).slice(0, 20) };
 }
 
-/** Scratch copy at steady-state volume on a LOCAL mongod: the records-sum path timed and explained. */
+/**
+ * Scratch copy at steady-state volume on a LOCAL mongod: the records-sum path timed and explained.
+ * LIN-4212: each lineage gets one posting row in dispatch-history (its `_id` is the item id the records name, its
+ * `rootItemId` the lineage anchor), so the loader's member read has rows to find, exactly as in production.
+ */
 async function measureScratch(scratchClient, prodRecords, steadyRecords, reps, scratchDbName) {
   const db = scratchClient.db(scratchDbName);
   await db.dropDatabase();
   const col = db.collection(REQUEST_USAGE_COLLECTION);
+  const history = db.collection('dispatch-history');
+  // The indexes production declares for these two reads (lib/db-indexes.js).
   await col.createIndex({ urlKey: 1, rootItemId: 1, requestId: 1 }, { unique: true });
   await col.createIndex({ urlKey: 1, rootItemId: 1 });
+  await col.createIndex({ urlKey: 1, itemId: 1 });
+  await history.createIndex({ urlKey: 1, rootItemId: 1 });
   const lineages = Math.max(1, Math.round(steadyRecords / 125));
   const anchors = Array.from({ length: lineages }, (_, i) => `scratch-${String(i).padStart(6, '0')}`);
+  const itemOf = (i) => `scratch-row-${String(i % lineages).padStart(6, '0')}`;
+  await history.insertMany(anchors.map((anchor, i) => ({
+    _id: itemOf(i), urlKey: 'scratch', rootItemId: anchor, kind: 'implementation', status: 'taken', abort: false,
+    dispatchedAt: new Date('2026-11-04T05:00:00Z')
+  })));
   const BATCH = 5000;
   let batch = [];
   let inserted = 0;
   for (let i = 0; i < steadyRecords; i += 1) {
     const src = prodRecords[i % prodRecords.length];
-    batch.push({ urlKey: 'scratch', rootItemId: anchors[i % lineages], requestId: `scratch-${i}`, harness: 'claude-code', model: src.model,
-      effort: src.effort ?? null, lane: src.lane ?? null, agent: 'main', at: src.at,
+    const at = src.at;
+    batch.push({ urlKey: 'scratch', itemId: itemOf(i), rootItemId: anchors[i % lineages], requestId: `scratch-${i}`, harness: 'claude-code', model: src.model,
+      effort: src.effort ?? null, lane: src.lane ?? null, agent: 'main', at, updatedAt: at,
       inputTokens: src.inputTokens, outputTokens: src.outputTokens, cacheCreationInputTokens: src.cacheCreationInputTokens,
       cacheCreation1hInputTokens: src.cacheCreation1hInputTokens, cacheReadInputTokens: src.cacheReadInputTokens });
     if (batch.length === BATCH) { await col.insertMany(batch, { ordered: false }); inserted += batch.length; batch = []; }
   }
   if (batch.length) { await col.insertMany(batch, { ordered: false }); inserted += batch.length; }
-  // LIN-4212: the scratch db also holds dispatch-history, the member read's source. The scratch seeding of matching history rows is beat 3's job.
-  const store = new RequestUsageStore({ collection: col, historyCollection: db.collection('dispatch-history') });
-  const explain = await explainListForAnchors(col, 'scratch', anchors);
-  const timing = await timeReps(`scratch records-sum path, ${inserted} records, ${lineages} lineages`, reps, async () => {
+  const store = new RequestUsageStore({ collection: col, historyCollection: history });
+  const explain = await explainListForAnchors(db, 'scratch', anchors);
+  const loaderTiming = await timeReps(`scratch records-sum path (loader), ${inserted} records, ${lineages} lineages`, reps, async () => {
     const recs = await store.listForAnchors('scratch', anchors);
     return sumRecordsByLineage(recs);
   });
-  timing.last = summarizeLast(timing.last);
+  const stampedTiming = await timeReps(`scratch stamped read (pre-LIN-4212 shape), ${inserted} records, ${lineages} lineages`, reps, async () => {
+    const recs = await col.find({ urlKey: 'scratch', rootItemId: { $in: anchors } }, { projection: LIST_PROJECTION }).toArray();
+    return sumRecordsByLineage(recs);
+  });
+  loaderTiming.last = summarizeLast(loaderTiming.last);
+  stampedTiming.last = summarizeLast(stampedTiming.last);
   await db.dropDatabase();
-  return { records: inserted, lineages, explain, timing };
+  return { records: inserted, lineages, explain, timing: loaderTiming, stampedTiming, deltaPct: deltaPctOf(stampedTiming.medianMs, loaderTiming.medianMs) };
 }
 
 async function main(argv) {
