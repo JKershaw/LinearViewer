@@ -7,7 +7,7 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { lineageIdentityOfRows, LINEAGE_IDENTITY_BATCH_SIZE } from '../../lib/dispatch-store.js';
+import { lineageIdentityOfRows, findLineageIdentity, UnboundedHistoryReadError, LINEAGE_IDENTITY_BATCH_SIZE } from '../../lib/dispatch-store.js';
 import { LINEAGE_IDENTITY_PROJECTION } from '../../lib/dispatch-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
@@ -68,6 +68,16 @@ describe('lineageIdentityOfRows: the query shape', () => {
     assert.equal(found.length, 1);
     const onlyHistory = await lineageIdentityOfRows([recordingCollection([founder])], [{ urlKey: 'ws', rootItemId: 'f' }]);
     assert.equal(onlyHistory.length, 1);
+  });
+});
+
+describe('findLineageIdentity: the one implementation carries the bounded-read guard (LIN-4201)', () => {
+  test('a query with a urlKey but no rootItemId and no issueIdentifier is rejected, and nothing is read', async () => {
+    const history = recordingCollection([]);
+    const queue = recordingCollection([]);
+    await assert.rejects(() => findLineageIdentity([history, queue], { urlKey: 'ws' }), UnboundedHistoryReadError);
+    assert.equal(history.calls.length, 0, 'the guard fires before any find');
+    assert.equal(queue.calls.length, 0, 'the guard fires before any find');
   });
 });
 
