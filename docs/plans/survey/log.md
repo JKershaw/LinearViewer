@@ -1570,3 +1570,6 @@ Sent to LIN-4168, 4177, 4178, 4179 and 4198, in their own sessions. The question
 - LIN-4198: two readers of the record vocabulary.
 
 If 4 or more of 5 match, a builder's q6 is a cheap stand-in for the place reading. If 2 or fewer match, the Periodical stays the only film.
+
+### 22:05 UTC: the runner stopped claiming work at 21:01:39
+Every dispatch since 21:03 is still `queued`: the LIN-4234 and LIN-4233 autopilots, the LIN-4144 Surveys and the five q6s. Harbour flags each one: "No consumer has polled this workspace since 2026-11-04T21:01:39Z". That was just after the 20:55 batch finished. Nothing on Harbour's side is wrong. The dispatcher host stopped polling, and `watch-restart.sh` doesn't relaunch a dead dispatcher (by design, LIN-2446). I can't reach the host from this session. The queue will drain when a runner polls again. Checks continue; nothing else is dispatched until it does.
