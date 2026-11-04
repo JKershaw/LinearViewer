@@ -1129,3 +1129,13 @@ I collected every "right direction, not this task's" from the 15 step-backs, plu
 - **This is the push/pull meeting point John described.** No Periodical proposed these: they came bottom-up, from tasks paying for their absence. The rows give the Periodicals' top-down findings something to be checked against.
 
 **Next test:** give the global offshoot the tally rows for the area its task lands in, and see whether the task carries part of one.
+
+### 08:20 UTC: check-in
+
+- **LIN-4196 is Done** (simple-dispatcher `502901c`). The mutation runner now copies both the dispatcher and Harbour into a private `sd-mutation-*` root and edits only the copies. It runs a baseline first and cleans up on a signal.
+  - **The real gate:** baseline 25/25, 67/67, exit 0, live-tree hashes identical before and after. That's the honest score John's ruling waited for, unblocked by LIN-4186/LIN-4185 (the halt tests, `67ff5c3`).
+  - **What was built** copies the dispatcher too, which is the step-back's option B. The step-back was hypothetical, asked after the plan was set, so this is agreement, not influence.
+- **LIN-4196's builder was asked the round-3 questions** (`69e051b5`, quiet), with **a new question 6**: "What did your change leave behind in the wider codebase, beyond this ticket: anything new without an obvious home, anything that now lives in two places, anything that got simpler?" The aim is to see whether builders notice the place without being shown the map.
+- **The Periodicals:** Seams & Tangles (LIN-4208) is in close-out; the other three are writing their reports.
+- **LIN-4200** is re-measuring under the to-the-cent ruling. LIN-4201 and LIN-4203 are Todo.
+- **Rulings:** none open.
