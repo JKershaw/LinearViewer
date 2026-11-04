@@ -1624,3 +1624,12 @@ Each is its own piece, with a stop-and-say rule on 5 and 6. Autopilot `84fa12ad`
   - the comments say what still holds.
   - The Harbour reader is the sibling LIN-4240.
 - **The first two rows with no Periodicals routing are both `+`.** Both came from their own Surveys, the larger scope and the at-merge list. Too few to call, but no sign yet that routing was what made the difference.
+
+### 23:15 UTC: LIN-4234 Done; the stop rule worked
+- **Piece 3 was skipped under the scope's own stop rule.** The builder's reason: "the derived universe already makes a renamed constant red, and the imports would add module coupling". That's a fair price, given without a review round trip. **The scope rule pays: a larger extra as its own piece, with a "stop and say so if it doesn't pay", gets an honest price from the builder instead of a forced landing** (compare LIN-4201's "loading part of the read", 18:25).
+- **The review earned its keep:**
+  - it ran five mutation checks, including a real planted `lib/` file;
+  - it found the new mutation test vacuous;
+  - it found an `.mjs` blind spot, fixed at close-out.
+- **For John (operator checks the close-out couldn't run, no production access):** were any Full wipes executed between LIN-4203's deploy (17:18 UTC) and this one (23:03)? If so, delete the `usage-snapshot-intake` documents for the wiped keys. Also a dry run of `erase-account.mjs` and `dry-run-urlkey-duplicates.mjs` on the real database, to confirm the new row shows up.
+- After-questions q1–q7 sent to its builder (`f0228592`).
