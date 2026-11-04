@@ -661,3 +661,20 @@ The replay's change list carries both. That's the "capture each surface's output
   - The founder lookup was timed on a real mongod at 20k, 80k and 200k lineages, with a narrowed fallback ready.
   - Four old reducers were deleted, and an all-unpriced `$0.00` now shows as `-`.
 - **LIN-4181** posted its baseline table: A, a workspace clone (1 failure, the git-probe precondition); B, `/tmp` (4 failures plus 704 leaks); C, `TMPDIR` in `state/` (119 failures). This **confirms the Survey's table almost exactly** (1 / 4 / 119). The "46" can't be traced: no location gives it. In the system suite, the 4 failures are the same ones LIN-4180's builder saw. A PR revision is in progress (#309).
+
+## 4 Nov, about 00:45 UTC: LIN-4181 done, clean main on the host, and its builder's answer
+
+**LIN-4181 is Done** (SD PR #309, `11a1279`). **On the runner host, `npm test` on merged `main` gives 3859 tests, 0 fail, 5 skipped (each with its reason, the git-probe one included), 0 leaks.** The system suite now gives 119 tests / 4 fail / 0 leaks in all three locations (before: 117/4, 129/16, and C unmeasured). The four remaining system failures fail identically on clean `main` and at three Harbour commits, so they aren't noise. Their cause is unknown, and they were filed as a follow-up.
+
+The fix followed the Survey's reading: pin the clone root into the run root, keep the run root out of `state/`, and gate the git probe on its precondition. One real defect came from it: **pinning `WORKSPACE_CLONE_ROOT` in the shared preload silently disabled the LIN-558 guard** (which returned early on that variable). Review found it by mutation. Neither the Survey nor the plan saw it.
+
+**The builder (third pass; "I mostly saw the end state"):**
+- *Where it bound:* "The shared test preload. Any env var it pins reaches every test." The system suite depends on host state: fixed ports colliding with orphaned servers, and the Harbour checkout moving three times during the ticket, so "same Harbour" was never held fixed. That's LIN-4180's builder's point again: "which Harbour?".
+- *First:* check `mergeable` on the PR. A conflicting PR starts no CI run, and the pass before read that as slow CI.
+- *Tidy now:* script the A/B/C baseline (by hand it "got it slightly wrong"), give the system suite ephemeral ports, and ticket the four failures. It also **corrected its own comment**: two claims there were inherited from the previous pass, not re-run.
+- *If the area were how you'd want it:* "If config exposed defaults apart from env-resolved values, the harness derived every path root from the run root in one place, and the system harness owned its ports and children, this ticket would have been 'add the clone root to the run-root list', or nothing." **Another one-owner answer.**
+- *What the plan got wrong:* "fits one session" (it took three passes plus a conflict). It missed that an env pin can make a guard vacuous. And it named a Harbour commit without pinning it.
+
+**LIN-4182 and LIN-4183 kicked off 00:34**, now that the baseline is clean. Their before/after comparisons start from 0 failures.
+
+**Costs:** LIN-4178 (piece 2) is Done and deployed (`0dc1620e`). S11–S13 now read from `lib/cost-read.js`. LIN-4179 (piece 3) is in progress. The builders of pieces 1 and 2 will be asked once LIN-4176's lineage ends. With records now kept 7 days (LIN-4164), there's no hurry, and waiting keeps to the rule (never follow up inside a running lineage; LIN-4166's parked-worker caveat).
