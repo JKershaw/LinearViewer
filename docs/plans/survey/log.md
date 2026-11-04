@@ -782,3 +782,32 @@ Seven pieces in a strict chain is a long night's work. Piece 2 needs piece 1 *de
 - **Piece 5 (LIN-4202, opencode and runner-kit post records)** is building in parallel, as the breakdown allowed.
 - Piece 3 (the live measurement gate) waits on piece 2.
 - **LIN-4196** still waits on John's ruling.
+
+## 4 Nov, about 06:00 UTC: rebuild 2 reaches its gate; four piece builders answer
+
+**State.** Pieces 0, 1, 2 and 5 are Done: LIN-4197 (corpus and baseline), LIN-4198 (Harbour intake, store, per-record pricing, `9cc5ff9c`), LIN-4199 (the runner posts records, flushes at terminal transitions, counts subagents, `9478e1c5`) and LIN-4202 (opencode and runner-kit post records, `765289d4`). **Per-request records have been arriving live since about 05:00Z.** Snapshots keep posting alongside them, so no figure has moved yet.
+
+**Blocked on John: piece 3, the live measurement gate (LIN-4200).** It needs read access to production `request-usage` and dispatch rows, which the runner machine doesn't have, and about 3 days of records. That means pieces 4 (the read switches) and 6 (stop snapshots) wait. Three rulings ask the same question (two on LIN-4200, one on LIN-4195). The Survey named this ("the live measure needs the runner host's transcripts as its denominator"), but not the access gap.
+
+**One deliberate break from my own rule:** I asked these four builders while LIN-4195's lineage is still open, because it is blocked on John for about 3 days. The four workers are finished, the questions are `subscription:'none'`, and none goes to the parked LIN-4200 worker (LIN-4166's caveat is about a worker the autopilot is parked on).
+
+**The four answers.**
+- **LIN-4197 (corpus):** "The logic was easy. Getting a baseline I could trust was not."
+  - The goldens were LIN-4177's *before*, so re-recording them at HEAD, as the plan said, would have erased the change list.
+  - The replay wasn't re-entrant: a rate limit plus a frozen clock meant "my first sibling recording was silently made of 429s. A green test proved nothing until I ran it twice."
+  - The killed and reap cases' goldens "match the oracle, which could read as covered when it isn't". Nothing posts at a kill or a reap in production.
+  - *If:* "composable cases, each with its own figure … this ticket would be 'add seven cases'."
+- **LIN-4198 (Harbour intake):** "The logic was small." It bound on registers (five pinned route-census files, the erasure count, the proxy inventory, the fault guard) and on auth (feedback's token is single-use; batches aren't).
+  - *First:* read the census tests and the auth middleware before designing; "all three changed the design, and I found each one through a failure."
+  - *If:* "Routes would declare which credentials they accept … registration would be one entry that every census reads … about a third of the work."
+- **LIN-4199 (runner posting):** "The hard part was the flush points." **Terminal phases are written inline in about six places**, though `phases.js` is meant to own the phase rules. "I wired the obvious one first and had to be pushed to enumerate the rest."
+  - *Tidy:* "one `transitionToTerminal(sid, phase, reason)` … with the flush hooked there, in place of six call sites that each have to remember it."
+  - The plan steered it to the wrong route and credential.
+  - It owns its misses: "I claimed red-first witnesses before I had run them red."
+- **LIN-4202 (opencode, runner-kit):** "The dependency moved under me." The breakdown said piece 5 was independent of piece 2, while asking it to reuse piece 2's ledger. `opencode-runner.js` (about 1900 lines, five end paths) is where it bound.
+  - *If:* "a harness-neutral usage-records module … 'add the opencode adapter (pure) and register it at session end': about 60 lines and a fixture."
+
+**Reading across.**
+- **The one-owner answer is now 14 of 14.** Every builder asked "if the area were how you'd want it" has named one owner or one seam: here a route manifest, one terminal transition, composable corpus cases, and a harness-neutral records module.
+- **The fifth "check that passes but can't fail".** Rebuild 2's corpus had goldens that match the oracle for cases production never posts, and a recording made silently of 429s. The same shape appeared earlier on LIN-4181, LIN-4178, LIN-4180 and LIN-4196.
+- **A new recurring friction: checks no one can run.** "NOT RUN: needs production access" now appears on LIN-4176 (two checks), LIN-4198 (indexes), LIN-4199 (counts, abort), LIN-4202 (three live checks), and blocks LIN-4200 outright. `docs/plans/costs.md` decision 10 already plans `GET /api/proxy/costs` for agents. A read-only aggregate route would let these checks, and the gate, run through the proxy with no database access handed out.
