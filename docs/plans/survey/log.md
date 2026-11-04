@@ -1340,3 +1340,12 @@ John: "No rush… we may hit a token limit, but it resets tomorrow morning."
 - **The discussion is tomorrow morning**, with a partial read possible from LIN-4201 alone.
 
 **To save tokens:** check-ins every ~75 minutes, lean (rulings, merges, at-merge readings). Surveys, pricing and the Periodicals rerun happen only when a merge calls for them. If the limit hits, scheduled check-ins resume from this log.
+
+### 13:15 UTC: the first two forward pieces merge, and both are positive
+
+LIN-4219's pieces 1 (`childEnv`, LIN-4220, `52d2c3d`) and 4 (group stop, LIN-4223, `54febbf`) merged in simple-dispatcher. Read against the at-merge checks:
+- **Env:** the hand-built sites are gone outside the owner, and a census guards it. ✓
+- **Group stop:** gone from `run-mutations.js`; one owner with a sync variant; a census guards it. ✓ **Partial:** two unit tests' own group kills are allowlisted (frozen) rather than removed. That's arm B's call ("the unit tests' group-kill copies stay"), not my scope decision. Worth asking the builder why at the end.
+- **Ledger: the first two `+` rows**, both from a tally row that was priced and then given its own ticket. The change is test infrastructure only (+2,353 / −107 lines, mostly characterization and census tests), so the place gained guards and owners, and the files grew.
+
+LIN-4201 is still in progress. LIN-4221 (exit codes and pre-flight) is in progress; LIN-4222 (ports) and LIN-4224 (baseline) are Todo.
