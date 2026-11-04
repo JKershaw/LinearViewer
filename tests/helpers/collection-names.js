@@ -46,7 +46,7 @@ function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name);
     if (statSync(path).isDirectory()) walk(path, out);
-    else if (name.endsWith('.js')) out.push(path);
+    else if (/\.m?js$/.test(name)) out.push(path);
   }
   return out;
 }
