@@ -19,6 +19,8 @@ import { readModelsHistory } from '../../lib/model-routing-history.js';
 import { agentSpendByJob, typicalByModel } from '../../lib/model-routing-spend.js';
 import { computeEffortReadout } from '../../lib/effort-readout.js';
 import { computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-cost.js';
+import { terminalMarkedTaskCostOf } from '../fixtures/cost-read-cores.js';
+import { runLineageAnchors } from '../../lib/run-view.js';
 import { collectKpiStats } from '../../lib/kpi-stats.js';
 import { collectWorkspaceKpis } from '../../lib/workspace-kpi-stats.js';
 import { createRunParagraphPrecompute } from '../../lib/run-paragraph-hook.js';
@@ -74,13 +76,15 @@ describe('Models spend (S5, S6, S8, S9): readModelsHistory then the spend reader
   });
 
   test('readModelsHistory loads the page\'s lineages\' records and the spend readers price from them', async () => {
+    // LIN-4226: the page carries the read's workerSessions (the read loads the records once); the spend readers take those.
     const loader = loaderOver(RECORDS);
     const history = await readModelsHistory(dispatchStore([snapshotRow()]), ACME, loader);
-    assert.equal(history.requestRows.length, 2);
+    assert.equal(loader.calls.length, 1, 'one records load for the page');
     assert.ok(askedFor(loader, 'root-1'));
-    const [spend] = agentSpendByJob(history.items, { jobs: ['implementation'], identityRows: history.identityRows, requestRows: history.requestRows });
+    close(history.workerSessions[0].costUsd, 0.3);
+    const [spend] = agentSpendByJob(history.workerSessions, { jobs: ['implementation'] });
     close(spend.spendUsd, 0.3);
-    const [typical] = typicalByModel(history.items, { job: 'implementation', identityRows: history.identityRows, requestRows: history.requestRows });
+    const [typical] = typicalByModel(history.workerSessions, { job: 'implementation' });
     close(typical.typicalUsd, 0.3);
   });
 
@@ -88,40 +92,42 @@ describe('Models spend (S5, S6, S8, S9): readModelsHistory then the spend reader
     await assert.rejects(readModelsHistory(dispatchStore([snapshotRow()]), ACME), /readModelsHistory: the request-usage loader is required/);
   });
 
-  test('the spend readers throw without requestRows', () => {
-    assert.throws(() => agentSpendByJob([snapshotRow()], { jobs: ['implementation'], identityRows: [] }), /requestRows is required/);
-    assert.throws(() => typicalByModel([snapshotRow()], { job: 'implementation', identityRows: [] }), /requestRows is required/);
+  test('the spend readers take the read\'s workerSessions: an empty read is no runs, not an error', () => {
+    // LIN-4226: the readers no longer take rows, so the old "throws without requestRows" pin is replaced by this one.
+    assert.equal(agentSpendByJob([], { jobs: ['implementation'] })[0].runs, 0);
+    assert.deepEqual(typicalByModel([], { job: 'implementation' }), []);
   });
 });
 
 describe('the effort read-out (S10)', () => {
-  test('its cost column is the records figure', () => {
-    const readout = computeEffortReadout({ liveRows: [], historyRows: [snapshotRow()], asOf: new Date().toISOString(), survivalAvailable: false, requestRows: RECORDS });
+  test('its cost column is the records figure', async () => {
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: [snapshotRow()], asOf: new Date().toISOString(), survivalAvailable: false, requestSource: loaderOver(RECORDS), urlKey: ACME });
     const card = readout.perKind.find(k => k.kind === 'implementation');
     close(card.costUsd, 0.3);
   });
 
-  test('it throws without requestRows', () => {
-    assert.throws(() => computeEffortReadout({ liveRows: [], historyRows: [snapshotRow()], asOf: new Date().toISOString(), survivalAvailable: false }), /requestRows is required/);
+  test('it throws without a requestSource', async () => {
+    await assert.rejects(computeEffortReadout({ liveRows: [], historyRows: [snapshotRow()], asOf: new Date().toISOString(), survivalAvailable: false, urlKey: ACME }), /requestSource is required/);
   });
 });
 
 describe('the /kpis cost per finished ticket (S11)', () => {
   test('computeTerminalMarkedTaskCost prices the lineage from its records', () => {
-    const figures = computeTerminalMarkedTaskCost([snapshotRow()], new Date(), { identityRows: [], requestRows: RECORDS });
+    // LIN-4226: the helper takes the lineage records (costLineages) its caller loaded; the adapter builds them from the records held here.
+    const figures = terminalMarkedTaskCostOf([snapshotRow()], new Date(), { identityRows: [], requestRows: RECORDS });
     close(figures.pricedTicketCostUsd, 0.3);
   });
 
-  test('it throws without requestRows', () => {
-    assert.throws(() => computeTerminalMarkedTaskCost([snapshotRow()], new Date(), { identityRows: [] }), /requestRows is required/);
+  test('it throws without costLineages (the helper loads nothing itself)', () => {
+    assert.throws(() => computeTerminalMarkedTaskCost([snapshotRow()], new Date(), { identityRows: [] }), /costLineages is required/);
   });
 
-  test('collectKpiStats refuses to start without the records function (before any read)', async () => {
+  test('collectKpiStats refuses to start without the request source (before any read)', async () => {
     let reads = 0;
     const collection = new Proxy({}, { get: () => () => { reads += 1; return { toArray: async () => [] }; } });
     await assert.rejects(
       collectKpiStats({ kpiDailyRollup: collection }, { lineageIdentity: async () => [], milestoneFunnelDeps: {} }),
-      /collectKpiStats: requestRows is required/
+      /collectKpiStats: requestSource is required/
     );
     assert.equal(reads, 0);
   });
@@ -140,16 +146,24 @@ describe('the run paragraph precompute (S13\'s third entry path)', () => {
   const session = { sessionId: 's1', loops: [{ loopId: 'root-1', lineageId: 'root-1' }, { loopId: 'f-1', lineageId: 'root-1' }, { loopId: 'other', lineageId: null }] };
 
   test('builds the run view from the session lineages\' records', async () => {
+    // LIN-4226: the hook hands the view the source and the urlKey; the view loads the lineages' records through it.
     const loader = loaderOver(RECORDS);
     let seen;
+    let handed;
     const precompute = createRunParagraphPrecompute({
       runParagraphStore: { get: async () => null, put: async () => {} },
       requestUsageLoader: loader,
-      buildView: (s, opts) => { seen = opts.requestRows; return { steps: [] }; },
+      buildView: async (s, opts) => {
+        handed = { source: opts.requestSource, urlKey: opts.urlKey };
+        seen = await opts.requestSource.forAnchors(opts.urlKey, runLineageAnchors(s));
+        return { steps: [] };
+      },
       generateParagraph: async () => ({ paragraph: 'p', model: 'm' }),
       logger: { error: () => {} },
     });
     await precompute(ACME, session, { apiKey: 'k' });
+    assert.equal(handed.source, loader);
+    assert.equal(handed.urlKey, ACME);
     assert.deepEqual(loader.calls, [{ urlKey: ACME, anchors: ['root-1', 'other'] }]);
     assert.deepEqual(seen, RECORDS);
   });

@@ -12,9 +12,10 @@ import { emptyTable, effectiveTable, applyChangesToTable, AGENT_JOB_IDS, HARBOUR
 import { agentSpendByJob as agentSpendByJob__unplumbed, harbourSpendByJob } from '../../lib/model-routing-spend.js';
 import { DEFAULT_MODEL } from '../../lib/openrouter.js';
 import { SURFACES } from '../../lib/llm-jobs.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
+import { agentSpendByJobOf } from '../fixtures/cost-read-cores.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const agentSpendByJob = withRequestRows(agentSpendByJob__unplumbed, 1, { requestRows: [] });
+const agentSpendByJob = agentSpendByJobOf;
 
 
 const AGENT = SURFACES.AGENT_SESSION;

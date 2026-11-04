@@ -14,9 +14,10 @@ import assert from 'node:assert/strict';
 import { windowedSpend } from '../../lib/weekly-budget.js';
 import { groupDispatchLineages } from '../../lib/dispatch-lineage.js';
 import { lineageRecords as lineageRecords__unplumbed } from '../../lib/cost-read.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
+import { lineageRecordsOf } from '../fixtures/cost-read-cores.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const lineageRecords = withRequestRows(lineageRecords__unplumbed, 0, { requestRows: [] });
+const lineageRecords = lineageRecordsOf;
 
 
 const SINCE = Date.parse('2026-08-20T06:00:00.000Z');

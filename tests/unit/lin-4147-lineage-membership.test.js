@@ -20,10 +20,11 @@ import { lineageRecords as lineageRecords__unplumbed } from '../../lib/cost-read
 import { buildTaskCost } from '../fixtures/task-cost-adapter.js';
 import { computeTerminalMarkedTaskCost as computeTerminalMarkedTaskCost__unplumbed } from '../../lib/terminal-marked-task-cost.js';
 import { windowedSpend } from '../../lib/weekly-budget.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
+import { lineageRecordsOf as lineageRecordsAdapter, terminalMarkedTaskCostOf } from '../fixtures/cost-read-cores.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const lineageRecords = withRequestRows(lineageRecords__unplumbed, 0, { requestRows: [] });
-const computeTerminalMarkedTaskCost = withRequestRows(computeTerminalMarkedTaskCost__unplumbed, 2, { requestRows: [] });
+const lineageRecords = lineageRecordsAdapter;
+const computeTerminalMarkedTaskCost = terminalMarkedTaskCostOf;
 
 
 // LIN-4178: the lineage records of the one cost read (joinCostLineages is gone).

@@ -10,9 +10,9 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { createRunParagraphPrecompute as createRunParagraphPrecompute__unplumbed } from '../../lib/run-paragraph-hook.js';
 import { createSessionSummaryPrecompute } from '../../lib/session-materializer-precompute.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const createRunParagraphPrecompute = withRequestRows(createRunParagraphPrecompute__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+const createRunParagraphPrecompute = withDefaults(createRunParagraphPrecompute__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
 
 
 const URL_KEY = 'ws-gate';

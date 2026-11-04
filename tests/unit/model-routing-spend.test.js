@@ -173,10 +173,11 @@ describe('spend totals and attribution (LIN-3952 item 1, 5)', () => {
 // LIN-3962: the per-model typical cost the decision panel shows beside a suggested model, and the one
 // reported model of an alias's family (the only way to know what an alias ran as).
 import { typicalByModel as typicalByModel__unplumbed, reportedModelForFamily } from '../../lib/model-routing-spend.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
+import { agentSpendByJobOf, typicalByModelOf } from '../fixtures/cost-read-cores.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const agentSpendByJob = withRequestRows(agentSpendByJob__unplumbed, 1, { requestRows: [] });
-const typicalByModel = withRequestRows(typicalByModel__unplumbed, 1, { requestRows: [] });
+const agentSpendByJob = agentSpendByJobOf;
+const typicalByModel = typicalByModelOf;
 
 
 describe('typicalByModel (LIN-3962)', () => {

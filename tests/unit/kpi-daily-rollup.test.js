@@ -10,14 +10,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
-import {
-  ROLLUP_LOOKBACK_DAYS, ROLLUP_MARKER_ID, rollupCountsByDay, writeRollupDays, createKpiDailyRollupRun,
-  firstRollupDay, yesterdayKey, addDays
-} from '../../lib/kpi-daily-rollup.js';
+import { ROLLUP_LOOKBACK_DAYS, ROLLUP_MARKER_ID, rollupCountsByDay, writeRollupDays, createKpiDailyRollupRun, firstRollupDay, yesterdayKey, addDays } from '../../lib/kpi-daily-rollup.js';
 import { collectKpiStats as collectKpiStats__unplumbed } from '../../lib/kpi-stats.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const collectKpiStats = withRequestRows(collectKpiStats__unplumbed, 1, { requestRows: async () => [] });
+const collectKpiStats = withDefaults(collectKpiStats__unplumbed, 1, { requestSource: NO_REQUEST_RECORDS });
 
 
 // LIN-4178: no founder lookup: the fetched rows stand in for it (the pre-LIN-4178 behaviour).

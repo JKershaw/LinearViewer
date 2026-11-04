@@ -165,10 +165,12 @@ async function computeWorkspaceEffortReadout(workspace, { now }, { dispatchQueue
   // LIN-4177: the founder lookup for every lineage these rows belong to (scalar, uncapped), so the cost read
   // names a lineage by its true issue and kind even when its founder is older than the 200-row read.
   const anchors = [...new Set([...liveRows, ...historyRows].map(anchorOf).filter(Boolean))];
-  // LIN-4226: the lineages' request records are loaded by the cost read itself (computeEffortReadout, through the
-  // loader). The lookup is awaited here, not handed over as a promise: issue contexts are fetched in between, and a
-  // lookup rejecting unawaited across those fetches would be an unhandled rejection.
-  const identityRows = await dispatchQueueStore.lineageIdentityRows(urlKey, { anchors });
+  // LIN-4226: the founder lookup and the lineages' request records run in parallel, as at HEAD: the lookup is started
+  // now and awaited inside the cost read, which starts the records load (through the loader) alongside it. It is
+  // marked handled at once, so a rejection while the issue contexts are fetched is not an unhandled rejection; the
+  // read still re-raises it when it awaits the lookup.
+  const identityRows = Promise.resolve(dispatchQueueStore.lineageIdentityRows(urlKey, { anchors }));
+  identityRows.catch(() => {});
 
   // The issues the survival walk will actually score — derived through the
   // SAME population rule the compute layer uses, so the set fetched and the

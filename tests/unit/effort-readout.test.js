@@ -19,9 +19,10 @@ import {
   NOT_INSTRUMENTED_KINDS,
 } from '../../lib/effort-readout.js';
 import { computePlanReviewRoundTrips } from '../../lib/plan-review-round-trips.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS } from '../fixtures/request-usage-loader.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const computeEffortReadout = withRequestRows(computeEffortReadout__unplumbed, 0, { requestRows: [] });
+// LIN-4226: the read loads its records through the source; these tests read snapshot-only lineages (no records, named).
+const computeEffortReadout = (params) => computeEffortReadout__unplumbed({ urlKey: 'acme', requestSource: NO_REQUEST_RECORDS, ...params });
 
 
 const ASOF = '2026-09-05T16:00:00.000Z';
@@ -95,8 +96,8 @@ function pricedRowNoDuration({ id, issueId, issueIdentifier, kind, dispatchedAt,
   };
 }
 
-describe('G2 — issue-object contract (plan-review 583701c2)', () => {
-  test('RED: passing a bare row set (the plan-review defect) yields an empty walk — rate null, roundTrips.n 0', () => {
+describe('G2 — issue-object contract (plan-review 583701c2)', async () => {
+  test('RED: passing a bare row set (the plan-review defect) yields an empty walk — rate null, roundTrips.n 0', async () => {
     const rows = fourRowLineageRows();
     // The exact mistake J1 found: handing the walk rows directly, not issues.
     const result = computePlanReviewRoundTrips(rows, { asOf: ASOF });
@@ -105,7 +106,7 @@ describe('G2 — issue-object contract (plan-review 583701c2)', () => {
     assert.equal(result.roundTrips.n, 0);
   });
 
-  test('GREEN: buildIssueCorpus groups rows into issue objects, producing a populated survival row', () => {
+  test('GREEN: buildIssueCorpus groups rows into issue objects, producing a populated survival row', async () => {
     const rows = fourRowLineageRows();
     const issueContext = new Map([
       ['LIN-1', { id: 'issue-1', description: '', comments: fourRowLineageComments() }],
@@ -127,12 +128,12 @@ describe('G2 — issue-object contract (plan-review 583701c2)', () => {
     assert.equal(reviewResult.scale.issuesRead, 1);
   });
 
-  test('computeEffortReadout end-to-end: both survival columns populated from one corpus (G2)', () => {
+  test('computeEffortReadout end-to-end: both survival columns populated from one corpus (G2)', async () => {
     const rows = fourRowLineageRows();
     const issueContext = new Map([
       ['LIN-1', { id: 'issue-1', description: '', comments: fourRowLineageComments() }],
     ]);
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext, asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext, asOf: ASOF });
     const planCard = readout.perKind.find((k) => k.kind === 'plan');
     const implCard = readout.perKind.find((k) => k.kind === 'implementation');
     assert.equal(planCard.survival.state, 'computed');
@@ -144,22 +145,22 @@ describe('G2 — issue-object contract (plan-review 583701c2)', () => {
   });
 });
 
-describe('G3 — asOf threaded, not omitted or improvised per-call', () => {
-  test('both computePlanReviewRoundTrips calls receive the exact injected asOf', () => {
+describe('G3 — asOf threaded, not omitted or improvised per-call', async () => {
+  test('both computePlanReviewRoundTrips calls receive the exact injected asOf', async () => {
     const rows = fourRowLineageRows();
     const issueContext = new Map([['LIN-1', { id: 'issue-1', comments: fourRowLineageComments() }]]);
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext, asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext, asOf: ASOF });
     // No throw (requireAsOf would throw on a missing/bad asOf) and a real result came back.
     assert.ok(readout.perKind.length > 0);
   });
 
-  test('computeEffortReadout throws on a missing asOf rather than silently defaulting', () => {
-    assert.throws(() => computeEffortReadout({ liveRows: [], historyRows: [] }), /asOf/);
+  test('computeEffortReadout throws on a missing asOf rather than silently defaulting', async () => {
+    await assert.rejects(() => computeEffortReadout({ liveRows: [], historyRows: [] }), /asOf/);
   });
 });
 
-describe('G4 — cost is per-lineage, survival is per-issue', () => {
-  test('two implementation lineages on one issue: 2 worker sessions, 1 survival denominator', () => {
+describe('G4 — cost is per-lineage, survival is per-issue', async () => {
+  test('two implementation lineages on one issue: 2 worker sessions, 1 survival denominator', async () => {
     const rows = [
       ...fourRowLineageRows({ issueIdentifier: 'LIN-9', issueId: 'issue-9' }),
       // A second, independent implementation lineage on the SAME issue (different rootItemId/anchor via a distinct id).
@@ -173,7 +174,7 @@ describe('G4 — cost is per-lineage, survival is per-issue', () => {
         { id: 'c3', body: 'Verdict: approve', createdAt: '2026-09-02T01:30:00.000Z' },
       ] }],
     ]);
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext, asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext, asOf: ASOF });
     const implCard = readout.perKind.find((k) => k.kind === 'implementation');
     assert.equal(implCard.sessionCount, 2, 'two implementation dispatch rows -> two worker-session entries');
     assert.equal(implCard.costUnit, 'lineage');
@@ -183,8 +184,8 @@ describe('G4 — cost is per-lineage, survival is per-issue', () => {
   });
 });
 
-describe('G1 — normalizeDispatchRow closes the live-row three-field gap', () => {
-  test('a live-queue row (no status/feedback/completedAt keys) normalizes to queued/[]/null and lands in inFlight, not eligible', () => {
+describe('G1 — normalizeDispatchRow closes the live-row three-field gap', async () => {
+  test('a live-queue row (no status/feedback/completedAt keys) normalizes to queued/[]/null and lands in inFlight, not eligible', async () => {
     const liveRow = { id: 'live-1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-05T00:00:00.000Z' };
     const normalized = normalizeDispatchRow(liveRow, { isLive: true });
     assert.equal(normalized.status, 'queued');
@@ -197,9 +198,9 @@ describe('G1 — normalizeDispatchRow closes the live-row three-field gap', () =
     assert.equal(inFlightByKind.implementation.queued, 1);
   });
 
-  test('end-to-end: a live row contributes to neither cost/duration/effort nor survival', () => {
+  test('end-to-end: a live row contributes to neither cost/duration/effort nor survival', async () => {
     const liveRow = { id: 'live-1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-05T00:00:00.000Z' };
-    const readout = computeEffortReadout({ liveRows: [liveRow], historyRows: [], issueContext: new Map(), asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [liveRow], historyRows: [], issueContext: new Map(), asOf: ASOF });
     const implCard = readout.perKind.find((k) => k.kind === 'implementation');
     assert.equal(implCard.sessionCount, 0);
     assert.equal(implCard.survival.denominator, 0);
@@ -207,8 +208,8 @@ describe('G1 — normalizeDispatchRow closes the live-row three-field gap', () =
   });
 });
 
-describe('two-vocabulary pin (raw status vs. derived lifecycleStatus)', () => {
-  test('a taken row that derives aborted is excluded from both joins, while the raw-status set still sees it as "taken"', () => {
+describe('two-vocabulary pin (raw status vs. derived lifecycleStatus)', async () => {
+  test('a taken row that derives aborted is excluded from both joins, while the raw-status set still sees it as "taken"', async () => {
     const row = {
       id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', status: 'taken',
       dispatchedAt: '2026-09-01T00:00:00.000Z',
@@ -224,14 +225,14 @@ describe('two-vocabulary pin (raw status vs. derived lifecycleStatus)', () => {
   });
 });
 
-describe('F1 — total kind partition over every kind present', () => {
-  test('close-out/spike/breakdown/bug/defer each get a card in state (iv), never dropped by a bucketOf fallback', () => {
+describe('F1 — total kind partition over every kind present', async () => {
+  test('close-out/spike/breakdown/bug/defer each get a card in state (iv), never dropped by a bucketOf fallback', async () => {
     const kinds = ['close-out', 'spike', 'breakdown', 'bug', 'defer'];
     const rows = kinds.map((kind, i) => doneRow({
       id: `r${i}`, issueId: `i${i}`, issueIdentifier: `LIN-${i}`, kind,
       dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z',
     }));
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
     for (const kind of kinds) {
       const card = readout.perKind.find((k) => k.kind === kind);
       assert.ok(card, `${kind} must have a card`);
@@ -241,16 +242,16 @@ describe('F1 — total kind partition over every kind present', () => {
     }
   });
 
-  test('a custom-kind row renders state (iii) — not-applicable orchestration — via the explicit set, not bucketOf', () => {
+  test('a custom-kind row renders state (iii) — not-applicable orchestration — via the explicit set, not bucketOf', async () => {
     const rows = [{ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'custom', status: 'done', dispatchedAt: '2026-09-01T00:00:00.000Z', feedback: [] }];
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
     const card = readout.perKind.find((k) => k.kind === 'custom');
     assert.equal(card.survival.state, 'not_applicable_orchestration');
   });
 
-  test('a synthetic future kind (absent from every named set) still renders state (iv), never dropped', () => {
+  test('a synthetic future kind (absent from every named set) still renders state (iv), never dropped', async () => {
     const rows = [{ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'some-future-kind', status: 'done', dispatchedAt: '2026-09-01T00:00:00.000Z', feedback: [] }];
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
     const card = readout.perKind.find((k) => k.kind === 'some-future-kind');
     assert.ok(card);
     assert.equal(card.survival.state, 'not_applicable_no_gate');
@@ -259,8 +260,8 @@ describe('F1 — total kind partition over every kind present', () => {
   });
 });
 
-describe('S1 — review-row tier a/b split, tier-c beside', () => {
-  test('one tier-a approve, one tier-c re-pass, one unresolved approve: rate is 1-of-1 over a/b, tier-c counted separately', () => {
+describe('S1 — review-row tier a/b split, tier-c beside', async () => {
+  test('one tier-a approve, one tier-c re-pass, one unresolved approve: rate is 1-of-1 over a/b, tier-c counted separately', async () => {
     const rows = [
       // Issue A: review row settles tier a (verdict comment present).
       { id: 'a1', issueId: 'ia', issueIdentifier: 'LIN-A', kind: 'implementation', status: 'done', dispatchedAt: '2026-09-01T00:00:00.000Z', feedback: [] },
@@ -278,7 +279,7 @@ describe('S1 — review-row tier a/b split, tier-c beside', () => {
       ['LIN-B', { id: 'ib', comments: [] }],
       ['LIN-C', { id: 'ic', comments: [] }],
     ]);
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext, asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext, asOf: ASOF });
     const implCard = readout.perKind.find((k) => k.kind === 'implementation');
     assert.equal(implCard.survival.denominator, 1, 'tier-c and unresolved rows excluded from the a/b denominator');
     assert.equal(implCard.survival.numerator, 1);
@@ -287,11 +288,11 @@ describe('S1 — review-row tier a/b split, tier-c beside', () => {
   });
 });
 
-describe('D10 — ship_empty effort column', () => {
-  test('a workerSession with effort: null renders as no distribution (not reported)', () => {
+describe('D10 — ship_empty effort column', async () => {
+  test('a workerSession with effort: null renders as no distribution (not reported)', async () => {
     const rows = fourRowLineageRows();
     const issueContext = new Map([['LIN-1', { id: 'issue-1', comments: fourRowLineageComments() }]]);
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext, asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext, asOf: ASOF });
     const planCard = readout.perKind.find((k) => k.kind === 'plan');
     // No telemetry in this fixture at all -> sessionCount 0, effort null either way;
     // the shape under test is that `effort` is null when no session reports one.
@@ -299,24 +300,24 @@ describe('D10 — ship_empty effort column', () => {
   });
 });
 
-describe('R1 — effort-caption honesty (implementation review 62e30986)', () => {
-  test('no session in the corpus reports a realised effort: the caption says none of the runs reported one, and names no ticket state', () => {
+describe('R1 — effort-caption honesty (implementation review 62e30986)', async () => {
+  test('no session in the corpus reports a realised effort: the caption says none of the runs reported one, and names no ticket state', async () => {
     // fourRowLineageRows/doneRow carry no [usage] telemetry at all.
     const rows = fourRowLineageRows();
     const issueContext = new Map([['LIN-1', { id: 'issue-1', comments: fourRowLineageComments() }]]);
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext, asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext, asOf: ASOF });
     assert.match(readout.notes.effortShipEmpty, /none of the runs in this corpus reported a realised effort value/);
     assert.match(readout.notes.effortShipEmpty, /the column fills for any run that does report one/);
     assert.doesNotMatch(readout.notes.effortShipEmpty, /LIN-2567|in progress|pending|lands|tracked separately/, 'the empty caption must not claim anything about a ticket\'s status');
   });
 
-  test('a session in the corpus reports a realised effort: the caption states what is true instead of a stale universal absence', () => {
+  test('a session in the corpus reports a realised effort: the caption states what is true instead of a stale universal absence', async () => {
     const rows = [
       pricedRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z', costUsd: 5, effort: 'high' }),
       // A second, un-stamped (backfill) lineage of the same kind, alongside the stamped one.
       doneRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z' }),
     ];
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
     assert.doesNotMatch(readout.notes.effortShipEmpty, /does not yet report a realised effort value/, 'the false unconditional claim must not survive once a session reports one');
     assert.match(readout.notes.effortShipEmpty, /LIN-2567/);
     assert.match(readout.notes.effortShipEmpty, /backfill/i, 'must disclose that un-stamped (backfill) rows stay null permanently');
@@ -325,23 +326,23 @@ describe('R1 — effort-caption honesty (implementation review 62e30986)', () =>
     assert.deepEqual(implCard.effort, { high: 1 });
   });
 
-  test('a requested (row-level) effort value never substitutes for a realised one, regardless of corpus state', () => {
+  test('a requested (row-level) effort value never substitutes for a realised one, regardless of corpus state', async () => {
     const row = { ...pricedRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z', costUsd: 5 }), effort: 'low' };
-    const readout = computeEffortReadout({ liveRows: [], historyRows: [row], issueContext: new Map(), asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: [row], issueContext: new Map(), asOf: ASOF });
     const implCard = readout.perKind.find((k) => k.kind === 'implementation');
     assert.equal(implCard.effort, null, 'the dispatch row\'s own REQUESTED effort field must never populate the realised-effort cell');
   });
 });
 
-describe('R2 — cost is a SUM, duration is a MEAN, with per-column coverage (implementation review 62e30986)', () => {
-  test('two priced lineages and one unpriced (but timed) lineage: cost sums only the priced two, duration means all three, coverage is disclosed', () => {
+describe('R2 — cost is a SUM, duration is a MEAN, with per-column coverage (implementation review 62e30986)', async () => {
+  test('two priced lineages and one unpriced (but timed) lineage: cost sums only the priced two, duration means all three, coverage is disclosed', async () => {
     const rows = [
       pricedRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T01:00:00.000Z', costUsd: 3 }),
       pricedRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T03:00:00.000Z', costUsd: 9 }),
       // No [usage] telemetry at all -> unpriced, but still carries a terminal marker -> still timed.
       doneRow({ id: 'r3', issueId: 'i3', issueIdentifier: 'LIN-3', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T02:00:00.000Z' }),
     ];
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
     const implCard = readout.perKind.find((k) => k.kind === 'implementation');
     assert.equal(implCard.sessionCount, 3);
     assert.equal(implCard.costUsd, 12, 'cost is the SUM of the two priced lineages, not an average over all three');
@@ -354,14 +355,14 @@ describe('R2 — cost is a SUM, duration is a MEAN, with per-column coverage (im
     assert.equal(implCard.durationMissingCount, 0);
   });
 
-  test('a lineage priced but not timed is excluded from the duration mean while still counting toward cost', () => {
+  test('a lineage priced but not timed is excluded from the duration mean while still counting toward cost', async () => {
     const rows = [
       pricedRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T01:00:00.000Z', costUsd: 4 }),
       // Terminal marker present (so the row is a settled 'done', eligible) but with no
       // timestamp, so `deriveCompletedAt` returns null and `buildTaskCost` derives no duration.
       pricedRowNoDuration({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', costUsd: 8 }),
     ];
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
     const implCard = readout.perKind.find((k) => k.kind === 'implementation');
     assert.equal(implCard.costUsd, 12, 'both lineages are priced');
     assert.equal(implCard.costPricedCount, 2);
@@ -371,16 +372,16 @@ describe('R2 — cost is a SUM, duration is a MEAN, with per-column coverage (im
     assert.equal(implCard.durationMissingCount, 1);
   });
 
-  test('notes.costUnit states the three distinct aggregations and does not claim cost is per-lineage the way duration/effort are', () => {
-    const readout = computeEffortReadout({ liveRows: [], historyRows: [], issueContext: new Map(), asOf: ASOF });
+  test('notes.costUnit states the three distinct aggregations and does not claim cost is per-lineage the way duration/effort are', async () => {
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: [], issueContext: new Map(), asOf: ASOF });
     assert.match(readout.notes.costUnit, /SUM/);
     assert.match(readout.notes.costUnit, /MEAN/);
     assert.match(readout.notes.costUnit, /COUNT/);
   });
 });
 
-describe('a blocked row is right-censored (LIN-2079)', () => {
-  test('a row whose lifecycleStatus derives "blocked" is in-flight, not scored', () => {
+describe('a blocked row is right-censored (LIN-2079)', async () => {
+  test('a row whose lifecycleStatus derives "blocked" is in-flight, not scored', async () => {
     const row = {
       id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', status: 'taken',
       dispatchedAt: '2026-09-01T00:00:00.000Z',
@@ -425,13 +426,13 @@ function opencodeUsageRow({ id, issueId, issueIdentifier, kind, dispatchedAt, co
   };
 }
 
-describe('LIN-2830 — harness/model split rows per kind', () => {
-  test('a claude-code run and an opencode run of the same kind land in two distinct rows with their own figures', () => {
+describe('LIN-2830 — harness/model split rows per kind', async () => {
+  test('a claude-code run and an opencode run of the same kind land in two distinct rows with their own figures', async () => {
     const rows = [
       claudeCodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T01:00:00.000Z', model: 'anthropic/claude-sonnet-5', effort: 'high', costUsd: null }),
       opencodeUsageRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-02T00:00:00.000Z', completedAt: '2026-09-02T00:30:00.000Z', costUsd: 0.42 }),
     ];
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
     const implCard = readout.perKind.find((k) => k.kind === 'implementation');
     assert.ok(Array.isArray(implCard.rows), 'the kind card must carry a per-(harness, model, effort) rows breakdown');
     assert.equal(implCard.rows.length, 2, 'the two harnesses must be distinguishable — one row each, never merged');
@@ -454,12 +455,12 @@ describe('LIN-2830 — harness/model split rows per kind', () => {
     assert.ok(Math.abs((claudeRow.costUsd || 0) + (opencodeRowRow.costUsd || 0) - implCard.costUsd) < 1e-9);
   });
 
-  test('same harness and model but different effort levels still split by effort', () => {
+  test('same harness and model but different effort levels still split by effort', async () => {
     const rows = [
       claudeCodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T01:00:00.000Z', model: 'anthropic/claude-sonnet-5', effort: 'high', costUsd: null }),
       claudeCodeUsageRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-02T00:00:00.000Z', completedAt: '2026-09-02T01:00:00.000Z', model: 'anthropic/claude-sonnet-5', effort: 'low', costUsd: null }),
     ];
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
     const implCard = readout.perKind.find((k) => k.kind === 'implementation');
     assert.equal(implCard.rows.length, 2, 'effort is part of the row key');
     assert.deepEqual(implCard.rows.map((r) => r.effort).sort(), ['high', 'low']);
@@ -469,12 +470,12 @@ describe('LIN-2830 — harness/model split rows per kind', () => {
   // indistinguishable from one on claude-code") — rows that differ ONLY in
   // harness, or ONLY in model, must still split. Pinning each key column in
   // isolation so a grouping that silently drops one column cannot pass.
-  test('rows differing only in harness, or only in model, still split — each key column is load-bearing', () => {
+  test('rows differing only in harness, or only in model, still split — each key column is load-bearing', async () => {
     const sameModelDifferentHarness = [
       claudeCodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T01:00:00.000Z', model: 'z-ai/glm-5.3', effort: null, costUsd: null }),
       opencodeUsageRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-02T00:00:00.000Z', completedAt: '2026-09-02T01:00:00.000Z', model: 'z-ai/glm-5.3', costUsd: 0.42 }),
     ];
-    let readout = computeEffortReadout({ liveRows: [], historyRows: sameModelDifferentHarness, issueContext: new Map(), asOf: ASOF });
+    let readout = await computeEffortReadout({ liveRows: [], historyRows: sameModelDifferentHarness, issueContext: new Map(), asOf: ASOF });
     let implCard = readout.perKind.find((k) => k.kind === 'implementation');
     assert.equal(implCard.rows.length, 2, 'same model + same (null) effort, different harness: two rows');
     assert.deepEqual(implCard.rows.map((r) => r.harness).sort(), ['claude-code', 'opencode']);
@@ -483,19 +484,19 @@ describe('LIN-2830 — harness/model split rows per kind', () => {
       opencodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T01:00:00.000Z', model: 'z-ai/glm-5.3', costUsd: 0.42 }),
       opencodeUsageRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-02T00:00:00.000Z', completedAt: '2026-09-02T01:00:00.000Z', model: 'deepseek/deepseek-v4.1-flash', costUsd: 0.10 }),
     ];
-    readout = computeEffortReadout({ liveRows: [], historyRows: sameHarnessDifferentModel, issueContext: new Map(), asOf: ASOF });
+    readout = await computeEffortReadout({ liveRows: [], historyRows: sameHarnessDifferentModel, issueContext: new Map(), asOf: ASOF });
     implCard = readout.perKind.find((k) => k.kind === 'implementation');
     assert.equal(implCard.rows.length, 2, 'same harness + same (null) effort, different model: two rows');
     assert.deepEqual(implCard.rows.map((r) => r.model).sort(), ['deepseek/deepseek-v4.1-flash', 'z-ai/glm-5.3']);
   });
 });
 
-describe('LIN-2830 — an effort-less opencode row survives, never dropped', () => {
-  test('an opencode session with no effort field keeps its own row with effort null', () => {
+describe('LIN-2830 — an effort-less opencode row survives, never dropped', async () => {
+  test('an opencode session with no effort field keeps its own row with effort null', async () => {
     const rows = [
       opencodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z', costUsd: 0.42 }),
     ];
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
     const implCard = readout.perKind.find((k) => k.kind === 'implementation');
     assert.equal(implCard.sessionCount, 1);
     assert.equal(implCard.rows.length, 1, 'the effort-less row must not be dropped from the breakdown');
@@ -506,12 +507,12 @@ describe('LIN-2830 — an effort-less opencode row survives, never dropped', () 
     assert.equal(implCard.rows[0].costUsd, 0.42);
   });
 
-  test('an effort-less opencode row and a claude-code row with effort never merge into one group', () => {
+  test('an effort-less opencode row and a claude-code row with effort never merge into one group', async () => {
     const rows = [
       opencodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z', costUsd: 0.42 }),
       claudeCodeUsageRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-02T00:00:00.000Z', completedAt: '2026-09-02T01:00:00.000Z', model: 'anthropic/claude-sonnet-5', effort: 'high', costUsd: null }),
     ];
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
     const implCard = readout.perKind.find((k) => k.kind === 'implementation');
     assert.equal(implCard.rows.length, 2);
     const effortless = implCard.rows.find((r) => r.effort === null);
@@ -519,9 +520,9 @@ describe('LIN-2830 — an effort-less opencode row survives, never dropped', () 
     assert.equal(effortless.harness, 'opencode');
   });
 
-  test('a session with no usage telemetry at all still gets a row (all three columns null)', () => {
+  test('a session with no usage telemetry at all still gets a row (all three columns null)', async () => {
     const rows = [doneRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z' })];
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
     const implCard = readout.perKind.find((k) => k.kind === 'implementation');
     assert.equal(implCard.rows.length, 1, 'no telemetry is a row with unknown columns, not a dropped row');
     assert.equal(implCard.rows[0].harness, null);
@@ -530,14 +531,14 @@ describe('LIN-2830 — an effort-less opencode row survives, never dropped', () 
     assert.equal(implCard.rows[0].sessionCount, 1);
   });
 
-  test('row ordering is deterministic: harness, then model, then effort, nulls last', () => {
+  test('row ordering is deterministic: harness, then model, then effort, nulls last', async () => {
     const rows = [
       claudeCodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T01:00:00.000Z', model: 'anthropic/claude-sonnet-5', effort: 'high', costUsd: null }),
       opencodeUsageRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-02T00:00:00.000Z', completedAt: '2026-09-02T00:30:00.000Z', costUsd: 0.42 }),
       opencodeUsageRow({ id: 'r3', issueId: 'i3', issueIdentifier: 'LIN-3', kind: 'implementation', dispatchedAt: '2026-09-02T02:00:00.000Z', completedAt: '2026-09-02T02:30:00.000Z', model: 'deepseek/deepseek-v4.1-flash', costUsd: 0.10 }),
       doneRow({ id: 'r4', issueId: 'i4', issueIdentifier: 'LIN-4', kind: 'implementation', dispatchedAt: '2026-09-03T00:00:00.000Z', completedAt: '2026-09-03T00:30:00.000Z' }),
     ];
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
     const implCard = readout.perKind.find((k) => k.kind === 'implementation');
     assert.deepEqual(
       implCard.rows.map((r) => [r.harness, r.model, r.effort]),
@@ -550,7 +551,7 @@ describe('LIN-2830 — an effort-less opencode row survives, never dropped', () 
     );
   });
 
-  test('requested (row-level) harness/model/effort values never substitute for realised ones (D10 rule, extended)', () => {
+  test('requested (row-level) harness/model/effort values never substitute for realised ones (D10 rule, extended)', async () => {
     // The dispatch row's own `harness`/`model`/`effort` fields are REQUESTED
     // values (what was asked to run); the row breakdown reports REALISED
     // telemetry only. A row claiming claude-code/wrong-model/high must not
@@ -560,7 +561,7 @@ describe('LIN-2830 — an effort-less opencode row survives, never dropped', () 
       ...opencodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z', costUsd: 0.42 }),
       harness: 'claude-code', model: 'wrong/model', effort: 'high',
     };
-    const readout = computeEffortReadout({ liveRows: [], historyRows: [row], issueContext: new Map(), asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: [row], issueContext: new Map(), asOf: ASOF });
     const implCard = readout.perKind.find((k) => k.kind === 'implementation');
     assert.equal(implCard.rows.length, 1);
     assert.equal(implCard.rows[0].harness, 'opencode', 'the requested row harness must never populate the breakdown');
@@ -568,7 +569,7 @@ describe('LIN-2830 — an effort-less opencode row survives, never dropped', () 
     assert.equal(implCard.rows[0].effort, null, 'the requested row effort must never populate the breakdown');
   });
 
-  test('row-level cost/duration coverage counts disclose partial figures (R2 discipline, row-scoped)', () => {
+  test('row-level cost/duration coverage counts disclose partial figures (R2 discipline, row-scoped)', async () => {
     // One priced+timed opencode lineage and one telemetry-free (but still
     // timed — a [done] marker timestamp is enough for duration) lineage: the
     // opencode row reports full coverage, the no-telemetry row reports an
@@ -578,7 +579,7 @@ describe('LIN-2830 — an effort-less opencode row survives, never dropped', () 
       opencodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z', costUsd: 0.42 }),
       doneRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-02T00:00:00.000Z', completedAt: '2026-09-02T00:30:00.000Z' }),
     ];
-    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
     const implCard = readout.perKind.find((k) => k.kind === 'implementation');
     const opencodeRowRow = implCard.rows.find((r) => r.harness === 'opencode');
     const unknownRow = implCard.rows.find((r) => r.harness === null);
@@ -593,8 +594,8 @@ describe('LIN-2830 — an effort-less opencode row survives, never dropped', () 
     assert.equal(unknownRow.durationCoveredCount, 1);
   });
 
-  test('notes disclose the row provenance: realised telemetry values, and why opencode reads "—" for effort', () => {
-    const readout = computeEffortReadout({ liveRows: [], historyRows: [], issueContext: new Map(), asOf: ASOF });
+  test('notes disclose the row provenance: realised telemetry values, and why opencode reads "—" for effort', async () => {
+    const readout = await computeEffortReadout({ liveRows: [], historyRows: [], issueContext: new Map(), asOf: ASOF });
     assert.ok(readout.notes.harnessModelRows, 'the readout must ship the provenance note');
     assert.match(readout.notes.harnessModelRows, /opencode/i);
     assert.match(readout.notes.harnessModelRows, /never the dispatch row/i);
@@ -606,17 +607,17 @@ describe('LIN-2830 — an effort-less opencode row survives, never dropped', () 
 // `dispatchedAt` as `since`: task-cost, dispatch-store, routes/proxy-dispatch).
 // Junk is `undefined` / 'not-a-date', never `null` (a null `since` is the one
 // deliberate change, pinned in dispatch-terminal.test.js).
-describe('normalizeDispatchRow — lineage join with a junk dispatchedAt (LIN-3456 characterization)', () => {
+describe('normalizeDispatchRow — lineage join with a junk dispatchedAt (LIN-3456 characterization)', async () => {
   const sibling = { feedback: [{ message: '[done] finished', timestamp: '2026-08-01T05:00:00.000Z', rootItemId: 'root-1' }] };
   const row = (dispatchedAt) => ({ id: 'r1', rootItemId: 'root-1', kind: 'implementation', status: 'taken', dispatchedAt, feedback: [] });
 
-  test('control: a dated row inherits the later sibling terminal', () => {
+  test('control: a dated row inherits the later sibling terminal', async () => {
     const n = normalizeDispatchRow(row('2026-08-01T00:00:00.000Z'), { isLive: false, siblingRows: [sibling] });
     assert.equal(n.lifecycleStatus, 'done');
     assert.notEqual(n.completedAt, null);
   });
 
-  test('a row with a missing/unparseable dispatchedAt inherits nothing (unverifiable `since` fails closed)', () => {
+  test('a row with a missing/unparseable dispatchedAt inherits nothing (unverifiable `since` fails closed)', async () => {
     for (const junk of [undefined, 'not-a-date']) {
       const n = normalizeDispatchRow(row(junk), { isLive: false, siblingRows: [sibling] });
       assert.equal(n.completedAt, null, `dispatchedAt=${String(junk)}`);

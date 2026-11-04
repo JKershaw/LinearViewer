@@ -20,6 +20,9 @@ import { collectKpiStats } from '../../lib/kpi-stats.js';
 import { requestUsageLoader } from '../../lib/request-usage-loader.js';
 import { loaderOver } from '../fixtures/request-usage-loader.js';
 import { buildApp, call, ACME as FAKE_ACME } from './lib/proxy-fake-deps.js';
+import express from 'express';
+import { createDashboardRoutes } from '../../routes/dashboard.js';
+import { registerProvider } from '../../lib/providers/registry.js';
 
 const ACME = 'acme-lin-4226';
 const DAY = 24 * 3600 * 1000;
@@ -210,6 +213,60 @@ describe('W6: a caller makes exactly one request-records load (witness 4, per ca
     assert.equal(res.status, 200);
     close(res.body.totalUsd, 0.3);
     assert.equal(loader.calls.length, 1, `one load: ${JSON.stringify(loader.calls)}`);
+  });
+});
+
+describe('W7: the effort route runs the founder lookup and the records load in parallel (witness 3, at the route)', () => {
+  // HEAD ran the lookup and the records load together. A route that awaits the lookup before the records load starts
+  // never resolves the lookup (it resolves only when the records are asked for), so the request hangs and the abort
+  // timeout turns that into a failure.
+  let providerSeq = 0;
+  test('GET /workspace/:urlKey/api/effort-readout answers while the lookup is pending until the records are asked for', { timeout: 10000 }, async () => {
+    const name = `fake-effort-lin4226-${++providerSeq}`;
+    registerProvider({ name, ui: {}, supports: () => true, fetchIssueComments: async () => [], fetchIssueFields: async () => ({}) });
+    const workspace = { urlKey: 'ws-1', name: 'Workspace One', provider: name, accessToken: 'tok' };
+    let release;
+    const identity = new Promise(resolve => { release = resolve; });
+    let recordsAsked = 0;
+    const requestUsageLoader = {
+      forAnchors: async () => [],
+      forRows: async () => { recordsAsked += 1; release([]); return []; },
+    };
+    const store = {
+      listItems: async () => [],
+      listHistory: async () => ({ items: [], total: 0 }),
+      lineageIdentityRows: () => identity,
+    };
+    const app = express();
+    app.use(createDashboardRoutes({
+      workspaceFromUrl: (req, _res, next) => {
+        req.workspace = workspace;
+        req.session = { workspaces: [{ urlKey: 'ws-1', name: 'Workspace One' }], features: {} };
+        next();
+      },
+      dispatchQueueStore: store,
+      agentStatusStore: {},
+      runSummaryCacheStore: {},
+      sessionSummaryCacheStore: {},
+      freeTierStore: {},
+      requestUsageLoader,
+      getWorkspaceAccessToken: () => 'tok',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => null,
+      getDeployInfo: () => ({}),
+    }));
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(resolve => server.once('listening', resolve));
+    try {
+      const { port } = server.address();
+      const res = await fetch(`http://127.0.0.1:${port}/workspace/ws-1/api/effort-readout`, { signal: AbortSignal.timeout(3000) });
+      assert.equal(res.status, 200);
+      assert.equal(recordsAsked, 1, 'one records load, asked for by the read');
+    } finally {
+      server.closeAllConnections?.();
+      server.close();
+    }
   });
 });
 

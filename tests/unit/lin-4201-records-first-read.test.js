@@ -14,6 +14,8 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readCost, lineageRecords, lineageFigureOf } from '../../lib/cost-read.js';
 import { buildRunView } from '../../lib/run-view.js';
+import { readCostOf, lineageRecordsOf, lineageFigureOfOf, buildRunViewOf } from '../fixtures/cost-read-cores.js';
+import { NO_REQUEST_RECORDS } from '../fixtures/request-usage-loader.js';
 
 const NOW = Date.UTC(2026, 10, 4, 12);
 const at = (hoursAgo) => new Date(NOW - hoursAgo * 3600 * 1000).toISOString();
@@ -42,7 +44,7 @@ describe('the decision: a lineage with records reads its records', () => {
     const rows = [row('r1', 'r1', 5, [snapshot(5, { costUsd: 0.30 })]), row('r2', 'r1', 2, [snapshot(2, { costUsd: 0.50 })])];
     // The records cover everything the snapshots covered and more (the session's later turns).
     const requestRows = [rec('r1', 'm1', 5, { costUsd: 0.20 }), rec('r1', 'm2', 4, { costUsd: 0.30 }), rec('r1', 'm3', 1, { costUsd: 0.25 })];
-    const result = readCost({ fetchedRows: rows, requestRows });
+    const result = readCostOf({ fetchedRows: rows, requestRows });
     close(sessionOf(result, 'r1').costUsd, 0.75);
     close(result.totalUsd, 0.75);
   });
@@ -50,8 +52,8 @@ describe('the decision: a lineage with records reads its records', () => {
   test('a lineage with no records reads its snapshots exactly as before, beside a lineage that has records', () => {
     const snapshotOnly = [row('s1', 's1', 6, [snapshot(6, { costUsd: 0.40 })]), row('s2', 's1', 3, [snapshot(3, { costUsd: 0.90 })])];
     const withRecords = [row('r1', 'r1', 5, [snapshot(5, { costUsd: 9 })])];
-    const before = readCost({ fetchedRows: snapshotOnly, requestRows: [] });
-    const after = readCost({ fetchedRows: [...snapshotOnly, ...withRecords], requestRows: [rec('r1', 'm1', 5, { costUsd: 0.1 })] });
+    const before = readCostOf({ fetchedRows: snapshotOnly, requestRows: [] });
+    const after = readCostOf({ fetchedRows: [...snapshotOnly, ...withRecords], requestRows: [rec('r1', 'm1', 5, { costUsd: 0.1 })] });
     assert.deepEqual(sessionOf(after, 's1'), sessionOf(before, 's1'));
     close(sessionOf(after, 's1').costUsd, 0.90); // the last running total, as before
     close(sessionOf(after, 'r1').costUsd, 0.1);
@@ -59,7 +61,7 @@ describe('the decision: a lineage with records reads its records', () => {
 
   test('a lineage\'s figure ignores records of another lineage', () => {
     const rows = [row('a', 'a', 4, [snapshot(4, { costUsd: 0.2 })])];
-    const result = readCost({ fetchedRows: rows, requestRows: [rec('elsewhere', 'm1', 4, { costUsd: 5 })] });
+    const result = readCostOf({ fetchedRows: rows, requestRows: [rec('elsewhere', 'm1', 4, { costUsd: 5 })] });
     close(sessionOf(result, 'a').costUsd, 0.2);
   });
 
@@ -69,7 +71,7 @@ describe('the decision: a lineage with records reads its records', () => {
       rec('r1', 'm1', 5, { model: 'claude-opus-5-5', costUsd: 0.9, effort: 'high' }),
       rec('r1', 'm2', 1, { model: 'claude-haiku-5-5', costUsd: 0.1, effort: 'low' }),
     ];
-    const session = sessionOf(readCost({ fetchedRows: rows, requestRows }), 'r1');
+    const session = sessionOf(readCostOf({ fetchedRows: rows, requestRows }), 'r1');
     assert.equal(session.model, 'claude-opus-5-5');
     assert.equal(session.effort, 'low');
     assert.equal(session.harness, 'claude-code');
@@ -77,7 +79,7 @@ describe('the decision: a lineage with records reads its records', () => {
 
   test('an unpriced record withholds the lineage figure and names the model (never a partial)', () => {
     const rows = [row('r1', 'r1', 5, [snapshot(5, { costUsd: 1 })])];
-    const result = readCost({ fetchedRows: rows, requestRows: [rec('r1', 'm1', 5, { costUsd: 0.5 }), rec('r1', 'm2', 4, { model: 'mystery-model' })] });
+    const result = readCostOf({ fetchedRows: rows, requestRows: [rec('r1', 'm1', 5, { costUsd: 0.5 }), rec('r1', 'm2', 4, { model: 'mystery-model' })] });
     assert.equal(sessionOf(result, 'r1').costUsd, null);
     assert.deepEqual(result.unpriced, ['mystery-model']);
     assert.equal(result.totalUsd, null);
@@ -85,7 +87,7 @@ describe('the decision: a lineage with records reads its records', () => {
 
   test('a lineage with records and no usage-bearing row is priced, not no-telemetry', () => {
     const rows = [row('r1', 'r1', 5, [])];
-    const result = readCost({ fetchedRows: rows, requestRows: [rec('r1', 'm1', 5, { costUsd: 0.4 })] });
+    const result = readCostOf({ fetchedRows: rows, requestRows: [rec('r1', 'm1', 5, { costUsd: 0.4 })] });
     assert.equal(result.noTelemetryCount, 0);
     close(sessionOf(result, 'r1').costUsd, 0.4);
   });
@@ -98,7 +100,7 @@ describe('per-harness scoping (review note 9)', () => {
       row('r2', 'r1', 4, [snapshot(4, { harness: 'claude-code', costUsd: 7 })]),
     ];
     const requestRows = [rec('r1', 'm1', 4, { costUsd: 0.10 }), rec('r1', 'm2', 3, { costUsd: 0.05 })];
-    const result = readCost({ fetchedRows: rows, requestRows });
+    const result = readCostOf({ fetchedRows: rows, requestRows });
     close(sessionOf(result, 'r1').costUsd, 0.25 + 0.15);
   });
 
@@ -108,25 +110,25 @@ describe('per-harness scoping (review note 9)', () => {
       row('r2', 'r1', 5, [snapshot(5, { harness: 'opencode', costUsd: 0.25 })]),
       row('r3', 'r1', 4, [snapshot(4, { harness: 'claude-code', costUsd: 2 })]),
     ];
-    const result = readCost({ fetchedRows: rows, requestRows: [rec('r1', 'o1', 6, { harness: 'opencode', costUsd: 0.6 })] });
+    const result = readCostOf({ fetchedRows: rows, requestRows: [rec('r1', 'o1', 6, { harness: 'opencode', costUsd: 0.6 })] });
     close(sessionOf(result, 'r1').costUsd, 0.6 + 2);
   });
 
   test('a record with no harness reads as claude-code, so it sets claude-code snapshots aside', () => {
     const rows = [row('r1', 'r1', 5, [snapshot(5, { harness: 'claude-code', costUsd: 3 })])];
-    const result = readCost({ fetchedRows: rows, requestRows: [rec('r1', 'm1', 5, { harness: undefined, costUsd: 0.2 })] });
+    const result = readCostOf({ fetchedRows: rows, requestRows: [rec('r1', 'm1', 5, { harness: undefined, costUsd: 0.2 })] });
     close(sessionOf(result, 'r1').costUsd, 0.2);
   });
 
   test('a snapshot with no reported harness is a claude-code running total, set aside by claude-code records', () => {
     const noHarness = { kind: 'usage', timestamp: at(5), message: `[usage] ${JSON.stringify({ model: 'claude-opus-5-5', inputTokens: 5, outputTokens: 1, lane: null, costUsd: 4 })}` };
-    const result = readCost({ fetchedRows: [row('r1', 'r1', 5, [noHarness])], requestRows: [rec('r1', 'm1', 5, { costUsd: 0.2 })] });
+    const result = readCostOf({ fetchedRows: [row('r1', 'r1', 5, [noHarness])], requestRows: [rec('r1', 'm1', 5, { costUsd: 0.2 })] });
     close(sessionOf(result, 'r1').costUsd, 0.2);
   });
 
   test('an unpriced remaining snapshot withholds the combined figure', () => {
     const rows = [row('r1', 'r1', 6, [snapshot(6, { harness: 'opencode', model: 'mystery-model' })])];
-    const result = readCost({ fetchedRows: rows, requestRows: [rec('r1', 'm1', 5, { costUsd: 0.2 })] });
+    const result = readCostOf({ fetchedRows: rows, requestRows: [rec('r1', 'm1', 5, { costUsd: 0.2 })] });
     assert.equal(sessionOf(result, 'r1').costUsd, null);
     assert.deepEqual(result.unpriced, ['mystery-model']);
   });
@@ -138,7 +140,7 @@ describe('review note 3: a record lineage is never incomplete', () => {
 
   test('a missing member does not withhold a record figure', () => {
     const rows = [row('r1', 'r1', 5, [snapshot(5, { costUsd: 1 })])];
-    const [record] = lineageRecords({ fetchedRows: rows, identityRows: [missingMember], requestRows: [rec('r1', 'm1', 5, { costUsd: 0.3 })] });
+    const [record] = lineageRecordsOf({ fetchedRows: rows, identityRows: [missingMember], requestRows: [rec('r1', 'm1', 5, { costUsd: 0.3 })] });
     assert.equal(record.missing.length, 1);
     assert.equal(record.incomplete, false);
     assert.equal(record.fold.source, 'records');
@@ -146,67 +148,71 @@ describe('review note 3: a record lineage is never incomplete', () => {
 
   test('the same missing member withholds the snapshot figure of a lineage without records (the narrow rule, as before)', () => {
     const rows = [row('r1', 'r1', 5, [snapshot(5, { harness: 'opencode', costUsd: 1 })])];
-    const [record] = lineageRecords({ fetchedRows: rows, identityRows: [missingMember], requestRows: [] });
+    const [record] = lineageRecordsOf({ fetchedRows: rows, identityRows: [missingMember], requestRows: [] });
     assert.equal(record.incomplete, true);
   });
 
   test('a lineage that still counts an opencode delta beside its records keeps the narrow rule for that delta', () => {
     const rows = [row('r1', 'r1', 5, [snapshot(5, { harness: 'opencode', costUsd: 1 })])];
-    const [record] = lineageRecords({ fetchedRows: rows, identityRows: [missingMember], requestRows: [rec('r1', 'm1', 5, { costUsd: 0.3 })] });
+    const [record] = lineageRecordsOf({ fetchedRows: rows, identityRows: [missingMember], requestRows: [rec('r1', 'm1', 5, { costUsd: 0.3 })] });
     assert.equal(record.incomplete, true);
   });
 
   test('lineageRecords exposes each lineage\'s request records', () => {
     const requestRows = [rec('r1', 'm1', 5, { costUsd: 0.3 })];
-    const [record] = lineageRecords({ fetchedRows: [row('r1', 'r1', 5)], requestRows });
+    const [record] = lineageRecordsOf({ fetchedRows: [row('r1', 'r1', 5)], requestRows });
     assert.deepEqual(record.requests, requestRows);
   });
 });
 
-describe('requestRows is required (review note 2): each entry point throws without it', () => {
+describe('the entry points take their records through a source, and refuse the old argument (LIN-4226)', () => {
+  // LIN-4201's guard (review note 2), in the new shape: an entry with no source throws by name, and the old
+  // `requestRows` argument throws too, so a half-migrated caller fails loudly.
   const rows = [row('r1', 'r1', 5, [snapshot(5, { costUsd: 1 })])];
   for (const missing of [undefined, null, 'records']) {
-    test(`readCost throws on requestRows = ${String(missing)}`, () => {
-      assert.throws(() => readCost({ fetchedRows: rows, requestRows: missing }), { name: 'TypeError', message: /readCost: requestRows is required/ });
+    test(`readCost refuses the old requestRows argument (= ${String(missing)})`, async () => {
+      await assert.rejects(() => readCost({ fetchedRows: rows, requestRows: missing }), { name: 'TypeError', message: /readCost: requestRows is not accepted/ });
     });
-    test(`lineageRecords throws on requestRows = ${String(missing)}`, () => {
-      assert.throws(() => lineageRecords({ fetchedRows: rows, requestRows: missing }), { name: 'TypeError', message: /lineageRecords: requestRows is required/ });
+    test(`lineageRecords refuses the old requestRows argument (= ${String(missing)})`, async () => {
+      await assert.rejects(() => lineageRecords({ fetchedRows: rows, requestRows: missing }), { name: 'TypeError', message: /lineageRecords: requestRows is not accepted/ });
     });
-    test(`lineageFigureOf throws on requestRows = ${String(missing)}`, () => {
-      assert.throws(() => lineageFigureOf(rows, { requestRows: missing }), { name: 'TypeError', message: /lineageFigureOf: requestRows is required/ });
+    test(`lineageFigureOf refuses the old requestRows argument (= ${String(missing)})`, () => {
+      assert.throws(() => lineageFigureOf(rows, { requestRows: missing }), { name: 'TypeError', message: /lineageFigureOf: requestRows is not accepted/ });
     });
-    test(`buildRunView throws on requestRows = ${String(missing)}`, () => {
-      assert.throws(() => buildRunView({ loops: [] }, { requestRows: missing }), { name: 'TypeError', message: /buildRunView: requestRows is required/ });
+    test(`buildRunView refuses the old requestRows argument (= ${String(missing)})`, async () => {
+      await assert.rejects(() => buildRunView({ loops: [] }, { requestRows: missing }), { name: 'TypeError', message: /buildRunView: requestRows is not accepted/ });
     });
   }
-  test('the throws hold with no options object at all', () => {
-    assert.throws(() => readCost(), /requestRows is required/);
-    assert.throws(() => lineageRecords(), /requestRows is required/);
-    assert.throws(() => lineageFigureOf(rows), /requestRows is required/);
-    assert.throws(() => buildRunView({ loops: [] }), /requestRows is required/);
+  test('the async entries name the missing source (readCost, lineageRecords, buildRunView)', async () => {
+    await assert.rejects(() => readCost({ fetchedRows: rows, urlKey: 'acme' }), { name: 'TypeError', message: /readCost: requestSource is required/ });
+    await assert.rejects(() => lineageRecords({ fetchedRows: rows, urlKey: 'acme' }), { name: 'TypeError', message: /lineageRecords: requestSource is required/ });
+    await assert.rejects(() => buildRunView({ loops: [] }, { urlKey: 'acme' }), { name: 'TypeError', message: /buildRunView: requestSource is required/ });
   });
-  test('[] is a real answer: no records, every lineage reads its snapshots', () => {
-    close(readCost({ fetchedRows: rows, requestRows: [] }).totalUsd, 1);
+  test('lineageFigureOf names its records: none passed is an error, not a silent no-records', () => {
+    assert.throws(() => lineageFigureOf(rows), { name: 'TypeError', message: /lineageFigureOf: records is required/ });
+  });
+  test('[] is a real answer: no records, every lineage reads its snapshots (the named source, on the async entry)', async () => {
+    close((await readCost({ fetchedRows: rows, requestSource: NO_REQUEST_RECORDS, urlKey: 'acme' })).totalUsd, 1);
   });
 });
 
 describe('the run page places a record figure on purpose', () => {
   test('lineageFigureOf: the figure sits on the latest record\'s posting row', () => {
     const rows = [row('r1', 'r1', 5), row('r2', 'r1', 3), row('r3', 'r1', 1)];
-    const figure = lineageFigureOf(rows, { requestRows: [rec('r1', 'm1', 5, { costUsd: 0.1 }), { ...rec('r1', 'm2', 2, { costUsd: 0.2 }), itemId: 'r2' }] });
+    const figure = lineageFigureOfOf(rows, { requestRows: [rec('r1', 'm1', 5, { costUsd: 0.1 }), { ...rec('r1', 'm2', 2, { costUsd: 0.2 }), itemId: 'r2' }] });
     close(figure.costUsd, 0.3);
     assert.equal(figure.lastIndex, 1);
   });
 
   test('lineageFigureOf: a posting row the caller did not pass puts the figure on the last row', () => {
     const rows = [row('r1', 'r1', 5), row('r2', 'r1', 3)];
-    const figure = lineageFigureOf(rows, { requestRows: [{ ...rec('r1', 'm1', 1, { costUsd: 0.1 }), itemId: 'not-on-page' }] });
+    const figure = lineageFigureOfOf(rows, { requestRows: [{ ...rec('r1', 'm1', 1, { costUsd: 0.1 }), itemId: 'not-on-page' }] });
     assert.equal(figure.lastIndex, 1);
   });
 
   test('lineageFigureOf: with no records the figure is the snapshot fold\'s, on its counted row, as before', () => {
     const rows = [row('r1', 'r1', 5, [snapshot(5, { costUsd: 0.4 })]), row('r2', 'r1', 3)];
-    const figure = lineageFigureOf(rows, { requestRows: [] });
+    const figure = lineageFigureOfOf(rows, { requestRows: [] });
     close(figure.costUsd, 0.4);
     assert.equal(figure.lastIndex, 0);
   });
@@ -217,7 +223,7 @@ describe('the run page places a record figure on purpose', () => {
     });
     const session = { sessionId: 's', seedIssue: 'LIN-1', loops: [loop('L1', 5, [snapshot(5, { costUsd: 8 })]), loop('L2', 2)] };
     const requestRows = [{ ...rec('L1', 'm1', 5, { costUsd: 0.1 }), itemId: 'L1' }, { ...rec('L1', 'm2', 2, { costUsd: 0.2 }), itemId: 'L2' }];
-    const view = buildRunView(session, { now: NOW, requestRows });
+    const view = buildRunViewOf(session, { now: NOW, requestRows });
     const [step] = view.steps;
     assert.equal(step.cost.status, 'priced');
     close(step.cost.usd, 0.3);
@@ -226,13 +232,14 @@ describe('the run page places a record figure on purpose', () => {
 
   test('buildRunView: records of another lineage do not reach a step', () => {
     const session = { sessionId: 's', seedIssue: 'LIN-1', loops: [{ loopId: 'L1', lineageId: 'L1', kind: 'implementation', dispatchedAt: at(5), feedback: [snapshot(5, { costUsd: 0.4 })], terminalStatus: 'done' }] };
-    const view = buildRunView(session, { now: NOW, requestRows: [rec('other', 'm1', 5, { costUsd: 9 })] });
+    const view = buildRunViewOf(session, { now: NOW, requestRows: [rec('other', 'm1', 5, { costUsd: 9 })] });
     close(view.steps[0].cost.usd, 0.4);
   });
 });
 
 describe('review note 1: the /kpis harness shares read a record lineage from its records', async () => {
-  const { computeTerminalMarkedTaskCost } = await import('../../lib/terminal-marked-task-cost.js');
+  // LIN-4226: the terminal figures over records the test holds, through the synchronous adapter.
+  const { terminalMarkedTaskCostOf: computeTerminalMarkedTaskCost } = await import('../fixtures/cost-read-cores.js');
   const done = (hoursAgo) => ({ message: '[done] landed', timestamp: at(hoursAgo) });
   const asOf = new Date(NOW);
 
@@ -267,7 +274,7 @@ describe('review note 1: the /kpis harness shares read a record lineage from its
 describe('a lineage that counts records and another harness\'s snapshots is labelled by its cost-dominant part', () => {
   test('an opencode delta that outweighs the records keeps naming the lineage', () => {
     const rows = [row('r1', 'r1', 6, [snapshot(6, { harness: 'opencode', model: 'openrouter/qwen-3', costUsd: 0.25 })])];
-    const session = sessionOf(readCost({ fetchedRows: rows, requestRows: [rec('r1', 'm1', 5, { costUsd: 0.04 })] }), 'r1');
+    const session = sessionOf(readCostOf({ fetchedRows: rows, requestRows: [rec('r1', 'm1', 5, { costUsd: 0.04 })] }), 'r1');
     assert.equal(session.harness, 'opencode');
     assert.equal(session.model, 'openrouter/qwen-3');
     close(session.costUsd, 0.29);
@@ -275,7 +282,7 @@ describe('a lineage that counts records and another harness\'s snapshots is labe
 
   test('records that outweigh the delta name it', () => {
     const rows = [row('r1', 'r1', 6, [snapshot(6, { harness: 'opencode', model: 'openrouter/qwen-3', costUsd: 0.01 })])];
-    const session = sessionOf(readCost({ fetchedRows: rows, requestRows: [rec('r1', 'm1', 5, { costUsd: 0.5, effort: 'max' })] }), 'r1');
+    const session = sessionOf(readCostOf({ fetchedRows: rows, requestRows: [rec('r1', 'm1', 5, { costUsd: 0.5, effort: 'max' })] }), 'r1');
     assert.equal(session.harness, 'claude-code');
     assert.equal(session.model, 'claude-opus-5-5');
     assert.equal(session.effort, 'max');

@@ -16,9 +16,9 @@ import { collectWorkspaceKpis as collectWorkspaceKpis__unplumbed } from '../../l
 import { buildDispatchByDay, loadDispatchHistory, loadProxyBins, tallyLabels, windowsAt } from '../../lib/kpi-stats.js';
 import { MAX_REPORTS_PER_WORKSPACE } from '../../lib/report-history-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const collectWorkspaceKpis = withRequestRows(collectWorkspaceKpis__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+const collectWorkspaceKpis = withDefaults(collectWorkspaceKpis__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
 
 
 const NOW = new Date('2026-06-10T12:00:00.000Z');

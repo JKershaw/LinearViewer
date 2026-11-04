@@ -23,10 +23,10 @@ import { createRunParagraphPrecompute as createRunParagraphPrecompute__unplumbed
 import { generateFeedbackTitle } from '../../lib/feedback-title.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { JOB_IDS } from '../../lib/llm-jobs.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const createDashboardRoutes = withRequestRows(createDashboardRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
-const createRunParagraphPrecompute = withRequestRows(createRunParagraphPrecompute__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+const createDashboardRoutes = withDefaults(createDashboardRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+const createRunParagraphPrecompute = withDefaults(createRunParagraphPrecompute__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
 
 
 const URL_KEY = 'ws-a';

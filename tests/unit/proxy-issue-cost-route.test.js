@@ -16,9 +16,9 @@ import express from 'express';
 import { createProxyRoutes as createProxyRoutes__unplumbed, LINEAGE_QUERY_LIMIT } from '../../routes/proxy.js';
 import { LlmCallLogStore } from '../../lib/llm-call-log.js';
 import { stubLineageIdentity } from '../fixtures/lineage-identity.js';
-import { NO_REQUEST_RECORDS, withRequestRows } from '../fixtures/request-usage-loader.js';
+import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const createProxyRoutes = withRequestRows(createProxyRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
+const createProxyRoutes = withDefaults(createProxyRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
 
 
 // LIN-4177: the route reads only the 30-day window, and its activity rule counts a lineage only with a
