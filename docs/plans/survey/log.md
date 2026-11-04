@@ -1228,3 +1228,18 @@ Following Beck, and our own lesson that proving costs more than changing, the re
 **First test: LIN-4203 and the seven Stop sites.** LIN-4203 removes the snapshot post from all seven Stop sites in `hook.js`. Its Survey deferred "one Stop sequence". The tally has three tasks paying for that absence (LIN-4165, LIN-4183, LIN-4203). I sent LIN-4203's Survey session a read-only pricing follow-up (`20e955b2`) with the other tasks' evidence. It asks what the absence has cost, what one sequence would cost done first as its own piece (and what that piece would prove), and whether it would do it first, fold it in, or leave it.
 
 **What would count:** a reasoned price on both sides, and a choice that follows from them. If it says "do it first", that's a proposal for John (a new piece 0 before LIN-4203), not something I file on my own.
+
+## 4 Nov, about 11:10 UTC: how much to tidy is John's call
+
+John: "It's *my* call. Eventually a task is chosen, surveyed, and the user decides how much to tidy up. Agents can recommend, but we can see they're not quite the right shape. We're breaking the 'natural' flow of tasks. But, don't need to worry about how this actually lands. If we can show the process works, everything else is pretty straightforward."
+
+**What changes.**
+- The Survey's last step is now **a ruling for John**: the range of options (narrowest to broadest, each with cost and what it leaves behind), a refactor-first piece where the pricing supports one, and the agent's recommendation.
+- **John chooses the scope.** His choice, not the agent's, goes onto the ticket as "How to go about it".
+- This is where the range of options earns its place: it's the menu the person decides from.
+
+**Correction to forward trial 1.** I wrote the step-back's choice straight onto LIN-4201 and LIN-4203, which let the agent make John's call. Those sections now count as recommendations. Their scope goes to John as rulings once the pricing answer is in.
+
+**Mechanism to try:** the Survey session ends with a `DECISION:` block, which Harbour turns into a ruling, and I post a suggested answer on it. If that doesn't work for a custom dispatch, the options go to John in my update instead.
+
+**Focus:** show the process works. How it lands in Harbour as a real stage comes after that.
