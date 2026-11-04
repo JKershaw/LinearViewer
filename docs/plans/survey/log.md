@@ -811,3 +811,43 @@ Seven pieces in a strict chain is a long night's work. Piece 2 needs piece 1 *de
 - **The one-owner answer is now 14 of 14.** Every builder asked "if the area were how you'd want it" has named one owner or one seam: here a route manifest, one terminal transition, composable corpus cases, and a harness-neutral records module.
 - **The fifth "check that passes but can't fail".** Rebuild 2's corpus had goldens that match the oracle for cases production never posts, and a recording made silently of 429s. The same shape appeared earlier on LIN-4181, LIN-4178, LIN-4180 and LIN-4196.
 - **A new recurring friction: checks no one can run.** "NOT RUN: needs production access" now appears on LIN-4176 (two checks), LIN-4198 (indexes), LIN-4199 (counts, abort), LIN-4202 (three live checks), and blocks LIN-4200 outright. `docs/plans/costs.md` decision 10 already plans `GET /api/proxy/costs` for agents. A read-only aggregate route would let these checks, and the gate, run through the proxy with no database access handed out.
+
+## Morning summary (4 Nov, 06:00 UTC), for John
+
+### What landed overnight
+
+| Ticket | What | State |
+|---|---|---|
+| LIN-4176 | **Costs rebuild 1:** one cost read for every surface; unknown shows as unknown, never $0; six engines deleted | Done, deployed |
+| LIN-4127 | the runner relays usage by default (its live check followed the Survey's ordering exactly) | Done |
+| LIN-4195 | **Costs rebuild 2:** one record per model request. Pieces 0, 1, 2 and 5 Done; records live since about 05:00Z | **At its gate, waiting on you** |
+| LIN-4180 | the system suite finds Harbour, or says plainly why not | Done |
+| LIN-4181 | clean `main` gives 0 failures and 0 leaks on the runner host (from 1, 4 or 119 depending on where you ran it) | Done |
+| LIN-4182 | one on/off parser for 16 sites | Done |
+| LIN-4183 | one Stop-hook test driver for 17 drifting copies | Done |
+| LIN-4196 | the mutation runner edits only its own copies, baseline first | PR green, **waiting on you** |
+| LIN-4164 (round 2, last evening) | sessions resumable for 7 days, clones for 24 h, re-clone on resume | Done |
+
+### Rulings waiting
+
+1. **LIN-4196:** merge with a recorded waiver, or hold until LIN-2995's halt test is green? *My read: merge-waive.* The baseline proved the old runner scored a red killer as a kill for every mutant, so keeping the old one is keeping a fake score.
+2. **Rebuild 2's gate (LIN-4200 twice, and LIN-4195):** how does the measurement read production records, and is about 3 days the right window? *My read:* let the worker write and fixture-test the measurement script now, and run it on the Harbour host after about 3 days. Then, separately, consider a read-only aggregate route (`GET /api/proxy/costs`, already decision 10 in `costs.md`). "NOT RUN: needs production access" is now on five tickets, and a route would let all of them run through the proxy.
+3. **LIN-4182's mutation question** is moot now that LIN-4196 exists. Dismiss.
+4. **Noted, not blocking:** LIN-4178 kept S12's population as today's (moving its window is your call). The mixed-model label change is named on LIN-4201 and LIN-4203.
+
+### What we learned (detail above, from 21:00)
+
+- **Acting on the forecast works.** Every "do first" was a preparation, not a tidy: a baseline, an inventory, a characterisation table, a corpus, a witness order. Writing it onto the ticket changed what happened. LIN-4127's witness avoided the trap the Survey named. Rebuild 2's plan follows the Survey's order exactly. LIN-4196's baseline found the fake score the Survey predicted. LIN-4182's builder: "the plan had already done the hard part."
+- **Your two new questions earned their place.** "If the area were how you'd want it" got a one-owner or one-seam answer from **14 of 14** builders, each sizing its ticket at a fraction of what it became ("a one-word default change", "add seven cases", "about 60 lines and a fixture"). That's the clearest view yet of what the mess costs.
+- **Proving costs more than changing.** Every Costs builder said so. The sharpest lesson: a change list that allows differences but never requires them passes a reverted fix. It's in rebuild 2's "Done when".
+- **The commonest quiet failure is a check that can't fail:** a guard made vacuous by an env pin, a one-way change list, "it runs" read as "it passes", a mutation score counting a broken test, goldens covering a case production never posts. Five times tonight, across both repos.
+- **Builders' friction became tickets, and the tickets fixed it.** Six quality-of-life tickets came straight from after-answers. The loop the essay describes ran end to end.
+- **Open questions for the discussion:**
+  - Should the bar's "follow-ups listed, not filed" stay? Close-out ignored it twice.
+  - Should the Survey stay open-0 (it's done well on 13 tickets)?
+  - Does "does the check you rely on actually fail when it should?" belong in the Survey or the builder question?
+
+### Today
+
+- **About 20:10 UTC:** the first finished session passes the 24 h clone window. A follow-up then is LIN-4164's live re-clone check.
+- **About 7 Nov:** rebuild 2's gate has its 3 days of records, if you choose to wait.
