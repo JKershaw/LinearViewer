@@ -131,6 +131,7 @@ F1 ranks first because it is the High knot and the only one that grew by code. T
 
 - **Placement −3.** `cost-read`, `row-usage` and `lineage-membership` moved to Runs (E/compare-run6.md:48-49).
 - **Code, a swap.** `founder-lookup.js` was deleted; `usage-snapshot-intake.js` was added (E/compare-run6.md:46-47).
+- **Code, an absorption (second-read).** The swap understates the deletion. `founder-lookup`'s query did not just leave the catch-all: its lineage-identity read (`lineageIdentityOfRows`) moved into `lib/dispatch-store.js:330`, Runs' store hub. It is reached two ways: injected by `server.js:2507` for the kpi-stats path, and imported directly by `lib/workspace-kpi-stats.js:40`, which is the new Reports → Runs edge. So the store now takes a direct Reports caller beside the N9 loader door, and one of its two callers bypasses the injection pattern that N9 credits. The store also gained the Runs → Other edge to `usage-snapshot-intake` (`dispatch-store.js:59`). Low–Medium. Not a follow-up: LIN-4226 / PR #2275 is still reshaping these callers.
 - **Members at HEAD** (E/compare-run6.md:45): the **13 run-5 files still unplaced** (`cost-format`, `dashboard-refresh`, `home-pipeline`, `home-row-states`, `home-rows`, `home-view`, `key-state`, `key-state-holders`, `live-anchor`, `ruling-standing`, `subtree-index`, `task-facts-holder`, `task-state`) **plus `usage-snapshot-intake`, which makes 14**.
 - **The new member.**
   - `lib/usage-snapshot-intake.js` counts legacy `[usage]` posts. It has no imports and 2 importers: `lib/dispatch-store.js:59` (Runs → Other) and `server.js:42` (E/compare-run6.md:119-124).
@@ -263,6 +264,7 @@ Auth → LLM 4 (E/compare-run6.md:26).
 | `lib/model-pricing.js` (LLM) | 3 | 4 | code: `request-usage-fold` |
 | `lib/kpi-page.js` (Platform) | 1 | 2 | code: `workspace-kpis-cache` |
 | `lib/usage-snapshot-intake.js` (Other) | — | 2 | code, N1 |
+| `lib/dispatch-store.js` (Runs) | 7 in (from Agent API, LLM, Other, Reports, Wiring) | 7 in (from Agent API, LLM, Reports, Wiring; Other dropped out) | code: lineage-identity read absorbed (N1), direct import from Reports; outbound 9 → 10 with `→ usage-snapshot-intake` |
 
 Source: E/compare-run6.md:75-77, :84-86, :101-124. Every other hub in run 5's table is unchanged (`proxy-preamble`, `tree`, `run-controls`, `task-page-loader` at E/compare-run6.md:125-147).
 
@@ -367,7 +369,23 @@ Nothing in the window adds a `lib/` → `routes/` import or a new knot pair. Tho
 
 ## 10. Adversarial Second-Read
 
-**Pending.** A fresh-context reader (Tier 1 or Tier 2) will answer *"what is the largest item in this window that this report missed or misfiled?"*. The verdict, whether the reader's answer differed from the top finding, and the disposition will be recorded here and on LIN-4231 by that step. This report does not pre-fill them.
+**Tier 1.** A wholly separate session (the dispatched `review` stage, session `ff147009`) with no memory of the report-writing run. Read: PR #2276 at head `fdae4eee4ed92ad1c109eaa528c17573dd0d3f06`, against `d7ceb373` / `5334c81a`.
+
+**Question:** *what is the largest item in this window that this report missed or misfiled?*
+
+**Answer.** Before answering, the reader re-ran all eight tool runs (`seams.mjs` × 4 and `cochange.mjs --days 60` × 4). The output is identical to the committed evidence, apart from the `areaMapSource` path string, and both guides are byte-identical. The catch-all's 14 members, F1 30/37, the 13 added and 3 removed cross-area edges, the importer counts for the loader, `cost-read` and `usage-snapshot-intake`, and the no-link pairs (18/19/18/20) all reproduce. Nothing in the report is misfiled by number.
+
+The largest item the report **under-reads** is **`founder-lookup`'s deletion**. The report files it as a catch-all member swap (N1: "code, a swap"). In code, the move was a hub absorption:
+- The lineage-identity query (`lineageIdentityOfRows`) moved **into `lib/dispatch-store.js`** (`:330`), Runs' store hub.
+- It is now reached **two ways**: injected by `server.js:2507` for the kpi-stats path, and **imported directly** by Reports' `lib/workspace-kpi-stats.js:40`. This is the new `workspace-kpi-stats → dispatch-store` Reports → Runs edge.
+- In the same window, `dispatch-store` also gained the Runs → Other edge to `usage-snapshot-intake` (`:59`).
+- So the store took on a domain read and a counter. One of its two callers bypasses the injection pattern that the report praises as N9 for the request records.
+
+It is Low–Medium, and it does not change the ranking: F1 stays the top finding. It belongs as one sentence under N1 or §4 (Reports readiness), with the `dispatch-store` absorption noted in the hub-movers table (outbound 9 → 10). It is not a follow-up, because LIN-4226 / PR #2275 is still reshaping these callers. The reading is now recorded under N1, in the hub-movers table and in the §11 ledger.
+
+Adversarial second-read verdict: AGREE
+Differed from top finding: YES
+Disposition: fixed in place
 
 ## 11. Trend ledger
 
@@ -380,6 +398,7 @@ The stable names carry forward from run 5. Delta is against run 5's published fi
 | N6 `hub:cost-read.js` | Medium, watch | 9 in from 5 areas (old guide) | 5 in from 4 areas (Runs) | **improved** by placement; code +1 intra; #2275 → 7 |
 | N9 `door:request-usage-loader` | healthy, Low | — | 7 importers, 6 cross-area incl. `server.js` (the rest import the guard only) | **new** |
 | N10 `map:cost-family-split` | Low–Medium | — | 11 of F1's 67 edges | **new** |
+| `hub:dispatch-store.js` (absorbed lineage read, under N1) | Low–Medium | — | 7 cross-area in; outbound 9 → 10; direct Reports → Runs import at `workspace-kpi-stats.js:40` | **new as read** (second-read) |
 | N8 `map hygiene: deleted task-cost` | Low | alias + 3 comments | alias + 2 comments | **improved** (−1 comment) |
 | `map hygiene: workspace- prefix (Auth)` (alias: `workspace-issues-memo.js`) | Low | 1 file named | `workspace-kpis-cache` near-miss; `workspace-api-mocks` (6 importers) | renamed; unchanged in effect |
 | N7 `door:request-usage-intake` | Low, healthy | 1 intake, 2 doors | same | unchanged |
