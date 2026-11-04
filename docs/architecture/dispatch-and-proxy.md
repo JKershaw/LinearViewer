@@ -76,7 +76,7 @@ read folds them). Intake is
   once, on insert.
 - **Counts grow only**: the five token counters and an optional native `costUsd` are merged with `$max`, so a
   repost of a streamed message grows the record and a smaller repost never shrinks it. Reposting the same request
-  leaves one document.
+  under the same stamp leaves one document; the read folds documents split across stamps (LIN-4212).
 - **Limits**: at most 100 records per call (a larger call is refused whole, 400). A record is judged on its own:
   a missing `requestId`, an over-long id, a non-finite or negative number, or a prompt size over 2,000,000 tokens
   (input + cache-read + cache-write) is rejected with a reason, and the rest of the call still applies. A record
