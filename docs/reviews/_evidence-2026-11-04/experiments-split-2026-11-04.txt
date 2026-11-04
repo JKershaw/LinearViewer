@@ -1,0 +1,17 @@
+Commands (run in the LinearViewer repo at 5334c81a; numstat from the first-parent window f25aa127..HEAD):
+
+git log --first-parent -m --numstat --no-renames --format= f25aa127..HEAD -- experiments
+  total added: 35,865
+  added under experiments/rebuild-rung7/replay/work/ (generated replay run output): 33,486
+  added excluding replay/work: 2,379
+
+git show --first-parent -m --numstat --format='%cI %s' ea4c6f88
+  LIN-3880 (2026-10-25T10:49:58Z), 35,041 added / 29 deleted over 28 files; 34,880 under experiments/, 33,486 under replay/work.
+
+Consequence: the run-3 comparison (+514k over 10-12..10-21) is also dominated by generated replay output
+(the 10-21 report says "mostly JSON replay and report artefacts"), so neither figure measures research growth.
+Cancelled-session rule commits (SD unless noted):
+  bd6d2cf LIN-4079 2026-11-01T14:41:01Z  follow-up never resumes a CANCELLED session
+  e1f75fe7 LIN-4080 2026-11-01T16:23:09Z (LV) stopped run stays stopped at the Harbour boundary
+  cf6369d LIN-4082 2026-11-01T17:08:34Z  force:true follow-up can revive a CANCELLED session
+  67ff5c3  LIN-4185/4186 2026-11-04T07:41:45Z  halt-system tests follow LIN-4079

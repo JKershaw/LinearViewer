@@ -53,6 +53,12 @@ Evidence and the scripts that produced every table are in `docs/reviews/_evidenc
 10. **Title-only corrective classifier: not trended** (run 3's decision, carried). The corrective row below is "not re-measured".
 11. **Ticket mint** anchors were read from the tracker: LIN-3547 `2026-10-12T15:13:57Z`, LIN-3743 `2026-10-20T23:18:37Z`,
     LIN-4206 `2026-11-04T07:45:30Z`.
+12. **Generated replay output is not research volume.** `experiments/**/replay/work/` holds generated run output, not authored
+    research. In this window it is **33,486 of the 35,865 lines** added under `experiments/`, almost all from one landing (LIN-3880,
+    `ea4c6f88`, 35,041 added lines overall). The research bucket is therefore split: authored `experiments/` growth is **+2,379
+    lines**; generated `replay/work` is reported separately. Run 3's +514k is also dominated by generated output (its report says
+    "mostly JSON replay and report artefacts"), so the two windows are not comparable on this row. Evidence:
+    `_evidence-2026-11-04/experiments-split-2026-11-04.txt`.
 
 ## Headline read
 
@@ -189,13 +195,15 @@ intensity fell from burst to tail.
   `lib/components/settings-change-panel.js` 10-25, `lib/render-settings-shell.js` 10-24 → 10-25).
 * **Reading:** the work is still rebuild-shaped every week (Settings, dashboard, the cost read), but each target converges,
   and the rewrite-in-place count is down from run 3. Changed from burst to standing mode.
+* **Cross-repo cost and usage work.** The cost read (LV LIN-4129, 4177, 4179) and the per-request usage pieces (LIN-4195, with LIN-4197,
+  4199, 4202 in both repos, and SD LIN-4127) form one cluster across F4, F5 and F6. Its line count was not re-measured as a single cluster.
 
 ### F6 — `project-velocity-trajectory` (LV) · Severity: Low–Medium · **changed: rewrite gave way to growth (partially)**
 
 * **Src (LV):** added +42,167, deleted −26,676 lines over the window. Per week: added 20.8k, deleted 13.1k, **gross 33.9k** (run 3
   corrected 38.8k), **net +7.6k** (run 3 corrected +3.0k), **delete/add 0.63** (run 3 corrected 0.86).
-* **Tests:** +74,468 / −13,205; **research bucket** `experiments/`: +35,865 lines in 30 files (run 3's +514k was the 10-12..10-21 burst;
-  this window is +36k).
+* **Tests:** +74,468 / −13,205; **research bucket** `experiments/`: +35,865 lines in 30 files, of which **33,486 are generated replay output** (method 12);
+  authored growth is **+2,379**. Run 3's +514k is not comparable (method 12).
 * **Scripts:** +1,787 / −81; **docs** (not `docs/reviews`): +3,406 / −513.
 * **Reading:** run 3's question 1 ("does gross turnover fall back toward the added-line rate?") is a **partial yes**: deletions
   fell, net growth resumed. Growth is the mode now, not convergence.
@@ -218,9 +226,11 @@ intensity fell from burst to tail.
   additions (LIN-3699, 3805); LIN-4202 is new surface (per-request usage records). Settling on touch count.
 * `lv-sd-contract-coupling`: 6 paired tickets (F4). Unchanged.
 
-### F10 — `research-eval-programme` · Severity: Low · **improved on volume; the owner question is still open**
+### F10 — `research-eval-programme` · Severity: Low · **not comparable with run 3; the owner question is still open**
 
-* `experiments/` **+35.9k lines in 30 files** this window (run 3: +514k in 8 landings), against 589 files now. No decision on where
+* `experiments/` **+35.9k lines in 30 files** this window, of which **33.5k are generated replay output** from one landing (LIN-3880,
+  `ea4c6f88`, method 12). Authored growth is **+2.4k**. The earlier "improved on volume" reading is withdrawn: run 3's +514k was also
+  mostly generated output, so the two figures do not measure research growth. 589 files at HEAD. No decision on where
   `experiments/` lives was taken (`scripts/code-shape/areas.json` still claims only `experiments/replay-kit/`, so `rebuild-rung7` and
   other experiment directories are unclaimed by any area).
 * Run 3's option "decide where `experiments/` lives" was **not taken**.
@@ -266,6 +276,15 @@ intensity fell from burst to tail.
 * A second bare `setInterval` (OpenRouter catalog refresh, LIN-3882, 10-24) is at `server.js:1022`, next to the scheduler's 14
   `scheduler.register` calls. The scheduler module itself is untouched. Not a finding of its own; carried.
 
+### F17 — `cancelled-session-invariant` (new, rework) · Severity: Low · **new**
+
+* **Rule:** a cancelled session stays cancelled. Landings: SD `bd6d2cf` (LIN-4079, 11-01 14:41Z, a follow-up never resumes a CANCELLED
+  session); LV `e1f75fe7` (LIN-4080, 11-01 16:23Z, a stopped run stays stopped at the Harbour boundary); SD `cf6369d` (LIN-4082, 11-01
+  17:08Z, a person's `force:true` follow-up can revive a CANCELLED session); SD `67ff5c3` (LIN-4185/4186, 11-04, halt-system tests follow LIN-4079).
+* **Reading:** the same invariant was fixed, then reopened through a second path (`force:true`) about 2.5 hours later, and its tests were
+  followed up three days on. That is not a true revert (no feature withdrawn), but it is rework on one rule that "0 true reverts" does
+  not measure. The corrective share is not re-measured (method 10), so this is read from the landing list by hand, by one labeller.
+
 ### Read, nothing (surfaces audited in scope, with no rate-shaped finding)
 
 * `public/` as a whole: CSS grew with the UI charter (`public/style.css` 4,372 → 5,379, +23%, 27 touches; `public/settings.css` +68%);
@@ -306,7 +325,7 @@ gives the regime(s) the row can be read from.
 | `proxy-churn-concentration` | LV | surface rate | low | `routes/proxy.js` 13 touches (0.92/day; run 3 0.67/day; prior-30 1.4/day) | below prior-30; slightly up | **unchanged** (slightly worse) |
 | `runner-kit-convergence` | LV | surface rate | low | `runner.mjs` 5 touches in 14 d (run 3: 4/3/4/7 per week) | settling | **improved** |
 | `lv-sd-contract-coupling` | LV+SD | change-coupling | low | 6 paired tickets | lockstep on contract change | **unchanged** |
-| `research-eval-programme` | LV | excluded-path churn | low | `experiments/` +35.9k lines / 30 files (run 3: +514k); owner question open | improved on volume | **improved** |
+| `research-eval-programme` | LV | excluded-path churn | low | `experiments/` +35.9k lines, of which 33.5k generated replay output (LIN-3880); authored +2.4k; run 3's figure is also generated-dominated | not comparable with run 3; owner question open | **changed (method, method 12)** |
 | `server-js-growth` (S2) | LV | surface rate | low | 20.2% of landings (run 3 corrected 14.9%); 4,657 → 4,668 lines | share up, size flat | **worsened** (share) |
 | `route-boundary-coupling` (S3) | LV | change-coupling | low | `workspace-api` 3,782 → 906 (split); lifts carried from research, n ≤ 14, not re-measured | not judgeable at small n | **improved** (carried) |
 | `periodic-loop-two-mechanisms` | LV | surface rate | low | second bare `setInterval` at `server.js:1022`; hourly cleanup at `server.js:4607` | slightly worse | **worsened** (slightly) |
@@ -319,6 +338,7 @@ gives the regime(s) the row can be read from.
 | `prompt-parity-coupling` | LV | change-coupling | none | resolved 10-12 | n/a | resolved (unchanged) |
 | `corrective-vs-additive-ratio` | LV | rework | — | not re-measured (title classifier recall ≈20%, not trended) | not trended | **not re-measured** |
 | `corrective-vs-additive-ratio` | SD | rework | — | not re-measured | not trended | **not re-measured** |
+| `cancelled-session-invariant` (new) | SD + LV | rework | low | one rule fixed by LIN-4079 (SD, 14:41Z), reopened by LIN-4082 via `force:true` (SD, 17:08Z), LV LIN-4080 the same day, tests follow 11-04 | fix-of-fix within ~2.5 h; not a true revert | **new** |
 | `ticket-mint-vs-landing` | tracker | proxy | low | 23.5/d → 32.3/d (+37%); landings 19.6/d combined | minting outpaces landing ~1.65× | **new** |
 
 Stable names are run 3's, unchanged. `opencode-runner-convergence` keeps run 3's name; `young-surface-hotspots` is run 3's name for the
@@ -371,4 +391,49 @@ The logs step needs `gh` auth and fetches 62 jobs (≈6 minutes).
 
 ## Adversarial Second-Read
 
-*(Filled after the fresh-context reader returns; see the task comment.)*
+**Tier 2** (fresh-context general-purpose sub-agent, no memory of the report-writing turn; given the report, both repos and the evidence directory, and the question only).
+
+**Question:** "What is the largest item in this window that this report missed or misfiled?"
+
+**Reader's answer, verbatim:**
+
+> **Largest miss: LIN-3880 (`ea4c6f88`, 2026-10-25), and the report misreads it.** It is the largest single landing in the window by non-doc lines (35,070 across 28 files). Most of it is generated output committed under `experiments/rebuild-rung7/replay/work/`: a `report.json` of 5,442 lines and six 4,673-line copies of `routes/workspace-api.js` (`run-52969`, `run-53355`, `run-53476`, each `old` and `new`). The report's F10 and its trend ledger read the same lines as research volume, "+35.9k, improved on volume against run 3's +514k". That is misfiled. Excluding `replay/work`, experiments grew by 2,379 lines.
+> 
+> **Runners-up, which the report also does not handle as clusters:**
+> - **Cost/usage pipeline across both repos** (LV `4126`→`4129`→`4134`→`4177`→`4178`→`4179`→`4197`→`4198`→`4202`; SD `4127`, `4165`, `4197`, `4199`, `4202`). Roughly 17k source lines across 21 landings. The report splits it across F4, F5, F7 and open decision 5, and never names it as one cluster.
+> - **Cancelled-run invariant** (SD `bd6d2cf` LIN-4079 and `cf6369d` LIN-4082, both on 11-01; LV `e1f75fe7` LIN-4080; SD `67ff5c3` LIN-4185/4186, on 11-04). The same rule was fixed, then fixed again the same day. LIN-4079, 4080 and 4082 do not appear in the report. Its "0 true reverts" line does not count fix-of-fix, and the corrective ratio was not re-measured.
+> 
+> **Top-finding comparison.** The report's top finding is F1, CI wall time (`test-suite-accretion`, Medium). It is the report's strongest finding and I agree it is a real trend. My item is not in the ranking at all. It is a misfile, not a severity error: the lines are generated output, and for stability I would rate them Low. The report's "research volume improved" reading is what I dispute.
+> 
+> **Verified (recomputed from git or the evidence files):**
+> - LV 243 first-parent landings (260 commits, `f25aa127..5334c81a`). SD 35 landings.
+> - CI, from `ci-main-runs-2026-11-04.json`: 1,000 runs, 994 success and 6 failure. Medians on `startedAt` date windows: Sep 4.9, 10-01..17 5.22, 10-18..20 6.59, 10-21..25 7.07, 10-26..11-01 7.87, 11-02..04 8.23, and 10-21..11-04 7.17. All match.
+> - Hot-file line counts at `5334c81a`: `routes/workspace-api.js` 906, `public/prompt-section.js` 2,867, `server.js` 4,668, `lib/dispatch-store.js` 3,967. All match.
+> - Experiments `+35,865` lines in 30 files: exact match, but see above.
+> - SD test share 83%; `reapers.js` 3,895 to 4,143 and `dispatcher.js` 2,351 to 2,470. All match.
+> - `task-cost.js` modified 11-03 (`10b2c82f`), deleted 11-04 (`72305215`). Matches F5.
+> 
+> **Not verified:** runtime test counts 19,596 to 22,958 and unit-file counts 890 to 1,163; the 38 rewrite events and their regime split; the 144-landing burst and 87-landing tail; per-region CI medians; the 91/10 stagnation reproduction; the 10-18 CI step. My SD `src` filter gives 2,577 added lines against the report's 2,616. The gap may be my filter, so I did not count it as an error.
+> 
+> **Claims I think are wrong or unsupported:**
+> 1. F10 and the `research-eval-programme` ledger row ("improved on volume"). The 35.9k is 93% generated replay output from LIN-3880 (`ea4c6f88`), not research growth.
+> 2. Measurement decision 1. Its exclusion list covers fixtures, screenshots, papers and reviews, but not generated run output under `experiments/`. That gap is how the replay dump entered the counts as research.
+> 3. The headline "nothing spiralling". "0 true reverts" is literally true, but the same-day fix-of-fix on LIN-4079/4082 is evidence of rework that the report never examines.
+> 4. The `## Adversarial Second-Read` section (around line 374 of `/Users/autopilot/development/simple-dispatcher-workspaces/ce420215-3d1f-44bc-aea6-61d8c88ffc35/LinearViewer/docs/reviews/stability-review-2026-11-04.md`) is still a placeholder. The report is not finished.
+
+**Response (verified against git before accepting):**
+
+* **Confirmed, and fixed in place.** LIN-3880 (`ea4c6f88`) adds 35,041 lines, of which **33,486 are generated replay output** under `experiments/rebuild-rung7/replay/work/`. Authored `experiments/` growth is **+2,379**, not +35,865. The reader is right that the report misfiled it. Fixed: method 12 (generated output split out), F10 re-rated and re-described, F6 and the ledger row changed. The run-3 comparison is also withdrawn, since its +514k is generated-dominated too. Evidence: `_evidence-2026-11-04/experiments-split-2026-11-04.txt`.
+* **Confirmed, and added as F17.** The cancelled-session rule was fixed by SD `bd6d2cf` (LIN-4079, 11-01 14:41Z), reopened through a `force:true` path by SD `cf6369d` (LIN-4082, 17:08Z), with LV `e1f75fe7` (LIN-4080) the same day, and halt-system tests followed on 11-04 (SD `67ff5c3`). It is not a true revert; it is rework on one rule. Now a Low finding and ledger row `cancelled-session-invariant`. It is read by hand, not trended.
+* **Confirmed, and noted in F5.** The cost and usage work spans both repos (LV LIN-4129/4177/4179; LIN-4195's pieces in both repos; SD LIN-4127). The report now names it as one cluster across F4, F5 and F6. Its line count is **not re-measured as one cluster**, so the reader's "~17k lines across 21 landings" is neither confirmed nor adopted.
+* **Not adopted: the reader's ranking.** The reader calls the LIN-3880 misfile "the largest miss" and rates it Low for stability. The report's top finding stays F1 (CI wall time). The reader's own answer differs from that top finding, and this is recorded below.
+* **SD `src` gap (2,577 against 2,616).** Not reconciled. The report's `src` bucket counts top-level files such as `README.md` and `package.json`; the reader's narrower filter presumably excludes them. Not changed.
+* **Verified by the reader and by me:** 243 and 35 landings; the CI medians; the hot-file line counts; the SD test share; `task-cost.js`.
+* **Still unverified:** runtime test counts, unit-file counts, the 38 rewrite events and their regime split, the 144/87 burst and tail, per-region CI medians, the 91/10 stagnation reproduction and the 10-18 CI step. These are marked as such in the report.
+
+**Fields (the engine reads the same three in one body on the task comment):**
+
+Adversarial second-read verdict: DISAGREE
+Differed from top finding: YES
+Disposition: fixed in place
+
