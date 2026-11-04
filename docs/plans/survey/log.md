@@ -1409,11 +1409,11 @@ This is the runtime witness LIN-4164 deferred. **Asking a builder days later wor
 John: "I feel like our process of refining, trying it on real work, and measuring from time to time, is pretty good. The risk is the prompts becoming lists, rules added, but that's something fairly easy to mitigate… I'd be happy to just keep running as we have, until we're confident." He's not too concerned about the test-line growth ("tests are a whole other topic"). He's happy for the Periodicals to run to help track. He agreed the next real test is an ordinary feature ticket through the loop.
 
 **The guard against prompts becoming lists.** Word counts of each prompt as of today, excluding the ticket text:
-- open-0: ~110;
-- global v1: ~250;
-- step-back with the place view: ~280;
-- the builder's after-questions (q1–q5): ~200, plus q6/q7 when used;
-- pricing: ~350, including its evidence.
+- open-0: 134;
+- global v1: 272;
+- step-back with the place view: 273;
+- the builder's after-questions (q1–q5): 179, plus q6/q7 when used;
+- pricing: 329, including its evidence.
 
 A new question must **replace** one or **earn its place with evidence** logged here. If these counts creep, that's the warning.
 
