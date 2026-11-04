@@ -1,0 +1,40 @@
+W1 {'groups': 566, 'mustRule': 106, 'table': 307, 'unranked': 0, 'gone': 1} status(all): {'unchanged': 559, 'new': 2, 'grown': 4, 'shrunk': 1} status(rule+table): {'unchanged': 412, 'grown': 1}
+W2 {'groups': 566, 'mustRule': 106, 'table': 309, 'unranked': 0, 'gone': 1} status(all): {'unchanged': 559, 'new': 2, 'grown': 4, 'shrunk': 1} status(rule+table): {'unchanged': 412, 'new': 1, 'grown': 2}
+R1 {'groups': 565, 'mustRule': 106, 'table': 309, 'unranked': 0, 'gone': 3} status(all): {'unchanged': 551, 'grown': 4, 'shrunk': 1, 'new': 9} status(rule+table): {'unchanged': 406, 'grown': 3, 'shrunk': 1, 'new': 5}
+R2 {'groups': 565, 'mustRule': 106, 'table': 308, 'unranked': 0, 'gone': 3} status(all): {'unchanged': 551, 'grown': 4, 'shrunk': 1, 'new': 9} status(rule+table): {'unchanged': 406, 'grown': 3, 'shrunk': 1, 'new': 4}
+
+== guide effect this window: HEAD guide (W1) vs old guide (W2): groups only in one: 0
+  G0443 repeated comparison completeness == 'complete' | areas 2->1 | table->table rank 443->443
+  G0369 repeated comparison completeness == 'no-usage' | areas 2->1 | table->none rank 369->369
+  G0305 repeated comparison harness == 'opencode' | areas 4->3 | mustRule->mustRule rank 305->305
+  G0171 repeated comparison kind == 'usage' | areas 2->1 | table->none rank 171->171
+  G0008 repeated comparison kind == 'wake' | areas 3->2 | mustRule->mustRule rank 8->8
+  G0010 repeated comparison status == 'taken' | areas 2->1 | mustRule->mustRule rank 10->10
+
+== guide effect prev window: HEAD guide (R2) vs old guide (R1): groups only in one: 0
+  G0382 repeated comparison completeness == 'no-usage' | areas 2->1 | table->none rank 382->382
+  G0329 repeated comparison harness == 'opencode' | areas 4->3 | mustRule->mustRule rank 329->329
+  G0008 repeated comparison kind == 'wake' | areas 3->2 | mustRule->mustRule rank 8->8
+  G0010 repeated comparison status == 'taken' | areas 2->1 | mustRule->mustRule rank 10->10
+  G0153 string set {'cacheCreation1hInputTokens', 'cacheCreationInputTokens', 'cacheReadInputToken | areas 2->1 | table->table rank 153->153
+
+== W1 code effect: non-unchanged groups
+  G0171 [none] new cmp repeated comparison kind == 'usage' | 1/2/2 | lib/dispatch-store.js,lib/row-usage.js
+  G0339 [none] new set string set {'cacheCreation1hInputTokens', 'cacheCreationInputTokens', 'cacheReadInputTokens', 'inputTokens', ' | 1/2/2 | lib/request-usage-vocabulary.js,lib/runner-kit/runner.mjs
+  G0369 [none] grown cmp repeated comparison completeness == 'no-usage' | 1/2/4 | lib/cost-read.js,lib/terminal-marked-task-cost.js
+  G0400 [none] shrunk contract text contract marker: [usage] | 1/2/3 | lib/effort-readout.js,lib/liveness-detectors.js
+  G0443 [table] grown cmp repeated comparison completeness == 'complete' | 1/3/6 | lib/cost-read.js,lib/request-usage-fold.js,lib/row-usage.js
+  G0472 [none] grown cmp repeated comparison completeness == 'unreadable' | 1/2/5 | lib/cost-read.js,lib/row-usage.js
+  G0474 [none] grown cmp repeated comparison state == 'present' | 1/2/5 | lib/cost-read.js,lib/row-usage.js
+gone: [('G0153', "string set {'cacheCreation1hInputTokens', 'cacheCreationInputTokens', 'cacheReadInputTokens', 'inputTokens', 'outputToke", ['lib/request-usage-store.js', 'lib/row-usage.js', 'lib/runner-kit/runner.mjs', 'lib/session-telemetry.js'])]
+
+mustRule W1 minus R1: []
+mustRule R1 minus W1: []
+table W1 minus R1: ["repeated comparison completeness == 'complete'"]
+table R1 minus W1: ["repeated comparison completeness == 'no-usage'", "string set {'cacheCreation1hInputTokens', 'cacheCreationInputTokens', 'cacheReadInputTokens', 'input", 'text contract marker: [usage]']
+
+mustRule site drift vs R1: identical 73, shifted lines 32, file set changed 1 [('G0173', 'tiny rule copied as a helper constructor(), 5 copies of 1-4 statements', ['lib/account-workspace-store.js', 'lib/brief-cache.js', 'lib/observation-sessions-store.js', 'lib/observer-shadow-log.js', 'lib/recap-cache.js', 'lib/report-history-store.js', 'lib/run-summary-cache.js', 'lib/session-store.js', 'lib/session-summary-cache.js', 'lib/ship-biscuit-history-store.js'])]
+
+[corrected join on (detector,decision,files)] mustRule vs 11-04 HEAD-guide run: identical sites 74, same files shifted lines 32, file set changed 0
+shifted: G0001 G0002 G0003 G0004 G0005 G0006 G0008 G0009 G0010 G0013 G0018 G0020 G0021 G0023 G0029 G0030 G0031 G0035 G0061 G0075 G0076 G0078 G0079 G0080 G0088 G0109 G0119 G0142 G0153 G0156 G0253 G0305
+shifted-site files: {'lib/run-paragraph-hook.js': 1, 'routes/proxy-compute.js': 22, 'server.js': 33, 'lib/dispatch-store.js': 11, 'lib/kpi-stats.js': 1, 'lib/run-view.js': 1, 'lib/workspace-kpi-stats.js': 1, 'routes/test.js': 5, 'routes/dashboard.js': 2, 'lib/key-state-holders.js': 1, 'lib/runner-kit/runner.mjs': 6, 'lib/session-telemetry.js': 2, 'lib/terminal-marked-task-cost.js': 4, 'lib/effort-readout.js': 1, 'lib/row-usage.js': 1}

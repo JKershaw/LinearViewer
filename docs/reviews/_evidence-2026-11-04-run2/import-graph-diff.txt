@@ -1,0 +1,30 @@
+SCC members same: True
+  SCC 6 ['settings-key-row', 'render-pages', 'render-settings-models', 'render-settings-workspace', 'render-settings', 'render']
+  SCC 6 ['digest-feedback', 'live-console', 'pipeline-loops', 'run-loop-state', 'run-summary', 'session-summary']
+dynamic same: True ['routes/proxy.js -> lib/sample-data/mock-data.js', 'routes/workspace-api-roadmap.js -> lib/prompts/roadmap-chat-template.js']
+edges removed 4:
+  - lib/founder-lookup.js -> lib/dispatch-store.js
+  - lib/terminal-marked-task-cost.js -> lib/row-usage.js
+  - lib/workspace-kpi-stats.js -> lib/founder-lookup.js
+  - server.js -> lib/founder-lookup.js
+edges added 20:
+  + lib/cost-read.js -> lib/request-usage-fold.js
+  + lib/dispatch-store.js -> lib/usage-snapshot-intake.js
+  + lib/model-routing-history.js -> lib/request-usage-loader.js
+  + lib/request-usage-fold.js -> lib/model-pricing.js
+  + lib/request-usage-fold.js -> lib/row-usage.js
+  + lib/request-usage-fold.js -> lib/utils/time.js
+  + lib/request-usage-loader.js -> lib/lineage-membership.js
+  + lib/request-usage-store.js -> lib/request-usage-vocabulary.js
+  + lib/row-usage.js -> lib/request-usage-vocabulary.js
+  + lib/run-paragraph-hook.js -> lib/request-usage-loader.js
+  + lib/session-telemetry.js -> lib/request-usage-vocabulary.js
+  + lib/workspace-kpi-stats.js -> lib/dispatch-store.js
+  + lib/workspace-kpi-stats.js -> lib/request-usage-loader.js
+  + lib/workspace-kpis-cache.js -> lib/kpi-page.js
+  + routes/dashboard-effort.js -> lib/request-usage-loader.js
+  + routes/dashboard.js -> lib/request-usage-loader.js
+  + routes/proxy-compute.js -> lib/request-usage-loader.js
+  + routes/workspace-kpis.js -> lib/workspace-kpis-cache.js
+  + server.js -> lib/request-usage-loader.js
+  + server.js -> lib/usage-snapshot-intake.js
