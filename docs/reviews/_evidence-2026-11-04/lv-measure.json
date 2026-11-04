@@ -1,0 +1,882 @@
+{
+ "repro_weeks": {
+  "2026-W40": 141,
+  "2026-W41": 104,
+  "2026-W42": 98,
+  "2026-W43": 73,
+  "2026-W44": 0,
+  "2026-W45": 0
+ },
+ "run3_window_6be148a8_f25aa127": 141,
+ "window_f25aa127_HEAD_landings": 243,
+ "window_commits_all": 260,
+ "window_first_date": "2026-10-21T01:03:22+01:00",
+ "window_last_date": "2026-11-04T05:23:59Z",
+ "daily_landings": {
+  "2026-10-21": 12,
+  "2026-10-23": 40,
+  "2026-10-24": 41,
+  "2026-10-25": 46,
+  "2026-10-26": 17,
+  "2026-10-29": 7,
+  "2026-10-30": 12,
+  "2026-10-31": 21,
+  "2026-11-01": 6,
+  "2026-11-02": 26,
+  "2026-11-03": 10,
+  "2026-11-04": 5
+ },
+ "weekly_window": {
+  "2026-W43": 139,
+  "2026-W44": 63,
+  "2026-W45": 41
+ },
+ "buckets_window": {
+  "docs": {
+   "added": 3406,
+   "deleted": 513,
+   "files": 49
+  },
+  "src": {
+   "added": 42167,
+   "deleted": 26676,
+   "files": 425
+  },
+  "excluded": {
+   "added": 406634,
+   "deleted": 2610,
+   "files": 1898
+  },
+  "tests": {
+   "added": 74468,
+   "deleted": 13205,
+   "files": 738
+  },
+  "scripts": {
+   "added": 1787,
+   "deleted": 81,
+   "files": 37
+  },
+  "ci-config": {
+   "added": 21,
+   "deleted": 6,
+   "files": 2
+  },
+  "research": {
+   "added": 35865,
+   "deleted": 35,
+   "files": 30
+  }
+ },
+ "buckets_run3_corrected": {
+  "excluded": {
+   "added": 73157,
+   "deleted": 124,
+   "files": 124
+  },
+  "tests": {
+   "added": 25192,
+   "deleted": 2388,
+   "files": 233
+  },
+  "docs": {
+   "added": 1959,
+   "deleted": 137,
+   "files": 26
+  },
+  "src": {
+   "added": 24740,
+   "deleted": 21210,
+   "files": 198
+  },
+  "scripts": {
+   "added": 3888,
+   "deleted": 102,
+   "files": 38
+  },
+  "ci-config": {
+   "added": 12,
+   "deleted": 1,
+   "files": 1
+  },
+  "research": {
+   "added": 513995,
+   "deleted": 2,
+   "files": 570
+  }
+ },
+ "buckets_prior30_09-12..10-12": {
+  "excluded": {
+   "added": 271925,
+   "deleted": 9801,
+   "files": 1105
+  },
+  "src": {
+   "added": 64811,
+   "deleted": 22519,
+   "files": 360
+  },
+  "tests": {
+   "added": 143741,
+   "deleted": 27087,
+   "files": 680
+  },
+  "docs": {
+   "added": 9259,
+   "deleted": 1237,
+   "files": 42
+  },
+  "scripts": {
+   "added": 25739,
+   "deleted": 942,
+   "files": 215
+  },
+  "ci-config": {
+   "added": 51,
+   "deleted": 5,
+   "files": 2
+  }
+ },
+ "hot_src_scripts_ge6": [
+  {
+   "file": "server.js",
+   "touches": 49,
+   "lines_at_f25aa127": 4657,
+   "lines_at_HEAD": 4668
+  },
+  {
+   "file": "public/llms.txt",
+   "touches": 40,
+   "lines_at_f25aa127": 788,
+   "lines_at_HEAD": 843
+  },
+  {
+   "file": "public/style.css",
+   "touches": 27,
+   "lines_at_f25aa127": 4372,
+   "lines_at_HEAD": 5379
+  },
+  {
+   "file": "lib/render.js",
+   "touches": 23,
+   "lines_at_f25aa127": 784,
+   "lines_at_HEAD": 1151
+  },
+  {
+   "file": "public/prompt-section.js",
+   "touches": 23,
+   "lines_at_f25aa127": 1479,
+   "lines_at_HEAD": 2867
+  },
+  {
+   "file": "lib/task-page-loader.js",
+   "touches": 20,
+   "lines_at_f25aa127": 993,
+   "lines_at_HEAD": 1535
+  },
+  {
+   "file": "lib/render-styleguide.js",
+   "touches": 19,
+   "lines_at_f25aa127": 438,
+   "lines_at_HEAD": 828
+  },
+  {
+   "file": "routes/workspace-api.js",
+   "touches": 19,
+   "lines_at_f25aa127": 3782,
+   "lines_at_HEAD": 906
+  },
+  {
+   "file": "lib/proxy-instructions.js",
+   "touches": 18,
+   "lines_at_f25aa127": 1183,
+   "lines_at_HEAD": 1243
+  },
+  {
+   "file": "lib/dispatch-store.js",
+   "touches": 16,
+   "lines_at_f25aa127": 3050,
+   "lines_at_HEAD": 3967
+  },
+  {
+   "file": "lib/render-task-page.js",
+   "touches": 16,
+   "lines_at_f25aa127": 781,
+   "lines_at_HEAD": 1013
+  },
+  {
+   "file": "scripts/code-shape/areas.json",
+   "touches": 15,
+   "lines_at_f25aa127": 76,
+   "lines_at_HEAD": 86
+  },
+  {
+   "file": "routes/dispatch.js",
+   "touches": 14,
+   "lines_at_f25aa127": 1462,
+   "lines_at_HEAD": 1689
+  },
+  {
+   "file": "routes/proxy.js",
+   "touches": 13,
+   "lines_at_f25aa127": 1614,
+   "lines_at_HEAD": 1668
+  },
+  {
+   "file": "public/app.js",
+   "touches": 13,
+   "lines_at_f25aa127": 1849,
+   "lines_at_HEAD": 2116
+  },
+  {
+   "file": "public/common.js",
+   "touches": 13,
+   "lines_at_f25aa127": 3212,
+   "lines_at_HEAD": 3272
+  },
+  {
+   "file": "routes/task-page.js",
+   "touches": 13,
+   "lines_at_f25aa127": 161,
+   "lines_at_HEAD": 298
+  },
+  {
+   "file": "lib/db-indexes.js",
+   "touches": 12,
+   "lines_at_f25aa127": 611,
+   "lines_at_HEAD": 913
+  },
+  {
+   "file": "lib/dispatch-entrance.js",
+   "touches": 12,
+   "lines_at_f25aa127": 1812,
+   "lines_at_HEAD": 1940
+  },
+  {
+   "file": "lib/render-settings.js",
+   "touches": 11,
+   "lines_at_f25aa127": 1239,
+   "lines_at_HEAD": 757
+  },
+  {
+   "file": "lib/task-board-view.js",
+   "touches": 11,
+   "lines_at_f25aa127": null,
+   "lines_at_HEAD": 334
+  },
+  {
+   "file": "lib/run-view.js",
+   "touches": 9,
+   "lines_at_f25aa127": 372,
+   "lines_at_HEAD": 508
+  },
+  {
+   "file": "routes/test.js",
+   "touches": 9,
+   "lines_at_f25aa127": 1948,
+   "lines_at_HEAD": 2127
+  },
+  {
+   "file": "public/settings.css",
+   "touches": 9,
+   "lines_at_f25aa127": 568,
+   "lines_at_HEAD": 955
+  },
+  {
+   "file": "lib/render-swipe.js",
+   "touches": 8,
+   "lines_at_f25aa127": 626,
+   "lines_at_HEAD": 174
+  },
+  {
+   "file": "CLAUDE.md",
+   "touches": 8,
+   "lines_at_f25aa127": 110,
+   "lines_at_HEAD": 110
+  },
+  {
+   "file": "lib/dispatch-factory.js",
+   "touches": 8,
+   "lines_at_f25aa127": 1033,
+   "lines_at_HEAD": 1205
+  },
+  {
+   "file": "public/swipe.css",
+   "touches": 8,
+   "lines_at_f25aa127": 1467,
+   "lines_at_HEAD": 988
+  },
+  {
+   "file": "lib/providers/linear/index.js",
+   "touches": 8,
+   "lines_at_f25aa127": 2372,
+   "lines_at_HEAD": 2374
+  },
+  {
+   "file": "lib/model-routing.js",
+   "touches": 8,
+   "lines_at_f25aa127": null,
+   "lines_at_HEAD": 495
+  },
+  {
+   "file": "routes/settings.js",
+   "touches": 7,
+   "lines_at_f25aa127": null,
+   "lines_at_HEAD": 551
+  },
+  {
+   "file": "public/run-control.css",
+   "touches": 7,
+   "lines_at_f25aa127": null,
+   "lines_at_HEAD": 400
+  },
+  {
+   "file": "public/task-page.css",
+   "touches": 7,
+   "lines_at_f25aa127": 308,
+   "lines_at_HEAD": 238
+  },
+  {
+   "file": "public/task-page.js",
+   "touches": 7,
+   "lines_at_f25aa127": 675,
+   "lines_at_HEAD": 799
+  },
+  {
+   "file": "lib/home-view.js",
+   "touches": 7,
+   "lines_at_f25aa127": null,
+   "lines_at_HEAD": 576
+  },
+  {
+   "file": "lib/dashboard-refresh.js",
+   "touches": 7,
+   "lines_at_f25aa127": null,
+   "lines_at_HEAD": 103
+  },
+  {
+   "file": "routes/task-chat.js",
+   "touches": 7,
+   "lines_at_f25aa127": 705,
+   "lines_at_HEAD": 727
+  },
+  {
+   "file": "public/styleguide.css",
+   "touches": 7,
+   "lines_at_f25aa127": 242,
+   "lines_at_HEAD": 323
+  },
+  {
+   "file": "lib/render-settings-you.js",
+   "touches": 7,
+   "lines_at_f25aa127": null,
+   "lines_at_HEAD": 222
+  },
+  {
+   "file": "lib/components/decision-panel.js",
+   "touches": 6,
+   "lines_at_f25aa127": null,
+   "lines_at_HEAD": 330
+  },
+  {
+   "file": "lib/render-flight-companion.js",
+   "touches": 6,
+   "lines_at_f25aa127": 427,
+   "lines_at_HEAD": 414
+  },
+  {
+   "file": "lib/task-cost.js",
+   "touches": 6,
+   "lines_at_f25aa127": 186,
+   "lines_at_HEAD": null
+  },
+  {
+   "file": "public/observation.js",
+   "touches": 6,
+   "lines_at_f25aa127": 4513,
+   "lines_at_HEAD": 5019
+  },
+  {
+   "file": "routes/proxy-compute.js",
+   "touches": 6,
+   "lines_at_f25aa127": 1597,
+   "lines_at_HEAD": 1617
+  },
+  {
+   "file": "lib/terminal-marked-task-cost.js",
+   "touches": 6,
+   "lines_at_f25aa127": 689,
+   "lines_at_HEAD": 357
+  },
+  {
+   "file": "lib/unanswered-decisions.js",
+   "touches": 6,
+   "lines_at_f25aa127": 718,
+   "lines_at_HEAD": 991
+  },
+  {
+   "file": "public/stage-track.css",
+   "touches": 6,
+   "lines_at_f25aa127": null,
+   "lines_at_HEAD": 164
+  },
+  {
+   "file": "lib/task-state.js",
+   "touches": 6,
+   "lines_at_f25aa127": null,
+   "lines_at_HEAD": 352
+  },
+  {
+   "file": "routes/dashboard-rulings.js",
+   "touches": 6,
+   "lines_at_f25aa127": null,
+   "lines_at_HEAD": 443
+  },
+  {
+   "file": "lib/render-pages.js",
+   "touches": 6,
+   "lines_at_f25aa127": 751,
+   "lines_at_HEAD": 914
+  },
+  {
+   "file": "lib/secret-scan.js",
+   "touches": 6,
+   "lines_at_f25aa127": 462,
+   "lines_at_HEAD": 680
+  },
+  {
+   "file": "lib/openrouter.js",
+   "touches": 6,
+   "lines_at_f25aa127": 1971,
+   "lines_at_HEAD": 2068
+  },
+  {
+   "file": "routes/workspace-api-feedback.js",
+   "touches": 6,
+   "lines_at_f25aa127": null,
+   "lines_at_HEAD": 567
+  },
+  {
+   "file": "routes/workspace-api-issue-write.js",
+   "touches": 6,
+   "lines_at_f25aa127": null,
+   "lines_at_HEAD": 765
+  },
+  {
+   "file": "public/observation.css",
+   "touches": 6,
+   "lines_at_f25aa127": 1428,
+   "lines_at_HEAD": 1599
+  },
+  {
+   "file": "lib/prompt-template-defs.js",
+   "touches": 6,
+   "lines_at_f25aa127": 1233,
+   "lines_at_HEAD": 1160
+  },
+  {
+   "file": "lib/settings-areas.js",
+   "touches": 6,
+   "lines_at_f25aa127": null,
+   "lines_at_HEAD": 137
+  },
+  {
+   "file": "lib/feature-defaults.js",
+   "touches": 6,
+   "lines_at_f25aa127": 274,
+   "lines_at_HEAD": 235
+  }
+ ],
+ "rewrite_events": [
+  {
+   "sha": "72305215",
+   "date": "2026-11-04",
+   "file": "lib/llm-call-log.js",
+   "added": 71,
+   "deleted": 193,
+   "prev_lines": 305,
+   "subject": "LIN-4179: Harbour calls on the cost read, one USD formatter, census and agreement (#2263)"
+  },
+  {
+   "sha": "72305215",
+   "date": "2026-11-04",
+   "file": "lib/task-cost.js",
+   "added": 0,
+   "deleted": 33,
+   "prev_lines": 33,
+   "subject": "LIN-4179: Harbour calls on the cost read, one USD formatter, census and agreement (#2263)"
+  },
+  {
+   "sha": "10b2c82f",
+   "date": "2026-11-03",
+   "file": "lib/task-cost.js",
+   "added": 24,
+   "deleted": 198,
+   "prev_lines": 207,
+   "subject": "LIN-4177: one cost read; /cost, Models and effort run on it (#2261)"
+  },
+  {
+   "sha": "30db2052",
+   "date": "2026-11-02",
+   "file": "lib/plan-fee-config.js",
+   "added": 0,
+   "deleted": 20,
+   "prev_lines": 20,
+   "subject": "LIN-4129: remove cost code that nothing reads (#2234)"
+  },
+  {
+   "sha": "30db2052",
+   "date": "2026-11-02",
+   "file": "lib/terminal-marked-task-cost.js",
+   "added": 103,
+   "deleted": 418,
+   "prev_lines": 689,
+   "subject": "LIN-4129: remove cost code that nothing reads (#2234)"
+  },
+  {
+   "sha": "30db2052",
+   "date": "2026-11-02",
+   "file": "lib/weekly-budget.js",
+   "added": 13,
+   "deleted": 196,
+   "prev_lines": 225,
+   "subject": "LIN-4129: remove cost code that nothing reads (#2234)"
+  },
+  {
+   "sha": "b72fadce",
+   "date": "2026-10-26",
+   "file": "lib/model-routing-summary.js",
+   "added": 27,
+   "deleted": 24,
+   "prev_lines": 48,
+   "subject": "LIN-3952: Settings \u203a Models shows spend, one name, one actor rule; No job moves to Dispatc"
+  },
+  {
+   "sha": "74ad4f4c",
+   "date": "2026-10-26",
+   "file": "public/task-chat.js",
+   "added": 449,
+   "deleted": 420,
+   "prev_lines": 458,
+   "subject": "LIN-3975: task page moves the task on, stages link to runs, quiet empty brief/recap, task "
+  },
+  {
+   "sha": "dfeabc20",
+   "date": "2026-10-25",
+   "file": "lib/components/settings-change-panel.js",
+   "added": 0,
+   "deleted": 59,
+   "prev_lines": 59,
+   "subject": "LIN-3962: one decision panel for Models and Home (#2155)"
+  },
+  {
+   "sha": "dfeabc20",
+   "date": "2026-10-25",
+   "file": "public/settings-models.js",
+   "added": 6,
+   "deleted": 71,
+   "prev_lines": 121,
+   "subject": "LIN-3962: one decision panel for Models and Home (#2155)"
+  },
+  {
+   "sha": "d53bb5bc",
+   "date": "2026-10-25",
+   "file": "routes/settings-model.js",
+   "added": 62,
+   "deleted": 159,
+   "prev_lines": 201,
+   "subject": "LIN-3855: Settings \u203a Models shows every job, its spend and its model; retires the old form"
+  },
+  {
+   "sha": "8bbd6b5f",
+   "date": "2026-10-25",
+   "file": "lib/render-settings-shell.js",
+   "added": 0,
+   "deleted": 185,
+   "prev_lines": 185,
+   "subject": "LIN-3890: Settings untangle 4 of 4 \u2014 rebuild Sources, Health, Account and the rest on the "
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "lib/next-run.js",
+   "added": 0,
+   "deleted": 1003,
+   "prev_lines": 1003,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "lib/render-next-run.js",
+   "added": 0,
+   "deleted": 146,
+   "prev_lines": 146,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/README.md",
+   "added": 0,
+   "deleted": 128,
+   "prev_lines": 128,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/chat-next.css",
+   "added": 0,
+   "deleted": 372,
+   "prev_lines": 372,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/chat-next.js",
+   "added": 0,
+   "deleted": 482,
+   "prev_lines": 482,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/compare.mjs",
+   "added": 0,
+   "deleted": 109,
+   "prev_lines": 109,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/mock-agent.js",
+   "added": 0,
+   "deleted": 80,
+   "prev_lines": 80,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/scenes.js",
+   "added": 0,
+   "deleted": 140,
+   "prev_lines": 140,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/shape-a.html",
+   "added": 0,
+   "deleted": 208,
+   "prev_lines": 208,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/shape-b.html",
+   "added": 0,
+   "deleted": 190,
+   "prev_lines": 190,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/shoot.mjs",
+   "added": 0,
+   "deleted": 95,
+   "prev_lines": 95,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/verify.mjs",
+   "added": 0,
+   "deleted": 290,
+   "prev_lines": 290,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/swim-flow/data.js",
+   "added": 0,
+   "deleted": 52,
+   "prev_lines": 52,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/swim-flow/index.html",
+   "added": 0,
+   "deleted": 30,
+   "prev_lines": 30,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/swim-flow/layout.js",
+   "added": 0,
+   "deleted": 301,
+   "prev_lines": 301,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/swim-flow/shoot.mjs",
+   "added": 0,
+   "deleted": 31,
+   "prev_lines": 31,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/swim-flow/styles.css",
+   "added": 0,
+   "deleted": 237,
+   "prev_lines": 237,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "public/next-run.css",
+   "added": 0,
+   "deleted": 421,
+   "prev_lines": 421,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "public/next-run.js",
+   "added": 0,
+   "deleted": 569,
+   "prev_lines": 569,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "routes/next-run.js",
+   "added": 0,
+   "deleted": 223,
+   "prev_lines": 223,
+   "subject": "LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)"
+  },
+  {
+   "sha": "9f7acff7",
+   "date": "2026-10-24",
+   "file": "routes/settings-workspace-features.js",
+   "added": 0,
+   "deleted": 68,
+   "prev_lines": 68,
+   "subject": "LIN-3846: Settings is a page per area, built from three kinds of row (#2099)"
+  },
+  {
+   "sha": "b133a713",
+   "date": "2026-10-24",
+   "file": "routes/dashboard.js",
+   "added": 122,
+   "deleted": 2277,
+   "prev_lines": 3027,
+   "subject": "LIN-3742: rebuild createDashboardRoutes into flat routes/dashboard-*.js modules (#2079)"
+  },
+  {
+   "sha": "bfb7ea21",
+   "date": "2026-10-24",
+   "file": "lib/render-swipe.js",
+   "added": 8,
+   "deleted": 354,
+   "prev_lines": 626,
+   "subject": "LIN-3554: move task ordering to lib/task-order.js (Task model area) (#2075)"
+  },
+  {
+   "sha": "d81aebd2",
+   "date": "2026-10-23",
+   "file": "public/chart.umd.min.js",
+   "added": 0,
+   "deleted": 14,
+   "prev_lines": 14,
+   "subject": "LIN-3787: DOMPurify 3.4.17 and vendored client libs under audit coverage (#2064)"
+  },
+  {
+   "sha": "d81aebd2",
+   "date": "2026-10-23",
+   "file": "public/marked.min.js",
+   "added": 0,
+   "deleted": 74,
+   "prev_lines": 74,
+   "subject": "LIN-3787: DOMPurify 3.4.17 and vendored client libs under audit coverage (#2064)"
+  },
+  {
+   "sha": "d81aebd2",
+   "date": "2026-10-23",
+   "file": "public/purify.min.js",
+   "added": 0,
+   "deleted": 3,
+   "prev_lines": 3,
+   "subject": "LIN-3787: DOMPurify 3.4.17 and vendored client libs under audit coverage (#2064)"
+  }
+ ],
+ "rewrite_files_with_repeats": {
+  "lib/task-cost.js": 2
+ },
+ "short_lived_src": {
+  "routes/settings-workspace-features.js": {
+   "created": "2026-10-24",
+   "last_touch": "2026-10-24"
+  },
+  "lib/render-settings-shell.js": {
+   "created": "2026-10-24",
+   "last_touch": "2026-10-25"
+  },
+  "lib/components/settings-change-panel.js": {
+   "created": "2026-10-25",
+   "last_touch": "2026-10-25"
+  }
+ },
+ "stagnation": {
+  "candidates_ge4_0401_0625": 106,
+  "present_at_f25aa127": 91,
+  "silent_since_0812_at_HEAD": [
+   "lib/harbour-spawn.js",
+   "lib/providers/registry.js",
+   "lib/render-custom-prompts.js"
+  ],
+  "silent_since_0812_at_f25aa127": 10
+ },
+ "review_layer": {
+  "prior30_touching": 17,
+  "run3_window_touching": 7,
+  "window_touching": 44,
+  "window_weekly": {
+   "2026-W43": 23,
+   "2026-W44": 7,
+   "2026-W45": 14
+  },
+  "window_day_counts": {
+   "2026-10-21": 12,
+   "2026-10-23": 11,
+   "2026-10-26": 2,
+   "2026-10-29": 1,
+   "2026-10-30": 2,
+   "2026-11-01": 2,
+   "2026-11-02": 10,
+   "2026-11-03": 4
+  },
+  "window_reviews_lines_added": 209016
+ }
+}
