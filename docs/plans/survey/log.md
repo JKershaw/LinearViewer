@@ -1354,3 +1354,8 @@ LIN-4201 is still in progress. LIN-4221 (exit codes and pre-flight) is in progre
 
 - **LIN-4221** (`90bbf82`): one exit-code table imported by both runners and the harness, a pre-flight, and a gap report. **LIN-4222** (`3330526`): **zero literal ports left** across 35 system-test files; ports are OS-assigned through `ports.js`. That's the broad option the scope pulled in, and it landed. Ledger: four `+` rows from LIN-4219 so far, with only the baseline piece (LIN-4224) to go.
 - **LIN-4201's PR is approved and green, and held at the production gate.** The worker says "no session here has" production access. But LIN-4200's own session ran the same script on production through the Railway CLI after John registered the SSH key. That's the **third time a builder didn't know a tool it has** (after LIN-4167 and LIN-4200). The same path leaked the Mongo root password this morning, so I proposed `operator-runs-gate`. My reason gives John the choice: an agent session on that path (never printing the URI), or he runs it.
+
+### 15:45 UTC: the harness is all in; the costs chain waits on John
+
+- **LIN-4224** (`86bde97`) merged: `npm run test:baseline`, plus a docs table of which skip rule applies to which tier. **All five harness pieces have now merged, all `+`.** The parent LIN-4219 is in final review. Then LIN-4187, on the harness.
+- **LIN-4201 waits on John to run the production gate himself.** He chose `operator-runs-gate`. The answer was delivered to the agent session, which has no `MONGODB_URI`, so the steps are on LIN-4201 for him. **A gap in the rulings loop:** an answer naming a *person* gets dispatched to an *agent*. The ruling should say where its answer goes.
