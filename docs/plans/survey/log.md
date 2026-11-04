@@ -774,3 +774,11 @@ Seven pieces in a strict chain is a long night's work. Piece 2 needs piece 1 *de
 **Ruling for John (LIN-4196), blocking the merge:** merge with a recorded waiver and re-run the gate for a score once LIN-2995's halt test is green (recommended), or hold the PR until then. My read: merge-waive. The new runner is strictly more honest than the old one, and holding it keeps the old, fake-scoring runner on `main`.
 
 **Rebuild 2:** piece 0 (LIN-4197, the corpus and baseline goldens, runner PR #312 plus a Harbour PR) is Done. Piece 1 (LIN-4198, Harbour intake, store and per-record pricing) has started.
+
+## 4 Nov, 04:55 UTC: rebuild 2, piece 1 done
+
+- **LIN-4198 (piece 1: Harbour intake, store, per-record pricing) is Done** and deployed, accepted but not yet read, as the Survey advised.
+- **Piece 2 (LIN-4199, the runner posts claude-code records, flushes at Stop, reap and cancel, and counts subagents)** is past its implementation arc.
+- **Piece 5 (LIN-4202, opencode and runner-kit post records)** is building in parallel, as the breakdown allowed.
+- Piece 3 (the live measurement gate) waits on piece 2.
+- **LIN-4196** still waits on John's ruling.
