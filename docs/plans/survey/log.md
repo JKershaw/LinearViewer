@@ -1987,3 +1987,9 @@ Surveys (dispatch ids): LIN-4252 `fc788200` / `77df15cc`; LIN-4253 `8cf6f0b3` / 
 - **The free check (C): the place voice did name a tidy without being asked,** but not the fake DOM. It named "one rule for 'the run has ended'": two pollers decide it differently, and Go's "in progress" has three answers. Because unifying those rules *is* the fix, that tidy can't go first without changing behaviour, so C stays the control (tidy folded in, in pieces).
 - **One design disagreement, settled by the person (no step-back):** LIN-4253's "offered". open-0 proposed an explicit flag plus a test that it matches `route`; the place voice proposed making `route: null` the one declaration. I chose the place voice's version: one signal for one fact. For the second trait I took open-0's naming: what the stage may *write*, not `readOnly`.
 - **Scopes written; autopilots started:** LIN-4252 `0e6a3233`, LIN-4253 `cd0971da`, LIN-4247 `f6b25026`. LIN-4247 runs beside LIN-4252, not after it: LIN-4252 touches only tests, and running in parallel keeps C a clean control with no help from the new fake.
+
+### 10:45 UTC: a working rule, reread the papers
+John: from time to time, reread the essay and the related papers, which are good at reminding us why we're doing this and which traps to avoid. Added to "How to resume" in the notes: reread at each milestone or notebook sync, and after each compaction. Three lines from this morning's reread that bear on this round:
+- "A step bounded by its ticket … sees one copy of a decision that lives in many". That is the blind scorer's edges finding, predicted.
+- "Tidying where a change does not bind moves stone without settling it". That is the check on tidy-first: each tidy must be where its follow-on binds.
+- "Delete in the same change". That is why LIN-4252 deletes the second fake rather than adding a third.
