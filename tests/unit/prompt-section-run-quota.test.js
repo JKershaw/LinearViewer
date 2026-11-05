@@ -9,7 +9,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadWorld } from './helpers/client-world.js';
-import { DISCLOSURE_SCRIPTS, disclosureWindowStubs, useRealDisclosure } from './helpers/real-dispatch-disclosure.js';
+import { DISCLOSURE_SCRIPTS, disclosureWindowStubs } from './helpers/real-dispatch-disclosure.js';
 
 const flush = () => new Promise((r) => setImmediate(r));
 
@@ -65,8 +65,6 @@ function loadPromptSection({ quota, dispatch } = {}) {
     maybeAppend: async (raw, urlKey, opts) => (opts && opts.force ? `${raw}\n\n## Workspace API access` : raw),
   };
   window.toast = () => {};
-  // The disclosure is production's own. Its markup gets the browser's entity decode before the fake parses it.
-  useRealDisclosure(window);
   // The reader is stubbed: production's reads the values of the harness and model `<select>`s, which the fake does not
   // model. The stub records the scope it is handed, so a test can check which element a press passes it.
   window.readDispatchExecControls = (scopeEl) => {
