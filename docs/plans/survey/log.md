@@ -1783,3 +1783,20 @@ I skipped LIN-4026: its own text says the write-side option is "a contract chang
 - it names every reader of ruling standing (feed, session page, Home, task page) and whether each guards.
 
 **At merge:** no reader of ruling standing can silently skip the guard. No new homeless file.
+
+### 05:10 UTC: LIN-4143's voices disagreed on a fact; I checked it; scoped and started
+- **The first factual divergence tonight.**
+  - The global said the card is fed by the unguarded `rulingFor`.
+  - open-0 said the card is built by `deriveSessionDecisions`, which is already guarded, and that the witness would pass before any change.
+  - **I read the code at the base: open-0 is right** (`buildQuestion` → `deriveSessionDecisions`; `rulingFor` only feeds `waiting`).
+- **Lesson for the loop:** when the voices disagree on *a fact*, check the fact. It's a minute's read, and a step-back would only weigh two claims. Keep the step-back for disagreements about *what to do*.
+- **Criteria (05:00):**
+  - "the optional parameter each caller must remember": **hit** (global: "one way to read standing, not a flag to forget");
+  - "names every reader and whether each guards": **hit** (both).
+- **The second stale premise tonight** (after LIN-4048). Both voices then found the real risk: the client fails open (an empty effect becomes `resume`, then `dispatch`).
+- **Scope:**
+  1. the witness first, run at the base, and say so if it passes;
+  2. fail closed in the client (a red test);
+  3. make the guard unconditional, so there's no parameter left (stop if users would see a change).
+
+  The global's "not this task's" (the proxy route's own predicate copy; a re-export shim) stays out, to the tally. Autopilot `6db86ecc`.

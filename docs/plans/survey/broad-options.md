@@ -45,6 +45,7 @@ Sources: the 13 step-backs of round 2/3/QoL (07:38, 4 Nov) and the two forward-t
 - **Split `home-view.js` (576 lines) and separate `upNextOf`'s eligibility from its ranking** (a candidate model both lists filter). LIN-4151 *(global)*; LIN-4144's Surveys both noted the same module threading `shown`/`waiting`/`linked`/`onHome` through every placement.
 - **Server fragments drawn by the page's own function, so the client never parses a whole page** (LIN-4242 did this for Waiting; LIN-4243 parses Home's HTML for Running and Up next instead). LIN-4243 q4 and q6.
 - **One ranking for "what's next" everywhere** (`orderIssuesForSwipe` beside `compareRank`). LIN-4151 q6; the 11-03 Drift review's three rankers.
+- **One live-run predicate** (`routes/proxy-rulings.js` writes its own instead of `liveOnAnchor`; its comment names an earlier incident from that class). LIN-4143 *(global)*.
 - **One rulings reduction for the badge and Home** (they count differently today). LIN-4144 (open-0 and global).
 - **The Home-wide live repaint** (Running follows rulings, not only Waiting). LIN-4144 (global); its piece 5 carries the on-change part.
 
