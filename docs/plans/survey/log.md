@@ -1728,3 +1728,12 @@ Surveys at `172f644a1`: open-0 `ca6d61ac`, global code-only `c2dd09c1`.
   - Piece 2 (names): the constant was renamed; the wire and DOM names were deliberately left as they were, within the stop rule.
 - **Two ordinary tickets through the loop tonight, four rows, all `+`** (one `+ (mixed)`), with the code-only global and no routed findings.
 - After-questions sent to LIN-4151's builder.
+
+### 03:50 UTC: the third ordinary ticket, LIN-4048 (the task page offers "Run to PR" on a finished task)
+I skipped LIN-4026: its own text says the write-side option is "a contract change John should hear about first".
+
+**What would count as the place view earning its keep, written before reading:**
+- it names LIN-4042's Home fix (`row.finished` in the browser) as a copy this task would duplicate, and the server's `mainActionOf` as the one place the rule could live;
+- it says whether Home's browser-side check can go once the server decides (one rule, not two).
+
+**At merge:** "finished means no main run action" is decided in one place, and both surfaces read it. No new homeless file.
