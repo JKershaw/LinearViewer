@@ -1,0 +1,94 @@
+# git diff --numstat for paths the task names as unchanged (LinearViewer d7ceb373..2eb73ae0); empty = 0-line diff
+## scripts/code-shape
+## lib/runner-kit
+## docs/runner-prompt.md
+
+# LinearViewer window: git log d7ceb373..2eb73ae0
+2eb73ae07fb7297fc0fa057a6198aa8cbe901558 2026-11-05T06:00:24Z LIN-4143: the task page's ruling reads go through the live-run guard, always (#2285)
+c70b004c0a2bd84824b92993e536602c4356e348 2026-11-05T04:50:25Z LIN-4048: a finished task's page matches Home's run block (#2284)
+13fe24a04acb7976603d673c25bf40438f0818e1 2026-11-05T03:37:44Z LIN-4151: rank a project's /backlog lead roots, one derivation for page and fold (#2283)
+172f644a10b176a12660e7677691c6902f52a006 2026-11-05T02:53:19Z LIN-4243: Home's Running and Up next follow a change of the Waiting set (#2282)
+ee8ec42e2d235e932e6ba43bf6860c96fcbe64e0 2026-11-05T01:34:01Z LIN-4242: Waiting on you goes live — home-waiting fragment, shared keyed merge, one rulings tick (#2281)
+941952711caf67cfe40e2b69e654cf6fde6f3109 2026-11-05T00:01:04Z LIN-4241: settled-ruling guard — refuse a second answer or dismiss with 409 ruling-settled (#2279)
+279dcb0a4e426e7ed069ecc07898278f46da46fb 2026-11-04T23:23:54Z LIN-4240: parseParkedWait decides on the newest state-bearing entry (#2280)
+950113b17f41baf8aa9714c621b940463861e587 2026-11-04T23:03:16Z LIN-4234: usage-snapshot-intake is in INVENTORY; one source of collection names for both guards (#2278)
+476d9ad478ede67da5cb44195ce24c98d07afa61 2026-11-04T19:59:00Z LIN-4232: Drift & Coherence Review 2026-11-04 run 2 (trend vs 11-04) (#2277)
+c55f0fb33929fc00f02b8ea7231541a4af66f3e6 2026-11-04T19:24:56Z LIN-4226: the cost read loads its request records through a requestSource (LIN-4195 piece 4b) (#2275)
+43dd0d64764d34b8ea691f3dea58268b5adf1b8e 2026-11-04T19:04:44Z LIN-4231: seams & tangles periodical run 6 (delta vs run 5) (#2276)
+
+# LinearViewer production stat (lib routes public server.js)
+ lib/account-erasure.js              |   6 +-
+ lib/cost-read.js                    | 133 +++++++++++++------
+ lib/digest-feedback.js              |  24 ++++
+ lib/dispatch-store.js               |  86 ++++++++++---
+ lib/effort-readout.js               |  15 ++-
+ lib/home-row-states.js              |  39 +++++-
+ lib/home-rows.js                    |  12 +-
+ lib/home-view.js                    | 140 ++++++++++++++------
+ lib/kpi-stats.js                    |  18 +--
+ lib/live-anchor.js                  |   8 +-
+ lib/model-routing-history.js        |  29 +++--
+ lib/model-routing-spend.js          |  20 ++-
+ lib/render-run-steps.js             |  10 +-
+ lib/render-session.js               |  12 +-
+ lib/render-task-page.js             |  10 +-
+ lib/render.js                       |  53 ++------
+ lib/request-usage-loader.js         |  12 +-
+ lib/ruling-settled.js               |  14 ++
+ lib/ruling-standing.js              |   7 +-
+ lib/run-paragraph-hook.js           |   8 +-
+ lib/run-view.js                     |  46 +++++--
+ lib/session-telemetry.js            |  60 +++++++--
+ lib/task-decisions-store.js         |  17 +++
+ lib/task-page-loader.js             |   3 +-
+ lib/terminal-marked-task-cost.js    |  29 ++---
+ lib/unanswered-decisions.js         |  17 +--
+ lib/waiting-section.js              |  74 +++++++++++
+ lib/workspace-kpi-stats.js          |  25 ++--
+ public/app.js                       | 246 +++++++++++++++++++++++++++++++++---
+ public/common.js                    |  51 +++++++-
+ public/home-placement.js            | 122 ++++++++++++++++++
+ public/llms.txt                     |   8 +-
+ public/prompt-section.js            |  36 ++++--
+ public/question-cards.js            | 124 +++++++++++++++++-
+ routes/dashboard-effort.js          |  14 +-
+ routes/dashboard-feed.js            |   4 +-
+ routes/dashboard-rulings.js         |  13 +-
+ routes/dashboard.js                 |  11 +-
+ routes/dispatch.js                  |   4 +-
+ routes/proxy-compute.js             |  14 +-
+ routes/settings.js                  |   8 +-
+ routes/workspace-api-issue-write.js | 167 ++++++++++++++++++++----
+ routes/workspace-api-scan.js        |   7 +
+ server.js                           |  37 +++++-
+ 44 files changed, 1430 insertions(+), 363 deletions(-)
+
+# simple-dispatcher window: git log d8d186c..07c88f7
+07c88f7a338b3e19a01070775e1f4d4cfc91f040 2026-11-04T23:46:41Z LIN-4233: finish the present-tense rewrite of the parseParkedWait comments (#328)
+580a5ea65941f99eecd706addba53fcdca573a13 2026-11-04T23:35:47Z LIN-4240: rewrite the "until LIN-4240 lands" pointers in the present tense (#327)
+796bc9da48349458d9cd8e103e85b4e5ba068ccd 2026-11-04T22:59:52Z LIN-4239: defer, blocked and failed post their status last (#326)
+bf499a43118999ca48e06cab5211ce344dc83fb0 2026-11-04T19:02:48Z LIN-4218: one outcome table and one executor for every Stop relay (#325)
+
+# SD outside test/
+ docs/module-map.md |   7 +
+ hook.js            | 519 ++++++++++++++++++++++++++---------------------------
+ opencode-runner.js |  10 +-
+ 3 files changed, 271 insertions(+), 265 deletions(-)
+
+# SD full
+7	0	docs/module-map.md
+259	260	hook.js
+5	5	opencode-runner.js
+3	3	test/decision-emission.test.js
+1	1	test/decision-withdrawal.test.js
+28	0	test/defer-deferred-at-after-flush.test.js
+43	32	test/feedback-metadata.test.js
+22619	0	test/fixtures/stop-relay-order.golden.json
+44	0	test/helpers/stop-status-order.js
+298	0	test/stop-relay-order-characterization.test.js
+148	0	test/stop-relay-table.test.js
+60	0	test/stop-status-retry-budget.test.js
+1	1	test/system/mutation/run-mutations.js
+77	0	test/system/park-read.test.js
+13	10	test/ticket-marker-relay.test.js
+1	1	test/tool-activity-relay-seams.test.js

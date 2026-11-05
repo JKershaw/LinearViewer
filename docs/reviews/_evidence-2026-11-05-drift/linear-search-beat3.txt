@@ -1,0 +1,47 @@
+## q="readWaitingStanding"
+  LIN-4150 | Backlog | | Survey spikes: record (don't dispatch or plan)
+## q="waiting-section"
+  LIN-4250 | In Progress | | Drift & Coherence Review (run 3, trend vs the 2026-11-04 run 2): a small window (9 production LinearViewer com
+  LIN-4249 | Done | | Seams & Tangles Review (periodical run 7): area knots, dependency direction, ways in, rebuild readiness and ch
+  LIN-4150 | Backlog | | Survey spikes: record (don't dispatch or plan)
+  LIN-4243 | Done | | Waiting on you (C): Home placement stays consistent when the Waiting set changes (spike-gated)
+  LIN-4242 | Done | | Waiting on you (B): live section — home-waiting fragment, shared keyed card merge, one rulings tick
+  LIN-4114 | Done | | UI round 3 · S3c: Waiting on you — one card per ruling on Home, recommended answer as the main button
+  LIN-4162 | Backlog | | Home: the task id on a Waiting on you card is sans, not mono
+  LIN-4144 | Done | | Home's Waiting on you has no live refresh: cards and count go stale until reload
+## q="stale comment"
+  LIN-2793 | Backlog | | Rulings: a STALE proposal delivers an opaque option id as the answer text (LIN-2754 review F2/F3 residual)
+  LIN-3869 | Done | | Stale comment in free-tier-model-clamp-wiring: DISPLAY_ONLY entry names the wrong file
+  LIN-3827 | Done | | Retire stale landing-status comments ("INERT", "no production caller", "later beat") at 13 confirmed-false sit
+  LIN-1528 | Done | | LIN-1472 follow-up: stale `origin/main` comment drift in executors.js + exec-test for the fully-unresolvable b
+  LIN-3894 | Done | | Move: the sessions route and the run-evidence / close-out routes (GET /api/sessions/:identifier, GET /api/run-
+  LIN-2714 | Backlog | | Stale Scan-due comments: three code comments still say the run control does not exist yet
+  LIN-1171 | Done | | Correct stale comment in public/session.js re: dispatchPrompt/followUpTo
+  LIN-1029 | Canceled | | Clean up stale renderWaitingBanner doc comment (post LIN-1025)
+## q="task-decisions-store settled"
+  LIN-2649 | Done | | LIN-2241 WS2 — cross-task scan-due list: stored due-basis, bounded paginated due checks, Observation tab
+  LIN-2230 | Done | | LIN-2211 review F1: _pruneToCapacity can evict the row recordScan just wrote, pinning a task permanently 'stal
+  LIN-3441 | Todo | | Scan decisions store rejects non-UUID canonical ids, so GitHub-backed tasks may never record scans or outcomes
+  LIN-2856 | Done | | Pin the `decision` and `outcome` `?? null` coalesces in `toRecord` — both still survive their mutation
+  LIN-2893 | Done | | LIN-2809 Step 5: LIN-2729 fix — newest-then-filter ordering for task-bound rulings, threaded through all 4 rea
+  LIN-2197 | Done | | LIN-1721: task decision scan — the third producer (triage instrument, works without a runner)
+  LIN-3322 | Done | | recordScan terminal path never $sets the binding pair on re-scan of an answered/dismissed task-decision row
+  LIN-3330 | Done | | Task share link: token store, /t/:token guest page, middleware exemptions, share and revoke
+## q="settled predicate"
+  LIN-1943 | Backlog | | Blocked-startup fast-fail does not cover a refire/follow-up-resume launch that blocks
+  LIN-3311 | Done | | LIN-2950 P1: PR-state store lift, run loader split + settle predicate, owner golden pin
+  LIN-3366 | Done | | LIN-3358 C: ticket-closed closer (proxy + workspace-API seams, scheduler sweep, decision withdrawal)
+  LIN-1899 | Done | | Security: Jira API token is transmitted to api.linear.app via the workspace audit route
+  LIN-2950 | Canceled | | Share link: one run, one URL, readable by whoever holds it
+  LIN-2418 | Done | | noLineage tickets dilute unknownHarnessShare/opencodeSummedShare — an ignorance disclosure that improves when 
+  LIN-3313 | Canceled | | LIN-2950 P3: run share link server side: run subject, owner run reader, refresh/settle, /s/:token serve
+  LIN-1122 | Done | | Pacing's cold-start gate never settles for opencode sessions — holds every fresh launch for the full 180s cool
+## q="RULING_SETTLED_CODE"
+  LIN-4244 | Backlog | | Rulings answer surfaces other than Home cards: send answerAttemptId and handle 409 ruling-settled
+  LIN-4241 | Done | | Waiting on you (A): settled-ruling guard — refuse a second answer or dismiss with 409 ruling-settled
+  LIN-4250 | In Progress | | Drift & Coherence Review (run 3, trend vs the 2026-11-04 run 2): a small window (9 production LinearViewer com
+  LIN-4249 | Done | | Seams & Tangles Review (periodical run 7): area knots, dependency direction, ways in, rebuild readiness and ch
+  LIN-3441 | Todo | | Scan decisions store rejects non-UUID canonical ids, so GitHub-backed tasks may never record scans or outcomes
+  LIN-4142 | Done | | A settled loop ruling must not accept a second answer (markDecisionAnswered has no guard)
+  LIN-2797 | Done | | Rulings tab: renderRulings() re-injects preservedRulingRows / rulingsPending keys that drop out of a poll payl
+  LIN-2796 | Duplicate | | rulingsSettled rows vanish without their outcome label — renderRulings releases a settled key with no re-injec

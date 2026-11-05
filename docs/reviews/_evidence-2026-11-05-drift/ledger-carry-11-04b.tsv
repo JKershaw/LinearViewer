@@ -1,0 +1,125 @@
+row	finding	severity	delta-vs-11-04 (11-04b)
+1	`lib-import-cycles`	low-medium	unchanged
+2	`provider-auth-router-upward-imports`	resolved	held
+3	`routes-error-envelope-fragmentation`	low-medium	unchanged
+4	`production-to-test-fixture-imports`	resolved	held
+5	`periodical-report-filename-convention-split`	medium-low	unchanged
+6	`dispatch-kind-vocabulary-cross-repo`	low	unchanged
+7	`provider-resolution-incantation`	low	unchanged
+8	`ui-divergences-registry-staleness`	low	unchanged
+9	`simple-dispatcher-api-base-duplication`	low	unchanged
+10	`cross-repo-halt-vocabulary`	low-medium (sub-row)	held
+11	`cross-repo-sentinel-decision-marker-vocabulary`	medium	unchanged
+12	`target-vocabulary`	low	unchanged
+13	`sse-frame-writer-duplication`	resolved	held
+14	`routes-proxy-decomposition`	—	unchanged
+15	`cross-repo-repo-list`	low	unchanged
+16	`ci-convention-split-across-repos`	informational	unchanged
+17	`semicolon-style-split`	low	unchanged
+18	`client-escape-html-duplication`	—	unchanged
+19	`client-shared-helper-duplication`	—	unchanged
+20	`client-section-fetch-idiom-duplication`	—	unchanged
+21	`linear-cli-parallel-graphql-surface`	—	held
+22	`store-module-uniformity`	—	unchanged
+23	`server-side-escaping`	—	unchanged
+24	`dispatch-payload-centralization`	—	unchanged
+25	`renderer-provider-abstraction`	—	unchanged (cited files 0-line diff in the window) [row has an escaped pipe; parsed by hand]
+26	`cache-module-family`	low	worsened (+1; now graded LOW)
+27	`lib-components-primitive-adoption`	—	unchanged
+28	`state-store-write-seam`	—	unchanged
+29	`phase-vocabulary-centralization`	low	unchanged
+30	`target-harness-axis-orthogonality`	—	held (cited files 0-line diff in the window) [row has an escaped pipe; parsed by hand]
+31	`test-seam-separation`	—	unchanged
+32	`css-token-layer`	—	unchanged
+33	`runner-contract-semantics-cross-repo`	medium	unchanged (snapshot-bridge sub-item resolved)
+34	`connection-binding-predicate-drift`	low-medium	unchanged
+35	`run-page-identity-scrape`	medium	unchanged
+36	`dispatch-entrance-field-duplication`	low	unchanged
+37	`owner-word-collision`	low	unchanged
+38	`run-family-render-primitives`	low	unchanged
+39	`persist-binding-sibling-seams`	low	unchanged
+40	`server-formatter-duplication`	low	unchanged
+41	`wake-marker-regex-copies`	resolved	held
+42	`runner-liveness-assumption`	low	unchanged
+43	`workspace-urlkey-consolidation`	—	unchanged
+44	`credential-decision-multiplicity`	medium-high	unchanged (borderline)
+45	`keepalive-error-envelope-writer`	resolved	held
+46	`html-error-page-two-writers`	resolved	held
+47	`ai-availability-gate-duplication`	medium-low	unchanged
+48	`dispatch-refusal-relay-duplication`	resolved	held
+49	`tolerant-date-parse-date-twins`	resolved	held
+50	`timestamp-parse-consolidation`	—	unchanged
+51	`loose-json-consolidation`	—	unchanged
+52	`ai-mock-predicate-consolidation`	—	unchanged
+53	`batch-guard-residue`	informational	unchanged
+54	`decision-dialect-split`	medium (sub-row)	unchanged
+55	`human-wait-derivation-split`	low-medium	unchanged
+56	`decision-stamp-classifier-copies`	low-medium	unchanged
+57	`provider-write-field-contract`	low-medium	unchanged
+58	`close-out-merged-refusal-split`	low-medium	unchanged
+59	`periodic-loop-two-mechanisms`	informational	unchanged
+60	`consumer-liveness-signal-conflation`	resolved	held
+61	`consumer-heartbeat-wire-restated`	low-medium (sub-row of 60)	unchanged
+62	`owner-answer-reader-copies`	low	unchanged
+63	`mock-ai-builder-copies`	low-medium	unchanged
+64	`fresh-run-definition-copies`	low-medium	unchanged
+65	`terminal-loop-rule-copies`	low-medium	unchanged
+66	`state-type-label-rank-maps`	low-medium	unchanged
+67	`csp-decision-split`	resolved	held
+68	`priority-label-maps`	low	unchanged
+69	`localhost-predicate-split`	low	unchanged
+70	`observer-instance-key-copies`	low	unchanged
+71	`pilot-eligibility-copies`	low	unchanged
+72	`linear-image-host-allowlist`	low	unchanged
+73	`page-chrome-options`	low	unchanged
+74	`ship-biscuit-desk-list`	low	unchanged
+75	`free-tier-rule-copies`	resolved	held
+76	`sd-blocked-child-last-activity-split`	low	unchanged
+77	`census-gone-overstates-resolution`	informational	held
+78	`follow-up-target-rule-copies`	resolved	held
+79	`lineage-row-read-copies`	low	unchanged
+80	`pr-url-regex-copies`	low	unchanged
+81	`pause-marker-predicate-gap`	low	unchanged
+82	`review-on-record-readers`	low	unchanged
+83	`credential-block-grammar-split`	low	unchanged
+84	`review-loop-ceiling-restated`	low	unchanged
+85	`sweep-as-library-imports`	low	unchanged
+86	`github-envelope-walker-split`	low	unchanged
+87	`binding-active-answer-copies`	low-medium (sub-row of 44)	unchanged
+88	`auth-failure-answer-copies`	low-medium	unchanged
+89	`account-group-reader-copies`	low	unchanged
+90	`stable-stringify-copies`	low	unchanged
+91	`kpi-page-twin-copies`	low-medium	unchanged
+92	`kit-terminal-status-copy`	low	unchanged
+93	`sd-parked-predicate-inline`	low	unchanged
+94	`https-predicate-restated`	low	unchanged
+95	`harbour-token-format-restated`	—	held
+96	`registry-providers-restated`	low (sub-row of 44)	unchanged
+97	`sd-401-layers-three`	low	unchanged
+98	`expire-ownerless-has-owner-copy`	low	unchanged
+99	`vendor-script-list-restated`	low	unchanged
+100	`prune-to-capacity-clones`	low	unchanged
+101	`resume-model-effort-cross-repo`	medium-high	unchanged
+102	`halt-word-map-copies`	medium	unchanged
+103	`home-next-answer-split`	medium	unchanged
+104	`coherence-loop-stalled`	medium (process)	unchanged
+105	`settings-run-setup-rebuilt`	low-medium	unchanged
+106	`settings-preset-systems`	low-medium	unchanged
+107	`routes-as-library`	low-medium	unchanged
+108	`model-vocabulary-rule-copies`	low-medium	unchanged
+109	`task-page-state-outside-owner`	low-medium	unchanged (borderline)
+110	`live-anchor-old-home-alive`	low-medium	unchanged
+111	`lineage-anchor-rules-three`	low-medium	improved (4 → 3)
+112	`model-constants-server-client-twins`	resolved	held
+113	`low-rows-unpromoted`	low	unchanged
+114	`halt-poll-cold-cache-fail-open`	medium (conditional)	unchanged
+115	`usage-relay-flag-partial`	resolved	resolved
+116	`usage-record-vocabulary-two-readers`	low-medium	improved
+117	`lineage-identity-read-twins`	resolved	resolved
+118	`reap-window-constant-cross-repo`	low-medium	unchanged
+119	`cost-fold-partition-restated`	resolved	resolved
+120	`key-state-residue`	informational	held
+121	`unit-census-convention-split`	informational	unchanged
+122	`usage-snapshot-prose-residue`	low	new
+123	`completeness-precedence-restated`	borderline (not graded)	new
+124	`erasure-inventory-lockstep-gap`	low-medium	new

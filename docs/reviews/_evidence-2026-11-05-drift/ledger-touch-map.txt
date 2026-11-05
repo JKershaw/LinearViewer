@@ -1,0 +1,87 @@
+Ledger rows whose 11-04b-ledger text (any column) names a file the window touched.
+LV touched: 53 SD touched (non-test): 3
+lib-import-cycles -> lib/digest-feedback.js, lib/dispatch-store.js, lib/render.js, routes/dispatch.js, server.js
+provider-auth-router-upward-imports -> lib/render.js, server.js
+routes-error-envelope-fragmentation -> routes/dashboard.js, routes/dispatch.js, server.js
+dispatch-kind-vocabulary-cross-repo -> routes/dispatch.js
+provider-resolution-incantation -> lib/account-erasure.js
+ui-divergences-registry-staleness -> public/common.js
+simple-dispatcher-api-base-duplication -> server.js
+cross-repo-sentinel-decision-marker-vocabulary -> lib/task-page-loader.js, routes/dispatch.js
+target-vocabulary -> lib/dispatch-store.js, routes/dispatch.js, server.js
+sse-frame-writer-duplication -> server.js
+semicolon-style-split -> server.js
+client-escape-html-duplication -> public/common.js
+client-shared-helper-duplication -> server.js
+client-section-fetch-idiom-duplication -> public/question-cards.js
+linear-cli-parallel-graphql-surface -> server.js
+server-side-escaping -> lib/render.js, server.js
+dispatch-payload-centralization -> public/app.js, public/common.js, public/prompt-section.js, routes/dispatch.js
+renderer-provider-abstraction -> lib/render.js
+lib-components-primitive-adoption -> lib/render-run-steps.js, lib/render.js
+target-harness-axis-orthogonality -> routes/dispatch.js
+dispatch-entrance-field-duplication -> routes/dispatch.js, routes/proxy-compute.js, server.js
+owner-word-collision -> lib/run-view.js, routes/dashboard.js
+run-family-render-primitives -> lib/render-run-steps.js, lib/render.js
+server-formatter-duplication -> lib/effort-readout.js, lib/render.js, server.js
+wake-marker-regex-copies -> lib/run-view.js, lib/task-page-loader.js, routes/dispatch.js
+credential-decision-multiplicity -> routes/settings.js
+keepalive-error-envelope-writer -> server.js
+html-error-page-two-writers -> lib/render.js
+ai-availability-gate-duplication -> routes/dashboard.js, routes/dispatch.js, routes/settings.js, routes/workspace-api-scan.js, server.js
+dispatch-refusal-relay-duplication -> routes/dispatch.js
+tolerant-date-parse-date-twins -> lib/session-telemetry.js, lib/task-page-loader.js
+decision-dialect-split -> SD:hook.js, lib/session-telemetry.js
+human-wait-derivation-split -> lib/digest-feedback.js, lib/render-run-steps.js, lib/render-session.js, lib/render.js, lib/run-view.js, lib/task-page-loader.js, lib/unanswered-decisions.js, routes/dashboard.js, routes/dispatch.js
+decision-stamp-classifier-copies -> lib/digest-feedback.js, lib/run-view.js, lib/session-telemetry.js, routes/dispatch.js
+close-out-merged-refusal-split -> lib/render.js, routes/dispatch.js
+periodic-loop-two-mechanisms -> server.js
+consumer-liveness-signal-conflation -> docs/dispatch-integration.md, routes/dispatch.js
+consumer-heartbeat-wire-restated -> docs/dispatch-integration.md, routes/dispatch.js
+owner-answer-reader-copies -> lib/account-erasure.js
+mock-ai-builder-copies -> routes/proxy-compute.js
+fresh-run-definition-copies -> lib/dispatch-store.js, routes/dispatch.js
+terminal-loop-rule-copies -> routes/dashboard.js, server.js
+state-type-label-rank-maps -> public/common.js, server.js
+csp-decision-split -> public/app.js
+priority-label-maps -> lib/home-view.js
+localhost-predicate-split -> routes/dispatch.js, server.js
+pilot-eligibility-copies -> lib/effort-readout.js, lib/render.js, routes/dispatch.js
+linear-image-host-allowlist -> lib/render.js
+page-chrome-options -> routes/dashboard.js
+ship-biscuit-desk-list -> lib/render.js
+free-tier-rule-copies -> server.js
+follow-up-target-rule-copies -> routes/dispatch.js
+pause-marker-predicate-gap -> lib/dispatch-store.js, lib/task-page-loader.js, routes/dispatch.js
+sweep-as-library-imports -> public/app.js
+github-envelope-walker-split -> public/app.js
+binding-active-answer-copies -> lib/render.js, server.js
+auth-failure-answer-copies -> routes/dispatch.js
+account-group-reader-copies -> lib/account-erasure.js
+stable-stringify-copies -> lib/account-erasure.js
+kpi-page-twin-copies -> lib/render.js, lib/workspace-kpi-stats.js
+kit-terminal-status-copy -> routes/dispatch.js
+https-predicate-restated -> server.js
+expire-ownerless-has-owner-copy -> routes/dispatch.js
+vendor-script-list-restated -> lib/render-session.js, lib/render-task-page.js, lib/render.js
+resume-model-effort-cross-repo -> routes/dispatch.js
+halt-word-map-copies -> lib/render.js, routes/settings.js
+home-next-answer-split -> lib/home-view.js
+settings-run-setup-rebuilt -> routes/settings.js
+settings-preset-systems -> lib/render.js, routes/dispatch.js, routes/settings.js
+routes-as-library -> routes/dashboard.js, routes/workspace-api-scan.js
+model-vocabulary-rule-copies -> lib/render.js, public/common.js
+task-page-state-outside-owner -> lib/render-task-page.js, lib/render.js
+live-anchor-old-home-alive -> lib/live-anchor.js
+lineage-anchor-rules-three -> lib/dispatch-store.js, routes/dispatch.js
+model-constants-server-client-twins -> public/common.js, server.js
+low-rows-unpromoted -> lib/render.js, lib/task-page-loader.js
+usage-relay-flag-partial -> SD:hook.js, SD:opencode-runner.js
+usage-record-vocabulary-two-readers -> lib/session-telemetry.js
+lineage-identity-read-twins -> lib/dispatch-store.js, routes/dispatch.js
+reap-window-constant-cross-repo -> lib/unanswered-decisions.js
+cost-fold-partition-restated -> lib/cost-read.js
+usage-snapshot-prose-residue -> docs/architecture/source-map.md, lib/effort-readout.js, lib/model-routing-spend.js
+completeness-precedence-restated -> lib/cost-read.js
+erasure-inventory-lockstep-gap -> lib/account-erasure.js, server.js
+rows hit: 84

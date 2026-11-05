@@ -1,0 +1,201 @@
+## q="legacy fold"
+  LIN-4235 | Backlog |  | Delete the legacy [usage] snapshot fold and the digest's frozen cost (after 2026-12-04, once the intake counte
+  LIN-4195 | Done |  | Costs rebuild 2: one record per model request, summed
+  LIN-4203 | Done |  | Costs rebuild 2 · piece 6: stop posting [usage] snapshots; remove the runner snapshot path
+  LIN-1488 | Backlog |  | Pin the untested edges of the LIN-1478 lineage fold (transcript isolation, interleaved ordering, reply-box tri
+  LIN-4232 | Done |  | Drift & Coherence Review (trend vs 2026-11-04): a very quiet window (8 LinearViewer + 8 SD commits, the record
+  LIN-2766 | Backlog |  | LIN-2756 regression: Keep is inert on every legacy (decisionId-only) dismissal suggestion — withdraw() has no 
+  LIN-3282 | Done |  | LIN-3278 residual: legacy owner row beats a same-scope healthy Connection, preserving the 401/200 toggle
+  LIN-2697 | Done |  | LIN-2649 follow-up (N1) — pin the `?? null` basis coalesces with strictEqual + add a `dueBasisVersion` legacy-
+  LIN-3971 | Backlog |  | UI sweep, Plain batch 2: Templates with the Prompts catalog folded in, and Custom prompts, on the Plain layout
+  LIN-3790 | Done |  | Legacy and refresh-token-kind secondary bindings still 503 the dashboard on an expired token (LIN-3774 follow-
+  LIN-1825 | Done |  | Stamp: carry `periodicalId` from mint through queue/history to the fold’s read path
+  LIN-2419 | Done |  | Provenance flags are two-valued over a three-state domain: "unknown" folds to false, and each fix moves the de
+## q="2026-12-04"
+  LIN-4235 | Backlog |  | Delete the legacy [usage] snapshot fold and the digest's frozen cost (after 2026-12-04, once the intake counte
+  LIN-4250 | In Progress |  | Drift & Coherence Review (run 3, trend vs the 2026-11-04 run 2): a small window (9 production LinearViewer com
+  LIN-4232 | Done |  | Drift & Coherence Review (trend vs 2026-11-04): a very quiet window (8 LinearViewer + 8 SD commits, the record
+  LIN-4231 | Done |  | Seams & Tangles Review (periodical run 6): area knots, dependency direction, ways in, rebuild readiness and ch
+  LIN-4208 | Done |  | Seams & Tangles Review (periodical run 5): area knots, dependency direction, ways in, rebuild readiness and ch
+  LIN-4211 | Backlog |  | Correct the merged 2026-11-04 code quality report: headline arithmetic, two §2 tables, two carried-row deltas,
+  LIN-4209 | Done |  | Drift & Coherence Review (trend vs 2026-11-03): a quiet ~1-day window (15 LinearViewer + 14 SD commits, mostly
+  LIN-4153 | Done |  | Drift & Coherence Review (trend vs 2026-10-23): the 10-23 follow-ups are unlanded, and a 196-commit window of 
+  LIN-4205 | Todo |  | Rotate the production Mongo root password (Railway MongoDB-harbour)
+  LIN-4206 | Done |  | Stability Review (periodical run): rate-of-change convergence — delta vs the 2026-10-21 run (14-day window, 24
+  LIN-4152 | Done |  | Seams & Tangles Review (periodical run 4): area knots, dependency direction, ways in, rebuild readiness and fi
+  LIN-4214 | Backlog |  | Simple-dispatcher: SD_WORKER_USAGE_RELAY=0 does not stop request-record posts from the fail, cancel, stall and
+## q="usageStateOf"
+  LIN-4150 | Backlog |  | Survey spikes: record (don't dispatch or plan)
+  LIN-4195 | Done |  | Costs rebuild 2: one record per model request, summed
+  LIN-4178 | Done |  | Costs rebuild 1.2: /kpis, workspace KPIs and the run page on the cost read
+  LIN-4235 | Backlog |  | Delete the legacy [usage] snapshot fold and the digest's frozen cost (after 2026-12-04, once the intake counte
+  LIN-4201 | Done |  | Costs rebuild 2 · piece 4: the cost read sums request records (records-first cutover)
+  LIN-4226 | Done |  | Costs rebuild 2 · piece 4b: the cost read loads its request records (loading becomes part of the read)
+  LIN-4203 | Done |  | Costs rebuild 2 · piece 6: stop posting [usage] snapshots; remove the runner snapshot path
+## q="usage-snapshot-intake"
+  LIN-4234 | Done |  | Account erasure: the usage-snapshot-intake collection (LIN-4203) is not in INVENTORY, and the completeness gua
+  LIN-4235 | Backlog |  | Delete the legacy [usage] snapshot fold and the digest's frozen cost (after 2026-12-04, once the intake counte
+  LIN-4232 | Done |  | Drift & Coherence Review (trend vs 2026-11-04): a very quiet window (8 LinearViewer + 8 SD commits, the record
+  LIN-4150 | Backlog |  | Survey spikes: record (don't dispatch or plan)
+  LIN-4240 | Done |  | Harbour: parseParkedWait reads the newest state-bearing entry, skipping tool/usage/resources/[ticket]/stamps
+  LIN-3948 | Canceled |  | Runner: post a final cumulative [usage] snapshot at session end and reap, so one-turn and killed claude-code s
+  LIN-4203 | Done |  | Costs rebuild 2 · piece 6: stop posting [usage] snapshots; remove the runner snapshot path
+  LIN-4200 | Done |  | Costs rebuild 2 · piece 3: measure records vs snapshots on live data (gate for the read switch)
+  LIN-4209 | Done |  | Drift & Coherence Review (trend vs 2026-11-03): a quiet ~1-day window (15 LinearViewer + 14 SD commits, mostly
+  LIN-4231 | Done |  | Seams & Tangles Review (periodical run 6): area knots, dependency direction, ways in, rebuild readiness and ch
+  LIN-2494 | Backlog |  | Per-request usage granularity: claude-code's cumulative [usage] snapshot cannot answer any per-request pricing
+  LIN-4202 | Done |  | Costs rebuild 2 · piece 5: opencode and runner-kit post per-request records
+## q="delete legacy snapshot"
+  LIN-4235 | Backlog |  | Delete the legacy [usage] snapshot fold and the digest's frozen cost (after 2026-12-04, once the intake counte
+  LIN-4203 | Done |  | Costs rebuild 2 · piece 6: stop posting [usage] snapshots; remove the runner snapshot path
+  LIN-4150 | Backlog |  | Survey spikes: record (don't dispatch or plan)
+  LIN-4195 | Done |  | Costs rebuild 2: one record per model request, summed
+  LIN-4232 | Done |  | Drift & Coherence Review (trend vs 2026-11-04): a very quiet window (8 LinearViewer + 8 SD commits, the record
+  LIN-4234 | Done |  | Account erasure: the usage-snapshot-intake collection (LIN-4203) is not in INVENTORY, and the completeness gua
+  LIN-1545 | Done |  | S1+S2+S5 · Harden human-refresh delete: remove durable credential only on definitive revocation (both paths + 
+  LIN-2913 | Backlog |  | Paper: why do 46 of 184 Done tickets have no description snapshot?
+  LIN-3464 | Done |  | One current token for a legacy workspace: retire the E1/E2 split so a headless refresh is seen by every reader
+  LIN-3137 | Done |  | LIN-2884 T4: J5 — owner-only mint gate on the legacy dispatch token (POST /workspace/:urlKey/api/dispatch/toke
+  LIN-2766 | Backlog |  | LIN-2756 regression: Keep is inert on every legacy (decisionId-only) dismissal suggestion — withdraw() has no 
+  LIN-3822 | Backlog |  | Settings provider list shows no active binding on a legacy workspace with undefined provider (isActiveBinding,
+## q="ruling-settled"
+  LIN-4244 | Backlog |  | Rulings answer surfaces other than Home cards: send answerAttemptId and handle 409 ruling-settled
+  LIN-4241 | Done |  | Waiting on you (A): settled-ruling guard — refuse a second answer or dismiss with 409 ruling-settled
+  LIN-4249 | In Progress |  | Seams & Tangles Review (periodical run 7): area knots, dependency direction, ways in, rebuild readiness and ch
+  LIN-4250 | In Progress |  | Drift & Coherence Review (run 3, trend vs the 2026-11-04 run 2): a small window (9 production LinearViewer com
+  LIN-2797 | Done |  | Rulings tab: renderRulings() re-injects preservedRulingRows / rulingsPending keys that drop out of a poll payl
+  LIN-2796 | Duplicate |  | rulingsSettled rows vanish without their outcome label — renderRulings releases a settled key with no re-injec
+  LIN-4238 | Backlog |  | Observation rulings rows: move rulingRowHoldsInput/mustReuse onto the shared card merge
+  LIN-4144 | Done |  | Home's Waiting on you has no live refresh: cards and count go stale until reload
+  LIN-4142 | Done |  | A settled loop ruling must not accept a second answer (markDecisionAnswered has no guard)
+  LIN-3310 | Done |  | LIN-3126 residual: ruling-dispatch and close-out-press senders must forward the issue's source/bindingScope
+  LIN-3853 | Done |  | Model routing · 2 — One settings store for every job (job settings, group defaults, presets, change log); both
+  LIN-2809 | Todo |  | Rulings: the inbox accumulates outdated asks — only rulings John can and should still answer belong in the mai
+## q="settled ruling"
+  LIN-4142 | Done |  | A settled loop ruling must not accept a second answer (markDecisionAnswered has no guard)
+  LIN-4244 | Backlog |  | Rulings answer surfaces other than Home cards: send answerAttemptId and handle 409 ruling-settled
+  LIN-4241 | Done |  | Waiting on you (A): settled-ruling guard — refuse a second answer or dismiss with 409 ruling-settled
+  LIN-2797 | Done |  | Rulings tab: renderRulings() re-injects preservedRulingRows / rulingsPending keys that drop out of a poll payl
+  LIN-2796 | Duplicate |  | rulingsSettled rows vanish without their outcome label — renderRulings releases a settled key with no re-injec
+  LIN-3310 | Done |  | LIN-3126 residual: ruling-dispatch and close-out-press senders must forward the issue's source/bindingScope
+  LIN-3359 | Done |  | Flight Companion: stop cutting answers off — measure the length rows, size a bare cap from them, and show when
+  LIN-4249 | In Progress |  | Seams & Tangles Review (periodical run 7): area knots, dependency direction, ways in, rebuild readiness and ch
+  LIN-4245 | Backlog |  | Comment dedupe key carries no ruling: a same-text answer to a second, unsettled ruling on the same issue gets 
+  LIN-3256 | Done |  | LIN-3126 residual: due bulk-scan items must carry source + bindingScope (review F6)
+  LIN-4144 | Done |  | Home's Waiting on you has no live refresh: cards and count go stale until reload
+  LIN-4238 | Backlog |  | Observation rulings rows: move rulingRowHoldsInput/mustReuse onto the shared card merge
+## q="error code case"
+  LIN-3793 | Backlog |  | classifyUpstreamError / isAuthError treat every 403 as auth and emit LINEAR_* codes for any provider (a GitHub
+  LIN-3775 | Done |  | Error pages say what failed: the source, the status and a reference to match the logs, not "try again later"
+  LIN-3805 | Done |  | Dispatch/runner lane: a store fault must answer a retryable 503, never 404, 401 or an empty 200 (API quality c
+  LIN-3589 | Backlog |  | Settings ?error=constructor renders a prototype member instead of the fallback message (lib/render-settings.js
+  LIN-417 | Done |  | Surface system errors with cause + actionable signal (structured error envelope)
+  LIN-1437 | Done |  | toOpenCodeToolRecord derives errored from the optional error STRING, not the real status:'error' signal (sibli
+  LIN-3792 | Backlog |  | Route error pages name Linear for a GitHub source failure: make the five dashboard/swim/ship/swipe/roadmap 500
+  LIN-3121 | Done |  | Upstream error page: the sentence says what the diagnostic says
+  LIN-3077 | Backlog |  | SD: surface a provider refusal on the post-turn sentinel self-check (runSentinelCheck) instead of silently deg
+  LIN-3479 | Done |  | Remove the unused .text error helpers (and textError) from lib/errors.js
+  LIN-2081 | Done |  | getAppConfig: validate PEM armor at config time — a malformed GITHUB_APP_PRIVATE_KEY surfaces as raw ERR_OSSL_
+  LIN-420 | Done |  | Adopt lib/errors.js in the three largest route files (proxy, workspace-api, dispatch)
+## q="kebab code"
+  LIN-1247 | Done |  | Add enabled experimental feature links to the More nav section
+  LIN-3810 | Done |  | Data & Fetch Architecture Review (periodical run, baseline): store-vs-provider boundary, read discipline, read
+  LIN-1039 | Done |  | Add the Data & Fetch Architecture periodical (static, cause)
+  LIN-3001 | Done |  | Incident record for LIN-2993 and a 'Harbour is degraded' operator runbook
+  LIN-1849 | Done |  | Passage Planner page — one-click kickoff prompt (Flight Companion parity)
+  LIN-2887 | Done |  | Scope the CLAUDE.md read: shrink both repos' CLAUDE.md to a short conventions file plus per-area docs, with a 
+  LIN-123 | Canceled |  | Fix code-review template: add code location
+  LIN-19 | Done |  | Code health review and refactoring
+  LIN-1392 | Todo |  | Inject Claude Code memories?
+  LIN-110 | Done |  | Simplify code review bot
+  LIN-14 | Done |  | Add code review prompt template
+  LIN-173 | Done |  | Optional instruction to wait for code review
+## q="parseParkedWait"
+  LIN-4240 | Done |  | Harbour: parseParkedWait reads the newest state-bearing entry, skipping tool/usage/resources/[ticket]/stamps
+  LIN-2264 | Done |  | runIsWaiting misses every real blocked run — the trailing [usage] entry defeats its last-entry read
+  LIN-2258 | Backlog |  | Close the producer gaps: lane-facing [ticket] marker feedback channel + widen the parked-wait detector
+  LIN-4233 | Done |  | simple-dispatcher: a parked or failed session's status is the last thing it posts, even with tool activity rel
+  LIN-4150 | Backlog |  | Survey spikes: record (don't dispatch or plan)
+  LIN-2560 | Done |  | SD: AWAITING_EXTERNAL has no branch before the catch-all allow at hook.js:1179 — a woken park does real work s
+  LIN-3037 | Done |  | LIN-2891 subtask D (LinearViewer): keep all three decision-lifecycle stamp kinds out of metadata renderers and
+  LIN-4239 | Done |  | simple-dispatcher: defer, blocked and failed post their status last (table rule + Harbour-reader proof)
+  LIN-2244 | Done |  | Parked-lane backstop: surface and bound lanes waiting on CI/wakeups (concentration multiplies dead-wait risk)
+  LIN-2423 | Done |  | [ticket] lane markers are written to Linear comments but read from dispatch feedback — every lane-aware surfac
+  LIN-3013 | Done |  | LIN-2996 Phase 5: swipe page session-count read goes lean (server.js:2748)
+  LIN-2242 | Done |  | Codify the worker-lane kickoff as a first-class prompt (docs artifact + generator)
+## q="scheduled wakeup"
+  LIN-4150 | Backlog |  | Survey spikes: record (don't dispatch or plan)
+  LIN-4233 | Done |  | simple-dispatcher: a parked or failed session's status is the last thing it posts, even with tool activity rel
+  LIN-2244 | Done |  | Parked-lane backstop: surface and bound lanes waiting on CI/wakeups (concentration multiplies dead-wait risk)
+  LIN-2242 | Done |  | Codify the worker-lane kickoff as a first-class prompt (docs artifact + generator)
+  LIN-2258 | Backlog |  | Close the producer gaps: lane-facing [ticket] marker feedback channel + widen the parked-wait detector
+  LIN-2423 | Done |  | [ticket] lane markers are written to Linear comments but read from dispatch feedback — every lane-aware surfac
+  LIN-2336 | Backlog |  | Add scheduled web push notifications with one-tap session resume
+  LIN-2263 | Done |  | Observer efficacy signal: the incumbent arm's timeToRespondMs measures the runner's own [usage] entry, not a r
+  LIN-3660 | Done |  | Reap leftover claude processes of sessions SD has finished, on close-on-DONE's signals, never on a timer
+  LIN-4239 | Done |  | simple-dispatcher: defer, blocked and failed post their status last (table rule + Harbour-reader proof)
+  LIN-824 | Done |  | Research: agent wait-latency audit — where does the wall-clock go when watchers/wake-ups don't fire?
+  LIN-2932 | Done |  | Worker that finished its work stayed taken for 30+ minutes behind its own CI monitor; the scoped autopilot wai
+## q="park text contract"
+  LIN-2258 | Backlog |  | Close the producer gaps: lane-facing [ticket] marker feedback channel + widen the parked-wait detector
+  LIN-4233 | Done |  | simple-dispatcher: a parked or failed session's status is the last thing it posts, even with tool activity rel
+  LIN-3759 | Done |  | SD: a child's PENDING-EXTERNAL report should reach its parked parent (deadlock seen 21 Oct)
+  LIN-4250 | In Progress |  | Drift & Coherence Review (run 3, trend vs the 2026-11-04 run 2): a small window (9 production LinearViewer com
+  LIN-2334 | Done |  | docs/autopilot-operating-manual.md:325 coordinator per-child liveness clock has no `blocked` carve-out — a hum
+  LIN-3436 | Canceled |  | LIN-3358 H0: Harbour `ifParked` contract, consumer capability, delivery gate, runner-kit parked-only abort
+  LIN-2114 | Todo |  | Move observation-type sessions out of Claude Code into a simpler cloud harness
+  LIN-2218 | Done |  | LIN-1721: a parent-gated child stopped waking its parent on a default terminal-only edge (LIN-2203 F2/L4)
+  LIN-2124 | Done |  | Shipped orchestrator prompt has no `blocked` carve-out in its wedged-session rule (the docs/ guide does)
+  LIN-3430 | Done |  | LIN-3358 F: SD `ifParked` abort and capability signal (blocking refactor)
+  LIN-1256 | Backlog |  | Runner: consider auto-forcing parked/BLOCKED resumes in resolveFollowUpTarget (defense-in-depth)
+  LIN-4150 | Backlog |  | Survey spikes: record (don't dispatch or plan)
+## q="answered dismissed outcome"
+  LIN-4150 | Backlog |  | Survey spikes: record (don't dispatch or plan)
+  LIN-2225 | Done |  | The Rulings page can only answer with the agent-declared options — "why was I asked this?" is unsayable, so th
+  LIN-2791 | Done |  | LIN-2754 Track B — discharge backend: task-bound answer route, durable `option_id`, `resolveEffect` docstring
+  LIN-2197 | Done |  | LIN-1721: task decision scan — the third producer (triage instrument, works without a runner)
+  LIN-4241 | Done |  | Waiting on you (A): settled-ruling guard — refuse a second answer or dismiss with 409 ruling-settled
+  LIN-2754 | Done |  | Rulings feed: a relayed human ruling never stamps the decision — let an agent propose an ANSWER, so one Agree 
+  LIN-2729 | Done |  | Giving a ruling any outcome resurfaces an older superseded ruling — the outcome filter sits upstream of the su
+  LIN-2650 | Done |  | LIN-2241 WS0+WS4 — reversible `self-resolved` outcome model, and retire/un-retire behaviour
+  LIN-4142 | Done |  | A settled loop ruling must not accept a second answer (markDecisionAnswered has no guard)
+  LIN-3038 | Done |  | LIN-2891 subtask E (LinearViewer): publish the withdrawn `resolution` in the /rulings contract and no-re-raise
+  LIN-4244 | Backlog |  | Rulings answer surfaces other than Home cards: send answerAttemptId and handle 409 ruling-settled
+  LIN-2757 | Done |  | Rulings tab: 'agree' reads as agreeing with the recommended option, not with dismissing — make every control n
+## q="isSettled"
+  LIN-1943 | Backlog |  | Blocked-startup fast-fail does not cover a refire/follow-up-resume launch that blocks
+  LIN-2515 | Done |  | SD: an expired host claude login idles every new session silently — fast-fail watchdog never captures a settle
+  LIN-1821 | Done |  | Launch path has no active fail-fast liveness check — a blocked startup (trust dialog or similar) silently wedg
+  LIN-2339 | Done |  | SD: resume failsafe re-ask can shadow a follow-up's dispatchedPrompt — ruling silently never reaches the sessi
+  LIN-1122 | Done |  | Pacing's cold-start gate never settles for opencode sessions — holds every fresh launch for the full 180s cool
+  LIN-2596 | Backlog |  | SD: mutation-suite parity — run-mutations.js carries curated mutants for findFastFailCandidates but none for f
+  LIN-2510 | Done |  | SD: stall failsafe re-fires into RESUMING but a bootstrap turn that never ends has no backstop — session parke
+  LIN-2839 | Done |  | Investigate the opencode concurrency ceiling on the host, and add a per-harness concurrent-session cap
+  LIN-2737 | Done |  | SD LIN-2735 C2 — adopt the liveness seam across the opencode completion lane (A1–A10) + non-CI validation reco
+  LIN-2116 | Done |  | Drop the bootstrap “Summarise this project” segment for the short leg kinds — 5.5% of the day, 15% of a review
+## q="proxy-rulings live"
+  LIN-3843 | Backlog |  | Rulings live-on-anchor predicate is duplicated in routes/proxy-rulings.js and routes/dashboard-session-state.j
+  LIN-3091 | Backlog |  | Rulings an agent can raise through the proxy, for a session Harbour did not dispatch
+  LIN-3260 | Done |  | Run-page question card: see live runs in other sessions on the same issue (LIN-3252 G2 residual)
+  LIN-2444 | Done |  | Rulings feed: operator/agent may PROPOSE a dismissal (one-click Agree in the UI, bulk-agree) — never dismiss; 
+  LIN-1557 | Done |  | GitHub in-app create/edit: scope/guard ui.inlineCreate/inlineEdit or verify round-trip (LIN-1553 ledger follow
+  LIN-3409 | Done |  | Part B (proxy lane): runner-owner gate for proxy halt and runner-credential revoke
+  LIN-2755 | Done |  | Rulings feed: ruling writes (dismiss/shelve/keep/suggest) never invalidate the sessions-feed cache — discharge
+  LIN-3281 | Backlog |  | Close-out residual (LIN-3260 outside-scope B): dashboard Rulings feed liveDispatchOnAnchor has no workspace fi
+  LIN-2778 | Backlog |  | Bind the published rulings contract's claims to `resolveEffect`'s actual output — three hand-written absolutes
+  LIN-3575 | Done |  | LIN-3573 (2/3): Rebuild routes/proxy-rulings.js design-first, replay-checked
+  LIN-2880 | Backlog |  | DECISION: blocks from dispatched sessions are not reaching /api/proxy/rulings
+  LIN-2799 | Backlog |  | Rulings cache: no test pins that a DASHBOARD ruling write clears the `proxy-rulings::` namespace — the exact d
+## q="usage contract row"
+  LIN-4199 | Done |  | Costs rebuild 2 · piece 2: runner posts per-request records for claude-code (snapshots still posted)
+  LIN-3449 | Todo |  | Coherence loop: bring scattered decisions down to one place, gauged by Drift & Coherence
+  LIN-3624 | Backlog |  | Runner kit markers beyond decision: [pending], decision-withdrawn, [evidence], per-session heartbeat, and the 
+  LIN-4232 | Done |  | Drift & Coherence Review (trend vs 2026-11-04): a very quiet window (8 LinearViewer + 8 SD commits, the record
+  LIN-4250 | In Progress |  | Drift & Coherence Review (run 3, trend vs the 2026-11-04 run 2): a small window (9 production LinearViewer com
+  LIN-1495 | Done |  | Derive claude-code costUsd pricing (nullable today per LIN-1425)
+  LIN-2403 | Done |  | Long-context `pricing.overrides` tier is unmodelled: cost under-prices >272k-token prompts on 3 of 10 pricing 
+  LIN-2567 | Done |  | Dispatch effort axis (simple-dispatcher half): resolve `effort` payload > workspace (row-atomic), pass `--effo
+  LIN-4209 | Done |  | Drift & Coherence Review (trend vs 2026-11-03): a quiet ~1-day window (15 LinearViewer + 14 SD commits, mostly
+  LIN-4134 | Done |  | Costs, tidy 3: one answer to "what is this row's usage"
+  LIN-3242 | Done |  | LIN-3126 slice 3: dispatch binding contract + effort read-out
+  LIN-1771 | Todo |  | Monitor: lane/harness agreement check on stored usage telemetry (LIN-1748 ledger item 1)

@@ -1,0 +1,21 @@
+W counts {'groups': 566, 'mustRule': 105, 'table': 309, 'unranked': 0, 'gone': 1}
+prior counts {'groups': 566, 'mustRule': 106, 'table': 307, 'unranked': 0, 'gone': 1}
+W status Counter({'unchanged': 562, 'grown': 2, 'new': 1, 'shrunk': 1})
+W gone: [('G0214', "string set {'/app.js', '/brief.js', '/common.js', '/context.js', '/cost-format.js', '/decision-panel.js', +8} as array [", ['lib/render-swipe.js', 'lib/render.js'])]
+
+== groups whose status is not unchanged
+G0211 new - set | string set {'/app.js', '/brief.js', '/common.js', '/context.js', '/cost-format.js', '/decision-panel.js', +9} as array [scripts] | ['lib/render-swipe.js', 'lib/render.js']
+G0231 grown table contract | text contract marker: [usage] | ['lib/effort-readout.js', 'lib/liveness-detectors.js', 'lib/session-telemetry.js']
+G0292 shrunk table cmp | repeated comparison outcome == 'dismissed' | ['lib/digest-feedback.js', 'lib/escalation-kpis.js', 'public/scan.js']
+G0294 grown table discrim | string set {'answered', 'dismissed'} as or-chain [ID.outcome] | ['public/scan.js', 'routes/dashboard-rulings.js', 'routes/workspace-api-issue-write.js', 'routes/workspace-api-scan.js']
+
+== mustRule: left the set 1
+ prior G0217 repeated comparison outcome == 'dismissed' ['lib/digest-feedback.js', 'lib/escalation-kpis.js', 'public/scan.js', 'routes/dashboard-rulings.js'] 3 -> now [('G0292', 'shrunk', False, True, ['lib/digest-feedback.js', 'lib/escalation-kpis.js', 'public/scan.js'], 2)]
+== mustRule: joined the set 0
+== mustRule kept (same detector/decision/files): 105 identical sites: 55 lines shifted: 50
+
+== table: left 1 ; joined 3
+ - discrim string set {'answered', 'dismissed'} as or-chain [ID.outcome] ('public/scan.js', 'routes/dashboard-rulings.js', 'routes/workspace-api-issue-write.js')
+ + contract text contract marker: [usage] ('lib/effort-readout.js', 'lib/liveness-detectors.js', 'lib/session-telemetry.js')
+ + discrim string set {'answered', 'dismissed'} as or-chain [ID.outcome] ('public/scan.js', 'routes/dashboard-rulings.js', 'routes/workspace-api-issue-write.js', 'routes/workspace-api-scan.js')
+ + cmp repeated comparison outcome == 'dismissed' ('lib/digest-feedback.js', 'lib/escalation-kpis.js', 'public/scan.js')
