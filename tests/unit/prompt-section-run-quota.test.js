@@ -9,19 +9,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadWorld } from './helpers/client-world.js';
-import { harnessModelsBlock } from '../../lib/model-routing-harnesses.js';
+import { DISCLOSURE_SCRIPTS, disclosureWindowStubs, useRealDisclosure } from './helpers/real-dispatch-disclosure.js';
 
 const flush = () => new Promise((r) => setImmediate(r));
 
 const RUN_LIMIT_TITLE = 'daily run limit reached \u00b7 resets at midnight UTC';
-
-// The fake DOM models the named entities a browser decodes only from a short table, and it throws on the rest. The real
-// dispatch disclosure (public/common.js) emits two of the others: an em dash in the blank option and an ellipsis in its
-// other text. Both are decoded here, the way a browser decodes them, before the markup reaches the fake. Any other entity
-// still throws.
-function browserMarkup(html) {
-  return html.replace(/&mdash;/g, '\u2014').replace(/&hellip;/g, '\u2026');
-}
 
 // Every element in the container outside `slotSelector`, in document order. A slot repaint keeps all of them: the same
 // nodes, still attached. A full render detaches them all.
@@ -44,11 +36,8 @@ function loadPromptSection({ quota, dispatch } = {}) {
   const calls = { api: [], dispatch: [], order: [], readers: [] };
   const timers = [];
   const world = loadWorld({
-    window: {
-      __HARNESS_MODELS__: harnessModelsBlock(),
-      location: { pathname: '/workspace/ws/swipe' },
-    },
-    scripts: ['common.js', 'prompt-section.js'],
+    window: disclosureWindowStubs(),
+    scripts: DISCLOSURE_SCRIPTS,
     timers,
     globals: {
       // This suite's own default: an unstubbed read answers `ok: false`. The shared default (`ok: true`) would hide that branch.
@@ -77,8 +66,7 @@ function loadPromptSection({ quota, dispatch } = {}) {
   };
   window.toast = () => {};
   // The disclosure is production's own. Its markup gets the browser's entity decode before the fake parses it.
-  const realDisclosure = window.renderDispatchDisclosure;
-  window.renderDispatchDisclosure = (opts) => browserMarkup(realDisclosure(opts));
+  useRealDisclosure(window);
   // The reader is stubbed: production's reads the values of the harness and model `<select>`s, which the fake does not
   // model. The stub records the scope it is handed, so a test can check which element a press passes it.
   window.readDispatchExecControls = (scopeEl) => {
