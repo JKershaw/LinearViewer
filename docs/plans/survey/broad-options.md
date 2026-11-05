@@ -49,6 +49,8 @@ Sources: the 13 step-backs of round 2/3/QoL (07:38, 4 Nov) and the two forward-t
 - **One rulings reduction for the badge and Home** (they count differently today). LIN-4144 (open-0 and global).
 - **The Home-wide live repaint** (Running follows rulings, not only Waiting). LIN-4144 (global); its piece 5 carries the on-change part.
 
+- **Derive "never offered" from a missing `route`, and fold a stage's per-kind tables into its one definition** (today a new template is a row in about nine parallel tables, some unguarded). LIN-4248 *(global)*. Related to the vocabulary rows above: a stage kind's facts are scattered across the tables that each keep a copy.
+
 ## How this is meant to be used (to test, not yet settled)
 
 1. The global offshoot gets the rows for the area a task lands in, as evidence, and is asked whether this task can carry part of one.

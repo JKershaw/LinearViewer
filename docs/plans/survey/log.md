@@ -1900,3 +1900,23 @@ John: the offshoots look like new prompt types for tasks. So move the prompts in
 - **What would count, written before reading:**
   - **The main question:** does the blind scorer, on its own, rate the loop's rows better than the baseline's? If its forward rows average no better than its baseline rows, the ledger's result is mostly my scoring.
   - **Agreement:** the sign matches (better, neutral or worse, with mixed matching mixed or either side) on about 70% or more of rows. Lower means the balance column needs a second hand from now on.
+
+### 08:35 UTC: LIN-4248's Surveys, scoped and started
+- **Both voices converged on where it binds,** and each found things the ticket didn't say:
+  - the stage frame (Scope and Authority, grounding notes, the dispatch preamble's "end with a PR link") contradicts a read-only forecast, and a kind left out of `GROUNDING_BY_KIND` silently gets "implement the fix";
+  - nothing on the server knows main's head, so the base can't be a server fill-in;
+  - "never offered" is enforced in two places (the selector reads `route`; the router's refusal and the task page's "Another step" read `EXCLUDED_FROM_AI_RECOMMENDATION`);
+  - doc and template would be two live copies;
+  - the name `survey` is taken by about 200 research scripts;
+  - nine per-kind tables, four of them unguarded.
+- **The forecast corrected the ticket again.** "Wording unchanged" and "Harbour fills the base" can't both hold as written.
+- **A fact checked, not stepped back on:** the global raised docs-backed prompts (`lib/prompts/`) as an alternative. They're served on a page for copy-paste, not dispatched, so templates stay, as both voices assumed.
+- **Scope (the voices converged; no step-back), larger and in order:**
+  1. settle the fill-ins (the session resolves `origin/main`);
+  2. `survey-task` alone, diffed against a hand-sent prompt, with a stop rule if the frame can't stay quiet without changing other stages;
+  3. `survey-place`;
+  4. the exclusion made real in both places, proved by the byte-pinned router fixtures;
+  5. one copy of the text, with the prose landing last.
+
+  The global's "not this task's" (derive the exclusion from `route`; one object per template) stays out, and goes to the tally.
+- Moved to Todo; autopilot `4d13268c`.
