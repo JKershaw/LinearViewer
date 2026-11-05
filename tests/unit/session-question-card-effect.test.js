@@ -208,6 +208,45 @@ test('G4 card-level: an issueless dispatch card refuses with the tab message —
   assert.equal(fixture.feedback.textContent, 'cannot start a fresh run: no linked issue');
 });
 
+// LIN-4143 fail-closed: a card whose markup carries no decided effect (`data-effect` absent or empty) cannot know the
+// row's effect, so it must record the answer and never start a run from it. Before this, the card defaulted an empty
+// effect to `resume`, which the shared helper turns into a fresh run on any non-resumable disposition — a run that
+// collides with one already in flight.
+for (const [label, effect] of [['an absent', undefined], ['an empty', '']]) {
+  for (const disposition of ['indeterminate', 'gone']) {
+    test(`LIN-4143 fail-closed: a card with ${label} data-effect (${disposition}) records the answer and starts no run`, async () => {
+      const fixture = makeCard({ effect, disposition, typed: 'go ahead' });
+      const { sandbox, calls, dispatched } = makeRealDeliverySandbox([fixture], {
+        hydrate: { hydrated: true, state: { name: 'Backlog', type: 'backlog' } }
+      });
+      sandbox.module.exports.initQuestionCards();
+      fixture.btn.click();
+      await flush();
+
+      assert.equal(dispatched.length, 0, 'an undecided effect must not start a run');
+      const comments = calls.filter(c => c.url.includes('/api/comments/'));
+      assert.equal(comments.length, 1, 'the answer is recorded on the task');
+      assert.match(fixture.feedback.textContent, /recorded on the task/);
+    });
+  }
+}
+
+// LIN-4143: the fail-closed default must not touch a declared resume. An explicit `resume` on a resumable card still
+// queues the follow-up into the waiting session and starts no fresh run.
+test('LIN-4143: an explicit resume on a resumable card still queues the follow-up and starts no fresh run', async () => {
+  const fixture = makeCard({ effect: 'resume', disposition: 'resumable', typed: 'go ahead' });
+  const { sandbox, dispatched } = makeRealDeliverySandbox([fixture], {
+    hydrate: { hydrated: true, state: { name: 'Backlog', type: 'backlog' } }
+  });
+  sandbox.module.exports.initQuestionCards();
+  fixture.btn.click();
+  await flush();
+
+  assert.equal(dispatched.length, 0, 'a resumable resume is a follow-up, not a fresh run');
+  assert.match(fixture.feedback.textContent, /reply queued/);
+  assert.equal(fixture.btn.textContent, 'queued ✓');
+});
+
 test('effect=dispatch: hands the card the dispatch effect and a composed brief (question + answer + why), never the raw comment text', async () => {
   const fixture = makeCard({ effect: 'dispatch', question: 'Ship it?', chunks: ['case one', 'case two'], typed: 'my answer' });
   const { opts } = await answer(fixture);
