@@ -1800,3 +1800,71 @@ I skipped LIN-4026: its own text says the write-side option is "a contract chang
   3. make the guard unconditional, so there's no parameter left (stop if users would see a change).
 
   The global's "not this task's" (the proxy route's own predicate copy; a re-export shim) stays out, to the tally. Autopilot `6db86ecc`.
+
+### 06:00 UTC: LIN-4048's builder; the "table of cases" question has earned its place
+- LIN-4048's q2: "List `renderGo`'s branches against the three surfaces and the offer kinds as a table, before touching code. Finding 1 falls straight out of that table." **That's the same as LIN-4241's "draw the state table before any code"**, where each review round found one more cell.
+- That's two tickets with the same need, and it's general. The question to try in open-0 next: *"What are the cases this change has to handle, and which of them does the code currently treat as the same?"*
+- q6 adds a fifth "test fakes with no home" naming (E2E seed helpers copied; the vm harness copied across files, each faking a different slice of `window.api`).
+
+## Overnight summary (5 Nov, 06:00 UTC), for John
+
+### What ran
+Your steer: no Periodicals routing, a code-only global ("as if in a repo where they can't be assumed"), err larger.
+- **Five tickets through the loop:**
+  - LIN-4234 (the erasure gap);
+  - LIN-4233 (park status, two pieces across both repos);
+  - **three ordinary tickets:** LIN-4144 (live "Waiting on you", three pieces), LIN-4151 (`/backlog` ranking) and LIN-4048 (a finished task's page);
+  - a fourth ordinary ticket, LIN-4143, is in review now.
+- **Eight merges**, each with a place reading, a ledger row and builder after-questions.
+- **q6 calibrated** against the five baseline builders.
+
+### The ledger
+
+| | Better | Mixed | Neutral | Worse |
+|---|--:|--:|--:|--:|
+| Baseline (3–4 Nov, before the place view) | 1 | 1 | 3 | 4 |
+| Through the loop, 4 Nov (routed findings) | 10 | 1 | 1 (not surveyed) | 0 |
+| **Through the loop, overnight (code only, no routing)** | **6** | **2** | 0 | **0** |
+
+- **The two mixed rows** are LIN-4242 (its new renderer module has no map home) and LIN-4243 (revised down after its builder's "nothing got simpler": Home's HTML is now an input the client parses).
+- **On ordinary work** (LIN-4144's three pieces, LIN-4151, LIN-4048), the place came out better every time. The copies the obvious way would have made never landed: a second poll, a third renderer, a third keep check, a re-split path, a second browser-side owner.
+
+### What the code-only, no-routing night shows
+- **The Surveys saw the place without the reports or the map.** Every criterion logged before a Survey was hit, except one homeless-file criterion at merge.
+- **No sign yet that routing was what made the difference.** Tonight's rows are as good as yesterday's routed ones. Small numbers, one night.
+- **The one pattern to watch:** 2 of 8 rows left a new file with no map home. Nobody tends the map when the Survey doesn't read it. That's the honest cost of the steer.
+- **Caveat:** the Surveys were code-only, but I, in the human's role, still knew the tally and yesterday's Periodicals. A fully blind run would need a scope-caller who hadn't seen them.
+
+### What we learned (all general, none Harbour-shaped)
+1. **The forecast keeps correcting the ticket.**
+   - Two of four ordinary tickets had a stale premise (LIN-4048: already fixed; LIN-4143: the card was already guarded).
+   - Two more had a wrong acceptance line (LIN-4151's dedupe, LIN-4144's assumed-quiet test suite).
+   - Without the Survey, LIN-4048 would have re-added an owner that LIN-4071 removed on purpose.
+2. **Err larger in pieces, and honour a voice that says "keep separate".**
+   - The one costly part of a larger scope tonight was where I overrode open-0's "file as a sibling" (LIN-4234's second guard).
+   - A stop rule on the optional extra worked: LIN-4234's piece 3 was skipped with a good reason, and LIN-4151's renames were half-done and stopped.
+3. **When the voices disagree on a fact, check the fact** (LIN-4143, a minute's read). Keep the step-back for disagreements about what to do.
+4. **Ask "who else must learn about it" of the chosen scope, not only of the ticket.** The v2 backtest missed only because the new thing came from the step-back. Put in each scope's at-merge list, the builders applied it every time.
+5. **The builders' q6 is the best source for the copies column**, but it isn't a stand-in for the balance. Only 3 of 5 matched the ledger, and they're blind to the map and kind to their own work. It found copies my reading missed in four rows tonight.
+6. **Let prose about a joint state land once, with the last piece.** LIN-4233's two pieces needed two follow-up PRs of comment churn.
+7. **A new general question has earned a try:** "what are the cases this change must handle, and which does the code treat as the same?" Two builders independently said it would have saved review rounds.
+
+### The tally
+- **Two vocabulary rows, the pattern behind tonight's three plumbing tickets:**
+  - each collection declared once with its facts;
+  - each feedback kind declared once with its role.
+- **"Shared test fakes with a home"** now has five namings, which makes it a pull candidate.
+- **New watch rows:** one live-run predicate, one "what's next" ranking, server fragments instead of client-parsing a page, splitting `home-view.js`.
+
+### Open for you
+- **Ruling `lin4233-deploy-gate`:** proposed `close-now`. The flag is off by default, so deploying changes nothing live.
+- **The simple-dispatcher host is still at `bf499a4`** (main is `07c88f7`). The deploy follower may not have come back with last night's restart.
+- **LIN-4234's operator checks:** were any Full wipes run between 17:18 and 23:03 UTC yesterday? Also the two dry runs on the real database.
+- **A rulings-loop gap:** a ruling is withdrawn automatically when its ticket closes (`lin4242-keep-witness-scope`), and nothing picks it up. I filed the orphaned witness as LIN-4246.
+- **Still open from before:** LIN-4195's `lin4195-mixed-model-label` (proposed `cost-dominant`); LIN-4210; LIN-4214 (stale behind LIN-4203).
+
+### Next, if you agree
+1. Try the "table of cases" question in open-0 on the next tickets.
+2. Pull "shared test fakes with a home" as its own priced ticket.
+3. A blind second scorer for the ledger rows. Still not done, and the single biggest gap in the evidence.
+4. Decide whether the map's homes matter enough to put back into the Survey: one line in the global ("does what it adds have an obvious home?"), still without the reports.
