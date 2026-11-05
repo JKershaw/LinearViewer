@@ -2302,3 +2302,7 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **My scope text becomes the builder's comments.** Don't write claims into a scope that would be false as a comment ("adds no rules of its own"). Write instructions ("keep each reader's inputs"), not descriptions.
   - **The blind reads overcharge a change for inherited debt** (LIN-4247). They read one diff and its surroundings, so a copy that predates the change can look like the change's. Drift checks against the base. Keep both.
 - **Pulled:** Drift's row 133 goes into LIN-4297 (64 of 68 vm suites don't use `loadWorld`; 38 build non-tree `document` stubs the census excludes by design, so the check has to decide about those).
+
+### 20:35 UTC: LIN-4292 merged (`b389f9b0`), the guards
+- All the `querySelector`/`matches`/`closest`/`getAttribute` method-presence guards are gone from the four files (the grep is empty at main). Every object null-check the old expressions had is kept, so each line returns the same value on a real DOM. Paired spellings went together. Left, with reasons: `slot.contains &&` and two `typeof … === 'function'` checks (outside the four named methods). The PR says plainly that **this unblocks no suite**. Unit 23,749 pass, the same name list as base; E2E 2,004 pass on a second run (one `lin-4010` Escape-drawer flake on the first, passing 5/5 in isolation on branch and base).
+- Blind reads sent: AI and AJ (LIN-4292 alone; it isn't a tidy-after, so there's no area read).
