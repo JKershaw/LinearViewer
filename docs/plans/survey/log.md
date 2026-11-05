@@ -1776,3 +1776,10 @@ I skipped LIN-4026: its own text says the write-side option is "a contract chang
   - map unchanged, no new file. Prod +25 / −12.
 - **The Survey's biggest single save of the night:** the ticket as written would have re-added an owner LIN-4071 had removed. Instead, the task closed the two real leftovers that each voice found.
 - After-questions sent to its builder.
+
+### 05:00 UTC: the fourth ordinary ticket, LIN-4143 (the task page's question card reads rulings without the live-run guard)
+**What would count as the place view earning its keep, written before reading:**
+- it names that the live-run guard is an *optional parameter each caller must remember*, which is how the task page came to miss it, and points at making it the default (or required) in the one reduction, rather than a third caller remembering to pass it;
+- it names every reader of ruling standing (feed, session page, Home, task page) and whether each guards.
+
+**At merge:** no reader of ruling standing can silently skip the guard. No new homeless file.
