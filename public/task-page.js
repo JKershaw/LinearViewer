@@ -233,7 +233,7 @@
     var ids = [];
     var open = root.querySelectorAll('.task-stage details.task-checkins[open]');
     for (var i = 0; i < open.length; i++) {
-      var row = open[i].closest ? open[i].closest('.task-stage') : null;
+      var row = open[i].closest('.task-stage');
       if (row) ids.push(rowId(row));
     }
     return ids;
@@ -513,7 +513,7 @@
    * page that carries no run control mounts none. Pure.
    */
   function runOptsOf(root) {
-    var raw = root && root.getAttribute ? root.getAttribute('data-run-opts') : null;
+    var raw = root ? root.getAttribute('data-run-opts') : null;
     if (!raw) return null;
     try { return JSON.parse(raw); } catch (e) { return null; }
   }
@@ -567,7 +567,7 @@
     var quietContext = doc.querySelector('[data-testid="task-page-context-quiet"]');
     if (writeOffers && quietContext) {
       writeOffers.addEventListener('click', function (e) {
-        var button = e.target && e.target.closest ? e.target.closest('[data-write-kind]') : null;
+        var button = e.target ? e.target.closest('[data-write-kind]') : null;
         if (!button || !writeOffers.contains(button)) return;
         var kind = button.getAttribute('data-write-kind');
         var widget = kind === 'brief' ? window.BriefSection : window.RecapSection;
@@ -649,7 +649,7 @@
       // The stage head is a real button, so Enter/Space arrive as a click too.
       // Links and the check-ins disclosure inside an opened stage are theirs.
       trackMount.addEventListener('click', function (e) {
-        var head = e.target.closest ? e.target.closest('.task-stage-head') : null;
+        var head = e.target.closest('.task-stage-head');
         var row = head && head.closest('.task-step');
         if (!row) return;
         toggle(row);
@@ -714,8 +714,8 @@
       var readyHtml = paintsReadyHeader(main.getAttribute('data-merge-ready'), state.status) ? main.getAttribute('data-ready-header') : null;
       var headerHtml = typeof readyHtml === 'string' && readyHtml ? readyHtml : state.headerHtml;
       if (answer && typeof headerHtml === 'string') repaintHeader(answer, headerHtml);
-      var painted = answer && answer.querySelector ? answer.querySelector('[data-testid="task-page-status"]') : null;
-      var paintedStatus = painted && painted.getAttribute ? painted.getAttribute('data-status') : null;
+      var painted = answer ? answer.querySelector('[data-testid="task-page-status"]') : null;
+      var paintedStatus = painted ? painted.getAttribute('data-status') : null;
       repaintTrack(state);
       applyOpenMemory(rows(), memory);
       main.setAttribute('data-status', readyHtml ? (paintedStatus || 'waiting') : state.status);
