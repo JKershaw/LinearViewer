@@ -69,7 +69,6 @@ const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/unit/lin-4241-settled-ruling-client.test.js',
   'tests/unit/lin-4242-waiting-live.test.js',
   'tests/unit/observation-card-order.test.js',
-  'tests/unit/observation-ruling-delivery.test.js',
   'tests/unit/observation-waiting-block.test.js',
   'tests/unit/prompt-section-task-mode.test.js',
   'tests/unit/question-card-task-bound.test.js',
