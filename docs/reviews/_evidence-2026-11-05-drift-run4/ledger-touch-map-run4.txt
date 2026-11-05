@@ -1,0 +1,18 @@
+12 `target-vocabulary` -> lib/dispatch-store.js
+20 `client-section-fetch-idiom-duplication` -> public/question-cards.js
+24 `dispatch-payload-centralization` -> public/prompt-section.js
+36 `dispatch-entrance-field-duplication` -> routes/proxy-compute.js
+37 `owner-word-collision` -> lib/run-view.js
+55 `human-wait-derivation-split` -> lib/run-view.js
+63 `mock-ai-builder-copies` -> routes/proxy-compute.js
+64 `fresh-run-definition-copies` -> lib/dispatch-store.js
+81 `pause-marker-predicate-gap` -> lib/dispatch-store.js
+109 `task-page-state-outside-owner` -> public/prompt-section.js
+111 `lineage-anchor-rules-three` -> lib/dispatch-store.js
+117 `lineage-identity-read-twins` -> lib/dispatch-store.js
+119 `cost-fold-partition-restated` -> lib/cost-read.js
+122 `usage-snapshot-prose-residue` -> lib/proxy-instructions.js
+123 `completeness-precedence-restated` -> lib/cost-read.js, lib/request-usage-fold.js
+126 `error-code-case-split` -> public/question-cards.js
+129 `request-source-guard-copies` -> lib/cost-read.js, lib/run-view.js
+130 `reply-effect-default-split` -> public/question-cards.js
