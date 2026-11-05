@@ -8,28 +8,13 @@
  * fresh world, and two worlds never share `document.activeElement`. To run a `public/` script against it, use `loadWorld`
  * in `tests/unit/helpers/client-world.js`: one world, one vm sandbox, the scripts a suite names.
  *
- * Guard and consumers (LIN-4265). `tests/unit/fake-dom-census.test.js` fails on any new hand-written fake DOM under
- * `tests/`, `scripts/eval` or `scripts/code-shape`; its `HAND_WRITTEN_FAKE_DOM_FILES` lists those not yet moved here.
- * The files that use this fake today: `client-world.js`, `fake-dom.test.js` and `lin-4242-waiting-merge.test.js`
- * directly, and `lin-4010-home-opened-task.test.js`, `lin-4246-opened-task-repaint-keep.test.js` and
- * `prompt-section-go.test.js` (LIN-4266), `prompt-section-preserve.test.js`, `prompt-section-recommend-url.test.js` and
- * `prompt-section-look-alike.test.js` (LIN-4268), `prompt-section-p0.test.js`, `prompt-section-run-quota.test.js` and
- * `prompt-section-runner-link.test.js` (LIN-4267), `prompt-section-task-mode.test.js` and `lin-4296-dispatch-reader.test.js`
- * (LIN-4296), `lin-3136-settings-take-predicate.test.js`, `lin-4296-scope-pick.test.js` and `lin-3833-run-control.test.js` (LIN-4296),
- * `chat-append-options.test.js`,`chat-render-markdown-text.test.js`,
- * `chat-tool-rows.test.js`, `observation-basis-check.test.js` and `observation-bulk-scan.test.js` (LIN-4280), and
- * `lin-3833-copy-first-view.test.js`, `lin-3968-home-polish.test.js`, `lin-3975-task-run-control.test.js`,
- * `lin-4040-close-out.test.js`, `lin-4042-finished-no-run-to-pr.test.js`, `brief-recap-autogenerate.test.js`,
- * `brief-recap-ai-not-configured-contract.test.js`, `scan-retire-ui.test.js` and `lin-4016-browser-follows-server.test.js`
- * (LIN-4269), `task-chat-flight-companion-sentinel-mask.test.js` and `chart-helpers.test.js` (LIN-4284),
- * `observation-card-order.test.js`, `observation-scope.test.js`, `observation-waiting-host.test.js` and
- * `observation-waiting-block.test.js` (LIN-4281), `observation-scan-due.test.js` and
- * `lin-2933-cross-seam-witness.test.js` (LIN-4283), and `observation-ruling-delivery.test.js` (LIN-4282), through
- * `loadWorld` (the last as `loadWorld({ scripts: [] })` with `common.js` and `observation.js` run by hand).
- * `client-world.test.js` (LIN-4280) tests `loadWorld`'s `run`.
- * `lin-4035-live-console-client.test.js` and `live-console-client-facts.test.js` (LIN-4285) through `loadWorld`, loaded
- * by the shared Live Console loader in `helpers/live-console-world.js` (a page and lane fixture, not a fake DOM).
- * A suite moved onto this fake leaves `HAND_WRITTEN_FAKE_DOM_FILES` and joins this list in the same PR.
+ * Guard and consumers (LIN-4265, LIN-4306). `tests/unit/fake-dom-census.test.js` fails on any new hand-written fake DOM
+ * under `tests/`, `scripts/eval` or `scripts/code-shape`; its `HAND_WRITTEN_FAKE_DOM_FILES` lists those not yet moved here.
+ * The consumers are not listed in this header. The census computes them: the files whose imports reach this module or
+ * `helpers/client-world.js`, directly or through a helper that does, found by an AST `ImportDeclaration` scan. It fails, and prints that set, if this paragraph
+ * names a consumer other than the helpers below and the census itself. `helpers/client-world.js` (the vm loader over this
+ * fake) and `helpers/live-console-world.js` (a page and lane fixture over that loader) are real importers, described here
+ * as such. A suite moved onto this fake leaves `HAND_WRITTEN_FAKE_DOM_FILES` in the same PR; nothing else here needs editing.
  *
  * Modelled:
  * - Tree and identity: element, text, comment and fragment nodes in order; `children` (elements only, a real array),
