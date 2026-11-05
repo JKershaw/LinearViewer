@@ -255,6 +255,14 @@
         "recordsOnly.replay.S13.cost.usd",
         "recordsOnly.replay.S13.cost.label"
       ]
+    },
+    "f": {
+      "reason": "LIN-4263 (additive only): the records-only lineage gains its three new keys on the wire: tokens (the fold's sum), byModel (its per-model figures, with tokens) and dispatches (its one dispatch, with the same figures). No figure path moves: every cost, count and label on the lineage is as before.",
+      "paths": [
+        "recordsOnly.replay.S1.LIN-42.body.workerSessions.l4201:records-only.tokens",
+        "recordsOnly.replay.S1.LIN-42.body.workerSessions.l4201:records-only.byModel",
+        "recordsOnly.replay.S1.LIN-42.body.workerSessions.l4201:records-only.dispatches"
+      ]
     }
   }
 }
