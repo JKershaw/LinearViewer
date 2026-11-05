@@ -1756,9 +1756,9 @@ window.renderDispatchExecControls = function renderDispatchExecControls(idPrefix
  * @returns {{model: string|null, harness: string|null}}
  */
 window.readDispatchExecControls = function readDispatchExecControls(scopeEl) {
-  const scope = scopeEl && (scopeEl.matches && scopeEl.matches('.dispatch-exec-controls')
+  const scope = scopeEl && (scopeEl.matches('.dispatch-exec-controls')
     ? scopeEl
-    : scopeEl.querySelector && scopeEl.querySelector('.dispatch-exec-controls'));
+    : scopeEl.querySelector('.dispatch-exec-controls'));
   if (!scope) return { model: null, harness: null };
   const select = scope.querySelector('.dispatch-exec-harness-select');
   const modelSelect = scope.querySelector('.dispatch-exec-model');
@@ -1865,10 +1865,10 @@ function syncHarnessModelList(select) {
 if (typeof document !== 'undefined' && document.addEventListener) {
   document.addEventListener('change', (e) => {
     const t = e.target;
-    if (t && t.matches && t.matches('.dispatch-exec-harness-select, .harness-select')) {
+    if (t && t.matches('.dispatch-exec-harness-select, .harness-select')) {
       syncHarnessModelList(t);
     }
-    if (t && t.matches && t.matches('.dispatch-exec-model, .dispatch-model-input')) {
+    if (t && t.matches('.dispatch-exec-model, .dispatch-model-input')) {
       syncDispatchModelOtherVisibility(t);
       updateDispatchModelHint(t);
     }

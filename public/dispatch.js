@@ -337,9 +337,9 @@ async function loadDispatchPresetPicker(container) {
  */
 function readDispatchPresetPicker(scopeEl) {
   if (!scopeEl) return undefined
-  const select = scopeEl.matches && scopeEl.matches('.dispatch-preset-select')
+  const select = scopeEl.matches('.dispatch-preset-select')
     ? scopeEl
-    : scopeEl.querySelector && scopeEl.querySelector('.dispatch-preset-select')
+    : scopeEl.querySelector('.dispatch-preset-select')
   return (select && select.value) || undefined
 }
 

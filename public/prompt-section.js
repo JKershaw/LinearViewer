@@ -992,7 +992,7 @@
 
     function render() {
       if (destroyed) return;
-      const oldQuestion = container.querySelector ? container.querySelector('[data-question-slot]') : null;
+      const oldQuestion = container.querySelector('[data-question-slot]');
       const focus = readerFocusIn(oldQuestion); // before applyState detaches the card (LIN-4246)
       const stateBlock = renderOpenedState();
       // LIN-3833: a viewer with no runner (no dispatch) gets the copy-first view: the step, then the prompt
@@ -1025,11 +1025,11 @@
     // An idle card is replaced, and bound again, on every repaint: a bound card never matches fresh server markup, so there is
     // no unchanged-markup keep here (LIN-4024's clause was dead, and LIN-4246 removed it). The LIN-4246 call-site tests pin this.
     function keepTypedQuestion(oldQuestion, focus) {
-      const fresh = container.querySelector ? container.querySelector('[data-question-slot]') : null;
+      const fresh = container.querySelector('[data-question-slot]');
       if (!fresh) return;
       const QC = window.QuestionCards;
-      const oldCard = oldQuestion && oldQuestion.querySelector ? oldQuestion.querySelector('[data-testid="session-question-card"]') : null;
-      const freshCard = fresh.querySelector ? fresh.querySelector('[data-testid="session-question-card"]') : null;
+      const oldCard = oldQuestion ? oldQuestion.querySelector('[data-testid="session-question-card"]') : null;
+      const freshCard = fresh.querySelector('[data-testid="session-question-card"]');
       const keepsPlace = !!(QC && typeof QC.keepsReaderPlace === 'function' && QC.keepsReaderPlace(oldCard, freshCard, focus ? focus.el : null));
       if (oldQuestion && keepsPlace) { fresh.replaceWith(oldQuestion); restoreReaderFocus(focus); return; }
       if (QC && typeof QC.initQuestionCards === 'function') QC.initQuestionCards(container);
@@ -1041,7 +1041,7 @@
     // there is no keep at all (keepTypedQuestion), so there is nothing to capture for.
     function readerFocusIn(oldQuestion) {
       const QC = window.QuestionCards;
-      const card = oldQuestion && oldQuestion.querySelector ? oldQuestion.querySelector('[data-testid="session-question-card"]') : null;
+      const card = oldQuestion ? oldQuestion.querySelector('[data-testid="session-question-card"]') : null;
       if (!QC || typeof QC.focusInCard !== 'function' || !QC.focusInCard(card)) return null;
       const active = document.activeElement;
       return { el: active, start: active.selectionStart, end: active.selectionEnd };
@@ -1153,9 +1153,9 @@
       // LIN-4048: the task page's run slot follows the poll too, so a held run's Stop and runs-on go when it ends (Home
       // repaints it from here as well). paintRun is a no-op where there is no run control (Swipe).
       if (!caps.stateBlock) { paintRun(); return; }
-      const oldQuestion = container.querySelector ? container.querySelector('[data-question-slot]') : null;
+      const oldQuestion = container.querySelector('[data-question-slot]');
       const focus = readerFocusIn(oldQuestion); // before the slot write detaches the card (LIN-4246)
-      const slot = container.querySelector && container.querySelector('[data-state-slot]');
+      const slot = container.querySelector('[data-state-slot]');
       // LIN-4293: with no state slot the write is render()'s, and render() keeps the card itself. Keeping here as well would
       // run keepTypedQuestion a second time (a second initQuestionCards) on the fallback path.
       if (slot) { slot.outerHTML = renderOpenedState(); keepTypedQuestion(oldQuestion, focus); }
@@ -1171,7 +1171,7 @@
     // in the same opened-task block as this mount, so it is found from the mount's parent.
     function paintFoldCount() {
       const scope = container.parentElement;
-      const el = scope && scope.querySelector ? scope.querySelector('[data-fold-count="sessions"]') : null;
+      const el = scope ? scope.querySelector('[data-fold-count="sessions"]') : null;
       const count = state.opened && state.opened.sessions ? state.opened.sessions.count : 0;
       if (el) el.textContent = count ? ` (${count})` : '';
     }
@@ -1181,7 +1181,7 @@
     // so a late read never rebuilds a streaming body.
     function paintLastCopy() {
       if (destroyed) return;
-      const slot = container.querySelector && container.querySelector('[data-last-copy-slot]');
+      const slot = container.querySelector('[data-last-copy-slot]');
       if (slot) slot.outerHTML = renderLastCopySlot(state);
     }
 
@@ -1204,7 +1204,7 @@
     // this run" applied a cut-off model, or none.
     function paintRun() {
       if (destroyed || !runControlOn()) return;
-      const slot = container.querySelector && container.querySelector('[data-run-slot]');
+      const slot = container.querySelector('[data-run-slot]');
       if (!slot) { render(); applyPanelDraft(); return; }
       const active = typeof document !== 'undefined' ? document.activeElement : null;
       const testid = active && active.dataset && slot.contains && slot.contains(active) ? active.dataset.testid : null;
@@ -1478,7 +1478,7 @@
     // rewritten: a repaint would replace the model field under the datalist and the caret (LIN-3969). No-op while the
     // Change panel is closed, since the summary is not on the page then.
     function refreshRunSummary() {
-      const el = container.querySelector && container.querySelector('[data-testid="run-will-use"]');
+      const el = container.querySelector('[data-testid="run-will-use"]');
       if (el) el.textContent = runWillUseText(state.run.draft || state.run.choice, state.run.preview);
     }
 
@@ -1593,7 +1593,7 @@
     // A repaint re-inserts the cached panel, which holds the choice it was read for. This puts the draft in progress back
     // into its controls, then lets the shared panel's own script settle the suggestions and effort for that harness.
     function applyPanelDraft() {
-      const root = container.querySelector && container.querySelector('[data-decision-panel]');
+      const root = container.querySelector('[data-decision-panel]');
       if (!root) return;
       const d = state.run.draft;
       if (d) {
@@ -1852,7 +1852,7 @@
 
     // LIN-4010: focus a control in the opened task, when it is on the page.
     function focusIn(selector) {
-      const el = container.querySelector && container.querySelector(selector);
+      const el = container.querySelector(selector);
       if (el && typeof el.focus === 'function') el.focus();
     }
 
@@ -1868,7 +1868,7 @@
       }
     };
     function keepFocusInDrawer(e) {
-      const drawer = container.querySelector && container.querySelector('[data-testid="run-change-panel"]');
+      const drawer = container.querySelector('[data-testid="run-change-panel"]');
       if (!drawer || !drawer.querySelectorAll) return;
       // Only what can take focus: the phone's × is display:none on a desktop, and a hidden control cannot hold focus.
       const items = [...drawer.querySelectorAll('button:not([disabled]), input:not([disabled]), select, textarea, a[href]')]
@@ -2058,7 +2058,7 @@
     // when the slot is absent, e.g. a caller that skins the component).
     function paintGo() {
       if (destroyed) return;
-      const slot = container.querySelector && container.querySelector('[data-go-slot]');
+      const slot = container.querySelector('[data-go-slot]');
       if (slot) slot.outerHTML = renderGo(opts, state);
       else render();
       if (typeof window.initLocalTimes === 'function') window.initLocalTimes(container);
@@ -2070,7 +2070,7 @@
     // disclosure and its selects alone (falling back to a full render when absent).
     function paintLadder() {
       if (destroyed) return;
-      const slot = container.querySelector && container.querySelector('[data-ladder-slot]');
+      const slot = container.querySelector('[data-ladder-slot]');
       if (slot) slot.outerHTML = renderLadder(opts, state);
       else render();
     }
@@ -2814,7 +2814,7 @@
     };
     container.addEventListener('input', onRunInput);
     container.addEventListener('change', (e) => {
-      const box = e.target && e.target.closest && e.target.closest('[data-testid="opened-task-progress-key"]');
+      const box = e.target && e.target.closest('[data-testid="opened-task-progress-key"]');
       if (box && container.contains(box) && window.ProxyToggle && typeof window.ProxyToggle.setActive === 'function') {
         window.ProxyToggle.setActive(box.checked === true);
         return;
@@ -2834,7 +2834,7 @@
       if (runControlOn()) { paintRun(); refreshRunPreview(); }
       // LIN-4040 close-out (review A): the ladder's run-step rung follows the offer the read carries (Swipe has no run block
       // to repaint). Only a ladder already on the card is redrawn; nothing else is rebuilt.
-      if (container.querySelector && container.querySelector('[data-ladder-slot]')) paintLadder();
+      if (container.querySelector('[data-ladder-slot]')) paintLadder();
     }
     function rereadUntilComplete(attempt) {
       if (destroyed || attempt > 15) return;
