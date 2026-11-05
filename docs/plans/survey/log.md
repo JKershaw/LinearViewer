@@ -1750,3 +1750,20 @@ I skipped LIN-4026: its own text says the write-side option is "a contract chang
 - **Scope:** close the reported symptom as covered; piece 1 is the run chrome (red test today); piece 2 is held-run Stop, reachability first, stop if unreachable. Folding the task page's run block into Home's stays out (the global: "LIN-4040's rework").
   - Autopilot `d1431ef4`.
 - **A general lesson worth one line in the open-0 prompt eventually:** "is the ticket still true at {BASE}?" Tonight it was false once (LIN-4048) and partly false twice (LIN-4151's dedupe, LIN-4234's runbook). It passes the generality test, but open-0 found it unprompted every time, so it doesn't need adding yet.
+
+### 04:30 UTC: the LIN-4144 and LIN-4151 builders' answers, and three rows revised
+- **Revised, honestly downward:**
+  - **LIN-4243** goes from `+` to `+ (mixed)`. Its builder: "nothing got simpler". Home's rendered HTML is now an input the client parses, with selectors as a contract only E2E guards; the replay exists twice; there's a new global.
+  - **LIN-4241** and **LIN-4151** stay `+`, with debits noted: one route behaves two ways by caller, and a second ranker remains.
+  - **The builders' q6 keeps finding copies my place reading missed. That's the calibration result from 22:30, repeated:** the place-change map plus my read of the diff is not enough for the copies column. q6 is now part of every row.
+- **On the larger scope (q7):**
+  - LIN-4242: "in the build, yes", but the opened task's keep is "a different surface with a different harness" and should be its own ticket. That confirms the proposed ruling and LIN-4246.
+  - LIN-4243: yes.
+  - LIN-4241: mixed, and "name the per-submission id in the plan as its own step, rather than letting review discover it".
+  - LIN-4151: one derivation "paid for itself outright". The naming piece was marginal, and "I'd leave the identifier renames for when `home-view.js` is split". **The stop rule half-worked: the builder stopped, but late.**
+- **Two general lessons for the Survey's questions (not yet prompt text):**
+  - **"What cases look the same to the code?"** (LIN-4241: retry, race loser and second tab all arrive as one request; each review round found one more). Drawing that state table first would have saved two review rounds.
+  - **"Is there an in-flight or busy signal you'll need, and does it exist?"** (LIN-4243 learned late that it didn't.)
+
+  Both pass the generality test. Hold them until a second ticket shows the same need.
+- **Tally:** "shared test fakes with a home" now has four namings (collection fakes ×3 tickets, a fake DOM). That's a pull candidate. Two new watch rows: server fragments instead of client-parsing a page; one ranking for "what's next".
