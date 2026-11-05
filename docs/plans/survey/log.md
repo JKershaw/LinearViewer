@@ -1876,3 +1876,9 @@ Your steer: no Periodicals routing, a code-only global ("as if in a repo where t
   3. a characterization snapshot first, then the guard made unconditional, with no `liveGuard` parameter left.
 - Map unchanged, no new file.
 - **Overnight now: 7 better, 2 mixed, 0 worse, from 9 rows.** All four ordinary tickets are `+` or `+ (mixed)`. After-questions sent to its builder.
+
+### 07:15 UTC: LIN-4143's builder, the clearest case for the larger scope
+- **q7:** "The fail-closed card was the only real fix, and it lived in the larger scope. A minimal 'add the guard to the task page' ticket would have found nothing to change."
+- **q6:** two defaults now disagree. The card's absent effect is `record`; `ReplyDelivery`'s is `resume`. It's pinned, but a new caller inherits fail-open. The live predicate is also built in three places. Both noted on the ledger row; the row stays `+`.
+- **q2:** "the probe told me more than the ticket did". That's open-0's method, used again by the builder.
+- The session paused at about 06:10 at the token cap and resumed at 07:13. Nothing was lost.
