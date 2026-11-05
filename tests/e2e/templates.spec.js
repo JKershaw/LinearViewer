@@ -14,9 +14,9 @@ test.describe('Templates page', () => {
     await expect(page).toHaveTitle(/Templates/);
   });
 
-  test('shows all 17 non-meta templates', async ({ page }) => {
+  test('shows all 19 non-meta templates (LIN-4248: + the two Surveys)', async ({ page }) => {
     await page.goto('/templates');
-    await expect(page.locator('.prompt-card')).toHaveCount(17);
+    await expect(page.locator('.prompt-card')).toHaveCount(19);
   });
 
   test('never renders the meta prompt', async ({ page }) => {

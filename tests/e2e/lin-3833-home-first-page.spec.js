@@ -205,7 +205,8 @@ test.describe('Home first page — the Change panel keeps what is typed across a
 });
 
 // LIN-3833 (ruling f9fa6bd7, option c: leave out only finished tasks and retro). A fresh top task is not finished,
-// so only the AI-excluded step (retro) does not fit: the list says one step is left out. The step line's ✦ button
+// so only the AI-excluded steps do not fit: retro, and (LIN-4248) the two hand-only Surveys, so the list says three
+// steps are left out. The step line's ✦ button
 // writes the prompt; it does not replace the why line.
 test.describe('Home first page — "Another step" fits the task (LIN-3833)', () => {
   test('the four default steps are listed in order, the excluded step is left out and counted, and the button writes a prompt', async ({ page, seedLocal, localWorkerUrlKey }) => {
@@ -225,6 +226,6 @@ test.describe('Home first page — "Another step" fits the task (LIN-3833)', () 
     const labels = await items.allInnerTexts();
     // LIN-4024 (item 17): each step carries its stage word (Build, not the step id "implement").
     expect(labels.slice(0, 4)).toEqual(['Look into', 'Research', 'Plan', 'Build']);
-    await expect(component.locator('[data-testid="run-another-left-out"]')).toHaveText("1 step left out: it does not fit this task's state.");
+    await expect(component.locator('[data-testid="run-another-left-out"]')).toHaveText("3 steps left out: they do not fit this task's state.");
   });
 });
