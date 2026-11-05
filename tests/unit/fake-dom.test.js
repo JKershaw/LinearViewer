@@ -446,3 +446,81 @@ describe('fake DOM: attributes, data, classes and listeners', () => {
     assert.equal(el.dispatchEvent({ type: 'click' }), true);
   });
 });
+
+describe('fake DOM: className and id reflect the class and id attributes (LIN-4270)', () => {
+  test('assigning className sets the class attribute: classList, querySelector and the serialized markup all follow', () => {
+    const { document } = world();
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    el.className = 'card wide';
+    assert.equal(el.classList.contains('card'), true);
+    assert.equal(el.classList.contains('wide'), true);
+    assert.equal(document.querySelector('.card.wide'), el);
+    assert.equal(el.outerHTML, '<div class="card wide"></div>');
+  });
+
+  test('classList.add and classList.remove are visible through className and the serialized markup', () => {
+    const { document } = world();
+    const el = document.createElement('span');
+    document.body.appendChild(el);
+    el.classList.add('a', 'b');
+    assert.equal(el.className, 'a b');
+    assert.equal(el.outerHTML, '<span class="a b"></span>');
+    el.classList.remove('a');
+    assert.equal(el.className, 'b');
+    assert.equal(document.querySelector('.b'), el);
+    assert.equal(document.querySelector('.a'), null, 'the removed class no longer matches');
+  });
+
+  test('className read back returns the class attribute as written, and setAttribute("class") is seen by className', () => {
+    const { document } = world();
+    const el = document.createElement('p');
+    document.body.appendChild(el);
+    el.setAttribute('class', 'p  q');
+    assert.equal(el.className, 'p  q', 'the raw attribute string, as a browser returns it');
+    assert.equal(document.querySelector('.p.q'), el);
+    el.className = 'r';
+    assert.equal(el.getAttribute('class'), 'r', 'the attribute is what className writes');
+    assert.equal(el.hasAttribute('class'), true);
+  });
+
+  test('assigning className to an element that has other attributes appends class after them, in serialized order', () => {
+    const { parse, document } = world();
+    parse('<p data-x="1">t</p>');
+    const p = document.querySelector('p');
+    p.className = 'k';
+    assert.equal(p.outerHTML, '<p data-x="1" class="k">t</p>');
+    assert.equal(document.querySelector('p[data-x="1"].k'), p);
+  });
+
+  test('className = "" leaves an empty class attribute in the markup, as a browser does', () => {
+    const { document } = world();
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    el.className = 'x';
+    el.className = '';
+    assert.equal(el.hasAttribute('class'), true, 'the attribute stays, empty');
+    assert.equal(el.outerHTML, '<div class=""></div>');
+    assert.equal(document.querySelector('.x'), null);
+  });
+
+  test('assigning id makes #id queries find the element, and the id attribute is serialized', () => {
+    const { parse, document } = world();
+    parse('<div></div>');
+    const el = document.querySelector('div');
+    el.id = 'a';
+    assert.equal(document.querySelector('#a'), el);
+    assert.equal(el.getAttribute('id'), 'a');
+    assert.equal(el.outerHTML, '<div id="a"></div>');
+  });
+
+  test('reading id reflects setAttribute("id"), and an element with no id reads it as the empty string', () => {
+    const { document } = world();
+    const el = document.createElement('section');
+    document.body.appendChild(el);
+    assert.equal(el.id, '', 'no id attribute reads as the empty string');
+    el.setAttribute('id', 'z');
+    assert.equal(el.id, 'z', 'the id attribute is the value read back');
+    assert.equal(document.querySelector('#z'), el);
+  });
+});
