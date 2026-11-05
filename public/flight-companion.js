@@ -800,7 +800,7 @@
   }
 
   function modelOptionEls() {
-    return modelListEl && modelListEl.querySelectorAll ? Array.prototype.slice.call(modelListEl.querySelectorAll('[role="option"]')) : [];
+    return modelListEl ? Array.prototype.slice.call(modelListEl.querySelectorAll('[role="option"]')) : [];
   }
 
   function findModelOption(id) {
@@ -947,7 +947,7 @@
     modelListEl.addEventListener('click', function (e) {
       // Walk up from the click target (it may be the <code>/tag inside a row).
       var li = e.target;
-      while (li && li !== modelListEl && !(li.getAttribute && li.getAttribute('role') === 'option')) li = li.parentNode;
+      while (li && li !== modelListEl && li.getAttribute('role') !== 'option') li = li.parentNode;
       if (li && li !== modelListEl && !li.hidden) commitModel(li.getAttribute('data-id') || '');
     });
   }

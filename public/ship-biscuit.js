@@ -163,7 +163,7 @@
   // Inert headline click seam (V1): the article body is not generated yet, so a
   // click just explains that. V2 will replace this note with an on-demand fetch.
   editionEl.addEventListener('click', function (e) {
-    var link = e.target.closest ? e.target.closest('.ship-biscuit-headline') : null;
+    var link = e.target.closest('.ship-biscuit-headline');
     if (!link) return;
     e.preventDefault();
     var article = link.closest('.ship-biscuit-article');

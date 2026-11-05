@@ -465,7 +465,7 @@
   // document.activeElement, the live Waiting section's and Home placement's reading; null says nothing was focused. The card's
   // own box is not focus inside it.
   function focusInCard(card, active) {
-    if (!card || typeof card.contains !== 'function') return false;
+    if (!card) return false;
     var el = active === undefined ? document.activeElement : active;
     return !!el && el !== card && card.contains(el);
   }

@@ -321,7 +321,7 @@
       (function (block) {
         var urlKey = block.dataset.urlKey || '';
         block.addEventListener('click', function (e) {
-          var btn = e.target.closest ? e.target.closest('button[data-proposal-action]') : null;
+          var btn = e.target.closest('button[data-proposal-action]');
           if (!btn) return;
           e.preventDefault();
           var row = btn.closest('[data-testid="session-proposal"]');
