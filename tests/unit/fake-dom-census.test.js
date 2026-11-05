@@ -46,28 +46,29 @@ const EXCLUDED = new Set(['tests/unit/helpers/fake-dom.js', SELF]);
 /**
  * The files that still hand-write a fake DOM: the baseline the scan found when the census landed (LIN-4265, 56 files),
  * sorted. It only shrinks. A file moved onto `helpers/fake-dom.js` leaves this list in the same PR, and a new file is
- * never added to get past the census.
+ * never added to get past the census. A stopped file keeps its entry, and its line names the API that stopped it (LIN-4272
+ * classification, beat 2); an entry with no comment is not yet classified as stopped.
  */
 const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/unit/close-out-client.test.js',
-  'tests/unit/common-assignee-filter-nav.test.js',
-  'tests/unit/common-team-filter-nav.test.js',
+  'tests/unit/common-assignee-filter-nav.test.js', // stop: getBoundingClientRect in initNavBar, public/common.js:2907 (LIN-4271 stop rule)
+  'tests/unit/common-team-filter-nav.test.js', // stop: getBoundingClientRect in initNavBar, public/common.js:2907 (LIN-4271 stop rule)
   'tests/unit/dashboard-routes.test.js',
-  'tests/unit/flight-companion-client.test.js',
+  'tests/unit/flight-companion-client.test.js', // stop: style write and layout read-back, public/flight-companion.js:653-665 (LIN-4271)
   'tests/unit/lin-2122-history-outcome-pill.test.js',
   'tests/unit/lin-2370-browser-copy-prompt-provider-identity.test.js',
-  'tests/unit/lin-3136-settings-take-predicate.test.js',
+  'tests/unit/lin-3136-settings-take-predicate.test.js', // stop: select value read, public/proxy.js:51 (the scope select is a select, lib/render-proxy.js:51)
   'tests/unit/lin-3254-session-run-toggles.test.js',
-  'tests/unit/lin-3833-run-control.test.js',
+  'tests/unit/lin-3833-run-control.test.js', // stop: select value setter, public/prompt-section.js:1565; the test reads it at :243 (LIN-4269)
   'tests/unit/lin-3975-proposal-refresh.test.js',
   'tests/unit/lin-4016-sessions-fold-parked.test.js',
   'tests/unit/lin-4024-home-description.test.js',
   'tests/unit/lin-4024-look.test.js',
-  'tests/unit/lin-4114-dismiss-order.test.js',
-  'tests/unit/lin-4114-inflight-lock.test.js',
-  'tests/unit/lin-4241-settled-ruling-client.test.js',
+  'tests/unit/lin-4114-dismiss-order.test.js', // stop: real bubbling dispatchEvent, public/question-cards.js:239-241; the fake dispatchEvent is inert
+  'tests/unit/lin-4114-inflight-lock.test.js', // stop: real bubbling dispatchEvent, public/question-cards.js:239-241; the fake dispatchEvent is inert
+  'tests/unit/lin-4241-settled-ruling-client.test.js', // stop: real bubbling dispatchEvent, public/question-cards.js:239-241; the fake dispatchEvent is inert
   'tests/unit/lin-4242-waiting-live.test.js',
-  'tests/unit/prompt-section-task-mode.test.js',
+  'tests/unit/prompt-section-task-mode.test.js', // stop: select value via readDispatchExecControls, public/prompt-section.js:2714-2715 and public/common.js:1758-1763 (LIN-4268)
   'tests/unit/question-card-task-bound.test.js',
   'tests/unit/run-limit-gating.test.js',
   'tests/unit/runner-link-surfaces.test.js',
