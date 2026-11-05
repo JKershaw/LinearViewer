@@ -668,6 +668,17 @@ describe('fake DOM: replaceChild, replaceChildren, insertAdjacentHTML, append an
     assert.equal(stranger.isConnected, true, 'the stranger is untouched');
   });
 
+  test('replaceChild(node, null) throws FakeDomError and leaves the tree unchanged (LIN-4279 review F2)', () => {
+    const { parse, document } = world();
+    parse('<ul><li id="a">a</li></ul>');
+    const ul = document.querySelector('ul');
+    const incoming = document.createElement('li');
+    const before = ul.childNodes.slice();
+    throwsNaming(() => ul.replaceChild(incoming, null), 'not a child');
+    assert.deepEqual(ul.childNodes, before, 'childNodes is unchanged');
+    assert.equal(incoming.parentNode, null, 'the new node was not attached');
+  });
+
   test('replaceChildren(...nodes) replaces every child with the given nodes, in order, and detaches the old ones', () => {
     const { parse, document } = world();
     parse('<div><i id="x">x</i><i id="y">y</i></div>');
@@ -845,5 +856,27 @@ describe('client world: stubs are copied by descriptor, and loadWorld routes to 
     assert.equal(parentCalls, 0, 'no bubbling');
     child.dispatchEvent({ type: 'click', target: child });
     assert.equal(childCalls, 1, 'dispatchEvent does not reach the listeners');
+  });
+});
+
+describe('fake DOM: type selectors fold case on HTML elements only (LIN-4279 review F1)', () => {
+  test('an upper-case type selector matches an HTML element through querySelector, closest and matches', () => {
+    const { parse, document } = world();
+    parse('<div id="d"><p id="x">t</p></div>');
+    const p = document.querySelector('#x');
+    assert.equal(document.querySelector('DIV'), document.querySelector('#d'), 'querySelector("DIV") finds the <div>');
+    assert.equal(p.closest('P'), p, 'closest("P") finds the <p>');
+    assert.equal(p.matches('P'), true, 'matches("P") is true');
+    assert.equal(p.matches('P#x'), true, 'a case-folded tag with an id part still matches');
+  });
+
+  test('an SVG element made by createElementNS is not matched by the upper-case name', () => {
+    const { document } = world();
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    document.body.appendChild(svg);
+    assert.equal(svg.matches('SVG'), false, 'no case fold for a non-HTML element');
+    assert.equal(svg.matches('svg'), true, 'the exact name still matches');
+    assert.equal(document.querySelector('SVG'), null, 'querySelector("SVG") does not find it');
+    assert.equal(document.querySelector('svg'), svg);
   });
 });
