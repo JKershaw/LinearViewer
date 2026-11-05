@@ -170,3 +170,11 @@ Against the 10:15 criteria: the tidies were better in one of two; the follow-ons
 | prompt plumbing | LIN-4251: better, mixed | LIN-4277: better, better | **better, better** | $11.94 | $5.93 ($0.77) |
 
 Two of two lifted their area to better in both blind reads, at about +45–50% of the parent's cost each, nearly all of it the fixed legs (two Surveys, plan, review, close-out, autopilot). LIN-4276's builder on its tidy-after q7: "Barely, on cost... Inside LIN-4263 it would have been cheaper... But the separate pass found the double listing, which a quick in-PR tidy would probably have missed." **Stop rule:** a tidy-after whose blind reads say better, better gets no tidy-after of its own, though its blind reads and its builder name further edges (both did). Those go into the notebook for the next ticket in the area to pull.
+
+### Track A turned around: partial move, ratchet, then the finishing move (5 Nov)
+
+| Ticket | Map | Copies (blind AA, AB, AC, AD) | Carried | Balance (blind) |
+|---|---|---|---|---|
+| LIN-4255 (fourteen merges, LIN-4265 → LIN-4272: the census first, then the shared fake grown and the families moved) | test-only, plus one CSS rule (a real unstyled-button bug found by a move) | 31 suites off their own fakes and vm sandboxes; `observation-dom-shim.js` deleted; an AST census that only shrinks (56 → 25), with each of the 9 stops named by the API that blocks it; the fake grew tested real-DOM API rather than per-suite patches. Residues: the `fake-dom.js` header's consumer list (a second, unguarded registry, edited by 13 of 15 commits); `clickOn` added then bypassed in four suites; three ways to load `common.js`; `real-dispatch-disclosure.js`'s entity decode dead on arrival (the fake already decoded them); `CLAUDE.md:58` stale on what the fake hosts | LIN-4252's blind reads (its own tidy-after), with a ratchet | **better, better.** And **LIN-4252 + LIN-4255 together: better, better** (LIN-4252 alone was mixed, mixed) |
+
+So track A, which read like the control at noon, now reads better. The partial move, held by a ratchet and then finished in one large move in pieces, did what John's Hanoi framing said it would. The residues are pulled into LIN-4292, the next ticket in that area, rather than filed (the stop rule).
