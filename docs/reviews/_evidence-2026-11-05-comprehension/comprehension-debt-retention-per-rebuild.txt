@@ -1,0 +1,178 @@
+# Retention check per rebuild/move — run 5, LIN-4300
+
+Tool: scripts/code-shape/retention.mjs (LIN-3829, 3861e1ea). Report-only; exit 0 whatever it finds.
+Wiring at af55cb73: NOT run by CI or npm scripts. `grep -n -i retention package.json .github/workflows/*.yml` → only
+`.github/workflows/test.yml:137: retention-days: 7` (an artifact setting). Every run below was by hand.
+Command per commit: node scripts/code-shape/retention.mjs . <sha>^ <sha> --include '^(lib|routes|public|server\.js)'
+"parse failure(s)" are all non-JS files the include pattern admits (.css, llms.txt, .png); no JS file failed to parse.
+LIN-3742 (b133a713) merged 2026-10-24, a day before the check existed (3861e1ea, 2026-10-25); it is measured here for the first time.
+
+=== LIN-3742-dashboard-rebuild b133a713^..b133a713
+retention 1e88e7eb→b133a713: 0 dropped (none); 0 parse failure(s)
+=== LIN-3755-renderers 8801cd0f^..8801cd0f
+retention fcab9f71→8801cd0f: 0 dropped (none); 0 parse failure(s)
+=== LIN-3872 32f088d3^..32f088d3
+retention 807fa889→32f088d3: 0 dropped (none); 0 parse failure(s)
+=== LIN-3876 aacbace1^..aacbace1
+retention a279a9b6→aacbace1: 0 dropped (none); 0 parse failure(s)
+=== LIN-3877 deff5cff^..deff5cff
+retention 143788ae→deff5cff: 0 dropped (none); 0 parse failure(s)
+=== LIN-3883 a32c14a3^..a32c14a3
+retention eb97e996→a32c14a3: 0 dropped (none); 0 parse failure(s)
+=== LIN-3893 fabd6e2d^..fabd6e2d
+retention 05a5b618→fabd6e2d: 0 dropped (none); 0 parse failure(s)
+=== LIN-3894 17fbdf92^..17fbdf92
+retention b82680ac→17fbdf92: 0 dropped (none); 0 parse failure(s)
+=== LIN-3846-settings 9f7acff7^..9f7acff7
+retention deff5cff→9f7acff7: 2 dropped (LIN-1399, LIN-2353); 4 parse failure(s)
+   dropped LIN-1399 from None
+   dropped LIN-2353 from None
+=== LIN-3911-pointer-sweep fcf2a53d^..fcf2a53d
+retention 343d34ec→fcf2a53d: 0 dropped (none); 0 parse failure(s)
+=== LIN-3890-settings-untangle 8bbd6b5f^..8bbd6b5f
+retention e2e61754→8bbd6b5f: 1 dropped (LIN-1247); 12 parse failure(s)
+   dropped LIN-1247 from None
+=== LIN-3855 d53bb5bc^..d53bb5bc
+retention 3861e1ea→d53bb5bc: 2 dropped (LIN-993, LIN-1145); 4 parse failure(s)
+   dropped LIN-993 from None
+   dropped LIN-1145 from None
+=== LIN-3853-model-routing 68eec35a^..68eec35a
+retention 7776bd23→68eec35a: 0 dropped (none); 0 parse failure(s)
+=== LIN-4016-home 80afbb8f^..80afbb8f
+retention 9b952eac→80afbb8f: 2 dropped (LIN-4011, LIN-4012); 0 parse failure(s)
+   dropped LIN-4011 from None
+   dropped LIN-4012 from None
+=== LIN-4129-cost-removal 30db2052^..30db2052
+retention c86e315b→30db2052: 4 dropped (LIN-1958, LIN-2087, LIN-2404, LIN-2423); 0 parse failure(s)
+   dropped LIN-1958 from None
+   dropped LIN-2087 from None
+   dropped LIN-2404 from None
+   dropped LIN-2423 from None
+=== LIN-4179 72305215^..72305215
+retention 0dc1620e→72305215: 1 dropped (LIN-2702); 0 parse failure(s)
+   dropped LIN-2702 from None
+=== LIN-4198 9cc5ff9c^..9cc5ff9c
+retention 1b6c6758→9cc5ff9c: 0 dropped (none); 0 parse failure(s)
+=== LIN-4202 5334c81a^..5334c81a
+retention 9cc5ff9c→5334c81a: 0 dropped (none); 0 parse failure(s)
+=== LIN-4201 2ee4e600^..2ee4e600
+retention eb44eff9→2ee4e600: 0 dropped (none); 0 parse failure(s)
+=== LIN-4203 d7ceb373^..d7ceb373
+retention 2ee4e600→d7ceb373: 0 dropped (none); 0 parse failure(s)
+=== LIN-4226 c55f0fb3^..c55f0fb3
+retention 43dd0d64→c55f0fb3: 0 dropped (none); 0 parse failure(s)
+=== whole window 76fc3e91..HEAD
+retention 76fc3e91→af55cb73: 21 dropped (LIN-296, LIN-633, LIN-638, LIN-640, LIN-642, LIN-644, LIN-853, LIN-923, LIN-992, LIN-1002, LIN-1399, LIN-1426, LIN-1566, LIN-1603, LIN-1958, LIN-2087, LIN-2404, LIN-2423, LIN-2702, LIN-3202, LIN-3230); 72 parse failure(s)
+
+## Dropped refs, judged (does the reason survive at HEAD in other words?)
+### LIN-296 lib/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   - "reasoning" is a single sentence under 160 characters. | - "referencedTaskIds" lists the exact identifiers (like "LIN-296") of the tasks this option touches, copied verbatim from the provided state. Use [] when the option references no specific task. These must be real identifiers from the state, never invented. | - "size" must be exactly one of S, M, L — never XL. Size reflects the AMOUNT of work in the run, NOT h
+   * Enrich each option's referenced tasks with their human-readable title (LIN-923). | * The wire only carried `referencedTaskIds` (opaque identifiers like "LIN-296"), | * so the page could name *which* tasks a goal touched but not *what* they are.
+### LIN-633 lib/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   * continue-until-stopped option below (running the project with no specific | * guide), so the scale and that option must move together (LIN-633). | */
+   *   deterministic grounding blob the model was given, returned verbatim so the page can show | *   the user what the suggestions were grounded in (LIN-633). | */
+### LIN-633 lib/render-next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   // Page-level expandable panel showing the exact deterministic grounding blob the | // model was given (LIN-633). One shared context per generation — NOT per-option. | // Hidden until a generation returns; the body is filled + toggled by next-run.js
+### LIN-633 public/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   /** | * Suggested Next Run client (experimental, LIN-603; LIN-633 UI parity). | *
+### LIN-633 routes/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   * ({ analysis, directions, options, summary, context }) without calling an LLM, so | * live and test paths don't diverge (LIN-633, LIN-638, LIN-642, LIN-1566). | *
+### LIN-638 lib/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   * points at the full context panel. Pure; never calls an LLM (mirrors the page's | * deterministic-grounding ethos — see formatNextRunContext). LIN-638. | *
+   *   `analysis` is the model's global think-first reasoning preamble (LIN-642; '' if absent). | *   `summary` is a short deterministic intro paragraph (LIN-638). `context` is the exact | *   deterministic grounding blob the model was given, returned verbatim so the page can show
+### LIN-638 lib/render-next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+    | // Deterministic intro paragraph above the options (LIN-638), then the model's | // global think-first reasoning preamble (LIN-642 — the "how I chose", distinct
+### LIN-638 public/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   * actions. The always-present "continue until stopped" option is flagged. Above | * the cards sit the deterministic `summary` intro (LIN-638) and the model's global | * `analysis` preamble (LIN-642 — "how I chose", vs each card's "why this one"). A
+   // responses. No char truncation — it wraps via CSS instead of being | // ellipsised, so the whole headline is visible while collapsed (LIN-638). | var preview = isOpen
+### LIN-638 routes/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   * ({ analysis, directions, options, summary, context }) without calling an LLM, so | * live and test paths don't diverge (LIN-633, LIN-638, LIN-642, LIN-1566). | *
+### LIN-640 lib/render-next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   // (the goal kickoff is built via /api/autopilot-prompt, which is proxy-gated); | // when off, the client keeps the navigate-to-/dispatch?goal= fallback (LIN-640). | const nextRunData = {
+### LIN-640 public/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   * | * Accepting an option (LIN-640): when the proxy feature is on, each card offers an | * inline `Dispatch ▾` disclosure (parity with the projects/swipe views) that builds
+### LIN-642 lib/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   /** | * Guarantee at least one option for each of S, M, L (LIN-642). For every required | * size missing from `options`, append a deterministic stand-in synthesized from
+   *   see resolveDirections for the partition/exclusion invariants the client relies on. | *   `analysis` is the model's global think-first reasoning preamble (LIN-642; '' if absent). | *   `summary` is a short deterministic intro paragraph (LIN-638). `context` is the exact
+### LIN-642 lib/render-next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   // Deterministic intro paragraph above the options (LIN-638), then the model's | // global think-first reasoning preamble (LIN-642 — the "how I chose", distinct | // from each card's per-option "why this one"). Both hidden until a generation
+### LIN-642 public/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   * Each card's head shows a t-shirt size chip and a standalone headline `title` | * (LIN-642); its caret-collapsible body holds the goal paragraph, per-option | * reasoning, the referenced-task ids rendered at the end, and the accept/copy
+   * the cards sit the deterministic `summary` intro (LIN-638) and the model's global | * `analysis` preamble (LIN-642 — "how I chose", vs each card's "why this one"). A | * single page-level expandable panel shows the exact grounding context the model
+### LIN-642 routes/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   * ({ analysis, directions, options, summary, context }) without calling an LLM, so | * live and test paths don't diverge (LIN-633, LIN-638, LIN-642, LIN-1566). | *
+### LIN-644 lib/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   * `referencedTaskIds` untouched (it is the machine-readable field the staleness | * diff reads — LIN-644). An id with no matching card resolves to an empty title, | * so the client still shows the identifier. Pure.
+   // Keep referencedTaskIds machine-readable AND trustworthy: drop any id the model | // emitted that isn't a real task in the grounded state (LIN-644 diffs this field | // for staleness, so it must not carry hallucinated identifiers).
+### LIN-853 public/dispatch.js (file at HEAD: yes) removed-by: 64419746 LIN-2122: Dispatch history shows each dispatch's outcome word (#2210)
+   // Map each resolved dispatch status onto the shared StatusPill vocabulary | // (LIN-853): `state` selects the canonical color token, `char` keeps the | // existing per-status glyph. `taken`/`expired`/`cancelled` are the stored
+### LIN-923 lib/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   /** | * Enrich each option's referenced tasks with their human-readable title (LIN-923). | * The wire only carried `referencedTaskIds` (opaque identifiers like "LIN-296"),
+   // lead. Resolve each option's referenced task ids → titles so the page can name | // what the tasks actually are, not just their identifiers (LIN-923). | const finalOptions = attachReferencedTaskTitles(
+### LIN-923 public/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   // Each task shows its machine-readable identifier → mono data Chip (LIN-861) | // AND its human-readable title (LIN-923), so the reader can tell what the | // tasks actually are, not just their opaque ids. Prefer the enriched
+### LIN-923 routes/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   const covered = ensureSizeCoverage(concrete, roadmapModel); | // Resolve referenced task ids → titles (LIN-923), mirroring the live generator so | // the mock exercises the same enriched shape the client renders.
+### LIN-992 lib/openrouter.js (file at HEAD: yes) removed-by: 8cb65c0e LIN-3882: capabilities and price hints come from the OpenRouter catalog (#2103)
+   * that single list as the source of truth keeps future model additions (e.g. the | * LIN-992 GPT-5.5 pair) in sync automatically — no separate capability table to | * drift. A custom/uncurated id, or a falsy/non-string id, is treated as UNKNOWN,
+### LIN-1002 public/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   // dispatched payload carries an unambiguous task reference, not prose alone | // (LIN-1002). The referenced-task data already rides on the option, so this is | // plumbing, not new data generation. Returns the prose unchanged when there are
+   // tasks (id + title) so the autopilot receives an unambiguous task | // reference alongside the prose, not prose alone (LIN-1002). The open | // option has no goal (and no refs), so it stays an empty open-ended walk.
+### LIN-1399 lib/render-settings.js (file at HEAD: yes) removed-by: 9f7acff7 LIN-3846: Settings is a page per area, built from three kinds of row (#2099)
+   // User settings. The old single "AI" section straddled the account-owned vs | // workspace-owned boundary (LIN-1331); it is split (LIN-1399) into the | // OpenRouter connection + per-user AI toggles here and the workspace model
+### LIN-1426 lib/render-run-steps.js (file at HEAD: yes) removed-by: 17e4f325 LIN-4136: one fold for how a lineage's rows add up (#2243)
+   * total", an unpriced/missing/harness-only lineage reads "not reported". A | * per-turn harness figure is labelled "as reported" (LIN-3230/LIN-1426); the | * cumulative snapshot keeps the bare figure.
+### LIN-1426 lib/run-view.js (file at HEAD: yes) removed-by: 17e4f325 LIN-4136: one fold for how a lineage's rows add up (#2243)
+   * `cumulative` is true only for the `claude-code` snapshot (OpenCode posts | * per-turn rows, LIN-1426), which is what the header total is gated on. The | * final loop that carried the usage is named so the renderer puts the figure on
+### LIN-1426 lib/session-telemetry.js (file at HEAD: yes) removed-by: caf33052 LIN-4134: one answer to what a row's usage is (#2238)
+   // opencode lineage under-reports. That mismatch predates this derivation and | // belongs to the lineage roll-up (LIN-1426); do NOT "fix" it by summing across | // harnesses, which would multiply-count claude-code by its Stop count.
+### LIN-1566 lib/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   * Options are additionally grouped under a small set of named *directions* | * (LIN-1566) so the page can ask "which direction?" before "which goal?". The | * flat `options` array stays authoritative — a direction is a per-option string
+   /** | * Max named directions retained from a reply (LIN-1566). The prompt asks for 2–3; | * this is the tolerance cap, not the target. The catch-all below is added on top
+### LIN-1566 lib/render-next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   // | // Between the preamble and the cards sits the direction chooser (LIN-1566): an | // empty mount point the client fills from the response's resolved `directions`,
+### LIN-1566 public/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   * | * Above the cards sits the direction chooser (LIN-1566): the generation groups its | * goals under a few named directions, so you pick a direction first and a concrete
+    | // ── Direction grouping (LIN-1566) ─────────────────────────────────────────── | // The response's flat `options` array stays authoritative; `directions` is the
+### LIN-1566 routes/next-run.js (file at HEAD: DELETED) removed-by: 2c836676 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   * ({ analysis, directions, options, summary, context }) without calling an LLM, so | * live and test paths don't diverge (LIN-633, LIN-638, LIN-642, LIN-1566). | *
+   // The two named directions the mock's hand-written options are tagged with | // (LIN-1566). Declared here exactly as the LLM would declare them, so the mock | // drives the same resolver over the same inputs the live path uses.
+### LIN-1603 lib/prompt-template-defs.js (file at HEAD: yes) removed-by: 8f6690f2 LIN-4021: land the agreed plan and plan-review prompt text (#2178)
+   '', | // The revision half of the plan-review loop (LIN-1603 item 2.2). Sited BEFORE | // Strategy Framing so a revising planner reads the verdict before re-deriving
+   '', | // The plan-review gate (LIN-1603 item 2.1). Sited AFTER Scope Assessment because | // criterion (a) reads the session-fit answer. The decision is written down so a
+### LIN-1958 lib/plan-fee-config.js (file at HEAD: DELETED) removed-by: 30db2052 LIN-4129: remove cost code that nothing reads (#2234)
+   /** | * Plan-fee configuration seam (LIN-1958, Session 2 of LIN-1625, beat 1/4). | *
+### LIN-1958 lib/weekly-budget.js (file at HEAD: yes) removed-by: 30db2052 LIN-4129: remove cost code that nothing reads (#2234)
+   * + `WEEKLY_BUDGET_CHECKPOINT_AT`, mirroring the existing | * `PLAN_FEE_MONTHLY_USD` operator-config seam from LIN-1958 — no new DB/route | * surface) acts as a recalibration point: when present and dated inside the
+### LIN-2087 lib/weekly-budget.js (file at HEAD: yes) removed-by: 30db2052 LIN-4129: remove cost code that nothing reads (#2234)
+   * calibrated from the one recorded checkpoint-series/spend correlation on | * LIN-2087 (2026-08-14 capacity test day: 27 checkpointed weekly-window | * points, 31%→58%, measured against $1,070.58 of API-rate-equivalent spend
+    | // The window resets Thursdays 06:00Z (John's subscription; LIN-2087 comment | // 2026-08-14T17:52:39.900Z: "Thursdays 07:00 BST (06:00Z)").
+### LIN-2404 lib/weekly-budget.js (file at HEAD: yes) removed-by: 30db2052 LIN-4129: remove cost code that nothing reads (#2234)
+   // | // Recorded as a named record (LIN-2404), not just comment prose above, so | // the calibration date/window/sample stay a testable, surfaceable fact next
+### LIN-2423 lib/terminal-marked-task-cost.js (file at HEAD: yes) removed-by: 30db2052 LIN-4129: remove cost code that nothing reads (#2234)
+   * | * LIN-2423: `markerOccupiedLineages`/`markerOccupancyShare` are the marker-channel occupancy | * probe — the count (and share of `ranLineages`) of in-window lineages carrying at least one
+   * `laneLandedCount === 0` alone could not: "no lane-landed tickets" (honest zero) versus "the | * marker channel is empty" (LIN-2423's own defect — the producer-side fix this ticket also | * ships is what makes a nonzero reading possible at all). Published beside `laneLandedCount`,
+### LIN-2702 lib/llm-call-log.js (file at HEAD: yes) removed-by: 72305215 LIN-4179: Harbour calls on the cost read, one USD formatter, census and agreement (#2263)
+   /** | * Feature-scoped cost aggregation (LIN-2702) — the pre-run estimate | * Phase 3 renders. Unlike `summarizeByIssue`'s literal-zero empty return,
+### LIN-3202 lib/prompt-template-defs.js (file at HEAD: yes) removed-by: 8f6690f2 LIN-4021: land the agreed plan and plan-review prompt text (#2178)
+   '', | // Cite-don't-restate (LIN-3202). The plan is an addition to the research, | // not a copy of it. Sited in the Goal list so it is read before the plan
+### LIN-3230 lib/render-run-steps.js (file at HEAD: yes) removed-by: 17e4f325 LIN-4136: one fold for how a lineage's rows add up (#2243)
+   * total", an unpriced/missing/harness-only lineage reads "not reported". A | * per-turn harness figure is labelled "as reported" (LIN-3230/LIN-1426); the | * cumulative snapshot keeps the bare figure.
+
+Verdicts (read by hand):
+- LIN-3742, LIN-3872/3876/3877/3883/3893/3894, LIN-3911, LIN-3853, LIN-4198/4202/4201/4203/4226, LIN-3755: 0 dropped.
+- LIN-3846 (9f7acff7): LIN-1399 (render-settings.js "split into user/workspace") — provenance only; the split itself is the page structure now. LIN-2353 survives in 4 files. No reason lost.
+- LIN-3855 (d53bb5bc): LIN-993, LIN-1145 survive elsewhere. BUT the counter is blind to the one real loss in the Settings rebuild: the LIN-1694 cross-repo
+  warning at render-settings.js:131-138@76fc3e91 ("adding a preset here is only half the change … Update both") was removed; LIN-1694's ref survives
+  elsewhere, so ref-pooling reports nothing. HEAD keeps only "mirrors SD's guard … read at 955349d" (lib/model-routing-harnesses.js:10-12). See report R4.
+- LIN-3890 (8bbd6b5f): LIN-1247 survives in 2 files. No reason lost.
+- LIN-4016 (80afbb8f): LIN-4011, LIN-4012 dropped from task-page-loader.js; both absent from the whole-window list, so they were re-cited later. No reason lost.
+- LIN-4129 (30db2052, "remove cost code that nothing reads"): LIN-1958/2087/2404/2423 left with the deleted code. Legitimate (the code went too).
+- LIN-4179 (72305215): LIN-2702 left with the deleted feature aggregation. Legitimate.
+- LIN-4134/4136 (caf33052, 17e4f325): LIN-1426's "do NOT sum across harnesses; claude-code is cumulative" — survives in other words at
+  lib/row-usage.js:7-11 and lib/session-telemetry.js:404-406. No reason lost.
+- LIN-4021 (8f6690f2): LIN-1603 / LIN-3202 siting comments in prompt-template-defs.js went with the prompt text they sited (the plan-review
+  gate text was rewritten). Not re-derived further.
+- Whole window: 21 refs dropped, 12 of them with the deleted Next-run page (LIN-3912) — legitimate.
+Lesson for the tool: ref-pooling cannot see a reason dropped while its ref survives elsewhere (LIN-1694 above). Sampling is still needed
+(10-23 note 6 holds).
