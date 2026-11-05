@@ -1,0 +1,20 @@
+## head-af55cb73
+- 2eb73ae0: files 543, links 1269, pairs 12, groups [9], Other 16, Costs None
+    Agent API<->LLM 37/4; Agent API<->Providers 20/3; Agent API<->Runs 45/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; LLM<->Other features 1/1; LLM<->Providers 11/4; LLM<->Runs 31/37; Other features<->Runs 6/5; server-rendered pages<->Other features 9/8; server-rendered pages<->Runs 13/8
+- af55cb73: files 544, links 1271, pairs 12, groups [9], Other 17, Costs None
+    Agent API<->LLM 37/4; Agent API<->Providers 20/3; Agent API<->Runs 45/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; LLM<->Other features 2/1; LLM<->Providers 11/4; LLM<->Runs 31/37; Other features<->Runs 6/5; server-rendered pages<->Other features 9/8; server-rendered pages<->Runs 13/8
+## proposal-P7min-stage-writes
+- 2eb73ae0: files 543, links 1269, pairs 12, groups [9], Other 16, Costs None
+    Agent API<->LLM 37/4; Agent API<->Providers 20/3; Agent API<->Runs 45/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; LLM<->Other features 1/1; LLM<->Providers 11/4; LLM<->Runs 31/37; Other features<->Runs 6/5; server-rendered pages<->Other features 9/8; server-rendered pages<->Runs 13/8
+- af55cb73: files 544, links 1270, pairs 12, groups [9], Other 16, Costs None
+    Agent API<->LLM 38/4; Agent API<->Providers 20/3; Agent API<->Runs 45/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; LLM<->Other features 1/1; LLM<->Providers 11/4; LLM<->Runs 31/37; Other features<->Runs 6/5; server-rendered pages<->Other features 9/8; server-rendered pages<->Runs 13/8
+## proposal-P2c-costs-area
+- 2eb73ae0: files 543, links 1278, pairs 13, groups [10], Other 14, Costs 16
+    Agent API<->LLM 37/4; Agent API<->Providers 20/3; Agent API<->Runs 42/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; Costs<->LLM 1/4; Costs<->Runs 7/10; LLM<->Providers 11/4; LLM<->Runs 27/32; Other features<->Runs 6/4; server-rendered pages<->Other features 3/8; server-rendered pages<->Runs 13/8
+- af55cb73: files 544, links 1280, pairs 14, groups [10], Other 15, Costs 16
+    Agent API<->LLM 37/4; Agent API<->Providers 20/3; Agent API<->Runs 42/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; Costs<->LLM 1/4; Costs<->Runs 7/10; LLM<->Other features 1/1; LLM<->Providers 11/4; LLM<->Runs 27/32; Other features<->Runs 6/4; server-rendered pages<->Other features 3/8; server-rendered pages<->Runs 13/8
+## proposal-P2c+P7min
+- 2eb73ae0: files 543, links 1278, pairs 13, groups [10], Other 14, Costs 16
+    Agent API<->LLM 37/4; Agent API<->Providers 20/3; Agent API<->Runs 42/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; Costs<->LLM 1/4; Costs<->Runs 7/10; LLM<->Providers 11/4; LLM<->Runs 27/32; Other features<->Runs 6/4; server-rendered pages<->Other features 3/8; server-rendered pages<->Runs 13/8
+- af55cb73: files 544, links 1279, pairs 13, groups [10], Other 14, Costs 16
+    Agent API<->LLM 38/4; Agent API<->Providers 20/3; Agent API<->Runs 42/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; Costs<->LLM 1/4; Costs<->Runs 7/10; LLM<->Providers 11/4; LLM<->Runs 27/32; Other features<->Runs 6/4; server-rendered pages<->Other features 3/8; server-rendered pages<->Runs 13/8
