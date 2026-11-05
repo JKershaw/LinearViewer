@@ -517,6 +517,7 @@ describe('fake DOM: className and id reflect the class and id attributes (LIN-42
   test('reading id reflects setAttribute("id"), and an element with no id reads it as the empty string', () => {
     const { document } = world();
     const el = document.createElement('section');
+    document.body.appendChild(el);
     assert.equal(el.id, '', 'no id attribute reads as the empty string');
     el.setAttribute('id', 'z');
     assert.equal(el.id, 'z', 'the id attribute is the value read back');
