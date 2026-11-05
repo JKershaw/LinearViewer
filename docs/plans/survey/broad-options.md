@@ -42,6 +42,7 @@ Sources: the 13 step-backs of round 2/3/QoL (07:38, 4 Nov) and the two forward-t
 - **One process-group termination helper.** LIN-4196's builder: `groupAlive`/`stopGroup` in `run-mutations.js` is "another ad-hoc copy, beside `reapers.js` and several tests".
 
 - **A system test importing another repo's internals** (`park-read` imports Harbour's `lib/` files; HTTP tests didn't couple to layout). LIN-4239 q6. A precedent to watch.
+- **Split `home-view.js` (576 lines) and separate `upNextOf`'s eligibility from its ranking** (a candidate model both lists filter). LIN-4151 *(global)*; LIN-4144's Surveys both noted the same module threading `shown`/`waiting`/`linked`/`onHome` through every placement.
 - **One rulings reduction for the badge and Home** (they count differently today). LIN-4144 (open-0 and global).
 - **The Home-wide live repaint** (Running follows rulings, not only Waiting). LIN-4144 (global); its piece 5 carries the on-change part.
 

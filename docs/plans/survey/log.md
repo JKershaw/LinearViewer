@@ -1702,3 +1702,19 @@ Surveys at `172f644a1`: open-0 `ca6d61ac`, global code-only `c2dd09c1`.
 - it says something about the two lists sharing a name but not a rule (rename vs rank), as a place question, not only a UX one.
 
 **At merge:** one ranking function used by both Home and `/backlog`; no second comparator; no new homeless file.
+
+### 03:10 UTC: LIN-4151's Surveys scored (3 of 3), scoped and started
+- **All three criteria hit, from both voices** (code-only global):
+  - share `upNextOf`'s ranking (both: export one comparator, no copy);
+  - page and fold in one order (both: one derivation, because `homeRowsFor` re-splits on its own);
+  - name vs rule (both: the page never shows "Up next", so the order is the decision).
+- **Beyond the criteria:**
+  - "ready only" must sort, not filter, or blocked roots vanish from `/backlog` and break the reachability property;
+  - "one per epic" means nothing for roots;
+  - the pinned fixtures tie on every key, so a green suite proves nothing;
+  - the global: the ticket's acceptance is wrong about dedupe.
+
+  **Again, the forecast corrected the ticket before work began.**
+- **Scope:** rank, not rename. Piece 1: one exported ranking, one derivation for page and fold, header and `llms.txt`. Piece 2: the names that now describe `/backlog`, with a stop rule.
+  - **Honouring the voice:** the global's "not this task's" (separate eligibility from ranking; split `home-view.js`) stays out and goes to the tally.
+  - Autopilot `0949c9f3`.
