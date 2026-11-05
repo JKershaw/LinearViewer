@@ -2139,3 +2139,15 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 ### 14:45 UTC: a ruling from inside LIN-4255
 - `lin-4271-fake-additions`: may LIN-4271 add small non-layout APIs to the shared fake before moving suites? With them, 16 suites move (census 55 → 40); without, 7. **Proposed `yes-add`:** it's within the scope (grow the fake with its own tests, stop at layout), and it's the big move early. Each addition is tested in `fake-dom.test.js`, layout stays unmodelled, and reds are findings.
 - **A mechanics note:** `suggest-answer` needs the ruling's `anchor.loopId`. For a piece's ruling, that differs from `stampLoopId`. My first post used the stamp id and got `RULING_NOT_FOUND` silently (I wasn't printing the response). The scripts now use the anchor id and print the result.
+
+### 14:50 UTC: after compaction; three after-questions sent
+- Reread the essay (v5) after compaction. The caution that bears most on what's next is the charter retro's: a tidy that doesn't reach where the change binds moves stone without settling it. The third after-trial is in `public/prompt-section.js`, the essay's own example of where changes bind.
+- **After-questions sent,** each lineage being Done:
+
+  | Ticket | Implementation session | Follow-up | Questions |
+  |---|---|---|---|
+  | LIN-4246 | `c8a048f0` | `a2e300a7` | q1–q7 (its scope added the vm-layer lift) |
+  | LIN-4263 | `05ebe420` | `25a8e16d` | q1–q6 (scoped to the Surveys' own shape) |
+  | LIN-4276 | `f7f76444` | `5e2dae6d` | q1–q6, plus a tidy-after q7 |
+
+- **The tidy-after q7, new:** "This ticket was a tidy-after: a small follow-on, filed straight after an earlier ticket merged, to gather the copies that earlier ticket had left at its edges. Was doing it as its own task, then, worth it, or would it have been cheaper inside the earlier ticket, or later, or not at all? What would have made it smaller?" It's the after-step's own question, asked of the one who did it. It goes to every tidy-after from now on (LIN-4277; the third trial).
