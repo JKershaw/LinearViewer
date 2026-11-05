@@ -2092,3 +2092,12 @@ Scoped: freeze a dated cost table per leg; split the cost into floor, work, keep
 - **LIN-4263** landed the Surveys' shape (a nested per-dispatch breakdown, opt-in, snapshots null) and re-wrote two small rules that already existed nearby. Mixed, mixed, the "edges" pattern on a capability ticket. The paper's v2 can now split build from follow-up.
 - **LIN-4255's first piece (LIN-4265, `69e8f175`)** merged before any move, as scoped: a structural fake-DOM census with a frozen 56-file list, and the world helper renamed to a client-world name. The families follow.
 - **For John (open):** a readability pass on the size-and-cost paper, which leads with its method rather than its answer.
+
+### 13:40 UTC: the paper's v2 is set for a week out
+John hoped for "a chart: size, cost, and it *not* being a straight line, which would tell us something interesting", and is happy to rerun in a week or so. **Filed as LIN-4275** (Backlog, not before 12 Nov):
+- the chart leads (cost against size, log–log, one series per leg, marked by repo; the slope answers it: about 1 is straight, above 1 bends up, the Hanoi case, below 1 flattens);
+- a plain version next, then the numbers;
+- the build separated from the follow-ups with LIN-4263's `perDispatch`;
+- review rounds counted per ticket.
+
+The readability fix is folded into v2 rather than filed on its own. A scheduled task in this session fires on 12 Nov 09:41 UTC to Survey, scope and start it. It needs a fresh proxy token by then (`.tok4` expires 7 Nov 10:12 UTC).
