@@ -52,7 +52,6 @@ const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/fixtures/observation-dom-shim.js',
   'tests/unit/brief-recap-ai-not-configured-contract.test.js',
   'tests/unit/brief-recap-autogenerate.test.js',
-  'tests/unit/chart-helpers.test.js',
   'tests/unit/close-out-client.test.js',
   'tests/unit/common-assignee-filter-nav.test.js',
   'tests/unit/common-team-filter-nav.test.js',
