@@ -2114,3 +2114,16 @@ John: "we have almost a before, during, and after tidying up step". The loop's s
 - **LIN-4276's Surveys** checked a claim both blind reads of LIN-4263 had made: that two undated members give NaN, "and the order is undefined". Both found it false. ECMAScript turns a NaN comparison into a tie, and the sort is stable, so the order is defined and matches the owner's. They ran it on node at several sizes. So my "red at base" Done-when couldn't be met honestly, and it's replaced: a test pins the exported order where it lives instead.
 - **Reading:** the blind read is the better hand for the balance, but **its specific claims are claims, not facts**, and the Survey before the tidy-after is where they get checked. That's one more reason to Survey every ticket, the "after" ones included.
 - Both voices also found a third key reader (`keyOf`) at the same edge, now in scope ("derive or explain"). The marker sort in `dispatch-lineage.js` goes to a follow-up. Autopilot started.
+
+### 14:10 UTC: John's framing, a network of tasks, and two dials
+John: we're turning a linear series of steps into a network of tasks and agents that can work on the "seemingly unbounded space of tangles and nests". Eventually a ticket with a small budget goes straight through without making additional mess, and any increase in the budget improves the codebase, making it cheaper, easier and more reliable afterwards. He doesn't want to spend much on the economic argument; standing we can measure is more useful.
+
+**Two dials, as I read it:**
+1. **"Make no new mess":** always on and cheap (the Survey before, ratchets during, the edges tidy-after). A small-budget ticket should land neutral, not worse. Today's "mixed" rows are exactly new mess at the edges, so the "after" step is aimed at this dial.
+2. **"How much to tidy":** the human's budget. Anything above zero is investment in the place.
+
+What keeps the network bounded is what we've been learning: pull not push, a price per move, the human choosing the size, and ratchets.
+
+**A future experiment (John):** costing runs on a blank repo, a greenfield project and an already-tidy codebase, as controls Harbour can't give itself, and as a test of the prompts' generality. The sharpest version is **the same tasks on two copies of one codebase, one tidy and one with planted duplication** (the "18 copies" kind), comparing cost, review rounds and escaped defects like for like. Either outcome is live: the record says copies drive escapes (45% of escaped defects), while hours within a size band don't differ, and the size-and-cost paper found the work leg doesn't follow size. So copies may cost reliability more than money. A candidate paper, not yet filed.
+
+John is happy to keep running as we have been: tweak, learn, improve.
