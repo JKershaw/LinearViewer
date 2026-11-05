@@ -93,9 +93,9 @@ describe('appendToolRow', () => {
     assert.equal(groupSummary(group).textContent, 'checked 2 things …', 'pending while any member is pending');
     a.settle('{}'); b.settle('{}');
     assert.equal(groupSummary(group).textContent, 'checked 2 things');
-    ChatUI.appendToolRow(thread, { label: 'c' });
+    const c = ChatUI.appendToolRow(thread, { label: 'c' });
     assert.equal(thread.children.length, 1);
-    assert.equal(groupRows(group).length, 3);
+    assertSameNodes(groupRows(group), [a.li, b.li, c.li], 'the third row joins at the end');
   });
 
   test('any non-tool li between rows breaks the run (a proposal or note is never a member)', () => {
