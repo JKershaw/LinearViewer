@@ -13,7 +13,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHomeRowStates } from '../../lib/home-row-states.js';
 import { readRulingStanding } from '../../lib/ruling-standing.js';
-import { rulingStandingOf } from '../../lib/unanswered-decisions.js';
+import { collectUnansweredDecisions } from '../../lib/unanswered-decisions.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { liveOnAnchor } from '../../routes/dashboard-session-state.js';
 import { buildHomeView } from '../../lib/home-view.js';
@@ -119,21 +119,25 @@ describe('LIN-4114 witness 6: a ruling with a live run on its task reads as "rec
     const home = await assembly({ urlKey: 'acme', issues: [issueNode('LIN-1').issue, issueNode('LIN-2').issue], runControls: true });
     // The feed (routes/dashboard-rulings.js) builds the same predicate over the enriched loops it holds.
     const enriched = loops.map(l => enrichLoop(l));
-    const feed = rulingStandingOf(
-      { urlKey: 'acme', loops, taskDecisions: [], shelvedRulings: [], newestScanByTask: {} },
-      { now: NOW, enrichLoop, liveDispatchOnAnchor: liveOnAnchor(enriched) }
+    const feed = collectUnansweredDecisions(
+      { loops: enriched.map(l => ({ ...l, workspaceUrlKey: 'acme' })), taskDecisions: [], shelvedRulings: [], newestScanByTask: {} },
+      { now: NOW, liveDispatchOnAnchor: liveOnAnchor(enriched) }
     );
     const effectsOf = rows => rows.map(r => `${r.anchor.issueIdentifier}:${r.effect}`).sort();
-    assert.deepEqual(effectsOf(home.rulingRows || []), effectsOf(feed.rows), 'Home and the feed agree row for row');
-    assert.ok(effectsOf(feed.rows).includes('LIN-1:record'), 'the feed says record for the task with a live run');
-    assert.ok(effectsOf(feed.rows).includes('LIN-2:dispatch'), 'the feed says dispatch for the task with no live run');
+    assert.deepEqual(effectsOf(home.rulingRows || []), effectsOf(feed), 'Home and the feed agree row for row');
+    assert.ok(effectsOf(feed).includes('LIN-1:record'), 'the feed says record for the task with a live run');
+    assert.ok(effectsOf(feed).includes('LIN-2:dispatch'), 'the feed says dispatch for the task with no live run');
   });
 
-  test('GUARD: the task page\'s ruling read, without the live-run option, still says "dispatch" for that ruling', async () => {
+  // LIN-4143 changed this: the live-run guard is unconditional in every standing read, so the task page's standing read
+  // reads the same effect as Home and the feed. Nothing on the task page renders a standing row's effect (its card is
+  // built from the run page's guarded read), so the page's output is unchanged; tests/unit/lin-4143-task-page-guard.test.js
+  // pins that the card's effect matches the feed's.
+  test('GUARD (LIN-4143): the task page\'s ruling read is guarded by default, so a live run\'s ruling reads "record" there too', async () => {
     const loops = [goneRulingLoop('LIN-1'), liveLoop('LIN-1')];
     const standing = await readRulingStanding({ urlKey: 'acme', loops, at: NOW, enrichLoop });
     const row = standing.rows.find(r => r.anchor.issueIdentifier === 'LIN-1');
-    assert.equal(row.effect, 'dispatch', 'the task page is not changed by this ticket');
+    assert.equal(row.effect, 'record', 'the standing read is the feed\'s read, with no flag to leave it unguarded');
   });
 });
 

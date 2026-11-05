@@ -25,7 +25,7 @@ import { createHomeRowStates, createWaitingStanding } from '../../lib/home-row-s
 import { renderWaitingSection, waitingTitlesOf } from '../../lib/waiting-section.js';
 import '../../lib/providers/linear/index.js';
 import { renderPage } from '../../lib/render.js';
-import { readRulingStanding } from '../../lib/ruling-standing.js';
+import { collectUnansweredDecisions } from '../../lib/unanswered-decisions.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -239,8 +239,8 @@ function pageHtmlFor(rulingRows, runControls) {
 describe('LIN-4242 witness 3: the page section and the live fragment are one markup over one reduction', () => {
   for (const [name, { loops, expected }] of Object.entries(SCENARIOS)) {
     test(`${name}, owner: the page draws the fragment's markup byte for byte, with ${expected} card(s)`, async () => {
-      // Witness: a page that reads the standing on its own without the live-run guard (liveGuard: false) carries the
-      // liveGuard scenario's ruling, so the page and the fragment differ and this fails.
+      // Witness: a page that reads the standing on its own without the live-run guard (the raw reduction, no predicate)
+      // carries the liveGuard scenario's ruling with effect null, so the page and the fragment differ and this fails.
       const d = deps(loops);
       const standing = createWaitingStanding(d);
       const { ruling } = await standing({ urlKey: 'ws', at: NOW });
@@ -271,17 +271,18 @@ describe('LIN-4242 witness 3: the page section and the live fragment are one mar
 });
 
 describe('LIN-4242 witness 3: the live-run guard is part of the one reduction the page and the fragment share', () => {
-  test('LIN-5 keeps its card under the guard with effect "record", and without it reads no effect: the page must carry the guarded one', async () => {
+  test('LIN-5 keeps its card under the guard with effect "record", and the raw reduction reads no effect: the page must carry the guarded one', async () => {
     const d = deps(SCENARIOS.liveGuard.loops);
     const standing = createWaitingStanding(d);
     const { ruling } = await standing({ urlKey: 'ws', at: NOW });
-    const unguarded = await readRulingStanding({
-      urlKey: 'ws', loops: SCENARIOS.liveGuard.loops, at: NOW, taskDecisionsStore: d.taskDecisionsStore,
-      shelvedRulingsStore: d.shelvedRulingsStore, enrichLoop, liveGuard: false,
-    });
+    // The raw reduction: the badge's collection with no live-run predicate, over the same enriched loops.
+    const raw = collectUnansweredDecisions(
+      { loops: SCENARIOS.liveGuard.loops.map(l => ({ ...enrichLoop(l), workspaceUrlKey: 'ws' })), taskDecisions: [], shelvedRulings: [], newestScanByTask: {} },
+      { now: NOW }
+    );
     const effectOf = (rows, id) => rows.find(r => r.anchor.issueIdentifier === id)?.effect;
     assert.equal(effectOf(ruling.rows, 'LIN-5'), 'record', 'the guarded read records the ruling');
-    assert.equal(effectOf(unguarded.rows, 'LIN-5'), null, 'the unguarded read leaves its effect unset, so a page that skips the guard differs');
+    assert.equal(effectOf(raw, 'LIN-5'), null, 'the raw reduction leaves its effect unset, so a page that skips the guard differs');
     const page = await createHomeRowStates({ ...d, waitingStanding: standing })({ urlKey: 'ws', issues: [], runControls: true });
     assert.equal(effectOf(page.rulingRows, 'LIN-5'), 'record', 'the page reads the same guarded effect');
   });

@@ -1,18 +1,20 @@
 /**
  * LIN-4143 characterization: the ruling standing's shape does not depend on the live-run guard; only a row's `effect` does.
  *
- * Written before the guard is made unconditional (commit 3a), so it is green at base. It pins, for scenarios that
+ * Written in commit 3a, before the guard was made unconditional, so it was green at base. It pins, for scenarios that
  * exercise a live run, a task-scan decision, a shelved ruling and a parked loop, the rows (identity and disposition),
- * `openLoopIds`, `shelvedTaskIdentifiers` and `taskScanByIdentifier`'s keys. Those must be identical with and without the
- * guard. The one `effect` difference the guard makes is pinned too: LIN-5's row reads `record` guarded and `null` raw.
+ * `openLoopIds`, `shelvedTaskIdentifiers` and `taskScanByIdentifier`'s keys. Commit 3b removed the guard flag: the
+ * standing is read guarded, and its rows are compared against the raw reduction (no predicate), which must agree on
+ * every row's identity. The one `effect` the guard changes is pinned: LIN-5's row reads `record` guarded, `null` raw.
  *
- * Any non-effect difference the guard change introduces fails here, which is the scope decision's stop condition.
+ * Any non-effect difference the guard introduces fails here, which is the scope decision's stop condition.
  *
  * Run with: node --test tests/unit/lin-4143-standing-characterization.test.js
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readRulingStanding } from '../../lib/ruling-standing.js';
+import { collectUnansweredDecisions } from '../../lib/unanswered-decisions.js';
 import { enrichLoop } from '../../routes/dashboard.js';
 
 const NOW = new Date('2026-10-30T10:06:00.000Z');
@@ -71,13 +73,19 @@ function storesFor(s) {
   };
 }
 
+/** A row's identity: everything about it except `effect` and `alternate`. */
+const rowIdentity = (rows) => rows.map(r => ({
+  id: r.decision.decision_id, disposition: r.disposition, loopId: r.anchor.loopId ?? null,
+  taskDecisionId: r.anchor.taskDecisionId ?? null, identifier: r.anchor.issueIdentifier,
+}));
+
+/** The loops as the reduction reads them: enriched and tagged with the workspace. */
+const taggedLoops = (loops) => loops.map(l => ({ ...enrichLoop(l), workspaceUrlKey: 'ws' }));
+
 /** The guard-independent shape of a standing: everything except `effect`. */
 function shapeOf(ruling) {
   return {
-    rows: ruling.rows.map(r => ({
-      id: r.decision.decision_id, disposition: r.disposition, loopId: r.anchor.loopId ?? null,
-      taskDecisionId: r.anchor.taskDecisionId ?? null, identifier: r.anchor.issueIdentifier,
-    })),
+    rows: rowIdentity(ruling.rows),
     openLoopIds: [...ruling.openLoopIds].sort(),
     shelvedTaskIdentifiers: [...ruling.shelvedTaskIdentifiers].sort(),
     taskScanKeys: [...ruling.taskScanByIdentifier.keys()].sort(),
@@ -103,25 +111,27 @@ const EXPECTED_SHAPE = {
   parked: { rows: [], openLoopIds: [], shelvedTaskIdentifiers: [], taskScanKeys: [] },
 };
 
-describe('LIN-4143 characterization: the standing shape is the same with and without the live-run guard', () => {
+describe('LIN-4143 characterization: the standing shape is pinned and agrees with the raw reduction', () => {
   for (const [name, s] of Object.entries(SCENARIOS)) {
-    test(`${name}: rows, open loops, shelves and task-scan keys are pinned and do not depend on the guard`, async () => {
-      const stores = storesFor(s);
-      const raw = await readRulingStanding({ urlKey: 'ws', loops: s.loops, at: NOW, enrichLoop, ...stores });
-      const guarded = await readRulingStanding({ urlKey: 'ws', loops: s.loops, at: NOW, enrichLoop, ...stores, liveGuard: true });
+    test(`${name}: rows, open loops, shelves and task-scan keys are pinned, and the rows agree with the raw reduction`, async () => {
+      const standing = await readRulingStanding({ urlKey: 'ws', loops: s.loops, at: NOW, enrichLoop, ...storesFor(s) });
+      assert.deepEqual(shapeOf(standing), EXPECTED_SHAPE[name], 'the shape the callers read');
 
-      assert.deepEqual(shapeOf(raw), EXPECTED_SHAPE[name], 'the shape the callers read');
-      assert.deepEqual(shapeOf(guarded), shapeOf(raw), 'the guard changes no shape, only effects');
+      // The raw reduction (no live-run predicate) over the same inputs: the guard changes effects, never a row.
+      const raw = collectUnansweredDecisions(
+        { loops: taggedLoops(s.loops), taskDecisions: s.taskDecisions, shelvedRulings: s.shelved, newestScanByTask: {} },
+        { now: NOW }
+      );
+      assert.deepEqual(rowIdentity(raw), shapeOf(standing).rows, 'the rows are the same with and without the guard');
     });
   }
 
-  test('the one effect the guard changes is the live run\'s row: LIN-5 records guarded, reads null raw', async () => {
+  test('a readRulingStanding call with no guard argument reads LIN-5 as record; the raw reduction reads it null', async () => {
     const s = SCENARIOS.liveRun;
-    const stores = storesFor(s);
-    const raw = await readRulingStanding({ urlKey: 'ws', loops: s.loops, at: NOW, enrichLoop, ...stores });
-    const guarded = await readRulingStanding({ urlKey: 'ws', loops: s.loops, at: NOW, enrichLoop, ...stores, liveGuard: true });
-    const effects = (ruling) => Object.fromEntries(ruling.rows.map(r => [r.anchor.issueIdentifier, r.effect]));
-    assert.deepEqual(effects(raw), { 'LIN-1': 'resume', 'LIN-5': null });
-    assert.deepEqual(effects(guarded), { 'LIN-1': 'resume', 'LIN-5': 'record' });
+    const standing = await readRulingStanding({ urlKey: 'ws', loops: s.loops, at: NOW, enrichLoop, ...storesFor(s) });
+    const raw = collectUnansweredDecisions({ loops: taggedLoops(s.loops), taskDecisions: [], shelvedRulings: [], newestScanByTask: {} }, { now: NOW });
+    const effects = (rows) => Object.fromEntries(rows.map(r => [r.anchor.issueIdentifier, r.effect]));
+    assert.deepEqual(effects(standing.rows), { 'LIN-1': 'resume', 'LIN-5': 'record' }, 'the only call shape left reads the guarded effect');
+    assert.deepEqual(effects(raw), { 'LIN-1': 'resume', 'LIN-5': null }, 'the raw reduction leaves LIN-5 unset');
   });
 });
