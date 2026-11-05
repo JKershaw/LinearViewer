@@ -165,6 +165,7 @@ lib/
   prompt-formatters.js Shared formatting helpers for prompt templates
   prompt-contract.js   The stage contract (LIN-3292): the formats later steps parse, appended by code (finishStagePrompt) after every stage's body
   stage-router.js      The next-stage choice's own seam (LIN-3304): the stage selector every recommendation call sends (LIN-3300: SELECTOR_RULES + the stages' own `route` descriptions → buildRouterPrompt, pinned by tests/fixtures/stage-router-prompts/) and the reply parse/contract (routeStage/parseRouteDecision, plus parseRecommendedAction/parseDeferTo/parseWhyNow); getRecommendation/getRecommendationStream call the seam
+  stage-writes.js      What a stage may write (LIN-4253): the `writes` values every template declares (`work`, the default; `one-comment`, the Surveys' read-only forecast). A dependency-free leaf: the templates import it to declare, the preamble imports it for the vocabulary; it imports nothing.
   prompt-template-defs.js  Prompt template definitions (19 templates), and STAGE_LEADS: each stage's Goal lead, the one intent source per stage (LIN-3299)
   completion-signals.js  Completion signals for prompt assessment
   custom-prompts-store.js  Custom prompt template storage (per workspace)
