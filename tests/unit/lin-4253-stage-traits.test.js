@@ -28,20 +28,20 @@ const PINNED = {
   'blocked': { route: 'offered', writes: 'work' },
   'bug': { route: 'offered', writes: 'work' },
   'plan': { route: 'offered', writes: 'work' },
-  'look-into': { route: 'offered', writes: 'work', reason: 'A reading pass (STAGE_INTENT READING), still work: LIN-4251 makes it read-only.' },
-  'triage': { route: 'offered', writes: 'work', reason: 'Files and updates tickets, so it is not read-only at all; still the default block until LIN-4251 gives it a write mode.' },
+  'look-into': { route: 'offered', writes: 'none', reason: 'A reading pass (STAGE_INTENT READING) that writes nothing (LIN-4251): it reports its findings in the session.' },
+  'triage': { route: 'offered', writes: 'ticket-fields', reason: 'Changes this ticket\'s labels, priority, state and project and comments on it (LIN-4251); it never files tickets, rewrites the description or touches code.' },
   'breakdown': { route: 'offered', writes: 'work' },
   'research': { route: 'offered', writes: 'work' },
   'scoping': { route: 'offered', writes: 'work' },
   'design': { route: 'offered', writes: 'work' },
   'spike': { route: 'offered', writes: 'work' },
-  'context': { route: 'offered', writes: 'work', reason: 'A reading pass (STAGE_INTENT READING), still work: LIN-4251 makes it read-only.' },
+  'context': { route: 'offered', writes: 'one-comment', reason: 'A reading pass (STAGE_INTENT READING) whose only write is one comment on its ticket (LIN-4251); it is not a forecast.' },
   'plan-review': { route: 'offered', writes: 'work' },
   'implementation': { route: 'offered', writes: 'work' },
   'review': { route: 'offered', writes: 'work' },
   'close-out': { route: 'offered', writes: 'work' },
   'retrospective-audit': { route: 'offered', writes: 'work' },
-  'retro': { route: 'hand-only', writes: 'work', reason: 'Hand-triggered look-back, never routed (LIN-3309); a reading pass still work until LIN-4251.' },
+  'retro': { route: 'hand-only', writes: 'none', reason: 'Hand-triggered look-back, never routed (LIN-3309); a reading pass that writes nothing unless asked (LIN-4251).' },
   'survey-task': { route: 'hand-only', writes: 'one-comment', reason: 'LIN-4248 forecast: reads, posts one comment on the surveyed ticket, changes nothing else.' },
   'survey-place': { route: 'hand-only', writes: 'one-comment', reason: 'LIN-4248 forecast of the codebase as a place: the same one-comment write as survey-task.' },
 };
@@ -110,18 +110,21 @@ describe('LIN-4253 — every template declares both traits (a missing one fails 
   }
 });
 
-describe('LIN-4253 — writes and the reading pass (STAGE_INTENT), related, not folded', () => {
-  test('every stage that may not write as work is a reading pass', () => {
+describe('LIN-4253 / LIN-4251 — writes and the reading pass (STAGE_INTENT), related, not folded', () => {
+  // The two-way statement (LIN-4251): a stage is a reading pass exactly when its writes is `none`
+  // or `one-comment`. Each direction is checked, so a stage that reads and writes as work, or that
+  // writes and does not read, fails here.
+  test('a stage is READING exactly when its writes is none or one-comment', () => {
+    const READS_ONLY = [WRITES.NONE, WRITES.ONE_COMMENT];
     for (const kind of KINDS) {
-      if (PROMPT_TEMPLATES[kind].writes !== DEFAULT) assert.match(STAGE_INTENT[kind][0], READING, kind);
+      const reading = READING.test(STAGE_INTENT[kind][0]);
+      assert.equal(reading, READS_ONLY.includes(PROMPT_TEMPLATES[kind].writes), `${kind}: READING iff writes is none or one-comment`);
     }
   });
 
-  test('the converse is false today: context, look-into and retro read, and still write as work', () => {
-    for (const kind of ['context', 'look-into', 'retro']) {
-      assert.match(STAGE_INTENT[kind][0], READING, kind);
-      assert.equal(PROMPT_TEMPLATES[kind].writes, DEFAULT, kind);
-    }
+  test('ticket-fields is not READING: triage is filing, its STAGE_INTENT says so', () => {
+    assert.doesNotMatch(STAGE_INTENT.triage[0], READING);
+    assert.equal(PROMPT_TEMPLATES.triage.writes, WRITES.TICKET_FIELDS);
   });
 });
 

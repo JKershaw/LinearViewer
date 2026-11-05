@@ -64,7 +64,9 @@ function buildApp(captured, { workspaceHarnessDefault = null, itemForWatch = nul
       listItems: async () => (itemForWatch ? [itemForWatch] : []),
       listHistory: async () => ({ items: [], total: 0 }),
       listHistoryLineageRows: async () => ({ items: [], total: 0 }),
-      ensureLineageStatus: async () => {}
+      ensureLineageStatus: async () => {},
+      // The resume helper's lookup (LIN-3134): no declared record, so a follow-up takes the plain path.
+      getGrantDeclaration: async () => ({ state: 'none' })
     },
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: {
@@ -96,24 +98,25 @@ async function call(app, method, path, body) {
 
 
 const PR_WORDING = /open PRs|PR link|commit SHA/;
-// LIN-4253: the Survey kinds are the templates declaring `writes: one-comment`, not a literal list.
-const SURVEY_KINDS = Object.keys(PROMPT_TEMPLATES).filter(kind => PROMPT_TEMPLATES[kind].writes === WRITES.ONE_COMMENT);
+// LIN-4253 / LIN-4251: every kind whose template declares a write mode other than `work` (the Surveys,
+// context, look-into, retro, triage), found from the templates, not a literal list.
+const NON_WORK_KINDS = Object.keys(PROMPT_TEMPLATES).filter(kind => PROMPT_TEMPLATES[kind].writes !== WRITES.WORK);
 
-function assertReadOnlyPreamble(item, where) {
+function assertNoPrWording(item, where) {
   assert.ok(item, `${where}: an item was dispatched`);
   assert.ok(item.prompt.includes(MARKER), `${where}: still gets the access block`);
-  assert.doesNotMatch(item.prompt, PR_WORDING, `${where}: no PR wording in a Survey dispatch`);
+  assert.doesNotMatch(item.prompt, PR_WORDING, `${where}: no PR wording in a non-work dispatch`);
 }
 
-describe('LIN-4248 — Survey kinds get the read-only preamble on every entry path', () => {
-  for (const kind of SURVEY_KINDS) {
+describe('LIN-4248 / LIN-4251 — every non-work stage gets its own preamble on every entry path', () => {
+  for (const kind of NON_WORK_KINDS) {
     test(`${kind}: POST /dispatch with an explicit kind`, async () => {
       const captured = {};
       const res = await call(buildApp(captured), 'post', '/api/proxy/dispatch', {
         prompt: 'survey it', issueIdentifier: 'TEST-1', kind
       });
       assert.equal(res.status, 201, JSON.stringify(res.body));
-      assertReadOnlyPreamble(captured.item, `${kind} (a)`);
+      assertNoPrWording(captured.item,`${kind} (a)`);
     });
 
     test(`${kind}: POST /dispatch with promptName and no kind (derived kind)`, async () => {
@@ -122,7 +125,7 @@ describe('LIN-4248 — Survey kinds get the read-only preamble on every entry pa
         prompt: 'survey it', issueIdentifier: 'TEST-1', promptName: kind
       });
       assert.equal(res.status, 201, JSON.stringify(res.body));
-      assertReadOnlyPreamble(captured.item, `${kind} (b)`);
+      assertNoPrWording(captured.item,`${kind} (b)`);
     });
 
     test(`${kind}: POST /recommend-and-dispatch with kind`, async () => {
@@ -131,7 +134,7 @@ describe('LIN-4248 — Survey kinds get the read-only preamble on every entry pa
         issueIdentifier: 'TEST-1', kind
       });
       assert.equal(res.status, 201, JSON.stringify(res.body));
-      assertReadOnlyPreamble(captured.item, `${kind} (c)`);
+      assertNoPrWording(captured.item,`${kind} (c)`);
     });
   }
 
@@ -143,5 +146,41 @@ describe('LIN-4248 — Survey kinds get the read-only preamble on every entry pa
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.ok(captured.item.prompt.includes(MARKER));
     assert.match(captured.item.prompt, PR_WORDING, 'non-Survey kinds keep the PR lines');
+  });
+});
+
+// LIN-4251: a follow-up resumes a parent's session and carries its own stage's preamble
+// (dispatch-entrance's follow-up arm passes `writes` to the resume helper's attach).
+const PARENT = '5d1c6a7e-2b3f-4c8d-9e0f-1a2b3c4d5e6f';
+// The opening of each non-work value's closing sentence, as the block states it.
+const CLOSING_OPENER = {
+  none: 'Just END with your findings',
+  'one-comment': 'Just END with the link to the one comment',
+  'ticket-fields': 'Just END with each field change',
+};
+
+describe('LIN-4251 — a follow-up gets the block of the stage it names, through the resume arm', () => {
+  for (const kind of NON_WORK_KINDS) {
+    test(`follow-up naming ${kind}: its own closing, no PR wording`, async () => {
+      const writes = PROMPT_TEMPLATES[kind].writes;
+      assert.ok(CLOSING_OPENER[writes], `${writes} has a closing opener in this witness`);
+      const captured = {};
+      const res = await call(buildApp(captured), 'post', '/api/proxy/dispatch', {
+        prompt: 'carry on', issueIdentifier: 'TEST-1', kind, followUpTo: PARENT, appendProxyContext: true
+      });
+      assert.equal(res.status, 201, JSON.stringify(res.body));
+      assertNoPrWording(captured.item, `${kind} follow-up`);
+      assert.ok(captured.item.prompt.includes(CLOSING_OPENER[writes]), `${kind} follow-up carries its closing`);
+    });
+  }
+
+  test('a kind-less follow-up is the work stage: the PR block is kept', async () => {
+    const captured = {};
+    const res = await call(buildApp(captured), 'post', '/api/proxy/dispatch', {
+      prompt: 'carry on', issueIdentifier: 'TEST-1', followUpTo: PARENT, appendProxyContext: true
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.ok(captured.item.prompt.includes(MARKER));
+    assert.match(captured.item.prompt, PR_WORDING, 'no stage named, so the work block');
   });
 });

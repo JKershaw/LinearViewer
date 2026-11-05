@@ -19,11 +19,11 @@ import { sessionSummaryOf } from '../../lib/task-page-loader.js';
 import { STAGE_INTENT } from '../../lib/prompts/stage-intent.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 import { BUCKET_OF_KIND } from '../../lib/wall-clock-summary.js';
-import { WRITES } from '../../lib/stage-writes.js';
 
-// LIN-4253: the two read-only Surveys are the templates declaring `writes: one-comment` (the pin
-// test in lin-4253-stage-traits.test.js holds that value, with its reason, for each kind).
-const SURVEYS = Object.keys(PROMPT_TEMPLATES).filter(kind => PROMPT_TEMPLATES[kind].writes === WRITES.ONE_COMMENT);
+// The two Surveys, by name: this file tests the Survey stages themselves. LIN-4251 gave `context` the
+// same `one-comment` write mode, so the value no longer picks out the Surveys. The pin test in
+// lin-4253-stage-traits.test.js holds each kind's writes value, with its reason.
+const SURVEYS = ['survey-task', 'survey-place'];
 const FIXTURE_ISSUE = {
   id: 'issue-4248', identifier: 'LIN-1', title: 'A fixture ticket', description: 'Its description, as it reads now.',
   url: 'https://linear.app/example/issue/LIN-1', state: { name: 'Backlog', type: 'backlog' }, labels: [],

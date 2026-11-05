@@ -255,6 +255,24 @@ describe('feedback submit (LIN-635)', () => {
     assert.match(prompt, /\/api\/proxy\/brief\/LIN-900/);
   });
 
+  // LIN-4251: feedback-filed triage resolves its stage's `writes` from the template (ticket-fields),
+  // so it carries the triage closing and no PR mandate. Before, it kept the work block.
+  test("action:'triage' carries the ticket-fields block, not the work block (LIN-4251)", async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const app = buildApp({
+      provider, dispatchQueueStore: dispatch, proxyTokenStore: fakeProxyTokenStore('rw-tok-tf')
+    });
+
+    const { status } = await submit(app, 'acme', { message: 'Something is broken', priority: 2, action: 'triage' });
+
+    assert.strictEqual(status, 201);
+    const prompt = dispatch.items[0].item.prompt;
+    assert.match(prompt, /Just END with each field change/, 'the triage closing');
+    assert.doesNotMatch(prompt, /open PRs|PR link|commit SHA/, 'no PR mandate or PR closing');
+    assert.doesNotMatch(prompt, /update the workspace as you work/, 'no update clause: the mandate names what triage may change');
+  });
+
   // === Explicit post-create actions (LIN-918) ==============================
 
   test("action:'save' files only — nothing enqueued even with a stale feedbackTriage flag", async () => {
