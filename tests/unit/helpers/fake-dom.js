@@ -26,7 +26,9 @@
  *   unmatched end tag, an unknown named entity and markup it does not model (`<!doctype …>`).
  * - Attributes: `get/set/has/removeAttribute`, `hidden`, `disabled` and `type` (reflecting; `type` defaults to `text` on an
  *   input and `submit` on a button), `dataset` (kebab-cased, with
- *   `delete`), `classList` (`add`, `remove`, `toggle` with force, `contains`).
+ *   `delete`), `classList` (`add`, `remove`, `toggle` with force, `contains`), and `className` and `id`, which reflect the `class`
+ *   and `id` attributes (a set writes the attribute, so `className = ''` leaves `class=""`, and a read is `''` when absent).
+ *   This reverses LIN-4252's "not modelled" choice for these two properties (LIN-4270).
  * - Selectors (`querySelector[All]`, `matches`, `closest`): type, `.class`, `#id`, `[attr]`, `[attr="v"]`, compound chains,
  *   descendant and `>` combinators, comma lists, `:not(<compound list>)`, and `:scope`. Anything else throws, naming the
  *   selector: `+`, `~`, `*`, `:has`, `:nth-*`, other pseudo-classes, and attribute operators other than `=`.
@@ -41,7 +43,7 @@
  * Deliberately not modelled: layout, CSS, `:hover`, `:checked` and the other state pseudo-classes, `+` and `~`, event
  * dispatch and bubbling, HTML error recovery (implied end tags such as `<p>` closing `<p>`), foreign content (SVG and
  * MathML), `<script>` execution, `getBoundingClientRect`, `MutationObserver`, `Range` and `Selection`,
- * `getClientRects` (so a Tab-driven focus trap cannot be exercised), `select`, `id` and `className` as properties (use the attributes), and selection direction.
+ * `getClientRects` (so a Tab-driven focus trap cannot be exercised), `select`, and selection direction.
  */
 
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
@@ -228,6 +230,12 @@ class FakeElement extends FakeNode {
   }
   hasAttribute(name) { return this._attrs.has(String(name).toLowerCase()); }
   removeAttribute(name) { this._attrs.delete(String(name).toLowerCase()); }
+
+  /** `className` and `id` reflect the `class` and `id` attributes: the attribute is the only store. A read with no attribute is `''`. */
+  get className() { return this.getAttribute('class') ?? ''; }
+  set className(v) { this.setAttribute('class', String(v)); }
+  get id() { return this.getAttribute('id') ?? ''; }
+  set id(v) { this.setAttribute('id', String(v)); }
 
   get hidden() { return this.hasAttribute('hidden'); }
   set hidden(on) { if (on) this.setAttribute('hidden', ''); else this.removeAttribute('hidden'); }
