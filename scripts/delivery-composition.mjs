@@ -43,6 +43,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { isTest, isDoc } from './delivery-paths.mjs';
 
 const args = process.argv.slice(2);
 const repos = [];
@@ -83,10 +84,6 @@ const weekOf = (iso) => {
   d.setUTCDate(d.getUTCDate() - dow);
   return d.toISOString().slice(0, 10);
 };
-
-const isTest = (p) => /(^|\/)tests?\//i.test(p) || /\.(test|spec)\./i.test(p)
-  || /(^|\/)(e2e|fixtures)\//i.test(p) || /playwright/i.test(p);
-const isDoc = (p) => /\.md$/i.test(p) || /(^|\/)docs\//i.test(p) || /claude\.md$/i.test(p);
 
 const tickets = new Map();                      // LIN-id -> { first, last }
 const raw = new Map(), mainline = new Map();

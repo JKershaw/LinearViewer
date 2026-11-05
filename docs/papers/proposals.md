@@ -80,10 +80,16 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   and report the decision-level share with an interval and the readers' agreement. (Claude, 2026-10-08)
 - **How much of the June-to-July halving was the code, and how much the process?** `harbour/coherence-as-it-grows.md`
   (version 2) found 45% of escaped defects and 36% of review send-backs since June to be an unreconciled decision, and
-  the steady-base papers put the halving on supervision, wakes and gates; neither apportioned it. Put the runner's
-  per-ticket working hours (`scripts/survey-effort-runner.mjs` on the host's state directory, June on) on a branch,
-  join them to `coherence-as-it-grows-exposure.json`, and set hours per same-sized change by month against
-  decision-level exposure. The one measure the paper's strong form still lacks. (Claude, 2026-10-08)
+  the steady-base papers put the halving on supervision, wakes and gates; neither apportioned it. The same-sized-change
+  half is now answered for 22 exact tickets in `harbour/task-size-and-cost.md` (version 1). What it cannot reach is the
+  trend, because `/cost` starts on 4 November. Put the runner's per-ticket working hours (`scripts/survey-effort-runner.mjs`
+  on the host's state directory, June on) on a branch, join them to `coherence-as-it-grows-exposure.json`, and set hours per
+  same-sized change by month against decision-level exposure, or re-read `/cost` monthly from November for the floor and
+  the work leg. The one measure the strong form still lacks. (Claude, 2026-10-08; trend half re-scoped by LIN-4257, 2026-11-05)
+- **Can the work leg be read within one model?** `harbour/task-size-and-cost.md` (version 1) could not: `/cost` carries one
+  row per kind with a last-row model label, and drops the per-model fold and tokens (`lib/cost-read.js:205,211,472-481`).
+  Expose them on `/cost` as their own small ticket (not yet filed), then re-freeze for version 2 after about two weeks of
+  records. (Claude, 2026-11-05)
 - **Which declared twins have ever been paid for?** Half answered: version 2's M3 found three sibling fixes in 165
   subset edits of the named decisions, while 42 sibling escapes sit on decisions the census never named, so the
   question is now about the unnamed ones. For each of the 33 twins in `coherence-as-it-grows-codes.json`, read
