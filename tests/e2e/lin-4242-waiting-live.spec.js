@@ -97,6 +97,9 @@ test('a ruling raised after load gets its card on refresh; the count line and ba
 
   await seedRuling(page, 'LOCAL-S', THREE_OPTIONS);
   await refresh(page);
+  // The fragment's task line takes its title from the held task facts (the route's `waitingTitlesOf`), not the dispatch's issueTitle.
+  // Witness: force the route's titles off → the line reads the seeded issueTitle `LOCAL-S`.
+  await expect(waitingCard(page, 'LOCAL-S').locator('.waiting-task-title')).toHaveText('Solo task, Todo');
   await expect(waitingCard(page, 'LOCAL-S')).toHaveCount(1);
   await expect(page.locator(SECTION)).toBeVisible();
   await expect(page.locator(COUNT)).toContainText('1 waiting on you');
@@ -258,4 +261,91 @@ test('one refresh is in flight at a time: calls made while it is out share one q
   await all;
   expect(requests).toBe(2);
   await page.unroute('**/api/home-waiting');
+});
+
+test.describe('the opened task keeps its typed question across a state repaint (keepTypedQuestion)', () => {
+  const OPENED_CARD = '[data-question-slot] [data-testid="session-question-card"]';
+  const OPENED_INPUT = `${OPENED_CARD} [data-testid="session-question-card-input"]`;
+  const STATE_URL = '**/api/task/LOCAL-S/state**';
+
+  /**
+   * Home with LOCAL-S started and running (a session taken, no ruling yet), opened, and the page clock held, so the
+   * opened task's 10s state poll runs only when the test says. Then the worker raises a ruling and one poll paints it.
+   * A task with a ruling is not a Home row (it is Waiting on you), so the task is opened before the ruling exists.
+   */
+  async function openRunningThenRaise(page) {
+    const started = await page.request.post('/test/set-local-session', {
+      data: { urlKey: URL_KEY, runnerKey: true, openRouterConnected: false, projects: [{ id: localSeedId(URL_KEY, 'proj-0'), name: 'Project 0', content: 'Seeded', sortOrder: 0 }],
+        issues: [{ id: localSeedId(URL_KEY, 'solo'), identifier: 'LOCAL-S', title: 'Solo task, started', description: 'Seeded task', projectId: localSeedId(URL_KEY, 'proj-0'), sortOrder: 1, createdAt: OLD, state: { name: 'In Progress', type: 'started' } }] },
+    });
+    expect(started.ok()).toBeTruthy();
+    // After the seed: a seed resets the key's tokens.
+    const token = (await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`)).json()).token;
+    const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+      data: { prompt: 'implementation prompt', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'LOCAL-S', issueTitle: 'LOCAL-S', target: 'cli' },
+    });
+    expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
+    const itemId = (await res.json()).item.id;
+    expect((await page.request.post(`/api/dispatch/take/${itemId}`, { headers: { Authorization: `Bearer ${token}` } })).status()).toBe(200);
+    const feedback = (data) => page.request.post(`/api/dispatch/feedback/${itemId}`, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, data });
+
+    await page.clock.install();
+    await page.goto(`/workspace/${URL_KEY}/`);
+    const row = page.locator('[data-top-task="1"]').first();
+    await expect(row).toBeVisible();
+    if (!(await page.locator('.opened-task').first().isVisible())) await row.click();
+    await expect(page.locator('.opened-task').first()).toBeVisible();
+
+    expect((await feedback({ message: '[blocked] which way?' })).status()).toBe(200);
+    expect((await feedback({ kind: 'decision', message: JSON.stringify({ decision_id: 'd-LOCAL-S', question: 'Which for LOCAL-S?', ...THREE_OPTIONS }) })).status()).toBe(200);
+    await pollOnce(page);
+    await expect(page.locator(OPENED_INPUT)).toHaveCount(1);
+  }
+
+  /** One state poll of the opened task: advance the held clock past the 10s beat and wait for the read to be painted. */
+  async function pollOnce(page) {
+    const read = page.waitForResponse(r => /\/api\/task\/LOCAL-S\/state/.test(r.url()));
+    await page.clock.runFor(10000);
+    await read;
+    // The paint follows the response in a later task: let it run, with the clock still held.
+    await page.evaluate(() => new Promise(resolve => { const c = new MessageChannel(); c.port1.onmessage = resolve; c.port2.postMessage(0); }));
+  }
+
+  /** The next state read carries the card with `edit` applied to its markup. */
+  async function editNextStateCard(page, edit) {
+    await page.route(STATE_URL, async route => {
+      const real = await route.fetch();
+      const body = await real.json();
+      if (body.questionHtml) body.questionHtml = edit(body.questionHtml);
+      return route.fulfill({ response: real, json: body });
+    });
+  }
+
+  test('a card whose markup changed is kept for the same ruling while it holds typed text', async ({ page }) => {
+    // Witness: drop `|| keepsPlace` from keepTypedQuestion → the repaint writes the new card and the typed text is gone.
+    await openRunningThenRaise(page);
+    await page.locator(OPENED_INPUT).fill('half a sentence in the opened task');
+    await page.locator(OPENED_CARD).evaluate(el => { el.dataset.keepMark = 'yes'; });
+
+    await editNextStateCard(page, html => html.replace('data-testid="session-question-card"', 'data-testid="session-question-card" data-repainted="yes"'));
+    await pollOnce(page);
+
+    await expect(page.locator(OPENED_INPUT)).toHaveValue('half a sentence in the opened task');
+    await expect(page.locator(`${OPENED_CARD}[data-keep-mark="yes"]`)).toHaveCount(1);
+    await expect(page.locator(`${OPENED_CARD}[data-repainted="yes"]`)).toHaveCount(0);
+  });
+
+  test('a different ruling\'s card replaces the typed one: the ruling key gates the keep', async ({ page }) => {
+    // Witness: drop the ruling-key comparison in keepsReaderPlace → the typed card of the old ruling is kept over the new one.
+    await openRunningThenRaise(page);
+    await page.locator(OPENED_INPUT).fill('an answer to the first ruling');
+    await page.locator(OPENED_CARD).evaluate(el => { el.dataset.keepMark = 'yes'; });
+
+    await editNextStateCard(page, html => html.replace(/data-decision-id="[^"]*"/, 'data-decision-id="d-another-ruling"'));
+    await pollOnce(page);
+
+    await expect(page.locator(`${OPENED_CARD}[data-decision-id="d-another-ruling"]`)).toHaveCount(1);
+    await expect(page.locator(`${OPENED_CARD}[data-keep-mark="yes"]`)).toHaveCount(0);
+    await expect(page.locator(OPENED_INPUT)).toHaveValue('');
+  });
 });
