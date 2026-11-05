@@ -17,7 +17,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadWorld } from './helpers/client-world.js';
-import { DISCLOSURE_SCRIPTS, disclosureWindowStubs, useRealDisclosure } from './helpers/real-dispatch-disclosure.js';
+import { DISCLOSURE_SCRIPTS, disclosureWindowStubs } from './helpers/real-dispatch-disclosure.js';
 
 // The client world (tests/unit/helpers/client-world.js): the real dispatch disclosure and the component. `makeContainer()`
 // makes a container in the world of the most recent `loadPromptSection()`; each test makes its containers straight after
@@ -58,12 +58,12 @@ function loadPromptSection({ localStorage } = {}) {
   window.ProxyToggle = {
     maybeAppend: async (raw, urlKey, opts) => (opts && opts.force ? `${raw}\n\n## Workspace API access` : raw),
   };
-  useRealDisclosure(window);
-  // The reader is stubbed: production's reads the values of the harness and model `<select>`s, which the fake does not
-  // model. The stub records the scope it is handed, so a test can check which element a press passes it.
+  // The reader is production's own (LIN-4296: the fake models the harness and model `<select>`s), wrapped to record the
+  // scope a press hands it. The assertions on `calls.readers` hold the same element.
+  const realReader = window.readDispatchExecControls;
   window.readDispatchExecControls = (scopeEl) => {
     calls.readers.push(scopeEl);
-    return { model: null, harness: null };
+    return realReader(scopeEl);
   };
   currentWorld = world;
   return { PromptSection: window.PromptSection, window, calls, timers };

@@ -20,27 +20,25 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { buildKeyList } from '../../lib/settings-keys.js';
+import { renderProxyPage } from '../../lib/render-proxy.js';
+import { loadWorld, clickOn } from './helpers/client-world.js';
 import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROXY_SRC = readFileSync(join(__dirname, '../../public/proxy.js'), 'utf8');
 
-function makeEl(extra = {}) {
-  return {
-    innerHTML: '', textContent: '', hidden: false, open: false, disabled: false,
-    dataset: {}, style: {},
-    classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
-    _handlers: {},
-    addEventListener(type, fn) { (this._handlers[type] = this._handlers[type] || []).push(fn); },
-    querySelector: () => null,
-    querySelectorAll: () => [],
-    ...extra
-  };
-}
+// The prompt controls and output exactly as the page draws them (lib/render-proxy.js), cut from the page's own output
+// (LIN-4296): the scope select's options are production's, not retyped here.
+const PROXY_PROMPT_BOX = (() => {
+  const page = renderProxyPage('acme', { urlKey: 'acme' });
+  const controls = /<div class="proxy-prompt-controls">[\s\S]*?<\/div>/.exec(page)?.[0];
+  const output = /<pre[^>]*id="proxy-prompt-output"[^>]*>[\s\S]*?<\/pre>/.exec(page)?.[0];
+  assert.ok(controls && output, 'the page draws the prompt controls and the output');
+  return `<div data-url-key="acme">${controls}${output}</div>`;
+})();
 
 const iso = (ms) => new Date(ms).toISOString();
 const flush = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -114,14 +112,10 @@ describe('LIN-3136 — the Settings "Generate agent prompt" states that a readWr
   // `respond` is the mint response (scope/grants come from it, never the picker);
   // `fail` makes the mint reject with that error; `toggle` is window.ProxyToggle.
   function agentPrompt(pick, { respond, fail, toggle } = {}) {
-    const generateBtn = makeEl({ closest: () => ({ dataset: { urlKey: 'acme' } }) });
-    const scopeSelect = makeEl({ value: pick });
-    const promptOutput = makeEl();
-    const feedback = makeEl();
     const copied = [];
     const requests = [];
     const defaultRespond = { token: 'BOOT', tokens: [], providerDisplayName: null, scope: pick, grants: [] };
-    const win = {
+    const window = {
       location: { origin: 'https://harbour.test' },
       relativeTime: () => 'just now',
       api: async (url, opts) => {
@@ -131,32 +125,37 @@ describe('LIN-3136 — the Settings "Generate agent prompt" states that a readWr
         return respond || defaultRespond;
       }
     };
-    if (toggle) win.ProxyToggle = toggle;
-    const sandbox = {
-      window: win,
-      document: {
-        getElementById: (id) => ({
-          'proxy-generate-btn': generateBtn, 'proxy-scope-select': scopeSelect,
-          'proxy-prompt-output': promptOutput, 'proxy-generate-feedback': feedback
-        }[id] || null),
-        querySelector: () => null,
-        addEventListener() {}
-      },
-      navigator: { clipboard: { writeText: async (t) => { copied.push(t); } } },
-      setTimeout, clearTimeout, console,
-      escapeHtml: (v) => String(v),
-      confirm: () => false,
-      toast: () => {}
+    if (toggle) window.ProxyToggle = toggle;
+    // No scripts at load: the page's elements must be in the document before proxy.js reads them, so the script runs after.
+    const world = loadWorld({
+      window,
+      scripts: [],
+      globals: {
+        escapeHtml: (v) => String(v),
+        confirm: () => false,
+        toast: () => {},
+        navigator: { clipboard: { writeText: async (t) => { copied.push(t); } } }
+      }
+    });
+    world.document.body.innerHTML = PROXY_PROMPT_BOX;
+    const scopeSelect = world.document.getElementById('proxy-scope-select');
+    scopeSelect.value = pick; // a real <select>: the pick must be one of the page's options, or it reads '' (see below)
+    world.run(PROXY_SRC);
+    return {
+      generateBtn: world.document.getElementById('proxy-generate-btn'),
+      feedback: world.document.getElementById('proxy-generate-feedback'),
+      copied,
+      requests
     };
-    sandbox.globalThis = sandbox;
-    vm.createContext(sandbox);
-    vm.runInContext(PROXY_SRC, sandbox, { filename: 'proxy.js' });
-    return { generateBtn, copied, requests, feedback };
   }
 
   const CANNOT = 'It cannot enqueue work: the dispatch routes return 403 `DISPATCH_GRANT_REQUIRED`.';
   const CAN = 'It also holds the dispatch grant, so it can enqueue work (`POST /dispatch`, `/recommend-and-dispatch`, `/autopilot/kickoff`)';
-  const click = async (h) => { assert.ok(h.generateBtn._handlers.click, 'the generate button is wired'); await h.generateBtn._handlers.click[0](); await flush(); };
+  const click = async (h) => {
+    assert.ok(h.generateBtn.listenersOf('click').length > 0, 'the generate button is wired');
+    await clickOn(h.generateBtn);
+    await flush();
+  };
 
   test('readWrite: the prompt ends with the cannot-enqueue clause; read: unchanged', async () => {
     for (const [scope, expectClause] of [['readWrite', true], ['read', false]]) {

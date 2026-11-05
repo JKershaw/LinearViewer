@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import vm from 'node:vm';
+import { loadWorld } from './helpers/client-world.js';
 import { decisionPanel, routingWords, agentLists, optionWordsOf } from '../../lib/components/decision-panel.js';
 import { offeredTargetsFor } from '../../lib/dispatch-targets.js';
 import { HARNESSES_WITHOUT_EFFORT } from '../../lib/model-routing.js';
@@ -25,62 +25,33 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-// A container that records every listener by type, so a test can fire input and change as well as click. It reads its
-// own markup back the way applyPanelDraft does: the decision panel by its attribute, its fields by data-testid. A value
-// written to a field lives until the markup is replaced, as a control's value does.
-function makeContainer() {
-  const listeners = {};
-  let html = '';
-  let written = {};
-  const markupValue = (testid) => {
-    const tag = new RegExp(`<(input|select)\\b[^>]*data-testid="${testid}"[^>]*>`).exec(html);
-    if (!tag) return undefined;
-    if (tag[1] === 'input') return /\svalue="([^"]*)"/.exec(tag[0])?.[1] ?? '';
-    const block = html.slice(tag.index, html.indexOf('</select>', tag.index));
-    return /<option value="([^"]*)"[^>]*\sselected/.exec(block)?.[1] ?? '';
+// The suite's container is a real element in the client world (LIN-4296: the fake models `<select>` and `<input>`), with the
+// two things this suite needs that a browser would give it. A press is a synthetic button handed to the container's click
+// listeners; the router drops a press outside its container, so the press counts as inside, as the old stub did. A field
+// change writes the value on the drawn control and then calls that control's listeners, as a change or input event would.
+function makeContainer(world) {
+  const c = world.makeContainer();
+  c.contains = () => true;
+  c.click = async (dataset) => {
+    const btn = { dataset: { ...dataset }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
+    for (const fn of c.listenersOf('click')) await fn({ target: btn });
+    return btn;
   };
-  const panelRoot = {
-    querySelector(sel) {
-      const m = /^\[data-testid="([^"]+)"\]$/.exec(sel);
-      if (!m || markupValue(m[1]) === undefined) return null;
-      const testid = m[1];
-      return {
-        get value() { return testid in written ? written[testid] : markupValue(testid); },
-        set value(v) { written[testid] = v; }
-      };
+  // `fire(type, target)`: a `{ dataset: { testid }, value }` writes that value to the drawn field, then fires; a drawn node
+  // fires as it is. A value that no option of a select carries reads back '' here, and the test fails at the write.
+  c.fire = async (type, target) => {
+    let node = target;
+    if (!target.nodeType) {
+      node = c.querySelector(`[data-testid="${target.dataset.testid}"]`);
+      assert.ok(node, `the field ${target.dataset.testid} is drawn`);
+      if ('value' in target) {
+        node.value = target.value;
+        assert.equal(node.value, target.value, `${target.dataset.testid} reads back ${JSON.stringify(target.value)}`);
+      }
     }
+    for (const fn of c.listenersOf(type)) await fn({ type, target: node });
   };
-  // The Change panel's summary is an element the page updates in place when a pick or a typed model changes it (LIN-3992),
-  // so it reads and writes its own text in the markup, as a real element's textContent does.
-  const summaryNode = {
-    get textContent() { return /data-testid="run-will-use">([^<]*)</.exec(html)?.[1] ?? ''; },
-    set textContent(v) { html = html.replace(/(data-testid="run-will-use">)[^<]*/, (_, open) => open + escapeHtml(v)); }
-  };
-  const container = {
-    get innerHTML() { return html; },
-    set innerHTML(v) { html = v; written = {}; },
-    dataset: {},
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    setAttribute() {},
-    getAttribute() { return null; },
-    querySelector(sel) {
-      if (sel === '[data-testid="run-will-use"]') return html.includes('data-testid="run-will-use"') ? summaryNode : null;
-      return sel === '[data-decision-panel]' && html.includes('data-decision-panel') ? panelRoot : null;
-    },
-    contains() { return true; },
-    addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
-    removeEventListener() {},
-    async click(dataset) {
-      const btn = { dataset: { ...dataset }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
-      for (const fn of listeners.click || []) await fn({ target: btn });
-      return btn;
-    },
-    async fire(type, target) {
-      const el = { dataset: {}, closest: () => null, ...target };
-      for (const fn of listeners[type] || []) await fn({ target: el });
-    },
-  };
-  return container;
+  return c;
 }
 
 // The server's panel for the choice it is asked about (routes/dispatch.js decision-panel), built by the same component.
@@ -108,10 +79,10 @@ const withWords = (preview) => (preview && !preview.words
   ? { ...preview, words: routingWords({ harness: preview.harness, model: preview.model, effort: preview.effort }) }
   : preview);
 
-function load({ opened = null, previewFor = () => null, panelFor = serverPanel, presets = [], kickoff = { prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' }, document = null } = {}) {
+function load({ opened = null, previewFor = () => null, panelFor = serverPanel, presets = [], kickoff = { prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' } } = {}) {
   const calls = { api: [], dispatch: [], kickoff: [] };
   const window = {
-    escapeHtml: (s) => (s == null ? '' : String(s)),
+    escapeHtml, // the page's own escape (lib/utils/html.js), so an attribute is escaped as a browser would see it
     stripCodeBlockWrapper: (s) => s,
     renderMarkdown: (s) => String(s == null ? '' : s),
     api: async (url, o = {}) => {
@@ -133,21 +104,16 @@ function load({ opened = null, previewFor = () => null, panelFor = serverPanel, 
     isPinnedToBottom: () => false,
     toast: () => {},
   };
-  const sandbox = {
-    window, AbortController, URLSearchParams, TextDecoder, TextEncoder, Blob: class {}, URL,
-    document: document || { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } },
-    requestAnimationFrame: (cb) => { cb(); return 1; },
-    // The Go poll schedules its own timers; unref them so a finished test does not hold the process open.
-    setTimeout: (fn, ms) => { const t = globalThis.setTimeout(fn, ms); if (t && t.unref) t.unref(); return t; },
-    clearTimeout,
-    navigator: { clipboard: { writeText: async () => {} } },
-    fetch: async () => ({ ok: true, json: async () => ({}) }),
-    console,
-  };
-  vm.createContext(sandbox);
-  loadCostFormat(sandbox); // LIN-4179: the shared browser formatter, loaded before the page script, as the page does
-  vm.runInContext(SRC, sandbox, { filename: 'prompt-section.js' });
-  return { PromptSection: sandbox.window.PromptSection, calls };
+  // No scripts at load: the cost formatter runs first, then the page script, in the same sandbox, as the page loads them.
+  // The Go poll's own timers are the client world's (collected by no one, unref'd), as before.
+  const world = loadWorld({
+    window,
+    scripts: [],
+    globals: { fetch: async () => ({ ok: true, json: async () => ({}) }) },
+  });
+  loadCostFormat(world.sandbox); // LIN-4179: the shared browser formatter, loaded before the page script, as the page does
+  world.run(SRC);
+  return { PromptSection: world.window.PromptSection, calls, world };
 }
 
 const HOME = {
@@ -163,7 +129,7 @@ const HOME = {
 // `offered` is the step the server offers (LIN-3968); `next` is the "comes next" wording. Nothing runs, so they agree.
 const PLAN_NEXT = { count: 1, next: { kind: 'plan', label: 'Plan' }, offered: { kind: 'plan', label: 'Plan', why: 'usual', failed: false, reason: 'usually next after Research' }, last: { label: 'Research', state: 'done', at: null }, running: null };
 
-async function mount(over = {}, loadOver = {}, container = null) {
+async function mount(over = {}, loadOver = {}) {
   // LIN-4016: the server's decision for the row and its sessions (the browser reads these, it decides nothing).
   const row = over.row || serverRow({ stateType: (over.issue || HOME.issue).stateType });
   const { subtaskNeedsYou, ...rest } = over;
@@ -176,7 +142,7 @@ async function mount(over = {}, loadOver = {}, container = null) {
   };
   const env = load({ ...loadOver, opened: opened || loadOver.opened });
   over = { ...rest, row };
-  const c = container || makeContainer();
+  const c = makeContainer(env.world);
   env.PromptSection.init(c, { ...HOME, ...over });
   await flush();
   return { ...env, c };
@@ -219,7 +185,11 @@ describe('LIN-3833 — Runs on says where each value comes from, from the server
     assert.match(c.innerHTML, /data-testid="run-change-panel"/);
     assert.match(c.innerHTML, /<option value=""[^>]*>As Settings \u203a Models sets it<\/option>/, 'the blank option is short, so a 390px select does not clip it');
     assert.match(c.innerHTML, /data-decision-hint="harness">Right now: Claude Code</, 'what the blank resolves to reads on its own line, in words (LIN-3987)');
-    assert.equal(/<option value="claude-code" selected>|<option value="opencode" selected>/.test(c.innerHTML), false, 'nothing is pre-selected');
+    // Read from the controls, not the markup: the fake serializes a marked option as `selected=""`, and a browser's selectedness
+    // is the node's, which is what a press would read (LIN-4296).
+    const harnessSelect = c.querySelector('[data-testid="run-harness"]');
+    assert.deepEqual([...harnessSelect.options].filter((o) => o.selected).map((o) => o.value), [''], 'only the blank option is selected: nothing is pre-selected');
+    assert.equal(harnessSelect.value, '', 'the blank option reads as nothing chosen');
     assert.ok(calls.api.some((a) => a.url.includes('/api/dispatch/decision-panel')), 'the shared panel is read from the server when Change opens');
   });
 
@@ -355,68 +325,28 @@ describe('LIN-3969 — the Runs-on line shows the answer to the latest preview r
 // applied a cut-off model or none (the browser repro ran on "chose" for "chosen-model-x"). The repaint keeps the
 // focused control: the same control in the new block is focused, with the typed value and the caret.
 describe('LIN-3969 — a run-block repaint keeps the control being typed in', () => {
-  // A run slot whose repaint is observable: `outerHTML = …` replaces the slot, and the new slot's controls are
-  // fresh objects, like a real outerHTML swap.
-  function slotContainer(doc) {
-    const c = makeContainer();
-    const control = (testid) => ({
-      dataset: { testid }, type: testid === 'run-model' ? 'text' : undefined, value: '', selectionStart: null, selectionEnd: null, focused: false,
-      focus() { this.focused = true; doc.activeElement = this; },
-      setSelectionRange(a, b) { this.selectionStart = a; this.selectionEnd = b; },
-    });
-    let slot = null;
-    const newSlot = () => {
-      const controls = {};
-      const s = {
-        controls,
-        contains: (el) => Object.values(controls).includes(el),
-        querySelector: (sel) => {
-          const m = sel.match(/data-testid="([^"]+)"/);
-          if (!m) return null;
-          return controls[m[1]] || (controls[m[1]] = control(m[1]));
-        },
-        set outerHTML(html) {
-          c.innerHTML = c.innerHTML.replace(/<div class="opened-task-run"[\s\S]*$/, html);
-          slot = newSlot();
-        },
-      };
-      return s;
-    };
-    c.querySelector = (sel) => {
-      if (!/data-run-slot/.test(sel)) return null;
-      if (!/opened-task-run/.test(c.innerHTML)) return null;
-      if (!slot) slot = newSlot();
-      const inner = sel.replace(/^\[data-run-slot\]\s*/, '');
-      return inner === sel || inner === '' ? slot : slot.querySelector(inner);
-    };
-    c.slot = () => slot;
-    return c;
-  }
-
+  // The repaint replaces the run slot in the drawn markup, so the Model input it holds is a new node, as in a browser.
   test('a preview landing mid-typing leaves the Model input focused, with its value and caret', async () => {
     const pending = [];
     const previewFor = () => new Promise((resolve) => { pending.push(() => resolve({ kind: 'plan', stepLabel: 'Plan', model: null, harness: 'claude-code', effort: null, sources: { model: 'none', harness: 'fallback', effort: 'none' } })); });
-    const doc = { activeElement: null, createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } };
-    const c = slotContainer(doc);
-    await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor, document: doc }, c);
+    const { c, world } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor });
     pending.shift()();
     await flush();
     await c.click({ action: 'change-run' });
     await flush();
     await c.click({ action: 'reset-run' });
     // The viewer is typing: "chose" so far, caret at the end.
-    const input = c.slot().querySelector('[data-testid="run-model"]');
+    const input = c.querySelector('[data-run-slot] [data-testid="run-model"]');
     input.focus();
     input.value = 'chose';
-    input.selectionStart = 5;
-    input.selectionEnd = 5;
+    input.setSelectionRange(5, 5);
     await c.fire('input', input);
     // The reset preview lands and the run block repaints.
     pending.shift()();
     await flush();
-    const again = c.slot().querySelector('[data-testid="run-model"]');
+    const again = c.querySelector('[data-run-slot] [data-testid="run-model"]');
     assert.notEqual(again, input, 'the repaint replaced the input');
-    assert.equal(doc.activeElement, again, 'the new Model input has the focus, so the next keystroke lands in it');
+    assert.equal(world.document.activeElement, again, 'the new Model input has the focus, so the next keystroke lands in it');
     assert.equal(again.value, 'chose');
     assert.deepEqual([again.selectionStart, again.selectionEnd], [5, 5]);
   });

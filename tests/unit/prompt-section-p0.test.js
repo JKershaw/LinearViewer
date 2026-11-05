@@ -894,7 +894,7 @@ describe('LIN-3211 / LIN-3833: the run-step rung sends only a chosen harness; a 
     if (!panel) window.renderDispatchDisclosure = () => '';
     // The card's panel, as the reader is given it: the drawn `.swipe-prompt-options`, and nothing else. A real
     // readDispatchExecControls reads the harness select inside the element it is given, and returns null for anything
-    // else (public/common.js:1263). This stub keeps that contract without a `<select>`.
+    // else (public/common.js, readDispatchExecControls). This stub keeps that contract without a `<select>`.
     window.readDispatchExecControls = (scopeEl) => (scopeEl && scopeEl.classList.contains('swipe-prompt-options')
       ? { model: null, harness: panelHarness || null }
       : { model: null, harness: null });

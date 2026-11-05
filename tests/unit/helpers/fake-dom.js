@@ -14,7 +14,9 @@
  * directly, and `lin-4010-home-opened-task.test.js`, `lin-4246-opened-task-repaint-keep.test.js` and
  * `prompt-section-go.test.js` (LIN-4266), `prompt-section-preserve.test.js`, `prompt-section-recommend-url.test.js` and
  * `prompt-section-look-alike.test.js` (LIN-4268), `prompt-section-p0.test.js`, `prompt-section-run-quota.test.js` and
- * `prompt-section-runner-link.test.js` (LIN-4267), `chat-append-options.test.js`, `chat-render-markdown-text.test.js`,
+ * `prompt-section-runner-link.test.js` (LIN-4267), `prompt-section-task-mode.test.js` and `lin-4296-dispatch-reader.test.js`
+ * (LIN-4296), `lin-3136-settings-take-predicate.test.js`, `lin-4296-scope-pick.test.js` and `lin-3833-run-control.test.js` (LIN-4296),
+ * `chat-append-options.test.js`,`chat-render-markdown-text.test.js`,
  * `chat-tool-rows.test.js`, `observation-basis-check.test.js` and `observation-bulk-scan.test.js` (LIN-4280), and
  * `lin-3833-copy-first-view.test.js`, `lin-3968-home-polish.test.js`, `lin-3975-task-run-control.test.js`,
  * `lin-4040-close-out.test.js`, `lin-4042-finished-no-run-to-pr.test.js`, `brief-recap-autogenerate.test.js`,
@@ -62,6 +64,12 @@
  *   A type selector is case-insensitive on an HTML element and case-sensitive on any other.
  * - Form state: an input's or textarea's `value` (from the `value` attribute or the text until it is set, then independent),
  *   an input's `checked` (from the `checked` attribute until it is set, then independent and not serialized), `selectionStart`, `selectionEnd` and `setSelectionRange`. The caret starts and moves to the end of the value.
+ * - Selects (LIN-4296): a `<select>`'s `value`, `selectedIndex` and `options` (a fresh array in tree order, optgroup children
+ *   included), and an `<option>`'s `selected`, `value` (its `value` attribute, else its collapsed text) and `text`. Selectedness
+ *   is per option, with a dirty flag like `checked`, so the markup and the typed value are not computed from each other. A
+ *   reset (the spec's "ask for a reset") runs after the parse and whenever an option or optgroup is inserted or removed (`_insert`, `_detach`), so
+ *   `innerHTML`, `replaceChildren`, `textContent`, `outerHTML` and `replaceWith` are covered by the one hook. A write that matches
+ *   nothing leaves `selectedIndex` -1 and `value` `''`, and it stays so until an option is inserted or removed.
  * - Focus: `focus()` and `blur()` on focusable elements. `document.activeElement` is per world. It returns the body when
  *   nothing is focused, and it stops naming a control once that control is removed or replaced (the focus fixup). The
  *   setter is a test shim: `document.activeElement = el` focuses `el`.
@@ -73,16 +81,16 @@
  * dispatch and bubbling, HTML error recovery (implied end tags such as `<p>` closing `<p>`), foreign content (SVG and
  * MathML): `innerHTML` parses SVG markup as HTML elements, so only `createElementNS` makes an SVG-namespace node;
  * `<script>` execution, `getBoundingClientRect`, `MutationObserver`, `Range` and `Selection`,
- * `getClientRects` (so a Tab-driven focus trap cannot be exercised), `select`, and selection direction.
+ * `getClientRects` (so a Tab-driven focus trap cannot be exercised), the `select()` method, selection direction, and `click()`
+ * (a suite that must see an anchor click records it with its own shim around `document.createElement`, not with a fake `click`).
+ * `<select multiple>` and a select with a `size` above 1 throw on `value`, `selectedIndex` and an option's `selected`, rather than
+ * guess. The `<select>` APIs that are not modelled (`length`, `selectedOptions`, `add`, `item`, `namedItem`, and `remove(index)`)
+ * throw, naming themselves, instead of reading as `undefined`.
  * `indeterminate` is a plain expando, not a modelled property: a browser's has no attribute to reflect, so a write reads
  * back on the node and changes no markup (PR #2308 relies on this for the select-all checkbox).
  *
- * `select` stop (LIN-4269). `<select>.value` is the API the suites below need and the fake does not model: its getter returns
- * undefined, its setter throws (`value is not modelled on <select>`, the setter below). Three suites stay on
- * the census, `HAND_WRITTEN_FAKE_DOM_FILES`, with their own hand-written fakes, stopped on this API:
- * `lin-3833-run-control.test.js` (production writes `el.value` on the run-harness select at `public/prompt-section.js:1565`
- * through `applyPanelDraft`, and the test reads it at line 243), `prompt-section-task-mode.test.js` (`public/prompt-section.js:2714-2715`
- * -> `public/common.js:1758-1763`) and `lin-3136-settings-take-predicate.test.js` (`public/proxy.js:51`).
+ * `<select>` (LIN-4269 stopped on it; modelled by LIN-4296, above). The suites that stopped on `<select>.value` are listed
+ * with the stop each one now reaches, in `HAND_WRITTEN_FAKE_DOM_FILES` (`fake-dom-census.test.js`), not here.
  */
 
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
@@ -173,6 +181,12 @@ class FakeNode {
     const at = ref ? this._kids.indexOf(ref) : this._kids.length;
     this._kids.splice(at, 0, node);
     node.parentNode = this;
+    // The select reset (LIN-4296) runs only when an option or optgroup is inserted (Chromium: a text node or comment leaves a
+    // no-match write alone), and an inserted option that is already selected takes the selection before the reset runs.
+    if (isOptionEl(node) || isOptgroupEl(node)) {
+      onOptionsInserted(this, node);
+      resetAround(this);
+    }
     return node;
   }
 
@@ -182,6 +196,7 @@ class FakeNode {
     if (!parent) return;
     parent._kids.splice(parent._kids.indexOf(this), 1);
     this.parentNode = null;
+    if (isOptionEl(this) || isOptgroupEl(this)) resetAround(parent); // only an option or optgroup leaving runs the reset
     const doc = this.ownerDocument;
     if (doc && doc._focused && this.contains(doc._focused)) doc._focused = null;
   }
@@ -203,7 +218,12 @@ class FakeNode {
     node._detach();
     return node;
   }
-  remove() { this._detach(); }
+  remove(...args) {
+    // `select.remove(index)` is the select's own method, not ChildNode.remove(); it is not modelled, so it throws rather than
+    // detaching the select (LIN-4296).
+    if (args.length > 0 && isSelectEl(this)) fail('remove(index) on <select> is not modelled; use removeChild on the option');
+    this._detach();
+  }
   replaceWith(...items) {
     const parent = this.parentNode;
     if (!parent) return;
@@ -215,8 +235,13 @@ class FakeNode {
   replaceChild(node, old) {
     if (!old || old.parentNode !== this) fail('replaceChild: the old node is not a child of this node');
     if (node === old) return old;
-    this._insert(node, old); // inserted first, so a refused insert leaves `old` in place
+    if (node === this || node.contains(this)) fail('cannot insert a node into itself or a descendant of itself');
+    // The spec removes `old` before it inserts `node`, so the select reset (LIN-4296) runs on the removal first. The reference
+    // is taken before the removal. The refusal above comes before any change, so a refused replace leaves `old` in place.
+    let ref = nextKid(old);
+    if (ref === node) ref = nextKid(node);
     old._detach();
+    this._insert(node, ref);
     return old;
   }
   /** Replaces every child with `items` (strings become text nodes). With no arguments it empties the node (LIN-4279). */
@@ -285,6 +310,11 @@ class FakeElement extends FakeNode {
     this._value = '';
     this._checkedDirty = false;
     this._checked = false;
+    // An option's selectedness (LIN-4296): `_optSel` is undefined until something writes it, and the `selected` attribute
+    // decides until then. `_optDirty` is the spec's dirtiness flag, set only by the option's `selected` setter and by the
+    // select's `value` and `selectedIndex` setters.
+    this._optSel = undefined;
+    this._optDirty = false;
     this._sel = null;
     this.content = localName === 'template' ? new FakeFragment(doc) : undefined;
   }
@@ -304,10 +334,16 @@ class FakeElement extends FakeNode {
   setAttribute(name, value) {
     const n = this._attrKey(name);
     if (!(isHtmlEl(this) ? ATTR_NAME : ATTR_NAME_NS).test(n)) fail(`invalid attribute name ${JSON.stringify(name)}`);
+    const added = !this._attrs.has(n);
     this._attrs.set(n, String(value));
+    if (added && n === 'selected' && isOptionEl(this)) onSelectedAttribute(this, true);
   }
   hasAttribute(name) { return this._attrs.has(this._attrKey(name)); }
-  removeAttribute(name) { this._attrs.delete(this._attrKey(name)); }
+  removeAttribute(name) {
+    const n = this._attrKey(name);
+    const had = this._attrs.delete(n);
+    if (had && n === 'selected' && isOptionEl(this)) onSelectedAttribute(this, false);
+  }
 
   /** `className` and `id` reflect the `class` and `id` attributes: the attribute is the only store. A read with no attribute is `''`. */
   get className() { return this.getAttribute('class') ?? ''; }
@@ -403,18 +439,70 @@ class FakeElement extends FakeNode {
     this._insert(parseFragment(String(html), this.ownerDocument), null);
   }
 
-  /** Form controls: `value` is the attribute (or the text, for a textarea) until it is set, then independent. */
+  /**
+   * Form controls: `value` is the attribute (or the text, for a textarea) until it is set, then independent. An option's
+   * `value` is its attribute, else its collapsed text. A select's `value` is the first selected option's value, or `''`
+   * (LIN-4296; see the select model above `serializeNode`).
+   */
   get value() {
+    if (isOptionEl(this)) return this.hasAttribute('value') ? this.getAttribute('value') : collapsedText(this);
+    if (isSelectEl(this)) {
+      assertSingle(this, 'value');
+      const first = optionsOf(this).find(selectedOf);
+      return first ? first.value : '';
+    }
     if (!isValueControl(this)) return undefined;
     if (this._valueDirty) return this._value;
     return this.localName === 'textarea' ? collectText(this) : (this.getAttribute('value') ?? '');
   }
   set value(v) {
+    if (isOptionEl(this)) { this.setAttribute('value', String(v)); return; }
+    if (isSelectEl(this)) {
+      assertSingle(this, 'value');
+      const opts = optionsOf(this);
+      for (const o of opts) o._optSel = false; // the spec: all unselected, then the first match selected and marked dirty
+      const hit = opts.find((o) => o.value === String(v));
+      if (hit) { hit._optSel = true; hit._optDirty = true; }
+      return;
+    }
     if (!isValueControl(this)) fail(`value is not modelled on <${this.localName}>`);
     this._valueDirty = true;
     this._value = String(v);
     this._sel = { start: this._value.length, end: this._value.length };
   }
+  /** A select's options: a fresh array of the option elements in tree order, so each read sees the current tree. */
+  get options() { return isSelectEl(this) ? optionsOf(this) : undefined; }
+  get selectedIndex() {
+    if (!isSelectEl(this)) return undefined;
+    assertSingle(this, 'selectedIndex');
+    return optionsOf(this).findIndex(selectedOf);
+  }
+  set selectedIndex(n) {
+    if (!isSelectEl(this)) fail(`selectedIndex is not modelled on <${this.localName}>`);
+    assertSingle(this, 'selectedIndex');
+    const opts = optionsOf(this);
+    for (const o of opts) o._optSel = false;
+    const i = Number(n);
+    if (Number.isInteger(i) && i >= 0 && i < opts.length) { opts[i]._optSel = true; opts[i]._optDirty = true; }
+  }
+  /** An option's selectedness (LIN-4296). Undefined on any other element, as `checked` is. */
+  get selected() { return isOptionEl(this) ? selectedOf(this) : undefined; }
+  set selected(on) {
+    if (!isOptionEl(this)) fail(`selected is not modelled on <${this.localName}>`);
+    setOptionSelected(this, Boolean(on));
+  }
+  /** An option's text: its textContent with ASCII whitespace stripped and collapsed. */
+  get text() { return isOptionEl(this) ? collapsedText(this) : undefined; }
+  set text(v) {
+    if (!isOptionEl(this)) fail(`text is not modelled on <${this.localName}>`);
+    this.textContent = v;
+  }
+  // The rest of the HTMLSelectElement surface is not modelled. These throw, naming the API, rather than read as undefined.
+  get selectedOptions() { if (isSelectEl(this)) fail('selectedOptions is not modelled on <select>; read options and selected'); return undefined; }
+  get length() { if (isSelectEl(this)) fail('length is not modelled on <select>; read options.length'); return undefined; }
+  add() { fail(`add() is not modelled on <${this.localName}>`); }
+  item() { fail(`item() is not modelled on <${this.localName}>`); }
+  namedItem() { fail(`namedItem() is not modelled on <${this.localName}>`); }
   get selectionStart() { return this._caret()?.start ?? null; }
   get selectionEnd() { return this._caret()?.end ?? null; }
   setSelectionRange(start, end = start) {
@@ -516,6 +604,112 @@ function isFocusable(el) {
   if (el.localName === 'input' && el.getAttribute('type') === 'hidden') return false;
   if (el.hasAttribute('tabindex')) return true;
   return FORM_CONTROLS.has(el.localName) || (el.localName === 'a' && el.hasAttribute('href'));
+}
+
+// ── Select selectedness (LIN-4296) ─────────────────────────────────────────
+// Chromium is the reference for each rule here; tests/unit/fake-dom.test.js pins them, each with the expectation a probe of
+// Chromium returned. An option's selectedness is `_optSel`, and it is undefined until a write sets it, so the `selected`
+// attribute decides until then (as `checked` does). `_optDirty` is the spec's dirtiness: once set (by the option's `selected`
+// setter, or by the select's `value` or `selectedIndex` setter), adding the `selected` attribute no longer selects the option.
+// The reset writes `_optSel` without dirtiness, a simplification: a browser keeps following the attribute there.
+
+const isSelectEl = (el) => el.nodeType === 1 && isHtmlEl(el) && el.localName === 'select';
+const isOptionEl = (el) => el.nodeType === 1 && isHtmlEl(el) && el.localName === 'option';
+const isOptgroupEl = (el) => el.nodeType === 1 && isHtmlEl(el) && el.localName === 'optgroup';
+const selectedOf = (opt) => (opt._optSel === undefined ? opt.hasAttribute('selected') : opt._optSel);
+const collapsedText = (el) => el.textContent.replace(/[ \t\n\f\r]+/g, ' ').replace(/^ | $/g, '');
+
+/** A select's list of options: its option children and the option children of its optgroup children, in tree order. */
+function optionsOf(select) {
+  const out = [];
+  for (const k of select._kids) {
+    if (isOptionEl(k)) out.push(k);
+    else if (isOptgroupEl(k)) for (const o of k._kids) if (isOptionEl(o)) out.push(o);
+  }
+  return out;
+}
+/** The select an option is in: its parent, or its optgroup's parent. Null when it is in none. */
+function ownerSelectOf(opt) {
+  const p = opt.parentNode;
+  if (!p) return null;
+  if (isSelectEl(p)) return p;
+  if (isOptgroupEl(p) && p.parentNode && isSelectEl(p.parentNode)) return p.parentNode;
+  return null;
+}
+/** `multiple` and a `size` above 1 are not modelled: their selection is not one value, so they throw rather than guess. */
+const isSingle = (select) => !select.hasAttribute('multiple') && !(Number(select.getAttribute('size')) > 1);
+function assertSingle(select, api) {
+  if (!isSingle(select)) fail(`${api} on a <select multiple> or a size above 1 is not modelled`);
+}
+
+/**
+ * The reset (the spec's "ask for a reset"): runs after the parse and whenever an option is inserted or removed. If more
+ * than one option is selected, the last one in tree order stays selected. If none is, the first option that is not
+ * disabled is selected, and if every option is disabled, none is. A reset writes selectedness only, never dirtiness.
+ */
+function resetSelectedness(select) {
+  if (!isSingle(select)) return;
+  const opts = optionsOf(select);
+  const chosen = opts.filter(selectedOf);
+  if (chosen.length > 1) {
+    for (const o of chosen.slice(0, -1)) o._optSel = false;
+  } else if (chosen.length === 0) {
+    const first = opts.find((o) => !o.hasAttribute('disabled'));
+    if (first) first._optSel = true;
+  }
+}
+/** Runs the reset for the select that `parent`'s option list belongs to, if there is one. Called when an option or optgroup is inserted or removed. */
+function resetAround(parent) {
+  if (parent.nodeType !== 1 || !isHtmlEl(parent)) return;
+  if (parent.localName === 'select') resetSelectedness(parent);
+  else if (parent.localName === 'optgroup' && parent.parentNode && isSelectEl(parent.parentNode)) resetSelectedness(parent.parentNode);
+}
+/**
+ * An option (or an optgroup's options) inserted into `parent`: when one is already selected, by attribute or by `.selected`, it
+ * takes the selection (Chromium: the inserted option wins over the old selection; the last selected one wins among several).
+ * Runs before the reset, which then only handles the none-selected and nothing-inserted-selected cases.
+ */
+function onOptionsInserted(parent, node) {
+  const select = isSelectEl(parent) ? parent : (isOptgroupEl(parent) && parent.parentNode && isSelectEl(parent.parentNode) ? parent.parentNode : null);
+  if (!select || !isSingle(select)) return;
+  const inserted = isOptionEl(node) ? [node] : node._kids.filter(isOptionEl);
+  const picked = inserted.filter(selectedOf).pop();
+  if (!picked) return;
+  for (const o of optionsOf(select)) if (o !== picked) o._optSel = false;
+  picked._optSel = true;
+}
+/**
+ * `option.selected = v`: sets this option's selectedness and dirtiness, then asks for a reset. Chromium resolves a `true`
+ * in favour of the option that was set (it deselects the others, whatever their tree order); a `false` runs the reset.
+ */
+function setOptionSelected(opt, on) {
+  const select = ownerSelectOf(opt);
+  if (select) assertSingle(select, 'option.selected');
+  opt._optSel = on;
+  opt._optDirty = true;
+  if (!select) return;
+  if (on) {
+    for (const o of optionsOf(select)) if (o !== opt) o._optSel = false;
+  } else {
+    resetSelectedness(select);
+  }
+}
+/**
+ * A `selected` attribute added to or removed from an option. Added, it selects the option unless the option is dirty, and then
+ * the others are deselected (Chromium: the attribute most recently added wins). Removed, the option is unselected even when
+ * it is dirty (Chromium, LIN-4296 probe: `option.selected = true` then `removeAttribute('selected')` reads the first option),
+ * and the reset runs.
+ */
+function onSelectedAttribute(opt, added) {
+  const select = ownerSelectOf(opt);
+  if (added) {
+    if (opt._optDirty) return;
+    opt._optSel = true;
+    if (select && isSingle(select)) for (const o of optionsOf(select)) if (o !== opt) o._optSel = false;
+  } else {
+    opt._optSel = false;
+    if (select) resetSelectedness(select);
+  }
 }
 
 // ── Serialization (browser-faithful, not an echo of the source) ────────────
