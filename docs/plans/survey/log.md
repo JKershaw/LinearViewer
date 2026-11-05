@@ -2172,3 +2172,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 
 ### 15:12 UTC: a ruling from LIN-4269 (a LIN-4255 piece)
 - `lin4269-4016-move`: the plan expected `lin-4016` to stop on the shared fake's unsupported `<select>.value`, but a scratch port passes 29/29, because the suite never reaches that path. **Proposed `move`** (census 47 → 46): the stop was a prediction, and the plan's own stop rule is evidence-based. `lin-3833-run-control` stays as the honest stop. The census has gone from 56 to 47 so far, and the ratchet is doing its job: each stop is named with the API that caused it.
+- 15:13: LIN-4277's after-questions sent to its builder (`54f7b466` → `a6201160`), q1–q6 plus the tidy-after q7.
