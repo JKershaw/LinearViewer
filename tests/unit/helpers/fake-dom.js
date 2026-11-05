@@ -11,12 +11,15 @@
  * Guard and consumers (LIN-4265). `tests/unit/fake-dom-census.test.js` fails on any new hand-written fake DOM under
  * `tests/`, `scripts/eval` or `scripts/code-shape`; its `HAND_WRITTEN_FAKE_DOM_FILES` lists those not yet moved here.
  * The files that use this fake today: `client-world.js`, `fake-dom.test.js` and `lin-4242-waiting-merge.test.js`
- * directly, and `lin-4010-home-opened-task.test.js`, `lin-4246-opened-task-repaint-keep.test.js`,
+ * directly, and `lin-4010-home-opened-task.test.js`, `lin-4246-opened-task-repaint-keep.test.js` and
  * `prompt-section-go.test.js` (LIN-4266), `prompt-section-preserve.test.js`, `prompt-section-recommend-url.test.js` and
  * `prompt-section-look-alike.test.js` (LIN-4268), `prompt-section-p0.test.js`, `prompt-section-run-quota.test.js` and
- * `prompt-section-runner-link.test.js` (LIN-4267), and `chat-append-options.test.js`, `chat-render-markdown-text.test.js`,
- * `chat-tool-rows.test.js`, `observation-basis-check.test.js` and `observation-bulk-scan.test.js` (LIN-4280) through
- * `loadWorld`. `client-world.test.js` (LIN-4280) tests `loadWorld`'s `run`.
+ * `prompt-section-runner-link.test.js` (LIN-4267), `chat-append-options.test.js`, `chat-render-markdown-text.test.js`,
+ * `chat-tool-rows.test.js`, `observation-basis-check.test.js` and `observation-bulk-scan.test.js` (LIN-4280), and
+ * `lin-3833-copy-first-view.test.js`, `lin-3968-home-polish.test.js`, `lin-3975-task-run-control.test.js`,
+ * `lin-4040-close-out.test.js`, `lin-4042-finished-no-run-to-pr.test.js`, `brief-recap-autogenerate.test.js`,
+ * `brief-recap-ai-not-configured-contract.test.js`, `scan-retire-ui.test.js` and `lin-4016-browser-follows-server.test.js`
+ * (LIN-4269) through `loadWorld`. `client-world.test.js` (LIN-4280) tests `loadWorld`'s `run`.
  * A suite moved onto this fake leaves `HAND_WRITTEN_FAKE_DOM_FILES` and joins this list in the same PR.
  *
  * Modelled:
@@ -64,6 +67,11 @@
  * MathML): `innerHTML` parses SVG markup as HTML elements, so only `createElementNS` makes an SVG-namespace node;
  * `<script>` execution, `getBoundingClientRect`, `MutationObserver`, `Range` and `Selection`,
  * `getClientRects` (so a Tab-driven focus trap cannot be exercised), `select`, and selection direction.
+ *
+ * `select` stop (LIN-4269). `<select>.value` is the API the suite below needs and the fake does not model: its getter returns
+ * undefined, its setter throws (`value is not modelled on <select>`, the setter above). `lin-3833-run-control.test.js` stays on
+ * the census, `HAND_WRITTEN_FAKE_DOM_FILES`, with its own hand-written fake: production writes `el.value` on the run-harness
+ * select at `public/prompt-section.js:1565` through `applyPanelDraft`, and the test reads it at line 243.
  */
 
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
