@@ -1678,3 +1678,17 @@ Each is its own piece, with a stop-and-say rule on 5 and 6. Autopilot `84fa12ad`
 - **Ledger:** `+ (mixed)`.
 - **A pattern worth watching (not yet a finding):** tonight's code-only rows LIN-4241 and LIN-4242 each left one new file without a map home; LIN-4234 and LIN-4240 left none. With no map in the Survey, "home" is judged from the code, and the map lags. That's what you'd expect in a repo with no map, and the honest cost of the steer: **the copies stay down, but nobody tends the homes.** Two rows isn't a trend; LIN-4203 (routed) left one too.
 - After-questions sent to LIN-4241's builder. LIN-4242's are held until its ruling is discharged, because its build session *is* the ruling's loop.
+
+### 03:00 UTC: LIN-4144, the ordinary feature, has all three pieces merged
+- **LIN-4243** (`172f644a`, piece C, the larger extra): when the Waiting set changes, Home reads its document once and swaps Running, Up next and the count line.
+  - The swap waits while the reader has something open.
+  - The policy is a pure, unit-tested module with a map home; the DOM swap is in `app.js`.
+  - The map is unchanged. Ledger `+`.
+- **The feature ticket's three rows: `+ (small)`, `+ (mixed)`, `+`.** On ordinary work, through the loop with the code-only global and no routed findings, the place came out better. The likely obvious way, by both Surveys, would have left a second poll, a third renderer, a third keep check, and a Home that shows a task twice or nowhere. None of those landed.
+- **The 21:50 criteria, final:**
+  - reuse the poll: **met**;
+  - the guard as partner: **met** (it was built first);
+  - no second poll at merge: **met**;
+  - no new homeless file: **missed by one** (`lib/waiting-section.js`).
+- **A gap in the rulings loop:** `lin4242-keep-witness-scope` was **withdrawn automatically when LIN-4242 closed** ("ticket-closed"). The close-out filed no follow-up ("no outside item is unowned"), so the opened-task repaint witness had silently lost its owner. I filed it as **LIN-4246** (Backlog), as the proposed answer said. Worth a look at how Harbour handles an open scope question when its ticket finishes. Today, closing the ticket withdraws the question.
+- After-questions sent to the LIN-4242 and LIN-4243 builders.
