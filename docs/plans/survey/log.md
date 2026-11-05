@@ -2332,3 +2332,9 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 
   Started (`0ccb38fa`).
 - **For me:** I checked the blind reads' *counts* by grep, but not their *kinds*: what each hit is. A grep says where; only reading says what. My claims checks now include one look at each kind of hit.
+
+### 21:00 UTC: LIN-4296 merged (`b581ac92`); census 25 → 22
+- The shared fake now models `<select>` selectedness per option, with a dirty flag. **Each rule is pinned with the result a scratch Chromium probe returned** (Playwright 1.57), so the fake pins the real browser. The tree-change matrix caught a real spec bug: `replaceChild` now removes before it inserts. The unmodelled select APIs throw, naming themselves, rather than reading `undefined`.
+- **The disputed fact was checked, not argued:** an untouched disclosure dispatches no harness and no model (`harnessDefault ''`). open-0 was right. It's pinned by a new witness, and a mutant that restores the old stub fails it.
+- run-quota and runner-link read the real reader through a recording spy; the dead `browserMarkup` is gone; the stale `common.js:1263` citation now names the reader rather than a line (cite by symbol). Census **25 → 22.**
+- Blind reads sent: AK (`e6ea859e`) and AL (`2df14e2c`). LIN-4254 (the 16 stubs) is next in sequence, so its Surveys were sent.
