@@ -2356,3 +2356,12 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - **The scan's hit list at the base was the work list:** 23 guards in four spellings. 20 removed, each verdict written in the commit (delegated targets trusted; `contains` is on Node; the `flight-companion.js` walk stops at `modelListEl`, so it was removable after all). 3 allow-listed (the `close-out.js` unit seams, for LIN-4254's last group). `matchMedia(...).matches` was correctly passed as a non-guard.
 - **The ratchet:** `public-element-method-guards.test.js`, an acorn AST scan, pinned by fixtures for each spelling, a multi-line guard, the `matchMedia` negative, and the allow-list rules. That includes **a stale-entry check, so an allow-list entry whose guard is gone fails.** The reasons can't go stale silently, which answers Comprehension-Debt's R1 for this list. The unedited base fails with 23 hits; two mutants turn their fixtures red. Unit 23,828 (+17, the new file only); E2E 2,004.
 - Blind reads sent: LIN-4304 alone, AM (`bfe90477`) and AN (`7a720dcd`); LIN-4292 + LIN-4304 as one change, AO (`3bba1012`) and AP (`50396736`). LIN-4292 alone was better, mixed.
+
+### 21:20 UTC: the fourth "after" step lifts its area too (LIN-4292 + LIN-4304 better, better)
+- **LIN-4304: better, better (AM, AN). LIN-4292 + LIN-4304: better, better (AO, AP).** "Taken on its own, b389f9b02 would be mixed … f742e5acb fills those gaps and adds the check." That's four of four tidy-afters today, and the first one made after a parent whose mixed reading came from **my own scope**.
+- **Residues, by the stop rule (no tidy-after):**
+  - **a fifth hand-rolled acorn walker** across the source-shape tests (`acorn-walk` is already a dependency), pulled into LIN-4297's step 6 as "extract one shared walker first, don't add a sixth";
+  - **allow-list reasons that cite tickets and line numbers**, despite the scope saying "present tense, true of the line now". The stale-entry check catches a removed guard but not a stale reason, so this goes to the notebook as a next guard to consider;
+  - the same idiom on `.focus` and `dispatchEvent` (notebook);
+  - one entry its own reason calls unneeded.
+- **A pattern in the residues:** each tidy-after's leftovers are smaller and more test-side than its parent's. From second copies of production rules, to a shared test walker and stale reasons in an allow-list. The stack is moving.
