@@ -50,8 +50,6 @@ const EXCLUDED = new Set(['tests/unit/helpers/fake-dom.js', SELF]);
  */
 const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/fixtures/observation-dom-shim.js',
-  'tests/unit/brief-recap-ai-not-configured-contract.test.js',
-  'tests/unit/brief-recap-autogenerate.test.js',
   'tests/unit/chart-helpers.test.js',
   'tests/unit/chat-append-options.test.js',
   'tests/unit/chat-render-markdown-text.test.js',
@@ -73,8 +71,6 @@ const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/unit/lin-4024-home-description.test.js',
   'tests/unit/lin-4024-look.test.js',
   'tests/unit/lin-4035-live-console-client.test.js',
-  'tests/unit/lin-4040-close-out.test.js',
-  'tests/unit/lin-4042-finished-no-run-to-pr.test.js',
   'tests/unit/lin-4114-dismiss-order.test.js',
   'tests/unit/lin-4114-inflight-lock.test.js',
   'tests/unit/lin-4241-settled-ruling-client.test.js',
@@ -96,7 +92,6 @@ const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/unit/question-card-task-bound.test.js',
   'tests/unit/run-limit-gating.test.js',
   'tests/unit/runner-link-surfaces.test.js',
-  'tests/unit/scan-retire-ui.test.js',
   'tests/unit/task-chat-flight-companion-sentinel-mask.test.js',
   'tests/unit/task-page-client.test.js',
   'tests/unit/task-page-link-client-surfaces.test.js',

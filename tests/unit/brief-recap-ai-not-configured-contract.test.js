@@ -43,6 +43,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { withHarnessModels } from '../fixtures/harness-models.js';
+import { loadWorld } from './helpers/client-world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -129,51 +130,29 @@ async function post(app, path) {
 
 // --- Composed-wire harness (ledger item 3) --------------------------------
 //
-// A sandbox holding the REAL public/common.js (for its `window.api`) plus the
-// section module, wired to a live server. The single seam is `fetch`: the
-// modules build ORIGIN-RELATIVE URLs, which a browser resolves against the page
-// origin and Node's fetch rejects — so the shim resolves them the same way. No
-// error, status, or body is fabricated anywhere in this path.
+// The client world (helpers/client-world.js): one fake document and one vm sandbox. The real public/common.js (for its
+// `window.api`, with the harness list a page carries) and the section module run in it, in that order. The single seam is
+// `fetch`: the modules build ORIGIN-RELATIVE URLs, which a browser resolves against the page origin and Node's fetch
+// rejects, so the shim resolves them the same way. No error, status, or body is fabricated anywhere in this path.
 function loadWiredSection(file, globalName, origin) {
-  const window = {
-    addEventListener() {},
-    location: { href: '' },
-    matchMedia: () => ({ matches: false, addEventListener() {} }),
-  };
-  const document = {
-    addEventListener() {},
-    querySelector: () => null,
-    querySelectorAll: () => [],
-    documentElement: { classList: { add() {}, remove() {}, contains: () => false } },
-    body: { classList: { add() {}, remove() {} } },
-    createElement: () => ({ style: {}, classList: { add() {}, remove() {} }, appendChild() {}, setAttribute() {} }),
-  };
-  const sandbox = {
-    window, document, console, setTimeout, clearTimeout, navigator: {},
-    localStorage: { getItem: () => null, setItem() {} },
-    URLSearchParams,
-    fetch: (url, opts) => globalThis.fetch(new URL(url, origin), opts),
-  };
-  const ctx = vm.createContext(sandbox);
-  // Real window.api — the hop the ledger flagged as read-verified only.
-  vm.runInContext(withHarnessModels(readFileSync(join(__dirname, '../../public/common.js'), 'utf8')), ctx);
-  assert.equal(typeof window.api, 'function', 'the real window.api loaded');
-  vm.runInContext(readFileSync(join(__dirname, '../../public', file), 'utf8'), ctx);
-  return window[globalName];
-}
-
-function makeContainer() {
-  return {
-    innerHTML: '',
-    _state: null,
-    classList: { add() {} },
-    setAttribute(k, v) { if (k === 'data-state') this._state = v; },
-    getAttribute(k) { return k === 'data-state' ? this._state : null; },
-    querySelector(sel) {
-      const attr = sel.replace(/[[\]]/g, '');
-      return this.innerHTML.includes(attr) ? { addEventListener() {} } : null;
+  const world = loadWorld({
+    window: {
+      addEventListener() {},
+      location: { href: '' },
+      matchMedia: () => ({ matches: false, addEventListener() {} }),
     },
-  };
+    scripts: [],
+    globals: {
+      localStorage: { getItem: () => null, setItem() {} },
+      navigator: {},
+      fetch: (url, opts) => globalThis.fetch(new URL(url, origin), opts),
+    },
+  });
+  // loadWorld runs the scripts it names as they are on disk; common.js is run with the page's harness list prepended.
+  vm.runInContext(withHarnessModels(readFileSync(join(__dirname, '../../public/common.js'), 'utf8')), world.sandbox);
+  assert.equal(typeof world.window.api, 'function', 'the real window.api loaded');
+  vm.runInContext(readFileSync(join(__dirname, '../../public', file), 'utf8'), world.sandbox);
+  return { section: world.window[globalName], makeContainer: world.makeContainer };
 }
 
 /** Run `fn(origin)` against a live server on an ephemeral port. */
@@ -217,7 +196,7 @@ for (const S of SECTIONS) {
   // must reach the error banner through the real client stack.
   test(`${S.name}: composed wire — real route → real window.api → error banner on manual generate`, async () => {
     await withServer(buildApp(), async (origin) => {
-      const section = loadWiredSection(S.file, S.global, origin);
+      const { section, makeContainer } = loadWiredSection(S.file, S.global, origin);
 
       const manual = makeContainer();
       await section.refresh(manual, 'test-workspace', 'LIN-1016', undefined);

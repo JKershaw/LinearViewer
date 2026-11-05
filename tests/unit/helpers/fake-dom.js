@@ -13,7 +13,9 @@
  * The files that use this fake today: `client-world.js`, `fake-dom.test.js` and `lin-4242-waiting-merge.test.js`
  * directly, and `lin-4010-home-opened-task.test.js`, `lin-4246-opened-task-repaint-keep.test.js` and
  * `prompt-section-go.test.js` (LIN-4266) through `loadWorld`, and `lin-3833-copy-first-view.test.js`, `lin-3968-home-polish.test.js`
- * and `lin-3975-task-run-control.test.js` (LIN-4269) through `loadWorld`.
+ * and `lin-3975-task-run-control.test.js` (LIN-4269) through `loadWorld`, and `lin-4040-close-out.test.js`,
+ * `lin-4042-finished-no-run-to-pr.test.js`, `brief-recap-autogenerate.test.js`, `brief-recap-ai-not-configured-contract.test.js`
+ * and `scan-retire-ui.test.js` (LIN-4269) through `loadWorld`.
  * A suite moved onto this fake leaves `HAND_WRITTEN_FAKE_DOM_FILES` and joins this list in the same PR.
  *
  * Modelled:
