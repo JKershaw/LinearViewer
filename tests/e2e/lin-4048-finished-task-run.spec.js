@@ -93,6 +93,8 @@ test.describe('Home, a run that ends before the first poll (LIN-4247)', () => {
 
     await expect(block.locator('[data-testid="opened-task-started"]')).toHaveCount(0, { timeout: 25000 });
     await expect(block.locator('[data-testid="opened-task-running"]')).toHaveCount(0);
+    // state.run.item is what keeps Home's run box on "Queued, waiting for a runner" for the finished item; only this line pins that endRun clears it.
+    await expect(block.locator('[data-testid="opened-task-queued"]')).toHaveCount(0);
     await expect(block.locator('[data-testid="opened-task-go"]')).toBeVisible();
   });
 });
