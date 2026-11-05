@@ -22,13 +22,35 @@ import { createFakeDom } from './fake-dom.js';
 const PUBLIC_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../../public');
 
 /**
- * Gives a click to `element`'s own click listeners, with `{ type: 'click', target: element }`. There is no bubbling, and
- * `dispatchEvent` stays inert, so this is the one way a test clicks in the world. Piece 5 uses it in place of
- * `element.click()` (LIN-4279).
+ * Gives a click to `element`'s own click listeners, with `{ type: 'click', target }`. `target` is what the event reports as
+ * its target and defaults to `element`. The fake does not bubble, so a listener on an ancestor is given a click on a
+ * descendant by naming both: `clickOn(run, proposal)` (LIN-4307). There is no bubbling, and `dispatchEvent` stays inert,
+ * so this is the one way a test clicks in the world. Piece 5 uses it in place of `element.click()` (LIN-4279).
  */
-export async function clickOn(element) {
-  const event = { type: 'click', target: element };
+export async function clickOn(element, target = element) {
+  const event = { type: 'click', target };
   for (const fn of element.listenersOf('click')) await fn(event);
+  return event;
+}
+
+/**
+ * A click on `target` as the page's document-level listeners see it (LIN-4307). app.js binds one click listener on
+ * `document` for every control, so the event goes to `document`'s listeners, not the target's own. The event carries the
+ * methods a browser's does, so a handler may call `stopPropagation()` or `preventDefault()`.
+ */
+export async function clickDelegated(target) {
+  const event = { type: 'click', target, stopPropagation() {}, preventDefault() {} };
+  for (const fn of target.ownerDocument.listenersOf('click')) await fn(event);
+  return event;
+}
+
+/**
+ * Runs the `DOMContentLoaded` listeners a script registered on `document`, once the page is parsed (LIN-4307). A suite
+ * parses its markup, runs the script with `world.run`, then calls this, so the script's init sees the page.
+ */
+export async function fireDOMContentLoaded(document) {
+  const event = { type: 'DOMContentLoaded', target: document };
+  for (const fn of document.listenersOf('DOMContentLoaded')) await fn(event);
   return event;
 }
 

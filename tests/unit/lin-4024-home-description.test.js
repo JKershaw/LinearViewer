@@ -5,14 +5,18 @@
  * Witnesses: the Home markup carries the description base64 for the client to render on first open (no raw lines in
  * the fold); the client renders it through the one shared renderer the "show more" block also uses; and the Home
  * description fold renders its markdown when it opens (public/app.js, real source).
+ *
+ * The page is the server's own markup (renderDetailsContent) drawn on the shared fake DOM, and app.js runs its init over it
+ * (LIN-4307): its document listeners are bound as they are in a browser, and a click is delivered to them with
+ * `clickDelegated`. There is no stand-in for document or window.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import vm from 'node:vm';
 import { renderDetailsContent } from '../../lib/render.js';
+import { loadWorld, clickDelegated, fireDOMContentLoaded } from './helpers/client-world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP = readFileSync(join(__dirname, '../../public/app.js'), 'utf8');
@@ -65,108 +69,58 @@ describe('Home description — rendered markdown on open, no raw preview', () =>
   });
 });
 
-// An element that answers any property with another element, so app.js's init can run over it. The tests below hand
-// the click handler its own small nodes (the fold, the show-more block) and read what they become.
-function standIn() {
-  const target = function () {};
-  target.dataset = {};
-  return new Proxy(target, {
-    get(t, p) {
-      if (p === Symbol.toPrimitive) return () => '';
-      if (p === 'then' || typeof p === 'symbol') return undefined;
-      if (p in t) return t[p];
-      if (p === 'length') return 0;
-      if (p === 'closest' || p === 'querySelector') return () => null;
-      if (p === 'querySelectorAll') return () => [];
-      if (p === 'getAttribute') return () => null;
-      if (p === 'classList') return { toggle: () => false, add() {}, remove() {}, contains: () => false };
-      return standIn();
-    },
-    apply() { return standIn(); },
-    set(t, p, v) { t[p] = v; return true; },
-  });
-}
-
-// Loads public/app.js for real, runs its DOMContentLoaded init (which registers the delegated click handler), and
-// returns a `click(target)` that dispatches a click through every registered handler. `renders` records each
-// markdown render, so a test counts renders, not calls to a helper.
-function loadAppJs() {
+// Home's page for `issue`: the server's markup drawn on the fake DOM, then public/app.js run over it and its
+// DOMContentLoaded init fired, so its document listeners are bound as in a browser. `renders` records each markdown
+// render: renderMarkdown is common.js's, and a stub stands in for it here.
+async function loadPage(issue, options) {
   const renders = [];
-  const listeners = {};
-  const doc = standIn();
-  doc.readyState = 'complete';
-  doc.addEventListener = (type, fn) => { (listeners[type] ||= []).push(fn); };
-  const win = standIn();
-  win.addEventListener = () => {};
-  const context = vm.createContext({
-    document: doc,
-    window: win,
-    console: { log() {}, error() {}, warn() {} },
-    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
-    atob: (s) => Buffer.from(s, 'base64').toString('binary'),
-    setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {},
-    fetch: () => new Promise(() => {}),
-    renderMarkdown: (text) => { renders.push(text); return `<p>${text}</p>`; },
-    location: win.location, navigator: standIn(), history: standIn(),
+  const world = loadWorld({
+    scripts: [],
+    window: { addEventListener() {} },
+    globals: {
+      renderMarkdown: (text) => { renders.push(text); return `<p>${text}</p>`; },
+      atob: (s) => Buffer.from(s, 'base64').toString('binary'),
+      localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+      setInterval: () => 0, clearInterval() {},
+      fetch: () => new Promise(() => {}),
+      console: { log() {}, error() {}, warn() {} },
+    },
   });
-  vm.runInContext(APP, context, { filename: 'public/app.js' });
-  for (const fn of listeners.DOMContentLoaded || []) fn({});
-  const click = (target) => {
-    const event = { target, stopPropagation() {}, preventDefault() {} };
-    for (const fn of listeners.click || []) fn(event);
-  };
-  return { click, renders };
+  // The details the server renders are injected into the row's `.details` wrapper, as the client does on expand
+  // (public/app.js fills the lazy `.details`); the fold's handler looks its content up from that wrapper.
+  const details = renderDetailsContent(issue, { urlKey: 'ws', featureFlags: {}, provider: EDITABLE, ...options });
+  world.document.body.innerHTML = `<div class="details" data-details-for="${issue.id}" data-section="">${details}</div>`;
+  world.run(APP);
+  await fireDOMContentLoaded(world.document);
+  return { world, renders };
 }
-
-// A fold's click target: `closest` answers only the selectors the handler asks for.
-const clickTargetFor = (answers) => ({ closest: (selector) => answers[selector] ?? null });
 
 describe('Home description — the client renders the markdown on first open (public/app.js, run)', () => {
-  const encoded = Buffer.from(DESCRIPTION).toString('base64');
+  test('Home\'s description fold renders its markdown the first time it opens, and not again', async () => {
+    const { world, renders } = await loadPage(issue, { layout: 'home' });
+    const toggle = world.document.querySelector('[data-testid="issue-description-toggle"]');
+    const home = world.document.querySelector('.home-description');
 
-  test('Home\'s description fold renders its markdown the first time it opens, and not again', () => {
-    const { click, renders } = loadAppJs();
-    const home = standIn();
-    home.dataset = { rawDesc: encoded, urlKey: 'ws' };
-    const content = { classList: hiddenFlag(true), querySelector: (sel) => (sel === '.home-description' ? home : null) };
-    const details = { querySelector: (sel) => (sel === '[data-content="description"]' ? content : null) };
-    const foldToggle = { dataset: { toggle: 'description' }, textContent: '▶ Description', closest: (sel) => (sel === '.details' ? details : null) };
-    const target = clickTargetFor({ '.detail-toggle': foldToggle });
-
-    click(target);
+    await clickDelegated(toggle);
     assert.equal(renders.length, 1, 'the first open renders the description');
     assert.equal(renders[0], DESCRIPTION, 'it renders the description exactly');
     assert.equal(home.dataset.rendered, 'true', 'the body is marked rendered');
     assert.ok(home.innerHTML.includes(DESCRIPTION), 'the rendered markdown is what the fold shows');
 
-    click(target); // close
-    click(target); // open again
+    await clickDelegated(toggle); // close
+    await clickDelegated(toggle); // open again
     assert.equal(renders.length, 1, 'a second open does not render it again');
   });
 
-  test('the show-more block renders on its first expansion, and not again', () => {
-    const { click, renders } = loadAppJs();
-    const fullContent = standIn();
-    fullContent.dataset = { rawDesc: encoded, urlKey: 'ws' };
-    const truncated = { classList: hiddenFlag(false) };
-    const full = { classList: hiddenFlag(true) };
-    const container = {
-      dataset: { rawDesc: encoded, urlKey: 'ws' },
-      querySelector: (sel) => ({ '.desc-truncated': truncated, '.desc-full': full, '.desc-full-content': fullContent })[sel] ?? null,
-    };
-    const showMore = { closest: (sel) => (sel === '.issue-description' ? container : null) };
-    const showMoreTarget = clickTargetFor({ '.issue-desc-toggle': showMore, '.issue-description': container });
+  test('the show-more block renders on its first expansion, and not again', async () => {
+    const { world, renders } = await loadPage(issue, {});
+    const showMore = world.document.querySelector('.issue-desc-toggle');
+    assert.ok(showMore, 'the long description has a show-more toggle');
 
-    click(showMoreTarget);
+    await clickDelegated(showMore);
     assert.equal(renders.length, 1, 'show more renders on its first expansion');
-    click(showMoreTarget);
-    click(showMoreTarget);
+    await clickDelegated(showMore);
+    await clickDelegated(showMore);
     assert.equal(renders.length, 1, 'and does not render again on a later expansion');
   });
 });
-
-/** A `classList` whose `toggle('hidden')` flips a flag and returns the new state, as the browser does. */
-function hiddenFlag(hidden) {
-  let state = hidden;
-  return { toggle: () => { state = !state; return state; }, contains: () => state };
-}

@@ -57,11 +57,7 @@ const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/unit/flight-companion-client.test.js', // stop: style write and layout read-back, public/flight-companion.js:653-665 (LIN-4271)
   'tests/unit/lin-2122-history-outcome-pill.test.js',
   'tests/unit/lin-2370-browser-copy-prompt-provider-identity.test.js',
-  'tests/unit/lin-3254-session-run-toggles.test.js',
   'tests/unit/lin-3975-proposal-refresh.test.js',
-  'tests/unit/lin-4016-sessions-fold-parked.test.js',
-  'tests/unit/lin-4024-home-description.test.js',
-  'tests/unit/lin-4024-look.test.js',
   'tests/unit/lin-4114-dismiss-order.test.js', // stop: real bubbling dispatchEvent, public/question-cards.js:239-241; the fake dispatchEvent is inert
   'tests/unit/lin-4114-inflight-lock.test.js', // stop: real bubbling dispatchEvent, public/question-cards.js:239-241; the fake dispatchEvent is inert
   'tests/unit/lin-4241-settled-ruling-client.test.js', // stop: real bubbling dispatchEvent, public/question-cards.js:239-241; the fake dispatchEvent is inert
