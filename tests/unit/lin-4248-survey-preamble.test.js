@@ -33,35 +33,16 @@ const MANDATE = {
   [WRITES.ONE_COMMENT]: 'Being dispatched here is a read-only stage: investigate and read freely, but do not change code, branches, pull requests, tickets or Linear state; your only write is one comment on the ticket named in your task, and do not hold your first call, or any call, waiting for a live reply before you start.',
   [WRITES.TICKET_FIELDS]: 'Being dispatched here is to triage the ticket named in your task: investigate freely, and you may change its labels, priority, state and project and comment on it. Do not change code, branches or pull requests, do not rewrite its description, do not create tickets or subtasks, and do not hold your first call, or any call, waiting for a live reply before you start.',
 };
-const CLOSING = {
-  [WRITES.WORK]: [
-    'Your runner reports back automatically when this session stops — you do not',
-    'need to curl anything to phone home. Just END with a concise summary that',
-    'names concrete evidence: PR link, commit SHA, and CI/test result, so the',
-    'report carries proof rather than a bare "done".',
-    ''
-  ].join('\n'),
-  [WRITES.NONE]: [
-    'Your runner reports back automatically when this session stops — you do not',
-    'need to curl anything to phone home. Just END with your findings and the sources they',
-    'came from, so the report carries proof rather than a bare "done".',
-    ''
-  ].join('\n'),
-  [WRITES.ONE_COMMENT]: [
-    'Your runner reports back automatically when this session stops — you do not',
-    'need to curl anything to phone home. Just END with the link to the one comment you',
-    'posted on the ticket named in your task, so the report carries proof rather than a bare "done".',
-    ''
-  ].join('\n'),
-  [WRITES.TICKET_FIELDS]: [
-    'Your runner reports back automatically when this session stops — you do not',
-    'need to curl anything to phone home. Just END with each field change you made (field,',
-    'before and after, and the reason), each change you intended but could not apply through the',
-    'workspace API, and the link to the comment you posted, if any, so the report carries proof',
-    'rather than a bare "done".',
-    ''
-  ].join('\n'),
+// LIN-4277: one literal lead-in (the two lines every closing opens with), then a tail per value. Written
+// here, not imported from lib/proxy-preamble.js, so a drift in the code's lead-in text fails this file.
+const CLOSING_LEAD_IN = 'Your runner reports back automatically when this session stops — you do not\nneed to curl anything to phone home. Just END with ';
+const CLOSING_TAIL = {
+  [WRITES.WORK]: 'a concise summary that\nnames concrete evidence: PR link, commit SHA, and CI/test result, so the\nreport carries proof rather than a bare "done".',
+  [WRITES.NONE]: 'your findings and the sources they\ncame from, so the report carries proof rather than a bare "done".',
+  [WRITES.ONE_COMMENT]: 'the link to the one comment you\nposted on the ticket named in your task, so the report carries proof rather than a bare "done".',
+  [WRITES.TICKET_FIELDS]: 'each field change you made (field,\nbefore and after, and the reason), each change you intended but could not apply through the\nworkspace API, and the link to the comment you posted, if any, so the report carries proof\nrather than a bare "done".',
 };
+const CLOSING = Object.fromEntries(Object.entries(CLOSING_TAIL).map(([value, tail]) => [value, `${CLOSING_LEAD_IN}${tail}\n`]));
 // What each non-work value must say, and must not, beyond the exact sentences above.
 const PHRASES = {
   [WRITES.NONE]: { says: [/report your findings in this session/], closingSays: [/findings/] },
@@ -270,4 +251,48 @@ describe('LIN-4248 — the factory hands the resolved kind to finalizePrompt', (
     });
     assert.equal(seen.resolvedKind, 'survey-task');
   });
+});
+
+// LIN-4277: a non-work block is the work block with only three things different: its mandate, its
+// closing and the update-the-workspace clause. The comparison is whitespace-normalised, so a line break
+// may move (the one ladder in lib/proxy-preamble.js uses work's). The clause forms are literals here,
+// not read from the ladder, so the test cannot check itself.
+const normalise = (text) => text.replace(/\s+/g, ' ').trim();
+// Longest first: ", and update…" contains " and update…", so the comma form must go before the bare one.
+const CLAUSE_FORMS = [
+  ' and to update the workspace as you work (status, comments, labels)',
+  ', and update the workspace as you work (status, comments, labels)',
+  ' and update the workspace as you work (status, comments, labels)',
+];
+const ENDPOINT_VARIANTS = [];
+for (const issueIdentifier of [ISSUE, undefined]) {
+  for (const issueDetail of [true, false]) for (const relations of [true, false]) for (const search of [true, false]) {
+    ENDPOINT_VARIANTS.push({ issueIdentifier, providerUi: { issueDetail, relations, search } });
+  }
+}
+
+describe('LIN-4277 — a non-work block differs from the work block only in its mandate, closing and clause', () => {
+  test('each clause form occurs in some work variant, so no form is left untested', () => {
+    for (const form of CLAUSE_FORMS) {
+      const seen = ENDPOINT_VARIANTS.some(variant => normalise(build({ ...variant, writes: WRITES.WORK })).includes(normalise(form)));
+      assert.ok(seen, `no work variant carries "${form.trim()}"`);
+    }
+  });
+
+  for (const value of NON_WORK) {
+    for (const tokenDelivery of ['prose', 'mcp']) {
+      for (const variant of ENDPOINT_VARIANTS) {
+        const label = `${variant.issueIdentifier ?? 'no issue'} ${JSON.stringify(variant.providerUi)} (${tokenDelivery})`;
+        test(`${value}, ${label}: the work block less its mandate, closing and clause`, () => {
+          let expected = normalise(build({ ...variant, tokenDelivery, writes: WRITES.WORK }))
+            .replace(normalise(MANDATE[WRITES.WORK]), normalise(MANDATE[value]))
+            .replace(normalise(CLOSING[WRITES.WORK]), normalise(CLOSING[value]));
+          for (const form of CLAUSE_FORMS) expected = expected.replace(form, '');
+          const block = build({ ...variant, tokenDelivery, writes: value });
+          assert.equal(normalise(block), expected);
+          assert.doesNotMatch(block, /update the workspace/, 'no update clause in any form');
+        });
+      }
+    }
+  }
 });
