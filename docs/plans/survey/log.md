@@ -2219,3 +2219,16 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - **The scope call (big moves early):** witness first, red at base; `goState`; the thin reader; one run-item helper; one exported focus-inside rule (with `hadFocus` gone); the two captures kept and named; the keep moved into `if (slot)`. Then **the larger extra as its own last piece, with a stop rule:** decide the keep before the slot write, so `readerFocusIn` and `restoreReaderFocus` go. It's the "make the change easy" move both voices named behind these copies. Not this ticket (to the notebook): moving the Go/run lifecycle out of the 2.9k-line closure; the server sending one "in progress" fact. Moved to Todo, and autopilot started (`8b90bb20`).
 - LIN-4255's after-questions go to LIN-4272's builder (the close-out, which saw the whole census) when LIN-4255 closes, with q7 (the scope was the big move).
 - 18:45: LIN-4255 closed at 18:36. Its after-questions went to LIN-4272's builder (`406cd032` → `f01eaf85`), q1–q7, asked to answer for the move as a whole where it helps (the close-out saw the whole census).
+
+### 19:10 UTC: LIN-4293 merged (`af55cb73`); step 7 stopped by its rule
+- The third after-trial landed steps 1–6 in about 25 minutes of build:
+  - `goState` returns fresh objects (mutation-checked: a shared object turns a LIN-4247 test red);
+  - `InProgress.{busy, liveNow, ended}` keeps each reader's inputs, and the docblock names `sessionFactsOf` as the source;
+  - `runItemOf` and `clearRunItem(why)`;
+  - `QuestionCards.focusInCard`, with `hadFocus` gone;
+  - the two captures kept and named;
+  - the no-slot fallback keeps the card once;
+  - a new witness file.
+- **Step 7 stopped, as its stop rule asked:** `render()` detaches the card through `container.innerHTML`, so deciding the keep before the write needs a change outside the question-slot functions. That's the honest stop, recorded in the PR. It goes to the notebook with the closure extraction (both Surveys' "better still").
+- **Blind reads sent:** LIN-4293 alone, AE (`4211ba2d`) and AF (`6647c437`); LIN-4247 + LIN-4246 + LIN-4293 as one change, AG (`5a53b65a`) and AH (`2054f8f2`). LIN-4247 and LIN-4246 were each mixed, mixed.
+- **LIN-4292's Surveys sent** (it waited on LIN-4293's question-slot functions).
