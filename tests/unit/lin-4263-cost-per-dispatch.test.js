@@ -244,6 +244,23 @@ describe('LIN-4263: a dispatch with no records, and a dispatch the fetch did not
     close(followEntry.costUsd, 0.5);
     close(session.costUsd, 1.1, 'the lineage total includes the out-of-window follow-up\'s records');
   });
+
+  test('an out-of-window older build is listed before the in-window follow-up (dispatch order, not fetch order)', () => {
+    // Only the follow-up is fetched; the older build is a true member the fetch did not return ("missing"), appended
+    // after the fetched members. The entries must still come out in dispatch order: build, then follow-up.
+    const followUp = dispatch('f1', 'b1', 2, { kind: 'custom', followUpTo: 'b1' });
+    const identity = [
+      { _id: 'b1', rootItemId: 'b1', status: 'taken', kind: 'implementation', issueIdentifier: 'LIN-4263', dispatchedAt: at(5) },
+      { _id: 'f1', rootItemId: 'b1', status: 'taken', kind: 'custom', issueIdentifier: 'LIN-4263', dispatchedAt: at(2), followUpTo: 'b1' },
+    ];
+    // Both records are posted under the follow-up; the Haiku one was made before the follow-up was dispatched.
+    const requests = [
+      request('b1', 'f1', 'q1', 4, { costUsd: 0.6 }),
+      request('b1', 'f1', 'o1', 1, { model: OPUS, costUsd: 0.5 }),
+    ];
+    const session = sessionOf(perDispatch({ fetchedRows: [followUp], identityRows: identity }, requests), 'b1');
+    assert.deepEqual(session.dispatches.map(d => [d.itemId, d.requests]), [['b1', 1], ['f1', 1]]);
+  });
 });
 
 describe('LIN-4263: only the /cost read builds dispatches, and the other figures do not depend on it', () => {

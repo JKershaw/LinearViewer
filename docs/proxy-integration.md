@@ -1255,10 +1255,11 @@ matching zero rows and returning an authoritative-looking `$0.00`.
   The entries sum to the lineage's `requests`, `tokens` and `costUsd`. A record belongs to
   the dispatch whose row posted it, unless it was made before that row was dispatched (a
   build that ran before the records deploy is posted under its follow-up's `itemId`); then
-  it belongs to the dispatch that made it. `dispatches` is `null` for a snapshot-only
-  lineage, whose cumulative total carries one model and cannot be split, and for any
-  lineage read without the `/cost` route's per-dispatch flag. A dispatch with no records
-  reads `requests: 0` and `null` tokens and cost, never `0`.
+  it belongs to the dispatch that made it. `dispatches` is `null` for a lineage without
+  records of its own (snapshot-only, records plus snapshots, no usage or unreadable),
+  whose cumulative total carries one model and cannot be split, and for any lineage read
+  without the `/cost` route's per-dispatch flag. A dispatch with no records reads
+  `requests: 0` and `null` tokens, `byModel` and cost, never `0`.
 - **Labels are the lineage's, not a session's**: `model` on a `workerSessions` row is the
   lineage's cost-dominant model, so a cheap follow-up does not rename an expensive build, and
   an expensive follow-up does rename it. `dispatches` says which model each dispatch ran.
