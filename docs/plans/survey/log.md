@@ -2316,3 +2316,19 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - **Blind: better, mixed.** Both reads give one reason: the sweep was drawn by file and method name, not by idiom. About 17 sites in 10 other `public/` files keep the guard (checked by hand at `b389f9b0`). Two functions LIN-4292 edited now mix both spellings (`paintRun`'s `slot.contains &&`, `keepFocusInDrawer`'s `!drawer.querySelectorAll`). Nothing stops the idiom coming back. "On its own it moves where the inconsistency sits more than it removes it."
 - **That's my scope call:** "the other method-presence guards across `public/` … are not this ticket; count them." It's a partial move with no ratchet, which the 11:35 rule forbids. I exempted a "small mechanical" sweep from it, wrongly. **The rule has no size exemption.** A sweep scoped to some files leaves two spellings in the place, and a reader can no longer tell the house style.
 - **Tidy-after LIN-4304** (filed and Surveyed): finish the sweep across `public/`; keep real non-Element checks (`flight-companion.js:950` walks `parentNode`, an `e.target` can be a Text node) with **an inline marker and reason on the line, not a list**; a source-shape check that fails an unmarked guard, pinned by fixtures. It touches `public/` and one new test file, not the census list, so it runs beside LIN-4296.
+
+### 20:55 UTC: LIN-4304 scoped and started
+- **Its Surveys corrected three claims in my ticket, all checked from code:**
+  - `.matches` on a `MediaQueryList` is a property, not a method, so removing `phone.matches ?` would change phone-width behaviour;
+  - there's a fourth spelling, `typeof x.m === 'function'`;
+  - **"an `e.target` can be a Text node" is wrong** for click, input, change and focus events, which the browser retargets to Elements. Taken literally, it would have put the exception on most sites.
+
+  Also: `close-out.js`'s `typeof` checks are a real unit seam; and **the house already has an exception convention** (an allow-list inside the test, as in `no-page-wide-label-listener.test.js`), so my inline marker would have been a second convention, a new noun.
+- **The scope call:**
+  - the check first, as an acorn AST scan ("tested, then the same member called"), covering four spellings, with fixtures including a `matchMedia` non-guard; its hit list is the work list;
+  - the rule decided once: delegated `e.target` is trusted, a `contains` guard is removable, a `parentNode` walk is judged on evidence;
+  - the close-out seams stay, and LIN-4254 removes them when it moves that suite (noted on LIN-4254);
+  - exceptions go in the house allow-list with present-tense reasons, with no `CLAUDE.md` change.
+
+  Started (`0ccb38fa`).
+- **For me:** I checked the blind reads' *counts* by grep, but not their *kinds*: what each hit is. A grep says where; only reading says what. My claims checks now include one look at each kind of hit.
