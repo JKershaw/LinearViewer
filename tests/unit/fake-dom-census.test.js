@@ -92,7 +92,6 @@ const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/unit/run-limit-gating.test.js',
   'tests/unit/runner-link-surfaces.test.js',
   'tests/unit/scan-retire-ui.test.js',
-  'tests/unit/task-chat-flight-companion-sentinel-mask.test.js',
   'tests/unit/task-page-client.test.js',
   'tests/unit/task-page-link-client-surfaces.test.js',
   'tests/unit/task-page-question.test.js',
