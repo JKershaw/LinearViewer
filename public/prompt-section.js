@@ -303,6 +303,10 @@
         ? (caps.runningBody === 'blank' ? '' : g.headerHtml)
         : '<p class="task-sentence" data-testid="opened-task-sentence">Started.</p>';
       html += `<div class="opened-task-started" data-testid="opened-task-started" data-go-status="${esc(g.status)}">${body}${link}</div>`;
+    } else if (takesNoRun(state, opts)) {
+      // LIN-4048 (review finding 1): a finished task (the server's no-run decision, LIN-4071) draws no Go on any surface.
+      // This must sit before the setup and quota-limit branches below, or a Done task with the quota spent (or no way to run
+      // yet) draws a disabled or setup Go on the task page and Swipe. The slot stays in the markup (paintGo needs it); it is empty.
     } else if (!ready) {
       // LIN-3849: only an owner with no way to run yet is offered "set up ›";
       // anyone else gets no run control at all (copy-first view, LIN-3833, is
@@ -325,12 +329,14 @@
       if (step) html += `<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="run-step-next">Run ${esc(step.label)}</button>${runRungButtonsOf(null)}`;
       else if (offer && offer.kind === 'offer') html += runRungButtonsOf(filledRungOf(opts));
     } else {
+      // Swipe's plain Go spends a run. A finished row (the no-run decision) never reaches here: the branch above draws nothing for it.
       html += `<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" data-action="go">Go</button>`;
     }
 
     // The allowance sits beside Go, the control it governs — shown only when the
-    // count was readable, so it never invents a number (LIN-3239).
-    if (quotaKnown) {
+    // count was readable, so it never invents a number (LIN-3239). LIN-4048: and only when a run can be offered at all:
+    // a finished task has no run to spend one on, so the count would stand beside nothing (Home, the task page and Swipe).
+    if (quotaKnown && !takesNoRun(state, opts)) {
       html += `<span class="opened-task-run-quota" data-testid="opened-task-run-quota" data-runs-remaining="${quota.remaining}" data-runs-limit="${quota.limit}">${quota.remaining} of ${quota.limit} runs left today</span>`;
     }
 
@@ -1081,7 +1087,9 @@
       if (destroyed) return;
       // Once the state shows a session running, the queued item from this page is no longer the thing to undo.
       if (state.opened && state.opened.sessions && state.opened.sessions.running) state.run.item = null;
-      if (!caps.stateBlock) return;
+      // LIN-4048: the task page's run slot follows the poll too, so a held run's Stop and runs-on go when it ends (Home
+      // repaints it from here as well). paintRun is a no-op where there is no run control (Swipe).
+      if (!caps.stateBlock) { paintRun(); return; }
       const oldQuestion = container.querySelector ? container.querySelector('[data-question-slot]') : null;
       const slot = container.querySelector && container.querySelector('[data-state-slot]');
       if (slot) slot.outerHTML = renderOpenedState();
@@ -1591,12 +1599,15 @@
     function renderRunBlock() {
       const step = runStepOf();
       if (!caps.runBox) {
-        // The task page's and Swipe's run block, as it was (LIN-3975): the step, what it runs on, Go, the proposals, the
-        // after-run line and More, in one slot.
+        // The task page's and Swipe's run block, in one slot: the step, what it runs on, Go, the proposals, the
+        // after-run line and More.
+        // LIN-4048: a finished task names no run (LIN-4042, as Home does): no runs-on line and no Change. Its Go slot
+        // stays (paintGo needs it) but draws nothing, and idle it is the More list and the proposals.
+        const noRun = takesNoRun(state, opts);
         return `<div class="opened-task-run" data-run-slot data-testid="opened-task-run">${[
           renderStepLine(step),
-          renderRunsOn(state.run.preview),
-          state.run.changeOpen ? renderChangePanel(state.run.preview) : '',
+          noRun ? '' : renderRunsOn(state.run.preview),
+          !noRun && state.run.changeOpen ? renderChangePanel(state.run.preview) : '',
           renderGo(opts, state),
           renderStagedProposals(),
           renderAfterRun(),
