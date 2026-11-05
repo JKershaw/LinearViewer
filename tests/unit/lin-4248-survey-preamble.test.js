@@ -2,19 +2,25 @@
 // dispatched prompt's "Workspace API access" block must not invite PRs, commits or
 // ticket edits; it asks for the one comment on the surveyed ticket instead. Every
 // other kind keeps the historical block byte-identical.
+// LIN-4253: the gate is the stage's declared `writes`, not a kind list. The tests
+// resolve each kind's writes from its template, as dispatch-entrance does.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   attachProxyContext,
   buildProxyContextPreamble,
-  SURVEY_KINDS
+  resolveWrites
 } from '../../lib/proxy-preamble.js';
 import { createDispatchItem } from '../../lib/dispatch-factory.js';
+import { PROMPT_TEMPLATES } from '../../lib/prompt-templates.js';
+import { WRITES, WRITES_VALUES } from '../../lib/stage-writes.js';
 
 const BASE_URL = 'https://host';
 const ISSUE = 'LIN-42';
-const SURVEY_KINDS_UNDER_TEST = ['survey-task', 'survey-place'];
+// The kind's writes as its template declares them (dispatch-entrance resolves it the same way).
+const writesOf = (kind) => PROMPT_TEMPLATES[kind]?.writes;
+const ONE_COMMENT_KINDS = Object.keys(PROMPT_TEMPLATES).filter(kind => writesOf(kind) === WRITES.ONE_COMMENT);
 
 // The exact sentences the gate swaps. Literal copies so a drift in the constant
 // text fails here rather than passing silently.
@@ -56,9 +62,28 @@ function fakeStore(token = 'BOOT_TOK') {
   };
 }
 
-describe('LIN-4248 — SURVEY_KINDS', () => {
-  test('is exactly the two read-only survey kinds', () => {
-    assert.deepEqual([...SURVEY_KINDS], SURVEY_KINDS_UNDER_TEST);
+describe('LIN-4253 — resolveWrites: the one guard the block and attachProxyContext share', () => {
+  test('absent (a kind with no template) is the default, work', () => {
+    assert.equal(resolveWrites(undefined), WRITES.WORK);
+    assert.equal(resolveWrites(null), WRITES.WORK);
+  });
+
+  test('each known value passes through', () => {
+    for (const value of WRITES_VALUES) assert.equal(resolveWrites(value), value);
+  });
+
+  test('an unknown value throws, naming the value and the vocabulary', () => {
+    assert.throws(() => resolveWrites('read-only'), /Unknown stage writes "read-only".*one-comment/);
+    assert.throws(() => resolveWrites(true), /Unknown stage writes "true"/);
+  });
+
+  test('attachProxyContext refuses an unknown value before it mints (no token spent)', async () => {
+    const store = fakeStore('BOOT_TOK');
+    await assert.rejects(
+      () => attachProxyContext({ proxyTokenStore: store, urlKey: 'acme', baseUrl: BASE_URL, prompt: 'x', harness: null, writes: 'read-only' }),
+      /Unknown stage writes/
+    );
+    assert.equal(store.calls.length, 0, 'no mint on a refusal');
   });
 });
 
@@ -69,7 +94,7 @@ describe('LIN-4248 — non-Survey kinds are byte-identical', () => {
     test(`kind ${JSON.stringify(kind)}: output equals the no-kind output in both delivery modes`, () => {
       for (const tokenDelivery of ['prose', 'mcp']) {
         const without = build({ tokenDelivery });
-        const withKind = build({ tokenDelivery, kind });
+        const withKind = build({ tokenDelivery, writes: writesOf(kind) });
         assert.equal(withKind, without);
       }
     });
@@ -77,7 +102,7 @@ describe('LIN-4248 — non-Survey kinds are byte-identical', () => {
 
   test('representative non-Survey kinds keep "open PRs" and "PR link" in the block', () => {
     for (const kind of ['implementation', 'review', 'retro', 'triage']) {
-      const block = build({ kind });
+      const block = build({ writes: writesOf(kind) });
       assert.ok(block.includes('open PRs'), `${kind} keeps the open-PRs mandate`);
       assert.ok(block.includes('PR link'), `${kind} keeps the PR-link closing`);
       assert.ok(block.includes('commit SHA'), `${kind} keeps the commit-SHA closing`);
@@ -88,17 +113,17 @@ describe('LIN-4248 — non-Survey kinds are byte-identical', () => {
 });
 
 describe('LIN-4248 — Survey kinds get the read-only block', () => {
-  for (const kind of SURVEY_KINDS_UNDER_TEST) {
+  for (const kind of ONE_COMMENT_KINDS) {
     for (const tokenDelivery of ['prose', 'mcp']) {
       test(`${kind} (${tokenDelivery}): no open-PRs, PR-link or commit-SHA wording`, () => {
-        const block = build({ kind, tokenDelivery });
+        const block = build({ writes: writesOf(kind), tokenDelivery });
         assert.ok(!block.includes('open PRs'), 'no open-PRs mandate');
         assert.ok(!block.includes('PR link'), 'no PR-link closing');
         assert.ok(!block.includes('commit SHA'), 'no commit-SHA closing');
       });
 
       test(`${kind} (${tokenDelivery}): read-only wording, brief line and catalog line survive`, () => {
-        const block = build({ kind, tokenDelivery });
+        const block = build({ writes: writesOf(kind), tokenDelivery });
         assert.ok(block.includes(SURVEY_MANDATE), 'read-only mandate present');
         assert.ok(block.endsWith(SURVEY_CLOSING), 'closing names the one surveyed-ticket comment');
         const apiBase = tokenDelivery === 'mcp' ? '$HARBOUR_LOCAL_BASE' : BASE_URL;
@@ -109,7 +134,7 @@ describe('LIN-4248 — Survey kinds get the read-only block', () => {
 
     test(`${kind}: the only differences from the default block are the mandate and closing sentences`, () => {
       const plain = build();
-      const survey = build({ kind });
+      const survey = build({ writes: writesOf(kind) });
       assert.notEqual(survey, plain);
       assert.equal(
         survey.replace(SURVEY_MANDATE, REVERSIBLE_MANDATE).replace(SURVEY_CLOSING, REVERSIBLE_CLOSING),
@@ -119,12 +144,12 @@ describe('LIN-4248 — Survey kinds get the read-only block', () => {
   }
 });
 
-describe('LIN-4248 — attachProxyContext threads kind into the block', () => {
-  test('kind survey-place emits the Survey variant (prose, token embedded and spent)', async () => {
+describe('LIN-4248 — attachProxyContext threads writes into the block', () => {
+  test('writes of survey-place emits the Survey variant (prose, token embedded and spent)', async () => {
     const store = fakeStore('BOOT_TOK');
     const out = await attachProxyContext({
       proxyTokenStore: store, urlKey: 'acme', baseUrl: BASE_URL,
-      issueIdentifier: ISSUE, prompt: 'Survey the place.', harness: null, kind: 'survey-place'
+      issueIdentifier: ISSUE, prompt: 'Survey the place.', harness: null, writes: writesOf('survey-place')
     });
     assert.ok(out.prompt.startsWith('Survey the place.'));
     assert.ok(out.prompt.includes(SURVEY_MANDATE), 'Survey mandate');
@@ -137,7 +162,7 @@ describe('LIN-4248 — attachProxyContext threads kind into the block', () => {
     assert.equal(store.calls.length, 1, 'exactly one mint');
   });
 
-  test('no kind (every non-Survey caller) keeps the reversible block', async () => {
+  test('no writes (every non-Survey caller) keeps the reversible block', async () => {
     const out = await attachProxyContext({
       proxyTokenStore: fakeStore('BOOT_TOK'), urlKey: 'acme', baseUrl: BASE_URL,
       issueIdentifier: ISSUE, prompt: 'Do it.', harness: null
