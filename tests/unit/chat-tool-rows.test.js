@@ -1,76 +1,53 @@
 /**
  * LIN-3361 — `window.ChatUI.appendToolRow` / `foldAfterAnchor` (public/chat.js)
- * against a minimal DOM shim: grouping by adjacency, settle/fail, scroll
- * pinning, textContent-only rendering, and the fold guards. Text-node
- * linkifying and real <details> toggling are proven in the e2e spec.
+ * over the shared fake DOM (tests/unit/helpers/fake-dom.js) through `loadWorld`:
+ * grouping by adjacency, settle/fail, scroll pinning, textContent-only rendering,
+ * and the fold guards. Text-node linkifying and real <details> toggling are
+ * proven in the e2e spec.
+ *
+ * The tree is asserted node by node. `children` is a fresh array on every read,
+ * so the group's rows and the fold's nodes are checked by identity, one
+ * `strictEqual` per position, never by a deep comparison of the node objects.
+ * A grouping that puts the right rows in the wrong order, or the wrong node in
+ * the group, goes red.
  *
  * Run with: node --test tests/unit/chat-tool-rows.test.js
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { loadWorld } from './helpers/client-world.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const CHAT_JS_SRC = readFileSync(join(__dirname, '../../public/chat.js'), 'utf8');
-
-class FakeElement {
-  constructor(tagName) {
-    this.tagName = tagName.toUpperCase();
-    this.children = [];
-    this.parentNode = null;
-    this.dataset = {};
-    this.hidden = false;
-    this.scrollTop = 0;
-    this.scrollHeight = 500;
-    this._text = '';
-    this._classes = new Set();
-    const self = this;
-    this.classList = {
-      add: (...n) => n.forEach((c) => self._classes.add(c)),
-      contains: (c) => self._classes.has(c),
-    };
-  }
-  get className() { return [...this._classes].join(' '); }
-  set className(v) { this._classes = new Set(String(v).split(/\s+/).filter(Boolean)); }
-  get textContent() {
-    return this.children.length ? this.children.map((c) => c.textContent).join('') : this._text;
-  }
-  set textContent(v) { this._text = String(v); this.children = []; }
-  _detach(child) {
-    if (child.parentNode) {
-      const at = child.parentNode.children.indexOf(child);
-      if (at !== -1) child.parentNode.children.splice(at, 1);
-    }
-  }
-  appendChild(child) { this._detach(child); child.parentNode = this; this.children.push(child); return child; }
-  insertBefore(child, ref) {
-    this._detach(child);
-    const at = this.children.indexOf(ref);
-    child.parentNode = this;
-    if (at === -1) this.children.push(child); else this.children.splice(at, 0, child);
-    return child;
-  }
-}
-
+/**
+ * A chat.js world with `window.isPinnedToBottom` answering `pinned`, and an
+ * empty thread in the document. The fake does not lay out, so the scroll
+ * numbers are plain values the client reads and writes: the thread starts at
+ * the top and is 500 tall.
+ */
 function setup({ pinned = true } = {}) {
-  const sandbox = {
-    window: { isPinnedToBottom: () => pinned },
-    document: { createElement: (t) => new FakeElement(t) },
-    console,
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(CHAT_JS_SRC, sandbox, { filename: 'chat.js' });
-  const thread = new FakeElement('ul');
-  return { ChatUI: sandbox.window.ChatUI, thread };
+  const world = loadWorld({ window: { isPinnedToBottom: () => pinned }, scripts: ['chat.js'] });
+  const { document } = world;
+  const thread = document.createElement('ul');
+  document.body.appendChild(thread);
+  thread.scrollTop = 0;
+  thread.scrollHeight = 500;
+  return { ChatUI: world.window.ChatUI, document, thread };
 }
 
-const note = (text) => { const li = new FakeElement('li'); li.className = 'chat-note'; li.textContent = text; return li; };
+const note = (document, text) => {
+  const li = document.createElement('li');
+  li.className = 'chat-note';
+  li.textContent = text;
+  return li;
+};
 const rowSummary = (li) => li.children[0].children[0];
 const groupSummary = (g) => g.children[0].children[0];
 const groupRows = (g) => g.children[0].children[1].children;
+
+/** The same nodes, in the same order, by identity: one `strictEqual` per position. */
+function assertSameNodes(actual, expected, message) {
+  assert.equal(actual.length, expected.length, `${message}: count`);
+  expected.forEach((node, i) => assert.strictEqual(actual[i], node, `${message}: node ${i}`));
+}
 
 describe('appendToolRow', () => {
   test('a single row is a bare closed <details> row, not a bubble and not wrapped', () => {
@@ -112,7 +89,7 @@ describe('appendToolRow', () => {
     assert.equal(thread.children.length, 1);
     const group = thread.children[0];
     assert.equal(group.className, 'chat-tool-group');
-    assert.deepEqual(groupRows(group), [a.li, b.li]);
+    assertSameNodes(groupRows(group), [a.li, b.li], 'the group holds the two rows in order');
     assert.equal(groupSummary(group).textContent, 'checked 2 things …', 'pending while any member is pending');
     a.settle('{}'); b.settle('{}');
     assert.equal(groupSummary(group).textContent, 'checked 2 things');
@@ -122,33 +99,33 @@ describe('appendToolRow', () => {
   });
 
   test('any non-tool li between rows breaks the run (a proposal or note is never a member)', () => {
-    const { ChatUI, thread } = setup();
+    const { ChatUI, thread, document } = setup();
     ChatUI.appendToolRow(thread, { label: 'a' });
-    const proposal = new FakeElement('li'); proposal.className = 'chat-msg fc-proposal-msg';
+    const proposal = document.createElement('li'); proposal.className = 'chat-msg fc-proposal-msg';
     thread.appendChild(proposal);
     ChatUI.appendToolRow(thread, { label: 'b' });
     assert.equal(thread.children.length, 3);
     assert.deepEqual(thread.children.map((c) => c.className), ['chat-tool-row', 'chat-msg fc-proposal-msg', 'chat-tool-row']);
-    thread.appendChild(note('cap'));
+    thread.appendChild(note(document, 'cap'));
     ChatUI.appendToolRow(thread, { label: 'c' });
     assert.equal(thread.children.length, 5, 'a note also breaks the run');
   });
 
   test('before: a row inserted before an anchor groups with the sibling that precedes the anchor', () => {
-    const { ChatUI, thread } = setup();
-    const answer = new FakeElement('li'); answer.className = 'chat-msg';
+    const { ChatUI, thread, document } = setup();
+    const answer = document.createElement('li'); answer.className = 'chat-msg';
     thread.appendChild(answer);
     const a = ChatUI.appendToolRow(thread, { label: 'a', before: answer });
     const b = ChatUI.appendToolRow(thread, { label: 'b', before: answer });
     assert.equal(thread.children.length, 2);
     assert.equal(thread.children[1], answer, 'the anchor stays last');
-    assert.deepEqual(groupRows(thread.children[0]), [a.li, b.li]);
+    assertSameNodes(groupRows(thread.children[0]), [a.li, b.li], 'the group holds the two rows in order');
   });
 
   test('a row inserted before a bubble joins the run that ends right there (adjacency is judged at the insertion point)', () => {
-    const { ChatUI, thread } = setup();
+    const { ChatUI, thread, document } = setup();
     ChatUI.appendToolRow(thread, { label: 'a' });
-    const bubble = new FakeElement('li'); bubble.className = 'chat-msg';
+    const bubble = document.createElement('li'); bubble.className = 'chat-msg';
     thread.appendChild(bubble);
     ChatUI.appendToolRow(thread, { label: 'b', before: bubble });
     assert.equal(thread.children.length, 2, 'a and b are adjacent at the insertion point, so they merge; the bubble stays outside');
@@ -182,15 +159,15 @@ describe('appendToolRow', () => {
 });
 
 describe('foldAfterAnchor', () => {
-  const block = (tag, text) => { const e = new FakeElement(tag); e.textContent = text; return e; };
+  const block = (document, tag, text) => { const e = document.createElement(tag); e.textContent = text; return e; };
   const long = 'word '.repeat(80);
 
   test('moves the anchor and everything after it into a closed fold, keeping the headline', () => {
-    const { ChatUI } = setup();
-    const el = new FakeElement('div');
-    const head = block('P', 'All green.');
-    const hr = block('HR', '');
-    const body = block('P', long);
+    const { ChatUI, document } = setup();
+    const el = document.createElement('div');
+    const head = block(document, 'p', 'All green.');
+    const hr = block(document, 'hr', '');
+    const body = block(document, 'p', long);
     [head, hr, body].forEach((n) => el.appendChild(n));
     assert.equal(ChatUI.foldAfterAnchor(el, { summary: 'full readout' }), true);
     assert.equal(el.children.length, 2);
@@ -198,31 +175,32 @@ describe('foldAfterAnchor', () => {
     const fold = el.children[1];
     assert.equal(fold.className, 'chat-fold');
     assert.equal(fold.children[0].textContent, 'full readout');
-    assert.deepEqual(fold.children.slice(1), [hr, body], 'the same nodes moved, not copies');
+    assert.equal(fold.children.length, 3, 'the summary, then the moved nodes');
+    assertSameNodes(fold.children.slice(1), [hr, body], 'the same nodes moved, not copies');
   });
 
   test('does nothing: no anchor, nothing before the anchor, or a short tail', () => {
-    const { ChatUI } = setup();
-    const none = new FakeElement('div'); none.appendChild(block('P', long));
+    const { ChatUI, document } = setup();
+    const none = document.createElement('div'); none.appendChild(block(document, 'p', long));
     assert.equal(ChatUI.foldAfterAnchor(none, {}), false);
     assert.equal(none.children.length, 1);
 
-    const lead = new FakeElement('div'); lead.appendChild(block('H2', 'Readout')); lead.appendChild(block('P', long));
+    const lead = document.createElement('div'); lead.appendChild(block(document, 'h2', 'Readout')); lead.appendChild(block(document, 'p', long));
     assert.equal(ChatUI.foldAfterAnchor(lead, {}), false, 'an answer that opens with a heading has no headline to keep');
 
-    const short = new FakeElement('div'); short.appendChild(block('P', 'Headline.')); short.appendChild(block('H2', 'Details')); short.appendChild(block('P', 'tiny'));
+    const short = document.createElement('div'); short.appendChild(block(document, 'p', 'Headline.')); short.appendChild(block(document, 'h2', 'Details')); short.appendChild(block(document, 'p', 'tiny'));
     assert.equal(ChatUI.foldAfterAnchor(short, {}), false);
     assert.equal(short.children.length, 3);
   });
 
   test('bold-label fallback folds from the first known heading', () => {
-    const { ChatUI } = setup();
-    const el = new FakeElement('div');
-    el.appendChild(block('P', 'Headline.'));
-    const p = new FakeElement('P'); const strong = new FakeElement('STRONG'); strong.textContent = 'The big thread';
+    const { ChatUI, document } = setup();
+    const el = document.createElement('div');
+    el.appendChild(block(document, 'p', 'Headline.'));
+    const p = document.createElement('p'); const strong = document.createElement('strong'); strong.textContent = 'The big thread';
     p.appendChild(strong);
     el.appendChild(p);
-    el.appendChild(block('P', long));
+    el.appendChild(block(document, 'p', long));
     assert.equal(ChatUI.foldAfterAnchor(el, { headings: ['The big thread'] }), true);
     assert.equal(ChatUI.foldAfterAnchor(el, { headings: ['The big thread'] }), false, 'idempotent: nothing left to fold after the details');
   });
