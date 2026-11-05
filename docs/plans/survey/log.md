@@ -2338,3 +2338,16 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - **The disputed fact was checked, not argued:** an untouched disclosure dispatches no harness and no model (`harnessDefault ''`). open-0 was right. It's pinned by a new witness, and a mutant that restores the old stub fails it.
 - run-quota and runner-link read the real reader through a recording spy; the dead `browserMarkup` is gone; the stale `common.js:1263` citation now names the reader rather than a line (cite by symbol). Census **25 → 22.**
 - Blind reads sent: AK (`e6ea859e`) and AL (`2df14e2c`). LIN-4254 (the 16 stubs) is next in sequence, so its Surveys were sent.
+
+### 21:10 UTC: LIN-4296 better, better; LIN-4254 scoped and started
+- **LIN-4296: better, better (AK, AL).** One owner for selectedness, pinned against Chromium; three fakes and two second copies deleted. By the stop rule, no tidy-after: its residues (the off-tree press shim in two suites, a `PROXY_PROMPT_BOX` copy, two stale comments) go into LIN-4297, the next ticket in the area.
+- **Another rule-induced copy, mine:** "names and counts unchanged" led the builder to put one new case in its own file, `lin-4296-scope-pick`, which then copied its parent's fixture. "A rule about counts led to duplicated code." It's the second today, after the byte-identical rule (LIN-4251/4277). **Revised:** every moved test keeps its name; a test may move to a better-placed suite and a new case may join one; the PR maps every name; don't split a file to keep a count.
+- **LIN-4254's Surveys:** the premise ("single-element stubs the fake can serve as it stands") understates it. None of the 16 uses `loadWorld` (each has its own `vm` sandbox). The shapes are seams, routers and **auto-vivifiers** (every selector returns an element, so whole page inits run as no-ops; stops will surface there). `querySelector: () => null` in at least six files hides dead paths. The question-cards suites avoid the `dispatchEvent` stop only because `CustomEvent` is absent.
+- **The scope call:**
+  - **piece 0 is a probe plus a derivation:** tag every shape, probe the three auto-vivifiers on `loadWorld`, and make the census derive and assert the fake's consumer list (moved here from LIN-4297, so the 16 moves don't hand-edit it);
+  - then five groups by client script, in sequence; "moved" means on `loadWorld`, with each private sandbox deleted;
+  - router markup from the real renderer; red tests classified as findings;
+  - no fake widening (a stop stays listed, named);
+  - `close-out-client` last, after LIN-4304, with its production seams removed as their own step.
+
+  Started (`2cff163e`).
