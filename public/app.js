@@ -572,9 +572,10 @@ function getDefaultState() {
  * own header finds its body. One keyed handler serves both (click, startup and reset), so the two cannot drift apart.
  */
 const DESK_SECTIONS = [
-  { key: 'waitingCollapsed', header: '.waiting-header', body: '.waiting-body' },
-  { key: 'runningCollapsed', header: '.running-header', body: '.running-body' },
-  { key: 'upNextCollapsed', header: '.up-next-header', body: '.up-next-body' },
+  { key: 'waitingCollapsed', section: '[data-testid="waiting-on-you"]', header: '.waiting-header', body: '.waiting-body' },
+  // LIN-4243: `placed` sections are replaced from the Home document when the Waiting set changes (createDeskPlacement).
+  { key: 'runningCollapsed', section: '.running-section', header: '.running-header', body: '.running-body', placed: true },
+  { key: 'upNextCollapsed', section: '.up-next-section', header: '.up-next-header', body: '.up-next-body', placed: true },
 ]
 const deskSectionOf = header => DESK_SECTIONS.find(section => header.matches(section.header)) ?? null
 
@@ -608,6 +609,15 @@ function initWaitingOnYou() {
   if (window.QuestionCards && typeof window.QuestionCards.initQuestionCards === 'function') {
     window.QuestionCards.initQuestionCards(section)
   }
+  // LIN-4243: Running, Up next and the count line follow a change of the Waiting key set. Captured here, at startup.
+  const placement = createDeskPlacement({
+    main,
+    countLine,
+    live,
+    searchResults: main.querySelector('[data-lazy-results]'),
+    searchInput: document.getElementById('search-input'),
+    initialKeys: waitingKeysIn(body),
+  })
   // LIN-4242: one request in flight at a time. A call made while one is out queues a single follow-up behind it.
   let inFlight = null
   let queued = null
@@ -622,6 +632,9 @@ function initWaitingOnYou() {
         if (removed.length > 0) live.textContent = 'Answered elsewhere'
         setWaitingCount(countLine, count)
         syncWaitingSection(section)
+        // LIN-4243: the Waiting set also places tasks in Running and Up next (the server's buildHomeView). On a change of
+        // the key set, those follow from one read of the Home document.
+        return placement.check(waitingKeysIn(body))
       })
       // A failed refresh is silent: the section keeps what it has and the next tick tries again.
       .catch(() => {})
@@ -671,6 +684,143 @@ function onRulingGone({ main, countLine, live, detail }) {
     main.focus()
   }
   live.textContent = detail.message || 'Answered'
+}
+
+/** LIN-4243: the ruling keys of the Waiting cards under `body`, sorted (one per card, by the one `rulingKeyOf`). */
+function waitingKeysIn(body) {
+  const keyOf = window.QuestionCards?.rulingKeyOf
+  if (!body || !keyOf) return []
+  return [...body.querySelectorAll('[data-testid="session-question-card"]')].map(keyOf).filter(Boolean).sort()
+}
+
+/**
+ * LIN-4243: Running, Up next and the count line follow a change of the Waiting key set. The policy (when to read, when to
+ * wait) is public/home-placement.js; this is the DOM half. Placement is the server's (buildHomeView: a waiting task leaves
+ * Running and Up next; an answered one returns), so the page reads the Home document and takes its sections from it.
+ *
+ * Re-binding: nothing in a row is bound to the row. Expand, collapse and the keyboard are delegated on the document (init),
+ * the opened task mounts lazily from `rowData` (mountHomePromptSections, guarded by data-mounted), and folds bind once
+ * (bindHomeFolds, guarded by data-bound). So a swap merges the fresh rowData, binds the new folds, replays the persisted
+ * expanded state on the new rows only, and tears down the old rows' mounted opened tasks first. The section wrappers and
+ * headers stay, so a collapsed desk section stays collapsed, and the count line's wrapper stays.
+ *
+ * Everything the swap touches is captured here, at startup. A tick queries nothing new.
+ */
+function createDeskPlacement({ main, countLine, live, searchResults, searchInput, initialKeys }) {
+  // The two desk sections the swap replaces, in page order. Index i is `els[i]`.
+  const PLACED = DESK_SECTIONS.filter(section => section.placed)
+  const els = PLACED.map(section => main.querySelector(`:scope > ${section.section}`))
+
+  function facts() {
+    const active = document.activeElement
+    const holds = window.QuestionCards?.cardHoldsInput || (() => false)
+    return {
+      search: !!(searchInput && searchInput.value.trim()),
+      dispatchesInFlight: typeof window.dispatchesInFlight === 'function' ? window.dispatchesInFlight() : 0,
+      sections: els.filter(Boolean).map(el => window.HomePlacement.sectionFacts(el, active, holds)),
+    }
+  }
+
+  // One read of the Home document: the same URL the page shows, as HTML.
+  async function read() {
+    try {
+      const res = await fetch(window.location.pathname + window.location.search, { headers: { Accept: 'text/html' } })
+      if (!res.ok) return null
+      return new DOMParser().parseFromString(await res.text(), 'text/html')
+    } catch (e) {
+      return null
+    }
+  }
+
+  // The persisted expanded state, replayed on the new rows only (applyState's expanded pass, scoped to `root`).
+  function replayExpanded(root) {
+    const expanded = (state && state.expanded) || []
+    const openLine = (line) => {
+      show(line.closest('.node')?.querySelector(':scope > .details'))
+      const children = line.closest('.node')?.querySelector(':scope > .children')
+      if (children) {
+        children.querySelectorAll(':scope > .home-fold').forEach(show)
+        children.querySelectorAll(':scope > .node').forEach(child => {
+          show(child)
+          const childLine = child.querySelector(':scope > .line')
+          if (childLine && isExpanded(expanded, childLine.dataset.id, childLine.dataset.section)) openLine(childLine)
+        })
+      }
+      const toggle = line.querySelector('.toggle')
+      if (toggle) toggle.textContent = '▼'
+      if (line.hasAttribute('aria-expanded')) line.setAttribute('aria-expanded', 'true')
+    }
+    root.querySelectorAll('.line[data-id][data-section]').forEach(line => {
+      if (line.closest('.node.hidden')) return
+      if (isExpanded(expanded, line.dataset.id, line.dataset.section)) openLine(line)
+    })
+  }
+
+  // Replace section `i` from the fresh section (or remove it, or insert it). Returns the section now on the page, or null.
+  function swapSection(i, fresh, anchorAfter) {
+    const section = PLACED[i]
+    const old = els[i]
+    if (old) destroyHomePromptSections(old)
+    if (old && fresh) {
+      old.querySelector(section.body).replaceChildren(...[...fresh.querySelector(section.body).childNodes].map(node => document.adoptNode(node)))
+      return old
+    }
+    if (old) {
+      old.remove()
+      els[i] = null
+      return null
+    }
+    if (fresh) {
+      const el = document.adoptNode(fresh)
+      if (anchorAfter) anchorAfter.after(el)
+      else main.prepend(el)
+      // A section new to the page takes the reader's persisted collapse, as on load.
+      const collapsed = !!(state && state[section.key])
+      setArrow(el.querySelector(section.header), !collapsed)
+      setHidden(el.querySelector(section.body), collapsed)
+      els[i] = el
+      return el
+    }
+    return null
+  }
+
+  function apply(doc) {
+    // The fresh per-row opts first, so an opened task mounted on a new row reads them (mountHomePromptSections).
+    const optsEl = doc.querySelector('script[type="application/json"][data-global="__HOME_PROMPT_OPTS__"]')
+    const page = window.__HOME_PROMPT_OPTS__
+    if (optsEl && page) {
+      try {
+        const fresh = JSON.parse(optsEl.textContent)
+        page.rowData = { ...(page.rowData || {}), ...(fresh.rowData || {}) }
+        page.topTaskId = fresh.topTaskId
+        page.topTaskWhy = fresh.topTaskWhy
+      } catch (e) { /* keep the page's opts */ }
+    }
+    const freshMain = doc.querySelector('main')
+    const freshSections = PLACED.map(section => freshMain?.querySelector(`:scope > ${section.section}`) || null)
+    const running = swapSection(0, freshSections[0], searchResults)
+    const upNext = swapSection(1, freshSections[1], running || searchResults)
+    for (const el of [running, upNext]) {
+      if (!el) continue
+      replayExpanded(el)
+      bindHomeFolds(el)
+      loadVisibleLazyDetails(el)
+    }
+    // The count line's parts come from the fresh page, into the wrapper the page already holds.
+    const freshCount = doc.querySelector('[data-testid="in-progress-count"]')
+    if (countLine) {
+      countLine.replaceChildren(...(freshCount ? [...freshCount.childNodes].map(node => document.adoptNode(node)) : []))
+    }
+  }
+
+  return window.HomePlacement.createHomePlacement({
+    initialKeys,
+    facts,
+    read,
+    apply,
+    announce: text => { live.textContent = text },
+    setCount: n => setWaitingCount(countLine, n),
+  })
 }
 
 // LIN-4242: the Waiting section has two hide reasons, empty and search. Each is a state on the element, and the section is

@@ -922,6 +922,18 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   return result;
 };
 
+// LIN-4243: how many dispatches are in flight on this page. Home's live placement waits for none: a swap would destroy the
+// opened task whose press is still pending, and its reply (the ✓, or the error) would land in a detached button.
+(function countDispatchesInFlight() {
+  const dispatchOnce = window.dispatchPrompt;
+  let inFlight = 0;
+  window.dispatchPrompt = function dispatchPrompt(opts) {
+    inFlight++;
+    return dispatchOnce(opts).finally(() => { inFlight--; });
+  };
+  window.dispatchesInFlight = () => inFlight;
+})();
+
 // =============================================================================
 // Reply Delivery (LIN-2200; extracted from public/session.js's LIN-2154 chain)
 // =============================================================================
