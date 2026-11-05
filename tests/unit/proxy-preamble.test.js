@@ -186,7 +186,7 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
     });
   });
 
-  // LIN-2804: gates ONLY the endpoint-hint contextLines on the resolved
+  // LIN-2804: gates ONLY the endpoint hints (endpointHintParts) on the resolved
   // provider's capability — exchangeLines (credential delivery, asserted
   // throughout this file) must stay untouched regardless of providerUi.
   describe('providerUi (LIN-2804)', () => {
