@@ -1962,3 +1962,19 @@ The plan for now is unchanged: finish LIN-4248, read blind passes C and D, try t
 - **Seams run 7** agrees with the overnight map column and adds LIN-4243's four new `window` globals. Drift run 3 (LIN-4250) is still running.
 - After-questions sent to LIN-4248's builder (`8a238b09`).
 - **Pause here, as agreed with John,** to choose what to run through the new process next.
+
+## 5 Nov, about 10:15 UTC: the next work through the new process, tidy first as its own task
+
+John: choose the next tasks and polish as we go. He has no preference about the notes. **So the running log stays on this branch and is synced to main in one docs step at each milestone**, keeping one live copy at a time. A new proxy token is in the scratchpad as `.tok4`, valid to 7 Nov 10:12 UTC.
+
+**The test this round:** does a tidy done *first, as its own task* move the blind read, where tidies folded into a feature didn't? Three tracks, each Surveyed through Harbour's stages (`survey-task` and `survey-place` via `recommend-and-dispatch`), with two blind reads per merge.
+- **A (browser): LIN-4252 → LIN-4246.** One fake DOM that can repaint, in a shared test-helper home, with the second copy deleted. Then LIN-4246's now-small witness, re-surveyed on the tidied ground. The tidy is the tally's "shared test fakes" row (five namings) and the gap both of LIN-4246's Surveys named.
+- **B (prompt plumbing): LIN-4253 → LIN-4251.** A stage's traits ("offered", "read-only") are declared once on its template, with no behaviour change and every dispatched prompt byte-identical. Then LIN-4251 (four stages read-only), which should shrink to four one-line edits. The tidy is what both blind reads of LIN-4248 named.
+- **C (ordinary): LIN-4247** (Go doesn't return after a run ends until a reload; `prompt-section.js`). Surveyed now at today's base. It runs after LIN-4252 because it's the same file.
+
+**What would count, written before reading:**
+- **The tidies themselves:** their blind reads are better, as LIN-4234's and LIN-4218's were.
+- **The follow-on tickets (LIN-4246, LIN-4251):** their blind reads are better or neutral, and their diffs are small, roughly the "if this area were how you'd want it" size. If they still come out mixed, tidy-first alone isn't what moves the needle.
+- **C:** a free check on whether the place voice names a prerequisite tidy (ideally the same fake DOM) without being asked.
+
+Surveys (dispatch ids): LIN-4252 `fc788200` / `77df15cc`; LIN-4253 `8cf6f0b3` / `02e44940`; LIN-4247 `7088b7f8` / `c7d5283a`.
