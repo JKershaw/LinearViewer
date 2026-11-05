@@ -9,41 +9,24 @@
  *
  * `public/observation.js` is a browser script with DOM/fetch dependencies at
  * call time but none at LOAD time (its addEventListener calls only run inside
- * `init()`, which this file never calls), so it is vm-sandboxed the same way
- * tests/unit/observation-render.test.js and observation-ruling-delivery.test.js
- * already do.
+ * `init()`, which this file never calls). It runs through `loadWorld` over the
+ * shared fake DOM (tests/unit/helpers/fake-dom.js); the DOM it draws into is the
+ * world's document.
  *
  * Run with: node --test tests/unit/observation-basis-check.test.js
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import vm from 'node:vm';
+import { loadWorld } from './helpers/client-world.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
-
-/** Minimal element stub — only what the stale-note branch touches. */
-class FakeElement {
-  constructor(tag) {
-    this.tagName = tag;
-    this.children = [];
-    this.className = '';
-    this.textContent = '';
-    this.hidden = false;
-    this.dataset = {};
-  }
-  appendChild(child) { this.children.push(child); return child; }
-  querySelector() { return null; }
-  addEventListener() {}
-  setAttribute() {}
-}
-
+/**
+ * observation.js loaded into a world, with the stubs the basis check reaches:
+ * `window.api` (the route under test), and the `module`, `escapeHtml` and
+ * `relativeTime` globals the page gets from common.js. `console` is silent.
+ */
 function makeSandbox({ api } = {}) {
-  const sandbox = {
-    module: { exports: {} },
+  return loadWorld({
     window: {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
@@ -57,26 +40,24 @@ function makeSandbox({ api } = {}) {
       },
       api: api || (async () => { throw new Error('no api stub'); })
     },
-    document: {
-      createElement: (tag) => new FakeElement(tag),
-      addEventListener() {},
-      getElementById: () => null
-    },
-    escapeHtml: (str) => (str === undefined || str === null ? '' : String(str)),
-    relativeTime: (ts) => (ts ? `rel(${ts})` : ''),
-    console: { warn() {}, error() {}, log() {} },
-    setTimeout,
-    clearTimeout
-  };
-  sandbox.window.window = sandbox.window;
-  vm.createContext(sandbox);
-  vm.runInContext(SRC, sandbox, { filename: 'observation.js' });
-  return sandbox;
+    scripts: ['observation.js'],
+    globals: {
+      module: { exports: {} },
+      escapeHtml: (str) => (str === undefined || str === null ? '' : String(str)),
+      relativeTime: (ts) => (ts ? `rel(${ts})` : ''),
+      console: { warn() {}, error() {}, log() {} }
+    }
+  });
 }
 
-/** The seam requires the Rulings tab to be the active view. */
-function onRulingsTab(sandbox) {
-  vm.runInContext('currentView = "rulings";', sandbox);
+/**
+ * The seam requires the Rulings tab to be the active view. `currentView` is a
+ * script-scope `let`, which is not a property of the context, so it is set by
+ * running the assignment in the world's vm context: the one state seam this file
+ * takes from the vm.
+ */
+function onRulingsTab(world) {
+  vm.runInContext('currentView = "rulings";', world.sandbox);
 }
 
 function anchorFor(n) {
@@ -99,11 +80,11 @@ test.describe('requestBasisCheck — request-volume guards', () => {
     // queue would outgrow the concurrency gate — an advisory hint turning into
     // a self-inflicted request flood.
     let calls = 0;
-    const sandbox = makeSandbox({ api: async () => { calls++; return { basisChanged: false }; } });
-    onRulingsTab(sandbox);
-    const { requestBasisCheck } = sandbox.module.exports;
+    const world = makeSandbox({ api: async () => { calls++; return { basisChanged: false }; } });
+    onRulingsTab(world);
+    const { requestBasisCheck } = world.sandbox.module.exports;
 
-    const note = new FakeElement('p');
+    const note = world.document.createElement('p');
     for (let repaint = 0; repaint < 25; repaint++) requestBasisCheck(anchorFor(1), note);
     await flush();
 
@@ -113,11 +94,11 @@ test.describe('requestBasisCheck — request-volume guards', () => {
   test('a failed check is not retried on the next repaint', async () => {
     // A hint that silently gives up is strictly better than one that hammers.
     let calls = 0;
-    const sandbox = makeSandbox({ api: async () => { calls++; throw new Error('503'); } });
-    onRulingsTab(sandbox);
-    const { requestBasisCheck } = sandbox.module.exports;
+    const world = makeSandbox({ api: async () => { calls++; throw new Error('503'); } });
+    onRulingsTab(world);
+    const { requestBasisCheck } = world.sandbox.module.exports;
 
-    const note = new FakeElement('p');
+    const note = world.document.createElement('p');
     for (let repaint = 0; repaint < 20; repaint++) {
       requestBasisCheck(anchorFor(2), note);
       await flush(2);
@@ -130,12 +111,12 @@ test.describe('requestBasisCheck — request-volume guards', () => {
     // how many run. The unanswered set is the population that provably
     // accumulates, so the total needs its own ceiling.
     let calls = 0;
-    const sandbox = makeSandbox({ api: async () => { calls++; return { basisChanged: false }; } });
-    onRulingsTab(sandbox);
-    const { requestBasisCheck, BASIS_CHECK_MAX_PER_PAGE } = sandbox.module.exports;
+    const world = makeSandbox({ api: async () => { calls++; return { basisChanged: false }; } });
+    onRulingsTab(world);
+    const { requestBasisCheck, BASIS_CHECK_MAX_PER_PAGE } = world.sandbox.module.exports;
 
     for (let i = 0; i < BASIS_CHECK_MAX_PER_PAGE + 25; i++) {
-      requestBasisCheck(anchorFor(`x${i}`), new FakeElement('p'));
+      requestBasisCheck(anchorFor(`x${i}`), world.document.createElement('p'));
     }
     await flush(40);
 
@@ -144,28 +125,28 @@ test.describe('requestBasisCheck — request-volume guards', () => {
 
   test('no check is issued unless the Rulings tab is the active view', async () => {
     let calls = 0;
-    const sandbox = makeSandbox({ api: async () => { calls++; return { basisChanged: true }; } });
+    const world = makeSandbox({ api: async () => { calls++; return { basisChanged: true }; } });
     // deliberately NOT onRulingsTab()
-    const { requestBasisCheck } = sandbox.module.exports;
-    requestBasisCheck(anchorFor(3), new FakeElement('p'));
+    const { requestBasisCheck } = world.sandbox.module.exports;
+    requestBasisCheck(anchorFor(3), world.document.createElement('p'));
     await flush();
     assert.equal(calls, 0);
   });
 
   test('a cached verdict is reused without a second request', async () => {
     let calls = 0;
-    const sandbox = makeSandbox({ api: async () => { calls++; return { basisChanged: true }; } });
-    onRulingsTab(sandbox);
-    const { requestBasisCheck } = sandbox.module.exports;
+    const world = makeSandbox({ api: async () => { calls++; return { basisChanged: true }; } });
+    onRulingsTab(world);
+    const { requestBasisCheck } = world.sandbox.module.exports;
 
-    const first = new FakeElement('p');
+    const first = world.document.createElement('p');
     requestBasisCheck(anchorFor(4), first);
     await flush();
     assert.equal(calls, 1);
 
     // A repaint hands the same row a NEW note element; the cached verdict must
     // still paint it, without going back to the network.
-    const second = new FakeElement('p');
+    const second = world.document.createElement('p');
     second.hidden = true;
     requestBasisCheck(anchorFor(4), second);
     assert.equal(calls, 1);
@@ -178,9 +159,10 @@ test.describe('applyBasisResult — the tri-state reaches the card correctly', (
     // `false` and `null` are different facts but the same rendering: the note
     // is an additive nudge, never a "we verified this is current" badge, so its
     // absence must claim nothing either way.
-    const { applyBasisResult } = makeSandbox().module.exports;
+    const world = makeSandbox();
+    const { applyBasisResult } = world.sandbox.module.exports;
     for (const [verdict, expectedHidden] of [[true, false], [false, true], [null, true], [undefined, true]]) {
-      const note = new FakeElement('p');
+      const note = world.document.createElement('p');
       applyBasisResult(note, verdict);
       assert.equal(note.hidden, expectedHidden, `verdict ${String(verdict)} should render hidden=${expectedHidden}`);
     }
@@ -189,10 +171,10 @@ test.describe('applyBasisResult — the tri-state reaches the card correctly', (
   test('a non-boolean response body is treated as unknown, never as a change', async () => {
     // The route can only answer `true`/`false`/`null`; anything else means the
     // response was not what we think it was, which is not evidence of a change.
-    const sandbox = makeSandbox({ api: async () => ({ basisChanged: 'yes' }) });
-    onRulingsTab(sandbox);
-    const { requestBasisCheck, basisCheckCache } = sandbox.module.exports;
-    const note = new FakeElement('p');
+    const world = makeSandbox({ api: async () => ({ basisChanged: 'yes' }) });
+    onRulingsTab(world);
+    const { requestBasisCheck, basisCheckCache } = world.sandbox.module.exports;
+    const note = world.document.createElement('p');
     requestBasisCheck(anchorFor(5), note);
     await flush();
     assert.equal(note.hidden, true);
@@ -200,7 +182,7 @@ test.describe('applyBasisResult — the tri-state reaches the card correctly', (
   });
 
   test('applyBasisResult tolerates a missing node', () => {
-    const { applyBasisResult } = makeSandbox().module.exports;
+    const { applyBasisResult } = makeSandbox().sandbox.module.exports;
     assert.doesNotThrow(() => applyBasisResult(null, true));
   });
 });
@@ -211,16 +193,16 @@ test.describe('the check targets the RULING\'s own workspace', () => {
     // necessarily the ruling's own workspace — the same reason dismiss and
     // reply target the anchor rather than the page.
     let url = null;
-    const sandbox = makeSandbox({ api: async (u) => { url = u; return { basisChanged: false }; } });
-    onRulingsTab(sandbox);
-    const { requestBasisCheck } = sandbox.module.exports;
+    const world = makeSandbox({ api: async (u) => { url = u; return { basisChanged: false }; } });
+    onRulingsTab(world);
+    const { requestBasisCheck } = world.sandbox.module.exports;
 
     requestBasisCheck({
       loopId: null,
       taskDecisionId: 'scan_row_ws',
       issueId: 'abc-123',
       workspaceUrlKey: 'the-rulings-own-workspace'
-    }, new FakeElement('p'));
+    }, world.document.createElement('p'));
     await flush();
 
     assert.match(url, /^\/workspace\/the-rulings-own-workspace\/api\/scan\/abc-123$/);
