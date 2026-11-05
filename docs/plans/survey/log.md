@@ -2038,3 +2038,16 @@ John's question for a paper: how does the "size" of a task relate to its cost? F
 - **Confounds the paper must handle:** the implementation model varies, keep-alive sessions dominate the big totals, and the observer is billed.
 
 Scoped: freeze a dated cost table per leg; split the cost into floor, work, keep-alive and Survey; take size from git with the existing counters (no fourth); test against the work within one model; read the tidy pairs last, as they finish. Who must learn: the Library index (plus its two missing files) and `proposals.md:81`. Autopilot started.
+
+### 12:00 UTC: LIN-4251, the first follow-on on a tidy: better and mixed
+- **LIN-4251: better, mixed.** It landed every piece of a scope larger than its ticket (four stages, a new vocabulary, three entrances, the resume path, the workspace-hint gate) in about 40 minutes, on LIN-4253's ground. That's a contrast with the control (LIN-4247: mixed, mixed) and the overnight features.
+- **The "mixed" names a cost I caused.** "Keep every `work` kind byte-identical" led the builder to copy the endpoint-hint ladder (`readOnlyContextLines`) rather than add an optional clause. **A lesson for the human's role: a proof-of-no-change constraint can invite a copy. Ask for the proof (a byte-pinned fixture) without forbidding the refactor that would change the bytes trivially, or say which of the two wins.**
+- **The round so far:**
+
+  | Ticket | Kind | Blind |
+  |---|---|---|
+  | LIN-4253 | tidy first, deleted its copies | better, better |
+  | LIN-4251 | follow-on on that tidy | better, mixed |
+  | LIN-4252 | tidy first, left its copies | mixed, mixed |
+  | LIN-4246 | follow-on on that tidy | (building) |
+  | LIN-4247 | control, tidy folded in | mixed, mixed |
