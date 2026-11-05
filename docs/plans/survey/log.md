@@ -1892,3 +1892,11 @@ John: the offshoots look like new prompt types for tasks. So move the prompts in
 - **Rulings:** none open. `lin4233-deploy-gate` was answered at 07:28 and `lin4195-mixed-model-label` last night, so the morning notes were stale on both. No Full wipes were run in LIN-4234's window. John is restarting the dispatcher.
 - **Periodicals:** Seams & Tangles and Drift & Coherence over the overnight window (autopilot `54aaa338`, maxTasks 2), as the independent film for the nine overnight rows.
 - `prompt.md` now leads with the prompts in use (open-0, global v2-code, the step-back, q1–q7); `survey.md` has a "where it stands" note at the top.
+
+### 08:20 UTC: LIN-4248 filed and surveyed by hand; the blind second scorer sent
+- **LIN-4248** (Backlog, High): "The Survey as two stages in Harbour: read-only forecasts of a task and of its place, triggered by hand". It covers two templates holding the prompts as they are, plus the notebook copied to main (named paths only, since this branch also carries unrelated unmerged code). Not in it: the after-questions, the step-back, removing overlap, automatic triggering.
+- **Its own Survey, by hand, one last time,** at `2eb73ae07`: open-0 `c7411566`, global code-only `69b45704`. One new line in the prefix: the named branch files are the task's source material, not the future.
+- **The blind second scorer**, at last. All 28 single-commit ledger rows (baseline and forward; the UI operator's combined row and the LIN-4219 parent left out) were shuffled (seed 20261105) into two batches of 14, each with both windows mixed and given as commits only. The scorers may read code, tests and how-to docs. They may not read tickets, PRs, `docs/plans/`, `docs/reviews/` or `docs/papers/`, and they aren't told why any change was made. Batch A `0cd18963`, batch B `308fe147`. The key is in the scratchpad (`ft7/blind/key.json`).
+- **What would count, written before reading:**
+  - **The main question:** does the blind scorer, on its own, rate the loop's rows better than the baseline's? If its forward rows average no better than its baseline rows, the ledger's result is mostly my scoring.
+  - **Agreement:** the sign matches (better, neutral or worse, with mixed matching mixed or either side) on about 70% or more of rows. Lower means the balance column needs a second hand from now on.
