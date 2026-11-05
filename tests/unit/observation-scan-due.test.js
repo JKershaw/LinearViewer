@@ -65,7 +65,6 @@ function makeSandbox({ fetchImpl, scanCostEstimate, postScanImpl } = {}) {
       fetch: fetchImpl || (async () => { throw new Error('no fetch stub configured'); }),
     },
   });
-  world.window.window = world.window;
   world.document.body.innerHTML = DUE_PAGE;
   world.run(`observationData = { urlKey: "acme", scanCostEstimate: ${JSON.stringify(scanCostEstimate ?? null)} };`);
   return {
@@ -269,8 +268,10 @@ test.describe('loadInitialDueCheckPage / loadMoreDueChecks — pagination', () =
     await loadInitialDueCheckPage();
     await loadMoreDueChecks();
 
-    assert.equal(dueRow(sandbox, 'a').querySelector('.obs-due-issue').textContent, 'LIN-1', 'the first page row stays drawn');
-    assert.equal(dueRow(sandbox, 'b').querySelector('.obs-due-issue').textContent, 'LIN-2', 'the second page must be appended, not replace the first');
+    assert.ok(dueRow(sandbox, 'a'), 'the first page row stays drawn');
+    assert.ok(dueRow(sandbox, 'b'), 'the second page must be appended, not replace the first');
+    assert.equal(dueRow(sandbox, 'a').querySelector('.obs-due-issue').textContent, 'LIN-1');
+    assert.equal(dueRow(sandbox, 'b').querySelector('.obs-due-issue').textContent, 'LIN-2');
   });
 
   test('the load-more button is hidden when nextCursor is null, shown when non-null', async () => {
@@ -815,9 +816,12 @@ test.describe('over-ceiling refusal — refuse, never truncate (LIN-2706 §B.8)'
     paintDuePage(items, items.length, { append: false });
     setAllDueSelected(true);
     assert.ok(dueBulkScanRefusalMessage(), 'sanity: over the ceiling by 1');
+    assert.equal(sandbox.node('obs-due-bulk-refusal').hidden, false, 'sanity: the refusal is drawn over the ceiling');
 
     toggleDueSelection('i0', false);
     assert.equal(dueBulkScanRefusalMessage(), null, 'dropping back to exactly the ceiling must clear the refusal');
+    // The drawn element, not only the message: a refusal that stays on screen after the message clears is the defect.
+    assert.equal(sandbox.node('obs-due-bulk-refusal').hidden, true, 'the drawn refusal must hide, not stay on screen');
   });
 
   test('a within-ceiling selection never shows a refusal', () => {
