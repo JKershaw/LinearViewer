@@ -1,7 +1,7 @@
 // LIN-4040 close-out — the review ledger's fixes A (the Swipe ladder's "run this step" rung follows the one run offer, and a
 // press re-reads it), B (the running line names the first worker's own issue or none) and C (pinned in
-// task-page-question.test.js: the task page's pill says "needs you"). Same vm-sandbox house pattern as
-// prompt-section-run-quota.test.js.
+// task-page-question.test.js: the task page's pill says "needs you"). Runs in the shared client world
+// (helpers/client-world.js).
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { firstWorkerIdentifier } from '../../lib/task-page-loader.js';
@@ -12,23 +12,6 @@ import { loadWorld } from './helpers/client-world.js';
 const flush = () => new Promise((r) => setImmediate(r));
 
 const RUN_LIMIT_TITLE = 'daily run limit reached \u00b7 resets at midnight UTC';
-
-// Replace the first <div> carrying the bare attribute `attr`, honouring nested
-// <div>s. The setter-only slot write a paint*() helper makes (LIN-3267).
-function replaceSlot(html, attr, replacement) {
-  const open = new RegExp(`<div\\b[^>]*\\b${attr}\\b[^>]*>`).exec(html);
-  if (!open) return html;
-  const start = open.index;
-  let depth = 1;
-  const tagRe = /<div\b|<\/div>/g;
-  tagRe.lastIndex = start + open[0].length;
-  let t;
-  while ((t = tagRe.exec(html))) {
-    if (t[0] === '</div>') { depth -= 1; if (depth === 0) return html.slice(0, start) + replacement + html.slice(t.index + 6); }
-    else depth += 1;
-  }
-  return html;
-}
 
 function loadPromptSection({ quota, dispatch, stateReply } = {}) {
   const calls = { api: [], dispatch: [], order: [] };
