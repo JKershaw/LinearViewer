@@ -11,8 +11,9 @@
  * Guard and consumers (LIN-4265). `tests/unit/fake-dom-census.test.js` fails on any new hand-written fake DOM under
  * `tests/`, `scripts/eval` or `scripts/code-shape`; its `HAND_WRITTEN_FAKE_DOM_FILES` lists those not yet moved here.
  * The files that use this fake today: `client-world.js`, `fake-dom.test.js` and `lin-4242-waiting-merge.test.js`
- * directly, and `lin-4010-home-opened-task.test.js`, `lin-4246-opened-task-repaint-keep.test.js` and
- * `prompt-section-go.test.js` (LIN-4266) through `loadWorld`, and `chat-append-options.test.js`,
+ * directly, and `lin-4010-home-opened-task.test.js`, `lin-4246-opened-task-repaint-keep.test.js`,
+ * `prompt-section-go.test.js` (LIN-4266), and `prompt-section-preserve.test.js`, `prompt-section-recommend-url.test.js`
+ * and `prompt-section-look-alike.test.js` (LIN-4268) through `loadWorld`, and `chat-append-options.test.js`,
  * `chat-render-markdown-text.test.js`, `chat-tool-rows.test.js`, `observation-basis-check.test.js` and
  * `observation-bulk-scan.test.js` (LIN-4280) through `loadWorld`. `client-world.test.js` (LIN-4280) tests `loadWorld`'s `run`.
  * A suite moved onto this fake leaves `HAND_WRITTEN_FAKE_DOM_FILES` and joins this list in the same PR.
