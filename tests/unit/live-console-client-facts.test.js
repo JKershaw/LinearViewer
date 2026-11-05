@@ -8,6 +8,10 @@
  * Console loader in helpers/live-console-world.js. The lane is supplied as markup (makeLaneNode), pinned to the client
  * source (pinLaneMarkupToClient). Reduced motion is pinned at the source: the one-shot constant is gone and a live
  * `change` listener re-applies it.
+ *
+ * Pending feed: `window.api` never resolves here (helpers/live-console-world.js), so poll() never reaches applyFeed
+ * and its `style` writes stay out of reach. A test that resolves the feed has hit LIN-4271's stop: do not add `style`
+ * to the fake.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';

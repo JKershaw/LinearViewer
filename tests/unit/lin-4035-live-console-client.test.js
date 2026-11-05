@@ -8,6 +8,10 @@
  * loaded by the Live Console loader in helpers/live-console-world.js. The stream row is pinned as its markup string
  * (`eventRowHtml`). The lane is supplied as markup (makeLaneNode), pinned to the client source (pinLaneMarkupToClient).
  * Each test's `api` is the client's own exports, read off the world.
+ *
+ * Pending feed: `window.api` never resolves here (helpers/live-console-world.js), so poll() never reaches applyFeed
+ * and its `style` writes stay out of reach. A test that resolves the feed has hit LIN-4271's stop: do not add `style`
+ * to the fake.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
