@@ -22,6 +22,8 @@ import { computeTerminalMarkedTaskCost as computeTerminalMarkedTaskCost__unplumb
 import { windowedSpend } from '../../lib/weekly-budget.js';
 import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 import { lineageRecordsOf as lineageRecordsAdapter, terminalMarkedTaskCostOf } from '../fixtures/cost-read-cores.js';
+// LIN-4276: a namespace import, so this file loads before `byDispatchOrder` is exported (on base only its describe is red).
+import * as lineageMembership from '../../lib/lineage-membership.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
 const lineageRecords = lineageRecordsAdapter;
 const computeTerminalMarkedTaskCost = terminalMarkedTaskCostOf;
@@ -317,5 +319,32 @@ describe('one answer across the readers (LIN-4147)', () => {
     const result = buildTaskCost({ ownRows: [base], siblingRowsByAnchor: new Map([['T', [member]]]), issueIdentifier: 'LIN-T' });
     assert.equal(result.pricedUsd, 3);
     assert.equal(result.workerSessions.length, 1);
+  });
+});
+
+/** LIN-4276: the one dispatch order, which `dispatchesOf` (lib/cost-read.js) reuses rather than re-writes. */
+describe('byDispatchOrder — the one dispatch order (LIN-4276)', () => {
+  const { byDispatchOrder } = lineageMembership;
+  const row = (id, dispatchedAt) => ({ id, dispatchedAt });
+  const ids = rows => rows.map(r => r.id);
+
+  test('undated rows sort last', () => {
+    const rows = [row('u', null), row('d2', '2026-11-05T10:00:00.000Z'), row('d1', '2026-11-05T09:00:00.000Z')];
+    assert.deepEqual(ids([...rows].sort(byDispatchOrder)), ['d1', 'd2', 'u']);
+  });
+
+  test('two undated rows keep their input order (a tie, not NaN)', () => {
+    const rows = [row('u1', undefined), row('d', '2026-11-05T09:00:00.000Z'), row('u2', null)];
+    assert.deepEqual(ids([...rows].sort(byDispatchOrder)), ['d', 'u1', 'u2']);
+  });
+
+  test('equal times keep their input order', () => {
+    const rows = [row('a', '2026-11-05T09:00:00.000Z'), row('b', '2026-11-05T09:00:00.000Z')];
+    assert.deepEqual(ids([...rows].sort(byDispatchOrder)), ['a', 'b']);
+  });
+
+  test('a Date and an ISO string at the same instant compare equal; the earlier one sorts first', () => {
+    const rows = [row('iso-later', '2026-11-05T10:00:00.000Z'), row('date-earlier', new Date('2026-11-05T09:00:00.000Z')), row('iso-same', '2026-11-05T09:00:00.000Z')];
+    assert.deepEqual(ids([...rows].sort(byDispatchOrder)), ['date-earlier', 'iso-same', 'iso-later']);
   });
 });

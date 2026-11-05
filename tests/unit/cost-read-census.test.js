@@ -242,3 +242,29 @@ describe('LIN-4201: buildSessionTelemetry is not a usage reader (kept, not delet
     assert.equal(JSON.stringify(telemetry).includes('costUsd'), false);
   });
 });
+
+/**
+ * LIN-4276: each rule `lib/cost-read.js` reads has one owner in this file. The dispatch order is `byDispatchOrder`
+ * from lineage-membership.js, and the posting-row key list is `postingKeysOf`'s alone. Scoped to lib/cost-read.js:
+ * task-board-view.js has an unrelated `rankOf`.
+ */
+describe('LIN-4276: one dispatch order and one posting-key list in lib/cost-read.js (re-fork guard)', () => {
+  const COST_READ = fs.readFileSync(path.join(REPO, 'lib/cost-read.js'), 'utf8');
+  const KEY_LIST = /\[\s*row\?\.id\s*,\s*row\?\._id\s*,\s*row\?\.loopId\s*\]/g;
+
+  test('the dispatch order is imported from lineage-membership.js, and no private sort key is defined here', () => {
+    assert.match(COST_READ, /import\s*\{[^}]*\bbyDispatchOrder\b[^}]*\}\s*from\s*'\.\/lineage-membership\.js'/);
+    assert.doesNotMatch(COST_READ, /\brankOf\b/);
+  });
+
+  test('dispatchesOf sorts with the imported order, and no comparator is re-forked under another name', () => {
+    assert.match(COST_READ, /\.sort\(byDispatchOrder\)/);
+    // An anonymous `(toEpochMs(a.dispatchedAt) ?? Infinity) - ...` comparator is the re-fork; the file's only other
+    // Infinity is `?? -Infinity` (the window filter), which this does not match.
+    assert.doesNotMatch(COST_READ, /\?\?\s*Infinity/);
+  });
+
+  test('the posting-row key list is written once, in postingKeysOf', () => {
+    assert.equal((COST_READ.match(KEY_LIST) || []).length, 1);
+  });
+});
