@@ -54,7 +54,7 @@
  * - Listeners: `addEventListener` and `removeEventListener` record. `listenersOf(type)` exposes the recorded functions, so
  *   a suite's click or key shim can call them. `dispatchEvent` is inert and returns true.
  *
- * Deliberately not modelled: layout, CSS, `:hover`, `:checked` and the other state pseudo-classes, `+` and `~`,
+ * Deliberately not modelled: layout, CSS, `style` (`element.style`), `:hover`, `:checked` and the other state pseudo-classes, `+` and `~`,
  * `insertAdjacentHTML` at `beforebegin`, `afterbegin` and `afterend` (they throw, so they are refused rather than ignored), event
  * dispatch and bubbling, HTML error recovery (implied end tags such as `<p>` closing `<p>`), foreign content (SVG and
  * MathML): `innerHTML` parses SVG markup as HTML elements, so only `createElementNS` makes an SVG-namespace node;
