@@ -170,6 +170,23 @@ test('after a swap rows are bound once, the opened task mounts once, and fold st
   await expect(page.locator(`${UP_NEXT} [data-prompt-mount][data-mounted="true"]`)).toHaveCount(1, { timeout: 15000 });
   await row(page, UP_NEXT, 'LOCAL-T').click();
   await expect(page.locator(`${UP_NEXT} .details:not(.hidden)`)).toHaveCount(0);
+  // Teardown witness: count destroy() calls on the old row's mounted PromptSection. A detached node would still lose its
+  // data-mounted attribute, so only a destroy call proves the section was torn down before the swap.
+  await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="home-up-next-section"] [data-prompt-mount][data-mounted="true"]');
+    const handle = el._promptSectionHandle;
+    const destroy = handle.destroy;
+    window.__destroyed = 0;
+    handle.destroy = (...args) => { window.__destroyed++; return destroy.apply(handle, args); };
+  });
+  // Fresh-rowData witness: take LOCAL-T's record off the page, so only the swap's merge from the fetched document can
+  // put it back before the new row mounts.
+  const tangoKey = await page.evaluate(() => {
+    const key = document.querySelector('[data-testid="home-up-next-section"] [data-prompt-mount][data-mounted="true"]').dataset.nodeKey;
+    delete window.__HOME_PROMPT_OPTS__.rowData[key];
+    return key;
+  });
+  expect(tangoKey).toBeTruthy();
 
   await seedRuling(page, 'LOCAL-A', THREE_OPTIONS);
   await refresh(page);
@@ -182,6 +199,7 @@ test('after a swap rows are bound once, the opened task mounts once, and fold st
   await expect(page.locator('.running-header')).toContainText('▶');
   // The old rows' mounted opened task went with them; LOCAL-T's fresh row is unopened.
   await expect(page.locator(`${UP_NEXT} [data-prompt-mount][data-mounted="true"]`)).toHaveCount(0);
+  expect(await page.evaluate(() => window.__destroyed)).toBe(1);
 
   // Bound once: one click opens LOCAL-T (a double-bound toggle would open and close it), and its opened task mounts once.
   await row(page, UP_NEXT, 'LOCAL-T').click();
@@ -194,6 +212,7 @@ test('after a swap rows are bound once, the opened task mounts once, and fold st
     return !!(window.__HOME_PROMPT_OPTS__.rowData || {})[el.dataset.nodeKey];
   });
   expect(hasRowData).toBe(true);
+  expect(await page.evaluate(() => document.querySelector('[data-testid="home-up-next-section"] .details:not(.hidden) [data-prompt-mount]').dataset.nodeKey)).toBe(tangoKey);
   // A second click closes it: one toggle per click.
   await row(page, UP_NEXT, 'LOCAL-T').click();
   await expect(row(page, UP_NEXT, 'LOCAL-T')).toHaveAttribute('aria-expanded', 'false');

@@ -190,3 +190,74 @@ describe('createHomePlacement: when the Home document is read', () => {
     assert.deepEqual(log.counts, []);
   });
 });
+
+// sectionFacts reads the DOM, so these run against stub elements: each stub answers only the selector its fact reads, and
+// records nothing else. A fact that is read from the wrong selector, or hard-wired, fails here. (Review of LIN-4243: the
+// policy tests above give blockedBy ready-made facts and so never reach this half.)
+describe('sectionFacts: the DOM facts that make the swap wait', () => {
+  const FIELD_SELECTORS = 'input, textarea, select, [contenteditable="true"]';
+
+  /** A section stub: `present` lists the selectors that match something; `cards` are the question-card stubs. */
+  function section({ present = [], cards = [], contains = () => false } = {}) {
+    return {
+      querySelector: (sel) => (present.includes(sel) ? {} : null),
+      querySelectorAll: (sel) => (sel === '[data-testid="session-question-card"]' ? cards : []),
+      contains,
+    };
+  }
+  /** An active-element stub that matches only the given selector text. */
+  const active = (matchesField) => ({ matches: (sel) => matchesField && sel === FIELD_SELECTORS });
+  const none = () => false;
+
+  test('a quiet section reads all four facts false', () => {
+    // (spread: the facts object is made in the vm realm, so compare a same-realm copy)
+    assert.deepEqual({ ...HP.sectionFacts(section(), null, none) }, { openedTask: false, openFold: false, fieldFocused: false, cardHoldsInput: false });
+  });
+
+  // Witness: hard-wire openedTask to false, or read it from another selector.
+  test('openedTask is true from a shown .details, and only that', () => {
+    assert.equal(HP.sectionFacts(section({ present: ['.details:not(.hidden)'] }), null, none).openedTask, true);
+    assert.equal(HP.sectionFacts(section({ present: ['.home-fetched'] }), null, none).openedTask, false);
+  });
+
+  // Witness: hard-wire openFold to false, and an opened "show N more" list is lost on the swap.
+  test('openFold is true from a .home-fetched list, and only that', () => {
+    const facts = HP.sectionFacts(section({ present: ['.home-fetched'] }), null, none);
+    assert.equal(facts.openFold, true);
+    assert.equal(facts.openedTask, false);
+    assert.equal(HP.sectionFacts(section({ present: ['.details:not(.hidden)'] }), null, none).openFold, false);
+  });
+
+  // Witness: hard-wire fieldFocused to false, and a swap lands under the reader's cursor.
+  test('fieldFocused is true for a field inside the section, not for a field elsewhere', () => {
+    const inside = section({ contains: () => true });
+    const outside = section({ contains: () => false });
+    assert.equal(HP.sectionFacts(inside, active(true), none).fieldFocused, true);
+    assert.equal(HP.sectionFacts(outside, active(true), none).fieldFocused, false);
+    assert.equal(HP.sectionFacts(inside, null, none).fieldFocused, false);
+  });
+
+  // The spike's false blocker: a clicked row keeps focus (tabindex=0). It is not a field, so it must not hold the swap.
+  test('a focused tabindex=0 row (not a field) is fieldFocused: false', () => {
+    const matched = [];
+    const row = { matches: (sel) => { matched.push(sel); return false; } };
+    assert.equal(HP.sectionFacts(section({ contains: () => true }), row, none).fieldFocused, false);
+    assert.deepEqual(matched, [FIELD_SELECTORS]);
+  });
+
+  // Witness: hard-wire cardHoldsInput to false, and typed text in a question card is swapped away. The cards are found in
+  // the section whether or not the task around them is shown, so a closed task (.details.hidden, card still mounted) counts.
+  test('cardHoldsInput is true when any question card holds input, including a card in a closed task', () => {
+    const typing = { id: 'typing' };
+    const idle = { id: 'idle' };
+    const holds = (card) => card === typing;
+    // The closed task: its details are hidden (openedTask false), but the card is still in the section and holds text.
+    const closedTask = section({ cards: [idle, typing] });
+    const facts = HP.sectionFacts(closedTask, null, holds);
+    assert.equal(facts.openedTask, false);
+    assert.equal(facts.cardHoldsInput, true);
+    assert.equal(HP.sectionFacts(section({ cards: [idle] }), null, holds).cardHoldsInput, false);
+    // blockedBy then waits, and says the reader is typing.
+    assert.equal(HP.blockedBy({ search: false, dispatchesInFlight: 0, sections: [facts] }), 'input');
+  });
+});
