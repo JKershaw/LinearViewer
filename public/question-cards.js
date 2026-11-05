@@ -52,6 +52,8 @@
     var original = btn.textContent;
     btn.disabled = true;
     setControls(true);
+    // LIN-4242: the answer is in flight until it settles. The live Waiting section keeps a card that is in flight.
+    if (cardCtx) cardCtx.card.dataset.answerInFlight = 'true';
     btn.textContent = 'sending…';
     feedback.innerHTML = '';
     feedback.className = 'sess-reply-feedback';
@@ -118,6 +120,9 @@
 
     function restoreButton() {
       if (cardCtx) {
+        // LIN-4242: a partial failure keeps its card (the Retry delivery lives on it), so it stays in flight; any other
+        // outcome has settled the answer.
+        if (outcome !== 'partial') delete cardCtx.card.dataset.answerInFlight;
         // LIN-4114: only a failure brings the card back. A delivered answer's text stays ("answered ✓"); the card goes.
         if (outcome !== 'failed') return;
         setControls(false);
@@ -289,6 +294,7 @@
 
   function dismissQuestionCard(card, dismissBtn, answerBtn, feedback) {
     var urlKey = card.dataset.urlKey;
+    card.dataset.answerInFlight = 'true'; // LIN-4242: in flight until it settles (the live section keeps it)
     if (dismissBtn) dismissBtn.disabled = true;
     if (answerBtn) answerBtn.disabled = true;
     if (feedback) { feedback.textContent = 'dismissing…'; feedback.className = 'sess-qcard-feedback sess-reply-feedback'; }
@@ -313,11 +319,13 @@
       dismissOpts.taskDecisionIssueId = card.dataset.issueId || '';
     }
     window.ReplyDelivery.dismissRuling(dismissOpts, DISMISS_NOOP_HANDLERS).then(function () {
+      delete card.dataset.answerInFlight;
       announceRulingGone(card, 'Dismissed');
       if (card.parentNode) card.parentNode.removeChild(card);
     }).catch(function (e) {
       // LIN-4241: answered elsewhere before this dismiss landed: the card is gone, not a failed dismiss.
       if (e && e.code === RULING_SETTLED_CODE) { removeAnsweredElsewhere(card); return; }
+      delete card.dataset.answerInFlight;
       if (dismissBtn) dismissBtn.disabled = false;
       if (answerBtn) answerBtn.disabled = false;
       if (feedback) {
@@ -442,7 +450,80 @@
     }
   }
 
-  var api = { appendYouBubble: appendYouBubble, sendReply: sendReply, dismissQuestionCard: dismissQuestionCard, initQuestionCards: initQuestionCards, rulingKeyOf: rulingKeyOf, RULING_GONE_EVENT: RULING_GONE_EVENT, setDeskRoot: function (el) { deskRoot = el; } };
+  // ── Live Waiting on you (LIN-4242) ───────────────────────────────────────────
+  // The merge unit is the `.waiting-card` wrapper (task line + card), keyed by rulingKeyOf on its inner session card. A
+  // kept wrapper is never re-rendered or moved: moving a focused textarea blurs it. Rulings this page has settled (answered
+  // or dismissed here, or removed as answered elsewhere) are remembered, so a response requested before that never
+  // re-adds one.
+  var settledKeys = new Set();
+  function noteSettled(key) { if (key) settledKeys.add(key); }
+  function innerCardOf(wrapper) { return wrapper.querySelector('[data-testid="session-question-card"]'); }
+  function cardKeyOf(wrapper) { var inner = innerCardOf(wrapper); return inner ? rulingKeyOf(inner) : ''; }
+  // Whether a card holds the reader's place: typed text, focus inside it, or an answer in flight. Home's opened task uses
+  // the same check (public/prompt-section.js keepTypedQuestion), gated on the ruling key first.
+  function cardHoldsInput(card) {
+    if (!card) return false;
+    if (card.dataset && card.dataset.answerInFlight === 'true') return true;
+    var textarea = card.querySelector('[data-testid="session-question-card-input"]');
+    if (textarea && textarea.value && textarea.value.length > 0) return true;
+    var active = document.activeElement;
+    return !!active && active !== card && typeof card.contains === 'function' && card.contains(active);
+  }
+  function waitingWrappersIn(body) {
+    var out = [];
+    var kids = body.children || [];
+    for (var i = 0; i < kids.length; i++) {
+      if (kids[i].classList && kids[i].classList.contains('waiting-card')) out.push(kids[i]);
+    }
+    return out;
+  }
+  /**
+   * Merge a fresh server section into the live `.waiting-body` (LIN-4242). Keeps cards the page and the server agree on,
+   * adds new ones in server order and binds them, removes cards the server no longer lists (announced by the caller),
+   * except a card whose answer is still in flight. Returns the cards now in the body and the keys removed.
+   * @param {Element} body - the live `.waiting-body`
+   * @param {string} freshHtml - the server's section markup (`{ html }` from /api/home-waiting)
+   * @returns {{count: number, removed: string[]}}
+   */
+  function mergeWaitingCards(body, freshHtml) {
+    var removed = [];
+    if (!body) return { count: 0, removed: removed };
+    var template = document.createElement('template');
+    template.innerHTML = freshHtml || '';
+    var fresh = [];
+    var freshKeys = new Set();
+    var found = template.content ? template.content.querySelectorAll('.waiting-card') : [];
+    for (var f = 0; f < found.length; f++) {
+      var key = cardKeyOf(found[f]);
+      if (!key || freshKeys.has(key) || settledKeys.has(key)) continue;
+      freshKeys.add(key);
+      fresh.push({ key: key, el: found[f] });
+    }
+    // Remove what the server no longer lists, unless its answer is still in flight.
+    waitingWrappersIn(body).forEach(function (wrapper) {
+      var key = cardKeyOf(wrapper);
+      if (freshKeys.has(key)) return;
+      var inner = innerCardOf(wrapper);
+      if (inner && inner.dataset && inner.dataset.answerInFlight === 'true') return;
+      noteSettled(key);
+      removed.push(key);
+      wrapper.remove();
+    });
+    // Insert what is new, at its server-order position: before the next fresh card already on the page, else at the end.
+    var onPage = new Map();
+    waitingWrappersIn(body).forEach(function (wrapper) { onPage.set(cardKeyOf(wrapper), wrapper); });
+    fresh.forEach(function (item, i) {
+      if (onPage.has(item.key)) return;
+      var before = null;
+      for (var j = i + 1; j < fresh.length && !before; j++) before = onPage.get(fresh[j].key) || null;
+      body.insertBefore(item.el, before);
+      onPage.set(item.key, item.el);
+      initQuestionCards(item.el);
+    });
+    return { count: waitingWrappersIn(body).length, removed: removed };
+  }
+
+  var api = { appendYouBubble: appendYouBubble, sendReply: sendReply, dismissQuestionCard: dismissQuestionCard, initQuestionCards: initQuestionCards, rulingKeyOf: rulingKeyOf, RULING_GONE_EVENT: RULING_GONE_EVENT, setDeskRoot: function (el) { deskRoot = el; }, cardHoldsInput: cardHoldsInput, mergeWaitingCards: mergeWaitingCards, noteSettled: noteSettled };
   if (typeof window !== 'undefined') window.QuestionCards = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();

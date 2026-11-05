@@ -407,6 +407,10 @@
     "disposition": "not-state",
     "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
   },
+  "server.js::waitingStanding": {
+    "disposition": "not-state",
+    "why": "LIN-4242: the factory instance keeps no empty Map, Set or WeakMap of its own; it reads the stores it was given on each call (census scan, factory-level)."
+  },
   "server.js::workspaceIssuesMemo": {
     "disposition": "registered",
     "holder": "workspace-issues-memo"
