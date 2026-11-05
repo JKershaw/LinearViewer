@@ -19,8 +19,11 @@ import { sessionSummaryOf } from '../../lib/task-page-loader.js';
 import { STAGE_INTENT } from '../../lib/prompts/stage-intent.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 import { BUCKET_OF_KIND } from '../../lib/wall-clock-summary.js';
+import { WRITES } from '../../lib/stage-writes.js';
 
-const SURVEYS = ['survey-task', 'survey-place'];
+// LIN-4253: the two read-only Surveys are the templates declaring `writes: one-comment` (the pin
+// test in lin-4253-stage-traits.test.js holds that value, with its reason, for each kind).
+const SURVEYS = Object.keys(PROMPT_TEMPLATES).filter(kind => PROMPT_TEMPLATES[kind].writes === WRITES.ONE_COMMENT);
 const FIXTURE_ISSUE = {
   id: 'issue-4248', identifier: 'LIN-1', title: 'A fixture ticket', description: 'Its description, as it reads now.',
   url: 'https://linear.app/example/issue/LIN-1', state: { name: 'Backlog', type: 'backlog' }, labels: [],
@@ -42,8 +45,8 @@ describe('LIN-4248 Survey templates: registry and routing', () => {
     }
   });
 
-  test('neither Survey has a route, so the stage selector never lists it', () => {
-    for (const kind of SURVEYS) assert.equal(PROMPT_TEMPLATES[kind].route, undefined, kind);
+  test('neither Survey has a route (hand-only: route null), so the stage selector never lists it', () => {
+    for (const kind of SURVEYS) assert.equal(PROMPT_TEMPLATES[kind].route, null, kind);
     const keys = getSelectableStages().map(s => s.key);
     for (const kind of SURVEYS) assert.ok(!keys.includes(kind), `${kind} is not a selectable stage`);
     assert.ok(!formatStageOptions().includes('survey-'), 'the selector options name neither Survey');

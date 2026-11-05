@@ -1,8 +1,9 @@
 /**
  * LIN-4248 — every dispatch entry path gives the two Survey kinds the read-only
  * preamble. The witness is at the production wire: lib/dispatch-entrance.js
- * enqueueRow -> attachProxyContext({ kind: resolvedKind }). Without that `kind`
- * the preamble falls back to the generic text, which tells the worker to
+ * finalizePrompt -> attachProxyContext({ writes: PROMPT_TEMPLATES[resolvedKind].writes })
+ * (LIN-4253; LIN-4248 passed `kind: resolvedKind`). Without that the preamble falls
+ * back to the generic text, which tells the worker to
  * "open PRs" and to end with a "PR link" — wrong for a stage that must change
  * nothing.
  *
@@ -22,6 +23,8 @@ import { installHermeticLinearTransport } from '../fixtures/hermetic-linear.js';
 installHermeticLinearTransport();
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
+import { PROMPT_TEMPLATES } from '../../lib/prompt-templates.js';
+import { WRITES } from '../../lib/stage-writes.js';
 
 const MARKER = '## Workspace API access (auto-appended)';
 const MINTED = 'bootstrap-xyz';
@@ -93,7 +96,8 @@ async function call(app, method, path, body) {
 
 
 const PR_WORDING = /open PRs|PR link|commit SHA/;
-const SURVEY_KINDS = ['survey-task', 'survey-place'];
+// LIN-4253: the Survey kinds are the templates declaring `writes: one-comment`, not a literal list.
+const SURVEY_KINDS = Object.keys(PROMPT_TEMPLATES).filter(kind => PROMPT_TEMPLATES[kind].writes === WRITES.ONE_COMMENT);
 
 function assertReadOnlyPreamble(item, where) {
   assert.ok(item, `${where}: an item was dispatched`);
