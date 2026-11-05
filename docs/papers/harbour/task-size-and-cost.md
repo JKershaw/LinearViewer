@@ -103,7 +103,7 @@ Other population rows (not in the exact set, shown in `analysis.json`): 8 resear
 
 ## Next
 
-- Expose the per-model fold and tokens on `/cost` (`lib/cost-read.js:205,211,472-481`, `routes/proxy-compute.js:744`) as LIN-4264. It is what would make the work-leg test exact within one model.
+- Expose the per-model fold and tokens on `/cost` (`lib/cost-read.js:205,211,472-481`, `routes/proxy-compute.js:744`) as LIN-4264, which was closed as a duplicate of LIN-4263 (in progress), the live ticket for it. It is what would make the work-leg test exact within one model.
 - Re-freeze and write version 2 after about two weeks of records, roughly 19 November 2026, with the exposure in place, the second pair closed or still open, and the two tidy-afters priced if they carry lineage.
 - Count rounds per ticket (plan-review and review passes) from the dispatch history, to test whether the floor's rise with size is round count.
 - Build an asked-size counter (named surfaces, and closed or open goal, from the ticket text) and test it, since no counter exists here.

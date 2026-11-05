@@ -88,7 +88,7 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   the work leg. The one measure the strong form still lacks. (Claude, 2026-10-08; trend half re-scoped by LIN-4257, 2026-11-05)
 - **Can the work leg be read within one model?** `harbour/task-size-and-cost.md` (version 1) could not: `/cost` carries one
   row per kind with a last-row model label, and drops the per-model fold and tokens (`lib/cost-read.js:205,211,472-481`).
-  Expose them on `/cost` as their own ticket (LIN-4264), then re-freeze for version 2 after about two weeks of
+  Expose them on `/cost` as their own ticket (LIN-4264, closed as a duplicate of LIN-4263, the live ticket), then re-freeze for version 2 after about two weeks of
   records. (Claude, 2026-11-05)
 - **Which declared twins have ever been paid for?** Half answered: version 2's M3 found three sibling fixes in 165
   subset edits of the named decisions, while 42 sibling escapes sit on decisions the census never named, so the
