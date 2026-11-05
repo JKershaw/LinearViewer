@@ -3,131 +3,97 @@
 // prompts are unlimited, so the run state never leaks into the prompt controls.
 //
 // The allowance is read from S1's GET /api/dispatch/quota at load, only when
-// the caller marks the workspace free-tier. Same vm-sandbox house pattern as
-// prompt-section-task-mode.test.js.
+// the caller marks the workspace free-tier. It runs in the shared client world
+// (tests/unit/helpers/client-world.js), with the real dispatch disclosure from public/common.js.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import vm from 'node:vm';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
+import { loadWorld } from './helpers/client-world.js';
+import { harnessModelsBlock } from '../../lib/model-routing-harnesses.js';
 
 const flush = () => new Promise((r) => setImmediate(r));
 
 const RUN_LIMIT_TITLE = 'daily run limit reached \u00b7 resets at midnight UTC';
 
-// Replace the first <div> carrying the bare attribute `attr`, honouring nested
-// <div>s. The setter-only slot write a paint*() helper makes (LIN-3267).
-function replaceSlot(html, attr, replacement) {
-  const open = new RegExp(`<div\\b[^>]*\\b${attr}\\b[^>]*>`).exec(html);
-  if (!open) return html;
-  const start = open.index;
-  let depth = 1;
-  const tagRe = /<div\b|<\/div>/g;
-  tagRe.lastIndex = start + open[0].length;
-  let t;
-  while ((t = tagRe.exec(html))) {
-    if (t[0] === '</div>') { depth -= 1; if (depth === 0) return html.slice(0, start) + replacement + html.slice(t.index + 6); }
-    else depth += 1;
-  }
-  return html;
+// The fake DOM models the named entities a browser decodes only from a short table, and it throws on the rest. The real
+// dispatch disclosure (public/common.js) emits two of the others: an em dash in the blank option and an ellipsis in its
+// other text. Both are decoded here, the way a browser decodes them, before the markup reaches the fake. Any other entity
+// still throws.
+function browserMarkup(html) {
+  return html.replace(/&mdash;/g, '\u2014').replace(/&hellip;/g, '\u2026');
 }
 
-// LIN-3267: resolves [data-go-slot] / [data-ladder-slot] and counts whole-
-// container innerHTML writes (`_fullRenders`), so a slot repaint can be told
-// apart from a full rebuild.
-function makeContainer() {
-  const container = {
-    _html: '',
-    _fullRenders: 0,
-    dataset: {},
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    setAttribute() {},
-    getAttribute() { return null; },
-    querySelector(sel) {
-      const m = /^\[(data-go-slot|data-ladder-slot)\]$/.exec(sel);
-      if (!m || !new RegExp(`\\b${m[1]}\\b`).test(this._html)) return null;
-      const self = this;
-      return {
-        set outerHTML(v) { self._html = replaceSlot(self._html, m[1], v); },
-        get outerHTML() { return ''; },
-      };
-    },
-    contains() { return true; },
-    _clickHandler: null,
-    addEventListener(type, fn) { if (type === 'click') this._clickHandler = fn; },
-    removeEventListener() {},
-    async click(dataset) {
-      const btn = { dataset: { ...dataset }, disabled: false, textContent: 'label', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
-      await this._clickHandler({ target: btn });
-      return btn;
-    },
+// Every element in the container outside `slotSelector`, in document order. A slot repaint keeps all of them: the same
+// nodes, still attached. A full render detaches them all.
+function nodesOutside(container, slotSelector) {
+  const out = [];
+  const walk = (el) => {
+    for (const child of el.children) {
+      if (child.closest(slotSelector)) continue; // the slot and what it holds are not kept
+      out.push(child);
+      walk(child);
+    }
   };
-  Object.defineProperty(container, 'innerHTML', {
-    get() { return this._html; },
-    set(v) { this._html = v; this._fullRenders += 1; },
-  });
-  return container;
+  walk(container);
+  return out;
 }
 
+// The client world: the real public/common.js (the dispatch disclosure and its exec controls come from it) and
+// public/prompt-section.js. The stubs this suite names are set after load, so they replace common.js's own definitions.
 function loadPromptSection({ quota, dispatch } = {}) {
-  const calls = { api: [], dispatch: [], order: [] };
+  const calls = { api: [], dispatch: [], order: [], readers: [] };
   const timers = [];
-  const window = {
-    escapeHtml: (s) => (s == null ? '' : String(s)),
-    stripCodeBlockWrapper: (s) => s,
-    renderMarkdown: (s) => String(s == null ? '' : s),
-    api: async (url) => {
-      calls.api.push(url);
-      if (String(url).endsWith('/api/dispatch/quota')) {
-        calls.order.push('quota');
-        // LIN-3267: a function yields the allowance at each read.
-        return typeof quota === 'function' ? quota() : quota;
-      }
-      return { prompt: 'TEMPLATE PROMPT', promptName: 'Template' };
+  const world = loadWorld({
+    window: {
+      __HARNESS_MODELS__: harnessModelsBlock(),
+      location: { pathname: '/workspace/ws/swipe' },
     },
-    ProxyToggle: { maybeAppend: async (raw) => raw },
-    renderDispatchDisclosure: () => '<div class="swipe-prompt-options"></div>',
-    readDispatchExecControls: () => ({}),
-    dispatchPrompt: async (args) => {
-      calls.dispatch.push(args);
-      calls.order.push('dispatch');
-      if (dispatch) return dispatch(args);
-      return { item: { id: 'disp-1' } };
+    scripts: ['common.js', 'prompt-section.js'],
+    timers,
+    globals: {
+      // This suite's own default: an unstubbed read answers `ok: false`. The shared default (`ok: true`) would hide that branch.
+      fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }),
     },
-    isPinnedToBottom: () => false,
-    toast: () => {},
-    fetchAutopilotKickoff: async () => ({ prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' }),
+  });
+  const { window } = world;
+  window.api = async (url) => {
+    calls.api.push(url);
+    if (String(url).endsWith('/api/dispatch/quota')) {
+      calls.order.push('quota');
+      // LIN-3267: a function yields the allowance at each read.
+      return typeof quota === 'function' ? quota() : quota;
+    }
+    return { prompt: 'TEMPLATE PROMPT', promptName: 'Template' };
   };
-  const sandbox = {
-    window,
-    AbortController,
-    URLSearchParams,
-    TextDecoder,
-    TextEncoder,
-    Blob: class {},
-    URL: { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} },
-    document: { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } },
-    requestAnimationFrame: (cb) => { cb(); return 1; },
-    setTimeout: (fn, delay) => { timers.push({ fn, delay }); return timers.length; },
-    clearTimeout: () => {},
-    navigator: { clipboard: { writeText: async () => {} } },
-    fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }),
+  window.fetchAutopilotKickoff = async () => ({ prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' });
+  window.dispatchPrompt = async (args) => {
+    calls.dispatch.push(args);
+    calls.order.push('dispatch');
+    if (dispatch) return dispatch(args);
+    return { item: { id: 'disp-1' } };
   };
-  vm.createContext(sandbox);
-  vm.runInContext(SRC, sandbox);
-  // Fire every pending timer once (the 2s button-restore), then let reads settle.
+  window.ProxyToggle = {
+    maybeAppend: async (raw, urlKey, opts) => (opts && opts.force ? `${raw}\n\n## Workspace API access` : raw),
+  };
+  window.toast = () => {};
+  // The disclosure is production's own. Its markup gets the browser's entity decode before the fake parses it.
+  const realDisclosure = window.renderDispatchDisclosure;
+  window.renderDispatchDisclosure = (opts) => browserMarkup(realDisclosure(opts));
+  // The reader is stubbed: production's reads the values of the harness and model `<select>`s, which the fake does not
+  // model. The stub records the scope it is handed, so a test can check which element a press passes it.
+  window.readDispatchExecControls = (scopeEl) => {
+    calls.readers.push(scopeEl);
+    return { model: null, harness: null };
+  };
+
+  // Fire every collected timer once (the 2s button restore, the re-read after it), then let reads settle.
   async function runTimers() {
-    const due = timers.splice(0);
+    const due = timers.splice(0).filter((t) => !t.cancelled);
     for (const t of due) t.fn();
     await flush();
     await flush();
   }
-  return { PromptSection: window.PromptSection, window, calls, timers, runTimers };
+  return { PromptSection: window.PromptSection, window, calls, timers, runTimers, makeContainer: world.makeContainer };
 }
 
 const ISSUE = { id: 'uuid-42', identifier: 'LIN-42', title: 'A task' };
@@ -156,7 +122,7 @@ function baseOpts(extra = {}) {
 
 async function mountIdle(extra, loadOpts) {
   const loaded = loadPromptSection(loadOpts);
-  const container = makeContainer();
+  const container = loaded.makeContainer();
   loaded.PromptSection.init(container, baseOpts(extra));
   await flush();
   await flush();
@@ -291,27 +257,38 @@ describe('LIN-3267 — re-read the run quota after a ladder press', () => {
     assert.equal(m.calls.order.filter((x) => x === 'quota').length, 0);
   });
 
-  // Slot repaint vs full rebuild: the container counts whole-container
-  // innerHTML writes, so a post-press refresh that calls render() is caught.
-  for (const [name, dataset] of [
-    ['a run-step press', { action: 'run-step', target: 'cli' }],
-    ['a Dispatch-panel dispatch press', { action: 'dispatch', target: 'cli' }],
+  // Slot repaint vs full rebuild: the nodes outside the Go and ladder slots must all stay attached through the press, the
+  // ✓ feedback, the restore and the re-read. A post-press refresh that calls render() detaches them.
+  // After the re-read the run rung has no action at zero, so it is found again by its rung, not by its action.
+  // `disabledAfterRestore`: the run rung is disabled at zero by the run limit, so only the dispatch button's `disabled` shows
+  // the guard lifting; the run rung's disabled state after the restore is checked against the run-limit reason instead.
+  for (const [name, dataset, selector, afterSelector, disabledAfterRestore] of [
+    ['a run-step press', { action: 'run-step', target: 'cli' }, 'button[data-action="run-step"][data-target="cli"]', 'button[data-rung="run-step"]', true],
+    ['a Dispatch-panel dispatch press', { action: 'dispatch', target: 'cli' }, 'button[data-action="dispatch"][data-target="cli"]', 'button[data-action="dispatch"][data-target="cli"]', false],
   ]) {
     test(`${name} makes no whole-container write and the button keeps ✓ + disabled until the restore`, async () => {
       const m = await mountFresh({}, { quota: seq(Q(1), Q(0)) });
-      const before = m.container._fullRenders;
-      const btn = await m.container.click(dataset);
+      const btn = m.container.querySelector(selector);
+      assert.ok(btn, 'precondition: the control is drawn');
+      const label = btn.textContent;
+      const panel = m.container.querySelector('.swipe-prompt-options');
+      const kept = nodesOutside(m.container, '[data-go-slot], [data-ladder-slot]');
+      assert.equal(await m.container.click(dataset), btn, 'the press lands on the drawn control');
       await flush();
       await flush();
       assert.equal(btn.textContent, '\u2713', 'the ✓ feedback is shown');
       assert.equal(btn.disabled, true, 'the double-press guard is held');
       assert.deepEqual(m.calls.order, ['quota', 'dispatch'], 'no quota read before the restore');
       assert.match(m.container.innerHTML, /1 of 10 runs left today/, 'the count is untouched until the restore');
+      assert.equal(m.calls.readers.at(-1), panel, 'the press hands the reader the drawn disclosure panel');
       await m.runTimers();
-      assert.equal(btn.textContent, 'label', 'the restore puts the label back');
-      assert.equal(btn.disabled, false, 'the restore lifts the guard');
+      const after = m.container.querySelector(afterSelector);
+      // At zero the run rung also carries the run-limit reason, so the label is checked as a prefix; the ✓ is gone.
+      assert.ok(after.textContent.startsWith(label) && !after.textContent.includes('\u2713'), 'the restore puts the label back');
+      assert.equal(after.disabled, disabledAfterRestore, 'the restore lifts the guard');
+      if (disabledAfterRestore) assert.match(after.outerHTML, new RegExp(RUN_LIMIT_TITLE), 'disabled by the run limit, not the guard');
       assert.deepEqual(m.calls.order, ['quota', 'dispatch', 'quota'], 'the re-read follows the restore');
-      assert.equal(m.container._fullRenders, before, 'no whole-container write at any point');
+      assert.ok(kept.every((node) => node.isConnected), 'no whole-container write at any point');
       assert.match(m.container.innerHTML, /0 of 10 runs left today/, 'the count still tracks the press');
       assert.match(tagFor(m.container.innerHTML, 'run-step'), /disabled/, 'the run rung is disabled at zero');
       assert.match(tagFor(m.container.innerHTML, 'run-task'), /disabled/, 'Go is disabled at zero');
@@ -321,7 +298,7 @@ describe('LIN-3267 — re-read the run quota after a ladder press', () => {
   test('a 429 run-step press keeps err + disabled until the restore, then exhausts the ladder without a full write', async () => {
     const dispatch = async () => { const e = new Error('limit'); e.status = 429; e.body = { code: 'RUN_LIMIT_REACHED' }; throw e; };
     const m = await mountFresh({}, { quota: seq(Q(1), Q(0)), dispatch });
-    const before = m.container._fullRenders;
+    const kept = nodesOutside(m.container, '[data-go-slot], [data-ladder-slot]');
     const btn = await m.container.click({ action: 'run-step', target: 'cli' });
     await flush();
     await flush();
@@ -329,7 +306,7 @@ describe('LIN-3267 — re-read the run quota after a ladder press', () => {
     assert.equal(btn.disabled, true);
     assert.deepEqual(m.calls.order, ['quota', 'dispatch']);
     await m.runTimers();
-    assert.equal(m.container._fullRenders, before, 'no whole-container write');
+    assert.ok(kept.every((node) => node.isConnected), 'no whole-container write');
     assert.match(m.container.innerHTML, /0 of 10 runs left today/);
     assert.match(tagFor(m.container.innerHTML, 'run-step'), new RegExp(`disabled[^>]*${RUN_LIMIT_TITLE}`));
   });
