@@ -66,7 +66,6 @@ const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/unit/lin-3254-session-run-toggles.test.js',
   'tests/unit/lin-3833-run-control.test.js',
   'tests/unit/lin-3975-proposal-refresh.test.js',
-  'tests/unit/lin-4016-browser-follows-server.test.js',
   'tests/unit/lin-4016-sessions-fold-parked.test.js',
   'tests/unit/lin-4024-home-description.test.js',
   'tests/unit/lin-4024-look.test.js',

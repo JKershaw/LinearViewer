@@ -7,73 +7,12 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import vm from 'node:vm';
 import { escapeHtml } from '../../lib/utils/html.js';
 import { rowRecordOf, rowDataByNodeKey } from '../../lib/task-board-view.js';
 import { nodeKey } from '../../lib/tree.js';
 import { stateBodyOf, stateIssue, failedStageLoop } from '../fixtures/state-route.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
+import { loadWorld } from './helpers/client-world.js';
 const flush = () => new Promise((r) => setTimeout(r, 0));
-
-function makeContainer() {
-  const listeners = {};
-  let html = '';
-  let written = {};
-  const markupValue = (testid) => {
-    const tag = new RegExp(`<(input|select)\\b[^>]*data-testid="${testid}"[^>]*>`).exec(html);
-    if (!tag) return undefined;
-    if (tag[1] === 'input') return /\svalue="([^"]*)"/.exec(tag[0])?.[1] ?? '';
-    const block = html.slice(tag.index, html.indexOf('</select>', tag.index));
-    return /<option value="([^"]*)"[^>]*\sselected/.exec(block)?.[1] ?? '';
-  };
-  const panelRoot = {
-    querySelector(sel) {
-      const m = /^\[data-testid="([^"]+)"\]$/.exec(sel);
-      if (!m || markupValue(m[1]) === undefined) return null;
-      const testid = m[1];
-      return {
-        get value() { return testid in written ? written[testid] : markupValue(testid); },
-        set value(v) { written[testid] = v; }
-      };
-    }
-  };
-  // The Change panel's summary is an element the page updates in place when a pick or a typed model changes it (LIN-3992),
-  // so it reads and writes its own text in the markup, as a real element's textContent does.
-  const summaryNode = {
-    get textContent() { return /data-testid="run-will-use">([^<]*)</.exec(html)?.[1] ?? ''; },
-    set textContent(v) { html = html.replace(/(data-testid="run-will-use">)[^<]*/, (_, open) => open + escapeHtml(v)); }
-  };
-  const container = {
-    get innerHTML() { return html; },
-    set innerHTML(v) { html = v; written = {}; },
-    dataset: {},
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    setAttribute() {},
-    getAttribute() { return null; },
-    querySelector(sel) {
-      if (sel === '[data-testid="run-will-use"]') return html.includes('data-testid="run-will-use"') ? summaryNode : null;
-      return sel === '[data-decision-panel]' && html.includes('data-decision-panel') ? panelRoot : null;
-    },
-    contains() { return true; },
-    addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
-    removeEventListener() {},
-    async click(dataset) {
-      const btn = { dataset: { ...dataset }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
-      for (const fn of listeners.click || []) await fn({ target: btn });
-      return btn;
-    },
-    async fire(type, target) {
-      const el = { dataset: {}, closest: () => null, ...target };
-      for (const fn of listeners[type] || []) await fn({ target: el });
-    },
-  };
-  return container;
-}
 
 // The state body, the way /state sends it (routes/task-page.js): the sessions block is the server's, the row record too.
 function loadClient({ stateBody, container = false }) {
@@ -98,19 +37,11 @@ function loadClient({ stateBody, container = false }) {
     taskPageHref: () => '/workspace/acme/task/LIN-42',
     toast: () => {},
   };
-  const sandbox = {
-    window, AbortController, URLSearchParams, TextDecoder, TextEncoder, Blob: class {}, URL,
-    document: { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } },
-    requestAnimationFrame: (cb) => { cb(); return 1; },
-    setTimeout: (fn, ms) => { const t = globalThis.setTimeout(fn, ms); if (t && t.unref) t.unref(); return t; },
-    clearTimeout,
-    navigator: { clipboard: { writeText: async () => {} } },
-    fetch: async () => ({ ok: true, json: async () => ({}) }),
-    console,
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(SRC, sandbox, { filename: 'prompt-section.js' });
-  return { PromptSection: sandbox.window.PromptSection, calls, container };
+  const world = loadWorld({
+    window, scripts: ['prompt-section.js'],
+    globals: { fetch: async () => ({ ok: true, json: async () => ({}) }) },
+  });
+  return { PromptSection: world.PromptSection, calls, container, makeContainer: world.makeContainer };
 }
 
 const HOME_ISSUE = { id: 'uuid-42', identifier: 'LIN-42', title: 'T', url: '', source: 'linear', stateType: 'started' };
@@ -131,7 +62,7 @@ const stateWith = (sessions) => ({
 });
 
 async function paint(stateBody, opts = {}) {
-  const { PromptSection } = loadClient({ stateBody, container: !!opts.row?.container });
+  const { PromptSection, makeContainer } = loadClient({ stateBody, container: !!opts.row?.container });
   const c = makeContainer();
   PromptSection.init(c, { ...HOME, ...opts });
   await flush(); await flush(); await flush();
@@ -354,7 +285,7 @@ describe('LIN-4104 review finding 2 — a step picked from Another step is refus
     // The page renders the offer; the server answers busy on every read after the pick (a run started since the render).
     let serverBusy = false;
     const body = () => stateWith({ action: serverBusy ? BUSY.action : OFFER_LEAF, ...(serverBusy ? { busy: true } : {}) });
-    const { PromptSection, calls } = loadClient({ stateBody: body });
+    const { PromptSection, calls, makeContainer } = loadClient({ stateBody: body });
     const c = makeContainer();
     PromptSection.init(c, { ...HOME, filledRung: 'pr' });
     await flush(); await flush(); await flush();
@@ -377,7 +308,7 @@ describe('LIN-4104 review finding 2 — a step picked from Another step is refus
 describe('LIN-4104 D4 — Another step re-reads the offer at its press', () => {
   test('a run starts between render and Another step: the list does not open, and a plain refusal says nothing was started', async () => {
     const body = stateWith({ action: { kind: 'offer', container: false, step: null, why: 'the run control offers the three rungs' } });
-    const { PromptSection } = loadClient({ stateBody: body });
+    const { PromptSection, makeContainer } = loadClient({ stateBody: body });
     const c = makeContainer();
     PromptSection.init(c, { ...HOME, filledRung: 'pr' });
     await flush(); await flush(); await flush();

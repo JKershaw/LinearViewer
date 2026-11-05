@@ -14,8 +14,8 @@
  * directly, and `lin-4010-home-opened-task.test.js`, `lin-4246-opened-task-repaint-keep.test.js` and
  * `prompt-section-go.test.js` (LIN-4266) through `loadWorld`, and `lin-3833-copy-first-view.test.js`, `lin-3968-home-polish.test.js`
  * and `lin-3975-task-run-control.test.js` (LIN-4269) through `loadWorld`, and `lin-4040-close-out.test.js`,
- * `lin-4042-finished-no-run-to-pr.test.js`, `brief-recap-autogenerate.test.js`, `brief-recap-ai-not-configured-contract.test.js`
- * and `scan-retire-ui.test.js` (LIN-4269) through `loadWorld`.
+ * `lin-4042-finished-no-run-to-pr.test.js`, `brief-recap-autogenerate.test.js`, `brief-recap-ai-not-configured-contract.test.js`,
+ * `scan-retire-ui.test.js` and `lin-4016-browser-follows-server.test.js` (LIN-4269) through `loadWorld`.
  * A suite moved onto this fake leaves `HAND_WRITTEN_FAKE_DOM_FILES` and joins this list in the same PR.
  *
  * Modelled:
@@ -48,12 +48,10 @@
  * MathML), `<script>` execution, `getBoundingClientRect`, `MutationObserver`, `Range` and `Selection`,
  * `getClientRects` (so a Tab-driven focus trap cannot be exercised), `select`, and selection direction.
  *
- * `select` stops (LIN-4269). `<select>.value` is the API the suites below need and the fake does not model: its getter returns
- * undefined, its setter throws (`value is not modelled on <select>`, the setter above). Both stay on the census,
- * `HAND_WRITTEN_FAKE_DOM_FILES`, with their own hand-written fakes, and are not moved onto this fake:
- * `lin-3833-run-control.test.js` (production writes `el.value` on the run-harness select at `public/prompt-section.js:1565`
- * through `applyPanelDraft`, and the test reads it at line 243). `lin-4016-browser-follows-server.test.js` is a stop by the
- * ticket's ruling only: a port on a throwaway copy passed 29/29 on the real DOM, so its stop is open (LIN-4269, beat 4).
+ * `select` stop (LIN-4269). `<select>.value` is the API the suite below needs and the fake does not model: its getter returns
+ * undefined, its setter throws (`value is not modelled on <select>`, the setter above). `lin-3833-run-control.test.js` stays on
+ * the census, `HAND_WRITTEN_FAKE_DOM_FILES`, with its own hand-written fake: production writes `el.value` on the run-harness
+ * select at `public/prompt-section.js:1565` through `applyPanelDraft`, and the test reads it at line 243.
  */
 
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
