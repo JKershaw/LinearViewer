@@ -23,8 +23,11 @@
  * except the one fake and this file. Comments never reach the AST, so `stripComments` from
  * `test-server-listen-bind.test.js` is not used: importing it would re-run that file's tests here (review note 3).
  *
+ * The ratchet. HAND_WRITTEN_FAKE_DOM_FILES is a sorted list of file names, not a count: a count passes when one copy is
+ * deleted and another added. The scan must find exactly the listed files. A file it finds that is not listed fails,
+ * with what to use instead. A listed file it no longer finds also fails, so a moved suite leaves the list in the same PR.
+ *
  * Run with: node --test tests/unit/fake-dom-census.test.js
- * `FAKE_DOM_CENSUS_LIST=1` also prints each file the scan finds, with the shape and line that put it there.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -39,6 +42,70 @@ const SELF = toRepoPath(fileURLToPath(import.meta.url));
 
 const SCAN_ROOTS = ['tests', 'scripts/eval', 'scripts/code-shape'];
 const EXCLUDED = new Set(['tests/unit/helpers/fake-dom.js', SELF]);
+
+/**
+ * The files that still hand-write a fake DOM: the baseline the scan found when the census landed (LIN-4265, 56 files),
+ * sorted. It only shrinks. A file moved onto `helpers/fake-dom.js` leaves this list in the same PR, and a new file is
+ * never added to get past the census.
+ */
+const HAND_WRITTEN_FAKE_DOM_FILES = [
+  'tests/fixtures/observation-dom-shim.js',
+  'tests/unit/brief-recap-ai-not-configured-contract.test.js',
+  'tests/unit/brief-recap-autogenerate.test.js',
+  'tests/unit/chart-helpers.test.js',
+  'tests/unit/chat-append-options.test.js',
+  'tests/unit/chat-render-markdown-text.test.js',
+  'tests/unit/chat-tool-rows.test.js',
+  'tests/unit/close-out-client.test.js',
+  'tests/unit/common-assignee-filter-nav.test.js',
+  'tests/unit/common-team-filter-nav.test.js',
+  'tests/unit/dashboard-routes.test.js',
+  'tests/unit/flight-companion-client.test.js',
+  'tests/unit/lin-2122-history-outcome-pill.test.js',
+  'tests/unit/lin-2370-browser-copy-prompt-provider-identity.test.js',
+  'tests/unit/lin-2933-cross-seam-witness.test.js',
+  'tests/unit/lin-3136-settings-take-predicate.test.js',
+  'tests/unit/lin-3254-session-run-toggles.test.js',
+  'tests/unit/lin-3833-copy-first-view.test.js',
+  'tests/unit/lin-3833-run-control.test.js',
+  'tests/unit/lin-3968-home-polish.test.js',
+  'tests/unit/lin-3975-proposal-refresh.test.js',
+  'tests/unit/lin-3975-task-run-control.test.js',
+  'tests/unit/lin-4016-browser-follows-server.test.js',
+  'tests/unit/lin-4016-sessions-fold-parked.test.js',
+  'tests/unit/lin-4024-home-description.test.js',
+  'tests/unit/lin-4024-look.test.js',
+  'tests/unit/lin-4035-live-console-client.test.js',
+  'tests/unit/lin-4040-close-out.test.js',
+  'tests/unit/lin-4042-finished-no-run-to-pr.test.js',
+  'tests/unit/lin-4114-dismiss-order.test.js',
+  'tests/unit/lin-4114-inflight-lock.test.js',
+  'tests/unit/lin-4241-settled-ruling-client.test.js',
+  'tests/unit/lin-4242-waiting-live.test.js',
+  'tests/unit/live-console-client-facts.test.js',
+  'tests/unit/observation-basis-check.test.js',
+  'tests/unit/observation-bulk-scan.test.js',
+  'tests/unit/observation-card-order.test.js',
+  'tests/unit/observation-ruling-delivery.test.js',
+  'tests/unit/observation-scan-due.test.js',
+  'tests/unit/observation-waiting-block.test.js',
+  'tests/unit/prompt-section-go.test.js',
+  'tests/unit/prompt-section-look-alike.test.js',
+  'tests/unit/prompt-section-p0.test.js',
+  'tests/unit/prompt-section-preserve.test.js',
+  'tests/unit/prompt-section-recommend-url.test.js',
+  'tests/unit/prompt-section-run-quota.test.js',
+  'tests/unit/prompt-section-runner-link.test.js',
+  'tests/unit/prompt-section-task-mode.test.js',
+  'tests/unit/question-card-task-bound.test.js',
+  'tests/unit/run-limit-gating.test.js',
+  'tests/unit/runner-link-surfaces.test.js',
+  'tests/unit/scan-retire-ui.test.js',
+  'tests/unit/task-chat-flight-companion-sentinel-mask.test.js',
+  'tests/unit/task-page-client.test.js',
+  'tests/unit/task-page-link-client-surfaces.test.js',
+  'tests/unit/task-page-question.test.js',
+];
 
 /** Defining one of these is what makes a shape answer selector queries. */
 const QUERY_MEMBERS = new Set(['querySelector', 'querySelectorAll']);
@@ -576,14 +643,74 @@ describe('LIN-4265 — the fake-DOM census: the scan', () => {
     for (const excluded of EXCLUDED) assert.ok(!files.includes(excluded), `${excluded} must not be scanned`);
   });
 
-  test('every scanned file parses with acorn', (t) => {
-    const { files, found, parseErrors } = scan();
+  test('every scanned file parses with acorn', () => {
+    const { parseErrors } = scan();
     assert.deepEqual(parseErrors, [], 'a file acorn cannot parse is a file the census cannot see');
-    if (process.env.FAKE_DOM_CENSUS_LIST) {
-      t.diagnostic(`scanned ${files.length} files; ${found.size} hold a hand-written fake DOM`);
-      for (const [file, shapes] of found) {
-        t.diagnostic(`${file}  ${shapes.map((s) => `${s.kind}${s.name ? ` ${s.name}` : ''}@${s.line} [${s.signals.join(',')}] ${s.members.join(' ')}`).join(' | ')}`);
-      }
-    }
+  });
+});
+
+// ── The ratchet ─────────────────────────────────────────────────────────────
+
+const describeShapes = (shapes) => shapes
+  .map((s) => `${s.kind}${s.name ? ` ${s.name}` : ''} at line ${s.line} (${s.members.join(', ')})`)
+  .join('; ');
+
+/** What a file the scan finds, and the list does not name, is told to do instead. */
+function unknownFileMessage(unknown) {
+  return [
+    `${unknown.length} file(s) hand-write a fake DOM that HAND_WRITTEN_FAKE_DOM_FILES does not list:`,
+    ...unknown.map(({ file, shapes }) => `  ${file}: ${describeShapes(shapes)}`),
+    'Do not hand-write one, and do not add the file to the list: use tests/unit/helpers/fake-dom.js, the one fake DOM.',
+    '- To run a public/ script with its container, use loadWorld from tests/unit/helpers/client-world.js:',
+    "    const world = loadWorld({ window: { api }, scripts: ['prompt-section.js'] }); const container = world.makeContainer();",
+    "  (as tests/unit/lin-4010-home-opened-task.test.js does); world.document is the fake's document.",
+    "- To vm-run a slice of a script against createFakeDom()'s document:",
+    "    const { document, parse } = createFakeDom(); parse(html, document.body);",
+    "    const sandbox = { document, window: { document }, console }; vm.createContext(sandbox);",
+    "    vm.runInContext(readFileSync(join(REPO, 'public/question-cards.js'), 'utf8'), sandbox, { filename: 'question-cards.js' });",
+    '  (as tests/unit/lin-4242-waiting-merge.test.js does).',
+    'If the fake lacks something the client needs, grow fake-dom.js with its own test in fake-dom.test.js.',
+  ].join('\n');
+}
+
+/** What a listed file the scan no longer finds is told to do. */
+function staleFileMessage(stale) {
+  return [
+    `${stale.length} file(s) in HAND_WRITTEN_FAKE_DOM_FILES no longer hand-write a fake DOM (moved, deleted or renamed):`,
+    ...stale.map((file) => `  ${file}`),
+    'Remove them from HAND_WRITTEN_FAKE_DOM_FILES in this PR. A suite now on the shared fake joins the consumer list in',
+    "tests/unit/helpers/fake-dom.js's header in the same PR.",
+  ].join('\n');
+}
+
+describe('LIN-4265 — the fake-DOM census: the ratchet', () => {
+  test('HAND_WRITTEN_FAKE_DOM_FILES is sorted, with no duplicates', () => {
+    const duplicates = HAND_WRITTEN_FAKE_DOM_FILES.filter((f, i) => HAND_WRITTEN_FAKE_DOM_FILES.indexOf(f) !== i);
+    assert.deepEqual(duplicates, [], `listed more than once: ${duplicates.join(', ')}`);
+    const outOfOrder = HAND_WRITTEN_FAKE_DOM_FILES.filter((f, i) => i > 0 && HAND_WRITTEN_FAKE_DOM_FILES[i - 1] > f);
+    assert.deepEqual(outOfOrder, [], `out of sorted order: ${outOfOrder.join(', ')}`);
+  });
+
+  test('no file hand-writes a fake DOM unless it is listed', () => {
+    const { found } = scan();
+    const listed = new Set(HAND_WRITTEN_FAKE_DOM_FILES);
+    const unknown = [...found].filter(([file]) => !listed.has(file)).map(([file, shapes]) => ({ file, shapes }));
+    assert.ok(unknown.length === 0, unknownFileMessage(unknown));
+  });
+
+  test('every listed file still hand-writes a fake DOM', () => {
+    const { found } = scan();
+    const stale = HAND_WRITTEN_FAKE_DOM_FILES.filter((file) => !found.has(file));
+    assert.ok(stale.length === 0, staleFileMessage(stale));
+  });
+
+  test('the unknown-file message names the shared fake, loadWorld, and how to vm-run a slice on its document', () => {
+    const message = unknownFileMessage([{ file: 'tests/unit/example.test.js', shapes: fakeDomShapes(POSITIVE[1].source) }]);
+    assert.match(message, /tests\/unit\/example\.test\.js: object at line 1 \(classList, innerHTML, querySelector\)/);
+    assert.match(message, /helpers\/fake-dom\.js/);
+    assert.match(message, /loadWorld/);
+    assert.match(message, /createFakeDom\(\)'s document/);
+    assert.match(message, /const \{ document, parse \} = createFakeDom\(\);/);
+    assert.match(message, /vm\.runInContext\(/);
   });
 });

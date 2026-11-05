@@ -5,7 +5,14 @@
  * `tests/unit/fake-dom.test.js`; a test that would pass on a fake that did nothing does not count there.
  *
  * Usage: `const { document, root, createElement, parse } = createFakeDom();` A world is one document. Each call makes a
- * fresh world, and two worlds never share `document.activeElement`.
+ * fresh world, and two worlds never share `document.activeElement`. To run a `public/` script against it, use `loadWorld`
+ * in `tests/unit/helpers/client-world.js`: one world, one vm sandbox, the scripts a suite names.
+ *
+ * Guard and consumers (LIN-4265). `tests/unit/fake-dom-census.test.js` fails on any new hand-written fake DOM under
+ * `tests/`, `scripts/eval` or `scripts/code-shape`; its `HAND_WRITTEN_FAKE_DOM_FILES` lists those not yet moved here.
+ * The files that use this fake today: `client-world.js`, `fake-dom.test.js` and `lin-4242-waiting-merge.test.js`
+ * directly, and `lin-4010-home-opened-task.test.js` and `lin-4246-opened-task-repaint-keep.test.js` through `loadWorld`.
+ * A suite moved onto this fake leaves `HAND_WRITTEN_FAKE_DOM_FILES` and joins this list in the same PR.
  *
  * Modelled:
  * - Tree and identity: element, text, comment and fragment nodes in order; `children` (elements only, a real array),
