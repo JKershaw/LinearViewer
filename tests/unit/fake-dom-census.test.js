@@ -645,10 +645,113 @@ function staleFileMessage(stale) {
   return [
     `${stale.length} file(s) in HAND_WRITTEN_FAKE_DOM_FILES no longer hand-write a fake DOM (moved, deleted or renamed):`,
     ...stale.map((file) => `  ${file}`),
-    'Remove them from HAND_WRITTEN_FAKE_DOM_FILES in this PR. A suite now on the shared fake joins the consumer list in',
-    "tests/unit/helpers/fake-dom.js's header in the same PR.",
+    'Remove them from HAND_WRITTEN_FAKE_DOM_FILES in this PR. The consumers are computed from imports, so nothing else needs editing.',
   ].join('\n');
 }
+
+// ── The consumers (LIN-4306) ────────────────────────────────────────────────
+
+const FAKE_HEADER = 'tests/unit/helpers/fake-dom.js';
+
+/** The modules whose importers are the fake's consumers: the fake itself, and the vm loader over it. */
+const CONSUMED_MODULES = new Set([FAKE_HEADER, 'tests/unit/helpers/client-world.js']);
+
+/**
+ * The names the header's consumer paragraph may keep: the census (it imports nothing), and the two helpers the paragraph
+ * describes as real importers. Any other consumer name in that paragraph is a hand-kept list again.
+ */
+const HEADER_NAMES_ALLOWED = new Set(['fake-dom-census.test.js', 'client-world.js', 'live-console-world.js']);
+
+const IMPORT_LIKE = /^(ImportDeclaration|ExportNamedDeclaration|ExportAllDeclaration)$/;
+
+/**
+ * The files whose static imports or re-exports reach a consumed module, from the same scope as the scan. An AST walk,
+ * not a text grep, so a comment or string that names the module does not make a consumer. Dynamic `import()` is not
+ * counted: no suite uses it to reach the fake, and the scan would miss it.
+ */
+function computedConsumers() {
+  const out = new Set();
+  for (const file of scannedFiles()) {
+    let ast;
+    try {
+      ast = parse(readFileSync(join(REPO, file), 'utf8'));
+    } catch (error) {
+      if (error instanceof SyntaxError) continue; // the parse test reports it
+      throw error;
+    }
+    for (const node of ast.body) {
+      if (!IMPORT_LIKE.test(node.type) || typeof node.source?.value !== 'string') continue;
+      if (!node.source.value.startsWith('.')) continue;
+      const target = toRepoPath(join(dirname(join(REPO, file)), node.source.value));
+      if (CONSUMED_MODULES.has(target)) { out.add(file); break; }
+    }
+  }
+  return [...out].sort();
+}
+
+/** The header's "Guard and consumers" paragraph: from its lead to the next blank comment line. Null when absent. */
+function consumerParagraph(source) {
+  const start = source.indexOf('Guard and consumers (LIN-4265');
+  if (start < 0) return null;
+  const end = source.indexOf('\n *\n', start);
+  return source.slice(start, end < 0 ? source.length : end);
+}
+
+/** The consumer file names a paragraph hand-lists that the census computes, other than the allowed helper names. */
+function handListedConsumers(paragraph, consumers) {
+  const byBase = new Set(consumers.map((file) => file.split('/').pop()));
+  const named = new Set(paragraph.match(/[\w-]+\.(?:test\.)?m?js/g) || []);
+  return [...named].filter((name) => byBase.has(name) && !HEADER_NAMES_ALLOWED.has(name)).sort();
+}
+
+function consumerListMessage(listed, consumers) {
+  return [
+    `${FAKE_HEADER} names consumer file(s) that the census computes: ${listed.join(', ')}`,
+    'The header says the consumers are the importers the census computes, so remove those names. The computed set is:',
+    ...consumers.map((file) => `  ${file}`),
+  ].join('\n');
+}
+
+describe('LIN-4306 — the fake-DOM consumer list is computed from imports, not hand-kept', () => {
+  test('the scan finds the real importers, including lin-4293-tidy-after-repaint.test.js, and not the census', () => {
+    const consumers = computedConsumers();
+    assert.ok(consumers.includes('tests/unit/lin-4293-tidy-after-repaint.test.js'), 'lin-4293 imports client-world.js and must be counted');
+    assert.ok(consumers.includes('tests/unit/fake-dom.test.js'), 'the fake\'s own suite imports the fake');
+    assert.ok(consumers.includes('tests/unit/helpers/live-console-world.js'), 'the live-console loader imports client-world.js');
+    assert.ok(!consumers.includes('tests/unit/fake-dom-census.test.js'), 'the census imports nothing, so it is not a consumer');
+  });
+
+  test('the header\'s consumer paragraph names no consumer the census computes, beyond the allowed helpers', () => {
+    const paragraph = consumerParagraph(readFileSync(join(REPO, FAKE_HEADER), 'utf8'));
+    assert.ok(paragraph, 'the header has its Guard and consumers paragraph');
+    const consumers = computedConsumers();
+    const listed = handListedConsumers(paragraph, consumers);
+    assert.deepEqual(listed, [], consumerListMessage(listed, consumers));
+  });
+
+  test('the header no longer tells a mover to join the consumer list', () => {
+    const paragraph = consumerParagraph(readFileSync(join(REPO, FAKE_HEADER), 'utf8'));
+    assert.doesNotMatch(paragraph, /joins/, 'the paragraph must not ask a mover to edit the consumer list');
+  });
+
+  test('the stale-file message no longer tells a mover to edit the header', () => {
+    const message = staleFileMessage(['tests/unit/example.test.js']);
+    assert.doesNotMatch(message, /joins|consumer list|header/);
+  });
+
+  test('fixture: a paragraph that hand-lists a consumer file goes red, naming that file', () => {
+    const consumers = ['tests/unit/lin-4242-waiting-merge.test.js', 'tests/unit/helpers/client-world.js'];
+    const paragraph = 'Guard and consumers (LIN-4265). The files that use this fake today: `lin-4242-waiting-merge.test.js` and `client-world.js`.';
+    assert.deepEqual(handListedConsumers(paragraph, consumers), ['lin-4242-waiting-merge.test.js']);
+    assert.match(consumerListMessage(['lin-4242-waiting-merge.test.js'], consumers), /lin-4242-waiting-merge\.test\.js[\s\S]*tests\/unit\/lin-4242-waiting-merge\.test\.js/, 'the message prints the computed set');
+  });
+
+  test('fixture: the pointer sentence goes green', () => {
+    const consumers = ['tests/unit/lin-4242-waiting-merge.test.js', 'tests/unit/helpers/client-world.js', 'tests/unit/helpers/live-console-world.js'];
+    const paragraph = 'Guard and consumers (LIN-4265, LIN-4306). `fake-dom-census.test.js` is the guard. `client-world.js` and `live-console-world.js` are the real importers; the consumers are the importers the census computes.';
+    assert.deepEqual(handListedConsumers(paragraph, consumers), []);
+  });
+});
 
 describe('LIN-4265 — the fake-DOM census: the ratchet', () => {
   test('HAND_WRITTEN_FAKE_DOM_FILES is sorted, with no duplicates', () => {
