@@ -4372,7 +4372,8 @@ describe('renderRulings — a poll keeps unsent input (LIN-3631)', () => {
 
     renderRulings([row]);
     const box = list.children[0].querySelector('.obs-ruling-answer-input');
-    sandbox.document.activeElement = box;
+    box.focus();
+    assert.equal(sandbox.document.activeElement, box, 'the drawn box takes the focus');
 
     renderRulings([row]);
 
@@ -4428,6 +4429,10 @@ describe('renderRulings — a poll keeps unsent input (LIN-3631)', () => {
     const duration = list.children[0].querySelector('.obs-ruling-shelve-duration');
     assert.equal(duration.value, String(24 * 60 * 60 * 1000), 'the panel draws its duration with the 1-day default');
     reason.value = 'waiting on the vendor';
+    // Opening the panel focuses its reason box (observation.js:2608), and a focused field holds the row on its own
+    // (:2144). Blur it, so the open panel (:2142) is the only thing holding the row through this repaint.
+    reason.blur();
+    assert.notEqual(sandbox.document.activeElement, reason);
 
     renderRulings([row]);
 
