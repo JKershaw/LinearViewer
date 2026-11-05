@@ -962,6 +962,7 @@
     function render() {
       if (destroyed) return;
       const oldQuestion = container.querySelector ? container.querySelector('[data-question-slot]') : null;
+      const focus = readerFocusIn(oldQuestion); // before applyState detaches the card (LIN-4246)
       const stateBlock = renderOpenedState();
       // LIN-3833: a viewer with no runner (no dispatch) gets the copy-first view: the step, then the prompt
       // to copy. Everything that runs, costs or names a session is absent from it.
@@ -980,23 +981,44 @@
       } else if (state.phase === 'error') {
         applyState(container, stateBlock + renderError(state, opts), 'error');
       }
-      keepTypedQuestion(oldQuestion);
+      keepTypedQuestion(oldQuestion, focus);
     }
 
     // The question card sits in the state block, so a repaint writes it again. A card stays only while it holds the reader's
     // place (typed text, focus, or an answer in flight): the check the live Waiting section uses (QuestionCards.keepsReaderPlace,
     // which cardHoldsInput decides). It is gated on the ruling key first, so this task can never keep another ruling's card.
+    // Focus is the one part that cannot be read after the write: the write detaches the old card, which blurs it, so the
+    // caller captures it first (readerFocusIn) and it is put back here after the card is moved back (LIN-4246).
     // An idle card is replaced, and bound again, on every repaint: a bound card never matches fresh server markup, so there is
     // no unchanged-markup keep here (LIN-4024's clause was dead, and LIN-4246 removed it). The LIN-4246 call-site tests pin this.
-    function keepTypedQuestion(oldQuestion) {
+    function keepTypedQuestion(oldQuestion, focus) {
       const fresh = container.querySelector ? container.querySelector('[data-question-slot]') : null;
       if (!fresh) return;
       const QC = window.QuestionCards;
       const oldCard = oldQuestion && oldQuestion.querySelector ? oldQuestion.querySelector('[data-testid="session-question-card"]') : null;
       const freshCard = fresh.querySelector ? fresh.querySelector('[data-testid="session-question-card"]') : null;
-      const keepsPlace = !!(QC && typeof QC.keepsReaderPlace === 'function' && QC.keepsReaderPlace(oldCard, freshCard));
-      if (oldQuestion && keepsPlace) { fresh.replaceWith(oldQuestion); return; }
+      const keepsPlace = !!(QC && typeof QC.keepsReaderPlace === 'function' && QC.keepsReaderPlace(oldCard, freshCard, !!focus));
+      if (oldQuestion && keepsPlace) { fresh.replaceWith(oldQuestion); restoreReaderFocus(focus); return; }
       if (QC && typeof QC.initQuestionCards === 'function') QC.initQuestionCards(container);
+    }
+
+    // The reader's focus inside the question card, read before a repaint detaches it: the element, and its caret or selection
+    // where it has one. Null when focus is elsewhere (or on the card's own box), so only a focused card is kept for focus.
+    function readerFocusIn(oldQuestion) {
+      const card = oldQuestion && oldQuestion.querySelector ? oldQuestion.querySelector('[data-testid="session-question-card"]') : null;
+      const active = typeof document !== 'undefined' ? document.activeElement : null;
+      if (!card || !active || active === card || typeof card.contains !== 'function' || !card.contains(active)) return null;
+      return { el: active, start: active.selectionStart, end: active.selectionEnd };
+    }
+
+    // Puts the captured focus back after the kept card is reinserted, which blurs it. The caret or selection goes back with it.
+    // preventScroll: the card is back in the place it was, so focusing it must not move the page.
+    function restoreReaderFocus(focus) {
+      if (!focus || !focus.el || typeof focus.el.focus !== 'function') return;
+      focus.el.focus({ preventScroll: true });
+      if (focus.start != null && typeof focus.el.setSelectionRange === 'function') {
+        try { focus.el.setSelectionRange(focus.start, focus.end); } catch (_) { /* not a text control: nothing to restore */ }
+      }
     }
 
     // LIN-3833: the state block above the control. The task's pill and sentence and its stage strip are
@@ -1096,10 +1118,11 @@
       // repaints it from here as well). paintRun is a no-op where there is no run control (Swipe).
       if (!caps.stateBlock) { paintRun(); return; }
       const oldQuestion = container.querySelector ? container.querySelector('[data-question-slot]') : null;
+      const focus = readerFocusIn(oldQuestion); // before the slot write detaches the card (LIN-4246)
       const slot = container.querySelector && container.querySelector('[data-state-slot]');
       if (slot) slot.outerHTML = renderOpenedState();
       else render();
-      keepTypedQuestion(oldQuestion);
+      keepTypedQuestion(oldQuestion, focus);
       // LIN-4010: Home's running box and "Last" line live in the run block, so it follows the state too (focus and
       // the Change panel's draft survive a run-block repaint, as they do for a preview).
       if (caps.runBox && runControlOn()) paintRun();

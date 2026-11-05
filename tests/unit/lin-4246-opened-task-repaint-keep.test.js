@@ -7,8 +7,10 @@
  * `question-cards.js` is loaded into the same vm (without it `keepsPlace` is always false and these cannot go red for the
  * right reason; `mountWithCard` fails loudly if it is missing).
  *
- * The typed-input survival claim is witnessed once, by the E2E in tests/e2e/lin-4242-waiting-live.spec.js. The case here is
- * the remaining one: a card with nothing typed is replaced, and the test's typed case is the contrast that makes it mean something.
+ * The typed-input survival claim is witnessed once, by the E2E in tests/e2e/lin-4242-waiting-live.spec.js. The cases here are
+ * the remaining ones: a card with nothing typed is replaced, and the typed case is the contrast that makes it mean something.
+ * A focused card with nothing typed is kept, and focus is back in its textarea after the repaint (LIN-4246 review: the write
+ * detaches the card before the gate reads focus, so focus is captured before it and restored after the card is moved back).
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -130,6 +132,24 @@ describe('LIN-4246 — the opened task\'s repaint keeps a card only while it hol
     assert.equal(h.card(), old, 'the same node is in the slot');
     assert.equal(old.isConnected, true, 'the old node is still in the document');
     assert.equal(old.querySelector('[data-testid="session-question-card-input"]').value, 'half a sentence', 'the typed text is intact');
+  });
+
+  test('same ruling, markup changed, focused but nothing typed: the same node is kept and focus returns to its textarea', async () => {
+    // Review finding on 926fdba9: the repaint detaches the old slot before keepTypedQuestion reads document.activeElement, so
+    // focus never keeps a card here and the reader loses the caret every poll. The focus must be captured before the write
+    // and restored after the old node is put back. Witness: drop the focus capture → the old node is replaced and this fails.
+    const h = await mountWithCard(stateWithCard(cardHtml('d-LOCAL-S', 'Which way?')));
+    const old = h.card();
+    const input = old.querySelector('[data-testid="session-question-card-input"]');
+    input.focus();
+    assert.equal(h.document.activeElement, input, 'the reader is typing in the empty textarea');
+    assert.equal(input.value, '', 'nothing is typed, so focus is the only thing that can keep the card');
+
+    await h.poll(stateWithCard(cardHtml('d-LOCAL-S', 'Which way, now?')));
+
+    assert.equal(h.card(), old, 'the same node is in the slot');
+    assert.equal(old.isConnected, true, 'the old node is still in the document');
+    assert.equal(h.document.activeElement, input, 'focus is back in the textarea after the repaint');
   });
 
   test('current behaviour, not a promise: an idle card is replaced on every poll, even with byte-identical markup', async () => {

@@ -339,6 +339,22 @@ test.describe('the opened task keeps its typed question across a state repaint (
     await expect(page.locator(`${OPENED_CARD}[data-repainted="yes"]`)).toHaveCount(0);
   });
 
+  test('a focused card with nothing typed keeps its focus through a state repaint (LIN-4246)', async ({ page }) => {
+    // Witness: drop the focus capture in paintState, or the restore after the card is moved back → the card is replaced
+    // (its mark is gone) or the textarea is left blurred. Nothing is typed here, so focus is the only thing that can keep it.
+    await openRunningThenRaise(page);
+    await page.locator(OPENED_INPUT).focus();
+    await expect(page.locator(OPENED_INPUT)).toBeFocused();
+    await page.locator(OPENED_CARD).evaluate(el => { el.dataset.keepMark = 'yes'; });
+
+    await editNextStateCard(page, html => html.replace('data-testid="session-question-card"', 'data-testid="session-question-card" data-repainted="yes"'));
+    await pollOnce(page);
+
+    await expect(page.locator(OPENED_INPUT)).toBeFocused();
+    await expect(page.locator(`${OPENED_CARD}[data-keep-mark="yes"]`)).toHaveCount(1);
+    await expect(page.locator(`${OPENED_CARD}[data-repainted="yes"]`)).toHaveCount(0);
+  });
+
   test('a different ruling\'s card replaces the typed one: the ruling key gates the keep', async ({ page }) => {
     // Witness: drop the ruling-key comparison in keepsReaderPlace → the typed card of the old ruling is kept over the new one.
     await openRunningThenRaise(page);
