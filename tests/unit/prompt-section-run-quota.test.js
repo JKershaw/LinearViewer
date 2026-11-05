@@ -270,6 +270,8 @@ describe('LIN-3267 — re-read the run quota after a ladder press', () => {
       assert.match(m.container.innerHTML, /1 of 10 runs left today/, 'the count is untouched until the restore');
       assert.equal(m.calls.readers.at(-1), panel, 'the press hands the reader the drawn disclosure panel');
       await m.runTimers();
+      assert.equal(btn.textContent, label, 'the restore puts the label back on the pressed control');
+      assert.equal(btn.disabled, false, 'the restore lifts the guard on the pressed control');
       const after = m.container.querySelector(afterSelector);
       // At zero the run rung also carries the run-limit reason, so the label is checked as a prefix; the ✓ is gone.
       assert.ok(after.textContent.startsWith(label) && !after.textContent.includes('\u2713'), 'the restore puts the label back');
