@@ -179,3 +179,20 @@ describe('LIN-4293: the "in progress" views keep today\'s inputs', () => {
       'idle: the step line is drawn (control for the busy case above)');
   });
 });
+
+describe('LIN-4293: focusInCard, the one "focus inside the question card" rule', () => {
+  // Pins the clause the render-path and LIN-4246 witnesses do not: the card's own box is not focus inside it. Witness: drop
+  // `el !== card` from QuestionCards.focusInCard and the first assertion goes red (card.contains(card) is true).
+  test('the card itself is not focus inside it; an element in it is; nothing focused is not', async () => {
+    const h = await mountWithCard();
+    const QC = h.world.window.QuestionCards;
+    const card = h.card();
+    assert.ok(card, 'the mount put the question card on the page');
+    const input = card.querySelector('[data-testid="session-question-card-input"]');
+    assert.ok(input, 'the card has a textarea');
+
+    assert.equal(QC.focusInCard(card, card), false, 'the card\'s own box is not focus inside it');
+    assert.equal(QC.focusInCard(card, input), true, 'the textarea inside the card is focus inside it');
+    assert.equal(QC.focusInCard(card, null), false, 'null says nothing was focused');
+  });
+});
