@@ -11,7 +11,8 @@
  *   [data-testid="waiting-header"]        the section header (the DESK_SECTIONS toggle)
  * The card, its options, Answer and the count line use the selectors the shared card already has.
  *
- * Witness 16 (a member and a keyless owner see no section, and no card text leaks through /api/home-rows) needs a
+ * LIN-4242: the owner's section is always on Home, hidden when empty (W12b and W14 assert hidden, not removed). Witness 16
+ * (a member and a keyless owner see no section, and no card text leaks through /api/home-rows) needs a
  * second session, and is not in this file yet (noted in the PR, to be written with its session helper).
  */
 import { randomUUID } from 'node:crypto';
@@ -25,6 +26,15 @@ const CARD = `${SECTION} [data-testid="session-question-card"]`;
 const WAIT_CARD = `${SECTION} .waiting-card`;
 const COUNT = '[data-testid="in-progress-count"]';
 const BADGE = '.rulings-badge .rulings-count';
+
+/**
+ * LIN-4242: the badge reads the rulings feed through the 5s cache and moves only on the interval. Clear the cache and read
+ * the badge once, so each badge assertion waits on this read and not on the interval.
+ */
+async function syncBadge(page) {
+  await page.request.get(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
+  await page.evaluate((urlKey) => window.updateRulingsBadge(urlKey), URL_KEY);
+}
 
 let URL_KEY;
 let RUNNER_TOKEN = null;
@@ -104,6 +114,7 @@ test('W7: a ruling three levels down and a solo ruling each get one card, and th
   await expect(section.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-D' })).toHaveCount(1);
   await expect(section.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-S' })).toHaveCount(1);
   await expect(page.locator(COUNT)).toContainText('2 waiting on you');
+  await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('2', { timeout: 15000 });
 });
 
@@ -170,6 +181,7 @@ test('W12: pressing the recommended button answers in place; the card goes, the 
   await seedRuling(page, 'LOCAL-S', { options: [{ id: 'a', label: 'Yes' }] });
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator(COUNT)).toContainText('2 waiting on you');
+  await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('2', { timeout: 15000 });
 
   const deep = page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-D' }) });
@@ -177,6 +189,7 @@ test('W12: pressing the recommended button answers in place; the card goes, the 
   await deep.locator('.btn--primary').click();
   await expect(deep).toHaveCount(0);
   await expect(page.locator(COUNT)).toContainText('1 waiting on you');
+  await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('1', { timeout: 15000 });
 
   await page.reload();
@@ -190,8 +203,11 @@ test('W12b: a press on a non-recommended option answers the same way, and the la
   await page.goto(`/workspace/${URL_KEY}/`);
   const card = page.locator(CARD).first();
   await card.locator('[data-option-id="ship"]').click();
-  await expect(page.locator(SECTION)).toHaveCount(0);
+  // LIN-4242: the owner's section and count line are hidden, not removed, so a ruling raised later can land in them.
+  await expect(page.locator(SECTION)).toBeHidden();
+  await expect(page.locator(WAIT_CARD)).toHaveCount(0);
   await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
+  await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('0', { timeout: 15000 });
 });
 
@@ -281,8 +297,11 @@ test('W14: answering a waiting task\'s card inside search removes the Waiting ca
   await expect(opened.locator('[data-option-id]').first()).toBeDisabled({ timeout: 15000 });
 
   await page.locator('#search-input').fill('');
-  await expect(page.locator(SECTION)).toHaveCount(0);
+  // LIN-4242: empty, so hidden (not removed); clearing the search does not un-hide an empty section.
+  await expect(page.locator(SECTION)).toBeHidden();
+  await expect(page.locator(WAIT_CARD)).toHaveCount(0);
   await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
+  await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('0', { timeout: 15000 });
 });
 
@@ -319,6 +338,7 @@ test('W9b: a started waiting task with a running child is the named context row:
   expect(drawn).toBe(1);
   await expect(page.locator('main [data-identifier="LOCAL-M"] [data-testid="issue-row-state"]'), 'the context row has no state words').toHaveCount(0);
   // Count line, badge and cards agree.
+  await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('1', { timeout: 15000 });
   await expect(page.locator(COUNT)).toContainText('1 waiting on you');
 });
@@ -350,6 +370,10 @@ test('W16: a viewer without run controls (a member, or a keyless owner) gets no 
   await expect(page.locator('[data-testid="waiting-task-line"]')).toHaveCount(0);
   const html = await page.content();
   expect(html, 'no Waiting section in the page').not.toContain('data-testid="waiting-on-you"');
+  // LIN-4242: the live fragment is owner-only by the same predicate: a 403, and no card text.
+  const fragment = await page.request.get(`/workspace/${URL_KEY}/api/home-waiting`);
+  expect(fragment.status(), 'the live fragment refuses a viewer without run controls').toBe(403);
+  expect(await fragment.text()).not.toContain('SCAN-M1');
 });
 
 // ---- witness 17: search hides the section; collapse persists across a reload; reset opens it ------------------------

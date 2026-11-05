@@ -3097,6 +3097,28 @@ let rulingsPollIntervalId = null;
 // here would just re-serve the same cached payload.
 const RULINGS_POLL_INTERVAL_MS = 5000;
 
+// LIN-4242: the listeners a rulings tick runs after its badge update (Home's live Waiting on you refresh registers here).
+// One tick path, so a page with a second concern hangs it on the tick rather than adding a second timer.
+const rulingsTickListeners = [];
+/** Register `fn(urlKey)` to run on every rulings tick, after the badge update. */
+window.onRulingsTick = function onRulingsTick(fn) {
+  if (typeof fn === 'function') rulingsTickListeners.push(fn);
+};
+/**
+ * One rulings tick: the badge update, then the registered listeners. The interval and the visibilitychange path both go
+ * through here. A failing listener is logged and does not stop the others.
+ */
+function runRulingsTick(urlKey) {
+  window.updateRulingsBadge(urlKey);
+  rulingsTickListeners.forEach(fn => {
+    try {
+      fn(urlKey);
+    } catch (e) {
+      console.error('Rulings tick listener failed:', e);
+    }
+  });
+}
+
 /**
  * Update the ambient "waiting on you" rulings badge count for a workspace.
  * Mirrors updateQueueBadge's raw-fetch, silently-swallow-failures shape (a
@@ -3135,7 +3157,7 @@ function startRulingsPolling(urlKey) {
 
   rulingsPollIntervalId = setInterval(() => {
     if (!document.hidden) {
-      window.updateRulingsBadge(urlKey);
+      runRulingsTick(urlKey);
     }
   }, RULINGS_POLL_INTERVAL_MS);
 }
@@ -3167,7 +3189,7 @@ function initRulingsBadge() {
 
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
-      window.updateRulingsBadge(urlKey);
+      runRulingsTick(urlKey);
     }
   });
 

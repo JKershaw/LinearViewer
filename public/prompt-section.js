@@ -974,11 +974,18 @@
     // LIN-4024: the question card sits in the state block, so a repaint writes it again. When its markup is unchanged,
     // the card already on the page is put back, so a half-typed answer and its thread survive a poll (the task page keeps
     // its card outside the repainted answer for the same reason). A new card is bound here; the kept one is bound already.
+    // LIN-4242: a card also stays when its markup changed but it holds the reader's place (typed text, focus, or an answer
+    // in flight): the same check the live Waiting section uses (QuestionCards.cardHoldsInput). It is gated on the ruling key
+    // first, so this task can never keep another ruling's card.
     function keepTypedQuestion(oldQuestion) {
       const fresh = container.querySelector ? container.querySelector('[data-question-slot]') : null;
       if (!fresh) return;
-      if (oldQuestion && oldQuestion.innerHTML === fresh.innerHTML) { fresh.replaceWith(oldQuestion); return; }
-      if (window.QuestionCards && typeof window.QuestionCards.initQuestionCards === 'function') window.QuestionCards.initQuestionCards(container);
+      const QC = window.QuestionCards;
+      const oldCard = oldQuestion && oldQuestion.querySelector ? oldQuestion.querySelector('[data-testid="session-question-card"]') : null;
+      const freshCard = fresh.querySelector ? fresh.querySelector('[data-testid="session-question-card"]') : null;
+      const keepsPlace = !!(QC && typeof QC.keepsReaderPlace === 'function' && QC.keepsReaderPlace(oldCard, freshCard));
+      if (oldQuestion && (oldQuestion.innerHTML === fresh.innerHTML || keepsPlace)) { fresh.replaceWith(oldQuestion); return; }
+      if (QC && typeof QC.initQuestionCards === 'function') QC.initQuestionCards(container);
     }
 
     // LIN-3833: the state block above the control. The task's pill and sentence and its stage strip are

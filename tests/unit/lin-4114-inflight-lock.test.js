@@ -207,3 +207,49 @@ test('gone / dispatch: pressing the recommended option writes one comment, start
   assert.equal(events[0].detail.key, sandbox.module.exports.rulingKeyOf(f.card), 'under the ruling\'s own key');
   assert.equal(events[0].detail.key, 'loop:lp-1|d-opts');
 });
+
+/**
+ * LIN-4242: the card marks itself `answerInFlight` while its answer is out, so the live Waiting section keeps it (a merge
+ * never removes an answer still in flight, and a repaint keeps a card that holds the reader's place). The mark is set and
+ * cleared in this harness, where a real answer's outcome is known.
+ */
+test('LIN-4242: the card is marked answerInFlight while its write is out, and the mark clears when the answer is delivered', async () => {
+  // Witness: remove the `answerInFlight = \'true\'` line in sendReply → the first assertion fails.
+  const f = makeLiveCard();
+  const { sandbox, release } = makeSandbox([f.card]);
+  sandbox.module.exports.initQuestionCards();
+  press(f.optionBtns[0]);
+  await flush();
+  assert.equal(f.card.dataset.answerInFlight, 'true', 'marked while the write is out');
+  release();
+  await flush();
+  assert.equal(f.card.dataset.answerInFlight, undefined, 'cleared once delivered');
+});
+
+test('LIN-4242: a failed answer clears the mark, so the card is not held after its controls come back', async () => {
+  const f = makeLiveCard();
+  const { sandbox, release } = makeSandbox([f.card]);
+  sandbox.commentResult = { ok: false, status: 500, data: { error: 'boom' } };
+  sandbox.module.exports.initQuestionCards();
+  press(f.optionBtns[0]);
+  await flush();
+  release();
+  await flush();
+  assert.equal(f.card.dataset.answerInFlight, undefined, 'a failure settles the answer');
+});
+
+test('LIN-4242: a partial failure (the answer recorded, the run refused) keeps the mark, so the card stays in flight for its Retry', async () => {
+  // Witness: drop the `if (outcome !== \'partial\')` guard → the mark clears on the partial outcome and this fails.
+  const f = makeLiveCard();
+  const { sandbox, release } = makeSandbox([f.card]);
+  const comments = sandbox.fetch;
+  sandbox.fetch = (url, opts) => (/\/api\/comments\//.test(url)
+    ? comments(url, opts)
+    : Promise.resolve({ ok: false, status: 503, json: () => Promise.resolve({ error: 'queue busy' }) }));
+  sandbox.module.exports.initQuestionCards();
+  press(f.optionBtns[0]);
+  await flush();
+  release();
+  await flush();
+  assert.equal(f.card.dataset.answerInFlight, 'true', 'the partial card stays in flight');
+});
