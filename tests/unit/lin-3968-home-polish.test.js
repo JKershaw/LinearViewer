@@ -12,23 +12,18 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import vm from 'node:vm';
 import { buildTaskStages, nextStepOf, buildRowStates } from '../../lib/task-page-loader.js';
 import { renderStageStrip } from '../../lib/render-task-page.js';
 import { renderPage } from '../../lib/render.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { serverSessions, serverRow } from '../fixtures/task-decision.js';
+import { loadWorld } from './helpers/client-world.js';
 
 // LIN-4119: the project sections are the backlog page's. A test that asserts them renders through this, which is
 // renderPage in backlog page mode (Home renders no project sections from S3a-3 on).
 const renderBacklogPage = (projectTrees, inProgressTrees, recentActivityTrees, organizationName, options = {}) =>
   renderPage(projectTrees, inProgressTrees, recentActivityTrees, organizationName, { ...options, pageMode: 'backlog' });
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
 const flush = () => new Promise((r) => setTimeout(r, 0));
 const NOW = new Date('2026-10-25T14:00:00.000Z');
 
@@ -128,27 +123,6 @@ describe('LIN-3968 — a row says its state wherever it sits, not only In Progre
 
 // ─── the opened task on Home (client) ────────────────────────────────────────
 
-/** A click target that runs the click listeners, as the PromptSection tests do. */
-function makeContainer() {
-  const listeners = {};
-  return {
-    innerHTML: '',
-    dataset: {},
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    setAttribute() {},
-    getAttribute() { return null; },
-    querySelector() { return null; },
-    contains() { return true; },
-    addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
-    removeEventListener() {},
-    async click(dataset) {
-      const btn = { dataset: { ...dataset }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
-      for (const fn of listeners.click || []) await fn({ target: btn });
-      return btn;
-    },
-  };
-}
-
 /** A PromptSection sandbox. `events` is the SSE stream the recommend route answers with. */
 function load({ stateBody = null, events = [] } = {}) {
   // LIN-4016: the state body is the server's: its `sessions` carry the decision the browser reads.
@@ -171,19 +145,12 @@ function load({ stateBody = null, events = [] } = {}) {
     isPinnedToBottom: () => false,
     toast: () => {},
   };
-  const sandbox = {
-    window, AbortController, URLSearchParams, TextDecoder, TextEncoder, Blob: class {}, URL,
-    document: { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } },
-    requestAnimationFrame: (cb) => { cb(); return 1; },
-    setTimeout: (fn, ms) => { const t = globalThis.setTimeout(fn, ms); if (t && t.unref) t.unref(); return t; },
-    clearTimeout,
-    navigator: { clipboard: { writeText: async () => {} } },
-    fetch: async () => ({ ok: true, events, json: async () => ({}) }),
-    console,
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(SRC, sandbox, { filename: 'prompt-section.js' });
-  return { PromptSection: sandbox.window.PromptSection };
+  const world = loadWorld({
+    window, scripts: ['prompt-section.js'],
+    // The stream answers the recommend route only; the task-mode record (fire-and-forget) gets a bare ok.
+    globals: { fetch: async (url) => (String(url).includes('/api/recommend/') ? { ok: true, events, json: async () => ({}) } : { ok: true, json: async () => ({}) }) },
+  });
+  return { PromptSection: world.PromptSection, makeContainer: world.makeContainer };
 }
 
 const COPY_FIRST = {
@@ -211,7 +178,7 @@ describe('LIN-3968 — copy-first: the streamed prompt says which task it is for
       ['delta', { section: 'prompt', content: 'Build the child.\n\n- step one' }],
       ['done', { truncated: false, identifier: 'LIN-43', title: 'Child work', deferredVia: ['LIN-42'] }],
     ];
-    const { PromptSection } = load({ events });
+    const { PromptSection, makeContainer } = load({ events });
     const c = makeContainer();
     PromptSection.init(c, COPY_FIRST);
     await flush();
@@ -220,7 +187,7 @@ describe('LIN-3968 — copy-first: the streamed prompt says which task it is for
     await flush();
     assert.match(c.innerHTML, /data-testid="opened-task-target">This prompt is for LIN-43 Child work, a subtask of LIN-42\. LIN-42’s work is split into subtasks, so Harbour wrote the prompt for the one to do next\./);
     assert.doesNotMatch(c.innerHTML, /routing to|↳/, 'the breadcrumbs are not shown');
-    assert.match(c.innerHTML, /<div class="opened-task-text" data-prompt-body>Build the child\.\n\n- step one<\/div>/, 'the prompt is the text that will be pasted');
+    assert.match(c.innerHTML, /<div class="opened-task-text" data-prompt-body="">Build the child\.\n\n- step one<\/div>/, 'the prompt is the text that will be pasted');
     assert.doesNotMatch(c.innerHTML, /<li>|<ul>/, 'no markdown list is rendered');
   });
 
@@ -230,7 +197,7 @@ describe('LIN-3968 — copy-first: the streamed prompt says which task it is for
       ['delta', { section: 'prompt', content: 'Do it.' }],
       ['done', { truncated: false, identifier: 'LIN-42', title: 'Parent work', deferredVia: [] }],
     ];
-    const { PromptSection } = load({ events });
+    const { PromptSection, makeContainer } = load({ events });
     const c = makeContainer();
     PromptSection.init(c, COPY_FIRST);
     await flush();
@@ -242,7 +209,7 @@ describe('LIN-3968 — copy-first: the streamed prompt says which task it is for
 
   test('the copy and the box controls carry the house button classes', async () => {
     const events = [['phase', { phase: 'prompt' }], ['delta', { section: 'prompt', content: 'Do it.' }], ['done', { truncated: false, identifier: 'LIN-42', deferredVia: [] }]];
-    const { PromptSection } = load({ events });
+    const { PromptSection, makeContainer } = load({ events });
     const c = makeContainer();
     PromptSection.init(c, COPY_FIRST);
     await flush();
@@ -264,7 +231,7 @@ describe('LIN-3968 — run control: one step at a time, a failed stage offered a
       last: { label: 'Build', state: 'running', at: null },
       running: { loopId: 'l1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-25T13:54:00.000Z', target: 'cli' },
     });
-    const { PromptSection } = load({ stateBody: busy });
+    const { PromptSection, makeContainer } = load({ stateBody: busy });
     const c = makeContainer();
     PromptSection.init(c, RUN);
     await flush();
@@ -281,7 +248,7 @@ describe('LIN-3968 — run control: one step at a time, a failed stage offered a
       offered: { kind: 'review', label: 'Review', why: 'again', failed: true, reason: 'failed last time, so it runs again' },
       last: { label: 'Review', state: 'failed', at: null },
     });
-    const { PromptSection } = load({ stateBody: failed });
+    const { PromptSection, makeContainer } = load({ stateBody: failed });
     const c = makeContainer();
     PromptSection.init(c, RUN);
     await flush();
@@ -297,7 +264,7 @@ describe('LIN-3968 — run control: one step at a time, a failed stage offered a
       offered: { kind: 'review', label: 'Review', why: 'again', failed: false, reason: 'cancelled last time, so it is offered again' },
       last: { label: 'Review', state: 'cancelled', at: null },
     });
-    const { PromptSection } = load({ stateBody: undone });
+    const { PromptSection, makeContainer } = load({ stateBody: undone });
     const c = makeContainer();
     PromptSection.init(c, RUN);
     await flush();
@@ -313,7 +280,7 @@ describe('LIN-3968 — run control: one step at a time, a failed stage offered a
     withStrip.headerHtml = '<p class="task-sentence">Idle</p>';
     withStrip.stripHtml = '<ol class="task-strip" data-testid="task-page-strip"></ol>';
     withStrip.trackHtml = '<ol data-testid="TRACK-IS-NOT-SHOWN"></ol>';
-    const { PromptSection } = load({ stateBody: withStrip });
+    const { PromptSection, makeContainer } = load({ stateBody: withStrip });
     const c = makeContainer();
     PromptSection.init(c, RUN);
     await flush();
@@ -330,7 +297,7 @@ describe('LIN-3991 — copy-first: the target line names the task by identifier,
       ['delta', { section: 'prompt', content: 'Build the child.' }],
       ['done', { truncated: false, identifier: 'LIN-3821', title: 'Child work', deferredVia: ['LIN-3820', 'LIN-3821'] }],
     ];
-    const { PromptSection } = load({ events });
+    const { PromptSection, makeContainer } = load({ events });
     const c = makeContainer();
     PromptSection.init(c, COPY_FIRST);
     await flush();
@@ -344,7 +311,7 @@ describe('LIN-3991 — copy-first: the target line names the task by identifier,
   });
 
   test('"Copy it, then paste it" is in the same row as Copy prompt, before the progress key', async () => {
-    const { PromptSection } = load({ events: [['delta', { section: 'prompt', content: 'Do it.' }], ['done', { truncated: false, identifier: 'LIN-42', deferredVia: [] }]] });
+    const { PromptSection, makeContainer } = load({ events: [['delta', { section: 'prompt', content: 'Do it.' }], ['done', { truncated: false, identifier: 'LIN-42', deferredVia: [] }]] });
     const c = makeContainer();
     PromptSection.init(c, COPY_FIRST);
     await flush();
