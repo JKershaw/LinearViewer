@@ -12,22 +12,20 @@
  *     dispatch then forces proxy access. The disclosure's dispatch buttons,
  *     the +proxy toggle and every other caller are unchanged.
  *
- * Same vm-sandbox house pattern (and harness) as prompt-section-p0.test.js.
+ * Runs in the shared client world (tests/unit/helpers/client-world.js), with the real dispatch disclosure.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import vm from 'node:vm';
+import { loadWorld } from './helpers/client-world.js';
+import { DISCLOSURE_SCRIPTS, disclosureWindowStubs, useRealDisclosure } from './helpers/real-dispatch-disclosure.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
-
-// ---------------------------------------------------------------------------
-// harness (copied from prompt-section-p0.test.js; a .test.js file can't be
-// imported without re-registering its tests)
-// ---------------------------------------------------------------------------
+// The client world (tests/unit/helpers/client-world.js): the real dispatch disclosure and the component. `makeContainer()`
+// makes a container in the world of the most recent `loadPromptSection()`; each test makes its containers straight after
+// its own load, so it always reaches its own world.
+let currentWorld = null;
+function makeContainer() {
+  return currentWorld.makeContainer();
+}
 
 function makeLocalStorage() {
   const map = new Map();
@@ -39,147 +37,36 @@ function makeLocalStorage() {
   };
 }
 
-// Locate the element whose opening tag matches `selector` (`[data-attr]` or
-// `.class`) in an HTML string, balancing nested same-name tags. Returns the
-// span of its inner HTML, or null. Enough DOM for the slot/body writes the
-// module makes through `container.querySelector` (N4).
-function findElement(html, selector) {
-  const attr = selector.match(/^\[([\w-]+)\]$/);
-  const cls = selector.match(/^\.([\w-]+)$/);
-  if (!attr && !cls) return null;
-  const matches = attr
-    ? (tag) => new RegExp(`\\s${attr[1]}(?=[\\s=>])`).test(tag)
-    : (tag) => new RegExp(`class="(?:[^"]*\\s)?${cls[1]}(?:\\s[^"]*)?"`).test(tag);
-  const tagRe = /<([a-z][a-z0-9]*)\b[^>]*>/gi;
-  let m;
-  while ((m = tagRe.exec(html))) {
-    if (!matches(m[0])) continue;
-    const openEnd = m.index + m[0].length;
-    const re = new RegExp(`<(/?)${m[1]}\\b[^>]*>`, 'gi');
-    re.lastIndex = openEnd;
-    let depth = 1;
-    let t;
-    while ((t = re.exec(html))) {
-      depth += t[1] ? -1 : 1;
-      if (depth === 0) return { openEnd, closeStart: t.index };
-    }
-    return null;
-  }
-  return null;
-}
-
-function makeContainer() {
-  const container = {
-    // Every full render is an `innerHTML` assignment on the container itself;
-    // `fullRenders` counts them. Element writes through querySelector splice
-    // `_html` directly, so they do NOT count as a full render.
-    _html: '',
-    fullRenders: 0,
-    get innerHTML() { return this._html; },
-    set innerHTML(v) { this._html = String(v); this.fullRenders++; },
-    dataset: {},
-    classList: {
-      _c: new Set(),
-      add(...c) { c.forEach(x => this._c.add(x)); },
-      remove(...c) { c.forEach(x => this._c.delete(x)); },
-      toggle() {},
-      contains(c) { return this._c.has(c); },
+function loadPromptSection({ localStorage } = {}) {
+  const calls = { dispatch: [], readers: [] };
+  const timers = [];
+  const storage = localStorage ? { localStorage } : {};
+  const world = loadWorld({
+    window: { ...disclosureWindowStubs(), ...storage },
+    scripts: DISCLOSURE_SCRIPTS,
+    timers,
+    globals: {
+      ...storage,
+      // This suite's own default answers `ok: false`, so an unstubbed read takes its error branch. The shared default
+      // (`ok: true`) would hide that branch, so it is kept here.
+      fetch: async () => ({ ok: false, json: async () => ({}) }),
     },
-    _attrs: {},
-    setAttribute(k, v) { this._attrs[k] = v; },
-    getAttribute(k) { return this._attrs[k] ?? null; },
-    querySelector(selector) {
-      if (!findElement(container._html, selector)) return null;
-      const splice = (value) => {
-        const at = findElement(container._html, selector);
-        if (!at) return;
-        container._html = container._html.slice(0, at.openEnd) + String(value) + container._html.slice(at.closeStart);
-      };
-      return {
-        get innerHTML() {
-          const at = findElement(container._html, selector);
-          return at ? container._html.slice(at.openEnd, at.closeStart) : '';
-        },
-        set innerHTML(v) { splice(v); },
-        set textContent(v) { splice(v); },
-        children: [],
-        scrollTop: 0,
-        scrollHeight: 0,
-      };
-    },
-    contains() { return true; },
-    _clickHandler: null,
-    addEventListener(type, fn) { if (type === 'click') this._clickHandler = fn; },
-    removeEventListener() {},
-    async click(match) {
-      const btn = {
-        dataset: { ...match },
-        disabled: false,
-        textContent: '',
-        closest: (sel) => (/^button/.test(sel) ? btn : null),
-      };
-      await this._clickHandler({ target: btn });
-      return btn;
-    },
-  };
-  return container;
-}
-
-function loadPromptSection({ localStorage, readSSEStream, fetchImpl } = {}) {
-  const calls = {
-    fetch: [], autopilot: [], api: [], disclosure: [], readSSE: [], dispatch: [],
-  };
-  const window = {
-    escapeHtml: (s) => (s == null ? '' : String(s)),
-    stripCodeBlockWrapper: (s) => s,
-    renderMarkdown: (s) => String(s == null ? '' : s),
-    // Post-P0 the module must call THIS, not its own reader (addendum 4).
-    readSSEStream: readSSEStream
-      ? async (...args) => { calls.readSSE.push(true); return readSSEStream(...args); }
-      : undefined,
-  };
-  window.api = async (url, opts) => {
-    calls.api.push({ url, opts });
-    return { prompt: 'TEMPLATE PROMPT', promptName: 'Template' };
-  };
-  window.fetchAutopilotKickoff = async (args) => {
-    calls.autopilot.push(args);
-    return { prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' };
-  };
+  });
+  const { window } = world;
+  window.api = async () => ({ prompt: 'TEMPLATE PROMPT', promptName: 'Template' });
+  window.dispatchPrompt = async (args) => { calls.dispatch.push(args); };
   window.ProxyToggle = {
     maybeAppend: async (raw, urlKey, opts) => (opts && opts.force ? `${raw}\n\n## Workspace API access` : raw),
   };
-  window.renderDispatchDisclosure = ({ idPrefix } = {}) => {
-    calls.disclosure.push(idPrefix);
-    return '<div class="swipe-prompt-options"></div>';
+  useRealDisclosure(window);
+  // The reader is stubbed: production's reads the values of the harness and model `<select>`s, which the fake does not
+  // model. The stub records the scope it is handed, so a test can check which element a press passes it.
+  window.readDispatchExecControls = (scopeEl) => {
+    calls.readers.push(scopeEl);
+    return { model: null, harness: null };
   };
-  window.readDispatchExecControls = () => ({});
-  window.dispatchPrompt = async (args) => { calls.dispatch.push(args); };
-  window.isPinnedToBottom = () => false;
-
-  const sandbox = {
-    window,
-    AbortController,
-    URLSearchParams,
-    TextDecoder,
-    TextEncoder,
-    requestAnimationFrame: (cb) => { cb(); return 1; },
-    setTimeout: (fn) => { fn(); return 1; },
-    clearTimeout: () => {},
-    navigator: { clipboard: { writeText: async () => {} } },
-    fetch: async (url, opts) => {
-      calls.fetch.push({ url, opts });
-      if (fetchImpl) return fetchImpl(url, opts);
-      return { ok: false, json: async () => ({}) };
-    },
-  };
-  if (localStorage) {
-    sandbox.localStorage = localStorage;
-    window.localStorage = localStorage;
-  }
-  vm.createContext(sandbox);
-  vm.runInContext(SRC, sandbox);
-  return { PromptSection: window.PromptSection, window, calls };
+  currentWorld = world;
+  return { PromptSection: window.PromptSection, window, calls, timers };
 }
 
 function baseOpts(issue, extra = {}) {
@@ -267,7 +154,8 @@ describe('the ○ set up › notices', () => {
     const { PromptSection } = loadPromptSection();
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { dispatchEnabled: false }));
-    await container.click({ action: 'setup', setupNeeds: 'dispatch' });
+    // Named by its rung: a press on the bare action would land on Go's set-up control first, which says something else.
+    await container.click({ rung: 'run-step', action: 'setup', setupNeeds: 'dispatch' });
     assert.match(container.innerHTML, /<div class="opened-task-setup-notice">running this step needs the dispatch runner set up <a [^>]*href="\/workspace\/ws\/runner"[^>]*data-testid="opened-task-setup-runner-link"/);
   });
 
@@ -275,7 +163,7 @@ describe('the ○ set up › notices', () => {
     const { PromptSection } = loadPromptSection();
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { dispatchEnabled: true, proxyEnabled: true }));
-    await container.click({ action: 'setup', setupNeeds: 'prompt' });
+    await container.click({ rung: 'copy', action: 'setup', setupNeeds: 'prompt' });
     assert.match(container.innerHTML, /<div class="opened-task-setup-notice">generate a prompt first<\/div>/);
   });
 });
@@ -323,7 +211,10 @@ describe('N3: proxyForce only on the run-step rung, only where a runner was set 
 
   test('the disclosure\'s dispatch button is unchanged, even where a runner was set up', async () => {
     const { container, calls } = await fresh({ localStorage: marked() });
+    const panel = container.querySelector('.swipe-prompt-options');
+    assert.ok(panel, 'precondition: the disclosure is drawn');
     await container.click({ action: 'dispatch', target: 'cli' });
+    assert.equal(calls.readers.at(-1), panel, 'the press hands the reader the drawn disclosure panel');
     assert.equal(calls.dispatch[0].proxyForce, false);
   });
 });
