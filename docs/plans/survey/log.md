@@ -1944,3 +1944,9 @@ John: the Survey tends more towards being the research step than the high-level 
 - open-0 may in time fold into the research stage.
 
 The plan for now is unchanged: finish LIN-4248, read blind passes C and D, try the stages once, then pause to discuss.
+
+### 09:30 UTC: the second blind pass agrees with the first
+- **The baseline scores +0.50 and the surveyed forward rows +0.37** (pass 1: +0.38 and +0.37). The loop's rows are no better than the baseline's to either blind hand.
+- **The scorers agree with each other on 20 of 28 rows exactly, and with me on 13.** Their disagreements are better ↔ mixed only. My balance column is the outlier, which settles what the morning's question was asking: the ledger's tipping point was my scoring.
+- **What both blind passes rate better:** deletions, a tidy as its own task, a tidy-after as its own ticket, and features whose change removed a second path. Capability-adding features land mixed or worse. That fits John's reading: the Survey has been a research step, and the needle moves when the clean-up is its own task.
+- **From now on, the at-merge balance is a blind read** (two passes where it matters). My reading stays for the copies and the at-merge checks.

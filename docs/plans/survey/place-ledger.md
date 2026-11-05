@@ -112,3 +112,16 @@ Two fresh sessions scored the 28 single-commit rows above (baseline and forward,
 - **The blind scorer finds leftover copies at the edges of nearly every row:** "One X titles are mostly true at the centre and not at the edges." That's its strongest pattern, and the ledger's copies column missed many of them.
 
 A second independent blind pass (batches C and D, reshuffled with seed 1105) is running, to see how much of this is one scorer's taste.
+
+## The blind second scorer, second pass (C and D, reshuffled with seed 1105)
+
+| | Ledger | Blind, pass 1 | Blind, pass 2 |
+|---|--:|--:|--:|
+| Baseline (8 rows) | −0.38 | +0.38 | **+0.50** (4 better, 4 mixed) |
+| Forward, surveyed (19 rows) | +0.84 | +0.37 | **+0.37** (8 better, 9 mixed, 1 neutral, 1 worse) |
+
+- **The result holds.** A second independent scorer also rates the loop's rows no better than the baseline's.
+- **The two blind passes agree with each other on 20 of 28 rows exactly, and against me on 13.** Every disagreement between them is better ↔ mixed, never opposite signs. The ledger's balance column is the outlier.
+- **Rows both passes rate better:** LIN-4168, LIN-4173, LIN-4179 (baseline), and LIN-4203, LIN-4218, LIN-4234, LIN-4151, LIN-4143 (forward). **Worse in both:** LIN-4241. **Neutral in both:** LIN-4048. LIN-4212 (unsurveyed) is worse, then "mixed, leans worse".
+- **What the forward rows rated better have in common:** a deletion (LIN-4203), a priced tally row done as its own task (LIN-4218), a tidy-after as its own ticket (LIN-4234), and two features whose change *was* removing a second path or a flag (LIN-4151, LIN-4143). The ordinary features that added a capability (LIN-4241, LIN-4242, LIN-4243, LIN-4048) are mixed, neutral or worse.
+- **From here, the balance column is the blind read.** My column stays as history.
