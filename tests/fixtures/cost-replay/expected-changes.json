@@ -195,6 +195,11 @@
       "path": "S3.byFeature",
       "change": "d",
       "reason": "LIN-4179 (d), S3: Each feature row carries its priced sum and unpriced count: review shows 1 call priced at $0 and 1 not priced, where it showed 2 calls at $0."
+    },
+    {
+      "pattern": "^S1\\.[^.]+\\.body\\.workerSessions\\.[^.]+\\.(tokens|byModel|dispatches)(\\.|$)",
+      "change": "f",
+      "reason": "LIN-4263 (additive only): every workerSessions row gains tokens, byModel (records lineages) and dispatches (records lineages, /cost only), placed after durationMs. The pattern names exactly those keys; no figure path is covered by it, and the figure pins (costUsd, pricedUsd, totalUsd, labels) are unchanged."
     }
   ]
 }

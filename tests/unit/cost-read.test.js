@@ -208,7 +208,11 @@ describe('formatUsd (plan: one formatter)', () => {
 });
 
 describe('W9: every replay difference is on the change list, and every listed change happened', () => {
-  const covers = (path, change) => path === change.path || path.startsWith(`${change.path}.`);
+  // A change names a path (it covers that path and everything under it), or, for LIN-4263's additive keys, a `pattern`
+  // over the exact new keys (every workerSessions row's tokens, byModel and dispatches). A pattern covers nothing else.
+  const covers = (path, change) => (change.pattern !== undefined
+    ? new RegExp(change.pattern).test(path)
+    : path === change.path || path.startsWith(`${change.path}.`));
 
   test('the diff against the goldens is exactly the named changes: no unlisted difference', async () => {
     const changes = JSON.parse(await readFile(CHANGES, 'utf8')).changes;
@@ -222,7 +226,7 @@ describe('W9: every replay difference is on the change list, and every listed ch
   test('every listed change is a real difference: no entry that did not happen', async () => {
     const changes = JSON.parse(await readFile(CHANGES, 'utf8')).changes;
     const diffs = diffReplay(golden, current);
-    const didNotHappen = changes.filter(c => !diffs.some(d => covers(d, c))).map(c => c.path);
+    const didNotHappen = changes.filter(c => !diffs.some(d => covers(d, c))).map(c => c.path ?? c.pattern);
     assert.deepEqual(didNotHappen, []);
   });
 });
@@ -273,7 +277,8 @@ describe('the founder lookup (LIN-4177 plan: scalar-only, uncapped, identity-bou
       assert.deepEqual(calls[0].query, { urlKey: 'acme', rootItemId: { $in: ['f1'] } });
       assert.deepEqual(calls[0].opts.projection, LINEAGE_IDENTITY_PROJECTION);
     }
-    assert.deepEqual(Object.keys(LINEAGE_IDENTITY_PROJECTION).sort(), ['_id', 'abort', 'dispatchedAt', 'issueIdentifier', 'kind', 'rootItemId', 'status']);
+    // LIN-4263: `followUpTo` joins the projection so an out-of-window member carries it (the per-dispatch split).
+    assert.deepEqual(Object.keys(LINEAGE_IDENTITY_PROJECTION).sort(), ['_id', 'abort', 'dispatchedAt', 'followUpTo', 'issueIdentifier', 'kind', 'rootItemId', 'status']);
   });
 
   test('reads by issue with the same projection, and an empty anchor set reads nothing', async () => {

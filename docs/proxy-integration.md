@@ -1212,7 +1212,15 @@ matching zero rows and returning an authoritative-looking `$0.00`.
   "totalUsd": 22.83,
   "workerSessions": [
     { "rootItemId": "…", "kind": "implementation", "dispatchedAt": "2026-08-01T10:00:00Z",
-      "model": "claude-sonnet-5", "costUsd": 4.90 }
+      "model": "claude-sonnet-5", "costUsd": 4.90, "durationMs": 154000,
+      "tokens": { "inputTokens": "…", "outputTokens": "…", "cacheCreationInputTokens": "…",
+                  "cacheCreation1hInputTokens": "…", "cacheReadInputTokens": "…" },
+      "byModel": [{ "model": "claude-sonnet-5", "requests": 40, "tokens": "…", "costUsd": 4.90 }],
+      "dispatches": [
+        { "itemId": "…", "kind": "implementation", "dispatchedAt": "2026-08-01T10:00:00Z",
+          "followUpTo": null, "byModel": [{ "model": "claude-sonnet-5", "requests": 40, "tokens": "…", "costUsd": 4.90 }],
+          "requests": 40, "tokens": "…", "costUsd": 4.90 }
+      ] }
   ],
   "appCalls": {
     "calls": 9, "costUsd": 0.05, "unpricedCalls": 0,
@@ -1235,11 +1243,27 @@ matching zero rows and returning an authoritative-looking `$0.00`.
   lineages whose usage was posted but does not parse (their figure is unknown, not the
   last readable one); `appCalls.unpricedCalls` counts app calls with no recorded cost. All
   are surfaced independently so a caller can tell *which* part of the join is uncertain.
-- **Lineage de-duplication**: a follow-up dispatch resumes the same worker transcript
-  and reports a *cumulative* usage snapshot on every Stop, so a task with a follow-up
+- **Lineage de-duplication**: a follow-up dispatch resumes the same worker transcript,
+  so its usage belongs to the lineage its build started, and a task with a follow-up
   chain is counted **once per lineage**, never once per dispatch row — summing rows
-  directly would multiply-count that lineage by its dispatch count. `workerSessions`
-  reports one entry per lineage (keyed by `rootItemId`), not per dispatch row.
+  directly would count that work once per dispatch. `workerSessions` reports one entry
+  per lineage (keyed by `rootItemId`), not per dispatch row.
+- **Per-dispatch detail (LIN-4263)**: each lineage row also carries `tokens` (the
+  lineage's token sum) and `byModel` (requests, tokens and USD per model; records
+  lineages only), and `dispatches`, one entry per dispatch in the lineage, in dispatch
+  order: `{itemId, kind, dispatchedAt, followUpTo, byModel, requests, tokens, costUsd}`.
+  The entries sum to the lineage's `requests`, `tokens` and `costUsd`. A record belongs to
+  the dispatch whose row posted it, unless it was made before that row was dispatched (a
+  build that ran before the records deploy is posted under its follow-up's `itemId`); then
+  it belongs to the dispatch that made it. `dispatches` is `null` for a lineage without
+  records of its own (snapshot-only, records plus snapshots, no usage or unreadable),
+  whose cumulative total carries one model and cannot be split, and for any lineage read
+  without the `/cost` route's per-dispatch flag. A dispatch with no records reads
+  `requests: 0` and `null` tokens, `byModel` and cost, never `0`.
+- **Labels are the lineage's, not a session's**: `model` on a `workerSessions` row is the
+  lineage's cost-dominant model, so a cheap follow-up does not rename an expensive build, and
+  an expensive follow-up does rename it. `dispatches` says which model each dispatch ran.
+  `effort` and `harness` are the latest record's (a follow-up's, when it posted last).
 - **Retention vs read window**: `window.days` (fixed 30) is how far back app-call
   figures reach — a **read window**, not retention. The app-call log and dispatch
   history are **retained for the life of the project**, so older rows still exist;

@@ -645,6 +645,12 @@ export function createComputeRoutes({
    * lineage-group/merge/sum join, and reports only the lineages that count
    * under `:identifier` (lib/lineage-membership.js, LIN-4147); this route only
    * fetches its inputs.
+   *
+   * LIN-4263: each `workerSessions` row stays one row per lineage, and gains
+   * `tokens`, `byModel` (records lineages only) and `dispatches`: one entry per
+   * true dispatch in the lineage, with its own model(s), tokens and USD, which
+   * sum to the lineage's own. `dispatches` is null for a snapshot-only lineage,
+   * where the split is not knowable. Only this route builds it (`perDispatch`).
    */
   router.get(['/api/proxy/issues/:identifier/cost', '/api/proxy/cost/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
@@ -723,6 +729,9 @@ export function createComputeRoutes({
       // LIN-4201 / LIN-4226: the read loads the request records of every lineage it sees, through the one loader
       // (lib/cost-read.js `lineageRecords`). A lineage with records reads them; one without reads its snapshots.
       const requestSource = requireRequestUsageLoader(requestUsageLoader, 'GET /api/proxy/cost');
+      // LIN-4263: `perDispatch` is this route's alone. It builds each lineage's `dispatches` (one entry per dispatch,
+      // each folded from its own records); the Models page, routing preview and effort readout read the same
+      // lineage rows without it and pay nothing for the split.
       const result = await readCost({
         fetchedRows,
         identityRows,
@@ -730,7 +739,8 @@ export function createComputeRoutes({
         urlKey: req.proxyUrlKey,
         appSummary,
         issueIdentifier: identifier,
-        windowStart: since
+        windowStart: since,
+        perDispatch: true
       });
 
       const window = {
@@ -739,8 +749,9 @@ export function createComputeRoutes({
       };
 
       logEvent(req, '/api/proxy/cost', 200);
-      // The published keys and their order are unchanged (LIN-4177). `telemetry` and `incomplete`
-      // are internal flags; the wire carries neither.
+      // The published keys and their order are unchanged (LIN-4177), and the LIN-4263 keys (`tokens`, `byModel`,
+      // `dispatches`) are additive, placed last in each row. `telemetry` and `incomplete` are internal flags; the wire
+      // carries neither.
       res.json({ identifier, ...result, workerSessions: result.workerSessions.map(({ telemetry, incomplete, ...session }) => session), window });
     } catch (err) {
       logEvent(req, '/api/proxy/cost', 500);
