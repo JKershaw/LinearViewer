@@ -5,6 +5,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createFakeDom, FakeDomError } from './helpers/fake-dom.js';
+import { loadWorld, clickOn } from './helpers/client-world.js';
+import { withHarnessModels } from '../fixtures/harness-models.js';
+import { harnessModelsBlock, DEFAULT_HARNESS } from '../../lib/model-routing-harnesses.js';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 
 const world = () => createFakeDom();
 const throwsNaming = (fn, text) => assert.throws(fn, (e) => e instanceof FakeDomError && e.message.includes(text), `expected a FakeDomError naming ${text}`);
@@ -234,9 +239,35 @@ describe('fake DOM: selectors match what a browser matches, and refuse what they
     assert.equal(k.closest('table'), null);
   });
 
+  test('[attr^="v"] matches a value that starts with v; an empty v matches nothing (CSS: LIN-4279)', () => {
+    const w = world();
+    w.parse('<p class="k">a</p><p class="kk">b</p><p class="xk">c</p><p class="kx">d</p>');
+    const texts = (sel) => w.document.querySelectorAll(sel).map((e) => e.textContent);
+    assert.deepEqual(texts('p[class^="k"]'), ['a', 'b', 'd']);
+    assert.equal(w.document.querySelectorAll('p[class^=""]').length, 0, 'an empty value matches nothing');
+  });
+
+  test('[attr$="v"] matches a value that ends with v (LIN-4279)', () => {
+    const w = world();
+    w.parse('<p class="k">a</p><p class="kk">b</p><p class="xk">c</p><p class="kx">d</p>');
+    assert.deepEqual(w.document.querySelectorAll('p[class$="k"]').map((e) => e.textContent), ['a', 'b', 'c']);
+  });
+
+  test('[attr*="v"] matches a value that contains v (LIN-4279)', () => {
+    const w = world();
+    w.parse('<p class="k">a</p><p class="kk">b</p><p class="xk">c</p><p class="zz">d</p>');
+    assert.deepEqual(w.document.querySelectorAll('p[class*="k"]').map((e) => e.textContent), ['a', 'b', 'c']);
+  });
+
+  test('~= and |= still throw, and the error names the selector (LIN-4279)', () => {
+    const { document } = fixture();
+    throwsNaming(() => document.querySelectorAll('[class~=k]'), '[class~=k]');
+    throwsNaming(() => document.querySelectorAll('[lang|=en]'), '[lang|=en]');
+  });
+
   test('a selector the engine does not model throws, naming it, and never returns empty', () => {
     const { document } = fixture();
-    for (const sel of ['p + span', 'p ~ span', '* ', 'p:has(span)', 'p:nth-child(2)', 'p:hover', 'p::before', '[class^="k"]']) {
+    for (const sel of ['p + span', 'p ~ span', '* ', 'p:has(span)', 'p:nth-child(2)', 'p:hover', 'p::before', '[class~="k"]', '[lang|="en"]']) {
       throwsNaming(() => document.querySelectorAll(sel), 'unsupported selector');
     }
   });
@@ -522,5 +553,330 @@ describe('fake DOM: className and id reflect the class and id attributes (LIN-42
     el.setAttribute('id', 'z');
     assert.equal(el.id, 'z', 'the id attribute is the value read back');
     assert.equal(document.querySelector('#z'), el);
+  });
+});
+
+describe('fake DOM: getElementById (LIN-4279)', () => {
+  test('getElementById returns the first connected match in tree order, and null when there is none', () => {
+    const { parse, document } = world();
+    parse('<div><p id="dup">first</p></div><span id="dup">second</span>');
+    assert.equal(document.getElementById('dup'), document.querySelector('p'), 'the first match in tree order');
+    assert.equal(document.getElementById('absent'), null);
+  });
+
+  test('getElementById finds nothing in a detached subtree, and finds the node once it is connected', () => {
+    const { document } = world();
+    const el = document.createElement('section');
+    el.id = 'loose';
+    assert.equal(document.getElementById('loose'), null, 'detached: not found');
+    document.body.appendChild(el);
+    assert.equal(document.getElementById('loose'), el, 'connected: found');
+  });
+
+  test('getElementById does not search a template’s content, which is not in the document', () => {
+    const { parse, document } = world();
+    parse('<template><i id="t">x</i></template><b id="u">y</b>');
+    assert.equal(document.getElementById('u').localName, 'b', 'a connected element outside the template is found');
+    assert.equal(document.getElementById('t'), null, 'template content is not in the document');
+    assert.equal(document.querySelector('template').content.querySelector('#t').localName, 'i', 'the content does hold it');
+  });
+});
+
+describe('fake DOM: named entities the server output uses (LIN-4279)', () => {
+  test('&middot; decodes to U+00B7 and serializes as the literal character', () => {
+    const { parse, document } = world();
+    parse('<p>a&middot;b</p>');
+    const p = document.querySelector('p');
+    assert.equal(p.textContent, 'a·b');
+    assert.equal(p.innerHTML, 'a·b');
+  });
+
+  test('&mdash; decodes to U+2014', () => {
+    const { parse, document } = world();
+    parse('<p>a&mdash;b</p>');
+    assert.equal(document.querySelector('p').textContent, 'a—b');
+  });
+
+  test('&hellip; decodes to U+2026', () => {
+    const { parse, document } = world();
+    parse('<p>wait&hellip;</p>');
+    assert.equal(document.querySelector('p').textContent, 'wait…');
+  });
+
+  test('&times; decodes to U+00D7', () => {
+    const { parse, document } = world();
+    parse('<p>2&times;3</p>');
+    assert.equal(document.querySelector('p').textContent, '2×3');
+  });
+});
+
+describe('fake DOM: createElementNS keeps SVG names as written (LIN-4279)', () => {
+  const SVG = 'http://www.w3.org/2000/svg';
+
+  test('an SVG-namespace element has tagName and localName "svg", not upper-cased', () => {
+    const { document } = world();
+    const svg = document.createElementNS(SVG, 'svg');
+    assert.equal(svg.tagName, 'svg');
+    assert.equal(svg.localName, 'svg');
+    assert.equal(svg.namespaceURI, SVG);
+  });
+
+  test('a mixed-case SVG name is pinned as written, in localName and tagName', () => {
+    const { document } = world();
+    const grad = document.createElementNS(SVG, 'linearGradient');
+    assert.equal(grad.localName, 'linearGradient');
+    assert.equal(grad.tagName, 'linearGradient');
+    document.body.appendChild(grad);
+    assert.equal(document.querySelector('linearGradient'), grad, 'a type selector matches the name as written');
+    assert.equal(document.querySelector('lineargradient'), null, 'a type selector is case-sensitive off the HTML namespace');
+  });
+
+  test('attribute names on a namespaced element keep their case (viewBox); an HTML element still lower-cases them', () => {
+    const { document } = world();
+    const svg = document.createElementNS(SVG, 'svg');
+    svg.setAttribute('viewBox', '0 0 10 10');
+    assert.equal(svg.getAttribute('viewBox'), '0 0 10 10');
+    assert.equal(svg.getAttribute('viewbox'), null, 'the name is stored as written');
+    assert.equal(svg.outerHTML, '<svg viewBox="0 0 10 10"></svg>');
+    const div = document.createElement('div');
+    div.setAttribute('viewBox', 'x');
+    assert.equal(div.getAttribute('viewbox'), 'x', 'HTML attribute names are lower-cased');
+  });
+});
+
+describe('fake DOM: replaceChild, replaceChildren, insertAdjacentHTML, append and prepend (LIN-4279)', () => {
+  test('replaceChild puts the new node in the old one’s place, returns the old node, and detaches it', () => {
+    const { parse, document } = world();
+    parse('<ul><li id="a">a</li><li id="b">b</li><li id="c">c</li></ul>');
+    const ul = document.querySelector('ul');
+    const old = document.querySelector('#b');
+    const repl = document.createElement('li');
+    repl.id = 'n';
+    assert.equal(ul.replaceChild(repl, old), old, 'returns the old node');
+    assert.equal(old.parentNode, null, 'the old node is detached');
+    assert.equal(ul.innerHTML, '<li id="a">a</li><li id="n"></li><li id="c">c</li>', 'the new node is in the same place');
+  });
+
+  test('replaceChild throws FakeDomError when the old node is not a child, and changes nothing', () => {
+    const { parse, document } = world();
+    parse('<ul><li id="a">a</li></ul><p id="other">x</p>');
+    const ul = document.querySelector('ul');
+    const stranger = document.querySelector('#other');
+    const before = ul.innerHTML;
+    throwsNaming(() => ul.replaceChild(document.createElement('li'), stranger), 'not a child');
+    assert.equal(ul.innerHTML, before, 'the parent is unchanged');
+    assert.equal(stranger.isConnected, true, 'the stranger is untouched');
+  });
+
+  test('replaceChild(node, null) throws FakeDomError and leaves the tree unchanged (LIN-4279 review F2)', () => {
+    const { parse, document } = world();
+    parse('<ul><li id="a">a</li></ul>');
+    const ul = document.querySelector('ul');
+    const incoming = document.createElement('li');
+    const before = ul.childNodes.slice();
+    throwsNaming(() => ul.replaceChild(incoming, null), 'not a child');
+    assert.deepEqual(ul.childNodes, before, 'childNodes is unchanged');
+    assert.equal(incoming.parentNode, null, 'the new node was not attached');
+  });
+
+  test('replaceChildren(...nodes) replaces every child with the given nodes, in order, and detaches the old ones', () => {
+    const { parse, document } = world();
+    parse('<div><i id="x">x</i><i id="y">y</i></div>');
+    const div = document.querySelector('div');
+    const old = document.querySelector('#x');
+    const p = document.createElement('p');
+    const span = document.createElement('span');
+    div.replaceChildren(p, span);
+    assert.deepEqual(div.children, [p, span]);
+    assert.equal(old.parentNode, null, 'the old child is detached');
+    assert.equal(div.innerHTML, '<p></p><span></span>');
+  });
+
+  test('replaceChildren with a string puts a text node in its place', () => {
+    const { parse, document } = world();
+    parse('<div><i>x</i></div>');
+    const div = document.querySelector('div');
+    div.replaceChildren('t', document.createElement('p'));
+    assert.equal(div.childNodes[0].nodeType, 3);
+    assert.equal(div.innerHTML, 't<p></p>');
+  });
+
+  test('replaceChildren() with no arguments empties the element, text nodes included', () => {
+    const { parse, document } = world();
+    parse('<div><i>a</i>text<b>b</b></div>');
+    const div = document.querySelector('div');
+    const i = document.querySelector('i');
+    div.replaceChildren();
+    assert.equal(div.childNodes.length, 0, 'no child nodes remain');
+    assert.equal(div.innerHTML, '');
+    assert.equal(i.parentNode, null, 'the old child is detached');
+  });
+
+  test('insertAdjacentHTML("beforeend", html) appends the parsed nodes after the existing children', () => {
+    const { parse, document } = world();
+    parse('<ul><li>a</li></ul>');
+    const ul = document.querySelector('ul');
+    const first = ul.children[0];
+    ul.insertAdjacentHTML('beforeend', '<li>b</li><li>c</li>');
+    assert.equal(ul.children[0], first, 'the existing child stays first');
+    assert.equal(ul.innerHTML, '<li>a</li><li>b</li><li>c</li>');
+  });
+
+  test('insertAdjacentHTML takes its position ASCII case-insensitively, as the DOM spec does (BeforeEnd is beforeend)', () => {
+    const { parse, document } = world();
+    parse('<ul><li>a</li></ul>');
+    const ul = document.querySelector('ul');
+    ul.insertAdjacentHTML('BeforeEnd', '<li>b</li>');
+    assert.equal(ul.innerHTML, '<li>a</li><li>b</li>');
+  });
+
+  test('insertAdjacentHTML throws FakeDomError for every position except beforeend, and changes nothing', () => {
+    const { parse, document } = world();
+    parse('<ul><li>a</li></ul>');
+    const ul = document.querySelector('ul');
+    const before = ul.innerHTML;
+    for (const pos of ['beforebegin', 'afterbegin', 'afterend', 'nonsense', '']) {
+      throwsNaming(() => ul.insertAdjacentHTML(pos, '<li>x</li>'), 'only "beforeend" is modelled');
+    }
+    assert.equal(ul.innerHTML, before, 'no position other than beforeend changed the element');
+  });
+
+  test('append(...nodes) adds nodes at the end, and a string becomes a text node', () => {
+    const { parse, document } = world();
+    parse('<ul><li id="a">a</li></ul>');
+    const ul = document.querySelector('ul');
+    const li = document.createElement('li');
+    ul.append(li, 'tail');
+    assert.equal(ul.childNodes[1], li, 'the node is appended');
+    assert.equal(ul.childNodes[2].nodeType, 3, 'the string is a text node');
+    assert.equal(ul.childNodes[2].data, 'tail');
+    assert.equal(ul.innerHTML, '<li id="a">a</li><li></li>tail');
+  });
+
+  test('prepend(...nodes) inserts before the first child, in argument order, and a string becomes a text node', () => {
+    const { parse, document } = world();
+    parse('<ul><li id="a">a</li></ul>');
+    const ul = document.querySelector('ul');
+    const x = document.createElement('li');
+    x.id = 'x';
+    ul.prepend(x, 'head');
+    assert.equal(ul.childNodes[0], x, 'the node is first');
+    assert.equal(ul.childNodes[1].nodeType, 3, 'the string is a text node, second');
+    assert.equal(ul.innerHTML, '<li id="x"></li>head<li id="a">a</li>');
+  });
+});
+
+describe('fake DOM: firstElementChild and lastElementChild (LIN-4279)', () => {
+  const fixture = () => {
+    const w = world();
+    w.parse('<div>text<!--c--><b id="a">a</b>more<i id="z">z</i>tail</div><p>only text</p>');
+    return w;
+  };
+
+  test('firstElementChild is the first element child, skipping text and comments, and null when there is none', () => {
+    const { document } = fixture();
+    assert.equal(document.querySelector('div').firstElementChild, document.querySelector('#a'));
+    assert.equal(document.querySelector('p').firstElementChild, null, 'a node with only text has no element child');
+  });
+
+  test('lastElementChild is the last element child, skipping text, and null when there is none', () => {
+    const { document } = fixture();
+    assert.equal(document.querySelector('div').lastElementChild, document.querySelector('#z'));
+    assert.equal(document.querySelector('p').lastElementChild, null, 'a node with only text has no element child');
+  });
+});
+
+describe('client world: stubs are copied by descriptor, and loadWorld routes to common.js (LIN-4279)', () => {
+  // A spread copy reads every getter; a descriptor copy never does. The getter counts its reads and throws, as a blocked
+  // localStorage does (lin-4035: "a storage that throws on read").
+  const throwingStorage = (target) => {
+    const reads = { count: 0 };
+    Object.defineProperty(target, 'localStorage', {
+      enumerable: true,
+      configurable: true,
+      get() { reads.count++; throw new Error('storage throws on read'); },
+    });
+    return reads;
+  };
+
+  test('window stubs are copied by descriptor: a throwing localStorage getter is not invoked at load', () => {
+    const stubs = {};
+    const reads = throwingStorage(stubs);
+    const w = loadWorld({ window: stubs, scripts: [] });
+    assert.equal(reads.count, 0, 'the getter was not invoked while copying');
+    assert.equal(typeof Object.getOwnPropertyDescriptor(w.window, 'localStorage').get, 'function', 'the accessor is kept');
+  });
+
+  test('globals are copied by descriptor too: a throwing localStorage global is not invoked at load', () => {
+    const globals = {};
+    const reads = throwingStorage(globals);
+    const w = loadWorld({ scripts: [], globals });
+    assert.equal(reads.count, 0, 'the getter was not invoked while copying');
+    assert.equal(typeof Object.getOwnPropertyDescriptor(w.sandbox, 'localStorage').get, 'function', 'the accessor is kept');
+  });
+
+  test('loadWorld runs the real common.js when window.__HARNESS_MODELS__ carries the block', () => {
+    const w = loadWorld({ window: { __HARNESS_MODELS__: harnessModelsBlock() }, scripts: ['common.js'] });
+    assert.equal(vm.runInContext('DEFAULT_HARNESS', w.sandbox), DEFAULT_HARNESS);
+  });
+
+  test('loadWorld does not apply withHarnessModels to common.js: without the block, common.js refuses to load', () => {
+    assert.throws(() => loadWorld({ scripts: ['common.js'] }), /window\.__HARNESS_MODELS__ is missing/);
+  });
+
+  test('scripts: [] with the source run by the caller on world.sandbox, under withHarnessModels, also loads common.js', () => {
+    const w = loadWorld({ scripts: [] });
+    const src = readFileSync(new URL('../../public/common.js', import.meta.url), 'utf8');
+    vm.runInContext(withHarnessModels(src), w.sandbox, { filename: 'common.js' });
+    assert.equal(vm.runInContext('DEFAULT_HARNESS', w.sandbox), DEFAULT_HARNESS);
+  });
+
+  test('clickOn calls the element’s own click listeners with { type: "click", target } (LIN-4279)', async () => {
+    const { document } = world();
+    const btn = document.createElement('button');
+    const seen = [];
+    btn.addEventListener('click', (e) => seen.push(e));
+    await clickOn(btn);
+    assert.equal(seen.length, 1, 'one listener call');
+    assert.equal(seen[0].type, 'click');
+    assert.equal(seen[0].target, btn);
+  });
+
+  test('clickOn does not bubble to a parent, and dispatchEvent stays inert (LIN-4279)', async () => {
+    const { document } = world();
+    const parent = document.createElement('div');
+    const child = document.createElement('button');
+    parent.appendChild(child);
+    let parentCalls = 0;
+    let childCalls = 0;
+    parent.addEventListener('click', () => { parentCalls++; });
+    child.addEventListener('click', () => { childCalls++; });
+    await clickOn(child);
+    assert.equal(childCalls, 1, 'the element’s own listener ran');
+    assert.equal(parentCalls, 0, 'no bubbling');
+    child.dispatchEvent({ type: 'click', target: child });
+    assert.equal(childCalls, 1, 'dispatchEvent does not reach the listeners');
+  });
+});
+
+describe('fake DOM: type selectors fold case on HTML elements only (LIN-4279 review F1)', () => {
+  test('an upper-case type selector matches an HTML element through querySelector, closest and matches', () => {
+    const { parse, document } = world();
+    parse('<div id="d"><p id="x">t</p></div>');
+    const p = document.querySelector('#x');
+    assert.equal(document.querySelector('DIV'), document.querySelector('#d'), 'querySelector("DIV") finds the <div>');
+    assert.equal(p.closest('P'), p, 'closest("P") finds the <p>');
+    assert.equal(p.matches('P'), true, 'matches("P") is true');
+    assert.equal(p.matches('P#x'), true, 'a case-folded tag with an id part still matches');
+  });
+
+  test('an SVG element made by createElementNS is not matched by the upper-case name', () => {
+    const { document } = world();
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    document.body.appendChild(svg);
+    assert.equal(svg.matches('SVG'), false, 'no case fold for a non-HTML element');
+    assert.equal(svg.matches('svg'), true, 'the exact name still matches');
+    assert.equal(document.querySelector('SVG'), null, 'querySelector("SVG") does not find it');
+    assert.equal(document.querySelector('svg'), svg);
   });
 });
