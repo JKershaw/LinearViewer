@@ -2021,3 +2021,11 @@ John: from time to time, reread the essay and the related papers, which are good
   | LIN-4247 | control: feature with the tidy folded in | mixed, mixed |
 
   LIN-4251 and LIN-4246, the follow-ons on tidied ground, are still building.
+
+### 11:35 UTC: John on the size of the move ("Towers of Hanoi")
+John: it has a fuzzy edge, which is partly the challenge, and that's why "the human" decides the size of the move. He'd do the big moves early. But even a smaller scope "should" make the next go smoother: trending in the right direction, even without moving the whole stack.
+
+**What changes in how we read and scope:**
+- **Judge a partial tidy by the film, not the still.** LIN-4252's own blind read is "mixed", but its real test is whether the next ticket in the area goes smoother. LIN-4246's Surveys already say its witness "now looks cheap" on the shared fake, where before it needed a slow E2E. So LIN-4246's cost and blind read count toward LIN-4252.
+- **A move of any size, but a partial one leaves a ratchet.** A helper with nothing holding it can drift back: the essay's adopt-on-next-touch "stayed flat" while a fresh file wrote raw copies beside the helper. A census whose count may only fall is what makes a smaller move trend instead of decay. (This replaces 11:30's "delete in the same change, or ship a guard". The guard is the minimum; deletion is the bigger disc.)
+- **Big moves early,** in the human's scope calls: the first ticket into an area takes the larger disc, and later tickets there ride on it.
