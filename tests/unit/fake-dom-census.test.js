@@ -58,7 +58,6 @@ const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/unit/lin-2122-history-outcome-pill.test.js',
   'tests/unit/lin-2370-browser-copy-prompt-provider-identity.test.js',
   'tests/unit/lin-3254-session-run-toggles.test.js',
-  'tests/unit/lin-3833-run-control.test.js', // stop: select value setter, public/prompt-section.js:1565; the test reads it at :243 (LIN-4269)
   'tests/unit/lin-3975-proposal-refresh.test.js',
   'tests/unit/lin-4016-sessions-fold-parked.test.js',
   'tests/unit/lin-4024-home-description.test.js',
