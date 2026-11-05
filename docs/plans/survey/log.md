@@ -2245,3 +2245,13 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   4. **LIN-4297**, new: `loadWorld` as the cheap path (LIN-4289's markup option, one `common.js` route, `clickOn` adopted, a derived consumer list, asserted stop reasons, then the check if it needs no new list), after LIN-4254.
 
   LIN-4292 touches only `public/`, so it runs beside LIN-4296. Tickets 2–4 share the census list, so they run in sequence.
+
+### 19:35 UTC: LIN-4296 scoped and started; LIN-4293's after-questions sent
+- **LIN-4296's Surveys** corrected my ticket:
+  - its two select rules conflict (the reset default against a no-match write), so model dirty selectedness like `checked`;
+  - probably only 1–2 of the 3 listed stops are really `<select>`: `task-mode` never reads one and may stop on `createElement('a').click()`;
+  - model `.options` too;
+  - the real reader loses the `calls.readers` assert unless it's wrapped in a spy.
+  - **The voices disagree on a fact:** whether an untouched harness select reads `''` or a pre-selected `'claude-code'`. Scoped as "check it with a test and pin what's true", not argued.
+- **The scope call:** pins first, each **checked once in Chromium** (Playwright is in the repo), so the fake pins the right browser; then `options`; then the probes cheapest first, crediting moves honestly (moved for the select model, versus relabelled); `lin-3833-run-control` last, in its own commit, with a stop rule; the reader stubs become the real reader wrapped in a spy; the dead `browserMarkup` and the stale line references in the same PR. Started (`6e5b4473`).
+- **LIN-4293's after-questions** sent (`3714f5f7` → `917a5f09`): q1–q6, the tidy-after q7, and a new q8 on the stopped larger step ("was the stop rule drawn in the right place? what would that move take?").
