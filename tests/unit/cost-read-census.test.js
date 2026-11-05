@@ -257,6 +257,13 @@ describe('LIN-4276: one dispatch order and one posting-key list in lib/cost-read
     assert.doesNotMatch(COST_READ, /\brankOf\b/);
   });
 
+  test('dispatchesOf sorts with the imported order, and no comparator is re-forked under another name', () => {
+    assert.match(COST_READ, /\.sort\(byDispatchOrder\)/);
+    // An anonymous `(toEpochMs(a.dispatchedAt) ?? Infinity) - ...` comparator is the re-fork; the file's only other
+    // Infinity is `?? -Infinity` (the window filter), which this does not match.
+    assert.doesNotMatch(COST_READ, /\?\?\s*Infinity/);
+  });
+
   test('the posting-row key list is written once, in postingKeysOf', () => {
     assert.equal((COST_READ.match(KEY_LIST) || []).length, 1);
   });

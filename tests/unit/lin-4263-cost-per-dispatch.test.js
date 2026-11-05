@@ -20,7 +20,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readCostOverRecords } from '../../lib/cost-read.js';
+import { readCostOverRecords, lineageFigureOf } from '../../lib/cost-read.js';
 import { foldRequestUsage } from '../../lib/request-usage-fold.js';
 
 const NOW = Date.UTC(2026, 10, 5, 12);
@@ -309,7 +309,9 @@ describe('LIN-4263: the fold gives each model its own tokens', () => {
  * `keyOf`, so it was never in `fetchedKeys` and was listed twice: once as the fetched member (`itemId: null`) and again
  * as a missing member (no requests). The red below is that duplicate. The order test pins the dispatch order that
  * `dispatchesOf` reuses from lineage-membership.js: dated first, undated in input order (a tie, not a defect: the old
- * `Infinity - Infinity` sort was already stable, so this passes before and after).
+ * `Infinity - Infinity` sort was already stable, so this passes before and after). That test does NOT reach
+ * `dispatchesOf`'s own sort: every member in it is fetched, so `record.members` is already in owner order. The
+ * identity-row test below is the one that does: its members are partly `record.missing`, which the sort must place.
  */
 describe('LIN-4276: a loopId-only member is listed once with its itemId, and dispatches sort by the one dispatch order', () => {
   test('a member known only by loopId owns the request posted under it, is listed once, and reports that itemId', () => {
@@ -319,6 +321,20 @@ describe('LIN-4276: a loopId-only member is listed once with its itemId, and dis
     assert.equal(session.dispatches.length, 1, 'listed once, not as a fetched member and again as missing');
     assert.equal(session.dispatches[0].requests, 1);
     assert.equal(session.dispatches[0].itemId, 'L1');
+  });
+
+  test('the sort in dispatchesOf decides the order: a dated missing member lands before undated ones (red without .sort(byDispatchOrder))', () => {
+    const undatedFetched = dispatch('u1', 'b1', 0, { dispatchedAt: null, kind: 'custom' });
+    // Identity order is [d3, u1, u2]; the fetched member (u1) comes first in `members`, d3 and u2 follow as `missing`.
+    // Unsorted that is [u1, d3, u2]; the dispatch order puts the dated member first: [d3, u1, u2].
+    const identity = [
+      { _id: 'd3', rootItemId: 'b1', status: 'taken', kind: 'custom', issueIdentifier: 'LIN-4263', dispatchedAt: at(3) },
+      { _id: 'u1', rootItemId: 'b1', status: 'taken', kind: 'custom', issueIdentifier: 'LIN-4263', dispatchedAt: null },
+      { _id: 'u2', rootItemId: 'b1', status: 'taken', kind: 'custom', issueIdentifier: 'LIN-4263', dispatchedAt: null },
+    ];
+    const requests = [request('b1', 'd3', 'q1', 2.5, { costUsd: 0.1 })];
+    const session = sessionOf(perDispatch({ fetchedRows: [undatedFetched], identityRows: identity }, requests), 'b1');
+    assert.deepEqual(session.dispatches.map(d => d.itemId), ['d3', 'u1', 'u2']);
   });
 
   test('two undated and two dated members: dated first in dispatch order, undated in input order', () => {
@@ -341,5 +357,17 @@ describe('LIN-4276: the posting-key order is load-bearing, id before loopId (pin
     assert.equal(session.dispatches.length, 1);
     assert.equal(session.dispatches[0].requests, 1);
     assert.equal(session.dispatches[0].itemId, 'A');
+  });
+});
+
+describe('LIN-4276: isPostingRow reads the loopId key of the one posting-key list', () => {
+  test('a record posted under a loopId finds its row, so the figure sits on that row (red if isPostingRow drops loopId)', () => {
+    const rows = [
+      { loopId: 'L1', rootItemId: 'b1', dispatchedAt: at(5), feedback: [] },
+      { loopId: 'L2', rootItemId: 'b1', dispatchedAt: at(2), feedback: [] },
+    ];
+    const records = [request('b1', 'L1', 'q1', 4, { costUsd: 0.4 })];
+    // The latest record was posted under L1, which is rows[0]. With loopId dropped from the match it falls back to the last row (1).
+    assert.equal(lineageFigureOf(rows, { records }).lastIndex, 0);
   });
 });
