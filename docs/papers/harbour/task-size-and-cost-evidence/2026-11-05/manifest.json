@@ -1,0 +1,1645 @@
+{
+  "ticket": "LIN-4257",
+  "window_start": "2026-11-04T05:00:00Z",
+  "freeze_finished_at": "2026-11-05T12:15:59.955Z",
+  "read_time_note": "Each file carries its own read_at; that is the read time of record.",
+  "repos": {
+    "LinearViewer": {
+      "path": ".",
+      "head": "2f0c9d5b0c9b567f836f43e6d6679db57ae0eb31",
+      "origin_main": "2f0c9d5b0c9b567f836f43e6d6679db57ae0eb31",
+      "commits_in_window": 205
+    },
+    "simple-dispatcher": {
+      "path": "../simple-dispatcher",
+      "head": "07c88f7a338b3e19a01070775e1f4d4cfc91f040",
+      "origin_main": "07c88f7a338b3e19a01070775e1f4d4cfc91f040",
+      "commits_in_window": 44
+    }
+  },
+  "candidate_rule": "commit ids (--all, since window start) union LIN-4170..newest seen (4257)",
+  "candidates": 95,
+  "population": [
+    "LIN-4048",
+    "LIN-4143",
+    "LIN-4144",
+    "LIN-4151",
+    "LIN-4177",
+    "LIN-4178",
+    "LIN-4179",
+    "LIN-4187",
+    "LIN-4195",
+    "LIN-4196",
+    "LIN-4197",
+    "LIN-4198",
+    "LIN-4199",
+    "LIN-4200",
+    "LIN-4201",
+    "LIN-4202",
+    "LIN-4203",
+    "LIN-4206",
+    "LIN-4207",
+    "LIN-4208",
+    "LIN-4209",
+    "LIN-4212",
+    "LIN-4218",
+    "LIN-4219",
+    "LIN-4220",
+    "LIN-4221",
+    "LIN-4222",
+    "LIN-4223",
+    "LIN-4224",
+    "LIN-4226",
+    "LIN-4231",
+    "LIN-4232",
+    "LIN-4233",
+    "LIN-4234",
+    "LIN-4239",
+    "LIN-4240",
+    "LIN-4241",
+    "LIN-4242",
+    "LIN-4243",
+    "LIN-4246",
+    "LIN-4247",
+    "LIN-4248",
+    "LIN-4249",
+    "LIN-4250",
+    "LIN-4251",
+    "LIN-4252",
+    "LIN-4253",
+    "LIN-4257"
+  ],
+  "population_count": 48,
+  "not_in_window": 47,
+  "dispatch_list_cap_note": "GET /dispatch returns the newest rows only; used for the newest-id bound, not for enumeration",
+  "states_at_freeze": {
+    "LIN-4048": {
+      "state": "Done",
+      "totalUsd": 11.115618940000001,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4143": {
+      "state": "Done",
+      "totalUsd": 6.48614347,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4144": {
+      "state": "Done",
+      "totalUsd": 9.7206907,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4151": {
+      "state": "Done",
+      "totalUsd": 6.41876356,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4177": {
+      "state": "Done",
+      "totalUsd": null,
+      "unpriced": [
+        "claude-haiku-5-5"
+      ],
+      "noLineage": false
+    },
+    "LIN-4178": {
+      "state": "Done",
+      "totalUsd": null,
+      "unpriced": [
+        "claude-haiku-5-5"
+      ],
+      "noLineage": false
+    },
+    "LIN-4179": {
+      "state": "Done",
+      "totalUsd": 16.170597050000005,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4187": {
+      "state": "Done",
+      "totalUsd": 3.79585389,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4195": {
+      "state": "Done",
+      "totalUsd": 76.05339660000001,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4196": {
+      "state": "Done",
+      "totalUsd": 16.004823209999998,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4197": {
+      "state": "Done",
+      "totalUsd": 9.664270989999999,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4198": {
+      "state": "Done",
+      "totalUsd": 17.988287530000004,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4199": {
+      "state": "Done",
+      "totalUsd": 12.514910559999999,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4200": {
+      "state": "Done",
+      "totalUsd": 13.05391481,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4201": {
+      "state": "Done",
+      "totalUsd": 40.12871573000001,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4202": {
+      "state": "Done",
+      "totalUsd": 22.164272599999997,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4203": {
+      "state": "Done",
+      "totalUsd": 6.21063665,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4206": {
+      "state": "Done",
+      "totalUsd": 6.915767875,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4207": {
+      "state": "Done",
+      "totalUsd": 8.266547404999999,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4208": {
+      "state": "Done",
+      "totalUsd": 6.361552455,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4209": {
+      "state": "Done",
+      "totalUsd": 17.465831520000002,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4212": {
+      "state": "Done",
+      "totalUsd": 24.79131085,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4218": {
+      "state": "Done",
+      "totalUsd": 6.845393530000002,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4219": {
+      "state": "Done",
+      "totalUsd": 16.425004799999996,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4220": {
+      "state": "Done",
+      "totalUsd": 6.513732540000001,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4221": {
+      "state": "Done",
+      "totalUsd": 7.21355582,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4222": {
+      "state": "Done",
+      "totalUsd": 5.456499369999999,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4223": {
+      "state": "Done",
+      "totalUsd": 7.987793830000001,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4224": {
+      "state": "Done",
+      "totalUsd": 16.37988595000001,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4226": {
+      "state": "Done",
+      "totalUsd": 27.836723930000005,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4231": {
+      "state": "Done",
+      "totalUsd": 12.679850239999999,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4232": {
+      "state": "Done",
+      "totalUsd": 21.951158550000002,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4233": {
+      "state": "Done",
+      "totalUsd": 14.54816595,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4234": {
+      "state": "Done",
+      "totalUsd": 5.78843316,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4239": {
+      "state": "Done",
+      "totalUsd": 3.31568223,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4240": {
+      "state": "Done",
+      "totalUsd": 3.6966336099999997,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4241": {
+      "state": "Done",
+      "totalUsd": 9.974438690000001,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4242": {
+      "state": "Done",
+      "totalUsd": 13.55341013,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4243": {
+      "state": "Done",
+      "totalUsd": 8.71133558,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4246": {
+      "state": "In Progress",
+      "totalUsd": null,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4247": {
+      "state": "Done",
+      "totalUsd": 6.27248273,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4248": {
+      "state": "Done",
+      "totalUsd": 12.262139665000001,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4249": {
+      "state": "Done",
+      "totalUsd": 13.335418249999998,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4250": {
+      "state": "Done",
+      "totalUsd": 20.392325150000012,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4251": {
+      "state": "Done",
+      "totalUsd": 9.39707673,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4252": {
+      "state": "Done",
+      "totalUsd": 10.38323542,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4253": {
+      "state": "Done",
+      "totalUsd": 11.242411589999998,
+      "unpriced": [],
+      "noLineage": false
+    },
+    "LIN-4257": {
+      "state": "In Progress",
+      "totalUsd": null,
+      "unpriced": [],
+      "noLineage": false
+    }
+  },
+  "files": [
+    {
+      "path": "dispatch/LIN-4048.json",
+      "bytes": 8734,
+      "sha256": "36d8983def226f844b2ab05bc88fbcee135f77a6873e2cc7eef997080c20fe8c",
+      "read_at": "2026-11-05T12:10:15.128Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4143.json",
+      "bytes": 4854,
+      "sha256": "90c187e0cc5d32ab6c4a8293573fe438921ff695618fd7a05b9a10da674f8056",
+      "read_at": "2026-11-05T12:10:17.332Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4144.json",
+      "bytes": 5357,
+      "sha256": "89a5410942a4dd9d27cc432e1a3d3bfbc284e6647c68e63cbd663e872accc065",
+      "read_at": "2026-11-05T12:10:18.435Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4151.json",
+      "bytes": 4855,
+      "sha256": "b90adbd2a247318d58f43f489eb4761742d894e7b1da4af5000ec63891d08e91",
+      "read_at": "2026-11-05T12:10:19.537Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4177.json",
+      "bytes": 5841,
+      "sha256": "ac19dc6d08093346a791ce2b9e480281fd5dfc678f5d93eebe4d168af779b42e",
+      "read_at": "2026-11-05T12:10:29.457Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4178.json",
+      "bytes": 5834,
+      "sha256": "b59a5717f7e487931b5b4a8941c8bf24a737497a6355e36b5c627c2777f3d829",
+      "read_at": "2026-11-05T12:10:30.559Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4179.json",
+      "bytes": 3883,
+      "sha256": "31c54fe0290158f42a319dedd5834fe23ee375e00b42516a0a3264941e47e31e",
+      "read_at": "2026-11-05T12:10:31.661Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4187.json",
+      "bytes": 4386,
+      "sha256": "af85e4d78b4841084c61a57d0d91625f88a6db9d6831ae0223ef8ce557ca1837",
+      "read_at": "2026-11-05T12:10:40.477Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4195.json",
+      "bytes": 7708,
+      "sha256": "0c04dbbfcf79b6b42267cbb4f4e381bd5571793cab7dba84fb5c9d03115e6b22",
+      "read_at": "2026-11-05T12:11:09.413Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4196.json",
+      "bytes": 8173,
+      "sha256": "9c4b71202c518d97cd9841a699c0d3404eaec54b70c4d35273dda604ebe027f6",
+      "read_at": "2026-11-05T12:11:10.514Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4197.json",
+      "bytes": 9879,
+      "sha256": "eac6c1093daed993d82bf933c1912571b7fef0062a4bc276be07c7a9e8b469de",
+      "read_at": "2026-11-05T12:11:11.616Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4198.json",
+      "bytes": 9811,
+      "sha256": "ba8596f80c72ca00ac669103b055c2f7edee5026078b09c532f780ab9cbafc2a",
+      "read_at": "2026-11-05T12:11:12.717Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4199.json",
+      "bytes": 9854,
+      "sha256": "a6d79cbc76b9fad8ec2474174a984829b1a7b5af56ce4116d1d58248057ac9c4",
+      "read_at": "2026-11-05T12:11:13.820Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4200.json",
+      "bytes": 9718,
+      "sha256": "dfc7d632000d12dd6004e74870889b1c71c526a1de60027432edcbf83fec8ab2",
+      "read_at": "2026-11-05T12:11:14.922Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4201.json",
+      "bytes": 9758,
+      "sha256": "761acdd7f4b886bac63f85989401f96bf81aa56f8b40637c97381a5380a7fbfc",
+      "read_at": "2026-11-05T12:11:16.024Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4202.json",
+      "bytes": 9681,
+      "sha256": "38864fdf929890891d5e41ad2fb6ae507c14ee8ef7276527fe0e991f45ac1e3b",
+      "read_at": "2026-11-05T12:11:17.126Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4203.json",
+      "bytes": 5405,
+      "sha256": "66b8d487a174c7e5f6df56c649d1cbb7e189fabfa9fc09e8056fced010290f6f",
+      "read_at": "2026-11-05T12:11:18.227Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4206.json",
+      "bytes": 3917,
+      "sha256": "a376fda398ddc2a774cffee600869054673ad54c28032a80036610a42b491a97",
+      "read_at": "2026-11-05T12:11:21.534Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4207.json",
+      "bytes": 4909,
+      "sha256": "1d75c743d4c3a7e5dfb53795b29d654e159608179a937fd7533532a3febc7a43",
+      "read_at": "2026-11-05T12:11:22.636Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4208.json",
+      "bytes": 4889,
+      "sha256": "3bd8855287510926b14543dac9c9f7d48dc8b42f3801c4bc840e434e706888f7",
+      "read_at": "2026-11-05T12:11:23.737Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4209.json",
+      "bytes": 4880,
+      "sha256": "9aeca4c83acb716b556a5daa0a5e76d3bed1fe9f9b3288729c0ef56dab5367ce",
+      "read_at": "2026-11-05T12:11:24.837Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4212.json",
+      "bytes": 9859,
+      "sha256": "85130a69c36dcbd654067b038d2788aeaa4db4a814cbcdbcad684a670bfd7db2",
+      "read_at": "2026-11-05T12:11:28.143Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4218.json",
+      "bytes": 5355,
+      "sha256": "0793ee76d3a8a218bc4a32477769b952be99ad80dfa78fa04c02108826229d74",
+      "read_at": "2026-11-05T12:11:34.753Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4219.json",
+      "bytes": 6784,
+      "sha256": "6721c708a8f7599384e90327f2c7a97bd9b62be0c2c7ed6ce807f7a7aad7bc19",
+      "read_at": "2026-11-05T12:11:47.937Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4220.json",
+      "bytes": 9941,
+      "sha256": "40aa777e19346e41204c5c0049e421ebef96e38f56959d3b7167c9d16da3054b",
+      "read_at": "2026-11-05T12:11:49.040Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4221.json",
+      "bytes": 9924,
+      "sha256": "49b80b7f14d6ed66ed82d0cbc3e51bf223f02bd46d3cd8008798a10a1e605478",
+      "read_at": "2026-11-05T12:11:50.143Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4222.json",
+      "bytes": 9879,
+      "sha256": "af3ff3771e80862e15b962e2fca5fe122711a2d13439baead24ad45e09687f0e",
+      "read_at": "2026-11-05T12:11:51.244Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4223.json",
+      "bytes": 9852,
+      "sha256": "f85104da7aca9023cea69d2b5c56df6880165ca5d388218fba77f0d346ec8aa3",
+      "read_at": "2026-11-05T12:11:52.346Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4224.json",
+      "bytes": 9739,
+      "sha256": "d58e544269724aea110a7fd88bcedd3816728ea441dd3db2daaf2590ef8af8ee",
+      "read_at": "2026-11-05T12:11:53.448Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4226.json",
+      "bytes": 9909,
+      "sha256": "34c77677d73c1ff08ffb1af135deec4cbfc12d23326d7d8ab91ab8dd4fa2be0a",
+      "read_at": "2026-11-05T12:11:55.650Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4231.json",
+      "bytes": 9754,
+      "sha256": "4621bfb5d4c82533aff5ee4599defa8d11830ee602026325018d1b0164806bb5",
+      "read_at": "2026-11-05T12:12:01.157Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4232.json",
+      "bytes": 8460,
+      "sha256": "020849b706f08610375ae3e6334602da71bd805d843e57c9239b555e406de097",
+      "read_at": "2026-11-05T12:12:02.259Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4233.json",
+      "bytes": 9729,
+      "sha256": "b2134455f8badb35299b4010ac65a5f67568750b80c3395546ae0189b78680dc",
+      "read_at": "2026-11-05T12:12:03.361Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4234.json",
+      "bytes": 4855,
+      "sha256": "9ec59bd9857161ae38fbbc2a2262aba192240b706c6785bbb30502efcd50b845",
+      "read_at": "2026-11-05T12:12:04.464Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4239.json",
+      "bytes": 1487,
+      "sha256": "184b5b196c7dff6b5727f95ff9b18cdb022a757161a7afe7415543f4c8bd5745",
+      "read_at": "2026-11-05T12:12:09.977Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4240.json",
+      "bytes": 4390,
+      "sha256": "b7953bbbd71125070cda9d4b3c09430b5e5e36934553e18e96885f7e565572b1",
+      "read_at": "2026-11-05T12:12:11.079Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4241.json",
+      "bytes": 7319,
+      "sha256": "f26134d39af13a53b6be770e34d1475c70991a691514b4752d287a2077f0d64c",
+      "read_at": "2026-11-05T12:12:12.182Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4242.json",
+      "bytes": 5403,
+      "sha256": "d877a98e677a0145c1b3db25221ac1574994b7de64ee715d3fe98f9de91558c3",
+      "read_at": "2026-11-05T12:12:13.285Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4243.json",
+      "bytes": 4386,
+      "sha256": "81d6356d0b94df5ea413a889b24eefaebb4a3f20c51ee3a9e82de90cae83d686",
+      "read_at": "2026-11-05T12:12:14.387Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4246.json",
+      "bytes": 5600,
+      "sha256": "0430a4ac98eee336e6b52034bf587611454367608ad1b12b58e8a35d3b7e53f9",
+      "read_at": "2026-11-05T12:12:17.693Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4247.json",
+      "bytes": 5301,
+      "sha256": "cb9b8b549462c1c18bbfd50d0224d9c587d528c20203d73339ab860ae00ed0a7",
+      "read_at": "2026-11-05T12:12:18.795Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4248.json",
+      "bytes": 5829,
+      "sha256": "d8bb60cc7494ddf111b0a9f578195546e1a562dd6dc776e4706315c8df2de90e",
+      "read_at": "2026-11-05T12:12:19.897Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4249.json",
+      "bytes": 8436,
+      "sha256": "badba48fe8feebc54d131c84e84a768e9212d62ec7bac9deba4cb71ee4cec6e3",
+      "read_at": "2026-11-05T12:12:41.146Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4250.json",
+      "bytes": 10010,
+      "sha256": "b98a138718b65efccaffdc6e1378c219b50a4543c69f58f942127ed2f783d7c7",
+      "read_at": "2026-11-05T12:12:42.246Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4251.json",
+      "bytes": 6276,
+      "sha256": "3118deee38174fbdea752b645c961b091dd42b48d2540068a9c2873076f61d9f",
+      "read_at": "2026-11-05T12:12:43.348Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4252.json",
+      "bytes": 6744,
+      "sha256": "c71175ca6fcb0c2c4975ab4d37c0b489bdf44e07b07bdfd15c5aecdf1249c36c",
+      "read_at": "2026-11-05T12:12:44.451Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4253.json",
+      "bytes": 6745,
+      "sha256": "feaf4403637b79253c3b71bc839cf6362073f79f14b4da21f39d0c6410c6a542",
+      "read_at": "2026-11-05T12:12:45.553Z",
+      "http_status": 200
+    },
+    {
+      "path": "dispatch/LIN-4257.json",
+      "bytes": 3728,
+      "sha256": "781b98424f3d9df7c2bb6daedc1659a71fc146593c97c6880058ba1f61191f62",
+      "read_at": "2026-11-05T12:12:49.961Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4048.json",
+      "bytes": 48564,
+      "sha256": "1f09ef3356d3819bac4f4d9fd8e1f55ddda0325368cd5316c6a1b4b4b6850ac0",
+      "read_at": "2026-11-05T12:12:51.063Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4048.json",
+      "bytes": 2500,
+      "sha256": "a5ad3efe57d7e287285da327bb2661a34bd144cbb3750f894016e1a8b26629d4",
+      "read_at": "2026-11-05T12:12:52.165Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/42b69beb-7189-4e0c-ab93-70e8b80c6a8c.json",
+      "bytes": 1834,
+      "sha256": "9b2226bf26011b34b6171a941a54f480abedbabc0c454f9ee7ed171988871936",
+      "read_at": "2026-11-05T12:12:53.267Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4143.json",
+      "bytes": 19557,
+      "sha256": "2f3c6a3a0c280ab73cc785f3427618d911c1adc982c3155b5e832a3a4fd2990f",
+      "read_at": "2026-11-05T12:12:54.377Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4143.json",
+      "bytes": 1554,
+      "sha256": "55d170638cfba4fcfeeda89f14d385a4d3d411df23fa68110343a27c42dcf586",
+      "read_at": "2026-11-05T12:12:55.479Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/f41fdea0-2de6-4d7c-8f7b-6a733705c45a.json",
+      "bytes": 1834,
+      "sha256": "746587ef75e0440df9a39790a72bd608ccb3d2bbc656c78ac66da3e3d5248954",
+      "read_at": "2026-11-05T12:12:56.581Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4144.json",
+      "bytes": 29863,
+      "sha256": "9dfe728011c14563d3ad35d4b784b3ad7296bf4a30b8cad61eb13af024c19823",
+      "read_at": "2026-11-05T12:12:57.683Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4144.json",
+      "bytes": 1768,
+      "sha256": "1f77011bde04347bbeb9fc45d69a21800f44924eb873e6cbbdd8e0e469485777",
+      "read_at": "2026-11-05T12:12:58.786Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4151.json",
+      "bytes": 25838,
+      "sha256": "5ee4ea464ba09464e606239ee5bd901ab3d1027e838137fb5bfe4bf6fa3f886f",
+      "read_at": "2026-11-05T12:12:59.888Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4151.json",
+      "bytes": 1547,
+      "sha256": "0fe6b4882776c77cdcc49d23e005740f2081735f93b1cf307080f50cf24a9e37",
+      "read_at": "2026-11-05T12:13:00.990Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/7cab5b13-3c1f-44c7-9ce8-faacd76b6be9.json",
+      "bytes": 1834,
+      "sha256": "f03748bd101523773d707fa97f8fd791d9e68f07a8841aa323adedb6b976e239",
+      "read_at": "2026-11-05T12:13:02.092Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4177.json",
+      "bytes": 35376,
+      "sha256": "81dd0b091292e95a8ca3389c61cda0dfa0a1c41bd4ef0aa488c4608691b3a5ba",
+      "read_at": "2026-11-05T12:13:03.194Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4177.json",
+      "bytes": 1563,
+      "sha256": "d522c70788ff03a975e5c9cda3bb24a776f20e4781e9a2b3d36363e815ec9ce1",
+      "read_at": "2026-11-05T12:13:04.296Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/0b0a50e9-b27d-4fd7-9dd4-f56ece1e9018.json",
+      "bytes": 1069,
+      "sha256": "716ee11535647ae0a2223538bd9820a08aebd38b989cd2fcdf6cbbcfdaeabf42",
+      "read_at": "2026-11-05T12:13:05.398Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4178.json",
+      "bytes": 34203,
+      "sha256": "ddc7ed0898799b858e84117be3d466a77cc35bb9d807a77041b8460fff55c57b",
+      "read_at": "2026-11-05T12:13:06.500Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4178.json",
+      "bytes": 1565,
+      "sha256": "b79a5f004bafecb4f26381af537268f0fdf6fdc9720e9e8ea92121f55412510f",
+      "read_at": "2026-11-05T12:13:07.602Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/f3f68529-2179-4bdd-aa61-3b45456d4df7.json",
+      "bytes": 1069,
+      "sha256": "d600bbb1b79ac7f92e59b9439059d2cea29285cc8a6413958529037f2f2196c2",
+      "read_at": "2026-11-05T12:13:08.703Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4179.json",
+      "bytes": 24537,
+      "sha256": "25e893379f470d8065425e54b7fa73a7236e8cefae61845caf06939c00df33b3",
+      "read_at": "2026-11-05T12:13:09.805Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4179.json",
+      "bytes": 1113,
+      "sha256": "cac43ee3ac497a02593a57c93a8c1e05fe453a247a071d317215c77dfcc039c4",
+      "read_at": "2026-11-05T12:13:10.907Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/9108bf4f-1413-4927-90dd-1188f5537442.json",
+      "bytes": 1069,
+      "sha256": "e86f291d75bc8f8ea3863933130912ec51ecc4a1ada57f2702d30c5b96b476e5",
+      "read_at": "2026-11-05T12:13:12.009Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4187.json",
+      "bytes": 21990,
+      "sha256": "8b940d7279ca10808bfc889a7311fd02ff5f0ec4d96dd97219f2fa56cf61f81e",
+      "read_at": "2026-11-05T12:13:13.112Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4187.json",
+      "bytes": 1576,
+      "sha256": "758d9484136e3ee5e5430ee3f7a5fab54a4f502445ecf8f2117c71f4a2bc13e3",
+      "read_at": "2026-11-05T12:13:26.299Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4195.json",
+      "bytes": 67264,
+      "sha256": "8804f7d0e58333f3a805bfda9d67020f0bb06cb9b67b3b4c0f4d9a4bf30e5f73",
+      "read_at": "2026-11-05T12:13:27.401Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4195.json",
+      "bytes": 1770,
+      "sha256": "e1d9b3dd88881fe219b9d6ee02b6363d5c7b037360c0ec76c599d8da3bf958cf",
+      "read_at": "2026-11-05T12:13:28.503Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/9a95ad7f-6f01-445c-a397-770028ca7cd7.json",
+      "bytes": 343,
+      "sha256": "c1906bd38674a97070f60d3b14865611c26ca9886b5513b90dd978c5c64c518a",
+      "read_at": "2026-11-05T12:13:29.604Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/8697cf20-bcbc-4108-8bc2-43651ffa6786.json",
+      "bytes": 497,
+      "sha256": "eecd5220e67609e1a26181241f3b7572e2ab381f92bffcfce533381673677a11",
+      "read_at": "2026-11-05T12:13:30.706Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/0b274d4b-1074-4ad1-831a-e0f04f433a4c.json",
+      "bytes": 310,
+      "sha256": "61c3b624b6cb98ddf3d94a88013350e04290579c419eaa9ece6d2be5d953198d",
+      "read_at": "2026-11-05T12:13:31.806Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/1bcbc0c4-8b21-4603-bd53-6016e1f01b9e.json",
+      "bytes": 344,
+      "sha256": "39c9a1cb98f8b41bf26bc223197e83026e67f9cd1fa04338fa7a2842dcf3d42a",
+      "read_at": "2026-11-05T12:13:32.908Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4196.json",
+      "bytes": 26635,
+      "sha256": "9df1f063e447c9b1c370676c65d67008e62587df0f7e5bdafc624b549fba9f48",
+      "read_at": "2026-11-05T12:13:34.009Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4196.json",
+      "bytes": 2040,
+      "sha256": "f0feab05373bbecf1886d0e3e7655c25d7cbad3a1b47432b7f2c9836e38f622f",
+      "read_at": "2026-11-05T12:13:35.109Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/69e051b5-eb03-48f6-9226-6d12b02e5f3f.json",
+      "bytes": 1545,
+      "sha256": "b888e8923bda7b1c875e955724ecc9877ea423abd4cafe3ec990e612f0aac37b",
+      "read_at": "2026-11-05T12:13:36.211Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/ba641b98-7c03-465c-8d4c-a3122d63f7be.json",
+      "bytes": 316,
+      "sha256": "4ddfb0c9b03731ff551bd106390909a8bfb26c2614f91413345b14ed68d07d67",
+      "read_at": "2026-11-05T12:13:37.311Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/98afedec-0f65-4602-a68d-a88918f89211.json",
+      "bytes": 339,
+      "sha256": "9b93c0ab2f124cafa4f7d1a5f4c3588184ee9795d439052d19e46b9633c16570",
+      "read_at": "2026-11-05T12:13:38.413Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4197.json",
+      "bytes": 23343,
+      "sha256": "1d8ff54690f159f1fdbc22371a61055de00e4fa3e6523b45641c4b3564dd932b",
+      "read_at": "2026-11-05T12:13:39.514Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4197.json",
+      "bytes": 1350,
+      "sha256": "d329acafa96728d4f9b191bb7dab5a86927f0c097b0ea1428cd53e3ad0128710",
+      "read_at": "2026-11-05T12:13:40.616Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/9879e58d-888b-452d-8b2b-a28ab50d929e.json",
+      "bytes": 1331,
+      "sha256": "eb6fe2fb7c4273a21e5d9bb0bebbda4f57d2ebd3e00483eccd493d33e6c34cc4",
+      "read_at": "2026-11-05T12:13:41.724Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4198.json",
+      "bytes": 27544,
+      "sha256": "39d8a41f503840cf6c76e7f289f0cfdf28b166965b5142ac23731e0efdefb633",
+      "read_at": "2026-11-05T12:13:42.826Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4198.json",
+      "bytes": 1334,
+      "sha256": "2f130d9c746b55a9f86123ad53e5380d9cd2646cfdba0ce276a744cb444d0f00",
+      "read_at": "2026-11-05T12:13:43.928Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/9bf02e5d-678b-4f54-9e7a-7da90e97519f.json",
+      "bytes": 1069,
+      "sha256": "f8e70858337baac6d8c19d3b21d51dddb505a08f6a33c291d2ea95885ea58bf8",
+      "read_at": "2026-11-05T12:13:45.031Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/b34bb9ad-1ffb-4c03-9e21-9bdd974af48f.json",
+      "bytes": 1375,
+      "sha256": "7225c4faa98b679877ce721b6691d6a361743b4546df90346aa44889c8cb4aee",
+      "read_at": "2026-11-05T12:13:46.133Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4199.json",
+      "bytes": 30194,
+      "sha256": "26652951e40b8dbd4faea734ec54de7c684caa6609213c18dad2b527b43a834e",
+      "read_at": "2026-11-05T12:13:47.235Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4199.json",
+      "bytes": 1326,
+      "sha256": "707ab72fe9d4e91a734f1ef23079d5bb60812364a3ecb3a57a5606fd64a854f1",
+      "read_at": "2026-11-05T12:13:48.337Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/fb0398dd-4ccf-453f-b82a-e8c92dec2818.json",
+      "bytes": 1375,
+      "sha256": "6aa40f3b91e01509b13ec6a8e2b5118fc0c15e21c1500e69bf325e5d255c0886",
+      "read_at": "2026-11-05T12:13:49.439Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4200.json",
+      "bytes": 50647,
+      "sha256": "a68023f1554385cc695d8f8c24d1814b74dd8b7fdb4fc30b2c77b58f9672d239",
+      "read_at": "2026-11-05T12:13:50.540Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4200.json",
+      "bytes": 1560,
+      "sha256": "aafcb497e58ae11a76939694e48be027ea88c9054d269244dea1441bbc2aeabc",
+      "read_at": "2026-11-05T12:13:51.641Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/3e49cc95-1b74-45b3-9b1b-5249b0045dfe.json",
+      "bytes": 332,
+      "sha256": "1b7e1b1e8d46e154206058f047495ee4f80a7113112f95527e605db4ef4091e0",
+      "read_at": "2026-11-05T12:13:52.743Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4201.json",
+      "bytes": 62166,
+      "sha256": "ac5f6e642315a925c005e5f2d3ca3fd1a1eaa1bfd354214797ede1ce905d2088",
+      "read_at": "2026-11-05T12:13:53.845Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4201.json",
+      "bytes": 1792,
+      "sha256": "91d961ffd8c5aebb2c6450ebd0a2258f0cee7966e8a640b8069885e48d398cbf",
+      "read_at": "2026-11-05T12:13:54.945Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/77d4be68-66b9-43bd-8449-295996e66259.json",
+      "bytes": 1821,
+      "sha256": "c4ec0ced98b737b4a2ec5ecfa3635e1ddf0b4104ceacec0b2591780f06da793b",
+      "read_at": "2026-11-05T12:13:56.047Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/41c42f3b-cac0-42ef-8b51-f4b2d6be166e.json",
+      "bytes": 2189,
+      "sha256": "37ffa5e3619965fb614f9098a9280de54056f8af4afd916487f2a658baa7b30d",
+      "read_at": "2026-11-05T12:13:57.149Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/fbc0c70e-a285-4928-9691-955eee48635b.json",
+      "bytes": 373,
+      "sha256": "56952cfee9c7afa75df9fc079a0a2f9b9fc98c1d8b51c4b325d41f5c38602523",
+      "read_at": "2026-11-05T12:13:58.251Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4202.json",
+      "bytes": 30785,
+      "sha256": "7dc0693ba2c5b3d7635da9b8688b920d81756e18023a016fddedfae966bda18a",
+      "read_at": "2026-11-05T12:14:11.434Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4202.json",
+      "bytes": 1398,
+      "sha256": "dc336e357bc9034d906f5eff492f3480d8147b6feb1631edbd0d18220dab3d97",
+      "read_at": "2026-11-05T12:14:12.536Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/72b48b3f-84c8-443e-99ca-e7ef28fbbefe.json",
+      "bytes": 1343,
+      "sha256": "547b83bb9e947033ca09ebbd3eb90f4356274d148dd1ca5beb3172ea6849b838",
+      "read_at": "2026-11-05T12:14:13.638Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/2e463c11-377c-4b23-8a4f-8c861e08bdcd.json",
+      "bytes": 1982,
+      "sha256": "b3ff0ab20d487ddb0dd3dd6be34d33b5e13319e1e44d5f9bb570ae726277f109",
+      "read_at": "2026-11-05T12:14:14.740Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/ba50531e-e045-4a04-85fd-910c938f1c2c.json",
+      "bytes": 2861,
+      "sha256": "c3cb5c1a3e6931f90d93b0992dec3190e110af7dd75db92a05838b8727c48f4b",
+      "read_at": "2026-11-05T12:14:15.842Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4203.json",
+      "bytes": 22359,
+      "sha256": "ee852ee3c22a45a6b1b4f417529f7c727f6aa840eceeb0740c8ea4825dbbc8ae",
+      "read_at": "2026-11-05T12:14:16.944Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4203.json",
+      "bytes": 1329,
+      "sha256": "618145a3a1eb4184cd143dc3ba0fd25aa399571207ce1e3b0fcbdc7121b2fba6",
+      "read_at": "2026-11-05T12:14:18.046Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4206.json",
+      "bytes": 73806,
+      "sha256": "f884817801f9bcfd507f84c05cdf6a538f9eaa5d83febceb05c877bd4cfe6591",
+      "read_at": "2026-11-05T12:14:19.148Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4206.json",
+      "bytes": 1337,
+      "sha256": "beb369eefc6ad4fba7026f60a2422ac288af3d8bd02178348cc871b0e6ae5e30",
+      "read_at": "2026-11-05T12:14:20.250Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4207.json",
+      "bytes": 75859,
+      "sha256": "c996f1f684cb424ebc87c9071fa6d4084dca2e58fde316ff61b591f61f599172",
+      "read_at": "2026-11-05T12:14:21.351Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4207.json",
+      "bytes": 1566,
+      "sha256": "98fdf693414ad0c5ff97fb2544461309a03cf141585a4b460eb85f97f8229646",
+      "read_at": "2026-11-05T12:14:22.454Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4208.json",
+      "bytes": 51805,
+      "sha256": "51efd5b7fe551350276c2d700498e2cb45892348ab6886dd2e4d4f41fc6edac5",
+      "read_at": "2026-11-05T12:14:23.557Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4208.json",
+      "bytes": 1561,
+      "sha256": "42f5083be9ff9010f1694551e9b62640156a94133faefbe6f132933e12d38c66",
+      "read_at": "2026-11-05T12:14:24.659Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4209.json",
+      "bytes": 111535,
+      "sha256": "28344062fec961bdb2130dcce61aee0908c01a7a7d55863eb6407bc28b9b59db",
+      "read_at": "2026-11-05T12:14:25.760Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4209.json",
+      "bytes": 1608,
+      "sha256": "06b2ff4bac825cb688e6f129b10702d83cfc3be8c75793a239c6be8f8377d039",
+      "read_at": "2026-11-05T12:14:26.860Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4212.json",
+      "bytes": 64574,
+      "sha256": "851f20da635838e4db2f6bb3497ef3ebf18f589c65a05d7eb5853baf983cec57",
+      "read_at": "2026-11-05T12:14:27.961Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4212.json",
+      "bytes": 2229,
+      "sha256": "90b9c51c10999a8e822b354c00507f31a488215a9a274aa13e6cea560afad1cd",
+      "read_at": "2026-11-05T12:14:29.063Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4218.json",
+      "bytes": 21598,
+      "sha256": "ffb7c74936c895b16cb4091d6c9f7728de7610e519554cc429f0b50081b4ab5d",
+      "read_at": "2026-11-05T12:14:30.164Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4218.json",
+      "bytes": 1776,
+      "sha256": "3b2a28afc7cfbe07634e9f7699cf2677bea59542bd664a42ad82304d1e955f63",
+      "read_at": "2026-11-05T12:14:31.267Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4219.json",
+      "bytes": 38845,
+      "sha256": "efbc4587e4e068647466a5858e694924e9b249242a04f6d0a8e2fc9289788e46",
+      "read_at": "2026-11-05T12:14:32.369Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4219.json",
+      "bytes": 2031,
+      "sha256": "1ae69e055e537c3f019c133d6dc801ff98b7e63316c7d05d507cfc5d84cce976",
+      "read_at": "2026-11-05T12:14:33.469Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4220.json",
+      "bytes": 23123,
+      "sha256": "627cc236904e54d74b66926c90c446bcaec84d86f6ea5b3a9973ea9ff54a1593",
+      "read_at": "2026-11-05T12:14:34.570Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4220.json",
+      "bytes": 1350,
+      "sha256": "2b0393461f65a8ec5c5b7fdbff23b0747ee80a186b5e481ec71a261cf5564844",
+      "read_at": "2026-11-05T12:14:35.672Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4221.json",
+      "bytes": 21984,
+      "sha256": "6774d4d3efee3cdbe87bdd187a3c961aa170a2c9306fa4a89aba5f02828b6870",
+      "read_at": "2026-11-05T12:14:36.773Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4221.json",
+      "bytes": 1327,
+      "sha256": "415c1c3a0ebcf157617532e914696f972f26e87b03477d6176248a7f8863ae5b",
+      "read_at": "2026-11-05T12:14:37.875Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4222.json",
+      "bytes": 27317,
+      "sha256": "8f8eea87811711ee47d6cab427db6e1e8046bc0c9cefb486f06204a12c8bcd58",
+      "read_at": "2026-11-05T12:14:38.977Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4222.json",
+      "bytes": 1372,
+      "sha256": "415aea4bb7e002da288fbc67a23dd43367340ee3a7d3bd32608d5da2caf862b0",
+      "read_at": "2026-11-05T12:14:40.078Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4223.json",
+      "bytes": 24318,
+      "sha256": "e7ed839b0c70794134f922ef814efd9865fb771b7d278917902c3d437e77c921",
+      "read_at": "2026-11-05T12:14:41.180Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4223.json",
+      "bytes": 1364,
+      "sha256": "a470133b31dd901c549441d78f9dddacb38be7fe5c795497ecfc8774a7353fcb",
+      "read_at": "2026-11-05T12:14:42.281Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4224.json",
+      "bytes": 37762,
+      "sha256": "f68d404f97b8e40252aefa32b756ca89d89f1ca23164801cf656522a1954ae55",
+      "read_at": "2026-11-05T12:14:43.384Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4224.json",
+      "bytes": 1343,
+      "sha256": "7c43e586a87cf28a59febe7ffcb79e4be883ab6fcbe4bfb30cf039c792746dbc",
+      "read_at": "2026-11-05T12:14:56.565Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/019e9e1b-8d65-44e5-80b4-ca4fd5049d82.json",
+      "bytes": 2399,
+      "sha256": "af59427e54985e818a3dbf81ad8aaa06788ee17c59df43156667bb1875696075",
+      "read_at": "2026-11-05T12:14:57.667Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/e5086ca6-78bf-47f5-97b4-e846faf90943.json",
+      "bytes": 1729,
+      "sha256": "4341777e64ced0746e125b098e626e05a2f9b48caed6b0168f7077f7c65ae35c",
+      "read_at": "2026-11-05T12:14:58.770Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/053d2a44-ab25-448a-b6f1-ab56bf0f966c.json",
+      "bytes": 2269,
+      "sha256": "b5ecefe6fea28b7e9ca24358e76e54228d7e9200ab038c411a5d5ecab285b0a9",
+      "read_at": "2026-11-05T12:14:59.872Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/d8fc1806-0208-4655-b9cc-686b58912b27.json",
+      "bytes": 4459,
+      "sha256": "16cd735f9300e821d6563be17770460b3ecfce54d831402546251bc30395b8d4",
+      "read_at": "2026-11-05T12:15:00.972Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4226.json",
+      "bytes": 51499,
+      "sha256": "0b35f0b964fc506a3590632383c34d639524c66f0b719085a4859f0992fa5960",
+      "read_at": "2026-11-05T12:15:02.074Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4226.json",
+      "bytes": 2045,
+      "sha256": "ce42ddbee6ddb04f40570a05efd0651fa98b69fc311b47f18cf4fa54757c8c6f",
+      "read_at": "2026-11-05T12:15:03.175Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4231.json",
+      "bytes": 48119,
+      "sha256": "785ec86c89c36b96b9ba80bddd3a15e64c216a1646df71279837cd5d8d0637cd",
+      "read_at": "2026-11-05T12:15:04.276Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4231.json",
+      "bytes": 1360,
+      "sha256": "03a11c9d43ce2e81cf5c3e52a0aa2d065c0f128bbdbfb243c08093eff177f424",
+      "read_at": "2026-11-05T12:15:05.376Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4232.json",
+      "bytes": 26704,
+      "sha256": "68839d4ac75682b08d915ffa1e948142cce94d9cf4c50fc60960b72b2f60601d",
+      "read_at": "2026-11-05T12:15:06.478Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4232.json",
+      "bytes": 885,
+      "sha256": "54d15984c568351c553b9c8e852e214751e5557822f8acd217953e7f87c3afe8",
+      "read_at": "2026-11-05T12:15:07.579Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4233.json",
+      "bytes": 43170,
+      "sha256": "2fc06b688916b2c609068608ceb28276d2862b0eee212dbf8a9aca6576b2f19e",
+      "read_at": "2026-11-05T12:15:08.682Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4233.json",
+      "bytes": 2676,
+      "sha256": "a1ffa4dfd5837c65fff3a37ff2cd8d411a8e0c053d653d6a7f47e6cb987c563a",
+      "read_at": "2026-11-05T12:15:09.783Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/12c0b581-4bb5-4055-909b-f690fb7d902b.json",
+      "bytes": 400,
+      "sha256": "a25fa7f510b8824bce870c2d36cae2214245cf52290d5d7f057145445f143ebd",
+      "read_at": "2026-11-05T12:15:10.885Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4234.json",
+      "bytes": 25357,
+      "sha256": "5ef5af30300ea458bb03c43ec41d27a7ce611b73b4a8e6fcf3401a4bfefe5334",
+      "read_at": "2026-11-05T12:15:11.988Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4234.json",
+      "bytes": 1530,
+      "sha256": "c5093a13197c65ecedc416c9e19862328c2af276618784b230f48669789263aa",
+      "read_at": "2026-11-05T12:15:13.091Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/f0228592-e37d-4b37-8e6a-8f87ab26f772.json",
+      "bytes": 1834,
+      "sha256": "05304e615ac0bc3014b299eaa08b4a8b55eaf6b8db676bd038e99aa0ae55d378",
+      "read_at": "2026-11-05T12:15:14.193Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4239.json",
+      "bytes": 14777,
+      "sha256": "18a7a890e3760eedcae1ca1bbbf5d91c39b5e48d602116eaf27c930383dbcac6",
+      "read_at": "2026-11-05T12:15:15.295Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4239.json",
+      "bytes": 659,
+      "sha256": "84f5323db6f5bd76318b8949b70393a5acded9bdc7981e15a353b02dd06a3d70",
+      "read_at": "2026-11-05T12:15:16.397Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/23bdd80c-9d14-49dc-8998-f4283c4660e2.json",
+      "bytes": 1838,
+      "sha256": "b4cd13e01c4ea59152887461a978cef60e5169db2d01a42c762518690c0a7075",
+      "read_at": "2026-11-05T12:15:17.497Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4240.json",
+      "bytes": 23706,
+      "sha256": "c57641beafa615c2a5d7675d5a8edcf3163f60c34794d609722bf939e630504e",
+      "read_at": "2026-11-05T12:15:18.600Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4240.json",
+      "bytes": 1341,
+      "sha256": "0d48fc5c4117c6b88e7993e19065e2a55db3931780d3d415acecd2a78c8ceafe",
+      "read_at": "2026-11-05T12:15:19.702Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/a0db5851-2826-4dde-a6e3-b8d0639df1eb.json",
+      "bytes": 1834,
+      "sha256": "855eec67fa6287250a0de8440cb4f01f0bff02ce56588628711b513d05b57b42",
+      "read_at": "2026-11-05T12:15:20.804Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4241.json",
+      "bytes": 45329,
+      "sha256": "7883f7cbffd03fcc13903d0a9449b39a1f0a4a3e60d4d4e294926ddea937a980",
+      "read_at": "2026-11-05T12:15:21.907Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4241.json",
+      "bytes": 2035,
+      "sha256": "b9a845ca88dab9ff6b4f8c3572546798bf5b8f9c369398a3257fbf323cff9d47",
+      "read_at": "2026-11-05T12:15:23.008Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/3e587ce4-91fb-41fa-83fa-a80ae19cffd5.json",
+      "bytes": 1834,
+      "sha256": "bf9bb63da5e5358c4f4c8e002309d0f3c8e63a524cbb0476ac2a4e6c9f730641",
+      "read_at": "2026-11-05T12:15:24.110Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4242.json",
+      "bytes": 31313,
+      "sha256": "9debd24c47e4e7cc473b40afa9c7c99019d6dd7da0222b370aab1c477b6f5f31",
+      "read_at": "2026-11-05T12:15:25.216Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4242.json",
+      "bytes": 1573,
+      "sha256": "3b74d38bb4fff75e7c7991fad53cfe35e5876226bb045144f77fd537189c8bd7",
+      "read_at": "2026-11-05T12:15:26.319Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/ce7eefda-0822-4392-ae4a-a8ed150ba2af.json",
+      "bytes": 1834,
+      "sha256": "dce96da7c328517feec672115e734ea84e8a3fbc5ef56ce1068fa00f430673e4",
+      "read_at": "2026-11-05T12:15:27.420Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4243.json",
+      "bytes": 26775,
+      "sha256": "f661bedb2dbe5dce4bd3c271a00ecb1284051a972ffbf5010fabd291daf309c5",
+      "read_at": "2026-11-05T12:15:28.523Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4243.json",
+      "bytes": 1321,
+      "sha256": "a7d3af37ff59442ac1d4785e6b6744339128a5fafa13ce37e4636354947de863",
+      "read_at": "2026-11-05T12:15:29.625Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/d120671a-ecec-450f-970b-130c1e3c5f39.json",
+      "bytes": 1834,
+      "sha256": "21ea887061fdf0caf610cd6fda19b69324a48482d4629fd8f564a006852dbd4d",
+      "read_at": "2026-11-05T12:15:30.728Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4246.json",
+      "bytes": 45036,
+      "sha256": "7f41b6fa413d7be9455c3209765e5c4e296b1db32de76484dc1ef00470d35231",
+      "read_at": "2026-11-05T12:15:31.831Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4246.json",
+      "bytes": 2641,
+      "sha256": "5a291cf2f03d877b1675b921cb085fb3081496449b8ef32a7941ca73b4b0370a",
+      "read_at": "2026-11-05T12:15:32.933Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4247.json",
+      "bytes": 24186,
+      "sha256": "8ac779ea2f7c190a537e791af036b3335080f2df88d684bd4d36f2cca967f850",
+      "read_at": "2026-11-05T12:15:34.036Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4247.json",
+      "bytes": 2052,
+      "sha256": "3f370112f7f2c5831dccde813d82fb2ff6131f6ec897278ae0eb5257d77c8569",
+      "read_at": "2026-11-05T12:15:35.137Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4248.json",
+      "bytes": 33701,
+      "sha256": "2e2ea25b392f14bcfac7c7fbf54493e78bfac96f6af1945337974ebac75906cc",
+      "read_at": "2026-11-05T12:15:36.239Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4248.json",
+      "bytes": 1788,
+      "sha256": "2bf75f7776e1fd6343de91b4f43d69eee74c08a886016e7f025561974cd93021",
+      "read_at": "2026-11-05T12:15:37.342Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/8a238b09-eb63-4ae8-8449-093bb4982bed.json",
+      "bytes": 1832,
+      "sha256": "ed284e0842595b9ec1702c29d5cfb257606f8e6d48f5169160161105b53e24a9",
+      "read_at": "2026-11-05T12:15:38.445Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4249.json",
+      "bytes": 23554,
+      "sha256": "7753e9184729ea996e38b01f765dac9ecd4b846931b4bccd1333815b389d87ca",
+      "read_at": "2026-11-05T12:15:39.547Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4249.json",
+      "bytes": 885,
+      "sha256": "0ae928652902bb788f394601974ffdbc472e52e8d2be9e97bde727369ab042b6",
+      "read_at": "2026-11-05T12:15:40.649Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4250.json",
+      "bytes": 22373,
+      "sha256": "815bad24db30c36aa6755fd42047617c02079e5cf2b83a7ce0666052273073d7",
+      "read_at": "2026-11-05T12:15:41.750Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4250.json",
+      "bytes": 893,
+      "sha256": "4c6f0f3f11fe2da1c9429e4235ee0ac78471db83a0ca3d29ab61b67b428aaa02",
+      "read_at": "2026-11-05T12:15:48.898Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4251.json",
+      "bytes": 36079,
+      "sha256": "38865031d32ac0d4aecb44304fd275b60f8ee613aa065cc9af74d3114ecb5360",
+      "read_at": "2026-11-05T12:15:50.000Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4251.json",
+      "bytes": 2248,
+      "sha256": "01124e8ebf75901640f3e835fba1373664fb8e0e144df591e48ba0837cae66d2",
+      "read_at": "2026-11-05T12:15:51.101Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4252.json",
+      "bytes": 31070,
+      "sha256": "defe04f6ed536e8d7e06b8503b931f9787336011f9bb12fefd9c5046e4c184c2",
+      "read_at": "2026-11-05T12:15:52.202Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4252.json",
+      "bytes": 2236,
+      "sha256": "1eac7a291cbba553ce62bb770099e82f89c054cacb708a3ee7c5a06ae1fb2a9e",
+      "read_at": "2026-11-05T12:15:53.305Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/a55d7b45-dfe5-4c83-a69e-543564753873.json",
+      "bytes": 1819,
+      "sha256": "5848630f175dd00f1ccbdcd6959fce6582c053ea1697f1a5e05471177aa79a69",
+      "read_at": "2026-11-05T12:15:54.406Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4253.json",
+      "bytes": 31577,
+      "sha256": "68dcc6fde4748a02c49e5d499907e71a9f74903c3cba0962d68221e7174ad921",
+      "read_at": "2026-11-05T12:15:55.510Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4253.json",
+      "bytes": 2257,
+      "sha256": "417d6a30abb94fb6c4df17b93698f959db46beb56a712006ce9a0b8a8fa05ecf",
+      "read_at": "2026-11-05T12:15:56.612Z",
+      "http_status": 200
+    },
+    {
+      "path": "prompts/307d82c0-d716-4e4f-85fe-0ae123074e31.json",
+      "bytes": 1819,
+      "sha256": "8cbc13f67c0849a89398feacfc29a223860fcd6a9391979dca889a046c3712d0",
+      "read_at": "2026-11-05T12:15:57.715Z",
+      "http_status": 200
+    },
+    {
+      "path": "issue/LIN-4257.json",
+      "bytes": 52104,
+      "sha256": "9e99032a900731df9c96533ca28ab632af1e14894f1fc6222680171f7e7cd6f4",
+      "read_at": "2026-11-05T12:15:58.817Z",
+      "http_status": 200
+    },
+    {
+      "path": "cost/LIN-4257.json",
+      "bytes": 1746,
+      "sha256": "42120430cc0ceb8cc868212ede84500c76af9027cd11b7706204e173c47ef913",
+      "read_at": "2026-11-05T12:15:59.917Z",
+      "http_status": 200
+    }
+  ]
+}

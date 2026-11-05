@@ -1,0 +1,3731 @@
+{
+  "ticket": "LIN-4257",
+  "window_start": "2026-11-04T05:00:00Z",
+  "population": [
+    "LIN-4048",
+    "LIN-4143",
+    "LIN-4144",
+    "LIN-4151",
+    "LIN-4177",
+    "LIN-4178",
+    "LIN-4179",
+    "LIN-4187",
+    "LIN-4195",
+    "LIN-4196",
+    "LIN-4197",
+    "LIN-4198",
+    "LIN-4199",
+    "LIN-4200",
+    "LIN-4201",
+    "LIN-4202",
+    "LIN-4203",
+    "LIN-4206",
+    "LIN-4207",
+    "LIN-4208",
+    "LIN-4209",
+    "LIN-4212",
+    "LIN-4218",
+    "LIN-4219",
+    "LIN-4220",
+    "LIN-4221",
+    "LIN-4222",
+    "LIN-4223",
+    "LIN-4224",
+    "LIN-4226",
+    "LIN-4231",
+    "LIN-4232",
+    "LIN-4233",
+    "LIN-4234",
+    "LIN-4239",
+    "LIN-4240",
+    "LIN-4241",
+    "LIN-4242",
+    "LIN-4243",
+    "LIN-4246",
+    "LIN-4247",
+    "LIN-4248",
+    "LIN-4249",
+    "LIN-4250",
+    "LIN-4251",
+    "LIN-4252",
+    "LIN-4253"
+  ],
+  "population_excluded": [
+    "LIN-4257"
+  ],
+  "counts": {
+    "population": 47,
+    "shapeCode": 32,
+    "shapeResearchAsWork": 8,
+    "shapeNoImplementation": 6,
+    "shapeNoLandedCode": [
+      "LIN-4246"
+    ],
+    "unpricedNull": [
+      "LIN-4177",
+      "LIN-4178",
+      "LIN-4246"
+    ],
+    "preWindowLegs": [
+      "LIN-4177",
+      "LIN-4178",
+      "LIN-4179",
+      "LIN-4195",
+      "LIN-4196",
+      "LIN-4197",
+      "LIN-4198",
+      "LIN-4199",
+      "LIN-4202"
+    ],
+    "reconcileFailures": [],
+    "finishedCode": 30,
+    "exact": [
+      "LIN-4143",
+      "LIN-4151",
+      "LIN-4187",
+      "LIN-4200",
+      "LIN-4201",
+      "LIN-4203",
+      "LIN-4212",
+      "LIN-4218",
+      "LIN-4220",
+      "LIN-4221",
+      "LIN-4222",
+      "LIN-4223",
+      "LIN-4226",
+      "LIN-4234",
+      "LIN-4239",
+      "LIN-4240",
+      "LIN-4243",
+      "LIN-4247",
+      "LIN-4248",
+      "LIN-4251",
+      "LIN-4252",
+      "LIN-4253"
+    ],
+    "clean": [
+      "LIN-4203",
+      "LIN-4212",
+      "LIN-4247",
+      "LIN-4251"
+    ],
+    "workObserver": [
+      "LIN-4143",
+      "LIN-4151",
+      "LIN-4201",
+      "LIN-4234",
+      "LIN-4239",
+      "LIN-4240",
+      "LIN-4243",
+      "LIN-4248",
+      "LIN-4252",
+      "LIN-4253"
+    ]
+  },
+  "tests": {
+    "cleanStratum_vs_workUsd": [
+      {
+        "label": "prodLines vs work USD",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 138,
+            "y": 2.5517
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 193,
+            "y": 2.8727
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 42,
+            "y": 0.6993
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 180,
+            "y": 1.5868
+          }
+        ]
+      },
+      {
+        "label": "testLines vs work USD",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 284,
+            "y": 2.5517
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 546,
+            "y": 2.8727
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 155,
+            "y": 0.6993
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 473,
+            "y": 1.5868
+          }
+        ]
+      },
+      {
+        "label": "prodFiles vs work USD",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 6,
+            "y": 2.5517
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 3,
+            "y": 2.8727
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 1,
+            "y": 0.6993
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 6,
+            "y": 1.5868
+          }
+        ]
+      },
+      {
+        "label": "lvPRs vs work USD",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 1,
+            "y": 2.5517
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 1,
+            "y": 2.8727
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 1,
+            "y": 0.6993
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 1,
+            "y": 1.5868
+          }
+        ]
+      },
+      {
+        "label": "sdCodeLines vs work USD",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 345,
+            "y": 2.5517
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 0,
+            "y": 2.8727
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 0,
+            "y": 0.6993
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 0,
+            "y": 1.5868
+          }
+        ]
+      },
+      {
+        "label": "sdTestLines vs work USD",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 897,
+            "y": 2.5517
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 0,
+            "y": 2.8727
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 0,
+            "y": 0.6993
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 0,
+            "y": 1.5868
+          }
+        ]
+      },
+      {
+        "label": "placeCrossAreaDelta vs work USD",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 2,
+            "y": 2.5517
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 0,
+            "y": 2.8727
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 0,
+            "y": 0.6993
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 0,
+            "y": 1.5868
+          }
+        ]
+      },
+      {
+        "label": "placeGrownPairs vs work USD",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 1,
+            "y": 2.5517
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 0,
+            "y": 2.8727
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 0,
+            "y": 0.6993
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 0,
+            "y": 1.5868
+          }
+        ]
+      },
+      {
+        "label": "placeHomelessNewFiles vs work USD",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 1,
+            "y": 2.5517
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 0,
+            "y": 2.8727
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 0,
+            "y": 0.6993
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 0,
+            "y": 1.5868
+          }
+        ]
+      }
+    ],
+    "cleanStratum_vs_workUnits": [
+      {
+        "label": "prodLines vs implementation weighted units",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 138,
+            "y": 1068756.5999999996
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 193,
+            "y": 1196076.74
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 42,
+            "y": 342391.9399999999
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 180,
+            "y": 673405.7200000001
+          }
+        ]
+      },
+      {
+        "label": "testLines vs implementation weighted units",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 284,
+            "y": 1068756.5999999996
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 546,
+            "y": 1196076.74
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 155,
+            "y": 342391.9399999999
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 473,
+            "y": 673405.7200000001
+          }
+        ]
+      },
+      {
+        "label": "prodFiles vs implementation weighted units",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 6,
+            "y": 1068756.5999999996
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 3,
+            "y": 1196076.74
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 1,
+            "y": 342391.9399999999
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 6,
+            "y": 673405.7200000001
+          }
+        ]
+      },
+      {
+        "label": "lvPRs vs implementation weighted units",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 1,
+            "y": 1068756.5999999996
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 1,
+            "y": 1196076.74
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 1,
+            "y": 342391.9399999999
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 1,
+            "y": 673405.7200000001
+          }
+        ]
+      },
+      {
+        "label": "sdCodeLines vs implementation weighted units",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 345,
+            "y": 1068756.5999999996
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 0,
+            "y": 1196076.74
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 0,
+            "y": 342391.9399999999
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 0,
+            "y": 673405.7200000001
+          }
+        ]
+      },
+      {
+        "label": "sdTestLines vs implementation weighted units",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 897,
+            "y": 1068756.5999999996
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 0,
+            "y": 1196076.74
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 0,
+            "y": 342391.9399999999
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 0,
+            "y": 673405.7200000001
+          }
+        ]
+      },
+      {
+        "label": "placeCrossAreaDelta vs implementation weighted units",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 2,
+            "y": 1068756.5999999996
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 0,
+            "y": 1196076.74
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 0,
+            "y": 342391.9399999999
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 0,
+            "y": 673405.7200000001
+          }
+        ]
+      },
+      {
+        "label": "placeGrownPairs vs implementation weighted units",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 1,
+            "y": 1068756.5999999996
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 0,
+            "y": 1196076.74
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 0,
+            "y": 342391.9399999999
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 0,
+            "y": 673405.7200000001
+          }
+        ]
+      },
+      {
+        "label": "placeHomelessNewFiles vs implementation weighted units",
+        "n": 4,
+        "rho": null,
+        "points": [
+          {
+            "ticket": "LIN-4203",
+            "x": 1,
+            "y": 1068756.5999999996
+          },
+          {
+            "ticket": "LIN-4212",
+            "x": 0,
+            "y": 1196076.74
+          },
+          {
+            "ticket": "LIN-4247",
+            "x": 0,
+            "y": 342391.9399999999
+          },
+          {
+            "ticket": "LIN-4251",
+            "x": 0,
+            "y": 673405.7200000001
+          }
+        ]
+      }
+    ],
+    "workObserver_vs_workUsd": [
+      {
+        "label": "prodLines vs work USD (work + observer)",
+        "n": 10,
+        "rho": -0.01
+      },
+      {
+        "label": "testLines vs work USD (work + observer)",
+        "n": 10,
+        "rho": 0.03
+      },
+      {
+        "label": "prodFiles vs work USD (work + observer)",
+        "n": 10,
+        "rho": 0.16
+      },
+      {
+        "label": "lvPRs vs work USD (work + observer)",
+        "n": 10,
+        "rho": -0.29
+      },
+      {
+        "label": "sdCodeLines vs work USD (work + observer)",
+        "n": 10,
+        "rho": -0.11
+      },
+      {
+        "label": "sdTestLines vs work USD (work + observer)",
+        "n": 10,
+        "rho": -0.11
+      },
+      {
+        "label": "placeCrossAreaDelta vs work USD (work + observer)",
+        "n": 10,
+        "rho": 0.02
+      },
+      {
+        "label": "placeGrownPairs vs work USD (work + observer)",
+        "n": 10,
+        "rho": 0.02
+      },
+      {
+        "label": "placeHomelessNewFiles vs work USD (work + observer)",
+        "n": 10,
+        "rho": 0.52
+      }
+    ],
+    "exact_vs_workUsd_modelMixed": [
+      {
+        "label": "prodLines vs work USD (models mixed; descriptive only)",
+        "n": 22,
+        "rho": 0.2
+      },
+      {
+        "label": "testLines vs work USD (models mixed; descriptive only)",
+        "n": 22,
+        "rho": 0.39
+      },
+      {
+        "label": "prodFiles vs work USD (models mixed; descriptive only)",
+        "n": 22,
+        "rho": 0.21
+      },
+      {
+        "label": "lvPRs vs work USD (models mixed; descriptive only)",
+        "n": 22,
+        "rho": 0.22
+      },
+      {
+        "label": "sdCodeLines vs work USD (models mixed; descriptive only)",
+        "n": 22,
+        "rho": -0.16
+      },
+      {
+        "label": "sdTestLines vs work USD (models mixed; descriptive only)",
+        "n": 22,
+        "rho": -0.22
+      },
+      {
+        "label": "placeCrossAreaDelta vs work USD (models mixed; descriptive only)",
+        "n": 22,
+        "rho": 0.23
+      },
+      {
+        "label": "placeGrownPairs vs work USD (models mixed; descriptive only)",
+        "n": 22,
+        "rho": 0.23
+      },
+      {
+        "label": "placeHomelessNewFiles vs work USD (models mixed; descriptive only)",
+        "n": 22,
+        "rho": 0.2
+      }
+    ],
+    "exact_vs_floorUsd": [
+      {
+        "label": "prodLines vs floor USD",
+        "n": 22,
+        "rho": 0.71
+      },
+      {
+        "label": "testLines vs floor USD",
+        "n": 22,
+        "rho": 0.78
+      },
+      {
+        "label": "prodFiles vs floor USD",
+        "n": 22,
+        "rho": 0.6
+      },
+      {
+        "label": "lvPRs vs floor USD",
+        "n": 22,
+        "rho": 0.56
+      },
+      {
+        "label": "sdCodeLines vs floor USD",
+        "n": 22,
+        "rho": -0.3
+      },
+      {
+        "label": "sdTestLines vs floor USD",
+        "n": 22,
+        "rho": -0.62
+      },
+      {
+        "label": "placeCrossAreaDelta vs floor USD",
+        "n": 22,
+        "rho": 0.38
+      },
+      {
+        "label": "placeGrownPairs vs floor USD",
+        "n": 22,
+        "rho": 0.38
+      },
+      {
+        "label": "placeHomelessNewFiles vs floor USD",
+        "n": 22,
+        "rho": 0.07
+      }
+    ],
+    "exact_vs_totalUsd": [
+      {
+        "label": "prodLines vs total USD",
+        "n": 22,
+        "rho": 0.51
+      },
+      {
+        "label": "testLines vs total USD",
+        "n": 22,
+        "rho": 0.73
+      },
+      {
+        "label": "prodFiles vs total USD",
+        "n": 22,
+        "rho": 0.43
+      },
+      {
+        "label": "lvPRs vs total USD",
+        "n": 22,
+        "rho": 0.41
+      },
+      {
+        "label": "sdCodeLines vs total USD",
+        "n": 22,
+        "rho": -0.45
+      },
+      {
+        "label": "sdTestLines vs total USD",
+        "n": 22,
+        "rho": -0.52
+      },
+      {
+        "label": "placeCrossAreaDelta vs total USD",
+        "n": 22,
+        "rho": 0.39
+      },
+      {
+        "label": "placeGrownPairs vs total USD",
+        "n": 22,
+        "rho": 0.39
+      },
+      {
+        "label": "placeHomelessNewFiles vs total USD",
+        "n": 22,
+        "rho": 0
+      }
+    ],
+    "surveyBalance_vs_floor": [
+      {
+        "label": "survey balance (ordinal) vs floor USD",
+        "n": 16,
+        "rho": -0.42
+      }
+    ],
+    "surveyBalance_vs_work": [
+      {
+        "label": "survey balance (ordinal) vs work USD",
+        "n": 16,
+        "rho": -0.14
+      }
+    ]
+  },
+  "perTicket": {
+    "LIN-4048": {
+      "ticket": "LIN-4048",
+      "state": "Done",
+      "totalUsd": 11.115618940000001,
+      "appCallsUsd": 0.2013,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 7.4229,
+        "work": 1.9642,
+        "keepAlive": 1.5271,
+        "survey": 0,
+        "before": 3.6483,
+        "after": 3.7746
+      },
+      "implModel": "multiple",
+      "implRows": 2,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "autopilot",
+        "close-out",
+        "custom",
+        "implementation",
+        "plan",
+        "research",
+        "review",
+        "triage",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 35,
+        "testLines": 317,
+        "prodFiles": 2
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": "+",
+      "surveyBalanceLine": 50,
+      "weightedUnits": {
+        "all": 3677032.5399999996,
+        "implementation": 744626.9800000001
+      }
+    },
+    "LIN-4143": {
+      "ticket": "LIN-4143",
+      "state": "Done",
+      "totalUsd": 6.48614347,
+      "appCallsUsd": 0.0695,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 2.5023,
+        "work": 3.2662,
+        "keepAlive": 0.6481,
+        "survey": 0,
+        "before": 0.968,
+        "after": 1.5343
+      },
+      "implModel": "claude-opus-5-5",
+      "implRows": 1,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "autopilot",
+        "close-out",
+        "custom",
+        "implementation",
+        "plan",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 43,
+        "testLines": 314,
+        "prodFiles": 6
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": "+",
+      "surveyBalanceLine": 51,
+      "weightedUnits": {
+        "all": 2059426.04,
+        "implementation": 1086619.8
+      }
+    },
+    "LIN-4144": {
+      "ticket": "LIN-4144",
+      "state": "Done",
+      "totalUsd": 9.7206907,
+      "appCallsUsd": 0.1524,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 5.6066,
+        "work": 0,
+        "keepAlive": 3.9617,
+        "survey": 0,
+        "before": 3.8713,
+        "after": 1.7353
+      },
+      "implModel": null,
+      "implRows": 0,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "breakdown",
+        "close-out",
+        "plan",
+        "plan-review",
+        "review",
+        "wake"
+      ],
+      "shape": "no-implementation-lineage",
+      "lv": {
+        "prs": 0,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 0
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 2933935.78,
+        "implementation": null
+      }
+    },
+    "LIN-4151": {
+      "ticket": "LIN-4151",
+      "state": "Done",
+      "totalUsd": 6.41876356,
+      "appCallsUsd": 0.0829,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 3.1127,
+        "work": 2.3649,
+        "keepAlive": 0.8584,
+        "survey": 0,
+        "before": 0.8352,
+        "after": 2.2774
+      },
+      "implModel": "claude-opus-5-5",
+      "implRows": 1,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "autopilot",
+        "close-out",
+        "custom",
+        "implementation",
+        "plan",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 157,
+        "testLines": 206,
+        "prodFiles": 3
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": "+",
+      "surveyBalanceLine": 49,
+      "weightedUnits": {
+        "all": 2006362.12,
+        "implementation": 783596.4600000001
+      }
+    },
+    "LIN-4177": {
+      "ticket": "LIN-4177",
+      "state": "Done",
+      "totalUsd": null,
+      "appCallsUsd": 0.1146,
+      "reconciles": null,
+      "unpriced": [
+        "claude-haiku-5-5"
+      ],
+      "noLineage": false,
+      "preWindowLegs": true,
+      "legs": {
+        "floor": 3.2755,
+        "work": null,
+        "keepAlive": 0,
+        "survey": 0,
+        "before": 0,
+        "after": 3.2755
+      },
+      "implModel": "multiple",
+      "implRows": 2,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "close-out",
+        "custom",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 689,
+        "testLines": 404,
+        "prodFiles": 12
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 0
+      },
+      "surveyBalance": "−/+",
+      "surveyBalanceLine": 18,
+      "weightedUnits": {
+        "all": 660349.3999999999,
+        "implementation": 660349.3999999999
+      }
+    },
+    "LIN-4178": {
+      "ticket": "LIN-4178",
+      "state": "Done",
+      "totalUsd": null,
+      "appCallsUsd": 0.1071,
+      "reconciles": null,
+      "unpriced": [
+        "claude-haiku-5-5"
+      ],
+      "noLineage": false,
+      "preWindowLegs": true,
+      "legs": {
+        "floor": 3.2882,
+        "work": null,
+        "keepAlive": 0,
+        "survey": 0,
+        "before": 0,
+        "after": 3.2882
+      },
+      "implModel": "multiple",
+      "implRows": 2,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "close-out",
+        "custom",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 401,
+        "testLines": 700,
+        "prodFiles": 12
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 9,
+        "newPairs": 0,
+        "grownPairs": 2,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 1,
+        "prsMapped": 1
+      },
+      "surveyBalance": "−",
+      "surveyBalanceLine": 19,
+      "weightedUnits": {
+        "all": 502372.60000000003,
+        "implementation": 502372.60000000003
+      }
+    },
+    "LIN-4179": {
+      "ticket": "LIN-4179",
+      "state": "Done",
+      "totalUsd": 16.170597050000005,
+      "appCallsUsd": 0.0445,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": true,
+      "legs": {
+        "floor": 2.8873,
+        "work": 13.2388,
+        "keepAlive": 0,
+        "survey": 0,
+        "before": 0,
+        "after": 2.8873
+      },
+      "implModel": "claude-opus-5-5",
+      "implRows": 1,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "close-out",
+        "custom",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 563,
+        "testLines": 1210,
+        "prodFiles": 26
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 9,
+        "newPairs": 1,
+        "grownPairs": 2,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": "0",
+      "surveyBalanceLine": 20,
+      "weightedUnits": {
+        "all": 1244685.7,
+        "implementation": 1244685.7
+      }
+    },
+    "LIN-4187": {
+      "ticket": "LIN-4187",
+      "state": "Done",
+      "totalUsd": 3.79585389,
+      "appCallsUsd": 0.0845,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 2.4551,
+        "work": 0.4633,
+        "keepAlive": 0.7929,
+        "survey": 0,
+        "before": 0.5411,
+        "after": 1.9141
+      },
+      "implModel": "claude-haiku-5-5",
+      "implRows": 1,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "close-out",
+        "implementation",
+        "plan",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 0,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 1,
+        "codeLines": 0,
+        "testLines": 343,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 0
+      },
+      "surveyBalance": "+",
+      "surveyBalanceLine": 42,
+      "weightedUnits": {
+        "all": 1235706.1,
+        "implementation": 246510.12000000002
+      }
+    },
+    "LIN-4195": {
+      "ticket": "LIN-4195",
+      "state": "Done",
+      "totalUsd": 76.05339660000001,
+      "appCallsUsd": 0.1354,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": true,
+      "legs": {
+        "floor": 8.8572,
+        "work": 0,
+        "keepAlive": 67.0608,
+        "survey": 0,
+        "before": 4.9848,
+        "after": 3.8724
+      },
+      "implModel": null,
+      "implRows": 0,
+      "customInWindow": 4,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "breakdown",
+        "close-out",
+        "custom",
+        "plan",
+        "plan-review",
+        "review",
+        "wake"
+      ],
+      "shape": "no-implementation-lineage",
+      "lv": {
+        "prs": 0,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 0
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 24553916.900000002,
+        "implementation": null
+      }
+    },
+    "LIN-4196": {
+      "ticket": "LIN-4196",
+      "state": "Done",
+      "totalUsd": 16.004823209999998,
+      "appCallsUsd": 0.1097,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": true,
+      "legs": {
+        "floor": 3.9684,
+        "work": 9.2129,
+        "keepAlive": 2.7137,
+        "survey": 0,
+        "before": 2.0919,
+        "after": 1.8766
+      },
+      "implModel": "multiple",
+      "implRows": 2,
+      "customInWindow": 3,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "autopilot",
+        "close-out",
+        "custom",
+        "implementation",
+        "plan",
+        "plan-review",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 0,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 1,
+        "codeLines": 0,
+        "testLines": 1007,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 0
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 4219199.3,
+        "implementation": 2914258.1799999997
+      }
+    },
+    "LIN-4197": {
+      "ticket": "LIN-4197",
+      "state": "Done",
+      "totalUsd": 9.664270989999999,
+      "appCallsUsd": 0.0576,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": true,
+      "legs": {
+        "floor": 1.8449,
+        "work": 6.0736,
+        "keepAlive": 1.6882,
+        "survey": 0,
+        "before": 0,
+        "after": 1.8449
+      },
+      "implModel": "claude-opus-5-5",
+      "implRows": 1,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "close-out",
+        "custom",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 0,
+        "testLines": 246,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 1,
+        "codeLines": 0,
+        "testLines": 1330,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 996871.8,
+        "implementation": 996871.8
+      }
+    },
+    "LIN-4198": {
+      "ticket": "LIN-4198",
+      "state": "Done",
+      "totalUsd": 17.988287530000004,
+      "appCallsUsd": 0.0578,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": true,
+      "legs": {
+        "floor": 1.835,
+        "work": 14.5388,
+        "keepAlive": 1.5568,
+        "survey": 0,
+        "before": 0,
+        "after": 1.835
+      },
+      "implModel": "claude-opus-5-5",
+      "implRows": 1,
+      "customInWindow": 2,
+      "customLegs": 0,
+      "afterAnswers": 2,
+      "kindsSeen": [
+        "close-out",
+        "custom",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 607,
+        "testLines": 1335,
+        "prodFiles": 11
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 4,
+        "newPairs": 0,
+        "grownPairs": 2,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": "−",
+      "surveyBalanceLine": 21,
+      "weightedUnits": {
+        "all": 2608112.6999999993,
+        "implementation": 2608112.6999999993
+      }
+    },
+    "LIN-4199": {
+      "ticket": "LIN-4199",
+      "state": "Done",
+      "totalUsd": 12.514910559999999,
+      "appCallsUsd": 0.0616,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": true,
+      "legs": {
+        "floor": 2.4346,
+        "work": 8.2316,
+        "keepAlive": 1.7871,
+        "survey": 0,
+        "before": 0,
+        "after": 2.4346
+      },
+      "implModel": "claude-opus-5-5",
+      "implRows": 1,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "close-out",
+        "custom",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 0,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 1,
+        "codeLines": 482,
+        "testLines": 884,
+        "codeFiles": 8
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 0
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 1473663.44,
+        "implementation": 1272634.4
+      }
+    },
+    "LIN-4200": {
+      "ticket": "LIN-4200",
+      "state": "Done",
+      "totalUsd": 13.05391481,
+      "appCallsUsd": 0.086,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 3.6012,
+        "work": 4.8765,
+        "keepAlive": 4.4902,
+        "survey": 0,
+        "before": 0,
+        "after": 3.6012
+      },
+      "implModel": "claude-haiku-5-5",
+      "implRows": 1,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "close-out",
+        "custom",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 0,
+        "testLines": 473,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 4531795.419999999,
+        "implementation": 2018132.8800000001
+      }
+    },
+    "LIN-4201": {
+      "ticket": "LIN-4201",
+      "state": "Done",
+      "totalUsd": 40.12871573000001,
+      "appCallsUsd": 0.1616,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 7.3344,
+        "work": 2.237,
+        "keepAlive": 30.3957,
+        "survey": 0,
+        "before": 0,
+        "after": 7.3344
+      },
+      "implModel": "claude-opus-5-5",
+      "implRows": 1,
+      "customInWindow": 3,
+      "customLegs": 1,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "close-out",
+        "custom",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 1006,
+        "testLines": 1620,
+        "prodFiles": 29
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 8,
+        "newPairs": 0,
+        "grownPairs": 2,
+        "shrunkPairs": 1,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": "+ (mixed)",
+      "surveyBalanceLine": 32,
+      "weightedUnits": {
+        "all": 15109595.579999993,
+        "implementation": 745249.1
+      }
+    },
+    "LIN-4202": {
+      "ticket": "LIN-4202",
+      "state": "Done",
+      "totalUsd": 22.164272599999997,
+      "appCallsUsd": 0.0566,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": true,
+      "legs": {
+        "floor": 1.8748,
+        "work": 0,
+        "keepAlive": 20.2329,
+        "survey": 0,
+        "before": 0,
+        "after": 1.8748
+      },
+      "implModel": null,
+      "implRows": 0,
+      "customInWindow": 3,
+      "customLegs": 1,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "close-out",
+        "custom",
+        "review",
+        "wake"
+      ],
+      "shape": "no-implementation-lineage",
+      "lv": {
+        "prs": 1,
+        "prodLines": 141,
+        "testLines": 326,
+        "prodFiles": 1
+      },
+      "sd": {
+        "prs": 1,
+        "codeLines": 216,
+        "testLines": 1104,
+        "codeFiles": 4
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": "−",
+      "surveyBalanceLine": 22,
+      "weightedUnits": {
+        "all": 4455247.260000001,
+        "implementation": null
+      }
+    },
+    "LIN-4203": {
+      "ticket": "LIN-4203",
+      "state": "Done",
+      "totalUsd": 6.21063665,
+      "appCallsUsd": 0.0608,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 2.9046,
+        "work": 2.5517,
+        "keepAlive": 0.6935,
+        "survey": 0,
+        "before": 0,
+        "after": 2.9046
+      },
+      "implModel": "claude-haiku-5-5",
+      "implRows": 1,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "close-out",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 138,
+        "testLines": 284,
+        "prodFiles": 6
+      },
+      "sd": {
+        "prs": 1,
+        "codeLines": 345,
+        "testLines": 897,
+        "codeFiles": 7
+      },
+      "place": {
+        "crossAreaDelta": 2,
+        "newPairs": 0,
+        "grownPairs": 1,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 1,
+        "prsMapped": 1
+      },
+      "surveyBalance": "+",
+      "surveyBalanceLine": 33,
+      "weightedUnits": {
+        "all": 2204143.76,
+        "implementation": 1068756.5999999996
+      }
+    },
+    "LIN-4206": {
+      "ticket": "LIN-4206",
+      "state": "Done",
+      "totalUsd": 6.915767875,
+      "appCallsUsd": 0.1745,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 5.872,
+        "work": 0.8692,
+        "keepAlive": 0,
+        "survey": 0,
+        "before": 4.8568,
+        "after": 1.0152
+      },
+      "implModel": "claude-haiku-5-5",
+      "implRows": 1,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "implementation",
+        "plan",
+        "research",
+        "review",
+        "wake"
+      ],
+      "shape": "research-as-work",
+      "lv": {
+        "prs": 1,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 2369316.21,
+        "implementation": 431458.37
+      }
+    },
+    "LIN-4207": {
+      "ticket": "LIN-4207",
+      "state": "Done",
+      "totalUsd": 8.266547404999999,
+      "appCallsUsd": 0.2215,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 6.3757,
+        "work": 1.6693,
+        "keepAlive": 0,
+        "survey": 0,
+        "before": 2.8973,
+        "after": 3.4784
+      },
+      "implModel": "claude-haiku-5-5",
+      "implRows": 1,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "implementation",
+        "plan",
+        "research",
+        "retrospective-audit",
+        "review",
+        "wake"
+      ],
+      "shape": "research-as-work",
+      "lv": {
+        "prs": 1,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 2827714.23,
+        "implementation": 780769.15
+      }
+    },
+    "LIN-4208": {
+      "ticket": "LIN-4208",
+      "state": "Done",
+      "totalUsd": 6.361552455,
+      "appCallsUsd": 0.2111,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 5.2218,
+        "work": 0.9286,
+        "keepAlive": 0,
+        "survey": 0,
+        "before": 2.983,
+        "after": 2.2389
+      },
+      "implModel": "claude-haiku-5-5",
+      "implRows": 1,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "close-out",
+        "implementation",
+        "plan",
+        "research",
+        "review",
+        "wake"
+      ],
+      "shape": "research-as-work",
+      "lv": {
+        "prs": 1,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 2101432.97,
+        "implementation": 439794.44999999995
+      }
+    },
+    "LIN-4209": {
+      "ticket": "LIN-4209",
+      "state": "Done",
+      "totalUsd": 17.465831520000002,
+      "appCallsUsd": 0.2982,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 14.3884,
+        "work": 2.7792,
+        "keepAlive": 0,
+        "survey": 0,
+        "before": 11.3205,
+        "after": 3.068
+      },
+      "implModel": "claude-haiku-5-5",
+      "implRows": 1,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "implementation",
+        "plan",
+        "research",
+        "retrospective-audit",
+        "review",
+        "wake"
+      ],
+      "shape": "research-as-work",
+      "lv": {
+        "prs": 1,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 6239970.909999998,
+        "implementation": 1329636.9600000004
+      }
+    },
+    "LIN-4212": {
+      "ticket": "LIN-4212",
+      "state": "Done",
+      "totalUsd": 24.79131085,
+      "appCallsUsd": 0.2091,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 16.7733,
+        "work": 2.8727,
+        "keepAlive": 4.9362,
+        "survey": 0,
+        "before": 14.0547,
+        "after": 2.7186
+      },
+      "implModel": "claude-haiku-5-5",
+      "implRows": 1,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "close-out",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 193,
+        "testLines": 546,
+        "prodFiles": 3
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": "0",
+      "surveyBalanceLine": 31,
+      "weightedUnits": {
+        "all": 8458817.64,
+        "implementation": 1196076.74
+      }
+    },
+    "LIN-4218": {
+      "ticket": "LIN-4218",
+      "state": "Done",
+      "totalUsd": 6.845393530000002,
+      "appCallsUsd": 0.1097,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 3.685,
+        "work": 1.753,
+        "keepAlive": 1.2977,
+        "survey": 0,
+        "before": 1.4149,
+        "after": 2.2701
+      },
+      "implModel": "claude-haiku-5-5",
+      "implRows": 1,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "blocked",
+        "close-out",
+        "implementation",
+        "plan",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 0,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 1,
+        "codeLines": 497,
+        "testLines": 21871,
+        "codeFiles": 2
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 0
+      },
+      "surveyBalance": "+",
+      "surveyBalanceLine": 34,
+      "weightedUnits": {
+        "all": 2268961.46,
+        "implementation": 737348.1799999999
+      }
+    },
+    "LIN-4219": {
+      "ticket": "LIN-4219",
+      "state": "Done",
+      "totalUsd": 16.425004799999996,
+      "appCallsUsd": 0.157,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 6.6689,
+        "work": 0,
+        "keepAlive": 9.5991,
+        "survey": 0,
+        "before": 3.2052,
+        "after": 3.4637
+      },
+      "implModel": null,
+      "implRows": 0,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "breakdown",
+        "close-out",
+        "plan",
+        "plan-review",
+        "review",
+        "wake"
+      ],
+      "shape": "no-implementation-lineage",
+      "lv": {
+        "prs": 0,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 1,
+        "codeLines": 0,
+        "testLines": 12,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 0
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 4984512.360000001,
+        "implementation": null
+      }
+    },
+    "LIN-4220": {
+      "ticket": "LIN-4220",
+      "state": "Done",
+      "totalUsd": 6.513732540000001,
+      "appCallsUsd": 0.0595,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 1.8177,
+        "work": 2.8257,
+        "keepAlive": 1.8109,
+        "survey": 0,
+        "before": 0,
+        "after": 1.8177
+      },
+      "implModel": "claude-haiku-5-5",
+      "implRows": 1,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "close-out",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 0,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 1,
+        "codeLines": 0,
+        "testLines": 1416,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 0
+      },
+      "surveyBalance": "+",
+      "surveyBalanceLine": 36,
+      "weightedUnits": {
+        "all": 2293505.4800000004,
+        "implementation": 1169535.2400000002
+      }
+    },
+    "LIN-4221": {
+      "ticket": "LIN-4221",
+      "state": "Done",
+      "totalUsd": 7.21355582,
+      "appCallsUsd": 0.0616,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 2.3072,
+        "work": 3.3217,
+        "keepAlive": 1.523,
+        "survey": 0,
+        "before": 0,
+        "after": 2.3072
+      },
+      "implModel": "claude-haiku-5-5",
+      "implRows": 1,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "close-out",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 0,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 1,
+        "codeLines": 0,
+        "testLines": 1213,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 0
+      },
+      "surveyBalance": "+",
+      "surveyBalanceLine": 38,
+      "weightedUnits": {
+        "all": 2570895.8999999994,
+        "implementation": 1378068.2999999996
+      }
+    },
+    "LIN-4222": {
+      "ticket": "LIN-4222",
+      "state": "Done",
+      "totalUsd": 5.456499369999999,
+      "appCallsUsd": 0.0577,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 2.0505,
+        "work": 1.4659,
+        "keepAlive": 1.8825,
+        "survey": 0,
+        "before": 0,
+        "after": 2.0505
+      },
+      "implModel": "claude-haiku-5-5",
+      "implRows": 1,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "close-out",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 0,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 1,
+        "codeLines": 0,
+        "testLines": 496,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 0
+      },
+      "surveyBalance": "+",
+      "surveyBalanceLine": 39,
+      "weightedUnits": {
+        "all": 1860678.9200000004,
+        "implementation": 640140.04
+      }
+    },
+    "LIN-4223": {
+      "ticket": "LIN-4223",
+      "state": "Done",
+      "totalUsd": 7.987793830000001,
+      "appCallsUsd": 0.0587,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 4.1361,
+        "work": 2.2793,
+        "keepAlive": 1.5137,
+        "survey": 0,
+        "before": 0,
+        "after": 4.1361
+      },
+      "implModel": "claude-haiku-5-5",
+      "implRows": 1,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "close-out",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 0,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 1,
+        "codeLines": 0,
+        "testLines": 1044,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 0
+      },
+      "surveyBalance": "+",
+      "surveyBalanceLine": 37,
+      "weightedUnits": {
+        "all": 2733358.6199999996,
+        "implementation": 980996.7599999998
+      }
+    },
+    "LIN-4224": {
+      "ticket": "LIN-4224",
+      "state": "Done",
+      "totalUsd": 16.37988595000001,
+      "appCallsUsd": 0.0679,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 2.2667,
+        "work": 0,
+        "keepAlive": 14.0452,
+        "survey": 0,
+        "before": 0,
+        "after": 2.2667
+      },
+      "implModel": null,
+      "implRows": 0,
+      "customInWindow": 4,
+      "customLegs": 1,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "close-out",
+        "custom",
+        "review",
+        "wake"
+      ],
+      "shape": "no-implementation-lineage",
+      "lv": {
+        "prs": 0,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 1,
+        "codeLines": 1,
+        "testLines": 1475,
+        "codeFiles": 1
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 0
+      },
+      "surveyBalance": "+",
+      "surveyBalanceLine": 40,
+      "weightedUnits": {
+        "all": 5880355.079999999,
+        "implementation": null
+      }
+    },
+    "LIN-4226": {
+      "ticket": "LIN-4226",
+      "state": "Done",
+      "totalUsd": 27.836723930000005,
+      "appCallsUsd": 0.1277,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 9.818,
+        "work": 7.0684,
+        "keepAlive": 10.8227,
+        "survey": 0,
+        "before": 3.3968,
+        "after": 6.4211
+      },
+      "implModel": "claude-haiku-5-5",
+      "implRows": 1,
+      "customInWindow": 0,
+      "customLegs": 1,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "close-out",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 403,
+        "testLines": 1115,
+        "prodFiles": 17
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 2,
+        "newPairs": 0,
+        "grownPairs": 1,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": "+ (small)",
+      "surveyBalanceLine": 35,
+      "weightedUnits": {
+        "all": 9878807.020000003,
+        "implementation": 2869119.2800000035
+      }
+    },
+    "LIN-4231": {
+      "ticket": "LIN-4231",
+      "state": "Done",
+      "totalUsd": 12.679850239999999,
+      "appCallsUsd": 0.1139,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 10.8995,
+        "work": 0.1305,
+        "keepAlive": 1.5359,
+        "survey": 0,
+        "before": 9.559,
+        "after": 1.3406
+      },
+      "implModel": "claude-haiku-5-5",
+      "implRows": 1,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "implementation",
+        "research",
+        "review",
+        "wake"
+      ],
+      "shape": "research-as-work",
+      "lv": {
+        "prs": 1,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 4515671.94,
+        "implementation": 114607.62
+      }
+    },
+    "LIN-4232": {
+      "ticket": "LIN-4232",
+      "state": "Done",
+      "totalUsd": 21.951158550000002,
+      "appCallsUsd": 0.0285,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 20.334,
+        "work": 0,
+        "keepAlive": 1.5887,
+        "survey": 0,
+        "before": 20.334,
+        "after": 0
+      },
+      "implModel": null,
+      "implRows": 0,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "research",
+        "wake"
+      ],
+      "shape": "research-as-work",
+      "lv": {
+        "prs": 1,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 9197113.830000002,
+        "implementation": null
+      }
+    },
+    "LIN-4233": {
+      "ticket": "LIN-4233",
+      "state": "Done",
+      "totalUsd": 14.54816595,
+      "appCallsUsd": 0.2641,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 8.7191,
+        "work": 0,
+        "keepAlive": 5.565,
+        "survey": 0,
+        "before": 5.5882,
+        "after": 3.1309
+      },
+      "implModel": null,
+      "implRows": 0,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "breakdown",
+        "close-out",
+        "custom",
+        "plan",
+        "plan-review",
+        "review",
+        "wake"
+      ],
+      "shape": "no-implementation-lineage",
+      "lv": {
+        "prs": 0,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 1,
+        "codeLines": 8,
+        "testLines": 4,
+        "codeFiles": 1
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 0
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 4423503.379999999,
+        "implementation": null
+      }
+    },
+    "LIN-4234": {
+      "ticket": "LIN-4234",
+      "state": "Done",
+      "totalUsd": 5.78843316,
+      "appCallsUsd": 0.0889,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 2.5775,
+        "work": 2.3062,
+        "keepAlive": 0.8159,
+        "survey": 0,
+        "before": 0.6922,
+        "after": 1.8853
+      },
+      "implModel": "claude-opus-5-5",
+      "implRows": 1,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "autopilot",
+        "close-out",
+        "custom",
+        "implementation",
+        "plan",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 6,
+        "testLines": 209,
+        "prodFiles": 1
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": "+",
+      "surveyBalanceLine": 43,
+      "weightedUnits": {
+        "all": 1828517.56,
+        "implementation": 773683.0199999999
+      }
+    },
+    "LIN-4239": {
+      "ticket": "LIN-4239",
+      "state": "Done",
+      "totalUsd": 3.31568223,
+      "appCallsUsd": 0.0227,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 0,
+        "work": 3.293,
+        "keepAlive": 0,
+        "survey": 0,
+        "before": 0,
+        "after": 0
+      },
+      "implModel": "claude-opus-5-5",
+      "implRows": 1,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "custom",
+        "implementation",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 0,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 1,
+        "codeLines": 50,
+        "testLines": 1863,
+        "codeFiles": 1
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 0
+      },
+      "surveyBalance": "+",
+      "surveyBalanceLine": 44,
+      "weightedUnits": {
+        "all": 1090203.14,
+        "implementation": 1090203.14
+      }
+    },
+    "LIN-4240": {
+      "ticket": "LIN-4240",
+      "state": "Done",
+      "totalUsd": 3.6966336099999997,
+      "appCallsUsd": 0.0714,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 2.164,
+        "work": 1.4613,
+        "keepAlive": 0,
+        "survey": 0,
+        "before": 0.4513,
+        "after": 1.7126
+      },
+      "implModel": "claude-opus-5-5",
+      "implRows": 1,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "blocked",
+        "close-out",
+        "custom",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 74,
+        "testLines": 161,
+        "prodFiles": 3
+      },
+      "sd": {
+        "prs": 1,
+        "codeLines": 12,
+        "testLines": 12,
+        "codeFiles": 1
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": "+",
+      "surveyBalanceLine": 45,
+      "weightedUnits": {
+        "all": 1161103.56,
+        "implementation": 488434.6200000001
+      }
+    },
+    "LIN-4241": {
+      "ticket": "LIN-4241",
+      "state": "Done",
+      "totalUsd": 9.974438690000001,
+      "appCallsUsd": 0.1405,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 5.1036,
+        "work": 4.7303,
+        "keepAlive": 0,
+        "survey": 0,
+        "before": 0,
+        "after": 5.1036
+      },
+      "implModel": "multiple",
+      "implRows": 3,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "close-out",
+        "custom",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 371,
+        "testLines": 872,
+        "prodFiles": 9
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 3,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 1,
+        "prsMapped": 1
+      },
+      "surveyBalance": "+ (small)",
+      "surveyBalanceLine": 46,
+      "weightedUnits": {
+        "all": 3388958.92,
+        "implementation": 1814232.0600000005
+      }
+    },
+    "LIN-4242": {
+      "ticket": "LIN-4242",
+      "state": "Done",
+      "totalUsd": 13.55341013,
+      "appCallsUsd": 0.109,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 5.0244,
+        "work": 8.42,
+        "keepAlive": 0,
+        "survey": 0,
+        "before": 0,
+        "after": 5.0244
+      },
+      "implModel": "multiple",
+      "implRows": 2,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "close-out",
+        "custom",
+        "implementation",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 408,
+        "testLines": 1140,
+        "prodFiles": 8
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 5,
+        "newPairs": 0,
+        "grownPairs": 1,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 1,
+        "prsMapped": 1
+      },
+      "surveyBalance": "+ (mixed)",
+      "surveyBalanceLine": 47,
+      "weightedUnits": {
+        "all": 4751068.88,
+        "implementation": 3141214.3599999994
+      }
+    },
+    "LIN-4243": {
+      "ticket": "LIN-4243",
+      "state": "Done",
+      "totalUsd": 8.71133558,
+      "appCallsUsd": 0.0666,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 5.534,
+        "work": 3.1108,
+        "keepAlive": 0,
+        "survey": 0,
+        "before": 2.8218,
+        "after": 2.7122
+      },
+      "implModel": "claude-opus-5-5",
+      "implRows": 1,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "close-out",
+        "custom",
+        "implementation",
+        "review",
+        "spike",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 292,
+        "testLines": 493,
+        "prodFiles": 4
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": "+ (mixed)",
+      "surveyBalanceLine": 48,
+      "weightedUnits": {
+        "all": 2851999.5,
+        "implementation": 1046363.96
+      }
+    },
+    "LIN-4246": {
+      "ticket": "LIN-4246",
+      "state": "In Progress",
+      "totalUsd": null,
+      "appCallsUsd": 0.1234,
+      "reconciles": null,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": null,
+        "work": 0.9081,
+        "keepAlive": 0.8079,
+        "survey": 3.0842,
+        "before": 3.8856,
+        "after": null
+      },
+      "implModel": "multiple",
+      "implRows": 2,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "implementation",
+        "plan",
+        "review",
+        "survey-place",
+        "survey-task",
+        "wake"
+      ],
+      "shape": "no-landed-code",
+      "lv": {
+        "prs": 0,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 0
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 2763696.1399999997,
+        "implementation": 475975.62
+      }
+    },
+    "LIN-4247": {
+      "ticket": "LIN-4247",
+      "state": "Done",
+      "totalUsd": 6.27248273,
+      "appCallsUsd": 0.0878,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 2.7871,
+        "work": 0.6993,
+        "keepAlive": 0.8439,
+        "survey": 1.8544,
+        "before": 2.5434,
+        "after": 2.0981
+      },
+      "implModel": "claude-haiku-5-5",
+      "implRows": 1,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "close-out",
+        "implementation",
+        "plan",
+        "review",
+        "survey-place",
+        "survey-task",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 42,
+        "testLines": 155,
+        "prodFiles": 1
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 2196452.1,
+        "implementation": 342391.9399999999
+      }
+    },
+    "LIN-4248": {
+      "ticket": "LIN-4248",
+      "state": "Done",
+      "totalUsd": 12.262139665000001,
+      "appCallsUsd": 0.1211,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 7.5511,
+        "work": 3.668,
+        "keepAlive": 0.9219,
+        "survey": 0,
+        "before": 4.5169,
+        "after": 3.0342
+      },
+      "implModel": "claude-opus-5-5",
+      "implRows": 1,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "autopilot",
+        "close-out",
+        "custom",
+        "implementation",
+        "plan",
+        "plan-review",
+        "review",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 186,
+        "testLines": 511,
+        "prodFiles": 12
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 3970789.7699999996,
+        "implementation": 1296733.89
+      }
+    },
+    "LIN-4249": {
+      "ticket": "LIN-4249",
+      "state": "Done",
+      "totalUsd": 13.335418249999998,
+      "appCallsUsd": 0.0197,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 11.691,
+        "work": 0,
+        "keepAlive": 1.6247,
+        "survey": 0,
+        "before": 11.691,
+        "after": 0
+      },
+      "implModel": null,
+      "implRows": 0,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "research",
+        "wake"
+      ],
+      "shape": "research-as-work",
+      "lv": {
+        "prs": 1,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 4875208.22,
+        "implementation": null
+      }
+    },
+    "LIN-4250": {
+      "ticket": "LIN-4250",
+      "state": "Done",
+      "totalUsd": 20.392325150000012,
+      "appCallsUsd": 0.0497,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 17.4608,
+        "work": 0,
+        "keepAlive": 2.8819,
+        "survey": 0,
+        "before": 17.4608,
+        "after": 0
+      },
+      "implModel": null,
+      "implRows": 0,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "research",
+        "wake"
+      ],
+      "shape": "research-as-work",
+      "lv": {
+        "prs": 1,
+        "prodLines": 0,
+        "testLines": 0,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 6590785.990000002,
+        "implementation": null
+      }
+    },
+    "LIN-4251": {
+      "ticket": "LIN-4251",
+      "state": "Done",
+      "totalUsd": 9.39707673,
+      "appCallsUsd": 0.1255,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 5.0747,
+        "work": 1.5868,
+        "keepAlive": 0.9917,
+        "survey": 1.6183,
+        "before": 4.3104,
+        "after": 2.3827
+      },
+      "implModel": "claude-haiku-5-5",
+      "implRows": 1,
+      "customInWindow": 0,
+      "customLegs": 0,
+      "afterAnswers": 0,
+      "kindsSeen": [
+        "autopilot",
+        "close-out",
+        "implementation",
+        "plan",
+        "plan-review",
+        "review",
+        "survey-place",
+        "survey-task",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 180,
+        "testLines": 473,
+        "prodFiles": 6
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 3078914.3200000008,
+        "implementation": 673405.7200000001
+      }
+    },
+    "LIN-4252": {
+      "ticket": "LIN-4252",
+      "state": "Done",
+      "totalUsd": 10.38323542,
+      "appCallsUsd": 0.1274,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 4.1535,
+        "work": 3.0272,
+        "keepAlive": 1.006,
+        "survey": 2.0692,
+        "before": 4.0947,
+        "after": 2.128
+      },
+      "implModel": "claude-opus-5-5",
+      "implRows": 1,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "autopilot",
+        "close-out",
+        "custom",
+        "implementation",
+        "plan",
+        "plan-review",
+        "review",
+        "survey-place",
+        "survey-task",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 0,
+        "testLines": 1442,
+        "prodFiles": 0
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 0,
+        "newPairs": 0,
+        "grownPairs": 0,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 0,
+        "prsMapped": 1
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 3272055.76,
+        "implementation": 1004862.6599999998
+      }
+    },
+    "LIN-4253": {
+      "ticket": "LIN-4253",
+      "state": "Done",
+      "totalUsd": 11.242411589999998,
+      "appCallsUsd": 0.1211,
+      "reconciles": true,
+      "unpriced": [],
+      "noLineage": false,
+      "preWindowLegs": false,
+      "legs": {
+        "floor": 4.3608,
+        "work": 3.8487,
+        "keepAlive": 0.9536,
+        "survey": 1.9583,
+        "before": 4.216,
+        "after": 2.103
+      },
+      "implModel": "claude-opus-5-5",
+      "implRows": 1,
+      "customInWindow": 1,
+      "customLegs": 0,
+      "afterAnswers": 1,
+      "kindsSeen": [
+        "autopilot",
+        "close-out",
+        "custom",
+        "implementation",
+        "plan",
+        "plan-review",
+        "review",
+        "survey-place",
+        "survey-task",
+        "wake"
+      ],
+      "shape": "code",
+      "lv": {
+        "prs": 1,
+        "prodLines": 182,
+        "testLines": 243,
+        "prodFiles": 6
+      },
+      "sd": {
+        "prs": 0,
+        "codeLines": 0,
+        "testLines": 0,
+        "codeFiles": 0
+      },
+      "place": {
+        "crossAreaDelta": 2,
+        "newPairs": 0,
+        "grownPairs": 1,
+        "shrunkPairs": 0,
+        "homelessNewFiles": 1,
+        "prsMapped": 1
+      },
+      "surveyBalance": null,
+      "surveyBalanceLine": null,
+      "weightedUnits": {
+        "all": 3591008.9400000004,
+        "implementation": 1296780.5799999998
+      }
+    }
+  },
+  "pairs": [
+    {
+      "name": "tidy-first 1",
+      "tidy": {
+        "ticket": "LIN-4253",
+        "state": "Done",
+        "totalUsd": 11.242411589999998,
+        "noLineage": false,
+        "noTelemetryCount": 0,
+        "floor": 4.3608,
+        "work": 3.8487,
+        "keepAlive": 0.9536,
+        "survey": 1.9583,
+        "implModels": [
+          "claude-opus-5-5"
+        ],
+        "preWindowLegs": false
+      },
+      "follow": {
+        "ticket": "LIN-4251",
+        "state": "Done",
+        "totalUsd": 9.39707673,
+        "noLineage": false,
+        "noTelemetryCount": 0,
+        "floor": 5.0747,
+        "work": 1.5868,
+        "keepAlive": 0.9917,
+        "survey": 1.6183,
+        "implModels": [
+          "claude-haiku-5-5"
+        ],
+        "preWindowLegs": false
+      }
+    },
+    {
+      "name": "tidy-first 2",
+      "tidy": {
+        "ticket": "LIN-4252",
+        "state": "Done",
+        "totalUsd": 10.38323542,
+        "noLineage": false,
+        "noTelemetryCount": 0,
+        "floor": 4.1535,
+        "work": 3.0272,
+        "keepAlive": 1.006,
+        "survey": 2.0692,
+        "implModels": [
+          "claude-opus-5-5"
+        ],
+        "preWindowLegs": false
+      },
+      "follow": {
+        "ticket": "LIN-4246",
+        "state": "In Progress",
+        "totalUsd": null,
+        "noLineage": false,
+        "noTelemetryCount": 1,
+        "floor": null,
+        "work": 0.9081,
+        "keepAlive": 0.9753,
+        "survey": 3.0842,
+        "implModels": [
+          "claude-haiku-5-5"
+        ],
+        "preWindowLegs": false
+      }
+    },
+    {
+      "name": "tidy-after of 2",
+      "tidy": {
+        "ticket": "LIN-4255",
+        "state": "Backlog",
+        "totalUsd": null,
+        "noLineage": true,
+        "noTelemetryCount": 0,
+        "floor": null,
+        "work": null,
+        "keepAlive": null,
+        "survey": null,
+        "implModels": [],
+        "preWindowLegs": false
+      },
+      "follow": null
+    },
+    {
+      "name": "second tidy-after",
+      "tidy": {
+        "ticket": "LIN-4254",
+        "state": "Backlog",
+        "totalUsd": null,
+        "noLineage": true,
+        "noTelemetryCount": 0,
+        "floor": null,
+        "work": null,
+        "keepAlive": null,
+        "survey": null,
+        "implModels": [],
+        "preWindowLegs": false
+      },
+      "follow": null
+    },
+    {
+      "name": "control (tidy folded in)",
+      "tidy": {
+        "ticket": "LIN-4247",
+        "state": "Done",
+        "totalUsd": 6.27248273,
+        "noLineage": false,
+        "noTelemetryCount": 0,
+        "floor": 2.7871,
+        "work": 0.6993,
+        "keepAlive": 0.8439,
+        "survey": 1.8544,
+        "implModels": [
+          "claude-haiku-5-5"
+        ],
+        "preWindowLegs": false
+      },
+      "follow": null
+    },
+    {
+      "name": "larger extra, split off",
+      "tidy": {
+        "ticket": "LIN-4201",
+        "state": "Done",
+        "totalUsd": 40.12871573000001,
+        "noLineage": false,
+        "noTelemetryCount": 0,
+        "floor": 7.3344,
+        "work": 2.237,
+        "keepAlive": 30.3957,
+        "survey": 0,
+        "implModels": [
+          "claude-opus-5-5"
+        ],
+        "preWindowLegs": false
+      },
+      "follow": {
+        "ticket": "LIN-4226",
+        "state": "Done",
+        "totalUsd": 27.836723930000005,
+        "noLineage": false,
+        "noTelemetryCount": 0,
+        "floor": 9.818,
+        "work": 7.0684,
+        "keepAlive": 10.8227,
+        "survey": 0,
+        "implModels": [
+          "claude-haiku-5-5"
+        ],
+        "preWindowLegs": false
+      }
+    }
+  ],
+  "checks": [
+    {
+      "name": "no frozen file carries a top-level error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "null session cost reaches its leg as null",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "exact tickets have no null leg",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "worker legs + app calls reconcile to totalUsd",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "population count matches manifest",
+      "ok": true,
+      "detail": "47 vs 47"
+    },
+    {
+      "name": "no coefficient below n = 8",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

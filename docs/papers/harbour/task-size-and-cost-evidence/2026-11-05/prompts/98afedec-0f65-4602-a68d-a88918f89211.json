@@ -1,0 +1,1 @@
+{"id":"98afedec-0f65-4602-a68d-a88918f89211","promptName":"Prompt","kind":"custom","prompt":"Hold the PR until LIN-2995 harbour-halt test is green, then get the score","issueIdentifier":"LIN-4196","issueUrl":null,"target":"cli","followUpTo":"70e909e8-a276-4cb7-8c78-4d358f462442","sessionId":null,"dispatchedAt":"2026-11-04T07:13:47.124Z"}

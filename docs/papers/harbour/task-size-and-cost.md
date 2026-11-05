@@ -1,0 +1,110 @@
+---
+title: How does the size of a task relate to its cost?
+kind: paper
+version: 1
+date: 2026-11-05
+authors: [Claude (LIN-4257, implementation), for John Kershaw]
+model: "claude-haiku-5-5 (Haiku 5.5), Claude Code CLI, dispatched by Harbour as an implementation (dispatch e9303a4d-4d2f-4df6-94ee-3a54c4b5385e); effort not recorded in this session. Unchecked by a second measurement. A fresh reader given only the first draft found gaps in the text and the draft was revised; a second fresh reader given only the final text at close-out (5 Nov) could state the answer, its n and its limits from the file alone, and its remaining questions are not addressed in this version."
+grounded_at: "LinearViewer 2f0c9d5b and simple-dispatcher 07c88f7a (origin/main at the freeze); population frozen 2026-11-05T12:10:15Z to 12:15:59Z, natural-experiment pairs re-read 12:21:09Z. Evidence: docs/papers/harbour/task-size-and-cost-evidence/2026-11-05/."
+cites:
+  - "docs/papers/harbour/coherence-as-it-grows.md@2f0c9d5b:100 (a change touching a known multi-site decision is 5× the size) and :129 (no trend in the cost of a same-sized change)"
+  - "docs/papers/harbour/the-second-copy.md@2f0c9d5b:139 (the hours of a change are recorded only from September)"
+  - "docs/papers/harbour/cost-mix.md@2f0c9d5b:249-255 (the small-change floor; the intercept of a linear fit)"
+  - "docs/papers/harbour/where-the-effort-goes.md@2f0c9d5b:26-28 (effort against production and test lines, ρ 0.19 in tokens)"
+  - "lib/wall-clock-summary.js@2f0c9d5b:39-59 (BUCKET_OF_KIND and bucketOf, the leg split used here)"
+  - "lib/cost-read.js@2f0c9d5b:205,211,472-481 (the per-model and token folds computed and not carried onto the /cost wire)"
+  - "docs/plans/survey/place-ledger.md@2f0c9d5b:15-51 (the Survey's judged balance, read in place)"
+  - "LIN-4257 comments 8c3231b6 (11:38), 5827df4a (11:38), fab43869 (12:02) and 19d33bd1 (12:03), 5 Nov (the Surveys and research this paper follows)"
+  - "PR LinearViewer #2292 (LIN-4251), #2289 (LIN-4247), #2291 (LIN-4252); simple-dispatcher #328 (LIN-4233)"
+---
+
+# How does the size of a task relate to its cost?
+
+Across the 22 tickets whose cost is exact in the first 31 hours of the records (since 4 November 05:00 UTC; every leg inside that window, all priced, all landing code), size tracks total cost only through the fixed legs. Planning, plan-review, review and close-out, the legs that do not depend on the change, have a median share of 44% of a ticket's cost, and they rise with the lines a ticket lands: LinearViewer production lines have ρ = 0.71 with the floor and test lines 0.78 (n = 22). The implementation leg, the work, is not shown to follow size: the one group with n ≥ 8 is ten implementations labelled Opus that carry a Survey after-answer, and there its dollars are flat against production lines (ρ = −0.01) and test lines (ρ = 0.03). The clean stratum (Haiku, one implementation row, no custom session of any kind) has four tickets, too few for a coefficient, and its points order the same way as size in five of six pairs. So, in this window, no sense of size is shown to predict the work leg (the one group large enough mixes the build with a billed observer, and the clean group has four points); size (LinearViewer lines) does track the floor, and the floor is not fixed. The record is 31 hours and 22 exact tickets, and the two repositories point in opposite directions, so this describes the window and is not a rate.
+
+## Findings
+
+**1. The floor rises with size.** Over the 22 exact tickets the median floor is $3.36 (range $0.00 to $16.77) against a median total of $7.03; the median per-ticket share of the floor is 44%, and of implementation 32% (median $2.69). Against LinearViewer lines the floor's rank correlation is 0.71 for production lines, 0.78 for test lines and 0.56 for PRs landed (n = 22). The Surveys (LIN-4257 comment 8c3231b6) put the fixed legs at about $5 to $7 per finished ticket; on the same definition (floor plus keep-alive plus survey legs) the median here is $5.23, inside that range; the narrower floor used here has a median of $3.36, and it grows with what lands. The record cannot say why. The likeliest mechanism is more plan-review and review rounds on larger changes, but round counts were not frozen, so this is a hypothesis, not a finding.
+
+**2. The work leg is not shown to follow size.** In the Opus-labelled group that carries a Survey after-answer (n = 10), the implementation dollars have ρ = −0.01 with production lines, 0.03 with test lines and −0.29 with PRs landed. The Survey's reading is that the after-answer is billed inside the implementation row; the wire cannot confirm it (Finding 5, Limits), so this group may measure build and observer together, and it is labelled that way. The clean Haiku-only stratum (n = 4: LIN-4247, 4251, 4203, 4212, in that order) has work of $0.70, $1.59, $2.55 and $2.87 against production lines of 42, 180, 138 and 193. Five of six pairs of tickets order the same way, but four points are not a rate and no coefficient is reported. Across all 22 exact tickets, with models mixed, the work leg has ρ = 0.20 with production lines and 0.39 with test lines. That is a model-confounded association and is reported only as descriptive.
+
+**3. The two repositories disagree, so they are not pooled.** The floor rises with LinearViewer size (production lines ρ = 0.71) and falls with simple-dispatcher size (code lines ρ = −0.30; test lines ρ = −0.62). The simple-dispatcher tickets in the exact set are mostly the harness series (LIN-4218, 4220 to 4223): their floors run $1.82 to $4.14, and their test lines run from 496 to 1,416, plus LIN-4218's 21,871 lines of golden file. That file does not drive the sign: without LIN-4218 the simple-dispatcher test-line correlation with the floor is −0.71 (n = 21), against −0.62 with it (n = 22). Whether size means one thing across both repositories is not settled by this window, so the paper keeps the two columns apart. Within the 15 exact tickets that land LinearViewer lines, the floor's ρ is 0.75 for production lines and 0.77 for test lines, so the rise is not the simple-dispatcher rows' zeros.
+
+**4. The largest total is waiting, not size.** The keep-alive leg (autopilot and custom sessions) has a median of $0.97 across the exact set, but the biggest total is dominated by it. LIN-4201 is $40.13, of which $30.40 is keep-alive, including an Opus custom session of $26.08; LIN-4226 is $27.84, of which $10.82 is keep-alive. Correlations of total cost against size (ρ 0.51 to 0.73 for LinearViewer lines, n = 22) follow the floor's correlation (0.71 to 0.78) more than the work's, which is flat in the build-plus-observer group.
+
+**5. The Survey adds a visible leg and a billed observer.** The four exact tickets surveyed on 5 November carry survey legs of $1.62 to $2.07, between 17% and 30% of their totals (LIN-4247 $1.85 of $6.27; LIN-4251 $1.62 of $9.40; LIN-4252 $2.07 of $10.38; LIN-4253 $1.96 of $11.24). These are reported as their own row and kept out of the floor. Ten of the exact tickets' implementations carry an Opus after-answer that the Survey resumed into the build session. The dispatch list has the custom item (for example LIN-4252's a55d7b45); the cost rows have no custom leg for it; whether its cost is folded into the implementation row or missing cannot be told from the wire, so work and observer cannot be separated for these ten.
+
+**6. The natural experiments are anecdotes, and one is incomplete.** The first tidy-first pair is complete: the tidy, LIN-4253, cost $11.24 (floor $4.36, implementation $3.85 on Opus, survey $1.96); the follow-on, LIN-4251, cost $9.40 (floor $5.07, implementation $1.59 on Haiku, survey $1.62). Its two floors sum to $9.43. Without a counterfactual, this cannot say whether the tidy moved cost out of the follow-on or removed it. The second pair is incomplete at the freeze: LIN-4246 was In Progress with a null total and one telemetry gap at the 12:21Z read, so its legs are not a completed comparison. LIN-4255 and LIN-4254, the tidy-afters, have `noLineage: true` and are unknown, not $0. The control, LIN-4247, cost $6.27 with a floor of $2.79. The larger extra, LIN-4201 against its split-off LIN-4226, is one pair and does not bear on the rate question. After the freeze, LIN-4246 closed (total $9.33) and LIN-4255 gained a lineage ($5.34); neither is in the frozen evidence, and the completed pair is for version 2. Each pair is one ticket against one, not a rate.
+
+**7. The Survey's judged balance does not discriminate.** Of the exact tickets the Survey's place ledger rates, 15 of 16 are "+" (three of them qualified as mixed or small) and one is "0". Its ordinal rank against floor has ρ = −0.42 and against work ρ = −0.14 (n = 16). That is a judgement with almost no spread, so it is reported and not treated as a bound measure. The area-map sub-sense (place-change cross-area delta) has ρ = 0.02 with the work of the ten build-plus-observer tickets, and 0.38 with the floor across the 22 (both descriptive).
+
+## Table: the 22 exact tickets
+
+Dollars, and lines. Each row is one ticket. Total = floor + work + keep-alive + survey + app calls, and this sums exactly for every row (checked). Floor = `bucketOf` `before` legs (less survey) plus `after` legs; work = implementation; keep-alive = autopilot, wake, custom and periodical; survey = survey-\*; app calls = the `/cost` app-call total. PRs = merged PRs naming the ticket, in both repositories. Lines are added plus deleted, summed over the ticket's PRs. LV = LinearViewer, SD = simple-dispatcher. n = 22.
+
+| Ticket | Total | Floor | Work | Keep-alive | Survey | App calls | Work model | PRs | LV prod | LV test | SD code | SD test |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| LIN-4143 | 6.49 | 2.50 | 3.27 | 0.65 | 0.00 | 0.07 | opus | 1 | 43 | 314 | 0 | 0 |
+| LIN-4151 | 6.42 | 3.11 | 2.36 | 0.86 | 0.00 | 0.08 | opus | 1 | 157 | 206 | 0 | 0 |
+| LIN-4187 | 3.80 | 2.46 | 0.46 | 0.79 | 0.00 | 0.08 | haiku | 1 | 0 | 0 | 0 | 343 |
+| LIN-4200 | 13.05 | 3.60 | 4.88 | 4.49 | 0.00 | 0.09 | haiku | 1 | 0 | 473 | 0 | 0 |
+| LIN-4201 | 40.13 | 7.33 | 2.24 | 30.40 | 0.00 | 0.16 | opus | 1 | 1006 | 1620 | 0 | 0 |
+| LIN-4203 | 6.21 | 2.90 | 2.55 | 0.69 | 0.00 | 0.06 | haiku | 2 | 138 | 284 | 345 | 897 |
+| LIN-4212 | 24.79 | 16.77 | 2.87 | 4.94 | 0.00 | 0.21 | haiku | 1 | 193 | 546 | 0 | 0 |
+| LIN-4218 | 6.85 | 3.69 | 1.75 | 1.30 | 0.00 | 0.11 | haiku | 1 | 0 | 0 | 497 | 21871 |
+| LIN-4220 | 6.51 | 1.82 | 2.83 | 1.81 | 0.00 | 0.06 | haiku | 1 | 0 | 0 | 0 | 1416 |
+| LIN-4221 | 7.21 | 2.31 | 3.32 | 1.52 | 0.00 | 0.06 | haiku | 1 | 0 | 0 | 0 | 1213 |
+| LIN-4222 | 5.46 | 2.05 | 1.47 | 1.88 | 0.00 | 0.06 | haiku | 1 | 0 | 0 | 0 | 496 |
+| LIN-4223 | 7.99 | 4.14 | 2.28 | 1.51 | 0.00 | 0.06 | haiku | 1 | 0 | 0 | 0 | 1044 |
+| LIN-4226 | 27.84 | 9.82 | 7.07 | 10.82 | 0.00 | 0.13 | haiku | 1 | 403 | 1115 | 0 | 0 |
+| LIN-4234 | 5.79 | 2.58 | 2.31 | 0.82 | 0.00 | 0.09 | opus | 1 | 6 | 209 | 0 | 0 |
+| LIN-4239 | 3.32 | 0.00 | 3.29 | 0.00 | 0.00 | 0.02 | opus | 1 | 0 | 0 | 50 | 1863 |
+| LIN-4240 | 3.70 | 2.16 | 1.46 | 0.00 | 0.00 | 0.07 | opus | 2 | 74 | 161 | 12 | 12 |
+| LIN-4243 | 8.71 | 5.53 | 3.11 | 0.00 | 0.00 | 0.07 | opus | 1 | 292 | 493 | 0 | 0 |
+| LIN-4247 | 6.27 | 2.79 | 0.70 | 0.84 | 1.85 | 0.09 | haiku | 1 | 42 | 155 | 0 | 0 |
+| LIN-4248 | 12.26 | 7.55 | 3.67 | 0.92 | 0.00 | 0.12 | opus | 1 | 186 | 511 | 0 | 0 |
+| LIN-4251 | 9.40 | 5.07 | 1.59 | 0.99 | 1.62 | 0.13 | haiku | 1 | 180 | 473 | 0 | 0 |
+| LIN-4252 | 10.38 | 4.15 | 3.03 | 1.01 | 2.07 | 0.13 | opus | 1 | 0 | 1442 | 0 | 0 |
+| LIN-4253 | 11.24 | 4.36 | 3.85 | 0.95 | 1.96 | 0.12 | opus | 1 | 182 | 243 | 0 | 0 |
+
+Read the Work model column with Limits: for ten tickets the Opus label is the lineage's last counted row, and the after-answer may sit inside that leg (unconfirmed; Finding 5).
+
+Other population rows (not in the exact set, shown in `analysis.json`): 8 research periodicals (LIN-4206 to 4209, 4231, 4232, 4249, 4250), whose research is the work and whose floors run $5 to $20; 6 tickets with no implementation lineage (LIN-4144, 4195, 4202, 4219, 4224, 4233), of which LIN-4195, 4202 and 4224 are almost all keep-alive; 9 tickets with legs from before the records era (approximate); 3 unpriced (LIN-4177 and 4178, unpriced Haiku in the snapshot era; LIN-4246, in flight).
+
+## Method
+
+**Population.** The window is commits since 2026-11-04T05:00:00Z in either repository, `git log --all`, plus every LIN id from LIN-4170 to the newest id seen at the freeze. That is 95 candidates; each is checked with `GET /dispatch?issueIdentifier=`, and 48 have a row dispatched in the window. LIN-4257 is frozen and excluded from analysis as in flight, leaving 47. The bound's known hole is an older ticket worked in the window that no window commit names; LIN-4144 was missing from the research's list and the commit scan found it, so the earlier list was incomplete.
+
+**Freeze.** `docs/papers/harbour/task-size-and-cost-scripts/freeze.mjs` reads the workspace API once, paced at 1.1 s per call, retries 429s and any non-200 or top-level-error response, and saves every answer raw with its read time (manifest in the evidence folder). Per population ticket it saves the issue, `/cost`, `/dispatch?issueIdentifier=`, and the prompt of each custom follow-up. A second run with `--pairs` re-reads the natural-experiment tickets last, into `pairs/`.
+
+**Cost.** Legs come from `/cost`'s `workerSessions`, bucketed with `bucketOf` from `lib/wall-clock-summary.js`, with no kind map of our own. Null is carried as null: a sum with a null term is null, and an exact ticket has no null leg. For every ticket with a total, the worker legs plus app calls reconcile to `totalUsd` to the cent: 44 of 47 reconcile. The three with null totals (LIN-4177, 4178, 4246) cannot be checked and are carried as null.
+
+**Terms.** A *lineage* is one ticket's chain of dispatched sessions; `/cost` counts it once, under its earliest issue. The *floor* is planning, plan-review, review and close-out. *Keep-alive* is autopilot, wake, custom and periodical sessions: time a ticket was kept running, not work on the change. The *Survey* is the pre-work and post-work readings the Surveys record (survey-task and survey-place sessions, billed to the ticket). An *after-answer* is an Opus custom follow-up the Survey resumes into a build session after merge; its prompt begins "A short, read-only follow-up for research (the Survey" or "One more short, read-only follow-up for the same research". The *place ledger* is `docs/plans/survey/place-ledger.md`. A *homeless* new file is one the area map gives no home. The *bound* is what a change had to push through: places, lists, areas.
+
+**Size.** Landed and proving size use the census's own PR enumeration (`coherence-census.mjs prs`, `coherence-as-it-grows-scripts/coherence-census.mjs`) for LinearViewer, with its production and test rules. For simple-dispatcher, which every PR reads 0/0 under the LinearViewer rule, `size-prs-repo-neutral.mjs` uses the same enumeration and the repo-neutral test and doc predicates, now in `scripts/delivery-paths.mjs`. That module was extracted from `scripts/delivery-composition.mjs` with no behaviour change: the weekly report's output is byte-identical before and after on the same repository state. Bound size uses `experiments/place-change/place-change.mjs` on every LinearViewer merge since 4 November (31 merges, none erroring), and the Survey's balance column read in place (`size-survey-balance.mjs`). Asked size has no counter and is not tested. Weighted units come from `scripts/survey-costmix-tokens.mjs --since 2026-11-04T05:00:00Z`, frozen; they are tier-weighted and so price-shaped, not a within-model count.
+
+**Strata and tests.** Exact: finished, priced, landing code, every leg inside the window, one implementation row. Clean: exact, implementation on Haiku, no custom session by any route, LinearViewer production lines above zero (n = 4). Build-plus-observer: exact, implementation on Opus, at least one after-answer (n = 10). Each sense is tested against work, floor and total. Coefficients are reported only at n ≥ 8, and below that as points. The self-checks in `analyse.mjs` assert that no frozen file carries an error, that a null session cost reaches its leg as null, that exact tickets carry no null leg, that the legs reconcile, that the population count matches the manifest, and that no coefficient appears below n = 8. A mutation witness held: with null treated as zero, the null-propagation check fails and names LIN-4177 (implementation), LIN-4178 (implementation) and LIN-4246 (review); restored, all six pass. Two runs of `analyse.mjs` on the frozen folder with the network unused are byte-identical.
+
+**Revisions made during analysis, disclosed.** Earlier runs of the analysis, on first versions of these rules, printed coefficients. I changed the rules twice after that. The clean rule first admitted LIN-4226, whose cost rows carry an Opus custom leg the per-issue dispatch listing does not show; it is now excluded on either source. The shape rule first treated the eight research periodicals as code because they had an implementation row; they now sort on landed lines, not PRs, since their PRs are doc-only. Both changes move tickets between groups and change no frozen number. The coefficients in this paper come from the final rules only, and the earlier ones are not reported.
+
+## Limits
+
+- **The window is thin.** About 31 hours, 47 tickets, 22 exact, 4 clean. No coefficient is a rate. The floor–size correlations at n = 22 are the strongest result and are still descriptive.
+- **The strata are small and the tests are many.** I ran nine senses against several legs and tables: 56 tests across seven tables, 38 with a coefficient and 18 as points, with no multiplicity correction. The one moderately large coefficient in the build-plus-observer group (place-change homeless new files, ρ = 0.52, n = 10) is one of those 56, not evidence.
+- **The wire cannot split build from observer.** `/cost` carries one row per kind, with a model label that is the lineage's last counted row, and it carries no per-model fold or tokens (`lib/cost-read.js:205,211` computes them; `:472-481` does not carry them). So a within-model test in dollars is impossible here, and the ten build-plus-observer tickets' work may include the after-answer.
+- **Tokens are approximate.** The weighted units are read from local transcripts and are tier-weighted (frontier-input equivalents at list-price ratios, from `survey-costmix-tokens.mjs`). In the window, 29.4 million of 228 million units in fleet sessions had no ticket attribution (the script's "no item fetched") and are not charged to any ticket. The shortfall is larger for tickets whose sessions were not fetched, so token shares of those tickets read low; the sign by size is not known.
+- **Some legs are approximate or absent.** Nine tickets have legs from before the records era, so they are not exact. LIN-4239 has no before or after rows in `/cost`, so its floor reads 0.00 as observed. Whether its planning was done under its parent piece, LIN-4233, is not checked here.
+- **The floor is a lower bound on the fixed part, so its share reads low.** It is what the wire attributes to planning, review and close-out; fixed work recorded under other kinds is not in it, and the share of the total that is fixed is understated by that amount. The rise of the floor with size may be process, not the change: I did not separate review rounds, plan rounds or ticket type.
+- **The Survey's bound is a selected sample, and its judgement is nearly uniform.** Only 16 exact tickets are rated, almost all "+", so the bound-as-judged sense does not discriminate here.
+- **Population hole.** An older ticket worked in the window that no window commit names is missed (the bound's known hole). Its effect cannot be signed: it would add a row of unknown size and cost, and the correlations here cannot say which way it moves.
+- **Natural experiments are one ticket each.** Pair 2 was incomplete at the frozen read and LIN-4254 and LIN-4255 had no lineage then. After the freeze, LIN-4246 closed (total $9.33) and LIN-4255 gained a lineage ($5.34); neither is in the frozen evidence, and the completed pair is for version 2. Only the first pair was complete in the frozen evidence, and it is one ticket against one.
+- **Unpriced and in-flight.** LIN-4177, 4178 (unpriced Haiku) and LIN-4246 (in flight) have null totals. They are carried as null and are not in any sum. The nine pre-records tickets are also outside the exact set, and they include the largest totals in the population (LIN-4195 at $76), so the exact-set totals read lower than the population's, and the exact set is slightly more Haiku-heavy than the wider code population (12 of 22 implementations on Haiku, against 12 of 26).
+- **What would settle it.** A per-model fold and token counts on `/cost` (the exposure this paper works around), two weeks more of exact records, a round count per ticket from the dispatch history, and a fixed rule for which repository's lines count as size.
+
+## Next
+
+- Expose the per-model fold and tokens on `/cost` (`lib/cost-read.js:205,211,472-481`, `routes/proxy-compute.js:744`) as LIN-4264. It is what would make the work-leg test exact within one model.
+- Re-freeze and write version 2 after about two weeks of records, roughly 19 November 2026, with the exposure in place, the second pair closed or still open, and the two tidy-afters priced if they carry lineage.
+- Count rounds per ticket (plan-review and review passes) from the dispatch history, to test whether the floor's rise with size is round count.
+- Build an asked-size counter (named surfaces, and closed or open goal, from the ticket text) and test it, since no counter exists here.
+- The trend in the cost of a same-sized change is still open. It is named in `proposals.md` for runner hours by month from June, or for `/cost` re-read monthly from 4 November.

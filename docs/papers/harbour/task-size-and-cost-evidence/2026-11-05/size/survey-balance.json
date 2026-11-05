@@ -1,0 +1,347 @@
+{
+ "source": "docs/plans/survey/place-ledger.md",
+ "rows": [
+  {
+   "ticket": "LIN-4168",
+   "line": 15,
+   "balance": "−",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4166",
+   "line": 16,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4173",
+   "line": 17,
+   "balance": "+",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4177",
+   "line": 18,
+   "balance": "−/+",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4178",
+   "line": 19,
+   "balance": "−",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4179",
+   "line": 20,
+   "balance": "0",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4198",
+   "line": 21,
+   "balance": "−",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4202",
+   "line": 22,
+   "balance": "−",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4106",
+   "line": 23,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4212",
+   "line": 31,
+   "balance": "0",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4201",
+   "line": 32,
+   "balance": "+ (mixed)",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4203",
+   "line": 33,
+   "balance": "+",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4218",
+   "line": 34,
+   "balance": "+",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4226",
+   "line": 35,
+   "balance": "+ (small)",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4220",
+   "line": 36,
+   "balance": "+",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4223",
+   "line": 37,
+   "balance": "+",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4221",
+   "line": 38,
+   "balance": "+",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4222",
+   "line": 39,
+   "balance": "+",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4224",
+   "line": 40,
+   "balance": "+",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4219",
+   "line": 41,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4187",
+   "line": 42,
+   "balance": "+",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4234",
+   "line": 43,
+   "balance": "+",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4239",
+   "line": 44,
+   "balance": "+",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4240",
+   "line": 45,
+   "balance": "+",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4241",
+   "line": 46,
+   "balance": "+ (small)",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4242",
+   "line": 47,
+   "balance": "+ (mixed)",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4243",
+   "line": 48,
+   "balance": "+ (mixed)",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4151",
+   "line": 49,
+   "balance": "+",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4048",
+   "line": 50,
+   "balance": "+",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4143",
+   "line": 51,
+   "balance": "+",
+   "row_has_balance_cell": true
+  },
+  {
+   "ticket": "LIN-4168",
+   "line": 70,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4166",
+   "line": 71,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4173",
+   "line": 72,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4177",
+   "line": 73,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4178",
+   "line": 74,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4179",
+   "line": 75,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4198",
+   "line": 76,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4202",
+   "line": 77,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4212",
+   "line": 78,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4201",
+   "line": 79,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4203",
+   "line": 80,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4218",
+   "line": 81,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4226",
+   "line": 82,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4220",
+   "line": 83,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4223",
+   "line": 84,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4221",
+   "line": 85,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4222",
+   "line": 86,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4224",
+   "line": 87,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4187",
+   "line": 88,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4234",
+   "line": 89,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4239",
+   "line": 90,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4241",
+   "line": 91,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4242",
+   "line": 92,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4243",
+   "line": 93,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4151",
+   "line": 94,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4048",
+   "line": 95,
+   "balance": null,
+   "row_has_balance_cell": false
+  },
+  {
+   "ticket": "LIN-4143",
+   "line": 96,
+   "balance": null,
+   "row_has_balance_cell": false
+  }
+ ]
+}
