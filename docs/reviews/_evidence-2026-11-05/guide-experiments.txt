@@ -1,0 +1,20 @@
+# Guide experiments, run 7 (labelled proposals; the committed guide is unchanged)
+
+## HEAD guide (the series) (`head-2eb73ae0`)
+- d7ceb373: files 540, unmapped 0, links 1259, pairs 12, group sizes [9], Other 14
+    pairs: Agent API<->LLM 37/4; Agent API<->Providers 20/3; Agent API<->Runs 45/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; LLM<->Other features 1/1; LLM<->Providers 11/4; LLM<->Runs 30/37; Other features<->Runs 6/5; server-rendered pages<->Other features 8/6; server-rendered pages<->Runs 13/8
+- 2eb73ae0: files 543, unmapped 0, links 1269, pairs 12, group sizes [9], Other 16
+    pairs: Agent API<->LLM 37/4; Agent API<->Providers 20/3; Agent API<->Runs 45/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; LLM<->Other features 1/1; LLM<->Providers 11/4; LLM<->Runs 31/37; Other features<->Runs 6/5; server-rendered pages<->Other features 9/8; server-rendered pages<->Runs 13/8
+
+## P7min-new-files (`proposal-P7min-new-files`)
+- d7ceb373: files 540, unmapped 0, links 1259, pairs 12, group sizes [9], Other 14
+    pairs: Agent API<->LLM 37/4; Agent API<->Providers 20/3; Agent API<->Runs 45/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; LLM<->Other features 1/1; LLM<->Providers 11/4; LLM<->Runs 30/37; Other features<->Runs 6/5; server-rendered pages<->Other features 8/6; server-rendered pages<->Runs 13/8
+- 2eb73ae0: files 543, unmapped 0, links 1266, pairs 12, group sizes [9], Other 14
+    pairs: Agent API<->LLM 37/4; Agent API<->Providers 20/3; Agent API<->Runs 45/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; LLM<->Other features 1/1; LLM<->Providers 11/4; LLM<->Runs 31/37; Other features<->Runs 6/5; server-rendered pages<->Other features 8/6; server-rendered pages<->Runs 13/8
+
+## P1d-placed-16 (`proposal-P1d-placed-16`)
+- d7ceb373: files 540, unmapped 0, links 1249, pairs 12, group sizes [8], Other 0
+    pairs: Agent API<->LLM 37/4; Agent API<->Providers 20/3; Agent API<->Runs 45/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; LLM<->Providers 11/4; LLM<->Runs 30/37; LLM<->Task model 2/1; Runs<->Task model 4/3; server-rendered pages<->Runs 15/8; server-rendered pages<->Task model 5/2
+- 2eb73ae0: files 543, unmapped 0, links 1256, pairs 12, group sizes [8], Other 0
+    pairs: Agent API<->LLM 37/4; Agent API<->Providers 20/3; Agent API<->Runs 45/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; LLM<->Providers 11/4; LLM<->Runs 31/37; LLM<->Task model 2/1; Runs<->Task model 4/3; server-rendered pages<->Runs 15/8; server-rendered pages<->Task model 5/2
+

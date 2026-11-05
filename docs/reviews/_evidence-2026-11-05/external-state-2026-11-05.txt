@@ -1,0 +1,224 @@
+# External state read for LIN-4249 (run 7), 2026-11-05T08:07Z. Linear via the workspace proxy; GitHub via gh.
+
+## Ticket states
+- LIN-4154 | Backlog | parent LIN-3490 | Seams: move fmtDuration out of lib/render-run-steps.js so task-state and task-page-loader stop importing a ren 
+- LIN-4155 | Backlog | parent LIN-3820 | Seams: move applyDefaultDispatchHarness out of lib/proxy-preamble.js so model routing stops importing Agent AP 
+- LIN-4193 | Backlog | parent LIN-3936 | Rename or absorb lib/weekly-budget.js and name the cost modules into a code-shape area 
+- LIN-3922 | Backlog | parent None | Retire the lib/tree.js re-export of the focus-child picker (repoint two eval scripts and three unit tests) 
+- LIN-3923 | Backlog | parent None | Decide the 'LLM & prompts ⇄ Providers' knot (now 11/4): do the context-shaping caps and focus-child picker bel 
+- LIN-3736 | Backlog | parent LIN-3449 | Seams: move stableStringify/hashContext from lib/recap-cache.js down to plumbing 
+- LIN-3737 | Backlog | parent None | Seams: move collectIssueAttachments out of lib/proxy-wire.js to a provider-neutral module 
+- LIN-3738 | Backlog | parent None | Seams: move dispatch credential provisioning (lib/proxy-preamble.js) out of the Agent API area 
+- LIN-3555 | Backlog | parent None | Seams: move RefResolutionError to a provider-neutral module 
+- LIN-2600 | Backlog | parent LIN-2601 | LIN-679 cleanup: remove the 53 dead named lib/* imports left in routes/proxy.js by the sub-router migration 
+- LIN-4195 | Done | parent LIN-3936 | Costs rebuild 2: one record per model request, summed | children: LIN-4226:Done, LIN-4212:Done, LIN-4203:Done, LIN-4202:Done, LIN-4201:Done, LIN-4200:Done, LIN-4199:Done, LIN-4198:Done, LIN-4197:Done
+- LIN-4226 | Done | parent LIN-4195 | Costs rebuild 2 · piece 4b: the cost read loads its request records (loading becomes part of the read) 
+- LIN-4028 | In Progress | parent None | Routing: a recorded ruling that sets a task's model is ignored by recommend-and-dispatch 
+- LIN-3720 | Done | parent None | Area map: decide the area for the 12 lib/ files still in 'Other features' 
+- LIN-3936 | Backlog | parent LIN-3490 | Costs: one place for what the work cost and what you paid; tidy the cost seam, then build the page (docs/plans | children: LIN-4195:Done, LIN-4194:Backlog, LIN-4193:Backlog, LIN-4192:Backlog, LIN-4191:Backlog, LIN-4176:Done, LIN-4147:Done, LIN-4136:Done, LIN-4134:Done, LIN-4130:Done, LIN-4129:Done, LIN-4127:Done, LIN-4126:Done, LIN-3945:Canceled, LIN-3944:Done, LIN-3943:Canceled, LIN-3942:Canceled, LIN-3941:Canceled, LIN-3940:Canceled, LIN-3939:Canceled, LIN-3938:Canceled, LIN-3937:Canceled
+- LIN-1249 | Backlog | parent None | Decompose server.js (2542-line app-entry: 29 routes + 17 helpers) 
+- LIN-4238 | Backlog | parent None | Observation rulings rows: move rulingRowHoldsInput/mustReuse onto the shared card merge 
+- LIN-4244 | Backlog | parent None | Rulings answer surfaces other than Home cards: send answerAttemptId and handle 409 ruling-settled 
+- LIN-4250 | In Progress | parent None | Drift & Coherence Review (run 3, trend vs the 2026-11-04 run 2): a small window (9 production LinearViewer com 
+- LIN-4232 | Done | parent None | Drift & Coherence Review (trend vs 2026-11-04): a very quiet window (8 LinearViewer + 8 SD commits, the record 
+- LIN-4144 | Done | parent None | Home's Waiting on you has no live refresh: cards and count go stale until reload | children: LIN-4243:Done, LIN-4242:Done, LIN-4241:Done
+
+## Searches (GET /api/proxy/search?q=...), top 8 each
+### cost area
+- LIN-4136 | Done | Costs, tidy 4: one way a lineage's rows add up
+- LIN-4147 | Done | Costs, tidy 5: one answer to which rows belong to a lineage
+- LIN-4130 | Done | Costs, tidy 2: price cost only when it is read
+- LIN-3942 | Canceled | Settings › Costs: what the work cost at list price, what you paid, and why
+- LIN-4134 | Done | Costs, tidy 3: one answer to "what is this row's usage"
+- LIN-4129 | Done | Costs, tidy 1: remove cost code that nothing reads
+- LIN-3936 | Backlog | Costs: one place for what the work cost and what you paid; tidy the cost seam, then build the page (docs/plans
+- LIN-4193 | Backlog | Rename or absorb lib/weekly-budget.js and name the cost modules into a code-shape area
+### costs area
+- LIN-3942 | Canceled | Settings › Costs: what the work cost at list price, what you paid, and why
+- LIN-3936 | Backlog | Costs: one place for what the work cost and what you paid; tidy the cost seam, then build the page (docs/plans
+- LIN-4136 | Done | Costs, tidy 4: one way a lineage's rows add up
+- LIN-4130 | Done | Costs, tidy 2: price cost only when it is read
+- LIN-4147 | Done | Costs, tidy 5: one answer to which rows belong to a lineage
+- LIN-4134 | Done | Costs, tidy 3: one answer to "what is this row's usage"
+- LIN-4129 | Done | Costs, tidy 1: remove cost code that nothing reads
+- LIN-3939 | Canceled | Costs untangle, 3 of 4 (Consolidate): one cost authority that every surface asks
+### cost modules area
+- LIN-4193 | Backlog | Rename or absorb lib/weekly-budget.js and name the cost modules into a code-shape area
+- LIN-3938 | Canceled | Costs untangle, 2 of 4 (Free the seam): replace the tests that pin cost code by its text with tests of its beh
+- LIN-3942 | Canceled | Settings › Costs: what the work cost at list price, what you paid, and why
+- LIN-4208 | Done | Seams & Tangles Review (periodical run 5): area knots, dependency direction, ways in, rebuild readiness and ch
+- LIN-4201 | Done | Costs rebuild 2 · piece 4: the cost read sums request records (records-first cutover)
+- LIN-4231 | Done | Seams & Tangles Review (periodical run 6): area knots, dependency direction, ways in, rebuild readiness and ch
+- LIN-3937 | Canceled | Costs untangle, 1 of 4 (Own): write down where each cost decision lives, and build the replay that judges the 
+- LIN-2840 | Backlog | Dependency-import guard tests miss root-level modules and prototypes/ (widen SCAN_DIRS)
+### Costs & usage
+- LIN-3936 | Backlog | Costs: one place for what the work cost and what you paid; tidy the cost seam, then build the page (docs/plans
+- LIN-4126 | Done | Costs, seed: map how Harbour tracks model usage and cost today, and recommend what to rebuild, fix or delete
+- LIN-3089 | Backlog | Cost for sessions started outside Harbour that drive Harbour through the proxy
+- LIN-4129 | Done | Costs, tidy 1: remove cost code that nothing reads
+- LIN-4136 | Done | Costs, tidy 4: one way a lineage's rows add up
+- LIN-4200 | Done | Costs rebuild 2 · piece 3: measure records vs snapshots on live data (gate for the read switch)
+- LIN-4203 | Done | Costs rebuild 2 · piece 6: stop posting [usage] snapshots; remove the runner snapshot path
+- LIN-4235 | Backlog | Delete the legacy [usage] snapshot fold and the digest's frozen cost (after 2026-12-04, once the intake counte
+### model-routing-history
+- LIN-4177 | Done | Costs rebuild 1.1: baseline goldens, the cost read core, and /cost + Models + effort on it
+- LIN-4150 | Backlog | Survey spikes: record (don't dispatch or plan)
+- LIN-3874 | Backlog | Model routing: retire the old model preference fields (modelId, aiModelOverrides, dispatchDefaults) once the m
+- LIN-3882 | Done | Model routing · Model capabilities and prices come from the OpenRouter catalog, not hand-written lists (tools,
+- LIN-3979 | Backlog | One preset system: merge Dispatch presets and Settings › Models routing presets
+- LIN-3859 | Done | Model routing · D5 — Count subagent tokens in SD sessions; price a lineage at each model it ran (Low)
+- LIN-3853 | Done | Model routing · 2 — One settings store for every job (job settings, group defaults, presets, change log); both
+- LIN-3925 | Backlog | Model routing: one Settings move writes one change-log entry (batch id from the caller), so one Undo reverts e
+### readCost
+- LIN-4226 | Done | Costs rebuild 2 · piece 4b: the cost read loads its request records (loading becomes part of the read)
+- LIN-4201 | Done | Costs rebuild 2 · piece 4: the cost read sums request records (records-first cutover)
+- LIN-4177 | Done | Costs rebuild 1.1: baseline goldens, the cost read core, and /cost + Models + effort on it
+- LIN-4195 | Done | Costs rebuild 2: one record per model request, summed
+- LIN-4208 | Done | Seams & Tangles Review (periodical run 5): area knots, dependency direction, ways in, rebuild readiness and ch
+- LIN-4150 | Backlog | Survey spikes: record (don't dispatch or plan)
+- LIN-4179 | Done | Costs rebuild 1.3: Harbour calls on the cost read, one USD formatter, census and agreement
+- LIN-4231 | Done | Seams & Tangles Review (periodical run 6): area knots, dependency direction, ways in, rebuild readiness and ch
+### code-shape area
+- LIN-4193 | Backlog | Rename or absorb lib/weekly-budget.js and name the cost modules into a code-shape area
+- LIN-3720 | Done | Area map: decide the area for the 12 lib/ files still in 'Other features'
+- LIN-3860 | Done | Seams & Tangles also reads change coupling: which areas keep changing together, so merges that queue behind ea
+- LIN-3549 | Done | Code shape: Harbour detects and corrects tangles, seams and size as a standard capability
+- LIN-3550 | Done | Add the Seams & Tangles periodical: how Harbour's areas depend on each other, and how ready each is to refacto
+- LIN-4231 | Done | Seams & Tangles Review (periodical run 6): area knots, dependency direction, ways in, rebuild readiness and ch
+- LIN-3730 | Done | Area map: a "Reports & operator tools" area for Platform's observer files
+- LIN-3552 | Done | Seams & Tangles Review (periodical run): area knots, dependency direction, ways in and rebuild readiness — bas
+### browser seam
+- LIN-3832 | Done | Seams & Tangles Review (periodical run): area knots, dependency direction, ways in and rebuild readiness — del
+- LIN-3755 | Done | Seams: page renderers receive the route's workspace instead of looking it up (invert the dependency; Auth <> p
+- LIN-3736 | Backlog | Seams: move stableStringify/hashContext from lib/recap-cache.js down to plumbing
+- LIN-625 | Done | Parallel E2E execution: per-worker urlKey isolation (gating subtask of LIN-215)
+- LIN-4208 | Done | Seams & Tangles Review (periodical run 5): area knots, dependency direction, ways in, rebuild readiness and ch
+- LIN-1367 | Done | Off-session credential durability + refresh for the workspace Linear/GitHub OAuth token
+- LIN-3754 | Done | UI flank: tidy the seams around the page layer before the UI overhaul
+- LIN-3383 | Done | LIN-2954 S1.4: only the workspace owner can queue work for their runner
+### window globals
+- LIN-419 | Done | Drift & Coherence Review (periodical run): duplication, convention fragmentation & dependency direction — tren
+- LIN-279 | Done | Plan step: add strategy-framing to catch local-right / globally-wrong fixes
+- LIN-280 | Duplicate | Plan step: add strategy-framing to catch local-right / globally-wrong fixes
+- LIN-2456 | Done | A held queue head starves every item behind it — the LIN-2452 terminal-override lane is unreachable while a gl
+- LIN-2712 | Backlog | window.api never sees a flushed-200 body statusCode — armKeepalive errors are silently mis-rendered as success
+- LIN-3668 | Done | Drift & Coherence Review (trend vs 2026-10-18) — verify LIN-3647/3648 landed and re-measure the window's one-p
+- LIN-4249 | In Progress | Seams & Tangles Review (periodical run 7): area knots, dependency direction, ways in, rebuild readiness and ch
+- LIN-3831 | Done | Drift & Coherence Review (trend vs 2026-10-19): verify LIN-3672/3673/3674 and re-measure a 105-commit window (
+### window.HomePlacement
+- LIN-4250 | In Progress | Drift & Coherence Review (run 3, trend vs the 2026-11-04 run 2): a small window (9 production LinearViewer com
+- LIN-4249 | In Progress | Seams & Tangles Review (periodical run 7): area knots, dependency direction, ways in, rebuild readiness and ch
+- LIN-4243 | Done | Waiting on you (C): Home placement stays consistent when the Waiting set changes (spike-gated)
+- LIN-540 | Done | Window reaper closes iTerm windows still in use
+- LIN-2976 | Backlog | Passages instruct a trim at N% of the usage window, and no endpoint reports the window
+- LIN-925 | Canceled | Close a dispatched session window at record-reap to stop iTerm window accumulation
+- LIN-2964 | Done | LIN-2959 review blocker: narrow-viewport windowing drops keyboard focus to <body> and leaves off-window ★ mark
+- LIN-422 | Done | De-duplicate client escapeHtml onto window.escapeHtml
+### script list
+- LIN-2896 | Done | LinearViewer: shrink CLAUDE.md to a conventions file plus 8 area docs, with a line+byte guard
+- LIN-3831 | Done | Drift & Coherence Review (trend vs 2026-10-19): verify LIN-3672/3673/3674 and re-measure a 105-commit window (
+- LIN-68 | Done | Environment check script
+- LIN-1785 | Todo | Provisioning script for the Linux dispatcher box
+- LIN-3928 | Backlog | scripts/proxy-decomposition-tables.mjs: stale note cites a removed billedClampCount, 17 assertion for the free
+- LIN-247 | Done | Pipeline: Renderer (lib/render-pipeline.js)
+- LIN-3618 | Done | Give new dispatch tokens a 90-day lifetime and expire the ownerless production tokens
+- LIN-3397 | Done | Run the urlKey duplicate dry-run on production and post counts on LIN-2954 (follow-up to LIN-3381)
+### public/common.js globals
+- LIN-419 | Done | Drift & Coherence Review (periodical run): duplication, convention fragmentation & dependency direction — tren
+- LIN-421 | Done | Hoist shared client helpers (relativeTime, renderMarkdown, stripCodeBlockWrapper) into common.js
+- LIN-2980 | Done | readSSEStream double-dispatches and swallows the error when an onEvent handler throws
+- LIN-727 | Done | Remember team selection per workspace
+- LIN-3953 | Backlog | public/common.js dispatchPrompt JSDoc says a blank model/harness inherits the consumer's own default; the sess
+- LIN-3674 | Done | A closed task looks the same everywhere: canceled and duplicate glyphs come from getStateDisplay
+- LIN-1728 | Done | LIN-1721: escalation surface — filtered rulings view, ambient count, option-button primitive, Live Console bli
+- LIN-2712 | Backlog | window.api never sees a flushed-200 body statusCode — armKeepalive errors are silently mis-rendered as success
+### waiting-section
+- LIN-4249 | In Progress | Seams & Tangles Review (periodical run 7): area knots, dependency direction, ways in, rebuild readiness and ch
+- LIN-4250 | In Progress | Drift & Coherence Review (run 3, trend vs the 2026-11-04 run 2): a small window (9 production LinearViewer com
+- LIN-4150 | Backlog | Survey spikes: record (don't dispatch or plan)
+- LIN-4243 | Done | Waiting on you (C): Home placement stays consistent when the Waiting set changes (spike-gated)
+- LIN-4242 | Done | Waiting on you (B): live section — home-waiting fragment, shared keyed card merge, one rulings tick
+- LIN-4114 | Done | UI round 3 · S3c: Waiting on you — one card per ruling on Home, recommended answer as the main button
+- LIN-4162 | Backlog | Home: the task id on a Waiting on you card is sans, not mono
+- LIN-4144 | Done | Home's Waiting on you has no live refresh: cards and count go stale until reload
+### ruling-settled
+- LIN-4244 | Backlog | Rulings answer surfaces other than Home cards: send answerAttemptId and handle 409 ruling-settled
+- LIN-4241 | Done | Waiting on you (A): settled-ruling guard — refuse a second answer or dismiss with 409 ruling-settled
+- LIN-4249 | In Progress | Seams & Tangles Review (periodical run 7): area knots, dependency direction, ways in, rebuild readiness and ch
+- LIN-4250 | In Progress | Drift & Coherence Review (run 3, trend vs the 2026-11-04 run 2): a small window (9 production LinearViewer com
+- LIN-2797 | Done | Rulings tab: renderRulings() re-injects preservedRulingRows / rulingsPending keys that drop out of a poll payl
+- LIN-2796 | Duplicate | rulingsSettled rows vanish without their outcome label — renderRulings releases a settled key with no re-injec
+- LIN-4238 | Backlog | Observation rulings rows: move rulingRowHoldsInput/mustReuse onto the shared card merge
+- LIN-4144 | Done | Home's Waiting on you has no live refresh: cards and count go stale until reload
+### rulings area
+- LIN-2740 | Backlog | Rulings tab at phone width: Agree/Keep/Agree-selected are 30px tall (not the 44px the plan named), and the sel
+- LIN-2215 | Done | LIN-1721: wire task decisions into the rulings surface — the Phase 3 predicate is inert with no caller (L1/L2,
+- LIN-2759 | Done | Rulings: an answer carries no declared consequence — the row derives resume / fresh-run / record from session 
+- LIN-3091 | Backlog | Rulings an agent can raise through the proxy, for a session Harbour did not dispatch
+- LIN-3959 | Done | Rulings: one question, one row, one resume (a worker and its autopilot raising the same decision_id join into 
+- LIN-3891 | Done | Pipeline churn: find which runs a ticket needs between launch and Done, and which it could skip
+- LIN-3629 | Done | Drift & Coherence Review runs the census: rule on the top 25 decision groups by places x change and on any gro
+- LIN-3720 | Done | Area map: decide the area for the 12 lib/ files still in 'Other features'
+### ruling- pattern
+- LIN-3959 | Done | Rulings: one question, one row, one resume (a worker and its autopilot raising the same decision_id join into 
+- LIN-2740 | Backlog | Rulings tab at phone width: Agree/Keep/Agree-selected are 30px tall (not the 44px the plan named), and the sel
+- LIN-2335 | Backlog | Tiered observation: a cheap watcher lane between running chains and the operator session
+- LIN-2710 | Backlog | Scan-due: "select all loaded" after a run erases every painted scan result — decide bug vs accepted limitation
+- LIN-2114 | Todo | Move observation-type sessions out of Claude Code into a simpler cloud harness
+- LIN-1871 | Done | Plans enumerate by hand, so plan-review cannot converge — derive the enumeration mechanically
+- LIN-2797 | Done | Rulings tab: renderRulings() re-injects preservedRulingRows / rulingsPending keys that drop out of a poll payl
+- LIN-2796 | Duplicate | rulingsSettled rows vanish without their outcome label — renderRulings releases a settled key with no re-injec
+### routing-ruling
+- LIN-4028 | In Progress | Routing: a recorded ruling that sets a task's model is ignored by recommend-and-dispatch
+- LIN-3843 | Backlog | Rulings live-on-anchor predicate is duplicated in routes/proxy-rulings.js and routes/dashboard-session-state.j
+- LIN-3820 | Todo | Every LLM use, classed and routed from one place: design the model, then build it
+- LIN-3573 | Done | Rebuild the Agent API's write and rulings routes (routes/proxy-writes.js, routes/proxy-rulings.js) design-firs
+- LIN-3505 | Done | A runner-kit worker can raise a ruling, as a Simple Dispatcher worker can
+- LIN-2794 | Backlog | Rulings discharge routes are broader than 'agree to a proposal' — decide whether answer AND dismiss should req
+- LIN-1275 | Todo | Routing-fact injection: ciGreenOnSha / reviewVerdictOnRecord / priorInvestigationOnRecord (lift #7)
+- LIN-1726 | Canceled | LIN-1721 S2 — ruling delivery seam: one action owning fresh-vs-resume, force, and lineage
+### Other features
+- LIN-107 | Done | UI minimisation for task details
+- LIN-3848 | Done | Settings: remove the nine switches that do nothing or are superseded (LIN-3846, first step)
+- LIN-3720 | Done | Area map: decide the area for the 12 lib/ files still in 'Other features'
+- LIN-4152 | Done | Seams & Tangles Review (periodical run 4): area knots, dependency direction, ways in, rebuild readiness and fi
+- LIN-4193 | Backlog | Rename or absorb lib/weekly-budget.js and name the cost modules into a code-shape area
+- LIN-218 | Canceled | Add chain tracking fields and feature toggle
+- LIN-3610 | Done | Seams: untie Other features ↔ Runs & dispatch by moving the periodical gate marker to its owner (builder, pars
+- LIN-4208 | Done | Seams & Tangles Review (periodical run 5): area knots, dependency direction, ways in, rebuild readiness and ch
+### catch-all
+- LIN-4193 | Backlog | Rename or absorb lib/weekly-budget.js and name the cost modules into a code-shape area
+- LIN-2288 | Backlog | Proxy: GET /recap and GET /brief outer catch-alls swallow classification and leak raw err.message
+- LIN-4152 | Done | Seams & Tangles Review (periodical run 4): area knots, dependency direction, ways in, rebuild readiness and fi
+- LIN-2644 | Backlog | SD: BLOCKED has no branch before the catch-all allow at hook.js:1185 — a woken BLOCKED park is silently allowe
+- LIN-2707 | Done | LIN-2701 Session 2 — Scan-due run surface: 7-way result classification, driving the pool, onResult, second-liv
+- LIN-2287 | Backlog | Proxy: graphqlErrorExtra's stage: provider-lane precondition no longer holds at recommend-and-dispatch's outer
+- LIN-4208 | Done | Seams & Tangles Review (periodical run 5): area knots, dependency direction, ways in, rebuild readiness and ch
+- LIN-4154 | Backlog | Seams: move fmtDuration out of lib/render-run-steps.js so task-state and task-page-loader stop importing a ren
+### home-waiting
+- LIN-4242 | Done | Waiting on you (B): live section — home-waiting fragment, shared keyed card merge, one rulings tick
+- LIN-4144 | Done | Home's Waiting on you has no live refresh: cards and count go stale until reload
+- LIN-4243 | Done | Waiting on you (C): Home placement stays consistent when the Waiting set changes (spike-gated)
+- LIN-4162 | Backlog | Home: the task id on a Waiting on you card is sans, not mono
+- LIN-3833 | Done | Home: the opened task leads with its state and has one run control, with a copy-first view for new users (UI o
+- LIN-4159 | Backlog | Home says "needs you" where the task page says "waiting" for the same task state
+- LIN-4139 | Done | UI round 3 · S3e: Up next shows what is actually next, not the swipe deck order
+- LIN-4250 | In Progress | Drift & Coherence Review (run 3, trend vs the 2026-11-04 run 2): a small window (9 production LinearViewer com
+### server.js inline route
+- LIN-1249 | Backlog | Decompose server.js (2542-line app-entry: 29 routes + 17 helpers)
+- LIN-234 | Done | Server route and API endpoints
+- LIN-252 | Done | Pipeline: Route registration (server.js)
+- LIN-1925 | Backlog | Pin server.js's getWorkspaceOpenRouterKey wrapper wiring with a real-server e2e test (LIN-1389 L7 follow-up)
+- LIN-967 | Done | Route the last bare OPENROUTER_API_KEY read (server.js background session-summary precompute) through getPaidE
+- LIN-3878 | Done | Role check for workspace feature toggles (any member can enable agent model-routing writes)
+- LIN-4150 | Backlog | Survey spikes: record (don't dispatch or plan)
+- LIN-3682 | Done | Free the seam for the data-mock predicate: the roadmap route harness follows the predicate wherever it lives (
+
+## GitHub
+- PR #2185 OPEN updated 2026-10-30T09:15:48Z feat/lin-4028-ruling-model-routing: LIN-4028: a recorded routing ruling pins the model and effort recommend-and-dispatch runs on
+- PR #2185 adds lib/routing-ruling.js (files list):
+    lib/dispatch-entrance.js
+    lib/dispatch-factory.js
+    lib/proxy-instructions.js
+    lib/routing-ruling.js
+    lib/session-telemetry.js
