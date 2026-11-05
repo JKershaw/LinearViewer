@@ -1662,3 +1662,11 @@ Each is its own piece, with a stop-and-say rule on 5 and 6. Autopilot `84fa12ad`
   - LIN-4240's builder: each feedback kind declared once with its role.
 
   Both are *a vocabulary whose facts are scattered across the readers and guards that each keep a copy*. That's the pattern behind tonight's three tickets (erasure, urlkey classes, park reading). Added to the tally as its own row, beside the collection row.
+
+### 01:20 UTC (5 Nov): LIN-4144's first piece merged; a scoping ruling proposed
+- **LIN-4241** (`94195271`, merged 00:01): the settled-ruling guard. **One refusal code for all four routes that can settle a ruling**, on the existing CAS pattern, and the client reuses the existing "gone" event. One small homeless file (the shared constant). Ledger `+ (small)`. **The first row for the ordinary feature ticket is positive.**
+- **LIN-4242 (piece B, the live section) in review:**
+  - **The review was very good.** It ran nine mutations and found four that stayed green. The builder answered with a merge witness over real markup (8 mutations, each caught), byte-for-byte conformance between the page and the fragment, a de-flaked badge read and cost measured (5 ms median).
+  - **It also extracted the keep check as one shared function**, as scoped.
+  - **The ruling `lin4242-keep-witness-scope`:** build a repaint witness for the opened task's `keepTypedQuestion` call site, or accept? **Proposed: accept, and make the witness its own follow-up.** The gap predates the ticket (LIN-4024), and it needs a full state fixture, a different-sized piece.
+- (A container restart at about 00:00 stopped my watcher; nothing was lost.)
