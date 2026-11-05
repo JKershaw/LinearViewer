@@ -10,38 +10,12 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import vm from 'node:vm';
 import { TaskModeStore, copyKindOf } from '../../lib/task-mode-store.js';
 import { renderPage } from '../../lib/render.js';
 import { serverSessions, serverRow } from '../fixtures/task-decision.js';
+import { loadWorld } from './helpers/client-world.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
 const flush = () => new Promise((r) => setTimeout(r, 0));
-
-function makeContainer() {
-  const container = {
-    innerHTML: '',
-    dataset: {},
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    setAttribute() {},
-    getAttribute() { return null; },
-    querySelector() { return null; },
-    contains() { return true; },
-    _clickHandler: null,
-    addEventListener(type, fn) { if (type === 'click') this._clickHandler = fn; },
-    removeEventListener() {},
-    async click(dataset) {
-      const btn = { dataset: { ...dataset }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
-      await this._clickHandler({ target: btn });
-      return btn;
-    },
-  };
-  return container;
-}
 
 /** A PromptSection sandbox. `stateBody` is what the state endpoint answers (null for no read). */
 function load({ stateBody = null } = {}) {
@@ -65,19 +39,8 @@ function load({ stateBody = null } = {}) {
     isPinnedToBottom: () => false,
     toast: () => {},
   };
-  const sandbox = {
-    window, AbortController, URLSearchParams, TextDecoder, TextEncoder, Blob: class {},
-    URL: { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} },
-    document: { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } },
-    requestAnimationFrame: (cb) => { cb(); return 1; },
-    setTimeout, clearTimeout,
-    navigator: { clipboard: { writeText: async () => {} } },
-    fetch: async () => ({ ok: true, json: async () => ({}) }),
-    console,
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(SRC, sandbox, { filename: 'prompt-section.js' });
-  return { PromptSection: sandbox.window.PromptSection, calls };
+  const world = loadWorld({ window, scripts: ['prompt-section.js'] });
+  return { PromptSection: world.PromptSection, calls, makeContainer: world.makeContainer };
 }
 
 function homeOpts(over = {}) {
@@ -99,7 +62,7 @@ describe('LIN-3833 — the copy-first step comes from the task\'s status alone',
     ['started', '__ai__', 'Generate the next prompt for this task'],
   ]) {
     test(`${stateType} → "Write the prompt" for ${label}`, async () => {
-      const { PromptSection } = load();
+      const { PromptSection, makeContainer } = load();
       const c = makeContainer();
       PromptSection.init(c, homeOpts({ issue: { id: 'uuid-42', identifier: 'LIN-42', title: 'T', url: '', stateType } }));
       await flush();
@@ -109,7 +72,7 @@ describe('LIN-3833 — the copy-first step comes from the task\'s status alone',
   }
 
   test('no run, model, cost, stage or session element is rendered to a copy-first viewer', async () => {
-    const { PromptSection } = load({ stateBody: { live: false, status: 'idle', headerHtml: '<p class="task-sentence">No sessions yet.</p>', trackHtml: '<div class="task-track">stages</div>', sessions: { count: 0, last: null, running: null } } });
+    const { PromptSection, makeContainer } = load({ stateBody: { live: false, status: 'idle', headerHtml: '<p class="task-sentence">No sessions yet.</p>', trackHtml: '<div class="task-track">stages</div>', sessions: { count: 0, last: null, running: null } } });
     const c = makeContainer();
     PromptSection.init(c, homeOpts());
     await flush();
@@ -121,7 +84,7 @@ describe('LIN-3833 — the copy-first step comes from the task\'s status alone',
 
 describe('LIN-3833 — once written, the prompt is copied, bounded and keyed', () => {
   test('a written prompt shows Copy, the bounded box with Rewrite and Download, and the progress-key checkbox', async () => {
-    const { PromptSection } = load();
+    const { PromptSection, makeContainer } = load();
     const c = makeContainer();
     PromptSection.init(c, homeOpts());
     await flush();
@@ -129,7 +92,8 @@ describe('LIN-3833 — once written, the prompt is copied, bounded and keyed', (
     await flush();
     assert.match(c.innerHTML, /data-testid="opened-task-copy"[^>]*data-action="copy"/);
     // LIN-3968: the prompt is the text that will be pasted: plain text in the bounded box, not rendered markdown.
-    assert.match(c.innerHTML, /class="opened-task-box"><div class="opened-task-text" data-prompt-body>PLAN PROMPT/);
+    // The serializer writes a valueless attribute as `name=""`, as a browser does (the fake is browser-faithful).
+    assert.match(c.innerHTML, /class="opened-task-box"><div class="opened-task-text" data-prompt-body="">PLAN PROMPT/);
     assert.match(c.innerHTML, /class="btn opened-task-regenerate" data-prompt="plan">Rewrite/);
     assert.match(c.innerHTML, /data-action="download"[^>]*>Download/);
     assert.match(c.innerHTML, /data-testid="opened-task-progress-key"[^>]*checked/, 'the key follows the account default (on)');
@@ -137,7 +101,7 @@ describe('LIN-3833 — once written, the prompt is copied, bounded and keyed', (
   });
 
   test('Rewrite and Download sit outside the markdown sink, so a look-alike in the prompt body is never bound', async () => {
-    const { PromptSection } = load();
+    const { PromptSection, makeContainer } = load();
     const c = makeContainer();
     PromptSection.init(c, homeOpts());
     await flush();
@@ -152,7 +116,7 @@ describe('LIN-3833 — once written, the prompt is copied, bounded and keyed', (
 
 describe('LIN-3833 — the state block: the task\'s own sentence, and what was last copied', () => {
   test('a copy-first state block says the tracker word and what was copied, with no session words (LIN-4010)', async () => {
-    const { PromptSection } = load({ stateBody: { live: false, status: 'idle', headerHtml: '<p class="task-sentence">No sessions yet.</p>', trackHtml: '<div class="task-track">stages</div>', sessions: { count: 0, last: null, running: null } } });
+    const { PromptSection, makeContainer } = load({ stateBody: { live: false, status: 'idle', headerHtml: '<p class="task-sentence">No sessions yet.</p>', trackHtml: '<div class="task-track">stages</div>', sessions: { count: 0, last: null, running: null } } });
     const c = makeContainer();
     PromptSection.init(c, homeOpts());
     await flush();
@@ -162,7 +126,7 @@ describe('LIN-3833 — the state block: the task\'s own sentence, and what was l
   });
 
   test('Swipe keeps its own card: no state block, no copy-first view', async () => {
-    const { PromptSection, calls } = load({ stateBody: { live: false, status: 'idle', headerHtml: '<p class="task-sentence">Nothing yet.</p>', sessions: { count: 0, last: null, running: null } } });
+    const { PromptSection, calls, makeContainer } = load({ stateBody: { live: false, status: 'idle', headerHtml: '<p class="task-sentence">Nothing yet.</p>', sessions: { count: 0, last: null, running: null } } });
     const c = makeContainer();
     PromptSection.init(c, homeOpts({ surface: 'swipe' }));
     await flush();

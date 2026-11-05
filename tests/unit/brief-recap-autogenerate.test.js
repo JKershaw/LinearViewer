@@ -20,47 +20,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import vm from 'node:vm';
+import { loadWorld } from './helpers/client-world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-
-// --- Minimal fake DOM: only what init()/applyState()/wireRefresh() touch ----
-function makeContainer() {
-  return {
-    innerHTML: '',
-    _state: null,
-    // LIN-1016: click handlers wireRefresh() registers, so a test can drive the
-    // REAL manual path rather than calling refresh() itself. wireRefresh runs on
-    // every applyState, so the last entry is the currently-wired button.
-    _clickHandlers: [],
-    classList: { add() {} },
-    setAttribute(k, v) { if (k === 'data-state') this._state = v; },
-    getAttribute(k) { return k === 'data-state' ? this._state : null; },
-    // The modules select the refresh button by its data-*-refresh attribute;
-    // return a wire-able stub when the current markup contains that attribute
-    // (renderGenerating has no button, the terminal states do).
-    querySelector(sel) {
-      const attr = sel.replace(/[[\]]/g, '');
-      if (!this.innerHTML.includes(attr)) return null;
-      const handlers = this._clickHandlers;
-      return { addEventListener(type, fn) { if (type === 'click') handlers.push(fn); } };
-    },
-    // Invoke the currently-wired ✦ generate / ↻ refresh handler. The module
-    // registers an `async` listener that awaits refresh(), so awaiting the
-    // handler awaits the whole render.
-    async clickRefresh() {
-      const fn = this._clickHandlers[this._clickHandlers.length - 1];
-      assert.ok(fn, 'a refresh button was wired before the click');
-      await fn();
-    },
-  };
-}
 
 // Load a client section module (brief/recap) into a fresh sandbox with a
 // scripted `window.api`. `responder(url, opts)` returns the JSON body for each
 // call; `calls` records what was requested so tests can assert POST behavior.
 function loadSection(file, globalName, responder) {
-  const src = readFileSync(join(__dirname, '../../public', file), 'utf8');
   const calls = [];
   const window = {
     escapeHtml: (s) => (s == null ? '' : String(s)),
@@ -72,11 +39,17 @@ function loadSection(file, globalName, responder) {
       return responder(url, method);
     },
   };
-  // URLSearchParams is a host global, not an ECMAScript intrinsic, so a fresh
-  // vm context does not expose it. Supplied here for the case below that
-  // exercises the `?source=&bindingScope=` query path (LIN-2944 P2 ledger).
-  vm.runInNewContext(src, { window, URLSearchParams });
-  return { section: window[globalName], calls };
+  // The section module runs in the shared client world (helpers/client-world.js): its real document and its vm sandbox.
+  const world = loadWorld({ window, scripts: [file] });
+  return { section: world.window[globalName], calls, makeContainer: world.makeContainer };
+}
+
+// A press on the drawn refresh button: the button's own click listeners run, as the browser runs them when it is clicked
+// (the fake records them, and does not model bubbling). The button must be drawn, or the press fails.
+async function pressDrawn(container, selector) {
+  const btn = container.querySelector(selector);
+  assert.ok(btn, `${selector} is drawn in the container`);
+  for (const fn of btn.listenersOf('click')) await fn({ target: btn });
 }
 
 const OPTS = { urlKey: 'ws', identifier: 'LIN-998' };
@@ -90,14 +63,14 @@ const FRESH_RECAP = {
 
 // Per-section config so the two modules share one behavioral test body.
 const SECTIONS = [
-  { name: 'Brief', file: 'brief.js', global: 'BriefSection', fresh: FRESH_BRIEF },
-  { name: 'Recap', file: 'recap.js', global: 'RecapSection', fresh: FRESH_RECAP },
+  { name: 'Brief', file: 'brief.js', global: 'BriefSection', fresh: FRESH_BRIEF, press: '[data-brief-refresh]' },
+  { name: 'Recap', file: 'recap.js', global: 'RecapSection', fresh: FRESH_RECAP, press: '[data-recap-refresh]' },
 ];
 
 for (const S of SECTIONS) {
   test(`${S.name}: status=missing renders the manual placeholder, NO POST (no spend on open)`, async () => {
     const responder = (url, method) => (method === 'POST' ? S.fresh : { status: 'missing' });
-    const { section, calls } = loadSection(S.file, S.global, responder);
+    const { section, calls, makeContainer } = loadSection(S.file, S.global, responder);
 
     const container = makeContainer();
     await section.init(container, OPTS);
@@ -110,7 +83,7 @@ for (const S of SECTIONS) {
 
   test(`${S.name}: status=fresh renders cache, NO POST (never clobber fresh)`, async () => {
     const responder = () => S.fresh;
-    const { section, calls } = loadSection(S.file, S.global, responder);
+    const { section, calls, makeContainer } = loadSection(S.file, S.global, responder);
 
     const container = makeContainer();
     await section.init(container, OPTS);
@@ -122,7 +95,7 @@ for (const S of SECTIONS) {
   test(`${S.name}: status=stale keeps manual refresh, NO POST (no reopen tax)`, async () => {
     const responder = (url, method) =>
       (method === 'POST' ? S.fresh : { status: 'stale', generatedAt: '2026-07-01T00:00:00Z' });
-    const { section, calls } = loadSection(S.file, S.global, responder);
+    const { section, calls, makeContainer } = loadSection(S.file, S.global, responder);
 
     const container = makeContainer();
     await section.init(container, OPTS);
@@ -145,7 +118,7 @@ for (const S of SECTIONS) {
       }
       return { status: 'missing' };
     };
-    const { section, calls } = loadSection(S.file, S.global, responder);
+    const { section, calls, makeContainer } = loadSection(S.file, S.global, responder);
 
     const container = makeContainer();
     // Open the section; its terminal state is the placeholder either way. P2's
@@ -155,7 +128,7 @@ for (const S of SECTIONS) {
     const beforeClick = calls.filter(c => c.method === 'POST').length;
 
     // Now the user clicks it — an explicit action, same coded 503.
-    await container.clickRefresh();
+    await pressDrawn(container, S.press);
 
     assert.equal(calls.filter(c => c.method === 'POST').length, beforeClick + 1, 'the click issued its own POST');
     assert.equal(container.getAttribute('data-state'), 'error', 'a manual click surfaces the reason, never the silent placeholder');
@@ -166,7 +139,7 @@ for (const S of SECTIONS) {
   // so the vm context never needed URLSearchParams (added in loadSection above).
   test(`${S.name}: manual ✦ generate forwards source on the POST (LIN-1910)`, async () => {
     const responder = (url, method) => (method === 'POST' ? S.fresh : { status: 'missing' });
-    const { section, calls } = loadSection(S.file, S.global, responder);
+    const { section, calls, makeContainer } = loadSection(S.file, S.global, responder);
 
     const container = makeContainer();
     await section.init(container, {
@@ -176,7 +149,7 @@ for (const S of SECTIONS) {
     });
     assert.equal(container.getAttribute('data-state'), 'missing', 'opens on the manual placeholder');
 
-    await container.clickRefresh();
+    await pressDrawn(container, S.press);
 
     const posts = calls.filter(c => c.method === 'POST');
     assert.equal(posts.length, 1, 'exactly one POST from the click');

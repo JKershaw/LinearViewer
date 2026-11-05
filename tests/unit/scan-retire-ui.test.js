@@ -2,13 +2,11 @@
 // affordances in public/scan.js.
 //
 // public/scan.js is a plain browser script (assigns to `window`, not an ES
-// module), so — same house pattern as tests/unit/scan-post-signal.test.js
-// and tests/unit/brief-recap-autogenerate.test.js — it is evaluated in a vm
-// sandbox against a minimal fake DOM `container` and a scripted
-// `window.api`. Unlike those two, wireActions() wires SEVERAL distinct
-// buttons on the same render (scan/rescan, dismiss, answer, retire,
-// unretire), so the fake `container` keys click handlers by selector rather
-// than tracking a single "last wired" handler.
+// module), so it runs in the shared client world (helpers/client-world.js):
+// one fake document, one vm sandbox, a scripted `window.api`. wireActions()
+// wires SEVERAL distinct buttons on the same render (scan/rescan, dismiss,
+// answer, retire, unretire); a press is the drawn button's own click listeners
+// (`press`), so a control the render does not draw cannot be pressed.
 //
 // scan.js calls the bare global `confirm(...)` (LIN-511's ratified
 // destructive-action primitive), not `window.confirm` — the vm sandbox's
@@ -18,41 +16,8 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import vm from 'node:vm';
+import { loadWorld } from './helpers/client-world.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(__dirname, '../../public/scan.js'), 'utf8');
-
-function makeContainer() {
-  const handlers = {};
-  return {
-    innerHTML: '',
-    _state: null,
-    classList: { add() {} },
-    setAttribute(k, v) { if (k === 'data-state') this._state = v; },
-    getAttribute(k) { return k === 'data-state' ? this._state : null; },
-    // wireActions() selectors are either a single `[data-scan-action="x"]`
-    // attribute or a comma-joined pair (scan/rescan). Match whichever named
-    // attribute is present in the CURRENT innerHTML, keyed by the exact
-    // selector string wireActions used, so a later click() call can address
-    // a specific button even when several are wired on the same render.
-    querySelector(sel) {
-      const parts = sel.split(',').map(s => s.trim());
-      const present = parts.find(p => this.innerHTML.includes(p.replace(/^\[|\]$/g, '')));
-      if (!present) return null;
-      return { addEventListener: (type, fn) => { if (type === 'click') handlers[sel] = fn; } };
-    },
-    querySelectorAll() { return []; },
-    async click(selector) {
-      const fn = handlers[selector];
-      assert.ok(fn, `no click handler wired for ${selector}`);
-      await fn();
-    }
-  };
-}
 
 const RETIRE_SEL = '[data-scan-action="retire"]';
 const UNRETIRE_SEL = '[data-scan-action="unretire"]';
@@ -80,13 +45,20 @@ function loadScanSection({ responder, confirmReturns = true } = {}) {
       return responder(url, method, body);
     },
   };
-  const context = {
-    window,
-    URLSearchParams,
-    confirm: (msg) => { confirmCalls.push(msg); return confirmReturns; },
-  };
-  vm.runInNewContext(SRC, context);
-  return { ScanSection: window.ScanSection, calls, confirmCalls };
+  // scan.js calls the bare global `confirm`, which the world's sandbox provides as a global beside `window`.
+  const world = loadWorld({
+    window, scripts: ['scan.js'],
+    globals: { confirm: (msg) => { confirmCalls.push(msg); return confirmReturns; } },
+  });
+  return { ScanSection: world.window.ScanSection, calls, confirmCalls, makeContainer: world.makeContainer };
+}
+
+// A press on the drawn control: the button's own click listeners run, as the browser runs them when it is clicked (the
+// fake records them, and does not model bubbling). The control must be drawn, or the press fails.
+async function press(container, selector) {
+  const btn = container.querySelector(selector);
+  assert.ok(btn, `${selector} is drawn in the container`);
+  for (const fn of btn.listenersOf('click')) await fn({ target: btn });
 }
 
 const OPTS = { urlKey: 'ws', identifier: 'LIN-1' };
@@ -118,7 +90,7 @@ function selfResolvedRow(overrides = {}) {
 
 describe('public/scan.js — self-resolved render branch (LIN-2650 WS4 §5)', () => {
   test('renderFresh: a self-resolved row renders as retired, not the interactive answer UI', async () => {
-    const { ScanSection } = loadScanSection({ responder: () => selfResolvedRow() });
+    const { ScanSection, makeContainer } = loadScanSection({ responder: () => selfResolvedRow() });
     const container = makeContainer();
     await ScanSection.init(container, OPTS);
 
@@ -133,7 +105,7 @@ describe('public/scan.js — self-resolved render branch (LIN-2650 WS4 §5)', ()
 
   test('renderStale: a self-resolved row whose content has since changed still renders as retired ("out of date · retired")', async () => {
     const stale = { ...selfResolvedRow(), status: 'stale', basisChanged: null };
-    const { ScanSection } = loadScanSection({ responder: () => stale });
+    const { ScanSection, makeContainer } = loadScanSection({ responder: () => stale });
     const container = makeContainer();
     await ScanSection.init(container, OPTS);
 
@@ -143,7 +115,7 @@ describe('public/scan.js — self-resolved render branch (LIN-2650 WS4 §5)', ()
   });
 
   test('an ordinary unanswered decision gains a Retire button alongside answer/dismiss', async () => {
-    const { ScanSection } = loadScanSection({ responder: () => unansweredDecision() });
+    const { ScanSection, makeContainer } = loadScanSection({ responder: () => unansweredDecision() });
     const container = makeContainer();
     await ScanSection.init(container, OPTS);
 
@@ -157,16 +129,16 @@ describe('public/scan.js — self-resolved render branch (LIN-2650 WS4 §5)', ()
   // dismissed/answered check, not a replacement for it.
   test('dismissed/answered/zero-finding branches are unaffected', async () => {
     const dismissed = unansweredDecision({ outcome: 'dismissed', outcomeAt: '2026-09-10T00:00:00.000Z' });
-    const { ScanSection: S1 } = loadScanSection({ responder: () => dismissed });
-    const c1 = makeContainer();
+    const { ScanSection: S1, makeContainer: makeContainer1 } = loadScanSection({ responder: () => dismissed });
+    const c1 = makeContainer1();
     await S1.init(c1, OPTS);
     assert.match(c1.innerHTML, /data-testid="scan-outcome-dismissed"/);
     assert.doesNotMatch(c1.innerHTML, /scan-outcome-self-resolved/);
     assert.doesNotMatch(c1.innerHTML, new RegExp(attrOf(UNRETIRE_SEL)));
 
     const zeroFinding = { status: 'fresh', id: 'row-2', issueId: 'uuid-2', decision: null, scannedAt: '2026-09-10T00:00:00.000Z', outcome: null };
-    const { ScanSection: S2 } = loadScanSection({ responder: () => zeroFinding });
-    const c2 = makeContainer();
+    const { ScanSection: S2, makeContainer: makeContainer2 } = loadScanSection({ responder: () => zeroFinding });
+    const c2 = makeContainer2();
     await S2.init(c2, OPTS);
     assert.match(c2.innerHTML, /data-testid="scan-empty"/);
     assert.doesNotMatch(c2.innerHTML, /scan-outcome-self-resolved/);
@@ -175,38 +147,38 @@ describe('public/scan.js — self-resolved render branch (LIN-2650 WS4 §5)', ()
 
 describe('public/scan.js — retire action (LIN-2650 WS4)', () => {
   test('confirm() carries the backstop-not-guarantee disclaimer', async () => {
-    const { ScanSection, confirmCalls } = loadScanSection({
+    const { ScanSection, confirmCalls, makeContainer } = loadScanSection({
       responder: (url, method) => (method === 'POST' ? { retired: true, ...selfResolvedRow() } : unansweredDecision())
     });
     const container = makeContainer();
     await ScanSection.init(container, OPTS);
-    await container.click(RETIRE_SEL);
+    await press(container, RETIRE_SEL);
 
     assert.equal(confirmCalls.length, 1);
     assert.match(confirmCalls[0], /backstop, not a guarantee/);
   });
 
   test('declining the confirm() dialog sends no request and leaves the view unchanged', async () => {
-    const { ScanSection, calls } = loadScanSection({
+    const { ScanSection, calls, makeContainer } = loadScanSection({
       responder: () => unansweredDecision(),
       confirmReturns: false
     });
     const container = makeContainer();
     await ScanSection.init(container, OPTS);
     const getCallsBefore = calls.length;
-    await container.click(RETIRE_SEL);
+    await press(container, RETIRE_SEL);
 
     assert.equal(calls.length, getCallsBefore, 'no POST fired');
     assert.match(container.innerHTML, new RegExp(attrOf(RETIRE_SEL)), 'still the interactive view');
   });
 
   test('a successful retire (retired: true) re-renders as self-resolved', async () => {
-    const { ScanSection, calls } = loadScanSection({
+    const { ScanSection, calls, makeContainer } = loadScanSection({
       responder: (url, method) => (method === 'POST' ? { retired: true, ...selfResolvedRow() } : unansweredDecision())
     });
     const container = makeContainer();
     await ScanSection.init(container, OPTS);
-    await container.click(RETIRE_SEL);
+    await press(container, RETIRE_SEL);
 
     const post = calls.find(c => c.method === 'POST');
     assert.ok(post, 'a POST was sent');
@@ -216,12 +188,12 @@ describe('public/scan.js — retire action (LIN-2650 WS4)', () => {
   });
 
   test('a non-retiring result (retired: false) restores the prior interactive view, not an error', async () => {
-    const { ScanSection } = loadScanSection({
+    const { ScanSection, makeContainer } = loadScanSection({
       responder: (url, method) => (method === 'POST' ? { retired: false, reason: 'still pending' } : unansweredDecision())
     });
     const container = makeContainer();
     await ScanSection.init(container, OPTS);
-    await container.click(RETIRE_SEL);
+    await press(container, RETIRE_SEL);
 
     assert.doesNotMatch(container.innerHTML, /scan-error/);
     assert.doesNotMatch(container.innerHTML, /scan-outcome-self-resolved/);
@@ -236,14 +208,14 @@ describe('public/scan.js — retire action (LIN-2650 WS4)', () => {
   // prior view, exactly as if nothing were wrong. This reproduces the
   // reviewer's by-hand repro as a real, permanent test.
   test('a keepalive-flushed error body (statusCode present) surfaces as an error, not a silent no-op', async () => {
-    const { ScanSection } = loadScanSection({
+    const { ScanSection, makeContainer } = loadScanSection({
       responder: (url, method) => (method === 'POST'
         ? { error: 'This ruling no longer exists — it may have been pruned or superseded by a newer scan', code: 'ROW_GONE', statusCode: 404 }
         : unansweredDecision())
     });
     const container = makeContainer();
     await ScanSection.init(container, OPTS);
-    await container.click(RETIRE_SEL);
+    await press(container, RETIRE_SEL);
 
     assert.match(container.innerHTML, /scan-error/, 'the flushed failure must render as an error, not a quiet restore');
     assert.match(container.innerHTML, /This ruling no longer exists/);
@@ -253,12 +225,12 @@ describe('public/scan.js — retire action (LIN-2650 WS4)', () => {
 
 describe('public/scan.js — un-retire action (LIN-2650 WS4)', () => {
   test('confirm() carries the disclaimer that un-retiring does not undo the underlying cause', async () => {
-    const { ScanSection, confirmCalls } = loadScanSection({
+    const { ScanSection, confirmCalls, makeContainer } = loadScanSection({
       responder: (url, method) => (method === 'POST' ? { status: 'fresh', ...unansweredDecision() } : selfResolvedRow())
     });
     const container = makeContainer();
     await ScanSection.init(container, OPTS);
-    await container.click(UNRETIRE_SEL);
+    await press(container, UNRETIRE_SEL);
 
     assert.equal(confirmCalls.length, 1);
     assert.match(confirmCalls[0], /does not undo whatever caused it to self-resolve/);
@@ -269,24 +241,24 @@ describe('public/scan.js — un-retire action (LIN-2650 WS4)', () => {
   // un-retire's confirmation copy — the restored ruling still comes from an
   // LLM judgement, even though the un-retire write itself is deterministic.
   test('confirm() also carries the backstop-not-guarantee disclaimer, attached to the restored scan judgement', async () => {
-    const { ScanSection, confirmCalls } = loadScanSection({
+    const { ScanSection, confirmCalls, makeContainer } = loadScanSection({
       responder: (url, method) => (method === 'POST' ? { status: 'fresh', ...unansweredDecision() } : selfResolvedRow())
     });
     const container = makeContainer();
     await ScanSection.init(container, OPTS);
-    await container.click(UNRETIRE_SEL);
+    await press(container, UNRETIRE_SEL);
 
     assert.equal(confirmCalls.length, 1);
     assert.match(confirmCalls[0], /backstop, not a guarantee/);
   });
 
   test('a successful un-retire returns to the interactive answer/dismiss/retire view', async () => {
-    const { ScanSection, calls } = loadScanSection({
+    const { ScanSection, calls, makeContainer } = loadScanSection({
       responder: (url, method) => (method === 'POST' ? { status: 'fresh', ...unansweredDecision() } : selfResolvedRow())
     });
     const container = makeContainer();
     await ScanSection.init(container, OPTS);
-    await container.click(UNRETIRE_SEL);
+    await press(container, UNRETIRE_SEL);
 
     const post = calls.find(c => c.method === 'POST');
     assert.ok(post, 'a POST was sent');
@@ -302,14 +274,14 @@ describe('public/scan.js — un-retire action (LIN-2650 WS4)', () => {
   // error body would have rendered straight through as if it were a real
   // restored record.
   test('a keepalive-flushed error body (statusCode present) surfaces as an error, not a bogus render', async () => {
-    const { ScanSection } = loadScanSection({
+    const { ScanSection, makeContainer } = loadScanSection({
       responder: (url, method) => (method === 'POST'
         ? { error: 'This ruling is not currently self-resolved and cannot be un-retired', code: 'NOT_SELF_RESOLVED', statusCode: 409 }
         : selfResolvedRow())
     });
     const container = makeContainer();
     await ScanSection.init(container, OPTS);
-    await container.click(UNRETIRE_SEL);
+    await press(container, UNRETIRE_SEL);
 
     assert.match(container.innerHTML, /scan-error/, 'the flushed failure must render as an error');
     assert.match(container.innerHTML, /not currently self-resolved/);

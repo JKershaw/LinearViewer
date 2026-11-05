@@ -1790,6 +1790,12 @@ a.wordmark:hover {
   align-self: flex-start;
 }
 
+/* The copied state (LIN-4269): the shared copy handler adds `copied` to the button it pressed, on the task surface too. */
+.opened-task-copy.copied {
+  color: var(--green);
+  border-color: var(--green);
+}
+
 .opened-task-write {
   align-self: flex-start;
 }
