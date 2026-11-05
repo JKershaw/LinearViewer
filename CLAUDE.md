@@ -55,7 +55,7 @@ E2E specs live in `tests/e2e/` (Playwright) with unit tests in `tests/unit/` (`n
 
 ## Unit Testing Pattern (LIN-2023)
 
-Test servers in `tests/unit` bind `127.0.0.1` explicitly (`app.listen(0, '127.0.0.1')`), never hostless — and are addressed the way they were bound (`http://127.0.0.1:${port}`, never `localhost`). A hostless `listen(0)` binds IPv6 dual-stack and can silently coexist with an unrelated IPv4-only process already holding that port number (LIN-2023) — see `tests/unit/test-server-listen-bind.test.js` for the enforcement. `tests/unit/helpers/fake-dom.js` is the one fake DOM for client tests (`prompt-section.js`, `question-cards.js`): use it, and `tests/unit/helpers/prompt-section-world.js` (`loadWorld`) for the vm over it; don't hand-write a `makeContainer`.
+Test servers in `tests/unit` bind `127.0.0.1` explicitly (`app.listen(0, '127.0.0.1')`), never hostless — and are addressed the way they were bound (`http://127.0.0.1:${port}`, never `localhost`). A hostless `listen(0)` binds IPv6 dual-stack and can silently coexist with an unrelated IPv4-only process already holding that port number (LIN-2023) — see `tests/unit/test-server-listen-bind.test.js` for the enforcement. `tests/unit/helpers/fake-dom.js` is the one fake DOM for client tests (`prompt-section.js`, `question-cards.js`): use it, and `tests/unit/helpers/client-world.js` (`loadWorld`) for the vm over it; don't hand-write a `makeContainer`.
 
 ## Linear API
 

@@ -1,7 +1,7 @@
 /**
- * The client world for suites that run `public/prompt-section.js` (LIN-4246): one fake DOM document (`fake-dom.js`) and one
- * vm sandbox, with the scripts a suite names run in it, in order. `question-cards.js` must be named in the same vm as
- * `prompt-section.js` when the test depends on the keep: `keepsPlace` is always false without `window.QuestionCards`.
+ * The client world (LIN-4246, LIN-4265): one fake DOM document (`fake-dom.js`) and one vm sandbox, with whichever `public/`
+ * scripts a suite names run in it, in order. `question-cards.js` must be named in the same vm as `prompt-section.js` when
+ * the test depends on the keep: `keepsPlace` is always false without `window.QuestionCards`.
  *
  * This layer is generic. What a suite's `/api/…` calls return is the suite's own, passed in as `window`. The container is a
  * real element in the world's document; `click` and `key` are the only shims over it: `click(dataset)` gives the drawn button
