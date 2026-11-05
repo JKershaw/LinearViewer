@@ -60,3 +60,55 @@ John's tipping point (4 Nov): when a task, on average, leaves the codebase even 
   - `cache-module-family` worsened (LOW): LIN-4201's `workspace-kpis-cache.js` is a second keyed cache, repeating a known write pattern.
 - **Census flat:** 0 `mustRule` groups moved. **Import graph:** no new cycle, 0 upward edges.
 - **Effect on the rows:** LIN-4203 stays `+`, with one new gap noted (erasure). LIN-4201 stays `+ (mixed)`, with one LOW copy noted (cache).
+
+## The blind second scorer (5 Nov, first pass)
+
+Two fresh sessions scored the 28 single-commit rows above (baseline and forward, shuffled together with seed 20261105 and given as commits only). They read code, tests and how-to docs at each parent and commit, not tickets, PRs, `docs/plans/`, `docs/reviews/` or `docs/papers/`, and weren't told why any change was made. Batches A and B are on LIN-4150 (07:48–07:49 UTC). Ledger balances are mapped as: `+` and `+ (small)` → better, `+ (mixed)` and `−/+` → mixed, `0` → neutral, `−` and `− (small)` → worse.
+
+| Ticket | Window | Ledger | Blind | What the blind scorer saw that the ledger didn't |
+|---|---|---|---|---|
+| LIN-4168 | baseline | − | **better** | one reset over six seams; it doesn't weigh the map's catch-all |
+| LIN-4166 | baseline | 0 | mixed | `followUpTo` hand-checked four times; `'none'` in the edge enum |
+| LIN-4173 | baseline | + | better | |
+| LIN-4177 | baseline | −/+ | mixed | |
+| LIN-4178 | baseline | − | mixed | credits the three lineage-cost copies it deleted |
+| LIN-4179 | baseline | 0 | **better** | `llm-call-log` shrinks, one formatter with a census |
+| LIN-4198 | baseline | − | mixed | a third token-field list, a copied `bulkWriteWithRetry` |
+| LIN-4202 | baseline | − | mixed | a cross-repo transcript walk re-implemented rule for rule |
+| LIN-4212 | forward, no Survey | 0 | **worse** | the read merges back what the write's key splits; a fourth member-row query |
+| LIN-4201 | forward | + (mixed) | mixed | a second stale-while-revalidate cache; batching repeated |
+| LIN-4203 | forward | + | better | |
+| LIN-4218 | forward | + | better | reshaped, not shorter; opencode keeps its own sequence |
+| LIN-4226 | forward | + (small) | better | |
+| LIN-4220 | forward | + | mixed | `envWithout` still two copies; tests ≈ 7× the owner |
+| LIN-4223 | forward | + | better | |
+| LIN-4221 | forward | + | mixed | literal exit codes left in four runners |
+| LIN-4222 | forward | + | better | |
+| LIN-4224 | forward | + | mixed | `UNIT_ARGS` restates `package.json`; the leak trap's roots hard-coded |
+| LIN-4187 | forward | + | mixed | the contract census checks only the format of its lines |
+| LIN-4234 | forward | + | better | |
+| LIN-4239 (+ LIN-4240) | forward | + / + | mixed (scored together) | a park's readability has an owner on each side; a third marker regex |
+| LIN-4241 | forward | + (small) | **worse** | the scan-row settled check goes from 2 copies to 5; a third stamp parser; two 409 codes |
+| LIN-4242 | forward | + (mixed) | mixed | the card merge copies `observation.js`'s; a second title rule |
+| LIN-4243 | forward | + (mixed) | mixed | |
+| LIN-4151 | forward | + | better | |
+| LIN-4048 | forward | + | **neutral** | "finished but held" now decided in three places |
+| LIN-4143 | forward | + | better | |
+
+**Read with +1 better, 0 mixed or neutral, −1 worse:**
+
+| | Ledger | Blind |
+|---|--:|--:|
+| Baseline (8 rows) | **−0.5** (1 better, 1 mixed, 2 neutral, 4 worse) | **+0.38** (3 better, 5 mixed) |
+| Forward, surveyed (19 rows) | **+1.0** (all better or mixed) | **+0.37** (8 better, 9 mixed, 1 neutral, 1 worse) |
+
+**Against the criteria logged at 08:20:**
+- **Main question: failed.** The blind scorer rates the loop's rows no better than the baseline's (+0.37 against +0.38). By the rule written beforehand, the ledger's gap between the windows is mostly my scoring.
+- **Agreement:** 23 of 28 by the logged rule, where "mixed" matches either side, but that rule is nearly empty: "mixed" is the blind scorer's answer on 14 of 28 rows. On exact classes the agreement is 13 of 28.
+
+**Where the two hands differ, and why:**
+- **I was harsher on the baseline.** I scored it against the map (homeless files) and Drift's findings, both of which the code-only scorer ignores.
+- **I was kinder to the forward rows,** because I credited what the forecasts said the obvious way would have made. A scorer reading the diff sees only what is there, not what was averted. "Left better than it started" is the blind scorer's measure, not mine.
+- **The blind scorer finds leftover copies at the edges of nearly every row:** "One X titles are mostly true at the centre and not at the edges." That's its strongest pattern, and the ledger's copies column missed many of them.
+
+A second independent blind pass (batches C and D, reshuffled with seed 1105) is running, to see how much of this is one scorer's taste.

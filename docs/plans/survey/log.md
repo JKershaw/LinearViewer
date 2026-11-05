@@ -1920,3 +1920,11 @@ John: the offshoots look like new prompt types for tasks. So move the prompts in
 
   The global's "not this task's" (derive the exclusion from `route`; one object per template) stays out, and goes to the tally.
 - Moved to Todo; autopilot `4d13268c`.
+
+### 08:50 UTC: the blind second scorer's first pass. The ledger's result is mostly my scoring
+- **Read against the 08:20 criterion, it fails.** The blind scorer rates the loop's 19 surveyed rows at +0.37 and the 8 baseline rows at +0.38, on +1 better / 0 mixed or neutral / −1 worse. The ledger had −0.5 against +1.0. Detail is in `place-ledger.md`, "The blind second scorer".
+- **Both windows come out slightly positive to the blind scorer.** Most rows are mixed: a real single owner at the centre and a leftover copy at the edges.
+- **Why the hands differ.** I scored the baseline against the map and Drift's findings, and credited the forward rows with the copies their forecasts said they averted. The blind scorer measures what is in the diff, which is the measure John's question asks for.
+- **The logged agreement rule was nearly empty.** "Mixed matches either side", with mixed the modal answer, gives 23 of 28. That's the "check that can't fail" lesson, on my own criterion. Exact agreement is 13 of 28.
+- **What's real either way:** the blind scorer found copies the loop left and nobody saw. LIN-4241's settled check went from 2 copies to 5, LIN-4048's "finished but held" is in three places, and LIN-4242's card merge copies `observation.js`. The one unsurveyed forward row (LIN-4212) scored worse.
+- **Next:** a second blind pass (C `cae0873d`, D `72c53d82`, reshuffled) to size scorer noise before reading anything into this.
