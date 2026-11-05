@@ -19,8 +19,8 @@ Every tool was run from the LinearViewer repo root against committed git objects
 | `ledger-carry-11-04b.tsv` | the 124 rows of 11-04b's compact trend ledger (row, stable name, severity, 11-04b delta); rows 25 and 30 parsed by hand | parsed from the 11-04b report |
 | `ledger-touch-map.txt` | the carried rows whose ledger text names a file the window touched (84) | name match against the window's file list |
 | `rulings-carry.py`, `rulings-11-05.tsv` | the 105 `mustRule` rulings (carried, joined, hunk-flagged) plus the departed G0217, re-ruled | `python3 $E/rulings-carry.py` |
-| `ledger-11-05.tsv` | this edition's 129-row ledger | `build-report-tables.py` |
+| `ledger-11-05.tsv` | this edition's 130-row ledger (124 carried + 6 new; `request-source-guard-copies` was added after the second-read) | `build-report-tables.py` |
 | `build-report-tables.py` | builds the report's ruling table, table-group list and ledger from the files above | `python3 $E/build-report-tables.py` |
 | `ticket-states-beat1.txt` | per-ticket state, comments since the 11-04b close | `GET /api/proxy/issues/<id>` |
-| `linear-search-beat2.txt`, `linear-search-beat3.txt` | every Linear search behind the Follow-ups section | `GET /api/proxy/search?q=` |
+| `linear-search-beat2.txt`, `linear-search-beat3.txt`, `linear-search-beat4.txt` | every Linear search behind the Follow-ups section (beat 4: the re-run for the one mint candidate) | `GET /api/proxy/search?q=` |
 | `notes-beat1.md`, `notes-beat2.md` | working notes. Where they differ from the report, the report is the corrected reading | — |

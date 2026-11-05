@@ -1,0 +1,90 @@
+## q="ruling-settled"
+  LIN-4244 | Backlog | Rulings answer surfaces other than Home cards: send answerAttemptId and handle 409 ruling-settled
+  LIN-4241 | Done | Waiting on you (A): settled-ruling guard — refuse a second answer or dismiss with 409 ruling-settled
+  LIN-4250 | In Progress | Drift & Coherence Review (run 3, trend vs the 2026-11-04 run 2): a small window (9 production LinearViewer commits + 4 S
+  LIN-2797 | Done | Rulings tab: renderRulings() re-injects preservedRulingRows / rulingsPending keys that drop out of a poll payload, but n
+  LIN-2796 | Duplicate | rulingsSettled rows vanish without their outcome label — renderRulings releases a settled key with no re-injection pass,
+  LIN-4249 | Done | Seams & Tangles Review (periodical run 7): area knots, dependency direction, ways in, rebuild readiness and change coupl
+  LIN-4238 | Backlog | Observation rulings rows: move rulingRowHoldsInput/mustReuse onto the shared card merge
+  LIN-4144 | Done | Home's Waiting on you has no live refresh: cards and count go stale until reload
+## q="settled ruling"
+  LIN-4142 | Done | A settled loop ruling must not accept a second answer (markDecisionAnswered has no guard)
+  LIN-4244 | Backlog | Rulings answer surfaces other than Home cards: send answerAttemptId and handle 409 ruling-settled
+  LIN-4241 | Done | Waiting on you (A): settled-ruling guard — refuse a second answer or dismiss with 409 ruling-settled
+  LIN-2797 | Done | Rulings tab: renderRulings() re-injects preservedRulingRows / rulingsPending keys that drop out of a poll payload, but n
+  LIN-2796 | Duplicate | rulingsSettled rows vanish without their outcome label — renderRulings releases a settled key with no re-injection pass,
+  LIN-3310 | Done | LIN-3126 residual: ruling-dispatch and close-out-press senders must forward the issue's source/bindingScope
+  LIN-3359 | Done | Flight Companion: stop cutting answers off — measure the length rows, size a bare cap from them, and show when a turn hi
+  LIN-4245 | Backlog | Comment dedupe key carries no ruling: a same-text answer to a second, unsettled ruling on the same issue gets 200 dedupe
+## q="isSettled"
+  LIN-1943 | Backlog | Blocked-startup fast-fail does not cover a refire/follow-up-resume launch that blocks
+  LIN-2515 | Done | SD: an expired host claude login idles every new session silently — fast-fail watchdog never captures a settled session 
+  LIN-1821 | Done | Launch path has no active fail-fast liveness check — a blocked startup (trust dialog or similar) silently wedges for the
+  LIN-2339 | Done | SD: resume failsafe re-ask can shadow a follow-up's dispatchedPrompt — ruling silently never reaches the session
+  LIN-1122 | Done | Pacing's cold-start gate never settles for opencode sessions — holds every fresh launch for the full 180s cooldown
+  LIN-2596 | Backlog | SD: mutation-suite parity — run-mutations.js carries curated mutants for findFastFailCandidates but none for findSilentS
+  LIN-2510 | Done | SD: stall failsafe re-fires into RESUMING but a bootstrap turn that never ends has no backstop — session parked indefini
+  LIN-2839 | Done | Investigate the opencode concurrency ceiling on the host, and add a per-harness concurrent-session cap
+## q="answered dismissed"
+  LIN-4150 | Backlog | Survey spikes: record (don't dispatch or plan)
+  LIN-4140 | Done | UI round 3 · S3c-0: the shared question card answers and dismisses a scan-raised (task-bound) ruling
+  LIN-4244 | Backlog | Rulings answer surfaces other than Home cards: send answerAttemptId and handle 409 ruling-settled
+  LIN-2225 | Done | The Rulings page can only answer with the agent-declared options — "why was I asked this?" is unsayable, so the false-es
+  LIN-4046 | Todo | Workers under an autopilot ask John questions their autopilot owns, several times over
+  LIN-4241 | Done | Waiting on you (A): settled-ruling guard — refuse a second answer or dismiss with 409 ruling-settled
+  LIN-4142 | Done | A settled loop ruling must not accept a second answer (markDecisionAnswered has no guard)
+  LIN-3322 | Done | recordScan terminal path never $sets the binding pair on re-scan of an answered/dismissed task-decision row
+## q="task decision outcome settled"
+  LIN-3463 | Done | Research paper: how a task is composed, and how that shapes the way it runs
+  LIN-2704 | Done | Flight Companion: project taskDecisionId + raw issueId in projectPendingDecision so task-bound decisions can be answered
+  LIN-3448 | Done | Task page: the header sticks on a finished "running" sentence when the PR is merge-ready
+  LIN-2211 | Done | LIN-1721: an unanswered task-decision ruling is orphaned by ordinary task activity (F1/N2)
+  LIN-2729 | Done | Giving a ruling any outcome resurfaces an older superseded ruling — the outcome filter sits upstream of the supersession
+  LIN-3485 | Backlog | The plan settles a change's effect on existing behaviour, in one line
+  LIN-3441 | Todo | Scan decisions store rejects non-UUID canonical ids, so GitHub-backed tasks may never record scans or outcomes
+  LIN-4241 | Done | Waiting on you (A): settled-ruling guard — refuse a second answer or dismiss with 409 ruling-settled
+## q="settled check routes"
+  LIN-3721 | Backlog | Proxy-token id check in routes/proxy-tokens-admin.js uses workspace.js's provider-id UUID_REGEX
+  LIN-3448 | Done | Task page: the header sticks on a finished "running" sentence when the PR is merge-ready
+  LIN-3835 | Backlog | One token-auth failure answer: 401 rejected / retryable 503 store failure written once in lib/errors.js, with detail on 
+  LIN-3500 | Done | The funnel reads the merge click from the close-out record
+  LIN-4241 | Done | Waiting on you (A): settled-ruling guard — refuse a second answer or dismiss with 409 ruling-settled
+  LIN-2427 | Done | Route the last env-keyed OpenRouter reader: resolveProxyLLM (routes/proxy.js:116)
+  LIN-3604 | Done | Dispatch entrance: one authority per entrance decision in lib/dispatch-entrance.js, reached by all three entrance files;
+  LIN-4128 | Done | Research: are our tickets settling intent too early?
+## q="task-decisions-store"
+  LIN-3441 | Todo | Scan decisions store rejects non-UUID canonical ids, so GitHub-backed tasks may never record scans or outcomes
+  LIN-2660 | Done | Task Chat: thread `taskDecisionsStore` + `shelvedRulingsStore` into `createTaskChatRoutes`
+  LIN-2893 | Done | LIN-2809 Step 5: LIN-2729 fix — newest-then-filter ordering for task-bound rulings, threaded through all 4 read consumer
+  LIN-2649 | Done | LIN-2241 WS2 — cross-task scan-due list: stored due-basis, bounded paginated due checks, Observation tab
+  LIN-3322 | Done | recordScan terminal path never $sets the binding pair on re-scan of an answered/dismissed task-decision row
+  LIN-2241 | Done | Scan-due surfacing + bulk scan, and rescan to clear self-resolved rulings — the catch-all lane for the queue
+  LIN-4028 | In Progress | Routing: a recorded ruling that sets a task's model is ignored by recommend-and-dispatch
+  LIN-2197 | Done | LIN-1721: task decision scan — the third producer (triage instrument, works without a runner)
+## q="already answered or dismissed"
+  LIN-4142 | Done | A settled loop ruling must not accept a second answer (markDecisionAnswered has no guard)
+  LIN-4244 | Backlog | Rulings answer surfaces other than Home cards: send answerAttemptId and handle 409 ruling-settled
+  LIN-4241 | Done | Waiting on you (A): settled-ruling guard — refuse a second answer or dismiss with 409 ruling-settled
+  LIN-2225 | Done | The Rulings page can only answer with the agent-declared options — "why was I asked this?" is unsayable, so the false-es
+  LIN-4141 | Backlog | Fold the Rulings tab's task-bound answer and dismiss branches into ReplyDelivery
+  LIN-2889 | Done | LIN-2809 Step 1: traceable answers that name the question they answer (both lineages) + the LIN-2724 self-resolved no-op
+  LIN-2739 | Backlog | markDecisionAnswered has no server-side idempotence on the loop-backed branch — a second client can push a duplicate dec
+  LIN-4150 | Backlog | Survey spikes: record (don't dispatch or plan)
+## q="readOutcome"
+  LIN-4241 | Done | Waiting on you (A): settled-ruling guard — refuse a second answer or dismiss with 409 ruling-settled
+## q="workspace-api-scan dismiss"
+  LIN-3877 | Done | Move: the scan routes (GET and POST /api/scan/:issueId, POST /api/scan/:issueId/dismiss, /retire and /unretire, GET /api
+  LIN-2444 | Done | Rulings feed: operator/agent may PROPOSE a dismissal (one-click Agree in the UI, bulk-agree) — never dismiss; plus a pro
+  LIN-2197 | Done | LIN-1721: task decision scan — the third producer (triage instrument, works without a runner)
+  LIN-2889 | Done | LIN-2809 Step 1: traceable answers that name the question they answer (both lineages) + the LIN-2724 self-resolved no-op
+  LIN-3441 | Todo | Scan decisions store rejects non-UUID canonical ids, so GitHub-backed tasks may never record scans or outcomes
+  LIN-2791 | Done | LIN-2754 Track B — discharge backend: task-bound answer route, durable `option_id`, `resolveEffect` docstring
+  LIN-2225 | Done | The Rulings page can only answer with the agent-declared options — "why was I asked this?" is unsayable, so the false-es
+  LIN-3911 | Done | Sweep comments that still name routes/workspace-api.js as the home of the feedback routes (left stale by the LIN-3893 mo
+## q="firstStampWins"
+  LIN-4142 | Done | A settled loop ruling must not accept a second answer (markDecisionAnswered has no guard)
+  LIN-2724 | Done | Answering a self-resolved row silently no-ops the answer stamp — markOutcome returns truthy, stampDecisionAnswers only c
+  LIN-2889 | Done | LIN-2809 Step 1: traceable answers that name the question they answer (both lineages) + the LIN-2724 self-resolved no-op
+  LIN-4241 | Done | Waiting on you (A): settled-ruling guard — refuse a second answer or dismiss with 409 ruling-settled
+  LIN-4144 | Done | Home's Waiting on you has no live refresh: cards and count go stale until reload
+  LIN-4114 | Done | UI round 3 · S3c: Waiting on you — one card per ruling on Home, recommended answer as the main button

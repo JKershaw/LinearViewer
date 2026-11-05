@@ -21,7 +21,7 @@
 
 ## Headline
 
-A small window. One 11-04b row resolved, three improved, and the window's own features added four small new rows. The top of the ledger did not move.
+A small window. One 11-04b row resolved, four improved, and six rows are new: one LOW-MEDIUM, four LOW (the window's own features) and one borderline. The top of the ledger did not move. The adversarial second-read agreed, and its one LOW addition is fixed in place (below).
 
 1. **Resolved: `erasure-inventory-lockstep-gap`** (11-04b's LOW-MEDIUM, minted as LIN-4234). It closed about three hours after minting (`950113b1`). The fix reaches the cause: one collection-name source feeds both guards (`tests/helpers/collection-names.js`), and a census makes every non-literal `collection()` in `server.js` an imported constant.
 2. **New, LOW-MEDIUM: `parked-wait-text-cross-repo`.** SD writes one park status for **4** wait kinds (`hook.js:1520-1537`, kinds at `heartbeat.js:258-264`), and Harbour reads **1** of them as parked (`PARKED_WAIT_HINT = /scheduled wakeup/i`, `lib/session-telemetry.js:325`).
@@ -114,15 +114,16 @@ Citations are at `2eb73ae0` (Harbour) and `07c88f7` (SD).
 | 14 | `ruling-settled-row-predicate-inline` | LOW | **new** (the window's own) | See (c). The only candidate here with no existing ticket. |
 | 15 | `error-code-case-split` | LOW | **new** | See (c). |
 | 16 | `usage-snapshot-prose-residue` | LOW | **improved (1 of 9), sharper** | See (f). |
-| 17 | `waiting-standing-comment-residue` | LOW | **new** (Seams hand-off) | See (d). |
-| 18 | `vendor-script-list-restated` | LOW | unchanged | 27 `scripts: [` arrays and 7 purify render files at both SHAs. Home's list gained `/home-placement.js` (`render.js:383`). |
+| 17 | `waiting-standing-comment-residue` | LOW | **new** (Seams hand-off; third site from the second-read) | See (d). |
+| 18 | `request-source-guard-copies` | LOW | **new** (second-read) | See (e). |
+| 19 | `vendor-script-list-restated` | LOW | unchanged | 27 `scripts: [` arrays and 7 purify render files at both SHAs. Home's list gained `/home-placement.js` (`render.js:383`). |
 | — | `reply-effect-default-split` | borderline (not graded) | **new** | See (d). |
 | — | `completeness-precedence-restated` | borderline | unchanged | `row-usage.js:116`, `cost-read.js:199`, `request-usage-fold.js:103`. |
 | — | `erasure-inventory-lockstep-gap` | resolved (was LOW-MEDIUM) | **resolved** | See (e). |
 | — | `usage-relay-flag-partial`, `lineage-identity-read-twins`, `cost-fold-partition-restated` | resolved | held | See (b) and (e). |
 | — | everything else | as 11-04b | unchanged or held | Each row was checked by its own cited files (ledger). |
 
-**Resolved:** 1. **Improved:** 4. **New:** 1 LOW-MEDIUM, 3 LOW, 1 borderline. **Worsened:** 0 among carried rows. The window's settled-check growth from 2 to 5 sites is filed as a new row because no earlier row named it.
+**Resolved:** 1. **Improved:** 4. **New:** 1 LOW-MEDIUM, 4 LOW, 1 borderline. **Worsened:** 0 among carried rows. The window's settled-check growth from 2 to 5 sites is filed as a new row because no earlier row named it.
 
 ### (c) LIN-4241, the settled-ruling guard
 
@@ -162,9 +163,19 @@ Citations are at `2eb73ae0` (Harbour) and `07c88f7` (SD).
   - One placement policy (`public/home-placement.js`).
   - Home has two live-update idioms, a keyed merge for Waiting and a deferred whole-desk swap for Running and Up next. That is deliberate and documented (`home-placement.js:1-7`): noise.
   - Observation's own merge copy is LIN-4238 (Backlog): recorded, not graded.
-- **`waiting-standing-comment-residue` (new, LOW).** Two comments the window wrote or left contradict the code beside them. Seams run 7 handed these to Drift; both were verified here.
+- **`waiting-standing-comment-residue` (new, LOW).** Three comments the window wrote or left contradict the code or tests beside them. Seams run 7 handed over the first two, and the adversarial second-read found the third. All three were verified here.
   - `lib/home-row-states.js:121`: "the task page's read leaves it off". That has been untrue since LIN-4143; the same file's `:67` says "unconditional since LIN-4143".
   - `lib/waiting-section.js:5` names a reduction `readWaitingStanding`, which does not exist. The function is `createWaitingStanding` / `waitingStanding` (`home-row-states.js:82,85`).
+  - **`public/app.js:630-631`** (LIN-4242, new in the window) says the badge "is not written from this count … the two reductions differ by design". The owner says the opposite:
+    - the open-ruling read uses "the badge's own reduction" (`lib/unanswered-decisions.js:963-964`);
+    - "a row, the count line and the badge agree" (`lib/home-row-states.js:120`);
+    - a unit test asserts "the badge equals the count line" (`tests/unit/dashboard-routes.test.js:6891-6893`).
+  - **What really differs is freshness, not the reduction.** Since LIN-4242, both numbers repaint on the one rulings tick from two reads:
+    - the badge reads the rulings feed through the 5-second stale-while-revalidate cache (`routes/dashboard-rulings.js:45-47`, `sessionsFeedCache`);
+    - the count line reads the uncached `/api/home-waiting` (`public/app.js:624-633`).
+
+    For up to one cache cycle after a ruling is settled elsewhere, the two numbers on one page can differ. The window's own E2E clears the feed cache before comparing them (`tests/e2e/lin-4242-waiting-live.spec.js:79-85`). Before the window the count line was drawn once by the server, so the lag never showed live.
+  - The cost is the comment: it records a split as deliberate that the owner and the tests forbid, and a later change could lean on it. The display lag itself is borderline: one cache cycle, and it is the cache family's shape (`cache-module-family`, LIN-2798).
 - **`home-next-answer-split` improved (partial), still MEDIUM.**
   - LIN-4151: /backlog's lead roots use Up next's ranking (`rankKeysOf` / `compareRank`, `home-view.js:422,432`), with one split for page and fold (`home-rows.js:156-158`).
   - Unchanged: triage (`home-view.js:36`, `task-order.js:163`) and the deck's top task (`home-pipeline.js`, 0-line diff).
@@ -184,7 +195,15 @@ Citations are at `2eb73ae0` (Harbour) and `07c88f7` (SD).
 - **LIN-4226 (`requestSource`): consolidation, in the costs owner's scope.**
   - The hand-threaded `requestRows`, deferred by 11-04b, is gone: callers pass the loader, with `NO_REQUEST_RECORDS` for "none".
   - The old key throws at three entrances (`cost-read.js:143,540`, `run-view.js:384`). That is a migration tripwire: noise.
-  - Seams N6 asks Drift to weigh `cost-read.js:34` "Pure: no store, clock or network". It is still true, because the source is injected: noise.
+  - **`request-source-guard-copies` (new, LOW; found by the second-read; first draft missed it).** The loader shape already has an owner, `requireRequestUsageLoader` (`lib/request-usage-loader.js:91-92`), which requires both `forAnchors` and `forRows`. It is called from 6 files at both SHAs.
+    - LIN-4226 added three inline checks of the same shape beside it, and each checks a different subset:
+      - `cost-read.js:147`: both methods;
+      - `kpi-stats.js:1067`: `forRows` only;
+      - `run-view.js:388`: `forAnchors` only.
+    - There were 0 inline copies at `d7ceb373`.
+    - The cost: a loader change (a third method, a renamed one) has four places to agree, and the three copies already disagree on what "a loader" is.
+    - **Home:** `requireRequestUsageLoader`, or a per-method variant of it.
+  - **Purity wording (borderline, re-ruled from noise after the second-read).** Seams N6 asked Drift to weigh `cost-read.js:34` "Pure: no store, clock or network". The second-read added `run-view.js:7` "NO I/O, no store reads", in a header the window edited (`:4`) while `buildRunView` now awaits `requestSource.forAnchors` (`:383-395`). Both are true only because the store read is injected. Read literally, both now overstate it.
 
 ### (f) Unlisted, in remit
 
@@ -247,6 +266,8 @@ Citations are at `2eb73ae0` (Harbour) and `07c88f7` (SD).
 | live-on-anchor inline copies outside the owner | 1 + a skippable flag | 1 | `liveGuard` = 0; `proxy-rulings.js:246-249` |
 | "what's next" rankers | 3 | 2 (+ triage split) | `rankKeysOf` / `compareRank`, `orderIssuesForSwipe` |
 | `[usage]` snapshot prose files | 9 | **8** | the 11-04b grep |
+| inline request-loader shape checks beside `requireRequestUsageLoader` | 0 | **3** (each a different subset) | `git grep -E "typeof [A-Za-z]+\??\.(forRows\|forAnchors)" -- lib routes server.js` at both SHAs |
+| window comments contradicting code or tests (Home Waiting / rulings read) | — | **3** | read by hand (Seams run 7 hand-off + second-read) |
 | legacy `[usage]` readers | 2 files | 3 files | census G0231 |
 | collections opened vs erasure `INVENTORY` | 1 unlisted | **0** | non-literal `collection(` vs `INVENTORY` |
 | contract rows (Harbour / SD / usage / park) | 38 / 34 / 0 / — | 38 / 34 / 0 / 0 | JSON row count, grep |
@@ -262,23 +283,31 @@ Citations are at `2eb73ae0` (Harbour) and `07c88f7` (SD).
 
 ## Follow-ups
 
-**Not minted in this beat.** Beat 4 decides, after the adversarial second-read. These are the candidates, each searched first (`linear-search-beat2.txt`, `linear-search-beat3.txt`).
+**Decision (beat 4): none minted.** Zero is a valid outcome under the description's bar: at most the top ~3 by severity, only where no ticket names the finding, and only if a new ticket is likely to be worked (`coherence-loop-stalled`). No Linear ticket was created or edited, and no evidence comment was posted on any other ticket. This report is the record.
 
-**Candidates for minting (at most ~3; only where no ticket names the finding):**
-1. **`ruling-settled-row-predicate-inline`** (LOW): one `isSettled` predicate in `lib/task-decisions-store.js`, read by the five route sites.
-   - Searches: "ruling-settled", "settled ruling", "answered dismissed outcome", "isSettled", "task-decisions-store settled", "settled predicate", "RULING_SETTLED_CODE".
-   - Hits: LIN-4244 (client handling), LIN-4245 (dedupe key), LIN-4142 and LIN-4241 (Done). None names the predicate. **The only candidate with no home.**
-2. No other candidate clears "no existing ticket".
+**The one candidate with no home: `ruling-settled-row-predicate-inline` (LOW).**
+- **Search, re-run in beat 4** (`linear-search-beat4.txt`, after `linear-search-beat2.txt` and `linear-search-beat3.txt`):
+  - Phrases: "ruling-settled", "settled ruling", "isSettled", "answered dismissed", "task decision outcome settled", "settled check routes", "task-decisions-store", "already answered or dismissed", "readOutcome", "workspace-api-scan dismiss", "firstStampWins".
+  - Relations read: LIN-4241 (related LIN-4142; blocks LIN-4242; inverse LIN-4244, LIN-4245), LIN-4244 (related LIN-4141, LIN-4241) and LIN-3449's children (44, none on this).
+  - The nearest hits are LIN-4244 (client surfaces: `answerAttemptId` and the 409 copy), LIN-4141 (the Rulings tab's client branches into `ReplyDelivery`) and LIN-4245 (the comment dedupe key). **None names the server-side predicate. The finding still has no home.**
+- **Why it is not minted.**
+  - It is LOW. 11-04b set the bar at its one LOW-MEDIUM gap with a user-facing cost, and this sits below that.
+  - The five sites each guard a behaviour that LIN-4241 pinned per route (`tests/unit/comment-write-route.test.js`, `scan-routes.test.js`, `dashboard-routes.test.js`). Today the cost is lockstep on a future change to the closed set, not a live defect.
+  - It would land beside 16 open Drift follow-ups, 14 of them unmoved.
+  - The natural next change to these routes is LIN-4244 (same feature, LIN-4144). Whoever takes LIN-4244 can lift the predicate in passing, and this ledger row tracks it until then.
+  - **Re-open the question if** a sixth site appears, or if a new outcome joins the closed set.
+
+**Observation for the ticket trend (no action taken).** LIN-2739 (Backlog since 2026-09-11) asks for server-side idempotence on `markDecisionAnswered`. Its problem, an unconditional `$push`, is gone: LIN-4241 made the call check-and-stamp (`dispatch-store.js:3841-3842`, `isDecisionSettledIn` → `{ success: false, alreadySettled: true }`). LIN-4241 does not name LIN-2739, and the ticket is still open. This is the same pattern as LIN-4214 at 11-04b. Closing it is the rulings owner's call.
 
 **Considered and not minted:**
 
 | candidate | severity | search phrases | existing home | outcome |
 |---|---|---|---|---|
-| `parked-wait-text-cross-repo` | LOW-MEDIUM | "parseParkedWait", "scheduled wakeup", "park text contract" | **LIN-2258** (Backlog since 2026-08-23, "widen the parked-wait detector … three park phrasings") | not minted; candidate for a dated evidence comment in beat 4 |
+| `parked-wait-text-cross-repo` | LOW-MEDIUM | "parseParkedWait", "scheduled wakeup", "park text contract" | **LIN-2258** (Backlog since 2026-08-23, "widen the parked-wait detector … three park phrasings") | not minted: existing home. No comment posted; this report holds the 4-vs-1 evidence |
 | `error-code-case-split` | LOW | "error code case", "kebab code", "ruling-settled", "RULING_SETTLED_CODE" | LIN-4244 (spreads the code's readers) | not minted; report only |
 | `waiting-standing-comment-residue` | LOW | "readWaitingStanding", "waiting-section", "stale comment" | none; a two-comment fix | below the bar; report only |
 | `usage-snapshot-prose-residue` | LOW | (11-04b phrases) | LIN-3484 (proxy-instructions sweep) | report only |
-| the legacy `[usage]` skip in `session-telemetry.js:89` | observation | "legacy fold", "2026-12-04", "usageStateOf", "usage-snapshot-intake", "delete legacy snapshot" | **LIN-4235** | candidate for a dated comment (one more site to clear) |
+| the legacy `[usage]` skip in `session-telemetry.js:89` | observation | "legacy fold", "2026-12-04", "usageStateOf", "usage-snapshot-intake", "delete legacy snapshot" | **LIN-4235** | existing home; no comment posted (one more site to clear, recorded here) |
 | contract rows (usage, park) | MEDIUM row | "usage contract row" | LIN-3624, LIN-3823 | existing homes |
 | `live-anchor-old-home-alive` residual | LOW-MEDIUM | "proxy-rulings live" | LIN-3843 | existing home |
 
@@ -303,6 +332,7 @@ States are from the workspace API at beat 1 (`ticket-states-beat1.txt`). Comment
 | LIN-4195 / 4226 | In Progress | Done | costs rebuild finished |
 | LIN-3948 | (not tracked) | Canceled | the snapshot path it proposed is gone |
 | LIN-4235 / 4238 / 4244 / 4245 | — | Backlog (filed between 11-04 19:46 and 11-05 00:10) | new homes named in (c), (d), (f) |
+| LIN-2739 | (not tracked) | Backlog since 2026-09-11, unparented | its problem was fixed by LIN-4241 (`dispatch-store.js:3841-3842`) and the ticket is not closed; observation, see Follow-ups |
 
 **Open Drift follow-ups: 16** (was 18). These are LIN-4210, 4214, 4156, 4157, 4158, the six 10-23 tickets, and five unparented ones (3823, 3636, 3649, 3843, 3979).
 
@@ -312,11 +342,40 @@ States are from the workspace API at beat 1 (`ticket-states-beat1.txt`). Comment
 | 11-03 | LIN-4156, 4157, 4158 | all three |
 | 11-04 | LIN-4210 (+ LIN-4214) | both |
 | 11-04b | LIN-4234 | **Done** (the first Drift mint closed by the next edition) |
-| 11-05 | (beat 4) | — |
+| 11-05 | none (see Follow-ups) | — |
 
 ## Adversarial Second-Read
 
-Pending (beat 4).
+**Tier 2:** a fresh-context sub-agent (general-purpose), launched in beat 4 with no memory of the report-writing. It was briefed cold and neutrally with the two repos, the window (LinearViewer `d7ceb373..2eb73ae0`, SD `d8d186c..07c88f7`), the remit as the LIN-4250 description states it, the sibling boundaries, and the report path on `lin-4250-drift-coherence-2026-11-05`. It was given none of the report's conclusions and no hypothesis. It worked read-only: it was told to read the window's diffs independently first, and only then the report.
+
+**Question (verbatim):** "What is the largest item in this window that this report missed or misfiled?"
+
+**The reader's answer, in full:**
+
+> 1. **ANSWER.** Nothing material missed; the largest miss is LOW. LIN-4242 (`ee8ec42e`) wrote a client comment asserting that Home's live "N waiting on you" count and the header rulings badge come from reductions that "differ by design". That contradicts the codebase's own stated and tested invariant that they are the same reduction (LIN-4024/LIN-4103). The window also made both numbers repaint live from two different server reads on the same 5s tick: the badge from the rulings feed behind the 5s SWR `sessionsFeedCache`, the count line from the new uncached `/api/home-waiting`. So for up to one cache cycle after a ruling is raised or settled elsewhere, the two numbers on one page can disagree. The window's own E2E has to clear the feed cache to make them agree. The real divergence is cache freshness, not the reduction, so the comment is window-created wrong prose, which is in Drift's remit. The report's `waiting-standing-comment-residue` (#17) names two other LIN-4242/4143 comments from the same work but not this one, and the badge vs count-line split is not mentioned anywhere in the report or its ledger.
+>
+> 2. **EVIDENCE** (Harbour `2eb73ae0`). Wrong claim: `public/app.js:630-631` ("The badge is not written from this count (the tick sets it from the feed's own count, and the two reductions differ by design)"). Contradicted by: `lib/unanswered-decisions.js:963-964` ("by the badge's own reduction (LIN-4024). The rows are the badge's rows"), `lib/ruling-standing.js:4,12`, `lib/home-row-states.js:120` ("a row, the count line and the badge agree"), `lib/task-page-loader.js:1267`. Tested invariant: `tests/unit/dashboard-routes.test.js:6891-6896` ("badge equals A's count line"; the badge must read the same 30-day window). Two read paths: badge `public/common.js:3143-3147` → `/api/dashboard/rulings`, cached via `routes/dashboard-rulings.js:45-47`, count at `:116`; count line `public/app.js:624-633` → `/api/home-waiting` (`server.js:3738-3756`, uncached); both from one tick (`public/common.js` `runRulingsTick`). The cache is the only real gap: `tests/e2e/lin-4242-waiting-live.spec.js:79-84` ("The badge reads the rulings feed through the 5s cache… Clear the cache and read the badge once"). Before the window (`d7ceb373`) the count line was drawn once by the server and only went down on a local answer, so the lag was never shown live.
+>
+> 3. **SEVERITY: LOW.** User-visible (two numbers for one fact, side by side) but bounded to one cache cycle. The lasting harm is the comment: it records a split as intentional that the owner code and the tests say must not exist, and the next person to touch this could rely on it. It belongs as a third site in #17, or as its own LOW row noting the two live reads.
+>
+> 4. **VERDICT: AGREE.** The report's reading and ranking stand. Spot-checks hold: settled-check sites 2 → 5 (`git grep` at both SHAs); the two #17 comment residues exist; `liveGuard` is gone; LIN-4151 is a real consolidation; park writer 4 kinds vs reader 1 (`hook.js:1520-1537`, `heartbeat.js:258-264`); SD changes are internal consolidation with comment-only status-string edits; LIN-4244 already covers the other reply surfaces not sending `answerAttemptId`.
+>
+> 5. **Smaller items.** (a) LIN-4226 added three inline "is this a request-usage loader" checks beside the existing exported `requireRequestUsageLoader` (`lib/request-usage-loader.js:91-92`, 6 callers, 0 inline copies at `d7ceb373`), each checking something different: `lib/cost-read.js:147` both methods, `lib/kpi-stats.js:1067` only `forRows`, `lib/run-view.js:388` only `forAnchors`. The report counted only the old-argument tripwire and called it noise. LOW or borderline. (b) `lib/run-view.js:4-7`: the window edited this header but kept "NO I/O, no store reads", while `buildRunView` now awaits `requestSource.forAnchors` (`:383-395`). The same kind as the `cost-read.js:34` "Pure" line the report ruled noise, but literally false here. Borderline. (c) `public/app.js:736` `replayExpanded` restates the expanded-row restore in `applyState` / `showDescendantsRespectingExpanded` (`:973`, `:1001+`), and its own comment says so; probably Code Quality's. Also `public/app.js:632` repeats "Answered elsewhere" instead of reading `ANSWERED_ELSEWHERE_COPY` (`public/question-cards.js:249`).
+>
+> 6. **Coverage.** Read: the window's commit list and stat for both repos; the full production diffs for `server.js`, `lib/{home-row-states,waiting-section,ruling-settled,render,task-decisions-store,digest-feedback,dispatch-store,session-telemetry,render-run-steps,live-anchor,ruling-standing,task-page-loader,unanswered-decisions,render-task-page,home-rows,home-view,cost-read,request-usage-loader,run-view}.js`, `routes/{workspace-api-issue-write,dashboard-rulings,workspace-api-scan,dashboard-feed}.js`, `public/{common,question-cards,prompt-section,app,home-placement}.js` and `llms.txt`; `docs/dispatch-integration.md`; SD `hook.js`, `opencode-runner.js` (comment-only) and `docs/module-map.md`; the report's narrative, findings, cross-repo table, hand-offs and ledger names; its beat-2 notes and Linear search; grepped parts of the 11-04b edition. Not read: the diffs of `lib/{effort-readout,kpi-stats (except the guard),model-routing-*,render-session,run-paragraph-hook,terminal-marked-task-cost,workspace-kpi-stats,account-erasure}.js` and `routes/{settings,dispatch,dashboard,dashboard-effort,proxy-compute}.js`; most SD tests, including `park-read`; the kit (taken as 0-line diff, not re-verified); the census JSON and import-graph evidence. No tests or census were re-run.
+
+**What was done with it (verified here before changing anything):**
+- **The answer: real, fixed in place.**
+  - `public/app.js:630-631` is new in the window (0 hits for "differ by design" at `d7ceb373`). The contradicting owner lines (`unanswered-decisions.js:963-964`, `home-row-states.js:120`), the test (`dashboard-routes.test.js:6891-6893`) and the cached and uncached read paths (`dashboard-rulings.js:45-47`, `app.js:624-633`, the E2E at `lin-4242-waiting-live.spec.js:79-85`) all read as the reader says. The unit test's two assertions are at `:6891` and `:6893`, inside the reader's `:6891-6896`.
+  - Added as the third site of `waiting-standing-comment-residue` (#17, still LOW), with the freshness split, in (d) and in the ledger.
+- **(a) Real, fixed in place** as a new LOW row, `request-source-guard-copies` (#18, ledger row 129), in (e). Verified with `git grep` at both SHAs: 3 inline copies at HEAD, 0 at `d7ceb373`, and 6 caller files of the owner at both. The first draft had read those lines only for the old-key tripwire.
+- **(b) Accepted:** `cost-read.js:34` and `run-view.js:7` are re-ruled from noise to borderline as one wording item (e). It is not a ledger row.
+- **(c) Not added.** `replayExpanded` is within one file and is Code Quality's (the Seams run 7 hand-off names the same "expanded-state replay exists twice"). The repeated "Answered elsewhere" copy is a UI string in two browser files with no build step, the same pattern as G0479: noise.
+- Follow-ups: unchanged (none minted). Both additions are LOW, and neither changes the ranking.
+
+Adversarial second-read verdict: AGREE
+Differed from top finding: YES
+Disposition: fixed in place
 
 ## Census ruling table (the 105 `mustRule` groups, HEAD guide)
 
@@ -749,7 +808,7 @@ Status is against `d7ceb373` under the one HEAD guide.
 
 ## Compact trend ledger
 
-Every 11-04b row keeps its stable name and order; none is re-keyed, dropped or retired. For the full history columns (06-25 through 11-04b), see the 11-04b ledger; this edition carries the severity, the 11-04b delta, this run's reading and the delta vs 11-04b. Rows with no named reading read "cited files 0-line diff" or "named files touched…", per `ledger-touch-map.txt`. Of the 124 carried rows: 102 unchanged, 17 held, 4 improved, 1 resolved. New: 5. Total 129 rows.
+Every 11-04b row keeps its stable name and order; none is re-keyed, dropped or retired. For the full history columns (06-25 through 11-04b), see the 11-04b ledger; this edition carries the severity, the 11-04b delta, this run's reading and the delta vs 11-04b. Rows with no named reading read "cited files 0-line diff" or "named files touched…", per `ledger-touch-map.txt`. Of the 124 carried rows: 102 unchanged, 17 held, 4 improved, 1 resolved. New: 6. Total 130 rows.
 
 | # | finding | severity (11-05) | delta vs 11-04 (11-04b) | 11-05 (this run, `2eb73ae0` / `07c88f7`) | delta vs 11-04b |
 |---|---|---|---|---|---|
@@ -880,5 +939,6 @@ Every 11-04b row keeps its stable name and order; none is re-keyed, dropped or r
 | 125 | `parked-wait-text-cross-repo` | low-medium | — | SD writes one park status for 4 wait kinds (`hook.js:1520-1537`, `heartbeat.js:258-264`); Harbour reads 1 (`PARKED_WAIT_HINT`, `session-telemetry.js:325`). No contract row; the binding test is SD system-tier only, outside SD CI. Home: LIN-2258 | **new** (first ruled) |
 | 126 | `error-code-case-split` | low | — | `ruling-settled` is the one kebab-case HTTP error `code` (routes: 42 UPPER_SNAKE codes, lib: 18); scan retire keeps `ALREADY_TERMINAL` (`workspace-api-scan.js:75,508`); browser restates the code (`question-cards.js:248`) | **new** |
 | 127 | `ruling-settled-row-predicate-inline` | low | — | task-row "settled" = outcome ∈ {answered, dismissed} inline at 5 sites / 3 route files (`dashboard-rulings.js:327`, `workspace-api-issue-write.js:162,168,646`, `workspace-api-scan.js:389`); loop side has one owner (`isDecisionSettledIn`). Home: `lib/task-decisions-store.js`. Census G0217 re-ruled real | **new** |
-| 128 | `waiting-standing-comment-residue` | low | — | two window comments contradict the code: `home-row-states.js:121` ("the task page's read leaves it off", untrue since LIN-4143) and `waiting-section.js:5` (names `readWaitingStanding`, which does not exist). Handed over by Seams run 7 | **new** |
-| 129 | `reply-effect-default-split` | borderline (not graded) | — | `question-cards.js` defaults an absent effect to `record` (LIN-4143, fail closed) while the shared reply helper keeps absent = `resume` (pinned by `reply-delivery-contract`); deliberate and documented | **new** (borderline) |
+| 128 | `waiting-standing-comment-residue` | low | — | three window comments contradict the code: `home-row-states.js:121` ("the task page's read leaves it off", untrue since LIN-4143); `waiting-section.js:5` (names `readWaitingStanding`, which does not exist; Seams run 7 hand-off); `public/app.js:630-631` (badge and count line "differ by design", against `unanswered-decisions.js:963-964`, `home-row-states.js:120` and `dashboard-routes.test.js:6891-6893`; second-read). The real difference is freshness: the badge reads the 5s-cached feed, the count line the uncached `/api/home-waiting`, on one tick | **new** |
+| 129 | `request-source-guard-copies` | low | — | LIN-4226 added three inline partial checks of the loader shape (`cost-read.js:147` both methods, `kpi-stats.js:1067` `forRows` only, `run-view.js:388` `forAnchors` only) beside the owner `requireRequestUsageLoader` (`request-usage-loader.js:91-92`, called from 6 files at both SHAs; 0 inline copies at `d7ceb373`). Found by the second-read | **new** |
+| 130 | `reply-effect-default-split` | borderline (not graded) | — | `question-cards.js` defaults an absent effect to `record` (LIN-4143, fail closed) while the shared reply helper keeps absent = `resume` (pinned by `reply-delivery-contract`); deliberate and documented | **new** (borderline) |
