@@ -25,6 +25,11 @@
  *   upper-cased), and `linearGradient` is pinned. Attribute names on a non-HTML element keep their case (`viewBox`); on an
  *   HTML element they are lower-cased, as before. The case is kept because a browser stores an SVG attribute as written,
  *   and `chart-helpers.js` sets `viewBox`.
+ * - Insertion (LIN-4279): `replaceChild(new, old)` puts `new` where `old` was, returns `old`, and throws `FakeDomError`, changing
+ *   nothing, when `old` is not a child. `replaceChildren(...nodes)` replaces every child; with no arguments it empties the
+ *   node. `append(...nodes)` and `prepend(...nodes)` add at the end or before the first child that is not one of them. A
+ *   string argument to any of these becomes a text node. `insertAdjacentHTML(position, html)` models `beforeend` only (read
+ *   ASCII case-insensitively, as the spec reads the position) and throws `FakeDomError` for any other position.
  * - `innerHTML` and `outerHTML`, get and set. The serializer is browser-faithful: attributes in source order, a valueless
  *   attribute as `name=""`, text escapes `& < >`, attribute values escape `& "`, void elements have no end tag, script
  *   and style text is raw, `<template>` serializes its content. The typed `value` is not in the markup. `outerHTML =` on
@@ -49,7 +54,8 @@
  * - Listeners: `addEventListener` and `removeEventListener` record. `listenersOf(type)` exposes the recorded functions, so
  *   a suite's click or key shim can call them. `dispatchEvent` is inert and returns true.
  *
- * Deliberately not modelled: layout, CSS, `:hover`, `:checked` and the other state pseudo-classes, `+` and `~`, event
+ * Deliberately not modelled: layout, CSS, `:hover`, `:checked` and the other state pseudo-classes, `+` and `~`,
+ * `insertAdjacentHTML` at `beforebegin`, `afterbegin` and `afterend` (they throw, so they are refused rather than ignored), event
  * dispatch and bubbling, HTML error recovery (implied end tags such as `<p>` closing `<p>`), foreign content (SVG and
  * MathML): `innerHTML` parses SVG markup as HTML elements, so only `createElementNS` makes an SVG-namespace node;
  * `<script>` execution, `getBoundingClientRect`, `MutationObserver`, `Range` and `Selection`,
@@ -94,6 +100,12 @@ const toNode = (item, doc) => {
   if (item instanceof FakeNode) return item;
   return fail(`cannot insert ${String(item)}; pass a node or a string`);
 };
+/** Append-style arguments as nodes. A string becomes a text node; a node that would contain its new parent is refused. */
+const toNodes = (items, parent) => items.map((item) => {
+  const node = toNode(item, parent.ownerDocument);
+  if (node === parent || node.contains(parent)) fail('cannot insert a node into itself or a descendant of itself');
+  return node;
+});
 
 class FakeNode {
   constructor(ownerDocument) {
@@ -172,6 +184,30 @@ class FakeNode {
     const ref = nextKid(this);
     this._detach();
     for (const item of items) parent._insert(toNode(item, this.ownerDocument), ref);
+  }
+  /** Puts `node` where `old` is, detaches `old`, and returns it. Throws, and changes nothing, if `old` is not a child (LIN-4279). */
+  replaceChild(node, old) {
+    if (!old || old.parentNode !== this) fail('replaceChild: the old node is not a child of this node');
+    if (node === old) return old;
+    this._insert(node, old); // inserted first, so a refused insert leaves `old` in place
+    old._detach();
+    return old;
+  }
+  /** Replaces every child with `items` (strings become text nodes). With no arguments it empties the node (LIN-4279). */
+  replaceChildren(...items) {
+    const nodes = toNodes(items, this);
+    const frag = new FakeFragment(this.ownerDocument);
+    for (const n of nodes) frag._insert(n, null);
+    this._replaceKids(frag);
+  }
+  append(...items) {
+    for (const n of toNodes(items, this)) this._insert(n, null);
+  }
+  /** Inserts `items` before the first child that is not one of them, in argument order (LIN-4279). */
+  prepend(...items) {
+    const nodes = toNodes(items, this);
+    const ref = this._kids.find((k) => !nodes.includes(k)) || null;
+    for (const n of nodes) this._insert(n, ref);
   }
   contains(other) {
     for (let n = other; n; n = n.parentNode) if (n === this) return true;
@@ -333,6 +369,12 @@ class FakeElement extends FakeNode {
     const ref = nextKid(this);
     this._detach();
     parent._insert(frag, ref);
+  }
+
+  /** Only `beforeend` is modelled, read ASCII case-insensitively as the spec reads the position. Any other position throws (LIN-4279). */
+  insertAdjacentHTML(position, html) {
+    if (String(position).toLowerCase() !== 'beforeend') fail(`insertAdjacentHTML: only "beforeend" is modelled, not ${JSON.stringify(position)}`);
+    this._insert(parseFragment(String(html), this.ownerDocument), null);
   }
 
   /** Form controls: `value` is the attribute (or the text, for a textarea) until it is set, then independent. */

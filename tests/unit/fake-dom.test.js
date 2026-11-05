@@ -638,3 +638,114 @@ describe('fake DOM: createElementNS keeps SVG names as written (LIN-4279)', () =
     assert.equal(div.getAttribute('viewbox'), 'x', 'HTML attribute names are lower-cased');
   });
 });
+
+describe('fake DOM: replaceChild, replaceChildren, insertAdjacentHTML, append and prepend (LIN-4279)', () => {
+  test('replaceChild puts the new node in the old one’s place, returns the old node, and detaches it', () => {
+    const { parse, document } = world();
+    parse('<ul><li id="a">a</li><li id="b">b</li><li id="c">c</li></ul>');
+    const ul = document.querySelector('ul');
+    const old = document.querySelector('#b');
+    const repl = document.createElement('li');
+    repl.id = 'n';
+    assert.equal(ul.replaceChild(repl, old), old, 'returns the old node');
+    assert.equal(old.parentNode, null, 'the old node is detached');
+    assert.equal(ul.innerHTML, '<li id="a">a</li><li id="n"></li><li id="c">c</li>', 'the new node is in the same place');
+  });
+
+  test('replaceChild throws FakeDomError when the old node is not a child, and changes nothing', () => {
+    const { parse, document } = world();
+    parse('<ul><li id="a">a</li></ul><p id="other">x</p>');
+    const ul = document.querySelector('ul');
+    const stranger = document.querySelector('#other');
+    const before = ul.innerHTML;
+    throwsNaming(() => ul.replaceChild(document.createElement('li'), stranger), 'not a child');
+    assert.equal(ul.innerHTML, before, 'the parent is unchanged');
+    assert.equal(stranger.isConnected, true, 'the stranger is untouched');
+  });
+
+  test('replaceChildren(...nodes) replaces every child with the given nodes, in order, and detaches the old ones', () => {
+    const { parse, document } = world();
+    parse('<div><i id="x">x</i><i id="y">y</i></div>');
+    const div = document.querySelector('div');
+    const old = document.querySelector('#x');
+    const p = document.createElement('p');
+    const span = document.createElement('span');
+    div.replaceChildren(p, span);
+    assert.deepEqual(div.children, [p, span]);
+    assert.equal(old.parentNode, null, 'the old child is detached');
+    assert.equal(div.innerHTML, '<p></p><span></span>');
+  });
+
+  test('replaceChildren with a string puts a text node in its place', () => {
+    const { parse, document } = world();
+    parse('<div><i>x</i></div>');
+    const div = document.querySelector('div');
+    div.replaceChildren('t', document.createElement('p'));
+    assert.equal(div.childNodes[0].nodeType, 3);
+    assert.equal(div.innerHTML, 't<p></p>');
+  });
+
+  test('replaceChildren() with no arguments empties the element, text nodes included', () => {
+    const { parse, document } = world();
+    parse('<div><i>a</i>text<b>b</b></div>');
+    const div = document.querySelector('div');
+    const i = document.querySelector('i');
+    div.replaceChildren();
+    assert.equal(div.childNodes.length, 0, 'no child nodes remain');
+    assert.equal(div.innerHTML, '');
+    assert.equal(i.parentNode, null, 'the old child is detached');
+  });
+
+  test('insertAdjacentHTML("beforeend", html) appends the parsed nodes after the existing children', () => {
+    const { parse, document } = world();
+    parse('<ul><li>a</li></ul>');
+    const ul = document.querySelector('ul');
+    const first = ul.children[0];
+    ul.insertAdjacentHTML('beforeend', '<li>b</li><li>c</li>');
+    assert.equal(ul.children[0], first, 'the existing child stays first');
+    assert.equal(ul.innerHTML, '<li>a</li><li>b</li><li>c</li>');
+  });
+
+  test('insertAdjacentHTML takes its position ASCII case-insensitively, as the DOM spec does (BeforeEnd is beforeend)', () => {
+    const { parse, document } = world();
+    parse('<ul><li>a</li></ul>');
+    const ul = document.querySelector('ul');
+    ul.insertAdjacentHTML('BeforeEnd', '<li>b</li>');
+    assert.equal(ul.innerHTML, '<li>a</li><li>b</li>');
+  });
+
+  test('insertAdjacentHTML throws FakeDomError for every position except beforeend, and changes nothing', () => {
+    const { parse, document } = world();
+    parse('<ul><li>a</li></ul>');
+    const ul = document.querySelector('ul');
+    const before = ul.innerHTML;
+    for (const pos of ['beforebegin', 'afterbegin', 'afterend', 'nonsense', '']) {
+      throwsNaming(() => ul.insertAdjacentHTML(pos, '<li>x</li>'), 'only "beforeend" is modelled');
+    }
+    assert.equal(ul.innerHTML, before, 'no position other than beforeend changed the element');
+  });
+
+  test('append(...nodes) adds nodes at the end, and a string becomes a text node', () => {
+    const { parse, document } = world();
+    parse('<ul><li id="a">a</li></ul>');
+    const ul = document.querySelector('ul');
+    const li = document.createElement('li');
+    ul.append(li, 'tail');
+    assert.equal(ul.childNodes[1], li, 'the node is appended');
+    assert.equal(ul.childNodes[2].nodeType, 3, 'the string is a text node');
+    assert.equal(ul.childNodes[2].data, 'tail');
+    assert.equal(ul.innerHTML, '<li id="a">a</li><li></li>tail');
+  });
+
+  test('prepend(...nodes) inserts before the first child, in argument order, and a string becomes a text node', () => {
+    const { parse, document } = world();
+    parse('<ul><li id="a">a</li></ul>');
+    const ul = document.querySelector('ul');
+    const x = document.createElement('li');
+    x.id = 'x';
+    ul.prepend(x, 'head');
+    assert.equal(ul.childNodes[0], x, 'the node is first');
+    assert.equal(ul.childNodes[1].nodeType, 3, 'the string is a text node, second');
+    assert.equal(ul.innerHTML, '<li id="x"></li>head<li id="a">a</li>');
+  });
+});
