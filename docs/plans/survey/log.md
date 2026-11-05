@@ -2101,3 +2101,11 @@ John hoped for "a chart: size, cost, and it *not* being a straight line, which w
 - review rounds counted per ticket.
 
 The readability fix is folded into v2 rather than filed on its own. A scheduled task in this session fires on 12 Nov 09:41 UTC to Survey, scope and start it. It needs a fresh proxy token by then (`.tok4` expires 7 Nov 10:12 UTC).
+
+### 13:55 UTC: before, during, after, and the first "after" step
+John: "we have almost a before, during, and after tidying up step". The loop's shape as it now stands:
+- **Before:** the Survey corrects the ticket and names the tidy it will bind on.
+- **During:** the tidy first, where the change binds; larger moves in pieces; a partial move leaves a ratchet.
+- **After:** the blind read names the copies left at the edges, and they become a small tidy-after in the same area, straight away (pull, while it's warm).
+
+**First trial of "after":** LIN-4263's tidy-after, the two edge copies both blind reads named (`postingKeysOf` repeating `isPostingRow`'s key list; `rankOf` copying `lineage-membership.js`'s order without its tie handling, a NaN on two undated members). It's filed and Surveyed through the stages. The `prompt-section.js` edges from LIN-4247 (the `state.go` literal, the fourth "in progress" answer) and LIN-4246 (the second focus capture and restore) wait for LIN-4255, which is moving those suites. **What would count:** the tidy-after's own blind read is better, and a re-read of the area (the original change plus its tidy-after) reads better than "mixed".
