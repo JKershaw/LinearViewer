@@ -994,6 +994,11 @@ window.ReplyDelivery = (function () {
     if (decision && typeof decision.optionId === 'string' && decision.optionId) {
       body.optionId = decision.optionId;
     }
+    // LIN-4241: the answering card's submission id, forwarded only when present. The server reads a
+    // resend with the same id as a retry, and a different id on an already-settled ruling as a second tab.
+    if (decision && typeof decision.answerAttemptId === 'string' && decision.answerAttemptId) {
+      body.answerAttemptId = decision.answerAttemptId;
+    }
     // LIN-3126 residual: the issue's own provider-kind source rides the URL so the
     // comment route (which resolves strictly) honours the issue's provider, not
     // the workspace's active one. SPARSE — absent on an unsourced caller, so
@@ -1120,7 +1125,7 @@ window.ReplyDelivery = (function () {
         onCommentFailed(new Error('cannot record an answer with no linked issue'));
         return Promise.resolve();
       }
-      return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, taskDecisionId: opts.taskDecisionId, taskDecisionIssueId: opts.taskDecisionIssueId, source: opts.source }).then(
+      return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, taskDecisionId: opts.taskDecisionId, taskDecisionIssueId: opts.taskDecisionIssueId, source: opts.source, answerAttemptId: opts.answerAttemptId }).then(
         function (commentResult) {
           if (!commentResult.ok) { onCommentFailed(errorFromResult(commentResult)); return; }
           onDispatchOk();
@@ -1148,7 +1153,7 @@ window.ReplyDelivery = (function () {
     // literal built here rather than the rest of `opts`, so this stays the
     // one place a caller's `opts.optionId` (when set) actually reaches
     // `postComment`'s own allowlist.
-    return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, taskDecisionId: opts.taskDecisionId, taskDecisionIssueId: opts.taskDecisionIssueId, source: opts.source }).then(function (commentResult) {
+    return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, taskDecisionId: opts.taskDecisionId, taskDecisionIssueId: opts.taskDecisionIssueId, source: opts.source, answerAttemptId: opts.answerAttemptId }).then(function (commentResult) {
       if (!commentResult.ok) {
         onCommentFailed(errorFromResult(commentResult));
         return;
@@ -1343,7 +1348,7 @@ window.ReplyDelivery = (function () {
           if (typeof handlers.onNoTarget === 'function') handlers.onNoTarget();
           return;
         }
-        return window.ReplyDelivery.postComment(opts.urlKey, targetId, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, taskDecisionId: opts.taskDecisionId, taskDecisionIssueId: opts.taskDecisionIssueId, source: opts.source })
+        return window.ReplyDelivery.postComment(opts.urlKey, targetId, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, taskDecisionId: opts.taskDecisionId, taskDecisionIssueId: opts.taskDecisionIssueId, source: opts.source, answerAttemptId: opts.answerAttemptId })
           .then(function (commentResult) {
             if (!commentResult.ok) { handlers.onCommentFailed(errorFromResult(commentResult)); return; }
             var recordOnNote = resolved.note
@@ -1395,7 +1400,7 @@ window.ReplyDelivery = (function () {
           return deliverRulingRecord(Object.assign({}, opts, { downgradeNote: PRESS_TIME_DOWNGRADE_NOTE }), handlers);
         }
 
-        return window.ReplyDelivery.postComment(opts.urlKey, opts.issueId || opts.issueIdentifier, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, taskDecisionId: opts.taskDecisionId, taskDecisionIssueId: opts.taskDecisionIssueId, source: opts.source })
+        return window.ReplyDelivery.postComment(opts.urlKey, opts.issueId || opts.issueIdentifier, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionLoopIds: opts.decisionLoopIds, decisionId: opts.decisionId, optionId: opts.optionId, taskDecisionId: opts.taskDecisionId, taskDecisionIssueId: opts.taskDecisionIssueId, source: opts.source, answerAttemptId: opts.answerAttemptId })
           .then(function (commentResult) {
             if (!commentResult.ok) { handlers.onCommentFailed(errorFromResult(commentResult)); return; }
             function startRun() {

@@ -9,6 +9,7 @@
  */
 import { json } from 'express';
 import { jsonError, keepaliveError, notFound } from '../lib/errors.js';
+import { RULING_SETTLED_REFUSAL } from '../lib/ruling-settled.js';
 import { streamChat } from '../lib/openrouter.js';
 import { resolveChatCredential, isAiUnavailable, checkFreeTierGate } from '../lib/chat-request.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
@@ -381,6 +382,12 @@ export function registerScanRoutes(router, { workspaceFromUrl, freeTierStore, wo
       });
       if (!record) {
         return notFound.json(res, 'Scan record not found');
+      }
+      // LIN-4241: markOutcome is first-stamp-wins. A row already answered or
+      // dismissed is settled, so refuse it rather than report a no-op as success.
+      // `self-resolved` is not settled and stays as it was.
+      if (record.firstStampWins === false && (record.outcome === 'answered' || record.outcome === 'dismissed')) {
+        return jsonError(res, ...RULING_SETTLED_REFUSAL);
       }
       // LIN-2755: uniform invalidation on every ruling write — taskDecisionsStore
       // is read live (not cached), so this is defensive/uniform rather than

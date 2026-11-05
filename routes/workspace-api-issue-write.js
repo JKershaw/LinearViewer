@@ -29,6 +29,7 @@ import { PartialWriteError } from '../lib/partial-write-error.js';
 import { isTrashed } from '../lib/trashed-signal.js';
 import { validateIssueWriteFields, isValidPriority, validateCommentBody, MAX_COMMENT_LENGTH } from '../lib/issue-write-validation.js';
 import { parseStampLoopIds, STAMP_LOOP_IDS_MESSAGE } from '../lib/unanswered-decisions.js';
+import { RULING_SETTLED_REFUSAL } from '../lib/ruling-settled.js';
 // LIN-2154: the session-auth (human-lane) comment write shares the agent-lane's
 // dedupe cache instances (routes/proxy.js) rather than a fresh pair that would
 // miss workspace-wide generation bumps, and its key-building primitive.
@@ -48,6 +49,36 @@ import { isTestToken, refuseCapability } from './workspace-api-steps.js';
 // rather than being treated as a retry forever.
 export const decisionStampDedupe = createDedupeCache();
 
+// LIN-4241: the settling stamp that landed for THIS dedupe `key`, as `{ target,
+// attemptId }`: `target` is the ruling it settled (settleTargetOf), `attemptId` the
+// client submission that settled it (answerAttemptIdOf, null when unsent). It is a
+// second marker in `decisionStampDedupe` under a derived key (the key is a hex
+// sha256, so `:primary` cannot collide), not a container of its own: the LIN-3198
+// reset seam clears `decisionStampDedupe` together with the comment cache, so this
+// marker is cleared with them. A first attempt can stamp the primary and then fail
+// a copy, so the primary is settled by this request's own write. An identical-text
+// retry must not read that as "answered elsewhere", and a second tab must not read
+// it as a retry.
+const primaryStampKey = (key) => `${key}:primary`;
+
+// LIN-4241: a non-empty id string (the settled-ruling pre-check's guard; the same
+// test `stampDecisionAnswers` applies to its own pairs).
+const givenString = (v) => typeof v === 'string' && v !== '';
+
+// LIN-4241: which ruling a request settles, as one comparable string: the loop
+// primary, else the scan row. A marker for one ruling never refuses another one
+// that happens to carry the same reply text.
+const settleTargetOf = (d) => JSON.stringify(
+  [d.decisionLoopId, d.decisionId, d.taskDecisionIssueId, d.taskDecisionId].map((v) => (givenString(v) ? v : ''))
+);
+
+// LIN-4241: the client's per-card submission id (`answerAttemptId`). It separates a
+// genuine retry (the same card, its first response lost) from a second tab that
+// answers the same ruling with the same text: the dedupe key is text-only, so the
+// two are otherwise identical. Absent or not a short string, it is null, and the
+// caller is an unconverted surface that keeps the LIN-2208 retry behaviour.
+const answerAttemptIdOf = (d) => (givenString(d.answerAttemptId) && d.answerAttemptId.length <= 128 ? d.answerAttemptId : null);
+
 /**
  * Best-effort decision-answer stamp(s) for a human comment write (LIN-1728
  * decision 1 / LIN-2197 Phase 5) — the loop-backed and task-bound sibling
@@ -57,13 +88,21 @@ export const decisionStampDedupe = createDedupeCache();
  * malformed/partial client payload, never a half-stamp attempt) and never
  * throw — failure is logged only, mirroring the pre-LIN-2208 inline code.
  *
- * @returns {Promise<boolean>} true iff every REQUESTED stamp (only the pairs
- *   actually present in `decision`) succeeded — the signal LIN-2208's dedupe
- *   bypass uses to decide whether a later identical-text retry still needs to
- *   try again.
+ * @returns {Promise<{landed: boolean, settledElsewhere: boolean, primaryLanded: boolean}>} `landed` is
+ *   true iff every REQUESTED stamp (only the pairs actually present in `decision`)
+ *   succeeded — the signal LIN-2208's dedupe bypass uses to decide whether a later
+ *   identical-text retry still needs to try again. `settledElsewhere` (LIN-4241) is
+ *   true when the PRIMARY loop's decision, or the task row, was already answered or
+ *   dismissed by an earlier write: the caller refuses with 409 `ruling-settled`
+ *   and starts no run. A copy already stamped counts as landed, not as settled.
+ *   `primaryLanded` (LIN-4241) is true when the primary loop stamp landed on THIS call.
+ *   `primaryAlreadyLanded` (an option) says this request's own settling stamp landed on
+ *   an earlier attempt for the same dedupe key. The settling stamp (the loop primary, or
+ *   the scan row when there is no loop) then reads as landed, not settled, when it
+ *   reports `alreadySettled`.
  */
-async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, taskDecisionsStore, sessionsFeedCache = null }) {
-  const given = (v) => typeof v === 'string' && v !== '';
+async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, taskDecisionsStore, sessionsFeedCache = null, primaryAlreadyLanded = false }) {
+  const given = givenString;
   const d = decision || {};
   const { urlKey } = workspace;
 
@@ -79,19 +118,38 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
   if (given(d.decisionLoopId) && given(d.decisionId)) {
     const loopIds = [...new Set([d.decisionLoopId, ...(parseStampLoopIds(d.decisionLoopIds) ?? [])])];
     for (const loopId of loopIds) {
+      const isPrimary = loopId === d.decisionLoopId;
       attempts.push({
+        primary: isPrimary,
         failure: 'Decision-answer stamp failed:',
         // LIN-2792: `optionId` rides this stamp with an undefined `outcome` (never
         // reached for a dismissal, so it cannot leak onto one) — the 5th argument
         // `markDecisionAnswered` gained in LIN-2754 Track B.
-        run: async () => (await dispatchQueueStore.markDecisionAnswered(loopId, urlKey, d.decisionId, undefined, d.optionId))
-          ? null
-          : `Decision-answer stamp not applied: no matching item ${loopId} in workspace ${urlKey}`
+        run: async () => {
+          const stamp = await dispatchQueueStore.markDecisionAnswered(loopId, urlKey, d.decisionId, undefined, d.optionId);
+          if (stamp?.alreadySettled) {
+            // LIN-4241: this loop's decision already carries an answer or dismissal.
+            // A copy already stamped has landed, so it does not count as settled. For
+            // the PRIMARY: when this request's own earlier attempt stamped it (the
+            // dedupe key's primary landed, then a copy failed), it has landed. Only a
+            // primary that another write settled refuses the request.
+            if (!isPrimary) return { landed: true, settledElsewhere: false, notApplied: null };
+            return primaryAlreadyLanded
+              ? { landed: true, settledElsewhere: false, notApplied: null }
+              : { landed: false, settledElsewhere: true, notApplied: null };
+          }
+          return stamp
+            ? { landed: true, settledElsewhere: false, notApplied: null }
+            : { landed: false, settledElsewhere: false, notApplied: `Decision-answer stamp not applied: no matching item ${loopId} in workspace ${urlKey}` };
+        }
       });
     }
   }
   if (taskDecisionsStore && given(d.taskDecisionId) && given(d.taskDecisionIssueId)) {
     attempts.push({
+      // LIN-4241: a scan row settles its ruling the way the loop primary does, so it
+      // is marked primary for the dedupe marker and honours primaryAlreadyLanded too.
+      primary: true,
       failure: 'Task-decision answer stamp failed:',
       // LIN-2889/LIN-2724: the shared answer() op un-retires a self-resolved row
       // before re-stamping it, and firstStampWins comes from a conditional write
@@ -102,19 +160,30 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
           urlKey, issueId: d.taskDecisionIssueId, id: d.taskDecisionId
         });
         const settled = firstStampWins || record?.outcome === 'answered' || record?.outcome === 'dismissed';
-        return record && settled
-          ? null
-          : `Task-decision answer stamp not applied: no matching row ${d.taskDecisionId} for issue ${d.taskDecisionIssueId} in workspace ${urlKey} (outcome=${record?.outcome ?? 'none'})`;
+        if (!record || !settled) {
+          return { landed: false, settledElsewhere: false, notApplied: `Task-decision answer stamp not applied: no matching row ${d.taskDecisionId} for issue ${d.taskDecisionIssueId} in workspace ${urlKey} (outcome=${record?.outcome ?? 'none'})` };
+        }
+        // LIN-4241: this call did not stamp the row, and it was already answered or
+        // dismissed: settled by an earlier write. That is not this request's landed stamp.
+        const settledElsewhere = !firstStampWins && (record.outcome === 'answered' || record.outcome === 'dismissed');
+        // LIN-4241: the row was settled by this same submission's earlier attempt (a
+        // copy failed after it) — that is this request's own landed stamp, not elsewhere.
+        if (settledElsewhere && primaryAlreadyLanded) return { landed: true, settledElsewhere: false, notApplied: null };
+        return { landed: !settledElsewhere, settledElsewhere, notApplied: null };
       }
     });
   }
 
   let everyStampLanded = true;
+  let settledElsewhere = false;
+  let primaryLanded = false;
   for (const attempt of attempts) {
     try {
-      const notApplied = await attempt.run();
-      if (notApplied) {
-        console.error(notApplied);
+      const outcome = await attempt.run();
+      if (outcome.settledElsewhere) settledElsewhere = true;
+      if (attempt.primary && outcome.landed) primaryLanded = true;
+      if (!outcome.landed) {
+        if (outcome.notApplied) console.error(outcome.notApplied);
         everyStampLanded = false;
       } else {
         // LIN-2755: both stamps write into state the cached loop reconstruction
@@ -128,7 +197,7 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
       everyStampLanded = false;
     }
   }
-  return everyStampLanded;
+  return { landed: everyStampLanded, settledElsewhere, primaryLanded };
 }
 
 // Normalize a provider write result to `{ success, issue }`. Linear returns that
@@ -368,9 +437,23 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
     // secondary annotation the rulings predicate tolerates missing (the
     // loop just stays "unanswered" until a later attempt succeeds — LIN-2208
     // is what makes an identical-text retry one such later attempt).
-    const stampAnswers = async () => {
-      const stampOk = await stampDecisionAnswers(workspace, req.body || {}, { dispatchQueueStore, taskDecisionsStore, sessionsFeedCache });
-      if (stampOk) decisionStampDedupe.set(key, true);
+    // Resolves true when the stamp found the ruling already answered or dismissed (LIN-4241).
+    // `isRetry` is set only on the dedupe-hit path, where this key's earlier attempt
+    // may have stamped the primary (LIN-4241). A fresh write never reads that marker.
+    const stampAnswers = async ({ isRetry = false } = {}) => {
+      const body = req.body || {};
+      const target = settleTargetOf(body);
+      // Only the same ruling's marker counts: a retry of THIS settle, not another one.
+      const primaryAlreadyLanded = isRetry && decisionStampDedupe.get(primaryStampKey(key))?.target === target;
+      const { landed, settledElsewhere, primaryLanded } = await stampDecisionAnswers(workspace, body, {
+        dispatchQueueStore,
+        taskDecisionsStore,
+        sessionsFeedCache,
+        primaryAlreadyLanded
+      });
+      if (primaryLanded) decisionStampDedupe.set(primaryStampKey(key), { target, attemptId: answerAttemptIdOf(body) });
+      if (landed) decisionStampDedupe.set(key, true);
+      return settledElsewhere;
     };
 
     // Best-effort Harbour-comments ledger record (LIN-2648, WS1 of LIN-2241):
@@ -395,7 +478,10 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
     const finishCommentSuccess = async (commentCreate) => {
       commentDedupe.set(key, commentCreate);
       await recordInLedger(commentCreate.comment?.id, 'Harbour-comments ledger record failed:');
-      await stampAnswers();
+      // LIN-4241: the comment is already written, so a lost race cannot undo it. But
+      // when the stamp finds the ruling settled by another write, this request must
+      // not start a run. A 409 is the signal: the client dispatches only on a 2xx.
+      if (await stampAnswers()) return jsonError(res, ...RULING_SETTLED_REFUSAL);
       return res.status(201).json(commentCreate);
     };
 
@@ -513,9 +599,24 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
         // `decisionStampDedupe` is what stops that from becoming a THIRD
         // stamp attempt once one has already landed (the pre-existing "a
         // deduped resubmission does not re-stamp" success-path coverage).
-        if (!decisionStampDedupe.get(key)) {
-          await stampAnswers();
-        }
+        // LIN-4241: when this key's own stamp has not landed yet, the retry still
+        // stamps the copies. If the PRIMARY is settled by ANOTHER write (a race this
+        // request lost), the retry must not answer 200: the client would dispatch a
+        // run for a settled ruling. It answers 409. A primary this key's own earlier
+        // attempt stamped is not "elsewhere" (primaryStampKey): it reads as
+        // landed, so the retry completes the copies and answers 200.
+        //
+        // LIN-4241 (second submission): the text-only dedupe key cannot tell a second
+        // tab from a retry, so the client's `answerAttemptId` does. When the ruling was
+        // already settled by a DIFFERENT submission, this request is a second answer:
+        // it is refused before any stamp, and a 200 here would start a second run. A
+        // request without an id keeps the retry path above unchanged.
+        const answerAttemptId = answerAttemptIdOf(req.body || {});
+        const settledBy = decisionStampDedupe.get(primaryStampKey(key));
+        const secondSubmission = answerAttemptId !== null
+          && settledBy?.target === settleTargetOf(req.body || {})
+          && settledBy.attemptId !== answerAttemptId;
+        const settledElsewhere = !secondSubmission && !decisionStampDedupe.get(key) && await stampAnswers({ isRetry: true });
 
         // Dedupe-hit ledger repair (LIN-2649 S1, F2): a dedupe hit means the
         // ORIGINAL create's own ledger-record attempt may have failed
@@ -524,7 +625,27 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
         // discipline as the non-dedupe path, never gates the response.
         await recordInLedger(prior.comment?.id, 'Harbour-comments ledger repair failed:');
 
+        if (secondSubmission || settledElsewhere) return jsonError(res, ...RULING_SETTLED_REFUSAL);
         return res.status(200).json({ ...prior, deduped: true });
+      }
+
+      // LIN-4241: the settled-ruling pre-check, before anything is written. It sits
+      // AFTER the dedupe-hit branch above (an identical-text retry whose primary stamp
+      // landed but whose copy failed must still stamp that copy). A refusal writes no
+      // comment and starts no run. For a loop, only the PRIMARY decision decides: a
+      // stamped copy never blocks. A scan row blocks only once answered or dismissed.
+      const settleCheck = req.body || {};
+      if (givenString(settleCheck.decisionLoopId) && givenString(settleCheck.decisionId)
+        && await dispatchQueueStore.isDecisionSettled(settleCheck.decisionLoopId, workspace.urlKey, settleCheck.decisionId)) {
+        return jsonError(res, ...RULING_SETTLED_REFUSAL);
+      }
+      if (taskDecisionsStore && givenString(settleCheck.taskDecisionId) && givenString(settleCheck.taskDecisionIssueId)) {
+        const row = await taskDecisionsStore.readOutcome({
+          urlKey: workspace.urlKey, issueId: settleCheck.taskDecisionIssueId, id: settleCheck.taskDecisionId
+        });
+        if (row?.outcome === 'answered' || row?.outcome === 'dismissed') {
+          return jsonError(res, ...RULING_SETTLED_REFUSAL);
+        }
       }
 
       const commentCreate = await writeComment(issueBinding);

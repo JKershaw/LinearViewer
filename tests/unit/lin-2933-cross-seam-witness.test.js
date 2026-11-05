@@ -201,7 +201,10 @@ async function startApp({ provider, ownerCredentialStore, accessToken }) {
     // markOutcome() directly — this witness's task stamp must actually land
     // (rather than throwing a logged TypeError) for the recovery-tail
     // fidelity it exists to check.
-    taskDecisionsStore: { answer: async () => ({ record: { outcome: 'answered' }, firstStampWins: true, unretried: false }) },
+    taskDecisionsStore: {
+      answer: async () => ({ record: { outcome: 'answered' }, firstStampWins: true, unretried: false }),
+      readOutcome: async () => ({ outcome: null }), // LIN-4241 pre-check: row not yet settled
+    },
     harbourCommentsStore: null,
     sessionsFeedCache: null,
     ownerCredentialStore,

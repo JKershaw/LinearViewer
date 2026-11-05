@@ -349,11 +349,19 @@ describe('POST /workspace/:urlKey/api/scan/:issueId/dismiss', () => {
     assert.equal(result.status, 400);
   });
 
-  test('a second dismiss is idempotent (first stamp wins, timestamp unchanged)', async () => {
+  // LIN-4241: a second dismiss is refused as settled, not answered with a silent
+  // 200. The first stamp still wins: the row's outcome and timestamp are untouched.
+  test('a second dismiss is refused ruling-settled (first stamp wins, timestamp unchanged)', async () => {
     const scanned = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
     const first = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}/dismiss`, { id: scanned.body.id });
     const second = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}/dismiss`, { id: scanned.body.id });
-    assert.equal(second.body.outcomeAt, first.body.outcomeAt);
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 409);
+    assert.equal(second.body.code, 'ruling-settled');
+    assert.equal(second.body.error, 'This ruling was already answered or dismissed.');
+    const reread = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    assert.equal(reread.body.outcome, 'dismissed');
+    assert.equal(reread.body.outcomeAt, first.body.outcomeAt);
   });
 
   // LIN-2197 Phase 5 (Phase 4 close-out ledger item L3): dismissing by the
