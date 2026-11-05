@@ -460,24 +460,32 @@
   function noteSettled(key) { if (key) settledKeys.add(key); }
   function innerCardOf(wrapper) { return wrapper.querySelector('[data-testid="session-question-card"]'); }
   function cardKeyOf(wrapper) { var inner = innerCardOf(wrapper); return inner ? rulingKeyOf(inner) : ''; }
+  // LIN-4293: "focus inside the card", the one rule. `active` is the element that had focus BEFORE a write that may detach the
+  // card: a repaint detaches it, which blurs it, so after the write only the caller can know. Omitted (undefined) it is
+  // document.activeElement, the live Waiting section's and Home placement's reading; null says nothing was focused. The card's
+  // own box is not focus inside it.
+  function focusInCard(card, active) {
+    if (!card || typeof card.contains !== 'function') return false;
+    var el = active === undefined ? document.activeElement : active;
+    return !!el && el !== card && card.contains(el);
+  }
   // Whether a card holds the reader's place: typed text, focus inside it, or an answer in flight. Home's opened task uses
-  // the same check (public/prompt-section.js keepTypedQuestion), gated on the ruling key first.
-  function cardHoldsInput(card) {
+  // the same check (public/prompt-section.js keepTypedQuestion), gated on the ruling key first. `active` as in focusInCard.
+  function cardHoldsInput(card, active) {
     if (!card) return false;
     if (card.dataset && card.dataset.answerInFlight === 'true') return true;
     var textarea = card.querySelector('[data-testid="session-question-card-input"]');
     if (textarea && textarea.value && textarea.value.length > 0) return true;
-    var active = document.activeElement;
-    return !!active && active !== card && typeof card.contains === 'function' && card.contains(active);
+    return focusInCard(card, active);
   }
   // LIN-4242: whether a repaint keeps the card already on the page in place of its fresh markup (the opened task's
   // keepTypedQuestion, public/prompt-section.js). The ruling key is the gate: a different ruling's card is never kept, and
-  // the same ruling's card is kept only while it holds the reader's place. `hadFocus` is the caller's report that focus was
-  // inside the card before its repaint detached it (LIN-4246): by the time this runs, document.activeElement is already
-  // gone, so only the caller can know. Omitted, the answer is the Waiting merge's, unchanged.
-  function keepsReaderPlace(oldCard, freshCard, hadFocus) {
+  // the same ruling's card is kept only while it holds the reader's place. LIN-4293: `active` is the focused element before
+  // the repaint (LIN-4246: the write detaches the card first, so only the caller can know it); omitted, the answer is the
+  // Waiting merge's, unchanged.
+  function keepsReaderPlace(oldCard, freshCard, active) {
     if (!oldCard || !freshCard) return false;
-    return rulingKeyOf(oldCard) === rulingKeyOf(freshCard) && (!!hadFocus || cardHoldsInput(oldCard));
+    return rulingKeyOf(oldCard) === rulingKeyOf(freshCard) && cardHoldsInput(oldCard, active);
   }
   function waitingWrappersIn(body) {
     var out = [];
@@ -534,7 +542,7 @@
     return { count: waitingWrappersIn(body).length, removed: removed };
   }
 
-  var api = { appendYouBubble: appendYouBubble, sendReply: sendReply, dismissQuestionCard: dismissQuestionCard, initQuestionCards: initQuestionCards, rulingKeyOf: rulingKeyOf, RULING_GONE_EVENT: RULING_GONE_EVENT, setDeskRoot: function (el) { deskRoot = el; }, cardHoldsInput: cardHoldsInput, keepsReaderPlace: keepsReaderPlace, mergeWaitingCards: mergeWaitingCards, noteSettled: noteSettled };
+  var api = { appendYouBubble: appendYouBubble, sendReply: sendReply, dismissQuestionCard: dismissQuestionCard, initQuestionCards: initQuestionCards, rulingKeyOf: rulingKeyOf, RULING_GONE_EVENT: RULING_GONE_EVENT, setDeskRoot: function (el) { deskRoot = el; }, cardHoldsInput: cardHoldsInput, focusInCard: focusInCard, keepsReaderPlace: keepsReaderPlace, mergeWaitingCards: mergeWaitingCards, noteSettled: noteSettled };
   if (typeof window !== 'undefined') window.QuestionCards = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();

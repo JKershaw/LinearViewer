@@ -244,16 +244,24 @@
    *   - starting: disabled, "starting…".
    *   - started/running: the task-page state line replaces the button. LIN-4247: it
    *     ends in runPoll, when a complete /state reply shows nothing in progress
-   *     (runEnded): endRun sets ready again and clears run.item. Go is then drawn
+   *     (InProgress.ended): endRun sets ready again and clears run.item. Go is then drawn
    *     from the server's offer (renderGo's takesNoRun), so a finished task draws none.
-   *     "In progress" has three answers: goInProgress (a run is live or waiting now:
-   *     the press and mount reads), stageBusy (hides the step line), and the offer's
-   *     busy kind. runEnded reads sessions.busy together with goInProgress.
+   *     "In progress" is InProgress (LIN-4293), read from the server's facts with
+   *     three named views: busy (hides the step line, from the last complete reply),
+   *     liveNow (the press and mount reads: a run is live or waiting now, never an end),
+   *     and ended (runPoll only: not live now and not sessions.busy).
    * The run allowance ("N of M runs left today") lives beside Go, so it shows in
    * every phase and is the same account-wide count the run rungs used.
    */
   function goReady(opts) {
     return !!opts.dispatchEnabled;
+  }
+
+  // LIN-4293: the one Go-state constructor. It returns a NEW object on every call. runPoll drops a stale read by identity
+  // (`state.go !== reading`), so a shared or frozen constant here would break that guard with no test failing.
+  function goState(status, fields) {
+    const f = fields || {};
+    return { status, headerHtml: f.headerHtml || null, notice: f.notice || null, noticeLink: f.noticeLink || null, noticeLinkLabel: f.noticeLinkLabel || null };
   }
 
   // LIN-3975: what each opened-task surface shows, one row per capability. `home` is Home's opened task, `task`
@@ -698,11 +706,34 @@
     const action = runOfferOf(state, opts);
     return !!action && action.kind === 'none';
   }
-  // LIN-3975 (review finding 1): busy is any session running, queued or waiting on an answer (`sessions.busy`, the server's).
-  function stageBusy(state) {
-    const sessions = state.opened && state.opened.sessions;
-    return !!(sessions && sessions.busy);
-  }
+  // LIN-4293: "is a run in progress?", one owner. It reads the server's facts (`live`, `status`, `sessions.busy`; the server
+  // derives them in lib/task-state.js sessionFactsOf) and adds no rule of its own. Three named views, each reading the reply it
+  // read before this change; the inputs are the point, so do not merge them:
+  //   busy(state)  the LAST COMPLETE reply (state.opened, stored only when complete): `sessions.busy`. Hides the step line.
+  //   liveNow(data) THIS reply: live or waiting on an answer. The mount and press reads. It never ends a run.
+  //   ended(data)  THIS reply: not liveNow and not `sessions.busy`. runPoll only. An incomplete reply is never an end.
+  // Not in this owner, on purpose: the offer's `sessions.action.kind` (listOfferIsStale, offerIsStale, the press guards). That is
+  // an offer reading (`busy`/`answer-first`/`offer`/`none`), not a run state, so it is read where the offer is read.
+  const InProgress = {
+    // LIN-3975 (review finding 1): busy is any session running, queued or waiting on an answer (`sessions.busy`).
+    busy(state) {
+      const sessions = state.opened && state.opened.sessions;
+      return !!(sessions && sessions.busy);
+    },
+    // Round-3 fix 1A: a WAITING session counts as in progress too: `live` only covers running/queued. Go must be suppressed while
+    // a run awaits an answer, or a second press starts a second orchestrator.
+    liveNow(data) {
+      return !!(data && (data.live === true || data.status === 'waiting'));
+    },
+    // LIN-4247: the one rule for "the run has ended". A COMPLETE reply that is neither liveNow nor sessions.busy (a queued,
+    // waiting or subtree-busy run). An incomplete reply is never an end: it carries no live or status. A reply without
+    // `sessions` (older fixtures and route mocks) is not busy.
+    ended(data) {
+      if (!data || data.incomplete) return false;
+      if (InProgress.liveNow(data)) return false;
+      return !(data.sessions && data.sessions.busy);
+    }
+  };
 
   // LIN-3833: the run control's vocabulary. The targets are the dispatch targets Home offers (`dash` is not
   // offered; LIN-3833 ruling, John 24 Oct); `local` only on localhost. Stop is offered only for a target a
@@ -898,7 +929,7 @@
       // the refusal notice survive every re-render and every stream settle.
       // status: 'ready' | 'starting' | 'started' | 'running'; headerHtml is the
       // task-page state endpoint's own sentence; notice is our plain-words line.
-      go: { status: 'ready', headerHtml: null, notice: null },
+      go: goState('ready'),
       // LIN-3833: the stored-data task state the state block shows (the state endpoint's body: header,
       // stage strip and session summary). Null until the mount read lands; a poll refreshes it.
       opened: null,
@@ -988,7 +1019,9 @@
     // place (typed text, focus, or an answer in flight): the check the live Waiting section uses (QuestionCards.keepsReaderPlace,
     // which cardHoldsInput decides). It is gated on the ruling key first, so this task can never keep another ruling's card.
     // Focus is the one part that cannot be read after the write: the write detaches the old card, which blurs it, so the
-    // caller captures it first (readerFocusIn) and it is put back here after the card is moved back (LIN-4246).
+    // caller captures it first (readerFocusIn) and it is put back here after the card is moved back (LIN-4246). `focus` is that
+    // capture: its `el` is the element that had focus before the write, and null when focus was not inside the card. LIN-4293:
+    // the keep rule takes that pre-write element, so "focus inside the card" is decided by QuestionCards.focusInCard alone.
     // An idle card is replaced, and bound again, on every repaint: a bound card never matches fresh server markup, so there is
     // no unchanged-markup keep here (LIN-4024's clause was dead, and LIN-4246 removed it). The LIN-4246 call-site tests pin this.
     function keepTypedQuestion(oldQuestion, focus) {
@@ -997,17 +1030,20 @@
       const QC = window.QuestionCards;
       const oldCard = oldQuestion && oldQuestion.querySelector ? oldQuestion.querySelector('[data-testid="session-question-card"]') : null;
       const freshCard = fresh.querySelector ? fresh.querySelector('[data-testid="session-question-card"]') : null;
-      const keepsPlace = !!(QC && typeof QC.keepsReaderPlace === 'function' && QC.keepsReaderPlace(oldCard, freshCard, !!focus));
+      const keepsPlace = !!(QC && typeof QC.keepsReaderPlace === 'function' && QC.keepsReaderPlace(oldCard, freshCard, focus ? focus.el : null));
       if (oldQuestion && keepsPlace) { fresh.replaceWith(oldQuestion); restoreReaderFocus(focus); return; }
       if (QC && typeof QC.initQuestionCards === 'function') QC.initQuestionCards(container);
     }
 
     // The reader's focus inside the question card, read before a repaint detaches it: the element, and its caret or selection
     // where it has one. Null when focus is elsewhere (or on the card's own box), so only a focused card is kept for focus.
+    // LIN-4293: "inside the card" is QuestionCards.focusInCard's rule, the same one the keep gate reads. With no QuestionCards
+    // there is no keep at all (keepTypedQuestion), so there is nothing to capture for.
     function readerFocusIn(oldQuestion) {
+      const QC = window.QuestionCards;
       const card = oldQuestion && oldQuestion.querySelector ? oldQuestion.querySelector('[data-testid="session-question-card"]') : null;
-      const active = typeof document !== 'undefined' ? document.activeElement : null;
-      if (!card || !active || active === card || typeof card.contains !== 'function' || !card.contains(active)) return null;
+      if (!QC || typeof QC.focusInCard !== 'function' || !QC.focusInCard(card)) return null;
+      const active = document.activeElement;
       return { el: active, start: active.selectionStart, end: active.selectionEnd };
     }
 
@@ -1113,16 +1149,17 @@
     function paintState() {
       if (destroyed) return;
       // Once the state shows a session running, the queued item from this page is no longer the thing to undo.
-      if (state.opened && state.opened.sessions && state.opened.sessions.running) state.run.item = null;
+      if (state.opened && state.opened.sessions && state.opened.sessions.running) clearRunItem('took-over');
       // LIN-4048: the task page's run slot follows the poll too, so a held run's Stop and runs-on go when it ends (Home
       // repaints it from here as well). paintRun is a no-op where there is no run control (Swipe).
       if (!caps.stateBlock) { paintRun(); return; }
       const oldQuestion = container.querySelector ? container.querySelector('[data-question-slot]') : null;
       const focus = readerFocusIn(oldQuestion); // before the slot write detaches the card (LIN-4246)
       const slot = container.querySelector && container.querySelector('[data-state-slot]');
-      if (slot) slot.outerHTML = renderOpenedState();
+      // LIN-4293: with no state slot the write is render()'s, and render() keeps the card itself. Keeping here as well would
+      // run keepTypedQuestion a second time (a second initQuestionCards) on the fallback path.
+      if (slot) { slot.outerHTML = renderOpenedState(); keepTypedQuestion(oldQuestion, focus); }
       else render();
-      keepTypedQuestion(oldQuestion, focus);
       // LIN-4010: Home's running box and "Last" line live in the run block, so it follows the state too (focus and
       // the Change panel's draft survive a run-block repaint, as they do for a preview).
       if (caps.runBox && runControlOn()) paintRun();
@@ -1290,7 +1327,7 @@
     function renderStepLine(step) {
       // LIN-3968: a running stage offers no step; the after-run line names what runs and what comes next. Before
       // the state read lands, the step is not known, so no step is offered either (not "Run to PR").
-      if (!state.run.step && (!state.opened || stageBusy(state) || takesNoRun(state, opts))) return '';
+      if (!state.run.step && (!state.opened || InProgress.busy(state) || takesNoRun(state, opts))) return '';
       // LIN-4103 beat 2: with no offered step, the line says the server's own words for a run to PR, never "the next step".
       let why = step ? 'the next step for this task' : 'no stage step is offered, so the run takes it to PR';
       if (!step && filledRungOf(opts) === 'next-step') why = 'Harbour picks the next step when you press Next step, then asks you to run it';
@@ -1690,7 +1727,7 @@
     // The refusal a stale press shows, in plain words, beside Go. Nothing is dispatched.
     function refuseStale() {
       state.run.recommend = null;
-      state.go = { status: 'ready', headerHtml: null, notice: 'A run started on this task while you were choosing, so nothing was started.', noticeLink: null, noticeLinkLabel: null };
+      state.go = goState('ready', { notice: 'A run started on this task while you were choosing, so nothing was started.' });
       paintRun();
     }
 
@@ -1746,8 +1783,8 @@
         });
         if (destroyed) return;
         state.run.recommend = null;
-        state.run.item = { id: result && result.item ? result.item.id : null, kind: target.kind || 'custom', label: 'Next step', target: c.target || 'cli' };
-        state.go = { status: 'started', headerHtml: null, notice: null, noticeLink: null, noticeLinkLabel: null };
+        state.run.item = runItemOf(result, target.kind || 'custom', 'Next step', c.target);
+        state.go = goState('started');
         paintRun();
         startPoll();
       } catch (error) {
@@ -1800,8 +1837,8 @@
           on401: false
         });
         if (destroyed) return;
-        state.run.item = { id: result && result.item ? result.item.id : null, kind: step.kind, label: step.label, target: c.target || 'cli' };
-        state.go = { status: 'started', headerHtml: null, notice: null, noticeLink: null, noticeLinkLabel: null };
+        state.run.item = runItemOf(result, step.kind, step.label, c.target);
+        state.go = goState('started');
         paintRun();
         startPoll();
       } catch (error) {
@@ -1972,7 +2009,7 @@
           const id = state.run.item && state.run.item.id;
           if (!id) return true;
           window.api(`/workspace/${encodeURIComponent(opts.urlKey)}/api/dispatch/${encodeURIComponent(id)}`, { method: 'DELETE', on401: false })
-            .then(() => { state.run.item = null; paintRun(); })
+            .then(() => { clearRunItem('undone'); paintRun(); })
             .catch((err) => { if (typeof window.toast === 'function') window.toast(err.message, { type: 'error' }); });
           return true;
         }
@@ -2011,7 +2048,7 @@
         headers: { 'Content-Type': 'application/json' },
         on401: false
       })
-        .then(() => { state.go = { status: 'running', headerHtml: null, notice: null, noticeLink: null, noticeLinkLabel: null }; startPoll(); })
+        .then(() => { state.go = goState('running'); startPoll(); })
         .catch((err) => { if (typeof window.toast === 'function') window.toast(err.message, { type: 'error' }); });
     }
 
@@ -2321,30 +2358,24 @@
         .catch(() => null);
     }
 
-    // Round-3 fix 1A: a WAITING session counts as in progress too — `live` only
-    // covers running/queued. Go must be suppressed while a run awaits an answer,
-    // or a second press starts a second orchestrator.
-    function goInProgress(data) {
-      return !!(data && (data.live === true || data.status === 'waiting'));
+    // LIN-4293: the run item (what Home's run box and Undo act on), built the same way for every set: the dispatch result's
+    // item id, the kind and label the press chose, and the target the viewer dispatched to (`cli` when none was chosen).
+    function runItemOf(result, kind, label, dispatchTarget) {
+      return { id: result && result.item ? result.item.id : null, kind, label, target: dispatchTarget || 'cli' };
     }
-
-    // LIN-4247: the one rule for "the run has ended", read by runPoll only. A COMPLETE reply that is not in progress by
-    // either answer: goInProgress (live or waiting now) and the server's `sessions.busy` (a queued, waiting or subtree-busy
-    // run). An incomplete reply is never an end: it carries no live or status, and says only that the state is not known
-    // yet. A reply without `sessions` (older fixtures and route mocks) is not busy. The mount and press reads keep
-    // goInProgress alone: they only decide whether a run is live now, so they never end one.
-    function runEnded(data) {
-      if (!data || data.incomplete) return false;
-      if (goInProgress(data)) return false;
-      return !(data.sessions && data.sessions.busy);
+    // LIN-4293: the one clear. Three reasons, named where each happens: 'took-over' (a session is running now, so this page's queued
+    // item is no longer the thing to undo), 'undone' (the viewer undid it), 'ended' (the run ended, endRun). The reason is for the
+    // reader: a fourth clear has to say why. The 'took-over' clear keeps its condition at its call site (paintState).
+    function clearRunItem(why) {
+      state.run.item = null;
     }
 
     // LIN-4247: the run has ended. Go goes back to ready, and renderGo draws it from the server's offer (nothing where that
     // offer is `none`, a finished task). run.item clears too, or Home's run box stays active on it. The three presses (Go,
     // Next step, run-step) all end in runPoll, so this one reset covers them; Swipe has no run block, so paintRun is a no-op there.
     function endRun() {
-      state.go = { status: 'ready', headerHtml: null, notice: null, noticeLink: null, noticeLinkLabel: null };
-      state.run.item = null;
+      state.go = goState('ready');
+      clearRunItem('ended');
       paintRun();
       paintGo();
     }
@@ -2352,7 +2383,7 @@
     // Paint the started/running line from the state endpoint and keep reading
     // while the run is in progress.
     function setGoRunning(headerHtml) {
-      state.go = { status: 'running', headerHtml: headerHtml || null, notice: null, noticeLink: null, noticeLinkLabel: null };
+      state.go = goState('running', { headerHtml });
       paintGo();
       startPoll();
     }
@@ -2368,7 +2399,7 @@
     }
 
     // One poll beat. A failed read backs off x2 to 60s; a successful read paints
-    // the task page's own sentence and keeps going until runEnded (LIN-4247). An
+    // the task page's own sentence and keeps going until InProgress.ended (LIN-4247). An
     // incomplete reply keeps going too: it is not an end.
     function runPoll() {
       pollTimer = null;
@@ -2391,9 +2422,9 @@
         paintState();
         // LIN-4247: the ended reply's sessions.action is already in state.opened (paintState above), so endRun's repaint
         // draws the server's offer. The header write below must not run for it: it would set Go back to running.
-        if (runEnded(data)) { endRun(); return; }
+        if (InProgress.ended(data)) { endRun(); return; }
         if (data.headerHtml) {
-          state.go = { status: 'running', headerHtml: data.headerHtml, notice: null, noticeLink: null, noticeLinkLabel: null };
+          state.go = goState('running', { headerHtml: data.headerHtml });
           paintGo();
         }
         schedulePoll(10000);
@@ -2418,14 +2449,11 @@
       // all are empty the notice is just the link. paintGo escapes the text.
       const body = (error && error.body) || {};
       const reason = body.error || body.message || (error && error.message) || '';
-      const g = {
-        status: 'ready',
-        headerHtml: null,
+      state.go = goState('ready', {
         notice: typeof reason === 'string' && reason ? reason : null,
         noticeLink: runnerSetupHref(opts),
         noticeLinkLabel: 'run on my machine \u203A'
-      };
-      state.go = g;
+      });
       paintGo();
     }
 
@@ -2433,7 +2461,7 @@
     // then show that it started. Auto-ignores a second press.
     async function startRun(boundary = 'pr') {
       if (!state.go || state.go.status !== 'ready') return;
-      state.go = { status: 'starting', headerHtml: null, notice: null, noticeLink: null, noticeLinkLabel: null };
+      state.go = goState('starting');
       paintGo();
       recordTaskMode({ rung: 'run-task', ready: true, needs: null, act: 'press' });
 
@@ -2444,7 +2472,7 @@
       // best-effort (null) and proceeds; the server's duplicate guard remains.
       const data = await readTaskState();
       if (destroyed) return;
-      if (goInProgress(data)) { setGoRunning(data.headerHtml); return; }
+      if (InProgress.liveNow(data)) { setGoRunning(data.headerHtml); return; }
       // LIN-4104 D3: a run that started since the render (a subtask now busy, say) makes the offer no longer an offer: stop here.
       if (data && !data.incomplete && data.sessions && (data.sessions.action ? data.sessions.action.kind : null) !== 'offer') {
         refuseStale();
@@ -2484,18 +2512,16 @@
           variant: 'standard',
           surface: opts.surface
         });
-        if (runControlOn()) state.run.item = { id: result && result.item ? result.item.id : null, kind: 'autopilot', label: boundary === 'pr' ? 'Run to PR' : 'Run to Done', target: c.target || 'cli' };
+        if (runControlOn()) state.run.item = runItemOf(result, 'autopilot', boundary === 'pr' ? 'Run to PR' : 'Run to Done', c.target);
         if (destroyed) return;
         // The 201's no-runner warning (routes/dispatch.js) is our own plain-words
         // line, never the server's string (FC call bf44d014).
         const noRunner = !!(result && result.warning);
-        state.go = {
-          status: 'started',
-          headerHtml: null,
+        state.go = goState('started', {
           notice: noRunner ? 'Nothing is listening for this run yet.' : null,
           noticeLink: noRunner ? runnerSetupHref(opts) : null,
           noticeLinkLabel: noRunner ? 'run on my machine \u203A' : null
-        };
+        });
         paintGo();
         startPoll();
       } catch (error) {
@@ -2885,7 +2911,7 @@
     if (goReady(opts) && mountRead) {
       mountRead.then((data) => {
         if (destroyed) return;
-        if (!goInProgress(data)) return;
+        if (!InProgress.liveNow(data)) return;
         if (!state.go || state.go.status !== 'ready') return; // a press already won
         setGoRunning(data.headerHtml);
       });
