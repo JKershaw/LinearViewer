@@ -36,121 +36,65 @@
  *    re-enable.
  *  - persistent dead credential → the named LINEAR_AUTH message, the row
  *    is restored (buttons re-enabled), and the comment is never recorded.
+ *
+ * The two scripts run through `loadWorld` (tests/unit/helpers/client-world.js)
+ * over the shared fake DOM (LIN-4283): the ruling row is parsed into the
+ * world's document, and the buttons and feedback are read back from it.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import express from 'express';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
-import { withHarnessModels } from '../fixtures/harness-models.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const COMMON_JS_SRC = readFileSync(join(__dirname, '../../public/common.js'), 'utf8');
-const OBSERVATION_JS_SRC = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
-
-// ─── Minimal DOM shim (same shape as tests/unit/observation-ruling-delivery.test.js) ───
-
-class FakeClassList {
-  constructor(el) { this.el = el; this._set = new Set(); }
-  add(...names) { names.forEach(n => this._set.add(n)); this._sync(); }
-  remove(...names) { names.forEach(n => this._set.delete(n)); this._sync(); }
-  contains(name) { return this._set.has(name); }
-  toggle(name, force) {
-    const on = force === undefined ? !this._set.has(name) : force;
-    if (on) this._set.add(name); else this._set.delete(name);
-    this._sync();
-    return on;
-  }
-  _sync() { this.el._className = Array.from(this._set).join(' '); }
-}
-
-class FakeElement {
-  constructor(tagName) {
-    this.tagName = tagName;
-    this._className = '';
-    this._textContent = '';
-    this.children = [];
-    this.dataset = {};
-    this.listeners = {};
-    this.disabled = false;
-    this.type = undefined;
-    this.classList = new FakeClassList(this);
-    this.attrs = {};
-    this.parentNode = null;
-  }
-  get className() { return this._className; }
-  set className(v) { this._className = v; this.classList._set = new Set(String(v).split(/\s+/).filter(Boolean)); }
-  get textContent() { return this._textContent; }
-  set textContent(v) { this._textContent = v; this.children = []; }
-  setAttribute(name, value) { this.attrs[name] = String(value); }
-  getAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attrs, name) ? this.attrs[name] : null; }
-  appendChild(child) { this.children.push(child); child.parentNode = this; return child; }
-  addEventListener(type, handler) { (this.listeners[type] = this.listeners[type] || []).push(handler); }
-  click() { (this.listeners.click || []).forEach(fn => fn({ type: 'click' })); }
-  _matches(el, selector) {
-    return selector.split(',').some((part) => {
-      const trimmed = part.trim();
-      return trimmed.startsWith('.') && el.classList.contains(trimmed.slice(1));
-    });
-  }
-  querySelectorAll(selector) {
-    const matches = [];
-    const walk = (node) => { for (const child of node.children) { if (this._matches(child, selector)) matches.push(child); walk(child); } };
-    walk(this);
-    return matches;
-  }
-  querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
-}
-
-function makeLi() {
-  const li = new FakeElement('li');
-  const approve = new FakeElement('button');
-  approve.className = 'chat-option-btn';
-  approve.textContent = 'Approve';
-  li.appendChild(approve);
-  const feedback = new FakeElement('p');
-  feedback.className = 'obs-ruling-feedback';
-  li.appendChild(feedback);
-  return li;
-}
+import { harnessModelsBlock } from '../../lib/model-routing-harnesses.js';
+import { loadWorld } from './helpers/client-world.js';
 
 // ─── Sandbox: the REAL common.js + the REAL observation.js, sharing one window ───
 
+/**
+ * `origin` is the started server's origin. `window.ReplyDelivery.postComment` builds `/workspace/...` paths, and the
+ * world's `fetch` resolves them against it, so the call is a real round-trip. `__HARNESS_MODELS__` is the block a rendered
+ * page carries (common.js reads it at load; loadWorld does not apply `withHarnessModels`).
+ */
 function makeSandbox(origin) {
-  const sandbox = {
-    module: { exports: {} },
-    confirm: () => true,
+  return loadWorld({
     window: {
-      _listeners: {},
-      addEventListener(type, handler) { (this._listeners[type] = this._listeners[type] || []).push(handler); },
+      __HARNESS_MODELS__: harnessModelsBlock(),
+      addEventListener() {},
       matchMedia: () => ({ matches: false }),
       location: { origin },
       ChatUI: { appendOptions() {}, resolveCaption: () => 'no action available yet' },
     },
-    document: {
-      createElement: (tag) => new FakeElement(tag),
-      addEventListener() {},
-      getElementById: () => null,
+    scripts: ['common.js', 'observation.js'],
+    globals: {
+      module: { exports: {} },
+      confirm: () => true,
+      localStorage: { getItem: () => null, setItem() {} },
+      escapeHtml: (str) => (str === undefined || str === null ? '' : String(str)),
+      relativeTime: (ts) => (ts ? `stub-relative-time(${ts})` : ''),
+      console: { warn() {}, error() {}, log() {} },
+      // Relative-URL fetch, real network — window.ReplyDelivery.postComment
+      // builds `/workspace/...` paths, and native fetch needs an absolute URL.
+      fetch(url, opts) {
+        const absolute = typeof url === 'string' && url.startsWith('/') ? origin + url : url;
+        return fetch(absolute, opts);
+      },
     },
-    localStorage: { getItem: () => null, setItem() {} },
-    escapeHtml: (str) => (str === undefined || str === null ? '' : String(str)),
-    relativeTime: (ts) => (ts ? `stub-relative-time(${ts})` : ''),
-    console: { warn() {}, error() {}, log() {} },
-    // Relative-URL fetch, real network — window.ReplyDelivery.postComment
-    // builds `/workspace/...` paths, and native fetch needs an absolute URL.
-    fetch(url, opts) {
-      const absolute = typeof url === 'string' && url.startsWith('/') ? origin + url : url;
-      return fetch(absolute, opts);
-    },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(withHarnessModels(COMMON_JS_SRC), sandbox, { filename: 'common.js' });
-  vm.runInContext(OBSERVATION_JS_SRC, sandbox, { filename: 'observation.js' });
-  return sandbox;
+  });
+}
+
+/**
+ * A ruling row drawn into the world's document: the option button ChatUI draws (`chat-option chat-option-btn`, chat.js) and
+ * the feedback line `renderRulingRow` ends every row with. `rulingRowControls` reads these nodes, so the re-enable check
+ * below reads real `disabled` state off real buttons.
+ */
+function drawRow(world) {
+  const container = world.makeContainer();
+  container.innerHTML = '<li class="obs-ruling" data-testid="obs-ruling-row">'
+    + '<button type="button" class="chat-option chat-option-btn">Approve</button>'
+    + '<p class="obs-ruling-feedback" data-testid="obs-ruling-feedback"></p>'
+    + '</li>';
+  return container.querySelector('li.obs-ruling');
 }
 
 // ─── Credential-keyed fake Linear provider + owner-credential store ───────
@@ -241,9 +185,9 @@ describe('LIN-2933 cross-seam witness: real deliverRulingReply → real window.R
     const server = await startApp({ provider, ownerCredentialStore, accessToken: REJECTED_TOKEN });
     try {
       const { port } = server.address();
-      const sandbox = makeSandbox(`http://127.0.0.1:${port}`);
-      const { deliverRulingReply } = sandbox.module.exports;
-      const li = makeLi();
+      const world = makeSandbox(`http://127.0.0.1:${port}`);
+      const { deliverRulingReply } = world.sandbox.module.exports;
+      const li = drawRow(world);
 
       // Distinct prompt text from the other case below — the route's dedupe
       // cache is keyed on (urlKey, issueId, body, generation) and is a
@@ -255,6 +199,8 @@ describe('LIN-2933 cross-seam witness: real deliverRulingReply → real window.R
       const feedback = li.querySelector('.obs-ruling-feedback');
       assert.match(feedback.textContent, /recorded ✓/, 'the press lands once the server has adopted a different credential');
       const buttons = li.querySelectorAll('.chat-option-btn');
+      // Non-vacuity: the row must carry its buttons, or the re-enable check below asserts nothing.
+      assert.ok(buttons.length > 0, 'the row has its option buttons drawn');
       buttons.forEach((b) => assert.equal(b.disabled, false, 'buttons re-enable once the ruling settles'));
       assert.deepStrictEqual(calls.createComment, [REJECTED_TOKEN, FRESH_TOKEN], 'the original attempt used the dead session token; the recovered retry used the adopted one');
     } finally {
@@ -268,9 +214,9 @@ describe('LIN-2933 cross-seam witness: real deliverRulingReply → real window.R
     const server = await startApp({ provider, ownerCredentialStore, accessToken: REJECTED_TOKEN });
     try {
       const { port } = server.address();
-      const sandbox = makeSandbox(`http://127.0.0.1:${port}`);
-      const { deliverRulingReply } = sandbox.module.exports;
-      const li = makeLi();
+      const world = makeSandbox(`http://127.0.0.1:${port}`);
+      const { deliverRulingReply } = world.sandbox.module.exports;
+      const li = drawRow(world);
 
       await deliverRulingReply(makeRow(), 'Approve — persistent-failure case', li);
 
@@ -279,6 +225,7 @@ describe('LIN-2933 cross-seam witness: real deliverRulingReply → real window.R
       assert.match(feedback.textContent, /Sign in again and press once more/);
       assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), true);
       const buttons = li.querySelectorAll('.chat-option-btn');
+      assert.ok(buttons.length > 0, 'the row has its option buttons drawn');
       buttons.forEach((b) => assert.equal(b.disabled, false, 'the row is restored — never left stuck disabled'));
       assert.strictEqual(calls.createComment.length, 1, 'no comment is ever recorded for a press that never succeeded');
     } finally {
