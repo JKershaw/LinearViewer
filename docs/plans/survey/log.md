@@ -2051,3 +2051,8 @@ Scoped: freeze a dated cost table per leg; split the cost into floor, work, keep
   | LIN-4252 | tidy first, left its copies | mixed, mixed |
   | LIN-4246 | follow-on on that tidy | (building) |
   | LIN-4247 | control, tidy folded in | mixed, mixed |
+
+### 12:10 UTC: LIN-4257's research finds our own after-questions inside the cost
+- **All 45 implementation dispatches in the window were routed to Haiku.** `/cost` labels 21 of them Opus, because the label comes from the last session in the chain. In 17 of those 21, the last session is **the Survey's own after-question follow-up** (Opus, read-only, sent into the builder's session after merge), billed inside the implementation cost. So the "model confound" the Surveys feared is mostly our observer, and today's per-ticket implementation costs include the after-questions.
+- `/cost` already computes per-model figures and tokens, and leaves them out of its response. The four-way split exists as `bucketOf` (`lib/wall-clock-summary.js`). `lineage.py` counts no lines; the 229/45 counter is `coherence-census.mjs`, which knows only LinearViewer.
+- **Ruling `lin4257-cost-wire-before-paper`:** the researcher recommends paper first, `/cost` change later. **Proposed instead: `wire-first`,** for this morning's reason. The paper binds on `/cost`, so the small fix is done first as its own task, and the paper lands on exact numbers: one extra floor and about an hour. Waiting on John.
