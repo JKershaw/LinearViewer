@@ -5,7 +5,8 @@
  *   - the `task` surface (client, vm): the run control with no state block, no repeated running sentence, no
  *     "watch on the task page" link, and the copy-first view with its own "You copied …" line;
  *   - the page (server render): the run control is the owner's only; a member and a guest read the next-step line
- *     in its slot; a finished task has no control; the tracker's state sits outside the repainted status mount;
+ *     in its slot; a finished task has no control unless a run is held (LIN-4048); the tracker's state sits outside the
+ *     repainted status mount;
  *   - the run control's classes are styled by a sheet the task page links, or are hooks (not styled);
  *   - the client mounts the run control before any Markdown render (source order);
  *   - the surface is accepted by the task-mode path and still refused when unknown.
@@ -340,6 +341,31 @@ describe('LIN-3975 — the run control is the owner\'s; everyone else reads the 
     const html = page(model({ finished: true, nextStep: null, status: 'done' }), 'owner', PROMPT_OPTS);
     assert.doesNotMatch(html, /task-page-run-control/);
     assert.match(html, /Nothing comes next: this task is finished\./);
+  });
+
+  // LIN-4048: a finished task mounts the control only while a run is held (Stop / Undo), never on a plain finished page.
+  test('LIN-4048: a finished task with a run held mounts the owner\'s run control, so Stop is reachable', () => {
+    const html = page(model({ finished: true, live: true, nextStep: null, status: 'running' }), 'owner', PROMPT_OPTS);
+    assert.match(html, /data-testid="task-page-run-control"/);
+    assert.doesNotMatch(html, /Nothing comes next: this task is finished\./, 'the mounted control replaces the finished line');
+  });
+
+  test('LIN-4048: a finished task with nothing held mounts no control and keeps the finished line (the split of the test above)', () => {
+    const html = page(model({ finished: true, live: false, nextStep: null, status: 'done' }), 'owner', PROMPT_OPTS);
+    assert.doesNotMatch(html, /task-page-run-control/);
+    assert.match(html, /Nothing comes next: this task is finished\./);
+  });
+
+  // LIN-4048: the next-step line reads the run first. A finished task with a run held says a step is running, not finished.
+  test('LIN-4048: a finished task whose gathered state is running reads "a step is running" to a member, not "finished"', () => {
+    const line = renderNextLine(model({ finished: true, live: true }), { taskState: { state: 'running' } });
+    assert.match(line, /A step is running, so nothing else is offered yet\./);
+    assert.doesNotMatch(line, /this task is finished/);
+  });
+
+  test('LIN-4048: a finished task with nothing running still reads "finished" (the order change is only for a running state)', () => {
+    const line = renderNextLine(model({ finished: true }), { taskState: { state: 'done' } });
+    assert.match(line, /Nothing comes next: this task is finished\./);
   });
 
   // LIN-4106 (beat 2): the "Tracker:" line and the "Harbour:" label are gone. One pill and one sentence in the status
