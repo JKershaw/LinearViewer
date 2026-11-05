@@ -21,7 +21,9 @@
  * `brief-recap-ai-not-configured-contract.test.js`, `scan-retire-ui.test.js` and `lin-4016-browser-follows-server.test.js`
  * (LIN-4269), `task-chat-flight-companion-sentinel-mask.test.js` and `chart-helpers.test.js` (LIN-4284), and
  * `observation-card-order.test.js`, `observation-scope.test.js`, `observation-waiting-host.test.js` and
- * `observation-waiting-block.test.js` (LIN-4281) through `loadWorld`. `client-world.test.js` (LIN-4280) tests `loadWorld`'s `run`.
+ * `observation-waiting-block.test.js` (LIN-4281) and `observation-scan-due.test.js` and
+ * `lin-2933-cross-seam-witness.test.js` (LIN-4283), through `loadWorld`.
+ * `client-world.test.js` (LIN-4280) tests `loadWorld`'s `run`.
  * A suite moved onto this fake leaves `HAND_WRITTEN_FAKE_DOM_FILES` and joins this list in the same PR.
  *
  * Modelled:
