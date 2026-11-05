@@ -16,7 +16,7 @@ import { USUAL_STAGES, SPINE } from '../../lib/run-view.js';
 import { buildRowStates, buildTaskPageModel, nextStepOf, waitingForOf, sessionSummaryOf } from '../../lib/task-page-loader.js';
 import { buildInProgressCountParts } from '../../lib/task-board-view.js';
 import { renderHomeStatus } from '../../lib/render-task-page.js';
-import { loadWorld } from './helpers/prompt-section-world.js';
+import { loadWorld } from './helpers/client-world.js';
 
 // LIN-4016: Home's pill reads the task's decided state. This helper reads the task's OWN facts; it equals the gather that
 // `/state` sends (lib/home-row-states.js) only for a leaf, which is every fixture that uses it. A container's state is
@@ -330,7 +330,7 @@ function loadClient({ stateBody = null, previewBody = null, presetsBody = [], pa
     isPinnedToBottom: () => false,
     toast: () => {},
   };
-  // The shared client world (tests/unit/helpers/prompt-section-world.js): the fake DOM, the vm, and the container's click and
+  // The shared client world (tests/unit/helpers/client-world.js): the fake DOM, the vm, and the container's click and
   // key shims. This suite's own layer is the `window` stubs above.
   const world = loadWorld({ window, scripts: ['prompt-section.js'] });
   return { PromptSection: world.PromptSection, calls, makeContainer: world.makeContainer };
