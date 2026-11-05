@@ -180,7 +180,7 @@ const PRESENCE_ALLOW = {
   // Unit seams: close-out-client.test.js:150 loads this module with a document that has no querySelector or querySelectorAll.
   // Kept until that suite moves to the shared fake (LIN-4254); the check still sees each line.
   'close-out.js: !d || typeof d.querySelector !== \'function\'': 'close-out-client.test.js:150 loads the module with a document that has no querySelector (LIN-4254 moves that suite)',
-  'close-out.js: main && typeof main.getAttribute === \'function\'': 'the close-out seam kept with the other close-out.js typeof checks: pageAlreadyDone reads a document that close-out-client.test.js hand-builds (LIN-4254 moves that suite)',
+  'close-out.js: main && typeof main.getAttribute === \'function\'': "kept by LIN-4304's scope call beside the :159/:175 seams, though not itself needed: close-out-client.test.js's <main> stubs define getAttribute (LIN-4312 removes it)",
   'close-out.js: !d || typeof d.querySelectorAll !== \'function\'': 'close-out-client.test.js:150 loads the module with a document that has no querySelectorAll (LIN-4254 moves that suite)',
 };
 
