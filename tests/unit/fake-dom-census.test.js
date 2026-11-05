@@ -82,7 +82,6 @@ const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/unit/live-console-client-facts.test.js',
   'tests/unit/observation-ruling-delivery.test.js',
   'tests/unit/observation-scan-due.test.js',
-  'tests/unit/observation-waiting-block.test.js',
   'tests/unit/prompt-section-p0.test.js',
   'tests/unit/prompt-section-run-quota.test.js',
   'tests/unit/prompt-section-runner-link.test.js',
