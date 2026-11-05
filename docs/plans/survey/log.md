@@ -2365,3 +2365,8 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - the same idiom on `.focus` and `dispatchEvent` (notebook);
   - one entry its own reason calls unneeded.
 - **A pattern in the residues:** each tidy-after's leftovers are smaller and more test-side than its parent's. From second copies of production rules, to a shared test walker and stale reasons in an allow-list. The stack is moving.
+
+### 21:35 UTC: LIN-4254 piece 0 merged (LIN-4306, `165c61e7`); its probe resized the ticket favourably
+- **The census now computes the fake's consumers from imports**, to a fixpoint through helpers. It found two consumers the hand list missed (`lin-4293-tidy-after-repaint`, `live-console-client-facts`). The header names only its pointer, and a paragraph hand-listing a consumer goes red. The hand-kept list, which drifted in every blind read since noon, is gone.
+- **The probe: all three auto-vivifiers move,** on real markup from the server renderers, with no stop hit. Instead it found four **loader** gaps: `loadWorld`'s `window` is a copy, not the global; delegated clicks on `document` don't bubble; Live Console's two stubs; a private lane template.
+- **My call, written onto LIN-4307 (piece 1):** fix each gap once, in `client-world.js`, in piece 1, so pieces 2–6 inherit it. The probe suggested "bridge with `Object.assign(globalThis, window)`" per suite, which would put a copy in every moved file. No bubbling in the fake; export the lane template rather than copying it. If a loader fix changes an existing `loadWorld` suite, stop and say so.
