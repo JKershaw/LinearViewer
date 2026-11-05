@@ -49,7 +49,6 @@ const EXCLUDED = new Set(['tests/unit/helpers/fake-dom.js', SELF]);
  * never added to get past the census.
  */
 const HAND_WRITTEN_FAKE_DOM_FILES = [
-  'tests/fixtures/observation-dom-shim.js',
   'tests/unit/brief-recap-ai-not-configured-contract.test.js',
   'tests/unit/brief-recap-autogenerate.test.js',
   'tests/unit/chart-helpers.test.js',
