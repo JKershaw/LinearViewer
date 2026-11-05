@@ -1,0 +1,30 @@
+# Orphan references to files deleted in the window — run 5, LIN-4300
+Deleted (git diff --name-status 76fc3e91..af55cb73 | grep ^D): lib/task-cost.js, lib/next-run.js, routes/next-run.js, lib/render-next-run.js, lib/plan-fee-config.js, public/next-run.js, public/next-run.css
+
+$ grep -rnE "task-cost\.js|buildTaskCost|plan-fee-config|next-run\.js|render-next-run|routes/next-run|lib/next-run" lib routes public server.js docs/architecture CLAUDE.md
+lib/dispatch-lineage.js:76: * task-cost numerator (`lib/terminal-marked-task-cost.js`) — not written
+lib/wall-clock-summary.js:99:  // `lib/task-cost.js`'s `buildTaskCost`, which merges a whole lineage's
+lib/kpi-stats.js:44:import { computeTerminalMarkedTaskCost } from './terminal-marked-task-cost.js';
+lib/model-routing-spend.js:5: * Both readers keep the rule the rest of the app keeps (lib/task-cost.js, LIN-1086): a run whose
+public/common.js:1512:// public/dispatch.js, app.js, prompt-section.js and next-run.js. Mirrors the
+public/common.js:1887: * next-run.js) with one reusable function that composes the existing shared
+public/ship-journey.js:177:  // (house pattern: public/live-console.js:87-89, public/next-run.js:239-280)
+public/ship-journey.js:635:  // next-run.js's delegated direction-chip listener) so the binding survives
+docs/architecture/source-map.md:141:  cost-read.js         The one cost read (LIN-4177; async since LIN-4226): `lineageRecords` (per lineage: anchor, true issue, true base kind, last activity, fetched members, one fold, 
+docs/architecture/source-map.md:153:  terminal-marked-task-cost.js  Terminal-marked task cost (LIN-1957, Session 1 of LIN-1625): `computeTerminalMarkedTaskCost` publishes `pricedTicketCount` and `pricedTicketCostUsd`, th
+public/ship.js:1272:  // already tracks; see next-run.js / this file's own mode/heading controls).
+
+$ grep -n "plan-fee-config" docs/plan-allowance-design.md
+18:Relation to `lib/plan-fee-config.js`: unrelated. That file reads `PLAN_FEE_MONTHLY_USD`, a cash figure for a KPI. They share the word "plan" and no import. The seam holds allowances; a paid plan's 
+
+SD: git grep -nE "task-cost|plan-fee-config|next-run" -- "*.js" "*.md" → 4 hits
+  SD hits: hook.js:383 and two test lines name terminal-marked-task-cost.js (still exists — not an orphan);
+  docs/full-system-test-plan.md:59 "(the recommend-and-dispatch / next-run launch path)" names the deleted Next-run page as a launch path (Low).
+
+Verdicts (Harbour):
+- ORPHAN, rationale pointer to a deleted file (F7 class recurring):
+  - public/ship-journey.js:177 ("house pattern: … public/next-run.js:239-280"), :635; public/ship.js:1272; public/common.js:1512, :1887 → public/next-run.js (deleted by LIN-3912).
+  - lib/model-routing-spend.js:5 → lib/task-cost.js as keeper of the UNPRICED/NO-TELEMETRY rule (deleted by LIN-4129/4179; the rule now lives in lib/cost-read.js).
+  - lib/wall-clock-summary.js:99 → "do not conflate with lib/task-cost.js's buildTaskCost": the contrast now points at nothing.
+  - docs/plan-allowance-design.md:18 → "unrelated to lib/plan-fee-config.js", a file that no longer exists (Low).
+- NOT orphans: lib/dispatch-lineage.js:76, lib/kpi-stats.js:44, source-map.md:141,153 (terminal-marked-task-cost.js exists).

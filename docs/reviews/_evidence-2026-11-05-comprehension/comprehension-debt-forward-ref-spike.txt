@@ -1,0 +1,27 @@
+# Forward-reference spike — run 5, LIN-4300
+Question: would a cheap mechanical check have caught the stale claims born in this window? It greps comments that promise future work
+by a named ticket, then reads each ticket's state through the workspace proxy. A forward clause naming a Done ticket is a candidate.
+Pattern (LV lib routes public server.js; SD *.js minus test/):
+  (until|once|so|as|when|before|after) (LIN-N) (lands|land|retires|ships|can|will|merges|is done|deploys|wires|admits)
+  | stays for (LIN-N) | (LIN-N) (will|retires them|is expected to) | until (LIN-N)
+Output (state | ticket | site | text):
+Done       LIN-4203  lib/cost-read.js:124  // never reaches it (the cutover, lib/cost-read.js). Delete 30 days after LIN-4203 deploys (not before 2026-12-04).
+Backlog    LIN-4217  lib/db-indexes.js:686  reason: 'kept until LIN-4217 retires it: the lineage lookup LIN-4198 first ran; the read now runs on {urlKey, itemId} (LIN-4212)'
+Done       LIN-3977  lib/live-console.js:650  * (isLoopActive). They are ranked here so LIN-3977 can admit them without
+Done       LIN-3855  lib/model-routing.js:55  * precompute now resolve through `jobModelResolver`. The shape stays for LIN-3855.
+Done       LIN-3855  lib/model-routing.js:62  * legacy form copies in routes/settings-model.js are left alone, as LIN-3855 retires them.
+Todo       LIN-2139  lib/observer-shadow-log.js:32  *    LIN-2139 will eventually make. `[blocked]` carries no payload beyond
+Todo       LIN-1522  lib/owner-credential-store.js:70  * chose. `updatedAt` is carried so LIN-1522 can add idle-based retention as a
+Done       LIN-4203  lib/row-usage.js:26  * never reaches it (the cutover, lib/cost-read.js). Delete 30 days after LIN-4203 deploys (not before 2026-12-04).
+Done       LIN-4203  lib/row-usage.js:91  * never reaches it (the cutover, lib/cost-read.js). Delete 30 days after LIN-4203 deploys (not before 2026-12-04). */
+Done       LIN-4015  public/style.css:4161  /* Connect / link actions: a quiet brand tone (LIN-4009). The name stays until LIN-4015 retires the tone names. */
+Done       LIN-1285  SD:harnesses.js  31:// stance from LIN-393's research — the mechanism turned out to be "not at all," so LIN-1285 wires it.)
+
+Verdicts:
+- STALE (4): lib/live-console.js:650 (LIN-3977 landed, :652-654 says so); lib/model-routing.js:55 and :62 (LIN-3855 landed);
+  public/style.css:4161 (LIN-4015 Done, `.btn--blue` still named).
+- Valid (3): lib/cost-read.js:124, lib/row-usage.js:26, :91 — "Delete 30 days after LIN-4203 deploys (not before 2026-12-04)": date-bound, Done is expected.
+- Valid (3): LIN-4217 Backlog, LIN-2139 Todo, LIN-1522 Todo — open tickets.
+- History phrasing (1): SD harnesses.js:31 ("so LIN-1285 wires it") describes the past.
+Result: 4 of 5 non-date-bound Done hits are real stale claims, from 11 hits in total. Recall is low: it cannot see "Nothing reads this
+collection yet" or "the old forms still read", which name no ticket. A useful, cheap partial guard; not a proof of completeness.

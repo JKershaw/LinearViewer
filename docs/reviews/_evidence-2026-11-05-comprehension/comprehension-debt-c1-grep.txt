@@ -1,0 +1,345 @@
+# Widened C1 grep (landing-status claims) — run 5, LIN-4300
+
+Pattern (git grep -E; no \b, which git's ERE on macOS does not honour — an earlier \b version silently missed hits):
+  INERT|[^a-z]inert[^a-z]|no production caller|no (live |real )?caller|nothing calls|nothing (yet )?(reads|consumes|issues)|read by nothing|not (yet )?wired|unwired|for now[^a-z]|until LIN-[0-9]+ (lands|ships|merges)|S1 only|PR ?[0-9] will|later beat|beat [0-9] (adds|will)|lands inert|not yet (called|used|consumed)
+
+Every hit has a verdict. [STATUS] hits were checked against callers by hand (evidence in the verdict); [other] hits were read and classified as design vocabulary
+(a flag/bound/control inert by design, a fail-closed unwired seam, a test seam, UI copy) — none of those asserts that live code is unused.
+The lexical bound misses claims worded differently ("Nothing reads this collection yet", "the old forms … still read", "can admit them", "the shape stays for") —
+those were found by reading (see the report's R1 table) and by the forward-reference spike (comprehension-debt-forward-ref-spike.out.txt).
+
+## LinearViewer @ af55cb73 (lib routes public server.js)
+
+- `lib/chat-tools.js:34` [STATUS] //     cache store was not wired into the catalog, the tool fails cleanly as
+    → Design (failure mode description).
+- `lib/ci-wake-sweep.js:208` [other ] if (!baseUrl) return; // inert; server.js logged why once at registration
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/connection-lifecycle.js:50` [other ] * an unfreed record is inert (nothing references its connectionId).
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/db-indexes.js:415` [STATUS] // retention policy (explicitly a follow-up, not wired here). Plain, non-TTL.
+    → TRUE (design: retention is a follow-up, not wired).
+- `lib/dispatch-entrance.js:212` [other ] // reject cascade:true without it rather than storing an inert flag.
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/dispatch-entrance.js:325` [other ] // every later beat is redundant and risks confusing the worker. The prose append
+    → Domain vocabulary (a stepper's later beats); not a status claim.
+- `lib/dispatch-entrance.js:884` [STATUS] // work (a cascade carries no prompt). INERT: nothing issues a cascade at end-of-run yet.
+    → FALSE in effect (born-stale in window): `expandCascadeAborts` is live — Home's Stop sends `cascade: true` (public/prompt-section.js:2043, since 8ecce6bc LIN-3833, 10-25). The "end-of-run" qualifier is true; "INERT" on the function is not.
+- `lib/dispatch-factory.js:100` [STATUS] * budget: no caller sets it, no prompt or feed shows it.
+    → TRUE (design: a constant, not a budget).
+- `lib/dispatch-store.js:2953` [STATUS] *   (LIN-3161); omitted → unbounded (no caller does this in production)
+    → TRUE: both callers (:2925, :2932) pass `since`.
+- `lib/dispatch-store.js:3385` [other ] //     resume target, so a resumed stepper's later beats + terminal land on a
+    → Domain vocabulary (a stepper's later beats); not a status claim.
+- `lib/dispatch-validation.js:279` [other ] // inert, and it is still refused.
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/escalation-kpis.js:166` [STATUS] // today, so this key is inert until a future ticket wires a tile for it.
+    → TRUE (pre-window design status).
+- `lib/flight-companion-gate.js:305` [other ] if (!Number.isFinite(seenMs)) return decision; // no stamp -> say nothing new (fixture-inert, fail-safe)
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/github-install-flow.js:186` [other ] // means held entry stays inert (D11 predicate defaults on, reader missing =>
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/graph-features.js:146` [other ] * inert, and ranking is unchanged. It only bites once the subtree carries real
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/harbour-feedback-tokens.js:78` [other ] * 401 Unauthorized — no caller-facing distinction between failure modes
+    → Design/description; not a landing-status claim.
+- `lib/held-connection-entry.js:68` [other ] *   2. D11 writes are enabled (otherwise inert: no reads);
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/held-connection-entry.js:108` [other ] if (!writesEnabled) return null; // D11 inert: zero reads
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/key-state-holders.js:130` [other ] global('ci-wake-sweep-backoff', 'Lineage-keyed back-off for a server sweep. The sweep is inert without a configured base URL, and no seam seeds a line
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/model-routing.js:53` [STATUS] * read by nothing. The effective-setting read says so rather than showing a model that
+    → STALE (window): ":55 The shape stays for LIN-3855" and ":61-62 … as LIN-3855 retires them" — LIN-3855 is Done (d53bb5bc), routes/settings-model.js has no MODEL_ID_PATTERN copy. UNROUTED_JOBS itself is still read (:311,:317).
+- `lib/model-routing.js:303` [other ] // still says where the stored value lives, and `effortNotApplied` carries it and says it is inert.
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/observer-pass.js:19` [STATUS] * field; nothing reads it.)
+    → TRUE (removed field; old docs only).
+- `lib/observer-state-store.js:79` [STATUS] * `llm-call-log`/`prompt-trace-store.js` ship a `cleanup()` nothing calls)
+    → STALE: neither lib/llm-call-log.js nor lib/prompt-trace-store.js has a cleanup() at HEAD (grep "cleanup" in both: 0 hits). Research parenthetical; Low.
+- `lib/owner-mint-refusals.js:107` [other ] * consulting the seam, because the seam folds "no caller identity" into
+    → Design/description; not a landing-status claim.
+- `lib/periodical-runs.js:42` [STATUS] *     production caller today (no caller narrows `historyTtlMs`/`horizonMs`
+    → TRUE: the only production caller passes READ_HORIZON_MS (routes/proxy-compute.js:1031), the 30-day default.
+- `lib/plan-review-round-trips.js:597` [other ] // there is no caller that passes this through unchecked: the only production
+    → Design/description; not a landing-status claim.
+- `lib/prompts/autopilot-kickoff.js:733` [other ] \`followUpTo\` beat or a wake — stamping a later continuation is silently inert and never
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/prompts/ship-biscuit-editor.js:215` [other ] * so e2e/local sessions get a grounded front page with inert headlines without an
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/providers/github-projects/index.js:606` [other ] return { blurb: 'your GitHub Projects boards, read-only for now', order: 2 }
+    → UI copy or design scope ("for now" as product wording); not a code-status claim.
+- `lib/providers/jira/oauth.js:67` [other ] * That is inert in production and in this repo's e2e harness — the gate below
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/providers/linear/index.js:134` [other ] * (sans `description`). `relations` is intentionally retained for now — its
+    → UI copy or design scope ("for now" as product wording); not a code-status claim.
+- `lib/providers/linear/index.js:499` [other ] # actionable leaves and the guard stays inert — which is why the single-hop
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/proxy-preamble.js:314` [other ] * inert the instant the agent starts. A leaked prompt leaks only an already-spent
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/proxy-tokens.js:34` [other ] *   clipboard) carry a credential that is inert the instant the agent starts, rather
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/proxy-tokens.js:104` [other ] // account/workspace stores exist; null (unwired) fails the grant mint closed.
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `lib/proxy-tokens.js:124` [other ] * LIN-3129 A3: a true ES private method, so no caller outside the class can
+    → Design/description; not a landing-status claim.
+- `lib/proxy-tokens.js:357` [other ] * unwired, throws, or answers anything unrecognised, the mint fails closed —
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `lib/proxy-tokens.js:364` [other ] *   - seam unwired / throws / corrupt  → 503 OWNER_CHECK_UNAVAILABLE (retryable)
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `lib/proxy-tokens.js:451` [other ] *    (not-owner/no-owner/throw/unwired/corrupt) spends the bootstrap and
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `lib/proxy-tokens.js:512` [other ] // throw, an unwired seam or a corrupt answer — spends the bootstrap and
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `lib/proxy-tokens.js:516` [other ] // (including an unwired seam) is untouched.
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `lib/proxy-tokens.js:603` [other ] * only on an explicit `owner` verdict. Every other outcome — unwired seam,
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `lib/proxy-tokens.js:970` [other ] * requester, an unwired or throwing seam, and an ownerless workspace.
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `lib/recommendation-facts.js:132` [other ] * (`hasOpenFrontier`, lib/graph-features.js) is inert when the children carry no
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/refresh-strategy.js:139` [STATUS] // longer inert. The route now defaults to `mode: 'new'` (the landing
+    → History phrasing ("no longer inert"); true.
+- `lib/render-email-auth.js:85` [other ] * with the step's copy and a "Skip for now" exit back to `next`. Settings' "Add
+    → UI copy or design scope ("for now" as product wording); not a code-status claim.
+- `lib/render-email-auth.js:101` [other ] ? `<a href="${escapeHtml(next)}" class="error-home-link" data-testid="email-register-skip">Skip for now</a>`
+    → UI copy or design scope ("for now" as product wording); not a code-status claim.
+- `lib/render-flight-companion.js:225` [other ] // altogether (a caller that has not wired the route's data at all)
+    → Design/description; not a landing-status claim.
+- `lib/render-flight-companion.js:321` [other ] // there is no user choice left to toggle — the inert `.prompt-proxy-toggle`
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/render-observation.js:336` [other ] control never ships inert. Enabled/hidden state itself is
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/render-observation.js:357` [other ] // pool calls window.ScanSection.postScan. Confirmed inert to add here —
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/render-ship-biscuit.js:9` [STATUS] * INERT in V1 — the on-demand article-body pass is deferred to V2. Clicking a
+    → TRUE (design status, V1): public/ship-biscuit.js:170-173 shows the "coming" note; no article-body route.
+- `lib/render-ship-biscuit.js:11` [other ] * (public/ship-biscuit.js). The lead headline is inert plain text, not a link.
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/render-ship-biscuit.js:125` [other ] // Lead story: dateline, the catchy lead headline (inert), an optional standfirst, then
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/render-ship-biscuit.js:165` [other ] /** One article inside a weighted section column: headline (inert link) + optional dek. */
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/render-ship.js:41` [other ] // (LIN-298). Defaults to [] so the toggle is simply inert when no report
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/render-styleguide.js:236` [other ] // sample sits in an `inert` wrapper, so its forms and links do nothing. Its phone root is the wrapper
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/render-styleguide.js:240` [other ] const SAMPLE_OPEN = '<div class="settings-shell sg-settings-sample" inert>';
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/render-styleguide.js:316` [other ] // owns the phone root its rows need (LIN-3956), and `inert` keeps its form from doing anything.
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/render-styleguide.js:324` [other ] const plainSample = () => `<div class="plain-page sg-settings-sample sg-plain-sample" inert>${renderPlainSections(PLAIN_SAMPLE_SECTIONS, 'h3')}</div>`
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/render-styleguide.js:802` [other ] ${sgSection('Settings pieces', `<p class="sg-intro" style="margin-bottom: var(--space-3)">The pieces every Settings area is built from (LIN-3890). Eac
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/request-usage-loader.js:13` [STATUS] * dependency, the way the founder lookup reaches `collectKpiStats` (LIN-4178): no caller imports the store.
+    → TRUE (design rule: callers get the injected loader).
+- `lib/run-paragraph-hook.js:59` [other ] *   unwired, the generator keeps DEFAULT_MODEL.
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `lib/run-paragraph-hook.js:61` [other ] *   free key the precompute charges it right before the generator call; unwired on the free
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `lib/run-paragraph-hook.js:99` [other ] // nothing; an unwired store on the free key fails closed.
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `lib/sample-data/mock-data.js:25` [other ] // The `repo=` line is an inert DECOY (LIN-3445): nothing parses it. It exists only
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `lib/session-materializer-precompute.js:38` [other ] *   unwired, the generator keeps DEFAULT_MODEL.
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `lib/session-materializer-precompute.js:40` [other ] *   free key the precompute charges it right before the generator call; unwired on the free
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `lib/session-materializer-precompute.js:83` [other ] // rebuild or click; an unwired store on the free key fails closed.
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `lib/session-telemetry.js:535` [STATUS] // ─── resources? (LIN-1789, forward-compat, inert until a producer exists) ────
+    → STALE-ish, pre-window: "inert until a producer exists" — SD now has a producer (SD config.js:1357-1365, RESOURCE_RELAY) behind a default-off flag. Low.
+- `lib/session-telemetry.js:613` [STATUS] // ─── decisions[] (LIN-2181, H2 of LIN-1725; inert until H3 wires a derivation) ─
+    → TRUE: parseDecisions (:751) has no importer in lib/routes (grep -rln parseDecisions → only this file).
+- `lib/starter-seed.js:11` [other ] { id: `${urlKey}-proj-1`, name: 'Getting started', content: 'Your first local project. Edit or add issues via the API/CLI for now.', sortOrder: 1 },
+    → UI copy or design scope ("for now" as product wording); not a code-status claim.
+- `lib/workspace-owner.js:16` [other ] *   { status: 'not-owner' } — a different account owns it, or no caller account
+    → Design/description; not a landing-status claim.
+- `lib/workspace-registry.js:3` [STATUS] * registry (LIN-3700, step 1 of LIN-3394). Write-only: nothing reads the row
+    → TRUE: still write-only (lib/credential-invariant-sweep.js:20 "has no read site yet").
+- `lib/workspace-token-refresh.js:496` [STATUS] // ticket named IS closed — but nothing consumes it to gate expiry
+    → TRUE (design rationale for not consuming the witness).
+- `public/chart-helpers.js:120` [other ] // Without a `total` function nothing is rendered and the handle is inert.
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `public/context.js:182` [other ] // neighbors that are themselves in the session (the "merged" cue) — for now a
+    → UI copy or design scope ("for now" as product wording); not a code-status claim.
+- `public/flight-companion.js:401` [STATUS] // that — reorient is not a fresh start, so nothing calls this today (see
+    → TRUE: clearStoredSession has no caller (only its export at :2183).
+- `public/flight-companion.js:2171` [other ] // Test-only seam (inert in the browser, where `module` is undefined):
+    → Test seam / test-route wiring guard; not a status claim.
+- `public/live-console.js:293` [other ] // openable by keyboard (Tab, Enter); with no run it is inert text.
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `public/live-console.js:1356` [other ] // inert in the browser where `module` is undefined. Placed here, after the
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `public/observation.js:353` [other ] // borrows the inert slate/queued treatment, and non-terminal `waiting` lands in
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `public/observation.js:733` [other ] * (`runs[].ticketWalk`) — session-level aggregation is inert on this lean
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `public/observation.js:3808` [STATUS] // branch 2), never this branch; no caller of this branch (the ordinary
+    → Design note on a branch; not re-derived.
+- `public/observation.js:4869` [other ] // Test-only seam (inert in the browser, where `module` is undefined): expose the
+    → Test seam / test-route wiring guard; not a status claim.
+- `public/observation.js:4960` [other ] // the session-level field is inert on this lean feed) for unit testing.
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `public/prompt-section.js:409` [other ] // that needs a prompt is rendered INERT with an honest "generating…"
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `public/prompt-section.js:2179` [other ] // suppresses the now-inert +proxy toggle. Every other result stays unforced.
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `public/run-control.css:303` [other ] shown, but inert until the prompt lands. */
+    → CSS/UI meaning (an inert control); not a status claim.
+- `public/ship-biscuit.css:201` [other ] .ship-biscuit-inert-note {
+    → CSS/UI meaning (an inert control); not a status claim.
+- `public/ship-biscuit.js:11` [STATUS] * Index headlines are clickable but INERT in V1: clicking one surfaces a "coming in
+    → TRUE (as render-ship-biscuit.js:9).
+- `public/ship-biscuit.js:15` [other ] * without restructuring the page. The lead headline is inert plain text, not a link.
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `public/ship-biscuit.js:170` [other ] if (!article || article.querySelector('.ship-biscuit-inert-note')) return;
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `public/ship-biscuit.js:172` [other ] note.className = 'ship-biscuit-inert-note';
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `public/ship-biscuit.js:207` [other ] // Test-only seam (inert in the browser, where `module` is undefined): expose the
+    → Test seam / test-route wiring guard; not a status claim.
+- `public/ship-journey.js:115` [other ] // Test-only seam (inert in the browser, where `module` is undefined): expose
+    → Test seam / test-route wiring guard; not a status claim.
+- `public/ship.js:1008` [other ] // orientation map just equals project positions and the toggle stays inert.
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `public/ship.js:1847` [other ] // Test-only seam (inert in the browser, where `module` is undefined): expose the
+    → Test seam / test-route wiring guard; not a status claim.
+- `public/style.css:292` [other ] overflow-breaks-sticky interaction that left the header inert (LIN-1068). Keep
+    → CSS/UI meaning (an inert control); not a status claim.
+- `public/style.css:418` [other ] this header inert (LIN-1068). See the `html`/`body` resets above. */
+    → CSS/UI meaning (an inert control); not a status claim.
+- `public/style.css:4348` [other ] non-byte-careful Phase-B follow-on. Keep this rule inert. */
+    → CSS/UI meaning (an inert control); not a status claim.
+- `public/swipe.css:50` [other ] distinctly inert disabled state (dashed hairline, no fill/shadow) rather than a
+    → CSS/UI meaning (an inert control); not a status claim.
+- `routes/dashboard.js:135` [other ] // empty, the same graceful degrade as the other unwired page caches.
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `routes/dashboard.js:147` [other ] // also its ordinary rendering, so an unwired test sees no behaviour change.
+    → Test seam / test-route wiring guard; not a status claim.
+- `routes/dashboard.js:165` [other ] // recapCacheStore/proxyEventStore above, so an unwired test sees no behaviour change.
+    → Test seam / test-route wiring guard; not a status claim.
+- `routes/dashboard.js:201` [other ] // Default null -> the mount is skipped entirely, so an unwired test (and every
+    → Test seam / test-route wiring guard; not a status claim.
+- `routes/dashboard.js:414` [other ] // store is unwired; never a page-load failure.
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `routes/dashboard.js:421` [other ] // Skipped when the reader is not wired (tests, and any deployment without
+    → Design/description; not a landing-status claim.
+- `routes/dashboard.js:698` [other ] // generation. A miss — or an unwired store — renders nothing.
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `routes/dashboard.js:711` [other ] * tests can skip it. Skipped (null) when the reader is unwired or the run has
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `routes/dashboard.js:831` [other ] * cached brief + recap. Pure reads; a store miss (or an unwired store) yields
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `routes/dispatch.js:279` [other ] *   (LIN-3137 J5) so only a workspace's owner can mint. `null` (unwired) fails
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `routes/dispatch.js:1104` [other ] // GRANT_OWNERLESS rather than the seam's not-owner), an unwired/absent seam,
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `routes/flight-companion.js:208` [STATUS] * LIN-2623 beat 3 adds the per-turn model picker's own data: `modelOptions`
+    → Provenance phrasing ("beat 3 adds"), describes code that exists. Not a status claim.
+- `routes/flight-companion.js:345` [other ] * Threading a store reference through with zero readers would be inert,
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `routes/jira-auth.js:420` [STATUS] * with no Jira binding. It is inert — nothing reads a provider partition whose
+    → TRUE (design: orphan durable record is unread).
+- `routes/live-console.js:53` [other ] *   per-token credential verdict (LIN-1588). Optional: unwired (tests) → every
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `routes/proxy-flight-companion.js:138` [other ] * @param {Object} deps.proxyTokenStore - Tool dep: `send_follow_up`'s bootstrap-provisioning seam (turn-core dep; inert under propose mode, kept for p
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `routes/test.js:95` [other ] * @param {Object|null} [options.commentDedupe] - In-process comment dedupe cache (LIN-3198 reset seam), or null when not wired
+    → Test seam / test-route wiring guard; not a status claim.
+- `routes/test.js:663` [other ] if (!taskShareCollection) return res.status(500).json({ error: 'taskShareCollection not wired' })
+    → Test seam / test-route wiring guard; not a status claim.
+- `routes/test.js:675` [other ] if (!kpiDailyRollupCollection) return res.status(500).json({ error: 'kpiDailyRollupCollection not wired' })
+    → Test seam / test-route wiring guard; not a status claim.
+- `routes/test.js:697` [other ] if (!kpiDailyRollupCollection) return res.status(500).json({ error: 'kpiDailyRollupCollection not wired' })
+    → Test seam / test-route wiring guard; not a status claim.
+- `routes/test.js:938` [other ] // first assertion. Resetting state must drop this too. No-op if not wired.
+    → Test seam / test-route wiring guard; not a status claim.
+- `routes/test.js:960` [other ] // one worker cannot change another worker's assertion. No-op if not wired.
+    → Test seam / test-route wiring guard; not a status claim.
+- `routes/test.js:1508` [other ] if (!localStore) throw new Error('localStore not wired into test routes');
+    → Test seam / test-route wiring guard; not a status claim.
+- `routes/workspace-api-roadmap.js:780` [other ] // ship-view toggle stays inert instead of leaving it silently disabled
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `server.js:361` [STATUS] // is safe because nothing calls them until the server is handling requests.
+    → TRUE (boot-order rationale).
+- `server.js:753` [other ] // is injected here rather than at construction; an unwired seam fails the
+    → Design: fail-closed/degrade behaviour when an injected seam is absent; not a status claim.
+- `server.js:1077` [other ] // canonical email link origin. The sweep is inert (and says so once) when that
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `server.js:3917` [other ] // had bearings) just leaves the toggle inert.
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+
+## simple-dispatcher @ 07c88f7 (*.js excluding test/, node_modules, experiments/)
+
+- `SD:config.js:808` [other ] // but is exactly as inert as a parse failure — isBreakerOpen's `now - openedAt < cooldownMs` is
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `SD:config.js:821` [other ] return `${named}: the launch-failure breaker's bound is well-formed but inert (LIN-2458) — a 0 ` +
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `SD:config.js:859` [other ] // warnings. THRESHOLD=0 is deliberately excluded from the inert check (it is harmless: it engages
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `SD:config.js:861` [other ] // well-formed WINDOW_MS=0 is inert (no failure is ever "within" a zero-width window).
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `SD:config.js:881` [other ] return `${named}: the auto-pause bound is well-formed but inert (LIN-3046) — a 0 window means no ` +
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `SD:config.js:1116` [STATUS] // relaxation" without failing this guard first. Pure; not wired into any write path.
+    → TRUE (design: a standing guard with no production caller, exported at :1423 for the test).
+- `SD:config.js:1372` [other ] // markers ever reaching it. A default-OFF flag here would ship this fix inert, the exact
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `SD:dispatcher.js:849` [other ] // not dropped, not re-queued, not treated as [aborted]. This is inert on the up-chain-wake axis:
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `SD:dispatcher.js:1399` [STATUS] // PENDING-internal exclusion is the only thing that suppresses a hold). Kept as an inert field
+    → TRUE: waitForFollowUps is stored and never read.
+- `SD:dispatcher.js:1565` [other ] // args file (non-secret; inert for claude-code, whose prepare step ignores them).
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `SD:e2e-smoke.js:1722` [STATUS] // on Ctrl-C). This is terminal-driver-only for now: iTerm's handle is an opaque window id, not a pid,
+    → PARTLY FALSE: "terminal-driver-only for now", but :1797 also accepts kitty handles (LIN-1315). Low.
+- `SD:executors.js:430` [other ] // is inert and this prefix is the mechanism that actually holds. Unconditional, like the
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `SD:executors.js:675` [other ] // opencode args file; claude-code's writeClaudeMcpConfig destructures neither, so they're inert there.
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `SD:hook.js:371` [other ] // default-OFF marker relay would ship this fix inert, the exact failure LIN-2423 exists to
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `SD:opencode-liveness.js:7` [STATUS] // C1 IS INERT: nothing in reapers.js calls readOpenCodeLiveness yet. `readOpenCodeExitSentinel`
+    → FALSE (carried N1; LIN-3827 SD PR #286 unmerged): readOpenCodeLiveness is called at reapers.js:1926, :2222, :2889, :2918, :2975, :3211.
+- `SD:pacing.js:80` [other ] //       control-channel probe) — `undefined` (not passed at all) stays INERT, same null-safety idiom
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `SD:reapers.js:38` [STATUS] // readOpenCodeLiveness/LIVENESS in this file — C1's seam was inert until this commit.
+    → STALE (carried): the ":1754" cite at :36-37 points into refireSentinelOverResume; the opencode arm is at :2221-2244.
+- `SD:reapers.js:1233` [STATUS] // unbounded form; LIN-3585: no production caller uses it any more (cleanup passes the BLOCKED_REAP_MS bound).
+    → TRUE: every hasLiveSubscribedChild/liveSubscribedChildren call passes a bound (failsafeChildShield/cleanupChildShield).
+- `SD:reapers.js:1775` [STATUS] // LANDS INERT — nothing calls this yet. Its two callers (the hold-expired backstop, and the
+    → FALSE (carried N1): resumeOpenCodeOverNativeId is the default dep at reapers.js:1929 and is called at :2230, :2464.
+- `SD:reapers.js:1797` [other ] // inert at best and, since opencode has no `--effort` flag of its own, a contract violation at
+    → Design meaning (a flag/bound/control that does nothing by design or by construction); not a landing-status claim.
+- `SD:transcript.js:119` [other ] // POSITIVELY; human input is closed by construction: any entry not positively named inert or
+    → Domain vocabulary (inert transcript entries), not status.
+- `SD:transcript.js:131` [other ] const INERT_ATTACHMENT_TYPES = new Set([
+    → Domain vocabulary (inert transcript entries), not status.
+- `SD:transcript.js:141` [other ] const INERT_SYSTEM_SUBTYPES = new Set([
+    → Domain vocabulary (inert transcript entries), not status.
+- `SD:transcript.js:159` [other ] if (entry.type === 'attachment') return INERT_ATTACHMENT_TYPES.has(entry.attachment?.type);
+    → Domain vocabulary (inert transcript entries), not status.
+- `SD:transcript.js:161` [other ] return entry.subtype !== 'scheduled_task_fire' && INERT_SYSTEM_SUBTYPES.has(entry.subtype);
+    → Domain vocabulary (inert transcript entries), not status.
+- `SD:transcript.js:184` [other ] // 'trigger' | 'inert' | 'human' for one parsed entry of the turn (`i` indexes `entries`).
+    → Domain vocabulary (inert transcript entries), not status.
+- `SD:transcript.js:194` [other ] if (entry.isSidechain || isToolResultOnly(entry)) return 'inert';
+    → Domain vocabulary (inert transcript entries), not status.
+- `SD:transcript.js:195` [other ] if (entry.isMeta && entry.origin === undefined) return isWakeupPrompt(entries, i) ? 'trigger' : 'inert';
+    → Domain vocabulary (inert transcript entries), not status.
+- `SD:transcript.js:199` [other ] return 'inert';
+    → Domain vocabulary (inert transcript entries), not status.
+- `SD:transcript.js:201` [other ] if (entry.operation === 'dequeue') return 'inert';
+    → Domain vocabulary (inert transcript entries), not status.
+- `SD:transcript.js:202` [other ] return typeof entry.content === 'string' && entry.content.startsWith(TASK_NOTIFICATION_PREFIX) ? 'inert' : 'human';
+    → Domain vocabulary (inert transcript entries), not status.
+- `SD:transcript.js:205` [other ] return INERT_SYSTEM_SUBTYPES.has(entry.subtype) ? 'inert' : 'human';
+    → Domain vocabulary (inert transcript entries), not status.
+- `SD:transcript.js:213` [other ] return INERT_ATTACHMENT_TYPES.has(att.type) ? 'inert' : 'human';
+    → Domain vocabulary (inert transcript entries), not status.
+- `SD:transcript.js:216` [other ] return isBookkeepingType(entry.type) ? 'inert' : 'human';
+    → Domain vocabulary (inert transcript entries), not status.
+- `SD:transcript.js:481` [other ] walkAssistantTextBlocks, findFlushedCopy, userEntryText, classifyTurnDriver, INERT_ATTACHMENT_TYPES, walkToolActivity, walkTicketMarkers,
+    → Domain vocabulary (inert transcript entries), not status.
