@@ -37,15 +37,15 @@ function workspaceOf(issues) {
   };
 }
 
-function scenario({ issues, states = {}, topTaskId = null }) {
+function scenario({ issues, states = {}, topTaskId = null, orderedCards = [] }) {
   const { trees, inProgressTrees } = workspaceOf(issues);
   const stateMap = new Map(Object.entries(states));
   // LIN-4114: a task in the needs-you state has an open ruling, so Home holds its row (the Waiting on you set).
   const rulingRows = Object.entries(states)
     .filter(([, state]) => state.state === 'needs-you')
     .map(([identifier]) => ({ decision: { decision_id: `d-${identifier}`, question: 'Which?' }, decisionCase: [], anchor: { loopId: null, issueId: `id-${identifier}`, issueIdentifier: identifier, workspaceUrlKey: 'w', taskDecisionId: `td-${identifier}` }, disposition: 'task-bound', effect: 'record', canReply: true }));
-  const view = buildHomeView({ inProgressTrees, trees, states: stateMap, topTaskId, rulingRows });
-  return { issues, trees, inProgressTrees, view, states: stateMap, topTaskId, rulingRows };
+  const view = buildHomeView({ inProgressTrees, trees, states: stateMap, topTaskId, rulingRows, orderedCards });
+  return { issues, trees, inProgressTrees, view, states: stateMap, topTaskId, rulingRows, orderedCards };
 }
 
 /** Appends the open identifiers of a node list, depth-first, to `into`. */
@@ -85,7 +85,7 @@ function placementsOf(s) {
       let offset = 0;
       let page;
       do {
-        page = homeRowsFor({ kind, projectId: tree.project.id, offset, trees, inProgressTrees, states, topTaskId, rulingRows: s.rulingRows });
+        page = homeRowsFor({ kind, projectId: tree.project.id, offset, trees, inProgressTrees, states, topTaskId, rulingRows: s.rulingRows, orderedCards: s.orderedCards });
         openIdsOf(page.nodes, folds);
         offset = page.nextOffset;
       } while (offset !== null);
@@ -95,7 +95,7 @@ function placementsOf(s) {
   const parentFolds = viewNodesOf(view.inProgressTrees.flatMap(tree => tree.roots))
     .filter(node => node.more > 0)
     .map(node => {
-      const rows = homeRowsFor({ kind: 'more-of-parent', parentId: node.issue.id, trees, inProgressTrees, states, topTaskId, rulingRows: s.rulingRows });
+      const rows = homeRowsFor({ kind: 'more-of-parent', parentId: node.issue.id, trees, inProgressTrees, states, topTaskId, rulingRows: s.rulingRows, orderedCards: s.orderedCards });
       return { parent: node.issue.identifier, more: node.more, topLevel: rows.nodes.map(n => n.issue.identifier), all: openIdsOf(rows.nodes, []) };
     });
 
@@ -216,6 +216,31 @@ describe('LIN-4117 W2b: every open task Home holds is placed exactly once', () =
       topTaskId: nodeKey({ id: 'T-5' }),
     });
     assertPlacedOnce(s, { inProgress: ['C-2', 'T-5'], waiting: ['R-6'] });
+  });
+});
+
+// LIN-4151: the property with the lead ranking doing real work. A project's roots are cut into the page's three and the fold in
+// ranked order (priority, readiness), so a mixed-priority project with a blocked High root puts that root behind the ready
+// ones. Readiness sorts and never filters: the blocked root must still be placed, once, in the fold.
+describe('LIN-4151 reachability: a ranked lead list places every root exactly once', () => {
+  test('mixed priorities and a High root blocked by an open card: the blocked root ranks last and is still reachable', () => {
+    const withPriority = (identifier, priority) => ({ ...issue(identifier, 'unstarted'), priority });
+    const issues = [
+      withPriority('L-1', 4),
+      withPriority('L-2', 4),
+      withPriority('M-3', 3),
+      withPriority('L-4', 4),
+      withPriority('HB-5', 2),
+      withPriority('U-6', 1),
+      withPriority('WALL-7', 4),
+    ];
+    // HB-5 is blocked by WALL-7, an open card; the card carries a `key`, so the `key || id` readiness lookup is exercised.
+    const orderedCards = issues.map(i => ({ id: `id-${i.identifier}`, identifier: i.identifier, isSeed: false, ...(i.identifier === 'HB-5' ? { key: 'key-HB-5' } : {}), ...(i.identifier === 'WALL-7' ? { blocksIds: ['key-HB-5'] } : {}) }));
+    const s = scenario({ issues, orderedCards });
+    assertPlacedOnce(s);
+    const p = placementsOf(s);
+    assert.deepEqual(p.upNext, ['U-6', 'M-3', 'L-1'], 'the page shows the three best-ranked ready roots');
+    assert.equal(p.folds.at(-1), 'HB-5', 'the blocked High root ranks after every ready root and is reached in the fold');
   });
 });
 
