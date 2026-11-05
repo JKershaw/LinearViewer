@@ -20,9 +20,11 @@
  * `lin-4040-close-out.test.js`, `lin-4042-finished-no-run-to-pr.test.js`, `brief-recap-autogenerate.test.js`,
  * `brief-recap-ai-not-configured-contract.test.js`, `scan-retire-ui.test.js` and `lin-4016-browser-follows-server.test.js`
  * (LIN-4269), `task-chat-flight-companion-sentinel-mask.test.js` and `chart-helpers.test.js` (LIN-4284),
- * `observation-scan-due.test.js` and `lin-2933-cross-seam-witness.test.js` (LIN-4283), and
- * `observation-ruling-delivery.test.js` (LIN-4282), through `loadWorld` (the last as `loadWorld({ scripts: [] })` with
- * `common.js` and `observation.js` run by hand). `client-world.test.js` (LIN-4280) tests `loadWorld`'s `run`.
+ * `observation-card-order.test.js`, `observation-scope.test.js`, `observation-waiting-host.test.js` and
+ * `observation-waiting-block.test.js` (LIN-4281), `observation-scan-due.test.js` and
+ * `lin-2933-cross-seam-witness.test.js` (LIN-4283), and `observation-ruling-delivery.test.js` (LIN-4282), through
+ * `loadWorld` (the last as `loadWorld({ scripts: [] })` with `common.js` and `observation.js` run by hand).
+ * `client-world.test.js` (LIN-4280) tests `loadWorld`'s `run`.
  * `lin-4035-live-console-client.test.js` and `live-console-client-facts.test.js` (LIN-4285) through `loadWorld`, loaded
  * by the shared Live Console loader in `helpers/live-console-world.js` (a page and lane fixture, not a fake DOM).
  * A suite moved onto this fake leaves `HAND_WRITTEN_FAKE_DOM_FILES` and joins this list in the same PR.

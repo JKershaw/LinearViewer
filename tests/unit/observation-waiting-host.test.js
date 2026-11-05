@@ -5,23 +5,23 @@
  * between hosts, the block caps what it attaches, and a row that lands on the
  * Rulings tab after being built elsewhere is basis-checked there.
  *
- * `public/observation.js` is vm-sandboxed as in observation-basis-check.test.js.
+ * `public/observation.js` runs through `loadWorld` over the shared fake DOM
+ * (tests/unit/helpers/fake-dom.js). The Rulings tab and the block's list are
+ * real elements in the world's document; the rows are built by the client.
  * Run with: node --test tests/unit/observation-waiting-host.test.js
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import { FakeElement } from '../fixtures/observation-dom-shim.js';
+import { loadWorld } from './helpers/client-world.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const OBSERVATION_JS_SRC = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
+// The Rulings tab's list and empty state, and the waiting block's list, as the page draws them.
+const RULINGS_MARKUP = `
+  <ul id="obs-rulings"></ul>
+  <p id="obs-rulings-empty"></p>
+  <ul id="obs-waiting-rulings"></ul>`;
 
-function makeSandbox({ elements = {}, api } = {}) {
-  const sandbox = {
-    module: { exports: {} },
+function makeWorld({ api } = {}) {
+  const world = loadWorld({
     window: {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
@@ -29,22 +29,19 @@ function makeSandbox({ elements = {}, api } = {}) {
       sourceQuery: (source) => (source ? `?source=${encodeURIComponent(source)}` : ''),
       api: api || (async () => { throw new Error('window.api not stubbed'); })
     },
-    document: {
-      createElement: (tag) => new FakeElement(tag),
-      addEventListener() {},
-      getElementById: (id) => elements[id] || null
-    },
-    escapeHtml: (str) => (str === undefined || str === null ? '' : String(str)),
-    relativeTime: (ts) => (ts ? `rel(${ts})` : ''),
-    console: { warn() {}, error() {}, log() {} },
-    setTimeout,
-    clearTimeout
-  };
-  sandbox.window.window = sandbox.window;
-  vm.createContext(sandbox);
-  vm.runInContext(OBSERVATION_JS_SRC, sandbox, { filename: 'observation.js' });
-  return sandbox;
+    scripts: ['observation.js'],
+    globals: {
+      module: { exports: {} },
+      escapeHtml: (str) => (str === undefined || str === null ? '' : String(str)),
+      relativeTime: (ts) => (ts ? `rel(${ts})` : ''),
+      console: { warn() {}, error() {}, log() {} }
+    }
+  });
+  world.document.body.innerHTML = RULINGS_MARKUP;
+  return world;
 }
+
+const byId = (world, id) => world.document.getElementById(id);
 
 function taskBoundRow(n) {
   return {
@@ -75,24 +72,22 @@ describe('renderRulings host seam (LIN-3983)', () => {
     // gated on the Rulings view at creation). If it is then reused on the tab
     // (here because a reply is pending), only the re-arm can check it.
     const calls = [];
-    const tabList = new FakeElement('ul');
-    const tabEmpty = new FakeElement('p');
-    const blockList = new FakeElement('ul');
-    const sandbox = makeSandbox({
-      elements: { 'obs-rulings': tabList, 'obs-rulings-empty': tabEmpty },
+    const world = makeWorld({
       api: async (url) => { calls.push(url); return { basisChanged: false }; }
     });
-    const { renderRulings, rulingKey, rulingsPending } = sandbox.module.exports;
+    const tabList = byId(world, 'obs-rulings');
+    const blockList = byId(world, 'obs-waiting-rulings');
+    const { renderRulings, rulingKey, rulingsPending } = world.sandbox.module.exports;
     const row = taskBoundRow(1);
     const key = rulingKey(row.anchor.workspaceUrlKey, row.anchor, row.decision.decision_id);
 
-    vm.runInContext('currentView = "runs";', sandbox);
+    world.run('currentView = "runs";');
     renderRulings([row], { list: blockList, empty: null, limit: 3, onTab: false });
     await flush();
     assert.equal(calls.length, 0, 'no basis check while the block is on screen');
 
     rulingsPending.add(key);
-    vm.runInContext('currentView = "rulings";', sandbox);
+    world.run('currentView = "rulings";');
     renderRulings([row]);
     await flush();
     rulingsPending.delete(key);
@@ -104,21 +99,19 @@ describe('renderRulings host seam (LIN-3983)', () => {
   });
 
   test('the block attaches at most `limit` rows; the Rulings tab still lists every row', () => {
-    const tabList = new FakeElement('ul');
-    const tabEmpty = new FakeElement('p');
-    const blockList = new FakeElement('ul');
-    const sandbox = makeSandbox({
-      elements: { 'obs-rulings': tabList, 'obs-rulings-empty': tabEmpty }
-    });
-    const { renderRulings, renderedRulingRows } = sandbox.module.exports;
+    const world = makeWorld();
+    const tabList = byId(world, 'obs-rulings');
+    const tabEmpty = byId(world, 'obs-rulings-empty');
+    const blockList = byId(world, 'obs-waiting-rulings');
+    const { renderRulings, renderedRulingRows } = world.sandbox.module.exports;
     const rows = [1, 2, 3].map(taskBoundRow);
 
-    vm.runInContext('currentView = "runs";', sandbox);
+    world.run('currentView = "runs";');
     renderRulings(rows, { list: blockList, empty: null, limit: 2, onTab: false });
     assert.equal(blockList.children.length, 2, 'the block shows the first two rows only');
     assert.equal(renderedRulingRows.size, 3, 'the rest stay tracked, so the tab reuses them');
 
-    vm.runInContext('currentView = "rulings";', sandbox);
+    world.run('currentView = "rulings";');
     renderRulings(rows);
     assert.equal(tabList.children.length, 3, 'the Rulings tab lists every row');
     assert.equal(blockList.children.length, 0, 'rows move out of the block when the tab paints');
@@ -126,12 +119,9 @@ describe('renderRulings host seam (LIN-3983)', () => {
   });
 
   test('the default host is the Rulings tab, so existing one-argument callers are unchanged', () => {
-    const tabList = new FakeElement('ul');
-    const tabEmpty = new FakeElement('p');
-    const sandbox = makeSandbox({
-      elements: { 'obs-rulings': tabList, 'obs-rulings-empty': tabEmpty }
-    });
-    const { renderRulings } = sandbox.module.exports;
+    const world = makeWorld();
+    const tabList = byId(world, 'obs-rulings');
+    const { renderRulings } = world.sandbox.module.exports;
     renderRulings([taskBoundRow(1), taskBoundRow(2)]);
     assert.equal(tabList.children.length, 2);
   });

@@ -9,36 +9,46 @@
  *   - the block's paint, the three openLoopIds states, and the URL written
  *     when the view or filter moves.
  *
- * `public/observation.js` is vm-sandboxed as in the other Observation tests.
+ * `public/observation.js` runs through `loadWorld` over the shared fake DOM (tests/unit/helpers/fake-dom.js).
  * Run with: node --test tests/unit/observation-waiting-block.test.js
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import { readSheets, appliedDecls } from '../helpers/css-rules.js';
-import { FakeElement } from '../fixtures/observation-dom-shim.js';
+import { loadWorld } from './helpers/client-world.js';
 import { loadCommonWindow } from '../fixtures/client-common.js';
 import { buildSessionPayload } from '../../routes/dashboard-feed.js';
 import { collectUnansweredDecisions, openDecisionLoopIds, MAX_STAMP_LOOP_IDS } from '../../lib/unanswered-decisions.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const OBSERVATION_JS_SRC = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
+// The regions these tests paint, as the page draws them. Each is a real element in the world's document, found by
+// the client with getElementById and read back by the test.
+const REGIONS_MARKUP = `
+  <div id="obs-waiting" hidden></div>
+  <div id="obs-waiting-rulings"></div>
+  <div id="obs-waiting-runs"></div>
+  <div id="obs-waiting-count"></div>
+  <div id="obs-waiting-more" hidden></div>
+  <div id="obs-rulings"></div>
+  <div id="obs-rulings-empty"></div>
+  <div id="obs-session-views"></div>
+  <div id="obs-rulings-section"></div>
+  <div id="obs-due-section"></div>
+  <div id="obs-poll-status"></div>
+  <div id="obs-view-hint"></div>`;
 
-function makeSandbox({ fetchImpl, href = 'https://harbour.test/workspace/acme/observation' } = {}) {
-  const nodes = new Map();
-  for (const id of ['obs-waiting', 'obs-waiting-rulings', 'obs-waiting-runs', 'obs-waiting-count',
-    'obs-waiting-more', 'obs-rulings', 'obs-rulings-empty', 'obs-session-views', 'obs-rulings-section',
-    'obs-due-section', 'obs-poll-status', 'obs-view-hint']) {
-    nodes.set(id, new FakeElement('div'));
-  }
-  nodes.get('obs-waiting').hidden = true;
-  nodes.get('obs-waiting-more').hidden = true;
+// The page's escapeHtml: quotes too, so a value written into an attribute cannot end it early.
+const escapeHtml = (s) => (s == null ? '' : String(s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'));
+
+const byId = (world, id) => world.document.getElementById(id);
+
+// observation.js in a world over the shared fake, with the window stubs the page's own scripts supply. The
+// location and history are the browser's, not DOM, so they stay as stubs; `world.replaced` holds every URL
+// the client wrote with replaceState.
+function makeWorld({ fetchImpl, href = 'https://harbour.test/workspace/acme/observation' } = {}) {
   const replaced = [];
-  const sandbox = {
-    module: { exports: {} },
+  const common = loadCommonWindow();
+  const world = loadWorld({
     window: {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
@@ -46,38 +56,26 @@ function makeSandbox({ fetchImpl, href = 'https://harbour.test/workspace/acme/ob
       history: { state: null, replaceState(state, title, url) { replaced.push(url); } },
       ChatUI: { appendOptions() {}, resolveCaption: () => '' },
       sourceQuery: () => '',
-      renderStatusPill: loadCommonWindow().renderStatusPill,
-      renderSegmentBar: loadCommonWindow().renderSegmentBar,
+      renderStatusPill: common.renderStatusPill,
+      renderSegmentBar: common.renderSegmentBar,
       api: async () => { throw new Error('window.api not stubbed'); }
     },
-    document: {
-      createElement: (tag) => new FakeElement(tag),
-      addEventListener() {},
-      getElementById: (id) => nodes.get(id) || null,
-      querySelector: () => null,
-      querySelectorAll: () => [],
-      hidden: false
-    },
-    escapeHtml: (s) => (s == null ? '' : String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')),
-    relativeTime: () => '',
-    console: { warn() {}, error() {}, log() {} },
-    fetch: fetchImpl || (async () => { throw new Error('no fetch stub configured'); }),
-    setTimeout,
-    clearTimeout,
-    URL,
-    URLSearchParams,
-    AbortController
-  };
-  sandbox.window.window = sandbox.window;
-  vm.createContext(sandbox);
-  vm.runInContext(OBSERVATION_JS_SRC, sandbox, { filename: 'observation.js' });
-  vm.runInContext('observationData = { urlKey: "acme", workspaces: [{ urlKey: "acme", name: "Acme" }] };', sandbox);
-  sandbox.__nodes = nodes;
-  sandbox.__replaced = replaced;
-  return sandbox;
+    scripts: ['observation.js'],
+    globals: {
+      module: { exports: {} },
+      escapeHtml,
+      relativeTime: () => '',
+      console: { warn() {}, error() {}, log() {} },
+      fetch: fetchImpl || (async () => { throw new Error('no fetch stub configured'); })
+    }
+  });
+  world.document.body.innerHTML = REGIONS_MARKUP;
+  world.run('observationData = { urlKey: "acme", workspaces: [{ urlKey: "acme", name: "Acme" }] };');
+  world.replaced = replaced;
+  return world;
 }
 
-// Values built inside the vm context carry that realm's prototypes, which
+// Values built inside the page's world carry that realm's prototypes, which
 // assert.deepEqual compares strictly. A JSON copy brings them back to this realm.
 const plain = (v) => JSON.parse(JSON.stringify(v));
 
@@ -107,8 +105,8 @@ function waitingSession(over = {}) {
 
 describe('stripFeedbackMarkers', () => {
   test('removes the runner markers and leaves the words', () => {
-    const sandbox = makeSandbox();
-    const { stripFeedbackMarkers } = sandbox.module.exports;
+    const world = makeWorld();
+    const { stripFeedbackMarkers } = world.sandbox.module.exports;
     assert.equal(stripFeedbackMarkers('[blocked] need a ruling'), 'need a ruling');
     assert.equal(stripFeedbackMarkers('[done]  shipped [working]'), 'shipped');
   });
@@ -116,7 +114,7 @@ describe('stripFeedbackMarkers', () => {
 
 describe('compactWaitSessions — which waiting runs get a compact row (LIN-3983)', () => {
   test('a waiting run whose only wait is not an open question gets a row with its producer message', () => {
-    const { module } = makeSandbox();
+    const { module } = makeWorld().sandbox;
     const { compactWaitSessions } = module.exports;
     const rows = compactWaitSessions([waitingSession()], new Set());
     assert.equal(rows.length, 1);
@@ -126,26 +124,26 @@ describe('compactWaitSessions — which waiting runs get a compact row (LIN-3983
   });
 
   test('a wait whose loop is an open question gets no row: the ruling row speaks for it', () => {
-    const { module } = makeSandbox();
+    const { module } = makeWorld().sandbox;
     const { compactWaitSessions } = module.exports;
     assert.deepEqual(plain(compactWaitSessions([waitingSession()], new Set(['loop-p']))), []);
   });
 
   test('a day-dead run never gets a row: its status is stale, though its wait flag is still set (LIN-608, F5.1)', () => {
-    const { module } = makeSandbox();
+    const { module } = makeWorld().sandbox;
     const { compactWaitSessions } = module.exports;
     // `waiting` is not gated on staleness in the feed, so the real shape is stale AND waiting.
     assert.deepEqual(plain(compactWaitSessions([waitingSession({ status: 'stale', waiting: true })], new Set())), []);
   });
 
   test('a finished run never gets a row', () => {
-    const { module } = makeSandbox();
+    const { module } = makeWorld().sandbox;
     const { compactWaitSessions } = module.exports;
     assert.deepEqual(plain(compactWaitSessions([waitingSession({ status: 'done', waiting: false, waitingLoopIds: [] })], new Set())), []);
   });
 
   test('a message-less wait gets the fixed fallback text (no message)', () => {
-    const { module } = makeSandbox();
+    const { module } = makeWorld().sandbox;
     const { compactWaitSessions } = module.exports;
     const rows = compactWaitSessions([waitingSession({ waitingMessage: null, producerLoopId: null })], new Set());
     assert.equal(rows.length, 1);
@@ -153,7 +151,7 @@ describe('compactWaitSessions — which waiting runs get a compact row (LIN-3983
   });
 
   test('when the producer is covered by a ruling but another loop of the run waits, the row shows the fallback', () => {
-    const { module } = makeSandbox();
+    const { module } = makeWorld().sandbox;
     const { compactWaitSessions } = module.exports;
     const session = waitingSession({ waitingLoopIds: ['loop-p', 'loop-b'] });
     const rows = compactWaitSessions([session], new Set(['loop-p']));
@@ -162,7 +160,7 @@ describe('compactWaitSessions — which waiting runs get a compact row (LIN-3983
   });
 
   test('a session from an older payload without waitingLoopIds gets no row rather than a wrong one', () => {
-    const { module } = makeSandbox();
+    const { module } = makeWorld().sandbox;
     const { compactWaitSessions } = module.exports;
     const old = waitingSession();
     delete old.waitingLoopIds;
@@ -171,7 +169,7 @@ describe('compactWaitSessions — which waiting runs get a compact row (LIN-3983
 });
 
 describe('viewFromParams — the URL contract, with the old tab names (LIN-3983)', () => {
-  const { viewFromParams } = (() => makeSandbox().module.exports)();
+  const { viewFromParams } = (() => makeWorld().sandbox.module.exports)();
   const parse = (qs) => viewFromParams(new URLSearchParams(qs));
 
   test('a bare URL opens on runs with the autopilot filter', () => {
@@ -204,66 +202,66 @@ describe('viewFromParams — the URL contract, with the old tab names (LIN-3983)
 
 describe('the waiting block paint (LIN-3983)', () => {
   test('the block is absent when nothing waits', () => {
-    const sandbox = makeSandbox();
-    const { renderWaitingBlock, setOpenLoopIds } = sandbox.module.exports;
+    const world = makeWorld();
+    const { renderWaitingBlock, setOpenLoopIds } = world.sandbox.module.exports;
     setOpenLoopIds(new Set());
     renderWaitingBlock();
-    assert.equal(sandbox.__nodes.get('obs-waiting').hidden, true);
+    assert.equal(byId(world, 'obs-waiting').hidden, true);
   });
 
   test('a waiting run with no ruling row shows as a compact row, under the runs view', () => {
-    const sandbox = makeSandbox();
-    const { renderWaitingBlock, setOpenLoopIds, sessionIndex } = sandbox.module.exports;
+    const world = makeWorld();
+    const { renderWaitingBlock, setOpenLoopIds, sessionIndex } = world.sandbox.module.exports;
     sessionIndex.set('s-1', waitingSession());
     setOpenLoopIds(new Set());
     renderWaitingBlock();
-    const block = sandbox.__nodes.get('obs-waiting');
+    const block = byId(world, 'obs-waiting');
     assert.equal(block.hidden, false);
-    assert.equal(sandbox.__nodes.get('obs-waiting-count').textContent, '1');
-    assert.match(sandbox.__nodes.get('obs-waiting-runs').innerHTML, /data-session-id="s-1"/);
-    assert.match(sandbox.__nodes.get('obs-waiting-runs').innerHTML, /reply on its run page/);
+    assert.equal(byId(world, 'obs-waiting-count').textContent, '1');
+    assert.match(byId(world, 'obs-waiting-runs').innerHTML, /data-session-id="s-1"/);
+    assert.match(byId(world, 'obs-waiting-runs').innerHTML, /reply on its run page/);
   });
 
   test('no compact rows paint while openLoopIds is still loading (null), so none duplicates a ruling row', () => {
-    const sandbox = makeSandbox();
-    const { renderWaitingBlock, sessionIndex } = sandbox.module.exports;
+    const world = makeWorld();
+    const { renderWaitingBlock, sessionIndex } = world.sandbox.module.exports;
     sessionIndex.set('s-1', waitingSession());
     renderWaitingBlock();
-    assert.equal(sandbox.__nodes.get('obs-waiting').hidden, true);
-    assert.equal(sandbox.__nodes.get('obs-waiting-runs').innerHTML, '', 'no compact row is painted');
+    assert.equal(byId(world, 'obs-waiting').hidden, true);
+    assert.equal(byId(world, 'obs-waiting-runs').innerHTML, '', 'no compact row is painted');
   });
 
   test('off the runs view the block is hidden, whatever it holds', () => {
-    const sandbox = makeSandbox();
-    const { renderWaitingBlock, setOpenLoopIds, sessionIndex, switchView } = sandbox.module.exports;
+    const world = makeWorld();
+    const { renderWaitingBlock, setOpenLoopIds, sessionIndex, switchView } = world.sandbox.module.exports;
     sessionIndex.set('s-1', waitingSession());
     setOpenLoopIds(new Set());
     renderWaitingBlock();
-    assert.equal(sandbox.__nodes.get('obs-waiting').hidden, false);
+    assert.equal(byId(world, 'obs-waiting').hidden, false);
     switchView('rulings');
-    assert.equal(sandbox.__nodes.get('obs-waiting').hidden, true);
+    assert.equal(byId(world, 'obs-waiting').hidden, true);
   });
 
   test('a failed first rulings read settles openLoopIds to empty, so waiting runs still get rows', async () => {
-    const sandbox = makeSandbox({ fetchImpl: async () => jsonResponse({}, { ok: false, status: 500 }) });
-    const { pollRulings, sessionIndex, openLoopIds } = sandbox.module.exports;
+    const world = makeWorld({ fetchImpl: async () => jsonResponse({}, { ok: false, status: 500 }) });
+    const { pollRulings, sessionIndex, openLoopIds } = world.sandbox.module.exports;
     sessionIndex.set('s-1', waitingSession());
     assert.equal(openLoopIds(), null);
     await pollRulings();
     await flush();
     assert.equal(openLoopIds().size, 0, 'settled to the empty set');
-    assert.equal(sandbox.__nodes.get('obs-waiting').hidden, false, 'the run is still shown');
-    assert.equal(sandbox.__nodes.get('obs-poll-status').textContent, '', 'a block read never touches the live pill');
+    assert.equal(byId(world, 'obs-waiting').hidden, false, 'the run is still shown');
+    assert.equal(byId(world, 'obs-poll-status').textContent, '', 'a block read never touches the live pill');
   });
 
   test('a later rulings failure keeps the last open set', async () => {
     let ok = true;
-    const sandbox = makeSandbox({
+    const world = makeWorld({
       fetchImpl: async () => (ok
         ? jsonResponse({ rulings: [], openLoopIds: ['loop-p'] })
         : jsonResponse({}, { ok: false, status: 500 }))
     });
-    const { pollRulings, openLoopIds } = sandbox.module.exports;
+    const { pollRulings, openLoopIds } = world.sandbox.module.exports;
     await pollRulings();
     await flush();
     ok = false;
@@ -273,8 +271,8 @@ describe('the waiting block paint (LIN-3983)', () => {
   });
 
   test('the block shows at most three ruling rows and says how many more are on the Rulings tab', () => {
-    const sandbox = makeSandbox();
-    const { renderWaitingBlock, setOpenLoopIds, renderedRulingRows } = sandbox.module.exports;
+    const world = makeWorld();
+    const { renderWaitingBlock, setOpenLoopIds, renderedRulingRows } = world.sandbox.module.exports;
     const rows = [1, 2, 3, 4, 5].map(n => ({
       decision: { decision_id: `d-${n}`, question: `Q${n}?`, options: [] },
       decisionCase: [],
@@ -284,12 +282,12 @@ describe('the waiting block paint (LIN-3983)', () => {
       alternate: null,
       suggestedDismissal: null
     }));
-    vm.runInContext(`lastRulings = ${JSON.stringify(rows)};`, sandbox);
+    world.run(`lastRulings = ${JSON.stringify(rows)};`);
     setOpenLoopIds(new Set());
     renderWaitingBlock();
-    assert.equal(sandbox.__nodes.get('obs-waiting-rulings').children.length, 3);
+    assert.equal(byId(world, 'obs-waiting-rulings').children.length, 3);
     assert.equal(renderedRulingRows.size, 5, 'the other two stay tracked for the tab');
-    const more = sandbox.__nodes.get('obs-waiting-more');
+    const more = byId(world, 'obs-waiting-more');
     assert.equal(more.hidden, false);
     assert.equal(more.textContent, '2 more in Rulings →');
   });
@@ -311,29 +309,27 @@ describe('a waiting card\'s answer choices follow the rulings read, whichever re
     ]
   }, { urlKey: 'acme', name: 'Acme' }, false);
 
-  // A card already on screen, as the feed paints it: its head is a node the page repaints in place.
-  function paintedCard(sandbox, payload) {
-    const head = { innerHTML: '' };
-    const body = { hidden: true, dataset: {}, querySelector: () => null };
-    const li = {
-      dataset: {},
-      classList: { toggle() {} },
-      querySelector: (sel) => (sel === '.obs-session-head' ? head : sel === '.obs-session-body' ? body : null)
-    };
-    const { sessionIndex } = sandbox.module.exports;
+  // A card already on screen, as the feed paints it: the client's own card in a list, its head repainted in
+  // place by refreshSessionCard. Returns the real head element.
+  function paintedCard(world, payload) {
+    const list = world.document.createElement('ul');
+    world.document.body.appendChild(list);
+    const { sessionIndex } = world.sandbox.module.exports;
     sessionIndex.set(String(payload.sessionId), payload);
-    vm.runInContext('activeCards', sandbox).set(payload.sessionId, li);
-    vm.runInContext('refreshSessionCard', sandbox)(payload.sessionId);
-    return head;
+    const li = world.run('makeSessionCard')(payload);
+    list.appendChild(li);
+    world.run('activeCards').set(payload.sessionId, li);
+    world.run('refreshSessionCard')(payload.sessionId);
+    return li.querySelector('.obs-session-head');
   }
 
   test('a card painted before the first rulings read gains its choices when the read lands, with no feed poll', async () => {
-    const sandbox = makeSandbox({ fetchImpl: async () => jsonResponse({ rulings: [], openLoopIds: ['w'] }) });
-    const { pollRulings, openLoopIds } = sandbox.module.exports;
+    const world = makeWorld({ fetchImpl: async () => jsonResponse({ rulings: [], openLoopIds: ['w'] }) });
+    const { pollRulings, openLoopIds } = world.sandbox.module.exports;
     const payload = waitingPayload();
     assert.equal(payload.producerLoopId, 'w');
     assert.equal(openLoopIds(), null);
-    const head = paintedCard(sandbox, payload);
+    const head = paintedCard(world, payload);
     assert.doesNotMatch(head.innerHTML, /obs-summary-decision-options/, 'no choices before the rulings read');
     await pollRulings();
     await flush();
@@ -342,9 +338,9 @@ describe('a waiting card\'s answer choices follow the rulings read, whichever re
 
   test('a card drops its choices when a later rulings read no longer lists the question as open', async () => {
     let open = ['w'];
-    const sandbox = makeSandbox({ fetchImpl: async () => jsonResponse({ rulings: [], openLoopIds: open }) });
-    const { pollRulings } = sandbox.module.exports;
-    const head = paintedCard(sandbox, waitingPayload());
+    const world = makeWorld({ fetchImpl: async () => jsonResponse({ rulings: [], openLoopIds: open }) });
+    const { pollRulings } = world.sandbox.module.exports;
+    const head = paintedCard(world, waitingPayload());
     await pollRulings();
     await flush();
     assert.match(head.innerHTML, /obs-summary-decision-options/);
@@ -355,9 +351,9 @@ describe('a waiting card\'s answer choices follow the rulings read, whichever re
   });
 
   test('a failed first rulings read settles the set to empty and repaints, so no choice is offered for want of a read', async () => {
-    const sandbox = makeSandbox({ fetchImpl: async () => jsonResponse({}, { ok: false, status: 500 }) });
-    const { pollRulings, openLoopIds } = sandbox.module.exports;
-    const head = paintedCard(sandbox, waitingPayload());
+    const world = makeWorld({ fetchImpl: async () => jsonResponse({}, { ok: false, status: 500 }) });
+    const { pollRulings, openLoopIds } = world.sandbox.module.exports;
+    const head = paintedCard(world, waitingPayload());
     await pollRulings();
     await flush();
     assert.equal(openLoopIds().size, 0);
@@ -365,9 +361,9 @@ describe('a waiting card\'s answer choices follow the rulings read, whichever re
   });
 
   test('a read that leaves the set unchanged does not repaint any card', async () => {
-    const sandbox = makeSandbox({ fetchImpl: async () => jsonResponse({ rulings: [], openLoopIds: ['w'] }) });
-    const { pollRulings } = sandbox.module.exports;
-    const head = paintedCard(sandbox, waitingPayload());
+    const world = makeWorld({ fetchImpl: async () => jsonResponse({ rulings: [], openLoopIds: ['w'] }) });
+    const { pollRulings } = world.sandbox.module.exports;
+    const head = paintedCard(world, waitingPayload());
     await pollRulings();
     await flush();
     head.innerHTML = 'untouched';
@@ -379,16 +375,16 @@ describe('a waiting card\'s answer choices follow the rulings read, whichever re
 
 describe('the runs filter and the URL (LIN-3983)', () => {
   test('the autopilot filter reads the plain feed; the others read the sessions source', () => {
-    const sandbox = makeSandbox();
-    const { sessionsUrl, setFilter } = sandbox.module.exports;
+    const world = makeWorld();
+    const { sessionsUrl, setFilter } = world.sandbox.module.exports;
     assert.equal(sessionsUrl('acme'), '/workspace/acme/api/dashboard/sessions');
     setFilter('standalone');
     assert.equal(sessionsUrl('acme'), '/workspace/acme/api/dashboard/sessions?view=sessions');
   });
 
   test('moving between standalone and all keeps the feed; moving to or from autopilot resets it', () => {
-    const sandbox = makeSandbox();
-    const { setFilter, sessionIndex, sessionsUrl } = sandbox.module.exports;
+    const world = makeWorld();
+    const { setFilter, sessionIndex, sessionsUrl } = world.sandbox.module.exports;
     setFilter('standalone');
     sessionIndex.set('s-1', waitingSession());
     setFilter('all');
@@ -399,30 +395,30 @@ describe('the runs filter and the URL (LIN-3983)', () => {
   });
 
   test('a view change writes the view into the URL, and a bare runs/autopilot view writes none', () => {
-    const sandbox = makeSandbox();
-    const { switchView, setFilter } = sandbox.module.exports;
+    const world = makeWorld();
+    const { switchView, setFilter } = world.sandbox.module.exports;
     switchView('rulings');
-    assert.match(sandbox.__replaced.at(-1), /[?&]view=rulings/);
+    assert.match(world.replaced.at(-1), /[?&]view=rulings/);
     switchView('runs');
-    assert.doesNotMatch(sandbox.__replaced.at(-1), /view=|filter=/);
+    assert.doesNotMatch(world.replaced.at(-1), /view=|filter=/);
     setFilter('standalone');
-    assert.match(sandbox.__replaced.at(-1), /[?&]filter=standalone/);
+    assert.match(world.replaced.at(-1), /[?&]filter=standalone/);
   });
 
   test('the URL keeps the other parameters the page was opened with', () => {
-    const sandbox = makeSandbox({ href: 'https://harbour.test/workspace/acme/observation?source=x&view=due' });
-    const { switchView } = sandbox.module.exports;
+    const world = makeWorld({ href: 'https://harbour.test/workspace/acme/observation?source=x&view=due' });
+    const { switchView } = world.sandbox.module.exports;
     switchView('rulings');
-    assert.match(sandbox.__replaced.at(-1), /source=x/);
-    assert.match(sandbox.__replaced.at(-1), /view=rulings/);
+    assert.match(world.replaced.at(-1), /source=x/);
+    assert.match(world.replaced.at(-1), /view=rulings/);
   });
 
   test('a filter change that keeps the source re-polls that source', async () => {
     const calls = [];
-    const sandbox = makeSandbox({
+    const world = makeWorld({
       fetchImpl: async (url) => { calls.push(url); return jsonResponse({ active: [], recent: [], rulings: [] }); }
     });
-    const { setFilter } = sandbox.module.exports;
+    const { setFilter } = world.sandbox.module.exports;
     setFilter('standalone');
     await flush();
     const before = calls.length;
@@ -436,8 +432,8 @@ describe('the runs filter and the URL (LIN-3983)', () => {
 describe('the standalone waiting read (decision 8, LIN-3983)', () => {
   test('it makes no request off the autopilot filter or off the runs view', async () => {
     let calls = 0;
-    const sandbox = makeSandbox({ fetchImpl: async () => { calls++; return jsonResponse({ active: [] }); } });
-    const { pollWaitingSupplement, setFilter, switchView } = sandbox.module.exports;
+    const world = makeWorld({ fetchImpl: async () => { calls++; return jsonResponse({ active: [] }); } });
+    const { pollWaitingSupplement, setFilter, switchView } = world.sandbox.module.exports;
     setFilter('standalone');
     switchView('due');
     await flush();
@@ -457,17 +453,17 @@ describe('the standalone waiting read (decision 8, LIN-3983)', () => {
 
   test('on the autopilot filter it adds the standalone waits, and keeps the block as it was when it fails', async () => {
     let ok = true;
-    const sandbox = makeSandbox({
+    const world = makeWorld({
       fetchImpl: async () => (ok
         ? jsonResponse({ active: [waitingSession({ sessionId: 'sa-1' }), { ...waitingSession({ sessionId: 'ap-1' }), standalone: false }] })
         : jsonResponse({}, { ok: false, status: 500 }))
     });
-    const { pollWaitingSupplement, standaloneWaitSupplement, setOpenLoopIds } = sandbox.module.exports;
+    const { pollWaitingSupplement, standaloneWaitSupplement, setOpenLoopIds } = world.sandbox.module.exports;
     setOpenLoopIds(new Set());
     await pollWaitingSupplement();
     await flush();
     assert.deepEqual([...standaloneWaitSupplement.keys()], ['sa-1'], 'only standalone runs are added');
-    assert.equal(sandbox.__nodes.get('obs-waiting').hidden, false);
+    assert.equal(byId(world, 'obs-waiting').hidden, false);
     ok = false;
     await pollWaitingSupplement();
     await flush();
@@ -476,16 +472,16 @@ describe('the standalone waiting read (decision 8, LIN-3983)', () => {
 
   test('on the standalone filter an autopilot run waiting on a plain [blocked] stays in the block (decision 8(i))', async () => {
     const autopilotWait = waitingSession({ sessionId: 'ap-1', standalone: false, waitingLoopIds: ['loop-ap'], producerLoopId: 'loop-ap' });
-    const sandbox = makeSandbox({
+    const world = makeWorld({
       fetchImpl: async () => jsonResponse({ active: [autopilotWait], recent: [], rulings: [] })
     });
-    const { setFilter, setOpenLoopIds } = sandbox.module.exports;
+    const { setFilter, setOpenLoopIds } = world.sandbox.module.exports;
     setOpenLoopIds(new Set());
     setFilter('standalone'); // the filter change polls the feed, which fills the block's session list
     await flush();
-    const block = sandbox.__nodes.get('obs-waiting');
+    const block = byId(world, 'obs-waiting');
     assert.equal(block.hidden, false, 'the block is shown on the standalone filter');
-    assert.match(sandbox.__nodes.get('obs-waiting-runs').innerHTML, /data-session-id="ap-1"/);
+    assert.match(byId(world, 'obs-waiting-runs').innerHTML, /data-session-id="ap-1"/);
   });
 });
 
@@ -584,7 +580,7 @@ function assertAgreement(payloads, rows, openIds, compact) {
   }
 }
 
-const { compactWaitSessions: compactOverBuilder } = makeSandbox().module.exports;
+const { compactWaitSessions: compactOverBuilder } = makeWorld().sandbox.module.exports;
 
 // Runs the block's whole rule over one loop set, and checks agreement before returning.
 function runBlock({ loops, shelved = [] }) {
