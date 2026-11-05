@@ -2127,3 +2127,8 @@ What keeps the network bounded is what we've been learning: pull not push, a pri
 **A future experiment (John):** costing runs on a blank repo, a greenfield project and an already-tidy codebase, as controls Harbour can't give itself, and as a test of the prompts' generality. The sharpest version is **the same tasks on two copies of one codebase, one tidy and one with planted duplication** (the "18 copies" kind), comparing cost, review rounds and escaped defects like for like. Either outcome is live: the record says copies drive escapes (45% of escaped defects), while hours within a size band don't differ, and the size-and-cost paper found the work leg doesn't follow size. So copies may cost reliability more than money. A candidate paper, not yet filed.
 
 John is happy to keep running as we have been: tweak, learn, improve.
+
+### 14:30 UTC: the first "after" trial lifts its area from mixed to better
+- **LIN-4276: better, better. LIN-4263 + LIN-4276 together: better, better.** LIN-4263 alone was mixed, mixed. A small tidy-after of the blind reads' named edges, Survey-checked first (the NaN claim corrected), turned a capability ticket's area from mixed to better. As a bonus, merging the two key lists fixed a real double-count.
+- **What it cost:** one small ticket (about 40 minutes from filing to merge), plus its floor. The size-and-cost paper's v2 can price that against the follow-on savings.
+- **Second trial, started now:** LIN-4251's edges (the second copy of the endpoint-hint ladder my byte-identical rule invited; four near-copies of the closing lead-in; a literal Survey list back in a test). LIN-4247's and LIN-4246's edges follow when LIN-4255 has moved their suites.
