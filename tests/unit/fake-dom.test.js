@@ -234,9 +234,35 @@ describe('fake DOM: selectors match what a browser matches, and refuse what they
     assert.equal(k.closest('table'), null);
   });
 
+  test('[attr^="v"] matches a value that starts with v; an empty v matches nothing (CSS: LIN-4279)', () => {
+    const w = world();
+    w.parse('<p class="k">a</p><p class="kk">b</p><p class="xk">c</p><p class="kx">d</p>');
+    const texts = (sel) => w.document.querySelectorAll(sel).map((e) => e.textContent);
+    assert.deepEqual(texts('p[class^="k"]'), ['a', 'b', 'd']);
+    assert.equal(w.document.querySelectorAll('p[class^=""]').length, 0, 'an empty value matches nothing');
+  });
+
+  test('[attr$="v"] matches a value that ends with v (LIN-4279)', () => {
+    const w = world();
+    w.parse('<p class="k">a</p><p class="kk">b</p><p class="xk">c</p><p class="kx">d</p>');
+    assert.deepEqual(w.document.querySelectorAll('p[class$="k"]').map((e) => e.textContent), ['a', 'b', 'c']);
+  });
+
+  test('[attr*="v"] matches a value that contains v (LIN-4279)', () => {
+    const w = world();
+    w.parse('<p class="k">a</p><p class="kk">b</p><p class="xk">c</p><p class="zz">d</p>');
+    assert.deepEqual(w.document.querySelectorAll('p[class*="k"]').map((e) => e.textContent), ['a', 'b', 'c']);
+  });
+
+  test('~= and |= still throw, and the error names the selector (LIN-4279)', () => {
+    const { document } = fixture();
+    throwsNaming(() => document.querySelectorAll('[class~=k]'), '[class~=k]');
+    throwsNaming(() => document.querySelectorAll('[lang|=en]'), '[lang|=en]');
+  });
+
   test('a selector the engine does not model throws, naming it, and never returns empty', () => {
     const { document } = fixture();
-    for (const sel of ['p + span', 'p ~ span', '* ', 'p:has(span)', 'p:nth-child(2)', 'p:hover', 'p::before', '[class^="k"]']) {
+    for (const sel of ['p + span', 'p ~ span', '* ', 'p:has(span)', 'p:nth-child(2)', 'p:hover', 'p::before', '[class~="k"]', '[lang|="en"]']) {
       throwsNaming(() => document.querySelectorAll(sel), 'unsupported selector');
     }
   });
@@ -522,5 +548,93 @@ describe('fake DOM: className and id reflect the class and id attributes (LIN-42
     el.setAttribute('id', 'z');
     assert.equal(el.id, 'z', 'the id attribute is the value read back');
     assert.equal(document.querySelector('#z'), el);
+  });
+});
+
+describe('fake DOM: getElementById (LIN-4279)', () => {
+  test('getElementById returns the first connected match in tree order, and null when there is none', () => {
+    const { parse, document } = world();
+    parse('<div><p id="dup">first</p></div><span id="dup">second</span>');
+    assert.equal(document.getElementById('dup'), document.querySelector('p'), 'the first match in tree order');
+    assert.equal(document.getElementById('absent'), null);
+  });
+
+  test('getElementById finds nothing in a detached subtree, and finds the node once it is connected', () => {
+    const { document } = world();
+    const el = document.createElement('section');
+    el.id = 'loose';
+    assert.equal(document.getElementById('loose'), null, 'detached: not found');
+    document.body.appendChild(el);
+    assert.equal(document.getElementById('loose'), el, 'connected: found');
+  });
+
+  test('getElementById does not search a template’s content, which is not in the document', () => {
+    const { parse, document } = world();
+    parse('<template><i id="t">x</i></template><b id="u">y</b>');
+    assert.equal(document.getElementById('u').localName, 'b', 'a connected element outside the template is found');
+    assert.equal(document.getElementById('t'), null, 'template content is not in the document');
+    assert.equal(document.querySelector('template').content.querySelector('#t').localName, 'i', 'the content does hold it');
+  });
+});
+
+describe('fake DOM: named entities the server output uses (LIN-4279)', () => {
+  test('&middot; decodes to U+00B7 and serializes as the literal character', () => {
+    const { parse, document } = world();
+    parse('<p>a&middot;b</p>');
+    const p = document.querySelector('p');
+    assert.equal(p.textContent, 'a·b');
+    assert.equal(p.innerHTML, 'a·b');
+  });
+
+  test('&mdash; decodes to U+2014', () => {
+    const { parse, document } = world();
+    parse('<p>a&mdash;b</p>');
+    assert.equal(document.querySelector('p').textContent, 'a—b');
+  });
+
+  test('&hellip; decodes to U+2026', () => {
+    const { parse, document } = world();
+    parse('<p>wait&hellip;</p>');
+    assert.equal(document.querySelector('p').textContent, 'wait…');
+  });
+
+  test('&times; decodes to U+00D7', () => {
+    const { parse, document } = world();
+    parse('<p>2&times;3</p>');
+    assert.equal(document.querySelector('p').textContent, '2×3');
+  });
+});
+
+describe('fake DOM: createElementNS keeps SVG names as written (LIN-4279)', () => {
+  const SVG = 'http://www.w3.org/2000/svg';
+
+  test('an SVG-namespace element has tagName and localName "svg", not upper-cased', () => {
+    const { document } = world();
+    const svg = document.createElementNS(SVG, 'svg');
+    assert.equal(svg.tagName, 'svg');
+    assert.equal(svg.localName, 'svg');
+    assert.equal(svg.namespaceURI, SVG);
+  });
+
+  test('a mixed-case SVG name is pinned as written, in localName and tagName', () => {
+    const { document } = world();
+    const grad = document.createElementNS(SVG, 'linearGradient');
+    assert.equal(grad.localName, 'linearGradient');
+    assert.equal(grad.tagName, 'linearGradient');
+    document.body.appendChild(grad);
+    assert.equal(document.querySelector('linearGradient'), grad, 'a type selector matches the name as written');
+    assert.equal(document.querySelector('lineargradient'), null, 'a type selector is case-sensitive off the HTML namespace');
+  });
+
+  test('attribute names on a namespaced element keep their case (viewBox); an HTML element still lower-cases them', () => {
+    const { document } = world();
+    const svg = document.createElementNS(SVG, 'svg');
+    svg.setAttribute('viewBox', '0 0 10 10');
+    assert.equal(svg.getAttribute('viewBox'), '0 0 10 10');
+    assert.equal(svg.getAttribute('viewbox'), null, 'the name is stored as written');
+    assert.equal(svg.outerHTML, '<svg viewBox="0 0 10 10"></svg>');
+    const div = document.createElement('div');
+    div.setAttribute('viewBox', 'x');
+    assert.equal(div.getAttribute('viewbox'), 'x', 'HTML attribute names are lower-cased');
   });
 });

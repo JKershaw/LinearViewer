@@ -19,19 +19,28 @@
  * - Tree and identity: element, text, comment and fragment nodes in order; `children` (elements only, a real array),
  *   `childNodes`, `parentNode`, `parentElement`, `appendChild`, `insertBefore`, `removeChild`, `remove`, `replaceWith`,
  *   `contains` (inclusive), `isConnected` (reaches the world's document), `textContent` get/set.
+ * - Documents and namespaces (LIN-4279): `getElementById` is the first connected match in tree order, and template content is
+ *   not searched. `createElementNS(ns, name)` makes an element in that namespace. An HTML-namespace one is made as
+ *   `createElement` makes it. Any other keeps its name as written: an SVG `svg` has `tagName` and `localName` `svg` (not
+ *   upper-cased), and `linearGradient` is pinned. Attribute names on a non-HTML element keep their case (`viewBox`); on an
+ *   HTML element they are lower-cased, as before. The case is kept because a browser stores an SVG attribute as written,
+ *   and `chart-helpers.js` sets `viewBox`.
  * - `innerHTML` and `outerHTML`, get and set. The serializer is browser-faithful: attributes in source order, a valueless
  *   attribute as `name=""`, text escapes `& < >`, attribute values escape `& "`, void elements have no end tag, script
  *   and style text is raw, `<template>` serializes its content. The typed `value` is not in the markup. `outerHTML =` on
  *   a node with no parent does nothing, as the DOM Parsing spec says. The parser throws on a malformed tag, an
- *   unmatched end tag, an unknown named entity and markup it does not model (`<!doctype …>`).
+ *   unmatched end tag, an unknown named entity (the named set is `amp lt gt quot apos nbsp middot mdash hellip times`) and
+ *   markup it does not model (`<!doctype …>`).
  * - Attributes: `get/set/has/removeAttribute`, `hidden`, `disabled` and `type` (reflecting; `type` defaults to `text` on an
  *   input and `submit` on a button), `dataset` (kebab-cased, with
  *   `delete`), `classList` (`add`, `remove`, `toggle` with force, `contains`), and `className` and `id`, which reflect the `class`
  *   and `id` attributes (a set writes the attribute, so `className = ''` leaves `class=""`, and a read is `''` when absent).
  *   This reverses LIN-4252's "not modelled" choice for these two properties (LIN-4270).
- * - Selectors (`querySelector[All]`, `matches`, `closest`): type, `.class`, `#id`, `[attr]`, `[attr="v"]`, compound chains,
+ * - Selectors (`querySelector[All]`, `matches`, `closest`): type, `.class`, `#id`, `[attr]`, `[attr="v"]`, `[attr^="v"]`,
+ *   `[attr$="v"]`, `[attr*="v"]` (an empty `v` matches nothing, as in CSS), compound chains,
  *   descendant and `>` combinators, comma lists, `:not(<compound list>)`, and `:scope`. Anything else throws, naming the
- *   selector: `+`, `~`, `*`, `:has`, `:nth-*`, other pseudo-classes, and attribute operators other than `=`.
+ *   selector: `+`, `~`, `*`, `:has`, `:nth-*`, other pseudo-classes, and attribute operators other than `=`, `^=`, `$=` and `*=` (so `~=` and `|=` throw).
+ *   A type selector is case-insensitive on an HTML element and case-sensitive on any other.
  * - Form state: an input's or textarea's `value` (from the `value` attribute or the text until it is set, then independent),
  *   an input's `checked` (from the `checked` attribute until it is set, then independent and not serialized), `selectionStart`, `selectionEnd` and `setSelectionRange`. The caret starts and moves to the end of the value.
  * - Focus: `focus()` and `blur()` on focusable elements. `document.activeElement` is per world. It returns the body when
@@ -42,7 +51,8 @@
  *
  * Deliberately not modelled: layout, CSS, `:hover`, `:checked` and the other state pseudo-classes, `+` and `~`, event
  * dispatch and bubbling, HTML error recovery (implied end tags such as `<p>` closing `<p>`), foreign content (SVG and
- * MathML), `<script>` execution, `getBoundingClientRect`, `MutationObserver`, `Range` and `Selection`,
+ * MathML): `innerHTML` parses SVG markup as HTML elements, so only `createElementNS` makes an SVG-namespace node;
+ * `<script>` execution, `getBoundingClientRect`, `MutationObserver`, `Range` and `Selection`,
  * `getClientRects` (so a Tab-driven focus trap cannot be exercised), `select`, and selection direction.
  */
 
@@ -50,10 +60,13 @@ const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input'
 const RAW_TEXT = new Set(['script', 'style']);
 const RCDATA = new Set(['textarea', 'title']);
 const FORM_CONTROLS = new Set(['input', 'textarea', 'select', 'button']);
-const NAMED = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+const NAMED = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", middot: '\u00b7', mdash: '\u2014', hellip: '\u2026', times: '\u00d7', nbsp: ' ' };
 const WS = /[ \t\n\f\r]/;
 const ELEMENT_NAME = /^[a-zA-Z][a-zA-Z0-9-]*$/;
 const ATTR_NAME = /^[a-z_:][a-z0-9_:.-]*$/;
+const ATTR_NAME_NS = /^[A-Za-z_:][A-Za-z0-9_:.-]*$/; // a non-HTML element keeps the case it was given (LIN-4279)
+const HTML_NS = 'http://www.w3.org/1999/xhtml';
+const isHtmlEl = (el) => el.namespaceURI === HTML_NS;
 const REF = /&(#[0-9]+|#[xX][0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g;
 
 /** Thrown for anything the fake does not model, or a DOM operation a browser would refuse. */
@@ -199,11 +212,12 @@ class FakeFragment extends FakeNode {
 }
 
 class FakeElement extends FakeNode {
-  constructor(doc, localName) {
+  constructor(doc, localName, namespaceURI = HTML_NS) {
     super(doc);
     this.nodeType = 1;
+    this.namespaceURI = namespaceURI;
     this.localName = localName;
-    this.tagName = localName.toUpperCase();
+    this.tagName = isHtmlEl(this) ? localName.toUpperCase() : localName;
     this._attrs = new Map();
     this._valueDirty = false;
     this._value = '';
@@ -219,17 +233,19 @@ class FakeElement extends FakeNode {
     if (this.content) this.content._adopt(doc);
   }
 
+  /** Attribute names are lower-cased on an HTML element and kept as written on any other (LIN-4279). */
+  _attrKey(name) { return isHtmlEl(this) ? String(name).toLowerCase() : String(name); }
   getAttribute(name) {
-    const v = this._attrs.get(String(name).toLowerCase());
+    const v = this._attrs.get(this._attrKey(name));
     return v === undefined ? null : v;
   }
   setAttribute(name, value) {
-    const n = String(name).toLowerCase();
-    if (!ATTR_NAME.test(n)) fail(`invalid attribute name ${JSON.stringify(name)}`);
+    const n = this._attrKey(name);
+    if (!(isHtmlEl(this) ? ATTR_NAME : ATTR_NAME_NS).test(n)) fail(`invalid attribute name ${JSON.stringify(name)}`);
     this._attrs.set(n, String(value));
   }
-  hasAttribute(name) { return this._attrs.has(String(name).toLowerCase()); }
-  removeAttribute(name) { this._attrs.delete(String(name).toLowerCase()); }
+  hasAttribute(name) { return this._attrs.has(this._attrKey(name)); }
+  removeAttribute(name) { this._attrs.delete(this._attrKey(name)); }
 
   /** `className` and `id` reflect the `class` and `id` attributes: the attribute is the only store. A read with no attribute is `''`. */
   get className() { return this.getAttribute('class') ?? ''; }
@@ -390,6 +406,31 @@ class FakeDocument extends FakeNode {
     if (!ELEMENT_NAME.test(n)) fail(`invalid element name ${JSON.stringify(name)}`);
     return new FakeElement(this, n);
   }
+
+  /** The first connected element with this id, in tree order; `null` for an empty id. Template content is not searched. */
+  getElementById(id) {
+    const want = String(id);
+    if (want === '') return null;
+    const walk = (node) => {
+      for (const k of node._kids) {
+        if (k.nodeType !== 1) continue;
+        if (k.getAttribute('id') === want) return k;
+        const hit = walk(k);
+        if (hit) return hit;
+      }
+      return null;
+    };
+    return walk(this);
+  }
+
+  /** An HTML-namespace element is made as `createElement` makes it. Any other keeps its name as written (LIN-4279). */
+  createElementNS(namespaceURI, name) {
+    const ns = namespaceURI === null || namespaceURI === undefined || namespaceURI === '' ? null : String(namespaceURI);
+    if (ns === HTML_NS) return this.createElement(name);
+    const n = String(name);
+    if (!ELEMENT_NAME.test(n)) fail(`invalid element name ${JSON.stringify(name)}`);
+    return new FakeElement(this, n, ns);
+  }
 }
 
 // ── Attributes, classes, data ──────────────────────────────────────────────
@@ -418,7 +459,7 @@ function serializeNode(node) {
   if (node.nodeType === 1) return serializeElement(node);
   if (node.nodeType === 3) {
     const parent = node.parentNode;
-    const raw = parent && parent.nodeType === 1 && RAW_TEXT.has(parent.localName);
+    const raw = parent && parent.nodeType === 1 && isHtmlEl(parent) && RAW_TEXT.has(parent.localName);
     return raw ? node.data : escapeText(node.data);
   }
   if (node.nodeType === 8) return `<!--${node.data}-->`;
@@ -428,7 +469,7 @@ function serializeElement(el) {
   let s = `<${el.localName}`;
   for (const [k, v] of el._attrs) s += ` ${k}="${escapeAttr(v)}"`;
   s += '>';
-  if (VOID.has(el.localName)) return s;
+  if (isHtmlEl(el) && VOID.has(el.localName)) return s;
   return `${s}${serializeKids(el._host())}</${el.localName}>`;
 }
 const serializeKids = (host) => host._kids.map(serializeNode).join('');
@@ -638,12 +679,12 @@ function parseSimple(text, i, whole) {
     return { simple: { kind: c === '.' ? 'class' : 'id', name: m[0] }, next: i + 1 + m[0].length };
   }
   if (c === '[') {
-    const attr = /\[\s*([a-zA-Z_][\w-]*)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([\w-]+))\s*)?\]/y;
+    const attr = /\[\s*([a-zA-Z_][\w-]*)\s*(?:([\^$*]?=)\s*(?:"([^"]*)"|'([^']*)'|([\w-]+))\s*)?\]/y;
     attr.lastIndex = i;
     const m = attr.exec(text);
-    if (!m) unsupported('only [attr] and [attr="value"] are modelled');
-    const value = m[2] ?? m[3] ?? m[4];
-    return { simple: { kind: 'attr', name: m[1].toLowerCase(), value }, next: i + m[0].length };
+    if (!m) unsupported('only [attr], [attr="value"], and the ^=, $= and *= forms are modelled');
+    const value = m[3] ?? m[4] ?? m[5];
+    return { simple: { kind: 'attr', name: m[1], op: m[2] ?? '=', value }, next: i + m[0].length };
   }
   if (c === ':') {
     if (text.startsWith(':scope', i) && !/[\w-]/.test(text[i + 6] || '')) {
@@ -667,7 +708,7 @@ function parseSimple(text, i, whole) {
   if (/[a-zA-Z]/.test(c)) {
     const m = /[a-zA-Z][\w-]*/y;
     m.lastIndex = i;
-    const tag = m.exec(text)[0].toLowerCase();
+    const tag = m.exec(text)[0];
     return { simple: { kind: 'tag', name: tag }, next: i + tag.length };
   }
   return unsupported(`"${c}" is not modelled`);
@@ -675,13 +716,20 @@ function parseSimple(text, i, whole) {
 
 function matchSimple(el, s, scope) {
   switch (s.kind) {
-    case 'tag': return el.localName === s.name;
+    case 'tag': return isHtmlEl(el) ? el.localName === s.name.toLowerCase() : el.localName === s.name;
     case 'class': return el.classList.contains(s.name);
     case 'id': return el.getAttribute('id') === s.name;
     case 'attr': {
       const v = el.getAttribute(s.name);
       if (v === null) return false;
-      return s.value === undefined || v === s.value;
+      if (s.value === undefined) return true;
+      switch (s.op) {
+        case '=': return v === s.value;
+        case '^=': return s.value !== '' && v.startsWith(s.value);
+        case '$=': return s.value !== '' && v.endsWith(s.value);
+        case '*=': return s.value !== '' && v.includes(s.value);
+        default: return fail(`unknown attribute operator ${s.op}`);
+      }
     }
     case 'scope': return el === scope;
     case 'not': return !s.list.some((c) => matchFrom(el, c, 0, scope));
