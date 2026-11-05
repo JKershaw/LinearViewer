@@ -1670,3 +1670,11 @@ Each is its own piece, with a stop-and-say rule on 5 and 6. Autopilot `84fa12ad`
   - **It also extracted the keep check as one shared function**, as scoped.
   - **The ruling `lin4242-keep-witness-scope`:** build a repaint witness for the opened task's `keepTypedQuestion` call site, or accept? **Proposed: accept, and make the witness its own follow-up.** The gap predates the ticket (LIN-4024), and it needs a full state fixture, a different-sized piece.
 - (A container restart at about 00:00 stopped my watcher; nothing was lost.)
+
+### 01:40 UTC: LIN-4242 merged, the feature's core; scored against the 21:50 criteria
+- **No second poll: met.** The `setInterval` count in `public/` is unchanged; the refresh rides the badge's tick.
+- **No new homeless file: missed.** `lib/waiting-section.js` (the one renderer, moved out of `render.js`) lands in the map's catch-all, and Pages↔Other grew by one each way.
+- **Every copy both voices predicted was avoided:** one renderer for page and fragment, one keep-if-typing check, Home's own reduction.
+- **Ledger:** `+ (mixed)`.
+- **A pattern worth watching (not yet a finding):** tonight's code-only rows LIN-4241 and LIN-4242 each left one new file without a map home; LIN-4234 and LIN-4240 left none. With no map in the Survey, "home" is judged from the code, and the map lags. That's what you'd expect in a repo with no map, and the honest cost of the steer: **the copies stay down, but nobody tends the homes.** Two rows isn't a trend; LIN-4203 (routed) left one too.
+- After-questions sent to LIN-4241's builder. LIN-4242's are held until its ruling is discharged, because its build session *is* the ruling's loop.
