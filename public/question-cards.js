@@ -453,8 +453,7 @@
   // ── Live Waiting on you (LIN-4242) ───────────────────────────────────────────
   // The merge unit is the `.waiting-card` wrapper (task line + card), keyed by rulingKeyOf on its inner session card. A
   // kept wrapper is never re-rendered or moved: moving a focused textarea blurs it. Rulings this page has settled (answered
-  // or dismissed here, or removed as answered elsewhere) are remembered, so a response requested before that never
-  // re-adds one.
+  // or dismissed here, or refused as settled) are remembered, so a response requested before that never re-adds one.
   var settledKeys = new Set();
   function noteSettled(key) { if (key) settledKeys.add(key); }
   function innerCardOf(wrapper) { return wrapper.querySelector('[data-testid="session-question-card"]'); }
@@ -468,6 +467,13 @@
     if (textarea && textarea.value && textarea.value.length > 0) return true;
     var active = document.activeElement;
     return !!active && active !== card && typeof card.contains === 'function' && card.contains(active);
+  }
+  // LIN-4242: whether a repaint keeps the card already on the page in place of its fresh markup (the opened task's
+  // keepTypedQuestion, public/prompt-section.js). The ruling key is the gate: a different ruling's card is never kept, and
+  // the same ruling's card is kept only while it holds the reader's place.
+  function keepsReaderPlace(oldCard, freshCard) {
+    if (!oldCard || !freshCard) return false;
+    return rulingKeyOf(oldCard) === rulingKeyOf(freshCard) && cardHoldsInput(oldCard);
   }
   function waitingWrappersIn(body) {
     var out = [];
@@ -505,7 +511,8 @@
       if (freshKeys.has(key)) return;
       var inner = innerCardOf(wrapper);
       if (inner && inner.dataset && inner.dataset.answerInFlight === 'true') return;
-      noteSettled(key);
+      // Not settled here: a card that leaves one response may return in a later one (a live run on its task comes and goes).
+      // Only an answer or dismiss on this page settles a key, through RULING_GONE_EVENT (app.js onRulingGone -> noteSettled).
       removed.push(key);
       wrapper.remove();
     });
@@ -523,7 +530,7 @@
     return { count: waitingWrappersIn(body).length, removed: removed };
   }
 
-  var api = { appendYouBubble: appendYouBubble, sendReply: sendReply, dismissQuestionCard: dismissQuestionCard, initQuestionCards: initQuestionCards, rulingKeyOf: rulingKeyOf, RULING_GONE_EVENT: RULING_GONE_EVENT, setDeskRoot: function (el) { deskRoot = el; }, cardHoldsInput: cardHoldsInput, mergeWaitingCards: mergeWaitingCards, noteSettled: noteSettled };
+  var api = { appendYouBubble: appendYouBubble, sendReply: sendReply, dismissQuestionCard: dismissQuestionCard, initQuestionCards: initQuestionCards, rulingKeyOf: rulingKeyOf, RULING_GONE_EVENT: RULING_GONE_EVENT, setDeskRoot: function (el) { deskRoot = el; }, cardHoldsInput: cardHoldsInput, keepsReaderPlace: keepsReaderPlace, mergeWaitingCards: mergeWaitingCards, noteSettled: noteSettled };
   if (typeof window !== 'undefined') window.QuestionCards = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();

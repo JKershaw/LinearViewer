@@ -983,8 +983,8 @@
       const QC = window.QuestionCards;
       const oldCard = oldQuestion && oldQuestion.querySelector ? oldQuestion.querySelector('[data-testid="session-question-card"]') : null;
       const freshCard = fresh.querySelector ? fresh.querySelector('[data-testid="session-question-card"]') : null;
-      const sameRuling = !!(QC && oldCard && freshCard && QC.rulingKeyOf(oldCard) === QC.rulingKeyOf(freshCard));
-      if (oldQuestion && (oldQuestion.innerHTML === fresh.innerHTML || (sameRuling && QC.cardHoldsInput(oldCard)))) { fresh.replaceWith(oldQuestion); return; }
+      const keepsPlace = !!(QC && typeof QC.keepsReaderPlace === 'function' && QC.keepsReaderPlace(oldCard, freshCard));
+      if (oldQuestion && (oldQuestion.innerHTML === fresh.innerHTML || keepsPlace)) { fresh.replaceWith(oldQuestion); return; }
       if (QC && typeof QC.initQuestionCards === 'function') QC.initQuestionCards(container);
     }
 

@@ -164,7 +164,7 @@ import { noJobBody, noJobNoticeOf } from './lib/components/dispatch-no-job.js'
 import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
 import { rowDataByNodeKey } from './lib/task-board-view.js'
 import { createHomeRowStates, createWaitingStanding, gatherTaskStates } from './lib/home-row-states.js'
-import { renderWaitingSection } from './lib/waiting-section.js'
+import { renderWaitingSection, waitingTitlesOf } from './lib/waiting-section.js'
 import { createTaskFactsHolder, createTaskFactsRefresh } from './lib/task-facts-holder.js'
 import { createWorkspaceIssuesMemo } from './lib/workspace-issues-memo.js'
 import { createKeyState } from './lib/key-state.js'
@@ -3734,6 +3734,7 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
 // LIN-4242: the live Waiting on you fragment. Owner only, by the page's own predicate (`featureFlags.runControls === true`):
 // anyone else gets a 403 and no card text. It draws the section the page draws, over the same reduction (`waitingStanding`),
 // and answers `{ html, count }` only. The client derives each card's key from the markup (`rulingKeyOf`), so no keys here.
+// Titles come from the held task facts when warm, so a card a refresh adds reads as the page reads it.
 app.get('/workspace/:urlKey/api/home-waiting', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
   try {
@@ -3741,7 +3742,11 @@ app.get('/workspace/:urlKey/api/home-waiting', workspaceFromUrl, async (req, res
     if (featureFlags.runControls !== true) return jsonError(res, 403, 'Waiting on you is for the workspace owner');
     const { ruling } = await waitingStanding({ urlKey: workspace.urlKey });
     const rows = ruling ? ruling.rows : [];
-    const html = renderWaitingSection({ rows }, { urlKey: workspace.urlKey, owner: true });
+    // The task titles come from the held issue set when it is warm (a read, no provider call); a cold set leaves them to
+    // `anchor.issueTitle`, the same fallback the section always had.
+    const held = taskFacts.read(workspace.urlKey);
+    const titles = held.complete ? waitingTitlesOf(held.issues, rows.map(row => row?.anchor?.issueIdentifier).filter(Boolean)) : {};
+    const html = renderWaitingSection({ rows, titles }, { urlKey: workspace.urlKey, owner: true });
     res.json({ html, count: rows.length });
   } catch (error) {
     if (isAuthError(error)) return unauthorized.json(res, 'Not authenticated');

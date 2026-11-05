@@ -159,6 +159,22 @@ test('Home on this shape with twenty open rulings: the Waiting section is owner-
   console.log(`LIN-4114 measure: home html with ${todo.length} open rulings=${bytes} bytes inlineStyle=${inlineStyles}`);
   expect(bytes).toBeLessThan(HOME_BYTES_CEILING);
   expect(inlineStyles).toBeLessThan(INLINE_STYLE_CEILING);
+
+  // LIN-4242 measure: the live fragment (the shared reduction, then the section's render) on this shape with these rulings.
+  // An open owner tab asks for it every rulings tick (5s), with no cache, so this is the cost each such tab adds.
+  const samples = [];
+  let fragment = null;
+  for (let i = 0; i < 10; i += 1) {
+    const start = Date.now();
+    fragment = await page.request.get(`/workspace/${URL_KEY}/api/home-waiting`);
+    samples.push(Date.now() - start);
+    expect(fragment.ok()).toBeTruthy();
+  }
+  const sorted = [...samples].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const body = await fragment.json();
+  console.log(`LIN-4242 measure: home-waiting fragment with ${todo.length} open rulings: median ${median} ms, min ${sorted[0]} ms, max ${sorted[sorted.length - 1]} ms over ${samples.length} requests, ${Buffer.byteLength(body.html, 'utf8')} bytes`);
+  expect(body.count).toBe(todo.length);
 });
 
 // Witness F (timing): the server's cost for Home's state build (the page render, which builds each row's state and the

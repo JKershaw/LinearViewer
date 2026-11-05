@@ -27,6 +27,15 @@ const WAIT_CARD = `${SECTION} .waiting-card`;
 const COUNT = '[data-testid="in-progress-count"]';
 const BADGE = '.rulings-badge .rulings-count';
 
+/**
+ * LIN-4242: the badge reads the rulings feed through the 5s cache and moves only on the interval. Clear the cache and read
+ * the badge once, so each badge assertion waits on this read and not on the interval.
+ */
+async function syncBadge(page) {
+  await page.request.get(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
+  await page.evaluate((urlKey) => window.updateRulingsBadge(urlKey), URL_KEY);
+}
+
 let URL_KEY;
 let RUNNER_TOKEN = null;
 
@@ -105,6 +114,7 @@ test('W7: a ruling three levels down and a solo ruling each get one card, and th
   await expect(section.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-D' })).toHaveCount(1);
   await expect(section.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-S' })).toHaveCount(1);
   await expect(page.locator(COUNT)).toContainText('2 waiting on you');
+  await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('2', { timeout: 15000 });
 });
 
@@ -171,6 +181,7 @@ test('W12: pressing the recommended button answers in place; the card goes, the 
   await seedRuling(page, 'LOCAL-S', { options: [{ id: 'a', label: 'Yes' }] });
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator(COUNT)).toContainText('2 waiting on you');
+  await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('2', { timeout: 15000 });
 
   const deep = page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-D' }) });
@@ -178,6 +189,7 @@ test('W12: pressing the recommended button answers in place; the card goes, the 
   await deep.locator('.btn--primary').click();
   await expect(deep).toHaveCount(0);
   await expect(page.locator(COUNT)).toContainText('1 waiting on you');
+  await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('1', { timeout: 15000 });
 
   await page.reload();
@@ -195,6 +207,7 @@ test('W12b: a press on a non-recommended option answers the same way, and the la
   await expect(page.locator(SECTION)).toBeHidden();
   await expect(page.locator(WAIT_CARD)).toHaveCount(0);
   await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
+  await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('0', { timeout: 15000 });
 });
 
@@ -288,6 +301,7 @@ test('W14: answering a waiting task\'s card inside search removes the Waiting ca
   await expect(page.locator(SECTION)).toBeHidden();
   await expect(page.locator(WAIT_CARD)).toHaveCount(0);
   await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
+  await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('0', { timeout: 15000 });
 });
 
@@ -324,6 +338,7 @@ test('W9b: a started waiting task with a running child is the named context row:
   expect(drawn).toBe(1);
   await expect(page.locator('main [data-identifier="LOCAL-M"] [data-testid="issue-row-state"]'), 'the context row has no state words').toHaveCount(0);
   // Count line, badge and cards agree.
+  await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('1', { timeout: 15000 });
   await expect(page.locator(COUNT)).toContainText('1 waiting on you');
 });

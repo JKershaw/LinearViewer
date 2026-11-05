@@ -46,3 +46,28 @@ describe('LIN-4114 witness 16: Waiting on you is owner only', () => {
     assert.doesNotMatch(html, /data-testid="waiting-on-you"/);
   });
 });
+
+// LIN-4242: an owner with zero rulings gets the section drawn hidden and empty, and the count line's wrapper drawn hidden,
+// so a ruling raised after load has both to land in. The live refresh (public/app.js) un-hides them; nothing is removed.
+describe('LIN-4242: the owner with zero rulings gets an empty, hidden section and a hidden count-line wrapper', () => {
+  const emptyView = {
+    inProgressTrees: [], trees: [], upNext: [], recent: { nodes: [], remaining: 0 },
+    waiting: { rows: [], ids: [], contextIds: [] },
+  };
+  const emptyHtml = (runControls) => renderPage([], [], [], 'Org', { urlKey: 'ws', workspaces: [], featureFlags: { runControls }, homeView: emptyView, rulingCount: 0 });
+
+  test('the owner: the section is present, hidden, and has no card; the count-line wrapper is present and hidden', () => {
+    // Witness: drop the `waiting-section hidden` class at zero, or the `keepWrapper` argument, and one of these fails.
+    const html = emptyHtml(true);
+    assert.match(html, /<div class="waiting-section hidden" role="region" aria-label="Waiting on you" data-testid="waiting-on-you"/);
+    assert.match(html, /data-testid="waiting-body"/);
+    assert.doesNotMatch(html, /session-question-card/);
+    assert.match(html, /<span data-testid="in-progress-count" class="hidden"><\/span>/);
+  });
+
+  test('a member gets neither the section nor the count-line wrapper', () => {
+    const html = emptyHtml(false);
+    assert.doesNotMatch(html, /data-testid="waiting-on-you"/);
+    assert.doesNotMatch(html, /data-testid="in-progress-count"/);
+  });
+});
