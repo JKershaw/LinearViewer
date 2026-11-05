@@ -11,7 +11,7 @@
  * Guard and consumers (LIN-4265, LIN-4306). `tests/unit/fake-dom-census.test.js` fails on any new hand-written fake DOM
  * under `tests/`, `scripts/eval` or `scripts/code-shape`; its `HAND_WRITTEN_FAKE_DOM_FILES` lists those not yet moved here.
  * The consumers are not listed in this header. The census computes them: the files whose imports reach this module or
- * `helpers/client-world.js`, found by an AST `ImportDeclaration` scan. It fails, and prints that set, if this paragraph
+ * `helpers/client-world.js`, directly or through a helper that does, found by an AST `ImportDeclaration` scan. It fails, and prints that set, if this paragraph
  * names a consumer other than the helpers below and the census itself. `helpers/client-world.js` (the vm loader over this
  * fake) and `helpers/live-console-world.js` (a page and lane fixture over that loader) are real importers, described here
  * as such. A suite moved onto this fake leaves `HAND_WRITTEN_FAKE_DOM_FILES` in the same PR; nothing else here needs editing.

@@ -665,12 +665,14 @@ const HEADER_NAMES_ALLOWED = new Set(['fake-dom-census.test.js', 'client-world.j
 const IMPORT_LIKE = /^(ImportDeclaration|ExportNamedDeclaration|ExportAllDeclaration)$/;
 
 /**
- * The files whose static imports or re-exports reach a consumed module, from the same scope as the scan. An AST walk,
- * not a text grep, so a comment or string that names the module does not make a consumer. Dynamic `import()` is not
- * counted: no suite uses it to reach the fake, and the scan would miss it.
+ * The files whose static imports or re-exports reach a consumed module, directly or through a helper under
+ * `tests/unit/helpers/` that does, from the same scope as the scan. A suite that imports only `live-console-world.js`
+ * (which imports `client-world.js`) is a consumer. The scan runs to a fixpoint: each pass adds the helpers found, and
+ * stops when none is new. An AST walk, not a text grep, so a comment or string that names the module does not make a
+ * consumer. Dynamic `import()` is not counted: no suite uses it to reach the fake, and the scan would miss it.
  */
 function computedConsumers() {
-  const out = new Set();
+  const imports = new Map();
   for (const file of scannedFiles()) {
     let ast;
     try {
@@ -679,11 +681,23 @@ function computedConsumers() {
       if (error instanceof SyntaxError) continue; // the parse test reports it
       throw error;
     }
+    const targets = [];
     for (const node of ast.body) {
       if (!IMPORT_LIKE.test(node.type) || typeof node.source?.value !== 'string') continue;
       if (!node.source.value.startsWith('.')) continue;
-      const target = toRepoPath(join(dirname(join(REPO, file)), node.source.value));
-      if (CONSUMED_MODULES.has(target)) { out.add(file); break; }
+      targets.push(toRepoPath(join(dirname(join(REPO, file)), node.source.value)));
+    }
+    imports.set(file, targets);
+  }
+  const reaching = new Set(CONSUMED_MODULES);
+  const out = new Set();
+  for (let added = true; added;) {
+    added = false;
+    for (const [file, targets] of imports) {
+      if (out.has(file) || !targets.some((target) => reaching.has(target))) continue;
+      out.add(file);
+      added = true;
+      if (file.startsWith('tests/unit/helpers/')) reaching.add(file);
     }
   }
   return [...out].sort();
@@ -718,6 +732,7 @@ describe('LIN-4306 — the fake-DOM consumer list is computed from imports, not 
     assert.ok(consumers.includes('tests/unit/lin-4293-tidy-after-repaint.test.js'), 'lin-4293 imports client-world.js and must be counted');
     assert.ok(consumers.includes('tests/unit/fake-dom.test.js'), 'the fake\'s own suite imports the fake');
     assert.ok(consumers.includes('tests/unit/helpers/live-console-world.js'), 'the live-console loader imports client-world.js');
+    assert.ok(consumers.includes('tests/unit/live-console-client-facts.test.js'), 'reaches client-world.js through live-console-world.js');
     assert.ok(!consumers.includes('tests/unit/fake-dom-census.test.js'), 'the census imports nothing, so it is not a consumer');
   });
 
