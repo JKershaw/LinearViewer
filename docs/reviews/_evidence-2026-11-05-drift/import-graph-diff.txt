@@ -1,0 +1,25 @@
+Import graph, rebuilt walker (scope server.js, lib/, routes/), d7ceb373 -> 2eb73ae0
+ nodes: 497 -> 499
+ staticEdges: 2042 -> 2051
+ dynamicEdges: 2 -> 2
+ routeToRoute: 53 -> 53
+ upward lib->routes/server.js (static/dynamic): {'static': 0, 'dynamic': 0} -> {'static': 0, 'dynamic': 0}
+ SCCs: [6, 6] -> [6, 6] ; members identical: True
+  SCC 6 lib/components/settings-key-row.js, lib/render-pages.js, lib/render-settings-models.js, lib/render-settings-workspace.js, lib/render-settings.js, lib/render.js
+  SCC 6 lib/digest-feedback.js, lib/live-console.js, lib/pipeline-loops.js, lib/run-loop-state.js, lib/run-summary.js, lib/session-summary.js
+ parse failures: [] -> []
+ static edges removed: 1
+  - lib/render.js -> lib/question-card.js
+ static edges added: 10
+  + lib/kpi-stats.js -> lib/cost-read.js
+  + lib/model-routing-history.js -> lib/cost-read.js
+  + lib/render.js -> lib/waiting-section.js
+  + lib/waiting-section.js -> lib/question-card.js
+  + lib/waiting-section.js -> lib/task-page-href.js
+  + lib/waiting-section.js -> lib/utils/html.js
+  + routes/dashboard-rulings.js -> lib/ruling-settled.js
+  + routes/workspace-api-issue-write.js -> lib/ruling-settled.js
+  + routes/workspace-api-scan.js -> lib/ruling-settled.js
+  + server.js -> lib/waiting-section.js
+ dynamic identical: True ['routes/proxy.js -> lib/sample-data/mock-data.js', 'routes/workspace-api-roadmap.js -> lib/prompts/roadmap-chat-template.js']
+ nodes added: ['lib/ruling-settled.js', 'lib/waiting-section.js']

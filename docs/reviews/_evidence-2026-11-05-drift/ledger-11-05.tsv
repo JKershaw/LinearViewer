@@ -1,0 +1,130 @@
+#	finding	severity (11-05)	delta vs 11-04 (11-04b)	11-05 (this run, `2eb73ae0` / `07c88f7`)	delta vs 11-04b
+1	`lib-import-cycles`	low-medium	unchanged	2 SCCs (6, 6), same members; 499 nodes / 2,051 static edges; no window edge closes a cycle (`import-graph-diff.txt`)	unchanged
+2	`provider-auth-router-upward-imports`	resolved	held	0 static / 0 dynamic `lib/`→`routes/`/`server.js` edges at both SHAs	held
+3	`routes-error-envelope-fragmentation`	low-medium	unchanged	`res.status(` 275 / 250 / 12 at both SHAs, identical per file; LIN-4241's 409 goes through `jsonError` (#F-c)	unchanged
+4	`production-to-test-fixture-imports`	resolved	held	held resolved; cited files 0-line diff	held
+5	`periodical-report-filename-convention-split`	medium-low	unchanged	cited files 0-line diff in the window	unchanged
+6	`dispatch-kind-vocabulary-cross-repo`	low	unchanged	named files touched (routes/dispatch.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+7	`provider-resolution-incantation`	low	unchanged	named files touched (lib/account-erasure.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+8	`ui-divergences-registry-staleness`	low	unchanged	named files touched (public/common.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+9	`simple-dispatcher-api-base-duplication`	low	unchanged	named files touched (server.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+10	`cross-repo-halt-vocabulary`	low-medium (sub-row)	held	cited files 0-line diff in the window	unchanged
+11	`cross-repo-sentinel-decision-marker-vocabulary`	medium	unchanged	kit 0-line diff; SD hook status strings unchanged (comment-only diff). New SD system test binds Harbour's terminal and wake readers one way, outside SD CI (#3)	unchanged
+12	`target-vocabulary`	low	unchanged	named files touched (lib/dispatch-store.js, routes/dispatch.js, server.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+13	`sse-frame-writer-duplication`	resolved	held	held resolved; named files touched, hunks in the window clusters, decision unmoved	held
+14	`routes-proxy-decomposition`	—	unchanged	cited files 0-line diff in the window	unchanged
+15	`cross-repo-repo-list`	low	unchanged	cited files 0-line diff in the window	unchanged
+16	`ci-convention-split-across-repos`	informational	unchanged	cited files 0-line diff in the window	unchanged
+17	`semicolon-style-split`	low	unchanged	named files touched (server.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+18	`client-escape-html-duplication`	—	unchanged	named files touched (public/common.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+19	`client-shared-helper-duplication`	—	unchanged	named files touched (server.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+20	`client-section-fetch-idiom-duplication`	—	unchanged	named files touched (public/question-cards.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+21	`linear-cli-parallel-graphql-surface`	—	held	named files touched (server.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+22	`store-module-uniformity`	—	unchanged	cited files 0-line diff in the window	unchanged
+23	`server-side-escaping`	—	unchanged	named files touched (lib/render.js, server.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+24	`dispatch-payload-centralization`	—	unchanged	named files touched (public/app.js, public/common.js, public/prompt-section.js, routes/dispatch.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+25	`renderer-provider-abstraction`	—	unchanged (cited files 0-line diff in the window)	named files touched (lib/render.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+26	`cache-module-family`	low	worsened (+1; now graded LOW)	8 `lib/*-cache.js`; no cache added in the window (new files: `ruling-settled`, `waiting-section`, `home-placement`)	unchanged
+27	`lib-components-primitive-adoption`	—	unchanged	named files touched (lib/render-run-steps.js, lib/render.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+28	`state-store-write-seam`	—	unchanged	cited files 0-line diff in the window	unchanged
+29	`phase-vocabulary-centralization`	low	unchanged	cited files 0-line diff in the window	unchanged
+30	`target-harness-axis-orthogonality`	—	held (cited files 0-line diff in the window)	named files touched (routes/dispatch.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+31	`test-seam-separation`	—	unchanged	cited files 0-line diff in the window	unchanged
+32	`css-token-layer`	—	unchanged	cited files 0-line diff in the window	unchanged
+33	`runner-contract-semantics-cross-repo`	medium	unchanged (snapshot-bridge sub-item resolved)	38 vs 34 rows, both 0-line diff, 0 usage rows. LIN-4218 puts the usage flush first in SD's Stop order (the U slot, `hook.js:441-468`), still in neither table	unchanged
+34	`connection-binding-predicate-drift`	low-medium	unchanged	cited files 0-line diff in the window	unchanged
+35	`run-page-identity-scrape`	medium	unchanged	cited files 0-line diff in the window	unchanged
+36	`dispatch-entrance-field-duplication`	low	unchanged	named files touched (routes/dispatch.js, routes/proxy-compute.js, server.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+37	`owner-word-collision`	low	unchanged	named files touched (lib/run-view.js, routes/dashboard.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+38	`run-family-render-primitives`	low	unchanged	named files touched (lib/render-run-steps.js, lib/render.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+39	`persist-binding-sibling-seams`	low	unchanged	cited files 0-line diff in the window	unchanged
+40	`server-formatter-duplication`	low	unchanged	named files touched (lib/effort-readout.js, lib/render.js, server.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+41	`wake-marker-regex-copies`	resolved	held	held resolved; named files touched, hunks in the window clusters, decision unmoved	held
+42	`runner-liveness-assumption`	low	unchanged	cited files 0-line diff in the window	unchanged
+43	`workspace-urlkey-consolidation`	—	unchanged	cited files 0-line diff in the window	unchanged
+44	`credential-decision-multiplicity`	medium-high	unchanged (borderline)	named files touched (routes/settings.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+45	`keepalive-error-envelope-writer`	resolved	held	held resolved; named files touched, hunks in the window clusters, decision unmoved	held
+46	`html-error-page-two-writers`	resolved	held	held resolved; named files touched, hunks in the window clusters, decision unmoved	held
+47	`ai-availability-gate-duplication`	medium-low	unchanged	named files touched (routes/dashboard.js, routes/dispatch.js, routes/settings.js, routes/workspace-api-scan.js, server.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+48	`dispatch-refusal-relay-duplication`	resolved	held	held resolved; named files touched, hunks in the window clusters, decision unmoved	held
+49	`tolerant-date-parse-date-twins`	resolved	held	held resolved; named files touched, hunks in the window clusters, decision unmoved	held
+50	`timestamp-parse-consolidation`	—	unchanged	cited files 0-line diff in the window	unchanged
+51	`loose-json-consolidation`	—	unchanged	cited files 0-line diff in the window	unchanged
+52	`ai-mock-predicate-consolidation`	—	unchanged	cited files 0-line diff in the window	unchanged
+53	`batch-guard-residue`	informational	unchanged	cited files 0-line diff in the window	unchanged
+54	`decision-dialect-split`	medium (sub-row)	unchanged	SD decision relay: three call sites → one D slot `relayDecisionAndWithdrawals` (`hook.js:538`, LIN-4218); `scanDecisionBlock` body byte-identical (`:771`); kit DECISION prose 0-line diff	unchanged (SD relay consolidated internally)
+55	`human-wait-derivation-split`	low-medium	unchanged	named files touched (lib/digest-feedback.js, lib/render-run-steps.js, lib/render-session.js, lib/render.js, lib/run-view.js, lib/task-page-loader.js, lib/unanswered-decisions.js, routes/dashboard.js, routes/dispatch.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+56	`decision-stamp-classifier-copies`	low-medium	unchanged	touched without consolidation: LIN-4240's `_isNonStateEntry` (`session-telemetry.js:85-91`) calls the inline `_isStampEntry` (`:60-63`), not `digest-feedback.js:78`	unchanged (touched)
+57	`provider-write-field-contract`	low-medium	unchanged	cited files 0-line diff in the window	unchanged
+58	`close-out-merged-refusal-split`	low-medium	unchanged	named files touched (lib/render.js, routes/dispatch.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+59	`periodic-loop-two-mechanisms`	informational	unchanged	named files touched (server.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+60	`consumer-liveness-signal-conflation`	resolved	held	held resolved; named files touched, hunks in the window clusters, decision unmoved	held
+61	`consumer-heartbeat-wire-restated`	low-medium (sub-row of 60)	unchanged	named files touched (docs/dispatch-integration.md, routes/dispatch.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+62	`owner-answer-reader-copies`	low	unchanged	named files touched (lib/account-erasure.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+63	`mock-ai-builder-copies`	low-medium	unchanged	named files touched (routes/proxy-compute.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+64	`fresh-run-definition-copies`	low-medium	unchanged	named files touched (lib/dispatch-store.js, routes/dispatch.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+65	`terminal-loop-rule-copies`	low-medium	unchanged	named files touched (routes/dashboard.js, server.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+66	`state-type-label-rank-maps`	low-medium	unchanged	named files touched (public/common.js, server.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+67	`csp-decision-split`	resolved	held	held resolved; named files touched, hunks in the window clusters, decision unmoved	held
+68	`priority-label-maps`	low	unchanged	named files touched (lib/home-view.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+69	`localhost-predicate-split`	low	unchanged	named files touched (routes/dispatch.js, server.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+70	`observer-instance-key-copies`	low	unchanged	cited files 0-line diff in the window	unchanged
+71	`pilot-eligibility-copies`	low	unchanged	named files touched (lib/effort-readout.js, lib/render.js, routes/dispatch.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+72	`linear-image-host-allowlist`	low	unchanged	named files touched (lib/render.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+73	`page-chrome-options`	low	unchanged	named files touched (routes/dashboard.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+74	`ship-biscuit-desk-list`	low	unchanged	named files touched (lib/render.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+75	`free-tier-rule-copies`	resolved	held	held resolved; named files touched, hunks in the window clusters, decision unmoved	held
+76	`sd-blocked-child-last-activity-split`	low	unchanged	cited files 0-line diff in the window	unchanged
+77	`census-gone-overstates-resolution`	informational	held	cited files 0-line diff in the window	unchanged
+78	`follow-up-target-rule-copies`	resolved	held	held resolved; named files touched, hunks in the window clusters, decision unmoved	held
+79	`lineage-row-read-copies`	low	unchanged	cited files 0-line diff in the window	unchanged
+80	`pr-url-regex-copies`	low	unchanged	cited files 0-line diff in the window	unchanged
+81	`pause-marker-predicate-gap`	low	unchanged	named files touched (lib/dispatch-store.js, lib/task-page-loader.js, routes/dispatch.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+82	`review-on-record-readers`	low	unchanged	cited files 0-line diff in the window	unchanged
+83	`credential-block-grammar-split`	low	unchanged	cited files 0-line diff in the window	unchanged
+84	`review-loop-ceiling-restated`	low	unchanged	cited files 0-line diff in the window	unchanged
+85	`sweep-as-library-imports`	low	unchanged	named files touched (public/app.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+86	`github-envelope-walker-split`	low	unchanged	named files touched (public/app.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+87	`binding-active-answer-copies`	low-medium (sub-row of 44)	unchanged	named files touched (lib/render.js, server.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+88	`auth-failure-answer-copies`	low-medium	unchanged	named files touched (routes/dispatch.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+89	`account-group-reader-copies`	low	unchanged	named files touched (lib/account-erasure.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+90	`stable-stringify-copies`	low	unchanged	named files touched (lib/account-erasure.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+91	`kpi-page-twin-copies`	low-medium	unchanged	named files touched (lib/render.js, lib/workspace-kpi-stats.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+92	`kit-terminal-status-copy`	low	unchanged	named files touched (routes/dispatch.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+93	`sd-parked-predicate-inline`	low	unchanged	cited files 0-line diff in the window	unchanged
+94	`https-predicate-restated`	low	unchanged	named files touched (server.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+95	`harbour-token-format-restated`	—	held	cited files 0-line diff in the window	unchanged
+96	`registry-providers-restated`	low (sub-row of 44)	unchanged	cited files 0-line diff in the window	unchanged
+97	`sd-401-layers-three`	low	unchanged	cited files 0-line diff in the window	unchanged
+98	`expire-ownerless-has-owner-copy`	low	unchanged	named files touched (routes/dispatch.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+99	`vendor-script-list-restated`	low	unchanged	27 `scripts: [` arrays, 7 purify render files at both SHAs; Home's list +`/home-placement.js` (`render.js:383`); census G0214→G0211 is the label (+8→+9)	unchanged
+100	`prune-to-capacity-clones`	low	unchanged	cited files 0-line diff in the window	unchanged
+101	`resume-model-effort-cross-repo`	medium-high	unchanged	named files touched (routes/dispatch.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+102	`halt-word-map-copies`	medium	unchanged	named files touched (lib/render.js, routes/settings.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+103	`home-next-answer-split`	medium	unchanged	LIN-4151: /backlog lead roots on Up next's ranking (`rankKeysOf`/`compareRank`, `home-view.js:422,432`), one split for page and fold (`home-rows.js:156-158`). Triage (`home-view.js:36`, `task-order.js:163`) and the deck top (`home-pipeline.js` 0-line diff) unchanged; `orderIssuesForSwipe` (`task-board-view.js:91`) still ranks apart	**improved (partial)**
+104	`coherence-loop-stalled`	medium (process)	unchanged	LIN-4234 Done ~3h after mint; LIN-4151 Done. 16 open Drift follow-ups (was 18); the other 14 unmoved, 0 new comments	**improved** (first movement)
+105	`settings-run-setup-rebuilt`	low-medium	unchanged	named files touched (routes/settings.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+106	`settings-preset-systems`	low-medium	unchanged	named files touched (lib/render.js, routes/dispatch.js, routes/settings.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+107	`routes-as-library`	low-medium	unchanged	named files touched (routes/dashboard.js, routes/workspace-api-scan.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+108	`model-vocabulary-rule-copies`	low-medium	unchanged	named files touched (lib/render.js, public/common.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+109	`task-page-state-outside-owner`	low-medium	unchanged (borderline)	`READY_TASK_STATE` still `render-task-page.js:108`; `public/task-page.js` 0-line diff. LIN-4048 kept the no-run rule in `runOfferOf` (`task-state.js:310`), read via `takesNoRun` (`prompt-section.js:691`)	unchanged
+110	`live-anchor-old-home-alive`	low-medium	unchanged	`liveGuard` flag gone; `liveOnAnchor` unconditional (`unanswered-decisions.js:982`). One inline copy left, `routes/proxy-rulings.js:246-249` (0-line diff), named at `live-anchor.js:9`; LIN-3843 Backlog	**improved**
+111	`lineage-anchor-rules-three`	low-medium	improved (4 → 3)	named files touched (lib/dispatch-store.js, routes/dispatch.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+112	`model-constants-server-client-twins`	resolved	held	held resolved; named files touched, hunks in the window clusters, decision unmoved	held
+113	`low-rows-unpromoted`	low	unchanged	named files touched (lib/render.js, lib/task-page-loader.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+114	`halt-poll-cold-cache-fail-open`	medium (conditional)	unchanged	`poll-halt.js`, `workspace-halt.js`, kit and SD `dispatcher.js` 0-line diff; LIN-4210 Backlog, 0 comments. John's ruling; not chosen	unchanged
+115	`usage-relay-flag-partial`	resolved	resolved	LIN-4218's U slot calls `flushRequestUsageSafely` → `request-usage-flush.js:114` (0-line diff). LIN-4214 Backlog, 0 new comments	held
+116	`usage-record-vocabulary-two-readers`	low-medium	improved	`request-usage-vocabulary.js`, `request-usage-intake.js` 0-line diff	unchanged
+117	`lineage-identity-read-twins`	resolved	resolved	`findLineageIdentity` `dispatch-store.js:320`; LIN-4241's dispatch-store hunks are the settled check and CAS only	held
+118	`reap-window-constant-cross-repo`	low-medium	unchanged	named files touched (lib/unanswered-decisions.js); hunks belong to the window clusters read in beat 2; cited decision unmoved	unchanged
+119	`cost-fold-partition-restated`	resolved	resolved	`countedRowsOf` read at `cost-read.js:89,252,268`	held
+120	`key-state-residue`	informational	held	held (informational)	held
+121	`unit-census-convention-split`	informational	unchanged	cited files 0-line diff in the window	unchanged
+122	`usage-snapshot-prose-residue`	low	new	8 of 9 files left. Fixed: `source-map.md:192` (LIN-4226). Left in files LIN-4226 edited: `effort-readout.js:599` (user-visible), `model-routing-spend.js:6,58`. Unchanged: `proxy-instructions.js:385-386`, `proxy-integration.md:1239`, `request-usage-vocabulary.js:4`, SD `request-usage-flush.js:3-8`, `request-usage.js:163-164`	**improved** (1 of 9)
+123	`completeness-precedence-restated`	borderline (not graded)	new	`row-usage.js:116`, `cost-read.js:199`, `request-usage-fold.js:103`	unchanged
+124	`erasure-inventory-lockstep-gap`	resolved	new	`usage-snapshot-intake` in `INVENTORY` (LIN-4234, `950113b1`); one name source `tests/helpers/collection-names.js` for both guards; `server.js` non-literal `collection()` census. Residual (noise): that census covers `server.js` only	**resolved**
+125	`parked-wait-text-cross-repo`	low-medium	—	SD writes one park status for 4 wait kinds (`hook.js:1520-1537`, `heartbeat.js:258-264`); Harbour reads 1 (`PARKED_WAIT_HINT`, `session-telemetry.js:325`). No contract row; the binding test is SD system-tier only, outside SD CI. Home: LIN-2258	**new** (first ruled)
+126	`error-code-case-split`	low	—	`ruling-settled` is the one kebab-case HTTP error `code` (routes: 42 UPPER_SNAKE codes, lib: 18); scan retire keeps `ALREADY_TERMINAL` (`workspace-api-scan.js:75,508`); browser restates the code (`question-cards.js:248`)	**new**
+127	`ruling-settled-row-predicate-inline`	low	—	"task-row ""settled"" = outcome ∈ {answered, dismissed} inline at 5 sites / 3 route files (`dashboard-rulings.js:327`, `workspace-api-issue-write.js:162,168,646`, `workspace-api-scan.js:389`); loop side has one owner (`isDecisionSettledIn`). Home: `lib/task-decisions-store.js`. Census G0217 re-ruled real"	**new**
+128	`waiting-standing-comment-residue`	low	—	"two window comments contradict the code: `home-row-states.js:121` (""the task page's read leaves it off"", untrue since LIN-4143) and `waiting-section.js:5` (names `readWaitingStanding`, which does not exist). Handed over by Seams run 7"	**new**
+129	`reply-effect-default-split`	borderline (not graded)	—	`question-cards.js` defaults an absent effect to `record` (LIN-4143, fail closed) while the shared reply helper keeps absent = `resume` (pinned by `reply-delivery-contract`); deliberate and documented	**new** (borderline)
