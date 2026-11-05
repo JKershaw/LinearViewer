@@ -8,7 +8,8 @@
  * with those data attributes to the click listeners, and `key(k)` sends the key to the focused element, as a browser does.
  *
  * Usage: `const world = loadWorld({ window: { api }, scripts: ['question-cards.js', 'prompt-section.js'], timers });`
- * `world.PromptSection`, `world.document`, `world.window`, `world.makeContainer()`. `timers`, when given, collects the client's
+ * `world.PromptSection`, `world.document`, `world.window`, `world.makeContainer()`, `world.run(code)` (LIN-4280: a snippet in
+ * the world's script scope, for the `let` bindings a context object cannot reach). `timers`, when given, collects the client's
  * `setTimeout`s instead of running them (each `{ fn, ms, cancelled, fired }`), so a test fires a poll itself.
  */
 import { readFileSync } from 'node:fs';
@@ -61,5 +62,10 @@ export function loadWorld({ window: windowStubs = {}, scripts = ['prompt-section
     };
     return container;
   };
-  return { PromptSection: window.PromptSection, document, window, sandbox, makeContainer };
+  // Evaluates a snippet in the world's script scope (LIN-4280). Top-level `let` and `const` bindings of the loaded
+  // scripts live there, not on the context object, so `sandbox` cannot reach them: `world.run('currentView = "rulings"')`
+  // sets one, and `world.run('currentView')` reads it. Bindings persist across calls in the same world.
+  const run = (code) => vm.runInContext(code, sandbox);
+
+  return { PromptSection: window.PromptSection, document, window, sandbox, makeContainer, run };
 }

@@ -17,7 +17,6 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
 import { loadWorld } from './helpers/client-world.js';
 
 /**
@@ -50,14 +49,9 @@ function makeSandbox({ api } = {}) {
   });
 }
 
-/**
- * The seam requires the Rulings tab to be the active view. `currentView` is a
- * script-scope `let`, which is not a property of the context, so it is set by
- * running the assignment in the world's vm context: the one state seam this file
- * takes from the vm.
- */
+/** The seam requires the Rulings tab to be the active view (`currentView`, a script-scope `let`). */
 function onRulingsTab(world) {
-  vm.runInContext('currentView = "rulings";', world.sandbox);
+  world.run('currentView = "rulings";');
 }
 
 function anchorFor(n) {
