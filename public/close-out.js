@@ -59,7 +59,7 @@
    * @returns {{urlKey: string, issueId: string, issueIdentifier: string, source: string, stopAt: string, state: string}}
    */
   function boxContext(box) {
-    const get = (k) => (box && box.getAttribute ? (box.getAttribute(k) || '') : '');
+    const get = (k) => (box ? (box.getAttribute(k) || '') : '');
     return {
       urlKey: get('data-url-key'),
       issueId: get('data-issue-id'),

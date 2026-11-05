@@ -329,7 +329,7 @@
     // immediately so a later, unrelated paint() never reuses a stale blur.
     var prevFocusedIdx = null;
     var activeEl = document.activeElement;
-    if (activeEl && activeEl.getAttribute && activeEl.getAttribute('data-testid') === 'ship-journey-waypoint') {
+    if (activeEl && activeEl.getAttribute('data-testid') === 'ship-journey-waypoint') {
       prevFocusedIdx = parseInt(activeEl.getAttribute('data-idx'), 10);
     } else if (lastBlurredWaypointIdx !== null) {
       prevFocusedIdx = lastBlurredWaypointIdx;
@@ -637,7 +637,7 @@
   // focusin/focusout/pointerover/pointerout all bubble (unlike
   // focus/blur/pointerenter/pointerleave), which delegation requires.
   function toggleLabel(target, revealed) {
-    var circle = target.closest && target.closest('[data-testid="ship-journey-waypoint"]');
+    var circle = target.closest('[data-testid="ship-journey-waypoint"]');
     if (!circle) return;
     var idx = parseInt(circle.getAttribute('data-idx'), 10);
     var lbl = labelNodes.get(idx);
@@ -656,7 +656,7 @@
     // going" field for a blur/focusout — restricting the write to it (rather
     // than recording every waypoint blur) is what keeps this fallback from
     // arming on a legitimate blur to the scrub control or anywhere else.
-    var circle = e.target.closest && e.target.closest('[data-testid="ship-journey-waypoint"]');
+    var circle = e.target.closest('[data-testid="ship-journey-waypoint"]');
     if (circle && (e.relatedTarget === playBtn || e.relatedTarget === stepBackBtn || e.relatedTarget === stepForwardBtn)) {
       var idx = parseInt(circle.getAttribute('data-idx'), 10);
       if (!isNaN(idx)) lastBlurredWaypointIdx = idx;
