@@ -880,3 +880,299 @@ describe('fake DOM: type selectors fold case on HTML elements only (LIN-4279 rev
     assert.equal(document.querySelector('svg'), svg);
   });
 });
+
+// ── <select> selectedness (LIN-4296) ─────────────────────────────────────────
+// Every expectation below was run once in Chromium (Playwright 1.57, scratch probes outside the repo), and the fake returns
+// the same. A refusal (a multiple select, an unmodelled API) has no browser value to match: the test says so.
+
+/** A world with one select (id `s`) built from `options` markup, plus its `document`. */
+function selectWith(options, attrs = '') {
+  const w = world();
+  w.parse(`<select id="s"${attrs}>${options}</select>`);
+  return { ...w, s: w.document.getElementById('s') };
+}
+/** An option made the way production makes one: `createElement`, then the value attribute. */
+function newOption(document, value) {
+  const o = document.createElement('option');
+  o.setAttribute('value', value);
+  o.textContent = value.toUpperCase();
+  return o;
+}
+const AB = '<option value="a">A</option><option value="b">B</option>';
+
+describe('fake DOM: <select> value and selectedIndex as a browser reads them (LIN-4296)', () => {
+  test('the option marked selected in the markup is the value (Chromium: "b", index 1)', () => {
+    const { s } = selectWith('<option value="a">A</option><option value="b" selected>B</option>');
+    assert.deepEqual([s.value, s.selectedIndex], ['b', 1]);
+  });
+
+  test('with none marked, the first option is selected (Chromium: "a", index 0)', () => {
+    const { s } = selectWith(AB);
+    assert.deepEqual([s.value, s.selectedIndex], ['a', 0]);
+  });
+
+  test('with two marked, the last one in tree order wins, and the other reads unselected', () => {
+    const { s } = selectWith('<option value="a" selected>A</option><option value="b" selected>B</option>');
+    assert.deepEqual([s.value, s.selectedIndex], ['b', 1]);
+    assert.deepEqual([s.options[0].selected, s.options[1].selected], [false, true]);
+  });
+
+  test('the reset skips a disabled option (Chromium: "b", index 1)', () => {
+    const { s } = selectWith('<option value="a" disabled>A</option><option value="b">B</option>');
+    assert.deepEqual([s.value, s.selectedIndex], ['b', 1]);
+  });
+
+  test('a marked option stays selected even when it is disabled (Chromium: "a", index 0)', () => {
+    const { s } = selectWith('<option value="a" disabled selected>A</option><option value="b">B</option>');
+    assert.deepEqual([s.value, s.selectedIndex], ['a', 0]);
+  });
+
+  test('with every option disabled, nothing is selected: value "" and selectedIndex -1 (Chromium)', () => {
+    const { s } = selectWith('<option value="a" disabled>A</option><option value="b" disabled>B</option>');
+    assert.deepEqual([s.value, s.selectedIndex], ['', -1]);
+  });
+
+  test('a write that matches no option gives value "" and selectedIndex -1, not the first option (Chromium)', () => {
+    const { s } = selectWith(AB);
+    s.value = 'zzz';
+    assert.deepEqual([s.value, s.selectedIndex], ['', -1]);
+  });
+
+  test('a selectedIndex out of range gives value "" and selectedIndex -1 (Chromium)', () => {
+    const { s } = selectWith(AB);
+    s.selectedIndex = 5;
+    assert.deepEqual([s.value, s.selectedIndex], ['', -1]);
+  });
+
+  test('a no-match write holds until an option is inserted, and the insert runs the reset to the first (Chromium: "a", 0)', () => {
+    const { document, s } = selectWith('<option value="a">A</option>');
+    s.value = 'zzz';
+    s.appendChild(newOption(document, 'n'));
+    assert.deepEqual([s.value, s.selectedIndex], ['a', 0]);
+  });
+
+  test('a no-match write is undone by removing an option, which runs the reset (Chromium: "a", 0)', () => {
+    const { s } = selectWith(AB);
+    s.value = 'zzz';
+    s.removeChild(s.options[1]);
+    assert.deepEqual([s.value, s.selectedIndex], ['a', 0]);
+  });
+
+  test('an empty select reads value "" and selectedIndex -1 with no options (Chromium)', () => {
+    const { s } = selectWith('');
+    assert.deepEqual([s.value, s.selectedIndex, s.options.length], ['', -1, 0]);
+  });
+
+  test('an optgroup\'s options are the select\'s options, in tree order (Chromium: "b", index 1, 2 options)', () => {
+    const { s } = selectWith('<optgroup label="g"><option value="a">A</option><option value="b" selected>B</option></optgroup>');
+    assert.deepEqual([s.value, s.selectedIndex, s.options.length], ['b', 1, 2]);
+  });
+});
+
+describe('fake DOM: an option\'s value, text and selected (LIN-4296)', () => {
+  test('an option without a value attribute has its collapsed text as its value and text (Chromium: "Hello world")', () => {
+    const { s } = selectWith('<option>  Hello \n\t  world </option>');
+    assert.equal(s.options[0].value, 'Hello world');
+    assert.equal(s.options[0].text, 'Hello world');
+    assert.equal(s.value, 'Hello world');
+  });
+
+  test('an empty value attribute stays empty and is the value (Chromium: "", index 0)', () => {
+    const { s } = selectWith('<option value="">Blank</option><option value="x">X</option>');
+    assert.equal(s.options[0].value, '');
+    assert.deepEqual([s.value, s.selectedIndex], ['', 0]);
+  });
+
+  test('option.value set writes the value attribute', () => {
+    const { s } = selectWith(AB);
+    s.options[0].value = 'z';
+    assert.equal(s.options[0].getAttribute('value'), 'z');
+    assert.equal(s.options[0].outerHTML, '<option value="z">A</option>');
+  });
+
+  test('option.selected = true deselects the others (Chromium: "b", the other reads false)', () => {
+    const { s } = selectWith(AB);
+    s.options[1].selected = true;
+    assert.equal(s.value, 'b');
+    assert.equal(s.options[0].selected, false);
+  });
+
+  test('option.selected = true on an earlier option wins over a later marked one (Chromium: "a", index 0)', () => {
+    const { s } = selectWith('<option value="a">A</option><option value="b" selected>B</option>');
+    s.options[0].selected = true;
+    assert.deepEqual([s.value, s.selectedIndex], ['a', 0]);
+  });
+
+  test('option.selected = true on a later option wins over an earlier marked one (Chromium: "a", index 1)', () => {
+    const { s } = selectWith('<option value="b" selected>B</option><option value="a">A</option>');
+    s.options[1].selected = true;
+    assert.deepEqual([s.value, s.selectedIndex], ['a', 1]);
+  });
+
+  test('option.selected = false runs the reset (Chromium: "a", index 0)', () => {
+    const { s } = selectWith('<option value="a">A</option><option value="b" selected>B</option>');
+    s.options[1].selected = false;
+    assert.deepEqual([s.value, s.selectedIndex], ['a', 0]);
+  });
+
+  test('the value setter selects the match, marks it, and unselects the rest', () => {
+    const { s } = selectWith(AB);
+    s.value = 'b';
+    assert.deepEqual([s.options[0].selected, s.options[1].selected], [false, true]);
+    assert.equal(s.selectedIndex, 1);
+  });
+
+  test('a dirty selection survives a sibling insert (Chromium: "b")', () => {
+    const { document, s } = selectWith(AB);
+    s.options[1].selected = true;
+    s.insertBefore(newOption(document, 'n'), s.options[0]);
+    assert.equal(s.value, 'b');
+  });
+
+  test('innerHTML on the select resets a dirty selection (Chromium: "a", index 0)', () => {
+    const { s } = selectWith(AB);
+    s.options[1].selected = true;
+    s.innerHTML = AB;
+    assert.deepEqual([s.value, s.selectedIndex], ['a', 0]);
+  });
+
+  test('an option\'s outerHTML does not carry a dirty selectedness (Chromium: no selected attribute)', () => {
+    const { s } = selectWith(AB);
+    s.options[1].selected = true;
+    assert.equal(s.options[1].outerHTML, '<option value="b">B</option>');
+  });
+
+  test('a selected attribute added to an option that is not dirty selects it and deselects the others (Chromium: "a")', () => {
+    const { s } = selectWith('<option value="a">A</option><option value="b" selected>B</option>');
+    s.options[0].setAttribute('selected', '');
+    assert.deepEqual([s.value, s.options[0].selected, s.options[1].selected], ['a', true, false]);
+  });
+
+  test('of two selected attributes added, the one added last wins (Chromium: "b")', () => {
+    const { s } = selectWith(AB);
+    s.options[0].setAttribute('selected', '');
+    s.options[1].setAttribute('selected', '');
+    assert.equal(s.value, 'b');
+  });
+
+  test('a dirty option ignores an added selected attribute (Chromium: "a" stays selected)', () => {
+    const { s } = selectWith(AB);
+    s.options[1].selected = false; // dirty, and the reset selects the first
+    s.options[1].setAttribute('selected', '');
+    assert.deepEqual([s.value, s.options[0].selected, s.options[1].selected], ['a', true, false]);
+  });
+
+  test('a removed selected attribute unselects the option and runs the reset, even when dirty (Chromium: "a")', () => {
+    const { s } = selectWith('<option value="a">A</option><option value="b" selected>B</option>');
+    s.options[1].selected = true;
+    s.options[1].removeAttribute('selected');
+    assert.deepEqual([s.value, s.selectedIndex], ['a', 0]);
+  });
+
+  test('removing the selected option from the tree selects the next one (Chromium: "b", index 0)', () => {
+    const { s } = selectWith('<option value="a" selected>A</option><option value="b">B</option>');
+    s.removeChild(s.options[0]);
+    assert.deepEqual([s.value, s.selectedIndex], ['b', 0]);
+  });
+
+  test('the reset after a removal skips a disabled option (Chromium: "c", index 1)', () => {
+    const { s } = selectWith('<option value="a">A</option><option value="b" disabled>B</option><option value="c">C</option>');
+    s.options[0].selected = true;
+    s.removeChild(s.options[0]);
+    assert.deepEqual([s.value, s.selectedIndex], ['c', 1]);
+  });
+
+  test('a replaceChildren of fresh options resets a dirty selection (Chromium: "a", index 0)', () => {
+    const { document, s } = selectWith(AB);
+    s.options[1].selected = true;
+    s.replaceChildren(newOption(document, 'a'), newOption(document, 'b'));
+    assert.deepEqual([s.value, s.selectedIndex], ['a', 0]);
+  });
+
+  test('textContent on the select removes its options and reads none (Chromium: "", -1)', () => {
+    const { s } = selectWith(AB);
+    s.options[1].selected = true;
+    s.textContent = 'x';
+    assert.deepEqual([s.value, s.selectedIndex], ['', -1]);
+  });
+
+  test('a refused replaceChild changes nothing: the old child stays in place', () => {
+    const { s } = selectWith(AB);
+    const a = s.options[0];
+    throwsNaming(() => s.replaceChild(s, a), 'into itself');
+    assert.equal(a.parentNode, s, 'the old option is still a child');
+    assert.deepEqual([s.value, s.selectedIndex], ['a', 0]);
+  });
+});
+
+// The tree-change witness (LIN-4296, Decision 2): every API that inserts into or removes from a select, in two states. (i)
+// nothing selected (a no-match write), (ii) `b` selected by its own setter (dirty). Each expected pair is `[value, selectedIndex]`
+// as Chromium gave it on a scratch page. One test per API, so an API the reset misses fails its own test.
+const TREE_CHANGES = [
+  ['insertBefore(new, first option)', (d, s) => s.insertBefore(newOption(d, 'n'), s.options[0]), ['n', 0], ['b', 2]],
+  ['prepend(new)', (d, s) => s.prepend(newOption(d, 'n')), ['n', 0], ['b', 2]],
+  ['appendChild(new)', (d, s) => s.appendChild(newOption(d, 'n')), ['a', 0], ['b', 1]],
+  ['append(new)', (d, s) => s.append(newOption(d, 'n')), ['a', 0], ['b', 1]],
+  ["insertAdjacentHTML('beforeend')", (d, s) => s.insertAdjacentHTML('beforeend', '<option value="n">N</option>'), ['a', 0], ['b', 1]],
+  ['innerHTML = [new, a, b]', (d, s) => { s.innerHTML = '<option value="n">N</option><option value="a">A</option><option value="b">B</option>'; }, ['n', 0], ['n', 0]],
+  ['replaceChildren(new, a, b)', (d, s) => { s.replaceChildren(newOption(d, 'n'), s.options[0], s.options[1]); }, ['b', 2], ['b', 2]],
+  ['a.outerHTML = [new, a]', (d, s) => { s.options[0].outerHTML = '<option value="n">N</option><option value="a">A</option>'; }, ['b', 2], ['b', 2]],
+  ['replaceChild(new, a)', (d, s) => s.replaceChild(newOption(d, 'n'), s.options[0]), ['b', 1], ['b', 1]],
+  ['a.replaceWith(new)', (d, s) => s.options[0].replaceWith(newOption(d, 'n')), ['b', 1], ['b', 1]],
+  ['removeChild(b)', (d, s) => s.removeChild(s.options[1]), ['a', 0], ['a', 0]],
+  ['b.remove()', (d, s) => s.options[1].remove(), ['a', 0], ['a', 0]],
+  ['replaceChild(new, b)', (d, s) => s.replaceChild(newOption(d, 'n'), s.options[1]), ['a', 0], ['a', 0]],
+  ['b.replaceWith(new)', (d, s) => s.options[1].replaceWith(newOption(d, 'n')), ['a', 0], ['a', 0]],
+  ['b.outerHTML = ""', (d, s) => { s.options[1].outerHTML = ''; }, ['a', 0], ['a', 0]],
+  ['replaceChildren(a)', (d, s) => s.replaceChildren(s.options[0]), ['a', 0], ['a', 0]],
+  ['innerHTML = [a]', (d, s) => { s.innerHTML = '<option value="a">A</option>'; }, ['a', 0], ['a', 0]],
+  ['textContent = "x"', (d, s) => { s.textContent = 'x'; }, ['', -1], ['', -1]],
+  ['replaceChildren()', (d, s) => s.replaceChildren(), ['', -1], ['', -1]],
+];
+describe('fake DOM: every tree change leaves a select as a browser does (LIN-4296 witness)', () => {
+  for (const [name, change, whenNothing, whenB] of TREE_CHANGES) {
+    test(`${name} runs the reset in both states`, () => {
+      const states = [
+        ['nothing selected', (s) => { s.value = 'zzz'; }, whenNothing],
+        ['b selected by its setter', (s) => { s.options[1].selected = true; }, whenB],
+      ];
+      for (const [state, setup, expected] of states) {
+        const { document, s } = selectWith(AB);
+        setup(s);
+        change(document, s);
+        assert.deepEqual([s.value, s.selectedIndex], expected, `${name}, ${state}`);
+      }
+    });
+  }
+});
+
+describe('fake DOM: <select> refusals name what they do not model (LIN-4296)', () => {
+  test('a multiple select throws on value, selectedIndex and an option\'s selected, rather than guessing', () => {
+    const { s } = selectWith(AB, ' multiple');
+    throwsNaming(() => s.value, 'multiple');
+    throwsNaming(() => s.selectedIndex, 'multiple');
+    throwsNaming(() => { s.options[0].selected = true; }, 'multiple');
+  });
+
+  test('a select with a size above 1 throws the same way', () => {
+    const { s } = selectWith(AB, ' size="3"');
+    throwsNaming(() => s.value, 'size above 1');
+  });
+
+  test('the unmodelled select APIs throw naming themselves, instead of reading as undefined', () => {
+    const { document, s } = selectWith(AB);
+    throwsNaming(() => s.remove(1), 'remove(index)');
+    assert.equal(s.isConnected, true, 'the select was not detached by the refused remove');
+    throwsNaming(() => s.selectedOptions, 'selectedOptions');
+    throwsNaming(() => s.length, 'length');
+    throwsNaming(() => s.add(), 'add()');
+    assert.equal(document.querySelectorAll('option').length, 2, 'nothing changed');
+  });
+
+  test('selected on a non-option throws, and text on a non-option is not modelled', () => {
+    const { document } = world();
+    const div = document.createElement('div');
+    throwsNaming(() => { div.selected = true; }, 'selected is not modelled');
+    assert.equal(div.text, undefined, 'text is an option property');
+  });
+});
