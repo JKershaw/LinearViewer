@@ -20,7 +20,7 @@ const BASELINE = JSON.parse(readFileSync(join(ROOT, 'tests/fixtures/lin-4251-wor
 
 describe('LIN-4251 — the work block is byte-identical to HEAD before the change', () => {
   // The same enumeration the baseline was captured with: issue or not, delivery, and the eight
-  // provider-flag combinations that pick each contextLines variant. Keys match the fixture's.
+  // provider-flag combinations that pick each endpoint-hint branch. Keys match the fixture's.
   for (const issueIdentifier of ['LIN-42', null]) {
     for (const tokenDelivery of ['prose', 'mcp']) {
       for (const issueDetail of [true, false]) for (const relations of [true, false]) for (const search of [true, false]) {
