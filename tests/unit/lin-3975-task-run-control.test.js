@@ -18,7 +18,6 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import vm from 'node:vm';
 import { SURFACES } from '../../lib/task-mode-store.js';
 import { validateTaskModeEvent } from '../../lib/task-mode-store.js';
 import { renderTaskPage, renderNextLine } from '../../lib/render-task-page.js';
@@ -26,6 +25,7 @@ import { buildPromptOpts } from '../../lib/render-prompt-opts.js';
 import { escapeHtml } from '../../lib/utils/html.js';
 import { serverSessions, serverRow } from '../fixtures/task-decision.js';
 import { readSheets } from '../helpers/css-rules.js';
+import { loadWorld } from './helpers/client-world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(join(__dirname, '../..', rel), 'utf8');
@@ -43,7 +43,7 @@ describe('LIN-3975 — the capability table has a row for every surface', () => 
   });
 
   test('the task row shows the run control and copy-first, with no state block and no watch link', () => {
-    const { capabilitiesOf } = load();
+    const { capabilitiesOf } = load().PromptSection;
     const task = { ...capabilitiesOf('task') };
     assert.equal(task.stateBlock, false);
     assert.equal(task.runControl, true);
@@ -53,7 +53,7 @@ describe('LIN-3975 — the capability table has a row for every surface', () => 
   });
 
   test('the home row is unchanged: state block, watch link, shared buttons; swipe has none of the run control', () => {
-    const { capabilitiesOf } = load();
+    const { capabilitiesOf } = load().PromptSection;
     const home = { ...capabilitiesOf('home') };
     assert.equal(home.stateBlock, true);
     assert.equal(home.watchLink, true);
@@ -74,7 +74,7 @@ const esc = (s) => escapeHtml(s);
  * The page's stubs. `prompt` answers `/api/prompt/…` (a hang, a failure, or a prompt); `reply` and `rateLimit`
  * drive the streamed reply and the proxy's token-limit notice, so every phase of the component is reachable.
  */
-function load({ opened = null, lastCopy = null, prompt = null, fetch = null, reply = null, rateLimit = false, calls = [] } = {}) {
+function load({ opened = null, lastCopy = null, prompt = null, fetch = null, reply = null, rateLimit = false, calls = [], preview = null } = {}) {
   // LIN-4016: the opened task's sessions are the server's (the decision the browser reads).
   if (opened && opened.sessions) opened = { ...opened, sessions: serverSessions(opened.sessions) };
   const window = {
@@ -85,7 +85,7 @@ function load({ opened = null, lastCopy = null, prompt = null, fetch = null, rep
       calls.push({ url, method: o && o.method ? o.method : 'GET' });
       if (url.includes('/api/task/')) return opened;
       if (url.includes('/api/task-mode/')) return { lastCopy };
-      if (url.includes('/api/dispatch/preview')) return null;
+      if (url.includes('/api/dispatch/preview')) return preview;
       if (url.includes('/api/dispatch/decision-panel')) return { html: '', words: null, withoutEffort: [] };
       if (url.includes('/api/dispatch/presets')) return { presets: [] };
       if (url.includes('/api/dispatch/quota')) return {};
@@ -106,76 +106,14 @@ function load({ opened = null, lastCopy = null, prompt = null, fetch = null, rep
     isPinnedToBottom: () => false,
     toast() {},
   };
-  const sandbox = {
-    window, AbortController, URLSearchParams, URL, TextDecoder, TextEncoder, Blob: class {},
-    document: { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} }, activeElement: null },
-    requestAnimationFrame: (cb) => { cb(); return 1; },
-    setTimeout: (fn, ms) => { const t = globalThis.setTimeout(fn, ms); if (t && t.unref) t.unref(); return t; },
-    clearTimeout,
-    navigator: { clipboard: { writeText: async () => {} } },
-    fetch: fetch || (async () => ({ ok: true, json: async () => ({}) })),
-    console,
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(SRC, sandbox, { filename: 'prompt-section.js' });
-  return window.PromptSection;
+  // The shared client world: one fake document, one vm sandbox, prompt-section.js run in it.
+  return loadWorld({
+    window, scripts: ['prompt-section.js'],
+    globals: { fetch: fetch || (async () => ({ ok: true, json: async () => ({}) })) },
+  });
 }
 
-/**
- * A container that keeps its markup, as the component writes it. Three writes reach it: the copy line's slot swap
- * (outerHTML), the setup notice's slot (innerHTML, a press) and the token-limit note's slot (textContent). Each is matched on the component's own slot markup,
- * so nothing else in the page is touched. Its own classes (`classList`) and its click listener are recorded, so a
- * test can press a control the way a reader does.
- */
-function makeContainer() {
-  let html = '';
-  const ownClasses = new Set();
-  const listeners = {};
-  const LAST_COPY_SLOT = /<div class="opened-task-last-copy-slot" data-last-copy-slot>(?:<div class="opened-task-last-copy"[^>]*>[^<]*<\/div>)?<\/div>/;
-  const NOTICE_SLOT = /(<div class="opened-task-notice-slot" data-setup-notice-slot aria-live="polite">)(?:<div class="opened-task-setup-notice">[\s\S]*?<\/div>)?<\/div>/;
-  const PROXY_SLOT = /(<div class="opened-task-proxy-limit" data-proxy-limit-slot aria-live="polite">)[^<]*<\/div>/;
-  return {
-    get innerHTML() { return html; },
-    set innerHTML(v) { html = v; },
-    get html() { return html; },
-    classList: {
-      add(c) { ownClasses.add(c); },
-      remove(c) { ownClasses.delete(c); },
-      toggle(c) { if (ownClasses.has(c)) ownClasses.delete(c); else ownClasses.add(c); return ownClasses.has(c); },
-      contains(c) { return ownClasses.has(c); },
-    },
-    ownClasses,
-    setAttribute() {},
-    querySelector(sel) {
-      if (sel === '[data-last-copy-slot]' && LAST_COPY_SLOT.test(html)) {
-        return { set outerHTML(v) { html = html.replace(LAST_COPY_SLOT, v); } };
-      }
-      if (sel === '[data-setup-notice-slot]' && NOTICE_SLOT.test(html)) {
-        return { set innerHTML(v) { html = html.replace(NOTICE_SLOT, (_, open) => `${open}${v}</div>`); } };
-      }
-      if (sel === '[data-proxy-limit-slot]' && PROXY_SLOT.test(html)) {
-        return { set textContent(v) { html = html.replace(PROXY_SLOT, (_, open) => `${open}${v}</div>`); } };
-      }
-      return null;
-    },
-    querySelectorAll() { return []; },
-    addEventListener(type, fn) { (listeners[type] ||= []).push(fn); },
-    removeEventListener() {},
-    /** A reader's press on a control with these `data-*` attributes (`dataset` keys, camelCase). */
-    press(dataset) {
-      const btn = { dataset, disabled: false, textContent: '', classList: { add() {}, remove() {} } };
-      // A real element answers getAttribute for its data-* attributes, the way the component reads them.
-      btn.getAttribute = (name) => {
-        const key = name.replace(/^data-/, '').replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-        return key in dataset ? dataset[key] : null;
-      };
-      btn.closest = (sel) => (sel.includes('button') ? btn : null);
-      for (const fn of listeners.click || []) fn({ target: btn });
-    },
-    contains() { return true; },
-    closest() { return null; },
-  };
-}
+const RUNS_ON_PREVIEW = { words: { model: 'Sonnet 4' }, harness: 'claude-code', effort: null, sources: {}, group: null };
 
 const BASE = {
   urlKey: 'acme',
@@ -205,9 +143,9 @@ const RUNNING = {
 };
 
 async function mount(surface, over = {}, loadOver = {}) {
-  const PS = load(loadOver);
-  const c = makeContainer();
-  PS.init(c, { ...BASE, surface, ...over });
+  const world = load(loadOver);
+  const c = world.makeContainer();
+  world.PromptSection.init(c, { ...BASE, surface, ...over });
   await flush();
   await flush();
   return c;
@@ -456,7 +394,6 @@ const SWIPE_ONLY = Object.freeze({
   'swipe-prompt-copy': 'Swipe\'s action cluster (renderActionCluster): copy, download and edit',
   'swipe-prompt-download': 'Swipe\'s action cluster (renderActionCluster): copy, download and edit',
   'swipe-prompt-edit': 'Swipe\'s action cluster (renderActionCluster): copy, download and edit',
-  'copied': 'the copied state of Swipe\'s copy button (swipe-prompt-copy.copied)',
   'opened-task-proxy': 'the +proxy disclosure in Swipe\'s action cluster',
   'opened-task-proxy-faq': 'the +proxy disclosure in Swipe\'s action cluster',
   'opened-task-proxy-label': 'the +proxy disclosure in Swipe\'s action cluster',
@@ -486,38 +423,43 @@ async function everyPhase() {
   const fails = async () => { throw new Error('boom'); };
   const prompt = async () => ({ prompt: 'PROMPT', promptName: 'Plan' });
   const reply = async (_resp, onEvent) => { onEvent('done', {}); };
+  const refused = async () => ({ ok: false, json: async () => ({ error: 'boom' }) });
+  const streamOk = async () => ({ ok: true });
+  const streamPrompt = async (_resp, onEvent) => { onEvent('delta', { section: 'prompt', content: 'PROMPT' }); onEvent('done', { identifier: 'LIN-42', title: 'T', deferredVia: [] }); };
   const phases = [];
   const run = async (name, marker, surface, over, loadOver, presses = []) => {
-    const PS = load(loadOver);
-    const c = makeContainer();
-    PS.init(c, { ...BASE, surface, ...over });
+    const world = load(loadOver);
+    const c = world.makeContainer();
+    world.PromptSection.init(c, { ...BASE, surface, ...over });
     await flush();
     await flush();
     for (const dataset of presses) {
-      c.press(dataset);
+      await c.click(dataset);
       await flush();
       await flush();
     }
-    phases.push({ name, marker, html: c.html, own: c.ownClasses });
+    phases.push({ name, marker, html: c.innerHTML, own: new Set((c.getAttribute('class') || '').split(/\s+/).filter(Boolean)) });
   };
   const idle = { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT };
   const copyFirst = { dispatchEnabled: false };
   await run('run idle', /data-testid="opened-task-go"/, 'task', {}, { opened: idle });
   await run('run running', /data-testid="opened-task-started"/, 'task', {}, { opened: { status: 'running', live: true, headerHtml: '', sessions: RUNNING } });
-  await run('run generating', /generating…/, 'task', {}, { opened: idle, prompt: hangs }, [{ prompt: 'plan' }]);
-  await run('run error', /prompt · error/, 'task', {}, { opened: idle, prompt: fails }, [{ prompt: 'plan' }]);
-  await run('run fresh', /data-prompt-body/, 'task', {}, { opened: idle, prompt: prompt }, [{ prompt: 'plan' }]);
-  await run('run change open', /data-testid="run-change"|opened-task-change-panel/, 'task', {}, { opened: idle }, [{ action: 'change-run' }]);
+  await run('run generating', /generating…/, 'task', {}, { opened: idle, prompt: hangs }, [{ action: 'see-prompt' }]);
+  await run('run error', /prompt · error/, 'task', {}, { opened: idle, prompt: fails }, [{ action: 'see-prompt' }]);
+  await run('run fresh', /data-prompt-body/, 'task', {}, { opened: idle, prompt: prompt }, [{ action: 'see-prompt' }]);
+  // The Change button sits in the "Runs on" line, which is drawn once the run's preview has loaded.
+  await run('run change open', /data-testid="run-change"|opened-task-change-panel/, 'task', {}, { opened: idle, preview: RUNS_ON_PREVIEW }, [{ action: 'change-run' }]);
   // Not a phase: the setup notice has no press on the task surface. A runner-less owner gets the copy-first view,
   // whose only control is "Write the prompt", and the run control's Go setup button is drawn only when the run
   // control is off. The notice's slot is still emitted by the fresh copy-first phase below.
   await run('copy-first idle', /data-testid="opened-task-write"/, 'task', copyFirst, { opened: idle });
-  await run('copy-first generating', /generating…/, 'task', copyFirst, { opened: idle, prompt: hangs }, [{ prompt: 'plan' }]);
-  await run('copy-first error', /prompt · error/, 'task', copyFirst, { opened: idle, prompt: fails }, [{ prompt: 'plan' }]);
-  await run('copy-first fresh', /data-prompt-body/, 'task', copyFirst, { opened: idle, prompt: prompt }, [{ prompt: 'plan' }]);
+  // With a stage's next step, the copy-first Write is the AI one (`__ai__`), which streams from the recommend route.
+  await run('copy-first generating', /generating…/, 'task', copyFirst, { opened: idle, fetch: hangs }, [{ prompt: '__ai__' }]);
+  await run('copy-first error', /prompt · error/, 'task', copyFirst, { opened: idle, fetch: refused }, [{ prompt: '__ai__' }]);
+  await run('copy-first fresh', /data-prompt-body/, 'task', copyFirst, { opened: idle, fetch: streamOk, reply: streamPrompt }, [{ prompt: '__ai__' }]);
   await run('copy-first after a copy', /You copied the Plan prompt/, 'task', copyFirst, { opened: idle, lastCopy: { label: 'Plan', kind: 'plan', at: new Date().toISOString() } });
-  await run('prompt warning', /swipe-prompt-warning/, 'task', {}, { opened: idle, reply, fetch: async () => ({ ok: true }) }, [{ prompt: '__ai__' }]);
-  await run('proxy limit', /opened-task-proxy-limit[^>]*>The agent-access link was skipped/, 'task', copyFirst, { opened: idle, prompt: prompt, rateLimit: true }, [{ prompt: 'plan' }, { action: 'copy' }]);
+  await run('prompt warning', /swipe-prompt-warning/, 'task', {}, { opened: idle, reply, fetch: async () => ({ ok: true }) }, [{ action: 'ask-harbour' }]);
+  await run('proxy limit', /opened-task-proxy-limit[^>]*>The agent-access link was skipped/, 'task', copyFirst, { opened: idle, fetch: streamOk, reply: streamPrompt, rateLimit: true }, [{ prompt: '__ai__' }, { action: 'copy' }]);
   await run('swipe card', /swipe-prompt-buttons|swipe-prompt-header/, 'swipe', {}, { opened: idle });
   return phases;
 }
@@ -580,9 +522,9 @@ describe('LIN-3975 — a staged chat proposal is applied or declined from the ru
   const PROPOSAL = { id: 'prop-1', runId: 'run-9', reason: 'Please post a status update.' };
 
   async function mountWithProposal(calls) {
-    const PS = load({ opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, calls });
-    const c = makeContainer();
-    PS.init(c, { ...BASE, surface: 'task', proposals: [PROPOSAL] });
+    const world = load({ opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, calls });
+    const c = world.makeContainer();
+    world.PromptSection.init(c, { ...BASE, surface: 'task', proposals: [PROPOSAL] });
     await flush();
     await flush();
     return c;
@@ -600,7 +542,7 @@ describe('LIN-3975 — a staged chat proposal is applied or declined from the ru
   test('Apply posts to the run page\'s apply endpoint, then settles the row to one quiet word', async () => {
     const calls = [];
     const c = await mountWithProposal(calls);
-    c.press({ action: 'apply-proposal', proposalId: 'prop-1', runId: 'run-9' });
+    await c.click({ action: 'apply-proposal', proposalId: 'prop-1', runId: 'run-9' });
     await flush();
     await flush();
     const post = calls.find(call => /\/proposals\/prop-1\/apply$/.test(call.url));
@@ -614,7 +556,7 @@ describe('LIN-3975 — a staged chat proposal is applied or declined from the ru
   test('Decline posts to the decline endpoint and never to apply', async () => {
     const calls = [];
     const c = await mountWithProposal(calls);
-    c.press({ action: 'decline-proposal', proposalId: 'prop-1', runId: 'run-9' });
+    await c.click({ action: 'decline-proposal', proposalId: 'prop-1', runId: 'run-9' });
     await flush();
     await flush();
     assert.ok(calls.some(call => /\/proposals\/prop-1\/decline$/.test(call.url)));
@@ -625,9 +567,9 @@ describe('LIN-3975 — a staged chat proposal is applied or declined from the ru
   // LIN-3975 (finding 1): a fold turn proposes after the page loaded. The run control is handed the list again and
   // lists it in place, with no reload; the same handle clears it when the list empties.
   test('a proposal staged after mount is listed in place by setProposals, and cleared the same way', async () => {
-    const PS = load({ opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, calls: [] });
-    const c = makeContainer();
-    const handle = PS.init(c, { ...BASE, surface: 'task', proposals: [] });
+    const world = load({ opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, calls: [] });
+    const c = world.makeContainer();
+    const handle = world.PromptSection.init(c, { ...BASE, surface: 'task', proposals: [] });
     await flush();
     await flush();
     assert.doesNotMatch(c.innerHTML, /data-testid="opened-task-proposals"/, 'nothing staged before the turn');

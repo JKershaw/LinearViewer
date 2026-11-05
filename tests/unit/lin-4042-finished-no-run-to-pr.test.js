@@ -11,66 +11,13 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import vm from 'node:vm';
 import { escapeHtml } from '../../lib/utils/html.js';
 import { rowRecordOf } from '../../lib/task-board-view.js';
 import { NO_RUN_ACTION } from '../../lib/task-state.js';
 import { stateBodyOf, stateIssue } from '../fixtures/state-route.js';
+import { loadWorld } from './helpers/client-world.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
 const flush = () => new Promise((r) => setTimeout(r, 0));
-
-function makeContainer() {
-  const listeners = {};
-  let html = '';
-  let written = {};
-  const markupValue = (testid) => {
-    const tag = new RegExp(`<(input|select)\\b[^>]*data-testid="${testid}"[^>]*>`).exec(html);
-    if (!tag) return undefined;
-    if (tag[1] === 'input') return /\svalue="([^"]*)"/.exec(tag[0])?.[1] ?? '';
-    const block = html.slice(tag.index, html.indexOf('</select>', tag.index));
-    return /<option value="([^"]*)"[^>]*\sselected/.exec(block)?.[1] ?? '';
-  };
-  const panelRoot = {
-    querySelector(sel) {
-      const m = /^\[data-testid="([^"]+)"\]$/.exec(sel);
-      if (!m || markupValue(m[1]) === undefined) return null;
-      const testid = m[1];
-      return {
-        get value() { return testid in written ? written[testid] : markupValue(testid); },
-        set value(v) { written[testid] = v; }
-      };
-    }
-  };
-  const summaryNode = {
-    get textContent() { return /data-testid="run-will-use">([^<]*)</.exec(html)?.[1] ?? ''; },
-    set textContent(v) { html = html.replace(/(data-testid="run-will-use">)[^<]*/, (_, open) => open + escapeHtml(v)); }
-  };
-  return {
-    get innerHTML() { return html; },
-    set innerHTML(v) { html = v; written = {}; },
-    dataset: {},
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    setAttribute() {},
-    getAttribute() { return null; },
-    querySelector(sel) {
-      if (sel === '[data-testid="run-will-use"]') return html.includes('data-testid="run-will-use"') ? summaryNode : null;
-      return sel === '[data-decision-panel]' && html.includes('data-decision-panel') ? panelRoot : null;
-    },
-    contains() { return true; },
-    addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
-    removeEventListener() {},
-    listenersFor(type) { return listeners[type] || []; },
-    async fire(type, target) {
-      const el = { dataset: {}, closest: () => null, ...target };
-      for (const fn of listeners[type] || []) await fn({ target: el });
-    },
-  };
-}
 
 // The state body, the way /state sends it (routes/task-page.js): the sessions block is the server's, tracker-free.
 // `stateBody` may be a function, read on each /state call (a poll after the first read sees the next body, LIN-4048).
@@ -96,23 +43,14 @@ function loadClient({ stateBody, timers = null, quota = null }) {
     isPinnedToBottom: () => false,
     taskPageHref: () => '/workspace/acme/task/LIN-42',
     toast: () => {},
+    dispatchPrompt: async () => ({ success: true, item: { id: 'd-1' } }),
+    fetchAutopilotKickoff: async () => ({ prompt: 'PLAN PROMPT', promptName: 'Plan', kind: 'plan' }),
   };
-  const sandbox = {
-    window, AbortController, URLSearchParams, TextDecoder, TextEncoder, Blob: class {}, URL,
-    document: { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } },
-    requestAnimationFrame: (cb) => { cb(); return 1; },
-    setTimeout: (fn, ms) => {
-      if (timers) { const t = { fn, ms, cancelled: false, fired: false }; timers.push(t); return t; }
-      const t = globalThis.setTimeout(fn, ms); if (t && t.unref) t.unref(); return t;
-    },
-    clearTimeout: (t) => { if (timers) { if (t) t.cancelled = true; return; } clearTimeout(t); },
-    navigator: { clipboard: { writeText: async () => {} } },
-    fetch: async () => ({ ok: true, json: async () => ({}) }),
-    console,
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(SRC, sandbox, { filename: 'prompt-section.js' });
-  return sandbox.window.PromptSection;
+  return loadWorld({
+    window, scripts: ['prompt-section.js'],
+    timers,
+    globals: { fetch: async () => ({ ok: true, json: async () => ({}) }) },
+  });
 }
 
 const HOME_ISSUE = { id: 'uuid-42', identifier: 'LIN-42', title: 'T', url: '', source: 'linear', stateType: 'started' };
@@ -147,9 +85,9 @@ function doneBody({ children }) {
 }
 
 async function paint(stateBody, opts = {}, quota = null) {
-  const PromptSection = loadClient({ stateBody, quota });
-  const c = makeContainer();
-  PromptSection.init(c, { ...HOME, ...opts });
+  const world = loadClient({ stateBody, quota });
+  const c = world.makeContainer();
+  world.PromptSection.init(c, { ...HOME, ...opts });
   await flush(); await flush(); await flush();
   return c.innerHTML;
 }
@@ -232,13 +170,40 @@ describe('LIN-4042 — a finished task on Home offers no run', () => {
 describe('LIN-4071 — runStepOfState offers no stage step for a container or a finished task, whatever step was chosen', () => {
   const CONTAINER_ACTION = { kind: 'offer', why: 'a container runs to PR', container: true };
 
-  async function paintAndPick(stateBody, opts) {
-    const PromptSection = loadClient({ stateBody });
-    const c = makeContainer();
-    PromptSection.init(c, { ...HOME, ...opts });
+  // A step is chosen on a leaf, where Another step draws it. The task then finishes while a Go run is live: the run poll
+  // reads the finished body, and the chosen step must not come back as a stage step or a Go. A finished task draws no
+  // pickable step on its own, so the pick happens first.
+  async function pickThenFinish(opts, finished) {
+    let current = stateWith({ action: RUN_TO_PR });
+    const timers = [];
+    const world = loadClient({ stateBody: () => current, timers });
+    const c = world.makeContainer();
+    world.PromptSection.init(c, { ...HOME, ...opts });
     await flush(); await flush(); await flush();
-    const btn = { dataset: { action: 'run-pick', kind: 'plan', label: 'Plan' }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
-    for (const fn of c.listenersFor('click')) await fn({ target: btn });
+    await c.click({ action: 'run-another' });
+    await flush(); await flush();
+    await c.click({ action: 'run-pick', kind: 'plan', label: 'Plan' });
+    await flush(); await flush(); await flush();
+    await c.click({ action: 'go' });
+    await flush(); await flush(); await flush();
+    current = finished;
+    const poll = timers.find((t) => t.ms === 10000 && !t.cancelled && !t.fired);
+    assert.ok(poll, 'a run poll is armed while the run is live');
+    poll.fired = true;
+    poll.fn();
+    await flush(); await flush(); await flush();
+    return c.innerHTML;
+  }
+
+  async function paintAndPick(stateBody, opts) {
+    const world = loadClient({ stateBody });
+    const c = world.makeContainer();
+    world.PromptSection.init(c, { ...HOME, ...opts });
+    await flush(); await flush(); await flush();
+    // The reader opens Another step, then picks a step from the list it draws.
+    await c.click({ action: 'run-another' });
+    await flush(); await flush();
+    await c.click({ action: 'run-pick', kind: 'plan', label: 'Plan' });
     await flush(); await flush(); await flush();
     return c.innerHTML;
   }
@@ -257,7 +222,7 @@ describe('LIN-4071 — runStepOfState offers no stage step for a container or a 
   });
 
   test('a finished task (action.kind none) with a step chosen paints no stage step line and no Go', async () => {
-    const html = await paintAndPick(stateWith({ action: NO_RUN, offered: PLAN_OFFER }), { row: DONE_ROW() });
+    const html = await pickThenFinish({ row: rowRecordOf({ stateType: 'started' }) }, stateWith({ action: NO_RUN, offered: PLAN_OFFER }));
     assert.doesNotMatch(html, /data-testid="opened-task-step"/, 'the step line is empty');
     assert.doesNotMatch(html, /data-action="run-step-next"/);
     assert.doesNotMatch(html, /data-action="go"/);
@@ -266,16 +231,16 @@ describe('LIN-4071 — runStepOfState offers no stage step for a container or a 
   // M5: on the task page the run slot has no early return for a finished task (that one is Home's), so the `kind: 'none'`
   // check in `runStepOfState` is what keeps a chosen step from becoming a "Run Plan" button on a finished task.
   test('task page: a finished task (action.kind none) with a step chosen offers no stage step and no Go', async () => {
-    const html = await paintAndPick(stateWith({ action: NO_RUN, offered: PLAN_OFFER }), { surface: 'task', row: DONE_ROW() });
+    const html = await pickThenFinish({ surface: 'task', row: rowRecordOf({ stateType: 'started' }) }, stateWith({ action: NO_RUN, offered: PLAN_OFFER }));
     assert.doesNotMatch(html, /data-action="run-step-next"/, 'no Run Plan on a finished task');
     assert.doesNotMatch(html, /data-action="go"/);
     assert.doesNotMatch(html, /opened-task-step-name[^>]*>Plan</, 'the chosen step is not the step line');
   });
 
   test('before the first /state reply, a container row record alone offers no stage step', async () => {
-    const PromptSection = loadClient({ stateBody: new Promise(() => {}) });
-    const c = makeContainer();
-    PromptSection.init(c, { ...HOME, row: { ...rowRecordOf({ stateType: 'started' }), action: CONTAINER_ACTION } });
+    const world = loadClient({ stateBody: new Promise(() => {}) });
+    const c = world.makeContainer();
+    world.PromptSection.init(c, { ...HOME, row: { ...rowRecordOf({ stateType: 'started' }), action: CONTAINER_ACTION } });
     await flush();
     assert.doesNotMatch(c.innerHTML, /data-action="run-step-next"/);
   });
@@ -294,9 +259,9 @@ describe('LIN-4048 — a finished task on the task page and Swipe shows no run c
   async function mountThenPoll({ first, next, opts = {} }) {
     const timers = [];
     let current = first;
-    const PromptSection = loadClient({ stateBody: () => current, timers });
-    const c = makeContainer();
-    PromptSection.init(c, { ...HOME, ...opts });
+    const world = loadClient({ stateBody: () => current, timers });
+    const c = world.makeContainer();
+    world.PromptSection.init(c, { ...HOME, ...opts });
     await flush(); await flush(); await flush();
     const before = c.innerHTML;
     current = next;
@@ -421,12 +386,11 @@ describe('LIN-4048 review — a finished task draws no Go, limit Go, setup Go, q
   test('the Change panel closes when a held run ends and the Done body arrives (Change was open on the run)', async () => {
     const timers = [];
     let current = { ...stateWith({ running: RUNNING, busy: true, canStop: true, action: null }), status: 'running', live: true };
-    const PromptSection = loadClient({ stateBody: () => current, timers });
-    const c = makeContainer();
-    PromptSection.init(c, { ...HOME, ...TASK, row: rowRecordOf({ stateType: 'started' }) });
+    const world = loadClient({ stateBody: () => current, timers });
+    const c = world.makeContainer();
+    world.PromptSection.init(c, { ...HOME, ...TASK, row: rowRecordOf({ stateType: 'started' }) });
     await flush(); await flush(); await flush();
-    const btn = { dataset: { action: 'change-run' }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
-    for (const fn of c.listenersFor('click')) await fn({ target: btn });
+    await c.click({ action: 'change-run' });
     await flush(); await flush(); await flush();
     assert.match(c.innerHTML, /data-testid="run-change-panel"/, 'precondition: Change is open on the held run');
     current = stateWith({ action: NO_RUN });

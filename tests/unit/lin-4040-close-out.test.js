@@ -1,76 +1,17 @@
 // LIN-4040 close-out — the review ledger's fixes A (the Swipe ladder's "run this step" rung follows the one run offer, and a
 // press re-reads it), B (the running line names the first worker's own issue or none) and C (pinned in
-// task-page-question.test.js: the task page's pill says "needs you"). Same vm-sandbox house pattern as
-// prompt-section-run-quota.test.js.
+// task-page-question.test.js: the task page's pill says "needs you"). Runs in the shared client world
+// (helpers/client-world.js).
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import vm from 'node:vm';
 import { firstWorkerIdentifier } from '../../lib/task-page-loader.js';
 import { runWordsOf } from '../../lib/task-run-facts.js';
+import { loadWorld } from './helpers/client-world.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
 
 const flush = () => new Promise((r) => setImmediate(r));
 
 const RUN_LIMIT_TITLE = 'daily run limit reached \u00b7 resets at midnight UTC';
-
-// Replace the first <div> carrying the bare attribute `attr`, honouring nested
-// <div>s. The setter-only slot write a paint*() helper makes (LIN-3267).
-function replaceSlot(html, attr, replacement) {
-  const open = new RegExp(`<div\\b[^>]*\\b${attr}\\b[^>]*>`).exec(html);
-  if (!open) return html;
-  const start = open.index;
-  let depth = 1;
-  const tagRe = /<div\b|<\/div>/g;
-  tagRe.lastIndex = start + open[0].length;
-  let t;
-  while ((t = tagRe.exec(html))) {
-    if (t[0] === '</div>') { depth -= 1; if (depth === 0) return html.slice(0, start) + replacement + html.slice(t.index + 6); }
-    else depth += 1;
-  }
-  return html;
-}
-
-// LIN-3267: resolves [data-go-slot] / [data-ladder-slot] and counts whole-
-// container innerHTML writes (`_fullRenders`), so a slot repaint can be told
-// apart from a full rebuild.
-function makeContainer() {
-  const container = {
-    _html: '',
-    _fullRenders: 0,
-    dataset: {},
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    setAttribute() {},
-    getAttribute() { return null; },
-    querySelector(sel) {
-      const m = /^\[(data-go-slot|data-ladder-slot)\]$/.exec(sel);
-      if (!m || !new RegExp(`\\b${m[1]}\\b`).test(this._html)) return null;
-      const self = this;
-      return {
-        set outerHTML(v) { self._html = replaceSlot(self._html, m[1], v); },
-        get outerHTML() { return ''; },
-      };
-    },
-    contains() { return true; },
-    _clickHandler: null,
-    addEventListener(type, fn) { if (type === 'click') this._clickHandler = fn; },
-    removeEventListener() {},
-    async click(dataset) {
-      const btn = { dataset: { ...dataset }, disabled: false, textContent: 'label', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
-      await this._clickHandler({ target: btn });
-      return btn;
-    },
-  };
-  Object.defineProperty(container, 'innerHTML', {
-    get() { return this._html; },
-    set(v) { this._html = v; this._fullRenders += 1; },
-  });
-  return container;
-}
 
 function loadPromptSection({ quota, dispatch, stateReply } = {}) {
   const calls = { api: [], dispatch: [], order: [] };
@@ -105,23 +46,10 @@ function loadPromptSection({ quota, dispatch, stateReply } = {}) {
     toast: () => {},
     fetchAutopilotKickoff: async () => ({ prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' }),
   };
-  const sandbox = {
-    window,
-    AbortController,
-    URLSearchParams,
-    TextDecoder,
-    TextEncoder,
-    Blob: class {},
-    URL: { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} },
-    document: { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } },
-    requestAnimationFrame: (cb) => { cb(); return 1; },
-    setTimeout: (fn, delay) => { timers.push({ fn, delay }); return timers.length; },
-    clearTimeout: () => {},
-    navigator: { clipboard: { writeText: async () => {} } },
-    fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }),
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(SRC, sandbox);
+  const world = loadWorld({
+    window, scripts: ['prompt-section.js'], timers,
+    globals: { fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }) },
+  });
   // Fire every pending timer once (the 2s button-restore), then let reads settle.
   async function runTimers() {
     const due = timers.splice(0);
@@ -129,7 +57,7 @@ function loadPromptSection({ quota, dispatch, stateReply } = {}) {
     await flush();
     await flush();
   }
-  return { PromptSection: window.PromptSection, window, calls, timers, runTimers };
+  return { PromptSection: world.PromptSection, window, calls, timers, runTimers, makeContainer: world.makeContainer };
 }
 
 const ISSUE = { id: 'uuid-42', identifier: 'LIN-42', title: 'A task' };
@@ -163,7 +91,7 @@ function baseOpts(extra = {}) {
 
 async function mountIdle(extra, loadOpts) {
   const loaded = loadPromptSection(loadOpts);
-  const container = makeContainer();
+  const container = loaded.makeContainer();
   loaded.PromptSection.init(container, baseOpts(extra));
   await flush();
   await flush();
