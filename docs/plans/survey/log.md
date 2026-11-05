@@ -1993,3 +1993,7 @@ John: from time to time, reread the essay and the related papers, which are good
 - "A step bounded by its ticket … sees one copy of a decision that lives in many". That is the blind scorer's edges finding, predicted.
 - "Tidying where a change does not bind moves stone without settling it". That is the check on tidy-first: each tidy must be where its follow-on binds.
 - "Delete in the same change". That is why LIN-4252 deletes the second fake rather than adding a third.
+
+### 11:05 UTC: LIN-4253 merged (tidy first, about 20 minutes); Drift run 3 sides with the blind read
+- **LIN-4253** (`d9c0f1cae`) met every at-merge item: `SURVEY_KINDS` gone, the excluded set derived from `route: null`, `writes` declared once per template, the preamble kind-blind, the router fixtures unchanged, the docs updated. Two blind reads are running (G `3d5b31a4`, H `3c2356c9`). LIN-4251 is re-surveyed on the new base (`def122d2` / `419bc376`).
+- **Drift run 3** independently confirms the blind scorer's LIN-4241 finding (the settled check inline at 5 sites, up from 2), which my ledger had scored `+ (small)`. That's a third hand against my balance column on that row.
