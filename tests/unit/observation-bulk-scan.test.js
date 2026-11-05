@@ -3,7 +3,7 @@
  * LIN-2701 §B.6 (Phase 3, beat 2) — the seven-way result classifier built on
  * top of that pool (classifyBulkScanResult), added below the Phase 2
  * witnesses in the same file: the classifier is exported from the SAME
- * vm-sandboxed module and needs the same harness, and its witnesses drive
+ * loaded module and needs the same harness, and its witnesses drive
  * real pool entries through it exactly the way §B.7's onResult wiring will.
  *
  * Three required witnesses, all net-new (zero prior coverage — no existing
@@ -20,61 +20,46 @@
  * cancellation here would assert a falsehood.
  *
  * `public/observation.js` is a browser script with DOM/fetch dependencies at
- * call time but none at load time, so it is vm-sandboxed the same way
- * tests/unit/observation-basis-check.test.js already does — that file stays
- * untouched; this is a new, separate seam for the bulk-scan pool.
+ * call time but none at load time, so it runs through `loadWorld`
+ * (tests/unit/helpers/client-world.js) over the shared fake DOM. The bulk-scan
+ * pool is exercised through the module it exports, with its own world per test.
  *
  * Run with: node --test tests/unit/observation-bulk-scan.test.js
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import vm from 'node:vm';
+import { loadWorld } from './helpers/client-world.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
-
 /**
- * `AbortController`/`DOMException` are NOT present in a bare vm context by
- * default (verified: `vm.createContext({})` then `typeof AbortController`
- * reads `'undefined'`) — public/observation.js's pool constructs a real
- * `new AbortController()`, so the sandbox must supply the host's own,
- * exactly like it already supplies `setTimeout`/`clearTimeout`.
+ * observation.js loaded into a world (tests/unit/helpers/client-world.js), with
+ * the bulk-scan pool's only window dependency, `ScanSection.postScan`, supplied
+ * per test. The pool must reach postScan through `window.ScanSection`, never
+ * `window.api`: the `api` stub below throws if it is ever called.
+ *
+ * Each call is a fresh world with its own silent `console`, so a test that
+ * replaces `sandbox.console.error` to capture a report cannot leak into another
+ * test. `AbortController` (which the pool constructs) comes from loadWorld.
+ * Returns the world's vm context, so the tests read `sandbox.module.exports`
+ * and `sandbox.window` as they always have.
  */
 function makeSandbox(postScanImpl) {
-  const sandbox = {
-    module: { exports: {} },
+  return loadWorld({
     window: {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
       ChatUI: { appendOptions() {} },
       ScanSection: { postScan: postScanImpl },
-      // The pool must reach postScan via window.ScanSection, never window.api
-      // directly (that would be re-deriving the scan endpoint itself — the
-      // "no fourth scan-URL builder" non-goal beat 1 flagged) — fail loud if
-      // it ever does.
       api: async () => { throw new Error('bulk-scan pool must call window.ScanSection.postScan, not window.api'); }
     },
-    document: {
-      createElement: () => ({ children: [], addEventListener() {}, querySelector() { return null; }, setAttribute() {} }),
-      addEventListener() {},
-      getElementById: () => null
-    },
-    escapeHtml: (s) => (s === undefined || s === null ? '' : String(s)),
-    relativeTime: () => '',
-    console: { warn() {}, error() {}, log() {} },
-    setTimeout,
-    clearTimeout,
-    setImmediate,
-    AbortController
-  };
-  sandbox.window.window = sandbox.window;
-  vm.createContext(sandbox);
-  vm.runInContext(SRC, sandbox, { filename: 'observation.js' });
-  return sandbox;
+    scripts: ['observation.js'],
+    globals: {
+      module: { exports: {} },
+      escapeHtml: (s) => (s === undefined || s === null ? '' : String(s)),
+      relativeTime: () => '',
+      console: { warn() {}, error() {}, log() {} }
+    }
+  }).sandbox;
 }
 
 /** A promise a test can resolve/reject on its own schedule. */

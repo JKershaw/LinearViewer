@@ -13,10 +13,12 @@
  * The files that use this fake today: `client-world.js`, `fake-dom.test.js` and `lin-4242-waiting-merge.test.js`
  * directly, and `lin-4010-home-opened-task.test.js`, `lin-4246-opened-task-repaint-keep.test.js` and
  * `prompt-section-go.test.js` (LIN-4266), `prompt-section-preserve.test.js`, `prompt-section-recommend-url.test.js` and
- * `prompt-section-look-alike.test.js` (LIN-4268), and `lin-3833-copy-first-view.test.js`, `lin-3968-home-polish.test.js`,
- * `lin-3975-task-run-control.test.js`, `lin-4040-close-out.test.js`, `lin-4042-finished-no-run-to-pr.test.js`,
- * `brief-recap-autogenerate.test.js`, `brief-recap-ai-not-configured-contract.test.js`, `scan-retire-ui.test.js` and
- * `lin-4016-browser-follows-server.test.js` (LIN-4269) through `loadWorld`.
+ * `prompt-section-look-alike.test.js` (LIN-4268), `chat-append-options.test.js`, `chat-render-markdown-text.test.js`,
+ * `chat-tool-rows.test.js`, `observation-basis-check.test.js` and `observation-bulk-scan.test.js` (LIN-4280), and
+ * `lin-3833-copy-first-view.test.js`, `lin-3968-home-polish.test.js`, `lin-3975-task-run-control.test.js`,
+ * `lin-4040-close-out.test.js`, `lin-4042-finished-no-run-to-pr.test.js`, `brief-recap-autogenerate.test.js`,
+ * `brief-recap-ai-not-configured-contract.test.js`, `scan-retire-ui.test.js` and `lin-4016-browser-follows-server.test.js`
+ * (LIN-4269) through `loadWorld`. `client-world.test.js` (LIN-4280) tests `loadWorld`'s `run`.
  * A suite moved onto this fake leaves `HAND_WRITTEN_FAKE_DOM_FILES` and joins this list in the same PR.
  *
  * Modelled:

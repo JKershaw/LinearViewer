@@ -51,9 +51,6 @@ const EXCLUDED = new Set(['tests/unit/helpers/fake-dom.js', SELF]);
 const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/fixtures/observation-dom-shim.js',
   'tests/unit/chart-helpers.test.js',
-  'tests/unit/chat-append-options.test.js',
-  'tests/unit/chat-render-markdown-text.test.js',
-  'tests/unit/chat-tool-rows.test.js',
   'tests/unit/close-out-client.test.js',
   'tests/unit/common-assignee-filter-nav.test.js',
   'tests/unit/common-team-filter-nav.test.js',
@@ -75,8 +72,6 @@ const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/unit/lin-4241-settled-ruling-client.test.js',
   'tests/unit/lin-4242-waiting-live.test.js',
   'tests/unit/live-console-client-facts.test.js',
-  'tests/unit/observation-basis-check.test.js',
-  'tests/unit/observation-bulk-scan.test.js',
   'tests/unit/observation-card-order.test.js',
   'tests/unit/observation-ruling-delivery.test.js',
   'tests/unit/observation-scan-due.test.js',
