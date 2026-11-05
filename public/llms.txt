@@ -292,7 +292,7 @@ Templates (including `retro`) are available on completed/canceled issues too.
 - `[data-testid="opened-task-go"]` - the filled run button (LIN-4104 D2): its label and `data-filled-rung` (next-step, pr or done) follow the viewer's last dispatch on this workspace; Next step runs the task to PR until its recommend step lands, Run to PR (`opened-task-run-to-pr`) is beside it when it is not the filled one, and Run to Done (`data-action="go-done"`) starts the no-stop kickoff (LIN-4104 D4)
 - `[data-testid="opened-task-next-step"]` - ✦ next step (AI-tailored prompt; requires OpenRouter or free tier)
 - `[data-testid="opened-task-primary-reason"]` - plain-words reason when the ✦ action is disabled
-- `[data-testid="opened-task-started"]` - the started/running line shown in the Go slot (carries the task-page link); Go is replaced while a run is live
+- `[data-testid="opened-task-started"]` - the started/running line shown in the Go slot (carries the task-page link); Go is replaced while a run is live, and comes back when it ends (a finished task draws no Go)
 - `[data-testid="opened-task-reasoning"]` - AI reasoning text (visible by default)
 - `[data-prompt-body]` - generated prompt text
 - `[data-testid="opened-task-ladder"]` - copy → run-this-step ladder (the run-whole-task rung is Go now)

@@ -67,6 +67,38 @@ async function finishRun(page, token, itemId) {
   expect(fb.status(), `feedback failed: ${await fb.text()}`).toBe(200);
 }
 
+// LIN-4247: Home's opened task. A run that starts and ends between two 10 s polls is never seen running, so the poll must
+// end it from the reply alone: the started line and Home's run box (state.run.item) both clear, and Go returns.
+test.describe('Home, a run that ends before the first poll (LIN-4247)', () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test('press Go, finish the queued run at once: the started line and run box go, Go returns', async ({ page }) => {
+    await seedDoneTask(page);
+    const token = await runnerToken(page);
+    await page.goto(`/workspace/${URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.line[data-section="in-progress"][data-identifier="LOCAL-FT2"]').click();
+    const block = page.locator('.opened-task').first();
+    await expect(block).toBeVisible();
+
+    // Run to PR is the press that queues one run (Home's filled Go is the next-step rung, which asks for a confirm first). Take and finish it before the first poll (10 s), so no read ever sees it running.
+    const [dispatched] = await Promise.all([
+      page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname.endsWith('/api/dispatch') && r.status() === 201),
+      block.locator('[data-testid="opened-task-run-to-pr"]').click(),
+    ]);
+    const itemId = (await dispatched.json()).item.id;
+    const taken = await page.request.post(`/api/dispatch/take/${itemId}`, { headers: { Authorization: `Bearer ${token}` } });
+    expect(taken.status(), `take failed: ${await taken.text()}`).toBe(200);
+    await finishRun(page, token, itemId);
+
+    await expect(block.locator('[data-testid="opened-task-started"]')).toHaveCount(0, { timeout: 25000 });
+    await expect(block.locator('[data-testid="opened-task-running"]')).toHaveCount(0);
+    // state.run.item is what keeps Home's run box on "Queued, waiting for a runner" for the finished item; only this line pins that endRun clears it.
+    await expect(block.locator('[data-testid="opened-task-queued"]')).toHaveCount(0);
+    await expect(block.locator('[data-testid="opened-task-go"]')).toBeVisible();
+  });
+});
+
 test.describe('Task page, a finished task (LIN-4048)', () => {
   test('Done with nothing held: no runs-on, no Change, no quota and no Go on the page', async ({ page }) => {
     await seedDoneTask(page);
@@ -95,6 +127,23 @@ test.describe('Task page, a finished task (LIN-4048)', () => {
     await expect(page.locator('[data-testid="run-stop"]')).toHaveCount(0, { timeout: 25000 });
     await expect(page.locator('[data-testid="opened-task-running"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="opened-task-go"]')).toHaveCount(0);
+  });
+
+  // LIN-4247: the same held run on an UNFINISHED task. Its Go and started line are Go's own state (state.go), not the run box,
+  // so the started line must go and Go must come back when the run ends, with no reload.
+  test('LIN-4247: an unfinished task whose run ends: the started line goes and Go returns, no reload', async ({ page }) => {
+    await seedDoneTask(page);
+    const token = await runnerToken(page);
+    const itemId = await seedHeldRun(page, token, { identifier: 'LOCAL-FT2', title: 'A task still in progress', kind: 'implementation' });
+
+    await page.goto(`/workspace/${URL_KEY}/task/LOCAL-FT2`);
+    await expect(page.locator('[data-testid="run-stop"]')).toBeVisible();
+    await expect(page.locator('[data-testid="opened-task-go"]')).toHaveCount(0);
+
+    await finishRun(page, token, itemId);
+    await expect(page.locator('[data-testid="opened-task-started"]')).toHaveCount(0, { timeout: 25000 });
+    await expect(page.locator('[data-testid="opened-task-go"]')).toBeVisible();
+    await expect(page.locator('[data-testid="run-stop"]')).toHaveCount(0);
   });
 
   test('control: an unfinished task with a run held keeps its running box and Stop', async ({ page }) => {

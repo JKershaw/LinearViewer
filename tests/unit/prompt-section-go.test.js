@@ -280,23 +280,115 @@ describe('LIN-3341 — Go is one press', () => {
     assert.equal(replaceGoSlot(m.container.innerHTML, ''), replaceGoSlot(before, ''), 'only the Go slot changed');
   });
 
-  test('the started line takes the task-state header sentence and stops polling when not live', async () => {
+  test('LIN-4247: a complete idle reply ends the run: Go returns, the started line goes, polling stops', async () => {
+    // The ended reply is complete and carries `sessions` with nothing busy, as the server sends it.
+    const idleReply = { live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">No session running.</p></div>', sessions: { busy: false, action: { kind: 'offer' } } };
     const queue = [
       { live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">No sessions yet.</p></div>' }, // mount read
       { live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">No sessions yet.</p></div>' }, // press-time read (LIN-3446)
-      { live: true, status: 'running', headerHtml: '<div class="task-status"><p class="task-sentence">Autopilot running since 12:00.</p></div>' }, // first poll
-      { live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">No session running.</p></div>' } // second poll
+      { live: true, status: 'running', headerHtml: '<div class="task-status"><p class="task-sentence">Autopilot running since 12:00.</p></div>', sessions: { busy: true, action: { kind: 'busy' } } }, // first poll
+      idleReply // second poll: the run has ended
     ];
-    const m = await mount({}, {}, { stateApi: async () => queue.shift() || { live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">No session running.</p></div>' } });
+    const m = await mount({}, {}, { stateApi: async () => queue.shift() || idleReply });
     await m.container.click({ action: 'go', rung: 'run-task' });
     await m.flush();
     await m.runTimers(); // first poll
     assert.match(m.container.innerHTML, /Autopilot running since 12:00\./, 'the state header sentence is painted');
     assert.match(m.container.innerHTML, /data-go-status="running"/, 'status is running');
-    await m.runTimers(); // second poll says idle
-    assert.match(m.container.innerHTML, /No session running\./);
+    await m.runTimers(); // second poll: the run has ended
+    assert.doesNotMatch(m.container.innerHTML, /data-testid="opened-task-started"/, 'the started line is gone');
+    assert.doesNotMatch(m.container.innerHTML, /data-go-status=/, 'the Go slot is no longer started or running');
+    assert.match(m.container.innerHTML, /data-testid="opened-task-go"/, 'Go returns');
     const active = m.timers.filter((t) => !t.cancelled).length;
-    assert.equal(active, 0, 'polling stops once the run is not live');
+    assert.equal(active, 0, 'polling stops once the run has ended');
+  });
+
+  // LIN-4247: the state replies in order; the last one repeats once the list is spent.
+  function repliesOf(...list) {
+    const q = [...list];
+    return async () => (q.length > 1 ? q.shift() : q[0]);
+  }
+  const NOT_YET = { live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">No sessions yet.</p></div>' };
+  const LIVE = { live: true, status: 'running', headerHtml: '<div class="task-status"><p class="task-sentence">Autopilot running.</p></div>', sessions: { busy: true, action: { kind: 'busy' } } };
+
+  test('LIN-4247: an incomplete reply is not an end: Go stays out and the poll goes on', async () => {
+    // `incomplete` carries no live or status (routes/task-page.js), and sessions.busy is set, as the server sends it.
+    const incomplete = { incomplete: 'cold', sessions: { busy: true, action: null } };
+    const m = await mount({}, {}, { stateApi: repliesOf(NOT_YET, NOT_YET, incomplete) });
+    await m.container.click({ action: 'go', rung: 'run-task' });
+    await m.flush();
+    await m.runTimers(); // the incomplete poll
+    assert.match(m.container.innerHTML, /data-go-status="(started|running)"/, 'the started line stays');
+    assert.doesNotMatch(m.container.innerHTML, /data-testid="opened-task-go"/, 'no Go while the state is not known');
+    assert.equal(m.timers.filter((t) => !t.cancelled).length, 1, 'a poll is scheduled');
+  });
+
+  test('LIN-4247: a merely incomplete reply, with no sessions at all, is never an end on its own', async () => {
+    // The rule must not lean on `sessions.busy`: an incomplete reply alone keeps the run started and the poll going.
+    const bare = { incomplete: 'cold' };
+    const m = await mount({}, {}, { stateApi: repliesOf(NOT_YET, NOT_YET, bare) });
+    await m.container.click({ action: 'go', rung: 'run-task' });
+    await m.flush();
+    await m.runTimers();
+    assert.match(m.container.innerHTML, /data-go-status="(started|running)"/, 'the started line stays');
+    assert.doesNotMatch(m.container.innerHTML, /data-testid="opened-task-go"/, 'no Go on an incomplete reply');
+    assert.equal(m.timers.filter((t) => !t.cancelled).length, 1, 'a poll is scheduled');
+  });
+
+  test('LIN-4247: a complete reply that is still busy (a subtask runs) is not an end', async () => {
+    // live is false, but a subtask runs: the offer is `busy`. Go must not return, or a second press could start a second run.
+    const busy = { live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">A subtask runs.</p></div>', sessions: { busy: true, action: { kind: 'busy', identifier: 'LIN-43' } } };
+    const m = await mount({}, {}, { stateApi: repliesOf(NOT_YET, NOT_YET, busy) });
+    await m.container.click({ action: 'go', rung: 'run-task' });
+    await m.flush();
+    await m.runTimers();
+    assert.match(m.container.innerHTML, /data-go-status="running"/, 'the started line stays');
+    assert.doesNotMatch(m.container.innerHTML, /data-testid="opened-task-go"/, 'no Go while a subtask runs');
+    assert.equal(m.timers.filter((t) => !t.cancelled).length, 1, 'a poll is scheduled');
+  });
+
+  test('LIN-4247: a finished task draws neither Go nor the started line when its run ends', async () => {
+    // The server's `none` offer is the only decider: the ended reply carries it, and Go stays out.
+    const finished = { live: false, status: 'done', headerHtml: '<div class="task-status"><p class="task-sentence">Done.</p></div>', sessions: { busy: false, action: { kind: 'none' } } };
+    const m = await mount({}, {}, { stateApi: repliesOf(NOT_YET, NOT_YET, LIVE, finished) });
+    await m.container.click({ action: 'go', rung: 'run-task' });
+    await m.flush();
+    await m.runTimers(); // live
+    await m.runTimers(); // the run ended on a finished task
+    assert.doesNotMatch(m.container.innerHTML, /data-testid="opened-task-go"/, 'no Go on a finished task');
+    assert.doesNotMatch(m.container.innerHTML, /data-testid="opened-task-started"/, 'no started line');
+    assert.doesNotMatch(m.container.innerHTML, /data-go-status=/, 'the Go slot is not started or running');
+    assert.equal(m.timers.filter((t) => !t.cancelled).length, 0, 'polling stops');
+  });
+
+  test('LIN-4247: a poll read that lands after a Stop restarted the run does not end the newer run', async () => {
+    // The poll read is held open; a Stop in the meantime restarts the poll with a new Go state. The held read is complete and
+    // says the run ended, but it is stale: it was taken before that Stop, so it must not reset Go.
+    const RUNNING_WITH_SESSION = { ...LIVE, sessions: { busy: true, action: { kind: 'busy' }, running: { loopId: 'loop-1', target: 'cli' }, canStop: true } };
+    const ended = { live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">Ended.</p></div>', sessions: { busy: false, action: { kind: 'offer' } } };
+    let held = null;
+    let reads = 0;
+    const stateApi = async () => {
+      reads += 1;
+      if (reads <= 2) return NOT_YET;   // mount, press
+      if (reads === 3) return RUNNING_WITH_SESSION; // first poll
+      return new Promise((resolve) => { held = resolve; }); // second poll: held open
+    };
+    // The task page surface: Stop is its run control (handleRunAction returns early on Swipe).
+    const m = await mount({}, { surface: 'task' }, { stateApi });
+    await m.container.click({ action: 'go', rung: 'run-task' });
+    await m.flush();
+    await m.runTimers(); // first poll: live, the session is known
+    await m.runTimers(); // second poll: its read is now held
+    assert.equal(typeof held, 'function', 'the second poll read is in flight');
+    await m.container.click({ action: 'stop-run-confirm', rung: 'run-task' }); // Stop restarts the poll
+    await m.flush();
+    assert.match(m.container.innerHTML, /data-go-status="running"/, 'the run is still shown as running after Stop');
+    held(ended);
+    await m.flush();
+    await m.flush();
+    assert.match(m.container.innerHTML, /data-go-status="running"/, 'the stale read did not reset Go');
+    assert.doesNotMatch(m.container.innerHTML, /data-testid="opened-task-go"/, 'no Go from the stale read');
   });
 
   test('a 201 no-runner warning adds our plain-words line with the runner link', async () => {

@@ -242,7 +242,13 @@
    *   - run-limited: disabled with the run-limit reason, from the same quota as
    *     the run-step rung.
    *   - starting: disabled, "starting…".
-   *   - started/running: the task-page state line replaces the button.
+   *   - started/running: the task-page state line replaces the button. LIN-4247: it
+   *     ends in runPoll, when a complete /state reply shows nothing in progress
+   *     (runEnded): endRun sets ready again and clears run.item. Go is then drawn
+   *     from the server's offer (renderGo's takesNoRun), so a finished task draws none.
+   *     "In progress" has three answers: goInProgress (a run is live or waiting now:
+   *     the press and mount reads), stageBusy (hides the step line), and the offer's
+   *     busy kind. runEnded reads sessions.busy together with goInProgress.
    * The run allowance ("N of M runs left today") lives beside Go, so it shows in
    * every phase and is the same account-wide count the run rungs used.
    */
@@ -2300,6 +2306,27 @@
       return !!(data && (data.live === true || data.status === 'waiting'));
     }
 
+    // LIN-4247: the one rule for "the run has ended", read by runPoll only. A COMPLETE reply that is not in progress by
+    // either answer: goInProgress (live or waiting now) and the server's `sessions.busy` (a queued, waiting or subtree-busy
+    // run). An incomplete reply is never an end: it carries no live or status, and says only that the state is not known
+    // yet. A reply without `sessions` (older fixtures and route mocks) is not busy. The mount and press reads keep
+    // goInProgress alone: they only decide whether a run is live now, so they never end one.
+    function runEnded(data) {
+      if (!data || data.incomplete) return false;
+      if (goInProgress(data)) return false;
+      return !(data.sessions && data.sessions.busy);
+    }
+
+    // LIN-4247: the run has ended. Go goes back to ready, and renderGo draws it from the server's offer (nothing where that
+    // offer is `none`, a finished task). run.item clears too, or Home's run box stays active on it. The three presses (Go,
+    // Next step, run-step) all end in runPoll, so this one reset covers them; Swipe has no run block, so paintRun is a no-op there.
+    function endRun() {
+      state.go = { status: 'ready', headerHtml: null, notice: null, noticeLink: null, noticeLinkLabel: null };
+      state.run.item = null;
+      paintRun();
+      paintGo();
+    }
+
     // Paint the started/running line from the state endpoint and keep reading
     // while the run is in progress.
     function setGoRunning(headerHtml) {
@@ -2319,14 +2346,19 @@
     }
 
     // One poll beat. A failed read backs off x2 to 60s; a successful read paints
-    // the task page's own sentence and keeps going while (live || waiting).
+    // the task page's own sentence and keeps going until runEnded (LIN-4247). An
+    // incomplete reply keeps going too: it is not an end.
     function runPoll() {
       pollTimer = null;
       if (destroyed) return;
       if (!state.go || (state.go.status !== 'running' && state.go.status !== 'started')) return;
       if (typeof document !== 'undefined' && document.hidden) { schedulePoll(10000); return; }
+      const reading = state.go;
       readTaskState().then((data) => {
         if (destroyed) return;
+        // LIN-4247: a read that lands after Go changed (a new press, a refusal, a Stop that restarted the poll) is stale. Acting
+        // on it could end a newer run, so it is dropped; the change that replaced Go scheduled its own poll where one is due.
+        if (state.go !== reading) return;
         if (!data) {
           pollFailures += 1;
           schedulePoll(Math.min(60000, 10000 * Math.pow(2, pollFailures)));
@@ -2335,12 +2367,14 @@
         pollFailures = 0;
         if (!data.incomplete || !state.opened) state.opened = data;
         paintState();
+        // LIN-4247: the ended reply's sessions.action is already in state.opened (paintState above), so endRun's repaint
+        // draws the server's offer. The header write below must not run for it: it would set Go back to running.
+        if (runEnded(data)) { endRun(); return; }
         if (data.headerHtml) {
           state.go = { status: 'running', headerHtml: data.headerHtml, notice: null, noticeLink: null, noticeLinkLabel: null };
           paintGo();
         }
-        if (goInProgress(data)) schedulePoll(10000);
-        // else: the run ended; keep the last sentence and stop polling.
+        schedulePoll(10000);
       });
     }
 
