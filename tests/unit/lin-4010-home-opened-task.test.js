@@ -12,15 +12,11 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import vm from 'node:vm';
 import { USUAL_STAGES, SPINE } from '../../lib/run-view.js';
 import { buildRowStates, buildTaskPageModel, nextStepOf, waitingForOf, sessionSummaryOf } from '../../lib/task-page-loader.js';
 import { buildInProgressCountParts } from '../../lib/task-board-view.js';
 import { renderHomeStatus } from '../../lib/render-task-page.js';
-import { createFakeDom } from './helpers/fake-dom.js';
+import { loadWorld } from './helpers/prompt-section-world.js';
 
 // LIN-4016: Home's pill reads the task's decided state. This helper reads the task's OWN facts; it equals the gather that
 // `/state` sends (lib/home-row-states.js) only for a leaf, which is every fixture that uses it. A container's state is
@@ -33,8 +29,6 @@ import { needsAPerson, taskStateOf, taskFactsOf } from '../../lib/task-state.js'
 import { serverSessions, serverRow } from '../fixtures/task-decision.js';
 import { stateBodyOf, stateIssue } from '../fixtures/state-route.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
 const NOW = new Date('2026-10-29T10:06:00.000Z');
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
@@ -313,8 +307,6 @@ function loadClient({ stateBody = null, previewBody = null, presetsBody = [], pa
   // LIN-4016: the state body is the server's (its `sessions` carry the decision: queued, busy, action and canStop).
   if (stateBody && stateBody.sessions) stateBody = { ...stateBody, sessions: serverSessions(stateBody.sessions, { container }) };
   const calls = { api: [], dispatch: [], post: [] };
-  const dom = createFakeDom();
-  const { document } = dom;
   const window = {
     escapeHtml: (x) => (x == null ? '' : escapeHtml(String(x))),
     stripCodeBlockWrapper: (x) => x,
@@ -338,39 +330,10 @@ function loadClient({ stateBody = null, previewBody = null, presetsBody = [], pa
     isPinnedToBottom: () => false,
     toast: () => {},
   };
-  const sandbox = {
-    window, AbortController, URLSearchParams, TextDecoder, TextEncoder, Blob: class {}, URL,
-    document,
-    requestAnimationFrame: (cb) => { cb(); return 1; },
-    setTimeout: (fn, ms) => { const t = globalThis.setTimeout(fn, ms); if (t && t.unref) t.unref(); return t; },
-    clearTimeout,
-    navigator: { clipboard: { writeText: async () => {} } },
-    fetch: async () => ({ ok: true, json: async () => ({}) }),
-    console,
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(SRC, sandbox, { filename: 'prompt-section.js' });
-  // The container is a real element in this world's document, so `contains`, `closest` and focus are the browser's. The
-  // two shims below are this suite's whole layer over it. `click` gives the real button with those data attributes to the
-  // click listeners as its target, and throws if the button is not drawn. `key` sends the key to the focused element, as a
-  // browser does, so a key pressed with nothing focused in the container reaches no listener.
-  const makeContainer = () => {
-    const container = document.createElement('div');
-    document.body.appendChild(container);
-    container.click = async (dataset) => {
-      const attrs = Object.entries(dataset).map(([k, v]) => `[data-${k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}="${v}"]`).join('');
-      const btn = container.querySelector(`button${attrs}`);
-      if (!btn) throw new Error(`no button ${JSON.stringify(dataset)} is drawn in the container`);
-      for (const fn of container.listenersOf('click')) await fn({ target: btn });
-      return btn;
-    };
-    container.key = async (k) => {
-      const event = { key: k, target: document.activeElement, preventDefault() {} };
-      for (const fn of container.listenersOf('keydown')) await fn(event);
-    };
-    return container;
-  };
-  return { PromptSection: sandbox.window.PromptSection, calls, makeContainer };
+  // The shared client world (tests/unit/helpers/prompt-section-world.js): the fake DOM, the vm, and the container's click and
+  // key shims. This suite's own layer is the `window` stubs above.
+  const world = loadWorld({ window, scripts: ['prompt-section.js'] });
+  return { PromptSection: world.PromptSection, calls, makeContainer: world.makeContainer };
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0));

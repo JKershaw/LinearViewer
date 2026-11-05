@@ -472,10 +472,12 @@
   }
   // LIN-4242: whether a repaint keeps the card already on the page in place of its fresh markup (the opened task's
   // keepTypedQuestion, public/prompt-section.js). The ruling key is the gate: a different ruling's card is never kept, and
-  // the same ruling's card is kept only while it holds the reader's place.
-  function keepsReaderPlace(oldCard, freshCard) {
+  // the same ruling's card is kept only while it holds the reader's place. `hadFocus` is the caller's report that focus was
+  // inside the card before its repaint detached it (LIN-4246): by the time this runs, document.activeElement is already
+  // gone, so only the caller can know. Omitted, the answer is the Waiting merge's, unchanged.
+  function keepsReaderPlace(oldCard, freshCard, hadFocus) {
     if (!oldCard || !freshCard) return false;
-    return rulingKeyOf(oldCard) === rulingKeyOf(freshCard) && cardHoldsInput(oldCard);
+    return rulingKeyOf(oldCard) === rulingKeyOf(freshCard) && (!!hadFocus || cardHoldsInput(oldCard));
   }
   function waitingWrappersIn(body) {
     var out = [];

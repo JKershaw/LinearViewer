@@ -325,12 +325,32 @@ test.describe('the opened task keeps its typed question across a state repaint (
     // Witness: drop `|| keepsPlace` from keepTypedQuestion → the repaint writes the new card and the typed text is gone.
     await openRunningThenRaise(page);
     await page.locator(OPENED_INPUT).fill('half a sentence in the opened task');
+    // fill() leaves the textarea focused, and focus alone keeps a card (cardHoldsInput). Blur first, so this test
+    // witnesses the typed text and not the focus: the card must hold no focus when the poll paints.
+    await page.locator(OPENED_INPUT).blur();
+    expect(await page.evaluate(() => !document.querySelector('[data-question-slot] [data-testid="session-question-card"]').contains(document.activeElement))).toBe(true);
     await page.locator(OPENED_CARD).evaluate(el => { el.dataset.keepMark = 'yes'; });
 
     await editNextStateCard(page, html => html.replace('data-testid="session-question-card"', 'data-testid="session-question-card" data-repainted="yes"'));
     await pollOnce(page);
 
     await expect(page.locator(OPENED_INPUT)).toHaveValue('half a sentence in the opened task');
+    await expect(page.locator(`${OPENED_CARD}[data-keep-mark="yes"]`)).toHaveCount(1);
+    await expect(page.locator(`${OPENED_CARD}[data-repainted="yes"]`)).toHaveCount(0);
+  });
+
+  test('a focused card with nothing typed keeps its focus through a state repaint (LIN-4246)', async ({ page }) => {
+    // Witness: drop the focus capture in paintState, or the restore after the card is moved back → the card is replaced
+    // (its mark is gone) or the textarea is left blurred. Nothing is typed here, so focus is the only thing that can keep it.
+    await openRunningThenRaise(page);
+    await page.locator(OPENED_INPUT).focus();
+    await expect(page.locator(OPENED_INPUT)).toBeFocused();
+    await page.locator(OPENED_CARD).evaluate(el => { el.dataset.keepMark = 'yes'; });
+
+    await editNextStateCard(page, html => html.replace('data-testid="session-question-card"', 'data-testid="session-question-card" data-repainted="yes"'));
+    await pollOnce(page);
+
+    await expect(page.locator(OPENED_INPUT)).toBeFocused();
     await expect(page.locator(`${OPENED_CARD}[data-keep-mark="yes"]`)).toHaveCount(1);
     await expect(page.locator(`${OPENED_CARD}[data-repainted="yes"]`)).toHaveCount(0);
   });
