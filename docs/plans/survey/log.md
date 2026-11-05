@@ -2071,3 +2071,14 @@ Scoped: freeze a dated cost table per leg; split the cost into floor, work, keep
 - **LIN-4246: mixed, mixed.** Partial adoption again (the shared vm layer has 2 users of about 19), plus a second focus capture and restore from the bug fix review found.
 - **The round** (summary table in `place-ledger.md`): track B, where the tidy deleted every copy, gave the only rows today that either blind pass rates better (LIN-4253 twice, LIN-4251 once). Track A, where the tidy stopped at 2 of about 30 copies with no guard, came out like the control: mixed for the tidy, the follow-on and LIN-4247 alike. A's payoff shows in the film: the follow-on found and fixed a user-facing bug the old fake hid. The still doesn't see it.
 - **Reading, tentative (two tracks):** tidy first moves the needle when the tidy *finishes*. A partial tidy behaves like no tidy on the blind read. John's view (11:35) is that a smaller move should still trend, and the way to test that is LIN-4255: A's tidy-after with a ratchet census. If A's next rows read better, partial plus ratchet is enough; if not, the bigger disc has to move first.
+
+### 12:50 UTC: LIN-4255 (A's tidy-after, with the ratchet) and LIN-4263 (`/cost` per dispatch), surveyed, scoped, started
+- **LIN-4255:**
+  - the `makeContainer` family (20 files, 18 with their own vm) moves cleanly onto the shared world;
+  - the `FakeElement` family needs `className`/`id` reflection, which LIN-4252 deliberately didn't model;
+  - 84 assertions measure the old fakes' internals (`_fullRenders`) and must be re-expressed and mapped;
+  - a count-only ratchet would pass a swap, so it must name files.
+
+  **Scope:** the census first (a definition, a frozen file list, the baseline); rename the world helper; `prompt-section-go` as the pricing probe; then the families. **The big move early:** `className`/`id` on the fake, then the `FakeElement` family, as its own piece with a stop rule. This is the test of John's "partial plus ratchet trends".
+- **LIN-4263:** the ticket's diagnosis was partly stale (builder and follow-up are one lineage row; the records-path label is cost-dominant, not last). Both voices: don't split `workerSessions`, which would quietly change the Models page and effort readout; add a nested per-dispatch breakdown. open-0's warning: snapshot-era totals may price Haiku tokens at Opus rates, so reprice one real ticket by hand first, and give snapshot lineages `dispatches: null` rather than a guessed split. The founder-model label goes to the tally.
+- Both autopilots started. The LIN-4257 ruling still waits on John (proposal revised to `proceed-readonly`).
