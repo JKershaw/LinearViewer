@@ -6,96 +6,33 @@
 // stored task-state endpoint once on mount, so a run already in progress shows
 // the running/waiting line instead of a pressable Go (`live || waiting`).
 //
-// The sandbox is the same vm house pattern as prompt-section-run-quota.test.js,
-// with a tiny DOM shim that understands the one targeted write Go makes
-// (`[data-go-slot]`), plus a manual timer queue so the poll is observable.
+// The client runs in the shared client world (tests/unit/helpers/client-world.js): the one fake DOM
+// and one vm sandbox. A press is `container.click(dataset)`, which needs the button to be drawn, as a
+// browser needs it. Assertions read the drawn markup (`innerHTML`, `querySelector`) and node identity:
+// a node held before a press is kept (the same node, still attached) or rebuilt (detached).
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import vm from 'node:vm';
+import { loadWorld } from './helpers/client-world.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
-
-// Replace the element carrying `data-go-slot` (a <div>) in a flat HTML string,
-// honouring nested <div>s. Setter-only: this is the one write Go makes.
-function replaceGoSlot(html, replacement) { return replaceSlot(html, 'data-go-slot', replacement); }
-function replaceSlot(html, attr, replacement) {
-  const open = new RegExp(`<div\\b[^>]*\\b${attr}\\b[^>]*>`).exec(html);
-  if (!open) return html;
-  const start = open.index;
-  let depth = 1;
-  const tagRe = /<div\b|<\/div>/g;
-  tagRe.lastIndex = start + open[0].length;
-  let t;
-  while ((t = tagRe.exec(html))) {
-    if (t[0] === '</div>') { depth -= 1; if (depth === 0) return html.slice(0, start) + replacement + html.slice(t.index + 6); }
-    else depth += 1;
-  }
-  return html;
-}
-
-function makeContainer() {
-  const container = {
-    _html: '',
-    _fullRenders: 0,
-    dataset: {},
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    setAttribute() {},
-    getAttribute() { return null; },
-    contains() { return true; },
-    _clickHandler: null,
-    addEventListener(type, fn) { if (type === 'click') this._clickHandler = fn; },
-    removeEventListener() {},
-    querySelector(sel) {
-      const self = this;
-      if (sel === '[data-go-slot]') {
-        return {
-          set outerHTML(v) { self._html = replaceGoSlot(self._html, v); },
-          get outerHTML() { return ''; },
-        };
-      }
-      if (sel === '[data-ladder-slot]') {
-        return {
-          set outerHTML(v) { self._html = replaceSlot(self._html, 'data-ladder-slot', v); },
-          get outerHTML() { return ''; },
-        };
-      }
-      if (sel === '[data-go-notice-slot]') {
-        return {
-          set innerHTML(v) { self._html = self._html.replace(/(data-go-notice-slot[^>]*>)[\s\S]*?(<\/div>)/, `$1${v}$2`); },
-          get innerHTML() { return ''; },
-        };
-      }
-      if (sel === '[data-setup-notice-slot]') {
-        return {
-          set innerHTML(v) { self._html = self._html.replace(/(data-setup-notice-slot[^>]*>)[\s\S]*?(<\/div>)/, `$1${v}$2`); },
-          get innerHTML() { return ''; },
-        };
-      }
-      if (sel === '.swipe-prompt-options') return null;
-      return null;
-    },
-    async click(dataset) {
-      const btn = { dataset: { ...dataset }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
-      await this._clickHandler({ target: btn });
-      return btn;
-    },
+// Every element in the container outside `slotSelector`. A repaint that touches only that slot keeps all of them: the
+// same node, still attached. A full render detaches them all.
+function nodesOutside(container, slotSelector) {
+  const out = [];
+  const walk = (el) => {
+    for (const child of el.children) {
+      if (child.closest(slotSelector)) continue; // the slot and what it holds are not kept
+      out.push(child);
+      walk(child);
+    }
   };
-  Object.defineProperty(container, 'innerHTML', {
-    get() { return this._html; },
-    set(v) { this._html = v; this._fullRenders += 1; },
-  });
-  return container;
+  walk(container);
+  return out;
 }
 
 function loadPromptSection(overrides = {}) {
   const calls = { api: [], dispatch: [], kickoff: [], records: [], fetch: [] };
   const timers = [];
-  let timerSeq = 1;
 
   const window = {
     escapeHtml: (s) => (s == null ? '' : String(s)),
@@ -134,26 +71,20 @@ function loadPromptSection(overrides = {}) {
     return { item: { id: 'disp-1' } };
   };
 
-  const sandbox = {
+  const world = loadWorld({
     window,
-    AbortController,
-    URLSearchParams,
-    TextDecoder,
-    TextEncoder,
-    requestAnimationFrame: (cb) => { cb(); return 1; },
-    setTimeout: (fn, delay) => { const id = timerSeq++; timers.push({ id, fn, delay, cancelled: false }); return id; },
-    clearTimeout: (id) => { const t = timers.find((x) => x.id === id); if (t) t.cancelled = true; },
-    navigator: { clipboard: { writeText: async () => {} } },
-    fetch: async (url, opts) => {
-      calls.fetch.push({ url, opts });
-      if (String(url).includes('/api/task-mode')) { calls.records.push({ url, opts }); return { ok: true, json: async () => ({}) }; }
-      if (String(url).includes('/stream')) return { ok: true };
-      if (overrides.streamFetch) return overrides.streamFetch(url, opts);
-      return { ok: false, status: 500, json: async () => ({}) };
+    scripts: ['prompt-section.js'],
+    timers,
+    globals: {
+      fetch: async (url, opts) => {
+        calls.fetch.push({ url, opts });
+        if (String(url).includes('/api/task-mode')) { calls.records.push({ url, opts }); return { ok: true, json: async () => ({}) }; }
+        if (String(url).includes('/stream')) return { ok: true };
+        if (overrides.streamFetch) return overrides.streamFetch(url, opts);
+        return { ok: false, status: 500, json: async () => ({}) };
+      },
     },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(SRC, sandbox);
+  });
 
   const flush = () => new Promise((r) => setImmediate(r));
   async function runTimers() {
@@ -163,7 +94,7 @@ function loadPromptSection(overrides = {}) {
     await flush();
     await flush();
   }
-  return { PromptSection: window.PromptSection, window, calls, timers, flush, runTimers };
+  return { PromptSection: world.PromptSection, window: world.window, calls, timers, flush, runTimers, makeContainer: world.makeContainer };
 }
 
 const ISSUE = { id: 'uuid-42', identifier: 'LIN-42', title: 'A task', source: 'linear' };
@@ -189,7 +120,7 @@ function baseOpts(extra = {}) {
 
 async function mount(overrides = {}, extra = {}, loadOverrides = {}) {
   const h = loadPromptSection({ ...overrides, ...loadOverrides });
-  const container = makeContainer();
+  const container = h.makeContainer();
   h.PromptSection.init(container, baseOpts(extra));
   await h.flush();
   await h.flush();
@@ -222,18 +153,34 @@ describe('LIN-3341 — Go is one press', () => {
   });
 
   test('a double press makes one dispatch', async () => {
-    const m = await mount();
+    // The first press is held in `starting` until its kickoff answers: that is the window a second press could land in.
+    let releaseKickoff;
+    const kickoffHeld = new Promise((r) => { releaseKickoff = r; });
+    const m = await mount({ kickoff: () => kickoffHeld });
     await m.container.click({ action: 'go', rung: 'run-task' });
     await m.flush();
-    await m.container.click({ action: 'go', rung: 'run-task' });
+    // A starting Go is drawn disabled and is not pressable, so a second press has no control to land on.
+    assert.equal(m.container.querySelector('[data-testid="opened-task-go"][data-action="go"]'), null, 'no pressable Go while the press is starting');
+    const starting = m.container.querySelector('[data-testid="opened-task-go"]');
+    assert.ok(starting && starting.hasAttribute('disabled'), 'the starting Go is drawn disabled');
+    releaseKickoff({ prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' });
+    await m.flush();
+    await m.flush();
     await m.flush();
     assert.equal(m.calls.dispatch.length, 1, 'the second press is ignored');
   });
 
   test('a non-blank panel harness is sent, never null', async () => {
-    const m = await mount({}, {}, { readDispatchExecControls: () => ({ model: 'openai/gpt-5.4-mini', harness: 'opencode' }) });
+    // The press reads the disclosure drawn on the card (startRun looks up `.swipe-prompt-options`), so the reader gets that node.
+    const panels = [];
+    const m = await mount({}, {}, { readDispatchExecControls: (panel) => { panels.push(panel); return { model: 'openai/gpt-5.4-mini', harness: 'opencode' }; } });
+    await m.container.click({ prompt: 'implementation' });
+    await m.flush();
+    const card = m.container.querySelector('.swipe-prompt-options');
+    assert.ok(card, 'the fresh prompt draws its disclosure');
     await m.container.click({ action: 'go', rung: 'run-task' });
     await m.flush();
+    assert.equal(panels.at(-1), card, 'the press hands the reader the disclosure drawn on the card');
     assert.equal(m.calls.dispatch[0].harness, 'opencode');
     assert.equal(m.calls.dispatch[0].model, 'openai/gpt-5.4-mini');
   });
@@ -247,7 +194,7 @@ describe('LIN-3341 — Go is one press', () => {
     // handler reaches fetchPrompt's first await synchronously, so the phase is
     // already `generating` when it returns.
     const genH = loadPromptSection({ readSSEStream: () => new Promise(() => {}) });
-    const genC = makeContainer();
+    const genC = genH.makeContainer();
     genH.PromptSection.init(genC, baseOpts());
     await genC.click({ prompt: '__ai__' });
     assert.match(genC.innerHTML, /data-testid="opened-task-go"/, 'Go shows while generating');
@@ -270,14 +217,16 @@ describe('LIN-3341 — Go is one press', () => {
     const m = await mount({}, {}, { readSSEStream: () => new Promise(() => {}) });
     await m.container.click({ prompt: '__ai__' });
     await m.flush();
-    const before = m.container.innerHTML;
-    const rendersBefore = m.container._fullRenders;
+    // The streamed body is held before the press. Everything outside the Go slot is held too.
+    const body = m.container.querySelector('[data-prompt-body]');
+    assert.ok(body, 'the streamed prompt body is drawn');
+    const kept = nodesOutside(m.container, '[data-go-slot]');
     await m.container.click({ action: 'go', rung: 'run-task' });
     await m.flush();
-    assert.equal(m.container._fullRenders, rendersBefore, 'no full container render on the Go press');
-    // Everything outside the Go slot is byte-identical — above all the streamed
+    // Everything outside the Go slot is still the same attached node — above all the streamed
     // [data-prompt-body], which a full render would have rebuilt (N4).
-    assert.equal(replaceGoSlot(m.container.innerHTML, ''), replaceGoSlot(before, ''), 'only the Go slot changed');
+    assert.equal(m.container.querySelector('[data-prompt-body]'), body, 'the streamed body is the same node');
+    for (const el of kept) assert.ok(el.isConnected, `only the Go slot was repainted: <${el.localName}> outside it was rebuilt`);
   });
 
   test('LIN-4247: a complete idle reply ends the run: Go returns, the started line goes, polling stops', async () => {
@@ -366,22 +315,27 @@ describe('LIN-3341 — Go is one press', () => {
     // says the run ended, but it is stale: it was taken before that Stop, so it must not reset Go.
     const RUNNING_WITH_SESSION = { ...LIVE, sessions: { busy: true, action: { kind: 'busy' }, running: { loopId: 'loop-1', target: 'cli' }, canStop: true } };
     const ended = { live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">Ended.</p></div>', sessions: { busy: false, action: { kind: 'offer' } } };
+    // The idle reply a task with a runnable offer sends: the task page draws Go only when `sessions.action` is an offer.
+    const OFFER = { ...NOT_YET, sessions: { busy: false, action: { kind: 'offer' } } };
     let held = null;
     let reads = 0;
     const stateApi = async () => {
       reads += 1;
-      if (reads <= 2) return NOT_YET;   // mount, press
+      if (reads <= 2) return OFFER;   // mount, press
       if (reads === 3) return RUNNING_WITH_SESSION; // first poll
       return new Promise((resolve) => { held = resolve; }); // second poll: held open
     };
-    // The task page surface: Stop is its run control (handleRunAction returns early on Swipe).
-    const m = await mount({}, { surface: 'task' }, { stateApi });
+    // The task page surface: Stop is its run control (handleRunAction returns early on Swipe). This file's workspace fills
+    // Run to PR, so the task page's primary control is the Go this test presses (without it that page's primary is Next step).
+    const m = await mount({}, { surface: 'task', filledRung: 'pr' }, { stateApi });
     await m.container.click({ action: 'go', rung: 'run-task' });
     await m.flush();
     await m.runTimers(); // first poll: live, the session is known
     await m.runTimers(); // second poll: its read is now held
     assert.equal(typeof held, 'function', 'the second poll read is in flight');
-    await m.container.click({ action: 'stop-run-confirm', rung: 'run-task' }); // Stop restarts the poll
+    // Stop is a two-step press in the drawn markup: Stop opens the confirm, and only the confirm stops the run.
+    await m.container.click({ action: 'stop-run' });
+    await m.container.click({ action: 'stop-run-confirm' }); // Stop restarts the poll
     await m.flush();
     assert.match(m.container.innerHTML, /data-go-status="running"/, 'the run is still shown as running after Stop');
     held(ended);
@@ -410,9 +364,8 @@ describe('LIN-3341 — Go is one press', () => {
     assert.match(dup.container.innerHTML, /data-go-status="running"/, 'the slot is in the running state');
     assert.match(dup.container.innerHTML, /href="\/workspace\/ws\/task\/LIN-42"[^>]*data-testid="opened-task-started-link"/, 'with the watch link');
     assert.equal(dup.timers.filter((t) => !t.cancelled).length, 1, 'the poll is running');
-    // (d) a second press after the refusal cannot send a second dispatch.
-    await dup.container.click({ action: 'go', rung: 'run-task' });
-    await dup.flush();
+    // (d) a second press after the refusal cannot send a second dispatch: no drawn Go is left to press.
+    assert.equal(dup.container.querySelector('[data-testid="opened-task-go"][data-action="go"]'), null, 'no pressable Go to press again');
     assert.equal(dup.calls.dispatch.length, 1, 'no second dispatch after the refusal');
 
     // LIN-3494: every other refusal shows the server's own reason, then the link.
@@ -422,7 +375,7 @@ describe('LIN-3341 — Go is one press', () => {
       await m.flush();
       return m.container.innerHTML;
     };
-    const LINK = /href="\/workspace\/ws\/runner">run on my machine \u203A<\/a>/;
+    const LINK = /href="\/workspace\/ws\/runner">run on my machine ›<\/a>/;
 
     const limitReason = 'Daily run limit reached (10 of 10 today). Resets at midnight UTC.';
     const limited = await refuse(429, { code: 'RUN_LIMIT_REACHED', error: limitReason });
@@ -447,7 +400,6 @@ describe('LIN-3341 — Go is one press', () => {
     const unverified = await refuse(503, { code: 'RUN_LIMIT_UNVERIFIED', error: 'Could not verify the run limit' });
     assert.ok(unverified.includes('Could not verify the run limit'));
     assert.match(unverified, LINK);
-
     // Reader order: body.error, else body.message, else error.message.
     assert.ok((await refuse(500, { message: 'from message' }, 'thrown')).includes('from message'));
     const both = await refuse(500, { error: 'from error', message: 'from message' }, 'thrown');
@@ -492,13 +444,18 @@ describe('LIN-3341 — Go is one press', () => {
 
     test('a Go press repaints only the Go and ladder slots, never the whole container', async () => {
       const m = await mount({}, { freeTier: true }, { quota: seq(Q(1), Q(0)) });
-      const before = m.container._fullRenders;
+      // The ✦ next-step button sits outside the Go and ladder slots. A full render would rebuild it, so holding it proves the
+      // press did not run one. Every other element outside those two slots is held the same way.
+      const next = m.container.querySelector('[data-testid="opened-task-next-step"]');
+      assert.ok(next, 'the ✦ next-step button is drawn outside the Go and ladder slots');
+      const kept = nodesOutside(m.container, '[data-go-slot], [data-ladder-slot]');
       await m.container.click({ action: 'go', rung: 'run-task' });
       await m.flush();
       await m.flush();
-      assert.equal(m.container._fullRenders, before, 'no whole-container write after the press');
+      assert.equal(m.container.querySelector('[data-testid="opened-task-next-step"]'), next, 'the next-step button is the same node: no whole-container write after the press');
+      for (const el of kept) assert.ok(el.isConnected, `only the Go and ladder slots were repainted: <${el.localName}> outside them was rebuilt`);
       assert.match(m.container.innerHTML, /0 of 10 runs left today/);
-      assert.match(m.container.innerHTML, /data-ladder-slot/, 'the ladder slot is still there');
+      assert.ok(m.container.querySelector('[data-ladder-slot]'), 'the ladder slot is still there');
     });
 
     test('a RUN_LIMIT_REACHED 429 leaves Go exhausted via the quota read', async () => {
@@ -560,19 +517,19 @@ describe('LIN-3341 — Go is one press', () => {
       assert.equal(notReady.calls.api.filter((u) => String(u).includes('/api/task/')).length, 1, 'one display read, and no Go read');
 
       const noKey = loadPromptSection();
-      noKey.window.PromptSection.init(makeContainer(), baseOpts({ urlKey: '' }));
+      noKey.PromptSection.init(noKey.makeContainer(), baseOpts({ urlKey: '' }));
       await noKey.flush();
       assert.equal(noKey.calls.api.some((u) => String(u).includes('/api/task/')), false, 'no urlKey → no read');
 
       const noIdent = loadPromptSection();
-      noIdent.window.PromptSection.init(makeContainer(), baseOpts({ issue: { id: 'uuid-42' } }));
+      noIdent.PromptSection.init(noIdent.makeContainer(), baseOpts({ issue: { id: 'uuid-42' } }));
       await noIdent.flush();
       assert.equal(noIdent.calls.api.some((u) => String(u).includes('/api/task/')), false, 'no identifier → no read');
 
       const noApi = loadPromptSection();
       delete noApi.window.api;
-      const c = makeContainer();
-      noApi.window.PromptSection.init(c, baseOpts());
+      const c = noApi.makeContainer();
+      noApi.PromptSection.init(c, baseOpts());
       await noApi.flush();
       assert.match(c.innerHTML, /data-rung="run-task"[^>]*data-action="go"/, 'Go still renders without window.api');
     });
@@ -581,11 +538,13 @@ describe('LIN-3341 — Go is one press', () => {
       let resolveState;
       const deferred = new Promise((r) => { resolveState = r; });
       const h = loadPromptSection({ stateApi: () => deferred });
-      const c = makeContainer();
-      const ret = h.window.PromptSection.init(c, baseOpts());
+      const c = h.makeContainer();
+      const ret = h.PromptSection.init(c, baseOpts());
       ret.destroy();
+      const beforeLate = c.innerHTML;
       resolveState({ live: true, status: 'running', headerHtml: '<div>x</div>' });
       await h.flush();
+      assert.equal(c.innerHTML, beforeLate, 'a late read writes nothing to the container');
       assert.doesNotMatch(c.innerHTML, /data-testid="opened-task-started"/, 'the post-destroy read does not paint');
       assert.match(c.innerHTML, /data-rung="run-task"[^>]*data-action="go"/, 'the pre-destroy render is untouched');
     });
