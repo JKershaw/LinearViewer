@@ -14,17 +14,11 @@
 //   Addendum 4 — adopt `window.readSSEStream`; ignore non-object payloads
 //                (`[DONE]`), throw on `payload.error`.
 //
-// Same vm-sandbox house pattern as prompt-section-recommend-url.test.js.
+// Runs in the shared client world (tests/unit/helpers/client-world.js): one fake DOM, one vm sandbox.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import vm from 'node:vm';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
+import { loadWorld } from './helpers/client-world.js';
 
 // ---------------------------------------------------------------------------
 // fakes
@@ -40,97 +34,38 @@ function makeLocalStorage() {
   };
 }
 
-// Locate the element whose opening tag matches `selector` (`[data-attr]` or
-// `.class`) in an HTML string, balancing nested same-name tags. Returns the
-// span of its inner HTML, or null. Enough DOM for the slot/body writes the
-// module makes through `container.querySelector` (N4).
-function findElement(html, selector) {
-  const attr = selector.match(/^\[([\w-]+)\]$/);
-  const cls = selector.match(/^\.([\w-]+)$/);
-  if (!attr && !cls) return null;
-  const matches = attr
-    ? (tag) => new RegExp(`\\s${attr[1]}(?=[\\s=>])`).test(tag)
-    : (tag) => new RegExp(`class="(?:[^"]*\\s)?${cls[1]}(?:\\s[^"]*)?"`).test(tag);
-  const tagRe = /<([a-z][a-z0-9]*)\b[^>]*>/gi;
-  let m;
-  while ((m = tagRe.exec(html))) {
-    if (!matches(m[0])) continue;
-    const openEnd = m.index + m[0].length;
-    const re = new RegExp(`<(/?)${m[1]}\\b[^>]*>`, 'gi');
-    re.lastIndex = openEnd;
-    let depth = 1;
-    let t;
-    while ((t = re.exec(html))) {
-      depth += t[1] ? -1 : 1;
-      if (depth === 0) return { openEnd, closeStart: t.index };
-    }
-    return null;
-  }
-  return null;
+// The client runs in the shared client world (tests/unit/helpers/client-world.js): one fake DOM and one vm sandbox.
+// A press is `container.click(dataset)`, which needs the control to be drawn, as a browser needs it. Assertions read the
+// drawn markup (`innerHTML`, `querySelector`), node identity, and the drawn control's own properties.
+//
+// `makeContainer()` makes a container in the world of the most recent `loadPromptSection()`. Each test makes its containers
+// straight after its own load, so it always reaches its own world.
+let currentWorld = null;
+function makeContainer() {
+  return currentWorld.makeContainer();
 }
 
-function makeContainer() {
-  const container = {
-    // Every full render is an `innerHTML` assignment on the container itself;
-    // `fullRenders` counts them. Element writes through querySelector splice
-    // `_html` directly, so they do NOT count as a full render.
-    _html: '',
-    fullRenders: 0,
-    get innerHTML() { return this._html; },
-    set innerHTML(v) { this._html = String(v); this.fullRenders++; },
-    dataset: {},
-    classList: {
-      _c: new Set(),
-      add(...c) { c.forEach(x => this._c.add(x)); },
-      remove(...c) { c.forEach(x => this._c.delete(x)); },
-      toggle() {},
-      contains(c) { return this._c.has(c); },
-    },
-    _attrs: {},
-    setAttribute(k, v) { this._attrs[k] = v; },
-    getAttribute(k) { return this._attrs[k] ?? null; },
-    querySelector(selector) {
-      if (!findElement(container._html, selector)) return null;
-      const splice = (value) => {
-        const at = findElement(container._html, selector);
-        if (!at) return;
-        container._html = container._html.slice(0, at.openEnd) + String(value) + container._html.slice(at.closeStart);
-      };
-      return {
-        get innerHTML() {
-          const at = findElement(container._html, selector);
-          return at ? container._html.slice(at.openEnd, at.closeStart) : '';
-        },
-        set innerHTML(v) { splice(v); },
-        set textContent(v) { splice(v); },
-        children: [],
-        scrollTop: 0,
-        scrollHeight: 0,
-      };
-    },
-    contains() { return true; },
-    _clickHandler: null,
-    addEventListener(type, fn) { if (type === 'click') this._clickHandler = fn; },
-    removeEventListener() {},
-    async click(match) {
-      const btn = {
-        dataset: { ...match },
-        disabled: false,
-        textContent: '',
-        closest: (sel) => (/^button/.test(sel) ? btn : null),
-      };
-      await this._clickHandler({ target: btn });
-      return btn;
-    },
+// Every element in the container outside `slotSelector`, in document order. A slot repaint keeps all of them: the same
+// nodes, still attached. A full render detaches them all.
+function nodesOutside(container, slotSelector) {
+  const out = [];
+  const walk = (el) => {
+    for (const child of el.children) {
+      if (child.closest(slotSelector)) continue; // the slot and what it holds are not kept
+      out.push(child);
+      walk(child);
+    }
   };
-  return container;
+  walk(container);
+  return out;
 }
 
 function loadPromptSection({ localStorage, readSSEStream, fetchImpl } = {}) {
   const calls = {
-    fetch: [], autopilot: [], api: [], disclosure: [], readSSE: [], dispatch: [],
+    fetch: [], autopilot: [], api: [], disclosure: [], readSSE: [], dispatch: [], clipboard: [],
   };
-  const window = {
+  const timers = [];
+  const windowStubs = {
     escapeHtml: (s) => (s == null ? '' : String(s)),
     stripCodeBlockWrapper: (s) => s,
     renderMarkdown: (s) => String(s == null ? '' : s),
@@ -138,49 +73,54 @@ function loadPromptSection({ localStorage, readSSEStream, fetchImpl } = {}) {
     readSSEStream: readSSEStream
       ? async (...args) => { calls.readSSE.push(true); return readSSEStream(...args); }
       : undefined,
-  };
-  window.api = async (url, opts) => {
-    calls.api.push({ url, opts });
-    return { prompt: 'TEMPLATE PROMPT', promptName: 'Template' };
-  };
-  window.fetchAutopilotKickoff = async (args) => {
-    calls.autopilot.push(args);
-    return { prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' };
-  };
-  window.ProxyToggle = {
-    maybeAppend: async (raw, urlKey, opts) => (opts && opts.force ? `${raw}\n\n## Workspace API access` : raw),
-  };
-  window.renderDispatchDisclosure = ({ idPrefix } = {}) => {
-    calls.disclosure.push(idPrefix);
-    return '<div class="swipe-prompt-options"></div>';
-  };
-  window.readDispatchExecControls = () => ({});
-  window.dispatchPrompt = async (args) => { calls.dispatch.push(args); };
-  window.isPinnedToBottom = () => false;
-
-  const sandbox = {
-    window,
-    AbortController,
-    URLSearchParams,
-    TextDecoder,
-    TextEncoder,
-    requestAnimationFrame: (cb) => { cb(); return 1; },
-    setTimeout: (fn) => { fn(); return 1; },
-    clearTimeout: () => {},
-    navigator: { clipboard: { writeText: async () => {} } },
-    fetch: async (url, opts) => {
-      calls.fetch.push({ url, opts });
-      if (fetchImpl) return fetchImpl(url, opts);
-      return { ok: false, json: async () => ({}) };
+    api: async (url, opts) => {
+      calls.api.push({ url, opts });
+      return { prompt: 'TEMPLATE PROMPT', promptName: 'Template' };
     },
+    fetchAutopilotKickoff: async (args) => {
+      calls.autopilot.push(args);
+      return { prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' };
+    },
+    ProxyToggle: {
+      maybeAppend: async (raw, urlKey, opts) => (opts && opts.force ? `${raw}\n\n## Workspace API access` : raw),
+    },
+    renderDispatchDisclosure: ({ idPrefix } = {}) => {
+      calls.disclosure.push(idPrefix);
+      return '<div class="swipe-prompt-options"></div>';
+    },
+    readDispatchExecControls: () => ({}),
+    dispatchPrompt: async (args) => { calls.dispatch.push(args); },
+    isPinnedToBottom: () => false,
   };
-  if (localStorage) {
-    sandbox.localStorage = localStorage;
-    window.localStorage = localStorage;
+  if (localStorage) windowStubs.localStorage = localStorage;
+
+  const world = loadWorld({
+    window: windowStubs,
+    scripts: ['prompt-section.js'],
+    timers,
+    globals: {
+      ...(localStorage ? { localStorage } : {}),
+      // This suite's own default answers `ok: false`: the error branch of every unstubbed read. The shared default
+      // (`ok: true`) would hide it, so it is kept here.
+      fetch: async (url, opts) => {
+        calls.fetch.push({ url, opts });
+        if (fetchImpl) return fetchImpl(url, opts);
+        return { ok: false, json: async () => ({}) };
+      },
+      navigator: { clipboard: { writeText: async (text) => { calls.clipboard.push(text); } } },
+    },
+  });
+  currentWorld = world;
+
+  // The module's own timers (the copy and download label restores, the poll) are collected, not run. A test fires them
+  // itself, so the order it sees is the order it asked for.
+  async function runTimers() {
+    const due = timers.splice(0).filter((t) => !t.cancelled);
+    for (const t of due) t.fn();
+    await flush();
+    await flush();
   }
-  vm.createContext(sandbox);
-  vm.runInContext(SRC, sandbox);
-  return { PromptSection: window.PromptSection, window, calls };
+  return { PromptSection: world.PromptSection, window: world.window, calls, timers, runTimers };
 }
 
 function baseOpts(issue, extra = {}) {
@@ -283,7 +223,10 @@ describe('P0 addendum 1: source is threaded on the template and Autopilot fetche
     const { PromptSection, calls } = loadPromptSection();
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-3', identifier: 'JIRA-3', source: 'jira' }));
-    await container.click({ prompt: '__autopilot__' });
+    // The standard `__autopilot__` entry is drawn in no state: production draws only the stepper as an Autopilot entry.
+    // The stepper runs the same handler branch, with the same `source` threading, so it is the drawn control pressed.
+    assert.ok(container.querySelector('button[data-prompt="__autopilot_stepper__"]'), 'the Autopilot entry is drawn');
+    await container.click({ prompt: '__autopilot_stepper__' });
     await flush();
 
     assert.equal(calls.autopilot.length, 1);
@@ -307,8 +250,9 @@ describe('P0 addendum 2 REVERSED by LIN-3341: autopilot prompt memory is not res
     const first = loadPromptSection({ localStorage: ls });
     const c1 = makeContainer();
     first.PromptSection.init(c1, baseOpts(issue, { proxyEnabled: true }));
-    await c1.click({ prompt: '__autopilot__' });
+    await c1.click({ prompt: '__autopilot_stepper__' });
     await flush();
+    assert.match(c1.innerHTML, /AUTOPILOT PROMPT/, 'precondition: the Autopilot result is drawn, so the save check is not vacuous');
     assert.equal(ls.dump()['harbour:prompt-memory:ws:issue-7'], undefined, 'an autopilot result is never saved');
 
     // A legacy-style autopilot record already in storage (from before LIN-3341).
@@ -366,13 +310,16 @@ describe('P0 addendum 2 REVERSED by LIN-3341: autopilot prompt memory is not res
   test('the appended proxy block is never persisted', async () => {
     const ls = makeLocalStorage();
     const issue = { id: 'issue-8', identifier: 'LIN-8' };
-    const { PromptSection } = loadPromptSection({ localStorage: ls });
+    const { PromptSection, calls } = loadPromptSection({ localStorage: ls });
     const container = makeContainer();
     PromptSection.init(container, baseOpts(issue, { proxyEnabled: true }));
-    await container.click({ prompt: '__autopilot__' });
+    await container.click({ prompt: '__autopilot_stepper__' });
     await flush();
+    assert.match(container.innerHTML, /AUTOPILOT PROMPT/, 'precondition: the Autopilot result is drawn');
     await container.click({ action: 'copy' });
     await flush();
+    // Not vacuous: the copied text does carry the proxy block, so its absence from storage is a real check.
+    assert.match(calls.clipboard.at(-1), /## Workspace API access/, 'precondition: the copy carries the proxy block');
 
     const persisted = Object.values(ls.dump()).join('\n');
     assert.equal(persisted.includes('## Workspace API access'), false);
@@ -857,12 +804,13 @@ describe('P0 re-review N4: a set-up press updates only the notice slot', () => {
     const { PromptSection } = loadPromptSection();
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-70', identifier: 'LIN-70' }, { dispatchEnabled: true }));
-    const renders = container.fullRenders;
+    const kept = nodesOutside(container, '[data-setup-notice-slot]');
+    assert.ok(kept.length > 0, 'the idle card draws nodes outside the notice slot');
 
     await container.click({ action: 'setup', setupNeeds: 'prompt' });
 
     assert.match(container.innerHTML, /<div class="opened-task-setup-notice">generate a prompt first<\/div>/);
-    assert.equal(container.fullRenders, renders, 'no full render on a set-up press');
+    assert.ok(kept.every((node) => node.isConnected), 'no full render on a set-up press: every node outside the notice slot is kept');
   });
 
   test('in fresh, a set-up press keeps the prompt body and does not re-render', async () => {
@@ -871,13 +819,15 @@ describe('P0 re-review N4: a set-up press updates only the notice slot', () => {
     PromptSection.init(container, baseOpts({ id: 'issue-71', identifier: 'LIN-71' }));
     await container.click({ prompt: 'implementation' });
     await flush();
-    const renders = container.fullRenders;
+    const body = container.querySelector('[data-prompt-body]');
+    const kept = nodesOutside(container, '[data-setup-notice-slot]');
 
     await container.click({ action: 'setup', setupNeeds: 'dispatch' });
 
     assert.match(container.innerHTML, /dispatch runner set up/);
     assert.equal(promptBody(container), 'TEMPLATE PROMPT');
-    assert.equal(container.fullRenders, renders, 'no full render on a set-up press');
+    assert.equal(container.querySelector('[data-prompt-body]'), body, 'the prompt body is the same node');
+    assert.ok(kept.every((node) => node.isConnected), 'no full render on a set-up press');
   });
 
   test('mid-stream, a set-up press keeps the streamed reasoning and does not re-render', async () => {
@@ -891,13 +841,15 @@ describe('P0 re-review N4: a set-up press updates only the notice slot', () => {
     await container.click({ prompt: '__ai__' });
     await flush();
     assert.ok(container.classList.contains('streaming'), 'the stream is in flight');
-    const renders = container.fullRenders;
+    const body = container.querySelector('[data-prompt-body]');
+    const kept = nodesOutside(container, '[data-setup-notice-slot]');
 
     await container.click({ action: 'setup', setupNeeds: 'dispatch' });
 
     assert.match(container.innerHTML, /dispatch runner set up/);
     assert.match(promptBody(container), /STREAMED REASONING/, 'the streamed body survives the press');
-    assert.equal(container.fullRenders, renders, 'no full render on a set-up press');
+    assert.equal(container.querySelector('[data-prompt-body]'), body, 'the streamed body is the same node');
+    assert.ok(kept.every((node) => node.isConnected), 'no full render on a set-up press');
     stream.release();
     await flush();
   });
@@ -940,19 +892,13 @@ describe('LIN-3211 / LIN-3833: the run-step rung sends only a chosen harness; a 
   async function pressRung({ panelHarness = 'claude-code', panel = true } = {}) {
     const { PromptSection, window, calls } = loadPromptSection();
     if (!panel) window.renderDispatchDisclosure = () => '';
-    // The card's panel, as the container's scoped lookup returns it. A real
-    // readDispatchExecControls reads the harness select inside the element it is
-    // given and returns null for anything else (public/common.js:1263).
-    window.readDispatchExecControls = (scopeEl) => (scopeEl && scopeEl.isCardPanel
+    // The card's panel, as the reader is given it: the drawn `.swipe-prompt-options`, and nothing else. A real
+    // readDispatchExecControls reads the harness select inside the element it is given, and returns null for anything
+    // else (public/common.js:1263). This stub keeps that contract without a `<select>`.
+    window.readDispatchExecControls = (scopeEl) => (scopeEl && scopeEl.classList.contains('swipe-prompt-options')
       ? { model: null, harness: panelHarness || null }
       : { model: null, harness: null });
     const container = makeContainer();
-    const qs = container.querySelector;
-    container.querySelector = (selector) => {
-      const el = qs(selector);
-      if (el && selector.includes('swipe-prompt-options')) el.isCardPanel = true;
-      return el;
-    };
     PromptSection.init(container, baseOpts(
       { id: 'issue-3211', identifier: 'LIN-3211', url: 'https://x/3211' },
       { dispatchEnabled: true }
@@ -960,15 +906,8 @@ describe('LIN-3211 / LIN-3833: the run-step rung sends only a chosen harness; a 
     await container.click({ prompt: 'implementation' });
     await flush();
     if (panel) assert.ok(container.querySelector('.swipe-prompt-options'), 'precondition: the card renders its panel');
-    // The rung is in the ladder, not inside the panel: closest() on the panel
-    // class finds nothing, as in the real DOM.
-    const btn = {
-      dataset: { action: 'run-step', target: 'cli' },
-      disabled: false,
-      textContent: '',
-      closest: (selector) => (/^button/.test(selector) ? btn : null),
-    };
-    await container._clickHandler({ target: btn });
+    // The rung is in the ladder, outside the panel: the press reads its own card's panel, as the real DOM does.
+    await container.click({ action: 'run-step', target: 'cli' });
     await flush();
     assert.equal(calls.dispatch.length, 1, 'the rung dispatched once');
     return calls.dispatch[0];
@@ -1046,10 +985,12 @@ describe('LIN-2944 P1 F9: the picker and the primary under the flag states', () 
     assert.match(container.innerHTML, /data-testid="opened-task-next-step"[^>]*disabled/, 'next step is disabled');
     assert.match(container.innerHTML, /data-testid="opened-task-primary-reason"[^>]*>needs OpenRouter/, 'plain-words reason shown');
 
-    // A disabled button never fires a click (the browser guarantee); the guard in
-    // handleClick is the load-bearing half, so press with a disabled synthetic button.
-    const btn = { dataset: { prompt: '__ai__' }, disabled: true, textContent: '', closest: (sel) => (/^button/.test(sel) ? btn : null) };
-    await container._clickHandler({ target: btn });
+    // The drawn next step is disabled. A browser never fires a disabled control, but loadWorld's click reaches the listener
+    // regardless, so this press reaches handleClick's own `btn.disabled` guard (prompt-section.js:2515). That guard is the
+    // load-bearing half, witnessed here through the real DOM on the drawn node.
+    const next = container.querySelector('[data-testid="opened-task-next-step"]');
+    assert.ok(next && next.hasAttribute('disabled'), 'precondition: the next step is drawn disabled');
+    await container.click({ testid: 'opened-task-next-step', prompt: '__ai__' });
     await flush();
     assert.equal(calls.fetch.length, 0, 'no recommend request from a disabled primary');
   });
