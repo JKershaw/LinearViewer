@@ -74,6 +74,8 @@
  * MathML): `innerHTML` parses SVG markup as HTML elements, so only `createElementNS` makes an SVG-namespace node;
  * `<script>` execution, `getBoundingClientRect`, `MutationObserver`, `Range` and `Selection`,
  * `getClientRects` (so a Tab-driven focus trap cannot be exercised), `select`, and selection direction.
+ * `indeterminate` is a plain expando, not a modelled property: a browser's has no attribute to reflect, so a write reads
+ * back on the node and changes no markup (PR #2308 relies on this for the select-all checkbox).
  *
  * `select` stop (LIN-4269). `<select>.value` is the API the suite below needs and the fake does not model: its getter returns
  * undefined, its setter throws (`value is not modelled on <select>`, the setter above). `lin-3833-run-control.test.js` stays on
