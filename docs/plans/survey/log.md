@@ -1692,3 +1692,13 @@ Each is its own piece, with a stop-and-say rule on 5 and 6. Autopilot `84fa12ad`
   - no new homeless file: **missed by one** (`lib/waiting-section.js`).
 - **A gap in the rulings loop:** `lin4242-keep-witness-scope` was **withdrawn automatically when LIN-4242 closed** ("ticket-closed"). The close-out filed no follow-up ("no outside item is unowned"), so the opened-task repaint witness had silently lost its owner. I filed it as **LIN-4246** (Backlog), as the proposed answer said. Worth a look at how Harbour handles an open scope question when its ticket finishes. Today, closing the ticket withdraws the question.
 - After-questions sent to the LIN-4242 and LIN-4243 builders.
+
+### 03:05 UTC: the second ordinary ticket, LIN-4151 (`/backlog`'s per-project "Up next" isn't ranked like Home's)
+Surveys at `172f644a1`: open-0 `ca6d61ac`, global code-only `c2dd09c1`.
+
+**What would count as the place view earning its keep, written before reading:**
+- it names Home's ranking (`upNextOf`) as the one to share, not a second comparator beside it;
+- it names that the "show more" fold and `/api/home-rows` must page the *same* order (or there are two orders for one list);
+- it says something about the two lists sharing a name but not a rule (rename vs rank), as a place question, not only a UX one.
+
+**At merge:** one ranking function used by both Home and `/backlog`; no second comparator; no new homeless file.
