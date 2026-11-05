@@ -171,9 +171,16 @@ describe('LIN-3341 — Go is one press', () => {
   });
 
   test('a non-blank panel harness is sent, never null', async () => {
-    const m = await mount({}, {}, { readDispatchExecControls: () => ({ model: 'openai/gpt-5.4-mini', harness: 'opencode' }) });
+    // The press reads the disclosure drawn on the card (startRun looks up `.swipe-prompt-options`), so the reader gets that node.
+    const panels = [];
+    const m = await mount({}, {}, { readDispatchExecControls: (panel) => { panels.push(panel); return { model: 'openai/gpt-5.4-mini', harness: 'opencode' }; } });
+    await m.container.click({ prompt: 'implementation' });
+    await m.flush();
+    const card = m.container.querySelector('.swipe-prompt-options');
+    assert.ok(card, 'the fresh prompt draws its disclosure');
     await m.container.click({ action: 'go', rung: 'run-task' });
     await m.flush();
+    assert.equal(panels.at(-1), card, 'the press hands the reader the disclosure drawn on the card');
     assert.equal(m.calls.dispatch[0].harness, 'opencode');
     assert.equal(m.calls.dispatch[0].model, 'openai/gpt-5.4-mini');
   });
@@ -372,22 +379,22 @@ describe('LIN-3341 — Go is one press', () => {
 
     const limitReason = 'Daily run limit reached (10 of 10 today). Resets at midnight UTC.';
     const limited = await refuse(429, { code: 'RUN_LIMIT_REACHED', error: limitReason });
-    assert.ok(limited.includes(limitReason), 'the server’s run-limit reason is shown');
+    assert.ok(limited.includes(limitReason), 'the server\u2019s run-limit reason is shown');
     assert.match(limited, LINK);
-    assert.doesNotMatch(limited, /used today’s runs/);
+    assert.doesNotMatch(limited, /used today\u2019s runs/);
 
     // Witness: an arbitrary reason is shown exactly, then the link (escaping is
     // window.escapeHtml's job; the harness stubs it as identity).
     const arbitrary = await refuse(503, { error: 'Zebras are loose today' });
     assert.ok(arbitrary.includes('Zebras are loose today'), 'the reason is shown exactly');
     assert.match(arbitrary, LINK);
-    assert.doesNotMatch(arbitrary, /Couldn’t start the run/);
+    assert.doesNotMatch(arbitrary, /Couldn\u2019t start the run/);
 
     // A code-less 503 (proxyAttachFailed) shows its reason, not the run limit.
     const nolimit = await refuse(503, { error: 'Proxy attach failed' });
     assert.ok(nolimit.includes('Proxy attach failed'));
     assert.match(nolimit, LINK);
-    assert.doesNotMatch(nolimit, /used today’s runs/);
+    assert.doesNotMatch(nolimit, /used today\u2019s runs/);
 
     // RUN_LIMIT_UNVERIFIED (a 503 WITH a code) shows the server's reason too.
     const unverified = await refuse(503, { code: 'RUN_LIMIT_UNVERIFIED', error: 'Could not verify the run limit' });
@@ -403,7 +410,7 @@ describe('LIN-3341 — Go is one press', () => {
     // Nothing at all: just the link, no fixed sentence.
     const empty = await refuse(500, {}, '');
     assert.match(empty, LINK);
-    assert.doesNotMatch(empty, /Couldn’t start the run/);
+    assert.doesNotMatch(empty, /Couldn\u2019t start the run/);
   });
 
   test('a not-set-up Go press records intent and dispatches nothing', async () => {
@@ -534,8 +541,10 @@ describe('LIN-3341 — Go is one press', () => {
       const c = h.makeContainer();
       const ret = h.PromptSection.init(c, baseOpts());
       ret.destroy();
+      const beforeLate = c.innerHTML;
       resolveState({ live: true, status: 'running', headerHtml: '<div>x</div>' });
       await h.flush();
+      assert.equal(c.innerHTML, beforeLate, 'a late read writes nothing to the container');
       assert.doesNotMatch(c.innerHTML, /data-testid="opened-task-started"/, 'the post-destroy read does not paint');
       assert.match(c.innerHTML, /data-rung="run-task"[^>]*data-action="go"/, 'the pre-destroy render is untouched');
     });
