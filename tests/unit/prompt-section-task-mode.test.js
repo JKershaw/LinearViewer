@@ -16,85 +16,79 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import vm from 'node:vm';
 import { RUNGS, NEEDS, SURFACES, validateTaskModeEvent } from '../../lib/task-mode-store.js';
+import { loadWorld } from './helpers/client-world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
 
-function makeContainer() {
-  const container = {
-    innerHTML: '',
-    dataset: {},
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    setAttribute() {},
-    getAttribute() { return null; },
-    querySelector() { return null; },
-    contains() { return true; },
-    _clickHandler: null,
-    addEventListener(type, fn) { if (type === 'click') this._clickHandler = fn; },
-    removeEventListener() {},
-    async click(dataset) {
-      const btn = { dataset: { ...dataset }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
-      await this._clickHandler({ target: btn });
-      return btn;
-    },
+/**
+ * The container is a real element in the client world (loadWorld). The suite's press is its own: a synthetic button with the
+ * dataset given, handed to the container's click listeners. The fake's own `click` needs a drawn button, and these presses
+ * name rungs and actions the suite does not draw (LIN-4296: moved onto the shared fake, the press shim stays here).
+ */
+function makeContainer(world) {
+  const container = world.makeContainer();
+  // The press is not in the tree, and the client's router drops a press outside its container. The suite's press counts as
+  // inside, as the old stub container said every node was.
+  container.contains = () => true;
+  container.click = async (dataset) => {
+    const btn = { dataset: { ...dataset }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
+    for (const fn of container.listenersOf('click')) await fn({ target: btn });
+    return btn;
   };
   return container;
 }
 
 function loadPromptSection({ copyFails = false, recordFails = false, recordThrowsSync = false } = {}) {
-  const calls = { records: [], dispatch: [], fetch: [], autopilotFetch: [] };
-  const window = {
-    escapeHtml: (s) => (s == null ? '' : String(s)),
-    stripCodeBlockWrapper: (s) => s,
-    renderMarkdown: (s) => String(s == null ? '' : s),
-    api: async () => ({ prompt: 'TEMPLATE PROMPT', promptName: 'Template' }),
-    fetchAutopilotKickoff: async (args) => { calls.autopilotFetch.push(args); return { prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' }; },
-    ProxyToggle: {
-      maybeAppend: async (raw) => {
-        if (copyFails) throw new Error('a driver copy is refused for a non-owner');
-        return raw;
+  const calls = { records: [], dispatch: [], fetch: [], autopilotFetch: [], anchorClicks: [] };
+  const world = loadWorld({
+    window: {
+      escapeHtml: (s) => (s == null ? '' : String(s)),
+      stripCodeBlockWrapper: (s) => s,
+      renderMarkdown: (s) => String(s == null ? '' : s),
+      api: async () => ({ prompt: 'TEMPLATE PROMPT', promptName: 'Template' }),
+      fetchAutopilotKickoff: async (args) => { calls.autopilotFetch.push(args); return { prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' }; },
+      ProxyToggle: {
+        maybeAppend: async (raw) => {
+          if (copyFails) throw new Error('a driver copy is refused for a non-owner');
+          return raw;
+        },
+      },
+      renderDispatchDisclosure: () => '<div class="swipe-prompt-options"></div>',
+      // The suite's stub: this suite never reads a select. Its disclosure is a bare <div>, so there is no control to read.
+      readDispatchExecControls: () => ({}),
+      dispatchPrompt: async (args) => { calls.dispatch.push(args); return { item: { id: 'disp-1' } }; },
+      isPinnedToBottom: () => false,
+      toast: () => {},
+    },
+    scripts: ['prompt-section.js'],
+    timers: [], // collected and never run, as the suite's old no-op setTimeout did
+    globals: {
+      URL: { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} },
+      fetch: (url, opts) => {
+        if (recordThrowsSync && url.endsWith('/api/task-mode')) throw new Error('fetch unavailable');
+        return sandboxFetch(url, opts);
       },
     },
-    renderDispatchDisclosure: () => '<div class="swipe-prompt-options"></div>',
-    readDispatchExecControls: () => ({}),
-    dispatchPrompt: async (args) => { calls.dispatch.push(args); return { item: { id: 'disp-1' } }; },
-    isPinnedToBottom: () => false,
-    toast: () => {},
-  };
-  const sandbox = {
-    window,
-    AbortController,
-    URLSearchParams,
-    TextDecoder,
-    TextEncoder,
-    Blob: class {},
-    URL: { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} },
-    document: { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } },
-    requestAnimationFrame: (cb) => { cb(); return 1; },
-    setTimeout: () => 1,
-    clearTimeout: () => {},
-    navigator: { clipboard: { writeText: async () => {} } },
-    fetch: (url, opts) => {
-      if (recordThrowsSync && url.endsWith('/api/task-mode')) throw new Error('fetch unavailable');
-      return sandboxFetch(url, opts);
-    },
-  };
+  });
   async function sandboxFetch(url, opts) {
-    {
-      calls.fetch.push({ url, opts });
-      if (url.endsWith('/api/task-mode')) {
-        calls.records.push({ url, opts, body: JSON.parse(opts.body) });
-        if (recordFails) throw new Error('offline');
-        return { ok: true, status: 204 };
-      }
-      return { ok: false, json: async () => ({}) };
+    calls.fetch.push({ url, opts });
+    if (url.endsWith('/api/task-mode')) {
+      calls.records.push({ url, opts, body: JSON.parse(opts.body) });
+      if (recordFails) throw new Error('offline');
+      return { ok: true, status: 204 };
     }
+    return { ok: false, json: async () => ({}) };
   }
-  vm.createContext(sandbox);
-  vm.runInContext(SRC, sandbox);
-  return { PromptSection: window.PromptSection, window, calls };
+  // The download's anchor click: a suite-local recorder around document.createElement, since the fake has no click() (the
+  // census stop for this suite, LIN-4296). The download itself is unchanged; the recorder only sees the click.
+  const realCreate = world.document.createElement.bind(world.document);
+  world.document.createElement = (name) => {
+    const el = realCreate(name);
+    if (String(name).toLowerCase() === 'a') el.click = () => calls.anchorClicks.push({ download: el.download });
+    return el;
+  };
+  return { PromptSection: world.window.PromptSection, window: world.window, calls, world };
 }
 
 const ISSUE = { id: 'uuid-42', identifier: 'LIN-42', title: 'A task' };
@@ -121,7 +115,7 @@ const flush = () => new Promise((r) => setImmediate(r));
 
 async function mount(extra, loadOpts) {
   const loaded = loadPromptSection(loadOpts);
-  const container = makeContainer();
+  const container = makeContainer(loaded.world);
   loaded.PromptSection.init(container, baseOpts(extra));
   return { ...loaded, container };
 }
@@ -207,6 +201,7 @@ describe('LIN-2942 client hooks in PromptSection', () => {
     const m = await withResult('implementation');
     await m.container.click({ action: 'download' });
     await flush();
+    assert.equal(m.calls.anchorClicks.length, 1, 'the download clicks its anchor once');
     assert.deepEqual(m.calls.records.map(r => `${r.body.rung}/${r.body.act}`), ['copy/copy']);
   });
 

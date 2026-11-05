@@ -68,7 +68,6 @@ const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/unit/lin-4114-inflight-lock.test.js', // stop: real bubbling dispatchEvent, public/question-cards.js:239-241; the fake dispatchEvent is inert
   'tests/unit/lin-4241-settled-ruling-client.test.js', // stop: real bubbling dispatchEvent, public/question-cards.js:239-241; the fake dispatchEvent is inert
   'tests/unit/lin-4242-waiting-live.test.js',
-  'tests/unit/prompt-section-task-mode.test.js', // stop: select value via readDispatchExecControls, public/prompt-section.js:2714-2715 and public/common.js:1758-1763 (LIN-4268)
   'tests/unit/question-card-task-bound.test.js',
   'tests/unit/run-limit-gating.test.js',
   'tests/unit/runner-link-surfaces.test.js',
