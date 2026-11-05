@@ -27,3 +27,22 @@ node $E/compare-run7.mjs . $E > $E/compare-run7.md
 - **Witness:** each edge dump's cross-area count equals the seams `links` total for the same commit: 1259 and 1269.
 - `compare-run7.mjs` reads only this folder plus the tool's own `compileGuide` / `readCommit(inScope)`. It is needed for catch-all membership and file-level edges, which `seams.mjs` does not list. `compare-run7.md` is its output.
 - `cochange-window-commits-{d7ceb373,2eb73ae0}.txt` list each cochange window's commits (`git log <sha> --first-parent --since=<windowStart> --until=<windowEnd> --format=%H`, the tool's own query). The `d7ceb373` list is byte-identical to run 6's. 840 commits are shared; 14 appear only at `d7ceb373` (11 dated 2026-09-05, 3 dated 2026-09-06 before 06:00Z) and 11 only at `2eb73ae0` (this window's 11 commits).
+
+## Supplementary figures (beat 2 onward; not in the tool JSON)
+
+- `supplementary-figures.py` reads committed git objects at the two pinned SHAs and the JSON in this folder. Sections S0–S15 keep run 6's definitions (`_evidence-2026-11-04-run6/supplementary-figures.py`), so the figures compare mechanically. S16–S19 are new: named hubs and doors, top files by cross-area importers, `server.js` outbound by area, and the browser seam (script lists, `window.HomePlacement`, the `ruling-settled` code).
+  - Run from the repo root: `SD_DIR=<simple-dispatcher clone> python3 -I docs/reviews/_evidence-2026-11-05/supplementary-figures.py . > docs/reviews/_evidence-2026-11-05/supplementary-figures.txt`.
+  - S13 read Simple Dispatcher `origin/main` at `07c88f7a338b3e19a01070775e1f4d4cfc91f040`. S14 read `origin/claude/cool-rubin-6acj5j` at `23edd667eff4bdd547c930adf8fe2578fac5464e`, read only.
+
+## Guide experiments (labelled proposals; the committed guide is not edited)
+
+- `guide-experiments.py write` writes `areas.proposal-P7min-new-files.json` (the window's two new catch-all files placed) and `areas.proposal-P1d-placed-16.json` (every catch-all file placed) from `areas.head-2eb73ae0.json`, by appending one pattern to each named area.
+- Each proposal guide was run through `seams.mjs` at both commits:
+  `node scripts/code-shape/seams.mjs . <code> $E/areas.proposal-<P>.json > $E/seams-code-<code8>-guide-proposal-<P>.json 2> $E/seams-code-<code8>-guide-proposal-<P>.stderr`
+  Every run exited 0, and every `.stderr` file is empty.
+- `guide-experiments.py summary > guide-experiments.txt` prints files, links, pairs, groups and the catch-all count for the HEAD guide and both proposals at both commits.
+- Nothing here is a test, check or count that enforces the guide.
+
+## External state
+
+- `external-state-2026-11-05.txt` records the ticket states, 21 Linear searches (`GET /api/proxy/search`) and PR #2185, as read on 2026-11-05 for the follow-up decision.
