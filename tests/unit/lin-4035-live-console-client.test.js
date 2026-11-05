@@ -4,102 +4,106 @@
  *
  * Run with: node --test tests/unit/lin-4035-live-console-client.test.js
  *
- * The client runs in a node:vm sandbox (the seam the LIN-3331 and LIN-3977 tests
- * use). There is no DOM parser here, so the stream row is pinned as its markup
- * string (`eventRowHtml`), and the detail line and the lane are driven through
- * their real element writes.
+ * The client runs in a vm world over the shared fake DOM (tests/unit/helpers/fake-dom.js, through
+ * client-world.js). The page is the server's own markup from renderLiveConsolePage, with the server's initial
+ * state removed, so every hidden or collapsed assertion is the client's write. The stream row is pinned as its
+ * markup string (`eventRowHtml`). The lane is supplied as markup, because laneNode is not exported (see
+ * LANE_CONTENTS). Each test's `api` is the client's own exports, read off the world.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import vm from 'node:vm';
-import { withHarnessModels } from '../fixtures/harness-models.js';
+import { loadWorld, clickOn } from './helpers/client-world.js';
+import { harnessModelsBlock } from '../../lib/model-routing-harnesses.js';
 import { renderLiveConsolePage } from '../../lib/render-live-console.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
-const COMMON_SRC = read('public/common.js');
 const CLIENT_SRC = read('public/live-console.js');
 
-// A tiny element: enough DOM for the client's writes, with real child tracking so
-// the detail line's text can be read back.
-class FakeEl {
-  constructor(tag = 'div') {
-    this.tag = tag;
-    this.className = '';
-    this.dataset = {};
-    this.style = {};
-    this.hidden = false;
-    this.children = [];
-    this._attrs = {};
-    this._listeners = {};
-    this._text = '';
-    this.classList = { add() {}, remove() {}, toggle() {}, contains() { return false; } };
-  }
-  get textContent() { return this._text; }
-  set textContent(v) { this._text = String(v); this.children = []; }
-  setAttribute(k, v) { this._attrs[k] = String(v); }
-  getAttribute(k) { return this._attrs[k] ?? null; }
-  removeAttribute(k) { delete this._attrs[k]; }
-  addEventListener(type, fn) { (this._listeners[type] ||= []).push(fn); }
-  fire(type) { for (const fn of this._listeners[type] || []) fn({}); }
-  append(...nodes) { this.children.push(...nodes); }
-  appendChild(node) { this.children.push(node); return node; }
-  remove() {}
-  insertBefore() {}
-  insertAdjacentHTML() {}
-  querySelector() { return null; }
-  querySelectorAll() { return []; }
-  get firstElementChild() { return null; }
+// The server's page, body only. The fake parser rejects `<!doctype …>`, so the doctype is removed first. Every
+// `hidden` and `aria-expanded="false"` the server ships is removed too: the collapsed and hidden tests below must
+// pass on the client's writes, not on the server's markup.
+function pageBody() {
+  const html = renderLiveConsolePage({ urlKey: 'ws' }).replace(/<!doctype[^>]*>/i, '');
+  const body = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)[1];
+  return body.replace(/<[^>]*>/g, (tag) => tag.replace(/\shidden(?=[\s>])/g, '').replace(/\saria-expanded="false"/g, ''));
 }
 
-// Element text as a reader sees it: text nodes plus each child element's text.
-const textOf = (node) => (typeof node === 'string' ? node : node.children.length ? node.children.map(textOf).join('') : node.textContent);
+// The lane markup laneNode builds (live-console.js, `function laneNode`), with its initial `hidden` attributes removed
+// so updateLaneNode's writes are what the tests see. laneNode is not exported, and it only runs once a feed resolves,
+// which the pending feed keeps out of reach, so the suite supplies the lane. laneHarness pins its classes to the
+// client source: drift in laneNode turns that test red.
+const LANE_CONTENTS = `
+        <span class="lc-lane-bar" aria-hidden="true"></span>
+        <span class="lc-lane-head">
+          <a class="lc-lane-task" data-testid="live-console-lane-task" href="#"></a>
+          <span class="lc-lane-title-sep" aria-hidden="true">·</span>
+          <span class="lc-lane-title" data-testid="live-console-lane-title"></span>
+          <a class="lc-lane-run" data-testid="live-console-lane-run" href="#">open run ↗</a>
+          <span class="lc-lane-ws"></span>
+        </span>
+        <span class="lc-lane-stage-row">
+          <span class="lc-lane-stage" data-testid="live-console-lane-stage"></span>
+          <span class="lc-lane-since" data-testid="live-console-lane-since"></span>
+          <span class="lc-lane-action" data-testid="live-console-lane-action"></span>
+          <span class="lc-lane-tickets" data-testid="live-console-lane-tickets"></span>
+        </span>
+        <span class="lc-lane-mid">
+          <span class="lc-lane-cred" data-testid="live-console-lane-credential"></span>
+          <span class="lc-lane-hb" data-testid="live-console-heartbeat"></span>
+          <span class="lc-lane-summary"></span>
+        </span>`;
 
 function memoryStorage(initial = {}) {
   const m = new Map(Object.entries(initial));
   return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), _m: m };
 }
 
-// Loads the real common.js and live-console.js in a fresh sandbox. `storage` may
-// be a throwing object to exercise the try/catch paths.
+// Loads the real common.js, then the real live-console.js, into one world over the server's page. `storage` may be
+// a throwing object to exercise the try/catch paths; `throwingGetter` makes the storage getter itself throw.
 function loadClient({ storage = memoryStorage(), throwingGetter = false } = {}) {
-  const els = new Map();
-  const byKey = (key) => { if (!els.has(key)) els.set(key, new FakeEl()); return els.get(key); };
-  const sandbox = {
-    location: { search: '', href: '' },
-    document: {
-      title: '', hidden: false,
-      getElementById: (id) => byKey(`#${id}`),
-      querySelector: (sel) => byKey(sel),
-      querySelectorAll: () => [],
-      createElement: (tag) => new FakeEl(tag),
-      addEventListener() {},
+  // `localStorage` goes on both the window and the global, as the client reads `window.localStorage` and a bare name
+  // needs the global. Both are accessor properties, so a throwing getter is not read at copy time (LIN-4279).
+  const storageProps = {};
+  Object.defineProperty(storageProps, 'localStorage', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      if (throwingGetter) throw new Error('storage denied');
+      return storage;
     },
-    history: { replaceState() {} },
-    setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {},
-    requestAnimationFrame: () => 0, cancelAnimationFrame() {},
-    matchMedia: () => ({ matches: false }),
-    addEventListener() {}, removeEventListener() {},
-    module: { exports: {} },
-    console,
-    __LIVE_CONSOLE_DATA__: { urlKey: 'ws', workspaces: [] },
-    PULSE_SPAN_RUNGS_MS: [180000],
-    api: async () => new Promise(() => {}),
-  };
-  if (throwingGetter) {
-    Object.defineProperty(sandbox, 'localStorage', { configurable: true, get() { throw new Error('storage denied'); } });
-  } else {
-    sandbox.localStorage = storage;
-  }
-  sandbox.window = sandbox;
-  vm.createContext(sandbox);
-  vm.runInContext(withHarnessModels(COMMON_SRC), sandbox, { filename: 'common.js' });
-  vm.runInContext(CLIENT_SRC, sandbox, { filename: 'live-console.js' });
-  // `el('live-console-more')` or `el('#live-console-more')`: the element the client looked up by id.
-  return { api: sandbox.module.exports, el: (id) => byKey(`#${id.replace(/^#/, '')}`), sandbox };
+  });
+  const world = loadWorld({
+    window: Object.defineProperties({
+      __LIVE_CONSOLE_DATA__: { urlKey: 'ws', workspaces: [] },
+      __HARNESS_MODELS__: harnessModelsBlock(),
+      matchMedia: () => ({ matches: false }),
+      addEventListener() {},
+      removeEventListener() {},
+      // PENDING FEED. window.api never resolves, so poll() never reaches applyFeed. applyFeed's `style` writes
+      // (live-console.js:338-340, :408, :482, :489, :516-519) stay out of reach. A later test that resolves this
+      // feed has hit that stop: it must not add `style` to the fake. See LIN-4271.
+      api: () => new Promise(() => {}),
+    }, Object.getOwnPropertyDescriptors(storageProps)),
+    scripts: ['common.js'],
+    // The client's setTimeout calls are collected, not run, so no timer outlives the test.
+    timers: [],
+    globals: Object.defineProperties({
+      module: { exports: {} },
+      requestAnimationFrame: () => 0,
+      cancelAnimationFrame() {},
+      setInterval: () => 0,
+      clearInterval() {},
+    }, Object.getOwnPropertyDescriptors(storageProps)),
+  });
+  // The page is in place before the client boots, so every id it looks up at load is a real element.
+  world.document.body.innerHTML = pageBody();
+  world.run(CLIENT_SRC);
+  const el = (id) => world.document.getElementById(id.replace(/^#/, ''));
+  return { api: world.sandbox.module.exports, el, world };
 }
 
 const stream = (over = {}) => ({
@@ -181,30 +185,51 @@ describe('the stream row names its task, and its run is a separate link (LIN-403
 });
 
 describe('the lane reads "ID · title" (LIN-4035)', () => {
+  // The lane's classes, pinned to laneNode and to updateLaneNode's own selectors (live-console.js). A class that
+  // laneNode drops, or that updateLaneNode starts to query and the fixture lacks, turns this red.
+  function pinLaneMarkupToClient() {
+    const start = CLIENT_SRC.indexOf('function laneNode(lane)');
+    const template = CLIENT_SRC.slice(start, CLIENT_SRC.indexOf('updateLaneNode(li, lane);', start));
+    assert.ok(template.includes('<li class="lc-lane'), 'laneNode still builds the lane the fixture mirrors');
+    const queried = [...CLIENT_SRC.matchAll(/li\.querySelector\('\.([a-z-]+)'\)/g)].map(m => m[1]);
+    assert.ok(queried.length > 0, 'updateLaneNode queries its lane parts');
+    for (const cls of queried) {
+      assert.ok(template.includes(`class="${cls}"`), `laneNode builds .${cls}`);
+      assert.ok(LANE_CONTENTS.includes(`class="${cls}"`), `the lane fixture carries .${cls}`);
+    }
+  }
   function laneHarness() {
-    const { api } = loadClient();
-    const anchors = {};
-    const li = { classList: { toggle() {} }, querySelector: (sel) => { if (!anchors[sel]) anchors[sel] = new FakeEl(); return anchors[sel]; } };
-    return { updateLaneNode: api.updateLaneNode, li, anchors };
+    pinLaneMarkupToClient();
+    const { api, world } = loadClient();
+    const li = world.document.createElement('li');
+    li.setAttribute('class', 'lc-lane');
+    li.innerHTML = LANE_CONTENTS;
+    return { updateLaneNode: api.updateLaneNode, li };
   }
   const base = { task: 'LIN-5', workspaceUrlKey: 'ws', workspaceName: 'WS', summary: '', heartbeat: null };
 
   test('the separator shows with a title and hides without one', () => {
-    const { updateLaneNode, li, anchors } = laneHarness();
+    const { updateLaneNode, li } = laneHarness();
     updateLaneNode(li, { ...base, title: 'Ship the thing' });
-    assert.equal(anchors['.lc-lane-title-sep'].hidden, false);
-    assert.equal(anchors['.lc-lane-title'].textContent, 'Ship the thing', 'the title is the title alone');
-    assert.equal(anchors['.lc-lane-title'].getAttribute('title'), 'Ship the thing');
+    assert.equal(li.querySelector('.lc-lane-title-sep').hidden, false);
+    assert.equal(li.querySelector('.lc-lane-title').textContent, 'Ship the thing', 'the title is the title alone');
+    assert.equal(li.querySelector('.lc-lane-title').getAttribute('title'), 'Ship the thing');
     updateLaneNode(li, { ...base, title: null });
-    assert.equal(anchors['.lc-lane-title-sep'].hidden, true);
-    assert.equal(anchors['.lc-lane-title'].getAttribute('title'), null);
+    assert.equal(li.querySelector('.lc-lane-title-sep').hidden, true);
+    assert.equal(li.querySelector('.lc-lane-title').getAttribute('title'), null);
   });
 });
 
 describe('the bar detail line names the task and offers both links (LIN-4035)', () => {
   function detailHarness(run, href = '/workspace/ws/observation/session/S1') {
-    const { api, el } = loadClient();
-    const div = { _run: run, firstElementChild: { getAttribute: (k) => (k === 'href' ? href : null) } };
+    const { api, el, world } = loadClient();
+    const { document } = world;
+    // The bar node: `_run` is the run the bar carries, and its first element child is the run link.
+    const div = document.createElement('div');
+    div._run = run;
+    const link = document.createElement('a');
+    link.setAttribute('href', href);
+    div.appendChild(link);
     api.showBarDetail(div);
     return el('#live-console-timeline-detail');
   }
@@ -212,15 +237,15 @@ describe('the bar detail line names the task and offers both links (LIN-4035)', 
 
   test('reads "ID · title — stage", with the identifier linked to the task page', () => {
     const detail = detailHarness(run);
-    assert.equal(textOf(detail).startsWith('LIN-5 · Ship the thing — Build'), true, textOf(detail));
-    const task = detail.children.find(c => c.className === 'lc-timeline-detail-task');
+    assert.equal(detail.textContent.startsWith('LIN-5 · Ship the thing — Build'), true, detail.textContent);
+    const task = detail.querySelector('.lc-timeline-detail-task');
     assert.equal(task.getAttribute('href'), '/workspace/ws/task/LIN-5?source=linear');
     assert.equal(task.textContent, 'LIN-5');
   });
 
   test('ends with both "open run →" and "open task →"', () => {
     const detail = detailHarness(run);
-    const links = detail.children.filter(c => c.className === 'lc-timeline-detail-link');
+    const links = detail.querySelectorAll('.lc-timeline-detail-link');
     assert.deepEqual(links.map(l => l.textContent), ['open run →', 'open task →']);
     assert.equal(links[0].getAttribute('href'), '/workspace/ws/observation/session/S1');
     assert.equal(links[1].getAttribute('href'), '/workspace/ws/task/LIN-5?source=linear');
@@ -228,9 +253,9 @@ describe('the bar detail line names the task and offers both links (LIN-4035)', 
 
   test('a run with no title reads "ID — stage", and with no task page the identifier is plain', () => {
     const detail = detailHarness({ issueIdentifier: 'LIN-6', stage: 'Build', workspaceUrlKey: '' });
-    assert.equal(textOf(detail).startsWith('LIN-6 — Build'), true, textOf(detail));
-    assert.equal(detail.children.some(c => c.className === 'lc-timeline-detail-task'), false);
-    assert.equal(detail.children.some(c => c.textContent === 'open task →'), false);
+    assert.equal(detail.textContent.startsWith('LIN-6 — Build'), true, detail.textContent);
+    assert.equal(detail.querySelector('.lc-timeline-detail-task'), null);
+    assert.equal(detail.querySelectorAll('.lc-timeline-detail-link').some(l => l.textContent === 'open task →'), false);
   });
 });
 
@@ -258,33 +283,33 @@ describe('the activity section starts collapsed, on every width (LIN-4035)', () 
     assert.equal(el('#live-console-activity-toggle').getAttribute('aria-expanded'), 'true');
   });
 
-  test('the toggle flips the section and remembers the choice in one key', () => {
+  test('the toggle flips the section and remembers the choice in one key', async () => {
     const storage = memoryStorage();
     const { el } = loadClient({ storage });
     const toggle = el('#live-console-activity-toggle');
-    toggle.fire('click');
+    await clickOn(toggle);
     assert.equal(el('#live-console-activity-body').hidden, false);
     assert.equal(toggle.getAttribute('aria-expanded'), 'true');
     assert.equal(storage._m.get('live-console-activity'), 'open');
-    toggle.fire('click');
+    await clickOn(toggle);
     assert.equal(el('#live-console-activity-body').hidden, true);
     assert.equal(storage._m.get('live-console-activity'), 'closed');
   });
 
-  test('a storage that throws on read falls back to collapsed, and the toggle still works', () => {
+  test('a storage that throws on read falls back to collapsed, and the toggle still works', async () => {
     const { el } = loadClient({ throwingGetter: true });
     assert.equal(el('#live-console-activity-body').hidden, true, 'collapsed, without throwing');
-    el('#live-console-activity-toggle').fire('click');
+    await clickOn(el('#live-console-activity-toggle'));
     assert.equal(el('#live-console-activity-body').hidden, false, 'the toggle still opens it for the session');
   });
 
-  test('a storage that throws on write still opens and closes the section', () => {
+  test('a storage that throws on write still opens and closes the section', async () => {
     const storage = { getItem: () => null, setItem() { throw new Error('quota'); } };
     const { el } = loadClient({ storage });
     const toggle = el('#live-console-activity-toggle');
-    toggle.fire('click');
+    await clickOn(toggle);
     assert.equal(el('#live-console-activity-body').hidden, false);
-    toggle.fire('click');
+    await clickOn(toggle);
     assert.equal(el('#live-console-activity-body').hidden, true);
   });
 });
