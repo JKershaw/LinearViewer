@@ -95,11 +95,15 @@ describe('PromptSection: look-alike controls in rendered markdown (LIN-3401)', (
   });
 
   test('every paint binds the +proxy toggle through the header template chain only', async () => {
-    const { PromptSection, makeContainer, bound } = load();
+    // The markdown puts a +proxy look-alike in the sink, so an unscoped selector would bind it too.
+    const { PromptSection, makeContainer, bound } = load({
+      promptMarkup: '<button class="prompt-proxy-toggle">+proxy</button>',
+    });
     const c = makeContainer();
     PromptSection.init(c, opts);
     await c.click({ prompt: 'implementation' });
     await flush();
+    assert.ok(c.querySelector('[data-prompt-body] .prompt-proxy-toggle'), 'the look-alike toggle is drawn in the markdown sink');
     const toggle = c.querySelector(':scope > .swipe-prompt-header > .swipe-prompt-actions > .prompt-proxy-toggle');
     assert.ok(toggle, 'the header toggle is drawn');
     assert.ok(bound.length > 0 && bound.every((b) => b === toggle), 'bound only the header toggle, every time');
