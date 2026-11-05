@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Supplementary figures for the Seams & Tangles run 7 report (LIN-4249).
+"""Supplementary figures for the Seams & Tangles run 8 report (LIN-4298).
 
 These figures are not in the seams.mjs / cochange.mjs JSON, so they are read here. Each one is read from committed
 git objects at a pinned SHA, or from the edge dumps in the evidence folder. Sections S0-S15 follow run 6's
@@ -49,7 +49,7 @@ def section(title):
 
 
 E = {c8: edges(c8) for c8, _ in COMMITS}
-print('# Supplementary figures, Seams & Tangles run 7 (LIN-4249)')
+print('# Supplementary figures, Seams & Tangles run 8 (LIN-4298)')
 print(f'measured commits {B} (baseline) and {H}; one guide, {G} (blob 642e9405)')
 
 section('S0. Window facts')

@@ -1,7 +1,7 @@
-// Comparison for LIN-4249 (seams & tangles run 7), beat 1. Reads only the evidence JSON in this folder,
+// Comparison for LIN-4298 (seams & tangles run 8, delta vs run 7). Reads only the evidence JSON in this folder,
 // plus the tool's own compileGuide / readCommit(inScope) over committed git objects (for catch-all membership
 // and file-level placement of the new files, which seams.mjs does not list).
-// usage (repo root): node docs/reviews/_evidence-2026-11-05-run8/compare-run7.mjs . docs/reviews/_evidence-2026-11-05-run8 > .../compare-run7.md
+// usage (repo root): node docs/reviews/_evidence-2026-11-05-run8/compare-run8.mjs . docs/reviews/_evidence-2026-11-05-run8 > docs/reviews/_evidence-2026-11-05-run8/compare-run8.md
 import { readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 const [repoArg, evArg] = process.argv.slice(2);
@@ -33,8 +33,8 @@ const B = data.B, H = data.H;
 const out = []; const p = (...a) => out.push(a.join(''));
 const pairKey = (q) => [q.a, q.b].sort().join(' ↔ ');
 
-p('# Run 7 beat 1 comparison (from evidence JSON; one guide, blob 642e9405, for both commits)\n');
-p(`Baseline \`${FULL.B}\` (run 6's measured commit) → measured \`${FULL.H}\` (origin/main).\n`);
+p('# Run 8 comparison (from evidence JSON; one guide, blob 642e9405, for both commits)\n');
+p(`Baseline \`${FULL.B}\` (run 7's measured commit) → measured \`${FULL.H}\` (origin/main).\n`);
 
 p('## Scope and tool limits (seams.scope)');
 p('| commit | files | parseFailures | nonLiteralDynamicImports | unmappedFiles | unresolvedRelativeImports |'); p('|---|---|---|---|---|---|');

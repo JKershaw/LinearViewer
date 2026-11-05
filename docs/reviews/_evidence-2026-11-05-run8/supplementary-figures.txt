@@ -1,4 +1,4 @@
-# Supplementary figures, Seams & Tangles run 7 (LIN-4249)
+# Supplementary figures, Seams & Tangles run 8 (LIN-4298)
 measured commits 2eb73ae07fb7297fc0fa057a6198aa8cbe901558 (baseline) and af55cb737ec4e63919bac65558b35498ede3d290; one guide, head-af55cb73 (blob 642e9405)
 
 ## S0. Window facts

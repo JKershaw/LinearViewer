@@ -1,6 +1,6 @@
-# Run 7 beat 1 comparison (from evidence JSON; one guide, blob 642e9405, for both commits)
+# Run 8 comparison (from evidence JSON; one guide, blob 642e9405, for both commits)
 
-Baseline `2eb73ae07fb7297fc0fa057a6198aa8cbe901558` (run 6's measured commit) → measured `af55cb737ec4e63919bac65558b35498ede3d290` (origin/main).
+Baseline `2eb73ae07fb7297fc0fa057a6198aa8cbe901558` (run 7's measured commit) → measured `af55cb737ec4e63919bac65558b35498ede3d290` (origin/main).
 
 ## Scope and tool limits (seams.scope)
 | commit | files | parseFailures | nonLiteralDynamicImports | unmappedFiles | unresolvedRelativeImports |
