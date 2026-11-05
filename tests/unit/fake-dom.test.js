@@ -380,13 +380,57 @@ describe('fake DOM: attributes, data, classes and listeners', () => {
   });
 
   test('hidden and disabled reflect their attributes', () => {
-    const { document } = world();
+    const w = world();
+    const { document } = w;
     const b = document.createElement('button');
     b.disabled = true;
     b.hidden = true;
     assert.equal(b.outerHTML, '<button disabled="" hidden=""></button>');
     b.disabled = false;
     assert.equal(b.hasAttribute('disabled'), false);
+    // The getter reads a parsed attribute, and a set disabled drops the button out of :not([disabled]).
+    w.parse('<button id="p" disabled>a</button><button id="q">b</button>');
+    assert.equal(document.querySelector('#p').disabled, true);
+    assert.equal(document.querySelector('#q').disabled, false);
+    document.querySelector('#q').disabled = true;
+    assert.equal(document.querySelectorAll('button:not([disabled])').length, 0);
+  });
+
+  test("an input with no type attribute reads type 'text', and setting type reflects to the attribute", () => {
+    const w = world();
+    const { document } = w;
+    w.parse('<input id="a"><input id="b" type="CHECKBOX"><button id="c">x</button><button id="d" type="button">y</button>');
+    assert.equal(document.querySelector('#a').type, 'text');
+    assert.equal(document.querySelector('#b').type, 'checkbox');
+    assert.equal(document.querySelector('#c').type, 'submit');
+    assert.equal(document.querySelector('#d').type, 'button');
+    assert.equal(document.createElement('div').type, '');
+    const b = document.createElement('button');
+    b.type = 'button';
+    assert.equal(b.outerHTML, '<button type="button"></button>');
+    const i = document.createElement('input');
+    i.type = 'password';
+    assert.equal(i.type, 'password');
+    assert.equal(i.getAttribute('type'), 'password');
+  });
+
+  test('checked starts from the attribute, then is independent and is not serialized', () => {
+    const w = world();
+    const { document } = w;
+    w.parse('<input id="a" type="checkbox" checked><input id="b" type="checkbox">');
+    const a = document.querySelector('#a');
+    const b = document.querySelector('#b');
+    assert.equal(a.checked, true);
+    assert.equal(b.checked, false);
+    a.checked = false;
+    b.checked = true;
+    assert.equal(a.checked, false);
+    assert.equal(b.checked, true);
+    assert.equal(a.hasAttribute('checked'), true, 'the attribute is the default, not the live state');
+    assert.equal(b.hasAttribute('checked'), false);
+    assert.equal(b.outerHTML, '<input id="b" type="checkbox">');
+    assert.equal(document.createElement('div').checked, undefined);
+    assert.throws(() => { document.createElement('div').checked = true; }, /checked is not modelled/);
   });
 
   test('listeners are recorded per type, not duplicated, and removable; dispatchEvent is inert', () => {

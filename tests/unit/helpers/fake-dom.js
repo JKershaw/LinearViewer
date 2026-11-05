@@ -16,13 +16,14 @@
  *   and style text is raw, `<template>` serializes its content. The typed `value` is not in the markup. `outerHTML =` on
  *   a node with no parent does nothing, as the DOM Parsing spec says. The parser throws on a malformed tag, an
  *   unmatched end tag, an unknown named entity and markup it does not model (`<!doctype …>`).
- * - Attributes: `get/set/has/removeAttribute`, `hidden` and `disabled` (reflecting), `dataset` (kebab-cased, with
+ * - Attributes: `get/set/has/removeAttribute`, `hidden`, `disabled` and `type` (reflecting; `type` defaults to `text` on an
+ *   input and `submit` on a button), `dataset` (kebab-cased, with
  *   `delete`), `classList` (`add`, `remove`, `toggle` with force, `contains`).
  * - Selectors (`querySelector[All]`, `matches`, `closest`): type, `.class`, `#id`, `[attr]`, `[attr="v"]`, compound chains,
  *   descendant and `>` combinators, comma lists, `:not(<compound list>)`, and `:scope`. Anything else throws, naming the
  *   selector: `+`, `~`, `*`, `:has`, `:nth-*`, other pseudo-classes, and attribute operators other than `=`.
  * - Form state: an input's or textarea's `value` (from the `value` attribute or the text until it is set, then independent),
- *   `selectionStart`, `selectionEnd` and `setSelectionRange`. The caret starts and moves to the end of the value.
+ *   an input's `checked` (from the `checked` attribute until it is set, then independent and not serialized), `selectionStart`, `selectionEnd` and `setSelectionRange`. The caret starts and moves to the end of the value.
  * - Focus: `focus()` and `blur()` on focusable elements. `document.activeElement` is per world. It returns the body when
  *   nothing is focused, and it stops naming a control once that control is removed or replaced (the focus fixup). The
  *   setter is a test shim: `document.activeElement = el` focuses `el`.
@@ -31,8 +32,8 @@
  *
  * Deliberately not modelled: layout, CSS, `:hover`, `:checked` and the other state pseudo-classes, `+` and `~`, event
  * dispatch and bubbling, HTML error recovery (implied end tags such as `<p>` closing `<p>`), foreign content (SVG and
- * MathML), `<script>` execution, `getBoundingClientRect`, `MutationObserver`, `Range` and `Selection`, `checked`,
- * `select`, `id` and `className` as properties (use the attributes), and selection direction.
+ * MathML), `<script>` execution, `getBoundingClientRect`, `MutationObserver`, `Range` and `Selection`,
+ * `getClientRects` (so a Tab-driven focus trap cannot be exercised), `select`, `id` and `className` as properties (use the attributes), and selection direction.
  */
 
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
@@ -196,6 +197,8 @@ class FakeElement extends FakeNode {
     this._attrs = new Map();
     this._valueDirty = false;
     this._value = '';
+    this._checkedDirty = false;
+    this._checked = false;
     this._sel = null;
     this.content = localName === 'template' ? new FakeFragment(doc) : undefined;
   }
@@ -222,6 +225,26 @@ class FakeElement extends FakeNode {
   set hidden(on) { if (on) this.setAttribute('hidden', ''); else this.removeAttribute('hidden'); }
   get disabled() { return this.hasAttribute('disabled'); }
   set disabled(on) { if (on) this.setAttribute('disabled', ''); else this.removeAttribute('disabled'); }
+
+  /** `type` reflects the attribute, with the element's default: `text` for an input, `submit` for a button, else empty. */
+  get type() {
+    const v = this.getAttribute('type');
+    if (this.localName === 'input') return v === null ? 'text' : v.toLowerCase();
+    if (this.localName === 'button') return v === null ? 'submit' : v.toLowerCase();
+    return v === null ? '' : v;
+  }
+  set type(v) { this.setAttribute('type', v); }
+
+  /** An input's `checked` starts from the `checked` attribute, then is independent and never serialized (like `value`). */
+  get checked() {
+    if (this.localName !== 'input') return undefined;
+    return this._checkedDirty ? this._checked : this.hasAttribute('checked');
+  }
+  set checked(on) {
+    if (this.localName !== 'input') fail(`checked is not modelled on <${this.localName}>`);
+    this._checkedDirty = true;
+    this._checked = Boolean(on);
+  }
 
   get dataset() {
     const el = this;
