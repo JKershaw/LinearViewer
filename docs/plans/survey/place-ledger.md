@@ -99,8 +99,8 @@ Two fresh sessions scored the 28 single-commit rows above (baseline and forward,
 
 | | Ledger | Blind |
 |---|--:|--:|
-| Baseline (8 rows) | **−0.5** (1 better, 1 mixed, 2 neutral, 4 worse) | **+0.38** (3 better, 5 mixed) |
-| Forward, surveyed (19 rows) | **+1.0** (all better or mixed) | **+0.37** (8 better, 9 mixed, 1 neutral, 1 worse) |
+| Baseline (8 rows) | **−0.38** (1 better, 1 mixed, 2 neutral, 4 worse) | **+0.38** (3 better, 5 mixed) |
+| Forward, surveyed (19 rows) | **+0.84** (16 better, 3 mixed) | **+0.37** (8 better, 9 mixed, 1 neutral, 1 worse) |
 
 **Against the criteria logged at 08:20:**
 - **Main question: failed.** The blind scorer rates the loop's rows no better than the baseline's (+0.37 against +0.38). By the rule written beforehand, the ledger's gap between the windows is mostly my scoring.

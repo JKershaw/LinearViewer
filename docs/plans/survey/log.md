@@ -1922,7 +1922,7 @@ John: the offshoots look like new prompt types for tasks. So move the prompts in
 - Moved to Todo; autopilot `4d13268c`.
 
 ### 08:50 UTC: the blind second scorer's first pass. The ledger's result is mostly my scoring
-- **Read against the 08:20 criterion, it fails.** The blind scorer rates the loop's 19 surveyed rows at +0.37 and the 8 baseline rows at +0.38, on +1 better / 0 mixed or neutral / −1 worse. The ledger had −0.5 against +1.0. Detail is in `place-ledger.md`, "The blind second scorer".
+- **Read against the 08:20 criterion, it fails.** The blind scorer rates the loop's 19 surveyed rows at +0.37 and the 8 baseline rows at +0.38, on +1 better / 0 mixed or neutral / −1 worse. The ledger had −0.38 against +0.84. Detail is in `place-ledger.md`, "The blind second scorer".
 - **Both windows come out slightly positive to the blind scorer.** Most rows are mixed: a real single owner at the centre and a leftover copy at the edges.
 - **Why the hands differ.** I scored the baseline against the map and Drift's findings, and credited the forward rows with the copies their forecasts said they averted. The blind scorer measures what is in the diff, which is the measure John's question asks for.
 - **The logged agreement rule was nearly empty.** "Mixed matches either side", with mixed the modal answer, gives 23 of 28. That's the "check that can't fail" lesson, on my own criterion. Exact agreement is 13 of 28.
