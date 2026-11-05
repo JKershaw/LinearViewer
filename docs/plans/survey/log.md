@@ -1928,3 +1928,19 @@ John: the offshoots look like new prompt types for tasks. So move the prompts in
 - **The logged agreement rule was nearly empty.** "Mixed matches either side", with mixed the modal answer, gives 23 of 28. That's the "check that can't fail" lesson, on my own criterion. Exact agreement is 13 of 28.
 - **What's real either way:** the blind scorer found copies the loop left and nobody saw. LIN-4241's settled check went from 2 copies to 5, LIN-4048's "finished but held" is in three places, and LIN-4242's card merge copies `observation.js`. The one unsurveyed forward row (LIN-4212) scored worse.
 - **Next:** a second blind pass (C `cae0873d`, D `72c53d82`, reshuffled) to size scorer noise before reading anything into this.
+
+### 09:00 UTC: John's reading of the blind result
+John: the Survey tends more towards being the research step than the high-level view that identifies the clean-up areas. We have a general shape that's easy to improve iteratively. Fold the result in after some review and exploration into what it *would* take to move the needle. For example, the Surveys could find things that become tasks done *before* the main task.
+
+**The evidence fits.**
+- open-0's "do first" was nearly always a preparation, which is research done well. The place voice's "better at this task's cost" became extra pieces *inside* the task.
+- The blind scorer rated better the rows where a tidy was its own task: LIN-4226 (the extra split off and done afterwards), LIN-4234 (the tidy-after as its own ticket), LIN-4203 (a deletion), and the priced harness and Stop-sequence work. Ordinary features with extras folded in came out mostly mixed or worse.
+- Its leftover copies sit just outside each change, in code that already did the same job. That's Beck's first half, still skipped.
+
+**To explore, not yet decided:**
+- the place view's clean-up becomes its own task, merged before the main one;
+- the blind read becomes the standard at-merge balance;
+- the place voice asks what is *already* doubled next to the change, not only what the change would add;
+- open-0 may in time fold into the research stage.
+
+The plan for now is unchanged: finish LIN-4248, read blind passes C and D, try the stages once, then pause to discuss.
