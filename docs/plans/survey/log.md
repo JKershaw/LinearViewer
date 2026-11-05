@@ -2029,3 +2029,12 @@ John: it has a fuzzy edge, which is partly the challenge, and that's why "the hu
 - **Judge a partial tidy by the film, not the still.** LIN-4252's own blind read is "mixed", but its real test is whether the next ticket in the area goes smoother. LIN-4246's Surveys already say its witness "now looks cheap" on the shared fake, where before it needed a slow E2E. So LIN-4246's cost and blind read count toward LIN-4252.
 - **A move of any size, but a partial one leaves a ratchet.** A helper with nothing holding it can drift back: the essay's adopt-on-next-touch "stayed flat" while a fresh file wrote raw copies beside the helper. A census whose count may only fall is what makes a smaller move trend instead of decay. (This replaces 11:30's "delete in the same change, or ship a guard". The guard is the minimum; deletion is the bigger disc.)
 - **Big moves early,** in the human's scope calls: the first ticket into an area takes the larger disc, and later tickets there ride on it.
+
+### 11:45 UTC: a paper on size and cost (LIN-4257), and what its Surveys say about the loop's own price
+John's question for a paper: how does the "size" of a task relate to its cost? Filed as LIN-4257 and Surveyed through the stages. Its Surveys bear directly on the loop:
+- **A floor of about $5–7 per finished ticket** for the fixed legs, whatever the change. Implementation is 11% to a third of the total (LIN-4247: $0.70 of $6.27; LIN-4252: $3.03 of $10.38; LIN-4253: $3.85 of $11.24).
+- **The two Survey legs are about $1.8–2 per ticket,** roughly 30% of a small ticket like LIN-4247. That's the first real figure for the loop's cost per ticket (an open question in the morning notes).
+- **Hanoi, in money:** every extra move pays the floor again, so a tidy done first as its own ticket adds about $5–7 before any work. That supports John's "big moves early" on price too: fewer, larger moves spread the floor.
+- **Confounds the paper must handle:** the implementation model varies, keep-alive sessions dominate the big totals, and the observer is billed.
+
+Scoped: freeze a dated cost table per leg; split the cost into floor, work, keep-alive and Survey; take size from git with the existing counters (no fourth); test against the work within one model; read the tidy pairs last, as they finish. Who must learn: the Library index (plus its two missing files) and `proposals.md:81`. Autopilot started.
