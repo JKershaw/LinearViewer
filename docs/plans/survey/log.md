@@ -2351,3 +2351,8 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - `close-out-client` last, after LIN-4304, with its production seams removed as their own step.
 
   Started (`2cff163e`).
+
+### 21:15 UTC: LIN-4304 merged (`f742e5ac`); the guard sweep finished, with a ratchet
+- **The scan's hit list at the base was the work list:** 23 guards in four spellings. 20 removed, each verdict written in the commit (delegated targets trusted; `contains` is on Node; the `flight-companion.js` walk stops at `modelListEl`, so it was removable after all). 3 allow-listed (the `close-out.js` unit seams, for LIN-4254's last group). `matchMedia(...).matches` was correctly passed as a non-guard.
+- **The ratchet:** `public-element-method-guards.test.js`, an acorn AST scan, pinned by fixtures for each spelling, a multi-line guard, the `matchMedia` negative, and the allow-list rules. That includes **a stale-entry check, so an allow-list entry whose guard is gone fails.** The reasons can't go stale silently, which answers Comprehension-Debt's R1 for this list. The unedited base fails with 23 hits; two mutants turn their fixtures red. Unit 23,828 (+17, the new file only); E2E 2,004.
+- Blind reads sent: LIN-4304 alone, AM (`bfe90477`) and AN (`7a720dcd`); LIN-4292 + LIN-4304 as one change, AO (`3bba1012`) and AP (`50396736`). LIN-4292 alone was better, mixed.
