@@ -412,7 +412,7 @@
    * leaves the escaped text.
    */
   function enhanceMarkdown(root) {
-    if (!root || !root.querySelectorAll || typeof window.renderMarkdown !== 'function') return;
+    if (!root || typeof window.renderMarkdown !== 'function') return;
     var nodes = root.querySelectorAll('[data-md]');
     for (var i = 0; i < nodes.length; i++) {
       var text = nodes[i].textContent;
@@ -426,7 +426,7 @@
    * the `<pre>` with a div, so a second call is a no-op.
    */
   function enhanceContextMarkdown(mount) {
-    if (!mount || !mount.querySelectorAll || typeof window.renderMarkdown !== 'function') return;
+    if (!mount || typeof window.renderMarkdown !== 'function') return;
     var pres = mount.querySelectorAll('pre.sess-ctx-body');
     for (var i = 0; i < pres.length; i++) {
       var pre = pres[i];

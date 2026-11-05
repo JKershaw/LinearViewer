@@ -65,7 +65,7 @@
 
   // A suggestion's button sets the model input, then tells the page the value changed, as a typed value would.
   document.addEventListener('click', (event) => {
-    const pick = event.target.closest && event.target.closest('[data-decision-pick]');
+    const pick = event.target.closest('[data-decision-pick]');
     if (!pick) return;
     const root = pick.closest('[data-decision-panel]');
     const model = root && field(root, 'model');
@@ -77,7 +77,7 @@
 
   document.addEventListener('change', (event) => {
     const el = event.target;
-    const root = el.closest && el.closest('[data-decision-panel]');
+    const root = el.closest('[data-decision-panel]');
     if (!root) return;
     const which = el.getAttribute('data-decision-field');
     if (which === 'harness') sync(root);
@@ -95,7 +95,7 @@
 
   // A typed model changes the hint and the chosen suggestion as it is typed, not only when the field loses focus.
   document.addEventListener('input', (event) => {
-    const root = event.target.closest && event.target.closest('[data-decision-panel]');
+    const root = event.target.closest('[data-decision-panel]');
     if (root && event.target.getAttribute('data-decision-field')) refreshFields(root);
   });
 

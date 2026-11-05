@@ -878,7 +878,7 @@
     // template above; the markdown sinks sit elsewhere, so a look-alike in them
     // is never bound. Every state paint goes through here (expand, poll, swipe
     // card change, setup/error), so no insertion site misses it.
-    if (window.ProxyToggle && typeof window.ProxyToggle.bind === 'function' && typeof container.querySelectorAll === 'function') {
+    if (window.ProxyToggle && typeof window.ProxyToggle.bind === 'function') {
       container.querySelectorAll(':scope > .swipe-prompt-header > .swipe-prompt-actions > .prompt-proxy-toggle')
         .forEach((btn) => window.ProxyToggle.bind(btn));
     }
@@ -1207,7 +1207,7 @@
       const slot = container.querySelector('[data-run-slot]');
       if (!slot) { render(); applyPanelDraft(); return; }
       const active = typeof document !== 'undefined' ? document.activeElement : null;
-      const testid = active && active.dataset && slot.contains && slot.contains(active) ? active.dataset.testid : null;
+      const testid = active && active.dataset && slot.contains(active) ? active.dataset.testid : null;
       const typed = testid && typeof active.value === 'string'
         ? { value: active.value, start: active.selectionStart, end: active.selectionEnd }
         : null;
@@ -1869,7 +1869,7 @@
     };
     function keepFocusInDrawer(e) {
       const drawer = container.querySelector('[data-testid="run-change-panel"]');
-      if (!drawer || !drawer.querySelectorAll) return;
+      if (!drawer) return;
       // Only what can take focus: the phone's × is display:none on a desktop, and a hidden control cannot hold focus.
       const items = [...drawer.querySelectorAll('button:not([disabled]), input:not([disabled]), select, textarea, a[href]')]
         .filter((el) => el.getClientRects().length > 0);

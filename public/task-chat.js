@@ -443,7 +443,7 @@
     // Delegated open/delete on the saved-chat list.
     if (savedList) {
       savedList.addEventListener('click', function (e) {
-        var item = e.target.closest ? e.target.closest('.task-chat-saved-item') : null;
+        var item = e.target.closest('.task-chat-saved-item');
         if (!item) return;
         var id = item.getAttribute('data-saved-id');
         if (e.target.classList.contains('task-chat-saved-open')) openSavedChat(id);

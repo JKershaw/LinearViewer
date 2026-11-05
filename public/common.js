@@ -2353,9 +2353,7 @@ window.ProxyToggle = (function () {
    * The active look comes from the body[data-proxy-active] CSS rule (LIN-2944 P3).
    */
   function init() {
-    if (typeof document.querySelectorAll === 'function') {
-      document.querySelectorAll('.prompt-actions > .prompt-proxy-toggle, .dispatch-options > .prompt-proxy-toggle').forEach(bind);
-    }
+    document.querySelectorAll('.prompt-actions > .prompt-proxy-toggle, .dispatch-options > .prompt-proxy-toggle').forEach(bind);
     // R1: a toggle-path 429 skip is announced on every surface (the opened-task
     // component also renders an inline notice beside the toggle).
     document.addEventListener('harbour:proxy-rate-limited', () => {
