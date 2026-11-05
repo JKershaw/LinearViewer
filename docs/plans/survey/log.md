@@ -1868,3 +1868,11 @@ Your steer: no Periodicals routing, a code-only global ("as if in a repo where t
 2. Pull "shared test fakes with a home" as its own priced ticket.
 3. A blind second scorer for the ledger rows. Still not done, and the single biggest gap in the evidence.
 4. Decide whether the map's homes matter enough to put back into the Survey: one line in the global ("does what it adds have an obvious home?"), still without the reports.
+
+### 06:05 UTC: LIN-4143 merged (`+`), after the summary
+- All three pieces landed as scoped:
+  1. the witness was **green at the base**, which confirms the stale premise;
+  2. the card fails closed (red first);
+  3. a characterization snapshot first, then the guard made unconditional, with no `liveGuard` parameter left.
+- Map unchanged, no new file.
+- **Overnight now: 7 better, 2 mixed, 0 worse, from 9 rows.** All four ordinary tickets are `+` or `+ (mixed)`. After-questions sent to its builder.
