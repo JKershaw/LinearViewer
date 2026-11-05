@@ -302,3 +302,44 @@ describe('LIN-4263: the fold gives each model its own tokens', () => {
     assert.equal(haiku.tokens.outputTokens + opus.tokens.outputTokens, fold.tokens.outputTokens);
   });
 });
+
+
+/**
+ * LIN-4276: `keyOf` derives from the posting-key list. Before, a member known only by its run-page `loopId` had no
+ * `keyOf`, so it was never in `fetchedKeys` and was listed twice: once as the fetched member (`itemId: null`) and again
+ * as a missing member (no requests). The red below is that duplicate. The order test pins the dispatch order that
+ * `dispatchesOf` reuses from lineage-membership.js: dated first, undated in input order (a tie, not a defect: the old
+ * `Infinity - Infinity` sort was already stable, so this passes before and after).
+ */
+describe('LIN-4276: a loopId-only member is listed once with its itemId, and dispatches sort by the one dispatch order', () => {
+  test('a member known only by loopId owns the request posted under it, is listed once, and reports that itemId', () => {
+    const loopOnly = { loopId: 'L1', rootItemId: 'b1', issueIdentifier: 'LIN-4263', kind: 'implementation', status: 'taken', dispatchedAt: at(5), feedback: [] };
+    const requests = [request('b1', 'L1', 'q1', 4, { costUsd: 0.4 })];
+    const session = sessionOf(perDispatch({ fetchedRows: [loopOnly] }, requests), 'b1');
+    assert.equal(session.dispatches.length, 1, 'listed once, not as a fetched member and again as missing');
+    assert.equal(session.dispatches[0].requests, 1);
+    assert.equal(session.dispatches[0].itemId, 'L1');
+  });
+
+  test('two undated and two dated members: dated first in dispatch order, undated in input order', () => {
+    const undatedA = dispatch('u1', 'b1', 0, { dispatchedAt: null, kind: 'custom' });
+    const dated3 = dispatch('d3', 'b1', 3, { kind: 'custom' });
+    const undatedB = dispatch('u2', 'b1', 0, { dispatchedAt: undefined, kind: 'custom' });
+    const dated1 = dispatch('d1', 'b1', 7, { kind: 'implementation' });
+    // One record, so the lineage is a records lineage and carries dispatches (a snapshot-only lineage carries null).
+    const requests = [request('b1', 'd1', 'q1', 6.5, { costUsd: 0.1 })];
+    const session = sessionOf(perDispatch({ fetchedRows: [undatedA, dated3, undatedB, dated1] }, requests), 'b1');
+    assert.deepEqual(session.dispatches.map(d => d.itemId), ['d1', 'd3', 'u1', 'u2']);
+  });
+});
+
+describe('LIN-4276: the posting-key order is load-bearing, id before loopId (pinned, passes before and after)', () => {
+  test('a row carrying both id and loopId reports its id as itemId, and a request posted under the loopId still matches it', () => {
+    const both = { id: 'A', loopId: 'L', rootItemId: 'b1', issueIdentifier: 'LIN-4263', kind: 'implementation', status: 'taken', dispatchedAt: at(5), feedback: [] };
+    const requests = [request('b1', 'L', 'q1', 4, { costUsd: 0.4 })];
+    const session = sessionOf(perDispatch({ fetchedRows: [both] }, requests), 'b1');
+    assert.equal(session.dispatches.length, 1);
+    assert.equal(session.dispatches[0].requests, 1);
+    assert.equal(session.dispatches[0].itemId, 'A');
+  });
+});
