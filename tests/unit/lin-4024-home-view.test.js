@@ -9,7 +9,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildHomeView, UP_NEXT_PER_PROJECT } from '../../lib/home-view.js';
+import { buildHomeView, PROJECT_LEAD_ROOTS } from '../../lib/home-view.js';
 import { PERIODICALS_PROJECT_ID, partitionCompleted, nodeKey } from '../../lib/tree.js';
 
 /** LIN-4114: an open ruling's row, as the standing hands it (a needs-you task has one); Home holds it as Waiting on you. */
@@ -126,7 +126,7 @@ describe('Project view: Up next, Backlog and done', () => {
     assert.equal(tree.upNextMore, 2, 'the two Todo roots past the limit are counted');
     assert.equal(tree.backlogCount, 2, 'LIN-55 and LIN-56 are open Backlog; the done child is not counted as open');
     assert.equal(tree.doneCount, 2, 'LIN-57 and LIN-58 are done and never rendered');
-    assert.equal(UP_NEXT_PER_PROJECT, 3);
+    assert.equal(PROJECT_LEAD_ROOTS, 3);
   });
 
   test('open work under a done task is kept, and the done task is counted once', () => {
