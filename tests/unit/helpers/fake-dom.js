@@ -23,6 +23,8 @@
  * `observation-scan-due.test.js` and `lin-2933-cross-seam-witness.test.js` (LIN-4283), and
  * `observation-ruling-delivery.test.js` (LIN-4282), through `loadWorld` (the last as `loadWorld({ scripts: [] })` with
  * `common.js` and `observation.js` run by hand). `client-world.test.js` (LIN-4280) tests `loadWorld`'s `run`.
+ * `lin-4035-live-console-client.test.js` and `live-console-client-facts.test.js` (LIN-4285) through `loadWorld`, loaded
+ * by the shared Live Console loader in `helpers/live-console-world.js` (a page and lane fixture, not a fake DOM).
  * A suite moved onto this fake leaves `HAND_WRITTEN_FAKE_DOM_FILES` and joins this list in the same PR.
  *
  * Modelled:
