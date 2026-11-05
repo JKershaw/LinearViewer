@@ -2151,3 +2151,8 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   | LIN-4276 | `f7f76444` | `5e2dae6d` | q1–q6, plus a tidy-after q7 |
 
 - **The tidy-after q7, new:** "This ticket was a tidy-after: a small follow-on, filed straight after an earlier ticket merged, to gather the copies that earlier ticket had left at its edges. Was doing it as its own task, then, worth it, or would it have been cheaper inside the earlier ticket, or later, or not at all? What would have made it smaller?" It's the after-step's own question, asked of the one who did it. It goes to every tidy-after from now on (LIN-4277; the third trial).
+
+### 15:05 UTC: LIN-4277 merged (`0c3d3448`); its blind reads sent
+- The second after-trial, LIN-4251's tidy-after (one endpoint-hint ladder, one closing lead-in), merged at 15:03.
+- Four blind reads, code-only, sent on the LIN-4276 template: LIN-4277 alone, passes W (`c66d62d8`) and X (`dcfde954`); LIN-4251 + LIN-4277 as one change, passes Y (`8cf1cc3c`) and Z (`7cc5d678`). The question is the same as for the first trial: does a small tidy-after of the named edges turn a "better, mixed" area into "better, better"?
+- Its after-questions (q1–q6 plus the tidy-after q7) go when its lineage ends.
