@@ -1767,3 +1767,12 @@ I skipped LIN-4026: its own text says the write-side option is "a contract chang
 
   Both pass the generality test. Hold them until a second ticket shows the same need.
 - **Tally:** "shared test fakes with a home" now has four namings (collection fakes ×3 tickets, a fake DOM). That's a pull candidate. Two new watch rows: server fragments instead of client-parsing a page; one ranking for "what's next".
+
+### 04:55 UTC: LIN-4048 merged (`+`)
+- **LIN-4048** (`c70b004c`, about 50 minutes from kickoff):
+  - the rule stays on the server, and no browser code reads the tracker's finished word;
+  - the task page and Swipe match Home, and a held run keeps its Stop;
+  - the review found an ordering bug, now fixed;
+  - map unchanged, no new file. Prod +25 / −12.
+- **The Survey's biggest single save of the night:** the ticket as written would have re-added an owner LIN-4071 had removed. Instead, the task closed the two real leftovers that each voice found.
+- After-questions sent to its builder.
