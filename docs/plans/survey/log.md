@@ -1737,3 +1737,16 @@ I skipped LIN-4026: its own text says the write-side option is "a contract chang
 - it says whether Home's browser-side check can go once the server decides (one rule, not two).
 
 **At merge:** "finished means no main run action" is decided in one place, and both surfaces read it. No new homeless file.
+
+### 04:00 UTC: LIN-4048's Surveys: the bug is already fixed, and the forecast stopped a drill
+- **Both voices:** the main-button bug as written was fixed by LIN-4071/LIN-4104. The decision moved to the server; `mainActionOf` and `row.finished` no longer exist. Both probed the real `/state` route to show it.
+- **Both warned that the obvious fix would re-add a browser-side check that LIN-4071 removed on purpose.** Criteria: both hit.
+- **This is the drill the Survey exists to stop:** the ticket's anchors pointed the builder at code that no longer exists, and the obvious way would have put a second owner back.
+- **Each voice found a different real residue:**
+  - global: the finished task page still paints run chrome (runs-on, Change, quota) through a branch without Home's early return;
+  - open-0: a Done task with a held run gets no Stop on its page.
+
+  Neither covers the other. That's the value of two voices: they diverged on *what's left*, not on what to do, so I took both as pieces rather than run a step-back.
+- **Scope:** close the reported symptom as covered; piece 1 is the run chrome (red test today); piece 2 is held-run Stop, reachability first, stop if unreachable. Folding the task page's run block into Home's stays out (the global: "LIN-4040's rework").
+  - Autopilot `d1431ef4`.
+- **A general lesson worth one line in the open-0 prompt eventually:** "is the ticket still true at {BASE}?" Tonight it was false once (LIN-4048) and partly false twice (LIN-4151's dedupe, LIN-4234's runbook). It passes the generality test, but open-0 found it unprompted every time, so it doesn't need adding yet.
