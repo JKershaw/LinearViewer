@@ -15,7 +15,9 @@
  * `prompt-section-go.test.js` (LIN-4266), and `prompt-section-preserve.test.js`, `prompt-section-recommend-url.test.js`
  * and `prompt-section-look-alike.test.js` (LIN-4268) through `loadWorld`, and `chat-append-options.test.js`,
  * `chat-render-markdown-text.test.js`, `chat-tool-rows.test.js`, `observation-basis-check.test.js` and
- * `observation-bulk-scan.test.js` (LIN-4280) through `loadWorld`. `client-world.test.js` (LIN-4280) tests `loadWorld`'s `run`.
+ * `observation-bulk-scan.test.js` (LIN-4280) through `loadWorld`, and `observation-ruling-delivery.test.js` (LIN-4282)
+ * through `loadWorld({ scripts: [] })` with `common.js` and `observation.js` run by hand. `client-world.test.js` (LIN-4280)
+ * tests `loadWorld`'s `run`.
  * A suite moved onto this fake leaves `HAND_WRITTEN_FAKE_DOM_FILES` and joins this list in the same PR.
  *
  * Modelled:

@@ -81,7 +81,6 @@ const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/unit/lin-4242-waiting-live.test.js',
   'tests/unit/live-console-client-facts.test.js',
   'tests/unit/observation-card-order.test.js',
-  'tests/unit/observation-ruling-delivery.test.js',
   'tests/unit/observation-scan-due.test.js',
   'tests/unit/observation-waiting-block.test.js',
   'tests/unit/prompt-section-p0.test.js',
