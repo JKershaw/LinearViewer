@@ -2009,3 +2009,15 @@ John: from time to time, reread the essay and the related papers, which are good
 - **LIN-4252's tidy-after is filed** as LIN-4255 (Backlog): move the hand-written fakes by family and delete each copy, with a census ratchet beside `test-server-listen-bind.test.js`. It runs after LIN-4247 and LIN-4246, which touch the same test files.
 - **LIN-4246's Surveys on the tidied ground:** both say a unit call-site witness "now looks cheap" on the shared fake (with `question-cards.js` loaded into the vm). open-0 found that the LIN-4024 "unchanged markup" keep can never fire (the `data-qcard-bound` stamp), so idle cards are replaced every poll. Scoped in pieces: check the existing E2E by mutation first; the missing case as one unit test; lift the vm layer into the helper (both blind reads' complaint, with a stop rule); blur the typed E2E; delete the dead clause (stop rule). Autopilot `0d9927a2`.
 - LIN-4253's builder has the after-questions (`307d82c0`).
+
+### 11:25 UTC: the control (LIN-4247) is mixed in both blind reads
+- **LIN-4247: mixed, mixed.** The fix is small, well placed and well tested, but the folded-in tidy *added* a fourth answer to "in progress" (documented beside the other three), plus one more copy of the `state.go` literal. That's the same shape as the overnight features.
+- **The round so far:**
+
+  | Ticket | Kind | Blind |
+  |---|---|---|
+  | LIN-4253 | tidy first; deleted its copies | better, better |
+  | LIN-4252 | tidy first; left its copies (2 of about 30) | mixed, mixed |
+  | LIN-4247 | control: feature with the tidy folded in | mixed, mixed |
+
+  LIN-4251 and LIN-4246, the follow-ons on tidied ground, are still building.
