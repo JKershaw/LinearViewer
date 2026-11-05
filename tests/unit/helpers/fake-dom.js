@@ -67,7 +67,7 @@
  * - Selects (LIN-4296): a `<select>`'s `value`, `selectedIndex` and `options` (a fresh array in tree order, optgroup children
  *   included), and an `<option>`'s `selected`, `value` (its `value` attribute, else its collapsed text) and `text`. Selectedness
  *   is per option, with a dirty flag like `checked`, so the markup and the typed value are not computed from each other. A
- *   reset (the spec's "ask for a reset") runs after the parse and on every child-list change (`_insert`, `_detach`), so
+ *   reset (the spec's "ask for a reset") runs after the parse and whenever an option or optgroup is inserted or removed (`_insert`, `_detach`), so
  *   `innerHTML`, `replaceChildren`, `textContent`, `outerHTML` and `replaceWith` are covered by the one hook. A write that matches
  *   nothing leaves `selectedIndex` -1 and `value` `''`, and it stays so until an option is inserted or removed.
  * - Focus: `focus()` and `blur()` on focusable elements. `document.activeElement` is per world. It returns the body when
@@ -181,7 +181,12 @@ class FakeNode {
     const at = ref ? this._kids.indexOf(ref) : this._kids.length;
     this._kids.splice(at, 0, node);
     node.parentNode = this;
-    resetAround(this); // every child-list change funnels through here, so the select reset (LIN-4296) cannot be missed
+    // The select reset (LIN-4296) runs only when an option or optgroup is inserted (Chromium: a text node or comment leaves a
+    // no-match write alone), and an inserted option that is already selected takes the selection before the reset runs.
+    if (isOptionEl(node) || isOptgroupEl(node)) {
+      onOptionsInserted(this, node);
+      resetAround(this);
+    }
     return node;
   }
 
@@ -191,7 +196,7 @@ class FakeNode {
     if (!parent) return;
     parent._kids.splice(parent._kids.indexOf(this), 1);
     this.parentNode = null;
-    resetAround(parent);
+    if (isOptionEl(this) || isOptgroupEl(this)) resetAround(parent); // only an option or optgroup leaving runs the reset
     const doc = this.ownerDocument;
     if (doc && doc._focused && this.contains(doc._focused)) doc._focused = null;
   }
@@ -653,11 +658,25 @@ function resetSelectedness(select) {
     if (first) first._optSel = true;
   }
 }
-/** Runs the reset for the select that `parent`'s option list belongs to, if there is one. Called on every child-list change. */
+/** Runs the reset for the select that `parent`'s option list belongs to, if there is one. Called when an option or optgroup is inserted or removed. */
 function resetAround(parent) {
   if (parent.nodeType !== 1 || !isHtmlEl(parent)) return;
   if (parent.localName === 'select') resetSelectedness(parent);
   else if (parent.localName === 'optgroup' && parent.parentNode && isSelectEl(parent.parentNode)) resetSelectedness(parent.parentNode);
+}
+/**
+ * An option (or an optgroup's options) inserted into `parent`: when one is already selected, by attribute or by `.selected`, it
+ * takes the selection (Chromium: the inserted option wins over the old selection; the last selected one wins among several).
+ * Runs before the reset, which then only handles the none-selected and nothing-inserted-selected cases.
+ */
+function onOptionsInserted(parent, node) {
+  const select = isSelectEl(parent) ? parent : (isOptgroupEl(parent) && parent.parentNode && isSelectEl(parent.parentNode) ? parent.parentNode : null);
+  if (!select || !isSingle(select)) return;
+  const inserted = isOptionEl(node) ? [node] : node._kids.filter(isOptionEl);
+  const picked = inserted.filter(selectedOf).pop();
+  if (!picked) return;
+  for (const o of optionsOf(select)) if (o !== picked) o._optSel = false;
+  picked._optSel = true;
 }
 /**
  * `option.selected = v`: sets this option's selectedness and dirtiness, then asks for a reset. Chromium resolves a `true`

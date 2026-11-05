@@ -50,7 +50,7 @@ async function mount() {
   // The disclosure is drawn once a prompt is generated (the same first press runner-link's mount makes).
   await container.click({ prompt: 'implementation' });
   await flush();
-  return { container, calls };
+  return { container, calls, world };
 }
 
 describe('LIN-4296 — the dispatch reader reads the disclosure\'s own selects', () => {
@@ -76,5 +76,24 @@ describe('LIN-4296 — the dispatch reader reads the disclosure\'s own selects',
     await container.click({ action: 'dispatch', target: 'cli' });
     assert.equal(calls.dispatch.length, 1);
     assert.deepEqual([calls.dispatch[0].harness, calls.dispatch[0].model], ['opencode', pick.value]);
+  });
+
+  // The end-to-end witness that the modelled `options` / `value` / `selectedIndex` / `dataset` surface is enough for production's
+  // rebuild path (public/common.js rebuildDispatchModelOptions + updateDispatchModelHint), which no catalog fetch reaches here.
+  test('rebuilding the model options keeps a prior model, keeps the blank and other… ends, and reads the hint without throwing', async () => {
+    const { container, world } = await mount();
+    const panel = container.querySelector('.swipe-prompt-options');
+    const model = panel.querySelector('.dispatch-exec-model');
+    const pick = [...model.options].find(isRealModelOption);
+    assert.ok(pick, 'precondition: the model select offers a real model to choose');
+    model.value = pick.value;
+    assert.equal(model.value, pick.value, 'precondition: the pick took');
+    world.run('rebuildDispatchModelOptions')(model, 'opencode');
+    const opts = [...model.options];
+    assert.equal(model.value, pick.value, 'the prior model survives the rebuild');
+    assert.equal(opts[0].value, '', 'the blank option stays first');
+    assert.equal(opts[opts.length - 1].text, 'other…', 'the other… sentinel stays last');
+    assert.ok(opts.length > 2, 'the curated options sit between them');
+    assert.ok(['', 'free'].includes(panel.querySelector('.dispatch-exec-model-hint').textContent), 'the hint reads from the selected option');
   });
 });

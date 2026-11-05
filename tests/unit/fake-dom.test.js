@@ -1146,6 +1146,39 @@ describe('fake DOM: every tree change leaves a select as a browser does (LIN-429
   }
 });
 
+// LIN-4296 review: the reset runs only when an option or optgroup is inserted or removed, and an inserted option that is already
+// selected takes the selection. Expectations are Chromium's (Playwright 1.57, chromium-1228), probed in the review.
+describe('fake DOM: the select reset runs for options only, and an inserted selected option wins (LIN-4296 review)', () => {
+  test('a text node or a comment inserted, or a text node removed, leaves a no-match write at -1 / ""', () => {
+    const { s } = selectWith(AB + ' ');
+    s.value = 'zz';
+    assert.deepEqual([s.value, s.selectedIndex], ['', -1], 'precondition: the no-match write');
+    s.append(' ');
+    assert.deepEqual([s.value, s.selectedIndex], ['', -1], 'after append of a text node');
+    s.insertAdjacentHTML('beforeend', '<!--c-->');
+    assert.deepEqual([s.value, s.selectedIndex], ['', -1], 'after a comment');
+    const kids = s.childNodes;
+    s.removeChild(kids[kids.length - 1]);
+    assert.deepEqual([s.value, s.selectedIndex], ['', -1], 'after removing the trailing node');
+  });
+
+  test('an option inserted with a selected attribute takes the selection from the old one (Chromium: "n", 0)', () => {
+    const { document, s } = selectWith('<option value="a">A</option><option value="b" selected>B</option>');
+    const n = newOption(document, 'n');
+    n.setAttribute('selected', '');
+    s.insertBefore(n, s.options[0]);
+    assert.deepEqual([s.value, s.selectedIndex], ['n', 0]);
+  });
+
+  test('an option inserted with selected = true takes the selection from the old one (Chromium: "n", 0)', () => {
+    const { document, s } = selectWith('<option value="a">A</option><option value="b" selected>B</option>');
+    const n = newOption(document, 'n');
+    n.selected = true;
+    s.insertBefore(n, s.options[0]);
+    assert.deepEqual([s.value, s.selectedIndex], ['n', 0]);
+  });
+});
+
 describe('fake DOM: <select> refusals name what they do not model (LIN-4296)', () => {
   test('a multiple select throws on value, selectedIndex and an option\'s selected, rather than guessing', () => {
     const { s } = selectWith(AB, ' multiple');
