@@ -1,5 +1,5 @@
 /**
- * The one fake DOM for client unit tests (LIN-4252). Client code (`public/prompt-section.js`, `public/question-cards.js`)
+ * The one fake DOM for client unit tests (LIN-4252). Client code (the `public/` client scripts)
  * runs in a vm sandbox against a real node tree: node identity is kept, `innerHTML` and `outerHTML` serialize the way a
  * browser does, `outerHTML =` and `replaceWith` swap real nodes, and focus is per world. Its own tests are
  * `tests/unit/fake-dom.test.js`; a test that would pass on a fake that did nothing does not count there.
@@ -77,10 +77,12 @@
  * `indeterminate` is a plain expando, not a modelled property: a browser's has no attribute to reflect, so a write reads
  * back on the node and changes no markup (PR #2308 relies on this for the select-all checkbox).
  *
- * `select` stop (LIN-4269). `<select>.value` is the API the suite below needs and the fake does not model: its getter returns
- * undefined, its setter throws (`value is not modelled on <select>`, the setter above). `lin-3833-run-control.test.js` stays on
- * the census, `HAND_WRITTEN_FAKE_DOM_FILES`, with its own hand-written fake: production writes `el.value` on the run-harness
- * select at `public/prompt-section.js:1565` through `applyPanelDraft`, and the test reads it at line 243.
+ * `select` stop (LIN-4269). `<select>.value` is the API the suites below need and the fake does not model: its getter returns
+ * undefined, its setter throws (`value is not modelled on <select>`, the setter below). Three suites stay on
+ * the census, `HAND_WRITTEN_FAKE_DOM_FILES`, with their own hand-written fakes, stopped on this API:
+ * `lin-3833-run-control.test.js` (production writes `el.value` on the run-harness select at `public/prompt-section.js:1565`
+ * through `applyPanelDraft`, and the test reads it at line 243), `prompt-section-task-mode.test.js` (`public/prompt-section.js:2714-2715`
+ * -> `public/common.js:1758-1763`) and `lin-3136-settings-take-predicate.test.js` (`public/proxy.js:51`).
  */
 
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
