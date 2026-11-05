@@ -325,6 +325,10 @@ test.describe('the opened task keeps its typed question across a state repaint (
     // Witness: drop `|| keepsPlace` from keepTypedQuestion → the repaint writes the new card and the typed text is gone.
     await openRunningThenRaise(page);
     await page.locator(OPENED_INPUT).fill('half a sentence in the opened task');
+    // fill() leaves the textarea focused, and focus alone keeps a card (cardHoldsInput). Blur first, so this test
+    // witnesses the typed text and not the focus: the card must hold no focus when the poll paints.
+    await page.locator(OPENED_INPUT).blur();
+    expect(await page.evaluate(() => !document.querySelector('[data-question-slot] [data-testid="session-question-card"]').contains(document.activeElement))).toBe(true);
     await page.locator(OPENED_CARD).evaluate(el => { el.dataset.keepMark = 'yes'; });
 
     await editNextStateCard(page, html => html.replace('data-testid="session-question-card"', 'data-testid="session-question-card" data-repainted="yes"'));

@@ -983,12 +983,11 @@
       keepTypedQuestion(oldQuestion);
     }
 
-    // LIN-4024: the question card sits in the state block, so a repaint writes it again. When its markup is unchanged,
-    // the card already on the page is put back, so a half-typed answer and its thread survive a poll (the task page keeps
-    // its card outside the repainted answer for the same reason). A new card is bound here; the kept one is bound already.
-    // LIN-4242: a card also stays when its markup changed but it holds the reader's place (typed text, focus, or an answer
-    // in flight): the same check the live Waiting section uses (QuestionCards.cardHoldsInput). It is gated on the ruling key
-    // first, so this task can never keep another ruling's card.
+    // The question card sits in the state block, so a repaint writes it again. A card stays only while it holds the reader's
+    // place (typed text, focus, or an answer in flight): the check the live Waiting section uses (QuestionCards.keepsReaderPlace,
+    // which cardHoldsInput decides). It is gated on the ruling key first, so this task can never keep another ruling's card.
+    // An idle card is replaced, and bound again, on every repaint: a bound card never matches fresh server markup, so there is
+    // no unchanged-markup keep here (LIN-4024's clause was dead, and LIN-4246 removed it). The LIN-4246 call-site tests pin this.
     function keepTypedQuestion(oldQuestion) {
       const fresh = container.querySelector ? container.querySelector('[data-question-slot]') : null;
       if (!fresh) return;
@@ -996,7 +995,7 @@
       const oldCard = oldQuestion && oldQuestion.querySelector ? oldQuestion.querySelector('[data-testid="session-question-card"]') : null;
       const freshCard = fresh.querySelector ? fresh.querySelector('[data-testid="session-question-card"]') : null;
       const keepsPlace = !!(QC && typeof QC.keepsReaderPlace === 'function' && QC.keepsReaderPlace(oldCard, freshCard));
-      if (oldQuestion && (oldQuestion.innerHTML === fresh.innerHTML || keepsPlace)) { fresh.replaceWith(oldQuestion); return; }
+      if (oldQuestion && keepsPlace) { fresh.replaceWith(oldQuestion); return; }
       if (QC && typeof QC.initQuestionCards === 'function') QC.initQuestionCards(container);
     }
 
