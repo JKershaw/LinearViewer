@@ -19,6 +19,8 @@
  * `lin-4040-close-out.test.js`, `lin-4042-finished-no-run-to-pr.test.js`, `brief-recap-autogenerate.test.js`,
  * `brief-recap-ai-not-configured-contract.test.js`, `scan-retire-ui.test.js` and `lin-4016-browser-follows-server.test.js`
  * (LIN-4269) through `loadWorld`. `client-world.test.js` (LIN-4280) tests `loadWorld`'s `run`.
+ * `lin-4035-live-console-client.test.js` and `live-console-client-facts.test.js` (LIN-4285) through `loadWorld`, loaded
+ * by the shared Live Console loader in `helpers/live-console-world.js` (a page and lane fixture, not a fake DOM).
  * A suite moved onto this fake leaves `HAND_WRITTEN_FAKE_DOM_FILES` and joins this list in the same PR.
  *
  * Modelled:
