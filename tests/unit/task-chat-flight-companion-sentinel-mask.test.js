@@ -14,20 +14,21 @@
  * (review finding 1 — the loudest of the four, since an assistant-only
  * transcript repeats it once per stored turn).
  *
- * task-chat.js is a browser script (IIFE, not a module), so — following the
- * targeted-extraction technique in tests/unit/dispatch-feedback-entries.test.js
- * and the hand-rolled-DOM-shim technique in
- * tests/unit/chat-append-options.test.js — this vm-sandboxes real source
- * slices rather than reimplementing the logic.
+ * task-chat.js is a browser script (an IIFE, not a module) whose helpers live
+ * inside `init`, so these tests run real source slices of it into one
+ * `loadWorld` world (LIN-4284): the slices run with `world.run`, and the DOM they
+ * touch is real nodes from the shared fake (`tests/unit/helpers/fake-dom.js`).
+ * Collaborators that are not DOM (the ChatUI helper, the api call, the toast,
+ * appendBubble and friends) stay as doubles that record what they were given.
  *
  * Run with: node --test tests/unit/task-chat-flight-companion-sentinel-mask.test.js
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { loadWorld } from './helpers/client-world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TASK_CHAT_JS_SRC = readFileSync(join(__dirname, '../../public/task-chat.js'), 'utf8');
@@ -49,7 +50,7 @@ function extractRenderSavedRowsSrc() {
 }
 
 // `appendBubble` is declared ABOVE the mask helper in the file, so its slice is
-// taken separately and run into the same context after the mask slice — the
+// taken separately and run into the same world after the mask slice — the
 // real file relies on hoisting for the same call, which a single contiguous
 // slice could not reproduce.
 //
@@ -68,178 +69,6 @@ function extractAppendBubbleSrc() {
   return TASK_CHAT_JS_SRC.slice(start, end);
 }
 
-// ─── Minimal DOM shim (renderSavedRows only needs this much) ────────────────
-class FakeClassList {
-  constructor(el) { this.el = el; this._set = new Set(); }
-  toggle(name, force) {
-    const on = force === undefined ? !this._set.has(name) : force;
-    if (on) this._set.add(name); else this._set.delete(name);
-    return on;
-  }
-  contains(name) { return this._set.has(name); }
-}
-
-class FakeElement {
-  constructor(tagName) {
-    this.tagName = tagName;
-    this.className = '';
-    this.attributes = {};
-    this._innerHTML = '';
-    this.children = [];
-    this.classList = new FakeClassList(this);
-  }
-  setAttribute(name, value) { this.attributes[name] = value; }
-  getAttribute(name) { return this.attributes[name]; }
-  get innerHTML() { return this._innerHTML; }
-  set innerHTML(v) { this._innerHTML = v; if (v === '') this.children = []; }
-  appendChild(child) { this.children.push(child); return child; }
-}
-
-// Sandbox for appendBubble: captures the opts handed to the shared ChatUI
-// helper, which is where the speaker-pill label (`who`) is decided.
-function makeBubbleSandbox(activeTask) {
-  const captured = [];
-  const sandbox = {
-    activeTask,
-    transcript: new FakeElement('ol'),
-    setEmptyVisible: () => {},
-    window: {
-      ChatUI: {
-        appendMessage: (_transcript, opts) => {
-          captured.push(opts);
-          return { querySelector: () => new FakeElement('span') };
-        },
-      },
-    },
-    console,
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(extractMaskFnSrc(), sandbox, { filename: 'task-chat.js-mask-slice' });
-  vm.runInContext(extractAppendBubbleSrc(), sandbox, { filename: 'task-chat.js-append-bubble-slice' });
-  return { sandbox, captured };
-}
-
-// A bubble <li> shaped the way ChatUI.appendMessage renders one, just deep
-// enough for setBubbleState (LIN-2445): the `.chat-msg__who` pill it looks up,
-// carrying the `.status-pill__char` glyph node it rewrites. Kept separate from
-// FakeElement above, whose FakeClassList models only toggle/contains — this
-// path needs real add/remove.
-function makePillLi() {
-  const classes = new Set(['status-pill', 'chat-msg__who', 'status-pill--in-progress']);
-  const char = { textContent: '◐' };
-  const pill = {
-    classList: {
-      add: (...n) => n.forEach(c => classes.add(c)),
-      remove: (...n) => n.forEach(c => classes.delete(c)),
-      contains: (c) => classes.has(c),
-    },
-    querySelector: (sel) => (sel === '.status-pill__char' ? char : null),
-  };
-  const li = { querySelector: (sel) => (sel === '.chat-msg__who' ? pill : null) };
-  return { li, pill, char };
-}
-
-function makeSandbox(src) {
-  const savedList = new FakeElement('ul');
-  const savedEmpty = new FakeElement('div');
-  const sandbox = {
-    document: { createElement: (tag) => new FakeElement(tag) },
-    window: { escapeHtml: (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') },
-    savedList,
-    savedEmpty,
-    console,
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(src, sandbox, { filename: 'task-chat.js-saved-rows-slice' });
-  return sandbox;
-}
-
-describe('maskFlightCompanionSentinel (LIN-2437 A.11)', () => {
-  test('masks the bare sentinel to a readable label', () => {
-    const sandbox = makeSandbox(extractMaskFnSrc());
-    assert.equal(sandbox.maskFlightCompanionSentinel('flight-companion'), 'Flight Companion');
-  });
-
-  test('masks the sentinel inside the auto-derived title fallback (the assistant-only-transcript leak)', () => {
-    const sandbox = makeSandbox(extractMaskFnSrc());
-    assert.equal(
-      sandbox.maskFlightCompanionSentinel('Chat about flight-companion'),
-      'Chat about Flight Companion'
-    );
-  });
-
-  test('leaves a real task identifier untouched', () => {
-    const sandbox = makeSandbox(extractMaskFnSrc());
-    assert.equal(sandbox.maskFlightCompanionSentinel('TEST-1'), 'TEST-1');
-  });
-
-  test('leaves a user-authored title untouched, even one that never mentions the sentinel', () => {
-    const sandbox = makeSandbox(extractMaskFnSrc());
-    assert.equal(sandbox.maskFlightCompanionSentinel('Where do you stand?'), 'Where do you stand?');
-  });
-
-  test('is a defensive no-op on a non-string', () => {
-    const sandbox = makeSandbox(extractMaskFnSrc());
-    assert.equal(sandbox.maskFlightCompanionSentinel(undefined), undefined);
-    assert.equal(sandbox.maskFlightCompanionSentinel(''), '');
-  });
-});
-
-describe('renderSavedRows (LIN-2437 A.11) — saved-row meta + title surfaces', () => {
-  test('a companion save (sentinel taskIdentifier, fallback title) renders both readable, never the raw sentinel', () => {
-    const sandbox = makeSandbox(extractRenderSavedRowsSrc());
-    sandbox.renderSavedRows([
-      { id: 'c1', taskIdentifier: 'flight-companion', title: 'Chat about flight-companion', turnCount: 1 }
-    ]);
-
-    assert.equal(sandbox.savedList.children.length, 1);
-    const html = sandbox.savedList.children[0].innerHTML;
-    assert.ok(html.includes('Flight Companion'), 'expected the readable label in the rendered row');
-    assert.ok(!html.includes('flight-companion'), 'the raw sentinel must never reach the rendered row');
-  });
-
-  test('an ordinary task-chat save is unaffected', () => {
-    const sandbox = makeSandbox(extractRenderSavedRowsSrc());
-    sandbox.renderSavedRows([
-      { id: 'c2', taskIdentifier: 'TEST-1', title: 'Where do you stand?', turnCount: 2 }
-    ]);
-
-    const html = sandbox.savedList.children[0].innerHTML;
-    assert.ok(html.includes('TEST-1'));
-    assert.ok(html.includes('Where do you stand?'));
-  });
-});
-
-describe('appendBubble (LIN-2437 A.11 review finding 1) — assistant bubble speaker pill', () => {
-  test('a resumed companion chat renders the readable label on the speaker pill, not the raw sentinel', () => {
-    // openSavedChat sets activeTask to the raw sentinel and THEN replays every
-    // stored turn through appendBubble — so on an assistant-only companion
-    // transcript this pill is the loudest surface, repeated once per bubble.
-    const { sandbox, captured } = makeBubbleSandbox('flight-companion');
-    sandbox.appendBubble('assistant', 'Standing by.');
-
-    assert.equal(captured.length, 1);
-    assert.equal(captured[0].who, 'Flight Companion');
-    assert.ok(!String(captured[0].who).includes('flight-companion'), 'the raw sentinel must never reach the speaker pill');
-  });
-
-  test('an ordinary task chat still names the task on the pill', () => {
-    const { sandbox, captured } = makeBubbleSandbox('TEST-1');
-    sandbox.appendBubble('assistant', 'Here is where I stand.');
-    assert.equal(captured[0].who, 'TEST-1');
-  });
-
-  test("the user's own turn is unaffected, and an empty activeTask still falls back to 'task'", () => {
-    const { sandbox, captured } = makeBubbleSandbox('flight-companion');
-    sandbox.appendBubble('user', 'hello');
-    assert.equal(captured[0].who, 'you');
-
-    const empty = makeBubbleSandbox('');
-    empty.sandbox.appendBubble('assistant', 'hi');
-    assert.equal(empty.captured[0].who, 'task', 'the || fallback must survive the mask being applied first');
-  });
-});
-
 // LIN-2445 — the pill's two write paths, at the unit level. The end-to-end
 // witnesses are in tests/e2e/task-chat.spec.js; these pin the mechanism
 // directly so a regression names the function rather than a rendered class.
@@ -256,72 +85,8 @@ function extractOpenSavedChatSrc() {
   return TASK_CHAT_JS_SRC.slice(start, end);
 }
 
-function makeOpenSavedChatSandbox({ apiResponse, apiRejects = false } = {}) {
-  const appendBubbleCalls = [];
-  const toasts = [];
-  const sandbox = {
-    urlKey: 'acme',
-    activeTask: '',
-    chatHistory: [],
-    idInput: { value: '' },
-    questionInput: { focus: () => {} },
-    transcript: new FakeElement('ol'),
-    activeLabel: { textContent: '' },
-    resetBtn: { classList: { remove: () => {} } },
-    setEmptyVisible: () => {},
-    updateSaveVisibility: () => {},
-    appendBubble: (role, text, state) => {
-      appendBubbleCalls.push({ role, text, state });
-      return { classList: { add: () => {} } };
-    },
-    window: {
-      api: () => (apiRejects ? Promise.reject(new Error('fail')) : Promise.resolve(apiResponse)),
-      ChatUI: { renderMarkdownText: () => {} },
-      toast: (msg, opts) => { toasts.push({ msg, opts }); },
-    },
-    console,
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(extractMaskFnSrc(), sandbox, { filename: 'task-chat.js-mask-slice' });
-  vm.runInContext(extractOpenSavedChatSrc(), sandbox, { filename: 'task-chat.js-open-saved-chat-slice' });
-  return { sandbox, appendBubbleCalls, toasts };
-}
-
-// One microtask-chain flush past window.api()'s .then/.catch — a Node
-// setImmediate (macrotask) runs strictly after every pending microtask, so
-// this is enough regardless of how many .then hops the resolved chain has.
-function flush() {
-  return new Promise((resolve) => setImmediate(resolve));
-}
-
-describe('openSavedChat (LIN-2483/LIN-2634) — resume never seeds the raw sentinel into idInput', () => {
-  test('a companion sentinel chat resumes with idInput EMPTY, while activeTask keeps the sentinel and the label reads the masked name', async () => {
-    const { sandbox } = makeOpenSavedChatSandbox({
-      apiResponse: { chat: { taskIdentifier: 'flight-companion', transcript: [{ role: 'assistant', content: 'Standing by.' }] } },
-    });
-    sandbox.openSavedChat('c1');
-    await flush();
-
-    assert.equal(sandbox.idInput.value, '', 'idInput must be left empty, never the raw sentinel');
-    assert.equal(sandbox.activeTask, 'flight-companion', 'activeTask must still carry the sentinel — the save path reads this');
-    assert.equal(sandbox.activeLabel.textContent, 'talking to Flight Companion');
-  });
-
-  test('an ordinary saved task chat still seeds idInput with the real identifier', async () => {
-    const { sandbox } = makeOpenSavedChatSandbox({
-      apiResponse: { chat: { taskIdentifier: 'TEST-1', transcript: [{ role: 'user', content: 'hi' }] } },
-    });
-    sandbox.openSavedChat('c2');
-    await flush();
-
-    assert.equal(sandbox.idInput.value, 'TEST-1');
-    assert.equal(sandbox.activeTask, 'TEST-1');
-    assert.equal(sandbox.activeLabel.textContent, 'talking to TEST-1');
-  });
-});
-
 // LIN-2483/LIN-2634 — send()'s label-rebuild mask, on the whole-function
-// slice + stubbed global fetch technique (correction 2): the harness parses
+// slice + never-settling fetch technique (correction 2): the harness parses
 // whole top-level statements between markers, so a partial-body slice up to
 // the label assignment (stopping short of the raw fetch call, the original
 // plan's technique) cannot parse. The label assignment runs synchronously
@@ -335,43 +100,280 @@ function extractSendSrc() {
   return TASK_CHAT_JS_SRC.slice(start, end);
 }
 
-function makeSendSandbox({ idValue, activeTask }) {
+// ─── Worlds ─────────────────────────────────────────────────────────────────
+// Each helper makes one loadWorld world with no public/ scripts (`scripts: []`),
+// runs the slices it needs into it, and hands back the world. The DOM the
+// slices touch is built from `world.document` (real nodes), so the assertions
+// read the tree the client actually wrote.
+
+const escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// A `<li>` shaped the way ChatUI.appendMessage renders a turn: a body span
+// (`.task-chat-msg-body`) and the `.chat-msg__who` pill setBubbleState looks up.
+function turnLi(doc) {
+  const li = doc.createElement('li');
+  const body = doc.createElement('span');
+  body.className = 'task-chat-msg-body';
+  li.appendChild(body);
+  return li;
+}
+
+// A bubble <li> with a pill in its in-progress state, carrying the
+// `.status-pill__char` glyph node setBubbleState rewrites.
+function pillLi(doc) {
+  const li = doc.createElement('li');
+  const pill = doc.createElement('span');
+  pill.className = 'status-pill chat-msg__who status-pill--in-progress';
+  const char = doc.createElement('span');
+  char.className = 'status-pill__char';
+  char.textContent = '◐';
+  pill.appendChild(char);
+  li.appendChild(pill);
+  return { li, pill, char };
+}
+
+function input(doc, value) {
+  const el = doc.createElement('input');
+  el.value = value;
+  return el;
+}
+
+// renderSavedRows only needs the list, the empty note, and escapeHtml.
+function savedRowsWorld() {
+  const world = loadWorld({ window: { escapeHtml }, scripts: [] });
+  const doc = world.document;
+  Object.assign(world.sandbox, {
+    savedList: doc.createElement('ul'),
+    savedEmpty: doc.createElement('div'),
+  });
+  world.run(extractRenderSavedRowsSrc());
+  return world;
+}
+
+// appendBubble: the ChatUI stub captures the opts handed to the shared helper,
+// which is where the speaker-pill label (`who`) is decided, and returns a turn
+// <li> built from the real fake.
+function bubbleWorld(activeTask) {
+  const captured = [];
+  let world;
+  world = loadWorld({
+    window: {
+      ChatUI: {
+        appendMessage: (_transcript, opts) => {
+          captured.push(opts);
+          return turnLi(world.document);
+        },
+      },
+    },
+    scripts: [],
+  });
+  Object.assign(world.sandbox, {
+    activeTask,
+    transcript: world.document.createElement('ol'),
+    setEmptyVisible: () => {},
+  });
+  world.run(extractMaskFnSrc());
+  world.run(extractAppendBubbleSrc());
+  return { world, sandbox: world.sandbox, captured };
+}
+
+function openSavedChatWorld({ apiResponse, apiRejects = false } = {}) {
   const appendBubbleCalls = [];
-  const sandbox = {
+  const toasts = [];
+  const world = loadWorld({
+    window: {
+      api: () => (apiRejects ? Promise.reject(new Error('fail')) : Promise.resolve(apiResponse)),
+      ChatUI: { renderMarkdownText: () => {} },
+      toast: (msg, opts) => { toasts.push({ msg, opts }); },
+    },
+    scripts: [],
+  });
+  const doc = world.document;
+  Object.assign(world.sandbox, {
+    urlKey: 'acme',
+    activeTask: '',
+    chatHistory: [],
+    idInput: input(doc, ''),
+    questionInput: doc.createElement('input'),
+    transcript: doc.createElement('ol'),
+    activeLabel: doc.createElement('span'),
+    resetBtn: doc.createElement('button'),
+    setEmptyVisible: () => {},
+    updateSaveVisibility: () => {},
+    appendBubble: (role, text, state) => {
+      appendBubbleCalls.push({ role, text, state });
+      return doc.createElement('span');
+    },
+  });
+  world.run(extractMaskFnSrc());
+  world.run(extractOpenSavedChatSrc());
+  return { world, sandbox: world.sandbox, appendBubbleCalls, toasts };
+}
+
+function sendWorld({ idValue, activeTask }) {
+  const appendBubbleCalls = [];
+  // A real, never-settling promise: send()'s .then()/.catch() chain registers
+  // callbacks that never run, so nothing downstream of the synchronous label
+  // assignment (readSSEStream, tool breadcrumbs, done/error handling) runs here.
+  const world = loadWorld({
+    scripts: [],
+    globals: { fetch: () => new Promise(() => {}) },
+  });
+  const doc = world.document;
+  Object.assign(world.sandbox, {
     streaming: false,
     propose: false,
-    idInput: { value: idValue, focus: () => {} },
-    questionInput: { value: 'a question', focus: () => {} },
+    idInput: input(doc, idValue),
+    questionInput: input(doc, 'a question'),
     activeTask,
     chatHistory: [],
-    transcript: new FakeElement('ol'),
-    activeLabel: { textContent: '' },
-    resetBtn: { classList: { remove: () => {} } },
+    transcript: doc.createElement('ol'),
+    activeLabel: doc.createElement('span'),
+    resetBtn: doc.createElement('button'),
     prefillTask: '',
     prefillSource: '',
     urlKey: 'acme',
     appendBubble: (role, text) => {
       appendBubbleCalls.push({ role, text });
-      return { classList: { add: () => {} }, closest: () => ({}) };
+      // send() reads `closest('li')` on the bubble, so the stub is a span inside a real <li>.
+      const li = doc.createElement('li');
+      const span = doc.createElement('span');
+      li.appendChild(span);
+      return span;
     },
     updateSaveVisibility: () => {},
     setBusy: () => {},
-    // A real, never-settling native Promise — send()'s .then()/.catch() chain
-    // registers callbacks that simply never run, so nothing downstream of the
-    // synchronous label assignment (readSSEStream, tool breadcrumbs, done/
-    // error handling) needs to exist in this sandbox.
-    fetch: () => new Promise(() => {}),
-    console,
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(extractMaskFnSrc(), sandbox, { filename: 'task-chat.js-mask-slice' });
-  vm.runInContext(extractSendSrc(), sandbox, { filename: 'task-chat.js-send-slice' });
-  return { sandbox, appendBubbleCalls };
+  });
+  world.run(extractMaskFnSrc());
+  world.run(extractSendSrc());
+  return { world, sandbox: world.sandbox, appendBubbleCalls };
 }
+
+describe('maskFlightCompanionSentinel (LIN-2437 A.11)', () => {
+  test('masks the bare sentinel to a readable label', () => {
+    const world = loadWorld({ scripts: [] });
+    world.run(extractMaskFnSrc());
+    assert.equal(world.sandbox.maskFlightCompanionSentinel('flight-companion'), 'Flight Companion');
+  });
+
+  test('masks the sentinel inside the auto-derived title fallback (the assistant-only-transcript leak)', () => {
+    const world = loadWorld({ scripts: [] });
+    world.run(extractMaskFnSrc());
+    assert.equal(
+      world.sandbox.maskFlightCompanionSentinel('Chat about flight-companion'),
+      'Chat about Flight Companion'
+    );
+  });
+
+  test('leaves a real task identifier untouched', () => {
+    const world = loadWorld({ scripts: [] });
+    world.run(extractMaskFnSrc());
+    assert.equal(world.sandbox.maskFlightCompanionSentinel('TEST-1'), 'TEST-1');
+  });
+
+  test('leaves a user-authored title untouched, even one that never mentions the sentinel', () => {
+    const world = loadWorld({ scripts: [] });
+    world.run(extractMaskFnSrc());
+    assert.equal(world.sandbox.maskFlightCompanionSentinel('Where do you stand?'), 'Where do you stand?');
+  });
+
+  test('is a defensive no-op on a non-string', () => {
+    const world = loadWorld({ scripts: [] });
+    world.run(extractMaskFnSrc());
+    assert.equal(world.sandbox.maskFlightCompanionSentinel(undefined), undefined);
+    assert.equal(world.sandbox.maskFlightCompanionSentinel(''), '');
+  });
+});
+
+describe('renderSavedRows (LIN-2437 A.11) — saved-row meta + title surfaces', () => {
+  test('a companion save (sentinel taskIdentifier, fallback title) renders both readable, never the raw sentinel', () => {
+    const world = savedRowsWorld();
+    const { savedList } = world.sandbox;
+    world.sandbox.renderSavedRows([
+      { id: 'c1', taskIdentifier: 'flight-companion', title: 'Chat about flight-companion', turnCount: 1 }
+    ]);
+
+    assert.equal(savedList.children.length, 1);
+    const li = savedList.children[0];
+    assert.equal(li.querySelector('.task-chat-saved-meta').textContent, 'Flight Companion',
+      'the meta chip reads the readable label');
+    assert.equal(li.querySelector('.task-chat-saved-title').textContent, 'Chat about Flight Companion',
+      'the fallback title reads the readable label');
+    assert.ok(!li.outerHTML.includes('flight-companion'), 'the raw sentinel must never reach the rendered row');
+  });
+
+  test('an ordinary task-chat save is unaffected', () => {
+    const world = savedRowsWorld();
+    const { savedList } = world.sandbox;
+    world.sandbox.renderSavedRows([
+      { id: 'c2', taskIdentifier: 'TEST-1', title: 'Where do you stand?', turnCount: 2 }
+    ]);
+
+    const li = savedList.children[0];
+    assert.equal(li.querySelector('.task-chat-saved-meta').textContent, 'TEST-1');
+    assert.equal(li.querySelector('.task-chat-saved-title').textContent, 'Where do you stand?');
+  });
+});
+
+describe('appendBubble (LIN-2437 A.11 review finding 1) — assistant bubble speaker pill', () => {
+  test('a resumed companion chat renders the readable label on the speaker pill, not the raw sentinel', () => {
+    // openSavedChat sets activeTask to the raw sentinel and THEN replays every
+    // stored turn through appendBubble — so on an assistant-only companion
+    // transcript this pill is the loudest surface, repeated once per bubble.
+    const { sandbox, captured } = bubbleWorld('flight-companion');
+    sandbox.appendBubble('assistant', 'Standing by.');
+
+    assert.equal(captured.length, 1);
+    assert.equal(captured[0].who, 'Flight Companion');
+    assert.ok(!String(captured[0].who).includes('flight-companion'), 'the raw sentinel must never reach the speaker pill');
+  });
+
+  test('an ordinary task chat still names the task on the pill', () => {
+    const { sandbox, captured } = bubbleWorld('TEST-1');
+    sandbox.appendBubble('assistant', 'Here is where I stand.');
+    assert.equal(captured[0].who, 'TEST-1');
+  });
+
+  test("the user's own turn is unaffected, and an empty activeTask still falls back to 'task'", () => {
+    const { sandbox, captured } = bubbleWorld('flight-companion');
+    sandbox.appendBubble('user', 'hello');
+    assert.equal(captured[0].who, 'you');
+
+    const empty = bubbleWorld('');
+    empty.sandbox.appendBubble('assistant', 'hi');
+    assert.equal(empty.captured[0].who, 'task', 'the || fallback must survive the mask being applied first');
+  });
+});
+
+describe('openSavedChat (LIN-2483/LIN-2634) — resume never seeds the raw sentinel into idInput', () => {
+  test('a companion sentinel chat resumes with idInput EMPTY, while activeTask keeps the sentinel and the label reads the masked name', async () => {
+    const { sandbox } = openSavedChatWorld({
+      apiResponse: { chat: { taskIdentifier: 'flight-companion', transcript: [{ role: 'assistant', content: 'Standing by.' }] } },
+    });
+    sandbox.openSavedChat('c1');
+    await flush();
+
+    assert.equal(sandbox.idInput.value, '', 'idInput must be left empty, never the raw sentinel');
+    assert.equal(sandbox.activeTask, 'flight-companion', 'activeTask must still carry the sentinel — the save path reads this');
+    assert.equal(sandbox.activeLabel.textContent, 'talking to Flight Companion');
+  });
+
+  test('an ordinary saved task chat still seeds idInput with the real identifier', async () => {
+    const { sandbox } = openSavedChatWorld({
+      apiResponse: { chat: { taskIdentifier: 'TEST-1', transcript: [{ role: 'user', content: 'hi' }] } },
+    });
+    sandbox.openSavedChat('c2');
+    await flush();
+
+    assert.equal(sandbox.idInput.value, 'TEST-1');
+    assert.equal(sandbox.activeTask, 'TEST-1');
+    assert.equal(sandbox.activeLabel.textContent, 'talking to TEST-1');
+  });
+});
 
 describe('send() (LIN-2483/LIN-2634) — the label rebuild never re-exposes the raw sentinel', () => {
   test('re-editing the id field back to the raw sentinel masks the label on the very next send', () => {
-    const { sandbox } = makeSendSandbox({ idValue: 'flight-companion', activeTask: '' });
+    const { sandbox } = sendWorld({ idValue: 'flight-companion', activeTask: '' });
     sandbox.send();
 
     assert.equal(sandbox.activeLabel.textContent, 'talking to Flight Companion');
@@ -379,7 +381,7 @@ describe('send() (LIN-2483/LIN-2634) — the label rebuild never re-exposes the 
   });
 
   test('an ordinary task id leaves the mask a no-op', () => {
-    const { sandbox } = makeSendSandbox({ idValue: 'TEST-1', activeTask: '' });
+    const { sandbox } = sendWorld({ idValue: 'TEST-1', activeTask: '' });
     sandbox.send();
 
     assert.equal(sandbox.activeLabel.textContent, 'talking to TEST-1');
@@ -389,7 +391,7 @@ describe('send() (LIN-2483/LIN-2634) — the label rebuild never re-exposes the 
     // activeTask already equals taskId (both real), so the switching branch
     // — and therefore the label rebuild — does not run at all here; this
     // pins that the mask fix didn't accidentally make the branch run always.
-    const { sandbox } = makeSendSandbox({ idValue: 'TEST-1', activeTask: 'TEST-1' });
+    const { sandbox } = sendWorld({ idValue: 'TEST-1', activeTask: 'TEST-1' });
     sandbox.send();
 
     assert.equal(sandbox.activeLabel.textContent, '', 'no switch happened, so the label is untouched by this send()');
@@ -398,7 +400,7 @@ describe('send() (LIN-2483/LIN-2634) — the label rebuild never re-exposes the 
 
 describe('appendBubble / setBubbleState (LIN-2445) — the assistant pill settles', () => {
   test('a live assistant turn still OPENS in-progress', () => {
-    const { sandbox, captured } = makeBubbleSandbox('TEST-1');
+    const { sandbox, captured } = bubbleWorld('TEST-1');
     sandbox.appendBubble('assistant', '');
     assert.equal(captured[0].whoState, 'in-progress');
   });
@@ -407,20 +409,20 @@ describe('appendBubble / setBubbleState (LIN-2445) — the assistant pill settle
     // openSavedChat replays stored turns, every one of which finished before it
     // was persisted. There is no completion moment to hook, so the state is
     // passed at append time instead of swapped afterwards.
-    const { sandbox, captured } = makeBubbleSandbox('TEST-1');
+    const { sandbox, captured } = bubbleWorld('TEST-1');
     sandbox.appendBubble('assistant', 'a stored answer', 'done');
     assert.equal(captured[0].whoState, 'done');
   });
 
   test("the user's turn takes no status state, with or without an explicit one", () => {
-    const { sandbox, captured } = makeBubbleSandbox('TEST-1');
+    const { sandbox, captured } = bubbleWorld('TEST-1');
     sandbox.appendBubble('user', 'a question', 'done');
     assert.equal(captured[0].whoState, undefined, 'the user pill stays a neutral tag chip');
   });
 
   test('setBubbleState swaps in-progress for the terminal state AND its glyph', () => {
-    const { sandbox } = makeBubbleSandbox('TEST-1');
-    const { li, pill, char } = makePillLi();
+    const { world, sandbox } = bubbleWorld('TEST-1');
+    const { li, pill, char } = pillLi(world.document);
 
     sandbox.setBubbleState(li, 'done');
 
@@ -432,8 +434,8 @@ describe('appendBubble / setBubbleState (LIN-2445) — the assistant pill settle
   });
 
   test('setBubbleState reaches the failed state too', () => {
-    const { sandbox } = makeBubbleSandbox('TEST-1');
-    const { li, pill, char } = makePillLi();
+    const { world, sandbox } = bubbleWorld('TEST-1');
+    const { li, pill, char } = pillLi(world.document);
 
     sandbox.setBubbleState(li, 'failed');
 
@@ -443,8 +445,15 @@ describe('appendBubble / setBubbleState (LIN-2445) — the assistant pill settle
   });
 
   test('setBubbleState is a defensive no-op on a missing li or a bubble with no pill', () => {
-    const { sandbox } = makeBubbleSandbox('TEST-1');
+    const { world, sandbox } = bubbleWorld('TEST-1');
     assert.doesNotThrow(() => sandbox.setBubbleState(null, 'done'));
-    assert.doesNotThrow(() => sandbox.setBubbleState({ querySelector: () => null }, 'done'));
+    assert.doesNotThrow(() => sandbox.setBubbleState(world.document.createElement('li'), 'done'));
   });
 });
+
+// One microtask-chain flush past window.api()'s .then/.catch — a Node
+// setImmediate (macrotask) runs strictly after every pending microtask, so
+// this is enough regardless of how many .then hops the resolved chain has.
+function flush() {
+  return new Promise((resolve) => setImmediate(resolve));
+}
