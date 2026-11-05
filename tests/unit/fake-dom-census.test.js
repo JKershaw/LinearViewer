@@ -49,7 +49,6 @@ const EXCLUDED = new Set(['tests/unit/helpers/fake-dom.js', SELF]);
  * never added to get past the census.
  */
 const HAND_WRITTEN_FAKE_DOM_FILES = [
-  'tests/unit/chart-helpers.test.js',
   'tests/unit/close-out-client.test.js',
   'tests/unit/common-assignee-filter-nav.test.js',
   'tests/unit/common-team-filter-nav.test.js',
@@ -77,7 +76,6 @@ const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/unit/question-card-task-bound.test.js',
   'tests/unit/run-limit-gating.test.js',
   'tests/unit/runner-link-surfaces.test.js',
-  'tests/unit/task-chat-flight-companion-sentinel-mask.test.js',
   'tests/unit/task-page-client.test.js',
   'tests/unit/task-page-link-client-surfaces.test.js',
   'tests/unit/task-page-question.test.js',
