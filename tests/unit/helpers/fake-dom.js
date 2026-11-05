@@ -15,7 +15,7 @@
  * `prompt-section-go.test.js` (LIN-4266), `prompt-section-preserve.test.js`, `prompt-section-recommend-url.test.js` and
  * `prompt-section-look-alike.test.js` (LIN-4268), `prompt-section-p0.test.js`, `prompt-section-run-quota.test.js` and
  * `prompt-section-runner-link.test.js` (LIN-4267), `prompt-section-task-mode.test.js` and `lin-4296-dispatch-reader.test.js`
- * (LIN-4296), `chat-append-options.test.js`, `chat-render-markdown-text.test.js`,
+ * (LIN-4296), `lin-3136-settings-take-predicate.test.js` and `lin-4296-scope-pick.test.js` (LIN-4296), `chat-append-options.test.js`,`chat-render-markdown-text.test.js`,
  * `chat-tool-rows.test.js`, `observation-basis-check.test.js` and `observation-bulk-scan.test.js` (LIN-4280), and
  * `lin-3833-copy-first-view.test.js`, `lin-3968-home-polish.test.js`, `lin-3975-task-run-control.test.js`,
  * `lin-4040-close-out.test.js`, `lin-4042-finished-no-run-to-pr.test.js`, `brief-recap-autogenerate.test.js`,
