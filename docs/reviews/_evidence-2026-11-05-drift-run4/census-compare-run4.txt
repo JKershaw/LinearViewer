@@ -1,0 +1,18 @@
+W counts {'groups': 566, 'mustRule': 105, 'table': 309, 'unranked': 0, 'gone': 1}
+prior counts {'groups': 566, 'mustRule': 105, 'table': 309, 'unranked': 0, 'gone': 1}
+W status Counter({'unchanged': 562, 'grown': 2, 'new': 1, 'shrunk': 1})
+W gone: [('G0119', "string set {'autopilot', 'blocked', 'breakdown', 'bug', 'close-out', 'context', +15} as table-keys [STAGE_LEADS, STAGE_L", ['lib/prompt-template-defs.js', 'lib/run-view.js', 'lib/wall-clock-summary.js'])]
+
+== groups whose status is not unchanged
+G0113 new table set | string set {'autopilot', 'blocked', 'breakdown', 'bug', 'close-out', 'context', +17} as table-keys [STAGE_LEADS, STAGE_LABELS, BUCKET_OF_KIN | ['lib/prompt-template-defs.js', 'lib/run-view.js', 'lib/wall-clock-summary.js']
+G0164 shrunk table clone | tiny rule copied as a helper (anonymous)(), 5 copies of 1-4 statements | ['public/dispatch.js', 'public/question-cards.js', 'public/session.js']
+G0166 grown table clone | tiny rule copied as a helper (anonymous)(), 6 copies of 1-4 statements | ['lib/connection-binding.js', 'lib/connection-credential.js', 'lib/connection-secondary-remint.js', 'routes/held-connection.js']
+G0173 grown - cmp | repeated comparison status == 'running' | ['public/prompt-section.js', 'public/task-page.js']
+
+== mustRule: left the set 0
+== mustRule: joined the set 0
+== mustRule kept (same detector/decision/files): 105 identical sites: 85 lines shifted: 20
+
+== table: left 1 ; joined 1
+ - set string set {'autopilot', 'blocked', 'breakdown', 'bug', 'close-out', 'context', +15} as table-keys [STAGE_LEADS, STAGE_LABELS, BUCKET_OF_KIN ('lib/prompt-template-defs.js', 'lib/run-view.js', 'lib/wall-clock-summary.js')
+ + set string set {'autopilot', 'blocked', 'breakdown', 'bug', 'close-out', 'context', +17} as table-keys [STAGE_LEADS, STAGE_LABELS, BUCKET_OF_KIN ('lib/prompt-template-defs.js', 'lib/run-view.js', 'lib/wall-clock-summary.js')
