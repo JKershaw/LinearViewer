@@ -113,9 +113,9 @@ describe('getPromptLabels', () => {
     assert.ok(labels.includes('retro'));
   });
 
-  test('has exactly 17 templates', () => {
+  test('has exactly 19 templates (LIN-4248: + survey-task, survey-place)', () => {
     const labels = getPromptLabels();
-    assert.strictEqual(labels.length, 17);
+    assert.strictEqual(labels.length, 19);
   });
 });
 
@@ -128,7 +128,7 @@ describe('defer recommend-meta action', () => {
     // The no-body cost contract is structural: defer has no PROMPT_TEMPLATES entry,
     // so it cannot produce a prompt and cannot inflate the template count.
     assert.ok(!('defer' in PROMPT_TEMPLATES), 'defer must not be a prompt template');
-    assert.strictEqual(getPromptLabels().length, 17, 'defer must not change the template count');
+    assert.strictEqual(getPromptLabels().length, 19, 'defer must not change the template count');
   });
 
   test('defer is registered in RECOMMEND_META_ACTIONS and the dispatch vocabulary', () => {
@@ -223,7 +223,7 @@ describe('current-state docs keep the prompt-template count in sync with PROMPT_
 
   const CURRENT_STATE_DOCS = [
     { file: 'docs/architecture/source-map.md', pattern: /Prompt template definitions \((\d+) templates\)/ },
-    { file: 'docs/executive-summary.md', pattern: /\| (\d+) prompt templates with `route`/ },
+    { file: 'docs/executive-summary.md', pattern: /\| (\d+) prompt templates \(\d+ with `route`/ },
     { file: 'content/landing.md', pattern: /(\d+) deterministic templates/ },
   ];
 
@@ -3490,6 +3490,7 @@ describe('grounding notes chosen per stage (LIN-3296)', () => {
     review: 'STC', 'close-out': 'STC',
     'look-into': 'S', context: 'S',
     'retrospective-audit': 'S', retro: 'S',
+    'survey-task': '', 'survey-place': '',
     triage: ''
   };
   const HEADINGS = {

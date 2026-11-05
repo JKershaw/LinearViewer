@@ -224,8 +224,9 @@ test.describe('Audit API', () => {
     expect(report.prompts).toHaveProperty('metaPrompt');
     expect(report.prompts).toHaveProperty('metaPromptCharCount');
     expect(report.prompts).toHaveProperty('totalCharCount');
-    expect(report.prompts.templateCount).toBe(17);
-    expect(report.prompts.templates).toHaveLength(17);
+    // LIN-4248: + survey-task, survey-place (hand-triggered, never routed)
+    expect(report.prompts.templateCount).toBe(19);
+    expect(report.prompts.templates).toHaveLength(19);
 
     // Verify template structure
     const firstTemplate = report.prompts.templates[0];

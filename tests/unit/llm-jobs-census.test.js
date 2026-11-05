@@ -391,8 +391,9 @@ describe('LIN-3852: every LLM use is a registered job', () => {
     assert.deepEqual(checkCensus(inputs), []);
   });
 
-  test('the registry has the 20 agent-session and 16 Harbour-call jobs of the design note', () => {
-    assert.equal(JOBS.filter((j) => j.surface === SURFACES.AGENT_SESSION).length, 20);
+  // LIN-4248: + survey-task, survey-place (agent sessions, hand-triggered, read-only).
+  test('the registry has the 22 agent-session and 16 Harbour-call jobs (20 of the design note, + the two Surveys)', () => {
+    assert.equal(JOBS.filter((j) => j.surface === SURFACES.AGENT_SESSION).length, 22);
     assert.equal(JOBS.filter((j) => j.surface === SURFACES.HARBOUR_CALL).length, 16);
   });
 

@@ -148,7 +148,7 @@ The planned feature — **follow-on prompts triggered by Claude Code** — would
 
 | Component | File | Role |
 |-----------|------|------|
-| Template definitions | `lib/prompt-template-defs.js` | 17 prompt templates with `route` and `completionSignals` |
+| Template definitions | `lib/prompt-template-defs.js` | 19 prompt templates (16 with `route`; `retro` and the two LIN-4248 Surveys have none) and `completionSignals` |
 | Template engine | `lib/prompt-templates.js` | `generatePrompt()` entry point, availability rules |
 | Formatting helpers | `lib/prompt-formatters.js` | Shared section formatters |
 | Routing prompt | `lib/stage-router.js` | AI decision tree for recommendation (picks the stage) |

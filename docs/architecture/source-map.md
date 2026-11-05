@@ -165,7 +165,7 @@ lib/
   prompt-formatters.js Shared formatting helpers for prompt templates
   prompt-contract.js   The stage contract (LIN-3292): the formats later steps parse, appended by code (finishStagePrompt) after every stage's body
   stage-router.js      The next-stage choice's own seam (LIN-3304): the stage selector every recommendation call sends (LIN-3300: SELECTOR_RULES + the stages' own `route` descriptions → buildRouterPrompt, pinned by tests/fixtures/stage-router-prompts/) and the reply parse/contract (routeStage/parseRouteDecision, plus parseRecommendedAction/parseDeferTo/parseWhyNow); getRecommendation/getRecommendationStream call the seam
-  prompt-template-defs.js  Prompt template definitions (17 templates), and STAGE_LEADS: each stage's Goal lead, the one intent source per stage (LIN-3299)
+  prompt-template-defs.js  Prompt template definitions (19 templates), and STAGE_LEADS: each stage's Goal lead, the one intent source per stage (LIN-3299)
   completion-signals.js  Completion signals for prompt assessment
   custom-prompts-store.js  Custom prompt template storage (per workspace)
   collective-characters-store.js  Collective character (persona) storage (LIN-1048): mirrors custom-prompts-store (Mongo/Mango, UUID, per-anchor-urlKey partition); each record carries its own repo binding (workspaceUrlKey, re-validated at dispatch, NO stored proxy token) + the five persona fields; two kinds — `custom` (capped 20, throw on overflow) and `recent` (auto-recorded per /start dispatch, rolling 10, evict-oldest, never throw); identity = binding+persona, so saving a recent promotes it to custom in place and a dispatched saved character is not double-listed
