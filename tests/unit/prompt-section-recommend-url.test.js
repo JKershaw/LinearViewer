@@ -2,82 +2,37 @@
 // `__ai__` branch) now threads `source` so a merged multi-binding swipe row resolves
 // recommend against its OWN binding rather than the active one.
 //
-// public/prompt-section.js is a plain browser script (assigns to `window`, not an ES
-// module), so it is evaluated in a vm sandbox against a minimal fake DOM — the same
-// house pattern tests/unit/brief-recap-autogenerate.test.js uses for public/brief.js
-// and public/recap.js. The marker-slice technique from
-// tests/unit/fetch-autopilot-kickoff-url.test.js does not transplant here: the fetch
-// under test lives inside `fetchPrompt`, a nested `async function` closing over
-// `init()`'s local state (issueId/opts/state/ac), and only `{ init, getCached }` is
-// exported — there is no standalone `window.X = async function` to slice out.
-//
-// The `__ai__` branch is a deliberate raw-`fetch()` SSE carve-out (documented inline
-// in the module), so `fetch` and `AbortController` are stubbed as TOP-LEVEL sandbox
-// globals (bare identifiers in the source), not as `window.fetch` — mirroring how
-// fetch-autopilot-kickoff-url.test.js supplies `URLSearchParams` at the top level for
-// the same reason.
+// The client runs in the shared client world (tests/unit/helpers/client-world.js): the one fake DOM and one vm
+// sandbox. The `__ai__` press is `container.click`, which needs the ✦ next-step button to be drawn, as a browser
+// needs it. The recommend-stream fetch is the network boundary, so it is recorded as a stub; `fetch` and
+// `AbortController` are sandbox globals (bare identifiers in the source), not `window.fetch`, because the `__ai__`
+// branch is a deliberate raw-`fetch()` SSE carve-out.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import vm from 'node:vm';
+import { loadWorld } from './helpers/client-world.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
-
-// Minimal fake container: only what init()/applyState()/handleClick() touch on the
-// idle → generating → error path this test drives (the __ai__ branch's fetch stub
-// resolves `{ ok: false }`, short-circuiting before handleStreamingResponse's
-// ReadableStream parsing, so no streaming body needs modelling).
-function makeContainer() {
-  return {
-    innerHTML: '',
-    classList: { add() {}, remove() {}, contains() { return false; } },
-    setAttribute() {},
-    getAttribute() { return null; },
-    querySelector() { return null; },
-    contains() { return true; },
-    _clickHandler: null,
-    addEventListener(type, fn) { if (type === 'click') this._clickHandler = fn; },
-    removeEventListener() {},
-    // Drives the real delegated handleClick() with a synthetic event whose
-    // target.closest(...) resolves to a button carrying data-prompt=<label>,
-    // mirroring the real button markup renderPicker() emits.
-    async clickPrompt(label) {
-      const btn = { dataset: { prompt: label }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
-      await this._clickHandler({ target: btn });
-    },
-  };
-}
-
-// Loads the real public/prompt-section.js into a fresh vm sandbox. `fetchImpl` is
-// mutable per-test via the returned setter; `calls` records every fetch request URL.
+// The `__ai__` fetch resolves `{ ok: false }`, which short-circuits before the stream body is read: no ReadableStream
+// needs modelling. The timers run at once (the original harness's `setTimeout` was a no-op: nothing timed out).
 function loadPromptSection() {
   const calls = [];
-  let fetchImpl = async () => ({ ok: false, json: async () => ({}) });
-  const window = {
-    escapeHtml: (s) => (s == null ? '' : String(s)),
-    stripCodeBlockWrapper: (s) => s,
-    renderMarkdown: (s) => String(s == null ? '' : s),
-  };
-  const sandbox = {
-    window,
-    AbortController,
-    URLSearchParams,
-    fetch: async (url, opts) => {
-      calls.push({ url, opts });
-      return fetchImpl(url, opts);
+  const world = loadWorld({
+    window: {
+      escapeHtml: (s) => (s == null ? '' : String(s)),
+      stripCodeBlockWrapper: (s) => s,
+      renderMarkdown: (s) => String(s == null ? '' : s),
     },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(SRC, sandbox);
-  return {
-    PromptSection: window.PromptSection,
-    calls,
-    setFetchImpl: (fn) => { fetchImpl = fn; },
-  };
+    scripts: ['prompt-section.js'],
+    globals: {
+      fetch: async (url, opts) => {
+        calls.push({ url, opts });
+        return { ok: false, json: async () => ({}) };
+      },
+      setTimeout: () => 1,
+      clearTimeout: () => {},
+    },
+  });
+  return { PromptSection: world.PromptSection, makeContainer: world.makeContainer, calls };
 }
 
 function baseOpts(issue) {
@@ -98,24 +53,24 @@ function baseOpts(issue) {
 
 describe('recommend-stream URL construction (LIN-2046)', () => {
   test('opts.issue.source present -> URL carries ?source=<provider>', async () => {
-    const { PromptSection, calls } = loadPromptSection();
+    const { PromptSection, makeContainer, calls } = loadPromptSection();
     const container = makeContainer();
     const issue = { id: 'issue-1', identifier: 'JIRA-1', source: 'jira' };
 
     PromptSection.init(container, baseOpts(issue));
-    await container.clickPrompt('__ai__');
+    await container.click({ prompt: '__ai__' });
 
     assert.equal(calls.length, 1);
     assert.equal(calls[0].url, '/workspace/ws/api/recommend/issue-1/stream?source=jira');
   });
 
   test('opts.issue.source absent -> URL unchanged, no query string', async () => {
-    const { PromptSection, calls } = loadPromptSection();
+    const { PromptSection, makeContainer, calls } = loadPromptSection();
     const container = makeContainer();
     const issue = { id: 'issue-2', identifier: 'LIN-2' };
 
     PromptSection.init(container, baseOpts(issue));
-    await container.clickPrompt('__ai__');
+    await container.click({ prompt: '__ai__' });
 
     assert.equal(calls.length, 1);
     assert.equal(calls[0].url, '/workspace/ws/api/recommend/issue-2/stream');
