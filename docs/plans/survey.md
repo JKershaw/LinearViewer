@@ -2,13 +2,15 @@
 
 *Working document, started 2 November 2026 by John Kershaw and Claude. It records what we know, what we think, and the spikes we plan. It is updated as the spikes run, and it is a reference, not a spec.*
 
+> **Where it stands (5 November).** The spikes below have run, and the Survey has grown into a loop: two read-only voices before work (open-0 for the task, a code-only global for the place), a scope call by the person, the build, and a place reading plus the builder's after-questions at merge. Over 4–5 November the place ledger went from 1 better / 1 mixed / 3 neutral / 4 worse (the baseline) to 17 better / 3 mixed / 1 neutral / 0 worse through the loop. The current picture is `survey/notes-2026-11-05.md`; the record is `survey/log.md`, `survey/place-ledger.md` and `survey/broad-options.md`; the prompts are `survey/prompt.md`. The next step is moving the two Survey voices into Harbour as stages that are triggered by hand. The rest of this document is the plan as it was written, kept for reference: its menu-based Survey was replaced by the open question, and its "What it reads" by the code alone.
+
 ## Why this exists
 
 Harbour runs coding agents over tickets, and it does the ticket well: requests survive, and about 95% of asks are delivered as written. But a codebase is a place, and nobody lives in it. Each stage answers to its ticket, so the condition of the code that tickets land in belongs to no one. The code only grows: since 1 September there have been 965 commits and +78,900 lines, and about 100 of those commits shrink the code, nearly all of them from tickets whose job was removal. Every later change pays to push through what the earlier ones left.
 
 The aim is to have Harbour bring codebases **toward settled**, its own included. Settled is a balance, not smallness: the code's size tracks what the product does rather than its history. John's image for it is a marble beacon on a trig point. It is not a destination. It is the fixed point every change is surveyed from, and a change moves the place either toward settled or away from it.
 
-The long argument is the essay `docs/papers/harbour/tasks-are-tasks.md` (v4 is live; v5, LIN-4149, is in flight). The evidence behind it is `docs/reviews/_evidence-2026-11-02-ticket-intent/investigation-notes.md`. A handoff for continuing the discussion is in the same folder.
+The long argument is the essay `docs/papers/harbour/tasks-are-tasks.md` (v5, LIN-4149, merged 2 November). The evidence behind it is `docs/reviews/_evidence-2026-11-02-ticket-intent/investigation-notes.md`. A handoff for continuing the discussion is in the same folder.
 
 ## What we know (from the record)
 

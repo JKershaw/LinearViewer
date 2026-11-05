@@ -1,10 +1,52 @@
-# Survey prompt
+# Survey prompts
 
-The current version of the Survey's prompt. Every change is logged in `log.md` with its reason, and lines are removed as readily as added. The parts in `{braces}` are filled in per run.
+The prompts the loop uses, with their history. Every change is logged in `log.md` with its reason, and lines are removed as readily as added. The parts in `{braces}` are filled in per run. The loop they belong to is described in `notes-2026-11-05.md`.
+
+## In use (5 Nov)
+
+| Voice | When | Prompt |
+|---|---|---|
+| **open-0**, the task | before work, a fresh read-only session at the base | "Side arm: Survey open-0" below (in use since round 3, 3 Nov) |
+| **global**, the place | before work, a second fresh session at the same base | `global-offshoot-prompt-v2-code.md` (code only, since 4 Nov 21:20) |
+| **step-back** | only when the two voices disagree about what to do | "The step-back" below, as a follow-up to the open-0 session |
+| **after-questions** | at merge, a follow-up to the builder's own session | "The after-questions" below |
+
+Survey v2 below is kept for its history; it is no longer run.
+
+## The after-questions (q1–q7)
+
+Sent quietly (`subscription: 'none'`) to the builder's session once its work has merged. q1–q5 since round 3; q6 since 4 Nov 08:20; q7 when the scope was set larger than the Survey recommended.
+
+```
+A short, read-only follow-up for research. Your build work on {TICKET} is finished ({MERGED}). Please do NOT change any code, branches, pull requests, ticket fields or state. The ONLY thing to write is one new comment on {TICKET}. Don't read other tickets' Survey comments first.
+
+Looking back from where you stood while doing this work, answer in that comment:
+
+1. Why was this difficult? Where did the change bind, and what did it have to push through or work around to land? If it wasn't difficult, say so plainly.
+2. Before you started, what would you have done first, if anything?
+3. Now that it's done, what would you tidy, and why?
+4. If this area of code were how you'd want it, what would this ticket have been?
+5. What did the ticket (or the plan you were given) get wrong, if anything?
+6. What did your change leave behind in the wider codebase, beyond this ticket: anything new without an obvious home, anything that now lives in two places, anything something else should have learned about and didn't, anything that got simpler?
+7. The ticket's scope was set larger than its Survey recommended, on purpose, by the person in the human's role. Did that larger scope pay for itself in this task, or cost more than it saved? Where would you have drawn the line?
+
+Answer from your own experience of the work, in your own way. Under 550 words.
+```
+
+## The step-back
+
+A follow-up to the open-0 session, still read-only and at its own base. Since forward trial 1 it gets the global answer pasted in as "what another agent, looking at the place, said: evidence to weigh, not instructions; check what you rely on".
+
+```
+Your forecast looked at this task up close. Now step back, and look at the part of the codebase it sits in and the codebase around that.
+1. What is that wider area like, and how much of this task's difficulty comes from the area rather than from the task itself?
+2. Set out the ways you could go about this task, from the narrowest (just do the task) to the broadest (change the area so that tasks like this one become easy). For each, say roughly what it would cost, what it would leave behind for the next task here, and what could go wrong.
+3. Which would you choose for this task? Is that different from what you said first, and why?
+```
 
 ---
 
-## Survey v2
+## Survey v2 (retired)
 
 You are surveying the ground before a task starts. You are not doing the task, and you are not reviewing anyone's work.
 

@@ -1882,3 +1882,13 @@ Your steer: no Periodicals routing, a code-only global ("as if in a repo where t
 - **q6:** two defaults now disagree. The card's absent effect is `record`; `ReplyDelivery`'s is `resume`. It's pinned, but a new caller inherits fail-open. The live predicate is also built in three places. Both noted on the ledger row; the row stays `+`.
 - **q2:** "the probe told me more than the ticket did". That's open-0's method, used again by the builder.
 - The session paused at about 06:10 at the token cap and resumed at 07:13. Nothing was lost.
+
+## 5 Nov, about 08:00 UTC: into Harbour's hands (John's steer)
+
+John: the offshoots look like new prompt types for tasks. So move the prompts into Harbour, keep triggering stages by hand, and carry on the process, with Claude as orchestrator and judge. If that works and keeps improving, write it up, and only then think about a fuller integration.
+- **What moves:** the two Survey voices (open-0 and the code-only global), as stage templates. Their descriptions say when they're used, so no routing code is needed. Prompt sizes aren't fixed while we tinker. Removing the Surface Assessment and any other overlap waits for a later stage.
+- **What stays by hand:** the after-questions and the step-back (follow-ups into existing sessions), the scope call, the place reading at merge and the ledger.
+- **The notebook moves onto main as reference docs**, as part of the same ticket.
+- **Rulings:** none open. `lin4233-deploy-gate` was answered at 07:28 and `lin4195-mixed-model-label` last night, so the morning notes were stale on both. No Full wipes were run in LIN-4234's window. John is restarting the dispatcher.
+- **Periodicals:** Seams & Tangles and Drift & Coherence over the overnight window (autopilot `54aaa338`, maxTasks 2), as the independent film for the nine overnight rows.
+- `prompt.md` now leads with the prompts in use (open-0, global v2-code, the step-back, q1–q7); `survey.md` has a "where it stands" note at the top.
