@@ -14,7 +14,7 @@ import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { badRequest, jsonError } from '../lib/errors.js';
 import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.js';
 import { refuseCapability } from './workspace-api-steps.js';
-import { generatePrompt } from '../lib/prompt-templates.js';
+import { generatePrompt, stageWrites } from '../lib/prompt-templates.js';
 import { PRIORITY_OPTION_LABELS } from '../lib/render.js';
 import { attachProxyContext, isCodedGrantRefusal, codedGrantRefusalResponse } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff } from '../lib/prompts/autopilot-kickoff.js';
@@ -263,9 +263,12 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
         runGate: overrides.runGate || null,
         model: overrides.model,
         harness: overrides.harness,
-        finalizePrompt: (harness) => attachProxyContext(
-          feedbackProxyContext({ workspace, issue, baseUrl, session, harness, prompt: basePrompt, label: 'feedback-triage' })
-        ),
+        // LIN-4251: the stage's `writes`, resolved from the kind the factory dispatches (`triage`:
+        // ticket-fields). Without it this entrance kept the work block's PR mandate.
+        finalizePrompt: (harness, kind) => attachProxyContext({
+          ...feedbackProxyContext({ workspace, issue, baseUrl, session, harness, prompt: basePrompt, label: 'feedback-triage' }),
+          writes: stageWrites(kind)
+        }),
         fields: {
           promptName: 'Triage',
           issueId: issue.id || null,
@@ -326,8 +329,10 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
         runGate: overrides.runGate || null,
         model: overrides.model,
         harness: overrides.harness,
-        finalizePrompt: (harness) => attachProxyContext({
+        finalizePrompt: (harness, kind) => attachProxyContext({
           ...feedbackProxyContext({ workspace, issue, baseUrl, session, harness, prompt: kickoff, label: 'feedback-autopilot' }),
+          // LIN-4251: the same helper as the triage twin (`autopilot` has no template: work).
+          writes: stageWrites(kind),
           // LIN-3136 M4: an orchestrator launch, owner-checked for this session.
           declaredGrants: ['dispatch'],
           declaredSite: 'M4',
