@@ -1950,3 +1950,15 @@ The plan for now is unchanged: finish LIN-4248, read blind passes C and D, try t
 - **The scorers agree with each other on 20 of 28 rows exactly, and with me on 13.** Their disagreements are better ↔ mixed only. My balance column is the outlier, which settles what the morning's question was asking: the ledger's tipping point was my scoring.
 - **What both blind passes rate better:** deletions, a tidy as its own task, a tidy-after as its own ticket, and features whose change removed a second path. Capability-adding features land mixed or worse. That fits John's reading: the Survey has been a research step, and the needle moves when the clean-up is its own task.
 - **From now on, the at-merge balance is a blind read** (two passes where it matters). My reading stays for the copies and the at-merge checks.
+
+### 09:40 UTC: LIN-4248 merged, the stages tried live, and a pause
+- **LIN-4248 merged** (`29f14bf6e`, deployed 09:13). Every item on its at-merge list was met: the router's byte-pinned fixtures are unchanged and it refuses both kinds, every guarded per-kind table and the docs counts are updated, and the notebook is on main with the prompt docs pointing at the templates.
+  - **Both blind reads: mixed.** "Survey" has no single owner (two name lists, the read-only rule in three places), and two unguarded lists were missed.
+  - This is the morning's pattern on a fresh row: a careful capability change that follows the registry pattern without reducing it. The clean-up it bound on (one flag per template) would have made it one object.
+- **The stages work through Harbour.** `survey-task` and `survey-place` were dispatched by kind (`recommend-and-dispatch`, `noDescend`) on LIN-4246, about two minutes each.
+  - Each was read-only, stood at the base it resolved (`29f14bf6e`), posted on the surveyed ticket and stayed under its word limit.
+  - Both converged on a **stale premise**: the witness LIN-4246 asks for landed with LIN-4242's review fix. The real gap is the "same ruling, no input, so replaced" case, plus a call-site witness that needs a fake DOM the unit tests don't have.
+  - One friction: the place stage said "the workspace's simple-dispatcher repo has no `keepTypedQuestion`", so it started in the wrong repo and found its way. The stage doesn't know which repo a ticket is in.
+- **Seams run 7** agrees with the overnight map column and adds LIN-4243's four new `window` globals. Drift run 3 (LIN-4250) is still running.
+- After-questions sent to LIN-4248's builder (`8a238b09`).
+- **Pause here, as agreed with John,** to choose what to run through the new process next.

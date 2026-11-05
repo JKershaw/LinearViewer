@@ -125,3 +125,11 @@ A second independent blind pass (batches C and D, reshuffled with seed 1105) is 
 - **Rows both passes rate better:** LIN-4168, LIN-4173, LIN-4179 (baseline), and LIN-4203, LIN-4218, LIN-4234, LIN-4151, LIN-4143 (forward). **Worse in both:** LIN-4241. **Neutral in both:** LIN-4048. LIN-4212 (unsurveyed) is worse, then "mixed, leans worse".
 - **What the forward rows rated better have in common:** a deletion (LIN-4203), a priced tally row done as its own task (LIN-4218), a tidy-after as its own ticket (LIN-4234), and two features whose change *was* removing a second path or a flag (LIN-4151, LIN-4143). The ordinary features that added a capability (LIN-4241, LIN-4242, LIN-4243, LIN-4048) are mixed, neutral or worse.
 - **From here, the balance column is the blind read.** My column stays as history.
+
+## Forward rows from 5 Nov (balance = the blind read)
+
+| Ticket | Map | Copies (blind reads E, F and mine) | Carried | Balance (blind) |
+|---|---|---|---|---|
+| LIN-4248 (the Survey as two hand-triggered stages; notebook to main) | not re-read yet | each template's text has one owner; the exclusion reuses the existing set; every per-kind table guarded by a test learned both kinds, and the docs counts are right. But "survey" has no single owner: `SURVEY_KINDS` (read-only) beside `EXCLUDED_FROM_AI_RECOMMENDATION` (hand-only), the read-only rule written in three places, and the literals copied in three test files. Two unguarded lists missed: `pipeline-churn.js FIRST_PASS_KINDS` and `workflow-config.js VIRTUAL_PROMPTS` (both already miss other kinds) | the scope's at-merge list; nothing routed | **mixed, mixed.** It followed the per-kind registry pattern carefully and didn't reduce it. The tidy it bound on (one flag per template, read by the router, "Another step" and the preamble) is the tally row named this morning |
+
+**Seams run 7 (LIN-4249, `d7ceb373..2eb73ae0`) as a check on the overnight rows:** the catch-all grew 14 → 16 from `ruling-settled.js` (LIN-4241) and `waiting-section.js` (LIN-4242), and Pages ↔ Other grew 8/6 → 9/8, all from that placement. F1 grew +1 from LIN-4226. The browser seam grew by four new `window` globals and one wrapper (LIN-4243's half), which no row named. No knot opened or closed. That agrees with the map column of those rows. No follow-ups were minted.
