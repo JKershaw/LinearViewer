@@ -34,16 +34,17 @@ c55f0fb3 2026-11-04T19:24:56Z LIN-4226: the cost read loads its request records 
 - 2eb73ae0: named lib imports 96, unused 45
 
 ## S4. F6 browser globals and the cost-format script lists
-- d7ceb373: window.X = in public/ 100; in public/common.js 52 (strict =[^=] 48); /cost-format.js script-list lines 6: lib/render-flight-companion.js, lib/render-observation.js, lib/render-swipe.js, lib/render-task-page.js, lib/render-workspace-kpis.js, lib/render.js
-- 2eb73ae0: window.X = in public/ 107; in public/common.js 55 (strict =[^=] 51); /cost-format.js script-list lines 6: lib/render-flight-companion.js, lib/render-observation.js, lib/render-swipe.js, lib/render-task-page.js, lib/render-workspace-kpis.js, lib/render.js
+- d7ceb373: window.X = in public/ 100; in public/common.js 52 (strict =[^=] 48); assignments only in public/ 61; /cost-format.js script-list lines 6: lib/render-flight-companion.js, lib/render-observation.js, lib/render-swipe.js, lib/render-task-page.js, lib/render-workspace-kpis.js, lib/render.js
+- 2eb73ae0: window.X = in public/ 107; in public/common.js 55 (strict =[^=] 51); assignments only in public/ 66; /cost-format.js script-list lines 6: lib/render-flight-companion.js, lib/render-observation.js, lib/render-swipe.js, lib/render-task-page.js, lib/render-workspace-kpis.js, lib/render.js
 - public/ files changed in window: 6: public/app.js, public/common.js, public/home-placement.js, public/llms.txt, public/prompt-section.js, public/question-cards.js
-- window.X = lines added or removed in the window, by file:
-    public/app.js: +  window.refreshWaitingOnYou = refreshWaitingOnYou
-    public/app.js: +  if (typeof window.onRulingsTick === 'function') window.onRulingsTick(() => refreshWaitingOnYou())
-    public/app.js: +      dispatchesInFlight: typeof window.dispatchesInFlight === 'function' ? window.dispatchesInFlight() : 0,
-    public/common.js: +  window.dispatchPrompt = function dispatchPrompt(opts) {
-    public/common.js: +  window.dispatchesInFlight = () => inFlight;
-    public/home-placement.js: +  if (typeof window !== 'undefined') window.HomePlacement = api;
+- window.X = lines added or removed in the window, by file (A = assignment, R = a read the loose pattern also matches):
+    A public/app.js: +  window.refreshWaitingOnYou = refreshWaitingOnYou
+    R public/app.js: +  if (typeof window.onRulingsTick === 'function') window.onRulingsTick(() => refreshWaitingOnYou())
+    R public/app.js: +      dispatchesInFlight: typeof window.dispatchesInFlight === 'function' ? window.dispatchesInFlight() : 0,
+    A public/common.js: +  window.dispatchPrompt = function dispatchPrompt(opts) {
+    A public/common.js: +  window.dispatchesInFlight = () => inFlight;
+    A public/common.js: +window.onRulingsTick = function onRulingsTick(fn) {
+    A public/home-placement.js: +  if (typeof window !== 'undefined') window.HomePlacement = api;
 
 ## S5. N8: the deleted task-cost module still named
 - d7ceb373: guide alias task-cost| present=True; comment refs 2

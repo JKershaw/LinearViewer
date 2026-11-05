@@ -10,7 +10,7 @@ Review-only. The only changes are this report and `docs/reviews/_evidence-2026-1
 - **F1 grew +1 by code (30/37 → 31/37).** `model-routing-history` now calls the cost read directly. This is the one real change at area level.
 - **The catch-all grew 14 → 16, and Pages ↔ Other grew 8/6 → 9/8.** Both come from two new files that no guide pattern names. A labelled experiment that places just those two files removes the Pages ↔ Other growth completely (§2, §7). This is a guide gap, not a tangle.
 - **The costs rebuild is finished.** LIN-4195 and all nine of its pieces are Done. Run 6 deferred F1, N6 and N10 because the cost code was "still moving". That reason has expired, and the cost-area decision can now be measured (§7 P2). It goes to LIN-4193 as a comment, not a new ticket.
-- **The Home/task-page seam has one way in** on each side: one ruling read and one renderer on the server; one tick, one keyed merge and one placement policy in the browser (§4). The browser half adds 7 `window.X` globals (F6).
+- **The Home/task-page seam has one way in** on each side: one ruling read and one renderer on the server; one tick, one keyed merge and one placement policy in the browser (§4). The browser half adds 4 new `window.X` globals and wraps a fifth, `window.dispatchPrompt`, on every page (F6; corrected after the second-read, §10).
 - **A correction to run 6:** its change-coupling "top 10" table carried run 5's set of pairs. At `d7ceb373` the real top ten included Runs + Wiring (81) and Pages + Wiring (79) (§6).
 - **No follow-ups are minted** (§9).
 
@@ -37,7 +37,7 @@ Review-only. The only changes are this report and `docs/reviews/_evidence-2026-1
 2. **The catch-all grew 14 → 16 by code.** `lib/waiting-section.js` and `lib/ruling-settled.js` fall through to "Other features" (E/compare-run7.md:48-51). Neither is a wrong-way edge; each is a file with an obvious home that the guide does not name (N1).
 3. **Pages ↔ Other grew 8/6 → 9/8, entirely by placement.** `waiting-section.js` is a page renderer. `lib/render.js` imports it, and it imports `question-card.js` and `task-page-href.js`, both Pages files. One intra-Pages edge (`render.js → question-card.js`) became three cross-area edges. Placing the file in Pages (P7min) gives 8/6 at both commits (E/guide-experiments.txt).
 4. **The cost read's importers grew 5 → 7 cross-area, still from 4 areas.** The new ones are `lib/kpi-stats.js:47` (Reports) and `lib/model-routing-history.js:12` (LLM) (E/supplementary-figures.txt §S16). This is the number run 6 predicted for PR #2275.
-5. **The browser seam grew.** `window.X =` lines went 100 → 107 in `public/`, and 52 → 55 in `public/common.js`. `public/home-placement.js` is new (F6; E/supplementary-figures.txt §S4).
+5. **The browser seam grew.** `window.X` assignments in `public/` went 61 → 66 (+5): 4 new globals and 1 wrapper of an existing one. The series count, which uses run 6's looser pattern, went 100 → 107; that pattern also counts two `typeof window.X === …` reads (§10). `public/home-placement.js` is new (F6; E/supplementary-figures.txt §S4).
 6. **Wiring.** `server.js` gained one import (`:167`) and one inline route (`:3738`, `/api/home-waiting`). Wiring → Other went 8 → 9 (E/supplementary-figures.txt §S18).
 7. **In-flight work closed.** LIN-4195 is Done and all its pieces are Done (LIN-4226 last, `c55f0fb3`). PR #2275 merged. PR #2185 is still open and untouched since 2026-10-30 (E/external-state-2026-11-05.txt).
 8. **Correction to run 6** (§6): its change-coupling "top 10" label.
@@ -99,15 +99,16 @@ F1 stays first: it is the High knot and the only pair that grew by code. F6 is s
 - **Reading.** F1's cost half is the cost family spread across LLM and Runs (N10). The costs rebuild is finished (LIN-4195 Done), so this is no longer a moving target. The decision it waits on is where the cost modules live, which is a guide decision that LIN-4193 owns (§7 P2, §9).
 - **Survey.** `place-ledger.md:35` (LIN-4226 row: "LLM↔Runs (F1) +1") agrees (E/supplementary-figures.txt §S14).
 
-### F6 — `knot:browser-window-globals(common.js)` · **Medium** · **worsened (100 → 107)**
+### F6 — `knot:browser-window-globals(common.js)` · **Medium** · **worsened (+5 assignments: 61 → 66; series 100 → 107)**
 
-- `window.X =` lines: 100 → **107** in `public/`, and 52 → **55** in `public/common.js` (48 → 51 with the strict pattern) (E/supplementary-figures.txt §S4).
-- **The new globals** (LIN-4241, 4242, 4243):
-  - `window.HomePlacement` (`public/home-placement.js:120`);
-  - `window.onRulingsTick` (`public/common.js:3116`);
-  - `window.dispatchesInFlight` (`public/common.js:934`);
-  - `window.refreshWaitingOnYou` (`public/app.js:653`);
-  - a second `window.dispatchPrompt` assignment in `common.js`.
+- **Assignments only:** 61 → **66** in `public/`, and 48 → **51** in `public/common.js` (E/supplementary-figures.txt §S4).
+- **The series count** keeps run 6's pattern so the trend compares: 100 → **107** in `public/`, 52 → **55** in `public/common.js`. That pattern also matches two of the added lines that are reads, not assignments: `typeof window.onRulingsTick === 'function'` (`public/app.js:654`) and `typeof window.dispatchesInFlight === 'function'` (`public/app.js:719`). The draft of this report read the +7 as "7 globals". The second-read corrected it (§10).
+- **The five assignments** (LIN-4242, 4243):
+  - `window.HomePlacement` (`public/home-placement.js:120`), new;
+  - `window.onRulingsTick` (`public/common.js:3116`), new;
+  - `window.dispatchesInFlight` (`public/common.js:934`), new;
+  - `window.refreshWaitingOnYou` (`public/app.js:653`), new;
+  - `window.dispatchPrompt`, **re-assigned as a wrapper** (`public/common.js:925-935`). It wraps the global defined at `:833` to count dispatches in flight for Home's placement policy. That changes the shared dispatch entry point on every page that loads `common.js`, not only Home. This is the most invasive of the five: a page-specific concern hooked into a cross-page global by replacing it.
 - **The new file is reached only through a global.** `public/home-placement.js` has no import edges either way (E/compare-run7.md:76-80). How it was read instead is in §4.
 - `/cost-format.js` is still in 6 script lists.
 - **Change coupling.** The browser-code pairs are still the largest pairs with no import link (§6). 6 of the window's 9 production commits touched `public/`, 5 of them a script (E/supplementary-figures.txt §S12).
@@ -165,6 +166,8 @@ F1 stays first: it is the High knot and the only pair that grew by code. F6 is s
 ### N11 — `door:home-waiting(one reduction, one renderer)` · **healthy, Low** · **new**
 
 The way into Home's live Waiting section (§4). Recorded so the next run can tell whether it stays one door.
+
+- **One instance today, two ways to build it** (from the second-read, §10). `createHomeRowStates` builds its own `createWaitingStanding` by default when none is passed (`lib/home-row-states.js:112`). `server.js:3313-3319` passes the shared one, so production has one instance. The default is a second construction path, which a future caller could take without noticing.
 
 ### N9 — `door:request-usage-loader` · **healthy, Low** · **unchanged in count; now required**
 
@@ -273,7 +276,7 @@ None of these is a code move, and none is enforced by a test, check or count. P1
   Measured: the catch-all is 0, links go 1249 → 1256, there are 12 pairs, and the group has 8 areas at both commits. The three Other pairs become Pages ↔ Task model (5/2), Runs ↔ Task model (4/3) and LLM ↔ Task model (2/1), and Pages ↔ Runs becomes 15/8. F1 is the only pair that moves. P1d leaves the wrong-way code where it is.
 
   Note LIN-4235 (Backlog): it deletes the legacy `[usage]` snapshot fold after 2026-12-04, which may make `usage-snapshot-intake`'s placement moot.
-- **P7min — place the window's two new files only (measured).** `waiting-section` to Pages, beside `question-card` and `task-page-href`. `ruling-settled` to Runs, beside the rulings stores. This is the smallest edit that stops the window's growth showing as a knot: Pages ↔ Other is 8/6 and the catch-all 14 at both commits.
+- **P7min — place the window's two new files only (measured).** `waiting-section` to Pages, beside `question-card` and `task-page-href`. `ruling-settled` to Runs, beside the rulings stores. This is the smallest edit that stops the window's growth showing as a knot: Pages ↔ Other is 8/6 and the catch-all 14 at both commits. The second-read (§10) notes another reasonable home for `ruling-settled`: it is an HTTP 409 reply shape used only by routes, so Platform, beside `errors.js`, fits as well. Either choice keeps the knot at 8/6, because the file has no imports.
 - **P1c — hygiene in the same edit (still stands).** Drop the dead `task-cost|` alias (N8). Narrow `workspace-(?!kpi-stats\.js)[^/]*` to the Auth files it means, and move `workspace-api-mocks.js` to Web routes.
 - **P2 — `tree.js` to Task model; model routing as its own area; or a "Costs & usage" area (still stands, now measurable).** LIN-4195 is Done, which was run 6's condition for measuring the cost-area option. It is not measured in this run. It belongs to LIN-4193 (§9).
 - **P3 — `experiments/rebuild-[^/]+/` to Reports & operator tools (still stands).** Cosmetic, as measured by run 5. Stability 11-04 F10 records the same gap.
@@ -316,6 +319,55 @@ Before deciding, I searched Linear again (21 queries, including "cost area", "Co
 
 Nothing in the window adds a `lib/` → `routes/` import, opens a knot pair, or adds a wrong-way edge on a placed map. Those are the things that would justify a new seam ticket in a window this size.
 
+## 10. Adversarial Second-Read
+
+**Tier 2.** A fresh-context sub-agent with no memory of the report-writing turns. It was briefed with only the repo, the window `d7ceb373..2eb73ae0`, the tools and the evidence folder, the report's path, this review's remit and the siblings' remits, and the question. It was told to form its own answer from the git history, the source and the tool output **before** reading the report, and then to compare. It was not given the findings list, a recap or any view of what was largest. It read PR #2286 at head `e87deccb5d6e023fc7c857907d07d3f7540972be`.
+
+**Question:** *What is the largest item in this window that this report missed or misfiled?*
+
+**The reader's answer, in full:**
+
+> **Verdict: AGREE.** The report's top finding is F1 (LLM ↔ Runs knot, High, grew by code 30/37 → 31/37). The full ranking is F1 > F6 (browser globals) > N1 (catch-all 14 → 16, Pages ↔ Other 8/6 → 9/8) > N6 > N12 > N10 > wiring > dispatch-store > N11 > N9. I accept the ranking. The one defect I found is a wrong number inside F6, and it doesn't change F6's rank.
+>
+> **Differed from top finding: YES.** In step 1 I ranked the Pages ↔ Other growth from `waiting-section.js` first, not F1. The report's labelled experiment P7min (place only the two new files) answers this: Pages ↔ Other goes back to 8/6 while F1 still moves to 31/37. I re-ran it and got the same result. So F1 is the only knot that grows by code on a placed map, and the report correctly calls the Pages ↔ Other growth a guide gap (N1).
+>
+> **My step-1 answer (before reading the report):**
+> 1. `lib/waiting-section.js` falls into the catch-all and adds crossings both ways. It was extracted from `render.js` by LIN-4242. It is a page renderer: it imports `question-card.js` and `task-page-href.js` (`lib/waiting-section.js:9-11`). It is imported by `lib/render.js:32` and `server.js:167`. One edge inside Pages (`render.js → question-card.js`) became cross-area edges in both directions, so Pages ↔ Other went 8/6 → 9/8. Other features grew 14 → 16, together with `lib/ruling-settled.js`, which is imported by three route files.
+> 2. The LLM ↔ Runs knot grew by one edge. `lib/model-routing-history.js:12` now imports `readCost`, and calls it at `:37-40` (LIN-4226). `lib/kpi-stats.js:47` (Reports) is also a new importer of `cost-read.js`, which now has 7 cross-area importers, up from 5.
+> 3. `server.js` grew an inline route. `GET /api/home-waiting` (`server.js:3738-3756`) sits in the wiring file, not in a `routes/` file. It imports a renderer and a new reduction (`server.js:166-167`, `:3313`), and Wiring → Other went 8 → 9.
+> 4. The browser half of the same feature is invisible to the import tool. `public/home-placement.js:120` publishes `window.HomePlacement`, which `public/app.js:720` and `:816` use. It is loaded only through the script list at `lib/render.js:383`.
+>
+> **Largest item missed or misfiled: the "+7 `window.X` globals" figure in F6 is inflated.** It appears in the headline, in F6 and in the ledger.
+> - 100 → 107 comes from a loose pattern that also counts comparisons. Two of the seven added lines are `typeof window.X === 'function'` reads, not assignments: `public/app.js:654` (`window.onRulingsTick`) and `public/app.js:719` (`window.dispatchesInFlight`).
+> - The actual size is 5 assignment lines: 4 new global names (`refreshWaitingOnYou`, `dispatchesInFlight`, `onRulingsTick`, `HomePlacement`) plus one reassignment of the existing `window.dispatchPrompt`. The strict count over all of `public/` is 61 → 66, which the report never gives; it gives the strict figure only for `common.js` (48 → 51). Check: `git grep -hE "window\.[A-Za-z_$][A-Za-z0-9_$]* *=($|[^=])" <sha> -- public | wc -l`.
+> - The evidence listing disagrees with its own count. `supplementary-figures.txt` §S4 lists 6 added lines against a count of +7. It leaves out `window.onRulingsTick = function onRulingsTick(fn) {` at `public/common.js:3116`, yet that is the line the report cites in F6. Its pattern seems to need leading whitespace.
+> - F6 also under-reads the `dispatchPrompt` line. It is not just "a second assignment". `public/common.js:925-935` wraps the existing global from `:833` to count dispatches in flight. That changes the shared dispatch entry point on every page that loads `common.js`, not only Home. It is a more invasive browser-seam coupling than a new name.
+> - Severity: Low–Medium. F6 stays "worsened" and stays second. The fix is to restate the series as 61 → 66 strict (+5 assignments: 4 new names and 1 wrapper), drop "adds 7 globals" from the headline, and note the wrapper's reach across pages.
+> - Smaller points, not graded: (a) N11 calls the Waiting entry point one way in, but `lib/home-row-states.js:112` builds its own `createWaitingStanding` by default when none is passed. `server.js` passes one in, so there is one instance today, but the module has a second way to build it. (b) P7min places `ruling-settled.js` in Runs. It is an HTTP 409 reply shape used only by routes, so Web routes or Platform (beside `errors.js`) is arguably its natural area.
+>
+> **Numbers checked.** Re-ran `seams.mjs` at `2eb73ae0` with the HEAD guide (it matches the evidence JSON exactly), `cochange.mjs --days 60` at `2eb73ae0` (pairs identical; 851 changes, 390 touching more than one area) and `seams.mjs` with the P7min guide (links 1266, Pages ↔ Other 8/6, LLM ↔ Runs 31/37). These reproduced from the evidence: files 540 → 543; links 1259 → 1269; 12 pairs; one group of 9; every changed directed count and the knot table; the 10 added and 1 removed file edges, and edges inside one area 785 → 784; catch-all 14 → 16 and its 16 members; `cost-read.js` cross-area importers 5 → 7 (names match), 9 → 11 importers in all, and 592 → 651 lines; Wiring → Runs 45; `server.js` 4682 → 4713 lines, 208 → 209 imports and 29 → 30 inline routes; the 59.471-day overlap; and the cited lines `model-routing-history.js:12` and `:40`, `cost-read.js:144-148`, `app.js:593-594`, `:653` and `:709`, and `common.js:934` and `:3116`. The loose browser-globals counts reproduce (100 → 107, 52 → 55) but are the wrong measure, as above. Not exact: the cost share of F1 came out 10 → 11 of 67 → 68 with my pattern, against the report's 11 → 12 with `supplementary-figures.py`'s list; the difference is only in which files count as cost files.
+
+**Judged on the evidence.** I re-checked every point against `2eb73ae0`:
+- **The F6 count is real.** The assignments-only count is 61 → 66. The two `app.js` lines are `typeof` reads. The S4 listing did miss `common.js:3116`. The `dispatchPrompt` wrapper at `common.js:925-935` replaces the global defined at `:833`.
+- **The N11 default is real** (`home-row-states.js:112`).
+
+**What changed:**
+- **Fixed in place:**
+  - F6's heading, figures and list, with the cross-page wrapper called out;
+  - the headline and §1 item 5;
+  - the F6 ledger row;
+  - N11's text and its ledger row;
+  - the S4 listing and count in `supplementary-figures.py`, re-run (Measurement note 5);
+  - P7min now records the second home suggested for `ruling-settled`;
+  - the cost-share difference is recorded (Measurement note 6).
+- **Unchanged:**
+  - F6 stays Medium and second. F1 stays first: the reader's own first answer, the Pages ↔ Other growth, is the guide gap that P7min removes, and the reader agreed after re-running it.
+  - No ticket follows from any of it.
+
+Adversarial second-read verdict: AGREE
+Differed from top finding: YES
+Disposition: fixed in place
+
 ## 11. Trend ledger
 
 The stable names carry forward from run 6. Delta is against run 6's published figures, which this run reproduces at `d7ceb373`. N11 and N12 are new. None is retired or renamed.
@@ -323,12 +375,12 @@ The stable names carry forward from run 6. Delta is against run 6's published fi
 | name | severity | run 6 | run 7 | delta |
 |---|---|---|---|---|
 | F1 `knot:agents-chat<->runs` | High | 30/37 | 31/37 | **grew** by code +1/+0 (`model-routing-history → cost-read`) |
-| F6 `knot:browser-window-globals` | Medium | 52 / 100 | 55 / 107 | **worsened** (+7; `HomePlacement`, `onRulingsTick`, `dispatchesInFlight`, `refreshWaitingOnYou`, `dispatchPrompt`) |
+| F6 `knot:browser-window-globals` | Medium | 52 / 100 (assignments in `public/`: 61) | 55 / 107 (66) | **worsened**: +5 assignments (4 new globals, `HomePlacement`, `onRulingsTick`, `dispatchesInFlight`, `refreshWaitingOnYou`; plus the cross-page `dispatchPrompt` wrapper). Series pattern +7 includes 2 reads |
 | N1 `knot:other-features-catch-all` | Medium–High map / Medium code | 14 files | 16 (+`waiting-section`, +`ruling-settled`) | **worsened** by code into a guide gap; Pages ↔ Other 8/6 → 9/8 is the same gap |
 | N6 `hub:cost-read.js` | Medium | 5 cross-area in from 4 areas | 7 from 4 areas | grew as predicted; **settled** (LIN-4195 Done) |
 | N9 `door:request-usage-loader` | healthy, Low | 7 importers | 7; now required by the cost read | unchanged in count; stronger |
 | N10 `map:cost-family-split` | Low–Medium | 11 of 67 | 12 of 68 | unchanged in shape; **now decidable** (P2) |
-| N11 `door:home-waiting` | healthy, Low | — | 1 read (`home-row-states.js:82`), 1 renderer (`waiting-section.js:30`), 2 callers | **new** |
+| N11 `door:home-waiting` | healthy, Low | — | 1 read (`home-row-states.js:82`), 1 renderer (`waiting-section.js:30`), 2 callers; a default second construction at `home-row-states.js:112` | **new** |
 | N12 `map:rulings-family-split` | Low | — | 6 areas; PR #2185 would add one more to Other | **new as named** |
 | `hub:dispatch-store.js` | Low–Medium | 7 cross-area in; 10 out | same; +`isDecisionSettled` | unchanged by import |
 | `wiring: server.js` | Low, watch | Runs 45; Other 8; 29 inline routes | Runs 45; Other 9; 30 inline routes | +1 import, +1 route (`/api/home-waiting`) |
@@ -393,4 +445,5 @@ No-link pairs: 20 of 76 at both commits (run 6 HEAD guide: 20).
 2. **This run's own beat-2 recap gave the fragment route as `server.js:3739`.** The `app.get(` line is `:3738`; `:3739` is the line after it.
 3. **`compare-run7.mjs` and `supplementary-figures.py` read committed git objects at the two pinned SHAs and the JSON in this folder.** Their outputs regenerate byte for byte (E/README.md).
 4. **PR, Linear and Survey state are as read on 2026-11-05** (E/external-state-2026-11-05.txt).
-5. **§10 is left for the adversarial second-read.** It is written by a separate reader after this report is drafted.
+5. **F6's evidence listing was fixed after the second-read.** The S4 diff listing in `supplementary-figures.py` missed `window.onRulingsTick = …` at `public/common.js:3116`, because its pattern required a character other than `+` or `-` before `window`. It now lists all seven lines, marks each as an assignment or a read, and adds the assignments-only count across `public/`. The S4 counts from run 6's pattern are unchanged. No other section's output changed.
+6. **F1's cost share depends on which files count as cost files.** `supplementary-figures.py` §S8's list gives 11 → 12 of 67 → 68. The second-reader's own list gave 10 → 11. The +1 is the same edge either way.

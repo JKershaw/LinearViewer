@@ -32,6 +32,7 @@ node $E/compare-run7.mjs . $E > $E/compare-run7.md
 
 - `supplementary-figures.py` reads committed git objects at the two pinned SHAs and the JSON in this folder. Sections S0–S15 keep run 6's definitions (`_evidence-2026-11-04-run6/supplementary-figures.py`), so the figures compare mechanically. S16–S19 are new: named hubs and doors, top files by cross-area importers, `server.js` outbound by area, and the browser seam (script lists, `window.HomePlacement`, the `ruling-settled` code).
   - Run from the repo root: `SD_DIR=<simple-dispatcher clone> python3 -I docs/reviews/_evidence-2026-11-05/supplementary-figures.py . > docs/reviews/_evidence-2026-11-05/supplementary-figures.txt`.
+  - After the second-read (report §10), S4 also gives an assignments-only count across `public/`, and its window listing marks each line as an assignment (A) or a read (R). The listing pattern was fixed so it no longer misses lines that start at column 0 (`public/common.js:3116`). The counts from run 6's pattern are unchanged.
   - S13 read Simple Dispatcher `origin/main` at `07c88f7a338b3e19a01070775e1f4d4cfc91f040`. S14 read `origin/claude/cool-rubin-6acj5j` at `23edd667eff4bdd547c930adf8fe2578fac5464e`, read only.
 
 ## Guide experiments (labelled proposals; the committed guide is not edited)

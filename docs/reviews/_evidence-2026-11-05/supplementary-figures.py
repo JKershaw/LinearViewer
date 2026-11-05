@@ -93,16 +93,20 @@ for c8, sha in COMMITS:
     pub = grep_lines(sha, r'window\.[A-Za-z_]* *=', 'public')
     com = grep_lines(sha, r'window\.[A-Za-z_]* *=', 'public/common.js')
     com_strict = grep_lines(sha, r'window\.[A-Za-z_]* *=[^=]', 'public/common.js')
+    # Added after the second-read (LIN-4249 §10): the loose pattern above (run 6's, kept for the series) also counts
+    # `typeof window.X === ...` comparisons. This one counts assignments only, across all of public/.
+    pub_strict = grep_lines(sha, r'window\.[A-Za-z_$][A-Za-z0-9_$]* *=($|[^=])', 'public')
     lists = grep_lines(sha, r"""['"]/cost-format\.js['"]""", 'lib', 'routes', 'server.js')
-    print(f'- {c8}: window.X = in public/ {len(pub)}; in public/common.js {len(com)} (strict =[^=] {len(com_strict)}); /cost-format.js script-list lines {len(lists)}: {", ".join(sorted(l.split(":")[0] for l in lists))}')
+    print(f'- {c8}: window.X = in public/ {len(pub)}; in public/common.js {len(com)} (strict =[^=] {len(com_strict)}); assignments only in public/ {len(pub_strict)}; /cost-format.js script-list lines {len(lists)}: {", ".join(sorted(l.split(":")[0] for l in lists))}')
 pubchg = [l for l in git('diff', '--name-only', B, H, '--', 'public').splitlines() if l]
 print(f'- public/ files changed in window: {len(pubchg)}: {", ".join(pubchg)}')
-print('- window.X = lines added or removed in the window, by file:')
+print('- window.X = lines added or removed in the window, by file (A = assignment, R = a read the loose pattern also matches):')
 for l in git('diff', '-U0', B, H, '--', 'public').splitlines():
     if l.startswith('+++ '):
         cur = l[6:]
-    elif re.match(r'^[+-][^+-].*window\.[A-Za-z_]* *=', l):
-        print(f'    {cur}: {l[:150]}')
+    elif re.match(r'^[+-](?![+-]{2} )', l) and re.search(r'window\.[A-Za-z_]* *=', l[1:]):
+        kind = 'A' if re.search(r'window\.[A-Za-z_$][A-Za-z0-9_$]* *=($|[^=])', l[1:]) else 'R'
+        print(f'    {kind} {cur}: {l[:150]}')
 
 section('S5. N8: the deleted task-cost module still named')
 for c8, sha in COMMITS:
