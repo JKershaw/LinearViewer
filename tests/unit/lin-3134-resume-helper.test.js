@@ -155,6 +155,19 @@ describe('S3 — record declared branch', () => {
     assert.equal(result.grantDeclaration, RECORD);
   });
 
+  test('LIN-4251: a declared-record follow-up forwards attach.writes (none gets the none closing, not the work block)', async () => {
+    const store = mintSpy();
+    const result = await provisionResumeCredential({
+      proxyTokenStore: store, dispatchStore: recordStore(), urlKey: 'acme', baseUrl: 'https://h',
+      prompt: 'ignored', attach: { issueIdentifier: 'LIN-1', prompt: 'base', providerDisplayName: null, providerUi: null, writes: 'none' },
+      label: 'dispatch-bootstrap', harness: 'claude-code', createdBy: 'poster-B', followUpTo: 'row-1'
+    });
+    assert.equal(store.calls.length, 1, 'the declared-record branch minted (this is not the record-less path)');
+    assert.equal(result.grantDeclaration, RECORD);
+    assert.match(result.prompt, /Just END with your findings/);
+    assert.doesNotMatch(result.prompt, /open PRs|PR link|commit SHA/);
+  });
+
   test('the S2 declared branch is reached (mintGrantBootstrap called)', async () => {
     const store = mintSpy();
     await provisionResumeCredential({ proxyTokenStore: store, dispatchStore: recordStore(), urlKey: 'acme', baseUrl: 'https://h', prompt: 'p', harness: 'claude-code', followUpTo: 'row-1' });
