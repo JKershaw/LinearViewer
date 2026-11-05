@@ -303,6 +303,10 @@
         ? (caps.runningBody === 'blank' ? '' : g.headerHtml)
         : '<p class="task-sentence" data-testid="opened-task-sentence">Started.</p>';
       html += `<div class="opened-task-started" data-testid="opened-task-started" data-go-status="${esc(g.status)}">${body}${link}</div>`;
+    } else if (takesNoRun(state, opts)) {
+      // LIN-4048 (review finding 1): a finished task (the server's no-run decision, LIN-4071) draws no Go on any surface.
+      // This must sit before the setup and quota-limit branches below, or a Done task with the quota spent (or no way to run
+      // yet) draws a disabled or setup Go on the task page and Swipe. The slot stays in the markup (paintGo needs it); it is empty.
     } else if (!ready) {
       // LIN-3849: only an owner with no way to run yet is offered "set up ›";
       // anyone else gets no run control at all (copy-first view, LIN-3833, is
@@ -324,9 +328,8 @@
       const offer = runOfferOf(state, opts);
       if (step) html += `<button class="btn btn--primary opened-task-go opened-task-go--main" data-testid="opened-task-go" data-rung="run-step" data-action="run-step-next">Run ${esc(step.label)}</button>${runRungButtonsOf(null)}`;
       else if (offer && offer.kind === 'offer') html += runRungButtonsOf(filledRungOf(opts));
-    } else if (!takesNoRun(state, opts)) {
-      // LIN-4048: Swipe's plain Go spends a run, so a finished row (the server's no-run decision, LIN-4071) offers none. The
-      // slot stays in the markup (paintGo needs it); only the button goes.
+    } else {
+      // Swipe's plain Go spends a run. A finished row (the no-run decision) never reaches here: the branch above draws nothing for it.
       html += `<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" data-action="go">Go</button>`;
     }
 

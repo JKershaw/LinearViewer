@@ -75,13 +75,15 @@ function makeContainer() {
 // The state body, the way /state sends it (routes/task-page.js): the sessions block is the server's, tracker-free.
 // `stateBody` may be a function, read on each /state call (a poll after the first read sees the next body, LIN-4048).
 // `timers`, when given, collects the client's timers instead of running them: the run poll (10s) is fired by the test.
-function loadClient({ stateBody, timers = null }) {
+// `quota` is the GET /api/dispatch/quota body (LIN-4048 review): a free-tier caller's allowance, read at load.
+function loadClient({ stateBody, timers = null, quota = null }) {
   const window = {
     escapeHtml: (x) => (x == null ? '' : escapeHtml(String(x))),
     stripCodeBlockWrapper: (x) => x,
     renderMarkdown: (x) => String(x == null ? '' : x),
     api: async (url) => {
       if (url.includes('/api/task/')) return typeof stateBody === 'function' ? stateBody() : stateBody;
+      if (url.includes('/api/dispatch/quota')) return quota || {};
       if (url.includes('/api/task-mode/')) return { lastCopy: null };
       if (url.includes('/api/dispatch/preview')) return { kind: 'implementation', harness: 'claude-code', words: {}, sources: {}, group: null, description: '' };
       if (url.includes('/api/dispatch/decision-panel')) return { html: '', words: null, withoutEffort: [], targets: ['cli', 'web'], optionWords: { harness: {}, model: {} } };
@@ -144,8 +146,8 @@ function doneBody({ children }) {
   return stateBodyOf({ issues: [stateIssue('LIN-42', 'completed'), ...children], loops: [failed], identifier: 'LIN-42' });
 }
 
-async function paint(stateBody, opts = {}) {
-  const PromptSection = loadClient({ stateBody });
+async function paint(stateBody, opts = {}, quota = null) {
+  const PromptSection = loadClient({ stateBody, quota });
   const c = makeContainer();
   PromptSection.init(c, { ...HOME, ...opts });
   await flush(); await flush(); await flush();
@@ -371,5 +373,69 @@ describe('LIN-4048 — a finished task on the task page and Swipe shows no run c
       const html = await paint(stateWith({ action: RUN_TO_PR }), { surface: 'swipe', row: rowRecordOf({ stateType: 'started' }) });
       assert.match(html, /data-action="go"/);
     });
+  });
+});
+
+// LIN-4048 review (findings 1-3): the first pass pinned the Go and quota cases with `doesNotMatch(data-action="go")`, which
+// the disabled limit button (no data-action) and the setup button slipped past. These cases pin the rendered button itself,
+// with a free-tier caller whose quota is read, so the quota branches are reachable.
+describe('LIN-4048 review — a finished task draws no Go, limit Go, setup Go, quota or Change, whatever the allowance', () => {
+  const FREE = { freeTier: true };
+  const TASK = { surface: 'task' };
+  const RUNNING = { loopId: 'loop-1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-30T10:00:00.000Z', target: 'cli' };
+  const quotaOf = (remaining) => ({ limited: true, runsUsed: 10 - remaining, remaining, limit: 10 });
+
+  test('task page, Done, nothing held, quota spent: no disabled limit Go and no Go of any kind', async () => {
+    const html = await paint(stateWith({ action: NO_RUN }), { ...TASK, ...FREE, row: DONE_ROW() }, quotaOf(0));
+    assert.doesNotMatch(html, /data-testid="opened-task-go"/, 'a finished task has no Go, not even a disabled "limit reached" one');
+    assert.doesNotMatch(html, /daily run limit reached/);
+    assert.match(html, /data-testid="run-another"/, 'the plain finished page keeps Another step');
+  });
+
+  test('swipe, Done row, quota spent: no disabled limit Go', async () => {
+    const html = await paint(stateWith({ action: NO_RUN }), { surface: 'swipe', ...FREE, row: DONE_ROW() }, quotaOf(0));
+    assert.doesNotMatch(html, /data-testid="opened-task-go"/, 'Swipe must not show a disabled Go on a finished row');
+  });
+
+  test('swipe, Done row, no dispatch but a set-up owner: no "set up" Go on a finished row', async () => {
+    const html = await paint(stateWith({ action: NO_RUN }), { surface: 'swipe', dispatchEnabled: false, runSetup: true, row: DONE_ROW() });
+    assert.doesNotMatch(html, /data-testid="opened-task-go"/, 'a finished row offers no set-up Go either');
+  });
+
+  test('task page, Done, nothing held, quota remaining: no quota span beside nothing', async () => {
+    const html = await paint(stateWith({ action: NO_RUN }), { ...TASK, ...FREE, row: DONE_ROW() }, quotaOf(3));
+    assert.doesNotMatch(html, /data-testid="opened-task-run-quota"/, 'the allowance names no run on a finished task');
+  });
+
+  test('control: an unfinished task with quota remaining keeps its Go and the quota span', async () => {
+    const html = await paint(stateWith({ action: RUN_TO_PR }), { ...TASK, ...FREE, row: rowRecordOf({ stateType: 'started' }) }, quotaOf(3));
+    assert.match(html, /data-testid="opened-task-run-quota"[^>]*>3 of 10 runs left today</);
+    assert.match(html, /data-action="go"[^>]*>Run to PR</);
+  });
+
+  test('control: an unfinished task with quota spent keeps its disabled limit Go (the rung the server gates)', async () => {
+    const html = await paint(stateWith({ action: RUN_TO_PR }), { ...TASK, ...FREE, row: rowRecordOf({ stateType: 'started' }) }, quotaOf(0));
+    assert.match(html, /data-testid="opened-task-go"[^>]*disabled/);
+  });
+
+  test('the Change panel closes when a held run ends and the Done body arrives (Change was open on the run)', async () => {
+    const timers = [];
+    let current = { ...stateWith({ running: RUNNING, busy: true, canStop: true, action: null }), status: 'running', live: true };
+    const PromptSection = loadClient({ stateBody: () => current, timers });
+    const c = makeContainer();
+    PromptSection.init(c, { ...HOME, ...TASK, row: rowRecordOf({ stateType: 'started' }) });
+    await flush(); await flush(); await flush();
+    const btn = { dataset: { action: 'change-run' }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
+    for (const fn of c.listenersFor('click')) await fn({ target: btn });
+    await flush(); await flush(); await flush();
+    assert.match(c.innerHTML, /data-testid="run-change-panel"/, 'precondition: Change is open on the held run');
+    current = stateWith({ action: NO_RUN });
+    const poll = timers.find((t) => t.ms === 10000 && !t.cancelled && !t.fired);
+    assert.ok(poll, 'a run poll is armed while a run is live');
+    poll.fired = true;
+    poll.fn();
+    await flush(); await flush(); await flush();
+    assert.doesNotMatch(c.innerHTML, /data-testid="run-change-panel"/, 'no Change panel for a run that can no longer happen');
+    assert.doesNotMatch(c.innerHTML, /data-testid="opened-task-running"/);
   });
 });
