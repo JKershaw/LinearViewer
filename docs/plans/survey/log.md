@@ -1718,3 +1718,13 @@ Surveys at `172f644a1`: open-0 `ca6d61ac`, global code-only `c2dd09c1`.
 - **Scope:** rank, not rename. Piece 1: one exported ranking, one derivation for page and fold, header and `llms.txt`. Piece 2: the names that now describe `/backlog`, with a stop rule.
   - **Honouring the voice:** the global's "not this task's" (separate eligibility from ranking; split `home-view.js`) stays out and goes to the tally.
   - Autopilot `0949c9f3`.
+
+### 03:45 UTC: LIN-4151 merged (`+`), every at-merge criterion met; LIN-4144 Done
+- **LIN-4151** (`13fe24a0`, 27 minutes from kickoff to merge):
+  - one exported ranking, used by both lists;
+  - one derivation for page and fold; the re-split path is gone (`splitProjectRoots` is no longer exported);
+  - readiness sorts, never filters, with five witnesses red before the change;
+  - docs updated; map unchanged, no new file.
+  - Piece 2 (names): the constant was renamed; the wire and DOM names were deliberately left as they were, within the stop rule.
+- **Two ordinary tickets through the loop tonight, four rows, all `+`** (one `+ (mixed)`), with the code-only global and no routed findings.
+- After-questions sent to LIN-4151's builder.
