@@ -5,6 +5,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createFakeDom, FakeDomError } from './helpers/fake-dom.js';
+import { loadWorld, clickOn } from './helpers/client-world.js';
+import { withHarnessModels } from '../fixtures/harness-models.js';
+import { harnessModelsBlock, DEFAULT_HARNESS } from '../../lib/model-routing-harnesses.js';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 
 const world = () => createFakeDom();
 const throwsNaming = (fn, text) => assert.throws(fn, (e) => e instanceof FakeDomError && e.message.includes(text), `expected a FakeDomError naming ${text}`);
@@ -747,5 +752,98 @@ describe('fake DOM: replaceChild, replaceChildren, insertAdjacentHTML, append an
     assert.equal(ul.childNodes[0], x, 'the node is first');
     assert.equal(ul.childNodes[1].nodeType, 3, 'the string is a text node, second');
     assert.equal(ul.innerHTML, '<li id="x"></li>head<li id="a">a</li>');
+  });
+});
+
+describe('fake DOM: firstElementChild and lastElementChild (LIN-4279)', () => {
+  const fixture = () => {
+    const w = world();
+    w.parse('<div>text<!--c--><b id="a">a</b>more<i id="z">z</i>tail</div><p>only text</p>');
+    return w;
+  };
+
+  test('firstElementChild is the first element child, skipping text and comments, and null when there is none', () => {
+    const { document } = fixture();
+    assert.equal(document.querySelector('div').firstElementChild, document.querySelector('#a'));
+    assert.equal(document.querySelector('p').firstElementChild, null, 'a node with only text has no element child');
+  });
+
+  test('lastElementChild is the last element child, skipping text, and null when there is none', () => {
+    const { document } = fixture();
+    assert.equal(document.querySelector('div').lastElementChild, document.querySelector('#z'));
+    assert.equal(document.querySelector('p').lastElementChild, null, 'a node with only text has no element child');
+  });
+});
+
+describe('client world: stubs are copied by descriptor, and loadWorld routes to common.js (LIN-4279)', () => {
+  // A spread copy reads every getter; a descriptor copy never does. The getter counts its reads and throws, as a blocked
+  // localStorage does (lin-4035: "a storage that throws on read").
+  const throwingStorage = (target) => {
+    const reads = { count: 0 };
+    Object.defineProperty(target, 'localStorage', {
+      enumerable: true,
+      configurable: true,
+      get() { reads.count++; throw new Error('storage throws on read'); },
+    });
+    return reads;
+  };
+
+  test('window stubs are copied by descriptor: a throwing localStorage getter is not invoked at load', () => {
+    const stubs = {};
+    const reads = throwingStorage(stubs);
+    const w = loadWorld({ window: stubs, scripts: [] });
+    assert.equal(reads.count, 0, 'the getter was not invoked while copying');
+    assert.equal(typeof Object.getOwnPropertyDescriptor(w.window, 'localStorage').get, 'function', 'the accessor is kept');
+  });
+
+  test('globals are copied by descriptor too: a throwing localStorage global is not invoked at load', () => {
+    const globals = {};
+    const reads = throwingStorage(globals);
+    const w = loadWorld({ scripts: [], globals });
+    assert.equal(reads.count, 0, 'the getter was not invoked while copying');
+    assert.equal(typeof Object.getOwnPropertyDescriptor(w.sandbox, 'localStorage').get, 'function', 'the accessor is kept');
+  });
+
+  test('loadWorld runs the real common.js when window.__HARNESS_MODELS__ carries the block', () => {
+    const w = loadWorld({ window: { __HARNESS_MODELS__: harnessModelsBlock() }, scripts: ['common.js'] });
+    assert.equal(vm.runInContext('DEFAULT_HARNESS', w.sandbox), DEFAULT_HARNESS);
+  });
+
+  test('loadWorld does not apply withHarnessModels to common.js: without the block, common.js refuses to load', () => {
+    assert.throws(() => loadWorld({ scripts: ['common.js'] }), /window\.__HARNESS_MODELS__ is missing/);
+  });
+
+  test('scripts: [] with the source run by the caller on world.sandbox, under withHarnessModels, also loads common.js', () => {
+    const w = loadWorld({ scripts: [] });
+    const src = readFileSync(new URL('../../public/common.js', import.meta.url), 'utf8');
+    vm.runInContext(withHarnessModels(src), w.sandbox, { filename: 'common.js' });
+    assert.equal(vm.runInContext('DEFAULT_HARNESS', w.sandbox), DEFAULT_HARNESS);
+  });
+
+  test('clickOn calls the element’s own click listeners with { type: "click", target } (LIN-4279)', async () => {
+    const { document } = world();
+    const btn = document.createElement('button');
+    const seen = [];
+    btn.addEventListener('click', (e) => seen.push(e));
+    await clickOn(btn);
+    assert.equal(seen.length, 1, 'one listener call');
+    assert.equal(seen[0].type, 'click');
+    assert.equal(seen[0].target, btn);
+  });
+
+  test('clickOn does not bubble to a parent, and dispatchEvent stays inert (LIN-4279)', async () => {
+    const { document } = world();
+    const parent = document.createElement('div');
+    const child = document.createElement('button');
+    parent.appendChild(child);
+    let parentCalls = 0;
+    let childCalls = 0;
+    parent.addEventListener('click', () => { parentCalls++; });
+    child.addEventListener('click', () => { childCalls++; });
+    await clickOn(child);
+    assert.equal(childCalls, 1, 'the element’s own listener ran');
+    assert.equal(parentCalls, 0, 'no bubbling');
+    child.dispatchEvent({ type: 'click', target: child });
+    assert.equal(childCalls, 1, 'dispatchEvent does not reach the listeners');
   });
 });

@@ -17,7 +17,7 @@
  *
  * Modelled:
  * - Tree and identity: element, text, comment and fragment nodes in order; `children` (elements only, a real array),
- *   `childNodes`, `parentNode`, `parentElement`, `appendChild`, `insertBefore`, `removeChild`, `remove`, `replaceWith`,
+ *   `childNodes`, `parentNode`, `parentElement`, `firstElementChild`, `lastElementChild`, `appendChild`, `insertBefore`, `removeChild`, `remove`, `replaceWith`,
  *   `contains` (inclusive), `isConnected` (reaches the world's document), `textContent` get/set.
  * - Documents and namespaces (LIN-4279): `getElementById` is the first connected match in tree order, and template content is
  *   not searched. `createElementNS(ns, name)` makes an element in that namespace. An HTML-namespace one is made as
@@ -117,6 +117,9 @@ class FakeNode {
 
   get childNodes() { return [...this._kids]; }
   get children() { return this._kids.filter((k) => k.nodeType === 1); }
+  /** The first and last element children, skipping text and comments; `null` when there are none (LIN-4279). */
+  get firstElementChild() { return this.children[0] || null; }
+  get lastElementChild() { const kids = this.children; return kids[kids.length - 1] || null; }
   get parentElement() { const p = this.parentNode; return p && p.nodeType === 1 ? p : null; }
   get isConnected() {
     let top = this;
