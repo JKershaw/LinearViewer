@@ -364,7 +364,9 @@
         var decisionId = card.dataset.decisionId || null;
         // LIN-3252 F1: the row's resolved effect, emitted server-side
         // (lib/render-session.js) exactly as the Rulings tab's row carries it.
-        var effect = card.dataset.effect || 'resume';
+        // LIN-4143 fail-closed: an absent or empty effect is `record`, never `resume`. A card whose markup carries no decided
+        // effect must not start a run (the shared helper turns `resume` on a non-resumable disposition into a fresh run).
+        var effect = card.dataset.effect || 'record';
 
         // LIN-4241: one submission id per card. Every retry of this card's answer reuses it, so the server
         // reads a resend as the same answer; another tab's answer to the same ruling carries its own id and is refused.
