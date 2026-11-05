@@ -20,6 +20,7 @@ import { USUAL_STAGES, SPINE } from '../../lib/run-view.js';
 import { buildRowStates, buildTaskPageModel, nextStepOf, waitingForOf, sessionSummaryOf } from '../../lib/task-page-loader.js';
 import { buildInProgressCountParts } from '../../lib/task-board-view.js';
 import { renderHomeStatus } from '../../lib/render-task-page.js';
+import { createFakeDom } from './helpers/fake-dom.js';
 
 // LIN-4016: Home's pill reads the task's decided state. This helper reads the task's OWN facts; it equals the gather that
 // `/state` sends (lib/home-row-states.js) only for a leaf, which is every fixture that uses it. A container's state is
@@ -308,38 +309,12 @@ describe('LIN-4010 — a new user\'s Home shows no "idle" or "No sessions yet"',
 
 // ─── the client: the run box, the running box, the container ─────────────────
 
-// A container that records its listeners, so a test can click a control or press a key the way a reader does.
-function makeContainer() {
-  const listeners = {};
-  let html = '';
-  const container = {
-    get innerHTML() { return html; },
-    set innerHTML(v) { html = v; },
-    dataset: {},
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    setAttribute() {},
-    getAttribute() { return null; },
-    querySelector() { return null; },
-    contains() { return true; },
-    addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
-    removeEventListener() {},
-    async click(dataset) {
-      const btn = { dataset: { ...dataset }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
-      for (const fn of listeners.click || []) await fn({ target: btn });
-      return btn;
-    },
-    async key(k) {
-      const target = { key: k, dataset: {}, closest: () => null, preventDefault() {} };
-      for (const fn of listeners.keydown || []) await fn(target);
-    },
-  };
-  return container;
-}
-
 function loadClient({ stateBody = null, previewBody = null, presetsBody = [], panelHtml = '', container = false } = {}) {
   // LIN-4016: the state body is the server's (its `sessions` carry the decision: queued, busy, action and canStop).
   if (stateBody && stateBody.sessions) stateBody = { ...stateBody, sessions: serverSessions(stateBody.sessions, { container }) };
   const calls = { api: [], dispatch: [], post: [] };
+  const dom = createFakeDom();
+  const { document } = dom;
   const window = {
     escapeHtml: (x) => (x == null ? '' : escapeHtml(String(x))),
     stripCodeBlockWrapper: (x) => x,
@@ -365,7 +340,7 @@ function loadClient({ stateBody = null, previewBody = null, presetsBody = [], pa
   };
   const sandbox = {
     window, AbortController, URLSearchParams, TextDecoder, TextEncoder, Blob: class {}, URL,
-    document: { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } },
+    document,
     requestAnimationFrame: (cb) => { cb(); return 1; },
     setTimeout: (fn, ms) => { const t = globalThis.setTimeout(fn, ms); if (t && t.unref) t.unref(); return t; },
     clearTimeout,
@@ -375,7 +350,27 @@ function loadClient({ stateBody = null, previewBody = null, presetsBody = [], pa
   };
   vm.createContext(sandbox);
   vm.runInContext(SRC, sandbox, { filename: 'prompt-section.js' });
-  return { PromptSection: sandbox.window.PromptSection, calls };
+  // The container is a real element in this world's document, so `contains`, `closest` and focus are the browser's. The
+  // two shims below are this suite's whole layer over it. `click` gives the real button with those data attributes to the
+  // click listeners as its target, and throws if the button is not drawn. `key` sends the key to the focused element, as a
+  // browser does, so a key pressed with nothing focused in the container reaches no listener.
+  const makeContainer = () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    container.click = async (dataset) => {
+      const attrs = Object.entries(dataset).map(([k, v]) => `[data-${k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}="${v}"]`).join('');
+      const btn = container.querySelector(`button${attrs}`);
+      if (!btn) throw new Error(`no button ${JSON.stringify(dataset)} is drawn in the container`);
+      for (const fn of container.listenersOf('click')) await fn({ target: btn });
+      return btn;
+    };
+    container.key = async (k) => {
+      const event = { key: k, target: document.activeElement, preventDefault() {} };
+      for (const fn of container.listenersOf('keydown')) await fn(event);
+    };
+    return container;
+  };
+  return { PromptSection: sandbox.window.PromptSection, calls, makeContainer };
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -400,7 +395,7 @@ const PLAN_NEXT = {
 
 describe('LIN-4010 — the client: one run box, the state once, a new user\'s line, a container\'s run', () => {
   test('the run box holds the step, why it is next, Run, then what it runs on, in that order', async () => {
-    const { PromptSection } = loadClient({
+    const { PromptSection, makeContainer } = loadClient({
       stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>idle</p>', sessions: PLAN_NEXT },
       previewBody: { kind: 'plan-review', harness: 'claude-code', words: {}, sources: {}, group: null, description: 'Review the plan before anything is built on it.' },
     });
@@ -418,7 +413,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   });
 
   test('a stage word is used for Another step, not the template name', async () => {
-    const { PromptSection } = loadClient({ stateBody: { status: 'idle', live: false, sessions: PLAN_NEXT } });
+    const { PromptSection, makeContainer } = loadClient({ stateBody: { status: 'idle', live: false, sessions: PLAN_NEXT } });
     const c = makeContainer();
     PromptSection.init(c, { ...HOME });
     await flush();
@@ -431,7 +426,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
 
   test('a running task names its state once: the running box, Stop beside Watch, and no "Last" line', async () => {
     const running = { loopId: 'l1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-29T10:00:00.000Z', target: 'cli' };
-    const { PromptSection } = loadClient({
+    const { PromptSection, makeContainer } = loadClient({
       stateBody: { status: 'running', live: true, homeStatusHtml: '<p>STATE-LINE</p>', sessions: { count: 2, next: { kind: 'review', label: 'Review' }, last: { label: 'Build', state: 'running', at: null }, running, offered: null, busy: true, excluded: [] } },
     });
     const c = makeContainer();
@@ -445,7 +440,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   });
 
   test('a new user\'s opened task says the tracker word and no session words', async () => {
-    const { PromptSection } = loadClient({ stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>No sessions yet.</p>', sessions: { count: 0 } } });
+    const { PromptSection, makeContainer } = loadClient({ stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>No sessions yet.</p>', sessions: { count: 0 } } });
     const c = makeContainer();
     PromptSection.init(c, { ...HOME, dispatchEnabled: false });
     await flush(); await flush();
@@ -456,7 +451,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   // LIN-4024 (John, 29 Oct): a container's opened task runs on the container. Its one action is Run to PR, which starts
   // the autopilot on it; no subtask's stage is offered, read, or named from Home.
   test('a container: no stage step is offered, the state read is the container\'s own, and its one action is Run to PR', async () => {
-    const { PromptSection, calls } = loadClient({
+    const { PromptSection, calls, makeContainer } = loadClient({
       container: true,
       stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>idle</p>', sessions: { ...PLAN_NEXT, offered: { kind: 'research', label: 'Research', why: 'usual', failed: false, reason: 'the next step for this task' }, next: { kind: 'research', label: 'Research' } } },
       previewBody: { kind: 'research', harness: 'claude-code', words: {}, sources: {}, group: null },
@@ -476,7 +471,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   // LIN-4071: the subtask line is `/state`'s `attention`; the parent's own idle line is the server's to leave out (it sends
   // no `homeStatusHtml` for an otherwise idle parent whose subtask needs attention), so the browser paints what it is sent.
   test('a container whose subtask needs you states that from /state\'s attention, and paints no own line the server withheld', async () => {
-    const { PromptSection } = loadClient({
+    const { PromptSection, makeContainer } = loadClient({
       stateBody: {
         status: 'idle', live: false, homeStatusHtml: '', sessions: PLAN_NEXT,
         attention: { identifier: 'LIN-99', title: 'Models rows', state: 'needs-you', lead: 'A subtask needs you', detail: '', words: 'A subtask needs you: LIN-99' },
@@ -490,7 +485,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   });
 
   test('a container with no subtask waiting keeps its own line', async () => {
-    const { PromptSection } = loadClient({
+    const { PromptSection, makeContainer } = loadClient({
       stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>OWN-IDLE-LINE</p>', sessions: PLAN_NEXT },
     });
     const c = makeContainer();
@@ -503,7 +498,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   // LIN-4024 (look): a new user's one action is a solid "Write the prompt", and the step line has no stray leading dot.
   // LIN-4103 (Item 5): before the prompt is written, no stage is named on screen; the step line gives the reason only.
   test('copy-first: the Write the prompt button is the primary, and no stage is named before the prompt is written', async () => {
-    const { PromptSection } = loadClient({ stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>No sessions yet.</p>', sessions: { count: 0 } } });
+    const { PromptSection, makeContainer } = loadClient({ stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>No sessions yet.</p>', sessions: { count: 0 } } });
     const c = makeContainer();
     PromptSection.init(c, { ...HOME, dispatchEnabled: false, issue: { ...HOME.issue, stateType: 'backlog' }, row: serverRow({ stateType: 'backlog' }) });
     await flush(); await flush();
@@ -516,21 +511,25 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   test('a waiting task shows its question card in the state block, and no slot when the server sends no card', async () => {
     const card = '<div class="sess-qcard" data-testid="session-question-card" data-url-key="acme"><p data-testid="session-question-card-question">Which key?</p></div>';
     const waiting = loadClient({ stateBody: { status: 'waiting', live: false, homeStatusHtml: '<p>needs you</p>', questionHtml: card, sessions: PLAN_NEXT } });
-    const c = makeContainer();
+    const c = waiting.makeContainer();
     waiting.PromptSection.init(c, HOME);
     await flush(); await flush();
-    assert.match(c.innerHTML, /data-question-slot>\s*<div class="sess-qcard" data-testid="session-question-card"/, 'the card is in its slot');
+    assert.match(c.innerHTML, /data-question-slot(?:="")?>\s*<div class="sess-qcard" data-testid="session-question-card"/, 'the card is in its slot');
     assert.match(c.innerHTML, /data-testid="opened-task-state"/, 'the card sits in the state block');
 
     const quiet = loadClient({ stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>idle</p>', questionHtml: '', sessions: PLAN_NEXT } });
-    const d = makeContainer();
+    const d = quiet.makeContainer();
     quiet.PromptSection.init(d, HOME);
     await flush(); await flush();
     assert.equal(d.innerHTML.includes('data-question-slot'), false, 'no card, no slot');
   });
 
   test('Escape closes the Change drawer and returns focus to its Change button (witnessed by the close action)', async () => {
-    const { PromptSection } = loadClient({ stateBody: { status: 'idle', live: false, sessions: PLAN_NEXT } });
+    const { PromptSection, makeContainer } = loadClient({
+      stateBody: { status: 'idle', live: false, sessions: PLAN_NEXT },
+      // The Change button is drawn in the Runs on line, which waits for a preview; without one the line reads "Working out".
+      previewBody: { kind: 'plan-review', harness: 'claude-code', words: { model: 'Sonnet' }, sources: { model: 'job' }, group: null, stepLabel: 'Plan review' },
+    });
     const c = makeContainer();
     PromptSection.init(c, HOME);
     await flush();
@@ -544,7 +543,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   // sends none), and the client must not fall back to the task page's sentence; the strip chip shows elapsed time only.
   test('a running task says its state once: no Home line, and the strip chip shows the elapsed time, not the word', async () => {
     const running = { loopId: 'l1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-29T10:00:00.000Z', target: 'cli' };
-    const { PromptSection } = loadClient({
+    const { PromptSection, makeContainer } = loadClient({
       stateBody: {
         status: 'running', live: true, homeStatusHtml: '', headerHtml: '<p>Build running for 1s.</p>',
         stripHtml: '<li class="task-strip-chip"><span class="task-strip-name">Build</span> <span class="task-strip-state">1s<span class="task-strip-srword"> running</span></span></li>',
@@ -563,7 +562,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   // LIN-4010 review (finding 5): Watch opens the task the running box runs on, not the container it sits under.
   test('a container\'s running box: Watch links to the container it runs on', async () => {
     const running = { loopId: 'l9', kind: 'research', label: 'Research', state: 'running', since: '2026-10-29T10:00:00.000Z', target: 'cli' };
-    const { PromptSection } = loadClient({
+    const { PromptSection, makeContainer } = loadClient({
       stateBody: { status: 'running', live: true, homeStatusHtml: '', headerHtml: '', sessions: { count: 1, running, next: null, last: null, offered: null, busy: true, excluded: [] } },
     });
     const c = makeContainer();
@@ -575,7 +574,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   // LIN-4010 review (finding 4, a missing witness): Stop on a container is the subtask's Stop, not the parent's.
   test('Stop on a container posts the container it runs on', async () => {
     const running = { loopId: 'l9', kind: 'research', label: 'Research', state: 'running', since: '2026-10-29T10:00:00.000Z', target: 'cli' };
-    const { PromptSection, calls } = loadClient({
+    const { PromptSection, calls, makeContainer } = loadClient({
       stateBody: { status: 'running', live: true, homeStatusHtml: '', headerHtml: '', sessions: { count: 1, running, next: null, last: null, offered: null, busy: true, excluded: [] } },
     });
     const c = makeContainer();
@@ -593,7 +592,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   // LIN-4010 review (finding 3): Change is a choice. A default card and the saved presets are the choices; "Choose for
   // this run" reveals the existing decision panel, which stays in the drawer, hidden until it is asked for.
   test('Change is a choice: a default card, preset cards, and "Choose for this run" reveals the decision panel', async () => {
-    const { PromptSection } = loadClient({
+    const { PromptSection, makeContainer } = loadClient({
       stateBody: { status: 'idle', live: false, sessions: PLAN_NEXT },
       previewBody: { kind: 'plan-review', harness: 'claude-code', words: { model: 'Sonnet' }, sources: { model: 'job' }, group: null, stepLabel: 'Plan review' },
       presetsBody: [{ id: 'p1', name: 'Quick' }],
@@ -613,7 +612,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   // LIN-4010 review (finding 3): a copy-first viewer's runner line is the view's own foot (inside the Home box), not a
   // line the server appends after the folds.
   test('the copy-first view carries the runner line as its foot', async () => {
-    const { PromptSection } = loadClient({ stateBody: { status: 'idle', live: false, sessions: { count: 0 } } });
+    const { PromptSection, makeContainer } = loadClient({ stateBody: { status: 'idle', live: false, sessions: { count: 0 } } });
     const c = makeContainer();
     PromptSection.init(c, { ...HOME, dispatchEnabled: false });
     await flush(); await flush();
@@ -622,7 +621,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   // LIN-4010 close-out (review: the opened-task surfaces class). Only Home changes layout: the task page's Change panel
   // keeps the Preset row and the decision panel open, with no cards and no "Choose for this run".
   test('the task surface\'s Change panel is unchanged: a Preset row, the decision panel visible, no cards, no choose toggle', async () => {
-    const { PromptSection } = loadClient({
+    const { PromptSection, makeContainer } = loadClient({
       stateBody: { status: 'idle', live: false, sessions: PLAN_NEXT },
       previewBody: { kind: 'plan-review', harness: 'claude-code', words: { model: 'Sonnet' }, sources: { model: 'job' }, group: null, stepLabel: 'Plan review' },
       presetsBody: [{ id: 'p1', name: 'Quick' }],
