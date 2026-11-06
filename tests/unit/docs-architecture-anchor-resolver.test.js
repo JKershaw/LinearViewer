@@ -84,12 +84,14 @@ import { join } from 'node:path';
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
 const architectureDir = join(repoRoot, 'docs/architecture');
 
-// The 4 directories excluded from the sweep (LIN-2896): dated/frozen artifacts
+// The 5 directories excluded from the sweep (LIN-2896): dated/frozen artifacts
 // that legitimately keep citing a location that has since moved — freezing a
 // historical record is not drift. Recursive prefix match, not a shallow glob:
 // a flat `docs/*.md` predicate is exactly what let docs/papers/harbour/ (a
 // nested, NON-denylisted directory) slip through a real sweep once already.
-const DENYLIST_DIRS = ['docs/reviews', 'docs/archive', 'plans', 'scripts/eval'];
+// docs/plans/survey is the Survey notebook (LIN-4314): dated history whose
+// log.md is left as written, so its line-numbered CLAUDE.md citations go stale.
+const DENYLIST_DIRS = ['docs/reviews', 'docs/archive', 'docs/plans/survey', 'plans', 'scripts/eval'];
 const SKIP_DIR_NAMES = new Set(['node_modules', '.git']);
 // `.txt`/`.html` are in the set because they were not, and a citation in
 // public/llms.txt (the live agent-facing file) or a shipped .html page would
