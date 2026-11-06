@@ -7,7 +7,8 @@
  *
  * The REAL `toggleRun`/`initRunToggles` source is sliced out of public/session.js
  * (LIN-4307: on the shared fake DOM through loadWorld, with no private vm), and run
- * over a run card that the test draws as markup, so the shipped selector is what decides.
+ * over the run page the server renders (renderSessionPage: one run with a pending proposal
+ * and its reply box), so the shipped selector decides over the shipped markup.
  *
  * Run with: node --test tests/unit/lin-3254-session-run-toggles.test.js
  */
@@ -17,6 +18,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { loadWorld, clickOn } from './helpers/client-world.js';
+import { renderSessionPageOf } from '../fixtures/cost-read-cores.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SESSION_JS_SRC = readFileSync(join(__dirname, '../../public/session.js'), 'utf8');
@@ -29,26 +31,44 @@ function extractToggleSrc() {
   return SESSION_JS_SRC.slice(start, end);
 }
 
-// One run card: the toggle head, a proposal row, and an inline reply box, as the run's own markup lays them out.
-const RUN_CARD = `<div class="sess-run">
-  <div data-testid="session-run-toggle" aria-expanded="false">Run</div>
-  <div class="sess-proposals"><span class="sess-proposal-text">Proposal</span></div>
-  <div class="sess-inline-reply"><span class="sess-reply-text">Reply</span></div>
-</div>`;
+// The run page as the server renders it: one run the owner can reply to, with one pending proposal (renderSessionPage,
+// through the fixture that builds its run view). Body only: the fake parser takes no doctype.
+const T = '2026-01-01T00:00:00.000Z';
+function runPageBody() {
+  const html = renderSessionPageOf({
+    session: {
+      sessionId: 'run-1', seedIssue: 'TEST-1', tasksTouched: ['TEST-1'], dispatchedAt: T, completedAt: T,
+      telemetry: { runtime: { ms: 60000 }, metrics: [], producedArtifacts: [] },
+      loops: [{
+        loopId: 'loop-1', issueIdentifier: 'TEST-1', issueId: 'uuid-1', issueTitle: 'Seed task', iteration: 1,
+        kind: 'autopilot', dispatchedAt: T, terminalStatus: 'done', terminalCompletedAt: T, feedback: [], telemetry: null,
+      }],
+    },
+    sessionId: 'run-1', urlKey: 'ws', issueContext: [], canReply: true,
+    proposals: [{ id: 'p1', runId: 'run-1', stepLoopId: 'loop-1', prompt: 'add a test', status: 'proposed' }],
+  });
+  return html.match(/<body[^>]*>([\s\S]*)<\/body>/i)[1];
+}
 
-// The world the slice runs in: the run card drawn on the page, then initRunToggles run over it.
+// The world the slice runs in: the server's run page drawn, then initRunToggles run over it. The click targets are
+// plain text inside each excluded region (the proposal's prompt, the reply box's thread), never a button or textarea,
+// which the selector excludes on their own.
 function makeWorld() {
   const world = loadWorld({ scripts: [] });
-  world.document.body.innerHTML = RUN_CARD;
+  world.document.body.innerHTML = runPageBody();
   world.run(extractToggleSrc());
   world.run('initRunToggles()');
-  const run = world.document.querySelector('.sess-run');
-  return {
+  const runs = world.document.querySelectorAll('.sess-run');
+  assert.equal(runs.length, 1, 'the page has the one run');
+  const run = runs[0];
+  const found = {
     run,
     head: run.querySelector('[data-testid="session-run-toggle"]'),
-    proposal: world.document.querySelector('.sess-proposal-text'),
-    reply: world.document.querySelector('.sess-reply-text'),
+    proposal: run.querySelector('.sess-proposals .sess-proposal-prompt'),
+    reply: run.querySelector('.sess-inline-reply [data-testid="session-inline-reply-thread"]'),
   };
+  for (const [name, el] of Object.entries(found)) assert.ok(el, `the server's run card has its ${name}`);
+  return found;
 }
 
 test('initRunToggles ignores a click inside .sess-proposals (LIN-3254 nit)', async () => {
