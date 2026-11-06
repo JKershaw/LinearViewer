@@ -2537,3 +2537,12 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 
   Not verified against live Linear's complexity limit, so the check is `GET /issues/LIN-4150` after deploy. Blind reads sent: BI and BJ.
 - 14:45: **LIN-4322: better, better (BI, BJ).** Residues pulled into LIN-4328, the builder's follow-up that touches the other two cursor loops: three cursor loops, the page size written about eight times, the guard blind to `return gql`, two or three truncation shapes, and the interface and catalogue not told. The live check (`LIN-4150` returning more than 50 comments) comes after deploy.
+- 15:05: **Drift & Coherence run 5 (LIN-4324):** "better, small", the same as run 4, with its area verdicts written from code before it opened the paper or the ledger:
+  - DOM-access spelling **better**;
+  - client test tree **better** (suites not on `loadWorld` 64 → 49 in its window);
+  - Periodical mint **better in the rule, neutral in its inputs** (the session lane decides the grant from browser-posted text, LIN-4318; its second read calls it "the larger item by consequence");
+  - **production shaped for tests: mixed** (the test-only `window.LiveConsoleLane`).
+
+  It agrees with the ledger on every ticket it could read. Top new finding: the enqueue-route list is restated in 10 prose places, 4 stale (home LIN-4320, whose acceptance grep would miss all four). That's the derived-list case again.
+- 15:05: **LIN-4322 deployed (`badec1fb`), and the live check passes:** `GET /issues/LIN-4150` returns **143 comments** (from 2 Nov 21:44), with no truncation flag. Live Linear accepted the paged queries, and the pre-5-Nov Surveys are visible again.
+- 15:05: LIN-4254's after-questions go to its last piece's builder (LIN-4312, `4b03a6bc`), q1–q7, answering for the whole move where it helps.
