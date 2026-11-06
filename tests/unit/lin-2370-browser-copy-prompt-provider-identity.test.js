@@ -44,6 +44,7 @@ import { dirname, join } from 'node:path';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { withHarnessModels } from '../fixtures/harness-models.js';
+import { PROXY_PROMPT_BOX } from '../fixtures/proxy-prompt-box.js';
 import { loadWorld, clickOn } from './helpers/client-world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -220,8 +221,8 @@ describe('LIN-2370 Part 2a — public/common.js buildBlock (the +proxy append)',
  * Drive the REAL public/proxy.js copy button in a loadWorld and return the prompt it composed.
  *
  * public/proxy.js is a DOM-bound IIFE with no window export, so this runs it over the shared fake DOM with the Proxy
- * page's own elements (the ids it reads at load, and the create-token form that names the workspace). The generate button
- * is clicked the way a browser delivers the click (`clickOn`), and the handler writes the composed prompt to
+ * page's own elements, cut from the real renderer (the ids it reads at load, and the element that names the workspace).
+ * The generate button is clicked the way a browser delivers the click (`clickOn`), and the handler writes the composed prompt to
  * `#proxy-prompt-output`. `window.api` is the mint response, the channel under test. This matters because no e2e touches
  * the Proxy page copy button at all (`grep proxy-generate-btn tests/e2e/` is empty), making this the only coverage
  * standing behind that call site.
@@ -240,10 +241,8 @@ async function runCopyButton(providerDisplayName) {
       navigator: { clipboard: { writeText: async () => {} } },
     },
   });
-  // The Proxy page's markup. No scope picker and no events list are drawn, so proxy.js takes its absent-element paths.
-  world.document.body.innerHTML = '<button id="proxy-generate-btn">Generate</button>'
-    + '<pre id="proxy-prompt-output"></pre>'
-    + '<form id="proxy-create-token-form" data-url-key="acme"></form>';
+  // The Proxy page's own prompt controls, cut from lib/render-proxy.js's output (tests/fixtures/proxy-prompt-box.js).
+  world.document.body.innerHTML = PROXY_PROMPT_BOX;
   // The IIFE's trailing init (refreshTokenCount / loadCredentialHealth) fires fetches through the same stubbed window.api;
   // nothing there affects the prompt, and any rejection is an unhandled promise, not a load failure.
   world.run(readFileSync(join(__dirname, '../../public/proxy.js'), 'utf8'));
