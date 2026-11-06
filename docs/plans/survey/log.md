@@ -2588,3 +2588,13 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **"The after-step's effect is real against this baseline" overclaims.** The pair baseline shows that reading a pair as one area doesn't by itself make it read better. It doesn't compare loop with no loop, and its one better pair was a consolidation, which fits "the prompt rewards consolidation wherever it happens" (the circularity limit) as well as a loop effect. What it supports: **consolidation reads better, and the loop's finished moves are consolidations.** The ledger's section is corrected.
   - **The clock in this log is unreliable on 6 Nov.** The headings are this session's labels and drift from git and comment times by up to about 1.5 h: the "12:30" rule was committed at 11:06:53Z (`e8442b96`), and the first read posted at 11:09:06Z. **Cite git and comment times, not these headings.** On that evidence the rule was fixed *before the results*, not before reading: I saw the four pairs, then logged them.
   - The independent-reading limit moves rather than lifts: Seams run 9 reads to `90542b2c` and Drift run 5 to `5c63aa26`, so LIN-4312, LIN-4322 and later have only the blind prompt. Seams run 9 calls the catch-all unchanged (17, with `lib/stage-writes.js` still in it), so run 8's worse area still stands.
+- LIN-4332 (the sync) scoped at the new pin `ad935b8d`, which includes the corrected pair-baseline claim and the clock note, and started. It lands alone, first. Both shas go in the PR. The operator working state in the notes (a token's *filename* and expiry, a trigger id, scratchpad paths, no secret values) is copied unchanged; moving session state off main is for the integration discussion. **LIN-4331's scope is prepared and applied once the sync merges:**
+  - three decisions written first (the pair baseline's name and its one narrow claim; one counting unit; the freeze points);
+  - one set of scripts for both versions, with v1 reproduced byte for byte;
+  - the title parser failing on what it can't read;
+  - the selection rule re-implemented;
+  - the Survey recount by a written rule;
+  - the independent-reading limit moved, not lifted;
+  - the census as its own definition (a crude grep rose 46 → 51);
+  - the facts at their true scope;
+  - git and comment times, not the notebook's clock headings.
