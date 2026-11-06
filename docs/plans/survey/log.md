@@ -2600,3 +2600,17 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - git and comment times, not the notebook's clock headings.
 - LIN-4332 merged (`1c894016`); the notebook on main matches `ad935b8d` exactly (empty diff). **LIN-4331 (paper v2) scoped and started.** The essay (LIN-4330) follows it.
 - **LIN-4333 (`509f797e`), v2's first piece:** one script set for both paper versions. Every v1-specific value has moved to `inputs-v1.json`, with a strict title parser and freeze hardening. **v1 reproduces byte for byte** (`cmp` on `blind-codes.json`, `analysis.json`, `evidence-table.tsv` and `census-by-merge.json`), and the v1 evidence folder is unchanged. That's "one set of scripts, proved by v1" as scoped.
+
+### Paper v2 merged (LIN-4334, `ea352306`); the essay started
+- **v2's headline:** "Areas read better in both passes, where one of four ordinary pairs did; the Periodicals broadly agree on direction; tasks on average: not shown."
+  - **Nine area readings over fifteen tickets, all better in both passes; no pass read one worse.** The pair baseline is stated narrowly: it's not loop against no loop, and its one better pair was a consolidation.
+  - **Survey recount:** 29 of 68, against v1's 17 of 59. LIN-4322's fix made the pre-5-Nov Surveys reachable, so the paper's own bug find improved the paper.
+  - **Census at 6, all stops, on its own definition,** beside Drift's crude grep (46 → 51).
+  - **The limits:** circularity (it applies to the pair baseline too); four pairs from one afternoon; seven merges after both Periodical windows, with no Periodical reading.
+  - One script set serves both versions, and v1 reproduces byte for byte. Two fresh readers.
+- **The essay, LIN-4330, scoped and started:**
+  - every number from v2, in v2's unit and wording;
+  - the census as its own definition, and Drift's mixed area used as the essay's own pattern;
+  - post-window facts stated as facts, not Periodical verdicts;
+  - figures scripted in `<slug>-scripts/`, reading v2's folder in place;
+  - citations at `path@sha:line`.
