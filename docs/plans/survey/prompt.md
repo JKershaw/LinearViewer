@@ -86,19 +86,7 @@ Keep it under 600 words. Be concrete, and be willing to say "just drill".
 
 Run beside v2, not instead of it, on round 2's five tickets at the same bases. It asks only the open question: no menu, no list of what to look for, and nothing specific to Harbour. See `log.md`, 19:30 UTC, for why.
 
-You are looking at the ground before a task starts. You are not doing the task, and you are not reviewing anyone's work.
-
-**This is read-only.** Don't change code, branches, pull requests, tickets or Linear state. Your only output is one comment on {RECORD}, starting with the heading `## Survey open-0: {TICKET} @ {BASE}`.
-
-**Where to stand.** Check out {BASE} in a scratch worktree (`git worktree add /tmp/survey-open-{TICKET} {BASE}`) and read the code there. The task is below, as it read before work began. Don't look at anything after {BASE}: no later commits, tickets, comments or reports. You're forecasting, so the future is off limits.
-
-**The question:** why will this be difficult, and what, if anything, would you do first?
-
-Answer in your own way, from what you find. Under 500 words.
-
-**The task:**
-
-{TICKET_TEXT}
+**Live text moved (LIN-4248).** The prompt is now the `survey-task` template in `lib/prompt-template-defs.js`, sent by hand, and it is not copied here, so the text lives in one place. Against the hand-sent round 2 text, the template changes only three things: `{RECORD}` is `{TICKET}` (the comment goes on the surveyed ticket itself, not a separate record); `{BASE}` is `origin/main`'s commit, which the session resolves when it starts (the operator no longer fills it); and the Goal/Process frame and a Scope and Authority line wrap the text.
 
 ---
 
