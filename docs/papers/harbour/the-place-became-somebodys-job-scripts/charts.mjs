@@ -5,7 +5,7 @@
 // located relative to this file. Nothing is copied into this folder.
 //   analysis.json           single_and_area_reads (9 area readings over 15 tickets; 16 singles), pair_baseline.readings (4 pairs)
 //   git/census-by-merge.json  the census count at each LinearViewer first-parent merge (git show at each merge)
-// The loop figure (figure 1) is a drawing of docs/plans/survey/notes-2026-11-05.md@1c894016:132-152 and carries no numbers.
+// The loop figure (figure 2) is a drawing of docs/plans/survey/notes-2026-11-05.md@1c894016:132-152 and carries no numbers.
 // Every value plotted is asserted below; a changed input fails the script instead of drawing a different claim.
 import { readFileSync, writeFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
@@ -51,20 +51,43 @@ const firstStopSplit = census.findIndex(m => m.stop_count !== 0 && m.stop_count 
 assert.equal(census[firstStopSplit].short, '591bb9596', 'stop marks first appear at LIN-4272');
 assert.ok(census.slice(0, firstStopSplit).every(m => m.stop_count === 0), 'no stop split before the marks exist');
 
-// ---------- figure 2: nine area readings, and four pairs, two cells each ----------
+// ---------- figure 3: nine area readings, and four pairs, two cells each ----------
+// Row names are plain descriptions of what each change did (LIN-4335). The ticket IDs live in the essay's
+// "Where to check" table, keyed here by the same subject strings the analysis uses. Every row must have a name.
+const AREA_NAMES = {
+  'LIN-4247+LIN-4246+LIN-4293': 'run-end and repaint, then tidy',
+  'LIN-4251+LIN-4277': 'preamble PR wording, then its tidy',
+  'LIN-4252+LIN-4255': 'test stand-in + its follow-on',
+  'LIN-4254': '16 stubs moved onto shared fake',
+  'LIN-4255': 'hand-written fakes onto shared fake',
+  'LIN-4263+LIN-4276': 'cost read + tidy-after',
+  'LIN-4292+LIN-4304': 'guards removed + one spelling',
+  'LIN-4296+LIN-4254': 'fake DOM models select; suites move',
+  'LIN-4313+LIN-4317': 'mint route, then one grant rule',
+};
+const PAIR_NAMES = {
+  '0eb4a2d1→a6e0ae11': 'free-tier seam, urlKey registry',
+  'c1d5c700→71a42131': 'KPI trend charts + cost figure',
+  'd10e7398→8ddb0f3b': 'loop-terminal checks, one stop rule',
+  '0da144c8→c5295b42': 'workspace KPI charts + PR times',
+};
+assert.equal(Object.keys(AREA_NAMES).length, 9, 'a name for each of the nine areas');
+assert.ok(areas.every(s => AREA_NAMES[s.subject]), 'every area subject has a plain name');
+assert.equal(Object.keys(PAIR_NAMES).length, 4, 'a name for each of the four pairs');
+assert.ok(pairs.every(p => PAIR_NAMES[p.selected_pair]), 'every pair has a plain name');
+
 function areaAndPairFigure() {
   const W = 960, rowH = 30, cellW = 92, X_CELL1 = 430, X_CELL2 = X_CELL1 + cellW + 10;
   const groupA = 78, groupB = groupA + areas.length * rowH + 62;
   const H = groupB + pairs.length * rowH + 110;
   const o = [svgOpen(W, H, 'Nine finished-move area readings, all better in both blind passes, beside four ordinary pre-loop pairs, of which one is better in both passes. Each row has two cells, pass 1 and pass 2.')];
   o.push(`<text x="20" y="28" font-size="14" font-weight="600" fill="${INK}">Finished moves, read as one area each</text>`);
-  o.push(`<text x="20" y="46" font-size="11" fill="${MUTED}">Nine readings over fifteen tickets. LIN-4254 and LIN-4255 each sit in two readings, so the tickets are counted once.</text>`);
+  o.push(`<text x="20" y="46" font-size="11" fill="${MUTED}">Nine readings over fifteen tickets. Two tickets sit in two readings each, so the tickets are counted once.</text>`);
   o.push(`<text x="${X_CELL1 + cellW / 2}" y="${groupA - 12}" font-size="10.5" fill="${MUTED}" text-anchor="middle">pass 1</text>`);
   o.push(`<text x="${X_CELL2 + cellW / 2}" y="${groupA - 12}" font-size="10.5" fill="${MUTED}" text-anchor="middle">pass 2</text>`);
-  const label = s => s.subject.replace(/LIN-(\d+)/g, '$1').replace(/\+/g, ' + ');
   areas.forEach((s, i) => {
     const y = groupA + i * rowH;
-    o.push(`<text x="20" y="${y + 17}" font-size="11.5" fill="${INK}" font-family="${MONO}">${esc('LIN-' + label(s))}</text>`);
+    o.push(`<text x="20" y="${y + 17}" font-size="11.5" fill="${INK}">${esc(AREA_NAMES[s.subject])}</text>`);
     o.push(`<text x="290" y="${y + 17}" font-size="10.5" fill="${MUTED}">${s.tickets.length} ticket${s.tickets.length > 1 ? 's' : ''}</text>`);
     s.passes.forEach((p, j) => {
       const x = j === 0 ? X_CELL1 : X_CELL2;
@@ -77,9 +100,9 @@ function areaAndPairFigure() {
   pairs.forEach((p, i) => {
     const sel = selected.find(x => x.pair === p.selected_pair);
     const y = groupB + i * rowH;
-    const name = `${sel.first.subject.split(':')[0]} → ${sel.second.subject.split(':')[0].replace('LIN-', '')}`;
+    const name = PAIR_NAMES[p.selected_pair];
     const kind = p.selected_pair === 'd10e7398→8ddb0f3b' ? 'a consolidation' : `shares ${sel.shared_production_files.length} file${sel.shared_production_files.length > 1 ? 's' : ''}`;
-    o.push(`<text x="20" y="${y + 17}" font-size="11.5" fill="${INK}" font-family="${MONO}">${esc(name)}</text>`);
+    o.push(`<text x="20" y="${y + 17}" font-size="11.5" fill="${INK}">${esc(name)}</text>`);
     o.push(`<text x="290" y="${y + 17}" font-size="10.5" fill="${MUTED}">${esc(kind)}</text>`);
     p.passes.forEach((ps, j) => {
       const x = j === 0 ? X_CELL1 : X_CELL2;
@@ -93,13 +116,13 @@ function areaAndPairFigure() {
   return o.join('\n') + '\n';
 }
 
-// ---------- figure 3: the census, one point per merge ----------
+// ---------- figure 1: the census, one point per merge ----------
 function censusFigure() {
   const W = 960, H = 430, X0 = 70, X1 = 910, Y0 = 318, Y1 = 40, YMAX = 60;
   const n = census.length;
   const x = i => X0 + (X1 - X0) * i / (n - 1);
   const y = v => Y0 - (Y0 - Y1) * v / YMAX;
-  const o = [svgOpen(W, H, 'Hand-written fake DOMs on the census list, one point per merge that carries a census count (42): 56 at the first count on 5 November, 25 at af55cb73, 6 from LIN-4312 on, all six marked stop.')];
+  const o = [svgOpen(W, H, 'Hand-written fake DOMs on the census list, one point per merge that carries a census count (42): 56 at the first count on 5 November, 25 by 19:02Z that day, 6 from 11:41Z on 6 November, all six marked stop.')];
   for (const v of [0, 10, 20, 30, 40, 50, 60]) {
     o.push(`<line x1="${X0}" y1="${y(v)}" x2="${X1}" y2="${y(v)}" stroke="${RULE}"/>`);
     o.push(`<text x="${X0 - 10}" y="${y(v) + 4}" font-size="10.5" fill="${MUTED}" text-anchor="end" font-family="${MONO}">${v}</text>`);
@@ -140,7 +163,7 @@ function censusFigure() {
   return o.join('\n') + '\n';
 }
 
-// ---------- figure 1: the loop, before / during / after ----------
+// ---------- figure 2: the loop, before / during / after ----------
 function loopFigure() {
   const W = 960, H = 350;
   const o = [svgOpen(W, H, 'The loop as it ran on 5 November, in three stages: before the work a read-only Survey and a scope call; during the work a tidy first where the change binds, then the change; at merge two blind reads and the builder\'s answers; after the merge a tidy-after of the copies left at the edges. A dashed line returns from the tidy-after to the next ticket in the same area.')];
