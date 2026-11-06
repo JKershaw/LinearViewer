@@ -1,0 +1,12 @@
+W counts {'groups': 566, 'mustRule': 105, 'table': 309, 'unranked': 0, 'gone': 0}
+prior counts {'groups': 566, 'mustRule': 105, 'table': 309, 'unranked': 0, 'gone': 1}
+W status Counter({'unchanged': 566})
+W gone: []
+
+== groups whose status is not unchanged
+
+== mustRule: left the set 0
+== mustRule: joined the set 0
+== mustRule kept (same detector/decision/files): 105 identical sites: 87 lines shifted: 18
+
+== table: left 0 ; joined 0

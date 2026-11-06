@@ -1,0 +1,310 @@
+id	decision	files	areas/files/sites	status vs run 4
+G0026	repeated comparison target == 'local'	lib/dispatch-entrance.js lib/dispatch-targets.js public/common.js public/dispatch.js routes/dispatch.js	2/5/5	unchanged
+G0027	string set {'aborted', 'done', 'failed', 'skipped'} as array/Set/or-chain/table-keys/if-chain [LOOP_TERMINAL_MARKERS, MARKER_TO_AGENT_STATE, TERMINAL_MARKER_TO_STATUS]	lib/dispatch-lineage-status.js lib/dispatch-terminal.js lib/follow-up-dispatch.js lib/kpi-daily-rollup.js lib/kpi-stats.js lib/observer-sweep.js lib/run-loop-state.js lib/runner-kit/runner.mjs	2/8/10	unchanged
+G0033	string set {'cancelled', 'expired'} as or-chain [ID.historyStatus, ID.status]	lib/dispatch-store.js lib/observer-sweep.js lib/task-page-loader.js routes/dispatch.js	1/4/4	unchanged
+G0034	repeated comparison status == 'queued'	lib/consumer-poll-warning.js lib/dispatch-store.js lib/liveness-detectors.js lib/pipeline-loops.js routes/proxy-dispatch.js	2/5/6	unchanged
+G0042	tiny rule copied as a helper clear(), 5 copies of 1-4 statements	lib/agent-status-store.js lib/dispatch-store.js lib/dispatch-tokens.js lib/proxy-events.js lib/proxy-tokens.js	2/5/5	unchanged
+G0043	repeated comparison disposition == 'resumable'	lib/unanswered-decisions.js public/common.js public/observation.js public/question-cards.js	2/4/8	unchanged
+G0044	text contract heading: what ci did not prove	lib/completion-signals.js lib/follow-on-ratio.js lib/prompt-contract.js lib/prompt-template-defs.js lib/prompts/autopilot-kickoff.js lib/run-ledger.js	2/6/8	unchanged
+G0045	text contract marker: [db-indexes]	lib/db-indexes.js server.js	2/2/9	unchanged
+G0046	repeated comparison marker == 'pending'	lib/dispatch-store.js lib/dispatch-wake.js lib/liveness-detectors.js lib/task-page-loader.js	1/4/7	unchanged
+G0047	repeated comparison provider == 'github'	lib/workspace.js server.js	2/2/3	unchanged
+G0048	repeated comparison provider == 'github-projects'	lib/workspace.js server.js	2/2/2	unchanged
+G0052	record assembled from the same sources {id=ID.id, title=ID.title, labels=LogicalExpression.map()}	routes/proxy-compute.js routes/proxy.js routes/task-chat.js	2/3/3	unchanged
+G0053	named constant TOKEN_REFRESH_BUFFER_MS=300000	lib/workspace-token-resolver.js server.js	2/2/2	unchanged
+G0054	string set {'LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'} as array [OAUTH_ENV_VARS, oauthEnvVars]	routes/auth.js server.js	2/2/2	unchanged
+G0055	repeated comparison rawTeam == 'all'	routes/workspace-api-roadmap.js server.js	2/2/2	unchanged
+G0056	literal record repeated verbatim {effort=null, harness=null, model=null}	lib/workspace-preferences.js server.js	2/2/2	unchanged
+G0057	text contract marker: [ci-wake-sweep]	lib/ci-wake-sweep.js server.js	2/2/5	unchanged
+G0058	text contract marker: [liveness-alarm-sweep]	lib/liveness-alarm-sweep.js server.js	2/2/2	unchanged
+G0059	repeated comparison kind == 'more-of-parent'	lib/home-rows.js server.js	2/2/3	unchanged
+G0060	repeated comparison kind == 'search'	lib/home-rows.js server.js	2/2/2	unchanged
+G0061	record assembled from the same sources {urlKey=ID.urlKey, workspaceId=ID.id, accountId=ID.session.accountId}	routes/workspace.js server.js	2/2/2	unchanged
+G0062	repeated comparison kind == 'capture'	lib/email-availability.js server.js	2/2/2	unchanged
+G0063	repeated comparison urlKey == 'test-workspace'	lib/workspace-title-resolver.js server.js	2/2/6	unchanged
+G0064	record assembled from the same sources {githubEnabled=getProvider().entryCta.isConfigured(), jiraEnabled=getProvider().entryCta.isConfigured(), emailEnabled=isEmailSignInAvailable(), freeTierEnabled=isFreeTierOffered()}	routes/getting-started.js server.js	2/2/2	unchanged
+G0065	repeated comparison via == 'proxy'	lib/model-routing-store.js server.js	2/2/3	unchanged
+G0066	repeated comparison getAttribute() == 'true'	public/app.js public/common.js public/dispatch.js public/task-page.js	1/4/7	unchanged
+G0067	near-duplicate function clear() (also: clearHistory), ~7 statements, fuzzy	lib/close-out-events-store.js lib/dispatch-store.js lib/observation-sessions-store.js lib/task-mode-store.js	1/4/4	unchanged
+G0069	string set {'github', 'github-projects'} as Set/array/or-chain [REMINT_KINDS, INSTALLATION_KEYED_PROVIDERS, ID.provider]	lib/connection-binding.js lib/connection-credential.js lib/errors.js lib/workspace-token-refresh.js lib/workspace-token-resolver.js lib/workspace.js	2/6/6	unchanged
+G0070	repeated comparison state == 'record'	lib/dispatch-store.js lib/proxy-preamble.js routes/dispatch.js	2/3/3	unchanged
+G0071	text contract marker: [dispatch]	lib/dispatch-store.js lib/proxy-preamble.js routes/dispatch.js	2/3/4	unchanged
+G0073	repeated comparison target == 'web'	lib/dispatch-targets.js public/prompt-section.js public/question-cards.js public/session.js	2/4/5	unchanged
+G0074	named constant CONTEXT_FETCH_TIMEOUT_MS=45000	routes/proxy.js routes/workspace-api.js	2/2/2	unchanged
+G0081	string set {'decision-answer', 'decision-withdrawal-reversed', 'decision-withdrawn'} as or-chain/Set [ID.kind, DECISION_STAMP_KINDS, DECISION_LIFECYCLE_STAMP_KINDS]	lib/digest-feedback.js lib/run-view.js lib/session-telemetry.js lib/wall-clock-summary.js public/dispatch.js	2/5/5	unchanged
+G0083	repeated comparison source == 'free'	lib/components/footer.js lib/render-settings-you.js routes/workspace-api.js	2/3/3	unchanged
+G0084	repeated comparison mode == 'add-source'	lib/github-install-flow.js lib/held-connection-entry.js lib/render-pages.js routes/account-merge.js routes/auth.js routes/jira-auth.js	2/6/28	unchanged
+G0085	named constant DANGEROUS_CHARS_REGEX=/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/	lib/dispatch-feedback-validation.js lib/dispatch-validation.js lib/issue-write-validation.js routes/dispatch.js	2/4/4	unchanged
+G0086	named constant MAX_NAME_LENGTH=1000	lib/dispatch-feedback-validation.js lib/dispatch-validation.js lib/issue-write-validation.js routes/dispatch.js	2/4/4	unchanged
+G0087	repeated comparison kind == 'decision'	lib/digest-feedback.js lib/pipeline-loops.js lib/runner-kit/runner.mjs lib/session-telemetry.js	1/4/6	unchanged
+G0089	tiny rule copied as a helper onEvent() (also: (anonymous)), 5 copies of 1-4 statements	routes/flight-companion.js routes/proxy-flight-companion.js routes/task-chat.js routes/workspace-api-roadmap.js	2/4/5	unchanged
+G0090	text contract marker: [skipped]	lib/observer-efficacy-signal.js lib/proxy-instructions.js lib/runner-kit/runner.mjs	2/3/6	unchanged
+G0091	tiny rule copied as a helper buildPromptFilename(), 3 copies of 1-4 statements	lib/prompt-formatters.js public/app.js public/prompt-section.js	2/3/3	unchanged
+G0094	tiny rule copied as a helper (anonymous)(), 3 copies of 1-4 statements	lib/components/decision-panel.js lib/render-settings.js public/common.js	2/3/3	unchanged
+G0096	text contract marker: [aborted]	lib/dispatch-lineage-status.js lib/proxy-instructions.js lib/runner-kit/runner.mjs	2/3/9	unchanged
+G0097	repeated comparison readyState == 'loading'	public/app.js public/feedback-widget.js public/flight-companion.js public/ship.js	1/4/4	unchanged
+G0098	near-duplicate function (anonymous)() (also: relayDispatchRefusal), ~10 statements, same vocabulary (dialect copy or close variant)	lib/dispatch-entrance.js routes/proxy.js	2/2/2	unchanged
+G0100	near-duplicate function clear(), ~7 statements, structurally identical	lib/dismissal-suggestions-store.js lib/report-history-store.js lib/run-proposals-store.js lib/saved-chat-store.js lib/shelved-rulings-store.js lib/ship-biscuit-history-store.js lib/task-decisions-store.js lib/task-snapshot-store.js	2/8/8	unchanged
+G0101	tiny rule copied as a helper (anonymous)(), 5 copies of 1-4 statements	public/prompt-section.js public/task-chat.js public/task-page.js	1/3/5	unchanged
+G0104	repeated comparison phase == 'proposed'	public/chat.js public/flight-companion.js public/task-chat.js routes/proxy-flight-companion.js	2/4/5	unchanged
+G0105	repeated comparison value == 'true'	public/app.js public/settings.js routes/test.js	2/3/3	unchanged
+G0107	repeated comparison id == '__periodicals__'	lib/home-rows.js lib/home-view.js lib/render.js lib/task-board-view.js	2/4/5	unchanged
+G0110	repeated comparison tagName == 'SELECT'	public/common.js public/settings-models.js public/swipe.js	1/3/3	unchanged
+G0111	repeated comparison kind == 'recap'	lib/render-run-steps.js routes/workspace-api.js	2/2/3	unchanged
+G0112	repeated comparison name == 'list_pending_decisions'	lib/chat-tools.js public/chat.js public/flight-companion.js	2/3/3	unchanged
+G0113	string set {'autopilot', 'blocked', 'breakdown', 'bug', 'close-out', 'context', +17} as table-keys [STAGE_LEADS, STAGE_LABELS, BUCKET_OF_KIND]	lib/prompt-template-defs.js lib/run-view.js lib/wall-clock-summary.js	2/3/3	unchanged
+G0114	string set {'done', 'failed'} as or-chain/table-keys [ID.terminalStatus, PILL_GLYPHS]	lib/render-session.js public/flight-companion.js public/task-chat.js	2/3/3	unchanged
+G0117	tiny rule copied as a helper header() (also: setupNoticeHtml), 3 copies of 1-4 statements	public/brief.js public/prompt-section.js public/scan.js	1/3/3	unchanged
+G0121	repeated comparison state == 'closed'	lib/github-pr-files.js lib/pr-state-copy.js lib/pr-state-store.js lib/providers/github/fake-client.js lib/render-task-page.js	2/5/5	unchanged
+G0122	record assembled from the same sources {urlKey=ID.urlKey, identifier=ID.identifier, source=ID.source}	public/prompt-section.js public/scan.js public/sessions.js	1/3/3	unchanged
+G0124	tiny rule copied as a helper enqueueGuard() (also: haltRefusal), 3 copies of 1-4 statements	routes/flight-companion.js routes/settings.js routes/task-chat.js	1/3/3	unchanged
+G0127	repeated comparison section == 'recent-activity'	lib/render-swipe.js lib/render.js public/swipe.js	2/3/5	unchanged
+G0128	string set {'1', 'true'} as or-chain [ID.query.cachedOnly, ID.query.noDescend, ID.query.diff]	routes/dashboard-summaries.js routes/proxy-compute.js routes/test.js	2/3/6	unchanged
+G0130	string set {'backlog', 'done', 'failed', 'in-progress', 'todo'} as table-keys [STATE_GLYPHS, STATUS_PILL_GLYPHS]	lib/components/status-pill.js public/audit.js public/common.js	2/3/3	unchanged
+G0131	repeated comparison section == 'prompt'	lib/openrouter.js public/prompt-section.js	2/2/2	unchanged
+G0132	repeated comparison section == 'reasoning'	lib/openrouter.js public/prompt-section.js	2/2/2	unchanged
+G0133	repeated comparison kind == 'bootstrap'	lib/proxy-tokens.js lib/settings-keys.js routes/test.js	2/3/9	unchanged
+G0134	record assembled from the same sources {urlKey=ID.urlKey, workspaceId=ID.id, ownerAccountId=ID.session.accountId}	routes/proxy-tokens-admin.js routes/task-share.js routes/test.js	2/3/3	unchanged
+G0141	repeated comparison toLowerCase() == 'bug'	lib/prompt-formatters.js lib/prompt-template-defs.js lib/task-order.js	2/3/3	unchanged
+G0144	text contract heading: workflow	lib/prompt-formatters.js lib/prompt-template-defs.js lib/prompts/revision-brief.js	1/3/14	unchanged
+G0145	repeated comparison finishReason == 'length'	lib/prompts/ship-biscuit-editor.js lib/stage-router.js public/flight-companion.js public/roadmap.js	2/4/5	unchanged
+G0147	tiny rule copied as a helper ui(), 4 copies of 1-4 statements	lib/providers/github-projects/index.js lib/providers/jira/index.js lib/providers/linear/index.js lib/providers/local/index.js	1/4/4	unchanged
+G0148	repeated comparison agentState == 'queued'	lib/observer-sweep.js lib/task-page-loader.js routes/dashboard-feed.js	2/3/4	unchanged
+G0150	repeated comparison protocol == 'https:'	public/common.js routes/jira-auth.js	2/2/2	unchanged
+G0156	named constant HOUR_MS=3600000	lib/kpi-daily-rollup.js lib/kpi-stats.js lib/periodical-runs.js lib/workspace-kpi-stats.js	2/4/4	unchanged
+G0158	named constant COMPANION_INSTANCE_PREFIX="companion:v1:"	lib/agent-turn.js lib/flight-companion-gate.js routes/flight-companion.js	2/3/3	unchanged
+G0159	string set {'complete', 'error'} as Set/or-chain [LOOP_TERMINAL_AGENT_STATES, TERMINAL_AGENT_STATES, ID.agentState]	lib/follow-up-dispatch.js lib/run-loop-state.js public/observation.js	2/3/4	unchanged
+G0160	tiny rule copied as a helper (anonymous)(), 5 copies of 1-4 statements	public/dispatch.js public/question-cards.js public/session.js	1/3/5	unchanged
+G0161	repeated comparison phase == 'error'	public/chat.js public/flight-companion.js routes/proxy-flight-companion.js	2/3/3	unchanged
+G0162	named constant POLL_MS=5000	public/collective.js public/live-console.js public/observation.js	1/3/3	unchanged
+G0163	tiny rule copied as a helper constructor(), 6 copies of 1-4 statements	lib/collective-characters-store.js lib/collective-presets-store.js lib/dispatch-presets-store.js lib/saved-chat-store.js lib/task-decisions-store.js lib/task-snapshot-store.js	2/6/6	unchanged
+G0165	tiny rule copied as a helper (anonymous)(), 6 copies of 1-4 statements	lib/connection-binding.js lib/connection-credential.js lib/connection-secondary-remint.js routes/held-connection.js	1/4/6	unchanged
+G0172	record assembled from the same sources {runs=ID.runs, priced=ID.priced, unpriced=ID.unpriced, noTelemetry=ID.noTelemetry, spendUsd=ID.spendUsd, +1}	lib/render-settings-models.js routes/dispatch.js	2/2/2	unchanged
+G0178	repeated comparison source == 'live'	lib/liveness-alarm-sweep.js lib/observer-sweep.js lib/pipeline-loops.js	1/3/4	unchanged
+G0179	near-duplicate function relativeTime() (also: renderDeployInfo), ~22 statements, same vocabulary (dialect copy or close variant)	lib/components/footer.js public/common.js	2/2/2	unchanged
+G0180	repeated comparison kind == 'brief'	lib/render-run-steps.js lib/render-task-page.js public/task-page.js	2/3/4	unchanged
+G0181	repeated comparison turnKind == 'boot'	lib/agent-turn.js lib/prompts/flight-companion-brief.js public/flight-companion.js	2/3/18	unchanged
+G0182	tiny rule copied as a helper msSince() (also: (anonymous)), 3 copies of 1-4 statements	lib/cost-read.js lib/task-page-loader.js lib/task-state.js	2/3/3	unchanged
+G0184	repeated comparison disposition == 'gone'	lib/unanswered-decisions.js public/observation.js	2/2/5	unchanged
+G0185	repeated comparison state == 'open'	lib/liveness-alarm-store.js lib/pr-state-copy.js lib/pr-state-store.js lib/run-closeout-state.js lib/run-evidence.js	2/5/6	unchanged
+G0186	string set {'http:', 'https:'} as array/or-chain [[...].includes, ID.protocol]	lib/dispatch-feedback-validation.js lib/email-availability.js lib/runner-kit/broker.mjs lib/runner-kit/runner.mjs	2/4/4	unchanged
+G0187	literal record repeated verbatim {label="__ai__", name=null, why="Generate the next prompt for this task"}	lib/task-board-view.js public/prompt-section.js	2/2/2	unchanged
+G0188	repeated comparison rung == 'run-task'	lib/task-mode-store.js public/prompt-section.js	2/2/2	unchanged
+G0189	string set {'done', 'next-step', 'pr'} as array	lib/task-mode-store.js public/prompt-section.js	2/2/2	unchanged
+G0190	string set {'done', 'pr'} as or-chain [ID.filledRung, ID()]	lib/task-mode-store.js public/prompt-section.js	2/2/3	unchanged
+G0191	near-duplicate function computeFitZoom(), ~11 statements, same vocabulary (dialect copy or close variant)	lib/ship-layout.js public/common.js	2/2/2	unchanged
+G0192	near-duplicate function firstPromptLine() (also: toStackHeadline), ~6 statements, fuzzy	lib/task-stack.js public/common.js	2/2/2	unchanged
+G0193	string set {'canceled', 'completed', 'duplicate'} as array [TERMINAL_TYPES]	lib/providers/models.js public/common.js	2/2/2	unchanged
+G0196	repeated comparison state == 'unknown'	lib/render-run-evidence.js lib/render-task-page.js lib/ticket-close-closer.js	2/3/5	unchanged
+G0197	repeated comparison status == 'aborted'	lib/dispatch-terminal.js lib/pipeline-churn.js lib/pipeline-loops.js	1/3/11	unchanged
+G0199	near-duplicate function (anonymous)(), ~7 statements, same vocabulary (dialect copy or close variant)	lib/components/segment-bar.js public/common.js	2/2/2	unchanged
+G0200	near-duplicate function clampTimelineWindow() (also: clampWindow), ~12 statements, fuzzy	lib/timeline-zoom.js public/common.js	2/2/2	unchanged
+G0201	near-duplicate function computeTimelineFit(), ~10 statements, same vocabulary (dialect copy or close variant)	lib/timeline-zoom.js public/common.js	2/2/2	unchanged
+G0202	near-duplicate function computeTimelineZoom(), ~15 statements, same vocabulary (dialect copy or close variant)	lib/timeline-zoom.js public/common.js	2/2/2	unchanged
+G0203	near-duplicate function renderChip(), ~8 statements, fuzzy	lib/components/tag.js public/common.js	2/2/2	unchanged
+G0204	near-duplicate function renderSegmentBar(), ~17 statements, fuzzy	lib/components/segment-bar.js public/common.js	2/2/2	unchanged
+G0205	near-duplicate function renderStatusPill(), ~18 statements, fuzzy	lib/components/status-pill.js public/common.js	2/2/2	unchanged
+G0206	near-duplicate function renderSurface(), ~11 statements, fuzzy	lib/components/surface.js public/common.js	2/2/2	unchanged
+G0207	near-duplicate function renderTag(), ~11 statements, fuzzy	lib/components/tag.js public/common.js	2/2/2	unchanged
+G0208	near-duplicate function groupLoopsByLineage() (also: runsByLineage), ~10 statements, structurally identical	lib/run-view.js public/observation.js	2/2/2	unchanged
+G0209	record assembled from the same sources {remaining=ID.remaining, limit=ID.limit}	lib/plan-allowance.js public/prompt-section.js	2/2/3	unchanged
+G0211	repeated comparison status == 'skipped'	lib/kpi-stats.js lib/terminal-marked-task-cost.js lib/weekly-budget.js	2/3/3	unchanged
+G0212	tiny rule copied as a helper (anonymous)(), 3 copies of 1-4 statements	public/flight-companion.js public/roadmap.js public/task-chat.js	1/3/3	unchanged
+G0213	repeated comparison status == 'merged'	lib/render-run-evidence.js lib/render-task-page.js routes/workspace-api-run-evidence.js	2/3/4	unchanged
+G0217	string set {'closed', 'multiple-prs', 'no-pr', 'not-ready'} as or-chain [ID.status]	lib/render-run-evidence.js public/close-out.js public/session.js	2/3/3	unchanged
+G0218	text contract marker: [working]	lib/dispatch-terminal.js lib/prompts/autopilot-kickoff.js lib/prompts/flight-companion-kickoff.js	2/3/3	unchanged
+G0222	string set {'cdn.linear.app', 'linear.app', 'uploads.linear.app'} as Set [LINEAR_IMAGE_HOSTS, allowedHosts]	lib/render.js routes/workspace-api-issue-read.js	2/2/2	unchanged
+G0223	string set {'home-up-next', 'in-progress', 'project', 'recent-activity'} as or-chain/array [KNOWN_SECTIONS]	lib/render.js routes/workspace-api-issue-read.js	2/2/2	unchanged
+G0225	repeated comparison singleUse == 'true'	routes/proxy-tokens-admin.js routes/test.js	2/2/2	unchanged
+G0226	string set {'High', 'Low', 'Medium', 'No priority', 'Urgent'} as array [PRIORITY_NAMES, PRIORITY_OPTION_LABELS]	lib/home-view.js lib/render.js	2/2/2	unchanged
+G0227	named constant MAX_IDENTIFIER_LENGTH=100	lib/dispatch-validation.js routes/proxy-dispatch.js	2/2/2	unchanged
+G0228	repeated comparison pageMode == 'backlog'	lib/home-pipeline.js lib/render.js	2/2/2	unchanged
+G0229	literal record repeated verbatim {lastCensusSnapshot=null, lastCensusStateHash=null, lastTurnAt=null, notes="", reservationId=null, turnReservedUntil=n...}	lib/flight-companion-gate.js routes/test.js	2/2/2	unchanged
+G0231	text contract marker: [usage]	lib/effort-readout.js lib/liveness-detectors.js lib/session-telemetry.js	1/3/4	unchanged
+G0232	record assembled from the same sources {promptMeta=ID.promptMeta, defaultPromptKeys=ID.defaultPromptKeys, morePromptKeys=ID.morePromptKeys, customPrompts=ID.customPrompts, hasAI=ID.hasAI, +5}	lib/render-swipe.js public/app.js	2/2/2	unchanged
+G0233	repeated comparison built == 'unknown'	lib/db-indexes.js lib/kpi-daily-rollup.js	2/2/2	unchanged
+G0234	repeated comparison status == 'proposed'	lib/render-session.js routes/task-page.js	2/2/2	unchanged
+G0235	repeated comparison tierOf() == 'deferred'	lib/db-indexes.js lib/kpi-daily-rollup.js	2/2/3	unchanged
+G0238	repeated comparison mergedBy == 'close-out'	lib/render-task-page.js lib/task-page-loader.js	2/2/2	unchanged
+G0241	repeated comparison reason == 'free-tier'	routes/flight-companion.js routes/proxy-flight-companion.js	2/2/3	unchanged
+G0243	tiny rule copied as a helper countFor() (also: lookupsFor), 3 copies of 1-4 statements	lib/connection-credential.js lib/task-done-cache.js lib/workspace-token-cache.js	2/3/3	unchanged
+G0244	named constant ARCHIVE_PAGE_SIZE=30	public/observation.js routes/dashboard-feed.js	2/2/2	unchanged
+G0245	named constant STALE_AFTER_MS=86400000	public/observation.js routes/dashboard-session-state.js	2/2/2	unchanged
+G0246	repeated comparison status == 'error'	public/observation.js routes/dashboard-feed.js	2/2/3	unchanged
+G0247	repeated comparison view == 'sessions'	public/observation.js routes/dashboard-feed.js	2/2/2	unchanged
+G0252	near-duplicate function constructor(), ~5 statements, fuzzy	lib/providers/github-projects/index.js lib/providers/github/index.js lib/providers/jira/index.js	1/3/3	unchanged
+G0253	near-duplicate function (anonymous)(), ~6 statements, fuzzy	lib/dispatch-feedback-format.js routes/proxy-dispatch.js	2/2/2	unchanged
+G0256	record assembled from the same sources {urlKey=ID.proxyUrlKey, createdBy=ID.proxyCreatedBy, clientSignal=ID.signal}	lib/dispatch-entrance.js routes/proxy-compute.js	2/2/2	unchanged
+G0258	repeated comparison kind == 'periodical'	lib/dispatch-entrance.js routes/proxy-compute.js	2/2/2	unchanged
+G0259	tiny rule copied as a helper buildBriefMessages() (also: buildRoadmapGapMessages, buildRoadmapProductMessages, buildEditorMessages, buildRecapMessages), 8 copies of 1-4 statements	lib/brief.js lib/prompts/roadmap-gap-template.js lib/prompts/roadmap-product-template.js lib/prompts/ship-biscuit-editor.js lib/recap.js lib/run-paragraph.js lib/run-summary.js lib/session-summary.js	2/8/8	unchanged
+G0260	repeated comparison state == 'none'	lib/pr-state-copy.js routes/test.js	2/2/2	unchanged
+G0261	repeated comparison status == 'priced'	lib/render-session.js lib/run-view.js	2/2/3	unchanged
+G0264	repeated comparison turnKind == 'auto-wake'	lib/agent-turn.js public/flight-companion.js	2/2/5	unchanged
+G0266	tiny rule copied as a helper isId() (also: shortString, (anonymous), isSafeSingleQuotedLiteral, isSafeDoubleQuotedLiteral), 6 copies of 1-4 statements	lib/close-out-events-store.js lib/consumer-heartbeat.js lib/harbour-spawn.js lib/task-mode-store.js	1/4/6	unchanged
+G0267	repeated comparison state == 'dead'	lib/render-session.js public/live-console.js	2/2/3	unchanged
+G0268	string set {'gone', 'resumable', 'task-bound'} as or-chain	lib/unanswered-decisions.js public/chat.js	2/2/2	unchanged
+G0269	repeated comparison openRouterSource == 'free'	lib/render-observation.js lib/render-prompt-opts.js routes/settings.js	2/3/3	unchanged
+G0271	repeated comparison category == 'upstream'	lib/prompt-templates.js lib/render-pages.js	2/2/2	unchanged
+G0280	repeated comparison by == 'close-out'	lib/task-page-loader.js routes/workspace-api-run-evidence.js	2/2/2	unchanged
+G0281	repeated comparison viewer == 'owner'	lib/render-task-page.js routes/task-page.js	2/2/3	unchanged
+G0283	near-duplicate function deleteByConnection() (also: deleteUserPreferences, deleteWorkspacePreferences), ~8 statements, structurally identical	lib/owner-credential-store.js lib/user-preferences.js lib/workspace-preferences.js	1/3/3	unchanged
+G0284	near-duplicate function listForWorkspaces() (also: listUnansweredForWorkspaces), ~7 statements, fuzzy	lib/dismissal-suggestions-store.js lib/shelved-rulings-store.js lib/task-decisions-store.js	1/3/3	unchanged
+G0285	repeated comparison mode == 'new'	lib/held-connection-entry.js routes/held-connection.js routes/jira-auth.js	1/3/5	unchanged
+G0287	repeated comparison tier == 'not reported'	lib/render-session.js lib/run-paragraph.js	2/2/2	unchanged
+G0291	repeated comparison outcome == 'dismissed'	lib/digest-feedback.js lib/escalation-kpis.js public/scan.js	2/3/4	unchanged
+G0293	repeated comparison status == 'fulfilled'	routes/dashboard-effort.js routes/dashboard-feed.js routes/live-console.js routes/workspace-api-scan.js	2/4/6	unchanged
+G0294	string set {'answered', 'dismissed'} as or-chain [ID.outcome]	public/scan.js routes/dashboard-rulings.js routes/workspace-api-issue-write.js routes/workspace-api-scan.js	2/4/7	unchanged
+G0295	repeated comparison kind == 'backlog'	lib/home-rows.js public/app.js	2/2/2	unchanged
+G0296	literal record repeated verbatim {effort="none", harness="none", model="none"}	lib/dispatch-factory.js lib/workspace-preferences.js	2/2/2	unchanged
+G0297	repeated comparison kind == 'close-out'	lib/prompt-formatters.js lib/terminal-marked-task-cost.js	2/2/2	unchanged
+G0298	near-duplicate function cleanup(), ~8 statements, fuzzy	lib/observation-sessions-store.js lib/observer-shadow-log.js lib/observer-state-store.js	1/3/3	unchanged
+G0299	tiny rule copied as a helper (anonymous)(), 4 copies of 1-4 statements	routes/proxy-writes.js routes/workspace-api-issue-write.js routes/workspace-api-run-evidence.js	2/3/4	unchanged
+G0303	repeated comparison state == 'reached'	lib/kpi-stats.js public/kpis.js	2/2/2	unchanged
+G0304	string set {'acting', 'deciding', 'orienting', 'reporting', 'watching'} as array [PROXY_PHASES, PHASE_NAMES]	lib/kpi-stats.js public/kpis.js	2/2/2	unchanged
+G0305	repeated comparison verdict == 'approve'	lib/effort-readout.js lib/pipeline-churn.js lib/plan-review-round-trips.js	1/3/3	unchanged
+G0306	tiny rule copied as a helper resolveCanonicalDegraded() (also: resolveCanonicalOrMiss, canonical), 3 copies of 1-4 statements	lib/account-session.js lib/openrouter-key-resolver.js routes/email-auth.js	1/3/3	unchanged
+G0308	string set {'blocked', 'queued', 'resolved', 'silent', 'terminal', 'unknown', +1} as array [CENSUS_LANE_KEYS, LANE_KEYS]	lib/flight-companion-census-seed.js lib/flight-companion-gate.js lib/observer-sweep.js	2/3/3	unchanged
+G0318	string set {'indeterminate', 'mid-turn'} as or-chain [ID.disposition]	lib/question-card.js lib/unanswered-decisions.js	2/2/2	unchanged
+G0322	string set {'dispatch', 'record', 'resume'} as Set/table-keys [ON_ANSWER_EFFECTS, EFFECT_CAPTIONS]	lib/session-telemetry.js public/chat.js	2/2/2	unchanged
+G0324	near-duplicate function get(), ~7 statements, fuzzy	lib/collective-characters-store.js lib/dispatch-presets-store.js lib/report-history-store.js lib/run-proposals-store.js lib/saved-chat-store.js lib/ship-biscuit-history-store.js	2/6/6	unchanged
+G0328	repeated comparison format == 'md'	routes/proxy-compute.js routes/workspace-api-prompts.js	2/2/2	unchanged
+G0330	string set {'fable', 'haiku', 'opus', 'sonnet'} as array [CLAUDE_MAPPABLE_MODEL_FAMILIES]	lib/model-routing-harnesses.js lib/runner-kit/runner.mjs	2/2/3	unchanged
+G0332	literal record repeated verbatim {_id=0, createdAt=1, createdBy=1, urlKey=1, workspaceId=1}	lib/account-erasure.js lib/proxy-tokens.js	2/2/2	unchanged
+G0337	repeated comparison role == 'owner'	lib/account-erasure.js lib/owner-backfill.js routes/held-connection.js	2/3/4	unchanged
+G0338	repeated comparison role == 'user'	lib/prompts/roadmap-chat-template.js lib/saved-chat-store.js public/task-chat.js	2/3/6	unchanged
+G0340	repeated comparison haltMode == 'pause'	lib/settings-areas.js public/dispatch.js	2/2/2	unchanged
+G0341	repeated comparison haltMode == 'stop'	lib/settings-areas.js public/dispatch.js	2/2/2	unchanged
+G0342	repeated comparison kind == 'decision-withdrawn'	lib/digest-feedback.js routes/proxy-runner.js	2/2/2	unchanged
+G0343	repeated comparison name == 'send_follow_up'	lib/agent-turn.js public/chat.js	2/2/3	unchanged
+G0345	repeated comparison view == 'digest'	lib/task-stack.js routes/proxy-compute.js	2/2/2	unchanged
+G0347	string set {'comment', 'description'} as ternary-chain/or-chain [ID.where]	lib/recommendation-facts.js routes/proxy-writes.js	2/2/2	unchanged
+G0351	named constant DAY_MS=86400000	lib/terminal-marked-task-cost.js lib/workspace-kpi-stats.js	2/2/2	unchanged
+G0358	repeated comparison message == 'reverseOutcome: row is not self-resolved'	lib/task-decisions-store.js routes/workspace-api-scan.js	2/2/2	unchanged
+G0360	near-duplicate function _pruneToCapacity(), ~6 statements, fuzzy	lib/observer-shadow-log.js lib/report-history-store.js lib/saved-chat-store.js lib/ship-biscuit-history-store.js lib/task-snapshot-store.js	2/5/5	unchanged
+G0362	tiny rule copied as a helper clampText(), 3 copies of 1-4 statements	lib/observer-pass.js lib/prompts/ship-biscuit-editor.js lib/ship-biscuit.js	2/3/3	unchanged
+G0366	repeated comparison name == 'linear'	lib/components/navbar.js routes/workspace-api-issue-write.js	2/2/2	unchanged
+G0367	named constant MAX_REASON_LENGTH=500	lib/model-routing.js routes/proxy-rulings.js	2/2/2	unchanged
+G0371	repeated comparison s == 'complete'	lib/live-console.js lib/ship-biscuit.js	2/2/2	unchanged
+G0375	string set {'inside', 'outside', 'total', 'unknown'} as array/table-keys [[...].every, SCOPE_MARK]	lib/close-out-events-store.js lib/render-run-evidence.js	2/2/2	unchanged
+G0378	named constant LANE_KEYS=[blocked,queued,resolved,silent,terminal,unknown,working]	lib/flight-companion-gate.js lib/observer-sweep.js	2/2/2	unchanged
+G0380	named constant TIMELINE_WINDOW_MS=86400000	lib/live-console.js public/live-console.js	2/2/2	unchanged
+G0382	near-duplicate function peakToolCount() (also: toolPeakOf), ~9 statements, fuzzy	lib/digest-feedback.js routes/dashboard-session-state.js	2/2/2	unchanged
+G0383	repeated comparison variant == 'standard'	lib/render-run-evidence.js lib/run-closeout-state.js	2/2/2	unchanged
+G0385	string set {'/common-actions.css', '/escalation-kpis.css', '/style.css'} as array [stylesheets]	lib/render-effort-readout.js lib/render-escalation-kpis.js lib/render-workspace-kpis.js	1/3/3	unchanged
+G0389	repeated comparison code == 'ERR_FR_TOO_MANY_REDIRECTS'	routes/proxy-reads.js routes/workspace-api-issue-read.js	2/2/2	unchanged
+G0391	repeated comparison message == 'unexpected redirect'	routes/proxy-reads.js routes/workspace-api-issue-read.js	2/2/2	unchanged
+G0392	text contract heading: workspace api access (auto-appended)	lib/prompts/collective-participant.js lib/proxy-preamble.js	2/2/2	unchanged
+G0393	literal record repeated verbatim {_id=0, createdAt=1, createdBy=1, urlKey=1}	lib/account-erasure.js lib/dispatch-tokens.js	2/2/2	unchanged
+G0397	string set {'first go', 'firstGo'} as array	lib/render-kpis.js public/kpis.js	2/2/2	unchanged
+G0398	string set {'login', 'signed up'} as array	lib/render-kpis.js public/kpis.js	2/2/2	unchanged
+G0399	string set {'merge clicked', 'mergeClicked'} as array	lib/render-kpis.js public/kpis.js	2/2/2	unchanged
+G0400	string set {'pr opened', 'prOpened'} as array	lib/render-kpis.js public/kpis.js	2/2/2	unchanged
+G0401	text contract heading: adversarial second-read	lib/periodical-report-gate.js lib/periodicals.js	2/2/2	unchanged
+G0402	near-duplicate function briefUrl() (also: recapUrl, scanUrl), ~6 statements, fuzzy	public/brief.js public/recap.js public/scan.js	1/3/3	unchanged
+G0404	string set {'fresh', 'stale'} as if-chain [ID.status]	public/brief.js public/recap.js public/scan.js	1/3/4	unchanged
+G0406	tiny rule copied as a helper getAccount() (also: getById, getWorkspace, getWorkspaceByUrlKey), 4 copies of 1-4 statements	lib/account-store.js lib/liveness-alarm-store.js lib/workspace-store.js	2/3/4	unchanged
+G0407	tiny rule copied as a helper postBrief() (also: postRecap, postScan), 3 copies of 1-4 statements	public/brief.js public/recap.js public/scan.js	1/3/3	unchanged
+G0408	named constant DEFAULT_HUMAN_NICK="John"	lib/prompts/collective-participant.js routes/collective.js	2/2/2	unchanged
+G0412	repeated comparison type == 'backlog'	lib/home-view.js lib/tree.js	2/2/3	unchanged
+G0414	near-duplicate function delete(), ~7 statements, fuzzy	lib/collective-characters-store.js lib/collective-presets-store.js lib/custom-prompts-store.js lib/dispatch-presets-store.js lib/saved-chat-store.js	2/5/5	unchanged
+G0415	repeated comparison trim() == '---'	lib/prompts/agent-onboarding.js lib/prompts/passage-planner-kickoff.js lib/prompts/passage-runner-kickoff.js lib/prompts/runner-kickoff.js lib/prompts/worker-lane-kickoff.js	1/5/5	unchanged
+G0417	repeated comparison completeness == 'complete'	lib/cost-read.js lib/request-usage-fold.js lib/row-usage.js	1/3/6	unchanged
+G0418	repeated comparison field == 'harness'	lib/components/model-change-lines.js lib/model-routing-edit.js lib/model-routing.js	2/3/3	unchanged
+G0420	near-duplicate function listEvents() (also: listTraces), ~9 statements, fuzzy	lib/prompt-trace-store.js lib/proxy-events.js	2/2/2	unchanged
+G0422	repeated comparison provider == 'email'	lib/account-erasure.js lib/account-store.js	2/2/2	unchanged
+G0424	string set {'jira', 'linear'} as Set/or-chain [REFRESH_TOKEN_KINDS]	lib/connection-binding.js lib/github-pr-status.js	2/2/2	unchanged
+G0425	record assembled from the same sources {urlKey=ID.urlKey, prUrl=ID.prUrl, headSha=ID.headSha, by=ID.by}	lib/close-out-events-store.js routes/workspace-api-run-evidence.js	2/2/3	unchanged
+G0426	repeated comparison type == 'heading'	lib/library.js lib/providers/jira/adf.js	2/2/2	unchanged
+G0427	string set {'dark', 'light'} as array/or-chain [VALID_THEMES, ID.session.theme]	lib/user-preferences.js routes/settings.js	2/2/2	unchanged
+G0428	text contract marker: [credential-adopted]	lib/suspect-credential-refresh.js routes/workspace-api-issue-write.js	2/2/3	unchanged
+G0430	tiny rule copied as a helper fetchBriefStatus() (also: fetchContext, fetchRecapStatus), 3 copies of 1-4 statements	public/brief.js public/context.js public/recap.js	1/3/3	unchanged
+G0431	near-duplicate function formatFossilThreshold() (also: formatStaleThreshold), ~10 statements, structurally identical	lib/observer-pass.js lib/prompts/flight-companion-brief.js	2/2/2	unchanged
+G0432	string set {'autopilot', 'save', 'triage'} as table-keys/Set [SENDING_STATUS, DONE_SUFFIX, FEEDBACK_ACTIONS]	public/feedback-widget.js routes/workspace-api-feedback.js	2/2/3	unchanged
+G0434	near-duplicate function list() (also: listByWorkspace), ~9 statements, fuzzy	lib/observer-shadow-log.js lib/report-history-store.js lib/ship-biscuit-history-store.js lib/task-snapshot-store.js	2/4/4	unchanged
+G0435	near-duplicate function orderByDependency(), ~59 statements, same vocabulary (dialect copy or close variant)	lib/ship-layout.js lib/swim-lanes.js public/ship.js public/swim.js	2/4/4	unchanged
+G0436	near-duplicate function (anonymous)() (also: graphql, request), ~15 statements, same vocabulary (dialect copy or close variant)	lib/providers/github-projects/client.js lib/providers/github/app-auth.js lib/providers/github/client.js	1/3/3	unchanged
+G0437	text contract marker: [string]	lib/prompts/ship-biscuit-editor.js lib/run-summary.js lib/session-summary.js	2/3/4	unchanged
+G0439	repeated comparison act == 'copy'	lib/task-mode-store.js routes/task-mode.js	2/2/3	unchanged
+G0441	repeated comparison kind == 'plan'	lib/effort-readout.js lib/render-effort-readout.js	2/2/2	unchanged
+G0443	repeated comparison scope == 'job'	lib/model-routing.js lib/render-settings-models.js	2/2/3	unchanged
+G0444	repeated comparison source == 'model'	lib/render-settings-workspace.js routes/settings.js	2/2/2	unchanged
+G0445	repeated comparison source == 'workspace'	lib/render-settings-workspace.js routes/settings.js	2/2/2	unchanged
+G0447	tiny rule copied as a helper (anonymous)(), 3 copies of 1-4 statements	lib/consumer-heartbeat-store.js lib/observer-shadow-log.js lib/workspace-change-log.js	2/3/3	unchanged
+G0448	near-duplicate function generateBrief() (also: generateFeedbackTitle, generateRecap, generateRunSummary, generateSessionSummary), ~7 statements, fuzzy	lib/brief.js lib/feedback-title.js lib/recap.js lib/run-summary.js lib/session-summary.js	2/5/5	unchanged
+G0449	near-duplicate function canonicalOf() (also: canonicalise), ~12 statements, structurally identical	lib/account-erasure.js lib/owner-backfill.js	2/2/2	unchanged
+G0450	near-duplicate function revokeByCreator() (also: revokeByOwner), ~9 statements, fuzzy	lib/dispatch-tokens.js lib/task-share-store.js	2/2/2	unchanged
+G0452	repeated comparison filter == 'set'	lib/render-settings-models.js routes/settings.js	2/2/2	unchanged
+G0453	repeated comparison mode == 'resume'	lib/components/halt-controls.js routes/settings.js	2/2/3	unchanged
+G0456	near-duplicate function clusterSiblingsInLane() (also: computeShipReachableIds, pullItemAndDescendants, promoteDependencyBlockers), ~33 statements, same vocabulary (dialect copy or close variant)	lib/ship-layout.js lib/swim-lanes.js public/swim.js	2/3/7	unchanged
+G0457	repeated comparison stateType == 'completed'	lib/close-out-merges.js public/ship.js public/swim.js	2/3/3	unchanged
+G0458	tiny rule copied as a helper (anonymous)() (also: isActive), 3 copies of 1-4 statements	lib/prompts/roadmap-digest-template.js lib/prompts/roadmap-narrative-template.js lib/render-roadmap.js	2/3/3	unchanged
+G0459	tiny rule copied as a helper _docsSorted() (also: _docsFor), 3 copies of 1-4 statements	lib/report-history-store.js lib/saved-chat-store.js lib/ship-biscuit-history-store.js	1/3/3	unchanged
+G0460	tiny rule copied as a helper union(), 3 copies of 1-4 statements	lib/ship-layout.js lib/swim-lanes.js public/swim.js	2/3/3	unchanged
+G0464	repeated comparison scope == 'default'	lib/components/model-change-lines.js lib/model-routing.js	2/2/2	unchanged
+G0465	named constant DUPLICATE_KEY_CODE=11000	lib/kpi-daily-rollup.js lib/request-usage-store.js	2/2/2	unchanged
+G0471	tiny rule copied as a helper get(), 5 copies of 1-4 statements	lib/brief-cache.js lib/recap-cache.js lib/run-paragraph-store.js lib/run-summary-cache.js lib/session-summary-cache.js	2/5/5	unchanged
+G0472	tiny rule copied as a helper createDashboardDrilldownRoutes() (also: createDashboardEffortRoutes, createDashboardKpisRoutes), 3 copies of 1-4 statements	routes/dashboard-drilldown.js routes/dashboard-effort.js routes/dashboard-kpis.js	1/3/3	unchanged
+G0474	record assembled from the same sources {id=ID._id, by=ID.by, prUrl=ID.prUrl, headSha=ID.headSha}	lib/close-out-merges.js routes/workspace-api-run-evidence.js	2/2/2	unchanged
+G0476	tiny rule copied as a helper deleteAll(), 4 copies of 1-4 statements	lib/collective-characters-store.js lib/collective-presets-store.js lib/custom-prompts-store.js lib/dispatch-presets-store.js	2/4/4	unchanged
+G0477	near-duplicate function buildPassagePlannerKickoff() (also: buildPassageRunnerKickoff, buildWorkerLaneKickoff), ~11 statements, structurally identical	lib/prompts/passage-planner-kickoff.js lib/prompts/passage-runner-kickoff.js lib/prompts/worker-lane-kickoff.js	1/3/3	unchanged
+G0478	repeated comparison field == 'model'	lib/components/model-change-lines.js lib/model-routing-edit.js lib/render-settings-models.js	2/3/3	unchanged
+G0480	named constant FORMER_MEMBER="former member"	lib/model-routing-store.js lib/workspace-change-log.js	2/2/2	unchanged
+G0482	named constant PROJECTION_RISK_TYPES=Set[overdue,unestimated-critical,velocity-declining]	lib/prompts/roadmap-narrative-template.js lib/render-roadmap.js	2/2/2	unchanged
+G0490	string set {'overdue', 'unestimated-critical', 'velocity-declining'} as Set [PROJECTION_RISK_TYPES]	lib/prompts/roadmap-narrative-template.js lib/render-roadmap.js	2/2/2	unchanged
+G0491	string set {'preset-save', 'undo'} as array [[...].includes]	lib/render-settings-models.js lib/workspace-change-log.js	2/2/3	unchanged
+G0492	near-duplicate function assignLanes(), ~32 statements, same vocabulary (dialect copy or close variant)	lib/swim-lanes.js public/swim.js	2/2/2	unchanged
+G0493	near-duplicate function assignSegments(), ~21 statements, same vocabulary (dialect copy or close variant)	lib/swim-lanes.js public/swim.js	2/2/2	unchanged
+G0494	near-duplicate function buildChainLabel(), ~10 statements, same vocabulary (dialect copy or close variant)	lib/swim-lanes.js public/swim.js	2/2/2	unchanged
+G0495	near-duplicate function cohereSubtaskGroups(), ~39 statements, same vocabulary (dialect copy or close variant)	lib/swim-lanes.js public/swim.js	2/2/2	unchanged
+G0496	near-duplicate function computeCrossLaneColumns(), ~108 statements, same vocabulary (dialect copy or close variant)	lib/swim-lanes.js public/swim.js	2/2/2	unchanged
+G0497	near-duplicate function groupByAssignee() (also: groupByProject), ~10 statements, same vocabulary (dialect copy or close variant)	lib/swim-lanes.js public/swim.js	2/2/4	unchanged
+G0498	near-duplicate function groupByStatus(), ~12 statements, same vocabulary (dialect copy or close variant)	lib/swim-lanes.js public/swim.js	2/2/2	unchanged
+G0499	near-duplicate function mergeLabels(), ~6 statements, fuzzy	lib/swim-lanes.js public/swim.js	2/2/2	unchanged
+G0500	near-duplicate function mergeLanes(), ~9 statements, same vocabulary (dialect copy or close variant)	lib/swim-lanes.js public/swim.js	2/2/2	unchanged
+G0502	repeated comparison grouping == 'dependency'	lib/swim-lanes.js public/swim.js	2/2/4	unchanged
+G0503	repeated comparison rawKey == 'duplicate'	lib/swim-lanes.js public/swim.js	2/2/2	unchanged
+G0505	string set {'/library.css', '/style.css'} as array [stylesheets]	lib/render-library.js routes/getting-started.js	2/2/2	unchanged
+G0506	string set {'assignee', 'dependency', 'project', 'status'} as switch	lib/swim-lanes.js public/swim.js	2/2/2	unchanged
+G0507	string set {'dependency', 'project'} as or-chain	lib/swim-lanes.js public/swim.js	2/2/2	unchanged
+G0508	string set {'halt', 'modelRoutingProxyWrites', 'periodicals'} as table-keys/array [SETTING_NAME, SETTINGS]	lib/render-settings-workspace.js lib/workspace-change-log.js	2/2/2	unchanged
+G0509	string set {'implicit', 'label', 'state'} as switch [ID.type]	lib/audit.js lib/queue-config.js	2/2/2	unchanged
+G0510	string set {'none', 'pause', 'stop', 'unknown'} as table-keys [HALT_VALUE, HALT_WORDS]	lib/render-settings-workspace.js lib/workspace-change-log.js	2/2/2	unchanged
+G0511	repeated comparison tone == 'bad'	lib/components/dispatch-no-job.js lib/components/settings-frame.js lib/components/settings-group.js	1/3/3	unchanged
+G0513	tiny rule copied as a helper toRecord(), 3 copies of 1-4 statements	lib/collective-characters-store.js lib/collective-presets-store.js lib/dispatch-presets-store.js	2/3/3	unchanged
+G0514	near-duplicate function get(), ~9 statements, structurally identical	lib/brief-cache.js lib/recap-cache.js lib/run-summary-cache.js lib/session-summary-cache.js	2/4/4	unchanged
+G0515	tiny rule copied as a helper delete(), 4 copies of 1-4 statements	lib/brief-cache.js lib/recap-cache.js lib/run-summary-cache.js lib/session-summary-cache.js	2/4/4	unchanged
+G0516	tiny rule copied as a helper put(), 4 copies of 1-4 statements	lib/brief-cache.js lib/recap-cache.js lib/run-summary-cache.js lib/session-summary-cache.js	2/4/4	unchanged
+G0517	tiny rule copied as a helper put(), 4 copies of 1-4 statements	lib/brief-cache.js lib/recap-cache.js lib/run-summary-cache.js lib/session-summary-cache.js	2/4/4	unchanged
+G0519	named constant REPO_RE=/^[A-Za-z0-9._-]{1,100}$/	lib/file-pointer.js lib/github-pr-files.js	2/2/2	unchanged
+G0521	record assembled from the same sources {access_token=ID.access_token, refresh_token=ID.refresh_token, expires_in=ID.expires_in}	lib/providers/jira/oauth.js lib/token-refresh.js	2/2/2	unchanged
+G0522	repeated comparison error == 'invalid_grant'	lib/providers/jira/oauth.js lib/token-refresh.js	2/2/2	unchanged
+G0526	string set {'digest', 'gap', 'northStarReading', 'product', 'technical', 'trajectory'} as array/table-keys [NARRATIVE_LAYERS, collected, NARRATIVE_FIELD_TO_LAYER]	lib/report-history-store.js public/roadmap.js	2/2/5	unchanged
+G0528	text contract marker: [credential-rejected]	lib/key-state-holders.js lib/proxy-credential-trail.js	2/2/2	unchanged
+G0529	tiny rule copied as a helper buildRoadmapDigestPrompt() (also: buildRoadmapGapPrompt, buildRoadmapNarrativePrompt, buildRoadmapNorthStarPrompt, buildRoadmapProductPrompt), 6 copies of 1-4 statements	lib/prompts/roadmap-digest-template.js lib/prompts/roadmap-gap-template.js lib/prompts/roadmap-narrative-template.js lib/prompts/roadmap-north-star-template.js lib/prompts/roadmap-product-template.js lib/prompts/roadmap-trajectory-template.js	1/6/6	unchanged
+G0530	literal record repeated verbatim {AFT="aft", DRIFT="drift", FORWARD="forward", PORT="port", SHIP="ship", STARBOARD="starboard"}	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0532	near-duplicate function bearingToAngle(), ~8 statements, structurally identical	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0533	near-duplicate function buildSegments(), ~59 statements, same vocabulary (dialect copy or close variant)	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0534	near-duplicate function cardMatchesHeading(), ~13 statements, same vocabulary (dialect copy or close variant)	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0535	near-duplicate function clusterSubtaskSiblings(), ~35 statements, same vocabulary (dialect copy or close variant)	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0536	near-duplicate function computePosition(), ~11 statements, fuzzy	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0538	near-duplicate function hash32(), ~11 statements, fuzzy	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0539	near-duplicate function orientationLayout(), ~57 statements, same vocabulary (dialect copy or close variant)	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0540	near-duplicate function pickAngle(), ~10 statements, fuzzy	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0541	near-duplicate function placeDriftBucket(), ~22 statements, fuzzy	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0542	near-duplicate function placeSegmentBucket(), ~44 statements, same vocabulary (dialect copy or close variant)	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0543	near-duplicate function pushProjectSegments() (also: pushProjectSegs), ~8 statements, fuzzy	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0544	record assembled from the same sources {label=ID[].name, projectName=ID[].name, cards=ID[].group}	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0545	repeated comparison kind == 'label'	lib/ship-layout.js public/ship.js	2/2/3	unchanged
+G0546	repeated comparison kind == 'project'	lib/ship-layout.js public/ship.js	2/2/3	unchanged
+G0547	repeated comparison orientation == 'vertical'	lib/components/accent-bar.js public/swim.js	2/2/6	unchanged
+G0548	repeated comparison projectSector == 'port'	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0549	repeated comparison projectSector == 'starboard'	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0550	repeated comparison sector == 'drift'	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0551	repeated comparison sector == 'ship'	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0553	string set {'E', 'W'} as or-chain	lib/ship-layout.js public/ship.js	2/2/2	unchanged
+G0555	named constant MAX_CUSTOM_PRESETS=20	lib/collective-presets-store.js lib/dispatch-presets-store.js	2/2/2	unchanged
+G0556	named constant MAX_PRESET_NAME_LENGTH=50	lib/collective-presets-store.js lib/dispatch-presets-store.js	2/2/2	unchanged
+G0558	near-duplicate function (anonymous)(), ~7 statements, fuzzy	lib/render-ship-biscuit.js public/ship-biscuit.js	2/2/2	unchanged
+G0560	near-duplicate function layoutIndex(), ~30 statements, same vocabulary (dialect copy or close variant)	lib/render-ship-biscuit.js public/ship-biscuit.js	2/2/2	unchanged
+G0561	near-duplicate function list(), ~7 statements, structurally identical	lib/collective-characters-store.js lib/dispatch-presets-store.js	2/2/2	unchanged
+G0564	repeated comparison stateType == 'unstarted'	lib/prompts/roadmap-narrative-template.js lib/task-order.js	2/2/2	unchanged
