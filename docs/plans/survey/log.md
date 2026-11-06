@@ -2410,3 +2410,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - no invented size ceiling.
 
   Started (`3cf6cd76`).
+- 08:50: **John applied both LIN-4307 rulings and approved LIN-4313's grant** ("I grant you authority"), recorded on the ticket. It's the first time the authority grant has been made explicitly, as a human call, which is the shape John named for integration: "a human instructs/gives authority to an agent".
