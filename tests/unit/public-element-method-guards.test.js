@@ -176,13 +176,9 @@ function staleEntries(hits, allow) {
 
 // ── The allow-list ──────────────────────────────────────────────────────────
 // `file: guard test` -> reason. Each guard here is one that must stay: its node may not be an Element.
-const PRESENCE_ALLOW = {
-  // Unit seams: close-out-client.test.js:150 loads this module with a document that has no querySelector or querySelectorAll.
-  // Kept until that suite moves to the shared fake (LIN-4254); the check still sees each line.
-  'close-out.js: !d || typeof d.querySelector !== \'function\'': 'close-out-client.test.js:150 loads the module with a document that has no querySelector (LIN-4254 moves that suite)',
-  'close-out.js: main && typeof main.getAttribute === \'function\'': "kept by LIN-4304's scope call beside the :159/:175 seams, though not itself needed: close-out-client.test.js's <main> stubs define getAttribute (LIN-4312 removes it)",
-  'close-out.js: !d || typeof d.querySelectorAll !== \'function\'': 'close-out-client.test.js:150 loads the module with a document that has no querySelectorAll (LIN-4254 moves that suite)',
-};
+// Empty since LIN-4312: the close-out.js seams that were listed here are removed, and close-out-client.test.js runs on
+// the shared fake, so no unit seam hands this module a document without querySelector or querySelectorAll.
+const PRESENCE_ALLOW = {};
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
