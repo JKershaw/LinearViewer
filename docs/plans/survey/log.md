@@ -2525,3 +2525,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - the rest unchanged.
 
   `seam:periodical-mint` is named healthy, its residue owned by LIN-4318. No follow-ups. The import graph moved by one edge, pointing the existing direction.
+- 14:00: **LIN-4312 merged (`ce42e721`), LIN-4254's last piece.** The census is now **6, all `// stop:` files** (they need a browser API the fake doesn't model: bubbling `dispatchEvent` and the like). **56 → 6 in two days, with every movable file moved.** The `close-out.js` `typeof` seams were removed from production along with their allow-list entries, so the guard allow-list is now empty. Blind reads sent: LIN-4254 as one move (its 7 merges), BE and BF; LIN-4296 + LIN-4254 as the test-fake area, BG and BH.
