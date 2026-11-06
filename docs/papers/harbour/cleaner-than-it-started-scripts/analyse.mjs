@@ -301,7 +301,15 @@ const analysis = {
     median_usd_all_place_exact: median(place.filter((r) => r.cost_usd !== null).map((r) => r.cost_usd)),
     median_usd_baseline: median(place.filter((r) => r.group.startsWith('baseline') && r.cost_usd !== null).map((r) => r.cost_usd)),
     median_usd_forward_4Nov: median(place.filter((r) => r.group.startsWith('forward') && r.cost_usd !== null).map((r) => r.cost_usd)),
-    median_usd_5Nov_place: median(place.filter((r) => r.primary_ticket && /^5 Nov|^LIN-4255 fake|^ordinary/.test(r.group) && r.cost_usd !== null).map((r) => r.cost_usd)),
+    // Rows whose group is a 5 Nov read, the LIN-4255 fake-DOM pieces or an ordinary feature (n given).
+    median_usd_5Nov_groups: { n: place.filter((r) => /^5 Nov|^LIN-4255 fake|^ordinary/.test(r.group) && r.cost_usd !== null).length, median: median(place.filter((r) => /^5 Nov|^LIN-4255 fake|^ordinary/.test(r.group) && r.cost_usd !== null).map((r) => r.cost_usd)) },
+    // One exact cost per ticket: the first place row per primary_ticket that has one (n = tickets).
+    median_usd_per_ticket_exact: (() => {
+      const seen = new Map();
+      for (const r of place) if (r.cost_usd !== null && !seen.has(r.primary_ticket)) seen.set(r.primary_ticket, r.cost_usd);
+      const vals = [...seen.values()];
+      return { n: vals.length, median: median(vals) };
+    })(),
   },
   tidy_after_pairs: (roles.tidy_after_pairs ?? []).map(([parent, child]) => {
     const pc = costState(costOf(parent)).total, cc = costState(costOf(child)).total;

@@ -965,7 +965,14 @@
     "median_usd_all_place_exact": 8.41,
     "median_usd_baseline": 17.08,
     "median_usd_forward_4Nov": 6.51,
-    "median_usd_5Nov_place": 8.56
+    "median_usd_5Nov_groups": {
+      "n": 34,
+      "median": 8.56
+    },
+    "median_usd_per_ticket_exact": {
+      "n": 56,
+      "median": 8.56
+    }
   },
   "tidy_after_pairs": [
     {
