@@ -9,8 +9,8 @@ const repo = resolve(repoArg); const ev = resolve(evArg);
 const lib = await import(join(repo, 'scripts/code-shape/code-shape-lib.mjs'));
 const { inScope } = await import(join(repo, 'scripts/code-shape/seams.mjs'));
 
-const FULL = { B: 'af55cb737ec4e63919bac65558b35498ede3d290', H: '5c63aa261a2de891907c9b8d567f9932ed1985d0' };
-const S8 = { B: 'af55cb73', H: '5c63aa26' };
+const FULL = { B: 'af55cb737ec4e63919bac65558b35498ede3d290', H: '90542b2c79016d2a1d64f75cb5d3e9037080eae7' };
+const S8 = { B: 'af55cb73', H: '90542b2c' };
 const G = 'head-5c63aa26';
 const J = (f) => JSON.parse(readFileSync(join(ev, f), 'utf8'));
 const OTHER = 'Other features', LLM = 'LLM & prompts', RUNS = 'Runs & dispatch';
@@ -63,7 +63,7 @@ for (const c of ['B', 'H']) p(`- ${S8[c]}: ${data[c].s.knots.groups.map((g) => `
 
 p('\n## Directed area links that differ');
 const keys = new Set([...Object.keys(B.directed), ...Object.keys(H.directed)]);
-p('| link | af55cb73 | 5c63aa26 | Δ |'); p('|---|---|---|---|');
+p('| link | af55cb73 | 90542b2c | Δ |'); p('|---|---|---|---|');
 for (const k of [...keys].sort()) { const a = B.directed[k] ?? 0, b = H.directed[k] ?? 0; if (a !== b) p(`| ${k.split(' → ').map(short).join(' → ')} | ${a} | ${b} | ${b - a > 0 ? '+' : ''}${b - a} |`); }
 
 p('\n## Catch-all ("Other features") members');
@@ -112,12 +112,12 @@ for (const c of ['B', 'H']) { const x = data[c].cc; p(`| ${S8[c]} | ${x.windowSt
 const ccMap = (x) => new Map(x.pairs.map((q) => [q.areas.join(' + '), q.changes]));
 const mb = ccMap(B.cc), mh = ccMap(H.cc);
 const linked = (s, a, b) => (s.directed[`${a} → ${b}`] ?? 0) + (s.directed[`${b} → ${a}`] ?? 0) > 0;
-p('\nTop 15 pairs at 5c63aa26 (with af55cb73, Δ, import link at 5c63aa26):');
-p('| pair | 5c63aa26 | af55cb73 | Δ | import link? |'); p('|---|---|---|---|---|');
+p('\nTop 15 pairs at 90542b2c (with af55cb73, Δ, import link at 90542b2c):');
+p('| pair | 90542b2c | af55cb73 | Δ | import link? |'); p('|---|---|---|---|---|');
 for (const q of H.cc.pairs.slice(0, 15)) { const k = q.areas.join(' + '); const o = mb.get(k) ?? 0; p(`| ${q.areas.map(short).join(' + ')} | ${q.changes} | ${o} | ${q.changes - o > 0 ? '+' : ''}${q.changes - o} | ${linked(H, ...q.areas) ? 'yes' : 'no'} |`); }
 p('\nAll pairs whose count moved:');
 for (const k of new Set([...mb.keys(), ...mh.keys()])) { const a = mb.get(k) ?? 0, b = mh.get(k) ?? 0; if (a !== b) p(`- ${k.split(' + ').map(short).join(' + ')}: ${a} → ${b}`); }
 const nolink = (s, x) => x.pairs.filter((q) => !linked(s, ...q.areas));
-p(`\nNo-link pairs: af55cb73 ${nolink(B, B.cc).length} of ${B.cc.pairs.length}; 5c63aa26 ${nolink(H, H.cc).length} of ${H.cc.pairs.length}.`);
-p(`- at 5c63aa26: ${nolink(H, H.cc).map((q) => `${q.areas.map(short).join(' + ')} (${q.changes})`).join('; ')}`);
+p(`\nNo-link pairs: af55cb73 ${nolink(B, B.cc).length} of ${B.cc.pairs.length}; 90542b2c ${nolink(H, H.cc).length} of ${H.cc.pairs.length}.`);
+p(`- at 90542b2c: ${nolink(H, H.cc).map((q) => `${q.areas.map(short).join(' + ')} (${q.changes})`).join('; ')}`);
 process.stdout.write(out.join('\n') + '\n');

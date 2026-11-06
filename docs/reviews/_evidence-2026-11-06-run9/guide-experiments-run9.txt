@@ -1,10 +1,10 @@
 ## head-5c63aa26
 - af55cb73: files 544, links 1271, pairs 12, groups [9], Other 17
     Agent API<->LLM 37/4; Agent API<->Providers 20/3; Agent API<->Runs 45/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; LLM<->Other features 2/1; LLM<->Providers 11/4; LLM<->Runs 31/37; Other features<->Runs 6/5; server-rendered pages<->Other features 9/8; server-rendered pages<->Runs 13/8
-- 5c63aa26: files 544, links 1272, pairs 12, groups [9], Other 17
+- 90542b2c: files 544, links 1272, pairs 12, groups [9], Other 17
     Agent API<->LLM 37/4; Agent API<->Providers 20/3; Agent API<->Runs 45/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; LLM<->Other features 2/1; LLM<->Providers 11/4; LLM<->Runs 31/37; Other features<->Runs 6/5; server-rendered pages<->Other features 9/8; server-rendered pages<->Runs 13/8
 ## proposal-P7min-stage-writes
 - af55cb73: files 544, links 1270, pairs 12, groups [9], Other 16
     Agent API<->LLM 38/4; Agent API<->Providers 20/3; Agent API<->Runs 45/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; LLM<->Other features 1/1; LLM<->Providers 11/4; LLM<->Runs 31/37; Other features<->Runs 6/5; server-rendered pages<->Other features 9/8; server-rendered pages<->Runs 13/8
-- 5c63aa26: files 544, links 1271, pairs 12, groups [9], Other 16
+- 90542b2c: files 544, links 1271, pairs 12, groups [9], Other 16
     Agent API<->LLM 38/4; Agent API<->Providers 20/3; Agent API<->Runs 45/10; Auth<->LLM 4/3; Auth<->Providers 12/1; Auth<->server-rendered pages 14/11; LLM<->Other features 1/1; LLM<->Providers 11/4; LLM<->Runs 31/37; Other features<->Runs 6/5; server-rendered pages<->Other features 9/8; server-rendered pages<->Runs 13/8

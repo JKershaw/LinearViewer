@@ -14,8 +14,8 @@ from datetime import datetime
 REPO = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else '.')
 EV = os.path.join(REPO, 'docs/reviews/_evidence-2026-11-06-run9')
 B = 'af55cb737ec4e63919bac65558b35498ede3d290'
-H = '5c63aa261a2de891907c9b8d567f9932ed1985d0'
-COMMITS = [('af55cb73', B), ('5c63aa26', H)]
+H = '90542b2c79016d2a1d64f75cb5d3e9037080eae7'
+COMMITS = [('af55cb73', B), ('90542b2c', H)]
 G = 'head-5c63aa26'
 RUNS, LLM, OTHER, PAGES = 'Runs & dispatch', 'LLM & prompts', 'Other features', 'Front end: server-rendered pages'
 
@@ -163,18 +163,18 @@ for l in grep_lines(H, r"from '\.\./lib/(cost-read|request-usage-[a-z]+|row-usag
 
 section('S11. Change-coupling window overlap')
 cb = json.load(open(os.path.join(EV, f'cochange-code-af55cb73-guide-{G}-days60.json')))
-ch = json.load(open(os.path.join(EV, f'cochange-code-5c63aa26-guide-{G}-days60.json')))
+ch = json.load(open(os.path.join(EV, f'cochange-code-90542b2c-guide-{G}-days60.json')))
 p = lambda s: datetime.fromisoformat(s.replace('Z', '+00:00'))
 ov = (min(p(cb['windowEnd']), p(ch['windowEnd'])) - max(p(cb['windowStart']), p(ch['windowStart']))).total_seconds() / 86400
 wb = set(open(os.path.join(EV, 'cochange-window-commits-af55cb73.txt')).read().split())
-wh = set(open(os.path.join(EV, 'cochange-window-commits-5c63aa26.txt')).read().split())
+wh = set(open(os.path.join(EV, 'cochange-window-commits-90542b2c.txt')).read().split())
 print(f'- windows {cb["windowStart"]}..{cb["windowEnd"]} and {ch["windowStart"]}..{ch["windowEnd"]}: overlap {ov:.3f} of 60 days ({ov / 60 * 100:.2f}%)')
-print(f'- commits {len(wb)} vs {len(wh)} (cochange changes {cb["changes"]} / {ch["changes"]}); shared {len(wb & wh)}; only af55cb73 {len(wb - wh)}; only 5c63aa26 {len(wh - wb)}')
+print(f'- commits {len(wb)} vs {len(wh)} (cochange changes {cb["changes"]} / {ch["changes"]}); shared {len(wb & wh)}; only af55cb73 {len(wb - wh)}; only 90542b2c {len(wh - wb)}')
 print('- true top 12 by count at each commit :')
-for name, cc in (('af55cb73', cb), ('5c63aa26', ch)):
+for name, cc in (('af55cb73', cb), ('90542b2c', ch)):
     print(f'    {name}: ' + '; '.join(f'{" + ".join(short(a) for a in q["areas"])} {q["changes"]}' for q in cc['pairs'][:12]))
 
-section('S12. No-link pairs: commits in the 5c63aa26 window that touch both areas, for the non-browser no-link pairs')
+section('S12. No-link pairs: commits in the 90542b2c window that touch both areas, for the non-browser no-link pairs')
 guide = json.load(open(os.path.join(EV, f'areas.{G}.json')))['areas']
 rx = [(a['name'], [re.compile(m) for m in a['match']]) for a in guide]
 def area_of(f):
@@ -194,7 +194,7 @@ for l in log.splitlines():
 for A_, B_ in [('Agent API (proxy)', 'Reports & operator tools'), ('Agent API (proxy)', OTHER), (OTHER, 'Reports & operator tools')]:
     hits = [c for c in commits if {A_, B_} <= {area_of(f) for f in c['files']}]
     print(f'- {short(A_)} + {short(B_)}: {len(hits)} commits; most recent 6: ' + '; '.join(git('log', '-1', '--format=%h %s', c['sha']).strip()[:70] for c in hits[:6]))
-print('- in-window (af55cb73..5c63aa26) commits per browser-code pair partner:')
+print('- in-window (af55cb73..90542b2c) commits per browser-code pair partner:')
 inwin = [c for c in commits if c['sha'] in (wh - wb)]
 for c in inwin:
     areas = sorted({short(area_of(f)) for f in c['files'] if area_of(f)})
@@ -227,8 +227,8 @@ except SystemExit as e:
 
 section('S15. Entry files / files / internal imports per area (seams.areas)')
 D = {c8: json.load(open(os.path.join(EV, f'seams-code-{c8}-guide-{G}.json'))) for c8, _ in COMMITS}
-print('| area | af55cb73 | 5c63aa26 |')
-for a in D['5c63aa26']['areas']:
+print('| area | af55cb73 | 90542b2c |')
+for a in D['90542b2c']['areas']:
     cells = []
     for c8, _ in COMMITS:
         x = next(y for y in D[c8]['areas'] if y['name'] == a['name'])
@@ -243,7 +243,7 @@ HUBS = ['lib/cost-read.js', 'lib/request-usage-loader.js', 'lib/request-usage-in
         'lib/ruling-settled.js', 'lib/waiting-section.js', 'lib/recommendation-facts.js', 'lib/errors.js', 'lib/workspace-api-mocks.js',
         # run 9: the window's touched hubs
         'lib/periodicals.js', 'lib/dispatch-entrance.js', 'lib/proxy-scopes.js', 'lib/dispatch-validation.js', 'lib/proxy-instructions.js', 'routes/proxy-dispatch.js', 'lib/stage-writes.js']
-print('| file (area) | in af55cb73 (cross / areas) | in 5c63aa26 (cross / areas) | out af55cb73 (cross) | out 5c63aa26 (cross) |')
+print('| file (area) | in af55cb73 (cross / areas) | in 90542b2c (cross / areas) | out af55cb73 (cross) | out 90542b2c (cross) |')
 for f in HUBS:
     row = []
     area = '?'
@@ -256,16 +256,16 @@ for f in HUBS:
         row.append((f'{len(i)} ({len(ic)} / {len({x["fromArea"] for x in ic})})', f'{len(o)} ({len(oc)})'))
     print(f'| {f} ({short(area)}) | {row[0][0]} | {row[1][0]} | {row[0][1]} | {row[1][1]} |')
 for f in ['lib/cost-read.js', 'lib/periodicals.js', 'lib/dispatch-entrance.js']:
-    print(f'- {f} cross-area importers at 5c63aa26: ' + ', '.join(f"{x['from']} [{short(x['fromArea'])}]" for x in E['5c63aa26'] if x['to'] == f and x['fromArea'] != x['toArea']))
+    print(f'- {f} cross-area importers at 90542b2c: ' + ', '.join(f"{x['from']} [{short(x['fromArea'])}]" for x in E['90542b2c'] if x['to'] == f and x['fromArea'] != x['toArea']))
 
-section('S17. Top 12 files by cross-area importers at 5c63aa26 (with af55cb73)')
+section('S17. Top 12 files by cross-area importers at 90542b2c (with af55cb73)')
 def cross_in(c8):
     d = {}
     for x in E[c8]:
         if x['fromArea'] != x['toArea']:
             d.setdefault(x['to'], set()).add(x['from'])
     return d
-ci_b, ci_h = cross_in('af55cb73'), cross_in('5c63aa26')
+ci_b, ci_h = cross_in('af55cb73'), cross_in('90542b2c')
 for f, s in sorted(ci_h.items(), key=lambda kv: -len(kv[1]))[:12]:
     print(f'- {f}: {len(ci_b.get(f, ()))} -> {len(s)}')
 moved = [(f, len(ci_b.get(f, ())), len(ci_h.get(f, ()))) for f in set(ci_b) | set(ci_h) if len(ci_b.get(f, ())) != len(ci_h.get(f, ()))]

@@ -1,21 +1,21 @@
 # Run 9 comparison (from evidence JSON; one guide, blob 642e9405, for both commits)
 
-Baseline `af55cb737ec4e63919bac65558b35498ede3d290` (run 8's measured commit) → measured `5c63aa261a2de891907c9b8d567f9932ed1985d0` (origin/main).
+Baseline `af55cb737ec4e63919bac65558b35498ede3d290` (run 8's measured commit) → measured `90542b2c79016d2a1d64f75cb5d3e9037080eae7` (origin/main).
 
 ## Scope and tool limits (seams.scope)
 | commit | files | parseFailures | nonLiteralDynamicImports | unmappedFiles | unresolvedRelativeImports |
 |---|---|---|---|---|---|
 | af55cb73 | 544 | 0 | 0 | 0 | 4 |
-| 5c63aa26 | 544 | 0 | 0 | 0 | 4 |
+| 90542b2c | 544 | 0 | 0 | 0 | 4 |
 
 ## Headline
 | commit | cross-area links (sum) | link rows | knot pairs | groups (sizes) | Other files | F1 LLM→Runs / Runs→LLM | lib→routes edges | edge-dump cross-area (witness) |
 |---|---|---|---|---|---|---|---|---|
 | af55cb73 | 1271 | 69 | 12 | 9 | 17 | 31/37 | 0 | 1271 |
-| 5c63aa26 | 1272 | 69 | 12 | 9 | 17 | 31/37 | 0 | 1272 |
+| 90542b2c | 1272 | 69 | 12 | 9 | 17 | 31/37 | 0 | 1272 |
 
 ## Knot pairs (a→b / b→a)
-| pair | af55cb73 | 5c63aa26 |
+| pair | af55cb73 | 90542b2c |
 |---|---|---|
 | Agent API ↔ LLM | 37/4 | 37/4 |
 | Agent API ↔ Providers | 20/3 | 20/3 |
@@ -32,16 +32,16 @@ Baseline `af55cb737ec4e63919bac65558b35498ede3d290` (run 8's measured commit) �
 
 Knot groups:
 - af55cb73: [Agent API, Auth, server-rendered pages, LLM, Other features, Providers, Reports, Runs, Task model]
-- 5c63aa26: [Agent API, Auth, server-rendered pages, LLM, Other features, Providers, Reports, Runs, Task model]
+- 90542b2c: [Agent API, Auth, server-rendered pages, LLM, Other features, Providers, Reports, Runs, Task model]
 
 ## Directed area links that differ
-| link | af55cb73 | 5c63aa26 | Δ |
+| link | af55cb73 | 90542b2c | Δ |
 |---|---|---|---|
 | server-rendered pages → LLM | 36 | 37 | +1 |
 
 ## Catch-all ("Other features") members
 - af55cb73 (17; seams says 17): cost-format.js, dashboard-refresh.js, home-pipeline.js, home-row-states.js, home-rows.js, home-view.js, key-state-holders.js, key-state.js, live-anchor.js, ruling-settled.js, ruling-standing.js, stage-writes.js, subtree-index.js, task-facts-holder.js, task-state.js, usage-snapshot-intake.js, waiting-section.js
-- 5c63aa26 (17; seams says 17): cost-format.js, dashboard-refresh.js, home-pipeline.js, home-row-states.js, home-rows.js, home-view.js, key-state-holders.js, key-state.js, live-anchor.js, ruling-settled.js, ruling-standing.js, stage-writes.js, subtree-index.js, task-facts-holder.js, task-state.js, usage-snapshot-intake.js, waiting-section.js
+- 90542b2c (17; seams says 17): cost-format.js, dashboard-refresh.js, home-pipeline.js, home-row-states.js, home-rows.js, home-view.js, key-state-holders.js, key-state.js, live-anchor.js, ruling-settled.js, ruling-standing.js, stage-writes.js, subtree-index.js, task-facts-holder.js, task-state.js, usage-snapshot-intake.js, waiting-section.js
 - code delta: −[] +[]
 
 ## Area file counts, internal imports, entry files
@@ -81,12 +81,12 @@ Intra-area edges: 784 → 784 (added 0, removed 0).
 | commit | window | changes | touching 2+ areas | pairs | unmapped | shallow |
 |---|---|---|---|---|---|---|
 | af55cb73 | 2026-09-06T19:02:28.000Z → 2026-11-05T19:02:28.000Z | 875 | 391 | 76 | 5746 | false |
-| 5c63aa26 | 2026-09-07T10:56:17.000Z → 2026-11-06T10:56:17.000Z | 890 | 393 | 76 | 6218 | false |
+| 90542b2c | 2026-09-07T11:12:59.000Z → 2026-11-06T11:12:59.000Z | 891 | 393 | 76 | 6220 | false |
 
-Shared window: 59.338 of 60 days (98.90%).
+Shared window: 59.326 of 60 days (98.88%).
 
-Top 15 pairs at 5c63aa26 (with af55cb73, Δ, import link at 5c63aa26):
-| pair | 5c63aa26 | af55cb73 | Δ | import link? |
+Top 15 pairs at 90542b2c (with af55cb73, Δ, import link at 90542b2c):
+| pair | 90542b2c | af55cb73 | Δ | import link? |
 |---|---|---|---|---|
 | browser code + server-rendered pages | 137 | 137 | 0 | no |
 | Runs + Web routes | 112 | 112 | 0 | yes |
@@ -112,5 +112,5 @@ All pairs whose count moved:
 - server-rendered pages + LLM: 41 → 43
 - Agent API + server-rendered pages: 34 → 36
 
-No-link pairs: af55cb73 19 of 76; 5c63aa26 19 of 76.
-- at 5c63aa26: browser code + server-rendered pages (137); browser code + Web routes (100); browser code + Runs (87); browser code + Wiring (70); browser code + LLM (45); Agent API + browser code (44); Auth + browser code (29); browser code + Other features (28); browser code + Platform (27); Agent API + Reports (14); browser code + Providers (13); browser code + Reports (13); Other features + Reports (5); browser code + Task model (3); Agent API + Task model (2); Auth + Task model (2); Providers + Reports (2); Task model + Web routes (2); Task model + Wiring (1)
+No-link pairs: af55cb73 19 of 76; 90542b2c 19 of 76.
+- at 90542b2c: browser code + server-rendered pages (137); browser code + Web routes (100); browser code + Runs (87); browser code + Wiring (70); browser code + LLM (45); Agent API + browser code (44); Auth + browser code (29); browser code + Other features (28); browser code + Platform (27); Agent API + Reports (14); browser code + Providers (13); browser code + Reports (13); Other features + Reports (5); browser code + Task model (3); Agent API + Task model (2); Auth + Task model (2); Providers + Reports (2); Task model + Web routes (2); Task model + Wiring (1)

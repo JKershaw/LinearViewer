@@ -18,7 +18,7 @@ if sys.argv[1] == 'write':
 else:
     for guide in ['head-5c63aa26'] + [f'proposal-{n}' for n in NAMES]:
         print(f'## {guide}')
-        for c in ['af55cb73', '5c63aa26']:
+        for c in ['af55cb73', '90542b2c']:
             d = json.load(open(os.path.join(EV, f'seams-code-{c}-guide-{guide}.json')))
             tot = sum(l['imports'] for l in d['links'])
             ar = {a['name']: a['files'] for a in d['areas']}
