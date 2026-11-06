@@ -340,6 +340,8 @@ function surveyRecountSection(v1Path) {
       stricter_rule: { n: v2Pre - v2Any },                     // pre-work rule minus v1 rule, both on v2 data
       v1_to_v2_pre_work: { n: v2Pre - v1Any },
     },
+    pre_work_gained_by_v1_tickets: { n: [...v1Vis.keys()].filter((t) => !v1Vis.get(t).pre_work && v2.get(t)?.pre_work).length, tickets: [...v1Vis.keys()].filter((t) => !v1Vis.get(t).pre_work && v2.get(t)?.pre_work) },
+    pre_work_on_new_tickets: { n: [...v2.keys()].filter((t) => !v1Vis.has(t) && v2.get(t).pre_work).length, tickets: [...v2.keys()].filter((t) => !v1Vis.has(t) && v2.get(t).pre_work) },
     visible_only_after_merge_v2: [...v2.keys()].filter((t) => v2.get(t).any && !v2.get(t).pre_work),
     visible_only_after_merge_v1: [...v1Vis.keys()].filter((t) => v1Vis.get(t).any && !v1Vis.get(t).pre_work),
     v1_finding_9_reference: '17 of 59 (paper Finding 9, v1 frozen data)',
@@ -380,6 +382,7 @@ function postAf55Section() {
     read_by_seams_run9: { n: rows.filter((r) => r.read_by_seams_run9).length },
     read_by_drift_run5: { n: rows.filter((r) => r.read_by_drift_run5).length },
     read_by_neither: { n: rows.filter((r) => !r.read_by_seams_run9 && !r.read_by_drift_run5).length },
+    read_by_neither_place: { n: rows.filter((r) => !r.read_by_seams_run9 && !r.read_by_drift_run5 && r.role === 'place').length },
     rows,
   };
 }
@@ -391,7 +394,14 @@ function crossCheckSection() {
   const singles = subjectList.filter((s) => s.kind === 'single ticket');
   const areaTickets = new Set(areas.flatMap((s) => s.tickets));
   const expected = { areas: 9, singles: 16, areas_all_better: true };
+  const baseRows = place.filter((r) => r.group.startsWith(COST_GROUPS.baseline));
+  const loopRows = place.filter((r) => !r.group.startsWith(COST_GROUPS.baseline));
   return {
+    place_rows: {
+      n: place.length,
+      baseline: { n: baseRows.length },
+      loop: { n: loopRows.length, LinearViewer: loopRows.filter((r) => r.repo === 'LinearViewer').length, 'simple-dispatcher': loopRows.filter((r) => r.repo === 'simple-dispatcher').length },
+    },
     areas: { n: areas.length, both_better: { n: areas.filter((s) => s.both_better).length }, subjects: areas.map((s) => `${s.subject}:${s.reading}`) },
     singles: { n: singles.length, both_better: { n: singles.filter((s) => s.both_better).length }, subjects: singles.map((s) => `${s.subject}:${s.reading}`) },
     area_readings_over_tickets: { readings: areas.length, tickets: areaTickets.size },

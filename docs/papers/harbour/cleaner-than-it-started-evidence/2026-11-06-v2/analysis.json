@@ -1507,6 +1507,28 @@
         "n": 12
       }
     },
+    "pre_work_gained_by_v1_tickets": {
+      "n": 8,
+      "tickets": [
+        "LIN-4201",
+        "LIN-4203",
+        "LIN-4234",
+        "LIN-4219",
+        "LIN-4187",
+        "LIN-4218",
+        "LIN-4166",
+        "LIN-4168"
+      ]
+    },
+    "pre_work_on_new_tickets": {
+      "n": 4,
+      "tickets": [
+        "LIN-4313",
+        "LIN-4317",
+        "LIN-4322",
+        "LIN-4254"
+      ]
+    },
     "visible_only_after_merge_v2": [
       "LIN-4178"
     ],
@@ -1526,6 +1548,9 @@
     },
     "read_by_neither": {
       "n": 7
+    },
+    "read_by_neither_place": {
+      "n": 3
     },
     "rows": [
       {
@@ -1738,6 +1763,17 @@
     ]
   },
   "cross_check": {
+    "place_rows": {
+      "n": 71,
+      "baseline": {
+        "n": 9
+      },
+      "loop": {
+        "n": 62,
+        "LinearViewer": 51,
+        "simple-dispatcher": 11
+      }
+    },
     "areas": {
       "n": 9,
       "both_better": {
