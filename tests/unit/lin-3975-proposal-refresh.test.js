@@ -13,16 +13,12 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import vm from 'node:vm';
 import { createTaskPageRoutes } from '../../routes/task-page.js';
+import { renderTaskChatFold } from '../../lib/render-task-chat.js';
+import { loadWorld, clickOn } from './helpers/client-world.js';
 import { createTaskPageLoader } from '../../lib/task-page-loader.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const read = (rel) => readFileSync(join(__dirname, '../..', rel), 'utf8');
 const NOW = new Date('2026-10-06T15:00:00.000Z');
 const UUID = '11111111-2222-3333-4444-555555555555';
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -124,76 +120,67 @@ describe('LIN-3975 — the staged proposals are the owner\'s, read on their own 
   });
 });
 
-// ─── the fold client, in a vm ────────────────────────────────────────────────
-
-/** An element stub: the fields TaskChat writes or reads, with its own click listeners. */
-function element(extra = {}) {
-  const listeners = {};
-  const el = {
-    value: '', textContent: '', innerHTML: '', disabled: false,
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    addEventListener(type, fn) { (listeners[type] ||= []).push(fn); },
-    fire(type) { for (const fn of listeners[type] || []) fn({ key: 'Enter', preventDefault() {} }); },
-    focus() {}, querySelector() { return null; }, closest() { return el; }, setAttribute() {},
-    ...extra,
-  };
-  return el;
-}
+// ─── the fold client, on the server's own fold markup ────────────────────────
 
 /**
- * Load public/task-chat.js in a vm with a page root of hooks, a model reply of `frames` (SSE frames, in order), and the
- * shared client's stubs. Returns the root's send button, so a test presses it as a reader does.
+ * Loads public/task-chat.js on loadWorld, with the server's fold markup (`renderTaskChatFold`, the page's own renderer)
+ * as the page root: its hooks are the `<input>`s, `<ul>`, `<p>` and `<button>` the renderer writes, so `hook(name)` is
+ * the element the page drew. The shared ChatUI is a stub, as before (its own suite is chat.js's): it builds each bubble as
+ * real nodes in the world's document and records the markdown the fold would render. A model reply of `frames` (SSE frames,
+ * in order) comes through the shared readSSEStream stub. Returns the fold's send button, so a test presses it as a reader does.
  */
 function loadFold({ frames, onProposed, propose = true }) {
-  const hooks = {
-    id: element({ value: 'LIN-50' }),
-    question: element({ value: 'Can you follow up?' }),
-    send: element(),
-    transcript: element(),
-    empty: element(),
-    'active-label': element(),
-    reset: element(),
-  };
-  const root = { querySelector: (sel) => {
-    const m = /^\[data-task-chat="([^"]+)"\]$/.exec(sel);
-    return m && hooks[m[1]] ? hooks[m[1]] : null;
-  } };
   const rendered = [];
-  const window = {
-    api: async () => ({}),
-    toast() {},
-    escapeHtml: (s) => String(s),
-    ChatUI: {
-      appendMessage: () => {
-        const body = element();
-        const li = element({ querySelector: () => body });
-        body.closest = () => li;
-        return li;
-      },
-      appendNote() {},
-      isPinnedToBottom: () => false,
-      renderMarkdownText(el, text) { rendered.push(text); },
-      toolBreadcrumbLabel: (e) => `${e.name} ${e.phase}`,
-    },
-  };
   const posts = [];
-  const sandbox = {
-    window,
-    document: { querySelectorAll: () => [] },
-    fetch: async (url, init) => { posts.push({ url, body: JSON.parse(init.body) }); return { ok: true }; },
-    readSSEStream: async (response, onEvent) => { for (const [type, data] of frames) onEvent(type, data); },
-    console, setTimeout, clearTimeout, Promise,
+  const ChatUI = {
+    appendMessage(thread, opts) {
+      const li = world.document.createElement('li');
+      li.className = opts.liClass;
+      const who = world.document.createElement('span');
+      who.className = 'chat-msg__who';
+      const body = world.document.createElement('div');
+      body.className = opts.textClass;
+      body.textContent = opts.text;
+      li.appendChild(who);
+      li.appendChild(body);
+      thread.appendChild(li);
+      return li;
+    },
+    appendNote(thread, text, opts = {}) {
+      const li = world.document.createElement('li');
+      li.className = opts.liClass || 'chat-msg';
+      li.textContent = text;
+      if (opts.before) thread.insertBefore(li, opts.before);
+      else thread.appendChild(li);
+      return li;
+    },
+    isPinnedToBottom: () => false,
+    renderMarkdownText(el, text) { rendered.push(text); },
+    toolBreadcrumbLabel: (e) => `${e.name} ${e.phase}`,
   };
-  vm.createContext(sandbox);
-  vm.runInContext(read('public/task-chat.js'), sandbox, { filename: 'task-chat.js' });
-  window.TaskChat.init(root, { urlKey: 'acme', propose, ...(onProposed ? { onProposed } : {}) });
-  return { send: hooks.send, rendered, posts };
+  const world = loadWorld({
+    scripts: ['task-chat.js'],
+    window: {
+      ChatUI,
+      api: async () => ({}),
+      toast() {},
+      escapeHtml: (s) => String(s),
+      readSSEStream: async (response, onEvent) => { for (const [type, data] of frames) onEvent(type, data); },
+      fetch: async (url, init) => { posts.push({ url, body: JSON.parse(init.body) }); return { ok: true }; },
+    },
+  });
+  world.document.body.innerHTML = renderTaskChatFold({ urlKey: 'acme', identifier: 'LIN-50' });
+  const root = world.document.querySelector('[data-task-chat-root]');
+  const hook = (name) => root.querySelector(`[data-task-chat="${name}"]`);
+  hook('question').value = 'Can you follow up?';
+  world.window.TaskChat.init(root, { urlKey: 'acme', propose, ...(onProposed ? { onProposed } : {}) });
+  return { send: hook('send'), rendered, posts };
 }
 
 describe('LIN-3975 — the fold\'s turns go out as propose, and only the fold\'s', () => {
   test('a fold turn is sent with propose: true on the wire', async () => {
     const { send, posts } = loadFold({ frames: [['done', {}]], propose: true });
-    send.fire('click');
+    await clickOn(send);
     await flush();
     assert.equal(posts.length, 1);
     assert.equal(posts[0].body.propose, true);
@@ -201,7 +188,7 @@ describe('LIN-3975 — the fold\'s turns go out as propose, and only the fold\'s
 
   test('a standalone chat (no propose option) sends no propose flag, so it stays an ordinary chat', async () => {
     const { send, posts } = loadFold({ frames: [['done', {}]], propose: false });
-    send.fire('click');
+    await clickOn(send);
     await flush();
     assert.equal(posts.length, 1);
     assert.ok(!('propose' in posts[0].body), 'the body carries no propose key');
@@ -222,7 +209,7 @@ describe('LIN-3975 — the fold tells the page when a turn proposed a follow-up'
       ],
       onProposed: (frame) => seen.push(frame),
     });
-    send.fire('click');
+    await clickOn(send);
     await flush();
     await flush();
     assert.deepEqual(seen, [PROPOSED], 'exactly the proposed frame reaches the host');
@@ -232,7 +219,7 @@ describe('LIN-3975 — the fold tells the page when a turn proposed a follow-up'
     const { send, rendered } = loadFold({
       frames: [['tool', PROPOSED], ['token', { token: 'ok' }], ['done', {}]],
     });
-    send.fire('click');
+    await clickOn(send);
     await flush();
     await flush();
     assert.deepEqual(rendered, ['ok'], 'the stream runs on to its done frame past the proposed frame');
@@ -242,10 +229,8 @@ describe('LIN-3975 — the fold tells the page when a turn proposed a follow-up'
 describe('LIN-3975 — the page names the proposals read beside the state it polls', () => {
   // The page script is an ES module-free IIFE; its helper is read through a vm, as the other client tests do.
   function proposalsUrlOf(stateUrl) {
-    const sandbox = { module: { exports: {} }, window: {}, console };
-    vm.createContext(sandbox);
-    vm.runInContext(read('public/task-page.js'), sandbox, { filename: 'task-page.js' });
-    return sandbox.module.exports.proposalsUrlOf(stateUrl);
+    const world = loadWorld({ scripts: ['task-page.js'], window: { module: { exports: {} } } });
+    return world.window.module.exports.proposalsUrlOf(stateUrl);
   }
 
   test('the state URL becomes the proposals URL, the same task and query', () => {
