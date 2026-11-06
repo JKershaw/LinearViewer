@@ -2626,3 +2626,10 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   7. three habits; cost; limits.
 - **Three generated figures,** rendered and checked: the loop; the census merge by merge (42 merges, 56 → 6, with the stops appearing); and nine finished areas against four ordinary pairs. Every number comes from paper v2. The census is named as its own definition beside Drift's crude grep. Post-window facts are stated as facts. Two fresh readers.
 - **My read:** accurate and well sourced, and the figures carry the story. **But the register is still cautious.** Limits are threaded through nearly every paragraph, the opening ends on "partly circular", and the prequel's images (the hand that stays, the trig point) are set up but not paid off at the close, which ends on the limits and the reading list. A v1.1 could keep every limit but gather them in one place: open on a concrete scene, and close on the direction. That's John's call.
+- **John agreed with the read, and asked for a v1.1.** **LIN-4335** filed and Surveyed. Shape and voice only, with every claim and number unchanged:
+  - open on a concrete scene (the census over two days, or the paper finding the bug that hid its own evidence);
+  - state each claim once, at its true size, and gather the limits into one section;
+  - pay off the prequel's images (the ball's edges, the hand that stays and its mistakes, the trig point), marked as John's;
+  - close the body on the direction, with the human calls as authority grants.
+
+  Two fresh readers: one new to Harbour (does it still feel defensive?), one for accuracy (nothing widened).
