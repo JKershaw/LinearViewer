@@ -2396,3 +2396,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **an essay for a fresh human reader:** narrative, big-picture framing, visual storytelling.
 
   The paper comes first, and the essay draws on it and cites it.
+- 08:15: **LIN-4314** (notebook sync to main, pinned to branch `24ac197f`, notebook paths only, no merge or cherry-pick) and **LIN-4315** (the technical paper) filed and Surveyed. The paper is blocked on the sync, so its citations land at main. It freezes at that commit; log entries after it aren't cited. The essay follows the paper. LIN-4254 goes in as "in flight" if it hasn't closed by the freeze.
