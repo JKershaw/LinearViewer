@@ -1,0 +1,158 @@
+{
+  "version": "v2",
+  "ticket": "LIN-4331",
+  "note": "Inputs for the v2 evidence folder cleaner-than-it-started-evidence/2026-11-06-v2/ (LIN-4334). Same shape as inputs-v1.json (see the header of inputs.mjs). Not frozen yet: beat 1 only writes this file. Pins and expected counts are re-checked at freeze start and changed here before any freeze if main has moved.",
+  "grounded_at": "LinearViewer 509f797e (main, after LIN-4333 merged; this file's pin). simple-dispatcher 07c88f7 (main). Freeze window: rows from window_start to each pin, first-parent. Re-read both at freeze start.",
+  "window_start": "2026-11-04T00:00:00Z",
+  "lv_pin": "509f797e",
+  "sd_pin": "07c88f7",
+  "census_pin": "509f797e",
+  "parents": [
+    "LIN-4144",
+    "LIN-4195",
+    "LIN-4233",
+    "LIN-4254",
+    "LIN-4255",
+    "LIN-4271"
+  ],
+  "oct_merges": {
+    "since": "2026-10-20T00:00:00Z",
+    "until": "2026-11-01T23:59:59Z",
+    "file": "git/merges-LinearViewer-2026-10-20-11-01.tsv"
+  },
+  "baseline_3nov_ids": [
+    "LIN-4168",
+    "LIN-4166",
+    "LIN-4173",
+    "LIN-4177"
+  ],
+  "baseline_3nov_window": {
+    "since": "2026-11-02T00:00Z",
+    "until": "2026-11-04T00:00Z"
+  },
+  "baseline_3nov_file": "git/merges-LinearViewer-2026-11-02-03.tsv",
+  "ui_four": [
+    "LIN-4106",
+    "LIN-4107",
+    "LIN-4110",
+    "LIN-4040"
+  ],
+  "folded": [
+    "LIN-4142",
+    "LIN-4114",
+    "LIN-4188"
+  ],
+  "context": [
+    "LIN-4150",
+    "LIN-4297",
+    "LIN-4318",
+    "LIN-4328",
+    "LIN-4331"
+  ],
+  "pair_baseline_tickets": [
+    "LIN-3700",
+    "LIN-3706",
+    "LIN-3710",
+    "LIN-3711",
+    "LIN-3713",
+    "LIN-3714",
+    "LIN-3717",
+    "LIN-3722"
+  ],
+  "pair_baseline": {
+    "expected_pairs": [
+      "0eb4a2d1→a6e0ae11",
+      "c1d5c700→71a42131",
+      "d10e7398→8ddb0f3b",
+      "0da144c8→c5295b42"
+    ],
+    "expected_pairs_written": "before the rule runs (LIN-4334, beat 1)",
+    "passes": [
+      "AW",
+      "AX",
+      "AY",
+      "AZ",
+      "BA",
+      "BB",
+      "BC",
+      "BD"
+    ],
+    "title_shape": "baseline pair <N> pass <ID>",
+    "rule": "production files are lib/, routes/, public/ and server.js; in date order, pair each unused merge with the next unused merge within 48 h that shares a production file; take the first four; parse times as Date (the list mixes +01:00 and Z)",
+    "rule_params": {
+      "production": [
+        "lib/",
+        "routes/",
+        "public/",
+        "server.js"
+      ],
+      "window_hours": 48,
+      "take": 4,
+      "time_parse": "Date (source mixes +01:00 and Z)"
+    },
+    "rule_commits": [
+      "e8442b96",
+      "3b7b4f0b"
+    ],
+    "rule_source": "docs/plans/survey/log.md@1c894016:2498 (the rule as logged, 6 Nov 12:30 entry). Committed as e8442b96 (11:06:53Z) on claude/cool-rubin-6acj5j, not an ancestor of main; frozen as text into git/ in beat 2.",
+    "fixed_before_results": "e8442b96 committed 11:06:53Z; first pass AW posted 11:09:06Z; result 3b7b4f0b committed 11:15:01Z",
+    "commit_times": "all eight pair commits are 20 Oct 2026, 00:41Z to 13:27Z",
+    "on_mismatch": "analyse throws if the four pairs differ from expected_pairs; the rule is not tuned"
+  },
+  "survey_recount": {
+    "rule": "A ticket has a visible pre-work Survey if a comment whose first line starts with '## Survey' and names that ticket was posted on the ticket or on LIN-4150 before that ticket's first merge in the population (merge commit time).",
+    "first_merge": "for a ticket with several merges (LIN-4254 has seven), the first merge in the population",
+    "v1_rule": "v1 counted any '## Survey' heading regardless of time (v1 Finding 9: 17 of 59; 16 / 4 / 22). Computed on v2's data too, so the change splits into 'more comments visible' and 'stricter rule'."
+  },
+  "blind": {
+    "ticket": "LIN-4150",
+    "comment_cutoff": "2026-11-06T12:02:19.388Z",
+    "expected_passes": 62,
+    "expected_batches": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "sessions": [
+      {
+        "name": "pass-1 (batches A+B)",
+        "batches": [
+          "A",
+          "B"
+        ]
+      },
+      {
+        "name": "pass-2 (batches C+D)",
+        "batches": [
+          "C",
+          "D"
+        ]
+      }
+    ],
+    "baseline_note": "Baseline = the ledger baseline window 015aa4c6..5334c81a (8 LinearViewer rows, all in the batches). Forward = every other row in the batches. The v2 pair baseline is separate (see pair_baseline)."
+  },
+  "periodicals": {
+    "linearviewer_end": "af55cb73",
+    "linearviewer_seams_run9": "90542b2c",
+    "linearviewer_drift_run5": "5c63aa26",
+    "simple_dispatcher_run2": "d8d186c",
+    "simple_dispatcher_run3": "07c88f7"
+  },
+  "ticket_notes": {
+    "LIN-4254": "v1's census note (18 at 1d10f9b3, 12 movable + 6 stop) is history. At the v2 pin the census lists 6 files, all // stop: (tests/unit/fake-dom-census.test.js:52-59).",
+    "LIN-4253": "lib/stage-writes.js is not placed on scripts/code-shape/areas.json (research §L9)"
+  },
+  "cost_groups": {
+    "baseline": "baseline",
+    "forward": "forward",
+    "five_nov_and_ordinary": "^5 Nov|^LIN-4255 fake|^ordinary"
+  },
+  "fake_dom_piece_group": "LIN-4255 fake-DOM move piece",
+  "named_costs": {
+    "LIN_4271_own_usd": "LIN-4271",
+    "parent_LIN_4255_usd": "LIN-4255"
+  },
+  "v1_reference": "docs/papers/harbour/cleaner-than-it-started-evidence/2026-11-06/analysis.json",
+  "v1_reference_note": "v1's frozen analysis.json, read by analyse.mjs only for the v1_vs_v2 comparison and the Survey split; its sha256 is recorded in analysis.json."
+}

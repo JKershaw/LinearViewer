@@ -1,0 +1,34 @@
+3b7b4f0b1a4ed3b3c399bda8ecc3d38c102c5296
+2026-11-06T11:15:01Z
+Survey: Next 2 baseline, 1 of 4 ordinary pairs better vs the after-step's 6 of 6
+
+diff --git a/docs/plans/survey/log.md b/docs/plans/survey/log.md
+index adc076a0..fa6933c3 100644
+--- a/docs/plans/survey/log.md
++++ b/docs/plans/survey/log.md
+@@ -2518,3 +2518,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
+   - a top-level `truncated` flag that survives `flattenIssue`;
+   - explicit order; docs in one place.
+ - 13:00: LIN-4311 (piece 5, the task-page suites) merged (`90542b2c`). Only LIN-4312 is left (`close-out-client`, plus `close-out.js`'s production seams and their allow-list entries).
++- 13:10: **Next 2's result: the baseline pairs read better in both passes on 1 of 4** (pairs 1, 2 and 4 mixed, mixed; pair 3 better, better), against the after-step's 6 of 6. By the rule logged before reading, the after-step's effect is real against this baseline. The one better baseline pair (LIN-3717 → LIN-3722) was itself a consolidation, so it supports the mechanism (deleting copies) rather than a pairing artefact. That answers the paper's Limit "no like-for-like baseline for areas", partly: four pairs, one prompt. Ledger: "Next 2: a baseline for the area reads".
+diff --git a/docs/plans/survey/place-ledger.md b/docs/plans/survey/place-ledger.md
+index 11994c11..be32c76b 100644
+--- a/docs/plans/survey/place-ledger.md
++++ b/docs/plans/survey/place-ledger.md
+@@ -209,3 +209,16 @@ Every tidy-after's blind reads name further residues (the stop rule sends them t
+ | LIN-4317 (LIN-4313's **edges tidy-after**, the fifth "after" step) | no behaviour change | one `declaresPeriodicalGrant` for both lanes; `isAutopilotVariant` beside the tail; `getPeriodical(id)`; `structuralRuleFor(subject)`; the gate suites list the mint mount, with every count claim in them true; the renderer pinned to the same hashes; the docs pointer. Residues: `periodical-runs.js:117`'s hand-written "+ Autopilot" name; the session lane's text input (LIN-4318); mount counts as prose in about 8 places; a census counting literals that blocks a better fold; forward ticket pointers in comments | the blind reads' named edges, checked by hand (the grant rules, the false "four mounts"), then Surveyed (trust differs, not the rule; route vs path; the F3 trap) | **better, better.** And **LIN-4313 + LIN-4317 together: better, better** (LIN-4313 alone was mixed, mixed) |
+ 
+ The "after" step: **five of five** areas lifted to better in both blind passes, the latest on the authority gate (LIN-4313 → LIN-4317).
++
++### Next 2: a baseline for the area reads (6 Nov, criteria logged at 12:30 before reading)
++
++Four ordinary pairs of consecutive same-file changes from before the loop (20 Oct – 1 Nov), picked by a fixed rule. Each was read as one area with the same prompt and wording as the after-step's area reads, two passes each (AW–BD).
++
++| Pair | Pass 1 | Pass 2 |
++|---|---|---|
++| 1. LIN-3706 `0eb4a2d1` → LIN-3700 `a6e0ae11` (shares only `server.js`; a weak pair, kept by the rule) | mixed | mixed |
++| 2. LIN-3710 `c1d5c700` → LIN-3714 `71a42131` (the KPI charts) | mixed | mixed |
++| 3. LIN-3717 `d10e7398` → LIN-3722 `8ddb0f3b` (the loop-terminal checks to `lib/run-loop-state.js`; one `stopAtFromRows` rule) | **better** | **better** |
++| 4. LIN-3711 `0da144c8` → LIN-3713 `c5295b42` (the workspace KPIs) | mixed | mixed |
++
++**1 of 4 better in both passes, against the after-step's 6 of 6.** By the logged rule (0–1 of 4), **the after-step's effect is real against this baseline:** reading a pair as one area doesn't by itself make it read better. The one baseline pair that read better was itself a consolidation (one owner for the terminal checks; one shared rule), which is the mechanism the paper's Finding 5 describes (deleting copies reads better), not an artefact of pairing. Small n (four pairs, eight passes), one prompt, and pairs from one repo.
