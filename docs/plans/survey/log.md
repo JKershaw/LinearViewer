@@ -2478,3 +2478,17 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 
   Again the forward comment came from a scope sentence of mine ("say plainly in the PR", which the builder also wrote into a comment).
 - 12:00: LIN-4310 (piece 4, the swipe/prompt-section/dispatch-slice suites) merged (`ff6a69fa`). Two pieces left: LIN-4311 (task-page) and LIN-4312 (close-out, with its production seams). The paper is still held on `lin4315-blind-prompt`.
+
+### 12:15 UTC: the paper merged (LIN-4315, `5c63aa26`, `docs/papers/harbour/cleaner-than-it-started.md`)
+- **Its answer:** "Tasks on average: not shown. Areas and finished moves: yes, on few cases."
+  - **Ordinary tickets:** level with the baseline or behind it. In the same pass, +0.39 against +0.38, then +0.37 against +0.50; a gap of one row's sign, too few rows to resolve. Two read worse in a pass (LIN-4241, LIN-4212).
+  - **Twelve subjects read better in both passes:** six areas covering eleven tickets, and six single tickets. No pass on a finished move or tidy step read worse.
+  - **The Periodicals point the same way, small and better.**
+
+  Its limits are the honest ones: circular blind reads, no like-for-like area baseline, and no independent reading after `af55cb73`.
+- **It corrected me:** "no instrument found an area the loop touched getting worse" was **false**. Seams run 8 rated "other features: worse as a map", from LIN-4253's `lib/stage-writes.js` growing the catch-all. I had logged it and then dismissed it as a guide gap. Neither blind pass on LIN-4253 caught it. Also: the census was 18 at its pin, and the ledger's "+0.37 against +0.38" crosses passes.
+- **It found a Harbour bug:** the Linear issue-detail query has no `first:` and no paging, so issue reads return at most 50 comments (and children and relations), silently. LIN-4150 returns exactly 50, so every Survey posted before 5 Nov 02:58 is invisible. Verified in `lib/providers/linear/index.js`. **Filed LIN-4322** (high), Surveyed.
+- **Its Next, acted on:**
+  - **Next 3** (read the merges after `af55cb73` independently before the essay cites them): **Drift & Coherence and Seams & Tangles minted through the new route with `--autopilot`,** with a short operator note (`dab3abb3`, `e364c521`). It's the route's first real use: no checkout, no render, no manual kickoff.
+  - **Next 1** (larger standalone tidies on the Periodicals' worst areas, John's hypothesis) and **Next 2** (an area read with a baseline: score an untouched area with the same prompt) are the experiments to run before or alongside the essay.
+- `docs/plans/survey.md`: the paper replaced the overturned 17/3/1/0 with a pointer on main. Brought back onto this branch by a path-limited checkout, not a merge.
