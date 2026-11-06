@@ -139,4 +139,5 @@
 | 137 | `enqueue-route-list-restated` | low | new (window-introduced; top of the window findings) |
 | 138 | `element-method-guard-idiom-beyond-scan` | low | new (pre-existing sites, made visible by the one-spelling claim) |
 | 139 | `client-dual-export-split` | low (borderline) | new (window-introduced, LIN-4310) |
+| 141 | `session-lane-grant-from-client-text` | low-medium | new as framed (the sniff is inline at af55cb73:lib/dispatch-entrance.js:1185; LIN-4317 named and centralised it; found by the Tier-2 second read) |
 | 140 | `working-beat-grammar-cross-repo` | low-medium | new (received from Comprehension-Debt run 5, R6, which rates it medium) |

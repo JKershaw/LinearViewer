@@ -12,7 +12,7 @@ Written from the code first. The draft is committed as `docs/reviews/_evidence-2
 
 | Area | Verdict | Evidence (code at `5c63aa26`, measured against `af55cb73`) |
 |---|---|---|
-| **Periodical mint and grant** (LIN-4313, LIN-4317) | **better**, with one stale-copy cost and one open input | One renderer: `renderPeriodicalPrompt` feeds both the nodes and the mint lane. One id lookup: `getPeriodical` (`lib/periodicals.js:1031`). The other `PERIODICALS.find` (`:1066`) matches by gate slug, a different key. One name helper, `periodicalPromptName` (`:1167`), used by `lib/render.js:660,674` and `lib/dispatch-entrance.js:2016`. One grant rule, `declaresPeriodicalGrant` (`lib/dispatch-entrance.js:1218`). It still takes two inputs: the session lane learns the variant by sniffing prompt text (`isAutopilotVariant`, `periodicals.js:1131`, read at `dispatch-entrance.js:1227`), which is LIN-4318. One copy predates the window: `lib/periodical-runs.js:117` builds `${t.title} + Autopilot` itself, also LIN-4318. **Cost:** the enqueue-route list is now restated in 10 prose places, 4 of them stale (row 137). |
+| **Periodical mint and grant** (LIN-4313, LIN-4317) | **better in the rule; neutral in its inputs**, with one stale-copy cost and one open input (row 141) | One renderer: `renderPeriodicalPrompt` feeds both the nodes and the mint lane. One id lookup: `getPeriodical` (`lib/periodicals.js:1031`). The other `PERIODICALS.find` (`:1066`) matches by gate slug, a different key. One name helper, `periodicalPromptName` (`:1167`), used by `lib/render.js:660,674` and `lib/dispatch-entrance.js:2016`. One grant rule, `declaresPeriodicalGrant` (`lib/dispatch-entrance.js:1218`). It still takes two inputs. The session lane learns the variant by sniffing prompt text (`isAutopilotVariant`, `periodicals.js:1131`, read at `dispatch-entrance.js:1226-1227`), and that text is what the browser posts (`public/app.js:1620-1626`), so on that lane the grant is decided on client-composed text (row 141). The mint lane takes the route flag. The owner check at the mint remains the authority. The input is LIN-4318's. One copy predates the window: `lib/periodical-runs.js:117` builds `${t.title} + Autopilot` itself, also LIN-4318. **Cost:** the enqueue-route list is now restated in 10 prose places, 4 of them stale (row 137). |
 | **DOM-access spelling in `public/`** (LIN-4292, LIN-4304) | **better** | The method-presence guards on the six scanned methods are gone and an AST scan holds the result (`tests/unit/public-element-method-guards.test.js`, allowlist of 3, stale entries fail). The scan reuses an existing shape (`no-page-wide-label-listener.test.js`), so it adds no new convention. Counts (`dom-guard-residue.txt`): the `typeof X.m === 'function'` form 13 at `af55cb73`, 10 at `5c63aa26`; the bare presence test form 40 → 1. **Residue:** the same idiom on `focus`, `setSelectionRange` and `dispatchEvent` at 8 sites outside the scan (row 138): `prompt-section.js:1053,1055,1219,1223,1856`, `question-cards.js:241-242`, `common.js:2301`. The named-idiom grep over `public/*.js` now leaves only `settings-models.js:61` (`phone.matches`, a MediaQueryList). |
 | **Production code shaped for tests** (LIN-4309, LIN-4310, the LIN-4304 allowlist) | **mixed** | Better: a test-side copy of the lane template was removed (LIN-4310; the suites now use the real `laneNode`). Outlier: `public/live-console.js` now publishes two disjoint surfaces, `module.exports` (`:1361-1362`, six functions) and `window.LiveConsoleLane` (`:1367`, one function read only by tests). The canonical dual export is one `api` object published both ways (question-cards, cost-format, home-placement); the named window namespace is also canonical (17 files, research §2). The window does not make the test global canonical by assumption: row 139 is report-only. LIN-4309's production comment about the unit suite is Comprehension-Debt's, not ruled here. |
 | **Client test tree** (LIN-4296, LIN-4306–4311) | **better** | Vm-over-`public/` suites that do not use `loadWorld`: **64 → 49** across the window (`client-tree-measure.txt`, same script at each end). Hand-written fakes in `HAND_WRITTEN_FAKE_DOM_FILES`: **25 → 10** (stop markers 9 → 6). The 39 own-stub suites (64 − 25 and 49 − 10) are unchanged. LIN-4306 computes the fake's consumer list from imports; it removes one hand-kept list and does not change what the census guards. Row 121: one more allowlist-shaped test, in an existing shape; the test files importing `acorn` go 5 → 6. |
@@ -38,7 +38,7 @@ Compared after the code verdicts above. "No reading" means the paper's Limits li
 - **LIN-4309** — **no reading**. Code: 15 → 14 at `8b84a8fe`, plus a two-line production comment (Comprehension-Debt's matter).
 - **LIN-4310** — **no reading**. Code: 14 → 10 at `ff6a69fa`, and the two-surface export outlier (row 139). Code verdict: mixed.
 - **LIN-4313** — **no reading**. Code: better (one renderer, one lookup, one name helper, one grant rule). The stale prose (row 137) and the `+ Autopilot` copy at `periodical-runs.js:117` (LIN-4318) are its costs.
-- **LIN-4317** — **no reading**. Code: better; one grant rule that still reads the prompt text in the session lane (LIN-4318).
+- **LIN-4317** — **no reading**. Code: better in the rule; the session lane's input is client-posted text, and that is row 141 (home LIN-4318).
 
 The paper's Next 3 asks for this reading. It is given here from the code. It does not answer the paper's question on the paper's behalf, and it does not edit the paper.
 
@@ -50,7 +50,7 @@ The paper's Next 3 asks for this reading. It is given here from the code. It doe
 4. **The halt cold-cache row (114) is John's ruling and is not chosen here.** Unchanged in code.
 5. **Follow-ups: zero new tickets.** Two existing tickets get comments: LIN-4320 (widen) and LIN-4303 (re-scope, since LIN-4304 finished its named list). Searches for each new finding are in "Considered, not minted".
 6. **The instruments reproduce.** The census tool run at `af55cb73` against `2eb73ae0` gives JSON byte-equal to run 4's HEAD census. The import walker at `af55cb73` is byte-equal to run 4's graph.
-7. **Second read:** see "Adversarial Second-Read". The reader's verdict and whether it differed from row 137 are recorded there in full.
+7. **Second read: DISAGREE** (Tier 2, a fresh-context sub-agent). Its primary item is different from row 137: the session lane declares the dispatch grant from prompt text the browser posts (row 141, home LIN-4318). The report was revised in place. Both items are kept: row 137 is the top window-introduced change, row 141 is the larger item by consequence. See "Adversarial Second-Read" for the full answer and the checks.
 
 ## Grounding (HEADs measured)
 
@@ -65,28 +65,29 @@ The paper's Next 3 asks for this reading. It is given here from the code. It doe
 
 ## Findings (severity-ranked; delta vs run 4)
 
-Citations are at `5c63aa26` (Harbour) and `07c88f7a` (SD). "Carried" rows keep their run-4 names; the compact ledger holds all 140 rows with their deltas.
+Citations are at `5c63aa26` (Harbour) and `07c88f7a` (SD). "Carried" rows keep their run-4 names; the compact ledger holds all 141 rows with their deltas.
 
 | # | name | severity | delta vs run 4 | one line |
 |---|---|---|---|---|
 | 1 | **140** `working-beat-grammar-cross-repo` | LOW-MEDIUM | **new** (received from Comprehension-Debt run 5, R6, which rates it medium) | Harbour reads the `[working]` beat; SD writes it; neither end names the other. CD's spike: `state:'running'` is unreachable from SD's real beats. Unchanged by construction (SD 0 commits). Home LIN-3828 (Backlog, 1 comment). |
-| 2 | **137** `enqueue-route-list-restated` | LOW | **new**; top window finding | Route list restated in 10 prose places, 6 current and 4 stale (`CLAUDE.md:107`, `lib/proxy-scopes.js:23-25`, `lib/proxy-instructions.js:1171`, `docs/proxy-integration.md:102`). The window introduced the fourth mount and left those four saying three. Home: widen LIN-4320. |
-| 3 | **131** `override-kind-list-stale` | LOW | unchanged | `lib/proxy-instructions.js:884` VERB OVERRIDE is not edited by the window (it moved 860 → 884). Lists 15 of the 19 template keys the route accepts. LIN-4302 (Backlog, 0 comments). |
-| 4 | **135** `in-progress-predicate-server-client-split` | LOW | unchanged | `public/prompt-section.js:726` still reads `data.status === 'waiting'` beside `data.live`; the server's `live: !!held` (`lib/task-state.js:65`) excludes waiting. Moved from run 4's `:2300`, not removed. Home LIN-4256 (Backlog). |
-| 5 | **138** `element-method-guard-idiom-beyond-scan` | LOW | **new** (pre-existing sites, made visible by the window's "one spelling" claim) | Eight presence guards on `focus` / `setSelectionRange` / `dispatchEvent` outside the scan's six methods. Home: LIN-4303, re-scope. |
-| 6 | **136** `stage-kind-roster-tables` | LOW | **new** (received from Seams & Tangles run 8 §3, which rates it low-medium) | The `survey-place` kind tables: 13 occurrences in 9 files, joined by string keys. 7 of 8 tables are guarded by a kind loop; the unguarded one is row 131. Unchanged at both ends. No ticket names the roster; see "Considered, not minted". |
-| 7 | **139** `client-dual-export-split` | LOW (borderline) | **new** (LIN-4310) | `public/live-console.js` has two disjoint export surfaces; one is a test-only window global. The canonical rule is one `api` object published both ways. Report-only: a convention outlier, not a finding that a fix is due. |
-| 8 | **134** `stage-writes-threading-per-entrance` | LOW | unchanged (report-only) | `stageWrites(` call sites in `lib` and `routes`: 5 at both ends. The PM lane goes through `enqueueRow`; no new threading site. The silent default is unchanged. |
-| 9 | **132** `path-class-predicate-copies` | LOW | unchanged (report-only) | `isTest` / `isDoc`: one canonical home (`scripts/delivery-paths.mjs`) and eight untouched copies in `scripts/`. |
-| 10 | **133** `world-helper-convention-half-guarded` | LOW | **improved** (guarded half) | `loadWorld` half: 64 → 49 not on `loadWorld` at `5c63aa26` (46 at `90542b2c`); census 25 → 10. The 39 own-stub suites are unchanged. |
+| 2 | **141** `session-lane-grant-from-client-text` | LOW-MEDIUM | **new as framed**; top by consequence (found by the second read) | The session lane declares the dispatch grant from prompt text the browser posts (`dispatch-entrance.js:1226-1227`, `isAutopilotVariant` at `periodicals.js:1131`). The mint lane takes the route flag. The owner check at the mint stays the authority, so this is a grant decided on client text, not an escalation. Home LIN-4318. |
+| 3 | **137** `enqueue-route-list-restated` | LOW | **new**; top window finding | Route list restated in 10 prose places, 6 current and 4 stale (`CLAUDE.md:107`, `lib/proxy-scopes.js:23-25`, `lib/proxy-instructions.js:1171`, `docs/proxy-integration.md:102`). The window introduced the fourth mount and left those four saying three. Home: widen LIN-4320. |
+| 4 | **131** `override-kind-list-stale` | LOW | unchanged | `lib/proxy-instructions.js:884` VERB OVERRIDE is not edited by the window (it moved 860 → 884). Lists 15 of the 19 template keys the route accepts. LIN-4302 (Backlog, 0 comments). |
+| 5 | **135** `in-progress-predicate-server-client-split` | LOW | unchanged | `public/prompt-section.js:726` still reads `data.status === 'waiting'` beside `data.live`; the server's `live: !!held` (`lib/task-state.js:65`) excludes waiting. Moved from run 4's `:2300`, not removed. Home LIN-4256 (Backlog). |
+| 6 | **138** `element-method-guard-idiom-beyond-scan` | LOW | **new** (pre-existing sites, made visible by the window's "one spelling" claim) | Eight presence guards on `focus` / `setSelectionRange` / `dispatchEvent` outside the scan's six methods. Home: LIN-4303, re-scope. |
+| 7 | **136** `stage-kind-roster-tables` | LOW | **new** (received from Seams & Tangles run 8 §3, which rates it low-medium) | The `survey-place` kind tables: 13 occurrences in 9 files, joined by string keys. 7 of 8 tables are guarded by a kind loop; the unguarded one is row 131. Unchanged at both ends. No ticket names the roster; see "Considered, not minted". |
+| 8 | **139** `client-dual-export-split` | LOW (borderline) | **new** (LIN-4310) | `public/live-console.js` has two disjoint export surfaces; one is a test-only window global. The canonical rule is one `api` object published both ways. Report-only: a convention outlier, not a finding that a fix is due. |
+| 9 | **134** `stage-writes-threading-per-entrance` | LOW | unchanged (report-only) | `stageWrites(` call sites in `lib` and `routes`: 5 at both ends. The PM lane goes through `enqueueRow`; no new threading site. The silent default is unchanged. |
+| 10 | **132** `path-class-predicate-copies` | LOW | unchanged (report-only) | `isTest` / `isDoc`: one canonical home (`scripts/delivery-paths.mjs`) and eight untouched copies in `scripts/`. |
+| 11 | **133** `world-helper-convention-half-guarded` | LOW | **improved** (guarded half) | `loadWorld` half: 64 → 49 not on `loadWorld` at `5c63aa26` (46 at `90542b2c`); census 25 → 10. The 39 own-stub suites are unchanged. |
 | — | `unit-census-convention-split` (row 121) | informational | **touched** (+1 census) | `tests/unit/public-element-method-guards.test.js` is an acorn AST scan with a keyed allowlist, the shape of `no-page-wide-label-listener.test.js`. Probably not a new shape. Files importing `acorn` in tests: 5 → 6. Still not ruled. |
 | — | Claude model-family mirror (CD run 5, R4) | — | **unchanged** (cross-repo) | See "Cross-repo verdicts". Real; home LIN-4301. |
 | — | `lineage-row-read-copies` (sub-item of row 79) | low | unchanged | The comment at `lib/lineage-membership.js:14-15` is unchanged and still wrong; the copies are unchanged. |
 | — | lib import cycles and the resolved rows | as run 4 | held | Re-measured: 2 SCCs with the same members, 0 upward edges. |
 
-**Resolved:** none new this run. **Improved:** 1 (row 133, guarded half). **Touched and unchanged:** 31 rows (see the ledger). **New:** 5 (rows 136–140). **Worsened:** none in code; row 137 is worse in the window by its own measure (four stale copies against a list that now has four routes).
+**Resolved:** none new this run. **Improved:** 1 (row 133, guarded half). **Touched and unchanged:** 31 rows (see the ledger). **New:** 6 (rows 136–141). **Worsened:** none in code; row 137 is worse in the window by its own measure (four stale copies against a list that now has four routes).
 
-Row 137 ranks first among the window's findings because the window made it worse and it is cheap to fix; row 140 ranks first by severity. Both are LOW or LOW-MEDIUM, and neither is a defect that is biting today.
+Row 140 ranks first by severity and row 141 second, both LOW-MEDIUM. Row 137 ranks first among the window's LOW findings because the window made it worse and it is cheap to fix. Row 141 is the larger item by consequence (a grant decided on client-composed text), found by the second read; it is not a defect that is biting today, because the owner check at the mint is the authority.
 
 ## Cross-repo verdicts
 
@@ -123,10 +124,11 @@ Seams run 9 (LIN-4323) is in progress and has made no hand-off to Drift yet. Thi
 - **Rulings.** `rulings-carry-run5.py` joins the 105 `mustRule` groups to run 4's rulings on (detector, decision, file set). Carried: **34 real, 29 borderline, 42 noise**, the same as run 4. A group is flagged when a site falls inside a hunk of `git diff -U0 af55cb73 5c63aa26`. **None was flagged.** The 18 shifted groups had line numbers move with no site inside a hunk. The ruling table is below, with run-5 ids (ids shift by rank for 53 groups; the join is on content, not id).
 - **Import walker.** `import-walker.mjs` (copied unchanged). Reproduced: at `af55cb73` its output is byte-equal to run 4's `import-graph-af55cb73.json`. At `5c63aa26`: **500 nodes, 2,054 static edges, 2 dynamic, the same two SCCs (6 + 6, same members), upward 0 / 0, route→route 53, parse failures 0.** The one added edge is `lib/render.js → lib/periodicals.js`.
 - **`res.status(`** in `routes/` and `server.js`: **275 at `af55cb73`, 275 at `5c63aa26`** (`res-status-count-run5.txt`).
+- **Client test tree cross-checks (second read).** The second read's counts reproduce on their own definitions: files referencing `loadWorld` in `tests/` 40 → 59 (`af55cb73` to `5c63aa26`), and a crude line count of `makeContainer|createElement` in `tests/unit` 495 → 506. Neither is the census measure, and the verdict does not rest on them. The census counts the files on `HAND_WRITTEN_FAKE_DOM_FILES`, not copies, so it does not show whether hand-written DOM construction disappeared outside that list; this limit is stated, not closed.
 - **Client test tree.** `client-tree-measure.py` (read from git objects, no checkout). Vm-over-`public/` suites: a `tests/**/*.test.[cm]js` file that uses `vm` and mentions `public/`. Not on `loadWorld`: no `loadWorld` or `client-world` reference. Hand-written fakes: the entries in `HAND_WRITTEN_FAKE_DOM_FILES`, and their `// stop:` markers. The definition reproduces run 4's 68 / 64 at `af55cb73` exactly. Per ticket: `client-tree-by-ticket-run5.txt`.
 - **DOM-guard residue.** `dom-guard-residue.sh`, two patterns over `public/` at each commit: `typeof X.m === 'function'` and a bare presence test (`X.m &&`, `||`, `?`), for a list of DOM methods that includes the six scanned by LIN-4304 plus `focus`, `setSelectionRange`, `dispatchEvent`. The per-commit counts are in `dom-guard-residue.txt`; they are pattern counts, not a count of "sites" in the ledger's sense, and are compared only by direction.
 - **Touch map.** `touch-map-run5.py` (a mechanical basename match of each run-4 ledger row's cited files against the window's numstat, `window-numstat-all-run5.tsv`). Output: `ledger-touch-map-run5.txt`, 31 rows. Row 121 is added by hand (its text names no file).
-- **Ledger.** `build-ledger-run5.py` carries run 4's 135 rows under their names, adds a run-5 delta column and rows 136–140. `ledger-run5.tsv` has all 135 names and all 5 new ones, each with a delta (checked by script; no name missing, no delta empty). The untouched rows default to "unchanged", except rows 1, 79, 104 and 120, which carry a re-measured note; the 32 touched rows have an explicit delta.
+- **Ledger.** `build-ledger-run5.py` carries run 4's 135 rows under their names, adds a run-5 delta column and rows 136–141. `ledger-run5.tsv` has all 135 names and all 6 new ones, each with a delta (checked by script; no name missing, no delta empty). The untouched rows default to "unchanged", except rows 1, 79, 104 and 120, which carry a re-measured note; the 32 touched rows have an explicit delta.
 - **Hand-offs.** Read from the Seams run 8 report (§3, §12) and the Comprehension-Debt run 5 report (R4, R6), each checked against the code at `5c63aa26`.
 - **Order of reading.** The beat-1 file was committed (`119f1b6f`) before the paper (`docs/papers/harbour/cleaner-than-it-started.md`) or the place ledger (`docs/plans/survey/place-ledger.md`) was opened, and before any instrument ran. The instruments and the ledger were committed in `c7a3444b`, after the beat-1 commit and before this report.
 - **Scope audit.** Widened, not shrunk: the periodical registry as a consumer of the entrance, grant and validation decisions (rows 137, 138, the `+ Autopilot` copy); the proxy catalog, `llms.txt` and the docs as restatements of the route and grant tables (row 137); the test tree's guard and census files (row 121, the client-tree figures; the census scope itself excludes `tests/`, so the test side is read through its own guard tests); `docs/plans/survey/` as a text that cites code by line (out of scope as a drift surface: its `@sha:line` citations are immutable by design, and it is read-only here).
@@ -148,15 +150,19 @@ Seams run 9 (LIN-4323) is in progress and has made no hand-off to Drift yet. Thi
 - **Row 139**, the `live-console.js` dual export. Searches: `LiveConsoleLane` (returns LIN-4310, which added it, and LIN-4324 itself). Not minted: the canonical rule is a convention choice with no behaviour at stake, and the outlier is one file. Re-raise on a second outlier.
 - **Row 136**, the stage-kind roster. Searches: `stage kind roster`, `per-kind tables` (return LIN-4298 and LIN-4299, both Done, which handed it on, and LIN-4323, Seams run 9, in progress). Not minted: it has no fix that is not a redesign of the kind tables, and the Drift home is this ledger. A ticket with no fix would be a Backlog item nobody works.
 - **Row 140**, the `[working]` grammar. Search: `working beat` returns **LIN-3828** (Backlog, 1 comment). Home. Recorded there by CD run 5 as a comment, not minted.
+- **Hand-listed grant mounts and the `declaration` literal** (second read's runner-up). The same class as row 137 (lists restated in code, held in place by a census test). The census owners are LIN-3134 and LIN-3136 (Done). Cross-linked; not a new Drift finding.
 - **Row 131**, VERB OVERRIDE. Home **LIN-4302** (Backlog, 0 comments), minted by run 4.
 - **Row 135**, the in-progress predicate. Home **LIN-4256** (Backlog).
 - **Row 132**, the path-class copies: repo tooling with no shipped behaviour; report-only.
 - **Row 133**, the `loadWorld` half: a guard for it would be new tooling, which this review does not introduce; the cheap path is tracked by LIN-4297 and LIN-4289.
 - **Row 134**, `stageWrites` threading: a designed default, guarded for the mint; report-only.
 - **The family mirror** (CD R4). Home **LIN-4301** (Backlog). Search: `CLAUDE_MAPPABLE_MODEL_FAMILIES update both` returns no ticket naming the warning; LIN-4301's title ("restore the dropped C…") is its home.
+- **Row 141** (the session-lane grant on client text). Home **LIN-4318**, which already reads "no grant decision reads prompt text". Search `periodical grant prompt text` returns it. A comment with the trust point was added to LIN-4318, and no ticket was minted.
 - **"Pure: no store, clock or network"** (`lib/cost-read.js:36`). Search: `Pure no store clock` returns no ticket. Not carried (see the hand-offs).
 
 Searches also run, for the record: `VERB OVERRIDE` (LIN-4302), `DISPATCH_GRANT_REQUIRED` (LIN-3136, LIN-3607 and LIN-4320 among the hits), `setSelectionRange` (no finding ticket), `periodical grant prompt text` (LIN-4318, LIN-4313, LIN-4317).
+
+**Comments posted on existing tickets, this run:** LIN-4320 (row 137), LIN-4303 (row 138), LIN-4318 (row 141: the session lane's grant input is client-posted text, so the fix belongs to the grant decision's owner, not the prompt-sniff).
 
 ## For John
 
@@ -196,7 +202,7 @@ Searches also run, for the record: `VERB OVERRIDE` (LIN-4302), `DISPATCH_GRANT_R
 | LIN-4297 | Backlog | Backlog | 2 | unchanged |
 | LIN-4289 | Backlog | Backlog | 0 | unchanged |
 | LIN-4291 | Backlog | Backlog | 0 | unchanged |
-| LIN-4318 | Backlog | Backlog | 0 | unchanged (the grant residue's home) |
+| LIN-4318 | Backlog | Backlog | 0 at read; comment added by this run | the grant input's home (row 141) |
 | LIN-4301 | — | Backlog | 0 | the family-mirror home (CD R4); unchanged |
 | LIN-3828 | — | Backlog | 1 | the `[working]` grammar home (row 140) |
 | LIN-4320 | — | Backlog | 0 at read; comment added by this run | widen (row 137) |
@@ -208,7 +214,55 @@ Related, not re-flagged: LIN-4292 (Done), LIN-4296 (Done), LIN-4304 (Done), LIN-
 
 ## Adversarial Second-Read
 
-_Pending. The fresh-context reader is started once this draft is committed, and its answer is recorded here in full before the PR is opened. The three required fields are posted on LIN-4324 in one comment body._
+**Tier:** Tier 2, a fresh-context sub-agent (`general-purpose`) with no memory of this run. It was given the repository, the window `af55cb73..5c63aa26`, the definition of cross-cutting (duplication, convention fragmentation, dependency direction, the cross-repo contract), and the exclusions: no `docs/reviews/`, `docs/plans/` or `docs/papers/`, no review-named files, read-only. It did not see this report, the research notes, the beat-1 file or any Linear comment. It did not see the report's row 137.
+
+**The question:** "What is the single largest item in this window that a cross-cutting review would miss or misfile?"
+
+**Its answer, in full (verbatim):**
+
+> **1. Primary: the "+ Autopilot" periodical variant is still identified by three different inputs, and on the session lane the grant follows client-posted text.**
+>
+> - **Session lane grant.** `declaresDispatchGrant` (`lib/dispatch-entrance.js:1226-1227`) calls `declaresPeriodicalGrant` with `autopilot: isAutopilotVariant(prompt)`. `isAutopilotVariant` (`lib/periodicals.js:1131`) is `prompt.includes(PERIODICAL_AUTOPILOT_TAIL)`. The prompt is what the browser posts: `public/app.js:1620-1626` sends `prompt`, `kind` and `periodicalId` from DOM data attributes.
+> - **Mint lane grant.** The same rule takes the route flag instead (`dispatch-entrance.js:2008`).
+> - **Variant name.** `periodicalPromptName` (`lib/periodicals.js:1167`) is used by `lib/render.js:660,674` and the mint row (`dispatch-entrance.js:2016`). `lib/periodical-runs.js:117` still hard-codes `` `${t.title} + Autopilot` ``. The browser's session `promptName` is read back from `.prompt-name` text (`public/app.js:1553`).
+> - **Why a cross-cutting review misses it.** The LIN-4317 commit and the comment at `dispatch-entrance.js:1212-1216` call this "the one periodical grant rule". A reviewer of the entrance sees one function and stops. `lib/periodical-runs.js` is outside the window's diff. The text dependence is explicitly deferred to LIN-4318, so it reads as a pending follow-up rather than a trust-input question.
+> - **Cost.** Whether the session lane declares the dispatch grant depends on whether the client echoes the server tail, while the mint lane uses a server flag. Renaming the variant suffix means editing `periodicals.js:1168` and `periodical-runs.js:117` separately.
+>
+> **Runner-up: production code shaped for the declared-mint census.** `LANES.periodical` keeps its `declaration` as a literal "so the census counts those literals" (`dispatch-entrance.js:866-869`). The set of dispatch-grant enqueue routes is hand-listed in several places: `requireGrant('dispatch')` at `routes/proxy-dispatch.js:252,293,310` and `routes/proxy-kickoff.js:110`, the `LANES` literals, the "four enqueue mounts" comment at `lib/proxy-scopes.js:8`, the grant section of `lib/proxy-instructions.js`, and the census test. The c491eca5 commit body lists about six lists touched for one new entrance. A review scoped to one file files this as census-test plumbing.
+>
+> **3. Verdict on the window**
+>
+> - **Periodical mint and grant: neutral.** Better: `renderPeriodicalPrompt` (`lib/periodicals.js:1150-1156`) is the one renderer for UI nodes and the mint route. Worse: the second grant input and the `periodical-runs.js` literal remain.
+> - **DOM-access spelling in `public/`: better.** The guard spellings were removed (b389f9b0, f742e5ac). The remaining `typeof … === 'function'` checks are `public/close-out.js:159,161,175`, allow-listed in the AST check `tests/unit/public-element-method-guards.test.js`.
+> - **Production code shaped for tests: worse.** The `declaration` literal above, and `declaresPeriodicalGrant` is exported for a direct test import (`tests/unit/lin-4317-periodical-grant-rule.test.js:12`). Counterpoint: b389f9b0 removed the method guards that existed only for test stubs.
+> - **Client test tree: better on shared helpers, mixed otherwise.** Files that reference `loadWorld` rose from 40 to 59 (`git grep -l loadWorld` at af55cb73 vs 5c63aa26). A crude `makeContainer|createElement` count in `tests/unit` rose from 46 to 51, so hand-written fakes did not disappear.
+>
+> **4. Not checked**
+>
+> - The sibling `simple-dispatcher` repo, which is not in this checkout.
+> - `lib/runner-kit/`: `contract.json` is unchanged in the window, and I grepped `runner.mjs` for periodical and grant terms with no hits. I did not check the contract against SD.
+> - The server-side session route `routes/dispatch.js`. I inferred the client-supplied `kind`/`periodicalId` from `public/app.js` and `dispatch-entrance.js`.
+> - The `lib/proxy-instructions.js` claim that a periodical kind on the proxy route is refused at kickoff.
+> - `docs/` was excluded by the rules.
+> - Checkout HEAD is `565b839b`, not the window end. I used `5c63aa26` throughout via explicit `git show` and `git grep`.
+> - No tests were run.
+
+**Checked by this review before it was accepted:**
+
+- **Primary (the session-lane grant on client text): confirmed.** `lib/dispatch-entrance.js:1226-1227` (`declaresDispatchGrant`) passes `isAutopilotVariant(prompt)`; `lib/periodicals.js:1131` is `prompt.includes(PERIODICAL_AUTOPILOT_TAIL)`; `public/app.js:1620-1626` posts the rendered `prompt`, `kind` and `periodicalId`; the comment at `dispatch-entrance.js:1222-1226` says "the UI posts rendered text; LIN-4318 is the cure". The mint lane takes the route flag (`dispatch-entrance.js:2008`). The sniff is inline at `af55cb73:lib/dispatch-entrance.js:1185`. The report had named the input and filed it under LIN-4318 but had not said that the grant on that lane is decided on client-composed text. That is the miss, and it is now row 141.
+- **Runner-up (hand-listed grant mounts and the `declaration` literal): the class is confirmed, the line numbers were not all re-checked.** It is the same class as row 137, a list restated in code and held in place by a census test. Its census owners are LIN-3134 and LIN-3136. Cross-linked, not a new Drift finding.
+- **"The one periodical grant rule" comment, and the `periodical-runs.js:117` literal:** both confirmed in the report.
+- **The client-test counts:** `loadWorld` file counts 40 → 59 reproduce. The crude `makeContainer|createElement` count is 495 → 506 as line hits, against the reader's 46 → 51 by its own method. Both are crude and neither is the census measure. The reader's point that hand-written fakes did not disappear outside the census list is a fair limit, now stated in Method.
+- **DOM residue:** `public/close-out.js:159,161,175` are `typeof` checks inside the six-method scan's allowlist for `close-out.js`, so they are not row 138's residue. Consistent with the report.
+- **Window verdicts:** the mint and grant area is re-graded from "better" to "better in the rule; neutral in its inputs" in the table above.
+
+**Verdict: DISAGREE.** The reader's primary item is not the report's top finding. It is the session-lane grant input, which the report named and filed under LIN-4318 as a pending follow-up, without saying that the grant on that lane is decided on client-composed text.
+
+**Differed from top finding: YES.** The report's top window-introduced finding is row 137 (the enqueue-route prose). The reader's answer is row 141 (the grant's trust input). Both are kept. Row 137 is the top change the window introduced; row 141 is the larger item by consequence, and it is now listed second among the LOW-MEDIUM rows.
+
+**Disposition: fixed in place.** The report now states the client-text input and its consequence, grades the mint and grant area as "better in the rule; neutral in its inputs", adds ledger row 141 with LIN-4318 as its home, and records the runner-up as cross-linked to row 137's class. A comment with the trust point is on LIN-4318, the existing home, so no ticket was minted. The choice of input is LIN-4318's own scope. The owner check at the mint is the authority, so the item does not need John's ruling and is not an escalation to a person.
+
+**Adversarial second-read verdict:** DISAGREE (Tier 2, fresh-context sub-agent). Differed from top finding: YES. Disposition: fixed in place.
 
 ## Census ruling table (the 105 `mustRule` groups, run-5 reading)
 
@@ -328,7 +382,7 @@ The full list, with decision, files and sites, is `_evidence-2026-11-06-drift/ce
 
 ## Compact trend ledger
 
-Run 4's 135 rows, carried under their stable names, each with a run-5 delta, plus rows 136–140. `_evidence-2026-11-06-drift/ledger-run5.tsv` is the machine copy; `build-ledger-run5.py` produces it. A row is retired only explicitly, and none is retired in this run.
+Run 4's 135 rows, carried under their stable names, each with a run-5 delta, plus rows 136–141. `_evidence-2026-11-06-drift/ledger-run5.tsv` is the machine copy; `build-ledger-run5.py` produces it. A row is retired only explicitly, and none is retired in this run.
 
 | # | finding | severity (run 4) | run 5 delta vs run 4, and evidence |
 |---|---|---|---|
@@ -471,4 +525,5 @@ Run 4's 135 rows, carried under their stable names, each with a run-5 delta, plu
 | 137 | `enqueue-route-list-restated` | low | new (window-introduced; top of the window findings) |
 | 138 | `element-method-guard-idiom-beyond-scan` | low | new (pre-existing sites, made visible by the one-spelling claim) |
 | 139 | `client-dual-export-split` | low (borderline) | new (window-introduced, LIN-4310) |
+| 141 | `session-lane-grant-from-client-text` | low-medium | new as framed (the sniff is inline at af55cb73:lib/dispatch-entrance.js:1185; LIN-4317 named and centralised it; found by the Tier-2 second read) |
 | 140 | `working-beat-grammar-cross-repo` | low-medium | new (received from Comprehension-Debt run 5, R6, which rates it medium) |
