@@ -807,7 +807,7 @@ Response includes full context: description, comments, children, parent, relatio
 
 `parent` is `null` when the issue has no parent. `children` is empty (`[]`) when there are no sub-issues. `labels`, `children`, `comments`, and `relations` are always plain arrays (never a `{ nodes: [...] }` wrapper), and `labels` is a plain array of name strings.
 
-**Complete, or flagged (LIN-4322).** `children`, `comments`, `relations`, and `inverseRelations` are each read whole, oldest first by creation time, up to 1,000 items per list. A list that reaches that cap is cut there, and the response says so: a top-level `truncated` object names each cut list, e.g. `"truncated": { "comments": true }`. The key is absent when every list is complete, so a response without `truncated` is a complete one. A cut list is never returned as if it were whole.
+**Complete, or flagged (LIN-4322).** `children`, `comments`, `relations`, and `inverseRelations` are each read whole, up to 1,000 items per list (requested `orderBy: createdAt`; the route returns comments oldest first). A list that reaches that cap is cut, and the response says so: a top-level `truncated` object names each cut list, e.g. `"truncated": { "comments": true }`. The key is absent when every list is complete, so a response without `truncated` is a complete one. A cut list is never returned as if it were whole.
 
 ##### Attachments
 
@@ -1005,7 +1005,7 @@ Response:
 
 `relations` and `inverseRelations` are plain arrays — the same flat convention as `relations` on `/issues/{id}` and `labels`/`children`/`comments` across the read endpoints. `relatedIssue` is the target of an outgoing relation; `issue` is the source of an inverse one (e.g. the issue that blocks this one). Each entry's `id` is the relation's own id — pass it to the delete-relation endpoint below.
 
-Both lists are read whole, oldest first, up to 1,000 each (LIN-4322). A list cut at that cap is named in a top-level `truncated` object beside `trashed` (e.g. `"truncated": { "inverseRelations": true }`); the key is absent when both lists are complete.
+Both lists are read whole, up to 1,000 each (LIN-4322). A list cut at that cap is named in a top-level `truncated` object beside `trashed` (e.g. `"truncated": { "inverseRelations": true }`); the key is absent when both lists are complete.
 
 #### Get Task Recap
 

@@ -159,6 +159,16 @@ describe('pageConnection termination', () => {
     assert.equal(calls.length, 0);
   });
 
+  test('an oversized first page (more than CONNECTION_CAP, no pageInfo) is cut and flagged, never returned as whole', async () => {
+    const client = { request: async () => ({}) };
+    const nodes = Array.from({ length: CONNECTION_CAP + 5 }, (_, i) => ({ id: `n${i}` }));
+
+    const page = await pageConnection(client, 'LIN-1', 'comments', 'id', { nodes });
+
+    assert.equal(page.nodes.length, CONNECTION_CAP);
+    assert.equal(page.truncated, true);
+  });
+
   test('hasNextPage with a null endCursor stops at once and counts as truncated', async () => {
     const calls = [];
     const client = { request: async (...args) => { calls.push(args); return {}; } };
