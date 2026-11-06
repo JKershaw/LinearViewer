@@ -2397,3 +2397,194 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 
   The paper comes first, and the essay draws on it and cites it.
 - 08:15: **LIN-4314** (notebook sync to main, pinned to branch `24ac197f`, notebook paths only, no merge or cherry-pick) and **LIN-4315** (the technical paper) filed and Surveyed. The paper is blocked on the sync, so its citations land at main. It freezes at that commit; log entries after it aren't cited. The essay follows the paper. LIN-4254 goes in as "in flight" if it hasn't closed by the freeze.
+
+### 08:40 UTC: LIN-4314 and LIN-4313 scoped and started
+- **LIN-4314's Surveys found the copy would revert LIN-4248.** The branch never took main's "Live text moved" pointers in `prompt.md` and `global-offshoot-prompt-v2-code.md`. The notebook drifted both ways. **Fixed at the cause, on this branch** (`98670be3`): main's two pointer paragraphs, plus the branch's tidy-after q7. Main's `lin-4248-survey-stages` test passes 13/13 against them. Re-pinned to `98670be3`, and the diff to main is now additions only. Started (`22106156`). A longer-term choice for the integration design: a notebook mirrored from a branch drifts, so either edit it on main, or cite the branch at a pin and stop mirroring.
+- **LIN-4313's Surveys: the grant is the real work.** The proxy lane is undeclared ("open question 1"), so a "+ Autopilot" mint through it would be a leaf whose kickoff fails. Scoped:
+  - grant first, as a failing test: owner allowed with a declared grant modelled on `LANES.kickoff`, non-owner refused, answering open question 1 for this route only. **Flagged for John: an owner's proxy token can start an orchestrator, the same authority kickoff already gives. John may veto, and then it's the plain mint only;**
+  - one shared `renderPeriodicalPrompt`;
+  - parity before the proxy block, without a note;
+  - the note before the template (the tail check untouched), capped;
+  - the fifth entrance's lists updated;
+  - the catalog points at `GET /periodicals` rather than listing ids;
+  - no invented size ceiling.
+
+  Started (`3cf6cd76`).
+- 08:50: **John applied both LIN-4307 rulings and approved LIN-4313's grant** ("I grant you authority"), recorded on the ticket. It's the first time the authority grant has been made explicitly, as a human call, which is the shape John named for integration: "a human instructs/gives authority to an agent".
+- 09:00: ruling `lin4314-anchor-fix`: the sync PR fails 3 rows of `docs-architecture-anchor-resolver.test.js`, citations of `CLAUDE.md:58` in `log.md` and `place-ledger.md`. **Proposed `denylist`, narrowly.** These are dated records, the same species as `docs/reviews`, which the resolver already excludes. Each citation was true when written, and one records that line being stale. Editing them would rewrite history and re-create the two-way drift. Preferably use the file-level frozen list for those two files only, so `notes-*.md` and the prompt docs stay checked.
+- 09:10: **LIN-4307 (piece 1) merged (`f73f1b11`), census 22 → 18.** The loader gaps were fixed once, in `client-world.js`, and pinned: `window` is the global (`world.window === world.sandbox`), `clickDelegated`, `fireDOMContentLoaded`, and `clickOn` with a target. The suites use the server's real renderers (`renderDetailsContent`, the Home markup) in place of hand-drawn cards. `observation-ruling-delivery`'s stubs were moved after `common.js`, per the ruling. Pieces 2–6 inherit all of it. The LIN-4314 anchor ruling has been answered.
+
+### 09:20 UTC: the sync landed; the paper scoped and started, with its headline corrected
+- **LIN-4314 merged (`1d10f9b3`):** the notebook on main matches `98670be3` exactly (an empty diff on those paths). The anchor resolver now excludes `docs/plans/survey` as frozen history. That's the whole directory, not the two files I suggested, so `notes-*.md` and the prompt docs are unchecked too. Small, for the notebook.
+- **LIN-4315's Surveys corrected the headline I'd been giving John.** The first blind passes scored the loop's ticket rows **no better than the baseline** (+0.37 against +0.38 / +0.50). What read better was specific: finished tidies done as their own task, the tidy-afters, and deletions. That's about five tickets, scored by the partly circular prompt. **So the claim is about areas ending better when the loop finishes the move, not "tasks on average leave it better".** My morning recap blurred that. The paper leads with it plainly, or it reads as advocacy.
+- **The independent instruments stop at `af55cb73`:** LIN-4292, 4296, 4304 and 4306 have no Periodical reading.
+- **The scope call:**
+  - stand at main at or after `1d10f9b3`;
+  - the evidence table first, a row per merge with its *n* visible, including "no lineage" costs and Periodical coverage;
+  - the answer as the evidence has it;
+  - the paper is the one home for the balances (`survey.md`'s overturned 17/3/1/0 is replaced by a pointer, and I take that edit back onto this branch afterwards);
+  - one short index row; retire the `proposals.md` lines it answers; a name apart from `survey-check-*`.
+
+  Started (`ce7361ec`).
+- **A mistake of mine, caught:** I ran `git merge origin/main` into this research branch, which carries unrelated unmerged code. It conflicted across many files, and I aborted it before anything was committed or pushed. **Notebook edits made on main come back onto this branch by a path-limited `git checkout origin/main -- docs/plans/survey*`, never by a merge.**
+- 09:35: **John:** the operator's mistakes "are what I'd expect to happen when you're holding the reins … that's why we're moving those points you hold into Harbour, so agents at this altitude don't need to provide judgement." And **"let's not undersell that this actually works":** even if it's small, and even if per ticket it's "simply not making things worse", "it still means the trend is towards a better, simpler, easier to maintain codebase." His hypothesis: larger standalone tidies from the Periodicals may be what moves the needle. **Added to LIN-4315** as the balance (the direction stated as plainly as the limits), and the mistakes as an argument for structure.
+- 09:50: ruling `lin4315-blind-prompt`: the paper's main instrument, the blind-read prompt, wasn't in the repo, only in the operator's scratchpad. **Supplied** as a comment on LIN-4315, for its evidence folder: the template, the four first- and second-pass change lists, both blinding keys (`key.json` A–B, `key2.json` C–D, seed 1105) and the two per-merge forms. Proposed `supply`. It's one more judgement point that lived only in my hands. A blind-read stage in Harbour would carry its own text.
+- 10:00: LIN-4308 (piece 2, the `common.js` slices) merged (`3f4d4131`). The `dashboard-routes` badge test moved to a client suite via an extracted fixture, as scoped; `dashboard-routes` doesn't import `client-world`. The `lin4315-blind-prompt` ruling waits on John (suggested: supply).
+- 10:05: **LIN-4313 merged (`c491eca5`):** `POST /api/proxy/periodicals/{id}/mint`, with:
+  - prompt hashes pinned for every id and variant before the refactor;
+  - one `renderPeriodicalPrompt`;
+  - grant witnesses (owner declares a grant, non-owner refused, plain mint a leaf);
+  - an operator note of at most 500 characters on one line, placed before the template.
+
+  Not deployed yet (production is at `1d10f9b3`). Blind reads sent: AQ and AR. Once it's live, `periodical.sh` retires to a one-line call.
+- 10:25: **LIN-4313: mixed, mixed (AQ, AR).** Checked by hand at `c491eca5`, and both reads' main claims hold:
+  - the periodical "+ Autopilot" grant is decided by **two rules** (the session lane's tail-in-prompt check at `dispatch-entrance.js` ~1228, the mint lane's flag);
+  - `lin-3136-dispatch-gate`'s header claims "four enqueue mounts" but its `MOUNTS` lists three (`lin-3133` also three). The mint's grant *is* tested in the grant sweep and its own suite, so it isn't unguarded, but **two guards on the authority gate make a false claim**;
+  - near-copy structural rules; the byte witness pins the old functions rather than the renderer; a third way to mint with no pointer.
+
+  **Tidy-after LIN-4317** filed and Surveyed: one rule for the grant (mutation-checked first), the gate suites list the mint mount, one structural rule, the renderer pinned, a docs pointer. Not this ticket: one derived list of enqueue mounts, which goes to the notebook (each new entrance costs about 10 files of hand edits).
+- 10:40: **LIN-4317 scoped and started** (`6e7be8a3`). Its Surveys:
+  - the lanes differ in what they *trust* (client text against a server flag), not in the rule;
+  - the gate suite's `mount.path` doubles as its source-pin regex, so the mint needs separate `route` and `path` fields;
+  - two more false "three" counts (`lin-3136-enqueue-census`, `lin-3383`);
+  - a census trap (folding the declarations breaks F3);
+  - three structural rules, not two.
+
+  Scoped:
+  - a two-sided mutation check first;
+  - one rule with an `isAutopilotVariant(prompt)` input, the PR saying plainly that text is still the session lane's source;
+  - `route` and `path` split, the mint mount listed, every count claim true;
+  - only the two true structural copies folded;
+  - F3 left with a reason;
+  - the renderer pinned to the same hashes;
+  - a pointer that says *why*.
+
+  **The real cure filed as LIN-4318:** the app mints Periodicals by id, so no grant decision reads prompt text. It runs after LIN-4317, one ticket per concern.
+- 11:00: LIN-4309 (piece 3, `question-card-task-bound`) merged (`8b84a8fe`). The paper (LIN-4315) is held on John's `lin4315-blind-prompt` ruling (suggested: supply).
+- 11:05: **LIN-4313 is live** (production at `c491eca5`). An unknown id gives 404 with nothing enqueued. `periodical.sh` is now a one-call wrapper over the route (no checkout, no render, and with `--autopilot` no manual kickoff). The process John asked to make easier is now Harbour's own.
+- 11:30: **LIN-4317 merged (`f2816e17`):**
+  - one `declaresPeriodicalGrant`, carrying the preconditions plus the variant, which both lanes call, with the PR saying plainly that the session lane still learns the variant from text (LIN-4318);
+  - `isAutopilotVariant` beside `withAutopilotTail`, and the entrance no longer imports the tail;
+  - `getPeriodical(id)`; `structuralRuleFor(subject)`, with the generic rule left and its reason given;
+  - the declaration literal left for F3;
+  - the gate suites list the mint mount (`route` and `path` split), with the false "three" wording fixed;
+  - the renderer pinned to the same hashes;
+  - the docs pointer.
+
+  Blind reads sent: LIN-4317 alone, AS and AT; LIN-4313 + LIN-4317 as one change, AU and AV. LIN-4313 alone was mixed, mixed.
+- 11:45: **LIN-4317: better, better (AS, AT). LIN-4313 + LIN-4317: better, better (AU, AV).** LIN-4313 alone was mixed, mixed. That's five of five tidy-afters, and this one on the authority gate. Residues in the area pulled into LIN-4318: `periodical-runs.js:117`'s missed name copy; the "LIN-4318 is the cure" comment to rewrite in the present tense; the re-checked preconditions. **Two for the notebook:**
+  - **mount counts as prose in about 8 places** ("three/four/five enqueue routes"), each hand-edited per entrance, which is the case for one derived list;
+  - **a census that counts *literals* (F3) blocked a fold that would read better.** A check should count behaviour, not spelling, or it shapes the code.
+
+  Again the forward comment came from a scope sentence of mine ("say plainly in the PR", which the builder also wrote into a comment).
+- 12:00: LIN-4310 (piece 4, the swipe/prompt-section/dispatch-slice suites) merged (`ff6a69fa`). Two pieces left: LIN-4311 (task-page) and LIN-4312 (close-out, with its production seams). The paper is still held on `lin4315-blind-prompt`.
+
+### 12:15 UTC: the paper merged (LIN-4315, `5c63aa26`, `docs/papers/harbour/cleaner-than-it-started.md`)
+- **Its answer:** "Tasks on average: not shown. Areas and finished moves: yes, on few cases."
+  - **Ordinary tickets:** level with the baseline or behind it. In the same pass, +0.39 against +0.38, then +0.37 against +0.50; a gap of one row's sign, too few rows to resolve. Two read worse in a pass (LIN-4241, LIN-4212).
+  - **Twelve subjects read better in both passes:** six areas covering eleven tickets, and six single tickets. No pass on a finished move or tidy step read worse.
+  - **The Periodicals point the same way, small and better.**
+
+  Its limits are the honest ones: circular blind reads, no like-for-like area baseline, and no independent reading after `af55cb73`.
+- **It corrected me:** "no instrument found an area the loop touched getting worse" was **false**. Seams run 8 rated "other features: worse as a map", from LIN-4253's `lib/stage-writes.js` growing the catch-all. I had logged it and then dismissed it as a guide gap. Neither blind pass on LIN-4253 caught it. Also: the census was 18 at its pin, and the ledger's "+0.37 against +0.38" crosses passes.
+- **It found a Harbour bug:** the Linear issue-detail query has no `first:` and no paging, so issue reads return at most 50 comments (and children and relations), silently. LIN-4150 returns exactly 50, so every Survey posted before 5 Nov 02:58 is invisible. Verified in `lib/providers/linear/index.js`. **Filed LIN-4322** (high), Surveyed.
+- **Its Next, acted on:**
+  - **Next 3** (read the merges after `af55cb73` independently before the essay cites them): **Drift & Coherence and Seams & Tangles minted through the new route with `--autopilot`,** with a short operator note (`dab3abb3`, `e364c521`). It's the route's first real use: no checkout, no render, no manual kickoff.
+  - **Next 1** (larger standalone tidies on the Periodicals' worst areas, John's hypothesis) and **Next 2** (an area read with a baseline: score an untouched area with the same prompt) are the experiments to run before or alongside the essay.
+- `docs/plans/survey.md`: the paper replaced the overturned 17/3/1/0 with a pointer on main. Brought back onto this branch by a path-limited checkout, not a merge.
+
+### 12:30 UTC: Next 2, a baseline for the area reads (criteria logged before reading)
+- **Question:** do *ordinary* pairs of consecutive changes to the same files, read as one area with the same blind prompt, also read "better"? If they do, the after-step's "better, better" is partly an artefact of reading pairs. If they read mixed or neutral, the after-step's effect stands.
+- **Selection, mechanical and fixed before seeing any pair:** LinearViewer first-parent merges from 20 Oct to 1 Nov (before the loop) that touch production code (`lib/`, `routes/`, `public/`, `server.js`). For each merge in date order, take the next merge within 48 h that shares a production file, with no merge used twice. The first four pairs:
+  1. `0eb4a2d1` LIN-3706 → `a6e0ae11` LIN-3700. Shares only `server.js`: **a weak pair, kept because the rule picked it**;
+  2. `c1d5c700` LIN-3710 → `71a42131` LIN-3714 (`kpi-stats`, `render-kpis`, `kpis.css`);
+  3. `d10e7398` LIN-3717 → `8ddb0f3b` LIN-3722 (`routes/dashboard.js`);
+  4. `0da144c8` LIN-3711 → `c5295b42` LIN-3713 (`kpi-stats`, `workspace-kpi`).
+- **Form:** the same template and area wording as the after-step's area reads (passes AU and AV), two passes per pair, labels AW–BD.
+- **Reading, decided now:**
+  - better in both passes on 3 or 4 of 4 pairs: pairing inflates area reads, and the after-step result is weak;
+  - on 0 or 1 of 4: the after-step's effect is real against this baseline;
+  - on 2 of 4: inconclusive.
+
+  The after-step areas were better in both passes on 6 of 6.
+- 12:45: **LIN-4322 (the 50-comment cap) scoped and started.** Its Surveys widened it:
+  - the same unpaged read feeds **the close-out gate** (`fetchIssueComments` → `latestReviewComment`, which gates merge and Done), so on a long trail the gate could read a stale review verdict;
+  - the file has fixed this class one query at a time with no shared helper.
+
+  Scoped by the sweep rule:
+  - **the check first** (no Linear connection without `first:`/`last:` or a recorded bound), its hit list the work list;
+  - one `pageConnection` helper;
+  - applied to the detail read, `fetchIssueComments` and `RELATIONS_QUERY`;
+  - a top-level `truncated` flag that survives `flattenIssue`;
+  - explicit order; docs in one place.
+- 13:00: LIN-4311 (piece 5, the task-page suites) merged (`90542b2c`). Only LIN-4312 is left (`close-out-client`, plus `close-out.js`'s production seams and their allow-list entries).
+- 13:10: **Next 2's result: the baseline pairs read better in both passes on 1 of 4** (pairs 1, 2 and 4 mixed, mixed; pair 3 better, better), against the after-step's 6 of 6. By the rule logged before reading, the after-step's effect is real against this baseline. The one better baseline pair (LIN-3717 → LIN-3722) was itself a consolidation, so it supports the mechanism (deleting copies) rather than a pairing artefact. That answers the paper's Limit "no like-for-like baseline for areas", partly: four pairs, one prompt. Ledger: "Next 2: a baseline for the area reads".
+- 13:45: **Seams & Tangles run 9 (LIN-4323, `fa3bd87a`), the independent reading after `af55cb73`**, which the paper's Next 3 asked for. Window `af55cb73 → 90542b2c`: the guard sweep, the `<select>` model, the mint route and its tidy-after, and LIN-4254's pieces to 5. **No area worse:**
+  - LLM & prompts **better** (watch `hub:periodicals.js`, 8 importers in 4 areas); Runs & dispatch **better**; Agent API **better**; Pages **better** by a small margin;
+  - Browser code **mixed, mostly better**: 50 method-presence guards deleted under an AST check, but one new test-only global, `window.LiveConsoleLane`. That's a residue for LIN-4297;
+  - the rest unchanged.
+
+  `seam:periodical-mint` is named healthy, its residue owned by LIN-4318. No follow-ups. The import graph moved by one edge, pointing the existing direction.
+- 14:00: **LIN-4312 merged (`ce42e721`), LIN-4254's last piece.** The census is now **6, all `// stop:` files** (they need a browser API the fake doesn't model: bubbling `dispatchEvent` and the like). **56 → 6 in two days, with every movable file moved.** The `close-out.js` `typeof` seams were removed from production along with their allow-list entries, so the guard allow-list is now empty. Blind reads sent: LIN-4254 as one move (its 7 merges), BE and BF; LIN-4296 + LIN-4254 as the test-fake area, BG and BH.
+- 14:15: **LIN-4254: better, better (BE, BF). LIN-4296 + LIN-4254: better, better (BG, BH).** That's seven areas better in both passes, against the baseline's 1 of 4. **A new residue pattern: production bent to the test fake.** `close-out.js` switched to `replaceChildren` because the fake lacks `firstChild`; production comments name unit suites; a test-only `window.LiveConsoleLane`. In each case a gap in the fake was worked around where a suite hit it, not fixed in the fake. All pulled into LIN-4297, with a rule: **fix a gap in the fake (modelled and pinned against Chromium, or made to throw), never by bending production.** Also the doctype/body cut in four copies, three ways to click, fixtures in two homes.
+- 14:30: **LIN-4322 merged (`badec1fb`):**
+  - **the check first** (a source-level test: every gql connection carries `first:`/`last:` or is allow-listed with a reason). It found **36 unbounded connections at base**, and the remainder are allow-listed with follow-ups LIN-4325–4328 filed by the builder;
+  - one `pageConnection` (100 a page, cap 1,000, terminates on every input);
+  - the detail read, `relations()` and **`fetchIssueComments`, the close-out gate, which now throws at the cap rather than return a prefix missing the latest review**;
+  - a top-level `truncated` flag that survives `flattenIssue`;
+  - a test of the gate reading the latest review past index 50;
+  - docs that make no claim about which end a cut loses.
+
+  Not verified against live Linear's complexity limit, so the check is `GET /issues/LIN-4150` after deploy. Blind reads sent: BI and BJ.
+- 14:45: **LIN-4322: better, better (BI, BJ).** Residues pulled into LIN-4328, the builder's follow-up that touches the other two cursor loops: three cursor loops, the page size written about eight times, the guard blind to `return gql`, two or three truncation shapes, and the interface and catalogue not told. The live check (`LIN-4150` returning more than 50 comments) comes after deploy.
+- 15:05: **Drift & Coherence run 5 (LIN-4324):** "better, small", the same as run 4, with its area verdicts written from code before it opened the paper or the ledger:
+  - DOM-access spelling **better**;
+  - client test tree **better** (suites not on `loadWorld` 64 → 49 in its window);
+  - Periodical mint **better in the rule, neutral in its inputs** (the session lane decides the grant from browser-posted text, LIN-4318; its second read calls it "the larger item by consequence");
+  - **production shaped for tests: mixed** (the test-only `window.LiveConsoleLane`).
+
+  It agrees with the ledger on every ticket it could read. Top new finding: the enqueue-route list is restated in 10 prose places, 4 stale (home LIN-4320, whose acceptance grep would miss all four). That's the derived-list case again.
+- 15:05: **LIN-4322 deployed (`badec1fb`), and the live check passes:** `GET /issues/LIN-4150` returns **143 comments** (from 2 Nov 21:44), with no truncation flag. Live Linear accepted the paged queries, and the pre-5-Nov Surveys are visible again.
+- 15:05: LIN-4254's after-questions go to its last piece's builder (LIN-4312, `4b03a6bc`), q1–q7, answering for the whole move where it helps.
+
+### 15:20 UTC: John on the paper ("reads like not much improved"); the essay filed
+- **John:** the paper reads as though not much improved, perhaps because it's formal reporting; "happy to see where the essay lands".
+- **Why it reads flat (my reading):**
+  - it leads with "Tasks on average: not shown", the literal answer, so everything after reads as a hedge;
+  - it was written against advocacy (the Survey and my scope both said so);
+  - it was **frozen before the strongest evidence**: the baseline (7 of 7 against 1 of 4) and the independent readings after `af55cb73` (Seams run 9, Drift run 5);
+  - it scores signs and *n*, but never says plainly what the tidier code looks like (56 → 6 fakes, about 50 dead guards gone under a check, one grant rule, a hidden gate bug fixed).
+- **The essay, LIN-4330,** filed and Surveyed:
+  - a sequel to *Tasks are tasks*, for a fresh reader;
+  - the argument that finished moves leave areas cleaner, small but real and robust to reading;
+  - the post-freeze evidence included;
+  - the concrete changes shown;
+  - the human's own instructions inviting copies as the turn, with mistakes as the case for structure;
+  - 2–4 generated SVG figures (the Library serves `figures/<slug>/*.svg`);
+  - neither oversold nor undersold;
+  - two fresh readers (one new to Harbour, one for accuracy).
+- **Candidate, later:** a short v1.1 addendum to the paper recording the baseline and the post-freeze readings, so the record isn't more pessimistic than the evidence.
+- 15:35: **John: the paper's v2 first, then the essay** ("we're at the point we are writing up"). **LIN-4331 filed and Surveyed:**
+  - v2 in place, with a revision line;
+  - the baseline (selection rule re-implemented to show it picks the same pairs; the eight reads frozen);
+  - Seams run 9 and Drift run 5;
+  - the newer areas (LIN-4296 + LIN-4254, LIN-4313 + LIN-4317) recounted from the comments;
+  - **the pre-5-Nov Surveys, now reachable because LIN-4322 fixed the comment cap the paper found;**
+  - what the code now looks like, as facts at commits;
+  - the headline reordered (the area finding against the baseline first, then "tasks on average: not shown"), with the same claims, neither undersold nor oversold.
+
+  The essay, LIN-4330, runs after v2 merges.
+- 15:50: **The essay's Surveys (LIN-4330) found its newest evidence isn't on main:** main's `log.md` ends at 6 Nov 08:15, so the baseline, John's notes and the authority grant are branch-only. That blocks v2 too. **Filed LIN-4332,** a second notebook sync pinned to `6db55dcd` (diff checked: 228 added and 1 replaced line, all branch-side), Surveyed. **The order is now: sync → v2 (LIN-4331) → essay (LIN-4330).**
+
+  For v2 and the essay, from the same Surveys:
+  - **define "area" once** (the paper's six areas and twelve subjects against my "seven");
+  - **56 → 6 is the census's definition, not "the fakes are gone"** (a crude `makeContainer|createElement` grep rose 46 → 51; the paper's Finding 6 already calls the count a proxy);
+  - extend the census series with the paper's own `census-by-merge.mjs` into a new dated evidence folder (one owner);
+  - figure scripts in `<slug>-scripts/`, reading the paper's evidence in place;
+  - settle `proposals.md:665` (the baseline line);
+  - cite `path@sha:line`, never clock times (the log's headings repeat times across days).
+- **For the integration discussion:** this is the third hand sync. A notebook kept off main and copied by hand is the essay's own pattern ("a list kept by hand goes stale"). Either edit it on main, or give the live record a home in Harbour.
+- **Correction, from v2's Surveys (LIN-4331, at `afe9074f`), to the 13:10 entry above.**
+  - **"The after-step's effect is real against this baseline" overclaims.** The pair baseline shows that reading a pair as one area doesn't by itself make it read better. It doesn't compare loop with no loop, and its one better pair was a consolidation, which fits "the prompt rewards consolidation wherever it happens" (the circularity limit) as well as a loop effect. What it supports: **consolidation reads better, and the loop's finished moves are consolidations.** The ledger's section is corrected.
+  - **The clock in this log is unreliable on 6 Nov.** The headings are this session's labels and drift from git and comment times by up to about 1.5 h: the "12:30" rule was committed at 11:06:53Z (`e8442b96`), and the first read posted at 11:09:06Z. **Cite git and comment times, not these headings.** On that evidence the rule was fixed *before the results*, not before reading: I saw the four pairs, then logged them.
+  - The independent-reading limit moves rather than lifts: Seams run 9 reads to `90542b2c` and Drift run 5 to `5c63aa26`, so LIN-4312, LIN-4322 and later have only the blind prompt. Seams run 9 calls the catch-all unchanged (17, with `lib/stage-writes.js` still in it), so run 8's worse area still stands.
