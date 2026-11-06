@@ -16,33 +16,18 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { renderTaskPage, renderTaskStatus } from '../../lib/render-task-page.js';
+import { renderTaskPage, renderTaskStatus, renderTaskQuestion } from '../../lib/render-task-page.js';
+import { loadWorld, fireDOMContentLoaded, clickOn } from './helpers/client-world.js';
+import { bodyOf } from './helpers/task-page-body.js';
 import { buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { gatherTaskStates } from '../../lib/home-row-states.js';
 import { pageStatusOf } from '../../lib/task-state.js';
 import { rulingStandingOf } from '../../lib/unanswered-decisions.js';
 import { enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from '../../routes/dashboard.js';
+import { NOW, PAGE_OPTIONS, loop } from './helpers/task-page-loop.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const NOW = new Date('2026-10-06T15:00:00.000Z');
 const URL_KEY = 'acme';
-const UUID = '11111111-2222-3333-4444-555555555555';
-const PAGE_OPTIONS = { deployInfo: { version: 't', commit: 't' }, featureFlags: {}, workspaces: [] };
 
-function loop(over = {}) {
-  return {
-    loopId: 'loop-x', issueIdentifier: 'LIN-50', issueId: UUID, issueTitle: 'T', kind: 'implementation', iteration: 1,
-    source: 'history', historyStatus: 'taken', agentState: 'running', target: 'cli',
-    dispatchedAt: '2026-10-06T10:00:00.000Z', takenAt: '2026-10-06T10:01:00.000Z', resolvedAt: '2026-10-06T10:01:00.000Z',
-    terminalStatus: null, terminalCompletedAt: null, wakeMarker: null, waitingMessage: null, feedback: [],
-    telemetry: { runtime: { ms: 1 }, metrics: [], producedArtifacts: [] }, followUpTo: null,
-    ...over,
-  };
-}
 // A worker waiting on an open ruling: the `[blocked]` line plus its structured decision.
 const blocked = (over) => loop({
   loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?', feedback: [{ message: '[blocked] which API key?' }],
@@ -68,8 +53,8 @@ function model(loops, { shelvedRulings = [], ...over } = {}) {
   STATES.set(m, stateOf(loops, { shelvedRulings, ctx: over.ctx ?? null }));
   return m;
 }
-const render = (m, viewer = 'owner') => renderTaskPage(m, {
-  viewer, urlKey: URL_KEY, binding: { source: 'linear' }, stateUrl: '/s', now: NOW, pageOptions: PAGE_OPTIONS, taskState: STATES.get(m) ?? null,
+const render = (m, viewer = 'owner', stateUrl = '/s') => renderTaskPage(m, {
+  viewer, urlKey: URL_KEY, binding: { source: 'linear' }, stateUrl, now: NOW, pageOptions: PAGE_OPTIONS, taskState: STATES.get(m) ?? null,
 });
 /** The page's status word and its header, from the model's gathered state. */
 const statusOf = (m) => pageStatusOf(STATES.get(m));
@@ -208,79 +193,77 @@ describe('only the owner sees controls (hidden, not disabled)', () => {
 });
 
 // ── client ────────────────────────────────────────────────────────────────────
-const TASK_PAGE_SRC = readFileSync(join(__dirname, '../../public/task-page.js'), 'utf8');
+// The card and the poll run on the server's own markup (`renderTaskPage`, `renderTaskQuestion`) in a client world.
+// The poll's replies are the state route's fields, built from the same renderers the route calls.
+const STATE_URL = '/workspace/acme/api/task/LIN-50/state';
+const settle = async () => { for (let i = 0; i < 6; i++) await Promise.resolve(); };
 
-describe('the poll leaves a half-typed answer alone and removes the card when the wait ends', () => {
-  const STATE_URL = '/workspace/acme/api/task/LIN-50/state';
-  const statusHtml = (status) => `<div class="task-status" data-testid="task-page-status" data-status="${status}"><p>x</p></div>`;
-  // The state read carries the card as `questionHtml` (LIN-4038): non-empty while the owner is being asked, '' otherwise.
-  const QUESTION_HTML = '<section data-testid="task-page-question"><p>which API key?</p></section>';
+/** The waiting task: an open ruling with two options, so the card has an option button (LIN-4114). */
+const ASKED = () => model([blocked({ decision: { decision_id: 'd1', question: 'Which API?', options: [{ id: 'a', label: 'Ship it' }, { id: 'b', label: 'Wait for review' }] } })]);
+const RUNNING = () => model([loop()]);
+const PARKED = () => model([bareBlocked()]);
 
-  function makePage({ withCard = true, owner = true, loadStatus = 'waiting', polls }) {
-    const attrs = { 'data-state-url': STATE_URL, 'data-status': loadStatus, 'data-live': 'false', 'data-merge-ready': 'false' };
-    const main = { getAttribute: (k) => (k in attrs ? attrs[k] : null), setAttribute: (k, v) => { attrs[k] = v; }, querySelector: () => null, querySelectorAll: () => [] };
-    const answer = {
-      innerHTML: statusHtml(loadStatus),
-      querySelector(sel) {
-        if (sel !== '[data-testid="task-page-status"]') return null;
-        const m = /data-status="([^"]*)"/.exec(this.innerHTML);
-        return m ? { getAttribute: () => m[1] } : null;
-      },
-    };
-    // The typed text and the picked option live on controls the CARD owns, so
-    // only a repaint of the card (or an ancestor) could wipe them.
-    const textarea = { value: 'half a typed answer' };
-    // LIN-4114: an option is a button now (no radio to tick); the poll must leave that same button in place.
-    const optionBtn = { dataset: { optionId: 'b' }, textContent: 'Wait for review', disabled: false };
-    let removed = false;
-    const card = {
-      parentNode: { removeChild() { removed = true; } },
-      querySelector: (sel) => (sel === 'textarea' ? textarea : sel === '[data-testid="session-question-card-option"]' ? optionBtn : null),
-    };
-    const reloads = [];
-    const timers = [];
-    let onReady = null;
-    const doc = {
-      hidden: false,
-      defaultView: { location: { reload: () => reloads.push(1) } },
-      querySelector: (sel) => {
-        if (sel === '[data-testid="task-page"][data-state-url]') return main;
-        if (sel === '[data-testid="task-page-answer"]') return answer;
-        if (sel === '[data-testid="task-page-question"]') return withCard && !removed ? card : null;
-        if (sel === '[data-testid="task-page-owner-widgets"]') return owner ? {} : null;
-        return null;
-      },
-      querySelectorAll: () => [],
-      addEventListener: (type, fn) => { if (type === 'DOMContentLoaded') onReady = fn; },
-    };
-    const queue = [...polls];
-    const inits = [];
-    const window = {
+/**
+ * The state read's reply for model `m`, as `routes/task-page.js` sends it: the header from `renderTaskStatus`, and the card
+ * from `renderTaskQuestion` (LIN-4024), which is '' when the viewer is not the owner or the wait is not an open ruling.
+ * `asked: false` is the reply a shelved or parked wait gets.
+ */
+const replyFor = (m, { asked = true } = {}) => ({
+  status: statusOf(m),
+  live: statusOf(m) === 'running',
+  headerHtml: headerOf(m),
+  questionHtml: asked ? renderTaskQuestion(m, { urlKey: URL_KEY, binding: { source: 'linear' } }) : '',
+});
+
+/**
+ * The task page as the server draws it, on loadWorld with the real `public/task-page.js`. `m` is the model it is drawn
+ * from; `owner: false` draws the guest page. The page loads (DOMContentLoaded), then `pollOnce` runs one poll with the
+ * next of `polls`. `QuestionCards` is a stub: the poll does not reach the card's own script.
+ */
+async function makePage({ m, owner = true, polls = [] }) {
+  const timers = [];
+  const reloads = [];
+  const inits = [];
+  const queue = [...polls];
+  const world = loadWorld({
+    scripts: ['task-page.js'],
+    timers,
+    window: {
       addEventListener() {},
+      setInterval: () => 0,
+      clearInterval() {},
       QuestionCards: { initQuestionCards: () => inits.push(1) },
       api: async (url) => { if (url === STATE_URL) return queue.shift(); throw new Error('unexpected ' + url); },
-    };
-    const ctx = {
-      module: { exports: {} }, window, Set, Math, Promise, Date, String, isNaN, Array, URLSearchParams, encodeURIComponent, JSON,
-      document: doc,
-      setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
-      clearTimeout: () => {}, setInterval: () => 0,
-    };
-    vm.runInNewContext(TASK_PAGE_SRC, ctx);
-    onReady();
-    return { timers, answer, card, textarea, optionBtn, reloads, inits, wasRemoved: () => removed, cardNode: () => doc.querySelector('[data-testid="task-page-question"]') };
-  }
-  const flush = async () => { for (let i = 0; i < 6; i++) await Promise.resolve(); };
+    },
+  });
+  const { document: doc } = world;
+  doc.body.innerHTML = bodyOf(render(m, owner ? 'owner' : 'guest', STATE_URL));
+  doc.defaultView = { location: { reload: () => reloads.push(1) } };
+  await fireDOMContentLoaded(doc);
+  const card = doc.querySelector('[data-testid="task-page-question"]');
+  return {
+    card,
+    timers,
+    reloads,
+    inits,
+    textarea: card ? card.querySelector('textarea') : null,
+    optionBtn: card ? card.querySelector('[data-testid="session-question-card-option"]') : null,
+    wasRemoved: () => doc.querySelector('[data-testid="task-page-question"]') === null,
+    cardNode: () => doc.querySelector('[data-testid="task-page-question"]'),
+    async pollOnce() { timers.shift().fn(); await settle(); },
+  };
+}
 
-  test('init captures the card once, before any poll', () => {
-    const page = makePage({ polls: [] });
+describe('the poll leaves a half-typed answer alone and removes the card when the wait ends', () => {
+  test('init captures the card once, before any poll', async () => {
+    const page = await makePage({ m: ASKED() });
     assert.equal(page.inits.length, 1);
   });
 
   test('a poll that still says waiting repaints the header but keeps the card and the typed text', async () => {
-    const page = makePage({ polls: [{ status: 'waiting', live: false, headerHtml: statusHtml('waiting'), questionHtml: QUESTION_HTML }] });
-    page.timers.shift().fn();
-    await flush();
+    const page = await makePage({ m: ASKED(), polls: [replyFor(ASKED())] });
+    page.textarea.value = 'half a typed answer';
+    await page.pollOnce();
     assert.equal(page.wasRemoved(), false, 'the card stays');
     assert.equal(page.cardNode(), page.card, 'the very same card node, not a re-render');
     assert.equal(page.card.querySelector('textarea'), page.textarea, 'the same textarea object');
@@ -291,63 +274,55 @@ describe('the poll leaves a half-typed answer alone and removes the card when th
   });
 
   test('a poll that finds the task no longer waiting removes the card', async () => {
-    const page = makePage({ polls: [{ status: 'running', live: true, headerHtml: statusHtml('running'), questionHtml: '' }] });
-    page.timers.shift().fn();
-    await flush();
+    const page = await makePage({ m: ASKED(), polls: [replyFor(RUNNING())] });
+    await page.pollOnce();
     assert.equal(page.wasRemoved(), true);
   });
 
   test('a poll that says waiting with no question (questionHtml "") removes the card and does not reload (LIN-4038)', async () => {
     // Shelving the ruling while the page is open: the status is still waiting, but the server says no question.
-    const page = makePage({ polls: [{ status: 'waiting', live: false, headerHtml: statusHtml('waiting'), questionHtml: '' }] });
-    page.timers.shift().fn();
-    await flush();
+    const page = await makePage({ m: ASKED(), polls: [replyFor(ASKED(), { asked: false })] });
+    await page.pollOnce();
     assert.equal(page.wasRemoved(), true, 'the card goes');
     assert.equal(page.reloads.length, 0, 'no reload for a card that should not be there');
   });
 
   test('a waiting-but-parked poll on a page with no card does not reload (LIN-4038)', async () => {
-    const page = makePage({ withCard: false, loadStatus: 'running', polls: [{ status: 'waiting', live: false, headerHtml: statusHtml('waiting'), questionHtml: '' }] });
-    page.timers.shift().fn();
-    await flush();
+    const page = await makePage({ m: RUNNING(), polls: [replyFor(PARKED(), { asked: false })] });
+    await page.pollOnce();
     assert.equal(page.reloads.length, 0);
   });
 
   test('an owner page that becomes asked reloads once to fetch the card; a page with no owner marker does not', async () => {
-    const own = makePage({ withCard: false, loadStatus: 'running', polls: [{ status: 'waiting', live: false, headerHtml: statusHtml('waiting'), questionHtml: QUESTION_HTML }] });
-    own.timers.shift().fn();
-    await flush();
+    const own = await makePage({ m: RUNNING(), polls: [replyFor(ASKED())] });
+    await own.pollOnce();
     assert.equal(own.reloads.length, 1);
-    const guest = makePage({ withCard: false, owner: false, loadStatus: 'running', polls: [{ status: 'waiting', live: false, headerHtml: statusHtml('waiting'), questionHtml: QUESTION_HTML }] });
-    guest.timers.shift().fn();
-    await flush();
+    const guest = await makePage({ m: RUNNING(), owner: false, polls: [replyFor(ASKED())] });
+    await guest.pollOnce();
     assert.equal(guest.reloads.length, 0);
   });
 });
 
 describe('the press goes through the run page\'s ReplyDelivery entry', () => {
+  // `CustomEvent` is absent in this world, and the press does not need it: question-cards.js's announceRulingGone returns
+  // before any dispatchEvent when the global is missing (question-cards.js:235-238), so no bubbling event is built here.
   test('the shared client hands the answer to window.ReplyDelivery.deliverRulingAnswer', async () => {
     const calls = [];
-    const el = (over = {}) => ({ dataset: {}, textContent: '', value: '', className: '', disabled: false, listeners: {}, addEventListener(t, f) { this.listeners[t] = f; }, querySelector() { return null; }, querySelectorAll() { return []; }, ...over });
-    const btn = el(); const textarea = el({ value: 'ship it' }); const feedback = el();
-    const card = el({
-      dataset: { urlKey: 'acme', loopId: 'impl-2', stampLoopId: 'impl-2', target: 'cli', issueId: UUID, issueIdentifier: 'LIN-50', disposition: 'resumable', effect: 'resume', sessionWaiting: 'true' },
-      querySelector(sel) {
-        if (sel.includes('answer')) return btn;
-        if (sel.includes('card-input')) return textarea;
-        if (sel === '.sess-qcard-feedback') return feedback;
-        return null;
+    const world = loadWorld({
+      scripts: ['question-cards.js'],
+      window: {
+        module: { exports: {} },
+        ReplyDelivery: { deliverRulingAnswer(opts, h) { calls.push(opts); h.onDispatchOk(); return Promise.resolve(); }, deliveredEffect: (o) => o.effect, composeDispatchPrompt: () => '' },
+        ChatUI: { appendMessage() {} },
       },
     });
-    const sandbox = {
-      module: { exports: {} },
-      window: { ReplyDelivery: { deliverRulingAnswer(opts, h) { calls.push(opts); h.onDispatchOk(); return Promise.resolve(); }, deliveredEffect: (o) => o.effect, composeDispatchPrompt: () => '' }, ChatUI: { appendMessage() {} } },
-      document: { querySelectorAll: () => [card], createElement: () => el() },
-      setTimeout() {}, console,
-    };
-    vm.runInNewContext(readFileSync(join(__dirname, '../../public/question-cards.js'), 'utf8'), sandbox);
-    sandbox.module.exports.initQuestionCards();
-    btn.listeners.click({ preventDefault() {} });
+    world.document.body.innerHTML = renderTaskQuestion(ASKED(), { urlKey: URL_KEY, binding: { source: 'linear' } });
+    world.window.module.exports.initQuestionCards();
+    const doc = world.document;
+    const textarea = doc.querySelector('textarea');
+    const btn = doc.querySelector('[data-testid="session-question-card-answer"]');
+    textarea.value = 'ship it';
+    await clickOn(btn);
     await Promise.resolve();
     assert.equal(calls.length, 1);
     assert.equal(calls[0].prompt, 'ship it');
