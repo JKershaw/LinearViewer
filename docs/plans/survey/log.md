@@ -2472,3 +2472,8 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - the docs pointer.
 
   Blind reads sent: LIN-4317 alone, AS and AT; LIN-4313 + LIN-4317 as one change, AU and AV. LIN-4313 alone was mixed, mixed.
+- 11:45: **LIN-4317: better, better (AS, AT). LIN-4313 + LIN-4317: better, better (AU, AV).** LIN-4313 alone was mixed, mixed. That's five of five tidy-afters, and this one on the authority gate. Residues in the area pulled into LIN-4318: `periodical-runs.js:117`'s missed name copy; the "LIN-4318 is the cure" comment to rewrite in the present tense; the re-checked preconditions. **Two for the notebook:**
+  - **mount counts as prose in about 8 places** ("three/four/five enqueue routes"), each hand-edited per entrance, which is the case for one derived list;
+  - **a census that counts *literals* (F3) blocked a fold that would read better.** A check should count behaviour, not spelling, or it shapes the code.
+
+  Again the forward comment came from a scope sentence of mine ("say plainly in the PR", which the builder also wrote into a comment).
