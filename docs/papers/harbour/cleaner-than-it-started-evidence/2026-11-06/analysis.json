@@ -1,0 +1,1033 @@
+{
+  "inputs_sha256": {
+    "manifest.json": "0957a0c01ca36db44e4f88a3316e726c22bff278b7352c9376cc6ed45a799cb0",
+    "roles.json": "e4106d760d9a8f7c785405f938af17bc3819d155b62c961c9aefac9c49517f65",
+    "blind-codes.json": "8dd41fb94dffb49812e0d115786f1bd5cdacbcca93cc8e768710cffc4056f759",
+    "git/census-by-merge.json": "b15d2eecf7acd80cfe14db244ba87f52666e0f0e0b0a3db34b44234e4e8ddb11",
+    "git/place-ledger.at-pin.snapshot": "e7ccb48fe0652ee05a2aa69ba3b614970a8f4758ca96b049b1e357d68b81b68a"
+  },
+  "grounded_at": {
+    "LinearViewer": "1d10f9b3f029d0326121103142da5cc41fd7e34e",
+    "simple-dispatcher": "07c88f7a338b3e19a01070775e1f4d4cfc91f040"
+  },
+  "window_start": "2026-11-04T00:00:00Z",
+  "frozen_at": "2026-11-06T09:12:34.030Z",
+  "inputs": {
+    "linear_150_comments": {
+      "count": 50,
+      "blind_passes": 42,
+      "batch_a_to_d_present": true
+    },
+    "merges_in_window": {
+      "LinearViewer": 62,
+      "simple-dispatcher": 20
+    },
+    "rows_in_table": 90,
+    "rows_by_role": {
+      "place": 62,
+      "outside-ledger": 9,
+      "not-place": 14,
+      "parent": 1,
+      "ui-context": 4
+    },
+    "unclassified_merges": [],
+    "custom_prompts_frozen": 73,
+    "population_tickets": 97
+  },
+  "blind_reads": {
+    "passes_total": 42,
+    "batch_rows": 56,
+    "session_pass_1": {
+      "session": "pass-1 (batches A+B)",
+      "signed_rows": 27,
+      "baseline": {
+        "n": 8,
+        "sum": 3,
+        "mean": 0.38,
+        "better": 3,
+        "mixed": 5,
+        "neutral": 0,
+        "worse": 0
+      },
+      "forward_all": {
+        "n": 19,
+        "sum": 6,
+        "mean": 0.32,
+        "better": 8,
+        "mixed": 8,
+        "neutral": 1,
+        "worse": 2
+      },
+      "forward_surveyed_as_ledger_labels": {
+        "n": 18,
+        "excluded_unsurveyed": [
+          "LIN-4212"
+        ],
+        "sum": 7,
+        "mean": 0.39,
+        "better": 8,
+        "mixed": 8,
+        "neutral": 1,
+        "worse": 1
+      },
+      "unsigned_rows": [
+        {
+          "pass": "batch B",
+          "row": 12,
+          "note": null
+        }
+      ]
+    },
+    "session_pass_2": {
+      "session": "pass-2 (batches C+D)",
+      "signed_rows": 28,
+      "baseline": {
+        "n": 8,
+        "sum": 4,
+        "mean": 0.5,
+        "better": 4,
+        "mixed": 4,
+        "neutral": 0,
+        "worse": 0
+      },
+      "forward_all": {
+        "n": 20,
+        "sum": 7,
+        "mean": 0.35,
+        "better": 8,
+        "mixed": 10,
+        "neutral": 1,
+        "worse": 1
+      },
+      "forward_surveyed_as_ledger_labels": {
+        "n": 19,
+        "excluded_unsurveyed": [
+          "LIN-4212"
+        ],
+        "sum": 7,
+        "mean": 0.37,
+        "better": 8,
+        "mixed": 9,
+        "neutral": 1,
+        "worse": 1
+      },
+      "unsigned_rows": []
+    },
+    "scoring": "better=+1, neutral=0, mixed=0, worse=-1; \"mixed (leans worse)\" kept as mixed with leans=worse",
+    "note": "Baseline = the ledger baseline window 015aa4c6..5334c81a (8 LinearViewer rows, all in the batches). Forward = every other row in the batches."
+  },
+  "single_and_area_reads": {
+    "passes_total": 38,
+    "subjects": [
+      {
+        "subject": "LIN-4246",
+        "tickets": [
+          "LIN-4246"
+        ],
+        "kind": "single ticket",
+        "passes": [
+          {
+            "id": "O",
+            "sign": "mixed",
+            "leans": null
+          },
+          {
+            "id": "P",
+            "sign": "mixed",
+            "leans": null
+          }
+        ],
+        "reading": "mixed,mixed",
+        "both_better": false
+      },
+      {
+        "subject": "LIN-4247",
+        "tickets": [
+          "LIN-4247"
+        ],
+        "kind": "single ticket",
+        "passes": [
+          {
+            "id": "K",
+            "sign": "mixed",
+            "leans": null
+          },
+          {
+            "id": "L",
+            "sign": "mixed",
+            "leans": null
+          }
+        ],
+        "reading": "mixed,mixed",
+        "both_better": false
+      },
+      {
+        "subject": "LIN-4247+LIN-4246+LIN-4293",
+        "tickets": [
+          "LIN-4247",
+          "LIN-4246",
+          "LIN-4293"
+        ],
+        "kind": "pair or area",
+        "passes": [
+          {
+            "id": "AG",
+            "sign": "better",
+            "leans": null
+          },
+          {
+            "id": "AH",
+            "sign": "better",
+            "leans": null
+          }
+        ],
+        "reading": "better,better",
+        "both_better": true
+      },
+      {
+        "subject": "LIN-4248",
+        "tickets": [
+          "LIN-4248"
+        ],
+        "kind": "single ticket",
+        "passes": [
+          {
+            "id": "E",
+            "sign": "mixed",
+            "leans": null
+          },
+          {
+            "id": "F",
+            "sign": "mixed",
+            "leans": null
+          }
+        ],
+        "reading": "mixed,mixed",
+        "both_better": false
+      },
+      {
+        "subject": "LIN-4251",
+        "tickets": [
+          "LIN-4251"
+        ],
+        "kind": "single ticket",
+        "passes": [
+          {
+            "id": "M",
+            "sign": "better",
+            "leans": null
+          },
+          {
+            "id": "N",
+            "sign": "mixed",
+            "leans": null
+          }
+        ],
+        "reading": "better,mixed",
+        "both_better": false
+      },
+      {
+        "subject": "LIN-4251+LIN-4277",
+        "tickets": [
+          "LIN-4251",
+          "LIN-4277"
+        ],
+        "kind": "pair or area",
+        "passes": [
+          {
+            "id": "Y",
+            "sign": "better",
+            "leans": null
+          },
+          {
+            "id": "Z",
+            "sign": "better",
+            "leans": null
+          }
+        ],
+        "reading": "better,better",
+        "both_better": true
+      },
+      {
+        "subject": "LIN-4252",
+        "tickets": [
+          "LIN-4252"
+        ],
+        "kind": "single ticket",
+        "passes": [
+          {
+            "id": "I",
+            "sign": "mixed",
+            "leans": null
+          },
+          {
+            "id": "J",
+            "sign": "mixed",
+            "leans": null
+          }
+        ],
+        "reading": "mixed,mixed",
+        "both_better": false
+      },
+      {
+        "subject": "LIN-4252+LIN-4255",
+        "tickets": [
+          "LIN-4252",
+          "LIN-4255"
+        ],
+        "kind": "pair or area",
+        "passes": [
+          {
+            "id": "AC",
+            "sign": "better",
+            "leans": null
+          },
+          {
+            "id": "AD",
+            "sign": "better",
+            "leans": null
+          }
+        ],
+        "reading": "better,better",
+        "both_better": true
+      },
+      {
+        "subject": "LIN-4253",
+        "tickets": [
+          "LIN-4253"
+        ],
+        "kind": "single ticket",
+        "passes": [
+          {
+            "id": "G",
+            "sign": "better",
+            "leans": null
+          },
+          {
+            "id": "H",
+            "sign": "better",
+            "leans": null
+          }
+        ],
+        "reading": "better,better",
+        "both_better": true
+      },
+      {
+        "subject": "LIN-4255",
+        "tickets": [
+          "LIN-4255"
+        ],
+        "kind": "pair or area",
+        "passes": [
+          {
+            "id": "AB",
+            "sign": "better",
+            "leans": null
+          },
+          {
+            "id": "AA",
+            "sign": "better",
+            "leans": null
+          }
+        ],
+        "reading": "better,better",
+        "both_better": true
+      },
+      {
+        "subject": "LIN-4263",
+        "tickets": [
+          "LIN-4263"
+        ],
+        "kind": "single ticket",
+        "passes": [
+          {
+            "id": "Q",
+            "sign": "mixed",
+            "leans": null
+          },
+          {
+            "id": "R",
+            "sign": "mixed",
+            "leans": null
+          }
+        ],
+        "reading": "mixed,mixed",
+        "both_better": false
+      },
+      {
+        "subject": "LIN-4263+LIN-4276",
+        "tickets": [
+          "LIN-4263",
+          "LIN-4276"
+        ],
+        "kind": "pair or area",
+        "passes": [
+          {
+            "id": "V",
+            "sign": "better",
+            "leans": null
+          },
+          {
+            "id": "U",
+            "sign": "better",
+            "leans": null
+          }
+        ],
+        "reading": "better,better",
+        "both_better": true
+      },
+      {
+        "subject": "LIN-4276",
+        "tickets": [
+          "LIN-4276"
+        ],
+        "kind": "single ticket",
+        "passes": [
+          {
+            "id": "S",
+            "sign": "better",
+            "leans": null
+          },
+          {
+            "id": "T",
+            "sign": "better",
+            "leans": null
+          }
+        ],
+        "reading": "better,better",
+        "both_better": true
+      },
+      {
+        "subject": "LIN-4277",
+        "tickets": [
+          "LIN-4277"
+        ],
+        "kind": "single ticket",
+        "passes": [
+          {
+            "id": "W",
+            "sign": "better",
+            "leans": null
+          },
+          {
+            "id": "X",
+            "sign": "better",
+            "leans": null
+          }
+        ],
+        "reading": "better,better",
+        "both_better": true
+      },
+      {
+        "subject": "LIN-4292",
+        "tickets": [
+          "LIN-4292"
+        ],
+        "kind": "single ticket",
+        "passes": [
+          {
+            "id": "AI",
+            "sign": "better",
+            "leans": null
+          },
+          {
+            "id": "AJ",
+            "sign": "mixed",
+            "leans": null
+          }
+        ],
+        "reading": "better,mixed",
+        "both_better": false
+      },
+      {
+        "subject": "LIN-4292+LIN-4304",
+        "tickets": [
+          "LIN-4292",
+          "LIN-4304"
+        ],
+        "kind": "pair or area",
+        "passes": [
+          {
+            "id": "AP",
+            "sign": "better",
+            "leans": null
+          },
+          {
+            "id": "AO",
+            "sign": "better",
+            "leans": null
+          }
+        ],
+        "reading": "better,better",
+        "both_better": true
+      },
+      {
+        "subject": "LIN-4293",
+        "tickets": [
+          "LIN-4293"
+        ],
+        "kind": "single ticket",
+        "passes": [
+          {
+            "id": "AF",
+            "sign": "better",
+            "leans": null
+          },
+          {
+            "id": "AE",
+            "sign": "better",
+            "leans": null
+          }
+        ],
+        "reading": "better,better",
+        "both_better": true
+      },
+      {
+        "subject": "LIN-4296",
+        "tickets": [
+          "LIN-4296"
+        ],
+        "kind": "single ticket",
+        "passes": [
+          {
+            "id": "AK",
+            "sign": "better",
+            "leans": null
+          },
+          {
+            "id": "AL",
+            "sign": "better",
+            "leans": null
+          }
+        ],
+        "reading": "better,better",
+        "both_better": true
+      },
+      {
+        "subject": "LIN-4304",
+        "tickets": [
+          "LIN-4304"
+        ],
+        "kind": "single ticket",
+        "passes": [
+          {
+            "id": "AM",
+            "sign": "better",
+            "leans": null
+          },
+          {
+            "id": "AN",
+            "sign": "better",
+            "leans": null
+          }
+        ],
+        "reading": "better,better",
+        "both_better": true
+      }
+    ],
+    "subjects_count": 19,
+    "single_ticket_subjects": 13,
+    "pair_or_area_subjects": 6,
+    "both_passes_better": [
+      "LIN-4247+LIN-4246+LIN-4293",
+      "LIN-4251+LIN-4277",
+      "LIN-4252+LIN-4255",
+      "LIN-4253",
+      "LIN-4255",
+      "LIN-4263+LIN-4276",
+      "LIN-4276",
+      "LIN-4277",
+      "LIN-4292+LIN-4304",
+      "LIN-4293",
+      "LIN-4296",
+      "LIN-4304"
+    ],
+    "both_passes_better_count": 12,
+    "both_better_pair_or_area": [
+      "LIN-4247+LIN-4246+LIN-4293",
+      "LIN-4251+LIN-4277",
+      "LIN-4252+LIN-4255",
+      "LIN-4255",
+      "LIN-4263+LIN-4276",
+      "LIN-4292+LIN-4304"
+    ],
+    "both_better_single": [
+      "LIN-4253",
+      "LIN-4276",
+      "LIN-4277",
+      "LIN-4293",
+      "LIN-4296",
+      "LIN-4304"
+    ]
+  },
+  "census": {
+    "merges_with_census": 28,
+    "first": {
+      "short": "69e8f1754",
+      "committed": "2026-11-05T13:18:01Z",
+      "count": 56,
+      "stop": 0,
+      "movable": 56,
+      "subject": "LIN-4265: fake-DOM census (structural, frozen 56-file ratche"
+    },
+    "at_af55cb73": {
+      "short": "af55cb737",
+      "committed": "2026-11-05T19:02:28Z",
+      "count": 25,
+      "stop": 9,
+      "movable": 16,
+      "subject": "LIN-4293: one Go-state constructor, one \"in progress\", one f"
+    },
+    "last": {
+      "short": "1d10f9b3f",
+      "committed": "2026-11-06T08:39:58Z",
+      "count": 18,
+      "stop": 6,
+      "movable": 12,
+      "subject": "LIN-4314: sync the Survey notebook on main to 98670be3b (#23"
+    },
+    "ladder": [
+      {
+        "short": "69e8f1754",
+        "committed": "2026-11-05T13:18:01Z",
+        "count": 56,
+        "stop": 0,
+        "movable": 56,
+        "subject": "LIN-4265: fake-DOM census (structural, frozen 56-file ratche"
+      },
+      {
+        "short": "6ff38cf5c",
+        "committed": "2026-11-05T13:22:19Z",
+        "count": 56,
+        "stop": 0,
+        "movable": 56,
+        "subject": "LIN-4263: /cost reports each dispatch's own model and tokens"
+      },
+      {
+        "short": "6d2875181",
+        "committed": "2026-11-05T13:54:18Z",
+        "count": 56,
+        "stop": 0,
+        "movable": 56,
+        "subject": "LIN-4270: className and id reflect the class and id attribut"
+      },
+      {
+        "short": "56f9b4749",
+        "committed": "2026-11-05T14:12:27Z",
+        "count": 55,
+        "stop": 0,
+        "movable": 55,
+        "subject": "LIN-4266: prompt-section-go suite onto loadWorld (census 56 "
+      },
+      {
+        "short": "473cc865e",
+        "committed": "2026-11-05T14:17:15Z",
+        "count": 55,
+        "stop": 0,
+        "movable": 55,
+        "subject": "LIN-4276: one posting-key list and one dispatch order in /co"
+      },
+      {
+        "short": "0c3d3448b",
+        "committed": "2026-11-05T15:02:26Z",
+        "count": 55,
+        "stop": 0,
+        "movable": 55,
+        "subject": "LIN-4277: one endpoint-hint ladder and one closing lead-in i"
+      },
+      {
+        "short": "8369461cd",
+        "committed": "2026-11-05T15:05:51Z",
+        "count": 52,
+        "stop": 0,
+        "movable": 52,
+        "subject": "LIN-4268: prompt-section-preserve / -recommend-url / -look-a"
+      },
+      {
+        "short": "82e75ee9d",
+        "committed": "2026-11-05T15:28:16Z",
+        "count": 47,
+        "stop": 0,
+        "movable": 47,
+        "subject": "LIN-4280: Fake-DOM piece 1: chat-append-options / chat-rende"
+      },
+      {
+        "short": "aeb9d8773",
+        "committed": "2026-11-05T15:30:59Z",
+        "count": 47,
+        "stop": 0,
+        "movable": 47,
+        "subject": "LIN-4279: fake-DOM piece 0 — shared-fake additions and clien"
+      },
+      {
+        "short": "069585bb0",
+        "committed": "2026-11-05T16:00:20Z",
+        "count": 38,
+        "stop": 0,
+        "movable": 38,
+        "subject": "LIN-4269: fake-DOM move: client suites onto loadWorld (censu"
+      },
+      {
+        "short": "d537cd695",
+        "committed": "2026-11-05T16:16:18Z",
+        "count": 35,
+        "stop": 0,
+        "movable": 35,
+        "subject": "LIN-4267: prompt-section p0, run-quota and runner-link suite"
+      },
+      {
+        "short": "48d93c5c2",
+        "committed": "2026-11-05T16:26:05Z",
+        "count": 33,
+        "stop": 0,
+        "movable": 33,
+        "subject": "LIN-4284: fake-DOM piece 5 — sentinel-mask and chart-helpers"
+      },
+      {
+        "short": "6dd136173",
+        "committed": "2026-11-05T16:40:57Z",
+        "count": 31,
+        "stop": 0,
+        "movable": 31,
+        "subject": "LIN-4283: fake-DOM piece 4 — observation-scan-due and lin-29"
+      },
+      {
+        "short": "5f825eb67",
+        "committed": "2026-11-05T16:51:28Z",
+        "count": 30,
+        "stop": 0,
+        "movable": 30,
+        "subject": "LIN-4282: fake-DOM piece 3 — observation-ruling-delivery ont"
+      },
+      {
+        "short": "8d8bd92ff",
+        "committed": "2026-11-05T17:02:13Z",
+        "count": 28,
+        "stop": 0,
+        "movable": 28,
+        "subject": "LIN-4285: live-console client suites onto loadWorld (fake-DO"
+      },
+      {
+        "short": "1b83bbff1",
+        "committed": "2026-11-05T17:13:12Z",
+        "count": 25,
+        "stop": 0,
+        "movable": 25,
+        "subject": "LIN-4281: observation suites onto the shared fake (fake-DOM "
+      },
+      {
+        "short": "591bb9596",
+        "committed": "2026-11-05T18:09:34Z",
+        "count": 25,
+        "stop": 9,
+        "movable": 16,
+        "subject": "LIN-4272: fake-DOM close-out — stop reasons in the census, i"
+      },
+      {
+        "short": "15061f40c",
+        "committed": "2026-11-05T18:33:28Z",
+        "count": 25,
+        "stop": 9,
+        "movable": 16,
+        "subject": "LIN-4255 close-out: fix stale scope wording in CLAUDE.md and"
+      },
+      {
+        "short": "af55cb737",
+        "committed": "2026-11-05T19:02:28Z",
+        "count": 25,
+        "stop": 9,
+        "movable": 16,
+        "subject": "LIN-4293: one Go-state constructor, one \"in progress\", one f"
+      },
+      {
+        "short": "ed46a714a",
+        "committed": "2026-11-05T20:06:58Z",
+        "count": 25,
+        "stop": 9,
+        "movable": 16,
+        "subject": "LIN-4300: Comprehension-debt review run 5 (window 10-23 → 11"
+      },
+      {
+        "short": "8f97e18e5",
+        "committed": "2026-11-05T20:08:40Z",
+        "count": 25,
+        "stop": 9,
+        "movable": 16,
+        "subject": "LIN-4298: seams & tangles periodical run 8 (delta vs run 7) "
+      },
+      {
+        "short": "6c6bada59",
+        "committed": "2026-11-05T20:11:02Z",
+        "count": 25,
+        "stop": 9,
+        "movable": 16,
+        "subject": "LIN-4299: Drift & Coherence run 4 report (#2319)"
+      },
+      {
+        "short": "b389f9b02",
+        "committed": "2026-11-05T20:12:38Z",
+        "count": 25,
+        "stop": 9,
+        "movable": 16,
+        "subject": "LIN-4292: remove method-presence guards in public/ (no behav"
+      },
+      {
+        "short": "b581ac926",
+        "committed": "2026-11-05T20:24:08Z",
+        "count": 22,
+        "stop": 6,
+        "movable": 16,
+        "subject": "LIN-4296: model <select> selectedness in the shared fake DOM"
+      },
+      {
+        "short": "f742e5acb",
+        "committed": "2026-11-05T21:04:38Z",
+        "count": 22,
+        "stop": 6,
+        "movable": 16,
+        "subject": "LIN-4304: one spelling for DOM element access in public/, wi"
+      },
+      {
+        "short": "165c61e7f",
+        "committed": "2026-11-05T21:28:06Z",
+        "count": 22,
+        "stop": 6,
+        "movable": 16,
+        "subject": "LIN-4306: compute the fake-DOM consumer list from imports (L"
+      },
+      {
+        "short": "f73f1b112",
+        "committed": "2026-11-06T08:25:57Z",
+        "count": 18,
+        "stop": 6,
+        "movable": 12,
+        "subject": "LIN-4307: sessions/app suites onto loadWorld (LIN-4254 piece"
+      },
+      {
+        "short": "1d10f9b3f",
+        "committed": "2026-11-06T08:39:58Z",
+        "count": 18,
+        "stop": 6,
+        "movable": 12,
+        "subject": "LIN-4314: sync the Survey notebook on main to 98670be3b (#23"
+      }
+    ]
+  },
+  "costs": {
+    "place_rows_by_state": {
+      "partial": 3,
+      "exact": 59
+    },
+    "place_rows": 62,
+    "fake_dom_piece_tickets": 14,
+    "fake_dom_piece_cost_sum_usd": 95.03,
+    "fake_dom_piece_states_not_exact": 0,
+    "not_exact_place_tickets": [
+      "LIN-4178: partial (unpriced: claude-haiku-5-5)",
+      "LIN-4173: partial (unpriced: claude-haiku-5-5)",
+      "LIN-4177: partial (unpriced: claude-haiku-5-5)"
+    ],
+    "LIN_4271_own_usd": 22.07,
+    "parent_LIN_4255_usd": 56.1
+  },
+  "surveys": {
+    "place_tickets": 59,
+    "tickets_with_survey_on_own_ticket": 13,
+    "tickets_with_survey_on_LIN_4150": 4,
+    "tickets_with_no_survey_found": [
+      "LIN-4178",
+      "LIN-4179",
+      "LIN-4198",
+      "LIN-4202",
+      "LIN-4212",
+      "LIN-4201",
+      "LIN-4203",
+      "LIN-4226",
+      "LIN-4234",
+      "LIN-4240",
+      "LIN-4241",
+      "LIN-4242",
+      "LIN-4243",
+      "LIN-4265",
+      "LIN-4270",
+      "LIN-4266",
+      "LIN-4268",
+      "LIN-4280",
+      "LIN-4279",
+      "LIN-4269",
+      "LIN-4267",
+      "LIN-4284",
+      "LIN-4283",
+      "LIN-4282",
+      "LIN-4285",
+      "LIN-4281",
+      "LIN-4272",
+      "LIN-4306",
+      "LIN-4307",
+      "LIN-4220",
+      "LIN-4223",
+      "LIN-4221",
+      "LIN-4222",
+      "LIN-4224",
+      "LIN-4219",
+      "LIN-4187",
+      "LIN-4218",
+      "LIN-4239",
+      "LIN-4166",
+      "LIN-4168",
+      "LIN-4173",
+      "LIN-4177"
+    ],
+    "tickets_with_scope_call": 20,
+    "tickets_with_scope_call_absent": [
+      "LIN-4178",
+      "LIN-4179",
+      "LIN-4198",
+      "LIN-4202",
+      "LIN-4212",
+      "LIN-4201",
+      "LIN-4226",
+      "LIN-4240",
+      "LIN-4241",
+      "LIN-4242",
+      "LIN-4243",
+      "LIN-4253",
+      "LIN-4252",
+      "LIN-4246",
+      "LIN-4265",
+      "LIN-4270",
+      "LIN-4266",
+      "LIN-4268",
+      "LIN-4280",
+      "LIN-4279",
+      "LIN-4269",
+      "LIN-4267",
+      "LIN-4284",
+      "LIN-4283",
+      "LIN-4282",
+      "LIN-4285",
+      "LIN-4281",
+      "LIN-4272",
+      "LIN-4306",
+      "LIN-4307",
+      "LIN-4220",
+      "LIN-4223",
+      "LIN-4221",
+      "LIN-4222",
+      "LIN-4224",
+      "LIN-4239",
+      "LIN-4166",
+      "LIN-4173",
+      "LIN-4177"
+    ],
+    "tickets_with_after_answer": 30,
+    "tickets_with_after_answer_list": [
+      "LIN-4178",
+      "LIN-4179",
+      "LIN-4198",
+      "LIN-4202",
+      "LIN-4201",
+      "LIN-4234",
+      "LIN-4240",
+      "LIN-4241",
+      "LIN-4242",
+      "LIN-4243",
+      "LIN-4151",
+      "LIN-4048",
+      "LIN-4143",
+      "LIN-4248",
+      "LIN-4253",
+      "LIN-4252",
+      "LIN-4247",
+      "LIN-4251",
+      "LIN-4246",
+      "LIN-4263",
+      "LIN-4276",
+      "LIN-4277",
+      "LIN-4272",
+      "LIN-4293",
+      "LIN-4292",
+      "LIN-4296",
+      "LIN-4304",
+      "LIN-4239",
+      "LIN-4168",
+      "LIN-4177"
+    ]
+  },
+  "periodicals": {
+    "LinearViewer_place_rows_covered": 45,
+    "LinearViewer_place_rows_after_af55cb73": 5,
+    "simple_dispatcher_place_rows_drift_run3": 3,
+    "simple_dispatcher_place_rows_total": 12
+  },
+  "cost_medians": {
+    "place_exact_rows": 59,
+    "median_usd_all_place_exact": 8.41,
+    "median_usd_baseline": 17.08,
+    "median_usd_forward_4Nov": 6.51,
+    "median_usd_5Nov_groups": {
+      "n": 34,
+      "median": 8.56
+    },
+    "median_usd_per_ticket_exact": {
+      "n": 56,
+      "median": 8.56
+    }
+  },
+  "tidy_after_pairs": [
+    {
+      "parent": "LIN-4263",
+      "child": "LIN-4276",
+      "parent_usd": 14.37,
+      "child_usd": 6.77,
+      "child_share_of_parent": 0.471
+    },
+    {
+      "parent": "LIN-4251",
+      "child": "LIN-4277",
+      "parent_usd": 11.94,
+      "child_usd": 7.82,
+      "child_share_of_parent": 0.655
+    },
+    {
+      "parent": "LIN-4292",
+      "child": "LIN-4304",
+      "parent_usd": 8.41,
+      "child_usd": 7.18,
+      "child_share_of_parent": 0.854
+    }
+  ],
+  "ledger_vs_code": [
+    {
+      "ticket": "LIN-4277",
+      "note": "ledger $5.93 vs live $7.82"
+    }
+  ],
+  "ledger_usd_rows": [
+    {
+      "ticket": "LIN-4251",
+      "ledger_usd": "11.94",
+      "live_usd": 11.94
+    },
+    {
+      "ticket": "LIN-4263",
+      "ledger_usd": "14.37",
+      "live_usd": 14.37
+    },
+    {
+      "ticket": "LIN-4276",
+      "ledger_usd": "6.77",
+      "live_usd": 6.77
+    },
+    {
+      "ticket": "LIN-4277",
+      "ledger_usd": "5.93",
+      "live_usd": 7.82
+    }
+  ],
+  "notes": {
+    "LIN-4254": "notebook and ticket say 22 (16 movable + 6 stop); the census file at 1d10f9b3 has 18 (12 movable + 6 stop)",
+    "LIN-4307": "the notebook ends at 08:00 UTC 6 Nov and still lists the LIN-4307 rulings as held; the code has LIN-4307 merged",
+    "LIN-4253": "lib/stage-writes.js is not placed on scripts/code-shape/areas.json (research §L9)"
+  }
+}

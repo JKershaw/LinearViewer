@@ -1,0 +1,416 @@
+{
+  "_note": "Hand-coded row roles, from the research comment's C1 membership (LIN-4315, 6 Nov). Each row's role is a judgement written here; a merge with no entry is reported as unclassified by analyse.mjs.",
+  "tickets": {
+    "LIN-4166": {
+      "role": "place",
+      "group": "baseline (ledger baseline window 015aa4c6..5334c81a)"
+    },
+    "LIN-4168": {
+      "role": "place",
+      "group": "baseline (ledger baseline window 015aa4c6..5334c81a)"
+    },
+    "LIN-4173": {
+      "role": "place",
+      "group": "baseline (ledger baseline window 015aa4c6..5334c81a)"
+    },
+    "LIN-4177": {
+      "role": "place",
+      "group": "baseline (ledger baseline window 015aa4c6..5334c81a)"
+    },
+    "LIN-4178": {
+      "role": "place",
+      "group": "baseline (ledger baseline window 015aa4c6..5334c81a)"
+    },
+    "LIN-4179": {
+      "role": "place",
+      "group": "baseline (ledger baseline window 015aa4c6..5334c81a)"
+    },
+    "LIN-4198": {
+      "role": "place",
+      "group": "baseline (ledger baseline window 015aa4c6..5334c81a)"
+    },
+    "LIN-4202": {
+      "role": "place",
+      "group": "baseline (ledger baseline window 015aa4c6..5334c81a)"
+    },
+    "LIN-4241": {
+      "role": "place",
+      "group": "ordinary feature"
+    },
+    "LIN-4242": {
+      "role": "place",
+      "group": "ordinary feature"
+    },
+    "LIN-4243": {
+      "role": "place",
+      "group": "ordinary feature"
+    },
+    "LIN-4151": {
+      "role": "place",
+      "group": "ordinary feature"
+    },
+    "LIN-4048": {
+      "role": "place",
+      "group": "ordinary feature"
+    },
+    "LIN-4143": {
+      "role": "place",
+      "group": "ordinary feature"
+    },
+    "LIN-4201": {
+      "role": "place",
+      "group": "forward 4 Nov"
+    },
+    "LIN-4203": {
+      "role": "place",
+      "group": "forward 4 Nov"
+    },
+    "LIN-4212": {
+      "role": "place",
+      "group": "forward 4 Nov"
+    },
+    "LIN-4218": {
+      "role": "place",
+      "group": "forward 4 Nov"
+    },
+    "LIN-4219": {
+      "role": "place",
+      "group": "forward 4 Nov"
+    },
+    "LIN-4220": {
+      "role": "place",
+      "group": "forward 4 Nov"
+    },
+    "LIN-4221": {
+      "role": "place",
+      "group": "forward 4 Nov"
+    },
+    "LIN-4222": {
+      "role": "place",
+      "group": "forward 4 Nov"
+    },
+    "LIN-4223": {
+      "role": "place",
+      "group": "forward 4 Nov"
+    },
+    "LIN-4224": {
+      "role": "place",
+      "group": "forward 4 Nov"
+    },
+    "LIN-4226": {
+      "role": "place",
+      "group": "forward 4 Nov"
+    },
+    "LIN-4187": {
+      "role": "place",
+      "group": "forward 4 Nov"
+    },
+    "LIN-4234": {
+      "role": "place",
+      "group": "forward 4 Nov"
+    },
+    "LIN-4239": {
+      "role": "place",
+      "group": "forward 4 Nov"
+    },
+    "LIN-4240": {
+      "role": "place",
+      "group": "forward 4 Nov"
+    },
+    "LIN-4079": {
+      "role": "outside-ledger",
+      "group": "pre-loop simple-dispatcher work, marked \"not in ledger\" (research \u00a7C1)"
+    },
+    "LIN-4181": {
+      "role": "outside-ledger",
+      "group": "pre-loop simple-dispatcher work, marked \"not in ledger\" (research \u00a7C1)"
+    },
+    "LIN-4182": {
+      "role": "outside-ledger",
+      "group": "pre-loop simple-dispatcher work, marked \"not in ledger\" (research \u00a7C1)"
+    },
+    "LIN-4183": {
+      "role": "outside-ledger",
+      "group": "pre-loop simple-dispatcher work, marked \"not in ledger\" (research \u00a7C1)"
+    },
+    "LIN-4185": {
+      "role": "outside-ledger",
+      "group": "pre-loop simple-dispatcher work, marked \"not in ledger\" (research \u00a7C1)"
+    },
+    "LIN-4186": {
+      "role": "outside-ledger",
+      "group": "pre-loop simple-dispatcher work, marked \"not in ledger\" (research \u00a7C1)"
+    },
+    "LIN-4196": {
+      "role": "outside-ledger",
+      "group": "pre-loop simple-dispatcher work, marked \"not in ledger\" (research \u00a7C1)"
+    },
+    "LIN-4197": {
+      "role": "outside-ledger",
+      "group": "pre-loop simple-dispatcher work, marked \"not in ledger\" (research \u00a7C1)"
+    },
+    "LIN-4199": {
+      "role": "outside-ledger",
+      "group": "pre-loop simple-dispatcher work, marked \"not in ledger\" (research \u00a7C1)"
+    },
+    "LIN-4200": {
+      "role": "outside-ledger",
+      "group": "pre-loop simple-dispatcher work, marked \"not in ledger\" (research \u00a7C1)"
+    },
+    "LIN-4253": {
+      "role": "place",
+      "group": "5 Nov tidy first"
+    },
+    "LIN-4252": {
+      "role": "place",
+      "group": "5 Nov tidy first"
+    },
+    "LIN-4251": {
+      "role": "place",
+      "group": "5 Nov follow-on"
+    },
+    "LIN-4246": {
+      "role": "place",
+      "group": "5 Nov follow-on"
+    },
+    "LIN-4247": {
+      "role": "place",
+      "group": "5 Nov control"
+    },
+    "LIN-4248": {
+      "role": "place",
+      "group": "5 Nov Survey stage templates"
+    },
+    "LIN-4263": {
+      "role": "place",
+      "group": "5 Nov parent of a tidy-after"
+    },
+    "LIN-4276": {
+      "role": "place",
+      "group": "5 Nov tidy-after"
+    },
+    "LIN-4277": {
+      "role": "place",
+      "group": "5 Nov tidy-after"
+    },
+    "LIN-4292": {
+      "role": "place",
+      "group": "5 Nov tidy-after"
+    },
+    "LIN-4293": {
+      "role": "place",
+      "group": "5 Nov tidy-after"
+    },
+    "LIN-4304": {
+      "role": "place",
+      "group": "5 Nov tidy-after"
+    },
+    "LIN-4296": {
+      "role": "place",
+      "group": "5 Nov finished move (single change)"
+    },
+    "LIN-4265": {
+      "role": "place",
+      "group": "LIN-4255 fake-DOM move piece"
+    },
+    "LIN-4266": {
+      "role": "place",
+      "group": "LIN-4255 fake-DOM move piece"
+    },
+    "LIN-4267": {
+      "role": "place",
+      "group": "LIN-4255 fake-DOM move piece"
+    },
+    "LIN-4268": {
+      "role": "place",
+      "group": "LIN-4255 fake-DOM move piece"
+    },
+    "LIN-4269": {
+      "role": "place",
+      "group": "LIN-4255 fake-DOM move piece"
+    },
+    "LIN-4270": {
+      "role": "place",
+      "group": "LIN-4255 fake-DOM move piece"
+    },
+    "LIN-4272": {
+      "role": "place",
+      "group": "LIN-4255 fake-DOM move piece"
+    },
+    "LIN-4279": {
+      "role": "place",
+      "group": "LIN-4255 fake-DOM move piece"
+    },
+    "LIN-4280": {
+      "role": "place",
+      "group": "LIN-4255 fake-DOM move piece"
+    },
+    "LIN-4281": {
+      "role": "place",
+      "group": "LIN-4255 fake-DOM move piece"
+    },
+    "LIN-4282": {
+      "role": "place",
+      "group": "LIN-4255 fake-DOM move piece"
+    },
+    "LIN-4283": {
+      "role": "place",
+      "group": "LIN-4255 fake-DOM move piece"
+    },
+    "LIN-4284": {
+      "role": "place",
+      "group": "LIN-4255 fake-DOM move piece"
+    },
+    "LIN-4285": {
+      "role": "place",
+      "group": "LIN-4255 fake-DOM move piece"
+    },
+    "LIN-4255": {
+      "role": "parent",
+      "group": "parent issue (its pieces are rows; cost excludes children)"
+    },
+    "LIN-4306": {
+      "role": "place",
+      "group": "LIN-4254 piece (in flight at the freeze)"
+    },
+    "LIN-4307": {
+      "role": "place",
+      "group": "LIN-4254 piece (in flight at the freeze)"
+    },
+    "LIN-4144": {
+      "role": "parent",
+      "group": "parent issue (its pieces are rows; cost excludes children)"
+    },
+    "LIN-4195": {
+      "role": "parent",
+      "group": "parent issue (its pieces are rows; cost excludes children)"
+    },
+    "LIN-4233": {
+      "role": "parent",
+      "group": "parent issue (its pieces are rows; cost excludes children)"
+    },
+    "LIN-4254": {
+      "role": "parent",
+      "group": "parent issue (its pieces are rows; cost excludes children)"
+    },
+    "LIN-4271": {
+      "role": "parent",
+      "group": "parent issue (its pieces are rows; cost excludes children)"
+    },
+    "LIN-4040": {
+      "role": "ui-context",
+      "group": "UI operator's four (3 Nov context rows)"
+    },
+    "LIN-4106": {
+      "role": "ui-context",
+      "group": "UI operator's four (3 Nov context rows)"
+    },
+    "LIN-4107": {
+      "role": "ui-context",
+      "group": "UI operator's four (3 Nov context rows)"
+    },
+    "LIN-4110": {
+      "role": "ui-context",
+      "group": "UI operator's four (3 Nov context rows)"
+    },
+    "LIN-4142": {
+      "role": "folded",
+      "group": "folded into a later merge's subject"
+    },
+    "LIN-4114": {
+      "role": "folded",
+      "group": "folded into a later merge's subject"
+    },
+    "LIN-4188": {
+      "role": "folded",
+      "group": "folded into a later merge's subject"
+    },
+    "LIN-4206": {
+      "role": "not-place",
+      "group": "Periodical report"
+    },
+    "LIN-4207": {
+      "role": "not-place",
+      "group": "Periodical report"
+    },
+    "LIN-4208": {
+      "role": "not-place",
+      "group": "Periodical report"
+    },
+    "LIN-4209": {
+      "role": "not-place",
+      "group": "Periodical report"
+    },
+    "LIN-4231": {
+      "role": "not-place",
+      "group": "Periodical report"
+    },
+    "LIN-4232": {
+      "role": "not-place",
+      "group": "Periodical report"
+    },
+    "LIN-4249": {
+      "role": "not-place",
+      "group": "Periodical report"
+    },
+    "LIN-4250": {
+      "role": "not-place",
+      "group": "Periodical report"
+    },
+    "LIN-4298": {
+      "role": "not-place",
+      "group": "Periodical report"
+    },
+    "LIN-4299": {
+      "role": "not-place",
+      "group": "Periodical report"
+    },
+    "LIN-4300": {
+      "role": "not-place",
+      "group": "Periodical report"
+    },
+    "LIN-4257": {
+      "role": "not-place",
+      "group": "paper / notebook / cost note"
+    },
+    "LIN-4264": {
+      "role": "not-place",
+      "group": "paper / notebook / cost note"
+    },
+    "LIN-4314": {
+      "role": "not-place",
+      "group": "paper / notebook / cost note"
+    },
+    "LIN-4150": {
+      "role": "context",
+      "group": "the blind-read ticket (frozen as context)"
+    },
+    "LIN-4297": {
+      "role": "context",
+      "group": "backlog residue (frozen as context)"
+    }
+  },
+  "merge_overrides": {
+    "15061f40": {
+      "role": "place",
+      "group": "LIN-4255 fake-DOM move close-out (a place row; LIN-4255 itself is its parent)"
+    }
+  },
+  "unsurveyed_by_ledger": [
+    "LIN-4212"
+  ],
+  "tidy_after_pairs": [
+    [
+      "LIN-4263",
+      "LIN-4276"
+    ],
+    [
+      "LIN-4251",
+      "LIN-4277"
+    ],
+    [
+      "LIN-4292",
+      "LIN-4304"
+    ]
+  ]
+}
