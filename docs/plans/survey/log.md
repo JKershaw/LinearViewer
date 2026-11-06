@@ -2430,3 +2430,10 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - 09:35: **John:** the operator's mistakes "are what I'd expect to happen when you're holding the reins … that's why we're moving those points you hold into Harbour, so agents at this altitude don't need to provide judgement." And **"let's not undersell that this actually works":** even if it's small, and even if per ticket it's "simply not making things worse", "it still means the trend is towards a better, simpler, easier to maintain codebase." His hypothesis: larger standalone tidies from the Periodicals may be what moves the needle. **Added to LIN-4315** as the balance (the direction stated as plainly as the limits), and the mistakes as an argument for structure.
 - 09:50: ruling `lin4315-blind-prompt`: the paper's main instrument, the blind-read prompt, wasn't in the repo, only in the operator's scratchpad. **Supplied** as a comment on LIN-4315, for its evidence folder: the template, the four first- and second-pass change lists, both blinding keys (`key.json` A–B, `key2.json` C–D, seed 1105) and the two per-merge forms. Proposed `supply`. It's one more judgement point that lived only in my hands. A blind-read stage in Harbour would carry its own text.
 - 10:00: LIN-4308 (piece 2, the `common.js` slices) merged (`3f4d4131`). The `dashboard-routes` badge test moved to a client suite via an extracted fixture, as scoped; `dashboard-routes` doesn't import `client-world`. The `lin4315-blind-prompt` ruling waits on John (suggested: supply).
+- 10:05: **LIN-4313 merged (`c491eca5`):** `POST /api/proxy/periodicals/{id}/mint`, with:
+  - prompt hashes pinned for every id and variant before the refactor;
+  - one `renderPeriodicalPrompt`;
+  - grant witnesses (owner declares a grant, non-owner refused, plain mint a leaf);
+  - an operator note of at most 500 characters on one line, placed before the template.
+
+  Not deployed yet (production is at `1d10f9b3`). Blind reads sent: AQ and AR. Once it's live, `periodical.sh` retires to a one-line call.
