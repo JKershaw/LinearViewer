@@ -54,7 +54,7 @@ const firstStopSplit = census.findIndex(m => m.stop_count !== 0 && m.stop_count 
 assert.equal(census[firstStopSplit].short, '591bb9596', 'stop marks first appear at LIN-4272');
 assert.ok(census.slice(0, firstStopSplit).every(m => m.stop_count === 0), 'no stop split before the marks exist');
 
-// ---------- figure 3: nine area readings, and four pairs, two cells each ----------
+// ---------- figure 5: nine area readings, and four pairs, two cells each ----------
 // Row names are plain descriptions of what each change did (LIN-4335). The ticket IDs live in the essay's
 // "Where to check" table, keyed here by the same subject strings the analysis uses. Every row must have a name.
 const AREA_NAMES = {
@@ -238,17 +238,17 @@ function copyAtEdgeFigure() {
   o.push(`<line x1="800" y1="96" x2="800" y2="104" stroke="${MUTED}" stroke-width="1.4" marker-end="url(#ar3)"/>`);
   o.push(`<line x1="800" y1="142" x2="800" y2="150" stroke="${MUTED}" stroke-width="1.4" marker-end="url(#ar3)"/>`);
   o.push(note(800, 205, 'copies gathered'));
-  o.push(`<text x="20" y="${H - 12}" font-size="11" fill="${MUTED}">A drawing by Claude, not data. Blue: the changed place. Dashed orange: a copy left behind. Dashed grey: a copy that now reads the changed place.</text>`);
+  o.push(`<text x="20" y="${H - 12}" font-size="11" fill="${MUTED}">A drawing, not data. Blue: the changed place. Dashed orange: a copy left behind. Dashed grey: a copy that now reads the changed place.</text>`);
   o.push('</svg>');
   return o.join('\n') + '\n';
 }
 
 // ---------- figure 4: adding an owner beside the copies, or finishing (a drawing, no data) ----------
 function ownerOrFinishingFigure() {
-  const W = 960, H = 250;
+  const W = 960, H = 300;
   const o = [svgOpen(W, H, 'Two panels. Left: a new owner added beside three old copies that stay, read mixed. Right: one owner with the copies deleted, read better. A drawing of the hypothesis from eleven cases, not data.')];
   const panel = (x, title) => {
-    o.push(`<rect x="${x}" y="20" width="450" height="200" rx="8" fill="#fbfbfc" stroke="${RULE}" stroke-width="1.2"/>`);
+    o.push(`<rect x="${x}" y="20" width="450" height="250" rx="8" fill="#fbfbfc" stroke="${RULE}" stroke-width="1.2"/>`);
     o.push(`<text x="${x + 16}" y="44" font-size="13" font-weight="600" fill="${INK}">${esc(title)}</text>`);
   };
   const box = (x, y, w, text, fill, stroke, dash) =>
@@ -257,19 +257,23 @@ function ownerOrFinishingFigure() {
   const pill = (x, y, text, fill) =>
     `<rect x="${x}" y="${y}" width="120" height="28" rx="14" fill="${fill}"/>` +
     `<text x="${x + 60}" y="${y + 19}" font-size="12" fill="#fff" text-anchor="middle" font-family="${MONO}">${esc(text)}</text>`;
+  // Layout guard: the lowest box's top and the caption's y, kept as constants so the assert below can check them.
+  const LOWEST_BOX_Y = 170, BOX_H = 40, CAPTION_Y = 234;
+  assert.ok(CAPTION_Y > LOWEST_BOX_Y + BOX_H, 'figure 4: caption sits below the lowest box');
   panel(20, 'Adding an owner beside the copies');
   o.push(box(44, 78, 190, 'new owner', '#eef4fd', BLUE, false));
   o.push(box(264, 78, 180, 'old copy', '#f3f4f6', GREY, false));
   o.push(box(264, 124, 180, 'old copy', '#f3f4f6', GREY, false));
-  o.push(box(264, 170, 180, 'old copy', '#f3f4f6', GREY, false));
+  o.push(box(264, LOWEST_BOX_Y, 180, 'old copy', '#f3f4f6', GREY, false));
   o.push(pill(44, 150, 'mixed', GREY));
-  o.push(`<text x="44" y="206" font-size="11" fill="${MUTED}">The new owner sits beside the copies it leaves running.</text>`);
+  // caption sits below the lowest box (the third old copy spans y 170 to 210)
+  o.push(`<text x="44" y="${CAPTION_Y}" font-size="11" fill="${MUTED}">The new owner sits beside the copies it leaves running.</text>`);
   panel(490, 'Finishing: the copies deleted');
   o.push(box(514, 78, 190, 'one owner', '#eef4fd', BLUE, false));
   o.push(`<text x="514" y="146" font-size="11" fill="${MUTED}">The copies are gone; nothing is left</text>`);
   o.push(`<text x="514" y="162" font-size="11" fill="${MUTED}">beside the owner to disagree with it.</text>`);
   o.push(pill(514, 180, 'better', BLUE));
-  o.push(`<text x="20" y="${H - 12}" font-size="11" fill="${MUTED}">A drawing by Claude, not data: the hypothesis from eleven cases, read by one prompt that asks whether a change added a copy and what it deleted.</text>`);
+  o.push(`<text x="20" y="${H - 12}" font-size="11" fill="${MUTED}">A drawing, not data: the hypothesis from eleven cases.</text>`);
   o.push('</svg>');
   return o.join('\n') + '\n';
 }

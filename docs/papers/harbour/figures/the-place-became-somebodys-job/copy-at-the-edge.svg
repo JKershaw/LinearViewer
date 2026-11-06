@@ -20,5 +20,5 @@
 <line x1="800" y1="96" x2="800" y2="104" stroke="#6b7280" stroke-width="1.4" marker-end="url(#ar3)"/>
 <line x1="800" y1="142" x2="800" y2="150" stroke="#6b7280" stroke-width="1.4" marker-end="url(#ar3)"/>
 <text data-on-fill="1" x="800" y="205" font-size="11" fill="#6b7280" text-anchor="middle">copies gathered</text>
-<text x="20" y="248" font-size="11" fill="#6b7280">A drawing by Claude, not data. Blue: the changed place. Dashed orange: a copy left behind. Dashed grey: a copy that now reads the changed place.</text>
+<text x="20" y="248" font-size="11" fill="#6b7280">A drawing, not data. Blue: the changed place. Dashed orange: a copy left behind. Dashed grey: a copy that now reads the changed place.</text>
 </svg>
