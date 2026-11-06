@@ -2397,3 +2397,16 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 
   The paper comes first, and the essay draws on it and cites it.
 - 08:15: **LIN-4314** (notebook sync to main, pinned to branch `24ac197f`, notebook paths only, no merge or cherry-pick) and **LIN-4315** (the technical paper) filed and Surveyed. The paper is blocked on the sync, so its citations land at main. It freezes at that commit; log entries after it aren't cited. The essay follows the paper. LIN-4254 goes in as "in flight" if it hasn't closed by the freeze.
+
+### 08:40 UTC: LIN-4314 and LIN-4313 scoped and started
+- **LIN-4314's Surveys found the copy would revert LIN-4248.** The branch never took main's "Live text moved" pointers in `prompt.md` and `global-offshoot-prompt-v2-code.md`. The notebook drifted both ways. **Fixed at the cause, on this branch** (`98670be3`): main's two pointer paragraphs, plus the branch's tidy-after q7. Main's `lin-4248-survey-stages` test passes 13/13 against them. Re-pinned to `98670be3`, and the diff to main is now additions only. Started (`22106156`). A longer-term choice for the integration design: a notebook mirrored from a branch drifts, so either edit it on main, or cite the branch at a pin and stop mirroring.
+- **LIN-4313's Surveys: the grant is the real work.** The proxy lane is undeclared ("open question 1"), so a "+ Autopilot" mint through it would be a leaf whose kickoff fails. Scoped:
+  - grant first, as a failing test: owner allowed with a declared grant modelled on `LANES.kickoff`, non-owner refused, answering open question 1 for this route only. **Flagged for John: an owner's proxy token can start an orchestrator, the same authority kickoff already gives. John may veto, and then it's the plain mint only;**
+  - one shared `renderPeriodicalPrompt`;
+  - parity before the proxy block, without a note;
+  - the note before the template (the tail check untouched), capped;
+  - the fifth entrance's lists updated;
+  - the catalog points at `GET /periodicals` rather than listing ids;
+  - no invented size ceiling.
+
+  Started (`3cf6cd76`).
