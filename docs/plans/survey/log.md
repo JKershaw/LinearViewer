@@ -2377,3 +2377,7 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 
 ### 00:05 UTC, 6 Nov: held on two rulings
 - LIN-4307 (piece 1) has been blocked since 22:05 on two `resume` rulings. My `fix-suite-stub-order` is on `lin4307-window-global`; its own review's `fix-here` is on `lin4307-loader-scope` (do loader fix #1 here, move `laneNode` to LIN-4310, swap `lin-3254`'s hand-drawn card for `renderSessionPage` markup), and I agree with it. The chain waits for John. The watcher reached its two-hour limit and wasn't restarted. The notes' in-flight list is refreshed.
+- 00:10: after-questions sent:
+  - LIN-4292 (`17204c9a` → `7cc9f827`): q1–q6, plus a new q7 for a scope drawn **narrower** than the idiom ("where should the line have been drawn?");
+  - LIN-4296 (`c964ff42` → `3cbc85f7`): q1–q6;
+  - LIN-4304 (`ca1f6297` → `9ac8a3f5`): q1–q6 plus the tidy-after q7.
