@@ -2517,3 +2517,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - applied to the detail read, `fetchIssueComments` and `RELATIONS_QUERY`;
   - a top-level `truncated` flag that survives `flattenIssue`;
   - explicit order; docs in one place.
+- 13:00: LIN-4311 (piece 5, the task-page suites) merged (`90542b2c`). Only LIN-4312 is left (`close-out-client`, plus `close-out.js`'s production seams and their allow-list entries).
