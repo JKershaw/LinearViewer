@@ -257,14 +257,17 @@ function ownerOrFinishingFigure() {
   const pill = (x, y, text, fill) =>
     `<rect x="${x}" y="${y}" width="120" height="28" rx="14" fill="${fill}"/>` +
     `<text x="${x + 60}" y="${y + 19}" font-size="12" fill="#fff" text-anchor="middle" font-family="${MONO}">${esc(text)}</text>`;
+  // Layout guard: the lowest box's top and the caption's y, kept as constants so the assert below can check them.
+  const LOWEST_BOX_Y = 170, BOX_H = 40, CAPTION_Y = 234;
+  assert.ok(CAPTION_Y > LOWEST_BOX_Y + BOX_H, 'figure 4: caption sits below the lowest box');
   panel(20, 'Adding an owner beside the copies');
   o.push(box(44, 78, 190, 'new owner', '#eef4fd', BLUE, false));
   o.push(box(264, 78, 180, 'old copy', '#f3f4f6', GREY, false));
   o.push(box(264, 124, 180, 'old copy', '#f3f4f6', GREY, false));
-  o.push(box(264, 170, 180, 'old copy', '#f3f4f6', GREY, false));
+  o.push(box(264, LOWEST_BOX_Y, 180, 'old copy', '#f3f4f6', GREY, false));
   o.push(pill(44, 150, 'mixed', GREY));
   // caption sits below the lowest box (the third old copy spans y 170 to 210)
-  o.push(`<text x="44" y="234" font-size="11" fill="${MUTED}">The new owner sits beside the copies it leaves running.</text>`);
+  o.push(`<text x="44" y="${CAPTION_Y}" font-size="11" fill="${MUTED}">The new owner sits beside the copies it leaves running.</text>`);
   panel(490, 'Finishing: the copies deleted');
   o.push(box(514, 78, 190, 'one owner', '#eef4fd', BLUE, false));
   o.push(`<text x="514" y="146" font-size="11" fill="${MUTED}">The copies are gone; nothing is left</text>`);
