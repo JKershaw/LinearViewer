@@ -55,7 +55,6 @@ const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/unit/common-team-filter-nav.test.js', // stop: getBoundingClientRect in initNavBar, public/common.js:2907 (LIN-4271 stop rule)
   'tests/unit/flight-companion-client.test.js', // stop: style write and layout read-back, public/flight-companion.js:653-665 (LIN-4271)
   'tests/unit/lin-2122-history-outcome-pill.test.js',
-  'tests/unit/lin-2370-browser-copy-prompt-provider-identity.test.js',
   'tests/unit/lin-3975-proposal-refresh.test.js',
   'tests/unit/lin-4114-dismiss-order.test.js', // stop: real bubbling dispatchEvent, public/question-cards.js:239-241; the fake dispatchEvent is inert
   'tests/unit/lin-4114-inflight-lock.test.js', // stop: real bubbling dispatchEvent, public/question-cards.js:239-241; the fake dispatchEvent is inert
