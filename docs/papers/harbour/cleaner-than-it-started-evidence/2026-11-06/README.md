@@ -1,8 +1,8 @@
 # Evidence for "Can a task finish with the codebase cleaner than it started?" (LIN-4315)
 
 Frozen 2026-11-06 (the freeze finished at `manifest.json` → `freeze_finished_at`). Every number in
-`cleaner-than-it-started.md` is a key in `analysis.json`, with its n. The analysis reads this folder
-alone: no network call, no git call.
+`cleaner-than-it-started.md` is a key in `analysis.json`, with its n, or is arithmetic on keys the
+paper shows in its text (58 and 65%). The analysis reads this folder alone: no network call, no git call.
 
 Grounded at LinearViewer `1d10f9b3` (main, after the notebook sync LIN-4314) and simple-dispatcher
 `07c88f7` (main). Rows are first-parent merges from 4 Nov 00:00 UTC to those pins, plus the 3 Nov
@@ -18,7 +18,9 @@ pieces 0 and 1 are merged (LIN-4306, LIN-4307), pieces 2 to 6 are not.
   A to D (the 42 "Blind place scoring" passes) are inside them.
 - `issue/`, `cost/` (`?perDispatch=true`), `dispatch/`: raw workspace-API answers for every ticket
   named in a population merge subject, plus the parents.
-- `prompts/`: the 73 custom (after-answer) prompts dispatched since 4 Nov, raw.
+- `prompts/`: the 73 custom (after-answer) prompts dispatched since 4 Nov, raw; and
+  `prompts/blind-read-prompt.md`, the blind-read template, copied verbatim from the operator's answer
+  on LIN-4315 (comment `c3ebba48`, 6 Nov 08:59 UTC). Its `read_at` is in `manifest.json`.
 - `git/merges-LinearViewer.tsv`, `git/merges-simple-dispatcher.tsv`, `git/merges-LinearViewer-2026-11-02-03.tsv`:
   the first-parent merge lists at the pins.
 - `git/place-ledger.at-pin.snapshot`: the place ledger at `1d10f9b3`, read in place.
@@ -59,8 +61,6 @@ the folder it used.
 
 ## What the folder cannot show
 
-- The blind-read prompt is not in the repository and not reachable through the API. The paper says
-  so; `blind-codes.json` records only what each pass wrote.
 - The proxy's comment cap is 50. LIN-4150's Surveys from 2 to 4 Nov are beyond it and are not in this
   folder. For the 4 Nov forward rows, the Surveys the ledger calls "surveyed" are visible only in the
   notebook's log narration, not on the tickets or on LIN-4150.

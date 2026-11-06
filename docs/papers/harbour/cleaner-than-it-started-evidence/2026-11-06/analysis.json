@@ -1,6 +1,6 @@
 {
   "inputs_sha256": {
-    "manifest.json": "f06b0a970ff2cd0316b8768d436eb70f91ea50971e61e75647a8b4ae43a93e56",
+    "manifest.json": "0957a0c01ca36db44e4f88a3316e726c22bff278b7352c9376cc6ed45a799cb0",
     "roles.json": "e4106d760d9a8f7c785405f938af17bc3819d155b62c961c9aefac9c49517f65",
     "blind-codes.json": "8dd41fb94dffb49812e0d115786f1bd5cdacbcca93cc8e768710cffc4056f759",
     "git/census-by-merge.json": "b15d2eecf7acd80cfe14db244ba87f52666e0f0e0b0a3db34b44234e4e8ddb11",

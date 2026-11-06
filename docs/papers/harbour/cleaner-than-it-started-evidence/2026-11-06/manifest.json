@@ -2740,6 +2740,14 @@
       "sha256": "b15d2eecf7acd80cfe14db244ba87f52666e0f0e0b0a3db34b44234e4e8ddb11",
       "read_at": "2026-11-06T09:12:39.915Z",
       "http_status": "git"
+    },
+    {
+      "path": "prompts/blind-read-prompt.md",
+      "bytes": 6992,
+      "sha256": "267de48038b0fb49422edd7dac132348c7a788dd9541f051c96a24f56088f456",
+      "read_at": "2026-11-06T09:47:51.378Z",
+      "http_status": 200,
+      "source": "GET /api/proxy/issues/LIN-4315, comment c3ebba48-44cd-4e2d-abfa-7cbcfe382514 (the operator's answer to lin4315-blind-prompt), verbatim"
     }
   ]
 }
