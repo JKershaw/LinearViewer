@@ -2664,3 +2664,18 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - some jargon is left ("place tickets", "dispatch grant", "session lane");
   - the worked example is still terse.
 - Clearly better than version 1. Whether to polish once more is John's call.
+- **John: a rewrite, in one coherent voice, hitting all the parts we value.** Version 2 was patched in layers mid-draft (five additions), and the seams show. **LIN-4338 filed (version 3 by the Library's numbering), with one complete brief up front:**
+  - the scene, uncrowded;
+  - the forcefield as spine, introduced early, carried through the middle and closed on (holding → shaping);
+  - attribution marked once, not repeatedly;
+  - narrative, not IDs;
+  - one vivid worked example;
+  - five diagrams, including the owner-vs-finishing layout fix, all rendered and looked at;
+  - how we knew, as a story;
+  - finishing, not adding (Hanoi, the ratchet);
+  - the person's seat; three habits; cost briefly;
+  - every limit in one section (version 2's hedge ledger as the contract);
+  - close on the trig point as the aim;
+  - numbers only from paper v2, no claim wider, plain words, no longer than version 2.
+
+  Surveyed. **Lesson for me: write the whole brief before the builder starts.** Mid-flight additions produced patchwork.
