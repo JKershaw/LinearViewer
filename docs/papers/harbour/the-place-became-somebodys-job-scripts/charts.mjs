@@ -1,4 +1,6 @@
-// Generates the three figures for docs/papers/harbour/the-place-became-somebodys-job.md.
+// Generates the five figures for docs/papers/harbour/the-place-became-somebodys-job.md.
+//   figure 1 census (data), figure 2 loop (drawing), figure 3 copy at the edge (drawing),
+//   figure 4 owner or finishing (drawing), figure 5 area readings and pairs (data).
 //   node docs/papers/harbour/the-place-became-somebodys-job-scripts/charts.mjs docs/papers/harbour/figures/the-place-became-somebodys-job && npm run figures:theme
 //
 // Data is read IN PLACE from the paper's version 2 evidence folder (cleaner-than-it-started-evidence/2026-11-06-v2/),
@@ -6,6 +8,7 @@
 //   analysis.json           single_and_area_reads (9 area readings over 15 tickets; 16 singles), pair_baseline.readings (4 pairs)
 //   git/census-by-merge.json  the census count at each LinearViewer first-parent merge (git show at each merge)
 // The loop figure (figure 2) is a drawing of docs/plans/survey/notes-2026-11-05.md@1c894016:132-152 and carries no numbers.
+// Figures 3 and 4 are Claude's drawings of the copy at the edge and of owner-versus-finishing: no data, no numbers.
 // Every value plotted is asserted below; a changed input fails the script instead of drawing a different claim.
 import { readFileSync, writeFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
@@ -58,7 +61,7 @@ const AREA_NAMES = {
   'LIN-4247+LIN-4246+LIN-4293': 'run-end and repaint, then tidy',
   'LIN-4251+LIN-4277': 'preamble PR wording, then its tidy',
   'LIN-4252+LIN-4255': 'test stand-in + its follow-on',
-  'LIN-4254': '16 stubs moved onto shared fake',
+  'LIN-4254': 'the census move',
   'LIN-4255': 'hand-written fakes onto shared fake',
   'LIN-4263+LIN-4276': 'cost read + tidy-after',
   'LIN-4292+LIN-4304': 'guards removed + one spelling',
@@ -202,8 +205,79 @@ function loopFigure() {
   return o.join('\n') + '\n';
 }
 
+// ---------- figure 3: the copy at the edge (a drawing, no data) ----------
+function copyAtEdgeFigure() {
+  const W = 960, H = 260;
+  const o = [svgOpen(W, H, 'Three panels. One decision written in three boxes; then one box changed while two still hold the old rule, marked left behind; then the changed box kept and the two others reading from it, marked gathered by the tidy-after. A drawing, not data.')];
+  o.push(`<defs><marker id="ar3" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="${MUTED}"/></marker></defs>`);
+  const panels = [
+    { x: 20, title: '1. One decision, three places' },
+    { x: 340, title: '2. A change fixes one place' },
+    { x: 660, title: '3. The tidy-after gathers them' },
+  ];
+  for (const pn of panels) {
+    o.push(`<rect x="${pn.x}" y="20" width="280" height="200" rx="8" fill="#fbfbfc" stroke="${RULE}" stroke-width="1.2"/>`);
+    o.push(`<text x="${pn.x + 14}" y="44" font-size="13" font-weight="600" fill="${INK}">${esc(pn.title)}</text>`);
+  }
+  const box = (x, y, text, fill, stroke, dash) =>
+    `<rect x="${x}" y="${y}" width="232" height="34" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="1.4"${dash ? ' stroke-dasharray="5 4"' : ''}/>` +
+    `<text x="${x + 116}" y="${y + 22}" font-size="12" fill="${INK}" text-anchor="middle">${esc(text)}</text>`;
+  const note = (x, y, text) => `<text x="${x}" y="${y}" font-size="11" fill="${MUTED}" text-anchor="middle">${esc(text)}</text>`;
+  // panel 1: three identical copies
+  for (let i = 0; i < 3; i++) o.push(box(44, 60 + i * 46, 'the rule, as written here', '#f3f4f6', GREY, false));
+  o.push(note(160, 205, 'same decision, three spots'));
+  // panel 2: one changed, two left behind
+  o.push(box(364, 60, 'the rule, changed', '#eef4fd', BLUE, false));
+  o.push(box(364, 106, 'the rule, old', '#f3f4f6', ORANGE, true));
+  o.push(box(364, 152, 'the rule, old', '#f3f4f6', ORANGE, true));
+  o.push(note(480, 205, 'two copies left at the edge'));
+  // panel 3: changed kept, two now read from it
+  o.push(box(684, 60, 'the rule, changed', '#eef4fd', BLUE, false));
+  o.push(box(684, 106, 'reads the rule above', '#ffffff', GREY, true));
+  o.push(box(684, 152, 'reads the rule above', '#ffffff', GREY, true));
+  o.push(`<line x1="800" y1="96" x2="800" y2="104" stroke="${MUTED}" stroke-width="1.4" marker-end="url(#ar3)"/>`);
+  o.push(`<line x1="800" y1="142" x2="800" y2="150" stroke="${MUTED}" stroke-width="1.4" marker-end="url(#ar3)"/>`);
+  o.push(note(800, 205, 'copies gathered'));
+  o.push(`<text x="20" y="${H - 12}" font-size="11" fill="${MUTED}">A drawing by Claude, not data. Blue: the changed place. Dashed orange: a copy left behind. Dashed grey: a copy that now reads the changed place.</text>`);
+  o.push('</svg>');
+  return o.join('\n') + '\n';
+}
+
+// ---------- figure 4: adding an owner beside the copies, or finishing (a drawing, no data) ----------
+function ownerOrFinishingFigure() {
+  const W = 960, H = 250;
+  const o = [svgOpen(W, H, 'Two panels. Left: a new owner added beside three old copies that stay, read mixed. Right: one owner with the copies deleted, read better. A drawing of the hypothesis from eleven cases, not data.')];
+  const panel = (x, title) => {
+    o.push(`<rect x="${x}" y="20" width="450" height="200" rx="8" fill="#fbfbfc" stroke="${RULE}" stroke-width="1.2"/>`);
+    o.push(`<text x="${x + 16}" y="44" font-size="13" font-weight="600" fill="${INK}">${esc(title)}</text>`);
+  };
+  const box = (x, y, w, text, fill, stroke, dash) =>
+    `<rect x="${x}" y="${y}" width="${w}" height="40" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="1.4"${dash ? ' stroke-dasharray="5 4"' : ''}/>` +
+    `<text x="${x + w / 2}" y="${y + 24}" font-size="12" fill="${INK}" text-anchor="middle">${esc(text)}</text>`;
+  const pill = (x, y, text, fill) =>
+    `<rect x="${x}" y="${y}" width="120" height="28" rx="14" fill="${fill}"/>` +
+    `<text x="${x + 60}" y="${y + 19}" font-size="12" fill="#fff" text-anchor="middle" font-family="${MONO}">${esc(text)}</text>`;
+  panel(20, 'Adding an owner beside the copies');
+  o.push(box(44, 78, 190, 'new owner', '#eef4fd', BLUE, false));
+  o.push(box(264, 78, 180, 'old copy', '#f3f4f6', GREY, false));
+  o.push(box(264, 124, 180, 'old copy', '#f3f4f6', GREY, false));
+  o.push(box(264, 170, 180, 'old copy', '#f3f4f6', GREY, false));
+  o.push(pill(44, 150, 'mixed', GREY));
+  o.push(`<text x="44" y="206" font-size="11" fill="${MUTED}">The new owner sits beside the copies it leaves running.</text>`);
+  panel(490, 'Finishing: the copies deleted');
+  o.push(box(514, 78, 190, 'one owner', '#eef4fd', BLUE, false));
+  o.push(`<text x="514" y="146" font-size="11" fill="${MUTED}">The copies are gone; nothing is left</text>`);
+  o.push(`<text x="514" y="162" font-size="11" fill="${MUTED}">beside the owner to disagree with it.</text>`);
+  o.push(pill(514, 180, 'better', BLUE));
+  o.push(`<text x="20" y="${H - 12}" font-size="11" fill="${MUTED}">A drawing by Claude, not data: the hypothesis from eleven cases, read by one prompt that asks whether a change added a copy and what it deleted.</text>`);
+  o.push('</svg>');
+  return o.join('\n') + '\n';
+}
+
 const outFiles = {
   'loop-before-during-after.svg': loopFigure(),
+  'copy-at-the-edge.svg': copyAtEdgeFigure(),
+  'owner-or-finishing.svg': ownerOrFinishingFigure(),
   'area-readings-and-pairs.svg': areaAndPairFigure(),
   'census-by-merge.svg': censusFigure(),
 };
