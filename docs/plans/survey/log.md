@@ -2599,3 +2599,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - the facts at their true scope;
   - git and comment times, not the notebook's clock headings.
 - LIN-4332 merged (`1c894016`); the notebook on main matches `ad935b8d` exactly (empty diff). **LIN-4331 (paper v2) scoped and started.** The essay (LIN-4330) follows it.
+- **LIN-4333 (`509f797e`), v2's first piece:** one script set for both paper versions. Every v1-specific value has moved to `inputs-v1.json`, with a strict title parser and freeze hardening. **v1 reproduces byte for byte** (`cmp` on `blind-codes.json`, `analysis.json`, `evidence-table.tsv` and `census-by-merge.json`), and the v1 evidence folder is unchanged. That's "one set of scripts, proved by v1" as scoped.
