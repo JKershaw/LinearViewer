@@ -31,9 +31,11 @@ const PUBLIC_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../../publi
  * its target and defaults to `element`. The fake does not bubble, so a listener on an ancestor is given a click on a
  * descendant by naming both: `clickOn(run, proposal)` (LIN-4307). There is no bubbling, and `dispatchEvent` stays inert,
  * so this is the one way a test clicks in the world. Piece 5 uses it in place of `element.click()` (LIN-4279).
+ * The event carries the no-op `preventDefault` and `stopPropagation` a browser's does, as `clickDelegated`'s does: the
+ * answer, option and dismiss handlers of the question card call `preventDefault` (LIN-4309).
  */
 export async function clickOn(element, target = element) {
-  const event = { type: 'click', target };
+  const event = { type: 'click', target, preventDefault() {}, stopPropagation() {} };
   for (const fn of element.listenersOf('click')) await fn(event);
   return event;
 }
