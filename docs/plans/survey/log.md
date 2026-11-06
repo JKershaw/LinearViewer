@@ -2614,3 +2614,15 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - post-window facts stated as facts, not Periodical verdicts;
   - figures scripted in `<slug>-scripts/`, reading v2's folder in place;
   - citations at `path@sha:line`.
+
+### The essay merged (LIN-4330, `b76d5239`, `docs/papers/harbour/the-place-became-somebodys-job.md`)
+- **The arc:**
+  1. the place had no one;
+  2. the loop in one picture;
+  3. what the code looks like now (the census 56 → 6, the guards, one grant rule, the silent cap);
+  4. how the first measure was overturned;
+  5. finishing, not adding;
+  6. the person's seat and the turn;
+  7. three habits; cost; limits.
+- **Three generated figures,** rendered and checked: the loop; the census merge by merge (42 merges, 56 → 6, with the stops appearing); and nine finished areas against four ordinary pairs. Every number comes from paper v2. The census is named as its own definition beside Drift's crude grep. Post-window facts are stated as facts. Two fresh readers.
+- **My read:** accurate and well sourced, and the figures carry the story. **But the register is still cautious.** Limits are threaded through nearly every paragraph, the opening ends on "partly circular", and the prequel's images (the hand that stays, the trig point) are set up but not paid off at the close, which ends on the limits and the reading list. A v1.1 could keep every limit but gather them in one place: open on a concrete scene, and close on the direction. That's John's call.
