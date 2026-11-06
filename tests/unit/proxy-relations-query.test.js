@@ -37,6 +37,16 @@ const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8
 const readsSource = readFileSync(join(__dirname, '../../routes/proxy-reads.js'), 'utf8');
 const providerSource = readFileSync(join(__dirname, '../../lib/providers/linear/index.js'), 'utf8');
 
+// LIN-4322: the provider builds each nested list's selection from a single-quoted
+// const (RELATION_FIELDS, COMMENT_FIELDS, ...). Expand those so the shape checks
+// below see the fields the query actually sends, not the placeholder.
+function expandSelections(text, source) {
+  return text.replace(/\$\{(\w+)\}/g, (whole, name) => {
+    const m = source.match(new RegExp(`const ${name} = '([^']*)'`));
+    return m ? m[1] : whole;
+  });
+}
+
 // Pull a named gql`...` template literal out of a source by its const name.
 function extractQuery(name, source = proxySource) {
   const start = source.indexOf(`const ${name} = gql\``);
@@ -44,7 +54,8 @@ function extractQuery(name, source = proxySource) {
   const open = source.indexOf('`', start);
   const close = source.indexOf('`', open + 1);
   assert.ok(close !== -1, `Could not find end of ${name} template literal`);
-  return source.slice(open + 1, close);
+  const raw = source.slice(open + 1, close);
+  return source === providerSource ? expandSelections(raw, source) : raw;
 }
 
 describe('proxy relationship queries', () => {
@@ -56,8 +67,8 @@ describe('proxy relationship queries', () => {
 
   test('RELATIONS_QUERY fetches both directions', () => {
     const q = extractQuery('RELATIONS_QUERY', providerSource);
-    assert.match(q, /relations\s*\{/, 'must fetch outgoing relations');
-    assert.match(q, /inverseRelations\s*\{/, 'must fetch inverseRelations');
+    assert.match(q, /relations(?:\([^)]*\))?\s*\{/, 'must fetch outgoing relations');
+    assert.match(q, /inverseRelations(?:\([^)]*\))?\s*\{/, 'must fetch inverseRelations');
   });
 
   test('RELATIONS_QUERY selects relation id (needed for delete)', () => {
@@ -66,8 +77,8 @@ describe('proxy relationship queries', () => {
     // assertion to the node fields BEFORE the nested relatedIssue/issue blocks,
     // so a nested `id` (relatedIssue { id }) can't satisfy it by accident.
     const q = extractQuery('RELATIONS_QUERY', providerSource);
-    const relBlock = q.match(/relations\s*\{\s*nodes\s*\{([^}]*relatedIssue)/s);
-    const invBlock = q.match(/inverseRelations\s*\{\s*nodes\s*\{([^}]*issue)/s);
+    const relBlock = q.match(/relations(?:\([^)]*\))?\s*\{\s*nodes\s*\{([^}]*relatedIssue)/s);
+    const invBlock = q.match(/inverseRelations(?:\([^)]*\))?\s*\{\s*nodes\s*\{([^}]*issue)/s);
     assert.ok(relBlock, 'outgoing relations node block not found');
     assert.ok(invBlock, 'inverseRelations node block not found');
     assert.match(relBlock[1], /\bid\b/, 'outgoing relation node must select id');
@@ -76,16 +87,16 @@ describe('proxy relationship queries', () => {
 
   test('API_ISSUE_DETAIL_QUERY includes inverseRelations (blocked-by)', () => {
     const q = extractQuery('API_ISSUE_DETAIL_QUERY', providerSource);
-    assert.match(q, /relations\s*\{/, 'must fetch outgoing relations');
-    assert.match(q, /inverseRelations\s*\{/, 'must fetch inverseRelations so agents can see blockers');
+    assert.match(q, /relations(?:\([^)]*\))?\s*\{/, 'must fetch outgoing relations');
+    assert.match(q, /inverseRelations(?:\([^)]*\))?\s*\{/, 'must fetch inverseRelations so agents can see blockers');
   });
 
   test('API_ISSUE_DETAIL_QUERY selects relation id on relation nodes', () => {
     const q = extractQuery('API_ISSUE_DETAIL_QUERY', providerSource);
     // Isolate the two relation node blocks (relatedIssue = outgoing,
     // issue-keyed = inverse) and confirm both carry id.
-    const relBlock = q.match(/relations\s*\{\s*nodes\s*\{([^}]*relatedIssue)/s);
-    const invBlock = q.match(/inverseRelations\s*\{\s*nodes\s*\{([^}]*issue)/s);
+    const relBlock = q.match(/relations(?:\([^)]*\))?\s*\{\s*nodes\s*\{([^}]*relatedIssue)/s);
+    const invBlock = q.match(/inverseRelations(?:\([^)]*\))?\s*\{\s*nodes\s*\{([^}]*issue)/s);
     assert.ok(relBlock, 'outgoing relations node block not found');
     assert.ok(invBlock, 'inverseRelations node block not found');
     assert.match(relBlock[1], /\bid\b/, 'outgoing relation node must select id');

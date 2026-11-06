@@ -328,6 +328,8 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
       res.json({
         trashed: isTrashed(issueRelations),
         ...flattenRelations(issueRelations),
+        // LIN-4322: a list cut short is named here, beside `trashed`; absent when none was cut.
+        ...(issueRelations.truncated ? { truncated: issueRelations.truncated } : {}),
       });
     },
   ));
