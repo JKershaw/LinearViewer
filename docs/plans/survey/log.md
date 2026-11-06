@@ -2598,3 +2598,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - the census as its own definition (a crude grep rose 46 → 51);
   - the facts at their true scope;
   - git and comment times, not the notebook's clock headings.
+- LIN-4332 merged (`1c894016`); the notebook on main matches `ad935b8d` exactly (empty diff). **LIN-4331 (paper v2) scoped and started.** The essay (LIN-4330) follows it.
