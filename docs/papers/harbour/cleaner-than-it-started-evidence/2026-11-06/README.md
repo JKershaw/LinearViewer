@@ -2,7 +2,7 @@
 
 Frozen 2026-11-06 (the freeze finished at `manifest.json` → `freeze_finished_at`). Every number in
 `cleaner-than-it-started.md` is a key in `analysis.json`, with its n, or is arithmetic on keys the
-paper shows in its text (58 and 65%). The analysis reads this folder alone: no network call, no git call.
+paper shows in its text (53 and 65%). The analysis reads this folder alone: no network call, no git call.
 
 Grounded at LinearViewer `1d10f9b3` (main, after the notebook sync LIN-4314) and simple-dispatcher
 `07c88f7` (main). Rows are first-parent merges from 4 Nov 00:00 UTC to those pins, plus the 3 Nov
