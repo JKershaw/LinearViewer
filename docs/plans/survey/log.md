@@ -2679,3 +2679,16 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - numbers only from paper v2, no claim wider, plain words, no longer than version 2.
 
   Surveyed. **Lesson for me: write the whole brief before the builder starts.** Mid-flight additions produced patchwork.
+
+- **LIN-4338 scoped and kicked off** (autopilot `2a0254a6`, dispatched 21:49 UTC). Both Surveys read. The scope:
+  - a one-page plan on the ticket before any prose: the hedge ledger rows, word budgets totalling no more than version 2, the opening within 240 characters, the figure plan;
+  - rulings made in the scope, not left to the builder:
+    - keep a short limits section despite the essay standard, with a one-line ask to the Library;
+    - the `rankOf` case in Finding 7's wording;
+    - no attribution for "Towers of Hanoi";
+    - Next points at the existing proposal;
+  - one attribution marker, with the wording carrying the line between what happened and what it means;
+  - Figure 4 gets a taller canvas, and the `charts.mjs` comments are fixed; all five figures are rendered and looked at;
+  - the accuracy reader gets the plan's rulings.
+
+  Nothing will be added mid-draft.
