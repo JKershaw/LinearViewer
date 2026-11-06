@@ -7,86 +7,57 @@
  * helper and carries the issue's source kind (`?source=<kind>`). These are the
  * one-assertion-per-surface checks the plan calls for; the server-rendered
  * surfaces are covered in render.test.js / render-session.test.js.
+ *
+ * Every surface runs in a client world (tests/unit/helpers/client-world.js over the one fake DOM, LIN-4310): the
+ * swipe card is the server's own markup (helpers/swipe-page.js), and the Live Console lane is the client's own builder.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import vm from 'node:vm';
 import { withHarnessModels } from '../fixtures/harness-models.js';
+import { loadWorld } from './helpers/client-world.js';
+import { loadLiveConsole, makeLaneNode } from './helpers/live-console-world.js';
+import { swipePageBody } from './helpers/swipe-page.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 const COMMON_SRC = read('public/common.js');
 
-function makeEl() {
-  return {
-    innerHTML: '',
-    textContent: '',
-    hidden: false,
-    className: '',
-    dataset: {},
-    style: {},
-    _attrs: {},
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    setAttribute(k, v) { this._attrs[k] = v; },
-    getAttribute(k) { return this._attrs[k] ?? null; },
-    removeAttribute(k) { delete this._attrs[k]; },
-    addEventListener() {},
-    remove() {},
-    appendChild() {},
-    insertAdjacentHTML() {},
-    querySelector() { return null; },
-    querySelectorAll() { return []; },
-  };
-}
-
-/** A browser-ish sandbox with the real common.js already loaded. */
-function sandboxWithCommon(extra = {}) {
-  const els = new Map();
-  const el = (key) => { if (!els.has(key)) els.set(key, makeEl()); return els.get(key); };
-  const sandbox = {
-    location: { search: '', href: '' },
-    document: {
-      title: '',
-      hidden: false,
-      getElementById: (id) => el(`#${id}`),
-      querySelector: (sel) => el(sel),
-      querySelectorAll: () => [],
-      createElement: () => makeEl(),
-      addEventListener() {},
+/**
+ * A client world with the real common.js already loaded. The stubs are the window and global calls a page's own scripts
+ * make at load (matchMedia, the storage and timer stubs), each set before common.js runs, as the page sets them.
+ */
+function worldWithCommon(windowStubs = {}) {
+  const world = loadWorld({
+    scripts: [],
+    window: { matchMedia: () => ({ matches: false }), addEventListener() {}, removeEventListener() {}, ...windowStubs },
+    globals: {
+      localStorage: { getItem: () => null, setItem() {} },
+      module: { exports: {} },
+      setInterval: () => 0,
+      clearInterval() {},
+      cancelAnimationFrame() {},
     },
-    history: { replaceState() {} },
-    localStorage: { getItem: () => null, setItem() {} },
-    setTimeout: () => 0,
-    clearTimeout() {},
-    setInterval: () => 0,
-    clearInterval() {},
-    requestAnimationFrame: () => 0,
-    cancelAnimationFrame() {},
-    matchMedia: () => ({ matches: false }),
-    addEventListener() {},
-    removeEventListener() {},
-    module: { exports: {} },
-    console,
-    ...extra,
-  };
-  sandbox.window = sandbox;
-  vm.createContext(sandbox);
-  vm.runInContext(withHarnessModels(COMMON_SRC), sandbox, { filename: 'common.js' });
-  return { sandbox, el };
+  });
+  world.run(withHarnessModels(COMMON_SRC));
+  return world;
 }
 
 describe('Swipe card task-page link (LIN-3331)', () => {
   function renderCard(issue, urlKey = 'ws') {
-    const { sandbox, el } = sandboxWithCommon({
-      __SWIPE_DATA__: { issues: [issue], filters: [{ key: 'all', label: 'All' }], urlKey },
+    const world = loadWorld({
+      scripts: [],
+      window: { __SWIPE_DATA__: { issues: [issue], filters: [{ key: 'all', label: 'All' }], urlKey } },
+      globals: { location: { search: '', href: '' }, history: { replaceState() {} } },
     });
-    sandbox.renderMarkdown = (s) => sandbox.escapeHtml(s);
-    sandbox.stripCodeBlockWrapper = (s) => s;
-    vm.runInContext(read('public/swipe.js'), sandbox, { filename: 'swipe.js' });
-    return el('#swipe-card').innerHTML;
+    world.document.body.innerHTML = swipePageBody({ urlKey });
+    world.run(withHarnessModels(COMMON_SRC));
+    world.window.renderMarkdown = (s) => world.window.escapeHtml(s);
+    world.window.stripCodeBlockWrapper = (s) => s;
+    world.run(read('public/swipe.js'));
+    return world.document.getElementById('swipe-card').innerHTML;
   }
 
   test('renders a task-page link for a plain issue', () => {
@@ -107,35 +78,34 @@ describe('Swipe card task-page link (LIN-3331)', () => {
 });
 
 describe('Queue row task-page link (LIN-3331)', () => {
-  const { sandbox } = sandboxWithCommon();
+  const world = worldWithCommon();
 
   test('builds the href with the shared helper, carrying the source', () => {
-    const html = sandbox.renderQueueRow({ id: 'd1', promptName: 'P', dispatchedAt: '2026-01-01T00:00:00Z', issueIdentifier: 'LIN-7', issueSource: 'linear', issueBindingScope: 'team-a' }, 'ws');
+    const html = world.sandbox.renderQueueRow({ id: 'd1', promptName: 'P', dispatchedAt: '2026-01-01T00:00:00Z', issueIdentifier: 'LIN-7', issueSource: 'linear', issueBindingScope: 'team-a' }, 'ws');
     assert.match(html, /data-testid="queue-item-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-7\?source=linear"/);
   });
 
   test('no identifier means no link', () => {
-    const html = sandbox.renderQueueRow({ id: 'd1', promptName: 'P', dispatchedAt: '2026-01-01T00:00:00Z' }, 'ws');
+    const html = world.sandbox.renderQueueRow({ id: 'd1', promptName: 'P', dispatchedAt: '2026-01-01T00:00:00Z' }, 'ws');
     assert.ok(!html.includes('queue-item-task-page-link'));
   });
 });
 
 describe('Sessions section task-page link (LIN-3331)', () => {
   test('the list header links to the task page, carrying the source', async () => {
-    const container = makeEl();
-    const { sandbox } = sandboxWithCommon();
-    sandbox.api = async () => ({ sessions: [] });
-    vm.runInContext(read('public/sessions.js'), sandbox, { filename: 'sessions.js' });
-    sandbox.SessionsSection.init(container, { urlKey: 'ws', identifier: 'LIN-7', source: 'linear', bindingScope: 'team-a' });
+    const world = worldWithCommon({ api: async () => ({ sessions: [] }) });
+    const container = world.makeContainer();
+    world.run(read('public/sessions.js'));
+    world.sandbox.SessionsSection.init(container, { urlKey: 'ws', identifier: 'LIN-7', source: 'linear', bindingScope: 'team-a' });
     await new Promise((r) => setImmediate(r));
     assert.match(container.innerHTML, /data-testid="sessions-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-7\?source=linear"/);
   });
 });
 
 describe('Observation task-block task-page link (LIN-3331)', () => {
-  const { sandbox } = sandboxWithCommon();
-  vm.runInContext(read('public/observation.js'), sandbox, { filename: 'observation.js' });
-  const { renderTaskBlock } = sandbox.module.exports;
+  const world = worldWithCommon();
+  world.run(read('public/observation.js'));
+  const { renderTaskBlock } = world.sandbox.module.exports;
 
   test('carries the run source on obs-task-page-link', () => {
     const html = renderTaskBlock({ workspaceUrlKey: 'ws' }, 'LIN-1', null, [
@@ -153,12 +123,12 @@ describe('Observation task-block task-page link (LIN-3331)', () => {
 });
 
 describe('Dispatch history task-page link (LIN-3331)', () => {
-  const { sandbox } = sandboxWithCommon();
-  vm.runInContext(read('public/dispatch.js'), sandbox, { filename: 'dispatch.js' });
+  const world = worldWithCommon();
+  world.run(read('public/dispatch.js'));
 
   function renderHistory(items) {
-    const container = makeEl();
-    sandbox.renderDispatchHistoryList(container, items, items.length, 0, 'ws');
+    const container = world.makeContainer();
+    world.sandbox.renderDispatchHistoryList(container, items, items.length, 0, 'ws');
     return container.innerHTML;
   }
 
@@ -179,34 +149,26 @@ describe('Dispatch history task-page link (LIN-3331)', () => {
 });
 
 describe('Live Console lane task-page link (LIN-3331)', () => {
-  function laneHarness() {
-    const { sandbox } = sandboxWithCommon({
-      __LIVE_CONSOLE_DATA__: { urlKey: 'ws', workspaces: [] },
-      PULSE_SPAN_RUNGS_MS: [180000],
-      api: async () => new Promise(() => {}),
-    });
-    vm.runInContext(read('public/live-console.js'), sandbox, { filename: 'live-console.js' });
-    const { updateLaneNode } = sandbox.module.exports;
-    const anchors = {};
-    // classList: updateLaneNode toggles the reduced-motion pulse and waiting classes on the node (LIN-3977).
-    const li = { classList: { toggle() {} }, querySelector: (sel) => { if (!anchors[sel]) anchors[sel] = makeEl(); return anchors[sel]; } };
-    return { updateLaneNode, li, anchors };
+  // The lane is the client's own laneNode (LIN-4310), in the client world the page loads over.
+  function laneHarness(lane = {}) {
+    const { api, world } = loadLiveConsole();
+    const li = makeLaneNode(world, lane);
+    return { updateLaneNode: api.updateLaneNode, li };
   }
 
   // LIN-3977: the lane has ONE task link (to the task page); the separate "task ↗"
   // link is gone. The LIN-3331 contract is unchanged: the link carries the source,
   // and a repaint with no task removes its href.
   test('a lane with a task and a source links the task page, carrying the source', () => {
-    const { updateLaneNode, li, anchors } = laneHarness();
-    updateLaneNode(li, { task: 'LIN-5', workspaceUrlKey: 'ws', workspaceName: 'WS', issueSource: 'linear', issueBindingScope: 'team-a' });
-    const link = anchors['.lc-lane-task'];
+    const { li } = laneHarness({ task: 'LIN-5', workspaceUrlKey: 'ws', workspaceName: 'WS', issueSource: 'linear', issueBindingScope: 'team-a' });
+    const link = li.querySelector('.lc-lane-task');
     assert.equal(link.getAttribute('href'), '/workspace/ws/task/LIN-5?source=linear');
   });
 
   test('a repaint with the task gone removes the task link href', () => {
-    const { updateLaneNode, li, anchors } = laneHarness();
+    const { updateLaneNode, li } = laneHarness();
     updateLaneNode(li, { task: 'LIN-5', workspaceUrlKey: 'ws' });
-    const link = anchors['.lc-lane-task'];
+    const link = li.querySelector('.lc-lane-task');
     assert.equal(link.getAttribute('href'), '/workspace/ws/task/LIN-5', 'linked while the lane has a task');
     // The same node is reused across polls; a repaint with no task must clear it.
     updateLaneNode(li, { workspaceUrlKey: 'ws' });

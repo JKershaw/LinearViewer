@@ -10,15 +10,16 @@
  * neutral and shows its own word.
  *
  * Same technique as tests/unit/dispatch-feedback-entries.test.js: the source slice of the two
- * functions is run in a vm sandbox with stubs for their free variables, and the real rendered
- * HTML is asserted.
+ * functions is run in a world with stubs for their free variables, and the real rendered HTML is
+ * asserted. The world is loadWorld (LIN-4310): one shared fake DOM, the container is a real element,
+ * and the slice runs with `world.run`, so no vm sandbox is built here.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { loadWorld } from './helpers/client-world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DISPATCH_JS_SRC = readFileSync(join(__dirname, '../../public/dispatch.js'), 'utf8');
@@ -33,25 +34,28 @@ function extractSrc() {
   return DISPATCH_JS_SRC.slice(start, end);
 }
 
-function makeSandbox() {
-  const sandbox = {
-    escapeHtml: (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
-    formatDispatchTime: () => 'just now',
-    formatPromptHtml: (s) => String(s),
-    renderFeedbackEntries: () => '',
-    window: { taskPageHref: () => null },
-    console,
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(extractSrc(), sandbox, { filename: 'dispatch.js-history-outcome-slice' });
-  return sandbox;
+// The stubs for the slice's free variables: the escape and formatters are the page's own (common.js and dispatch.js
+// outside the slice), and `taskPageHref` is the window helper, so the window stub carries it.
+function makeWorld() {
+  const world = loadWorld({
+    scripts: [],
+    window: {
+      escapeHtml: (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
+      formatDispatchTime: () => 'just now',
+      formatPromptHtml: (s) => String(s),
+      renderFeedbackEntries: () => '',
+      taskPageHref: () => null,
+    },
+  });
+  world.run(extractSrc());
+  return world;
 }
 
 // Render a page of history items through the real renderer; returns the container's HTML.
 function renderPage(items, { total = items.length, offset = 0 } = {}) {
-  const sandbox = makeSandbox();
-  const container = { innerHTML: '', querySelector: () => null, insertAdjacentHTML() {}, appendChild() {} };
-  sandbox.renderDispatchHistoryList(container, items, total, offset, 'acme');
+  const world = makeWorld();
+  const container = world.makeContainer();
+  world.sandbox.renderDispatchHistoryList(container, items, total, offset, 'acme');
   return container.innerHTML;
 }
 
@@ -68,21 +72,21 @@ const itemFor = (outcome, extra = {}) => ({
 
 describe('historyOutcomePill (LIN-2122)', () => {
   test('done is the one green success state, with the check glyph', () => {
-    const sandbox = makeSandbox();
+    const { sandbox } = makeWorld();
     const pill = sandbox.historyOutcomePill('done');
     assert.equal(pill.state, 'done');
     assert.equal(pill.char, '✓');
   });
 
   test('taken (running or unresolved) is in-progress, never green', () => {
-    const sandbox = makeSandbox();
+    const { sandbox } = makeWorld();
     const pill = sandbox.historyOutcomePill('taken');
     assert.equal(pill.state, 'in-progress');
     assert.notEqual(pill.state, 'done');
   });
 
   test('failed, aborted and cancelled are the red family, never green', () => {
-    const sandbox = makeSandbox();
+    const { sandbox } = makeWorld();
     for (const word of ['failed', 'aborted', 'cancelled']) {
       const pill = sandbox.historyOutcomePill(word);
       assert.equal(pill.state, 'failed', `${word} is red`);
@@ -91,7 +95,7 @@ describe('historyOutcomePill (LIN-2122)', () => {
   });
 
   test('skipped, closed and blocked are non-green and distinct from one another by state or glyph', () => {
-    const sandbox = makeSandbox();
+    const { sandbox } = makeWorld();
     const skipped = sandbox.historyOutcomePill('skipped');
     const closed = sandbox.historyOutcomePill('closed');
     const blocked = sandbox.historyOutcomePill('blocked');
@@ -102,7 +106,7 @@ describe('historyOutcomePill (LIN-2122)', () => {
   });
 
   test('an unknown word is neutral: no state colour and no glyph, never the expired look', () => {
-    const sandbox = makeSandbox();
+    const { sandbox } = makeWorld();
     const pill = sandbox.historyOutcomePill('some-future-word');
     assert.equal(pill.state, '');
     assert.equal(pill.char, '');
@@ -111,7 +115,7 @@ describe('historyOutcomePill (LIN-2122)', () => {
   });
 
   test('a prototype member name is an unknown word, not a pill from Object.prototype', () => {
-    const sandbox = makeSandbox();
+    const { sandbox } = makeWorld();
     for (const word of ['constructor', '__proto__', 'toString']) {
       const pill = sandbox.historyOutcomePill(word);
       assert.equal(pill.state, '', `${word} is neutral`);
@@ -168,9 +172,15 @@ describe('renderDispatchHistoryList renders the outcome word (LIN-2122)', () => 
     assert.ok(html.includes('data-status="done"'));
   });
 
+  // The word lands as text in the label and as a class fragment, both escaped. Read off the live tree (LIN-4310): a
+  // browser's serializer leaves `<` bare inside an attribute value, so the markup string cannot show "escaped" the way
+  // the old plain-string container did. No element is created, and the label reads back the word exactly.
   test('an outcome word is escaped, never injected as markup', () => {
-    const html = renderPage([itemFor('<img src=x onerror=alert(1)>')]);
-    assert.ok(!html.includes('<img'), 'the word is escaped');
-    assert.ok(html.includes('&lt;img'));
+    const word = '<img src=x onerror=alert(1)>';
+    const world = makeWorld();
+    const container = world.makeContainer();
+    world.sandbox.renderDispatchHistoryList(container, [itemFor(word)], 1, 0, 'acme');
+    assert.equal(container.querySelector('img'), null, 'the word is text, not an element');
+    assert.equal(container.querySelector('.status-pill__label').textContent, word);
   });
 });

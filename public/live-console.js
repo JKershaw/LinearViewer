@@ -1361,6 +1361,10 @@
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { updateLaneNode, eventRowHtml, showBarDetail, readActivityOpen, setActivityOpen, countActivityArrivals };
   }
+  // LIN-4310: the lane's own builder, as a window global, so a suite gets the real lane markup from the client instead of
+  // a copy of it (tests/unit/helpers/live-console-world.js). laneNode is the one builder paintLanes uses; nothing else
+  // reads this global.
+  window.LiveConsoleLane = { laneNode };
   function paintLanes(lanes) {
     if (!els.lanes) return;
     const visible = (Array.isArray(lanes) ? lanes : []).filter(l => l.task && isVisibleWs(l.workspaceUrlKey));

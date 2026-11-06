@@ -3,8 +3,9 @@
  * live-console-client-facts.test.js.
  *
  * This is a loader and a fixture, not a fake DOM. The DOM is the shared one (fake-dom.js) and the vm is loadWorld's.
- * What lives here: the server's page as the client boots over (pageBody), the lane markup laneNode builds
- * (LANE_CONTENTS, makeLaneNode), and the source pin that ties that markup to the client (pinLaneMarkupToClient).
+ * What lives here: the server's page as the client boots over (pageBody), the lane the client builds
+ * (makeLaneNode, over window.LiveConsoleLane), and the source pin on that builder (pinLaneMarkupToClient). LIN-4310: the
+ * lane is the client's own laneNode, not a copy of its markup.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -26,52 +27,24 @@ export function pageBody() {
   return body.replace(/<[^>]*>/g, (tag) => tag.replace(/\shidden(?=[\s>])/g, '').replace(/\saria-expanded="false"/g, ''));
 }
 
-// The lane markup laneNode builds (live-console.js, `function laneNode`), with its initial `hidden` attributes removed
-// so updateLaneNode's writes are what a test sees. laneNode is not exported, and it only runs once a feed resolves,
-// which the pending feed keeps out of reach, so the suites supply the lane through makeLaneNode.
-export const LANE_CONTENTS = `
-        <span class="lc-lane-bar" aria-hidden="true"></span>
-        <span class="lc-lane-head">
-          <a class="lc-lane-task" data-testid="live-console-lane-task" href="#"></a>
-          <span class="lc-lane-title-sep" aria-hidden="true">·</span>
-          <span class="lc-lane-title" data-testid="live-console-lane-title"></span>
-          <a class="lc-lane-run" data-testid="live-console-lane-run" href="#">open run ↗</a>
-          <span class="lc-lane-ws"></span>
-        </span>
-        <span class="lc-lane-stage-row">
-          <span class="lc-lane-stage" data-testid="live-console-lane-stage"></span>
-          <span class="lc-lane-since" data-testid="live-console-lane-since"></span>
-          <span class="lc-lane-action" data-testid="live-console-lane-action"></span>
-          <span class="lc-lane-tickets" data-testid="live-console-lane-tickets"></span>
-        </span>
-        <span class="lc-lane-mid">
-          <span class="lc-lane-cred" data-testid="live-console-lane-credential"></span>
-          <span class="lc-lane-hb" data-testid="live-console-heartbeat"></span>
-          <span class="lc-lane-summary"></span>
-        </span>`;
-
-// A lane `li` in `world`, without the pulse class: the class on the node is the client's write, not the fixture's.
-export function makeLaneNode(world) {
-  const li = world.document.createElement('li');
-  li.setAttribute('class', 'lc-lane');
-  li.innerHTML = LANE_CONTENTS;
-  return li;
+// The lane is the client's own builder (LIN-4310): `window.LiveConsoleLane.laneNode`, which live-console.js exports for
+// this purpose. This file used to hold a copy of its markup (LANE_CONTENTS), and that copy is gone. laneNode paints the
+// lane once with updateLaneNode, so a suite gets a lane in the state the client leaves it in.
+export function makeLaneNode(world, lane = {}) {
+  return world.window.LiveConsoleLane.laneNode(lane);
 }
 
-// The lane's classes and anchors, pinned to laneNode and to updateLaneNode's own selectors. A class that laneNode drops,
-// or that updateLaneNode queries and the fixture lacks, fails here. The anchor count also fails if laneNode emits a
-// second task link: laneNode has exactly two anchors, the task link and the run link.
+// The lane's parts and anchors, pinned to the client source. laneNode builds every part that updateLaneNode queries, and
+// it has exactly two anchors, the task link and the run link. A class updateLaneNode queries that laneNode does not build
+// fails here. (LIN-4310: this used to check a copied fixture against laneNode; with the copy gone, it checks laneNode.)
 export function pinLaneMarkupToClient() {
   const start = CLIENT_SRC.indexOf('function laneNode(lane)');
   const template = CLIENT_SRC.slice(start, CLIENT_SRC.indexOf('updateLaneNode(li, lane);', start));
-  assert.ok(template.includes('<li class="lc-lane'), 'laneNode still builds the lane the fixture mirrors');
+  assert.ok(template.includes('<li class="lc-lane'), 'laneNode still builds the lane');
   assert.equal((template.match(/<a class=/g) || []).length, 2, 'laneNode emits one task link and one run link, nothing else');
   const queried = [...CLIENT_SRC.matchAll(/li\.querySelector\('\.([a-z-]+)'\)/g)].map(m => m[1]);
   assert.ok(queried.length > 0, 'updateLaneNode queries its lane parts');
-  for (const cls of queried) {
-    assert.ok(template.includes(`class="${cls}"`), `laneNode builds .${cls}`);
-    assert.ok(LANE_CONTENTS.includes(`class="${cls}"`), `the lane fixture carries .${cls}`);
-  }
+  for (const cls of queried) assert.ok(template.includes(`class="${cls}"`), `laneNode builds .${cls}`);
 }
 
 /**
