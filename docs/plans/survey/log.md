@@ -2634,3 +2634,11 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 
   Two fresh readers: one new to Harbour (does it still feel defensive?), one for accuracy (nothing widened).
 - **John: more narrative, fewer task IDs,** so it's easier for a human to read. Added to LIN-4335: describe each change by what it did; keep IDs, hashes and paths for a "where to check" table and the reading list; relabel Figure 2's rows with plain names (regenerated from the same data, with the IDs in the caption).
+- **LIN-4335 scoped and started.** Its Surveys:
+  - **the accuracy reader is what made v1 defensive**, so a hedge ledger (each of v1's ~25 hedges marked inline-short, moved-to-limits or cut) becomes that reader's contract, and a limit counts as present when it's in the limits section;
+  - the image payoffs are Claude's glosses on John's images, and each must be marked. The hand answers v1's own question with *not yet*: the seat was still a hand, which is John's case for structure. The trig point goes in the close as the aim, not a standing;
+  - both candidate scenes sit on post-window merges, so the scene carries its limit in one clause;
+  - the first paragraph is the Library card and must also argue;
+  - `version: 2` (integers only);
+  - the README row, `model:` line and `charts.mjs` comments updated in the same PR.
+- The Survey's symptom is worth keeping for integration: **the defensiveness comes from the house process** (a per-claim accuracy reader; "does not support" for every source) as much as from the writer.
