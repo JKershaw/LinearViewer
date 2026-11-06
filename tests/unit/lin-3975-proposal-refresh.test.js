@@ -227,7 +227,7 @@ describe('LIN-3975 — the fold tells the page when a turn proposed a follow-up'
 });
 
 describe('LIN-3975 — the page names the proposals read beside the state it polls', () => {
-  // The page script is an ES module-free IIFE; its helper is read through a vm, as the other client tests do.
+  // The page script is an ES module-free IIFE; its helper is read from a loadWorld, as the other client tests do.
   function proposalsUrlOf(stateUrl) {
     const world = loadWorld({ scripts: ['task-page.js'], window: { module: { exports: {} } } });
     return world.window.module.exports.proposalsUrlOf(stateUrl);

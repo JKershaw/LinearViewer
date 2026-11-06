@@ -331,7 +331,6 @@ describe('the press goes through the run page\'s ReplyDelivery entry', () => {
   });
 });
 
-
 describe('a joined ruling row on the task page (LIN-3959)', () => {
   test('the page of the autopilot copy keeps a joined row whose anchor is the worker', () => {
     const rows = [

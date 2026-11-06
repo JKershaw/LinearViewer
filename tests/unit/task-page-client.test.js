@@ -646,7 +646,8 @@ describe('stage rows: head, clocks and check-ins across a repaint (LIN-3356)', (
     const track = trackOf([
       loop({ loopId: 'impl', kind: 'implementation', takenAt: new Date(now - 4 * 60 * 1000).toISOString() }),
       loop({ loopId: 'rev', kind: 'review', agentState: 'idle', terminalStatus: 'completed', takenAt: new Date(now - 125 * 60 * 1000).toISOString() }),
-    ], new Date(now));
+    ], new Date(now - 60 * 1000));
+    assert.deepEqual(track.doc.querySelectorAll('[data-running-since]').map((el) => el.textContent), ['running 3m'], 'drawn a minute ago');
     tickClocks(track.doc.body);
     const running = track.doc.querySelectorAll('[data-running-since]');
     assert.deepEqual(running.map((el) => el.textContent), ['running 4m']);
@@ -687,12 +688,15 @@ describe('repaintHeader keeps the load-time summary (LIN-3373)', () => {
     assert.ok(answer.querySelector('[data-testid="task-page-summary"]'), 'the load-time summary is on the page');
     repaintHeader(answer, headerOf(taskModel([loop({ agentState: 'idle', terminalStatus: 'completed' })])));
     assert.ok(answer.querySelector('[data-testid="task-page-summary"]'), 'the summary survives the repaint');
+    assert.ok(answer.querySelector('[data-testid="task-page-status"] [data-testid="task-page-summary"]'), 'carried into the repainted status block');
+    assert.notEqual(answer.querySelector('[data-testid="task-page-status"]').getAttribute('data-status'), 'running', 'the header was repainted');
   });
 
   test('a header that carries its own summary replaces it; nothing is re-added', () => {
     const answer = answerOf('## Current\nWorking on it.');
     repaintHeader(answer, headerOf(taskModel([loop()], { brief: { brief: '## Current\nNow something else.' } })));
     assert.equal(answer.querySelectorAll('[data-testid="task-page-summary"]').length, 1);
+    assert.match(answer.querySelector('[data-testid="task-page-summary"]').textContent, /Now something else/, 'the new summary, not the old one');
   });
 
   test('no load-time summary: nothing is carried', () => {
