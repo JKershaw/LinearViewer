@@ -1,0 +1,12 @@
+af55cb73 vm-over-public=68 notOnLoadWorld=64 handWrittenFakeList=25 stopMarkers=9
+b389f9b0 vm-over-public=68 notOnLoadWorld=64 handWrittenFakeList=25 stopMarkers=9
+f742e5ac vm-over-public=65 notOnLoadWorld=61 handWrittenFakeList=22 stopMarkers=6
+b581ac92 vm-over-public=65 notOnLoadWorld=61 handWrittenFakeList=22 stopMarkers=6
+165c61e7 vm-over-public=65 notOnLoadWorld=61 handWrittenFakeList=22 stopMarkers=6
+f73f1b11 vm-over-public=61 notOnLoadWorld=57 handWrittenFakeList=18 stopMarkers=6
+3f4d4131 vm-over-public=58 notOnLoadWorld=54 handWrittenFakeList=15 stopMarkers=6
+8b84a8fe vm-over-public=57 notOnLoadWorld=53 handWrittenFakeList=14 stopMarkers=6
+ff6a69fa vm-over-public=53 notOnLoadWorld=49 handWrittenFakeList=10 stopMarkers=6
+c491eca5 vm-over-public=58 notOnLoadWorld=54 handWrittenFakeList=15 stopMarkers=6
+f2816e17 vm-over-public=57 notOnLoadWorld=53 handWrittenFakeList=14 stopMarkers=6
+5c63aa26 vm-over-public=53 notOnLoadWorld=49 handWrittenFakeList=10 stopMarkers=6
