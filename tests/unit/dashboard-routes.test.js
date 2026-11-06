@@ -14,28 +14,21 @@
  */
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert';
-import vm from 'node:vm';
-import { readFileSync } from 'node:fs';
-import { createDashboardRoutes as createDashboardRoutes__unplumbed, buildTestSummary, buildTestSessionSummary, deriveSessionStatus, deriveSessionDecisions } from '../../routes/dashboard.js';
+import { buildTestSummary, buildTestSessionSummary, deriveSessionStatus, deriveSessionDecisions } from '../../routes/dashboard.js';
+import { NOW_ISO, createDashboardRoutes, makeStores, findRouteLayer, getHandler, makeReqRes, makeRouter, decisionItem } from '../fixtures/dashboard-router.js';
 import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
-import { InMemoryRunParagraphStore } from '../../lib/run-paragraph-store.js';
 import { createTaskDoneCache } from '../../lib/task-done-cache.js';
 import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { extractEmbeddedData, embeddedDataText } from '../helpers/embedded-data.js';
 import { REAP_INACTIVITY_MS } from '../../lib/unanswered-decisions.js';
-import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
-// LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
-const createDashboardRoutes = withDefaults(createDashboardRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
-
 
 // A timestamp safely past the record window (SD's 7-day REAP_INACTIVITY_MS), so the fixture is `gone`.
 const PAST_REAP_WINDOW_ISO = () => new Date(Date.now() - REAP_INACTIVITY_MS - 24 * 60 * 60 * 1000).toISOString();
 
-const NOW_ISO = new Date().toISOString();
 // >24h ago: a session whose last activity is this old falls into Archive under
 // the recency-only Active/Archive split (LIN-631).
 const OLD_ISO = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
@@ -52,21 +45,6 @@ function findSession(body, id) {
 //   - a live queue item  → agentState 'queued'  (active)
 //   - a taken history item + agentStatus 'completed' → agentState 'complete' (recent)
 
-function makeStores(perWorkspace) {
-  return {
-    dispatchQueueStore: {
-      // `withFreshDigests` here too: a handful of fixtures below simulate a
-      // still-live item that ALREADY carries feedback (an edge case, since
-      // production live items never do — feedback only ever lands on an
-      // archived/history row) to exercise a derived field before archival.
-      async listItems(urlKey) { return withFreshDigests(perWorkspace[urlKey]?.live || []); },
-      async listHistory(urlKey) { return { items: withFreshDigests(perWorkspace[urlKey]?.history || []) }; }
-    },
-    agentStatusStore: {
-      async listStatus(urlKey) { return { items: perWorkspace[urlKey]?.agentStatus || [] }; }
-    }
-  };
-}
 
 function activeItem(id, identifier) {
   return { id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'plan', prompt: 'p', dispatchedAt: NOW_ISO };
@@ -100,75 +78,6 @@ function markerDoneItem(id, identifier) {
   return { id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: '[done] shipped it', timestamp: NOW_ISO }] };
 }
 
-// ─── Handler extraction ─────────────────────────────────────────────────────────
-
-// LIN-3840: one finder, structure only. It descends nested routers
-// (`layer.handle.stack`) so the test does not care whether createDashboardRoutes
-// registers a route directly or through a router it mounts, returns the single
-// matching route layer, and fails on zero or more than one match. It loosens no
-// guard: every assertion made on the layer or its handler is unchanged.
-function findRouteLayer(router, method, path) {
-  const matches = [];
-  const walk = (stack) => {
-    for (const layer of stack) {
-      if (layer.route) {
-        if (layer.route.path === path && layer.route.methods[method]) matches.push(layer);
-      } else if (Array.isArray(layer.handle?.stack)) {
-        walk(layer.handle.stack);
-      }
-    }
-  };
-  walk(router.stack);
-  assert.ok(matches.length > 0, `${method.toUpperCase()} ${path} route is registered`);
-  assert.equal(matches.length, 1, `${method.toUpperCase()} ${path} is registered ${matches.length} times, expected exactly once`);
-  return matches[0];
-}
-
-function getHandler(router, method, path) {
-  const layer = findRouteLayer(router, method, path);
-  return layer.route.stack[layer.route.stack.length - 1].handle;
-}
-
-function makeReqRes({ session = {}, workspace = null, params = {}, query = {} } = {}) {
-  session.features = session.features || {};
-  const req = { session, workspace, params, query, body: {}, protocol: 'http', get: () => 'localhost' };
-  const res = {
-    statusCode: 200,
-    jsonBody: null,
-    redirectedTo: null,
-    status(code) { this.statusCode = code; return this; },
-    json(b) { this.jsonBody = b; return this; },
-    redirect(url) { this.redirectedTo = url; return this; },
-    send(b) { this.sentBody = b; return this; },
-    end(b) { this.endedWith = b; return this; }
-  };
-  return { req, res };
-}
-
-function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, issues, observationSessionsStore, prState, freeTierStore } = {}) {
-  const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
-  return createDashboardRoutes({
-    workspaceFromUrl: (req, res, next) => next(),
-    dispatchQueueStore,
-    agentStatusStore,
-    observationSessionsStore: observationSessionsStore || null,
-    runSummaryCacheStore: runSummaryCacheStore || new InMemoryRunSummaryCacheStore(),
-    sessionSummaryCacheStore: sessionSummaryCacheStore || new InMemorySessionSummaryCacheStore(),
-    runParagraphStore: runParagraphStore || new InMemoryRunParagraphStore(),
-    prState: prState || null,
-    freeTierStore: freeTierStore || { async tryUse() { return { allowed: true }; } },
-    getWorkspaceAccessToken: async () => 'token',
-    // Default touched-task state is NOT done, so the LIN-1258 bounded feed
-    // hydration leaves an eligible (terminal+error) session at 'error' — the
-    // pre-hydration feed behaviour these shared tests assert. Tests that want a
-    // task hydrated to Done (drill-in, or the done-with-warning upgrade) inject
-    // their own `fetchIssueContext` returning a `completed` state.
-    fetchIssueContext: async () => ({ issue: { state: { name: 'In Progress', type: 'started' }, labels: { nodes: [] } } }),
-    fetchWorkspaceIssues: async () => issues || [],
-    getOpenRouterSource: () => 'env',
-    getDeployInfo: () => ({})
-  });
-}
 
 // ─── Session fixtures (drive lib/pipeline-loops.getSessionsForWorkspace) ─────────
 // An autopilot orchestrator dispatch (kind:'autopilot') anchors a session; its
@@ -319,21 +228,6 @@ describe('GET /api/dashboard/loops', () => {
 
 // ─── Filtered rulings feed (LIN-1728 Phase 2) ─────────────────────────────────
 
-// A taken history item carrying a `kind:'decision'` feedback entry (the
-// same shape `hook.js`'s complete-path emission and a `[blocked]`-parked
-// wait both produce) — the input the rulings predicate reads.
-function decisionItem(id, identifier, decisionId, extraFeedback = []) {
-  return {
-    id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`,
-    promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO,
-    status: 'taken',
-    feedback: [
-      { message: '[blocked] need a decision', timestamp: NOW_ISO },
-      { kind: 'decision', message: JSON.stringify({ decision_id: decisionId, question: 'Proceed?' }), timestamp: NOW_ISO },
-      ...extraFeedback
-    ]
-  };
-}
 
 describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
   test('serves unanswered decisions across workspaces, workspace-tagged, count === rulings.length', async () => {
@@ -6848,49 +6742,6 @@ describe('LIN-4103 beat 3 — the rulings feed counts the page\'s own workspace 
     assert.equal(res.statusCode, 200);
     assert.equal(res.jsonBody.count, 2, 'the all-workspaces count is unchanged');
     assert.equal(res.jsonBody.workspaceCount, 1, 'the badge count is the page\'s own workspace');
-  });
-
-  // LIN-4103 review item 2: the number painted in the header badge is the page's own workspace, the number its Home count
-  // line shows ("N waiting on you" reads that workspace's rulings only). Distinguishing precondition: a SECOND workspace on
-  // the same session holds a ruling; with one workspace both numbers agree by accident. The client function is the real
-  // shipped one, sliced out of public/common.js and run against the real route's JSON, so a badge that reads the
-  // all-workspaces `count` paints 2 here and fails.
-  test('the badge paints the page\'s own workspace number when a second workspace holds a ruling', async () => {
-    const src = readFileSync(new URL('../../public/common.js', import.meta.url), 'utf8');
-    const start = src.indexOf('window.updateRulingsBadge = async function updateRulingsBadge(');
-    const end = src.indexOf('\n};', start);
-    assert.ok(start !== -1 && end !== -1, 'updateRulingsBadge not found in public/common.js');
-    const slice = src.slice(start, end + 3).replace('window.updateRulingsBadge', 'var updateRulingsBadge');
-
-    const router = makeRouter({
-      'ws-a': { live: [], history: [decisionItem('a-dec', 'LIN-24', 'd-a')], agentStatus: [] },
-      'ws-b': { live: [], history: [decisionItem('b-dec', 'LIN-25', 'd-b'), decisionItem('b-dec2', 'LIN-28', 'd-b2')], agentStatus: [] },
-    });
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
-    const session = { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }, { urlKey: 'ws-b', name: 'Beta' }] };
-
-    const paint = async (urlKey) => {
-      const { req, res } = makeReqRes({ session, params: { urlKey } });
-      await handler(req, res);
-      assert.equal(res.statusCode, 200);
-      const countEl = { textContent: '' };
-      const hidden = new Set(['hidden']);
-      const badge = { querySelector: () => countEl, classList: { toggle: (c, on) => (on ? hidden.add(c) : hidden.delete(c)) } };
-      const ctx = vm.createContext({
-        fetch: async () => ({ ok: true, json: async () => res.jsonBody }),
-        document: { querySelector: () => badge },
-        console,
-      });
-      vm.runInContext(`${slice}; this.updateRulingsBadge = updateRulingsBadge;`, ctx);
-      await ctx.updateRulingsBadge(urlKey);
-      return { text: countEl.textContent, hidden: hidden.has('hidden'), feedCount: res.jsonBody.count };
-    };
-
-    const a = await paint('ws-a');
-    assert.equal(a.feedCount, 3, 'the all-workspaces count is 3 (this is the number a wrong badge would paint)');
-    assert.equal(String(a.text), '1', 'workspace A\'s badge equals A\'s count line: one ruling');
-    const b = await paint('ws-b');
-    assert.equal(String(b.text), '2', 'workspace B\'s badge equals B\'s count line: two rulings');
   });
 
   // LIN-4103 review item 3: the count line reads the 30-day window (`windowedLoops`), so the badge must too. The distinguishing

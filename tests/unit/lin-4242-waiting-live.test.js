@@ -16,11 +16,12 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { withHarnessModels } from '../fixtures/harness-models.js';
+import { loadWorld } from './helpers/client-world.js';
+import { renderNavBar } from '../../lib/components/navbar.js';
 import { createHomeRowStates, createWaitingStanding } from '../../lib/home-row-states.js';
 import { renderWaitingSection, waitingTitlesOf } from '../../lib/waiting-section.js';
 import '../../lib/providers/linear/index.js';
@@ -128,45 +129,42 @@ describe('LIN-4242: the owner section is always drawn, hidden when empty; a non-
 });
 
 /**
- * Loads public/common.js into a vm with a recording fake window, document and timer, then runs its own rulings-badge
- * startup (the function the DOMContentLoaded handler calls). The badge element is present, so the poll starts.
+ * Loads public/common.js into a loadWorld over the fake DOM, with a recording setInterval and fetch, then runs its own
+ * rulings-badge startup (initRulingsBadge, the function its DOMContentLoaded handler calls). The badge is the navbar's
+ * real markup, so the poll starts when the badge exists.
+ *
+ * The world has no `CustomEvent`, and this suite does not add one. question-cards.js returns early without it
+ * (question-cards.js:236, announceRulingGone), so that file's bubbling dispatchEvent stop is never reached from here.
  */
 function loadCommon() {
   const intervals = [];
-  const docListeners = {};
-  const badge = { dataset: { urlKey: 'ws' }, querySelector: () => ({ textContent: '', classList: { toggle() {} } }), classList: { toggle() {} } };
   const fetches = [];
-  const sandbox = {
-    console,
-    setTimeout,
-    clearTimeout,
-    setInterval: (fn, ms) => { intervals.push({ fn, ms }); return intervals.length; },
-    clearInterval: () => {},
-    fetch: (url) => { fetches.push(String(url)); return Promise.resolve({ ok: true, json: () => Promise.resolve({ workspaceCount: 3 }) }); },
-    document: {
-      hidden: false,
-      addEventListener(type, fn) { (docListeners[type] = docListeners[type] || []).push(fn); },
-      querySelector: (sel) => (sel === '[data-rulings-badge]' ? badge : null),
-      querySelectorAll: () => [],
-      createElement: () => ({ classList: { add() {}, remove() {}, toggle() {} }, style: {}, setAttribute() {}, addEventListener() {}, appendChild() {} }),
-      body: { appendChild() {} },
+  const world = loadWorld({
+    scripts: [],
+    window: {
+      setInterval: (fn, ms) => { intervals.push({ fn, ms }); return intervals.length; },
+      clearInterval: () => {},
+      addEventListener() {},
+      matchMedia: () => ({ matches: false }),
     },
-    window: { addEventListener() {}, matchMedia: () => ({ matches: false }) },
-  };
-  sandbox.window.document = sandbox.document;
-  vm.createContext(sandbox);
-  vm.runInContext(withHarnessModels(COMMON_JS_SRC), sandbox, { filename: 'common.js' });
-  return { sandbox, intervals, docListeners, fetches };
+    globals: {
+      fetch: (url) => { fetches.push(String(url)); return Promise.resolve({ ok: true, json: () => Promise.resolve({ workspaceCount: 3 }) }); },
+    },
+  });
+  world.run(withHarnessModels(COMMON_JS_SRC));
+  world.document.body.innerHTML = renderNavBar({ workspaces: [], urlKey: 'ws', featureFlags: { runControls: true } });
+  assert.equal(world.run('typeof CustomEvent'), 'undefined', 'the world has no CustomEvent');
+  return { world, intervals, fetches };
 }
 
 describe('LIN-4242: one rulings tick, through one path', () => {
   test('startup starts a single interval; a tick runs the badge update, then each listener once, with the urlKey', () => {
-    const { sandbox, intervals, fetches } = loadCommon();
+    const { world, intervals, fetches } = loadCommon();
     const seen = [];
-    sandbox.window.onRulingsTick((urlKey) => seen.push(['a', urlKey]));
-    sandbox.window.onRulingsTick((urlKey) => seen.push(['b', urlKey]));
-    vm.runInContext('initRulingsBadge()', sandbox);
-    vm.runInContext('initRulingsBadge()', sandbox); // a second startup does not start a second interval
+    world.window.onRulingsTick((urlKey) => seen.push(['a', urlKey]));
+    world.window.onRulingsTick((urlKey) => seen.push(['b', urlKey]));
+    world.run('initRulingsBadge()');
+    world.run('initRulingsBadge()'); // a second startup does not start a second interval
     assert.equal(intervals.length, 1, 'one interval after load');
     assert.equal(intervals[0].ms, 5000);
     intervals[0].fn();
@@ -175,26 +173,26 @@ describe('LIN-4242: one rulings tick, through one path', () => {
   });
 
   test('a hidden tab skips the interval tick; a listener that throws does not stop the others', () => {
-    const { sandbox, intervals, docListeners } = loadCommon();
+    const { world, intervals } = loadCommon();
     const seen = [];
-    sandbox.window.onRulingsTick(() => { throw new Error('boom'); });
-    sandbox.window.onRulingsTick(() => seen.push('after-throw'));
-    vm.runInContext('initRulingsBadge()', sandbox);
-    sandbox.document.hidden = true;
+    world.window.onRulingsTick(() => { throw new Error('boom'); });
+    world.window.onRulingsTick(() => seen.push('after-throw'));
+    world.run('initRulingsBadge()');
+    world.document.hidden = true;
     intervals[0].fn();
     assert.deepEqual(seen, [], 'no tick while hidden');
-    sandbox.document.hidden = false;
+    world.document.hidden = false;
     intervals[0].fn();
     assert.deepEqual(seen, ['after-throw']);
   });
 
   test('visibilitychange runs the same tick as the interval (badge, then the listeners), and adds no timer', () => {
-    const { sandbox, intervals, docListeners, fetches } = loadCommon();
+    const { world, intervals, fetches } = loadCommon();
     const seen = [];
-    sandbox.window.onRulingsTick((urlKey) => seen.push(urlKey));
-    vm.runInContext('initRulingsBadge()', sandbox);
+    world.window.onRulingsTick((urlKey) => seen.push(urlKey));
+    world.run('initRulingsBadge()');
     const before = fetches.length;
-    const visibility = docListeners.visibilitychange;
+    const visibility = world.document.listenersOf('visibilitychange');
     assert.equal(visibility.length, 1);
     visibility[0]();
     assert.deepEqual(seen, ['ws'], 'the listener runs from the visibility path too');

@@ -3,24 +3,17 @@
  * that is not one of the page's options reads '' and takes public/proxy.js's 'read' fallback, as a browser does. The page's
  * own suite (lin-3136-settings-take-predicate) keeps its names and count across the move; this is the case it did not have.
  *
- * The page's controls are cut from lib/render-proxy.js's output, so the options are production's.
+ * The page's controls are cut from lib/render-proxy.js's output (tests/fixtures/proxy-prompt-box.js), so the options are production's.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { renderProxyPage } from '../../lib/render-proxy.js';
+import { PROXY_PROMPT_BOX } from '../fixtures/proxy-prompt-box.js';
 import { loadWorld, clickOn } from './helpers/client-world.js';
 
 const PROXY_SRC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../public/proxy.js'), 'utf8');
-const PROXY_PROMPT_BOX = (() => {
-  const page = renderProxyPage('acme', { urlKey: 'acme' });
-  const controls = /<div class="proxy-prompt-controls">[\s\S]*?<\/div>/.exec(page)?.[0];
-  const output = /<pre[^>]*id="proxy-prompt-output"[^>]*>[\s\S]*?<\/pre>/.exec(page)?.[0];
-  assert.ok(controls && output, 'the page draws the prompt controls and the output');
-  return `<div data-url-key="acme">${controls}${output}</div>`;
-})();
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 test('a scope pick that is not one of the page\'s options reads "" and mints as read', async () => {

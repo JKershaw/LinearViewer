@@ -38,13 +38,14 @@ process.env.NODE_ENV = 'test';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { withHarnessModels } from '../fixtures/harness-models.js';
+import { PROXY_PROMPT_BOX } from '../fixtures/proxy-prompt-box.js';
+import { loadWorld, clickOn } from './helpers/client-world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TOKENS_PATH = '/workspace/acme/api/proxy/tokens';
@@ -171,23 +172,21 @@ describe('LIN-2370 Part 1 — the mint response carries the DECLARED provider na
 const CLAUSE = /currently backed by/;
 
 /**
- * vm-sandbox the REAL public/common.js (the seam tests/unit/reply-delivery-contract.js
- * established) so `window.ProxyToggle.buildBlock` is the shipped function, not a
- * reimplementation of it. `document` is only the bare stub common.js's top-level
- * auto-init needs to register its DOMContentLoaded listener at load time.
+ * Load the REAL public/common.js into a loadWorld (the seam tests/unit/reply-delivery-contract.js established), so
+ * `window.ProxyToggle.buildBlock` is the shipped function, not a reimplementation of it. The world's document is the
+ * shared fake DOM; common.js's own DOMContentLoaded listener is registered and never fired here.
  */
 function loadProxyToggle() {
-  const sandbox = {
+  const world = loadWorld({
+    scripts: [],
     window: { location: { origin: 'http://test.local' } },
-    document: { addEventListener() {} },
-    localStorage: { getItem: () => null, setItem() {} },
-    console,
-    fetch() { throw new Error('fetch should not be called'); },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(withHarnessModels(readFileSync(join(__dirname, '../../public/common.js'), 'utf8')),
-    sandbox, { filename: 'common.js' });
-  return sandbox.window.ProxyToggle;
+    globals: {
+      localStorage: { getItem: () => null, setItem() {} },
+      fetch() { throw new Error('fetch should not be called'); },
+    },
+  });
+  world.run(withHarnessModels(readFileSync(join(__dirname, '../../public/common.js'), 'utf8')));
+  return world.window.ProxyToggle;
 }
 
 describe('LIN-2370 Part 2a — public/common.js buildBlock (the +proxy append)', () => {
@@ -219,62 +218,37 @@ describe('LIN-2370 Part 2a — public/common.js buildBlock (the +proxy append)',
 });
 
 /**
- * Drive the REAL public/proxy.js copy button in a vm sandbox and return the
- * prompt it composed.
+ * Drive the REAL public/proxy.js copy button in a loadWorld and return the prompt it composed.
  *
- * public/proxy.js is a DOM-bound IIFE with no window export, so an earlier draft
- * of this file asserted regexes against its source instead. Review was right that
- * this is coverage-by-appearance — it pins formatting and would pass on a
- * behaviour change the regexes do not happen to spell out. The builder IS
- * reachable: the generate-button handler writes the composed prompt to
- * `promptOutput.textContent`, so a stub document plus a stub `window.api` gets
- * the shipped function's real output. This matters because no e2e touches the
- * Proxy page copy button at all (`grep proxy-generate-btn tests/e2e/` is empty),
- * making this the only coverage standing behind that call site.
+ * public/proxy.js is a DOM-bound IIFE with no window export, so this runs it over the shared fake DOM with the Proxy
+ * page's own elements, cut from the real renderer (the ids it reads at load, and the element that names the workspace).
+ * The generate button is clicked the way a browser delivers the click (`clickOn`), and the handler writes the composed prompt to
+ * `#proxy-prompt-output`. `window.api` is the mint response, the channel under test. This matters because no e2e touches
+ * the Proxy page copy button at all (`grep proxy-generate-btn tests/e2e/` is empty), making this the only coverage
+ * standing behind that call site.
  */
 async function runCopyButton(providerDisplayName) {
-  const el = (extra = {}) => ({
-    textContent: '', dataset: {}, disabled: false,
-    classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
-    addEventListener(type, fn) { this._handlers = this._handlers || {}; this._handlers[type] = fn; },
-    querySelector: () => null, closest: () => null,
-    ...extra,
-  });
-
-  const generateBtn = el();
-  const promptOutput = el();
-  const tokenList = el({ dataset: { urlKey: 'acme' } });
-
-  const byId = { 'proxy-generate-btn': generateBtn, 'proxy-prompt-output': promptOutput, 'proxy-create-token-form': tokenList };
-  // LIN-3888: no public script queries a proxy-token-list any more, so no selector maps to the list.
-  const bySelector = {};
-
-  const sandbox = {
+  const world = loadWorld({
+    scripts: [],
     window: {
       location: { origin: 'https://harbour.test' },
       // The mint response is the channel under test.
       api: async () => ({ token: 'BOOTSTRAP', providerDisplayName }),
       relativeTime: () => '',
     },
-    document: {
-      getElementById: (id) => byId[id] || null,
-      querySelector: (sel) => bySelector[sel] || null,
-      addEventListener() {},
+    globals: {
+      escapeHtml: (v) => String(v),
+      navigator: { clipboard: { writeText: async () => {} } },
     },
-    navigator: { clipboard: { writeText: async () => {} } },
-    setTimeout, clearTimeout, console,
-    escapeHtml: (v) => String(v),
-  };
-  sandbox.globalThis = sandbox;
-  vm.createContext(sandbox);
-  // The IIFE's trailing init (refreshTokenCount / loadCredentialHealth) fires
-  // fetches through the same stubbed window.api; nothing there affects the
-  // prompt, and any rejection is an unhandled promise, not a load failure.
-  vm.runInContext(readFileSync(join(__dirname, '../../public/proxy.js'), 'utf8'),
-    sandbox, { filename: 'proxy.js' });
+  });
+  // The Proxy page's own prompt controls, cut from lib/render-proxy.js's output (tests/fixtures/proxy-prompt-box.js).
+  world.document.body.innerHTML = PROXY_PROMPT_BOX;
+  // The IIFE's trailing init (refreshTokenCount / loadCredentialHealth) fires fetches through the same stubbed window.api;
+  // nothing there affects the prompt, and any rejection is an unhandled promise, not a load failure.
+  world.run(readFileSync(join(__dirname, '../../public/proxy.js'), 'utf8'));
 
-  await generateBtn._handlers.click();
-  return promptOutput.textContent;
+  await clickOn(world.document.getElementById('proxy-generate-btn'));
+  return world.document.getElementById('proxy-prompt-output').textContent;
 }
 
 describe('LIN-2370 Part 2b — public/proxy.js buildAgentPrompt (the Proxy page copy button)', () => {
