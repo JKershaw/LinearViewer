@@ -2492,3 +2492,18 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **Next 3** (read the merges after `af55cb73` independently before the essay cites them): **Drift & Coherence and Seams & Tangles minted through the new route with `--autopilot`,** with a short operator note (`dab3abb3`, `e364c521`). It's the route's first real use: no checkout, no render, no manual kickoff.
   - **Next 1** (larger standalone tidies on the Periodicals' worst areas, John's hypothesis) and **Next 2** (an area read with a baseline: score an untouched area with the same prompt) are the experiments to run before or alongside the essay.
 - `docs/plans/survey.md`: the paper replaced the overturned 17/3/1/0 with a pointer on main. Brought back onto this branch by a path-limited checkout, not a merge.
+
+### 12:30 UTC: Next 2, a baseline for the area reads (criteria logged before reading)
+- **Question:** do *ordinary* pairs of consecutive changes to the same files, read as one area with the same blind prompt, also read "better"? If they do, the after-step's "better, better" is partly an artefact of reading pairs. If they read mixed or neutral, the after-step's effect stands.
+- **Selection, mechanical and fixed before seeing any pair:** LinearViewer first-parent merges from 20 Oct to 1 Nov (before the loop) that touch production code (`lib/`, `routes/`, `public/`, `server.js`). For each merge in date order, take the next merge within 48 h that shares a production file, with no merge used twice. The first four pairs:
+  1. `0eb4a2d1` LIN-3706 → `a6e0ae11` LIN-3700. Shares only `server.js`: **a weak pair, kept because the rule picked it**;
+  2. `c1d5c700` LIN-3710 → `71a42131` LIN-3714 (`kpi-stats`, `render-kpis`, `kpis.css`);
+  3. `d10e7398` LIN-3717 → `8ddb0f3b` LIN-3722 (`routes/dashboard.js`);
+  4. `0da144c8` LIN-3711 → `c5295b42` LIN-3713 (`kpi-stats`, `workspace-kpi`).
+- **Form:** the same template and area wording as the after-step's area reads (passes AU and AV), two passes per pair, labels AW–BD.
+- **Reading, decided now:**
+  - better in both passes on 3 or 4 of 4 pairs: pairing inflates area reads, and the after-step result is weak;
+  - on 0 or 1 of 4: the after-step's effect is real against this baseline;
+  - on 2 of 4: inconclusive.
+
+  The after-step areas were better in both passes on 6 of 6.
