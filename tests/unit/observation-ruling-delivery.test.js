@@ -168,13 +168,6 @@ function makeSandbox({ world = makeWorld(), postComment, dispatchPrompt, deliver
   // to accepting, since most tests here aren't exercising the gate itself.
   sandbox.confirm = confirmImpl || (() => true);
   sandbox.module = { exports: {} };
-  // Browser globals common.js installs and observation.js references bare.
-  // Same faithful-copy/stub pattern tests/unit/observation-render.test.js
-  // already uses; only renderRulingRow reaches them from this file.
-  sandbox.escapeHtml = (str) => (str === undefined || str === null ? '' : String(str)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#039;'));
-  sandbox.relativeTime = (ts) => (ts ? `stub-relative-time(${ts})` : '');
   sandbox.console = { warn() {}, error() {}, log() {} };
   Object.assign(sandbox.window, {
     // LIN-2758: recorded (not just a no-op) so a test can retrieve and
@@ -208,6 +201,14 @@ function makeSandbox({ world = makeWorld(), postComment, dispatchPrompt, deliver
   // then the per-test fetch seams are overridden on top, keeping every
   // existing assertion about the calls actually made meaningful.
   vm.runInContext(withHarnessModels(COMMON_JS_SRC), sandbox, { filename: 'common.js' });
+  // Browser globals common.js installs (`window.escapeHtml`, `window.relativeTime`) and observation.js references bare.
+  // The world's window is the global (LIN-4307), so these are set after common.js runs, or its own definitions would
+  // replace them. Same faithful-copy/stub pattern tests/unit/observation-render.test.js already uses; only
+  // renderRulingRow reaches them from this file.
+  sandbox.escapeHtml = (str) => (str === undefined || str === null ? '' : String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;'));
+  sandbox.relativeTime = (ts) => (ts ? `stub-relative-time(${ts})` : '');
   sandbox.window.ReplyDelivery.postComment = postComment;
   sandbox.window.ReplyDelivery.deliverReply = deliverReply;
   sandbox.window.ReplyDelivery.errorFromResult = (r) => new Error((r.data && r.data.error) || `HTTP ${r.status}`);

@@ -8,16 +8,11 @@
  */
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import vm from 'node:vm';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { findRouteLayer } from './lib/route-layer.js';
 import { escapeHtml } from '../../lib/utils/html.js';
+import { loadWorld } from './helpers/client-world.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SESSIONS_SRC = readFileSync(join(__dirname, '../../public/sessions.js'), 'utf8');
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 const PATH = '/workspace/:urlKey/api/sessions/:identifier';
@@ -95,12 +90,9 @@ describe('LIN-4016 — the sessions route says whether a waiting session sits on
 
 // The fold's word for a waiting session: the browser reads the route's flag and paints it (public/sessions.js).
 async function foldWordFor(data) {
-  const window = { escapeHtml, relativeTime: () => '', runPageHref: () => null, api: async () => data };
-  const sandbox = { window, console };
-  vm.createContext(sandbox);
-  vm.runInContext(SESSIONS_SRC, sandbox, { filename: 'sessions.js' });
-  const container = { innerHTML: '', classList: { add() {} }, setAttribute() {}, querySelector: () => null };
-  sandbox.window.SessionsSection.init(container, { urlKey: 'acme', identifier: 'LIN-7', home: true, stageWords: {} });
+  const world = loadWorld({ window: { escapeHtml, relativeTime: () => '', runPageHref: () => null, api: async () => data }, scripts: ['sessions.js'] });
+  const container = world.makeContainer();
+  world.window.SessionsSection.init(container, { urlKey: 'acme', identifier: 'LIN-7', home: true, stageWords: {} });
   await flush(); await flush();
   return /<span class="session-state-word">([^<]*)<\/span>/.exec(container.innerHTML)?.[1] ?? null;
 }

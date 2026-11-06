@@ -6,17 +6,21 @@
  * containers and no others (LIN-4071: the container fact is the gather's, and it reaches the browser as the row's decided
  * action, `container: true`, never as a flag); the Home mount hands each row its record and the "Another step" stage words,
  * from the page options and the rows a fold fetches (the real `mountHomePromptSections` and `mergeHomeRowOpts` from public/app.js).
+ *
+ * The placeholders are the server's own (`renderDetailsContent`, layout home), drawn on the shared fake DOM through loadWorld
+ * (LIN-4307); the mount and merge run from public/app.js source, and the Sessions fold runs from public/sessions.js.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import vm from 'node:vm';
 import { rowDataByNodeKey } from '../../lib/task-board-view.js';
 import { buildRowStates } from '../../lib/task-page-loader.js';
 import { nodeKey } from '../../lib/tree.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
+import { renderDetailsContent } from '../../lib/render.js';
+import { loadWorld } from './helpers/client-world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP = readFileSync(join(__dirname, '../../public/app.js'), 'utf8');
@@ -59,82 +63,73 @@ describe('rowDataByNodeKey — the rows that have subtasks are the containers', 
 });
 
 describe('the Home mount — each opened row gets its decision record and the stage words (public/app.js)', () => {
-  // A row placeholder as the server emits it: identity on data attributes, one per opened task.
-  const placeholder = (nodeKeyValue, issueId) => ({
-    dataset: { issueId, identifier: `LIN-${issueId}`, title: `Task ${issueId}`, url: '', source: 'linear', stateType: 'started', nodeKey: nodeKeyValue, instanceKey: nodeKeyValue },
-    closest: () => null,
-  });
+  // An opened task as Home draws it: the server's own placeholder (renderDetailsContent, layout home).
+  const openedTask = (id) => ({ id, identifier: `LIN-${id}`, title: `Task ${id}`, url: '', source: 'linear', description: '', state: { name: 'Started', type: 'started' } });
 
   function mountWith(pageOpts) {
     const inits = [];
-    const sandbox = {
+    const world = loadWorld({
+      scripts: [],
       window: {
         __HOME_PROMPT_OPTS__: { topTaskId: 'linear:top', defaultPromptKeys: [], morePromptKeys: [], ...pageOpts },
         PromptSection: { init: (el, opts) => { inits.push({ el, opts }); return {}; } },
       },
-      document: {},
+    });
+    world.run(functionSource(APP, 'mountHomePromptSections'));
+    world.run(functionSource(APP, 'mergeHomeRowOpts'));
+    // The page is drawn from the server's placeholders, then mounted by the real function.
+    const mount = (issues) => {
+      world.document.body.innerHTML = issues.map((issue) => renderDetailsContent(issue, { urlKey: 'ws', featureFlags: {}, layout: 'home' })).join('');
+      world.run('mountHomePromptSections()');
     };
-    vm.createContext(sandbox);
-    vm.runInContext(`${functionSource(APP, 'mountHomePromptSections')}\nthis.mountHomePromptSections = mountHomePromptSections;`, sandbox);
-    return { inits, mount: (rows) => sandbox.mountHomePromptSections({ querySelectorAll: () => rows }) };
+    return { inits, world, mount };
   }
 
   test('a container row carries its decided action (Run to PR, container) in its record; a leaf row has no record, and the stage words reach both', () => {
+    const parent = openedTask('1');
+    const leaf = openedTask('2');
     const { inits, mount } = mountWith({
-      rowData: { 'linear:parent': { action: { kind: 'offer', why: 'a container runs to PR', container: true }, copyStep: { label: 'plan', name: 'Plan', why: '' }, trackerWord: 'In progress' } },
+      rowData: { [nodeKey(parent)]: { action: { kind: 'offer', why: 'a container runs to PR', container: true }, copyStep: { label: 'plan', name: 'Plan', why: '' }, trackerWord: 'In progress' } },
       stageWords: { research: 'Research', implementation: 'Build' },
     });
-    mount([placeholder('linear:parent', '1'), placeholder('linear:leaf', '2')]);
-    const byNode = (key) => inits.find((i) => i.el.dataset.nodeKey === key).opts;
-    assert.equal(byNode('linear:parent').row.action.container, true);
-    assert.equal(byNode('linear:leaf').row, null);
-    assert.equal(JSON.stringify(byNode('linear:leaf').stageWords), JSON.stringify({ research: 'Research', implementation: 'Build' }), 'the stage words name each step');
+    mount([parent, leaf]);
+    const byNode = (issue) => inits.find((i) => i.el.dataset.nodeKey === nodeKey(issue)).opts;
+    assert.equal(byNode(parent).row.action.container, true);
+    assert.equal(byNode(leaf).row, null);
+    assert.equal(JSON.stringify(byNode(leaf).stageWords), JSON.stringify({ research: 'Research', implementation: 'Build' }), 'the stage words name each step');
   });
 
   test('a fetched row\'s container flag is merged into the page map before it mounts (mergeHomeRowOpts)', () => {
-    const { inits, mount } = mountWith({ rowData: {} });
-    const sandbox = {
-      window: { __HOME_PROMPT_OPTS__: { rowData: {} } },
-    };
-    vm.createContext(sandbox);
-    vm.runInContext(`${functionSource(APP, 'mergeHomeRowOpts')}\nthis.mergeHomeRowOpts = mergeHomeRowOpts;`, sandbox);
+    const { inits, world, mount } = mountWith({ rowData: {} });
     const fetched = { 'linear:fetched-parent': { action: { kind: 'offer', why: 'a container runs to PR', container: true }, copyStep: { label: 'plan', name: 'Plan', why: '' }, trackerWord: 'In progress' } };
-    sandbox.mergeHomeRowOpts({ rowData: fetched });
-    sandbox.mergeHomeRowOpts({ rowData: fetched });
-    // The page map is built inside the vm context, so compare its JSON, not a cross-realm array.
-    assert.equal(Object.keys(sandbox.window.__HOME_PROMPT_OPTS__.rowData).length, 1, 'merged once, not duplicated');
-    assert.equal(sandbox.window.__HOME_PROMPT_OPTS__.rowData['linear:fetched-parent'].action.container, true);
+    world.run(`mergeHomeRowOpts(${JSON.stringify({ rowData: fetched })})`);
+    world.run(`mergeHomeRowOpts(${JSON.stringify({ rowData: fetched })})`);
+    const rowData = world.window.__HOME_PROMPT_OPTS__.rowData;
+    assert.equal(Object.keys(rowData).length, 1, 'merged once, not duplicated');
+    assert.equal(rowData['linear:fetched-parent'].action.container, true);
     assert.equal(inits.length, 0, 'the merge alone mounts nothing');
     mount([]);
   });
 });
 
 describe('the Sessions fold on Home reads as sessions (public/sessions.js)', () => {
-  const SESSIONS = readFileSync(join(__dirname, '../../public/sessions.js'), 'utf8');
   const flush = () => new Promise((r) => setTimeout(r, 0));
 
-  // Loads the real renderer over a fake container; `api` answers the sessions read.
+  // Loads the real renderer into a world; `api` answers the sessions read.
   function load(sessions, opts) {
-    let html = '';
-    const container = {
-      get innerHTML() { return html; },
-      set innerHTML(v) { html = v; },
-      classList: { add() {} },
-      setAttribute() {},
-      querySelector() { return null; },
-    };
-    const window = {
-      escapeHtml: (x) => String(x == null ? '' : x).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]),
-      relativeTime: () => '3m ago',
-      taskPageHref: () => '/workspace/acme/task/LIN-42',
-      runPageHref: (urlKey, sessionId) => (urlKey && sessionId ? `/workspace/${urlKey}/observation/session/${sessionId}` : ''),
-      api: async () => ({ sessions }),
-    };
-    const sandbox = { window, console };
-    vm.createContext(sandbox);
-    vm.runInContext(SESSIONS, sandbox, { filename: 'sessions.js' });
-    sandbox.window.SessionsSection.init(container, { urlKey: 'acme', identifier: 'LIN-42', ...opts });
-    return flush().then(flush).then(() => html);
+    const world = loadWorld({
+      scripts: ['sessions.js'],
+      window: {
+        escapeHtml: (x) => String(x == null ? '' : x).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]),
+        relativeTime: () => '3m ago',
+        taskPageHref: () => '/workspace/acme/task/LIN-42',
+        runPageHref: (urlKey, sessionId) => (urlKey && sessionId ? `/workspace/${urlKey}/observation/session/${sessionId}` : ''),
+        api: async () => ({ sessions }),
+      },
+    });
+    const container = world.makeContainer();
+    world.window.SessionsSection.init(container, { urlKey: 'acme', identifier: 'LIN-42', ...opts });
+    return flush().then(flush).then(() => container.innerHTML);
   }
 
   const SESSION = {
