@@ -6,7 +6,8 @@
  *
  * The client runs in a vm world over the shared fake DOM (tests/unit/helpers/fake-dom.js, through client-world.js),
  * loaded by the Live Console loader in helpers/live-console-world.js. The stream row is pinned as its markup string
- * (`eventRowHtml`). The lane is supplied as markup (makeLaneNode), pinned to the client source (pinLaneMarkupToClient).
+ * (`eventRowHtml`). The lane is the client's own `laneNode`, built through makeLaneNode (LIN-4310), with its markup
+ * pinned to the client source (pinLaneMarkupToClient).
  * Each test's `api` is the client's own exports, read off the world.
  *
  * Pending feed: `window.api` never resolves here (helpers/live-console-world.js), so poll() never reaches applyFeed

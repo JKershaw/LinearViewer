@@ -19,13 +19,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import vm from 'node:vm';
 import { renderDetailsContent } from '../../lib/render.js';
 import { renderSwimPage } from '../../lib/render-swim.js';
 import { renderRunnerLink, runnerSetupHref } from '../../lib/components/runner-link.js';
 // Side-effect import: registers the Linear provider so the render fallbacks resolve.
 import '../../lib/providers/linear/index.js';
 import { withHarnessModels } from '../fixtures/harness-models.js';
+import { loadWorld } from './helpers/client-world.js';
+import { swipePageBody } from './helpers/swipe-page.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPT_SECTION_SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
@@ -86,11 +87,8 @@ describe('the shared markup', () => {
   });
 
   test('client twin (PromptSection.runnerLinkHtml) emits the same markup', () => {
-    const window = { escapeHtml: escapeLikeCommon };
-    const sandbox = { window };
-    vm.createContext(sandbox);
-    vm.runInContext(PROMPT_SECTION_SRC, sandbox);
-    assert.equal(window.PromptSection.runnerLinkHtml('ws'), renderRunnerLink('ws'));
+    const world = loadWorld({ scripts: ['prompt-section.js'], window: { escapeHtml: escapeLikeCommon } });
+    assert.equal(world.window.PromptSection.runnerLinkHtml('ws'), renderRunnerLink('ws'));
   });
 });
 
@@ -158,49 +156,26 @@ function escapeLikeCommon(s) {
     .replace(/'/g, '&#039;');
 }
 
-function makeEl() {
-  return {
-    innerHTML: '',
-    disabled: false,
-    dataset: {},
-    style: {},
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    addEventListener() {},
-    querySelector() { return null; },
-    querySelectorAll() { return []; },
-  };
-}
-
 function renderSwipeCard(swipeData) {
-  const els = new Map();
-  const el = (key) => { if (!els.has(key)) els.set(key, makeEl()); return els.get(key); };
-  // In a browser `window` is the global: swipe.js calls some window.* helpers
-  // as bare globals (renderMarkdown).
-  const sandbox = {
-    __SWIPE_DATA__: swipeData,
-    escapeHtml: escapeLikeCommon,
-    renderMarkdown: (s) => escapeLikeCommon(s),
-    stripCodeBlockWrapper: (s) => s,
-    location: { search: '', href: '' },
-    document: {
-      title: '',
-      getElementById: (id) => el(`#${id}`),
-      querySelector: (sel) => el(sel),
-      addEventListener() {},
+  // swipe.js reads `.swipe-filter-select` and friends at load, so the markup is in the document before any script
+  // runs (loadWorld has no markup option). `window` is the global object, as in a browser: swipe.js calls some
+  // window.* helpers as bare globals (renderMarkdown), and the card's history and location are read on load.
+  const world = loadWorld({
+    scripts: [],
+    window: {
+      __SWIPE_DATA__: swipeData,
+      escapeHtml: escapeLikeCommon,
+      renderMarkdown: (s) => escapeLikeCommon(s),
+      stripCodeBlockWrapper: (s) => s,
     },
-    history: { replaceState() {} },
-    setTimeout: () => 0,
-    clearTimeout() {},
-    requestAnimationFrame: () => 0,
-    console,
-  };
-  sandbox.window = sandbox;
-  vm.createContext(sandbox);
+    globals: { location: { search: '', href: '' }, history: { replaceState() {} } },
+  });
+  world.document.body.innerHTML = swipePageBody({ urlKey: swipeData.urlKey });
   // The real common.js, as the page loads it first: it owns the terminal-state set swipe.js reads.
-  vm.runInContext(withHarnessModels(COMMON_SRC), sandbox);
-  vm.runInContext(PROMPT_SECTION_SRC, sandbox);
-  vm.runInContext(SWIPE_SRC, sandbox);
-  return el('#swipe-card').innerHTML;
+  world.run(withHarnessModels(COMMON_SRC));
+  world.run(PROMPT_SECTION_SRC);
+  world.run(SWIPE_SRC);
+  return world.document.getElementById('swipe-card').innerHTML;
 }
 
 function swipeData(extra = {}) {

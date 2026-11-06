@@ -20,10 +20,10 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import vm from 'node:vm';
 import express from 'express';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { FreeTierStore } from '../../lib/free-tier-store.js';
+import { loadWorld } from './helpers/client-world.js';
 import { isWorkspaceApiUnitFile } from './lib/workspace-api-unit.js';
 
 const FUTURE = '2026-10-03T00:00:00.000Z';
@@ -80,48 +80,29 @@ const FRESH = { prompt: 'run me', kind: 'implementation' };
 /**
  * The THIRD surface (LIN-3239): render the shared opened-task ladder against
  * the exact `GET .../dispatch/quota` body, so the client's displayed run count
- * is proven to agree with the route's read. Minimal vm sandbox — the ladder
- * render only needs the `window.api` quota read to resolve.
+ * is proven to agree with the route's read. A client world (loadWorld, LIN-4310)
+ * with prompt-section.js and the ladder's window stubs; the container is a real
+ * element, and the ladder render only needs the `window.api` quota read to resolve.
  */
 async function renderLadderQuota(quotaBody) {
-  const src = readFileSync(new URL('../../public/prompt-section.js', import.meta.url), 'utf8');
-  const window = {
-    escapeHtml: (s) => (s == null ? '' : String(s)),
-    stripCodeBlockWrapper: (s) => s,
-    renderMarkdown: (s) => String(s == null ? '' : s),
-    api: async (url) => (String(url).endsWith('/api/dispatch/quota') ? quotaBody : { prompt: 'P', promptName: 'T' }),
-    ProxyToggle: { maybeAppend: async (raw) => raw },
-    renderDispatchDisclosure: () => '<div class="swipe-prompt-options"></div>',
-    readDispatchExecControls: () => ({}),
-    dispatchPrompt: async () => ({ item: { id: 'disp-1' } }),
-    isPinnedToBottom: () => false,
-    toast: () => {},
-    fetchAutopilotKickoff: async () => ({ prompt: 'A', promptName: 'A', kind: 'autopilot' })
-  };
-  const sandbox = {
-    window,
-    AbortController,
-    URLSearchParams,
-    TextDecoder,
-    TextEncoder,
-    Blob: class {},
-    URL: { createObjectURL: () => '', revokeObjectURL: () => {} },
-    document: { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } },
-    requestAnimationFrame: (cb) => { cb(); return 1; },
-    setTimeout: () => 1,
-    clearTimeout: () => {},
-    navigator: { clipboard: { writeText: async () => {} } },
-    fetch: async () => ({ ok: false, status: 500, json: async () => ({}) })
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(src, sandbox);
-  const container = {
-    innerHTML: '', dataset: {},
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    setAttribute() {}, getAttribute() { return null; }, querySelector() { return null; },
-    contains() { return true; }, addEventListener() {}, removeEventListener() {}
-  };
-  window.PromptSection.init(container, {
+  const world = loadWorld({
+    scripts: ['prompt-section.js'],
+    window: {
+      escapeHtml: (s) => (s == null ? '' : String(s)),
+      stripCodeBlockWrapper: (s) => s,
+      renderMarkdown: (s) => String(s == null ? '' : s),
+      api: async (url) => (String(url).endsWith('/api/dispatch/quota') ? quotaBody : { prompt: 'P', promptName: 'T' }),
+      ProxyToggle: { maybeAppend: async (raw) => raw },
+      renderDispatchDisclosure: () => '<div class="swipe-prompt-options"></div>',
+      readDispatchExecControls: () => ({}),
+      dispatchPrompt: async () => ({ item: { id: 'disp-1' } }),
+      isPinnedToBottom: () => false,
+      toast: () => {},
+      fetchAutopilotKickoff: async () => ({ prompt: 'A', promptName: 'A', kind: 'autopilot' })
+    },
+  });
+  const container = world.makeContainer();
+  world.window.PromptSection.init(container, {
     urlKey: 'acme',
     issue: { id: 'i-1', identifier: 'A-1', title: 'A task' },
     surface: 'swipe',
