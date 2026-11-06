@@ -7,28 +7,28 @@
  * build and are expected to FAIL against the unmodified code.
  *
  * The card client runs for real: public/common.js (ReplyDelivery) and
- * public/question-cards.js are vm-sandboxed with a stubbed `fetch`, and the
- * card's DOM is built from the REAL `renderDecisionCard` markup, so the
- * markup→client contract is what is under test.
+ * public/question-cards.js load into one `loadWorld` (the shared fake DOM,
+ * tests/unit/helpers/fake-dom.js) with a stubbed `fetch`, and the card's DOM is
+ * the REAL `renderDecisionCard` markup parsed into the page, so the
+ * markup→client contract is what is under test. The page has no `CustomEvent`,
+ * so `announceRulingGone` exits before its bubbling `dispatchEvent` (LIN-4309).
  *
  * Run with: node --test tests/unit/question-card-task-bound.test.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
-import { withHarnessModels } from '../fixtures/harness-models.js';
+import { harnessModelsBlock } from '../../lib/model-routing-harnesses.js';
 import { renderDecisionCard } from '../../lib/question-card.js';
 import {
   LOOP_BACKED_ROWS, RENDER_OPTS, TASK_BOUND_ROW, TASK_DECISION_ID, TASK_ISSUE_UUID
 } from '../fixtures/question-card-rows.js';
+import { clickOn, loadWorld } from './helpers/client-world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = join(__dirname, '../..');
-const COMMON_JS_SRC = readFileSync(join(REPO, 'public/common.js'), 'utf8');
-const QUESTION_CARDS_JS_SRC = readFileSync(join(REPO, 'public/question-cards.js'), 'utf8');
 const GOLDEN = JSON.parse(readFileSync(join(__dirname, '../fixtures/question-card-loop-golden.json'), 'utf8'));
 
 const OPEN_TASK = { hydrated: true, state: { name: 'In Progress', type: 'started' } };
@@ -38,108 +38,67 @@ const NOOP_HANDLERS = {
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-function unescapeHtml(s) {
-  return s.replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-}
-
-function el(over = {}) {
-  return Object.assign({
-    dataset: {}, textContent: '', value: '', className: '', disabled: false, hidden: false, isConnected: true,
-    listeners: {},
-    addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); },
-    click() { (this.listeners.click || []).forEach(fn => fn({ preventDefault() {} })); },
-    querySelector() { return null; },
-    querySelectorAll() { return []; }
-  }, over);
-}
-
-/**
- * Build the card's client-side DOM from the real rendered markup: the root's
- * data-* attributes become `dataset` (camelCased, entity-decoded), and the
- * controls the client looks up are fakes whose state the tests read.
- */
-function makeFakeCard(html, { typed = '' } = {}) {
-  const root = html.match(/<div class="sess-qcard" ([^>]*)>/);
-  assert.ok(root, 'the rendered card has a root element');
-  const dataset = {};
-  for (const m of root[1].matchAll(/data-([a-z-]+)="([^"]*)"/g)) {
-    dataset[m[1].replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = unescapeHtml(m[2]);
-  }
-  const questionMatch = html.match(/data-testid="session-question-card-question">([^<]*)</);
-  const questionEl = el({ textContent: questionMatch ? unescapeHtml(questionMatch[1]) : '' });
-  const btn = el();
-  const textarea = el({ value: typed });
-  const feedback = el();
-  const dismissBtn = html.includes('data-testid="session-question-card-dismiss"') ? el() : null;
-  // LIN-4114: each option is a button. A press answers with that button's own label (no radio is ticked any more).
-  const optionBtns = [...html.matchAll(/<button [^>]*data-option-id="([^"]*)"[^>]*>([^<]*)<\/button>/g)]
-    .map(m => el({ dataset: { optionId: unescapeHtml(m[1]) }, textContent: unescapeHtml(m[2]) }));
-  const optionBtn = (id) => {
-    const b = optionBtns.find(x => x.dataset.optionId === id);
-    assert.ok(b, `option ${id} is rendered`);
-    return b;
-  };
-  const card = el({
-    dataset,
-    parentNode: { removeChild() { card.removed = true; } },
-    querySelector(sel) {
-      switch (sel) {
-        case '[data-testid="session-question-card-answer"]': return btn;
-        case '[data-testid="session-question-card-input"]': return textarea;
-        case '.sess-qcard-feedback': return feedback;
-        case '[data-testid="session-question-card-dismiss"]': return dismissBtn;
-        case '[data-testid="session-question-card-question"]': return questionEl;
-        default: return null;
-      }
-    },
-    querySelectorAll(sel) { return sel === '[data-testid="session-question-card-option"]' ? optionBtns : []; }
-  });
-  return { card, btn, textarea, feedback, dismissBtn, optionBtn };
-}
-
 async function flush() { for (let i = 0; i < 10; i++) await new Promise(r => setImmediate(r)); }
 
 /**
- * A vm sandbox holding the REAL common.js and question-cards.js. Only the
- * network seams are stubbed: `fetch` (recorded), `window.api` (the hydrate),
- * and `window.dispatchPrompt` (the fresh-run starter).
+ * A world with the REAL common.js and question-cards.js. Only the network seams are stubbed: `fetch` (recorded),
+ * `window.api` (the hydrate), and `window.dispatchPrompt` (the fresh-run starter). common.js defines `api` and
+ * `dispatchPrompt` as it loads, so the stubs are set after it, as the page's own script order left them.
+ * `timers` collects the client's timeouts instead of running them, so a restore never fires mid-test.
  */
-function makeSandbox(cards, { hydrate = OPEN_TASK, commentOk = true, dismissOk = true } = {}) {
+function makeWorld({ hydrate = OPEN_TASK, commentOk = true, dismissOk = true } = {}) {
   const calls = [];
   const dispatched = [];
-  const sandbox = {
-    module: { exports: {} },
+  const world = loadWorld({
     window: {
-      _listeners: {},
-      addEventListener(type, fn) { (this._listeners[type] = this._listeners[type] || []).push(fn); },
-      matchMedia: () => ({ matches: false }),
-      ChatUI: { appendMessage() {} }
+      __HARNESS_MODELS__: harnessModelsBlock(),
+      ChatUI: { appendMessage() {} },
+      fetch(url, opts) {
+        const body = opts && opts.body ? JSON.parse(opts.body) : undefined;
+        calls.push({ url: String(url), opts, body });
+        let ok = true;
+        if (/\/api\/comments\//.test(String(url))) ok = commentOk;
+        if (/\/api\/scan\/|\/rulings\/dismiss/.test(String(url))) ok = dismissOk;
+        return Promise.resolve({ ok, status: ok ? 200 : 500, json: () => Promise.resolve(ok ? { success: true } : { error: 'boom' }) });
+      }
     },
-    document: {
-      addEventListener() {},
-      querySelectorAll(sel) { return sel.includes('session-question-card') ? cards.map(c => c.card) : []; },
-      createElement() { return el(); }
-    },
-    localStorage: { getItem: () => null, setItem() {} },
-    fetch(url, opts) {
-      const body = opts && opts.body ? JSON.parse(opts.body) : undefined;
-      calls.push({ url: String(url), opts, body });
-      let ok = true;
-      if (/\/api\/comments\//.test(String(url))) ok = commentOk;
-      if (/\/api\/scan\/|\/rulings\/dismiss/.test(String(url))) ok = dismissOk;
-      return Promise.resolve({ ok, status: ok ? 200 : 500, json: () => Promise.resolve(ok ? { success: true } : { error: 'boom' }) });
-    },
-    setTimeout() {},
-    console
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(withHarnessModels(COMMON_JS_SRC), sandbox, { filename: 'common.js' });
-  sandbox.window.api = async () => hydrate;
-  sandbox.window.dispatchPrompt = async (o) => { dispatched.push(o); return { id: 'run-1' }; };
-  vm.runInContext(QUESTION_CARDS_JS_SRC, sandbox, { filename: 'question-cards.js' });
+    scripts: ['common.js', 'question-cards.js'],
+    timers: [],
+  });
+  world.window.api = async () => hydrate;
+  world.window.dispatchPrompt = async (o) => { dispatched.push(o); return { id: 'run-1' }; };
   const commentCalls = () => calls.filter(c => /\/api\/comments\//.test(c.url));
   const runStarts = () => calls.filter(c => /\/api\/dispatch/.test(c.url)).length + dispatched.length;
-  return { sandbox, calls, dispatched, commentCalls, runStarts };
+  return { world, calls, commentCalls, runStarts };
+}
+
+/**
+ * Parses the rendered card into the page and returns its controls. The controls are the real nodes the client looks up;
+ * `typed` sets the textarea's value, which the markup does not carry.
+ */
+function mountCard(world, html, { typed = '' } = {}) {
+  world.document.body.innerHTML = html;
+  const card = world.document.querySelector('[data-testid="session-question-card"]');
+  assert.ok(card, 'the rendered card is on the page');
+  const btn = card.querySelector('[data-testid="session-question-card-answer"]');
+  const textarea = card.querySelector('[data-testid="session-question-card-input"]');
+  textarea.value = typed;
+  const feedback = card.querySelector('.sess-qcard-feedback');
+  const dismissBtn = card.querySelector('[data-testid="session-question-card-dismiss"]');
+  const optionBtn = (id) => {
+    const b = card.querySelector(`[data-testid="session-question-card-option"][data-option-id="${id}"]`);
+    assert.ok(b, `option ${id} is rendered`);
+    return b;
+  };
+  return { card, btn, textarea, feedback, dismissBtn, optionBtn };
+}
+
+/** A world with `html` mounted and the card bound, as the page's own init binds it. */
+function answerable(html, { typed = '', ...opts } = {}) {
+  const h = makeWorld(opts);
+  const f = mountCard(h.world, html, { typed });
+  h.world.window.QuestionCards.initQuestionCards();
+  return { ...h, ...f };
 }
 
 const noopHandlers = () => ({ ...NOOP_HANDLERS });
@@ -189,12 +148,10 @@ test('GUARD markup: a task-bound row with no issue id does not carry the attribu
 });
 
 test('GUARD client: a loop-backed answer carries no task-decision fields and keeps its chosen option', async () => {
-  const f = makeFakeCard(renderDecisionCard(structuredClone(LOOP_BACKED_ROWS['loop-with-options']), RENDER_OPTS), { typed: '' });
-  const h = makeSandbox([f]);
-  h.sandbox.module.exports.initQuestionCards();
-  f.optionBtn('opt-a').click();
+  const f = answerable(renderDecisionCard(structuredClone(LOOP_BACKED_ROWS['loop-with-options']), RENDER_OPTS), { typed: '' });
+  await clickOn(f.optionBtn('opt-a'));
   await flush();
-  const [comment] = h.commentCalls();
+  const [comment] = f.commentCalls();
   assert.ok(comment, 'the answer writes its comment');
   assert.equal(comment.body.optionId, 'opt-a', 'the loop-backed body keeps optionId');
   assert.equal('taskDecisionId' in comment.body, false);
@@ -202,13 +159,11 @@ test('GUARD client: a loop-backed answer carries no task-decision fields and kee
 });
 
 test('GUARD client: a loop-backed dismiss still hits the rulings dismiss route first, with the loop stamp', async () => {
-  const f = makeFakeCard(renderDecisionCard(structuredClone(LOOP_BACKED_ROWS['loop-with-options']), RENDER_OPTS));
-  const h = makeSandbox([f]);
-  h.sandbox.module.exports.initQuestionCards();
-  f.dismissBtn.click();
+  const f = answerable(renderDecisionCard(structuredClone(LOOP_BACKED_ROWS['loop-with-options']), RENDER_OPTS));
+  await clickOn(f.dismissBtn);
   await flush();
-  assert.equal(h.calls[0].url, '/workspace/w/api/dashboard/rulings/dismiss');
-  assert.deepEqual(h.calls[0].body, { decisionLoopId: 'lp-1', decisionId: 'd-opts' });
+  assert.equal(f.calls[0].url, '/workspace/w/api/dashboard/rulings/dismiss');
+  assert.deepEqual(f.calls[0].body, { decisionLoopId: 'lp-1', decisionId: 'd-opts' });
 });
 
 // ── NEW: the markup carries the scan decision id ───────────────────────────
@@ -221,12 +176,10 @@ test('NEW markup: a task-bound row with a scan id and an issue UUID emits data-t
 // ── NEW: comment writes forward the scan pair (real ReplyDelivery) ──────────
 
 test('NEW client: a task-bound free-text answer writes the comment with the scan pair and no optionId', async () => {
-  const f = makeFakeCard(taskBoundMarkup(), { typed: 'my answer' });
-  const h = makeSandbox([f]);
-  h.sandbox.module.exports.initQuestionCards();
-  f.btn.click();
+  const f = answerable(taskBoundMarkup(), { typed: 'my answer' });
+  await clickOn(f.btn);
   await flush();
-  const [comment] = h.commentCalls();
+  const [comment] = f.commentCalls();
   assert.ok(comment, 'the answer writes its comment');
   assert.equal(comment.body.taskDecisionId, TASK_DECISION_ID);
   assert.equal(comment.body.taskDecisionIssueId, TASK_ISSUE_UUID);
@@ -235,12 +188,10 @@ test('NEW client: a task-bound free-text answer writes the comment with the scan
 });
 
 test('NEW client: a task-bound option press drops the chosen option id from the body', async () => {
-  const f = makeFakeCard(taskBoundMarkup(), { typed: '' });
-  const h = makeSandbox([f]);
-  h.sandbox.module.exports.initQuestionCards();
-  f.optionBtn('opt-a').click();
+  const f = answerable(taskBoundMarkup(), { typed: '' });
+  await clickOn(f.optionBtn('opt-a'));
   await flush();
-  const [comment] = h.commentCalls();
+  const [comment] = f.commentCalls();
   assert.ok(comment, 'the press writes its comment');
   assert.equal(comment.body.taskDecisionId, TASK_DECISION_ID, 'the scan pair is forwarded');
   assert.equal('optionId' in comment.body, false, 'the body matches the Rulings tab: no optionId');
@@ -248,30 +199,26 @@ test('NEW client: a task-bound option press drops the chosen option id from the 
 });
 
 test('NEW client: a task-bound row that declares dispatch is delivered as record — no run, "recorded on the task"', async () => {
-  const f = makeFakeCard(taskBoundMarkup({ effect: 'dispatch', declaredEffect: 'dispatch' }), { typed: 'go ahead' });
-  const h = makeSandbox([f]);
-  h.sandbox.module.exports.initQuestionCards();
-  f.btn.click();
+  const f = answerable(taskBoundMarkup({ effect: 'dispatch', declaredEffect: 'dispatch' }), { typed: 'go ahead' });
+  await clickOn(f.btn);
   await flush();
-  assert.equal(h.runStarts(), 0, 'no fresh run is started for a scan row, even when an older row declares dispatch');
-  assert.equal(h.commentCalls().length, 1, 'the answer is recorded');
-  assert.equal(h.commentCalls()[0].body.taskDecisionId, TASK_DECISION_ID);
+  assert.equal(f.runStarts(), 0, 'no fresh run is started for a scan row, even when an older row declares dispatch');
+  assert.equal(f.commentCalls().length, 1, 'the answer is recorded');
+  assert.equal(f.commentCalls()[0].body.taskDecisionId, TASK_DECISION_ID);
   assert.match(f.feedback.textContent, /recorded on the task/);
 });
 
 test('NEW client: a task-bound row that declares resume is also delivered as record — no follow-up dispatch', async () => {
-  const f = makeFakeCard(taskBoundMarkup({ effect: 'resume', declaredEffect: 'resume' }), { typed: 'go ahead' });
-  const h = makeSandbox([f]);
-  h.sandbox.module.exports.initQuestionCards();
-  f.btn.click();
+  const f = answerable(taskBoundMarkup({ effect: 'resume', declaredEffect: 'resume' }), { typed: 'go ahead' });
+  await clickOn(f.btn);
   await flush();
-  assert.equal(h.runStarts(), 0, 'no resume follow-up for a scan row');
-  assert.equal(h.commentCalls()[0].body.taskDecisionId, TASK_DECISION_ID);
+  assert.equal(f.runStarts(), 0, 'no resume follow-up for a scan row');
+  assert.equal(f.commentCalls()[0].body.taskDecisionId, TASK_DECISION_ID);
 });
 
 test('NEW write site (deliverReply, resume branch): forwards the scan pair', async () => {
-  const h = makeSandbox([]);
-  await h.sandbox.window.ReplyDelivery.deliverReply({
+  const h = makeWorld();
+  await h.world.window.ReplyDelivery.deliverReply({
     urlKey: 'w', issueId: TASK_ISSUE_UUID, followUpTo: 'lp-1', target: 'cli', source: 'github',
     taskDecisionId: TASK_DECISION_ID, taskDecisionIssueId: TASK_ISSUE_UUID
   }, 'my answer', noopHandlers());
@@ -282,8 +229,8 @@ test('NEW write site (deliverReply, resume branch): forwards the scan pair', asy
 });
 
 test('NEW write site (deliverReply, recordOnly branch): forwards the scan pair and starts no run', async () => {
-  const h = makeSandbox([]);
-  await h.sandbox.window.ReplyDelivery.deliverReply({
+  const h = makeWorld();
+  await h.world.window.ReplyDelivery.deliverReply({
     urlKey: 'w', issueId: TASK_ISSUE_UUID, followUpTo: 'lp-1', target: 'cli', source: 'github', recordOnly: true,
     taskDecisionId: TASK_DECISION_ID, taskDecisionIssueId: TASK_ISSUE_UUID
   }, 'my answer', noopHandlers());
@@ -295,8 +242,8 @@ test('NEW write site (deliverReply, recordOnly branch): forwards the scan pair a
 });
 
 test('NEW write site (deliverRulingRecord): forwards the scan pair', async () => {
-  const h = makeSandbox([]);
-  await h.sandbox.window.ReplyDelivery.deliverRulingRecord({
+  const h = makeWorld();
+  await h.world.window.ReplyDelivery.deliverRulingRecord({
     urlKey: 'w', issueId: TASK_ISSUE_UUID, issueIdentifier: 'LIN-7', source: 'github', prompt: 'my answer',
     taskDecisionId: TASK_DECISION_ID, taskDecisionIssueId: TASK_ISSUE_UUID
   }, noopHandlers());
@@ -307,8 +254,8 @@ test('NEW write site (deliverRulingRecord): forwards the scan pair', async () =>
 });
 
 test('NEW write site (deliverRulingDispatch, the defensive downgrade/dispatch path): forwards the scan pair', async () => {
-  const h = makeSandbox([]);
-  await h.sandbox.window.ReplyDelivery.deliverRulingDispatch({
+  const h = makeWorld();
+  await h.world.window.ReplyDelivery.deliverRulingDispatch({
     urlKey: 'w', issueId: TASK_ISSUE_UUID, issueIdentifier: 'LIN-7', source: 'github', prompt: 'my answer',
     dispatchPrompt: 'brief', target: 'cli',
     taskDecisionId: TASK_DECISION_ID, taskDecisionIssueId: TASK_ISSUE_UUID
@@ -330,8 +277,8 @@ const withoutAttemptId = ({ answerAttemptId, ...rest }) => rest;
 //   postComment(targetUrlKey, anchor.issueId || anchor.issueIdentifier, prompt,
 //     { taskDecisionId: anchor.taskDecisionId, taskDecisionIssueId: anchor.issueId, source: anchor.source })
 async function rulingsTabCommentFor(prompt) {
-  const h = makeSandbox([]);
-  await h.sandbox.window.ReplyDelivery.postComment('w', TASK_ISSUE_UUID, prompt, {
+  const h = makeWorld();
+  await h.world.window.ReplyDelivery.postComment('w', TASK_ISSUE_UUID, prompt, {
     taskDecisionId: TASK_DECISION_ID, taskDecisionIssueId: TASK_ISSUE_UUID, source: 'github'
   });
   const [comment] = h.commentCalls();
@@ -340,12 +287,10 @@ async function rulingsTabCommentFor(prompt) {
 
 test('NEW differential: a task-bound free-text answer sends the same comment request as the Rulings tab', async () => {
   const tab = await rulingsTabCommentFor('my answer');
-  const f = makeFakeCard(taskBoundMarkup(), { typed: 'my answer' });
-  const h = makeSandbox([f]);
-  h.sandbox.module.exports.initQuestionCards();
-  f.btn.click();
+  const f = answerable(taskBoundMarkup(), { typed: 'my answer' });
+  await clickOn(f.btn);
   await flush();
-  const [comment] = h.commentCalls();
+  const [comment] = f.commentCalls();
   assert.ok(comment, 'the card writes its comment');
   assert.equal(comment.url, tab.url);
   assert.deepEqual(withoutAttemptId(comment.body), tab.body);
@@ -353,12 +298,10 @@ test('NEW differential: a task-bound free-text answer sends the same comment req
 
 test('NEW differential: a task-bound option press sends the same comment request as the Rulings tab', async () => {
   const tab = await rulingsTabCommentFor('Yes, ship it');
-  const f = makeFakeCard(taskBoundMarkup(), { typed: '' });
-  const h = makeSandbox([f]);
-  h.sandbox.module.exports.initQuestionCards();
-  f.optionBtn('opt-a').click();
+  const f = answerable(taskBoundMarkup(), { typed: '' });
+  await clickOn(f.optionBtn('opt-a'));
   await flush();
-  const [comment] = h.commentCalls();
+  const [comment] = f.commentCalls();
   assert.ok(comment, 'the card writes its comment');
   assert.equal(comment.url, tab.url);
   assert.deepEqual(withoutAttemptId(comment.body), tab.body);
@@ -372,10 +315,14 @@ test('NEW differential: a stray record_on on a scan row never redirects the comm
     neighborhood: { parent: null, siblings: [{ identifier: 'LIN-9', id: 'uuid-9', state: { type: 'started' } }], children: [], cousins: [] }
   };
   const tab = await rulingsTabCommentFor('my answer');
-  const f = makeFakeCard(renderDecisionCard(structuredClone(row), RENDER_OPTS), { typed: 'my answer' });
-  const h = makeSandbox([f], { hydrate: neighbourhood });
-  h.sandbox.module.exports.initQuestionCards();
-  f.btn.click();
+  // The markup blanks record_on on a scan row (lib/question-card.js), so the card below is given one, as a stale or forged
+  // card would carry it: the client's own guard (deliverRulingRecord) is what must keep the comment on the anchor. The card
+  // reads data-record-on when it binds, so the attribute is set before initQuestionCards runs.
+  const h = makeWorld({ hydrate: neighbourhood });
+  const f = mountCard(h.world, renderDecisionCard(structuredClone(row), RENDER_OPTS), { typed: 'my answer' });
+  f.card.dataset.recordOn = 'LIN-9';
+  h.world.window.QuestionCards.initQuestionCards();
+  await clickOn(f.btn);
   await flush();
   const [comment] = h.commentCalls();
   assert.ok(comment, 'the card writes its comment');
@@ -386,55 +333,49 @@ test('NEW differential: a stray record_on on a scan row never redirects the comm
 // ── NEW: dismissal of a scan row goes to the scan route ─────────────────────
 
 test('NEW dismiss: a task-bound dismiss makes exactly one request, to the scan dismiss route by issue UUID with the source, body {id}', async () => {
-  const f = makeFakeCard(taskBoundMarkup());
-  const h = makeSandbox([f]);
-  h.sandbox.module.exports.initQuestionCards();
-  f.dismissBtn.click();
+  const f = answerable(taskBoundMarkup());
+  await clickOn(f.dismissBtn);
   await flush();
-  assert.equal(h.calls.length, 1, 'one request — no rulings dismiss, no follow-up');
-  assert.equal(h.calls[0].url, `/workspace/w/api/scan/${TASK_ISSUE_UUID}/dismiss?source=github`);
-  assert.deepEqual(h.calls[0].body, { id: TASK_DECISION_ID });
-  assert.equal(h.runStarts(), 0);
-  assert.equal(f.card.removed, true, 'the card is removed on success');
+  assert.equal(f.calls.length, 1, 'one request — no rulings dismiss, no follow-up');
+  assert.equal(f.calls[0].url, `/workspace/w/api/scan/${TASK_ISSUE_UUID}/dismiss?source=github`);
+  assert.deepEqual(f.calls[0].body, { id: TASK_DECISION_ID });
+  assert.equal(f.runStarts(), 0);
+  assert.equal(f.card.isConnected, false, 'the card is removed on success');
 });
 
 test('NEW dismiss: a failed scan dismiss leaves the card in place, re-enables its buttons and says so', async () => {
-  const f = makeFakeCard(taskBoundMarkup());
-  const h = makeSandbox([f], { dismissOk: false });
-  h.sandbox.module.exports.initQuestionCards();
-  f.dismissBtn.click();
+  const f = answerable(taskBoundMarkup(), { dismissOk: false });
+  await clickOn(f.dismissBtn);
   await flush();
-  assert.equal(h.calls[0].url, `/workspace/w/api/scan/${TASK_ISSUE_UUID}/dismiss?source=github`);
-  assert.equal(f.card.removed, undefined, 'the card stays');
+  assert.equal(f.calls[0].url, `/workspace/w/api/scan/${TASK_ISSUE_UUID}/dismiss?source=github`);
+  assert.equal(f.card.isConnected, true, 'the card stays');
   assert.equal(f.dismissBtn.disabled, false);
   assert.equal(f.btn.disabled, false);
   assert.match(f.feedback.textContent, /dismiss failed/);
 });
 
 test('NEW dismiss: a task-bound dismiss sends no follow-up even when the disposition reads resumable', async () => {
-  const f = makeFakeCard(taskBoundMarkup());
+  const f = answerable(taskBoundMarkup());
   f.card.dataset.disposition = 'resumable';
-  const h = makeSandbox([f]);
-  h.sandbox.module.exports.initQuestionCards();
-  f.dismissBtn.click();
+  await clickOn(f.dismissBtn);
   await flush();
-  assert.equal(h.calls.length, 1, 'the scan dismiss is the only request');
-  assert.equal(h.runStarts(), 0, 'no run is started for a scan row');
+  assert.equal(f.calls.length, 1, 'the scan dismiss is the only request');
+  assert.equal(f.runStarts(), 0, 'no run is started for a scan row');
 });
 
 // ── NEW: the delivered-effect rule ─────────────────────────────────────────
 
 test('NEW effect: deliveredEffect returns record for a card carrying a scan decision id, whatever it declares', () => {
-  const h = makeSandbox([]);
-  const { deliveredEffect } = h.sandbox.window.ReplyDelivery;
+  const h = makeWorld();
+  const { deliveredEffect } = h.world.window.ReplyDelivery;
   const scan = { taskDecisionId: TASK_DECISION_ID, taskDecisionIssueId: TASK_ISSUE_UUID };
   assert.equal(deliveredEffect({ ...scan, effect: 'dispatch' }), 'record');
   assert.equal(deliveredEffect({ ...scan, effect: 'resume', disposition: 'resumable' }), 'record');
 });
 
 test('GUARD effect: deliveredEffect leaves a loop-backed dispatch declared as dispatch', () => {
-  const h = makeSandbox([]);
-  assert.equal(h.sandbox.window.ReplyDelivery.deliveredEffect({ effect: 'dispatch' }), 'dispatch');
+  const h = makeWorld();
+  assert.equal(h.world.window.ReplyDelivery.deliveredEffect({ effect: 'dispatch' }), 'dispatch');
 });
 
 // ── NEW: the search guard — every postComment( call site is named ──────────
