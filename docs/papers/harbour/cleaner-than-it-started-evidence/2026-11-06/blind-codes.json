@@ -1,0 +1,3205 @@
+{
+  "source": "comments/LIN-4150.json (frozen); every sign is the pass's own Balance cell, copied verbatim",
+  "scoring": "better=+1, neutral=0, mixed=0, worse=-1; \"mixed (leans worse)\" kept as mixed with leans=worse",
+  "passes_count": 42,
+  "unresolved_labels": [],
+  "passes": [
+    {
+      "id": "batch B",
+      "kind": "batch",
+      "title": "batch B",
+      "comment_id": "b1907c14-df7e-436e-8dfc-70361c561fff",
+      "created_at": "2026-11-05T07:48:43.861Z",
+      "session": "pass-1 (batches A+B)",
+      "subject_tickets": null,
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "simple-dispatcher 86bde97",
+          "shas": [
+            {
+              "repo": "simple-dispatcher",
+              "short": "86bde97",
+              "full": "86bde97492f6f19de0a0fd13707a0b9dee3cbaef",
+              "subject": "LIN-4224: scripted clean-main baseline (npm run test:baseline), docs, final census (heavy-tier harness 5/5) (#321)"
+            }
+          ],
+          "tickets": [
+            "LIN-4224"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "`npm run test:baseline` replaces a hand-run docs table and reuses `childEnv`, `stopGroupSync`, `preflight` and `SUITE_ARGS`. But it adds second copies: `UNIT_ARGS` restates the `package.json` test script, held in step by a test; `pathRefusal` hard-codes the leak trap's shared roots instead of living in `test/protected-paths.js`. `baseline.js` sits under `system/harness/` while driving both tiers. About 1,400 new lines simplify about 6 existing ones."
+          }
+        },
+        {
+          "row": 2,
+          "commit_cell": "simple-dispatcher 54febbf",
+          "shas": [
+            {
+              "repo": "simple-dispatcher",
+              "short": "54febbf",
+              "full": "54febbf8cfccb5c68954f61b50f660af6ecd7a1a",
+              "subject": "LIN-4223: one process-group stop for the heavy tier (stop-group.js, sync variant for reap.js) (#317)"
+            }
+          ],
+          "tickets": [
+            "LIN-4223"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "The process-group stop moves out of `run-mutations.js` into `harness/stop-group.js`, and `reap.js` and `harbour.js` now use it instead of SIGKILLing only the parent. No other group-kill copy is left. Costs: the unit preload `isolate-run.js` now requires a system-harness file, `'harbour-groups'` is hard-coded in three files, and `SD_HARBOUR_GROUPS` never reached the `isolate-run-vars.js` registry, so a test edits `process.env` by hand."
+          }
+        },
+        {
+          "row": 3,
+          "commit_cell": "simple-dispatcher 796bc9d + LinearViewer 279dcb0a4",
+          "shas": [
+            {
+              "repo": "simple-dispatcher",
+              "short": "796bc9d",
+              "full": "796bc9da48349458d9cd8e103e85b4e5ba068ccd",
+              "subject": "LIN-4239: defer, blocked and failed post their status last (#326)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "279dcb0a",
+              "full": "279dcb0a4e426e7ed069ecc07898278f46da46fb",
+              "subject": "LIN-4240: parseParkedWait decides on the newest state-bearing entry (#2280)"
+            }
+          ],
+          "tickets": [
+            "LIN-4239",
+            "LIN-4240"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "One rule now holds in both repos. simple-dispatcher drops the `statusLastTrailingTool` exception for a single \"status last\" rule with one helper (`stop-status-order.js`). LinearViewer's `_isNonStateEntry` replaces `_isStampEntry` at both walk sites, and the docs were updated. But \"a park is readable\" now has an owner on each side; `park-read.test.js` is the first system test to `import()` a Harbour module, while the README still says HTTP only; and the change adds a third ticket-marker regex and a second `[usage]` regex. The skip-kinds deny-list isn't tied to `FEEDBACK_ENTRY_KINDS`. 1,415 of the 1,707 lines added in simple-dispatcher are golden fixture."
+          }
+        },
+        {
+          "row": 4,
+          "commit_cell": "LinearViewer 2ee4e6006",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "2ee4e600",
+              "full": "2ee4e6006a28fcd50d546a4b94922746de4289d5",
+              "subject": "LIN-4201: the cost read sums request records (records-first cutover, LIN-4195 piece 4) (#2273)"
+            }
+          ],
+          "tickets": [
+            "LIN-4201",
+            "LIN-4195"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "Records-versus-snapshots is now decided in one place (`lineageUsageOf`/`countedRowsOf`). The `founder-lookup.js` copy goes back into `dispatch-store.findLineageIdentity` with its bounded-read guard. But `workspace-kpis-cache.js` rebuilds `kpi-page.js`'s stale-while-revalidate cache, and `request-usage-loader.forRows` repeats the 500-anchor batching. The snapshot path stays alive via `combineFolds`, and the loader is threaded through about 15 files. `source-map.md` lists none of the three new modules and still calls `row-usage.js` \"a leaf: it imports nothing\"."
+          }
+        },
+        {
+          "row": 5,
+          "commit_cell": "LinearViewer c70b004c0",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "c70b004c",
+              "full": "c70b004c0a2bd84824b92993e536602c4356e348",
+              "subject": "LIN-4048: a finished task's page matches Home's run block (#2284)"
+            }
+          ],
+          "tickets": [
+            "LIN-4048"
+          ],
+          "balance_raw": "**neutral**",
+          "sign": "neutral",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "neutral",
+            "reason": "It reuses `takesNoRun` rather than adding a new check. But it matches Home by adding conditions to the task-page branch of `renderRunBlock`, not by merging that branch with Home's, so \"finished but a run is held\" is now decided in three places: Home's branch, the task-page ternaries and the server's `model.finished && !model.live`. It also leaves an empty `takesNoRun` branch in `renderGo`."
+          }
+        },
+        {
+          "row": 6,
+          "commit_cell": "LinearViewer 723052153",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "72305215",
+              "full": "723052153f3e1eee8787c072878726452fa40ad9",
+              "subject": "LIN-4179: Harbour calls on the cost read, one USD formatter, census and agreement (#2263)"
+            }
+          ],
+          "tickets": [
+            "LIN-4179"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "`llm-call-log.js` shrinks to `listInHorizon`, with the sums in `readCalls`. Every hand-rolled `$`+`toFixed` copy goes through one formatter, the browser copy is pinned to it by a parity test, and `task-cost.js` moves out of `lib/`; a census pins all of it. The cost: `cost-read.js` now imports a store module and mixes token and latency telemetry into the cost read via `callsSurfaceOf`."
+          }
+        },
+        {
+          "row": 7,
+          "commit_cell": "LinearViewer ee8ec42e2",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "ee8ec42e",
+              "full": "ee8ec42e2d235e932e6ba43bf6860c96fcbe64e0",
+              "subject": "LIN-4242: Waiting on you goes live — home-waiting fragment, shared keyed merge, one rulings tick (#2281)"
+            }
+          ],
+          "tickets": [
+            "LIN-4242"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "One rulings reduction (`createWaitingStanding`), one renderer (`waiting-section.js`) and the existing 5s tick (`onRulingsTick`) are good single owners. But `mergeWaitingCards`/`cardHoldsInput`/`rulingKeyOf` copy `observation.js`'s `renderRulings`/`rulingRowHoldsInput`/`rulingKey`, and `waitingTitlesOf` is a second title rule beside `visitTitles`. `/api/home-waiting` is inline in `server.js`, and the module header names a `readWaitingStanding` that doesn't exist."
+          }
+        },
+        {
+          "row": 8,
+          "commit_cell": "simple-dispatcher 52d2c3d",
+          "shas": [
+            {
+              "repo": "simple-dispatcher",
+              "short": "52d2c3d",
+              "full": "52d2c3d507ab933bf82128885249b6f24e890e0f",
+              "subject": "LIN-4220: childEnv(mode) owns every nested test environment (#318)"
+            }
+          ],
+          "tickets": [
+            "LIN-4220"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "`childEnv` gives the nested environment one owner, `isolate-run-vars.js` gives the names one list, and `killerEnvFor`/`HARNESS_STATE_VARS` are deleted. But about 150 lines of owner come with about 1,100 of census and characterization tests, including a 562-line hand-written lexer census with pinned allowlist counts. `envWithout` survives as two identical copies, and `docs/testing-and-ci.md`'s isolation list never learned about `child-env.js`."
+          }
+        },
+        {
+          "row": 9,
+          "commit_cell": "LinearViewer 10b2c82fb",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "10b2c82f",
+              "full": "10b2c82fbe3640f6c7b0e8963fbdd352a02cca40",
+              "subject": "LIN-4177: one cost read; /cost, Models and effort run on it (#2261)"
+            }
+          ],
+          "tickets": [
+            "LIN-4177"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "`/cost`, Models and effort get one cost read, and the docs and proxy instructions learned about it. But `joinCostLineages`, `reduceLineageCost` and run-view's `lineageCost` keep computing cost their own way. `cost-format.js` is added with no callers while about 12 `toFixed` copies remain, `task-cost.js` lingers as an adapter only tests call, and `scripts/cost-replay.mjs` imports from `tests/fixtures/`."
+          }
+        },
+        {
+          "row": 10,
+          "commit_cell": "LinearViewer 950113b17",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "950113b1",
+              "full": "950113b17f41baf8aa9714c621b940463861e587",
+              "subject": "LIN-4234: usage-snapshot-intake is in INVENTORY; one source of collection names for both guards (#2278)"
+            }
+          ],
+          "tickets": [
+            "LIN-4234"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Two guards that kept drifting hand-made lists now derive collection names from one source (`tests/helpers/collection-names.js`), which immediately surfaced collections both had missed. The duplicate literal-scan walkers and regexes are deleted, and `INVENTORY`, `URLKEY_SOURCES` and `source-map.md` all learned the change. Small gap: the non-literal `collection(` census only scans `server.js`."
+          }
+        },
+        {
+          "row": 11,
+          "commit_cell": "LinearViewer 2eb73ae07",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "2eb73ae0",
+              "full": "2eb73ae07fb7297fc0fa057a6198aa8cbe901558",
+              "subject": "LIN-4143: the task page's ruling reads go through the live-run guard, always (#2285)"
+            }
+          ],
+          "tickets": [
+            "LIN-4143"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "The live-run guard on ruling reads used to be an opt-in flag, off by default; it is now always on inside `rulingStandingOf`, and the dead `liveDispatchOnAnchor` override is removed. `live-anchor.js` lists its consumers. Left behind: `routes/proxy-rulings.js` keeps an inline copy of the predicate, and `question-cards.js` now treats a missing effect as `'record'` while `common.js`'s `ReplyDelivery` treats it as resume."
+          }
+        },
+        {
+          "row": 12,
+          "commit_cell": "LinearViewer 279dcb0a4",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "279dcb0a",
+              "full": "279dcb0a4e426e7ed069ecc07898278f46da46fb",
+              "subject": "LIN-4240: parseParkedWait decides on the newest state-bearing entry (#2280)"
+            }
+          ],
+          "tickets": [
+            "LIN-4240"
+          ],
+          "balance_raw": "(with #3)",
+          "sign": null,
+          "score": null,
+          "leans": null,
+          "quote": {
+            "balance": "(with #3)",
+            "reason": "Scored together with simple-dispatcher 796bc9d: two halves of one change. simple-dispatcher's test imports LinearViewer's `parseParkedWait`, and its comments name this fix."
+          }
+        },
+        {
+          "row": 13,
+          "commit_cell": "LinearViewer 13fe24a04",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "13fe24a0",
+              "full": "13fe24a04acb7976603d673c25bf40438f0818e1",
+              "subject": "LIN-4151: rank a project's /backlog lead roots, one derivation for page and fold (#2283)"
+            }
+          ],
+          "tickets": [
+            "LIN-4151"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "One ranking (`rankKeysOf`/`compareRank`) replaces `upNextOf`'s inline sort and its own `buildBlockingGraph` call. The fold now reads `view.projectSplits` instead of re-running `splitProjectRoots`, which is no longer exported. Naming lags: code says \"lead\" while `upNextMore`, the `up-next` fold kind and the testid don't, and `tree.js`/`task-order.js` keep their own priority sorts in the opposite order."
+          }
+        },
+        {
+          "row": 14,
+          "commit_cell": "LinearViewer 0dc1620ea",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "0dc1620e",
+              "full": "0dc1620eacdc9b050d42d4e05c4a314e55664018",
+              "subject": "LIN-4178: /kpis, workspace KPIs and the run page on the cost read (#2262)"
+            }
+          ],
+          "tickets": [
+            "LIN-4178"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "Deletes the three parallel lineage-cost copies (`joinCostLineages`, `reduceLineageCost`, run-view's fold) and two private USD formatters. But it adds `founder-lookup.js`, a second copy of `lineageIdentityRows`' query without the bounded-read guard (removed two commits later), wired by injection in one caller and by direct import in the other. It also leaves a ticket-named `scripts/lin4178-founder-timing.mjs`, and `source-map.md` still credits `joinCostLineages`, stale through #4."
+          }
+        }
+      ]
+    },
+    {
+      "id": "batch A",
+      "kind": "batch",
+      "title": "batch A",
+      "comment_id": "fe848eea-917d-49b0-bfa8-99e9a8a3d309",
+      "created_at": "2026-11-05T07:49:38.168Z",
+      "session": "pass-1 (batches A+B)",
+      "subject_tickets": null,
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LV 9cc5ff9cb",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "9cc5ff9c",
+              "full": "9cc5ff9cb8ad05478e1e416e3894df16eba9ecca",
+              "subject": "LIN-4198: request-usage intake, store and per-request pricing (LIN-4195 piece 1) (#2265)"
+            }
+          ],
+          "tickets": [
+            "LIN-4198",
+            "LIN-4195"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "Request records get a proper home: an intake and a store module, and `priceRequest` shares `priceUsage` with snapshot pricing. `ownershipFilterOf`/`promptTokensOf` were extracted and most registries learned about it (db-indexes, account-erasure, proxy-instructions, source-map). But it adds a third copy of the token-field list (`USAGE_TOKEN_FIELDS` beside `row-usage` and `session-telemetry`), copies `bulkWriteWithRetry` from `kpi-daily-rollup.js` (\"Mirrors…\"), leaves `lane` open where `session-telemetry` closes it, and the urlKey-holders list/test never learned the new collection."
+          }
+        },
+        {
+          "row": 2,
+          "commit_cell": "LV 5334c81a7 + SD 765289d",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "5334c81a",
+              "full": "5334c81a7207b9f2cc85ca429a2c6b18e1635c0e",
+              "subject": "LIN-4202: runner-kit posts per-request usage records beside the [usage] snapshot (LIN-4195 piece 5, Harbour half) (#2266)"
+            },
+            {
+              "repo": "simple-dispatcher",
+              "short": "765289d",
+              "full": "765289d46e42e757283e27e08fe56284cd6792eb",
+              "subject": "LIN-4202: opencode per-request usage records behind an unwired seam (LIN-4195 piece 5, runner half; posting waits on LIN-4199) (#315)"
+            }
+          ],
+          "tickets": [
+            "LIN-4202",
+            "LIN-4195",
+            "LIN-4199"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "Good factoring in each repo: LV `foldTranscriptMessages` serves both snapshot and records, and SD `postRecordsWithLedger` is now one ledger/resend loop for both harnesses. But LV `transcriptRequestRecords` re-implements SD `walkRequestRecords` rule for rule, with the constants copied too and already drifting (synthetic-skip point, `effort`). Parity rests on byte-copied fixtures that nothing ties back to SD. In SD, `opencode-runner.js` spells out a ~15-argument `relayRequestRecords` call twice in the catch path."
+          }
+        },
+        {
+          "row": 3,
+          "commit_cell": "LV 7797c306b",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "7797c306",
+              "full": "7797c306b877740e939c84ce724142b06cd67288",
+              "subject": "LIN-4166: a follow-up sent with subscription 'none' is a question that wakes no one (#2258)"
+            }
+          ],
+          "tickets": [
+            "LIN-4166"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "The layering is sensible (validate in entrance, suppress in store, docs/proxy-instructions updated). But `'none'` went into `SUBSCRIPTION_LEVELS`, the edge-declaration list every validator reads, so the follow-up-only limit lives in `subscriptionFailure` alone. The `followUpTo` test is now hand-written four times with no `isFollowUp`, wake policy moved into `addFeedback` beside `dispatch-wake.js`, and the store's schema comment still lists two values."
+          }
+        },
+        {
+          "row": 4,
+          "commit_cell": "SD d8d186c",
+          "shas": [
+            {
+              "repo": "simple-dispatcher",
+              "short": "d8d186c",
+              "full": "d8d186c07113d6e61e3489e38f1210d0b0624cad",
+              "subject": "LIN-4187: system suite asserts Harbour's session contract (24h Sessions split) (#324)"
+            }
+          ],
+          "tickets": [
+            "LIN-4187"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "`findSession` gives \"which bucket is this session in\" one owner, and the `// Contract:` census can't silently miss a file. But the census checks only the line's format (nothing reads the lines). `findSession` was placed in the boot/stop module `harbour.js`, and `w.findSession` in world.js is documented yet unused. `knownRed*`/`formatDiff` gained parameters only so tests can feed an empty list."
+          }
+        },
+        {
+          "row": 5,
+          "commit_cell": "LV 941952711",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "94195271",
+              "full": "941952711caf67cfe40e2b69e654cf6fde6f3109",
+              "subject": "LIN-4241: settled-ruling guard — refuse a second answer or dismiss with 409 ruling-settled (#2279)"
+            }
+          ],
+          "tickets": [
+            "LIN-4241"
+          ],
+          "balance_raw": "**worse**",
+          "sign": "worse",
+          "score": -1,
+          "leans": null,
+          "quote": {
+            "balance": "worse",
+            "reason": "The refusal shape has one owner (`ruling-settled.js`), and loop-side settled is one predicate shared by the pre-check and the CAS. But the scan-row `outcome === 'answered' \\ | \\ | 'dismissed'` check goes from 2 hand-written copies to 5 (issue-write ×3, scan, dashboard-rulings). `isDecisionSettledIn` is a third parser of decision-answer stamps (per-row, while the feed is per-lineage). `workspace-api-issue-write.js` gains ~120 net lines of dedupe/attempt bookkeeping (`primaryStampKey`, `secondSubmission`, three-flag return). Scan routes now answer \"already stamped\" with two different 409 codes, and llms.txt still says \"best-effort\"."
+          }
+        },
+        {
+          "row": 6,
+          "commit_cell": "SD 90bbf82",
+          "shas": [
+            {
+              "repo": "simple-dispatcher",
+              "short": "90bbf82",
+              "full": "90bbf82429aa366453b7433507ebf1a9986c3a2b",
+              "subject": "LIN-4221: exit-code table, preflight and COULDNT_RUN for the heavy tier (#319)"
+            }
+          ],
+          "tickets": [
+            "LIN-4221"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "`harness/exit-codes.js` owns the new paths in all three runners, and `harbour-summary.js` replaces `run-system.js`'s local copy. But literal 1/130/143 remain in `isolate-run.js`, `reap.js`, `run-system.js` and `run-mutations.js`. A `ports` preflight need ships with no caller, an unreachable `located.kind` branch is kept alive, and no doc learned the new exit code."
+          }
+        },
+        {
+          "row": 7,
+          "commit_cell": "LV d7ceb3734 + SD 44ab30e",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "d7ceb373",
+              "full": "d7ceb373444f9efbc027656132352d247535aa5e",
+              "subject": "LIN-4203: runner-kit stops posting [usage]; intake counts legacy snapshots (#2274)"
+            },
+            {
+              "repo": "simple-dispatcher",
+              "short": "44ab30e",
+              "full": "44ab30ec7d70dcedde71817ef6fb62fc0f029b57",
+              "subject": "LIN-4203: stop posting [usage] snapshots; the flag gates record flushes (runner) (#323)"
+            }
+          ],
+          "tickets": [
+            "LIN-4203"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "A large coordinated deletion (~1,350 lines) removes every `[usage]` snapshot producer in both repos: `postUsageSnapshot` and its 7 call sites, `walkUsage`, opencode `postUsageFeedback`/`usageDelta`, and LV `sumTranscriptUsage`. The flag now has one meaning. Leftovers: source-map's `runner.mjs` entry still describes `sumTranscriptUsage` and the snapshot, `foldTranscriptMessages` keeps a `keyOf` generality for its one caller, unused goldens are still loaded, and `usage-snapshot-intake.js` has no exit or reader."
+          }
+        },
+        {
+          "row": 8,
+          "commit_cell": "LV eb44eff97",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "eb44eff9",
+              "full": "eb44eff97d6143576ba7ec2cb2c135a435a58a69",
+              "subject": "LIN-4212: read request records by their posting row, not the wake's stamp (#2272)"
+            }
+          ],
+          "tickets": [
+            "LIN-4212"
+          ],
+          "balance_raw": "**worse**",
+          "sign": "worse",
+          "score": -1,
+          "leans": null,
+          "quote": {
+            "balance": "worse",
+            "reason": "The read now keys on the posting row's `itemId`, but the upsert key still includes the `rootItemId` stamp the docs now call informational. So ~50 lines of `oneRecordPerRequest` merge back at read time what the write splits apart. `RequestUsageStore` now reads `dispatch-history` directly (a fourth copy of the member-row query, with a new `HISTORY_COLLECTION` constant for a collection another store owns). It also leaves an index nothing reads and file:line references in the architecture doc."
+          }
+        },
+        {
+          "row": 9,
+          "commit_cell": "LV 172f644a1",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "172f644a",
+              "full": "172f644a10b176a12660e7677691c6902f52a006",
+              "subject": "LIN-4243: Home's Running and Up next follow a change of the Waiting set (#2282)"
+            }
+          ],
+          "tickets": [
+            "LIN-4243"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "Placement stays on the server (`home-placement.js` only decides when to re-read, and reuses `QuestionCards` predicates), and source-map/render learned the file. But `createDeskPlacement` adds a second way to fetch Home data: it fetches the whole page and parses it with `DOMParser`, beside the existing `/api/home-*` fragment endpoints. It also copies `applyState`'s expanded/collapse replay, wraps `dispatchPrompt` inside its own file, and adds ~150 lines to a 2,180-line `app.js`."
+          }
+        },
+        {
+          "row": 10,
+          "commit_cell": "LV 42fcf5d1b",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "42fcf5d1",
+              "full": "42fcf5d1b130d10301a2208f0107d9e6d052f328",
+              "subject": "LIN-4168: one reset for all of a workspace key's test state (#2259)"
+            }
+          ],
+          "tickets": [
+            "LIN-4168"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Before, each test seam remembered which caches to reset (two resets in one seam, none in five others). Now one `keyState.resetKey` with a single registration function covers six seams, `workspace-issues-memo.js` is cleanly lifted out of `server.js`, and a census fails on any unclassified container. Costs: classifications are split between `globalOnly()` prose in production code and a 400-line JSON fixture, the regex scanner taxes every new `Map`, and each cache gained near-duplicate `clear`/`countFor` key-matching."
+          }
+        },
+        {
+          "row": 11,
+          "commit_cell": "SD bf499a4",
+          "shas": [
+            {
+              "repo": "simple-dispatcher",
+              "short": "bf499a4",
+              "full": "bf499a43118999ca48e06cab5211ce344dc83fb0",
+              "subject": "LIN-4218: one outcome table and one executor for every Stop relay (#325)"
+            }
+          ],
+          "tickets": [
+            "LIN-4218"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Every Stop-switch relay now goes through `STOP_OUTCOMES` + `runStopOutcome`, and the triple-written decision/withdraw scan is one `relayDecisionAndWithdrawals` (`feedbackWithText`/`betweenTextAndStatus` gone). A coverage test ties outcome types to table rows. Modest gain: hook.js is reshaped, not shorter, `exceptions` metadata is never read, opencode keeps its own sequence, and the 21k-line golden snapshots whole session state, so unrelated changes churn it."
+          }
+        },
+        {
+          "row": 12,
+          "commit_cell": "LV 9e397e6be",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "9e397e6b",
+              "full": "9e397e6bee39be815a7319673bb8227a9044f5b8",
+              "subject": "LIN-4173: resolveDisposition uses SD's 7-day record window (one exported copy) (#2260)"
+            }
+          ],
+          "tickets": [
+            "LIN-4173"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "`REAP_INACTIVITY_MS` is now one exported constant: the test's private copy and hard-coded \"7h ago\" fixtures were deleted in favour of imports. No other copy is left in lib/routes/public. A small but clean step; the cross-repo pair with SD config remains (one side is env-overridable)."
+          }
+        },
+        {
+          "row": 13,
+          "commit_cell": "SD 3330526",
+          "shas": [
+            {
+              "repo": "simple-dispatcher",
+              "short": "3330526",
+              "full": "3330526fd32eece196d6b55fcb3b21ed63200df8",
+              "subject": "LIN-4222: ports with one owner (OS-assigned, empty fixed-port registry) (#320)"
+            }
+          ],
+          "tickets": [
+            "LIN-4222"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "About 30 hard-coded system-test ports collapse to `ports.js allocatePort()` inside `startHarbour`, `systemSuite` refuses `port`, and a census holds the count at zero. `harbour.js` boot splits into `bootOnce`/`controllerFor`. Loose ends: a `FIXED_PORTS` registry nothing reads, a second bind-probe in preflight, the port rule placed in the env-var census file, and readiness now matching Harbour's startup log string with no guard on the Harbour side."
+          }
+        },
+        {
+          "row": 14,
+          "commit_cell": "LV c55f0fb33",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "c55f0fb3",
+              "full": "c55f0fb33929fc00f02b8ea7231541a4af66f3e6",
+              "subject": "LIN-4226: the cost read loads its request records through a requestSource (LIN-4195 piece 4b) (#2275)"
+            }
+          ],
+          "tickets": [
+            "LIN-4226",
+            "LIN-4195"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "The cost read now loads its own records through one `requestSource` instead of ~10 callers gathering anchors and passing `requestRows`. `model-routing-spend`/`terminal-marked-task-cost`/settings stop re-running the read, and `render-session`'s fallback `buildRunView` is gone. Caveats: `run-view.js` also loads for itself, the loader-shape guard is written four times, and the surface doubles with `*OverRecords` pure twins plus promise-or-array `identityRows`."
+          }
+        }
+      ]
+    },
+    {
+      "id": "batch C",
+      "kind": "batch",
+      "title": "batch C",
+      "comment_id": "1f40d6ba-b93b-4d19-827c-46121f7e76c6",
+      "created_at": "2026-11-05T07:54:54.744Z",
+      "session": "pass-2 (batches C+D)",
+      "subject_tickets": null,
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer 0dc1620ea",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "0dc1620e",
+              "full": "0dc1620eacdc9b050d42d4e05c4a314e55664018",
+              "subject": "LIN-4178: /kpis, workspace KPIs and the run page on the cost read (#2262)"
+            }
+          ],
+          "tickets": [
+            "LIN-4178"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "/kpis, workspace KPIs and the run page now read from `cost-read.js`. It deletes the old copies of the lineage cost: `joinCostLineages` and `reduceLineageCost`, and `windowedSpend` is cut down to just windowing. `kpi-stats` now throws if the founder lookup isn't injected. Against that, `lib/founder-lookup.js` repeats the store's `lineageIdentityRows` over the raw collections, `usageStateOf` sits next to the surviving `dispatch-lineage` `usageOf`, and a one-off `scripts/lin4178-founder-timing.mjs` was added to scripts/."
+          }
+        },
+        {
+          "row": 2,
+          "commit_cell": "simple-dispatcher 54febbf",
+          "shas": [
+            {
+              "repo": "simple-dispatcher",
+              "short": "54febbf",
+              "full": "54febbf8cfccb5c68954f61b50f660af6ecd7a1a",
+              "subject": "LIN-4223: one process-group stop for the heavy tier (stop-group.js, sync variant for reap.js) (#317)"
+            }
+          ],
+          "tickets": [
+            "LIN-4223"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "`stopGroup`/`groupAlive` move from `run-mutations.js` into `harness/stop-group.js`, and `reap.js` and `harbour.js` now use it, so it has one owner. But the new `SD_HARBOUR_GROUPS` variable isn't in `isolate-run-vars.js`/`child-env.js`. The `'harbour-groups'` folder name is typed out in four places. And the unit-tier preload `isolate-run.js` now requires a module from `test/system/harness/`."
+          }
+        },
+        {
+          "row": 3,
+          "commit_cell": "simple-dispatcher bf499a4",
+          "shas": [
+            {
+              "repo": "simple-dispatcher",
+              "short": "bf499a4",
+              "full": "bf499a43118999ca48e06cab5211ce344dc83fb0",
+              "subject": "LIN-4218: one outcome table and one executor for every Stop relay (#325)"
+            }
+          ],
+          "tickets": [
+            "LIN-4218"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "The Stop relay order used to be spread across eight `switch` cases with three copies of the decision/withdraw scan. It now has one owner: `STOP_OUTCOMES` plus `runStopOutcome`. `feedbackWithText` is deleted, and a test fails if a relay call reappears inside the switch. The `exceptions` arrays are labels only the test reads, and opencode-runner keeps its own relay order."
+          }
+        },
+        {
+          "row": 4,
+          "commit_cell": "LinearViewer 42fcf5d1b",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "42fcf5d1",
+              "full": "42fcf5d1b130d10301a2208f0107d9e6d052f328",
+              "subject": "LIN-4168: one reset for all of a workspace key's test state (#2259)"
+            }
+          ],
+          "tickets": [
+            "LIN-4168"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Before, each seed route reset only the caches its author knew about. Now there is one reset (`key-state.js` `resetKey`), one list of what it clears (`key-state-holders.js`), and a census that fails on any unlisted holder. It also moves the issues memo out of server.js. Some stray copies remain: `/test/clear-workspace-issues-memo` and a manual `sessionsFeedCache.clear` in routes/test.js, the `${urlKey}::` prefix scan rewritten in five caches, and server.js gaining five imports and a cache it now builds itself."
+          }
+        },
+        {
+          "row": 5,
+          "commit_cell": "LinearViewer 9e397e6be",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "9e397e6b",
+              "full": "9e397e6bee39be815a7319673bb8227a9044f5b8",
+              "subject": "LIN-4173: resolveDisposition uses SD's 7-day record window (one exported copy) (#2260)"
+            }
+          ],
+          "tickets": [
+            "LIN-4173"
+          ],
+          "balance_raw": "**better** (small)",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better (small)",
+            "reason": "One exported `REAP_INACTIVITY_MS` replaces the test-side 6h copies and the hard-coded \"7h ago\" fixtures. The small cost is that `PAST_REAP_WINDOW_ISO` is pasted into two test files instead of living in a shared helper."
+          }
+        },
+        {
+          "row": 6,
+          "commit_cell": "LinearViewer 723052153",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "72305215",
+              "full": "723052153f3e1eee8787c072878726452fa40ad9",
+              "subject": "LIN-4179: Harbour calls on the cost read, one USD formatter, census and agreement (#2263)"
+            }
+          ],
+          "tickets": [
+            "LIN-4179"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "About nine hand-written `$`+`toFixed` sites now go through `formatUsd`. The `summarize*` folds leave `llm-call-log.js`, `task-cost.js` moves out of lib/ into a test fixture, and a census forbids the retired paths. Against that: `public/cost-format.js` is a parity-tested twin, not shared code; `harbourSpendByJob` writes the summary shape out by hand; and `wall-clock-summary.js:97` still points at the deleted `buildTaskCost`."
+          }
+        },
+        {
+          "row": 7,
+          "commit_cell": "simple-dispatcher 90bbf82",
+          "shas": [
+            {
+              "repo": "simple-dispatcher",
+              "short": "90bbf82",
+              "full": "90bbf82429aa366453b7433507ebf1a9986c3a2b",
+              "subject": "LIN-4221: exit-code table, preflight and COULDNT_RUN for the heavy tier (#319)"
+            }
+          ],
+          "tickets": [
+            "LIN-4221"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "It adds one `EXIT` table, but `reap.js:37` still hard-codes 130/143. Preflight declares `ports`/`git` needs that no caller uses, `harbourSummaryLine` has a `tier==='unit'` branch nothing calls, and `suite.js` runs preflight and then `startHarbour` runs it again. `isolate-run.js` now pulls in two more heavy-tier modules. On the plus side, `shortCommit` gets one home and both runners use `childEnv`."
+          }
+        },
+        {
+          "row": 8,
+          "commit_cell": "LinearViewer d7ceb3734 + simple-dispatcher 44ab30e",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "d7ceb373",
+              "full": "d7ceb373444f9efbc027656132352d247535aa5e",
+              "subject": "LIN-4203: runner-kit stops posting [usage]; intake counts legacy snapshots (#2274)"
+            },
+            {
+              "repo": "simple-dispatcher",
+              "short": "44ab30e",
+              "full": "44ab30ec7d70dcedde71817ef6fb62fc0f029b57",
+              "subject": "LIN-4203: stop posting [usage] snapshots; the flag gates record flushes (runner) (#323)"
+            }
+          ],
+          "tickets": [
+            "LIN-4203"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Deletes a whole parallel usage path: `postUsageSnapshot` and its 7 call sites, `walkUsage`, the opencode roll-up and delta, and the kit's `sumTranscriptUsage`. That is about −1,090/+160 in SD, and the flag is now checked at the flush point. Left behind: the source-map runner.mjs entry still describes the `[usage]` snapshot, opencode-runner's comment still calls it \"the snapshot's flag\", the flag is still checked in two places, and the goldens are kept with nothing reading them (`GOLDEN` in the 4202 test, `found` in `foldTranscriptMessages`)."
+          }
+        },
+        {
+          "row": 9,
+          "commit_cell": "LinearViewer 10b2c82fb",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "10b2c82f",
+              "full": "10b2c82fbe3640f6c7b0e8963fbdd352a02cca40",
+              "subject": "LIN-4177: one cost read; /cost, Models and effort run on it (#2261)"
+            }
+          ],
+          "tickets": [
+            "LIN-4177"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "`cost-read.js` arrives as the one read, and `task-cost.js` shrinks to an adapter. But `joinCostLineages`, `reduceLineageCost` and run-view's fold still compute lineage cost on their own, so there are two paths. `cost-format.js` lands with no caller, the anchors-then-`lineageIdentityRows` step is repeated in three callers, and `identityRows=[]` silently falls back to the old window-bound behaviour."
+          }
+        },
+        {
+          "row": 10,
+          "commit_cell": "simple-dispatcher 52d2c3d",
+          "shas": [
+            {
+              "repo": "simple-dispatcher",
+              "short": "52d2c3d",
+              "full": "52d2c3d507ab933bf82128885249b6f24e890e0f",
+              "subject": "LIN-4220: childEnv(mode) owns every nested test environment (#318)"
+            }
+          ],
+          "tickets": [
+            "LIN-4220"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "`childEnv(mode)` replaces nine hand-built child environments and deletes `killerEnvFor`. The setting side (`isolate-run`) and the stripping side now read names from one `isolate-run-vars.js`. The weight is about 1,200 test lines for about 150 lines of code, including a 562-line census with its own lexer and exact-count ceilings."
+          }
+        },
+        {
+          "row": 11,
+          "commit_cell": "LinearViewer ee8ec42e2",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "ee8ec42e",
+              "full": "ee8ec42e2d235e932e6ba43bf6860c96fcbe64e0",
+              "subject": "LIN-4242: Waiting on you goes live — home-waiting fragment, shared keyed merge, one rulings tick (#2281)"
+            }
+          ],
+          "tickets": [
+            "LIN-4242"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "Good: the section moves out of render.js into `waiting-section.js`, `createWaitingStanding` is one read shared by the page and the fragment, and polling runs on one `runRulingsTick`. Costs: `mergeWaitingCards` is a third keyed DOM reconcile in public/, next to the ones in observation.js and live-console `paintLanes`; `waitingTitlesOf` is a second title lookup beside `visitTitles`; the new route lands in server.js, not routes/; and the standing can be built in two ways (a default in `createHomeRowStates` and one built and passed in by server.js)."
+          }
+        },
+        {
+          "row": 12,
+          "commit_cell": "LinearViewer 5334c81a7 + simple-dispatcher 765289d",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "5334c81a",
+              "full": "5334c81a7207b9f2cc85ca429a2c6b18e1635c0e",
+              "subject": "LIN-4202: runner-kit posts per-request usage records beside the [usage] snapshot (LIN-4195 piece 5, Harbour half) (#2266)"
+            },
+            {
+              "repo": "simple-dispatcher",
+              "short": "765289d",
+              "full": "765289d46e42e757283e27e08fe56284cd6792eb",
+              "subject": "LIN-4202: opencode per-request usage records behind an unwired seam (LIN-4195 piece 5, runner half; posting waits on LIN-4199) (#315)"
+            }
+          ],
+          "tickets": [
+            "LIN-4202",
+            "LIN-4195",
+            "LIN-4199"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "Within each repo the logic gets one owner: the kit's `foldTranscriptMessages` and SD's `postRecordsWithLedger`. But the kit's `transcriptRequestRecords` is a second copy of SD's `walkRequestRecords` that already disagrees on `<synthetic>` handling and `effort`, kept in step only by byte-copied fixtures. `opencode-request-records.js` repeats `postUsageFeedback`'s token mapping, and its own header says so."
+          }
+        },
+        {
+          "row": 13,
+          "commit_cell": "simple-dispatcher 86bde97",
+          "shas": [
+            {
+              "repo": "simple-dispatcher",
+              "short": "86bde97",
+              "full": "86bde97492f6f19de0a0fd13707a0b9dee3cbaef",
+              "subject": "LIN-4224: scripted clean-main baseline (npm run test:baseline), docs, final census (heavy-tier harness 5/5) (#321)"
+            }
+          ],
+          "tickets": [
+            "LIN-4224"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "`baseline.js` builds on the shared pieces (`childEnv`, preflight, `stopGroupSync`, `EXIT`, the exported `SUITE_ARGS`), and the docs replace a hand-run baseline table. But `UNIT_ARGS` copies package.json's `test` script, the shared temp-dir list now exists in three places, `KNOWN_RED` hard-codes two ticket IDs, and this command-line tool lives among the harness helpers."
+          }
+        },
+        {
+          "row": 14,
+          "commit_cell": "LinearViewer c70b004c0",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "c70b004c",
+              "full": "c70b004c0a2bd84824b92993e536602c4356e348",
+              "subject": "LIN-4048: a finished task's page matches Home's run block (#2284)"
+            }
+          ],
+          "tickets": [
+            "LIN-4048"
+          ],
+          "balance_raw": "**neutral**",
+          "sign": "neutral",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "neutral",
+            "reason": "Small and contained: it reuses `takesNoRun` in `renderGo`, the quota span and the run block. But the no-run rule is still written separately for Home (an early return) and the task page (inline `noRun ?` checks), and the server mount gate (`finished && !live`) reads a different input from the client's offer. Nothing is simplified."
+          }
+        }
+      ]
+    },
+    {
+      "id": "batch D",
+      "kind": "batch",
+      "title": "batch D",
+      "comment_id": "70f369ac-3e8c-48e3-a71e-f1695cdf8139",
+      "created_at": "2026-11-05T07:55:22.846Z",
+      "session": "pass-2 (batches C+D)",
+      "subject_tickets": null,
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer 279dcb0a4",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "279dcb0a",
+              "full": "279dcb0a4e426e7ed069ecc07898278f46da46fb",
+              "subject": "LIN-4240: parseParkedWait decides on the newest state-bearing entry (#2280)"
+            }
+          ],
+          "tickets": [
+            "LIN-4240"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Small and contained. `_isNonStateEntry` sits next to `DECISION_LIFECYCLE_STAMP_KINDS` and reuses `_isStampEntry`, the drift test now follows the stamp check, and the stale \"latest entry decides\" wording is fixed in four places. Two small copies remain: `/^\\s*\\[usage\\]/i` copies `USAGE_RE` from `liveness-detectors.js`, and `PARKED_WAIT_SKIPPED_KINDS` is a hand-picked subset of `FEEDBACK_ENTRY_KINDS` with nothing linking them."
+          }
+        },
+        {
+          "row": 2,
+          "commit_cell": "LinearViewer 2ee4e6006",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "2ee4e600",
+              "full": "2ee4e6006a28fcd50d546a4b94922746de4289d5",
+              "subject": "LIN-4201: the cost read sums request records (records-first cutover, LIN-4195 piece 4) (#2273)"
+            }
+          ],
+          "tickets": [
+            "LIN-4201",
+            "LIN-4195"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "It gives the records-vs-snapshots choice one owner (`lineageUsageOf`), deletes `founder-lookup.js` in favour of `findLineageIdentity`, and pulls the three token-field lists into `request-usage-vocabulary.js`. But it adds copies of its own: `workspace-kpis-cache.js` rebuilds `kpi-page.js`'s stale-while-revalidate cache and lock, and `request-usage-loader.js:forRows` repeats the urlKey/batch-of-500 logic of `lineageIdentityOfRows`. source-map.md doesn't list the fold, loader or cache modules."
+          }
+        },
+        {
+          "row": 3,
+          "commit_cell": "LinearViewer c55f0fb33",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "c55f0fb3",
+              "full": "c55f0fb33929fc00f02b8ea7231541a4af66f3e6",
+              "subject": "LIN-4226: the cost read loads its request records through a requestSource (LIN-4195 piece 4b) (#2275)"
+            }
+          ],
+          "tickets": [
+            "LIN-4226",
+            "LIN-4195"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "It removes repeated `readCost` runs (settings ran it 2+N times over the same rows; kpi-stats now passes its own lineage grouping through). But `buildRunView`, `readCost` and `lineageRecords` now do I/O while their headers still say \"Pure / NO I/O\", each gains an `…OverRecords` twin, and the loader check is copied in four places."
+          }
+        },
+        {
+          "row": 4,
+          "commit_cell": "simple-dispatcher 3330526",
+          "shas": [
+            {
+              "repo": "simple-dispatcher",
+              "short": "3330526",
+              "full": "3330526fd32eece196d6b55fcb3b21ed63200df8",
+              "subject": "LIN-4222: ports with one owner (OS-assigned, empty fixed-port registry) (#320)"
+            }
+          ],
+          "tickets": [
+            "LIN-4222"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "31 hard-coded ports are gone and `startHarbour` owns port choice and readiness (`waitForOwnHarbour`/`bootOnce`). But `harness/ports.js:allocatePort` repeats `net-util.js:reserveFreePort`, whose header says it exists to avoid exactly that. `FIXED_PORTS` is read by nothing but its own test, and `docs/testing-and-ci.md` still talks about \"the suite's fixed ports\"."
+          }
+        },
+        {
+          "row": 5,
+          "commit_cell": "LinearViewer 950113b17",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "950113b1",
+              "full": "950113b17f41baf8aa9714c621b940463861e587",
+              "subject": "LIN-4234: usage-snapshot-intake is in INVENTORY; one source of collection names for both guards (#2278)"
+            }
+          ],
+          "tickets": [
+            "LIN-4234"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Two hand-kept collection-name walks are replaced by one derived source, `tests/helpers/collection-names.js`, and `usage-snapshot-intake` and `request-usage` are registered in INVENTORY, `URLKEY_SOURCES` and `COLLECTION_CLASSES`. The new `unnamedOpenings` census only checks `server.js`, and the exception list in the lin-4198 \"single reader\" census grew again."
+          }
+        },
+        {
+          "row": 6,
+          "commit_cell": "LinearViewer eb44eff97",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "eb44eff9",
+              "full": "eb44eff97d6143576ba7ec2cb2c135a435a58a69",
+              "subject": "LIN-4212: read request records by their posting row, not the wake's stamp (#2272)"
+            }
+          ],
+          "tickets": [
+            "LIN-4212"
+          ],
+          "balance_raw": "**mixed (leans worse)**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": "worse",
+          "quote": {
+            "balance": "mixed (leans worse)",
+            "reason": "The measure script drops its own copy of the join and calls `listForAnchors`. But the usage store now runs its own raw `dispatch-history` member read, the fourth `{urlKey, rootItemId:$in}` read, which skips the `lineage-membership.js:isMember` rule. Its write key (the stamp) and read key (`itemId`) disagree, so a 60-line `oneRecordPerRequest` de-duplicates at read time and the declared index goes unread."
+          }
+        },
+        {
+          "row": 7,
+          "commit_cell": "LinearViewer 941952711",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "94195271",
+              "full": "941952711caf67cfe40e2b69e654cf6fde6f3109",
+              "subject": "LIN-4241: settled-ruling guard — refuse a second answer or dismiss with 409 ruling-settled (#2279)"
+            }
+          ],
+          "tickets": [
+            "LIN-4241"
+          ],
+          "balance_raw": "**worse**",
+          "sign": "worse",
+          "score": -1,
+          "leans": null,
+          "quote": {
+            "balance": "worse",
+            "reason": "`RULING_SETTLED_REFUSAL` is the one decision with a single owner. \"Is this ruling settled\" is now decided in several places: `isDecisionSettledIn` works per row, while `answeredDecisionIdsByLineage` works per lineage, and the inline `answered \\ | \\ | dismissed` check went from 2 copies to 6. `stampDecisionAnswers` gains a `primaryAlreadyLanded` option, a three-field return and a second dedupe marker, and the issue-write route grows by about 100 stateful lines."
+          }
+        },
+        {
+          "row": 8,
+          "commit_cell": "LinearViewer 13fe24a04",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "13fe24a0",
+              "full": "13fe24a04acb7976603d673c25bf40438f0818e1",
+              "subject": "LIN-4151: rank a project's /backlog lead roots, one derivation for page and fold (#2283)"
+            }
+          ],
+          "tickets": [
+            "LIN-4151"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "One ranking (`rankKeysOf`/`compareRank`) replaces `upNextOf`'s inline four-key sort and readiness check. `buildHomeView` now computes `projectSplits` once, so `homeRowsFor` no longer re-splits and the fold can't drift from the page. Two loose ends: code says \"lead\" while the wire/DOM still say `up-next`, and `tree.js:sortNodesWithStatus` still orders priority on its own."
+          }
+        },
+        {
+          "row": 9,
+          "commit_cell": "simple-dispatcher d8d186c",
+          "shas": [
+            {
+              "repo": "simple-dispatcher",
+              "short": "d8d186c",
+              "full": "d8d186c07113d6e61e3489e38f1210d0b0624cad",
+              "subject": "LIN-4187: system suite asserts Harbour's session contract (24h Sessions split) (#324)"
+            }
+          ],
+          "tickets": [
+            "LIN-4187"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "`findSession` gives \"which bucket holds this session\" one owner, and the `// Contract:` census follows the repo's census pattern. But `world.js:w.findSession` has no callers. `KNOWN_RED` is now empty, yet four functions gained test-only `entries`/`knownRed` parameters to keep it testable, and `observation-feed.test.js` re-declares Harbour's 24h `STALE_AFTER_MS`."
+          }
+        },
+        {
+          "row": 10,
+          "commit_cell": "simple-dispatcher 796bc9d",
+          "shas": [
+            {
+              "repo": "simple-dispatcher",
+              "short": "796bc9d",
+              "full": "796bc9da48349458d9cd8e103e85b4e5ba068ccd",
+              "subject": "LIN-4239: defer, blocked and failed post their status last (#326)"
+            }
+          ],
+          "tickets": [
+            "LIN-4239"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "It deletes the `statusLastTrailingTool` carve-out from `STOP_OUTCOMES`, `EXCEPTIONS` and the table test in favour of one rule, which `stop-status-order.js:statusLastViolations` checks for both callers, and module-map.md learned it. Three dents: `STATUS_LAST_ACTIONS` hard-codes what the helper already works out, `park-read.test.js` deep-imports Harbour internals and skips `harbour-locate.js`, and the `hook.js` comments say what holds only until a named later change lands."
+          }
+        },
+        {
+          "row": 11,
+          "commit_cell": "LinearViewer 172f644a1",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "172f644a",
+              "full": "172f644a10b176a12660e7677691c6902f52a006",
+              "subject": "LIN-4243: Home's Running and Up next follow a change of the Waiting set (#2282)"
+            }
+          ],
+          "tickets": [
+            "LIN-4243"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "The pure placement policy has a good, tested home in `public/home-placement.js`, and `DESK_SECTIONS` was extended rather than copied. But `app.js:createDeskPlacement` adds a third refresh channel that scrapes the whole page with `:scope > .running-section`, `replayExpanded` re-implements `applyState`'s expand pass, and `common.js` wraps `dispatchPrompt` from outside it. It deletes nothing (156 lines added to `app.js`)."
+          }
+        },
+        {
+          "row": 12,
+          "commit_cell": "LinearViewer 7797c306b",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "7797c306",
+              "full": "7797c306b877740e939c84ce724142b06cd67288",
+              "subject": "LIN-4166: a follow-up sent with subscription 'none' is a question that wakes no one (#2258)"
+            }
+          ],
+          "tickets": [
+            "LIN-4166"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "It reuses the existing `subscription` field and puts the wake gate in one place in `addFeedback`. But `'none'` is a per-row flag added to a list documented as edge levels, its \"requires followUpTo\" rule lives only in `subscriptionFailure`, there are now 4 inline \"followUpTo present\" checks, and the schema comment at `dispatch-store.js:37` wasn't updated."
+          }
+        },
+        {
+          "row": 13,
+          "commit_cell": "LinearViewer 9cc5ff9cb",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "9cc5ff9c",
+              "full": "9cc5ff9cb8ad05478e1e416e3894df16eba9ecca",
+              "subject": "LIN-4198: request-usage intake, store and per-request pricing (LIN-4195 piece 1) (#2265)"
+            }
+          ],
+          "tickets": [
+            "LIN-4198",
+            "LIN-4195"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "The new subsystem has a sensible home and is registered widely (INVENTORY, INDEX_SPECS, source map, endpoint inventory, mint sweep). It also pulls out `ownershipFilterOf` and `promptTokensOf`/`priceUsage`. But it copies `kpi-daily-rollup.js`'s E11000 bulk-write retry word for word (\"Mirrors…\") and adds a third token-field list. `requestUsageStoreFor` hid the collection from the urlkey-holders guard, which wasn't told about it (fixed later by #5)."
+          }
+        },
+        {
+          "row": 14,
+          "commit_cell": "LinearViewer 2eb73ae07",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "2eb73ae0",
+              "full": "2eb73ae07fb7297fc0fa057a6198aa8cbe901558",
+              "subject": "LIN-4143: the task page's ruling reads go through the live-run guard, always (#2285)"
+            }
+          ],
+          "tickets": [
+            "LIN-4143"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "It deletes the opt-in `liveGuard` flag and the `liveDispatchOnAnchor` override, so `rulingStandingOf` owns the live-run guard and no caller can forget to turn it on. The `live-anchor.js` consumer list was updated. Two loose ends: the inline predicate copy in `proxy-rulings.js` is noted but not removed, and `question-cards.js` now defaults a missing effect to `'record'` while `common.js` defaults it to resume."
+          }
+        }
+      ]
+    },
+    {
+      "id": "E",
+      "kind": "single-or-area",
+      "title": "LIN-4248 pass E",
+      "comment_id": "ef7f8416-a9c0-44de-8518-fd522643e924",
+      "created_at": "2026-11-05T09:06:42.057Z",
+      "session": "pass E",
+      "subject_tickets": [
+        "LIN-4248"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer `29f14bf6e`",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "29f14bf6",
+              "full": "29f14bf6e6b65fdcd0d0b0501e416267fa3bd680",
+              "subject": "LIN-4248: the Survey as two hand-triggered, read-only stage templates (#2287)"
+            }
+          ],
+          "tickets": [
+            "LIN-4248"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "Better: each new template's text has one owner, its `PROMPT_TEMPLATES` entry. Keeping the templates away from the router reuses the existing `EXCLUDED_FROM_AI_RECOMMENDATION` set rather than adding a new mechanism, and the one new connection between modules is small: `finalizePrompt(harness, kind)`, with non-Survey output tested as byte-identical. Every per-kind table was updated (leads, completion signals, grounding, stage intent, run-view labels, time buckets, LLM jobs, budgets, proxy-instructions kind list, llms.txt). Worse: \"is read-only\" is not a property of the template. It is a third hand-written list of names (`SURVEY_KINDS` in `lib/proxy-preamble.js`) next to the exclusion set, and the read-only rule is written twice, in the template body and in the preamble mandate. The resume paths (`provisionResumeCredential` callers in follow-up-dispatch, chat-tools, routes/dispatch) don't receive `kind`, so a follow-up to a Survey that appends context would get the reversible-work mandate again. Adding one stage still means editing about 10 tables and 6 hard-coded counts. The change adds two more counts (\"16 chosen by an LLM router\", \"16 with `route`\") that the docs-count test's regexes don't check, and a change-log row that says \"PR pending\" on the day it arrived."
+          }
+        }
+      ]
+    },
+    {
+      "id": "F",
+      "kind": "single-or-area",
+      "title": "LIN-4248 pass F",
+      "comment_id": "9ab7ac36-b1a4-4391-b1bc-b4cad528a1d1",
+      "created_at": "2026-11-05T09:06:52.890Z",
+      "session": "pass F",
+      "subject_tickets": [
+        "LIN-4248"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer 29f14bf6e",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "29f14bf6",
+              "full": "29f14bf6e6b65fdcd0d0b0501e416267fa3bd680",
+              "subject": "LIN-4248: the Survey as two hand-triggered, read-only stage templates (#2287)"
+            }
+          ],
+          "tickets": [
+            "LIN-4248"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "It uses the homes and mechanisms already there: two `PROMPT_TEMPLATES` entries, the existing `EXCLUDED_FROM_AI_RECOMMENDATION` set and kind override, and an entry in each per-kind table (completion signals, `GROUNDING_BY_KIND`, `STAGE_INTENT`, `STAGE_LABELS`, `BUCKET_OF_KIND`, `JOBS`), and the bucket-completeness tests check those tables. But \"survey\" now has no single owner. The pair is listed separately in `proxy-preamble.js` `SURVEY_KINDS` (read-only) and in `prompt-templates.js` `EXCLUDED_FROM_AI_RECOMMENDATION` (hand-only), and copied as literals in three test files. The read-only rule is written three times (template body, `SURVEY_READ_ONLY_MANDATE`, completion signals). A new positional `kind` argument on `finalizePrompt` is threaded factory → entrance → `attachProxyContext` → `buildProxyContextPreamble`, so the credential/preamble module now branches on stage identity. Nothing was deleted or simplified."
+          }
+        }
+      ]
+    },
+    {
+      "id": "G",
+      "kind": "single-or-area",
+      "title": "LIN-4253 pass G",
+      "comment_id": "df5f70cb-9ce3-479c-8f98-09de09f8b652",
+      "created_at": "2026-11-05T11:00:07.345Z",
+      "session": "pass G",
+      "subject_tickets": [
+        "LIN-4253"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer d9c0f1cae",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "d9c0f1ca",
+              "full": "d9c0f1caedd3506ef35c9ef0da6ab840d4ebb714",
+              "subject": "LIN-4253: a stage's route and writes are declared once, on its template (#2290)"
+            }
+          ],
+          "tickets": [
+            "LIN-4253"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Two separate name lists that both had to be updated whenever a stage was added (`EXCLUDED_FROM_AI_RECOMMENDATION` in prompt-templates and `SURVEY_KINDS` in proxy-preamble) are replaced by two traits each template declares for itself (`route: null` and `writes`). The excluded set is now derived from those traits, `getSelectableStages` lost its double filter, the preamble's inline ternary became a `WRITES_BLOCK` table, and an unknown value throws before a token is minted. The new vocabulary lives in a dependency-free leaf, `lib/stage-writes.js`, and the preamble still doesn't import the template registry. One thing it missed: the resume attach in `provisionResumeCredential` (proxy-preamble.js ~833/859) still calls `attachProxyContext` without `writes`, so a follow-up on a one-comment stage falls back to the `work` mandate. That gap already existed with `kind`, so it isn't a regression, but the gate is only \"one\" for new dispatches."
+          }
+        }
+      ]
+    },
+    {
+      "id": "H",
+      "kind": "single-or-area",
+      "title": "LIN-4253 pass H",
+      "comment_id": "11b77908-13fc-4c57-a62f-79fae6c38c8a",
+      "created_at": "2026-11-05T11:00:13.021Z",
+      "session": "pass H",
+      "subject_tickets": [
+        "LIN-4253"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer `d9c0f1cae`",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "d9c0f1ca",
+              "full": "d9c0f1caedd3506ef35c9ef0da6ab840d4ebb714",
+              "subject": "LIN-4253: a stage's route and writes are declared once, on its template (#2290)"
+            }
+          ],
+          "tickets": [
+            "LIN-4253"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Two hand-kept name lists go away: `EXCLUDED_FROM_AI_RECOMMENDATION` is now derived from each template's own `route: null`, and the preamble's `SURVEY_KINDS` is replaced by a `writes` trait declared on every template. The preamble keeps a `WRITES_BLOCK` table keyed by that trait, so the inline survey ternary and the stage names leave `proxy-preamble.js`, which still doesn't import the registry. The new leaf `lib/stage-writes.js` has an obvious home, and a completeness test plus source-map and prompt-system docs make the next stage declare both traits. The cost is small: one test file and one dependency-free module."
+          }
+        }
+      ]
+    },
+    {
+      "id": "I",
+      "kind": "single-or-area",
+      "title": "LIN-4252 pass I",
+      "comment_id": "854305eb-9778-4923-bd99-ea8394151ef4",
+      "created_at": "2026-11-05T11:10:55.612Z",
+      "session": "pass I",
+      "subject_tickets": [
+        "LIN-4252"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer `d234b94a6`",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "d234b94a",
+              "full": "d234b94a61b80dea5a38615bc8e99f59770b0dbf",
+              "subject": "LIN-4252: one shared fake DOM for client unit tests (#2291)"
+            }
+          ],
+          "tickets": [
+            "LIN-4252"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "Good on its own terms: `tests/unit/helpers/fake-dom.js` gives the fake DOM one documented home next to `routing-fakes.js`. It has its own witness suite (`fake-dom.test.js`) and throws on selectors it doesn't model. It deleted `lin-4242-waiting-merge`'s private ~150-line FakeNode/parser/matcher and `lin-4010`'s always-true stub (which was hiding a test that clicked a button that was never drawn). But it calls itself \"the one fake DOM\", and the new CLAUDE.md line says \"don't hand-write a `makeContainer`\", while 17 other suites still do (8 `prompt-section-*`, `lin-3833/3968/3975/4016/4040/4042`, `scan-retire-ui`, `brief-recap-*`), plus about 15 private `FakeElement`/`makeEl` classes elsewhere. The repo now has N+1 fake DOMs and a doc rule most of the existing code breaks."
+          }
+        }
+      ]
+    },
+    {
+      "id": "J",
+      "kind": "single-or-area",
+      "title": "LIN-4252 pass J",
+      "comment_id": "79a75a6a-032e-4b31-9069-4b040c19ae3a",
+      "created_at": "2026-11-05T11:11:04.574Z",
+      "session": "pass J",
+      "subject_tickets": [
+        "LIN-4252"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer `d234b94a6`",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "d234b94a",
+              "full": "d234b94a61b80dea5a38615bc8e99f59770b0dbf",
+              "subject": "LIN-4252: one shared fake DOM for client unit tests (#2291)"
+            }
+          ],
+          "tickets": [
+            "LIN-4252"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "Better where it touched: it deletes `lin-4242-waiting-merge`'s private 150-line `FakeNode`/parser/matcher and `lin-4010`'s stub `makeContainer`. That stub accepted clicks on buttons that were never drawn, and the stricter fake exposed that in the Escape test. The replacement is `tests/unit/helpers/fake-dom.js`, which states what it models, throws on everything else and has its own tests (`fake-dom.test.js`; 100/100 pass across the three files). But it is one more fake among many. 18 suites still hand-write `makeContainer` (`prompt-section-*`, `lin-3833/3975/4016/4040/4042`, `brief-recap-*`, `scan-retire-ui`), and about 10 more carry their own `FakeElement`/`FakeClassList` (`chat-*`, `observation-*`, `flight-companion-client`, `lin-2933`, `lin-4035`). `CLAUDE.md` now says \"use it, don't hand-write a `makeContainer`\" with no guard behind that rule, so the doc describes a codebase that mostly doesn't exist yet."
+          }
+        }
+      ]
+    },
+    {
+      "id": "K",
+      "kind": "single-or-area",
+      "title": "LIN-4247 pass K",
+      "comment_id": "55773f63-1a72-4066-a2fa-ecfce43cddda",
+      "created_at": "2026-11-05T11:16:13.135Z",
+      "session": "pass K",
+      "subject_tickets": [
+        "LIN-4247"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer b5cc4c621",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "b5cc4c62",
+              "full": "b5cc4c621914f451bb3e708d8eaee1a2a3e7e1d1",
+              "subject": "LIN-4247: a held run's end clears Go's started state and Home's run box (#2289)"
+            }
+          ],
+          "tickets": [
+            "LIN-4247"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "It gives \"the run has ended\" one owner (`runEnded`), one reset (`endRun`, covering the Go, Next step and run-step presses), and an identity guard (`state.go !== reading`) that drops stale reads. It also flips the old \"keep the last sentence\" test instead of adding a second one, and it updates `llms.txt`. Against that, \"in progress\" now has four answers in `prompt-section.js` (`goInProgress`, `stageBusy`, the offer's busy kind, and `runEnded`, which re-reads `data.sessions.busy` instead of sharing `stageBusy`). The `state.go` five-field literal goes from 7 copies to 8, and `run.item = null` goes from 2 places to 3. All of this lands in a file that is already 2.9k lines."
+          }
+        }
+      ]
+    },
+    {
+      "id": "L",
+      "kind": "single-or-area",
+      "title": "LIN-4247 pass L",
+      "comment_id": "f49400ad-e521-4312-bdf7-964af9a299d4",
+      "created_at": "2026-11-05T11:16:50.269Z",
+      "session": "pass L",
+      "subject_tickets": [
+        "LIN-4247"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer b5cc4c621",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "b5cc4c62",
+              "full": "b5cc4c621914f451bb3e708d8eaee1a2a3e7e1d1",
+              "subject": "LIN-4247: a held run's end clears Go's started state and Home's run box (#2289)"
+            }
+          ],
+          "tickets": [
+            "LIN-4247"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "Better: the end of a run now has one named owner (`runEnded` → `endRun`, read only by `runPoll` in `public/prompt-section.js`) instead of an implicit \"else: stop polling\" comment, the old pinned unit test is flipped rather than duplicated, and `llms.txt` learned the new behaviour. Worse: `runEnded` re-reads `sessions.busy` off the raw reply, which is the same fact `stageBusy` already reads from `state.opened`, and the header comment lists \"three answers\" to in progress instead of folding them into one. `endRun` is also one more hand-written copy of the full `state.go` literal (no helper). The stale-read guard (`state.go !== reading`) quietly turns every writer of `state.go` into a poll-cancel signal, and none of those writers says so."
+          }
+        }
+      ]
+    },
+    {
+      "id": "M",
+      "kind": "single-or-area",
+      "title": "LIN-4251 pass M",
+      "comment_id": "3f0d654f-f864-4c9d-8d39-c133c95d0339",
+      "created_at": "2026-11-05T11:55:21.418Z",
+      "session": "pass M",
+      "subject_tickets": [
+        "LIN-4251"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer `2f0c9d5b0`",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "2f0c9d5b",
+              "full": "2f0c9d5b0c9b567f836f43e6d6679db57ae0eb31",
+              "subject": "LIN-4251: a stage's preamble says what it may write, for every entrance (#2292)"
+            }
+          ],
+          "tickets": [
+            "LIN-4251"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Gives \"what may this kind write\" one owner, `stageWrites(kind)` in `lib/prompt-templates.js`, used by the launch arm, the follow-up attach and both feedback routes. Before, dispatch-entrance indexed `PROMPT_TEMPLATES` inline and the feedback entrances passed nothing. It also adds a census test that fails any new `attachProxyContext` call site until its `writes` choice is recorded, and turns the one-way READING/`writes` check into a two-way one. The cost is `readOnlyContextLines`, a second hand-written copy of the 8-way issue/detail/relations/search capability tree beside `workContextLines`, which has to be kept in step from now on, and `WRITES_BLOCK` now holds four near-copies of the same mandate and \"runner reports back\" sentences."
+          }
+        }
+      ]
+    },
+    {
+      "id": "N",
+      "kind": "single-or-area",
+      "title": "LIN-4251 pass N",
+      "comment_id": "b3030520-2f9e-4c05-bf53-026c1c9aef11",
+      "created_at": "2026-11-05T11:56:54.119Z",
+      "session": "pass N",
+      "subject_tickets": [
+        "LIN-4251"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer 2f0c9d5b0",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "2f0c9d5b",
+              "full": "2f0c9d5b0c9b567f836f43e6d6679db57ae0eb31",
+              "subject": "LIN-4251: a stage's preamble says what it may write, for every entrance (#2292)"
+            }
+          ],
+          "tickets": [
+            "LIN-4251"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "Better: `stageWrites(kind)` in `lib/prompt-templates.js` now owns the kind→`writes` lookup, and all four entrances use it (launch, follow-up via `provisionResumeCredential`, and both feedback routes, where `finalizePrompt(harness, kind)` now uses the kind the factory was already passing). The new values sit in the leaf `stage-writes.js`, the traits test is now an exact two-way check against `STAGE_INTENT` READING, and `prompt-system.md` and `source-map.md` were updated. Worse: `readOnlyContextLines` in `lib/proxy-preamble.js` is a second hand-written copy of the six-branch endpoint-hint ladder (`workContextLines`, renamed in place), differing by one clause and wrapped differently. The test that pinned \"only the mandate and closing differ from the default block\" was deleted, and the new tests only check that the clause is absent, so a later hint change made on the work side will quietly miss every non-work stage."
+          }
+        }
+      ]
+    },
+    {
+      "id": "O",
+      "kind": "single-or-area",
+      "title": "LIN-4246 pass O",
+      "comment_id": "17ba7295-5bb9-4eee-a5d9-e06fd2c863c8",
+      "created_at": "2026-11-05T12:22:24.710Z",
+      "session": "pass O",
+      "subject_tickets": [
+        "LIN-4246"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer b53917365",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "b5391736",
+              "full": "b5391736540c30fd228b116c746ae67cb2674177",
+              "subject": "LIN-4246: witness the opened task's repaint at the keepTypedQuestion call site (#2293)"
+            }
+          ],
+          "tickets": [
+            "LIN-4246"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "Better: it deletes the dead `innerHTML === fresh.innerHTML` keep from `keepTypedQuestion`, moves lin-4010's hand-rolled vm and fake-DOM loader into `tests/unit/helpers/prompt-section-world.js` (that file gets ~40 lines shorter), and updates CLAUDE.md to point at the helper. Worse: the new `readerFocusIn`/`restoreReaderFocus` is a second focus/caret capture-and-restore beside `paintRun`'s existing one in the same file, the \"focus inside the card\" test now exists in both `readerFocusIn` and `QuestionCards.cardHoldsInput`, and `keepsReaderPlace` gets a `hadFocus` flag that overrides part of `cardHoldsInput`. So the focus decision is now split between two files."
+          }
+        }
+      ]
+    },
+    {
+      "id": "P",
+      "kind": "single-or-area",
+      "title": "LIN-4246 pass P",
+      "comment_id": "ce9a15fc-8bc9-476d-b33f-6c7f10f483d9",
+      "created_at": "2026-11-05T12:22:46.575Z",
+      "session": "pass P",
+      "subject_tickets": [
+        "LIN-4246"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer b53917365",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "b5391736",
+              "full": "b5391736540c30fd228b116c746ae67cb2674177",
+              "subject": "LIN-4246: witness the opened task's repaint at the keepTypedQuestion call site (#2293)"
+            }
+          ],
+          "tickets": [
+            "LIN-4246"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "Good: the keep decision still has one owner (`QuestionCards.keepsReaderPlace`), the dead `innerHTML ===` clause is gone, the comments now say what the code does, and 4010's inline vm loader moved into `tests/unit/helpers/prompt-section-world.js`, which CLAUDE.md names. Bad: the new `readerFocusIn`/`restoreReaderFocus` is a second focus-and-caret capture/restore in `prompt-section.js`, next to `paintRun`'s LIN-3969 one. \"Focus is inside the card\" is now checked in two places (`readerFocusIn` and `cardHoldsInput`), and on this path `cardHoldsInput`'s check can't fire, so the rule is split across two files and joined by a `hadFocus` flag. Also, the \"shared\" world is used by 2 suites while about 17 others still load `prompt-section.js` with their own vm."
+          }
+        }
+      ]
+    },
+    {
+      "id": "Q",
+      "kind": "single-or-area",
+      "title": "LIN-4263 pass Q",
+      "comment_id": "4653f06d-ada8-4dac-af05-f46a565f3587",
+      "created_at": "2026-11-05T13:25:28.021Z",
+      "session": "pass Q",
+      "subject_tickets": [
+        "LIN-4263"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer `6ff38cf5c`",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "6ff38cf5",
+              "full": "6ff38cf5cec32b450b01c4ac31027ae533179272",
+              "subject": "LIN-4263: /cost reports each dispatch's own model and tokens inside its lineage (#2295)"
+            }
+          ],
+          "tickets": [
+            "LIN-4263"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "Good shape overall: the per-dispatch split has one home (`dispatchesOf` in `lib/cost-read.js`, reusing `foldRequestUsage` instead of re-pricing), one helper (`usageDetailOf`) feeds all four `workerSessions` push sites, it's opt-in only for `/cost` (`perDispatch`), and both doc surfaces (`docs/proxy-integration.md`, `lib/proxy-instructions.js`) were updated, with the stale \"cumulative snapshot\" rationale replaced. But it adds two more copies of rules the code already had. `postingKeysOf` repeats `isPostingRow`'s `id/_id/loopId` list in the same file, and `rankOf` plus the sort repeat `lineage-membership.js`'s private `dispatchOrder` (the comment admits it) without the tie handling (two undated members give `Infinity - Infinity = NaN`). The W9 replay guard also gains a regex `pattern` mode, which loosens a path-exact guard for good."
+          }
+        }
+      ]
+    },
+    {
+      "id": "R",
+      "kind": "single-or-area",
+      "title": "LIN-4263 pass R",
+      "comment_id": "9bdcc161-61ee-4abc-96cb-b0bce067b6b1",
+      "created_at": "2026-11-05T13:26:13.011Z",
+      "session": "pass R",
+      "subject_tickets": [
+        "LIN-4263"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer 6ff38cf5c",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "6ff38cf5",
+              "full": "6ff38cf5cec32b450b01c4ac31027ae533179272",
+              "subject": "LIN-4263: /cost reports each dispatch's own model and tokens inside its lineage (#2295)"
+            }
+          ],
+          "tickets": [
+            "LIN-4263"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "Good: the per-dispatch figures reuse the one fold (`foldRequestUsage`, which just gains a per-model `tokens`), the split sits behind an opt-in `perDispatch` flag that only `/cost` passes, and the change lists, the W9 checker (new `pattern` entries) and both API docs were updated, including fixing the outdated \"cumulative snapshot\" reason for counting once per lineage. Worse: `dispatchesOf` brings back two things that already existed. `postingKeysOf` repeats `isPostingRow`'s `[id, _id, loopId]` list in the same file without either using the other. The `rankOf` sort copies `lineage-membership.js`'s private `byDispatchOrder` and differs from it: two undated members give `Infinity - Infinity = NaN`. \"Split rule C\" is now written out in four places (JSDoc, route comment, `proxy-integration.md`, `proxy-instructions.js`)."
+          }
+        }
+      ]
+    },
+    {
+      "id": "S",
+      "kind": "single-or-area",
+      "title": "LIN-4276 pass S",
+      "comment_id": "eaab4073-20a5-44ed-83cc-4c81bf034921",
+      "created_at": "2026-11-05T14:19:32.587Z",
+      "session": "pass S",
+      "subject_tickets": [
+        "LIN-4276"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer `473cc865e`",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "473cc865",
+              "full": "473cc865e0a769768cfc117a83d89d1d12408e24",
+              "subject": "LIN-4276: one posting-key list and one dispatch order in /cost (#2300)"
+            }
+          ],
+          "tickets": [
+            "LIN-4276"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Two forked rules now have one owner each: `dispatchesOf` drops its private `rankOf` sort and reuses `byDispatchOrder` from `lib/lineage-membership.js` (newly exported), and `postingKeysOf` moves up to become the single `[id, _id, loopId]` list that `isPostingRow` and `keyOf` both derive from, so the inline copy in `isPostingRow` and the separate `id ?? _id` rule in `keyOf` are gone. Held back from a clean win by misses around it: `docs/architecture/source-map.md`'s `lineage-membership.js` entry still lists its exports without `byDispatchOrder`, and `keyOf` gaining `loopId` also changes how `distinctRows` dedups rows (a loopId-only row is no longer keyless, so two rows sharing a loopId now collapse into one). The commit message calls the behaviour change \"confined\", but that second effect isn't written down there and isn't tested."
+          }
+        }
+      ]
+    },
+    {
+      "id": "T",
+      "kind": "single-or-area",
+      "title": "LIN-4276 pass T",
+      "comment_id": "c376db0b-9349-457d-a5c7-37045813cd9b",
+      "created_at": "2026-11-05T14:19:46.670Z",
+      "session": "pass T",
+      "subject_tickets": [
+        "LIN-4276"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer `473cc865e`",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "473cc865",
+              "full": "473cc865e0a769768cfc117a83d89d1d12408e24",
+              "subject": "LIN-4276: one posting-key list and one dispatch order in /cost (#2300)"
+            }
+          ],
+          "tickets": [
+            "LIN-4276"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Two forks inside `lib/cost-read.js` are gone: the private `rankOf` comparator (its `Infinity - Infinity` gave NaN for two undated rows) now reuses `byDispatchOrder`, newly exported from `lib/lineage-membership.js`, which `groupLineageMembership` already sorted by. The `[id, _id, loopId]` list, previously written in both `isPostingRow` and `postingKeysOf`, now exists once, and `keyOf` derives from it. The cost: `lib/dispatch-lineage.js:162` still sorts dispatches with its own `(dispatched ?? Infinity) - …` comparator, while the new docstring in lineage-membership.js says no reader re-writes the order. Also, the `keyOf` change quietly reaches `distinctRows`: loopId-only rows are now deduped by loopId instead of being kept as keyless, a side effect that only the `missing` case pins."
+          }
+        }
+      ]
+    },
+    {
+      "id": "V",
+      "kind": "single-or-area",
+      "title": "LIN-4263+4276 pass V",
+      "comment_id": "bb19dc97-cf3f-43f2-ae62-337fc10dd704",
+      "created_at": "2026-11-05T14:20:37.482Z",
+      "session": "pass V",
+      "subject_tickets": [
+        "LIN-4263",
+        "LIN-4276"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer 6ff38cf5c + 473cc865e",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "6ff38cf5",
+              "full": "6ff38cf5cec32b450b01c4ac31027ae533179272",
+              "subject": "LIN-4263: /cost reports each dispatch's own model and tokens inside its lineage (#2295)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "473cc865",
+              "full": "473cc865e0a769768cfc117a83d89d1d12408e24",
+              "subject": "LIN-4276: one posting-key list and one dispatch order in /cost (#2300)"
+            }
+          ],
+          "tickets": [
+            "LIN-4263",
+            "LIN-4276"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "The per-dispatch split (`dispatchesOf`, `usageDetailOf`) sits in `lib/cost-read.js`, the one cost read. It reuses `foldRequestUsage` and the newly exported `byDispatchOrder` instead of adding its own fold or sort, and runs only behind an opt-in `perDispatch` flag that only `/cost` sets. Net of the parent, `postingKeysOf` merges the two key spellings that had already drifted apart (`keyOf` ignored `loopId`, `isPostingRow` read it), which fixes the loopId-only row being listed twice. `LINEAGE_IDENTITY_PROJECTION`, its pinned key test, the census and both API docs all picked up the change. Costs: W9 gains a regex `pattern` mode, so `goldens.json` now skips any future change under `.tokens/.byModel/.dispatches` rather than listing it, and the `readCost` JSDoc for `identityRows` still lists the old projection without `followUpTo`."
+          }
+        }
+      ]
+    },
+    {
+      "id": "U",
+      "kind": "single-or-area",
+      "title": "LIN-4263+4276 pass U",
+      "comment_id": "10495b2f-3379-4d87-b0ea-c4b342488a8b",
+      "created_at": "2026-11-05T14:20:46.925Z",
+      "session": "pass U",
+      "subject_tickets": [
+        "LIN-4263",
+        "LIN-4276"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer 6ff38cf5c + 473cc865e (net `6ff38cf5c^..473cc865e`)",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "6ff38cf5",
+              "full": "6ff38cf5cec32b450b01c4ac31027ae533179272",
+              "subject": "LIN-4263: /cost reports each dispatch's own model and tokens inside its lineage (#2295)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "473cc865",
+              "full": "473cc865e0a769768cfc117a83d89d1d12408e24",
+              "subject": "LIN-4276: one posting-key list and one dispatch order in /cost (#2300)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "6ff38cf5",
+              "full": "6ff38cf5cec32b450b01c4ac31027ae533179272",
+              "subject": "LIN-4263: /cost reports each dispatch's own model and tokens inside its lineage (#2295)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "473cc865",
+              "full": "473cc865e0a769768cfc117a83d89d1d12408e24",
+              "subject": "LIN-4276: one posting-key list and one dispatch order in /cost (#2300)"
+            }
+          ],
+          "tickets": [
+            "LIN-4263",
+            "LIN-4276"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Compared with the parent, the per-dispatch split goes where it belongs: `dispatchesOf` and split rule C sit in `lib/cost-read.js`, which already owns the records-vs-snapshot decision; per-model tokens are added in `foldRequestUsage`; and the work is behind a `/cost`-only `perDispatch` flag, so the Models page, routing preview and effort readout don't change. The pair also leaves two rules with a single owner each: `byDispatchOrder` is now exported from `lineage-membership.js` and reused, not re-written, and `postingKeysOf` replaces two lists that disagreed (`keyOf` read id/_id, `isPostingRow` read id/_id/loopId). That fixes a loopId-only row being counted twice. Against that, all four `workerSessions.push` literals got longer instead of being merged into one, and the same contract is now written out by hand in two places (`docs/proxy-integration.md` and `lib/proxy-instructions.js`), which already differ slightly (only the md says `byModel` is null for an empty dispatch)."
+          }
+        }
+      ]
+    },
+    {
+      "id": "W",
+      "kind": "single-or-area",
+      "title": "LIN-4277 pass W",
+      "comment_id": "643dbd1e-30b6-436d-9019-08760be986f1",
+      "created_at": "2026-11-05T15:05:39.997Z",
+      "session": "pass W",
+      "subject_tickets": [
+        "LIN-4277"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer `0c3d3448b`",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "0c3d3448",
+              "full": "0c3d3448b3f3cdfe2a97a09a4975113c73e723c9",
+              "subject": "LIN-4277: one endpoint-hint ladder and one closing lead-in in the preamble (#2301)"
+            }
+          ],
+          "tickets": [
+            "LIN-4277"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "The endpoint hints had two owners, the eight-branch `workContextLines` and a four-branch copy in `readOnlyContextLines`. Now `endpointHintParts` is the only owner: the update clause is data that `renderEndpointHints` drops for non-work, and the copy is deleted. `CLOSING_LEAD_IN` keeps the four `WRITES_BLOCK` closings from drifting apart. Two costs: the wrap positions are now baked into the clause strings (`', and\\nupdate…'`, `'\\nand to update…'`), and `buildProxyContextPreamble` now mixes pre-joined strings (`endpointHints`, `closing`) with the line arrays in `exchangeLines`."
+          }
+        }
+      ]
+    },
+    {
+      "id": "X",
+      "kind": "single-or-area",
+      "title": "LIN-4277 pass X",
+      "comment_id": "b6d41050-9d99-47ad-bb58-163518d65606",
+      "created_at": "2026-11-05T15:06:01.792Z",
+      "session": "pass X",
+      "subject_tickets": [
+        "LIN-4277"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer `0c3d3448b`",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "0c3d3448",
+              "full": "0c3d3448b3f3cdfe2a97a09a4975113c73e723c9",
+              "subject": "LIN-4277: one endpoint-hint ladder and one closing lead-in in the preamble (#2301)"
+            }
+          ],
+          "tickets": [
+            "LIN-4277"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "It deletes `readOnlyContextLines`, a reworded second copy of the eight-branch endpoint-hint ladder, so `endpointHintParts` + `renderEndpointHints` in `lib/proxy-preamble.js` now own the hints for every `writes` value, and the four `WRITES_BLOCK` closings share one `CLOSING_LEAD_IN`. The cost: the update clause is still spelled out in all eight branches, in five punctuation and line-break forms. Line breaks now sit as `\\n` inside concatenated strings, which reads worse than the old one-element-per-line arrays. `updateClause()` wraps an `otherwise` that is always `'.'`."
+          }
+        }
+      ]
+    },
+    {
+      "id": "Y",
+      "kind": "single-or-area",
+      "title": "LIN-4251+4277 pass Y",
+      "comment_id": "bc29c9de-7fdd-450e-bd49-efbf6c791707",
+      "created_at": "2026-11-05T15:07:07.313Z",
+      "session": "pass Y",
+      "subject_tickets": [
+        "LIN-4251",
+        "LIN-4277"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer `2f0c9d5b0` + `0c3d3448b`",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "2f0c9d5b",
+              "full": "2f0c9d5b0c9b567f836f43e6d6679db57ae0eb31",
+              "subject": "LIN-4251: a stage's preamble says what it may write, for every entrance (#2292)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "0c3d3448",
+              "full": "0c3d3448b3f3cdfe2a97a09a4975113c73e723c9",
+              "subject": "LIN-4277: one endpoint-hint ladder and one closing lead-in in the preamble (#2301)"
+            }
+          ],
+          "tickets": [
+            "LIN-4251",
+            "LIN-4277"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Working out a stage's `writes` from its kind now has one owner, `stageWrites(kind)` in `lib/prompt-templates.js`. It replaces the inline `PROMPT_TEMPLATES[k]?.writes`, and all four entrances use it: launch, follow-up via `provisionResumeCredential`'s `attach.writes`, feedback triage and feedback autopilot. Before this, the feedback and resume entrances always got the `work` block without saying so. The eight-branch nested ternary in `buildProxyContextPreamble`, plus the read-only copy of it that the first commit added, became one `endpointHintParts` ladder where the update clause is data rather than a second text. `WRITES_BLOCK` closings share `CLOSING_LEAD_IN`, and READING ⇔ `writes ∈ {none, one-comment}` is now tested in both directions. The costs are small: the three new mandates still each repeat the same \"do not hold your first call…\" tail, and `plumbing.md` still cites `finalizePrompt(resolvedHarness)` at `:1032-1043`, although it now takes `(harness, kind)` and sits at `:1025`."
+          }
+        }
+      ]
+    },
+    {
+      "id": "Z",
+      "kind": "single-or-area",
+      "title": "LIN-4251+4277 pass Z",
+      "comment_id": "87d69209-01e4-40a9-8558-20554efa88a7",
+      "created_at": "2026-11-05T15:07:39.657Z",
+      "session": "pass Z",
+      "subject_tickets": [
+        "LIN-4251",
+        "LIN-4277"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer 2f0c9d5b0 + 0c3d3448b",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "2f0c9d5b",
+              "full": "2f0c9d5b0c9b567f836f43e6d6679db57ae0eb31",
+              "subject": "LIN-4251: a stage's preamble says what it may write, for every entrance (#2292)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "0c3d3448",
+              "full": "0c3d3448b3f3cdfe2a97a09a4975113c73e723c9",
+              "subject": "LIN-4277: one endpoint-hint ladder and one closing lead-in in the preamble (#2301)"
+            }
+          ],
+          "tickets": [
+            "LIN-4251",
+            "LIN-4277"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "A stage's `writes` now has one lookup, `stageWrites(kind)` in `lib/prompt-templates.js`, which takes the place of the inline `PROMPT_TEMPLATES[kind]?.writes`. The launch, follow-up (`provisionResumeCredential` via `attach.writes`) and both feedback entrances use it, and a census test of `attachProxyContext` call sites makes any new entrance choose a value. In `proxy-preamble.js`, the 50-line nested ternary of endpoint hints is now one `endpointHintParts` ladder where the update clause is data (`updateClause`). The interim `readOnlyContextLines` copy is gone, and the four closings share `CLOSING_LEAD_IN`. The cost is that `TICKET_FIELDS_MANDATE` repeats the triage template's own \"Triage preserves scope\" rules in a second module. On top of that, the hint text is now built from `\\n`-embedded string fragments (`detail`, `lead`, `pull`), which are harder to read and edit than the old per-line arrays."
+          }
+        }
+      ]
+    },
+    {
+      "id": "AB",
+      "kind": "single-or-area",
+      "title": "LIN-4255 pass AB",
+      "comment_id": "119e118e-89ed-4773-bf90-4c25a9d869cd",
+      "created_at": "2026-11-05T18:13:48.953Z",
+      "session": "pass AB",
+      "subject_tickets": [
+        "LIN-4255"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer 69e8f1754, 6d2875181, 56f9b4749, 8369461cd, 82e75ee9d, aeb9d8773, 069585bb0, d537cd695, 48d93c5c2, 6dd136173, 5f825eb67, 8d8bd92ff, 1b83bbff1, 591bb9596 (judged at 591bb9596 against 69e8f1754^)",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "69e8f175",
+              "full": "69e8f1754f5c1a1c38c924ce82531b1e680ee48c",
+              "subject": "LIN-4265: fake-DOM census (structural, frozen 56-file ratchet) + rename prompt-section-world.js to client-world.js (#2297)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "6d287518",
+              "full": "6d2875181e6b06940fb1525caa8c3bc4b5b73943",
+              "subject": "LIN-4270: className and id reflect the class and id attributes on the shared fake (#2298)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "56f9b474",
+              "full": "56f9b4749f7fd1f9c155aba11606eccaa6872eeb",
+              "subject": "LIN-4266: prompt-section-go suite onto loadWorld (census 56 -> 55) (#2299)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "8369461c",
+              "full": "8369461cd1cd263c84225294f523db641d8bb6e3",
+              "subject": "LIN-4268: prompt-section-preserve / -recommend-url / -look-alike onto loadWorld (census 55 -> 52) (#2302)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "82e75ee9",
+              "full": "82e75ee9d72acd1293b96dd4e721ed4ffc65b417",
+              "subject": "LIN-4280: Fake-DOM piece 1: chat-append-options / chat-render-markdown-text / chat-tool-rows / observation-basis-check / observation-bulk-scan onto loadWorld (census 52 -> 47) (#2304)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "aeb9d877",
+              "full": "aeb9d8773cf7216a7d50333fbdd129eba0f93947",
+              "subject": "LIN-4279: fake-DOM piece 0 — shared-fake additions and client-world helpers (#2303)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "069585bb",
+              "full": "069585bb0be2f7be696498d1b8db0b58a9b8ba4f",
+              "subject": "LIN-4269: fake-DOM move: client suites onto loadWorld (census 55 -> 46) (#2306)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "d537cd69",
+              "full": "d537cd695f199fe0d500a9a086ef3cb3e25e60c9",
+              "subject": "LIN-4267: prompt-section p0, run-quota and runner-link suites onto loadWorld (#2305)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "48d93c5c",
+              "full": "48d93c5c290f4a6c957bba23ca887ca04f8f9eec",
+              "subject": "LIN-4284: fake-DOM piece 5 — sentinel-mask and chart-helpers onto loadWorld (#2309)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "6dd13617",
+              "full": "6dd136173783bc709c9a115235656b17e138db9f",
+              "subject": "LIN-4283: fake-DOM piece 4 — observation-scan-due and lin-2933 onto loadWorld (#2308)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "5f825eb6",
+              "full": "5f825eb67e815ca0f8ece92a6c78aaab857d7d4d",
+              "subject": "LIN-4282: fake-DOM piece 3 — observation-ruling-delivery onto loadWorld (#2307)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "8d8bd92f",
+              "full": "8d8bd92fff89f06ed40edeb274b273d460986cc9",
+              "subject": "LIN-4285: live-console client suites onto loadWorld (fake-DOM piece 6) (#2310)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "1b83bbff",
+              "full": "1b83bbff1076cdf7ddea888a905a8e1abbc6aae3",
+              "subject": "LIN-4281: observation suites onto the shared fake (fake-DOM piece 2) (#2311)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "591bb959",
+              "full": "591bb9596159df600eeff47dd7205e7d41b31bb1",
+              "subject": "LIN-4272: fake-DOM close-out — stop reasons in the census, indeterminate in the fake header (#2312)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "591bb959",
+              "full": "591bb9596159df600eeff47dd7205e7d41b31bb1",
+              "subject": "LIN-4272: fake-DOM close-out — stop reasons in the census, indeterminate in the fake header (#2312)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "69e8f175",
+              "full": "69e8f1754f5c1a1c38c924ce82531b1e680ee48c",
+              "subject": "LIN-4265: fake-DOM census (structural, frozen 56-file ratchet) + rename prompt-section-world.js to client-world.js (#2297)"
+            }
+          ],
+          "tickets": [
+            "LIN-4255"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Client tests now have one owner for \"fake DOM + vm\": `helpers/fake-dom.js` + `helpers/client-world.js` (`loadWorld`). 31 suites dropped their own container fakes and vm sandboxes, `tests/fixtures/observation-dom-shim.js` is deleted, and the AST census (`fake-dom-census.test.js`) is a guard that only shrinks (56 → 25 files, with stop reasons inline). The fake grew modelled behaviour (getElementById, createElementNS, replaceChild/append/prepend, `^= $= *=`) that is pinned in `fake-dom.test.js`, not patched into each suite. Debt left behind: several second copies (below) and a consumer list kept by hand."
+          }
+        }
+      ]
+    },
+    {
+      "id": "AA",
+      "kind": "single-or-area",
+      "title": "LIN-4255 pass AA",
+      "comment_id": "64c4d1e3-451a-482a-a750-bfadfa75e327",
+      "created_at": "2026-11-05T18:14:39.139Z",
+      "session": "pass AA",
+      "subject_tickets": [
+        "LIN-4255"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer 69e8f1754, 6d2875181, 56f9b4749, 8369461cd, 82e75ee9d, aeb9d8773, 069585bb0, d537cd695, 48d93c5c2, 6dd136173, 5f825eb67, 8d8bd92ff, 1b83bbff1, 591bb9596 (judged at 591bb9596 against 69e8f1754^)",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "69e8f175",
+              "full": "69e8f1754f5c1a1c38c924ce82531b1e680ee48c",
+              "subject": "LIN-4265: fake-DOM census (structural, frozen 56-file ratchet) + rename prompt-section-world.js to client-world.js (#2297)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "6d287518",
+              "full": "6d2875181e6b06940fb1525caa8c3bc4b5b73943",
+              "subject": "LIN-4270: className and id reflect the class and id attributes on the shared fake (#2298)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "56f9b474",
+              "full": "56f9b4749f7fd1f9c155aba11606eccaa6872eeb",
+              "subject": "LIN-4266: prompt-section-go suite onto loadWorld (census 56 -> 55) (#2299)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "8369461c",
+              "full": "8369461cd1cd263c84225294f523db641d8bb6e3",
+              "subject": "LIN-4268: prompt-section-preserve / -recommend-url / -look-alike onto loadWorld (census 55 -> 52) (#2302)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "82e75ee9",
+              "full": "82e75ee9d72acd1293b96dd4e721ed4ffc65b417",
+              "subject": "LIN-4280: Fake-DOM piece 1: chat-append-options / chat-render-markdown-text / chat-tool-rows / observation-basis-check / observation-bulk-scan onto loadWorld (census 52 -> 47) (#2304)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "aeb9d877",
+              "full": "aeb9d8773cf7216a7d50333fbdd129eba0f93947",
+              "subject": "LIN-4279: fake-DOM piece 0 — shared-fake additions and client-world helpers (#2303)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "069585bb",
+              "full": "069585bb0be2f7be696498d1b8db0b58a9b8ba4f",
+              "subject": "LIN-4269: fake-DOM move: client suites onto loadWorld (census 55 -> 46) (#2306)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "d537cd69",
+              "full": "d537cd695f199fe0d500a9a086ef3cb3e25e60c9",
+              "subject": "LIN-4267: prompt-section p0, run-quota and runner-link suites onto loadWorld (#2305)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "48d93c5c",
+              "full": "48d93c5c290f4a6c957bba23ca887ca04f8f9eec",
+              "subject": "LIN-4284: fake-DOM piece 5 — sentinel-mask and chart-helpers onto loadWorld (#2309)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "6dd13617",
+              "full": "6dd136173783bc709c9a115235656b17e138db9f",
+              "subject": "LIN-4283: fake-DOM piece 4 — observation-scan-due and lin-2933 onto loadWorld (#2308)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "5f825eb6",
+              "full": "5f825eb67e815ca0f8ece92a6c78aaab857d7d4d",
+              "subject": "LIN-4282: fake-DOM piece 3 — observation-ruling-delivery onto loadWorld (#2307)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "8d8bd92f",
+              "full": "8d8bd92fff89f06ed40edeb274b273d460986cc9",
+              "subject": "LIN-4285: live-console client suites onto loadWorld (fake-DOM piece 6) (#2310)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "1b83bbff",
+              "full": "1b83bbff1076cdf7ddea888a905a8e1abbc6aae3",
+              "subject": "LIN-4281: observation suites onto the shared fake (fake-DOM piece 2) (#2311)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "591bb959",
+              "full": "591bb9596159df600eeff47dd7205e7d41b31bb1",
+              "subject": "LIN-4272: fake-DOM close-out — stop reasons in the census, indeterminate in the fake header (#2312)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "591bb959",
+              "full": "591bb9596159df600eeff47dd7205e7d41b31bb1",
+              "subject": "LIN-4272: fake-DOM close-out — stop reasons in the census, indeterminate in the fake header (#2312)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "69e8f175",
+              "full": "69e8f1754f5c1a1c38c924ce82531b1e680ee48c",
+              "subject": "LIN-4265: fake-DOM census (structural, frozen 56-file ratchet) + rename prompt-section-world.js to client-world.js (#2297)"
+            }
+          ],
+          "tickets": [
+            "LIN-4255"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "The rule that `helpers/fake-dom.js` is the one fake DOM now has an owner that enforces it: `fake-dom-census.test.js` is an AST scan and a ratchet keyed on file names. 31 suites came off hand-written fakes, `tests/fixtures/observation-dom-shim.js` is deleted, and the fake grew tested real-DOM API (`className`/`id` reflection, `replaceChild`/`replaceChildren`/`append`/`prepend`, `getElementById`, `createElementNS`, `^= $= *=`), so the next move is cheaper. Some debt came with it: an unguarded consumer roll-call, a workaround that was already dead when it landed, and helpers that were added and then bypassed (see below)."
+          }
+        }
+      ]
+    },
+    {
+      "id": "AC",
+      "kind": "single-or-area",
+      "title": "LIN-4252+4255 pass AC",
+      "comment_id": "15f571da-9892-4f85-b171-9b4b77b1c844",
+      "created_at": "2026-11-05T18:15:03.910Z",
+      "session": "pass AC",
+      "subject_tickets": [
+        "LIN-4252",
+        "LIN-4255"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "d234b94a6, 69e8f1754, 6d2875181, 56f9b4749, 8369461cd, 82e75ee9d, aeb9d8773, 069585bb0, d537cd695, 48d93c5c2, 6dd136173, 5f825eb67, 8d8bd92ff, 1b83bbff1, 591bb9596",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "d234b94a",
+              "full": "d234b94a61b80dea5a38615bc8e99f59770b0dbf",
+              "subject": "LIN-4252: one shared fake DOM for client unit tests (#2291)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "69e8f175",
+              "full": "69e8f1754f5c1a1c38c924ce82531b1e680ee48c",
+              "subject": "LIN-4265: fake-DOM census (structural, frozen 56-file ratchet) + rename prompt-section-world.js to client-world.js (#2297)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "6d287518",
+              "full": "6d2875181e6b06940fb1525caa8c3bc4b5b73943",
+              "subject": "LIN-4270: className and id reflect the class and id attributes on the shared fake (#2298)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "56f9b474",
+              "full": "56f9b4749f7fd1f9c155aba11606eccaa6872eeb",
+              "subject": "LIN-4266: prompt-section-go suite onto loadWorld (census 56 -> 55) (#2299)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "8369461c",
+              "full": "8369461cd1cd263c84225294f523db641d8bb6e3",
+              "subject": "LIN-4268: prompt-section-preserve / -recommend-url / -look-alike onto loadWorld (census 55 -> 52) (#2302)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "82e75ee9",
+              "full": "82e75ee9d72acd1293b96dd4e721ed4ffc65b417",
+              "subject": "LIN-4280: Fake-DOM piece 1: chat-append-options / chat-render-markdown-text / chat-tool-rows / observation-basis-check / observation-bulk-scan onto loadWorld (census 52 -> 47) (#2304)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "aeb9d877",
+              "full": "aeb9d8773cf7216a7d50333fbdd129eba0f93947",
+              "subject": "LIN-4279: fake-DOM piece 0 — shared-fake additions and client-world helpers (#2303)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "069585bb",
+              "full": "069585bb0be2f7be696498d1b8db0b58a9b8ba4f",
+              "subject": "LIN-4269: fake-DOM move: client suites onto loadWorld (census 55 -> 46) (#2306)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "d537cd69",
+              "full": "d537cd695f199fe0d500a9a086ef3cb3e25e60c9",
+              "subject": "LIN-4267: prompt-section p0, run-quota and runner-link suites onto loadWorld (#2305)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "48d93c5c",
+              "full": "48d93c5c290f4a6c957bba23ca887ca04f8f9eec",
+              "subject": "LIN-4284: fake-DOM piece 5 — sentinel-mask and chart-helpers onto loadWorld (#2309)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "6dd13617",
+              "full": "6dd136173783bc709c9a115235656b17e138db9f",
+              "subject": "LIN-4283: fake-DOM piece 4 — observation-scan-due and lin-2933 onto loadWorld (#2308)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "5f825eb6",
+              "full": "5f825eb67e815ca0f8ece92a6c78aaab857d7d4d",
+              "subject": "LIN-4282: fake-DOM piece 3 — observation-ruling-delivery onto loadWorld (#2307)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "8d8bd92f",
+              "full": "8d8bd92fff89f06ed40edeb274b273d460986cc9",
+              "subject": "LIN-4285: live-console client suites onto loadWorld (fake-DOM piece 6) (#2310)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "1b83bbff",
+              "full": "1b83bbff1076cdf7ddea888a905a8e1abbc6aae3",
+              "subject": "LIN-4281: observation suites onto the shared fake (fake-DOM piece 2) (#2311)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "591bb959",
+              "full": "591bb9596159df600eeff47dd7205e7d41b31bb1",
+              "subject": "LIN-4272: fake-DOM close-out — stop reasons in the census, indeterminate in the fake header (#2312)"
+            }
+          ],
+          "tickets": [
+            "LIN-4252",
+            "LIN-4255"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "About 30 suites dropped their own FakeElement, container stub or vm sandbox and now use one owner: `tests/unit/helpers/fake-dom.js` with `loadWorld` in `client-world.js`. `tests/fixtures/observation-dom-shim.js` is deleted, and an AST census with a sorted list that only shrinks (56 → 25, and the 9 files that can't move are each tagged with the API that blocks them) stops new hand-written fakes. The marks against it are small but real: stale docs, a workaround that no longer does anything, and a few helpers that suites copied instead of using. Details below."
+          }
+        }
+      ]
+    },
+    {
+      "id": "AD",
+      "kind": "single-or-area",
+      "title": "LIN-4252+4255 pass AD",
+      "comment_id": "83d5f9fa-4970-42b1-adee-ad3352a622ec",
+      "created_at": "2026-11-05T18:15:14.840Z",
+      "session": "pass AD",
+      "subject_tickets": [
+        "LIN-4252",
+        "LIN-4255"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer d234b94a6, 69e8f1754, 6d2875181, 56f9b4749, 8369461cd, 82e75ee9d, aeb9d8773, 069585bb0, d537cd695, 48d93c5c2, 6dd136173, 5f825eb67, 8d8bd92ff, 1b83bbff1, 591bb9596 (together, d234b94a6^ → 591bb9596)",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "d234b94a",
+              "full": "d234b94a61b80dea5a38615bc8e99f59770b0dbf",
+              "subject": "LIN-4252: one shared fake DOM for client unit tests (#2291)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "69e8f175",
+              "full": "69e8f1754f5c1a1c38c924ce82531b1e680ee48c",
+              "subject": "LIN-4265: fake-DOM census (structural, frozen 56-file ratchet) + rename prompt-section-world.js to client-world.js (#2297)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "6d287518",
+              "full": "6d2875181e6b06940fb1525caa8c3bc4b5b73943",
+              "subject": "LIN-4270: className and id reflect the class and id attributes on the shared fake (#2298)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "56f9b474",
+              "full": "56f9b4749f7fd1f9c155aba11606eccaa6872eeb",
+              "subject": "LIN-4266: prompt-section-go suite onto loadWorld (census 56 -> 55) (#2299)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "8369461c",
+              "full": "8369461cd1cd263c84225294f523db641d8bb6e3",
+              "subject": "LIN-4268: prompt-section-preserve / -recommend-url / -look-alike onto loadWorld (census 55 -> 52) (#2302)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "82e75ee9",
+              "full": "82e75ee9d72acd1293b96dd4e721ed4ffc65b417",
+              "subject": "LIN-4280: Fake-DOM piece 1: chat-append-options / chat-render-markdown-text / chat-tool-rows / observation-basis-check / observation-bulk-scan onto loadWorld (census 52 -> 47) (#2304)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "aeb9d877",
+              "full": "aeb9d8773cf7216a7d50333fbdd129eba0f93947",
+              "subject": "LIN-4279: fake-DOM piece 0 — shared-fake additions and client-world helpers (#2303)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "069585bb",
+              "full": "069585bb0be2f7be696498d1b8db0b58a9b8ba4f",
+              "subject": "LIN-4269: fake-DOM move: client suites onto loadWorld (census 55 -> 46) (#2306)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "d537cd69",
+              "full": "d537cd695f199fe0d500a9a086ef3cb3e25e60c9",
+              "subject": "LIN-4267: prompt-section p0, run-quota and runner-link suites onto loadWorld (#2305)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "48d93c5c",
+              "full": "48d93c5c290f4a6c957bba23ca887ca04f8f9eec",
+              "subject": "LIN-4284: fake-DOM piece 5 — sentinel-mask and chart-helpers onto loadWorld (#2309)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "6dd13617",
+              "full": "6dd136173783bc709c9a115235656b17e138db9f",
+              "subject": "LIN-4283: fake-DOM piece 4 — observation-scan-due and lin-2933 onto loadWorld (#2308)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "5f825eb6",
+              "full": "5f825eb67e815ca0f8ece92a6c78aaab857d7d4d",
+              "subject": "LIN-4282: fake-DOM piece 3 — observation-ruling-delivery onto loadWorld (#2307)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "8d8bd92f",
+              "full": "8d8bd92fff89f06ed40edeb274b273d460986cc9",
+              "subject": "LIN-4285: live-console client suites onto loadWorld (fake-DOM piece 6) (#2310)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "1b83bbff",
+              "full": "1b83bbff1076cdf7ddea888a905a8e1abbc6aae3",
+              "subject": "LIN-4281: observation suites onto the shared fake (fake-DOM piece 2) (#2311)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "591bb959",
+              "full": "591bb9596159df600eeff47dd7205e7d41b31bb1",
+              "subject": "LIN-4272: fake-DOM close-out — stop reasons in the census, indeterminate in the fake header (#2312)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "d234b94a",
+              "full": "d234b94a61b80dea5a38615bc8e99f59770b0dbf",
+              "subject": "LIN-4252: one shared fake DOM for client unit tests (#2291)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "591bb959",
+              "full": "591bb9596159df600eeff47dd7205e7d41b31bb1",
+              "subject": "LIN-4272: fake-DOM close-out — stop reasons in the census, indeterminate in the fake header (#2312)"
+            }
+          ],
+          "tickets": [
+            "LIN-4252",
+            "LIN-4255"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "The client fake DOM now has one owner. `tests/unit/helpers/fake-dom.js` has its own tests and a documented \"throws on what it doesn't model\" contract, `client-world.js` `loadWorld` is the one vm, and `fake-dom-census.test.js` is an AST ratchet that CLAUDE.md points to. 31 of the 56 hand-written fakes are gone, along with `tests/fixtures/observation-dom-shim.js`, and the 25 left are named. Every migrated suite got shorter. The marks against it are a second copy of who uses the fake, written by hand (see below), and helpers that were added but not used everywhere: `clickOn` exists, yet `brief-recap-autogenerate`, `scan-retire-ui` and `chat-append-options` still each write the same own-listeners click loop."
+          }
+        }
+      ]
+    },
+    {
+      "id": "AF",
+      "kind": "single-or-area",
+      "title": "LIN-4293 pass AF",
+      "comment_id": "5b99ac01-e3a4-4e2d-a3db-baaf0bd9c045",
+      "created_at": "2026-11-05T19:06:40.486Z",
+      "session": "pass AF",
+      "subject_tickets": [
+        "LIN-4293"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer af55cb737",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "af55cb73",
+              "full": "af55cb737ec4e63919bac65558b35498ede3d290",
+              "subject": "LIN-4293: one Go-state constructor, one \"in progress\", one focus rule (#2314)"
+            }
+          ],
+          "tickets": [
+            "LIN-4293"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Real consolidation in `public/prompt-section.js`: about ten hand-written `state.go = {…}` literals become `goState()` (with the comment on the identity guard runPoll depends on), three copies of the run item become `runItemOf()`, `stageBusy`/`goInProgress`/`runEnded` become one `InProgress` owner with three named inputs, and the focus-inside-card test that `readerFocusIn` and `cardHoldsInput` each wrote out is now just `QuestionCards.focusInCard` (the `hadFocus` boolean side-channel is gone). It also deletes the second keep on paintState's no-slot path, which ran `initQuestionCards` twice. Small debits: `clearRunItem(why)` passes a reason string that nothing reads, the offer's `sessions.action.kind` is still read inline in startRun, the comments grow faster than the code, and the ~2.9k-line file gets no smaller."
+          }
+        }
+      ]
+    },
+    {
+      "id": "AE",
+      "kind": "single-or-area",
+      "title": "LIN-4293 pass AE",
+      "comment_id": "791ff697-6ef8-4e5b-9bec-f06db3833765",
+      "created_at": "2026-11-05T19:06:56.659Z",
+      "session": "pass AE",
+      "subject_tickets": [
+        "LIN-4293"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer af55cb737",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "af55cb73",
+              "full": "af55cb737ec4e63919bac65558b35498ede3d290",
+              "subject": "LIN-4293: one Go-state constructor, one \"in progress\", one focus rule (#2314)"
+            }
+          ],
+          "tickets": [
+            "LIN-4293"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "In `public/prompt-section.js`, 11 hand-written `state.go = {…}` literals (which didn't all have the same fields) now go through `goState()`. Three copies of the run-item literal are now `runItemOf()`. `stageBusy`/`goInProgress`/`runEnded` are now one `InProgress` owner whose comment names which reply each view reads. The inline \"focus inside the card\" check in `readerFocusIn` and `cardHoldsInput` is now one `QuestionCards.focusInCard`, so the `hadFocus` boolean is gone and `paintState` no longer keeps the card twice on its no-slot path. No references to the removed names are left in `public/`. Against that: `clearRunItem(why)` ignores its `why` argument, so the \"reason\" is only enforced by a comment. `focusInCard`/`cardHoldsInput` now treat `undefined` and `null` for `active` differently, which is a quiet three-way contract. The new test copies `RUNNING`/`HOME`/`stateWithCard`/`cardHtml`/`mountWithCard` from the lin-4246 test instead of sharing them."
+          }
+        }
+      ]
+    },
+    {
+      "id": "AG",
+      "kind": "single-or-area",
+      "title": "LIN-4247+4246+4293 pass AG",
+      "comment_id": "9b4ded7d-8021-4728-a85b-3b1f084710d5",
+      "created_at": "2026-11-05T19:07:56.255Z",
+      "session": "pass AG",
+      "subject_tickets": [
+        "LIN-4247",
+        "LIN-4246",
+        "LIN-4293"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer b5cc4c621 + b53917365 + af55cb737",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "b5cc4c62",
+              "full": "b5cc4c621914f451bb3e708d8eaee1a2a3e7e1d1",
+              "subject": "LIN-4247: a held run's end clears Go's started state and Home's run box (#2289)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "b5391736",
+              "full": "b5391736540c30fd228b116c746ae67cb2674177",
+              "subject": "LIN-4246: witness the opened task's repaint at the keepTypedQuestion call site (#2293)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "af55cb73",
+              "full": "af55cb737ec4e63919bac65558b35498ede3d290",
+              "subject": "LIN-4293: one Go-state constructor, one \"in progress\", one focus rule (#2314)"
+            }
+          ],
+          "tickets": [
+            "LIN-4247",
+            "LIN-4246",
+            "LIN-4293"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Net, decisions that were spread across `prompt-section.js` now each have one owner. \"In progress\" lives in `InProgress` (`busy` / `liveNow` / `ended`, each with its input named, and the offer's `action.kind` left out with a stated reason); about 12 hand-written Go-state literals became `goState()`, which also fixes the initial state's missing fields; three run-item literals became `runItemOf()`; and \"focus inside the card\" is `QuestionCards.focusInCard`, shared by `cardHoldsInput`, `keepsReaderPlace` and `readerFocusIn`, which removes the `hadFocus` boolean side channel. It also deleted the dead `innerHTML ===` keep clause and `paintState`'s second `keepTypedQuestion` on the no-slot path, and moved lin-4010's vm loader into a shared helper (`prompt-section-world.js`, recorded in CLAUDE.md). Against that: `clearRunItem(why)` is a one-line setter whose `why` is never read, so it is a comment written as a parameter and doesn't own the took-over condition it claims to; `prompt-section.js` grew by 82 lines (2885 → 2967) with 18 new ticket-ID comments; and the two focus restores (paintRun's re-find by testid, readerFocusIn's same node) are still separate."
+          }
+        }
+      ]
+    },
+    {
+      "id": "AH",
+      "kind": "single-or-area",
+      "title": "LIN-4247+4246+4293 pass AH",
+      "comment_id": "4917084b-3183-482c-a1fe-9b50f424a97b",
+      "created_at": "2026-11-05T19:08:03.515Z",
+      "session": "pass AH",
+      "subject_tickets": [
+        "LIN-4247",
+        "LIN-4246",
+        "LIN-4293"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer b5cc4c621 → b53917365 → af55cb737",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "b5cc4c62",
+              "full": "b5cc4c621914f451bb3e708d8eaee1a2a3e7e1d1",
+              "subject": "LIN-4247: a held run's end clears Go's started state and Home's run box (#2289)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "b5391736",
+              "full": "b5391736540c30fd228b116c746ae67cb2674177",
+              "subject": "LIN-4246: witness the opened task's repaint at the keepTypedQuestion call site (#2293)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "af55cb73",
+              "full": "af55cb737ec4e63919bac65558b35498ede3d290",
+              "subject": "LIN-4293: one Go-state constructor, one \"in progress\", one focus rule (#2314)"
+            }
+          ],
+          "tickets": [
+            "LIN-4247",
+            "LIN-4246",
+            "LIN-4293"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "The series ends with fewer copies than it started with. Seven hand-written Go-state literals become one `goState()`, the three \"in progress\" readings (`goInProgress`, `stageBusy`, `runEnded`) move into one `InProgress` owner with named views, `runItemOf()` replaces three run-item literals, and the \"focus inside the card\" check now lives only in `QuestionCards.focusInCard`, which `cardHoldsInput`, `keepsReaderPlace` and `readerFocusIn` all call. Along the way the dead `innerHTML ===` keep clause and `paintState`'s second `keepTypedQuestion` on the no-slot path were deleted. Docs kept up: llms.txt names the Go-comes-back behaviour, and CLAUDE.md names the shared vm layer, which other suites later adopted as `client-world.js`. Some cost is left behind: `clearRunItem(why)` never reads its `why` argument, and the stale-read guard depends on `goState` returning a fresh object each time, an invariant only a comment protects."
+          }
+        }
+      ]
+    },
+    {
+      "id": "AI",
+      "kind": "single-or-area",
+      "title": "LIN-4292 pass AI",
+      "comment_id": "0e8c1aea-5a46-47b9-9687-f04188d5d563",
+      "created_at": "2026-11-05T20:15:49.648Z",
+      "session": "pass AI",
+      "subject_tickets": [
+        "LIN-4292"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer `b389f9b02`",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "b389f9b0",
+              "full": "b389f9b02d2646afe7500f903c537eac2234c7c2",
+              "subject": "LIN-4292: remove method-presence guards in public/ (no behaviour change) (#2315)"
+            }
+          ],
+          "tickets": [
+            "LIN-4292"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "It deletes about 30 dead `obj.querySelector && …` / `.matches ?` / `.closest ?` / `.getAttribute ?` branches across `prompt-section.js`, `common.js`, `dispatch.js` and `task-page.js`. Each kept the same object null check and added nothing, so the code is simpler. The one shared fake (`tests/unit/helpers/fake-dom.js`) already defines all four methods, and the related unit files pass (94/94 on a run I did). The sweep stops at those four files, though. The same idiom for the same methods is still in `decision-panel.js:68,80,98`, `ship-journey.js:332,640,659`, `session.js:324`, `task-chat.js:446`, `ship-biscuit.js:166`, `close-out.js:62` and `flight-companion.js:803,950`. In the touched file it also survives as `!drawer.querySelectorAll` at `prompt-section.js:1871` and `slot.contains &&` at `:1210`. Nothing (a lint rule, a code-shape check or a census) was taught to stop the idiom coming back."
+          }
+        }
+      ]
+    },
+    {
+      "id": "AJ",
+      "kind": "single-or-area",
+      "title": "LIN-4292 pass AJ",
+      "comment_id": "0cc57a37-ce31-4ec8-8ef7-b9b4dd29f031",
+      "created_at": "2026-11-05T20:16:05.534Z",
+      "session": "pass AJ",
+      "subject_tickets": [
+        "LIN-4292"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer `b389f9b02`",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "b389f9b0",
+              "full": "b389f9b02d2646afe7500f903c537eac2234c7c2",
+              "subject": "LIN-4292: remove method-presence guards in public/ (no behaviour change) (#2315)"
+            }
+          ],
+          "tickets": [
+            "LIN-4292"
+          ],
+          "balance_raw": "**mixed**",
+          "sign": "mixed",
+          "score": 0,
+          "leans": null,
+          "quote": {
+            "balance": "mixed",
+            "reason": "It does simplify things: 30 `x.querySelector && x.querySelector(...)` / `x.closest ? ... : null` guards in `common.js`, `dispatch.js`, `prompt-section.js` and `task-page.js` are removed, and every real object-null check is kept. The cleanup stops at four files, though. The same idiom is still in 8 other `public/` files (`decision-panel.js` ×3, `ship-journey.js` ×3, `session.js`, `ship-biscuit.js`, `task-chat.js`, `close-out.js`), and in the functions it edited: `!drawer.querySelectorAll` (prompt-section.js:1872) is one line under a de-guarded `querySelector`, and `slot.contains &&` (:1210) is one line under another. Nothing (no lint rule, code-shape check or doc) now owns the rule \"DOM elements are trusted to have their methods\", so both spellings stay and the old one can come back."
+          }
+        }
+      ]
+    },
+    {
+      "id": "AK",
+      "kind": "single-or-area",
+      "title": "LIN-4296 pass AK",
+      "comment_id": "95a1718d-a837-4c83-8066-938f5da901ec",
+      "created_at": "2026-11-05T20:26:29.337Z",
+      "session": "pass AK",
+      "subject_tickets": [
+        "LIN-4296"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer b581ac926",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "b581ac92",
+              "full": "b581ac926e843d8554f07fd3e6568194ffa29f36",
+              "subject": "LIN-4296: model <select> selectedness in the shared fake DOM; move the suites it stopped (#2317)"
+            }
+          ],
+          "tickets": [
+            "LIN-4296"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "`<select>`/`<option>` selectedness now has one owner, the shared fake (`tests/unit/helpers/fake-dom.js`), and the APIs it does not model throw by name. Because of that, three hand-written vm/regex fakes (lin-3136, lin-3833, task-mode) and the `browserMarkup`/`useRealDisclosure` second copy of the fake's entity decode are deleted, and run-quota/runner-link now call production's `readDispatchExecControls` instead of a stub. The census and the fake's header both learned about the change. What it leaves behind: the off-tree synthetic-button press with `contains = () => true` is now copied into two suites (run-control, task-mode), even though `client-world.js` still says `click`/`key` are the only shims. `PROXY_PROMPT_BOX` (regex cut of `renderProxyPage`) is copied verbatim into lin-3136 and lin-4296-scope-pick. p0's `readDispatchExecControls` stub still gives \"without a `<select>`\" as its reason, which is no longer true."
+          }
+        }
+      ]
+    },
+    {
+      "id": "AL",
+      "kind": "single-or-area",
+      "title": "LIN-4296 pass AL",
+      "comment_id": "90b28056-bc33-4a62-a9a4-2f2aa311a8ca",
+      "created_at": "2026-11-05T20:27:34.485Z",
+      "session": "pass AL",
+      "subject_tickets": [
+        "LIN-4296"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer b581ac926",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "b581ac92",
+              "full": "b581ac926e843d8554f07fd3e6568194ffa29f36",
+              "subject": "LIN-4296: model <select> selectedness in the shared fake DOM; move the suites it stopped (#2317)"
+            }
+          ],
+          "tickets": [
+            "LIN-4296"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "`<select>`/`<option>` selection now has one owner, the shared `tests/unit/helpers/fake-dom.js`. Each rule there has a pinned test in `fake-dom.test.js`, and unmodelled APIs throw with their own name. That lets three hand-written fakes leave `HAND_WRITTEN_FAKE_DOM_FILES` (run-control's regex-reading container, task-mode's, and 3136's `makeEl`). It also deletes two second copies: the `browserMarkup`/`useRealDisclosure` entity decode, and the `readDispatchExecControls` stubs in run-quota and runner-link, which now wrap the real reader. On the cost side, it adds a new copy: the `PROXY_PROMPT_BOX` regex cut of `renderProxyPage` appears verbatim in `lin-3136-settings-take-predicate` and the split-off `lin-4296-scope-pick`. The synthetic-press shim (`contains = () => true` plus a fake button) is still written separately in run-control and task-mode rather than living in `client-world.js`. Some comments are now stale: task-mode calls the anchor-click recorder \"the census stop for this suite\" though the suite left the census, and the `fake-dom.js` header says the former select stops are \"listed … in `HAND_WRITTEN_FAKE_DOM_FILES`\", but all three were removed."
+          }
+        }
+      ]
+    },
+    {
+      "id": "AM",
+      "kind": "single-or-area",
+      "title": "LIN-4304 pass AM",
+      "comment_id": "885fb7b0-6b2d-42cc-97e0-24201f0de4a4",
+      "created_at": "2026-11-05T21:08:03.073Z",
+      "session": "pass AM",
+      "subject_tickets": [
+        "LIN-4304"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer f742e5acb",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "f742e5ac",
+              "full": "f742e5acb3bec0d3a77292502ca20974fa757360",
+              "subject": "LIN-4304: one spelling for DOM element access in public/, with a check (#2320)"
+            }
+          ],
+          "tickets": [
+            "LIN-4304"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Gives element method calls in `public/` one spelling: it removes 19 `x.m && x.m(…)` / `typeof x.m === 'function'` presence guards across 11 files, keeping each null check, and adds `tests/unit/public-element-method-guards.test.js` so the idiom can't come back, with the 3 remaining `close-out.js` seams allow-listed in the test. On the cost side, the 289-line check writes its own parse/parent-link/visit scaffolding, which already exists in some form in at least four other acorn census tests (`fake-dom-census`, `llm-jobs-census`, `free-tier-model-clamp-wiring`, `lin-4080-*`), and its fixed six-method set misses the same idiom on `.focus` (`prompt-section.js:1053/1219/1856`), so \"one spelling\" holds only for those six."
+          }
+        }
+      ]
+    },
+    {
+      "id": "AN",
+      "kind": "single-or-area",
+      "title": "LIN-4304 pass AN",
+      "comment_id": "db4d5213-5161-458d-b4ff-b4f4fb1c7b76",
+      "created_at": "2026-11-05T21:08:53.465Z",
+      "session": "pass AN",
+      "subject_tickets": [
+        "LIN-4304"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer f742e5acb",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "f742e5ac",
+              "full": "f742e5acb3bec0d3a77292502ca20974fa757360",
+              "subject": "LIN-4304: one spelling for DOM element access in public/, with a check (#2320)"
+            }
+          ],
+          "tickets": [
+            "LIN-4304"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Removes 19 method-presence guards across 11 `public/*.js` files (e.g. `e.target.closest ? e.target.closest(…) : null`, `typeof document.querySelectorAll === 'function'`). Each becomes a direct call that keeps its null check, so \"an element has its methods\" is decided once. `tests/unit/public-element-method-guards.test.js` now owns that rule, with a stale-entry check that makes the allow-list shrink over time. The cost is test-side: the acorn parse fallback and child walker repeat `fake-dom-census.test.js`'s `parse`/`childrenOf` (with `acorn-walk` already a dependency). One of the three `close-out.js` allow-list entries (`main && typeof main.getAttribute === 'function'`) says the guard isn't needed but keeps it anyway."
+          }
+        }
+      ]
+    },
+    {
+      "id": "AP",
+      "kind": "single-or-area",
+      "title": "LIN-4292+4304 pass AP",
+      "comment_id": "20efed6d-648a-43e7-bd1a-a9b347aa8a3b",
+      "created_at": "2026-11-05T21:09:23.088Z",
+      "session": "pass AP",
+      "subject_tickets": [
+        "LIN-4292",
+        "LIN-4304"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer b389f9b02 + f742e5acb",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "b389f9b0",
+              "full": "b389f9b02d2646afe7500f903c537eac2234c7c2",
+              "subject": "LIN-4292: remove method-presence guards in public/ (no behaviour change) (#2315)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "f742e5ac",
+              "full": "f742e5acb3bec0d3a77292502ca20974fa757360",
+              "subject": "LIN-4304: one spelling for DOM element access in public/, with a check (#2320)"
+            }
+          ],
+          "tickets": [
+            "LIN-4292",
+            "LIN-4304"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Takes out about 50 `x.m ? x.m(…) : null` / `x.m && x.m(…)` / `typeof x.m === 'function'` guards across 12 `public/` files and keeps every receiver null check. `public/` now has one way to call an element's methods (`el.closest(…)`), where before two spellings were mixed even inside one function (prompt-section.js `keepTypedQuestion`/`paintRun`). `tests/unit/public-element-method-guards.test.js` (AST scan over every non-vendored public/*.js, a reason for each allow-list entry, and a stale-entry check) enforces that one way, so the list can only shrink. On the cost side, the check is 289 lines and brings its own `parseSource`/`forEachChild` walker even though `acorn-walk` is already a dependency and `fake-dom-census.test.js` already has the same parse-with-fallback. One of its three allow-list entries (`close-out.js: main && typeof main.getAttribute`) says in its own reason that it isn't needed."
+          }
+        }
+      ]
+    },
+    {
+      "id": "AO",
+      "kind": "single-or-area",
+      "title": "LIN-4292+4304 pass AO",
+      "comment_id": "a720ccd0-182e-4f9c-af68-a78281b9ec08",
+      "created_at": "2026-11-05T21:09:27.071Z",
+      "session": "pass AO",
+      "subject_tickets": [
+        "LIN-4292",
+        "LIN-4304"
+      ],
+      "rows": [
+        {
+          "row": 1,
+          "commit_cell": "LinearViewer b389f9b02 + f742e5acb",
+          "shas": [
+            {
+              "repo": "LinearViewer",
+              "short": "b389f9b0",
+              "full": "b389f9b02d2646afe7500f903c537eac2234c7c2",
+              "subject": "LIN-4292: remove method-presence guards in public/ (no behaviour change) (#2315)"
+            },
+            {
+              "repo": "LinearViewer",
+              "short": "f742e5ac",
+              "full": "f742e5acb3bec0d3a77292502ca20974fa757360",
+              "subject": "LIN-4304: one spelling for DOM element access in public/, with a check (#2320)"
+            }
+          ],
+          "tickets": [
+            "LIN-4292",
+            "LIN-4304"
+          ],
+          "balance_raw": "**better**",
+          "sign": "better",
+          "score": 1,
+          "leans": null,
+          "quote": {
+            "balance": "better",
+            "reason": "Together they remove about 50 `x.m ? x.m(…) : null` / `x.m && x.m(…)` / `typeof x.m === 'function'` guards across 13 `public/*.js` files. Every edit I read keeps the null check the expression already had, so `public/` now has one way to touch an element. That rule has an owner: `tests/unit/public-element-method-guards.test.js`, an AST check with fixtures, an allow-list where each entry gives a reason, and a stale-entry check. I ran it: it passes at f742e5acb and fails against b389f9b02's `public/`. The cost is a new 289-line census test that brings its own `parseSource` and `forEachChild` walker. The other acorn censuses (fake-dom-census, llm-jobs-census, …) also roll their own, and `acorn-walk` is already a dependency."
+          }
+        }
+      ]
+    }
+  ]
+}
