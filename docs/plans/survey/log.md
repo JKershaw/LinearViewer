@@ -2692,3 +2692,17 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - the accuracy reader gets the plan's rulings.
 
   Nothing will be added mid-draft.
+
+- **LIN-4338 merged** as `aec9e16b` (essay version 3, PR #2342; built 21:49–22:34 UTC). I read the full text and rendered all five figures. Figure 4 is fixed: the caption sits below the boxes, and an assert stops the overlap coming back. The other four figures are clean.
+  - **Against the brief:**
+    - no ticket IDs in the body; they are all in the check table;
+    - a 235-character card;
+    - 4,160 words;
+    - every number traced by review (47 of 47).
+  - **Weaker:**
+    - "My reading is" appears 8 times, so one marker was swapped for another;
+    - the forcefield is one paragraph at the start and returns at the close, rather than running through the middle;
+    - the overturn reads as a sequence with no tension;
+    - 13 limit bullets meet "every limit" but weigh against "don't undersell";
+    - a few clumsy lines.
+  - The global Survey predicted this: "a v3 written whole from [a checklist brief] could reproduce [the seams]". Discussed with John before any further rewrite.
