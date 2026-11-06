@@ -2507,3 +2507,13 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - on 2 of 4: inconclusive.
 
   The after-step areas were better in both passes on 6 of 6.
+- 12:45: **LIN-4322 (the 50-comment cap) scoped and started.** Its Surveys widened it:
+  - the same unpaged read feeds **the close-out gate** (`fetchIssueComments` → `latestReviewComment`, which gates merge and Done), so on a long trail the gate could read a stale review verdict;
+  - the file has fixed this class one query at a time with no shared helper.
+
+  Scoped by the sweep rule:
+  - **the check first** (no Linear connection without `first:`/`last:` or a recorded bound), its hit list the work list;
+  - one `pageConnection` helper;
+  - applied to the detail read, `fetchIssueComments` and `RELATIONS_QUERY`;
+  - a top-level `truncated` flag that survives `flattenIssue`;
+  - explicit order; docs in one place.
