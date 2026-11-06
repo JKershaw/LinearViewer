@@ -40,3 +40,19 @@ export function need(inputs, key) {
   if (v === undefined) throw new Error(`inputs file is missing "${key}"`);
   return v;
 }
+
+// The optional blind-ticket comment cutoff (LIN-4333, v2). Absent from v1's inputs, so v1 reads no cutoff.
+// Returns the cutoff as epoch ms, or null when the inputs name none. A cutoff that is not a time throws.
+export function blindCutoff(inputs) {
+  const raw = inputs?.blind?.comment_cutoff;
+  if (raw === undefined) return null;
+  const ms = Date.parse(raw);
+  if (Number.isNaN(ms)) throw new Error(`inputs blind.comment_cutoff is not a UTC time: ${JSON.stringify(raw)}`);
+  return ms;
+}
+
+// True when a comment was posted after the cutoff. Comments after it are kept in the raw files but are
+// excluded from every count and reading. A null cutoff excludes nothing.
+export function postsAfter(createdAt, cutoffMs) {
+  return cutoffMs !== null && Date.parse(createdAt) > cutoffMs;
+}

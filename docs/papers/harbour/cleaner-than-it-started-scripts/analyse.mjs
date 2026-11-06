@@ -13,7 +13,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { takeInputs, need } from './inputs.mjs';
+import { takeInputs, need, blindCutoff, postsAfter } from './inputs.mjs';
 
 const { inputs: I, positional } = takeInputs(process.argv.slice(2), 'analyse.mjs <evidence-dir>');
 const dir = positional[0];
@@ -31,6 +31,10 @@ const COST_GROUPS = need(I, 'cost_groups');
 const FIVE_NOV_RE = new RegExp(need(I, 'cost_groups.five_nov_and_ordinary'));
 const FAKE_DOM_GROUP = need(I, 'fake_dom_piece_group');
 const NAMED_COSTS = need(I, 'named_costs');
+const cutoffMs = blindCutoff(I);                       // v2 only; null for v1
+// The pair_baseline section (LIN-4333 v2) is emitted only when the inputs name one. Its selection rule and
+// expected pairs are the v2 subtask's work; this gate only makes room for the section.
+const PAIR_ENABLED = I.pair_baseline !== undefined;
 const read = (rel) => readFileSync(path.join(dir, rel), 'utf8');
 const readJson = (rel) => JSON.parse(read(rel));
 
@@ -65,13 +69,20 @@ const censusBySha = new Map(census.merges.map((m) => [m.sha, m]));
 // ---- blind codes: index batch rows and single/area passes ----
 const batchRows = [];   // { pass, session, row, sign, score, tickets, shas }
 const singlePasses = []; // { id, subject_tickets, title, sign (row 1), balance_raw, quote }
+const pairPasses = [];   // kind 'pair-baseline': no ticket, kept out of the subjects loop and areaFor (LIN-4333)
 for (const p of blind.passes) {
   if (p.kind === 'batch') for (const r of p.rows) batchRows.push({ pass: p.id, session: p.session, row: r.row, sign: r.sign, score: r.score, tickets: r.tickets, shas: r.shas.map((s) => s.full), note: r.note ?? null, commit_cell: r.commit_cell, balance_raw: r.balance_raw, quote: r.quote });
+  else if (p.kind === 'pair-baseline') pairPasses.push({ id: p.id, subject: p.subject, sign: p.rows[0]?.sign ?? null, score: p.rows[0]?.score ?? null, rows: p.rows.length });
   else singlePasses.push({ id: p.id, subject_tickets: p.subject_tickets, title: p.title, sign: p.rows[0]?.sign ?? null, score: p.rows[0]?.score ?? null, balance_raw: p.rows[0]?.balance_raw ?? null, quote: p.rows[0]?.quote ?? null, leans: p.rows[0]?.leans ?? null });
+}
+// Pair passes with no inputs naming a pair_baseline section would be dropped silently. Refuse instead.
+if (pairPasses.length && !PAIR_ENABLED) {
+  throw new Error(`blind-codes.json holds ${pairPasses.length} pair-baseline pass(es), but the inputs file does not name a pair_baseline section`);
 }
 
 // ---- the LIN-4150 survey and after-answer facts ----
-const blindComments = readJson(`comments/${BLIND_TICKET}.json`).comments;
+// Comments posted after the inputs' cutoff are kept in the raw file and left out of every reading (LIN-4333 v2).
+const blindComments = readJson(`comments/${BLIND_TICKET}.json`).comments.filter((c) => !postsAfter(c.createdAt, cutoffMs));
 const surveyOnBlind = new Set();
 for (const c of blindComments) {
   const h = (c.body || '').split('\n')[0];
@@ -240,6 +251,27 @@ const fakeDomPieces = ROLE && Object.entries(ROLE).filter(([, v]) => v.group.sta
 const pieceCost = fakeDomPieces.map((t) => costState(costOf(t)).total);
 const ledgerDollarCheck = table.filter((r) => r.code_notebook_note.includes('vs live')).map((r) => ({ ticket: r.primary_ticket, note: r.code_notebook_note }));
 
+// The pair-baseline readings, grouped by subject ('baseline pair N'), each pass with its sign and its n.
+// This describes what was read; the selection rule that picks the pairs is the v2 subtask's work.
+function pairBaselineSection() {
+  const bySubject = new Map();
+  for (const p of pairPasses) {
+    if (!bySubject.has(p.subject)) bySubject.set(p.subject, []);
+    bySubject.get(p.subject).push({ id: p.id, sign: p.sign, score: p.score, rows: p.rows });
+  }
+  const subjects = [...bySubject].map(([subject, passes]) => ({
+    subject,
+    passes,
+    both_better: passes.length === 2 && passes.every((x) => x.sign === 'better'),
+  })).sort((a, b) => a.subject.localeCompare(b.subject));
+  return {
+    passes_total: pairPasses.length,
+    subjects_count: subjects.length,
+    subjects,
+    both_better_count: subjects.filter((s) => s.both_better).length,
+  };
+}
+
 const sha = (rel) => createHash('sha256').update(readFileSync(path.join(dir, rel))).digest('hex');
 const analysis = {
   inputs_sha256: { 'manifest.json': sha('manifest.json'), 'roles.json': sha('roles.json'), 'blind-codes.json': sha('blind-codes.json'), 'git/census-by-merge.json': sha('git/census-by-merge.json'), 'git/place-ledger.at-pin.snapshot': sha('git/place-ledger.at-pin.snapshot') },
@@ -328,6 +360,8 @@ const analysis = {
   ledger_vs_code: ledgerDollarCheck,
   ledger_usd_rows: table.filter((r) => r.ledger_usd).map((r) => ({ ticket: r.primary_ticket, ledger_usd: r.ledger_usd, live_usd: r.cost_usd })),
   notes: NOTE,
+  // Only when the inputs name a pair_baseline section (v2). Absent for v1: v1's keys do not change.
+  ...(PAIR_ENABLED ? { pair_baseline: pairBaselineSection() } : {}),
 };
 writeFileSync(path.join(dir, 'analysis.json'), JSON.stringify(analysis, null, 2) + '\n');
 console.error(`rows ${table.length}; place ${place.length}; unclassified ${unclassified.length}; subjects ${subjectList.length}`);

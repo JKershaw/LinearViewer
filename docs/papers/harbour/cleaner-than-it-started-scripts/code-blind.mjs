@@ -23,7 +23,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { takeInputs, need } from './inputs.mjs';
+import { takeInputs, need, blindCutoff, postsAfter } from './inputs.mjs';
 
 // Returns { kind, id, subject_tickets, batch?, subject? } for a title, or throws naming the title.
 // `id` is 'batch <X>' for a batch and the pass letter otherwise (the same ids the coder always used).
@@ -53,6 +53,7 @@ function main() {
   const BATCHES = need(I, 'blind.expected_batches');
   const SESSIONS = need(I, 'blind.sessions');
   const BASELINE_FILE = need(I, 'baseline_3nov_file');
+  const cutoffMs = blindCutoff(I);
   const sessionFor = (b) => {
     const s = SESSIONS.find((x) => x.batches.includes(b));
     if (!s) throw new Error(`batch ${b} is in no session in the inputs file`);
@@ -63,7 +64,11 @@ function main() {
 
   // ---- merges (frozen git lists) ----
   const merges = [];
-  for (const [repo, file] of [['LinearViewer', 'git/merges-LinearViewer.tsv'], ['simple-dispatcher', 'git/merges-simple-dispatcher.tsv'], ['LinearViewer', BASELINE_FILE]]) {
+  const lists = [['LinearViewer', 'git/merges-LinearViewer.tsv'], ['simple-dispatcher', 'git/merges-simple-dispatcher.tsv'], ['LinearViewer', BASELINE_FILE]];
+  // The pair-baseline's Oct merge list (LIN-4333 v2): loaded only when the inputs name one, so pair-baseline
+  // commit labels from 20 Oct - 1 Nov can resolve. v1 names none, so v1 loads exactly the three lists above.
+  if (I.oct_merges) lists.push(['LinearViewer', need(I, 'oct_merges.file')]);
+  for (const [repo, file] of lists) {
     for (const line of frozen(file).split('\n').slice(1).filter(Boolean)) {
       const [full, short, committed, subject] = line.split('\t');
       const ids = [...new Set([...subject.matchAll(/\bLIN-(\d+)\b/g)].map((m) => `LIN-${m[1]}`))];
@@ -78,7 +83,8 @@ function main() {
 
   // ---- the blind comments ----
   const { comments } = JSON.parse(frozen(`comments/${BLIND_TICKET}.json`));
-  const blind = comments.filter((c) => /^## Blind place scoring, /.test(c.body || ''))
+  // Comments posted after the inputs' cutoff stay in the raw file and are left out of the coding (LIN-4333 v2).
+  const blind = comments.filter((c) => /^## Blind place scoring, /.test(c.body || '') && !postsAfter(c.createdAt, cutoffMs))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
   const SCORE = { better: 1, neutral: 0, mixed: 0, worse: -1 };
