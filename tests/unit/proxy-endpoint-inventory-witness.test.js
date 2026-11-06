@@ -461,6 +461,12 @@ const ROWS = [
     run: () => call(buildApp({ dispatchQueueStore: makeDispatchStore() }), 'POST', '/api/proxy/recommend-and-dispatch', { body: {} }),
   },
   {
+    group: 'I', method: 'POST', url: '/api/proxy/periodicals/:id/mint', expect: 404,
+    note: 'LIN-4313: an unknown registry id is refused before the store is read (routes/proxy-dispatch.js → enterPeriodicalMint)',
+    expectBody: { error: 'Unknown periodical id: the known ids are listed at GET /api/proxy/periodicals' },
+    run: () => call(buildApp({ dispatchQueueStore: makeDispatchStore() }), 'POST', '/api/proxy/periodicals/no-such-periodical/mint', { body: { autopilot: true } }),
+  },
+  {
     group: 'I', method: 'GET', url: '/api/proxy/dispatch', expect: 200,
     note: 'listItems + listHistoryLineageRows, empty result (:6387)',
     run: () => call(buildApp({ dispatchQueueStore: makeDispatchStore() }), 'GET', '/api/proxy/dispatch'),

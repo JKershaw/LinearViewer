@@ -1,6 +1,6 @@
 /**
  * LIN-3136 S1 / P1 (acceptance 1, 2, 3, 5 and 12) — `requireGrant('dispatch')`
- * on the three enqueue mounts.
+ * on the four enqueue mounts (the periodical mint, LIN-4313, is the fourth).
  *
  *  1. On each mount: `readWrite` without the grant → 403 DISPATCH_GRANT_REQUIRED,
  *     nothing enqueued; `read` → the scope's own 403 (never the grant code);

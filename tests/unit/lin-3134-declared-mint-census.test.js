@@ -15,7 +15,8 @@
  * LIN-3601: the dispatch entrances (E: routes/dispatch.js, routes/proxy-dispatch.js,
  * routes/proxy-kickoff.js, lib/dispatch-entrance.js) are judged as ONE unit, so a
  * call may sit in any of the four and the three routes can share one authority:
- *   - F3: E holds exactly 2 `declaredGrants: ['dispatch'],` literals (M1 + M2);
+ *   - F3: E holds exactly 3 `declaredGrants: ['dispatch'],` literals (M1 + M2 + PM; PM is the
+ *     periodical mint's "+ Autopilot" variant, LIN-4313);
  *   - C2 (i)-(iii): a createDispatchItem call in E that carries followUpTo takes its
  *     gate from the two known predicate forms (`isFollowUp`, the `followUpTo`
  *     ternary), and fails if it has none;
@@ -153,16 +154,17 @@ function appendToE(files, file, text) {
 // ── F3 — the declared-mint writer set ────────────────────────────────────────
 // LIN-3136 (T3) adds the first production writers: exactly the M1 (kickoff),
 // M2 (session dispatch, incl. M2b) and M4 (feedback autopilot) launch literals.
-// The three proxy-dispatch launch arms stay undeclared (M3, deferred to
+// LIN-4313 adds PM, the periodical mint's "+ Autopilot" variant (LANES.periodical), the one other
+// declared proxy-token launch. The proxy-dispatch launch arms stay undeclared (M3, deferred to
 // LIN-3099). The mutations below check against this allowed set, so a planted
 // writer cannot pass just because the set is no longer empty.
 
-// LIN-3601: M1 (kickoff) and M2 (session dispatch) are the two writers in E. The
-// declared-writer allow-list is the one place E is counted exactly: E holds 2,
+// LIN-3601: M1 (kickoff), M2 (session dispatch) and, since LIN-4313, PM (periodical mint) are the
+// three writers in E. The declared-writer allow-list is the one place E is counted exactly: E holds 3,
 // wherever they sit. M4 (feedback autopilot) is outside E and stays exact: W (the workspace-API
 // unit, LIN-3861) holds exactly 1, in whichever of its files.
 const F3_WRITERS = [
-  { site: 'M1+M2', unit: 'E', count: 2, text: "declaredGrants: ['dispatch']," },
+  { site: 'M1+M2+PM', unit: 'E', count: 3, text: "declaredGrants: ['dispatch']," },
   { site: 'M4', unit: 'W', count: 1, text: "declaredGrants: ['dispatch']," }
 ];
 
@@ -182,9 +184,9 @@ function checkF3(files, allowed = F3_WRITERS) {
   return v;
 }
 
-describe('F3 — the declared-mint writer set is exactly M1+M2 (in E) and M4', () => {
-  test('the production writers are exactly the declared launch literals (E holds exactly 2, whichever file)', () => {
-    assert.deepEqual(F3_WRITERS.map(w => w.site), ['M1+M2', 'M4']);
+describe('F3 — the declared-mint writer set is exactly M1+M2+PM (in E) and M4', () => {
+  test('the production writers are exactly the declared launch literals (E holds exactly 3, whichever file)', () => {
+    assert.deepEqual(F3_WRITERS.map(w => w.site), ['M1+M2+PM', 'M4']);
     assert.deepEqual(checkF3(PRODUCTION), []);
   });
 
@@ -228,15 +230,15 @@ describe('F3 — the declared-mint writer set is exactly M1+M2 (in E) and M4', (
 
   test('mutation: a listed writer removed from E fails F3 (the set never shrinks silently)', () => {
     const one = plantInE(PRODUCTION, "declaredGrants: ['dispatch'],", '');
-    assert.ok(checkF3(one).some(m => m.startsWith('M1+M2 (the dispatch entrances): expected exactly 2 writers, found 1')), checkF3(one).join('\n'));
+    assert.ok(checkF3(one).some(m => m.startsWith('M1+M2+PM (the dispatch entrances): expected exactly 3 writers, found 2')), checkF3(one).join('\n'));
     const none = plantInE(one, "declaredGrants: ['dispatch'],", '');
-    assert.ok(checkF3(none).some(m => m.startsWith('M1+M2 (the dispatch entrances): expected exactly 2 writers, found 0')), checkF3(none).join('\n'));
+    assert.ok(checkF3(none).some(m => m.startsWith('M1+M2+PM (the dispatch entrances): expected exactly 3 writers, found 1')), checkF3(none).join('\n'));
   });
 
   test('mutation (re-targeted, LIN-3601): a third literal anywhere in E fails F3, including in lib/dispatch-entrance.js', () => {
     for (const file of E_FILES) {
       const mutated = appendToE(PRODUCTION, file, "          declaredGrants: ['dispatch'],");
-      assert.ok(checkF3(mutated).some(m => m.startsWith('M1+M2 (the dispatch entrances): expected exactly 2 writers, found 3')), file);
+      assert.ok(checkF3(mutated).some(m => m.startsWith('M1+M2+PM (the dispatch entrances): expected exactly 3 writers, found 4')), file);
     }
   });
 
@@ -244,7 +246,7 @@ describe('F3 — the declared-mint writer set is exactly M1+M2 (in E) and M4', (
     const removed = plantInE(PRODUCTION, "declaredGrants: ['dispatch'],", '');
     const moved = appendToE(removed, 'lib/dispatch-entrance.js', "export const m = {\ndeclaredGrants: ['dispatch'],\n};");
     // the hit's text is the trimmed line, which must equal the listed literal exactly
-    assert.deepEqual(checkF3(moved).filter(m => m.startsWith('M1+M2')), []);
+    assert.deepEqual(checkF3(moved).filter(m => m.startsWith('M1+M2+PM')), []);
   });
 });
 

@@ -13,8 +13,8 @@
  *   - a `read` token,
  * and neither may reach `addItem` or `expandCascadeAborts`. A POST without the
  * grant that calls `createDispatchItem` therefore fails here whichever file the
- * call sits in. The three enqueue mounts must answer 403 DISPATCH_GRANT_REQUIRED
- * to the `readWrite` token.
+ * call sits in. The four enqueue mounts (LIN-4313 adds the periodical mint) must answer
+ * 403 DISPATCH_GRANT_REQUIRED to the `readWrite` token.
  *
  * Positive controls (the same three mounts with the grant DO reach the sink)
  * stop the sweep from passing because its fixtures never get past validation.
@@ -53,7 +53,8 @@ const SINKS = ['addItem', 'expandCascadeAborts'];
 const ENQUEUE_MOUNTS = [
   { path: '/api/proxy/dispatch', body: { prompt: 'p' } },
   { path: '/api/proxy/recommend-and-dispatch', body: { issueIdentifier: 'LIN-1' } },
-  { path: '/api/proxy/autopilot/kickoff', body: { issueIdentifier: 'LIN-1' } }
+  { path: '/api/proxy/autopilot/kickoff', body: { issueIdentifier: 'LIN-1' } },
+  { path: '/api/proxy/periodicals/:id/mint', body: { autopilot: true } }
 ];
 
 // Bodies that reach the enqueue point WITH the dispatch grant (LIN-3604). Both
@@ -62,7 +63,8 @@ const ENQUEUE_MOUNTS = [
 const REACHING_BODIES = [
   { path: '/api/proxy/recommend-and-dispatch', body: { issueIdentifier: 'TEST-1', kind: 'implementation' } },
   { path: '/api/proxy/recommend-and-dispatch', body: { issueIdentifier: 'TEST-1' } },
-  { path: '/api/proxy/autopilot/kickoff', body: { issueIdentifier: 'TEST-1' } }
+  { path: '/api/proxy/autopilot/kickoff', body: { issueIdentifier: 'TEST-1' } },
+  { path: '/api/proxy/periodicals/documentation-review/mint', body: { autopilot: true } }
 ];
 
 function makeWorld({ scope, grants }) {

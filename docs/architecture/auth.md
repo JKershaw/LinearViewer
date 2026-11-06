@@ -233,7 +233,7 @@ it); `503 GRANT_OWNERLESS` is a session with no account. Any signed-in member ma
 revoke a grant-less one. Only the owner may revoke a runner (grant-bearing) credential, and revoking
 it revokes its whole lineage (`403 RUNNER_OWNER_ONLY` otherwise). Keys are revoked at Settings ›
 Agent access, not the Proxy page ([proxy-integration.md](../proxy-integration.md)). `dispatch` is
-**enforced** on the three enqueue routes (`requireGrant('dispatch')`, LIN-2884 T3 / LIN-3136): the
+**enforced** on the four enqueue routes (LIN-4313 adds the periodical mint) (`requireGrant('dispatch')`, LIN-2884 T3 / LIN-3136): the
 runner copy carries it, as do the owner's driver copies (`{ "purpose": "driver" }`, `['dispatch']`
 only, the 48h `worker` profile), the Proxy page's "read-write + dispatch" Agent Prompt
 (`{ "purpose": "agent" }`, `['dispatch']` only, the 48h `worker` profile, label
