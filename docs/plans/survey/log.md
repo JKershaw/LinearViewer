@@ -2648,3 +2648,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - simple generated diagrams where they earn their place: a copy at the edge; adding an owner vs finishing; the ratchet; and possibly the forcefield's shapes, marked as John's image;
   - short paragraphs, concrete, one idea each;
   - the new-to-Harbour reader asked which diagram helped most.
+- **John: "How the first measure was overturned" would be clearer as a narrative.** Added to LIN-4335 (with a follow-up note into the builder's session): the scorekeeper marked their own work and the tally looked very good; blind readers who saw only the code disagreed; the claim narrowed to what they saw; and independent readers kept correcting the operator, which is the method working. The pass means go out of the prose, into a small table or a graphic if needed.
