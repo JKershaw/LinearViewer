@@ -8,6 +8,13 @@
 // script set, so they sit beside the scripts that read them. A later version's inputs sit in that
 // version's own evidence folder instead, beside its roles.json, where its record needs them.
 //
+// Re-run: the "Re-run" commands in v1's evidence README
+// (cleaner-than-it-started-evidence/2026-11-06/README.md) predate `--inputs`. Run as written, each exits 2
+// with the usage line. Append `--inputs docs/papers/harbour/cleaner-than-it-started-scripts/inputs-v1.json`
+// to each of the four commands, and run census-by-merge on a separate copy of the folder: it rewrites
+// manifest.json's `read_at`, which analyse hashes into `inputs_sha256`. That README must stay
+// byte-identical, so the correction is written here.
+//
 // Inputs files are JSON (JSON has no comments, which is why the reasons are written here). A key that is
 // missing throws, naming it, so no script runs on a datum that silently went absent.
 
