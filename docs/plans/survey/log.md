@@ -2413,3 +2413,17 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - 08:50: **John applied both LIN-4307 rulings and approved LIN-4313's grant** ("I grant you authority"), recorded on the ticket. It's the first time the authority grant has been made explicitly, as a human call, which is the shape John named for integration: "a human instructs/gives authority to an agent".
 - 09:00: ruling `lin4314-anchor-fix`: the sync PR fails 3 rows of `docs-architecture-anchor-resolver.test.js`, citations of `CLAUDE.md:58` in `log.md` and `place-ledger.md`. **Proposed `denylist`, narrowly.** These are dated records, the same species as `docs/reviews`, which the resolver already excludes. Each citation was true when written, and one records that line being stale. Editing them would rewrite history and re-create the two-way drift. Preferably use the file-level frozen list for those two files only, so `notes-*.md` and the prompt docs stay checked.
 - 09:10: **LIN-4307 (piece 1) merged (`f73f1b11`), census 22 → 18.** The loader gaps were fixed once, in `client-world.js`, and pinned: `window` is the global (`world.window === world.sandbox`), `clickDelegated`, `fireDOMContentLoaded`, and `clickOn` with a target. The suites use the server's real renderers (`renderDetailsContent`, the Home markup) in place of hand-drawn cards. `observation-ruling-delivery`'s stubs were moved after `common.js`, per the ruling. Pieces 2–6 inherit all of it. The LIN-4314 anchor ruling has been answered.
+
+### 09:20 UTC: the sync landed; the paper scoped and started, with its headline corrected
+- **LIN-4314 merged (`1d10f9b3`):** the notebook on main matches `98670be3` exactly (an empty diff on those paths). The anchor resolver now excludes `docs/plans/survey` as frozen history. That's the whole directory, not the two files I suggested, so `notes-*.md` and the prompt docs are unchecked too. Small, for the notebook.
+- **LIN-4315's Surveys corrected the headline I'd been giving John.** The first blind passes scored the loop's ticket rows **no better than the baseline** (+0.37 against +0.38 / +0.50). What read better was specific: finished tidies done as their own task, the tidy-afters, and deletions. That's about five tickets, scored by the partly circular prompt. **So the claim is about areas ending better when the loop finishes the move, not "tasks on average leave it better".** My morning recap blurred that. The paper leads with it plainly, or it reads as advocacy.
+- **The independent instruments stop at `af55cb73`:** LIN-4292, 4296, 4304 and 4306 have no Periodical reading.
+- **The scope call:**
+  - stand at main at or after `1d10f9b3`;
+  - the evidence table first, a row per merge with its *n* visible, including "no lineage" costs and Periodical coverage;
+  - the answer as the evidence has it;
+  - the paper is the one home for the balances (`survey.md`'s overturned 17/3/1/0 is replaced by a pointer, and I take that edit back onto this branch afterwards);
+  - one short index row; retire the `proposals.md` lines it answers; a name apart from `survey-check-*`.
+
+  Started (`ce7361ec`).
+- **A mistake of mine, caught:** I ran `git merge origin/main` into this research branch, which carries unrelated unmerged code. It conflicted across many files, and I aborted it before anything was committed or pushed. **Notebook edits made on main come back onto this branch by a path-limited `git checkout origin/main -- docs/plans/survey*`, never by a merge.**
