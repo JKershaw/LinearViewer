@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="430" viewBox="0 0 960 430" font-family="Inter, system-ui, sans-serif" font-size="12" role="img" aria-label="Hand-written fake DOMs on the census list, one point per merge that carries a census count (42): 56 at the first count on 5 November, 25 at af55cb73, 6 from LIN-4312 on, all six marked stop."><style data-figure-theme="1">@media (prefers-color-scheme: dark){rect[fill="#fff"]:not([fill-opacity]),rect[fill="#ffffff"]:not([fill-opacity]),rect[fill="white"]:not([fill-opacity]){fill:#16181d}[stroke="#fff"],[stroke="#ffffff"],[stroke="white"]{stroke:#16181d}circle[fill="#fff"]:not([fill-opacity]),circle[fill="#ffffff"]:not([fill-opacity]),circle[fill="white"]:not([fill-opacity]){fill:#16181d}path[fill="#fff"]:not([fill-opacity]),path[fill="#ffffff"]:not([fill-opacity]),path[fill="white"]:not([fill-opacity]){fill:#16181d}polygon[fill="#fff"]:not([fill-opacity]),polygon[fill="#ffffff"]:not([fill-opacity]),polygon[fill="white"]:not([fill-opacity]){fill:#16181d}ellipse[fill="#fff"]:not([fill-opacity]),ellipse[fill="#ffffff"]:not([fill-opacity]),ellipse[fill="white"]:not([fill-opacity]){fill:#16181d}text[fill="#111827"]:not([data-on-fill]),text[fill="#1f2937"]:not([data-on-fill]),text[fill="#333"]:not([data-on-fill]),text[fill="#1f2328"]:not([data-on-fill]),text[fill="#555"]:not([data-on-fill]),text[fill="#475569"]:not([data-on-fill]){fill:#e6e6e6}[stroke="#111827"],[stroke="#1f2937"],[stroke="#333"],[stroke="#1f2328"],[stroke="#555"],[stroke="#475569"]{stroke:#e6e6e6}text[fill="#6b7280"]:not([data-on-fill]),text[fill="#666"]:not([data-on-fill]),text[fill="#667085"]:not([data-on-fill]),text[fill="#888"]:not([data-on-fill]),text[fill="#6e7781"]:not([data-on-fill]),text[fill="#999"]:not([data-on-fill]),text[fill="#aaa"]:not([data-on-fill]),text[fill="#bbb"]:not([data-on-fill]),text[fill="#9ca3af"]:not([data-on-fill]),text[fill="#94a3b8"]:not([data-on-fill]){fill:#9aa0a6}[stroke="#6b7280"],[stroke="#666"],[stroke="#667085"],[stroke="#888"],[stroke="#6e7781"],[stroke="#999"],[stroke="#aaa"],[stroke="#bbb"],[stroke="#9ca3af"],[stroke="#94a3b8"]{stroke:#9aa0a6}[stroke="#e5e7eb"],[stroke="#eee"],[stroke="#d1d5db"],[stroke="#f0f0f0"],[stroke="#cbd5e1"],[stroke="#d9d9d9"]{stroke:#2c313a}[fill="#f3f4f6"],[fill="#f9fafb"]{fill:#1f222a}rect[fill="#f0f0f0"],rect[fill="#d1d5db"],rect[fill="#e5e7eb"],rect[fill="#eee"]{fill:#2c313a}text:not([fill]):not([class]):not([data-on-fill]){fill:#e6e6e6}rect[fill="#1f2937"],circle[fill="#1f2937"],path[fill="#1f2937"]{fill:#4b5563}rect[fill="#3b1f5e"],circle[fill="#3b1f5e"],path[fill="#3b1f5e"]{fill:#553185}svg .t,svg .h{fill:#e6e6e6}svg .a,svg .s{fill:#9aa0a6}svg .f{fill:#1f222a;stroke:#2c313a}svg .g{stroke:#2c313a}rect[fill="#dbeafe"]{fill:#1d2d44}rect[fill="#93c5fd"]{fill:#2a5a9a}rect[fill="#fff7ed"]{fill:#2a2118}}</style><rect x="0" y="0" width="960" height="430" fill="#fff"/>
+<line x1="70" y1="318" x2="910" y2="318" stroke="#e5e7eb"/>
+<text x="60" y="322" font-size="10.5" fill="#6b7280" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace">0</text>
+<line x1="70" y1="271.6666666666667" x2="910" y2="271.6666666666667" stroke="#e5e7eb"/>
+<text x="60" y="275.6666666666667" font-size="10.5" fill="#6b7280" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace">10</text>
+<line x1="70" y1="225.33333333333331" x2="910" y2="225.33333333333331" stroke="#e5e7eb"/>
+<text x="60" y="229.33333333333331" font-size="10.5" fill="#6b7280" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace">20</text>
+<line x1="70" y1="179" x2="910" y2="179" stroke="#e5e7eb"/>
+<text x="60" y="183" font-size="10.5" fill="#6b7280" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace">30</text>
+<line x1="70" y1="132.66666666666666" x2="910" y2="132.66666666666666" stroke="#e5e7eb"/>
+<text x="60" y="136.66666666666666" font-size="10.5" fill="#6b7280" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace">40</text>
+<line x1="70" y1="86.33333333333334" x2="910" y2="86.33333333333334" stroke="#e5e7eb"/>
+<text x="60" y="90.33333333333334" font-size="10.5" fill="#6b7280" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace">50</text>
+<line x1="70" y1="40" x2="910" y2="40" stroke="#e5e7eb"/>
+<text x="60" y="44" font-size="10.5" fill="#6b7280" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace">60</text>
+<text x="20" y="179" font-size="11" fill="#6b7280" transform="rotate(-90 20 179)" text-anchor="middle">hand-written fake DOMs on the list</text>
+<polyline fill="none" stroke="#9ca3af" stroke-width="1.6" points="70.0,58.5 90.5,58.5 111.0,58.5 131.5,63.2 152.0,63.2 172.4,63.2 192.9,77.1 213.4,100.2 233.9,100.2 254.4,141.9 274.9,155.8 295.4,165.1 315.9,174.4 336.3,179.0 356.8,188.3 377.3,202.2 397.8,202.2 418.3,202.2 438.8,202.2 459.3,202.2 479.8,202.2 500.2,202.2 520.7,202.2 541.2,216.1 561.7,216.1 582.2,216.1 602.7,234.6 623.2,234.6 643.7,248.5 664.1,248.5 684.6,253.1 705.1,253.1 725.6,271.7 746.1,271.7 766.6,285.6 787.1,285.6 807.6,290.2 828.0,290.2 848.5,290.2 869.0,290.2 889.5,290.2 910.0,290.2"/>
+<circle cx="70.0" cy="58.5" r="3.6" fill="#9ca3af"/>
+<circle cx="90.5" cy="58.5" r="3.6" fill="#9ca3af"/>
+<circle cx="111.0" cy="58.5" r="3.6" fill="#9ca3af"/>
+<circle cx="131.5" cy="63.2" r="3.6" fill="#9ca3af"/>
+<circle cx="152.0" cy="63.2" r="3.6" fill="#9ca3af"/>
+<circle cx="172.4" cy="63.2" r="3.6" fill="#9ca3af"/>
+<circle cx="192.9" cy="77.1" r="3.6" fill="#9ca3af"/>
+<circle cx="213.4" cy="100.2" r="3.6" fill="#9ca3af"/>
+<circle cx="233.9" cy="100.2" r="3.6" fill="#9ca3af"/>
+<circle cx="254.4" cy="141.9" r="3.6" fill="#9ca3af"/>
+<circle cx="274.9" cy="155.8" r="3.6" fill="#9ca3af"/>
+<circle cx="295.4" cy="165.1" r="3.6" fill="#9ca3af"/>
+<circle cx="315.9" cy="174.4" r="3.6" fill="#9ca3af"/>
+<circle cx="336.3" cy="179.0" r="3.6" fill="#9ca3af"/>
+<circle cx="356.8" cy="188.3" r="3.6" fill="#9ca3af"/>
+<circle cx="377.3" cy="202.2" r="3.6" fill="#9ca3af"/>
+<circle cx="397.8" cy="243.9" r="3.6" fill="#2a78d6"/>
+<circle cx="397.8" cy="202.2" r="3.6" fill="#eb6834"/>
+<circle cx="418.3" cy="243.9" r="3.6" fill="#2a78d6"/>
+<circle cx="418.3" cy="202.2" r="3.6" fill="#eb6834"/>
+<circle cx="438.8" cy="243.9" r="3.6" fill="#2a78d6"/>
+<circle cx="438.8" cy="202.2" r="3.6" fill="#eb6834"/>
+<circle cx="459.3" cy="243.9" r="3.6" fill="#2a78d6"/>
+<circle cx="459.3" cy="202.2" r="3.6" fill="#eb6834"/>
+<circle cx="479.8" cy="243.9" r="3.6" fill="#2a78d6"/>
+<circle cx="479.8" cy="202.2" r="3.6" fill="#eb6834"/>
+<circle cx="500.2" cy="243.9" r="3.6" fill="#2a78d6"/>
+<circle cx="500.2" cy="202.2" r="3.6" fill="#eb6834"/>
+<circle cx="520.7" cy="243.9" r="3.6" fill="#2a78d6"/>
+<circle cx="520.7" cy="202.2" r="3.6" fill="#eb6834"/>
+<circle cx="541.2" cy="243.9" r="3.6" fill="#2a78d6"/>
+<circle cx="541.2" cy="216.1" r="3.6" fill="#eb6834"/>
+<circle cx="561.7" cy="243.9" r="3.6" fill="#2a78d6"/>
+<circle cx="561.7" cy="216.1" r="3.6" fill="#eb6834"/>
+<circle cx="582.2" cy="243.9" r="3.6" fill="#2a78d6"/>
+<circle cx="582.2" cy="216.1" r="3.6" fill="#eb6834"/>
+<circle cx="602.7" cy="262.4" r="3.6" fill="#2a78d6"/>
+<circle cx="602.7" cy="234.6" r="3.6" fill="#eb6834"/>
+<circle cx="623.2" cy="262.4" r="3.6" fill="#2a78d6"/>
+<circle cx="623.2" cy="234.6" r="3.6" fill="#eb6834"/>
+<circle cx="643.7" cy="276.3" r="3.6" fill="#2a78d6"/>
+<circle cx="643.7" cy="248.5" r="3.6" fill="#eb6834"/>
+<circle cx="664.1" cy="276.3" r="3.6" fill="#2a78d6"/>
+<circle cx="664.1" cy="248.5" r="3.6" fill="#eb6834"/>
+<circle cx="684.6" cy="280.9" r="3.6" fill="#2a78d6"/>
+<circle cx="684.6" cy="253.1" r="3.6" fill="#eb6834"/>
+<circle cx="705.1" cy="280.9" r="3.6" fill="#2a78d6"/>
+<circle cx="705.1" cy="253.1" r="3.6" fill="#eb6834"/>
+<circle cx="725.6" cy="299.5" r="3.6" fill="#2a78d6"/>
+<circle cx="725.6" cy="271.7" r="3.6" fill="#eb6834"/>
+<circle cx="746.1" cy="299.5" r="3.6" fill="#2a78d6"/>
+<circle cx="746.1" cy="271.7" r="3.6" fill="#eb6834"/>
+<circle cx="766.6" cy="313.4" r="3.6" fill="#2a78d6"/>
+<circle cx="766.6" cy="285.6" r="3.6" fill="#eb6834"/>
+<circle cx="787.1" cy="313.4" r="3.6" fill="#2a78d6"/>
+<circle cx="787.1" cy="285.6" r="3.6" fill="#eb6834"/>
+<circle cx="807.6" cy="318.0" r="3.6" fill="#2a78d6"/>
+<circle cx="807.6" cy="290.2" r="3.6" fill="#eb6834"/>
+<circle cx="828.0" cy="318.0" r="3.6" fill="#2a78d6"/>
+<circle cx="828.0" cy="290.2" r="3.6" fill="#eb6834"/>
+<circle cx="848.5" cy="318.0" r="3.6" fill="#2a78d6"/>
+<circle cx="848.5" cy="290.2" r="3.6" fill="#eb6834"/>
+<circle cx="869.0" cy="318.0" r="3.6" fill="#2a78d6"/>
+<circle cx="869.0" cy="290.2" r="3.6" fill="#eb6834"/>
+<circle cx="889.5" cy="318.0" r="3.6" fill="#2a78d6"/>
+<circle cx="889.5" cy="290.2" r="3.6" fill="#eb6834"/>
+<circle cx="910.0" cy="318.0" r="3.6" fill="#2a78d6"/>
+<circle cx="910.0" cy="290.2" r="3.6" fill="#eb6834"/>
+<text x="80.0" y="48.5" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace">56 · 5 Nov 13:18Z</text>
+<text x="448.8" y="190.2" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace">25 at af55cb73 (9 stops)</text>
+<line x1="807.6" y1="179.0" x2="807.6" y2="284.2" stroke="#6b7280" stroke-width="1"/>
+<text x="799.6" y="174.4" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace" text-anchor="end">6 · 6 Nov 11:41Z</text>
+<line x1="397.8" y1="34" x2="397.8" y2="318" stroke="#6b7280" stroke-dasharray="4 4"/>
+<text x="403.8" y="48" font-size="10.5" fill="#6b7280">stops first marked (591bb9596)</text>
+<text x="70" y="336" font-size="10.5" fill="#6b7280">merge 1 · 5 Nov 13:18Z</text>
+<text x="910" y="336" font-size="10.5" fill="#6b7280" text-anchor="end">merge 42 · 6 Nov 13:51Z</text>
+<circle cx="70" cy="360" r="4" fill="#9ca3af"/><text x="80" y="364" font-size="11" fill="#111827">total, before the stops were marked</text>
+<circle cx="320" cy="360" r="4" fill="#2a78d6"/><text x="330" y="364" font-size="11" fill="#111827">movable entries</text>
+<circle cx="450" cy="360" r="4" fill="#eb6834"/><text x="460" y="364" font-size="11" fill="#111827">marked stop (cannot move yet)</text>
+<text x="70" y="410" font-size="11" fill="#6b7280">This is the census's own count of files on its list. It is not a count of copies, and it is not the crude grep (46 to 51), which is a different measure.</text>
+</svg>
