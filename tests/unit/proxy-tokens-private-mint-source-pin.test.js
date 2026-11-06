@@ -128,10 +128,10 @@ describe('LIN-3129/LIN-3131 — the grant API caller allow-lists', () => {
   // one planned file is added by name; any other take mount still fails.
   //
   // SPLIT BY GRANT (LIN-3136, T3): LIN-2884's dispatch gate now exists, on
-  // exactly the three enqueue mounts. The take half below is unchanged; the
-  // dispatch half is pinned to its exact files and counts, so a fourth dispatch
-  // mount, or one in another file, still fails.
-  test('take is mounted in routes/proxy-runner.js and routes/proxy-runner-prompt.js only; dispatch on exactly the three enqueue mounts', () => {
+  // exactly the four enqueue mounts (LIN-4313 adds the periodical mint beside /dispatch). The take
+  // half below is unchanged; the dispatch half is pinned to its exact files and counts, so a fifth
+  // dispatch mount, or one in another file, still fails.
+  test('take is mounted in routes/proxy-runner.js and routes/proxy-runner-prompt.js only; dispatch on exactly the four enqueue mounts', () => {
     // Match an actual mount call, requireGrant('<name>') — not a passing mention.
     const mounts = [];
     for (const file of walk(join(REPO, 'routes'))) {
@@ -152,8 +152,8 @@ describe('LIN-3129/LIN-3131 — the grant API caller allow-lists', () => {
     const dispatchMounts = mounts.filter((m) => m.grant === 'dispatch').map((m) => m.file).sort();
     assert.deepEqual(
       dispatchMounts,
-      ['routes/proxy-dispatch.js', 'routes/proxy-dispatch.js', 'routes/proxy-kickoff.js'],
-      "requireGrant('dispatch') is mounted exactly on POST /dispatch and /recommend-and-dispatch (proxy-dispatch.js) and /autopilot/kickoff (proxy-kickoff.js) (LIN-3136)"
+      ['routes/proxy-dispatch.js', 'routes/proxy-dispatch.js', 'routes/proxy-dispatch.js', 'routes/proxy-kickoff.js'],
+      "requireGrant('dispatch') is mounted exactly on POST /dispatch, /recommend-and-dispatch and /periodicals/:id/mint (proxy-dispatch.js) and /autopilot/kickoff (proxy-kickoff.js) (LIN-3136, LIN-4313)"
     );
 
     const grants = [...new Set(mounts.map((m) => m.grant))].sort();

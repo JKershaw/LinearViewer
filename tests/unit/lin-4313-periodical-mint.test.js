@@ -6,7 +6,7 @@
  * Real `createProxyRoutes` over a REAL `ProxyTokenStore`, as in lin-3136-m1-kickoff-declared.
  * Covers:
  *  - grant witnesses: an owner's dispatch token minting + Autopilot declares `['dispatch']`
- *    (site M5) and its child can enqueue; a non-owner is REFUSED, never handed a leaf; a
+ *    (site PM) and its child can enqueue; a non-owner is REFUSED, never handed a leaf; a
  *    plain mint from any dispatch holder stays a grant-less leaf; no `dispatch` → 403;
  *  - parity: for every registry id and both variants the stored prompt begins with the text
  *    the UI's node carries (`buildPeriodicalNodes`), and kind / periodicalId / promptName
@@ -121,7 +121,7 @@ function uiNode(id) {
 }
 
 describe('LIN-4313 — the owner\'s + Autopilot mint declares [dispatch] for its orchestrator', () => {
-  test('owner token + autopilot:true → 201, declared site M5, owner\'s; the child can enqueue', async () => {
+  test('owner token + autopilot:true → 201, declared site PM, owner\'s; the child can enqueue', async () => {
     const w = world();
     const caller = await dispatchCaller(w);
 
@@ -134,7 +134,7 @@ describe('LIN-4313 — the owner\'s + Autopilot mint declares [dispatch] for its
     assert.deepEqual(w.spy.grant[0], {
       urlKey: 'acme', workspaceId: WS, ownerAccountId: OWNER, grants: ['dispatch'], label: 'periodical-bootstrap', profile: 'worker'
     });
-    assert.equal(item.grantDeclaration.site, 'M5');
+    assert.equal(item.grantDeclaration.site, 'PM');
     assert.deepEqual(item.grantDeclaration.grants, ['dispatch']);
     assert.equal(item.grantDeclaration.ownerAccountId, OWNER);
     assert.equal(item.grantDeclaration.workspaceId, WS);
@@ -214,14 +214,32 @@ describe('LIN-4313 — the owner\'s + Autopilot mint declares [dispatch] for its
     assert.equal(w.spy.grant.length + w.spy.plain.length, 0);
   });
 
-  test('the run gate applies to the route: an over-limit free-tier account gets the run-limit refusal, nothing enqueued', async () => {
+  // Free tier is decided by the shared free key (lib/plan-allowance.js FREE_FOR.keyed: no own key,
+  // no paid env key, a free key set), so the witness sets that key for its own duration.
+  const withFreeKey = async (fn) => {
+    const prior = process.env.OPENROUTER_FREE_TIER_KEY;
+    process.env.OPENROUTER_FREE_TIER_KEY = 'test-free-tier-key';
+    try { return await fn(); } finally {
+      if (prior === undefined) delete process.env.OPENROUTER_FREE_TIER_KEY; else process.env.OPENROUTER_FREE_TIER_KEY = prior;
+    }
+  };
+
+  test('the run gate applies to the route: an over-limit free-tier account gets the run-limit 429, nothing enqueued', async () => withFreeKey(async () => {
     const w = world({ freeTierCheck: async () => ({ allowed: false, reason: 'limit', runsUsed: 10, limit: 10, remaining: 0, resetsAt: '2026-11-07T00:00:00.000Z' }) });
     const caller = await dispatchCaller(w);
     const res = await call(w.app, 'post', mintPath(TEMPLATE.id), { token: caller, body: { autopilot: true } });
-    assert.ok([429, 503].includes(res.status), `a refused run is never admitted, got ${res.status} ${JSON.stringify(res.body)}`);
+    assert.equal(res.status, 429, JSON.stringify(res.body));
     assert.equal(w.items.length, 0);
     assert.equal(w.spy.grant.length + w.spy.plain.length, 0, 'no token minted for a refused run');
-  });
+  }));
+
+  test('the run gate admits an in-limit free-tier run (the same route, the same gate)', async () => withFreeKey(async () => {
+    const w = world({ freeTierCheck: async () => ({ allowed: true, runsUsed: 1, limit: 10, remaining: 9, resetsAt: '2026-11-07T00:00:00.000Z' }) });
+    const caller = await dispatchCaller(w);
+    const res = await call(w.app, 'post', mintPath(TEMPLATE.id), { token: caller, body: { autopilot: true } });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(w.items.length, 1);
+  }));
 });
 
 describe('LIN-4313 — parity: the route dispatches the text the UI\'s action sends', () => {
@@ -267,6 +285,9 @@ describe('LIN-4313 — unknown id and the operator note', () => {
     const { prompt } = w.items[0];
     const ui = uiNode(TEMPLATE.id);
     assert.ok(prompt.includes(ui.autopilotPrompt), 'the template text, tail included, is present verbatim');
+    // indexOf is -1 for an absent note, so presence is asserted first: an order check alone passes a dropped note.
+    assert.ok(prompt.includes(NOTE), 'the note is in the prompt');
+    assert.ok(prompt.startsWith('## Operator note'), 'the server-written preamble opens the prompt');
     assert.ok(prompt.indexOf(NOTE) < prompt.indexOf(ui.autopilotPrompt), 'the note comes before the template');
     assert.ok(prompt.includes(PERIODICAL_AUTOPILOT_TAIL), 'the tail still gates the grant');
   });
@@ -323,10 +344,11 @@ describe('LIN-4313 — run-state visibility', () => {
     const caller = await dispatchCaller(w);
     const minted = await call(w.app, 'post', mintPath(TEMPLATE.id), { token: caller, body: { autopilot: true } });
     assert.equal(minted.status, 201, JSON.stringify(minted.body));
+    assert.equal(w.items[0].periodicalId, TEMPLATE.id, 'the stored row is stamped, not just titled');
     const res = await call(w.app, 'get', '/api/proxy/periodicals', { token: caller });
     assert.equal(res.status, 200, JSON.stringify(res.body));
-    const entry = (res.body.periodicals || res.body).find(p => p.id === TEMPLATE.id);
+    const entry = res.body.periodicals.find(p => p.id === TEMPLATE.id);
     assert.ok(entry, 'the template is listed');
-    assert.notEqual(entry.state ?? entry.status, undefined, 'the entry carries a run state');
+    assert.equal(entry.state, 'recent', 'the queued run is counted as this template\'s recent run');
   });
 });

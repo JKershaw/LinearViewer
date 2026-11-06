@@ -26,6 +26,8 @@
  *
  *   World N, no declaration record on the parent row:
  *     kickoff POST                      one `mintGrantBootstrap`, ['dispatch'], the caller token's owner and workspace
+ *     periodical mint, autopilot (PM)   the same, labelled periodical-bootstrap (LIN-4313; lin-4313-periodical-mint.test.js owns it)
+ *     periodical mint, plain (PM)       one `createToken`, no `grants`
  *     session POST, autopilot (M2)      one `mintGrantBootstrap`, ['dispatch'], the session account and workspace
  *     session POST, other kind          one `createToken`, no `grants`
  *     proxy-dispatch launch arms (M3)   one `createToken`, no `grants`

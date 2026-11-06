@@ -16,7 +16,7 @@ import { deriveCompletedAt, deriveWireStatus, deriveWireTerminal, closedProjecti
 import { wireStatusOf } from '../lib/dispatch-lineage-status.js';
 import { buildQueuedPollWarning, getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
 import { redactSessionItem } from '../lib/dispatch-session-redaction.js';
-import { enterProxyDispatch, enterRecommendDispatch, refuseWithoutStore, rejectAudited } from '../lib/dispatch-entrance.js';
+import { enterProxyDispatch, enterRecommendDispatch, enterPeriodicalMint, refuseWithoutStore, rejectAudited } from '../lib/dispatch-entrance.js';
 
 // Dispatch input limits. The prompt/url caps for the POST /dispatch payload now
 // live in lib/dispatch-validation.js (shared with the session-auth twin via
@@ -292,6 +292,23 @@ export function createDispatchRoutes({
    */
   router.post('/api/proxy/recommend-and-dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant('dispatch'), async (req, res) => {
     await enterRecommendDispatch({ ...lane, req, res, endpoint: '/api/proxy/recommend-and-dispatch' });
+  });
+
+  /**
+   * POST /api/proxy/periodicals/:id/mint (LIN-4313)
+   * Mint a Periodical run by registry id, as the UI's Mint and Mint + Autopilot actions do, with no
+   * checkout and no prompt on the client. The server renders the registry's prompt (the plain Mint,
+   * or the "+ Autopilot" variant when `autopilot: true`), stamps `periodicalId` so GET /periodicals
+   * shows the run, and enqueues it through the shared entrance (lib/dispatch-entrance.js,
+   * enterPeriodicalMint). Only the "+ Autopilot" variant declares the dispatch grant, for the token's
+   * owner, checked at the mint; a plain Mint is a grant-less leaf.
+   *
+   * Body (all optional): { autopilot?: boolean, note?: string, target?, repo?, model?, harness?, effort? }.
+   * `note` is at most 500 single-line characters; the server places it before the template text and
+   * the template text is never changed. An unknown id is a 404 naming GET /api/proxy/periodicals.
+   */
+  router.post('/api/proxy/periodicals/:id/mint', proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant('dispatch'), async (req, res) => {
+    await enterPeriodicalMint({ ...lane, req, res, endpoint: '/api/proxy/periodicals/:id/mint', periodicalId: req.params.id });
   });
 
   /**

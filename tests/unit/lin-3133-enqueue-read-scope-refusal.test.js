@@ -3,7 +3,7 @@
  *
  * T1 threads `requireGrant` into the kickoff and dispatch sub-routers inertly
  * (declared, unused). Acceptance criterion (b) says a `scope:'read'` token still
- * gets today's `requireWriteScope` 403 on the three enqueue POSTs, and a
+ * gets today's `requireWriteScope` 403 on the four enqueue POSTs, and a
  * `readWrite` token still enqueues. Research found no test that drives a `read`
  * token through any of the three, so this is a pure addition closing that gap.
  *
