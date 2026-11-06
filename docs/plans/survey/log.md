@@ -2518,3 +2518,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - a top-level `truncated` flag that survives `flattenIssue`;
   - explicit order; docs in one place.
 - 13:00: LIN-4311 (piece 5, the task-page suites) merged (`90542b2c`). Only LIN-4312 is left (`close-out-client`, plus `close-out.js`'s production seams and their allow-list entries).
+- 13:10: **Next 2's result: the baseline pairs read better in both passes on 1 of 4** (pairs 1, 2 and 4 mixed, mixed; pair 3 better, better), against the after-step's 6 of 6. By the rule logged before reading, the after-step's effect is real against this baseline. The one better baseline pair (LIN-3717 → LIN-3722) was itself a consolidation, so it supports the mechanism (deleting copies) rather than a pairing artefact. That answers the paper's Limit "no like-for-like baseline for areas", partly: four pairs, one prompt. Ledger: "Next 2: a baseline for the area reads".
