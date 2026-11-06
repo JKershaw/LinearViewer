@@ -5,14 +5,32 @@
 // Byte-identical on re-run from the same folder. Each number in the paper is a key in analysis.json,
 // with its n.
 //
-// Usage: node docs/papers/harbour/cleaner-than-it-started-scripts/analyse.mjs <evidence-dir>
+// Usage: node docs/papers/harbour/cleaner-than-it-started-scripts/analyse.mjs <evidence-dir> --inputs <file.json>
+// Every version-specific value (window, pins for the Periodical windows, blind ticket and batch sessions,
+// per-ticket notes, cost-group patterns, named costs) comes from the inputs file. Why v1's inputs live in
+// this folder and not in v1's evidence folder is in inputs.mjs.
 
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { takeInputs, need } from './inputs.mjs';
 
-const dir = process.argv[2];
-if (!dir) { console.error('usage: analyse.mjs <evidence-dir>'); process.exit(2); }
+const { inputs: I, positional } = takeInputs(process.argv.slice(2), 'analyse.mjs <evidence-dir>');
+const dir = positional[0];
+if (!dir) { console.error('usage: analyse.mjs <evidence-dir> --inputs <file.json>'); process.exit(2); }
+const WINDOW_START = need(I, 'window_start');
+const BLIND_TICKET = need(I, 'blind.ticket');
+const SESSIONS = need(I, 'blind.sessions');
+const BLIND_BASELINE_NOTE = need(I, 'blind.baseline_note');
+const BASELINE_FILE = need(I, 'baseline_3nov_file');
+const LV_END = need(I, 'periodicals.linearviewer_end');          // the Periodical windows end here (LinearViewer)
+const SD_RUN2 = need(I, 'periodicals.simple_dispatcher_run2');   // Drift run 2 grounding (simple-dispatcher)
+const SD_RUN3 = need(I, 'periodicals.simple_dispatcher_run3');   // Drift run 3 and Comprehension-Debt run 5 (simple-dispatcher)
+const TICKET_NOTES = need(I, 'ticket_notes');
+const COST_GROUPS = need(I, 'cost_groups');
+const FIVE_NOV_RE = new RegExp(need(I, 'cost_groups.five_nov_and_ordinary'));
+const FAKE_DOM_GROUP = need(I, 'fake_dom_piece_group');
+const NAMED_COSTS = need(I, 'named_costs');
 const read = (rel) => readFileSync(path.join(dir, rel), 'utf8');
 const readJson = (rel) => JSON.parse(read(rel));
 
@@ -21,9 +39,6 @@ const roles = readJson('roles.json');
 const blind = readJson('blind-codes.json');
 const census = readJson('git/census-by-merge.json');
 const ledger = read('git/place-ledger.at-pin.snapshot');
-const LV_AF55 = 'af55cb73';   // the Periodical windows end here (LinearViewer)
-const SD_D8D = 'd8d186c';     // Drift run 2 grounding (simple-dispatcher)
-const SD_07C = '07c88f7';     // Drift run 3 and Comprehension-Debt run 5 (simple-dispatcher)
 
 const tsvRows = (rel) => read(rel).split('\n').slice(1).filter(Boolean).map((l) => {
   const [full, short, committed, subject] = l.split('\t');
@@ -33,9 +48,9 @@ const lvMerges = tsvRows('git/merges-LinearViewer.tsv').map((m) => ({ ...m, repo
 const sdMerges = tsvRows('git/merges-simple-dispatcher.tsv').map((m) => ({ ...m, repo: 'simple-dispatcher' })).reverse();
 const lvCommitted = (s) => (lvMerges.find((m) => m.full.startsWith(s)) || {}).committed;
 const sdCommitted = (s) => (sdMerges.find((m) => m.full.startsWith(s)) || {}).committed;
-const AF55_COMMITTED = lvCommitted(LV_AF55);
-const D8D_COMMITTED = sdCommitted(SD_D8D);
-const baselineMerges = tsvRows('git/merges-LinearViewer-2026-11-02-03.tsv').map((m) => ({ ...m, repo: 'LinearViewer' })).reverse();
+const AF55_COMMITTED = lvCommitted(LV_END);
+const D8D_COMMITTED = sdCommitted(SD_RUN2);
+const baselineMerges = tsvRows(BASELINE_FILE).map((m) => ({ ...m, repo: 'LinearViewer' })).reverse();
 
 const ROLE = roles.tickets;
 const issueOf = (id) => { const f = `issue/${id}.json`; return existsSync(path.join(dir, f)) ? readJson(f) : null; };
@@ -56,16 +71,16 @@ for (const p of blind.passes) {
 }
 
 // ---- the LIN-4150 survey and after-answer facts ----
-const l4150 = readJson('comments/LIN-4150.json').comments;
-const surveyOn4150 = new Set();
-for (const c of l4150) {
+const blindComments = readJson(`comments/${BLIND_TICKET}.json`).comments;
+const surveyOnBlind = new Set();
+for (const c of blindComments) {
   const h = (c.body || '').split('\n')[0];
-  if (/^## Survey/.test(h)) for (const m of h.matchAll(/LIN-(\d+)/g)) surveyOn4150.add(`LIN-${m[1]}`);
+  if (/^## Survey/.test(h)) for (const m of h.matchAll(/LIN-(\d+)/g)) surveyOnBlind.add(`LIN-${m[1]}`);
 }
 
 // ---- rows ----
 const rowsAll = [];
-const inWindow = (m) => m.committed >= '2026-11-04T00:00:00Z';
+const inWindow = (m) => m.committed >= WINDOW_START;
 const merges = [
   ...lvMerges.filter(inWindow),
   ...sdMerges.filter(inWindow),
@@ -125,11 +140,7 @@ for (const line of ledger.split('\n')) {
   });
 }
 // code/notebook notes (checked in the frozen data; each one is re-derived below where it can be)
-const NOTE = {
-  'LIN-4254': 'notebook and ticket say 22 (16 movable + 6 stop); the census file at 1d10f9b3 has 18 (12 movable + 6 stop)',
-  'LIN-4307': 'the notebook ends at 08:00 UTC 6 Nov and still lists the LIN-4307 rulings as held; the code has LIN-4307 merged',
-  'LIN-4253': 'lib/stage-writes.js is not placed on scripts/code-shape/areas.json (research §L9)',
-};
+const NOTE = TICKET_NOTES;
 
 // ---- rows out ----
 const table = [];
@@ -141,17 +152,17 @@ for (const { m, t, r } of rowsAll) {
   const ownSurvey = own.some((c) => /^## Survey (open-\d|global)/.test(headOf(c)));
   const afterAnswer = own.some((c) => /Survey 1a|round 3|\(after\)/i.test(headOf(c)));
   const scope = iss ? (/How to go about it/.test(iss.description || '') ? 'present' : 'absent') : 'n/a';
-  const sl = [surveyOn4150.has(t) ? 'LIN-4150' : null, ownSurvey ? 'own ticket' : null].filter(Boolean).join(' + ') || 'none found';
+  const sl = [surveyOnBlind.has(t) ? BLIND_TICKET : null, ownSurvey ? 'own ticket' : null].filter(Boolean).join(' + ') || 'none found';
   const unsurveyedByLedger = (roles.unsurveyed_by_ledger ?? []).includes(t);
   const b = batchFor(m.full);
-  const bA = b.find((x) => x.session.startsWith('pass-1')) ?? null;
-  const bC = b.find((x) => x.session.startsWith('pass-2')) ?? null;
+  const bA = b.find((x) => x.session === SESSIONS[0].name) ?? null;
+  const bC = b.find((x) => x.session === SESSIONS[1].name) ?? null;
   const areas = areaFor(t).map((p) => `${p.id}:${p.sign ?? 'none'}`);
   const cs = costState(t ? costOf(t) : null);
   const cen = censusBySha.get(m.full);
   const per = m.repo === 'LinearViewer'
-    ? (m.committed <= AF55_COMMITTED ? 'covered: Periodical windows through af55cb73' : 'none (after af55cb73)')
-    : `Comprehension-Debt run 5 (SD to ${SD_07C})` + (m.committed > D8D_COMMITTED ? '; Drift run 3 (d8d186c..07c88f7)' : '; Drift run 2 grounding at d8d186c (window start not stated)');
+    ? (m.committed <= AF55_COMMITTED ? `covered: Periodical windows through ${LV_END}` : `none (after ${LV_END})`)
+    : `Comprehension-Debt run 5 (SD to ${SD_RUN3})` + (m.committed > D8D_COMMITTED ? `; Drift run 3 (${SD_RUN2}..${SD_RUN3})` : `; Drift run 2 grounding at ${SD_RUN2} (window start not stated)`);
   const led = t ? (ledgerRows[t] ?? []) : [];
   // ledger dollar figures against the frozen live cost (history, not an input)
   const ledgerUsd = led.map((x) => x.dollars).filter((d) => d !== null);
@@ -184,7 +195,7 @@ const tk = (rows, f) => { const seen = new Map(); for (const r of rows) if (f(r)
 const median = (xs) => { const v = xs.filter((x) => x !== null && x !== undefined).sort((a, b) => a - b); if (!v.length) return null; const m = Math.floor(v.length / 2); return Math.round((v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2) * 100) / 100; };
 const mean = (xs) => xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 100) / 100 : null;
 const sumOf = (xs) => xs.reduce((a, b) => a + b, 0);
-const BASE = new Set(Object.entries(ROLE).filter(([, v]) => v.group.startsWith('baseline')).map(([k]) => k));
+const BASE = new Set(Object.entries(ROLE).filter(([, v]) => v.group.startsWith(COST_GROUPS.baseline)).map(([k]) => k));
 const UI = new Set(Object.entries(ROLE).filter(([, v]) => v.role === 'ui-context').map(([k]) => k));
 
 const UNSURVEYED = new Set(roles.unsurveyed_by_ledger ?? []);
@@ -202,8 +213,8 @@ function batchSummary(session) {
     unsigned_rows: batchRows.filter((b) => b.session === session && b.score === null).map((b) => ({ pass: b.pass, row: b.row, note: b.note })),
   };
 }
-const pass1 = batchSummary('pass-1 (batches A+B)');
-const pass2 = batchSummary('pass-2 (batches C+D)');
+const pass1 = batchSummary(SESSIONS[0].name);
+const pass2 = batchSummary(SESSIONS[1].name);
 
 // single / area passes: group into subjects of two passes each
 const subjects = new Map();
@@ -225,7 +236,7 @@ const censusLadder = census.merges.filter((m) => m.count !== null).map((m) => ({
 // cost states over place rows
 const costStates = {};
 for (const r of place) { const k = r.cost_state.split(' ')[0]; costStates[k] = (costStates[k] || 0) + 1; }
-const fakeDomPieces = ROLE && Object.entries(ROLE).filter(([, v]) => v.group.startsWith('LIN-4255 fake-DOM move piece')).map(([k]) => k);
+const fakeDomPieces = ROLE && Object.entries(ROLE).filter(([, v]) => v.group.startsWith(FAKE_DOM_GROUP)).map(([k]) => k);
 const pieceCost = fakeDomPieces.map((t) => costState(costOf(t)).total);
 const ledgerDollarCheck = table.filter((r) => r.code_notebook_note.includes('vs live')).map((r) => ({ ticket: r.primary_ticket, note: r.code_notebook_note }));
 
@@ -250,7 +261,7 @@ const analysis = {
     session_pass_1: pass1,
     session_pass_2: pass2,
     scoring: blind.scoring,
-    note: 'Baseline = the ledger baseline window 015aa4c6..5334c81a (8 LinearViewer rows, all in the batches). Forward = every other row in the batches.',
+    note: BLIND_BASELINE_NOTE,
   },
   single_and_area_reads: {
     passes_total: singlePasses.length,
@@ -266,7 +277,7 @@ const analysis = {
   census: {
     merges_with_census: censusLadder.length,
     first: censusLadder[0],
-    at_af55cb73: censusLadder.find((c) => c.short.startsWith(LV_AF55)) ?? null,
+    at_af55cb73: censusLadder.find((c) => c.short.startsWith(LV_END)) ?? null,
     last: censusLadder[censusLadder.length - 1],
     ladder: censusLadder,
   },
@@ -277,13 +288,12 @@ const analysis = {
     fake_dom_piece_cost_sum_usd: Math.round(sumOf(pieceCost.filter((x) => x !== null)) * 100) / 100,
     fake_dom_piece_states_not_exact: fakeDomPieces.filter((t, i) => pieceCost[i] === null).length,
     not_exact_place_tickets: tk(place, (r) => !r.cost_state.startsWith('exact')).map((r) => `${r.primary_ticket}: ${r.cost_state}`),
-    LIN_4271_own_usd: costState(costOf('LIN-4271')).total,
-    parent_LIN_4255_usd: costState(costOf('LIN-4255')).total,
+    ...Object.fromEntries(Object.entries(NAMED_COSTS).map(([key, t]) => [key, costState(costOf(t)).total])),
   },
   surveys: {
     place_tickets: placeTickets.length,
     tickets_with_survey_on_own_ticket: tk(place, (r) => r.survey_location.includes('own ticket')).length,
-    tickets_with_survey_on_LIN_4150: tk(place, (r) => r.survey_location.includes('LIN-4150')).length,
+    tickets_with_survey_on_LIN_4150: tk(place, (r) => r.survey_location.includes(BLIND_TICKET)).length,
     tickets_with_no_survey_found: tk(place, (r) => r.survey_location === 'none found').map((r) => r.primary_ticket),
     tickets_with_scope_call: tk(place, (r) => r.scope_call === 'present').length,
     tickets_with_scope_call_absent: tk(place, (r) => r.scope_call === 'absent').map((r) => r.primary_ticket),
@@ -299,10 +309,10 @@ const analysis = {
   cost_medians: {
     place_exact_rows: place.filter((r) => r.cost_usd !== null).length,
     median_usd_all_place_exact: median(place.filter((r) => r.cost_usd !== null).map((r) => r.cost_usd)),
-    median_usd_baseline: median(place.filter((r) => r.group.startsWith('baseline') && r.cost_usd !== null).map((r) => r.cost_usd)),
-    median_usd_forward_4Nov: median(place.filter((r) => r.group.startsWith('forward') && r.cost_usd !== null).map((r) => r.cost_usd)),
+    median_usd_baseline: median(place.filter((r) => r.group.startsWith(COST_GROUPS.baseline) && r.cost_usd !== null).map((r) => r.cost_usd)),
+    median_usd_forward_4Nov: median(place.filter((r) => r.group.startsWith(COST_GROUPS.forward) && r.cost_usd !== null).map((r) => r.cost_usd)),
     // Rows whose group is a 5 Nov read, the LIN-4255 fake-DOM pieces or an ordinary feature (n given).
-    median_usd_5Nov_groups: { n: place.filter((r) => /^5 Nov|^LIN-4255 fake|^ordinary/.test(r.group) && r.cost_usd !== null).length, median: median(place.filter((r) => /^5 Nov|^LIN-4255 fake|^ordinary/.test(r.group) && r.cost_usd !== null).map((r) => r.cost_usd)) },
+    median_usd_5Nov_groups: { n: place.filter((r) => FIVE_NOV_RE.test(r.group) && r.cost_usd !== null).length, median: median(place.filter((r) => FIVE_NOV_RE.test(r.group) && r.cost_usd !== null).map((r) => r.cost_usd)) },
     // One exact cost per ticket: the first place row per primary_ticket that has one (n = tickets).
     median_usd_per_ticket_exact: (() => {
       const seen = new Map();

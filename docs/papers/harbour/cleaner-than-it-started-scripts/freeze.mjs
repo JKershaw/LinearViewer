@@ -3,10 +3,12 @@
 // into a dated evidence folder. analyse.mjs reads that folder alone (no network, no git).
 //
 // Usage (LinearViewer root, with HARBOUR_LOCAL_BASE set):
-//   node docs/papers/harbour/cleaner-than-it-started-scripts/freeze.mjs <out-dir> [--sd <simple-dispatcher path>]
+//   node docs/papers/harbour/cleaner-than-it-started-scripts/freeze.mjs <out-dir> --inputs <file.json> [--sd <simple-dispatcher path>]
+// Every version's pins, ticket lists and expectations come from the inputs file (inputs-v1.json for v1).
+// Why v1's inputs live in this folder and not in v1's evidence folder: see inputs.mjs.
 //
-// Order (the 50-comment cap means LIN-4150 must be read FIRST, before anything else moves):
-//   1. LIN-4150 comments, raw, with read_at; assertions on the 42 blind passes.
+// Order (the 50-comment cap means the blind ticket must be read FIRST, before anything else moves):
+//   1. The blind ticket's comments (LIN-4150 for v1), raw, with read_at; assertions on its blind passes.
 //   2. git merge lists for both repos, pinned to the shas below (never origin/main).
 //   3. issue/ and cost/ and dispatch/ for every ticket named in those merge subjects, plus parents.
 //   4. prompts/ for every custom (after-answer) dispatch since the window start.
@@ -18,26 +20,32 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { takeInputs, need } from './inputs.mjs';
 
-export const WINDOW_START = '2026-11-04T00:00:00Z';
-export const LV_PIN = '1d10f9b3';   // LinearViewer main at grounded_at
-export const SD_PIN = '07c88f7';    // simple-dispatcher main at grounded_at
-export const PARENTS = ['LIN-4144', 'LIN-4195', 'LIN-4233', 'LIN-4254', 'LIN-4255', 'LIN-4271'];
-// Ledger rows that are not 4 Nov merges: the 3 Nov baseline rows (blind batches A-D), the UI four
-// (context rows), and tickets folded into a later merge's subject. LIN-4150 and LIN-4297 are the
-// blind-read ticket and a backlog residue; they are frozen as context, not as rows.
-export const BASELINE_3NOV = ['LIN-4168', 'LIN-4166', 'LIN-4173', 'LIN-4177'];
-export const UI_FOUR = ['LIN-4106', 'LIN-4107', 'LIN-4110', 'LIN-4040'];
-export const FOLDED = ['LIN-4142', 'LIN-4114', 'LIN-4188'];
-export const CONTEXT = ['LIN-4150', 'LIN-4297'];
+const { inputs: I, positional } = takeInputs(process.argv.slice(2), 'freeze.mjs <out-dir> [--sd <path>]');
+export const TICKET = need(I, 'ticket');
+export const WINDOW_START = need(I, 'window_start');
+export const LV_PIN = need(I, 'lv_pin');   // LinearViewer main at grounded_at
+export const SD_PIN = need(I, 'sd_pin');   // simple-dispatcher main at grounded_at
+export const PARENTS = need(I, 'parents');
+export const BLIND = need(I, 'blind');     // { ticket, expected_passes, expected_batches, ... }
+// Ledger rows that are not in the window's merges: the 3 Nov baseline rows (blind batches A-D), the UI four
+// (context rows), and tickets folded into a later merge's subject. The blind ticket and a backlog residue
+// are frozen as context, not as rows.
+export const BASELINE_3NOV = need(I, 'baseline_3nov_ids');
+export const BASELINE_3NOV_WINDOW = need(I, 'baseline_3nov_window');
+export const BASELINE_3NOV_FILE = need(I, 'baseline_3nov_file');
+export const UI_FOUR = need(I, 'ui_four');
+export const FOLDED = need(I, 'folded');
+export const CONTEXT = need(I, 'context');
 const PACE_MS = 1100;               // proxy limit 60/min
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..', '..', '..', '..');
 
-const outDir = process.argv[2];
-if (!outDir || outDir.startsWith('--')) { console.error('usage: freeze.mjs <out-dir> [--sd <path>]'); process.exit(2); }
-const sdArg = process.argv.indexOf('--sd');
-const SD_ROOT = sdArg > 0 ? path.resolve(process.argv[sdArg + 1]) : path.resolve(REPO_ROOT, '..', 'simple-dispatcher');
+const outDir = positional[0];
+if (!outDir || outDir.startsWith('--')) { console.error('usage: freeze.mjs <out-dir> --inputs <file.json> [--sd <path>]'); process.exit(2); }
+const sdArg = positional.indexOf('--sd');
+const SD_ROOT = sdArg > 0 ? path.resolve(positional[sdArg + 1]) : path.resolve(REPO_ROOT, '..', 'simple-dispatcher');
 const BASE = process.env.HARBOUR_LOCAL_BASE;
 if (!BASE) { console.error('HARBOUR_LOCAL_BASE is not set'); process.exit(2); }
 const API = `${BASE}/api/proxy`;
@@ -79,16 +87,17 @@ const saveGit = (rel, text) => {
 };
 
 // ---- 1. LIN-4150 first: the proxy caps an issue read at 50 comments ----
-const l4150 = await getJson('/issues/LIN-4150');
-save('comments/LIN-4150.json', l4150.text, l4150.readAt, l4150.status);
+const l4150 = await getJson(`/issues/${BLIND.ticket}`);
+save(`comments/${BLIND.ticket}.json`, l4150.text, l4150.readAt, l4150.status);
 const comments = l4150.body.comments?.nodes ?? l4150.body.comments ?? [];
 const blind = comments.filter((c) => /^## Blind place scoring/.test(c.body || ''));
 const blindLabels = blind.map((c) => c.body.split('\n')[0].replace(/^## Blind place scoring, /, ''));
-const hasBatchA = blindLabels.some((l) => /^batch A\b/.test(l));
-if (comments.length === 50 && !hasBatchA) throw new Error('LIN-4150 is capped at 50 and batch A is missing: freeze cannot recover it');
-if (blind.length !== 42) throw new Error(`expected 42 blind passes on LIN-4150, found ${blind.length}`);
-for (const b of ['A', 'B', 'C', 'D']) if (!blindLabels.some((l) => l.startsWith(`batch ${b}`))) throw new Error(`batch ${b} missing`);
-process.stderr.write(`LIN-4150: ${comments.length} comments, ${blind.length} blind passes, batch A-D present\n`);
+const firstBatch = BLIND.expected_batches[0];
+const hasFirstBatch = blindLabels.some((l) => new RegExp(`^batch ${firstBatch}\\b`).test(l));
+if (comments.length === 50 && !hasFirstBatch) throw new Error(`${BLIND.ticket} is capped at 50 and batch ${firstBatch} is missing: freeze cannot recover it`);
+if (blind.length !== BLIND.expected_passes) throw new Error(`expected ${BLIND.expected_passes} blind passes on ${BLIND.ticket}, found ${blind.length}`);
+for (const b of BLIND.expected_batches) if (!blindLabels.some((l) => l.startsWith(`batch ${b}`))) throw new Error(`batch ${b} missing`);
+process.stderr.write(`${BLIND.ticket}: ${comments.length} comments, ${blind.length} blind passes, batches ${BLIND.expected_batches.join('-')} present\n`);
 
 // ---- 2. git: pinned merge lists and the shas they stand on ----
 const repos = [['LinearViewer', REPO_ROOT, LV_PIN], ['simple-dispatcher', SD_ROOT, SD_PIN]];
@@ -112,8 +121,8 @@ const notInMerges = [...ledgerIds].filter((id) => !subjectIds.has(id));  // chec
 process.stderr.write(`ledger ids ${ledgerIds.size}; not in merge subjects: ${notInMerges.join(', ') || 'none'}\n`);
 
 // 3 Nov baseline merges (the window before the loop's place view): kept as their own git list.
-const baselineLog = git(REPO_ROOT, ['log', '--first-parent', LV_PIN, '--since=2026-11-02T00:00Z', '--until=2026-11-04T00:00Z', '--format=%H|%h|%cI|%s']);
-saveGit('git/merges-LinearViewer-2026-11-02-03.tsv', ['full_sha\tshort\tcommitted\tsubject', ...baselineLog.trim().split('\n').filter(Boolean).map((l) => l.split('|').join('\t'))].join('\n') + '\n');
+const baselineLog = git(REPO_ROOT, ['log', '--first-parent', LV_PIN, `--since=${BASELINE_3NOV_WINDOW.since}`, `--until=${BASELINE_3NOV_WINDOW.until}`, '--format=%H|%h|%cI|%s']);
+saveGit(BASELINE_3NOV_FILE, ['full_sha\tshort\tcommitted\tsubject', ...baselineLog.trim().split('\n').filter(Boolean).map((l) => l.split('|').join('\t'))].join('\n') + '\n');
 for (const line of baselineLog.split('\n').filter(Boolean)) {
   for (const m of line.matchAll(/\bLIN-(\d+)\b/g)) if (BASELINE_3NOV.includes(`LIN-${m[1]}`)) subjectIds.add(`LIN-${m[1]}`);
 }
@@ -150,7 +159,7 @@ for (const id of population) {
 process.stderr.write(`custom prompts frozen: ${promptCount}\n`);
 
 const manifest = {
-  ticket: 'LIN-4315',
+  ticket: TICKET,
   window_start: WINDOW_START,
   freeze_finished_at: new Date().toISOString(),
   read_time_note: 'Each file carries its own read_at in this manifest; that is the read time of record.',

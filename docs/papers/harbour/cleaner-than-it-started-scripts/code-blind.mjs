@@ -9,19 +9,32 @@
 // is attributed to tickets through the merge subject; the pass title names the ticket(s) of a
 // single or combined read.
 //
-// Usage: node docs/papers/harbour/cleaner-than-it-started-scripts/code-blind.mjs <out-dir>
+// Usage: node docs/papers/harbour/cleaner-than-it-started-scripts/code-blind.mjs <out-dir> --inputs <file.json>
+// The blind ticket, batch names, session split and baseline merge file come from the inputs file; the
+// reason v1's inputs live in this folder and not in v1's evidence folder is in inputs.mjs.
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { takeInputs, need } from './inputs.mjs';
 
-const outDir = process.argv[2];
-if (!outDir) { console.error('usage: code-blind.mjs <out-dir>'); process.exit(2); }
+const { inputs: I, positional } = takeInputs(process.argv.slice(2), 'code-blind.mjs <out-dir>');
+const outDir = positional[0];
+if (!outDir) { console.error('usage: code-blind.mjs <out-dir> --inputs <file.json>'); process.exit(2); }
+const BLIND_TICKET = need(I, 'blind.ticket');
+const BATCHES = need(I, 'blind.expected_batches');
+const SESSIONS = need(I, 'blind.sessions');
+const BASELINE_FILE = need(I, 'baseline_3nov_file');
+const sessionFor = (b) => {
+  const s = SESSIONS.find((x) => x.batches.includes(b));
+  if (!s) throw new Error(`batch ${b} is in no session in the inputs file`);
+  return s.name;
+};
 
 const frozen = (rel) => readFileSync(path.join(outDir, rel), 'utf8');
 
 // ---- merges (frozen git lists) ----
 const merges = [];
-for (const [repo, file] of [['LinearViewer', 'git/merges-LinearViewer.tsv'], ['simple-dispatcher', 'git/merges-simple-dispatcher.tsv'], ['LinearViewer', 'git/merges-LinearViewer-2026-11-02-03.tsv']]) {
+for (const [repo, file] of [['LinearViewer', 'git/merges-LinearViewer.tsv'], ['simple-dispatcher', 'git/merges-simple-dispatcher.tsv'], ['LinearViewer', BASELINE_FILE]]) {
   for (const line of frozen(file).split('\n').slice(1).filter(Boolean)) {
     const [full, short, committed, subject] = line.split('\t');
     const ids = [...new Set([...subject.matchAll(/\bLIN-(\d+)\b/g)].map((m) => `LIN-${m[1]}`))];
@@ -35,7 +48,7 @@ function resolve(label) {
 }
 
 // ---- the blind comments ----
-const { comments } = JSON.parse(frozen('comments/LIN-4150.json'));
+const { comments } = JSON.parse(frozen(`comments/${BLIND_TICKET}.json`));
 const blind = comments.filter((c) => /^## Blind place scoring, /.test(c.body || ''))
   .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
@@ -47,7 +60,7 @@ const unresolved = [];
 for (const c of blind) {
   const lines = c.body.split('\n');
   const title = lines[0].replace(/^## Blind place scoring, /, '').trim();
-  const batch = title.match(/^batch ([A-D])$/);
+  const batch = title.match(new RegExp(`^batch ([${BATCHES.join('')}])$`));
   const single = title.match(/^(.*?) pass ([A-Z]{1,2})$/);
   const id = batch ? `batch ${batch[1]}` : single[2];
   const subjectTickets = batch ? null : [...new Set(single[1].match(/\d+/g).map((n) => `LIN-${n}`))];
@@ -87,7 +100,7 @@ for (const c of blind) {
     title,
     comment_id: c.id,
     created_at: c.createdAt,
-    session: batch ? (['A', 'B'].includes(batch[1]) ? 'pass-1 (batches A+B)' : 'pass-2 (batches C+D)') : `pass ${id}`,
+    session: batch ? sessionFor(batch[1]) : `pass ${id}`,
     subject_tickets: subjectTickets,
     rows,
   });
