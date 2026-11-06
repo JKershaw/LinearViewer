@@ -15,7 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'crypto';
-import { getPeriodicals, withAutopilotTail } from '../../lib/periodicals.js';
+import { getPeriodicals, renderPeriodicalPrompt, withAutopilotTail } from '../../lib/periodicals.js';
 
 const sha256 = (text) => crypto.createHash('sha256').update(text).digest('hex');
 
@@ -45,5 +45,15 @@ test('LIN-4313: every registry id has a pinned plain and Mint + Autopilot prompt
     const plain = template.generatePrompt();
     assert.equal(sha256(plain), PINNED[template.id].plain, `${template.id}: plain prompt bytes changed`);
     assert.equal(sha256(withAutopilotTail(plain)), PINNED[template.id].autopilot, `${template.id}: Mint + Autopilot prompt bytes changed`);
+  }
+});
+
+// LIN-4317: the same pins, now through the one renderer the UI and the mint route both read. No new
+// hashes: matching PINNED is the parity claim (the renderer's output equals the composition's output).
+test('LIN-4317: renderPeriodicalPrompt matches the same pinned hashes for every id, plain and Mint + Autopilot', () => {
+  for (const template of getPeriodicals()) {
+    assert.equal(sha256(renderPeriodicalPrompt(template.id)), PINNED[template.id].plain, `${template.id}: renderer plain bytes changed`);
+    assert.equal(sha256(renderPeriodicalPrompt(template.id, { autopilot: false })), PINNED[template.id].plain, `${template.id}: renderer plain (autopilot: false) bytes changed`);
+    assert.equal(sha256(renderPeriodicalPrompt(template.id, { autopilot: true })), PINNED[template.id].autopilot, `${template.id}: renderer Mint + Autopilot bytes changed`);
   }
 });

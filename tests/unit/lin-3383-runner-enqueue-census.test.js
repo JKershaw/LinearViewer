@@ -176,7 +176,7 @@ const E_FILES = new Set(['routes/dispatch.js', 'routes/proxy-dispatch.js', 'rout
 const inW = (file) => isWorkspaceApiUnitFile(file);
 const siteOf = (file) => (inW(file) ? 'W' : file);
 const E_MEMBERS = [
-  { sink: 'createDispatchItem', verdict: 'gated', reason: 'session POST /api/dispatch (LIN-3383 owner gate: every browser launcher lands here) and the three proxy POSTs behind requireGrant(\'dispatch\') (LIN-3136; the grant is minted owner-checked only)' },
+  { sink: 'createDispatchItem', verdict: 'gated', reason: 'session POST /api/dispatch (LIN-3383 owner gate: every browser launcher lands here) and the four proxy POSTs behind requireGrant(\'dispatch\') (LIN-3136; the grant is minted owner-checked only)' },
   { sink: 'expandCascadeAborts', verdict: 'gated', reason: 'cascade abort expansion writes runner-consumed abort rows without the factory: the session POST behind the owner gate, the proxy POST behind the dispatch grant' },
   { sink: 'addFeedback', verdict: 'token-scoped', reason: 'runner/feedback-token write; comes from the runner itself, not a session' },
   { sink: 'setWorkspaceHalt', verdict: 'gated', reason: 'session halt POST: owner-only (LIN-3408), gate after mode validation and before the write' },
