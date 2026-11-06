@@ -35,6 +35,23 @@ describe('loadWorld — run(code) reaches script-scope bindings', () => {
   });
 });
 
+describe('loadWorld — window is the global object, as in a browser (LIN-4307)', () => {
+  test('a script\'s window.X = … is the bare X a later script reads', () => {
+    const world = loadWorld({ scripts: [] });
+    world.run('window.shared = function () { return "from the first script"; };');
+    assert.equal(world.run('shared()'), 'from the first script', 'a later script calls the bare name');
+    assert.equal(world.run('window === this'), true, 'window is the global object');
+  });
+
+  test('a window stub is a global too, and a later write to window.X replaces it', () => {
+    const world = loadWorld({ window: { relativeTime: () => 'stub' }, scripts: [] });
+    assert.equal(world.run('relativeTime()'), 'stub', 'the stub is readable bare');
+    world.run('window.relativeTime = () => "defined by a script";');
+    assert.equal(world.run('relativeTime()'), 'defined by a script', 'one binding, as in a browser');
+    assert.equal(world.window, world.sandbox);
+  });
+});
+
 describe('loadWorld — delegated clicks and DOMContentLoaded (LIN-4307)', () => {
   test('clickDelegated gives the click to document listeners with the target, and not to the target\'s own listeners', async () => {
     const { document } = loadWorld({ scripts: [] });

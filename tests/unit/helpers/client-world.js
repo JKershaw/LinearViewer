@@ -8,6 +8,11 @@
  * element-level click (its own listeners, no bubbling; LIN-4279). `click(dataset)` gives the drawn button
  * with those data attributes to the click listeners, and `key(k)` sends the key to the focused element, as a browser does.
  *
+ * `window` is the global object, as in a browser (LIN-4307): `world.window === world.sandbox`. A script's `window.X = …` is
+ * the bare `X` a later script reads, and a stub passed as `window` is a global too. A suite that stubs a name a loaded
+ * script also defines (common.js's `escapeHtml`, `relativeTime`) sets its stub after that script runs, as a browser
+ * page's later script would.
+ *
  * Usage: `const world = loadWorld({ window: { api }, scripts: ['question-cards.js', 'prompt-section.js'], timers });`
  * `world.PromptSection`, `world.document`, `world.window`, `world.makeContainer()`, `world.run(code)` (LIN-4280: a snippet in
  * the world's script scope, for the `let` bindings a context object cannot reach). `timers`, when given, collects the client's
@@ -55,18 +60,14 @@ export async function fireDOMContentLoaded(document) {
 }
 
 /**
- * A copy of `source` made from its property descriptors, never a spread. A spread reads every getter, so a throwing
- * `localStorage` getter would fire at copy time (lin-4035: "a storage that throws on read"). LIN-4279.
- */
-const copyByDescriptor = (source) => Object.defineProperties({}, Object.getOwnPropertyDescriptors(source));
-
-/**
  * @param {{window?: object, scripts?: string[], timers?: Array|null, globals?: object}} options
  *   `window` are the stubs the client calls on `window`; `scripts` are file names under `public/`; `globals` are extra sandbox
  *   globals (for example `CustomEvent`, `localStorage`) that a suite needs and the default set does not have.
  *
  *   `window` and `globals` are copied by property descriptor, never spread, so a getter that throws (a blocked
- *   `localStorage`) is not read at copy time (LIN-4279).
+ *   `localStorage`) is not read at copy time (LIN-4279): a spread would read every getter. Both are defined on the global,
+ *   which is `window` (LIN-4307), `globals` last; a `window` stub of a default's name (a `fetch` stub) is the one a bare
+ *   `fetch` reads, as in a browser.
  *
  *   Routes to `common.js` (LIN-4279). loadWorld runs a `public/` file as written and does not apply `withHarnessModels`:
  *   `common.js` throws at load unless `window.__HARNESS_MODELS__` is set. Either pass
@@ -86,9 +87,8 @@ const copyByDescriptor = (source) => Object.defineProperties({}, Object.getOwnPr
 export function loadWorld({ window: windowStubs = {}, scripts = ['prompt-section.js'], timers = null, globals = {} } = {}) {
   const dom = createFakeDom();
   const { document } = dom;
-  const window = copyByDescriptor(windowStubs);
   const sandbox = {
-    window, AbortController, URLSearchParams, TextDecoder, TextEncoder, Blob: class {}, URL,
+    AbortController, URLSearchParams, TextDecoder, TextEncoder, Blob: class {}, URL,
     document,
     requestAnimationFrame: (cb) => { cb(); return 1; },
     setTimeout: (fn, ms) => {
@@ -100,7 +100,10 @@ export function loadWorld({ window: windowStubs = {}, scripts = ['prompt-section
     fetch: async () => ({ ok: true, json: async () => ({}) }),
     console,
   };
+  Object.defineProperties(sandbox, Object.getOwnPropertyDescriptors(windowStubs));
   Object.defineProperties(sandbox, Object.getOwnPropertyDescriptors(globals));
+  // The global object is the window, as in a browser (LIN-4307).
+  sandbox.window = sandbox;
   vm.createContext(sandbox);
   for (const name of scripts) vm.runInContext(readFileSync(join(PUBLIC_DIR, name), 'utf8'), sandbox, { filename: name });
 
@@ -125,5 +128,5 @@ export function loadWorld({ window: windowStubs = {}, scripts = ['prompt-section
   // sets one, and `world.run('currentView')` reads it. Bindings persist across calls in the same world.
   const run = (code) => vm.runInContext(code, sandbox);
 
-  return { PromptSection: window.PromptSection, document, window, sandbox, makeContainer, run };
+  return { PromptSection: sandbox.PromptSection, document, window: sandbox, sandbox, makeContainer, run };
 }
