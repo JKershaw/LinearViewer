@@ -50,7 +50,6 @@ const EXCLUDED = new Set(['tests/unit/helpers/fake-dom.js', SELF]);
  * classification, beat 2); an entry with no comment is not yet classified as stopped.
  */
 const HAND_WRITTEN_FAKE_DOM_FILES = [
-  'tests/unit/close-out-client.test.js',
   'tests/unit/common-assignee-filter-nav.test.js', // stop: getBoundingClientRect in initNavBar, public/common.js:2907 (LIN-4271 stop rule)
   'tests/unit/common-team-filter-nav.test.js', // stop: getBoundingClientRect in initNavBar, public/common.js:2907 (LIN-4271 stop rule)
   'tests/unit/flight-companion-client.test.js', // stop: style write and layout read-back, public/flight-companion.js:653-665 (LIN-4271)

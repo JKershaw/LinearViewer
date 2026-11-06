@@ -70,13 +70,16 @@
     };
   }
 
-  /** Replace the box's dynamic content with one text line (no markup injection). */
+  /**
+   * Replace the box's dynamic content with one text line (no markup injection). One `replaceChildren` call clears every
+   * child and adds the line; a `firstChild` loop does the same in a browser, but the unit fake DOM does not model
+   * `firstChild` (it reads as undefined, so the loop clears nothing there). LIN-4312.
+   */
   function paint(box, testId, line) {
-    while (box.firstChild) box.removeChild(box.firstChild);
     const p = document.createElement('p');
     p.setAttribute('data-testid', testId);
     p.textContent = line;
-    box.appendChild(p);
+    box.replaceChildren(p);
   }
 
   /** Reflect a check result's state on the box. */
@@ -149,30 +152,30 @@
   /**
    * Whether the page is already showing the tracker as Done. Read off the task
    * page's `<main data-status>`. A second safeguard behind `doneNow` (B1'): a
-   * missing document (unit seams) or no `<main>` reports false.
+   * missing document or no `<main>` reports false.
    *
    * @param {Document} [doc]
    * @returns {boolean}
    */
   function pageAlreadyDone(doc) {
     const d = doc || (typeof document !== 'undefined' ? document : null);
-    if (!d || typeof d.querySelector !== 'function') return false;
+    if (!d) return false;
     const main = d.querySelector('[data-testid="task-page"]');
-    return !!(main && typeof main.getAttribute === 'function' && main.getAttribute('data-status') === 'done');
+    return !!(main && main.getAttribute('data-status') === 'done');
   }
 
   /**
    * Whether a text field on the page holds unsent text or has focus (LIN-3631).
    * A reload would discard it, so the Done reload below waits for the person.
    * Read-only fields (the share link's copy box) hold nothing to lose. A missing
-   * document or one without `querySelectorAll` (unit seams) reports false.
+   * document reports false.
    *
    * @param {Document} [doc]
    * @returns {boolean}
    */
   function pageHoldsDraft(doc) {
     const d = doc || (typeof document !== 'undefined' ? document : null);
-    if (!d || typeof d.querySelectorAll !== 'function') return false;
+    if (!d) return false;
     const fields = d.querySelectorAll('textarea, input[type="text"]');
     for (let i = 0; i < fields.length; i++) {
       const f = fields[i];
@@ -184,7 +187,7 @@
 
   /** Say, under the close-out box's line, that the page is behind and reloading would drop the draft. */
   function noteReloadDeferred(box) {
-    if (!box || typeof box.appendChild !== 'function') return;
+    if (!box) return;
     const p = document.createElement('p');
     p.setAttribute('data-testid', 'run-evidence-closeout-reload-note');
     p.textContent = 'Done — reload to update';

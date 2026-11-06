@@ -7,48 +7,61 @@
  * POST carry `?source=`/`{source}` when the box has one, and nothing when it
  * doesn't.
  *
- * A plain browser script, so the real shipped source runs in a vm sandbox.
+ * A plain browser script, so the real shipped source runs on `loadWorld` (LIN-4312): the
+ * shared fake DOM (`helpers/fake-dom.js`) over a vm sandbox. The close-out box is the
+ * server's own renderer output (`renderCloseOutBox`), parsed into the world's document, so
+ * no test hand-writes the box's markup.
  *
  * Run with: node --test tests/unit/close-out-client.test.js
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { loadWorld } from './helpers/client-world.js';
+import { renderCloseOutBox } from '../../lib/render-run-evidence.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(__dirname, '../../public/close-out.js'), 'utf8');
+/** Silences the client's `console.error` in the refusal tests; everything else is the real console. */
+const SILENT_CONSOLE = { ...console, error() {} };
 
-function load({ window = {}, document } = {}) {
-  const module = { exports: {} };
-  const doc = document || {
-    createElement() { return { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, textContent: '' }; },
-    addEventListener() {},
-  };
-  vm.runInNewContext(SRC, {
-    module, window, document: doc, URLSearchParams, console, setTimeout, clearTimeout, Promise,
-    Array, String, encodeURIComponent,
-  });
-  return module.exports;
+/**
+ * `public/close-out.js` on loadWorld, with the window stubs the suite names. The script's own `window.CloseOut` is what the
+ * suite reads (`world.window.CloseOut`), so nothing is re-implemented here.
+ */
+function loadCloseOut({ window = {}, globals = {} } = {}) {
+  return loadWorld({ scripts: ['close-out.js'], window: { console: SILENT_CONSOLE, ...window }, globals });
 }
 
-/** A box that reports the given attributes. */
-function box(attrs) {
-  return {
-    firstChild: null,
-    getAttribute: (k) => (k in attrs ? attrs[k] : null),
-    setAttribute() {},
-    appendChild() {},
-    removeChild() {},
-  };
+/** The server's close-out box for `state` (with the task's identity), parsed into the world's document. */
+function mountBox(world, state, opts = {}) {
+  const host = world.document.createElement('div');
+  world.document.body.appendChild(host);
+  host.innerHTML = renderCloseOutBox(state, opts);
+  return host.querySelector('[data-testid="run-evidence-closeout"]');
+}
+
+/** A task page's `<main data-status>` with `inner` markup, parsed into the world's document: the page the Done guard reads. */
+function mountPage(world, status, inner = '') {
+  const host = world.document.createElement('div');
+  world.document.body.appendChild(host);
+  host.innerHTML = `<main data-testid="task-page" data-status="${status}">${inner}</main>`;
+  return host.querySelector('main');
 }
 
 const UUID = '11111111-2222-3333-4444-555555555555';
+const PR_URL = 'https://github.com/acme/app/pull/41';
+
+/** A standard stop-at-PR run whose PR is ready: the state the server renders the close-out box from. */
+const READY = {
+  owner: true,
+  urlKey: 'acme',
+  issueIdentifier: 'LIN-50',
+  stopAt: 'pr',
+  variant: 'standard',
+  status: 'ready',
+  pr: { url: PR_URL, headSha: 'abc1234' },
+};
 
 describe('close-out.js: URLs and bodies thread source', () => {
-  const { promptUrl, checkUrl, checkBody } = load();
+  const { promptUrl, checkUrl, checkBody } = loadCloseOut().window.CloseOut;
 
   test('promptUrl carries ?source when present, bare otherwise', () => {
     assert.equal(promptUrl('acme', UUID, 'linear'), `/workspace/acme/api/prompt/${UUID}/close-out?source=linear`);
@@ -68,16 +81,10 @@ describe('close-out.js: URLs and bodies thread source', () => {
 });
 
 describe('close-out.js: boxContext reads only the box', () => {
-  const { boxContext } = load();
   test('reads identity and state off the attributes', () => {
-    const ctx = boxContext(box({
-      'data-url-key': 'acme',
-      'data-issue-id': UUID,
-      'data-issue-identifier': 'LIN-50',
-      'data-source': 'linear',
-      'data-stop-at': 'pr',
-      'data-state': 'ready',
-    }));
+    const world = loadCloseOut();
+    const box = mountBox(world, READY, { issueId: UUID, source: 'linear' });
+    const ctx = world.window.CloseOut.boxContext(box);
     assert.deepEqual(JSON.parse(JSON.stringify(ctx)), { urlKey: 'acme', issueId: UUID, issueIdentifier: 'LIN-50', source: 'linear', stopAt: 'pr', state: 'ready' });
   });
 });
@@ -85,25 +92,20 @@ describe('close-out.js: boxContext reads only the box', () => {
 describe('close-out.js: the press (the 8 Oct witness)', () => {
   test('presses from the box with no reply box in the DOM', async () => {
     const calls = [];
-    const window = {
-      api(url, opts) {
-        calls.push({ url, opts });
-        if (url.includes('/api/prompt/')) return Promise.resolve({ prompt: 'P', promptName: 'close-out', issueTitle: 'T' });
-        if (url.includes('/close-out-press')) return Promise.resolve({ success: true });
-        return Promise.resolve({});
+    const world = loadCloseOut({
+      window: {
+        api(url, opts) {
+          calls.push({ url, opts });
+          if (url.includes('/api/prompt/')) return Promise.resolve({ prompt: 'P', promptName: 'close-out', issueTitle: 'T' });
+          if (url.includes('/close-out-press')) return Promise.resolve({ success: true });
+          return Promise.resolve({});
+        },
+        dispatchPrompt(arg) { calls.push({ dispatch: arg }); return Promise.resolve({ id: 'd1' }); },
       },
-      dispatchPrompt(arg) { calls.push({ dispatch: arg }); return Promise.resolve({ id: 'd1' }); },
-    };
-    const { pressCloseOut } = load({ window });
-    const btn = { textContent: '[ close out & merge ]', disabled: false };
-    await pressCloseOut(box({
-      'data-url-key': 'acme',
-      'data-issue-id': UUID,
-      'data-issue-identifier': 'LIN-50',
-      'data-source': 'linear',
-      'data-pr-url': 'https://github.com/acme/app/pull/41',
-      'data-head-sha': 'abc1234',
-    }), btn);
+    });
+    const box = mountBox(world, READY, { issueId: UUID, source: 'linear' });
+    const btn = box.querySelector('[data-action="closeout-press"]');
+    await world.window.CloseOut.pressCloseOut(box, btn);
 
     assert.equal(calls[0].url, `/workspace/acme/api/prompt/${UUID}/close-out?source=linear`, 'the prompt GET carries source');
     assert.equal(calls[1].dispatch.kind, 'close-out');
@@ -111,95 +113,88 @@ describe('close-out.js: the press (the 8 Oct witness)', () => {
     assert.equal(calls[1].dispatch.issue.source, 'linear');
     const press = calls.find(c => c.url && c.url.includes('/close-out-press'));
     assert.ok(press, 'the press is recorded');
-    assert.deepEqual(JSON.parse(press.opts.body), { prUrl: 'https://github.com/acme/app/pull/41', headSha: 'abc1234', dispatchId: 'd1' });
+    assert.deepEqual(JSON.parse(press.opts.body), { prUrl: PR_URL, headSha: 'abc1234', dispatchId: 'd1' });
     assert.equal(btn.textContent, 'close-out sent ✓');
   });
 
   test('a source-less box sends no source (unchanged behaviour)', async () => {
     const calls = [];
-    const window = {
-      api(url, opts) { calls.push({ url, opts }); return Promise.resolve(url.includes('/api/prompt/') ? { prompt: 'P' } : {}); },
-      dispatchPrompt() { return Promise.resolve({}); },
-    };
-    const { pressCloseOut } = load({ window });
-    await pressCloseOut(box({ 'data-url-key': 'acme', 'data-issue-id': UUID, 'data-issue-identifier': 'LIN-50' }), { textContent: 'x', disabled: false });
+    const world = loadCloseOut({
+      window: {
+        api(url, opts) { calls.push({ url, opts }); return Promise.resolve(url.includes('/api/prompt/') ? { prompt: 'P' } : {}); },
+        dispatchPrompt() { return Promise.resolve({}); },
+      },
+    });
+    const box = mountBox(world, READY, { issueId: UUID });
+    await world.window.CloseOut.pressCloseOut(box, box.querySelector('[data-action="closeout-press"]'));
     assert.equal(calls[0].url, `/workspace/acme/api/prompt/${UUID}/close-out`);
   });
 });
 
 describe('close-out.js: a not-ready refusal (LIN-3634)', () => {
   function pressWith(rejection) {
-    const attrs = { 'data-url-key': 'acme', 'data-issue-id': UUID, 'data-issue-identifier': 'LIN-50', 'data-state': 'ready' };
-    const painted = [];
-    const b = {
-      firstChild: null,
-      getAttribute: (k) => (k in attrs ? attrs[k] : null),
-      setAttribute(k, v) { attrs[k] = v; },
-      appendChild(el) { painted.push(el); },
-      removeChild() {},
-    };
-    const window = {
-      api() { return Promise.resolve({ prompt: 'P' }); },
-      dispatchPrompt() { return Promise.reject(rejection); },
-    };
-    const btn = { textContent: 'close out', disabled: false };
-    const quiet = { ...console, error() {} };
-    const module = { exports: {} };
-    vm.runInNewContext(SRC, {
-      module, window, console: quiet, URLSearchParams, setTimeout, clearTimeout, Promise, Array, String, encodeURIComponent,
-      document: { createElement() { return { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, textContent: '' }; }, addEventListener() {} },
+    const world = loadCloseOut({
+      window: {
+        api() { return Promise.resolve({ prompt: 'P' }); },
+        dispatchPrompt() { return Promise.reject(rejection); },
+      },
     });
-    return { run: () => module.exports.pressCloseOut(b, btn), attrs, painted, btn };
+    const box = mountBox(world, READY, { issueId: UUID, source: 'linear' });
+    const btn = box.querySelector('[data-action="closeout-press"]');
+    return { run: () => world.window.CloseOut.pressCloseOut(box, btn), box, btn };
   }
 
   test('a 409 CLOSE_OUT_NOT_READY repaints the box from the refusal state and re-enables the button', async () => {
     const err = Object.assign(new Error('The pull request changed since the review approved it'), {
       body: { code: 'CLOSE_OUT_NOT_READY', reason: 'head-moved', state: { status: 'not-ready', reason: 'head-moved' } },
     });
-    const { run, attrs, painted, btn } = pressWith(err);
+    const { run, box, btn } = pressWith(err);
     await run();
-    assert.equal(attrs['data-state'], 'not-ready');
-    assert.equal(painted.length, 1, 'the box shows the not-ready line');
+    assert.equal(box.getAttribute('data-state'), 'not-ready');
+    assert.equal(box.children.length, 1, 'the box shows one line: the not-ready line');
+    assert.equal(box.children[0].getAttribute('data-testid'), 'run-evidence-closeout-setup');
     assert.equal(btn.disabled, false);
-    assert.equal(btn.textContent, 'close out');
+    assert.equal(btn.textContent, '[ close out & merge ]');
   });
 
   test('any other failure leaves the box as it was', async () => {
-    const { run, attrs, painted } = pressWith(Object.assign(new Error('nope'), { body: { code: 'SOMETHING_ELSE' } }));
+    const { run, box } = pressWith(Object.assign(new Error('nope'), { body: { code: 'SOMETHING_ELSE' } }));
+    const before = box.outerHTML;
     await run();
-    assert.equal(attrs['data-state'], 'ready');
-    assert.equal(painted.length, 0);
+    assert.equal(box.getAttribute('data-state'), 'ready');
+    assert.equal(box.outerHTML, before);
   });
 });
 
 describe('close-out.js: the check', () => {
   test('only a stop-at-PR run at ready/merged/partial checks, and the body carries source', async () => {
     const calls = [];
-    const window = {
-      api(url, opts) { calls.push({ url, opts }); return Promise.resolve({ state: { status: 'ready' }, done: false }); },
-      location: { reload() {} },
-    };
-    const { runCheck } = load({ window });
-    const ready = box({ 'data-url-key': 'acme', 'data-issue-identifier': 'LIN-50', 'data-source': 'linear', 'data-stop-at': 'pr', 'data-state': 'ready' });
-    await runCheck(ready);
+    const world = loadCloseOut({
+      window: {
+        api(url, opts) { calls.push({ url, opts }); return Promise.resolve({ state: { status: 'ready' }, done: false }); },
+        location: { reload() {} },
+      },
+    });
+    const { runCheck } = world.window.CloseOut;
+    await runCheck(mountBox(world, READY, { issueId: UUID, source: 'linear' }));
     assert.equal(calls.length, 1);
     assert.equal(calls[0].url, '/workspace/acme/api/run-evidence/LIN-50/check');
     assert.deepEqual(JSON.parse(calls[0].opts.body), { source: 'linear' });
 
     // An ordinary run (no stop-at) never checks.
-    const ordinary = box({ 'data-url-key': 'acme', 'data-issue-identifier': 'LIN-50', 'data-state': 'ready' });
-    await runCheck(ordinary);
+    await runCheck(mountBox(world, { ...READY, stopAt: null }, { issueId: UUID }));
     assert.equal(calls.length, 1, 'no check for a non-stop-at run');
   });
 
   test('a done result reloads so the tracker Finished header shows', async () => {
     let reloads = 0;
-    const window = {
-      api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: true }); },
-      location: { reload() { reloads++; } },
-    };
-    const { runCheck } = load({ window });
-    await runCheck(box({ 'data-url-key': 'acme', 'data-issue-identifier': 'LIN-50', 'data-stop-at': 'pr', 'data-state': 'ready' }));
+    const world = loadCloseOut({
+      window: {
+        api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: true }); },
+        location: { reload() { reloads++; } },
+      },
+    });
+    await world.window.CloseOut.runCheck(mountBox(world, READY));
     assert.equal(reloads, 1);
   });
 
@@ -211,13 +206,14 @@ describe('close-out.js: the check', () => {
    */
   test('a done result from an already-recorded merge (doneNow:false) makes 0 reloads', async () => {
     let reloads = 0;
-    const window = {
-      api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: false }); },
-      location: { reload() { reloads++; } },
-    };
-    const { runCheck } = load({ window });
-    const doc = { querySelector: () => ({ getAttribute: () => 'idle' }) };
-    await runCheck(box({ 'data-url-key': 'acme', 'data-issue-identifier': 'LIN-50', 'data-stop-at': 'pr', 'data-state': 'merged' }), doc);
+    const world = loadCloseOut({
+      window: {
+        api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: false }); },
+        location: { reload() { reloads++; } },
+      },
+    });
+    mountPage(world, 'idle');
+    await world.window.CloseOut.runCheck(mountBox(world, { ...READY, status: 'merged' }), world.document);
     assert.equal(reloads, 0, 'a recorded Done must not reload a page the tracker reopened');
   });
 
@@ -227,35 +223,46 @@ describe('close-out.js: the check', () => {
    */
   test('a doneNow result on a page already showing done makes 0 reloads', async () => {
     let reloads = 0;
-    const window = {
-      api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: true }); },
-      location: { reload() { reloads++; } },
-    };
-    const { runCheck, pageAlreadyDone } = load({ window });
-    const main = { getAttribute: (k) => (k === 'data-status' ? 'done' : null) };
-    const doc = { querySelector: (sel) => (sel === '[data-testid="task-page"]' ? main : null) };
-    assert.equal(pageAlreadyDone(doc), true);
-    await runCheck(box({ 'data-url-key': 'acme', 'data-issue-identifier': 'LIN-50', 'data-stop-at': 'pr', 'data-state': 'merged' }), doc);
+    const world = loadCloseOut({
+      window: {
+        api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: true }); },
+        location: { reload() { reloads++; } },
+      },
+    });
+    const { runCheck, pageAlreadyDone } = world.window.CloseOut;
+    mountPage(world, 'done');
+    assert.equal(pageAlreadyDone(world.document), true);
+    await runCheck(mountBox(world, { ...READY, status: 'merged' }), world.document);
     assert.equal(reloads, 0, 'no reload loop on the end state the feature exists for');
   });
 
   test('pageAlreadyDone is false without a main / status / document', () => {
-    const { pageAlreadyDone } = load();
-    assert.equal(pageAlreadyDone(), false);
-    assert.equal(pageAlreadyDone({ querySelector: () => null }), false);
-    assert.equal(pageAlreadyDone({ querySelector: () => ({ getAttribute: () => 'idle' }) }), false);
-    assert.equal(pageAlreadyDone({ querySelector: () => ({ getAttribute: () => 'done' }) }), true);
+    const noMain = loadCloseOut();
+    assert.equal(noMain.window.CloseOut.pageAlreadyDone(noMain.document), false, 'no <main>');
+
+    const notDone = loadCloseOut();
+    mountPage(notDone, 'idle');
+    assert.equal(notDone.window.CloseOut.pageAlreadyDone(notDone.document), false, 'a main that is not done');
+
+    const done = loadCloseOut();
+    mountPage(done, 'done');
+    assert.equal(done.window.CloseOut.pageAlreadyDone(done.document), true, 'a main that is done');
+
+    // No document at all: the sandbox's `document` global is removed, as a page without one has none.
+    const noDocument = loadCloseOut({ globals: { document: undefined } });
+    assert.equal(noDocument.window.CloseOut.pageAlreadyDone(), false, 'no document');
   });
 
   test('a doneNow result reloads once on a page not yet done (In Progress → Done)', async () => {
     let reloads = 0;
-    const window = {
-      api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: true }); },
-      location: { reload() { reloads++; } },
-    };
-    const { runCheck } = load({ window });
-    const doc = { querySelector: () => ({ getAttribute: () => 'running' }) };
-    await runCheck(box({ 'data-url-key': 'acme', 'data-issue-identifier': 'LIN-50', 'data-stop-at': 'pr', 'data-state': 'merged' }), doc);
+    const world = loadCloseOut({
+      window: {
+        api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: true }); },
+        location: { reload() { reloads++; } },
+      },
+    });
+    mountPage(world, 'running');
+    await world.window.CloseOut.runCheck(mountBox(world, { ...READY, status: 'merged' }), world.document);
     assert.equal(reloads, 1);
   });
 
@@ -265,48 +272,47 @@ describe('close-out.js: the check', () => {
    * one does not.
    */
   describe('the Done reload leaves unsent text alone (LIN-3631)', () => {
-    const attrs = { 'data-url-key': 'acme', 'data-issue-identifier': 'LIN-50', 'data-stop-at': 'pr', 'data-state': 'merged' };
-
-    async function checkWith(fields, activeElement) {
+    /**
+     * A running page holding `fieldsHtml`, then a doneNow check on it. `focus` is the index of the field that has focus;
+     * `readOnly` lists the indexes whose `readOnly` is set.
+     */
+    async function checkWith(fieldsHtml, { focus = -1, readOnly = [] } = {}) {
       let reloads = 0;
-      const window = {
-        api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: true }); },
-        location: { reload() { reloads++; } },
-      };
-      const notes = [];
-      const document = {
-        createElement() { return { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, textContent: '' }; },
-        addEventListener() {},
-      };
-      const { runCheck } = load({ window, document });
-      const doc = {
-        querySelector: () => ({ getAttribute: () => 'running' }),
-        querySelectorAll: () => fields,
-        activeElement,
-      };
-      const b = box(attrs);
-      b.appendChild = (n) => notes.push(n);
-      await runCheck(b, doc);
-      return { reloads, notes };
+      const world = loadCloseOut({
+        window: {
+          api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: true }); },
+          location: { reload() { reloads++; } },
+        },
+      });
+      mountPage(world, 'running', fieldsHtml);
+      const fields = world.document.querySelectorAll('textarea, input');
+      // The fake DOM does not model `readOnly`: reading it returns undefined even when the `readonly` attribute is set,
+      // and the fake does not map the attribute (a fake gap, recorded in the PR; not widened here). The property the
+      // browser derives from the attribute is set directly, so the assertion's branch is the one the page takes.
+      for (const i of readOnly) fields[i].readOnly = true;
+      if (focus >= 0) fields[focus].focus();
+      const box = mountBox(world, { ...READY, status: 'merged' });
+      await world.window.CloseOut.runCheck(box, world.document);
+      return { reloads, box };
     }
 
     test('a field holding text defers the reload and shows the note', async () => {
-      const { reloads, notes } = await checkWith([{ value: 'half typed' }], null);
+      const { reloads, box } = await checkWith('<textarea>half typed</textarea>');
       assert.equal(reloads, 0);
+      const notes = box.querySelectorAll('[data-testid="run-evidence-closeout-reload-note"]');
       assert.equal(notes.length, 1);
       assert.equal(notes[0].textContent, 'Done — reload to update');
     });
 
     test('an empty but focused field defers the reload', async () => {
-      const field = { value: '' };
-      const { reloads } = await checkWith([field], field);
+      const { reloads } = await checkWith('<input type="text">', { focus: 0 });
       assert.equal(reloads, 0);
     });
 
     test('read-only and empty unfocused fields do not hold the reload', async () => {
-      const { reloads, notes } = await checkWith([{ value: 'https://x/share', readOnly: true }, { value: '' }], null);
+      const { reloads, box } = await checkWith('<input type="text" value="https://x/share" readonly><input type="text">', { readOnly: [0] });
       assert.equal(reloads, 1);
-      assert.equal(notes.length, 0);
+      assert.equal(box.querySelectorAll('[data-testid="run-evidence-closeout-reload-note"]').length, 0);
     });
   });
 });
@@ -315,26 +321,15 @@ describe('close-out.js: applyCloseOutState repaints a merge neutrally', () => {
   // LIN-3426: a merged PR reads the same for every viewer, so the repaint never
   // claims the viewer merged it.
   test('a ready → merged transition paints the neutral line, never "merged by you"', () => {
-    const document = {
-      createElement() { return { setAttribute(k, v) { this[k] = v; }, textContent: '' }; },
-      addEventListener() {},
-    };
-    const { applyCloseOutState } = load({ document });
-    const appended = [];
-    const attrs = { 'data-state': 'ready' };
-    const b = {
-      firstChild: null,
-      getAttribute: (k) => (k in attrs ? attrs[k] : null),
-      setAttribute(k, v) { attrs[k] = v; },
-      appendChild(child) { appended.push(child); },
-      removeChild() {},
-    };
-    applyCloseOutState(b, { status: 'merged', message: 'PR #12 merged' });
-    assert.equal(attrs['data-state'], 'merged');
-    assert.equal(appended.length, 1);
-    assert.equal(appended[0]['data-testid'], 'run-evidence-closeout-neutral');
-    assert.equal(appended[0].textContent, 'PR #12 merged');
-    assert.doesNotMatch(appended[0].textContent, /merged by you|you merged/i);
-    assert.doesNotMatch(String(appended[0]['data-testid']), /merged-by-you/);
+    const world = loadCloseOut();
+    const box = mountBox(world, READY);
+    world.window.CloseOut.applyCloseOutState(box, { status: 'merged', message: 'PR #12 merged' });
+    assert.equal(box.getAttribute('data-state'), 'merged');
+    assert.equal(box.children.length, 1);
+    const line = box.children[0];
+    assert.equal(line.getAttribute('data-testid'), 'run-evidence-closeout-neutral');
+    assert.equal(line.textContent, 'PR #12 merged');
+    assert.doesNotMatch(line.textContent, /merged by you|you merged/i);
+    assert.doesNotMatch(line.getAttribute('data-testid'), /merged-by-you/);
   });
 });
