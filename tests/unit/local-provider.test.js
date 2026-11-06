@@ -294,6 +294,11 @@ describe('LocalProvider proxy surface (LIN-583)', () => {
     assert.equal(blocked.inverseRelations.nodes[0].issue.id, 'i1');
   });
 
+  test('issueDetail and relations carry no truncated flag (LIN-4322: Local never cuts a list)', async () => {
+    assert.equal('truncated' in await provider.issueDetail(SCOPE, 'LOCAL-1'), false);
+    assert.equal('truncated' in await provider.relations(SCOPE, 'i1'), false);
+  });
+
   test('issueDetail returns null for a missing issue', async () => {
     assert.equal(await provider.issueDetail(SCOPE, 'nope'), null);
   });
