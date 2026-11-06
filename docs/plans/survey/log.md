@@ -2374,3 +2374,6 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 ### 22:05 UTC: a ruling from LIN-4307 (piece 1): the stop rule worked
 - `lin4307-window-global`: making `loadWorld`'s `window` the global breaks `observation-ruling-delivery`, whose stub of the bare `relativeTime` (set before `common.js`) is overwritten by `common.js`'s `window.relativeTime`. The builder stopped and asked, as the 21:35 call said to.
 - **Proposed `fix-suite-stub-order`:** in a browser `common.js` would overwrite that stub too, so the suite relied on the copy model's isolation, which isn't browser-faithful. The stub goes after `common.js` and before the script under test (in case it captures `relativeTime` at load), names and asserts kept. The global goes into `loadWorld` once, pinned in `client-world.test.js`, and later pieces inherit it.
+
+### 00:05 UTC, 6 Nov: held on two rulings
+- LIN-4307 (piece 1) has been blocked since 22:05 on two `resume` rulings. My `fix-suite-stub-order` is on `lin4307-window-global`; its own review's `fix-here` is on `lin4307-loader-scope` (do loader fix #1 here, move `laneNode` to LIN-4310, swap `lin-3254`'s hand-drawn card for `renderSessionPage` markup), and I agree with it. The chain waits for John. The watcher reached its two-hour limit and wasn't restarted. The notes' in-flight list is refreshed.
