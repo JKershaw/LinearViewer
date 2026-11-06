@@ -2462,3 +2462,13 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   **The real cure filed as LIN-4318:** the app mints Periodicals by id, so no grant decision reads prompt text. It runs after LIN-4317, one ticket per concern.
 - 11:00: LIN-4309 (piece 3, `question-card-task-bound`) merged (`8b84a8fe`). The paper (LIN-4315) is held on John's `lin4315-blind-prompt` ruling (suggested: supply).
 - 11:05: **LIN-4313 is live** (production at `c491eca5`). An unknown id gives 404 with nothing enqueued. `periodical.sh` is now a one-call wrapper over the route (no checkout, no render, and with `--autopilot` no manual kickoff). The process John asked to make easier is now Harbour's own.
+- 11:30: **LIN-4317 merged (`f2816e17`):**
+  - one `declaresPeriodicalGrant`, carrying the preconditions plus the variant, which both lanes call, with the PR saying plainly that the session lane still learns the variant from text (LIN-4318);
+  - `isAutopilotVariant` beside `withAutopilotTail`, and the entrance no longer imports the tail;
+  - `getPeriodical(id)`; `structuralRuleFor(subject)`, with the generic rule left and its reason given;
+  - the declaration literal left for F3;
+  - the gate suites list the mint mount (`route` and `path` split), with the false "three" wording fixed;
+  - the renderer pinned to the same hashes;
+  - the docs pointer.
+
+  Blind reads sent: LIN-4317 alone, AS and AT; LIN-4313 + LIN-4317 as one change, AU and AV. LIN-4313 alone was mixed, mixed.
