@@ -2,7 +2,7 @@
 
 *Working document, started 2 November 2026 by John Kershaw and Claude. It records what we know, what we think, and the spikes we plan. It is updated as the spikes run, and it is a reference, not a spec.*
 
-> **Where it stands (5 November).** The spikes below have run, and the Survey has grown into a loop: two read-only voices before work (open-0 for the task, a code-only global for the place), a scope call by the person, the build, and a place reading plus the builder's after-questions at merge. Over 4–5 November the place ledger went from 1 better / 1 mixed / 3 neutral / 4 worse (the baseline) to 17 better / 3 mixed / 1 neutral / 0 worse through the loop. The current picture is `survey/notes-2026-11-05.md`; the record is `survey/log.md`, `survey/place-ledger.md` and `survey/broad-options.md`; the prompts are `survey/prompt.md`. The next step is moving the two Survey voices into Harbour as stages that are triggered by hand. The rest of this document is the plan as it was written, kept for reference: its menu-based Survey was replaced by the open question, and its "What it reads" by the code alone.
+> **Where it stands.** The balances for this loop are in the paper [Can a task finish with the codebase cleaner than it started?](../papers/harbour/cleaner-than-it-started.md): the blind reads, the Periodicals and the limits. The place ledger keeps its rows, and this notebook does not restate their tally.
 
 ## Why this exists
 
