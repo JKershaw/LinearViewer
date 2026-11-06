@@ -2387,3 +2387,12 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - **LIN-4304's builder, on the tidy-after q7:** the removals alone, no (21 lines carried by Surveys, reads, a plan and a full verification cycle); the check is the lasting part. "What would have made this smaller: building the scanner first in LIN-4292, so its edges came from a list rather than from a reviewer's read." Also honest about a departure: it ran the full suite once at the end rather than each owning suite after each file. The scan found 23 sites against my hand count of about 17.
 - **LIN-4296's builder:** fidelity bound twice where the spec reading disagreed with Chromium (`option.selected = true` wins whatever the order; removing the `selected` attribute unselects even a dirty option). Only the probes caught that. **A new untracked stop:** `public/ship.js:1154` calls `select.remove(1)`, which the fake now refuses by name. The plan's "witnesses inside the moved suites" collided with "counts unchanged", which is why the ticket-named files exist (the 21:10 rule revision covers it).
 - **The rule, from two builders independently:** **a sweep starts by writing its check. The check's hit list at the base is the work list, and the check passing is done. A grep is not a definition of done.** It also generalises the census ratchet: the check that holds the line afterwards is the same thing that defines the work before.
+
+### 08:00 UTC, 6 Nov: John on the next steps
+- **The Periodical route: filed as LIN-4313** (Backlog), Surveyed (`38b987e2`, `328f041d`). It's a proxy route that mints a Periodical by registry id, plain or + Autopilot, as the UI does, with an optional operator note. It retires `periodical.sh`'s checkout render and the hand kickoff. Scope when the Surveys land.
+- **Integration:** John: "perhaps *how* we do this is best left until after the write-up", and it's a new feature, so adding or tweaking things is fine. The human calls stay human, either "a human call (nice UI, etc)" or "like this session runs: a human instructs/gives authority to an agent". So the authority grant is itself one of the human calls. Deferred until after the write-up, as he says.
+- **The write-up, in two pieces:**
+  - **a technical paper covering everything;**
+  - **an essay for a fresh human reader:** narrative, big-picture framing, visual storytelling.
+
+  The paper comes first, and the essay draws on it and cites it.
