@@ -309,6 +309,8 @@ describe('LIN-4313 — unknown id and the operator note', () => {
     ['an ESC', 'a\u001bb'],
     ['a C1 control', 'a\u0085b'],
     ['DEL', 'a\u007fb'],
+    ['a U+2028 line separator', 'a\u2028b'],
+    ['a U+2029 paragraph separator', 'a\u2029b'],
     ['an empty string', ''],
     ['a number', 123],
     ['an array', ['a']],

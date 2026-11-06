@@ -1529,7 +1529,8 @@ is required (see "Enqueue routes and the dispatch grant" above).
 ```
 
 All fields are optional. `target`, `repo`, `model`, `harness` and `effort` are the execution fields
-the other enqueue routes take.
+the other enqueue routes take. A blank `harness` takes the proxy lane's default, `claude-code`; the
+app's Mint takes the dispatch page's selector instead.
 
 - **`autopilot`** (boolean, default `false`). `true` is the Mint + Autopilot variant: the prompt
   carries the autopilot handoff, and the run is dispatched holding the `dispatch` grant for your
