@@ -3,24 +3,31 @@
 // For every LinearViewer first-parent merge in the window, reads tests/unit/fake-dom-census.test.js
 // at that merge and records the HAND_WRITTEN_FAKE_DOM_FILES entries (movable vs `// stop:`).
 // Writes <out-dir>/git/census-by-merge.json and adds it to manifest.json's file list.
-// Usage: node docs/papers/harbour/cleaner-than-it-started-scripts/census-by-merge.mjs <out-dir>
+// Rewrites manifest.json (its read_at), so run it on a scratch copy of a frozen folder, never on a
+// committed one; analyse.mjs hashes manifest.json into inputs_sha256.
+// Usage: node docs/papers/harbour/cleaner-than-it-started-scripts/census-by-merge.mjs <out-dir> --inputs <file.json>
+// The window start and census pin come from the inputs file; the reason v1's inputs live in this
+// folder and not in v1's evidence folder is in inputs.mjs.
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { takeInputs, need } from './inputs.mjs';
+
+const { inputs: I, positional } = takeInputs(process.argv.slice(2), 'census-by-merge.mjs <out-dir>');
+const outDir = positional[0];
+if (!outDir) { console.error('usage: census-by-merge.mjs <out-dir> --inputs <file.json>'); process.exit(2); }
+const WINDOW_START = need(I, 'window_start');
+const CENSUS_PIN = need(I, 'census_pin');
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..', '..', '..', '..');
-const outDir = process.argv[2];
-if (!outDir) { console.error('usage: census-by-merge.mjs <out-dir>'); process.exit(2); }
 const CENSUS = 'tests/unit/fake-dom-census.test.js';
-const WINDOW_START = '2026-11-04T00:00:00Z';
-const LV_PIN = '1d10f9b3';
 
 const git = (args) => execFileSync('git', ['-C', REPO_ROOT, ...args], { encoding: 'utf8', maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'pipe'] });
-const shas = git(['log', '--first-parent', LV_PIN, `--since=${WINDOW_START}`, '--format=%H|%cI|%s'])
+const shas = git(['log', '--first-parent', CENSUS_PIN, `--since=${WINDOW_START}`, '--format=%H|%cI|%s'])
   .split('\n').filter(Boolean).map((l) => { const [sha, committed, ...s] = l.split('|'); return { sha, committed, subject: s.join('|') }; })
   .reverse(); // oldest first
 

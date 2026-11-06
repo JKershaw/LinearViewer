@@ -1,0 +1,46 @@
+{
+  "version": "v1",
+  "ticket": "LIN-4315",
+  "note": "Inputs for the v1 evidence folder cleaner-than-it-started-evidence/2026-11-06/. They live in the scripts folder, not in that folder, which must stay byte-identical. See the header of inputs.mjs for why.",
+  "window_start": "2026-11-04T00:00:00Z",
+  "lv_pin": "1d10f9b3",
+  "sd_pin": "07c88f7",
+  "census_pin": "1d10f9b3",
+  "parents": ["LIN-4144", "LIN-4195", "LIN-4233", "LIN-4254", "LIN-4255", "LIN-4271"],
+  "baseline_3nov_ids": ["LIN-4168", "LIN-4166", "LIN-4173", "LIN-4177"],
+  "baseline_3nov_window": { "since": "2026-11-02T00:00Z", "until": "2026-11-04T00:00Z" },
+  "baseline_3nov_file": "git/merges-LinearViewer-2026-11-02-03.tsv",
+  "ui_four": ["LIN-4106", "LIN-4107", "LIN-4110", "LIN-4040"],
+  "folded": ["LIN-4142", "LIN-4114", "LIN-4188"],
+  "context": ["LIN-4150", "LIN-4297"],
+  "blind": {
+    "ticket": "LIN-4150",
+    "expected_passes": 42,
+    "expected_batches": ["A", "B", "C", "D"],
+    "sessions": [
+      { "name": "pass-1 (batches A+B)", "batches": ["A", "B"] },
+      { "name": "pass-2 (batches C+D)", "batches": ["C", "D"] }
+    ],
+    "baseline_note": "Baseline = the ledger baseline window 015aa4c6..5334c81a (8 LinearViewer rows, all in the batches). Forward = every other row in the batches."
+  },
+  "periodicals": {
+    "linearviewer_end": "af55cb73",
+    "simple_dispatcher_run2": "d8d186c",
+    "simple_dispatcher_run3": "07c88f7"
+  },
+  "ticket_notes": {
+    "LIN-4254": "notebook and ticket say 22 (16 movable + 6 stop); the census file at 1d10f9b3 has 18 (12 movable + 6 stop)",
+    "LIN-4307": "the notebook ends at 08:00 UTC 6 Nov and still lists the LIN-4307 rulings as held; the code has LIN-4307 merged",
+    "LIN-4253": "lib/stage-writes.js is not placed on scripts/code-shape/areas.json (research §L9)"
+  },
+  "cost_groups": {
+    "baseline": "baseline",
+    "forward": "forward",
+    "five_nov_and_ordinary": "^5 Nov|^LIN-4255 fake|^ordinary"
+  },
+  "fake_dom_piece_group": "LIN-4255 fake-DOM move piece",
+  "named_costs": {
+    "LIN_4271_own_usd": "LIN-4271",
+    "parent_LIN_4255_usd": "LIN-4255"
+  }
+}
