@@ -2519,3 +2519,9 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - explicit order; docs in one place.
 - 13:00: LIN-4311 (piece 5, the task-page suites) merged (`90542b2c`). Only LIN-4312 is left (`close-out-client`, plus `close-out.js`'s production seams and their allow-list entries).
 - 13:10: **Next 2's result: the baseline pairs read better in both passes on 1 of 4** (pairs 1, 2 and 4 mixed, mixed; pair 3 better, better), against the after-step's 6 of 6. By the rule logged before reading, the after-step's effect is real against this baseline. The one better baseline pair (LIN-3717 → LIN-3722) was itself a consolidation, so it supports the mechanism (deleting copies) rather than a pairing artefact. That answers the paper's Limit "no like-for-like baseline for areas", partly: four pairs, one prompt. Ledger: "Next 2: a baseline for the area reads".
+- 13:45: **Seams & Tangles run 9 (LIN-4323, `fa3bd87a`), the independent reading after `af55cb73`**, which the paper's Next 3 asked for. Window `af55cb73 → 90542b2c`: the guard sweep, the `<select>` model, the mint route and its tidy-after, and LIN-4254's pieces to 5. **No area worse:**
+  - LLM & prompts **better** (watch `hub:periodicals.js`, 8 importers in 4 areas); Runs & dispatch **better**; Agent API **better**; Pages **better** by a small margin;
+  - Browser code **mixed, mostly better**: 50 method-presence guards deleted under an AST check, but one new test-only global, `window.LiveConsoleLane`. That's a residue for LIN-4297;
+  - the rest unchanged.
+
+  `seam:periodical-mint` is named healthy, its residue owned by LIN-4318. No follow-ups. The import graph moved by one edge, pointing the existing direction.
