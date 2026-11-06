@@ -53,7 +53,6 @@ const HAND_WRITTEN_FAKE_DOM_FILES = [
   'tests/unit/close-out-client.test.js',
   'tests/unit/common-assignee-filter-nav.test.js', // stop: getBoundingClientRect in initNavBar, public/common.js:2907 (LIN-4271 stop rule)
   'tests/unit/common-team-filter-nav.test.js', // stop: getBoundingClientRect in initNavBar, public/common.js:2907 (LIN-4271 stop rule)
-  'tests/unit/dashboard-routes.test.js',
   'tests/unit/flight-companion-client.test.js', // stop: style write and layout read-back, public/flight-companion.js:653-665 (LIN-4271)
   'tests/unit/lin-2122-history-outcome-pill.test.js',
   'tests/unit/lin-2370-browser-copy-prompt-provider-identity.test.js',
