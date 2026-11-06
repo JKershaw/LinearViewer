@@ -2546,3 +2546,21 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   It agrees with the ledger on every ticket it could read. Top new finding: the enqueue-route list is restated in 10 prose places, 4 stale (home LIN-4320, whose acceptance grep would miss all four). That's the derived-list case again.
 - 15:05: **LIN-4322 deployed (`badec1fb`), and the live check passes:** `GET /issues/LIN-4150` returns **143 comments** (from 2 Nov 21:44), with no truncation flag. Live Linear accepted the paged queries, and the pre-5-Nov Surveys are visible again.
 - 15:05: LIN-4254's after-questions go to its last piece's builder (LIN-4312, `4b03a6bc`), q1–q7, answering for the whole move where it helps.
+
+### 15:20 UTC: John on the paper ("reads like not much improved"); the essay filed
+- **John:** the paper reads as though not much improved, perhaps because it's formal reporting; "happy to see where the essay lands".
+- **Why it reads flat (my reading):**
+  - it leads with "Tasks on average: not shown", the literal answer, so everything after reads as a hedge;
+  - it was written against advocacy (the Survey and my scope both said so);
+  - it was **frozen before the strongest evidence**: the baseline (7 of 7 against 1 of 4) and the independent readings after `af55cb73` (Seams run 9, Drift run 5);
+  - it scores signs and *n*, but never says plainly what the tidier code looks like (56 → 6 fakes, about 50 dead guards gone under a check, one grant rule, a hidden gate bug fixed).
+- **The essay, LIN-4330,** filed and Surveyed:
+  - a sequel to *Tasks are tasks*, for a fresh reader;
+  - the argument that finished moves leave areas cleaner, small but real and robust to reading;
+  - the post-freeze evidence included;
+  - the concrete changes shown;
+  - the human's own instructions inviting copies as the turn, with mistakes as the case for structure;
+  - 2–4 generated SVG figures (the Library serves `figures/<slug>/*.svg`);
+  - neither oversold nor undersold;
+  - two fresh readers (one new to Harbour, one for accuracy).
+- **Candidate, later:** a short v1.1 addendum to the paper recording the baseline and the post-freeze readings, so the record isn't more pessimistic than the evidence.
