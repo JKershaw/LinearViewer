@@ -142,7 +142,7 @@ function censusFigure() {
 
 // ---------- figure 1: the loop, before / during / after ----------
 function loopFigure() {
-  const W = 960, H = 330;
+  const W = 960, H = 350;
   const o = [svgOpen(W, H, 'The loop as it ran on 5 November, in three stages: before the work a read-only Survey and a scope call; during the work a tidy first where the change binds, then the change; at merge two blind reads and the builder\'s answers; after the merge a tidy-after of the copies left at the edges. A dashed line returns from the tidy-after to the next ticket in the same area.')];
   o.push(`<defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="${MUTED}"/></marker></defs>`);
   const wrap = (t, n) => { const words = t.split(' '); const lines = ['']; for (const w of words) { if ((lines[lines.length - 1] + ' ' + w).trim().length > n) lines.push(w); else lines[lines.length - 1] = (lines[lines.length - 1] + ' ' + w).trim(); } return lines; };
@@ -151,7 +151,7 @@ function loopFigure() {
     { title: 'During the work', x: 330, items: ['A tidy first, as its own task, where the change binds', 'Then the change itself, re-surveyed on the tidied ground'], fill: '#f3f4f6', stroke: GREY },
     { title: 'At merge', x: 640, items: ['Two blind reads of the commit, from its code alone', "The builder's after-answers, once the work's lineage has ended"], fill: '#f3f4f6', stroke: GREY },
   ];
-  const colW = 300, colY = 58, colH = 150;
+  const colW = 290, colY = 58, colH = 150;
   for (const c of cols) {
     o.push(`<rect x="${c.x}" y="${colY}" width="${colW}" height="${colH}" rx="8" fill="${c.fill}" stroke="${c.stroke}" stroke-width="1.4"/>`);
     o.push(`<text x="${c.x + 16}" y="${colY + 28}" font-size="14" font-weight="600" fill="${INK}">${esc(c.title)}</text>`);
@@ -163,16 +163,17 @@ function loopFigure() {
     });
   }
   // arrows between columns
-  o.push(`<line x1="326" y1="${colY + colH / 2}" x2="322" y2="${colY + colH / 2}" stroke="${MUTED}" stroke-width="1.6" marker-end="url(#ar)"/>`);
-  o.push(`<line x1="636" y1="${colY + colH / 2}" x2="632" y2="${colY + colH / 2}" stroke="${MUTED}" stroke-width="1.6" marker-end="url(#ar)"/>`);
+  o.push(`<line x1="311" y1="${colY + colH / 2}" x2="328" y2="${colY + colH / 2}" stroke="${MUTED}" stroke-width="1.6" marker-end="url(#ar)"/>`);
+  o.push(`<line x1="621" y1="${colY + colH / 2}" x2="638" y2="${colY + colH / 2}" stroke="${MUTED}" stroke-width="1.6" marker-end="url(#ar)"/>`);
   // after box
-  o.push(`<rect x="640" y="236" width="300" height="60" rx="8" fill="#fff7f3" stroke="${ORANGE}" stroke-width="1.4"/>`);
+  o.push(`<rect x="640" y="236" width="290" height="72" rx="8" fill="#fff7f3" stroke="${ORANGE}" stroke-width="1.4"/>`);
   o.push(`<text x="656" y="260" font-size="14" font-weight="600" fill="${INK}">After the merge</text>`);
-  o.push(`<text x="656" y="282" font-size="12" fill="${INK}">A tidy-after: the copies left at the edges, straight away</text>`);
-  o.push(`<line x1="790" y1="${colY + colH}" x2="790" y2="232" stroke="${MUTED}" stroke-width="1.6" marker-end="url(#ar)"/>`);
+  o.push(`<text x="656" y="282" font-size="12" fill="${INK}">A tidy-after: the copies left at the</text>`);
+  o.push(`<text x="656" y="299" font-size="12" fill="${INK}">edges, gathered straight away</text>`);
+  o.push(`<line x1="785" y1="${colY + colH}" x2="785" y2="232" stroke="${MUTED}" stroke-width="1.6" marker-end="url(#ar)"/>`);
   // loop back: tidy-after to next ticket in the area
   o.push(`<path d="M640 266 C 520 300, 240 300, 170 ${colY + colH + 4}" fill="none" stroke="${ORANGE}" stroke-width="1.6" stroke-dasharray="6 5" marker-end="url(#ar)"/>`);
-  o.push(`<text x="330" y="292" font-size="11" fill="${MUTED}" text-anchor="middle">the next ticket in the same area starts from what was left in the notebook</text>`);
+  o.push(`<text x="400" y="312" font-size="11" fill="${MUTED}" text-anchor="middle">the next ticket in the same area starts from what was left in the notebook</text>`);
   o.push(`<text x="20" y="${H - 14}" font-size="11" fill="${MUTED}">The Periodical reviews sit outside the loop: an occasional read of the whole codebase, the film rather than the still.</text>`);
   o.push('</svg>');
   return o.join('\n') + '\n';
