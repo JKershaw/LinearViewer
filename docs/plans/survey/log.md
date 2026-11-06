@@ -2564,3 +2564,13 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - neither oversold nor undersold;
   - two fresh readers (one new to Harbour, one for accuracy).
 - **Candidate, later:** a short v1.1 addendum to the paper recording the baseline and the post-freeze readings, so the record isn't more pessimistic than the evidence.
+- 15:35: **John: the paper's v2 first, then the essay** ("we're at the point we are writing up"). **LIN-4331 filed and Surveyed:**
+  - v2 in place, with a revision line;
+  - the baseline (selection rule re-implemented to show it picks the same pairs; the eight reads frozen);
+  - Seams run 9 and Drift run 5;
+  - the newer areas (LIN-4296 + LIN-4254, LIN-4313 + LIN-4317) recounted from the comments;
+  - **the pre-5-Nov Surveys, now reachable because LIN-4322 fixed the comment cap the paper found;**
+  - what the code now looks like, as facts at commits;
+  - the headline reordered (the area finding against the baseline first, then "tasks on average: not shown"), with the same claims, neither undersold nor oversold.
+
+  The essay, LIN-4330, runs after v2 merges.
