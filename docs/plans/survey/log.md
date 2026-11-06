@@ -2443,3 +2443,20 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - near-copy structural rules; the byte witness pins the old functions rather than the renderer; a third way to mint with no pointer.
 
   **Tidy-after LIN-4317** filed and Surveyed: one rule for the grant (mutation-checked first), the gate suites list the mint mount, one structural rule, the renderer pinned, a docs pointer. Not this ticket: one derived list of enqueue mounts, which goes to the notebook (each new entrance costs about 10 files of hand edits).
+- 10:40: **LIN-4317 scoped and started** (`6e7be8a3`). Its Surveys:
+  - the lanes differ in what they *trust* (client text against a server flag), not in the rule;
+  - the gate suite's `mount.path` doubles as its source-pin regex, so the mint needs separate `route` and `path` fields;
+  - two more false "three" counts (`lin-3136-enqueue-census`, `lin-3383`);
+  - a census trap (folding the declarations breaks F3);
+  - three structural rules, not two.
+
+  Scoped:
+  - a two-sided mutation check first;
+  - one rule with an `isAutopilotVariant(prompt)` input, the PR saying plainly that text is still the session lane's source;
+  - `route` and `path` split, the mint mount listed, every count claim true;
+  - only the two true structural copies folded;
+  - F3 left with a reason;
+  - the renderer pinned to the same hashes;
+  - a pointer that says *why*.
+
+  **The real cure filed as LIN-4318:** the app mints Periodicals by id, so no grant decision reads prompt text. It runs after LIN-4317, one ticket per concern.
