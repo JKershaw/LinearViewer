@@ -5,7 +5,7 @@
  * (declared, unused). Acceptance criterion (b) says a `scope:'read'` token still
  * gets today's `requireWriteScope` 403 on the four enqueue POSTs, and a
  * `readWrite` token still enqueues. Research found no test that drives a `read`
- * token through any of the three, so this is a pure addition closing that gap.
+ * token through any of the four, so this is a pure addition closing that gap.
  *
  * Built through the real composer (`buildApp`/`BASE_DEPS`) with a local
  * `validateToken` override, so the `read`/`readWrite` decision is made where
@@ -50,6 +50,11 @@ const ENQUEUE_ROUTES = [
     path: '/api/proxy/autopilot/kickoff',
     body: { goal: 'walk the stack' },
   },
+  {
+    name: 'POST /api/proxy/periodicals/:id/mint',
+    path: '/api/proxy/periodicals/seams-tangles/mint',
+    body: {},
+  }
 ];
 
 // Builds the real proxy composer with one local token override and an

@@ -3,7 +3,7 @@
  * lin-3134-declared-mint-census.test.js, C5 in lin-3136-copy-surface-census).
  *
  *  C1 every `createDispatchItem(` in `routes/proxy-*.js` (the proxy-token
- *     enqueue sinks) sits inside one of the three POST handlers that carry
+ *     enqueue sinks) sits inside one of the enqueue POST handlers that carry
  *     `requireGrant('dispatch')`, so no proxy-token route enqueues ungated.
  *  C4 the Flight Companion turn (`routes/proxy-flight-companion.js`) keeps
  *     `followUpMode: 'propose'`: it proposes a follow-up for the human to
