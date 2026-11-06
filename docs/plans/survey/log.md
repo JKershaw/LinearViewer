@@ -2574,3 +2574,13 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - the headline reordered (the area finding against the baseline first, then "tasks on average: not shown"), with the same claims, neither undersold nor oversold.
 
   The essay, LIN-4330, runs after v2 merges.
+- 15:50: **The essay's Surveys (LIN-4330) found its newest evidence isn't on main:** main's `log.md` ends at 6 Nov 08:15, so the baseline, John's notes and the authority grant are branch-only. That blocks v2 too. **Filed LIN-4332,** a second notebook sync pinned to `6db55dcd` (diff checked: 228 added and 1 replaced line, all branch-side), Surveyed. **The order is now: sync → v2 (LIN-4331) → essay (LIN-4330).**
+
+  For v2 and the essay, from the same Surveys:
+  - **define "area" once** (the paper's six areas and twelve subjects against my "seven");
+  - **56 → 6 is the census's definition, not "the fakes are gone"** (a crude `makeContainer|createElement` grep rose 46 → 51; the paper's Finding 6 already calls the count a proxy);
+  - extend the census series with the paper's own `census-by-merge.mjs` into a new dated evidence folder (one owner);
+  - figure scripts in `<slug>-scripts/`, reading the paper's evidence in place;
+  - settle `proposals.md:665` (the baseline line);
+  - cite `path@sha:line`, never clock times (the log's headings repeat times across days).
+- **For the integration discussion:** this is the third hand sync. A notebook kept off main and copied by hand is the essay's own pattern ("a list kept by hand goes stale"). Either edit it on main, or give the live record a home in Harbour.
