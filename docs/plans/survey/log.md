@@ -2650,3 +2650,17 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - the new-to-Harbour reader asked which diagram helped most.
 - **John: "How the first measure was overturned" would be clearer as a narrative.** Added to LIN-4335 (with a follow-up note into the builder's session): the scorekeeper marked their own work and the tally looked very good; blind readers who saw only the code disagreed; the claim narrowed to what they saw; and independent readers kept correcting the operator, which is the method working. The pass means go out of the prose, into a small table or a graphic if needed.
 - **John: an overall review last, so the essay reads and flows well.** Added to LIN-4335 (and noted to the builder): one end-to-end pass after the section changes, covering transitions that carry the story, one voice, no repetition, story-beat headings, and shorter if possible. The new-to-Harbour reader is asked where they slowed down or lost the thread.
+
+### The essay's version 2 merged (LIN-4335, `f90488d0`)
+- **Against John's five asks:**
+  - narrative over IDs: **done** (3 ticket IDs left in the body; a check table);
+  - a worked example plus diagrams: **done** ("a copy at the edge" is clear; "adding an owner vs finishing" has a **layout bug**, with the third box overflowing its panel and the caption overlapping it);
+  - the overturned measure as a story: **mostly**;
+  - the forcefield: **carried**, in the setup, the ratchet and the close ("what holds the more complex shape"; from holding to shaping);
+  - the flow pass: **partly**.
+- **What still doesn't read easily:**
+  - the opening two paragraphs are crowded (scene, argument, a limit and two definitions);
+  - the attribution markers ("Claude's reading", "Claude's gloss") recur, four times in the closing paragraph alone, and interrupt the voice. Marking once near the start that the readings of John's images are Claude's would carry it;
+  - some jargon is left ("place tickets", "dispatch grant", "session lane");
+  - the worked example is still terse.
+- Clearly better than version 1. Whether to polish once more is John's call.
