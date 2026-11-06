@@ -2477,3 +2477,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **a census that counts *literals* (F3) blocked a fold that would read better.** A check should count behaviour, not spelling, or it shapes the code.
 
   Again the forward comment came from a scope sentence of mine ("say plainly in the PR", which the builder also wrote into a comment).
+- 12:00: LIN-4310 (piece 4, the swipe/prompt-section/dispatch-slice suites) merged (`ff6a69fa`). Two pieces left: LIN-4311 (task-page) and LIN-4312 (close-out, with its production seams). The paper is still held on `lin4315-blind-prompt`.
