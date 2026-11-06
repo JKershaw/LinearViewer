@@ -2460,3 +2460,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - a pointer that says *why*.
 
   **The real cure filed as LIN-4318:** the app mints Periodicals by id, so no grant decision reads prompt text. It runs after LIN-4317, one ticket per concern.
+- 11:00: LIN-4309 (piece 3, `question-card-task-bound`) merged (`8b84a8fe`). The paper (LIN-4315) is held on John's `lin4315-blind-prompt` ruling (suggested: supply).
