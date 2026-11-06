@@ -2536,3 +2536,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - docs that make no claim about which end a cut loses.
 
   Not verified against live Linear's complexity limit, so the check is `GET /issues/LIN-4150` after deploy. Blind reads sent: BI and BJ.
+- 14:45: **LIN-4322: better, better (BI, BJ).** Residues pulled into LIN-4328, the builder's follow-up that touches the other two cursor loops: three cursor loops, the page size written about eight times, the guard blind to `return gql`, two or three truncation shapes, and the interface and catalogue not told. The live check (`LIN-4150` returning more than 50 comments) comes after deploy.
