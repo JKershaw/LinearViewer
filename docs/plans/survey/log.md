@@ -1950,3 +1950,450 @@ The plan for now is unchanged: finish LIN-4248, read blind passes C and D, try t
 - **The scorers agree with each other on 20 of 28 rows exactly, and with me on 13.** Their disagreements are better ↔ mixed only. My balance column is the outlier, which settles what the morning's question was asking: the ledger's tipping point was my scoring.
 - **What both blind passes rate better:** deletions, a tidy as its own task, a tidy-after as its own ticket, and features whose change removed a second path. Capability-adding features land mixed or worse. That fits John's reading: the Survey has been a research step, and the needle moves when the clean-up is its own task.
 - **From now on, the at-merge balance is a blind read** (two passes where it matters). My reading stays for the copies and the at-merge checks.
+
+### 09:40 UTC: LIN-4248 merged, the stages tried live, and a pause
+- **LIN-4248 merged** (`29f14bf6e`, deployed 09:13). Every item on its at-merge list was met: the router's byte-pinned fixtures are unchanged and it refuses both kinds, every guarded per-kind table and the docs counts are updated, and the notebook is on main with the prompt docs pointing at the templates.
+  - **Both blind reads: mixed.** "Survey" has no single owner (two name lists, the read-only rule in three places), and two unguarded lists were missed.
+  - This is the morning's pattern on a fresh row: a careful capability change that follows the registry pattern without reducing it. The clean-up it bound on (one flag per template) would have made it one object.
+- **The stages work through Harbour.** `survey-task` and `survey-place` were dispatched by kind (`recommend-and-dispatch`, `noDescend`) on LIN-4246, about two minutes each.
+  - Each was read-only, stood at the base it resolved (`29f14bf6e`), posted on the surveyed ticket and stayed under its word limit.
+  - Both converged on a **stale premise**: the witness LIN-4246 asks for landed with LIN-4242's review fix. The real gap is the "same ruling, no input, so replaced" case, plus a call-site witness that needs a fake DOM the unit tests don't have.
+  - One friction: the place stage said "the workspace's simple-dispatcher repo has no `keepTypedQuestion`", so it started in the wrong repo and found its way. The stage doesn't know which repo a ticket is in.
+- **Seams run 7** agrees with the overnight map column and adds LIN-4243's four new `window` globals. Drift run 3 (LIN-4250) is still running.
+- After-questions sent to LIN-4248's builder (`8a238b09`).
+- **Pause here, as agreed with John,** to choose what to run through the new process next.
+
+## 5 Nov, about 10:15 UTC: the next work through the new process, tidy first as its own task
+
+John: choose the next tasks and polish as we go. He has no preference about the notes. **So the running log stays on this branch and is synced to main in one docs step at each milestone**, keeping one live copy at a time. A new proxy token is in the scratchpad as `.tok4`, valid to 7 Nov 10:12 UTC.
+
+**The test this round:** does a tidy done *first, as its own task* move the blind read, where tidies folded into a feature didn't? Three tracks, each Surveyed through Harbour's stages (`survey-task` and `survey-place` via `recommend-and-dispatch`), with two blind reads per merge.
+- **A (browser): LIN-4252 → LIN-4246.** One fake DOM that can repaint, in a shared test-helper home, with the second copy deleted. Then LIN-4246's now-small witness, re-surveyed on the tidied ground. The tidy is the tally's "shared test fakes" row (five namings) and the gap both of LIN-4246's Surveys named.
+- **B (prompt plumbing): LIN-4253 → LIN-4251.** A stage's traits ("offered", "read-only") are declared once on its template, with no behaviour change and every dispatched prompt byte-identical. Then LIN-4251 (four stages read-only), which should shrink to four one-line edits. The tidy is what both blind reads of LIN-4248 named.
+- **C (ordinary): LIN-4247** (Go doesn't return after a run ends until a reload; `prompt-section.js`). Surveyed now at today's base. It runs after LIN-4252 because it's the same file.
+
+**What would count, written before reading:**
+- **The tidies themselves:** their blind reads are better, as LIN-4234's and LIN-4218's were.
+- **The follow-on tickets (LIN-4246, LIN-4251):** their blind reads are better or neutral, and their diffs are small, roughly the "if this area were how you'd want it" size. If they still come out mixed, tidy-first alone isn't what moves the needle.
+- **C:** a free check on whether the place voice names a prerequisite tidy (ideally the same fake DOM) without being asked.
+
+Surveys (dispatch ids): LIN-4252 `fc788200` / `77df15cc`; LIN-4253 `8cf6f0b3` / `02e44940`; LIN-4247 `7088b7f8` / `c7d5283a`.
+
+### 10:35 UTC: the round's Surveys (all six through Harbour's stages), scoped and started
+- **All six ran through `survey-task` and `survey-place`,** about two minutes each, at `29f14bf6e`. Each pair converged. Each corrected or sharpened its ticket:
+  - **LIN-4252:** the main repaint is an `outerHTML` setter the ticket didn't list. A faithful serializer has to be decided first, or "the witness is a lie LIN-4246 builds on". `lin-4242`'s `''` getter would make LIN-4246's witness pass silently. There's a third copy (`lin-3833`). A test in a subfolder would never run. A real `querySelector` makes `lin-4010` run repaint paths it has never run.
+  - **LIN-4253:** "offered" is already declared exactly once, by whether a template has a `route`; the Set repeats it. The preamble deliberately doesn't import the registry. A boolean `readOnly` is the wrong shape for LIN-4251. Tests derived from the trait would be circular. Nothing proves byte-identity on every path today.
+  - **LIN-4247:** an *incomplete* `/state` reply already ends the poll, which is the likely source of the lasting "Started.". A plain reset would bring Go back mid-run. Home has a second sticky flag (`state.run.item`). There's a race between start and the first read. The current behaviour is pinned by a test that should flip, not gain a sibling.
+- **The free check (C): the place voice did name a tidy without being asked,** but not the fake DOM. It named "one rule for 'the run has ended'": two pollers decide it differently, and Go's "in progress" has three answers. Because unifying those rules *is* the fix, that tidy can't go first without changing behaviour, so C stays the control (tidy folded in, in pieces).
+- **One design disagreement, settled by the person (no step-back):** LIN-4253's "offered". open-0 proposed an explicit flag plus a test that it matches `route`; the place voice proposed making `route: null` the one declaration. I chose the place voice's version: one signal for one fact. For the second trait I took open-0's naming: what the stage may *write*, not `readOnly`.
+- **Scopes written; autopilots started:** LIN-4252 `0e6a3233`, LIN-4253 `cd0971da`, LIN-4247 `f6b25026`. LIN-4247 runs beside LIN-4252, not after it: LIN-4252 touches only tests, and running in parallel keeps C a clean control with no help from the new fake.
+
+### 10:45 UTC: a working rule, reread the papers
+John: from time to time, reread the essay and the related papers, which are good at reminding us why we're doing this and which traps to avoid. Added to "How to resume" in the notes: reread at each milestone or notebook sync, and after each compaction. Three lines from this morning's reread that bear on this round:
+- "A step bounded by its ticket … sees one copy of a decision that lives in many". That is the blind scorer's edges finding, predicted.
+- "Tidying where a change does not bind moves stone without settling it". That is the check on tidy-first: each tidy must be where its follow-on binds.
+- "Delete in the same change". That is why LIN-4252 deletes the second fake rather than adding a third.
+
+### 11:05 UTC: LIN-4253 merged (tidy first, about 20 minutes); Drift run 3 sides with the blind read
+- **LIN-4253** (`d9c0f1cae`) met every at-merge item: `SURVEY_KINDS` gone, the excluded set derived from `route: null`, `writes` declared once per template, the preamble kind-blind, the router fixtures unchanged, the docs updated. Two blind reads are running (G `3d5b31a4`, H `3c2356c9`). LIN-4251 is re-surveyed on the new base (`def122d2` / `419bc376`).
+- **Drift run 3** independently confirms the blind scorer's LIN-4241 finding (the settled check inline at 5 sites, up from 2), which my ledger had scored `+ (small)`. That's a third hand against my balance column on that row.
+
+### 11:15 UTC: the first tidy-first result. LIN-4253 is better in both blind reads; LIN-4251 re-surveyed and started
+- **LIN-4253: better, better.** It's the first row since the blind read began that both passes rate better while adding something. It's a tidy done first, as its own task, where its follow-on binds. That meets the 10:15 criterion for the tidy.
+- **LIN-4251's Surveys on the tidied ground** both open with "the ticket describes code that's gone". The task shrank from "extend a hand-kept list" to "set `writes` on four templates", and the one real decision became the vocabulary: none of the four fits one-comment (look-into and retro write nothing, context comments, triage edits ticket fields). open-0 also found a second triage entrance with no `writes` and the "update the workspace as you work" line that contradicts every read-only mode. That's the deeper copy of the symptom, which a pre-tidy Survey would have had to dig through a name list to see.
+- **Scope:** the vocabulary first, written down before code. Then every entrance passes `writes`. Then two larger extras as their own pieces with stop rules: the resume path, which both blind reads of LIN-4253 named, and gating the "update the workspace" line. Then witnesses that loop over the values, with no new stage list. Deriving each workflow formatter from `writes` goes to the tally. Autopilot started.
+
+### 11:30 UTC: LIN-4252 is mixed in both blind reads. A tidy first still has to delete its copies
+- **LIN-4252: mixed, mixed.** The helper is well built and both suites moved, but it owns 2 of about 30 consumers. CLAUDE.md now states a rule most of the code breaks, with no guard. The click/key vm layer stayed in one suite, where the next migration will copy it.
+- **The lesson is the essay's own.** "Delete in the same change. A helper that callers may adopt later is one more copy." My scope left the other copies out on the place voice's "not this task's". LIN-4253 left no copies behind and scored better twice. **So tidy-first is necessary but not sufficient: a consolidating tidy must delete its copies in the same change, or ship a ratchet guard that holds them.** From now on, a scope call that leaves copies out names the guard that holds them.
+- **LIN-4252's tidy-after is filed** as LIN-4255 (Backlog): move the hand-written fakes by family and delete each copy, with a census ratchet beside `test-server-listen-bind.test.js`. It runs after LIN-4247 and LIN-4246, which touch the same test files.
+- **LIN-4246's Surveys on the tidied ground:** both say a unit call-site witness "now looks cheap" on the shared fake (with `question-cards.js` loaded into the vm). open-0 found that the LIN-4024 "unchanged markup" keep can never fire (the `data-qcard-bound` stamp), so idle cards are replaced every poll. Scoped in pieces: check the existing E2E by mutation first; the missing case as one unit test; lift the vm layer into the helper (both blind reads' complaint, with a stop rule); blur the typed E2E; delete the dead clause (stop rule). Autopilot `0d9927a2`.
+- LIN-4253's builder has the after-questions (`307d82c0`).
+
+### 11:25 UTC: the control (LIN-4247) is mixed in both blind reads
+- **LIN-4247: mixed, mixed.** The fix is small, well placed and well tested, but the folded-in tidy *added* a fourth answer to "in progress" (documented beside the other three), plus one more copy of the `state.go` literal. That's the same shape as the overnight features.
+- **The round so far:**
+
+  | Ticket | Kind | Blind |
+  |---|---|---|
+  | LIN-4253 | tidy first; deleted its copies | better, better |
+  | LIN-4252 | tidy first; left its copies (2 of about 30) | mixed, mixed |
+  | LIN-4247 | control: feature with the tidy folded in | mixed, mixed |
+
+  LIN-4251 and LIN-4246, the follow-ons on tidied ground, are still building.
+
+### 11:35 UTC: John on the size of the move ("Towers of Hanoi")
+John: it has a fuzzy edge, which is partly the challenge, and that's why "the human" decides the size of the move. He'd do the big moves early. But even a smaller scope "should" make the next go smoother: trending in the right direction, even without moving the whole stack.
+
+**What changes in how we read and scope:**
+- **Judge a partial tidy by the film, not the still.** LIN-4252's own blind read is "mixed", but its real test is whether the next ticket in the area goes smoother. LIN-4246's Surveys already say its witness "now looks cheap" on the shared fake, where before it needed a slow E2E. So LIN-4246's cost and blind read count toward LIN-4252.
+- **A move of any size, but a partial one leaves a ratchet.** A helper with nothing holding it can drift back: the essay's adopt-on-next-touch "stayed flat" while a fresh file wrote raw copies beside the helper. A census whose count may only fall is what makes a smaller move trend instead of decay. (This replaces 11:30's "delete in the same change, or ship a guard". The guard is the minimum; deletion is the bigger disc.)
+- **Big moves early,** in the human's scope calls: the first ticket into an area takes the larger disc, and later tickets there ride on it.
+
+### 11:45 UTC: a paper on size and cost (LIN-4257), and what its Surveys say about the loop's own price
+John's question for a paper: how does the "size" of a task relate to its cost? Filed as LIN-4257 and Surveyed through the stages. Its Surveys bear directly on the loop:
+- **A floor of about $5–7 per finished ticket** for the fixed legs, whatever the change. Implementation is 11% to a third of the total (LIN-4247: $0.70 of $6.27; LIN-4252: $3.03 of $10.38; LIN-4253: $3.85 of $11.24).
+- **The two Survey legs are about $1.8–2 per ticket,** roughly 30% of a small ticket like LIN-4247. That's the first real figure for the loop's cost per ticket (an open question in the morning notes).
+- **Hanoi, in money:** every extra move pays the floor again, so a tidy done first as its own ticket adds about $5–7 before any work. That supports John's "big moves early" on price too: fewer, larger moves spread the floor.
+- **Confounds the paper must handle:** the implementation model varies, keep-alive sessions dominate the big totals, and the observer is billed.
+
+Scoped: freeze a dated cost table per leg; split the cost into floor, work, keep-alive and Survey; take size from git with the existing counters (no fourth); test against the work within one model; read the tidy pairs last, as they finish. Who must learn: the Library index (plus its two missing files) and `proposals.md:81`. Autopilot started.
+
+### 12:00 UTC: LIN-4251, the first follow-on on a tidy: better and mixed
+- **LIN-4251: better, mixed.** It landed every piece of a scope larger than its ticket (four stages, a new vocabulary, three entrances, the resume path, the workspace-hint gate) in about 40 minutes, on LIN-4253's ground. That's a contrast with the control (LIN-4247: mixed, mixed) and the overnight features.
+- **The "mixed" names a cost I caused.** "Keep every `work` kind byte-identical" led the builder to copy the endpoint-hint ladder (`readOnlyContextLines`) rather than add an optional clause. **A lesson for the human's role: a proof-of-no-change constraint can invite a copy. Ask for the proof (a byte-pinned fixture) without forbidding the refactor that would change the bytes trivially, or say which of the two wins.**
+- **The round so far:**
+
+  | Ticket | Kind | Blind |
+  |---|---|---|
+  | LIN-4253 | tidy first, deleted its copies | better, better |
+  | LIN-4251 | follow-on on that tidy | better, mixed |
+  | LIN-4252 | tidy first, left its copies | mixed, mixed |
+  | LIN-4246 | follow-on on that tidy | (building) |
+  | LIN-4247 | control, tidy folded in | mixed, mixed |
+
+### 12:10 UTC: LIN-4257's research finds our own after-questions inside the cost
+- **All 45 implementation dispatches in the window were routed to Haiku.** `/cost` labels 21 of them Opus, because the label comes from the last session in the chain. In 17 of those 21, the last session is **the Survey's own after-question follow-up** (Opus, read-only, sent into the builder's session after merge), billed inside the implementation cost. So the "model confound" the Surveys feared is mostly our observer, and today's per-ticket implementation costs include the after-questions.
+- `/cost` already computes per-model figures and tokens, and leaves them out of its response. The four-way split exists as `bucketOf` (`lib/wall-clock-summary.js`). `lineage.py` counts no lines; the 229/45 counter is `coherence-census.mjs`, which knows only LinearViewer.
+- **Ruling `lin4257-cost-wire-before-paper`:** the researcher recommends paper first, `/cost` change later. **Proposed instead: `wire-first`,** for this morning's reason. The paper binds on `/cost`, so the small fix is done first as its own task, and the paper lands on exact numbers: one extra floor and about an hour. Waiting on John.
+
+### 12:30 UTC: LIN-4246 merged, and the fake DOM found a real bug; the paper ruling revised
+- **LIN-4246** (`b53917365`), the follow-on on LIN-4252's fake, landed every piece:
+  - the missing no-input case as a unit test on the shared fake (red under a focus-only mutation);
+  - **the vm layer lifted into `tests/unit/helpers/prompt-section-world.js`** (the blind reads' complaint, so the next suite won't copy it);
+  - the dead `innerHTML ===` keep deleted, with today's behaviour pinned;
+  - CLAUDE.md names the vm layer.
+
+  **Review then found a real bug users hit, which the fake made visible by modelling focus:** the opened task's repaint detached the old slot before reading `document.activeElement`, so a reader typing an answer lost the caret on every 10 s poll. It's fixed, with a unit witness on the shared fake and an E2E, both red first. Two blind reads are running (O `c3c3669d`, P `c174adba`). That's the film reading of LIN-4252: its follow-on found and fixed a user-facing bug that the old string fake could not have seen.
+- **The LIN-4257 ruling, revised.** The paper's autopilot didn't wait (the ruling's effect is "record"): plan, then implementation, began at 12:04–12:07. So `wire-first` came too late to be the cheap path. The proposal is now `proceed-readonly`: v1 now, naming our own follow-ups inside implementation cost as a known confound. The `/cost` fix is filed as **LIN-4263** (per-session model and tokens; a follow-up is its own row), and v2 re-runs the within-one-model test on it. A lesson for the human's role: a "record"-effect ruling doesn't hold the lineage, so a proposal that changes the order has to land before the next stage starts, or not at all.
+
+### 12:40 UTC: the tidy-first round is in
+- **LIN-4246: mixed, mixed.** Partial adoption again (the shared vm layer has 2 users of about 19), plus a second focus capture and restore from the bug fix review found.
+- **The round** (summary table in `place-ledger.md`): track B, where the tidy deleted every copy, gave the only rows today that either blind pass rates better (LIN-4253 twice, LIN-4251 once). Track A, where the tidy stopped at 2 of about 30 copies with no guard, came out like the control: mixed for the tidy, the follow-on and LIN-4247 alike. A's payoff shows in the film: the follow-on found and fixed a user-facing bug the old fake hid. The still doesn't see it.
+- **Reading, tentative (two tracks):** tidy first moves the needle when the tidy *finishes*. A partial tidy behaves like no tidy on the blind read. John's view (11:35) is that a smaller move should still trend, and the way to test that is LIN-4255: A's tidy-after with a ratchet census. If A's next rows read better, partial plus ratchet is enough; if not, the bigger disc has to move first.
+
+### 12:50 UTC: LIN-4255 (A's tidy-after, with the ratchet) and LIN-4263 (`/cost` per dispatch), surveyed, scoped, started
+- **LIN-4255:**
+  - the `makeContainer` family (20 files, 18 with their own vm) moves cleanly onto the shared world;
+  - the `FakeElement` family needs `className`/`id` reflection, which LIN-4252 deliberately didn't model;
+  - 84 assertions measure the old fakes' internals (`_fullRenders`) and must be re-expressed and mapped;
+  - a count-only ratchet would pass a swap, so it must name files.
+
+  **Scope:** the census first (a definition, a frozen file list, the baseline); rename the world helper; `prompt-section-go` as the pricing probe; then the families. **The big move early:** `className`/`id` on the fake, then the `FakeElement` family, as its own piece with a stop rule. This is the test of John's "partial plus ratchet trends".
+- **LIN-4263:** the ticket's diagnosis was partly stale (builder and follow-up are one lineage row; the records-path label is cost-dominant, not last). Both voices: don't split `workerSessions`, which would quietly change the Models page and effort readout; add a nested per-dispatch breakdown. open-0's warning: snapshot-era totals may price Haiku tokens at Opus rates, so reprice one real ticket by hand first, and give snapshot lineages `dispatches: null` rather than a guessed split. The founder-model label goes to the tally.
+- Both autopilots started. The LIN-4257 ruling still waits on John (proposal revised to `proceed-readonly`).
+
+### 13:00 UTC: the paper is in (LIN-4257, `docs/papers/harbour/task-size-and-cost.md`)
+- **Answer (22 exact tickets, 31 hours):** size tracks total cost only through the fixed legs. The floor (planning, plan-review, review, close-out) is a median 44% of a ticket's cost and **rises with landed lines** (LinearViewer production ρ 0.71, tests 0.78), so the floor isn't fixed, and review rounds are the likely reason (counting them is its next step). **The work leg isn't shown to follow size** (ρ ≈ 0 in the one big-enough group, which mixes the build with our billed follow-up; four points in the clean group). **The biggest totals are keep-alive**, not size (LIN-4201: $30.40 of $40.13). The two repos point opposite ways and aren't pooled. Pair 1: LIN-4253 $11.24 + LIN-4251 $9.40, with no counterfactual.
+- **Finding 7, for us: "the Survey's judged balance does not discriminate"** (15 of 16 ledger rows "+"). That's a third independent hand, after the two blind scorers, that my balance column was the outlier.
+- **For the loop:** if the floor grows with size through review rounds, the Survey's corrections to tickets (stale premises, wrong acceptance lines) should show up as fewer rounds. That's a testable claim for v2 (about 19 Nov, on LIN-4263's per-dispatch `/cost`).
+
+### 13:30 UTC: LIN-4263 is mixed in both blind reads; LIN-4255's ratchet is in
+- **LIN-4263** landed the Surveys' shape (a nested per-dispatch breakdown, opt-in, snapshots null) and re-wrote two small rules that already existed nearby. Mixed, mixed, the "edges" pattern on a capability ticket. The paper's v2 can now split build from follow-up.
+- **LIN-4255's first piece (LIN-4265, `69e8f175`)** merged before any move, as scoped: a structural fake-DOM census with a frozen 56-file list, and the world helper renamed to a client-world name. The families follow.
+- **For John (open):** a readability pass on the size-and-cost paper, which leads with its method rather than its answer.
+
+### 13:40 UTC: the paper's v2 is set for a week out
+John hoped for "a chart: size, cost, and it *not* being a straight line, which would tell us something interesting", and is happy to rerun in a week or so. **Filed as LIN-4275** (Backlog, not before 12 Nov):
+- the chart leads (cost against size, log–log, one series per leg, marked by repo; the slope answers it: about 1 is straight, above 1 bends up, the Hanoi case, below 1 flattens);
+- a plain version next, then the numbers;
+- the build separated from the follow-ups with LIN-4263's `perDispatch`;
+- review rounds counted per ticket.
+
+The readability fix is folded into v2 rather than filed on its own. A scheduled task in this session fires on 12 Nov 09:41 UTC to Survey, scope and start it. It needs a fresh proxy token by then (`.tok4` expires 7 Nov 10:12 UTC).
+
+### 13:55 UTC: before, during, after, and the first "after" step
+John: "we have almost a before, during, and after tidying up step". The loop's shape as it now stands:
+- **Before:** the Survey corrects the ticket and names the tidy it will bind on.
+- **During:** the tidy first, where the change binds; larger moves in pieces; a partial move leaves a ratchet.
+- **After:** the blind read names the copies left at the edges, and they become a small tidy-after in the same area, straight away (pull, while it's warm).
+
+**First trial of "after":** LIN-4263's tidy-after, the two edge copies both blind reads named (`postingKeysOf` repeating `isPostingRow`'s key list; `rankOf` copying `lineage-membership.js`'s order without its tie handling, a NaN on two undated members). It's filed and Surveyed through the stages. The `prompt-section.js` edges from LIN-4247 (the `state.go` literal, the fourth "in progress" answer) and LIN-4246 (the second focus capture and restore) wait for LIN-4255, which is moving those suites. **What would count:** the tidy-after's own blind read is better, and a re-read of the area (the original change plus its tidy-after) reads better than "mixed".
+
+### 14:00 UTC: the Survey corrects a blind reader
+- **LIN-4276's Surveys** checked a claim both blind reads of LIN-4263 had made: that two undated members give NaN, "and the order is undefined". Both found it false. ECMAScript turns a NaN comparison into a tie, and the sort is stable, so the order is defined and matches the owner's. They ran it on node at several sizes. So my "red at base" Done-when couldn't be met honestly, and it's replaced: a test pins the exported order where it lives instead.
+- **Reading:** the blind read is the better hand for the balance, but **its specific claims are claims, not facts**, and the Survey before the tidy-after is where they get checked. That's one more reason to Survey every ticket, the "after" ones included.
+- Both voices also found a third key reader (`keyOf`) at the same edge, now in scope ("derive or explain"). The marker sort in `dispatch-lineage.js` goes to a follow-up. Autopilot started.
+
+### 14:10 UTC: John's framing, a network of tasks, and two dials
+John: we're turning a linear series of steps into a network of tasks and agents that can work on the "seemingly unbounded space of tangles and nests". Eventually a ticket with a small budget goes straight through without making additional mess, and any increase in the budget improves the codebase, making it cheaper, easier and more reliable afterwards. He doesn't want to spend much on the economic argument; standing we can measure is more useful.
+
+**Two dials, as I read it:**
+1. **"Make no new mess":** always on and cheap (the Survey before, ratchets during, the edges tidy-after). A small-budget ticket should land neutral, not worse. Today's "mixed" rows are exactly new mess at the edges, so the "after" step is aimed at this dial.
+2. **"How much to tidy":** the human's budget. Anything above zero is investment in the place.
+
+What keeps the network bounded is what we've been learning: pull not push, a price per move, the human choosing the size, and ratchets.
+
+**A future experiment (John):** costing runs on a blank repo, a greenfield project and an already-tidy codebase, as controls Harbour can't give itself, and as a test of the prompts' generality. The sharpest version is **the same tasks on two copies of one codebase, one tidy and one with planted duplication** (the "18 copies" kind), comparing cost, review rounds and escaped defects like for like. Either outcome is live: the record says copies drive escapes (45% of escaped defects), while hours within a size band don't differ, and the size-and-cost paper found the work leg doesn't follow size. So copies may cost reliability more than money. A candidate paper, not yet filed.
+
+John is happy to keep running as we have been: tweak, learn, improve.
+
+### 14:30 UTC: the first "after" trial lifts its area from mixed to better
+- **LIN-4276: better, better. LIN-4263 + LIN-4276 together: better, better.** LIN-4263 alone was mixed, mixed. A small tidy-after of the blind reads' named edges, Survey-checked first (the NaN claim corrected), turned a capability ticket's area from mixed to better. As a bonus, merging the two key lists fixed a real double-count.
+- **What it cost:** one small ticket (about 40 minutes from filing to merge), plus its floor. The size-and-cost paper's v2 can price that against the follow-on savings.
+- **Second trial, started now:** LIN-4251's edges (the second copy of the endpoint-hint ladder my byte-identical rule invited; four near-copies of the closing lead-in; a literal Survey list back in a test). LIN-4247's and LIN-4246's edges follow when LIN-4255 has moved their suites.
+
+### 14:35 UTC: the second "after" trial (LIN-4277) surveyed, scoped, started
+Both voices: the update clause comes in three grammatical forms woven into hand-wrapped line breaks under a byte-frozen work fixture, so "one ladder" means positional branches with a clause slot, not string surgery. Both also corrected my third bullet: deriving the Survey kinds from `route === null` would make an existing assert prove itself, so the literal stays with its reason extended. Root cause, named by both and to the tally: pinning hand-wrapped prose byte for byte welds presentation to wording, so every hint tidy will fight the fixture. Scope: a non-work fixture and the "only these differ" test captured at base first; one positional ladder; one closing lead-in in code, with the tests keeping their literals; a change-log row. Autopilot started.
+
+### 14:45 UTC: a ruling from inside LIN-4255
+- `lin-4271-fake-additions`: may LIN-4271 add small non-layout APIs to the shared fake before moving suites? With them, 16 suites move (census 55 → 40); without, 7. **Proposed `yes-add`:** it's within the scope (grow the fake with its own tests, stop at layout), and it's the big move early. Each addition is tested in `fake-dom.test.js`, layout stays unmodelled, and reds are findings.
+- **A mechanics note:** `suggest-answer` needs the ruling's `anchor.loopId`. For a piece's ruling, that differs from `stampLoopId`. My first post used the stamp id and got `RULING_NOT_FOUND` silently (I wasn't printing the response). The scripts now use the anchor id and print the result.
+
+### 14:50 UTC: after compaction; three after-questions sent
+- Reread the essay (v5) after compaction. The caution that bears most on what's next is the charter retro's: a tidy that doesn't reach where the change binds moves stone without settling it. The third after-trial is in `public/prompt-section.js`, the essay's own example of where changes bind.
+- **After-questions sent,** each lineage being Done:
+
+  | Ticket | Implementation session | Follow-up | Questions |
+  |---|---|---|---|
+  | LIN-4246 | `c8a048f0` | `a2e300a7` | q1–q7 (its scope added the vm-layer lift) |
+  | LIN-4263 | `05ebe420` | `25a8e16d` | q1–q6 (scoped to the Surveys' own shape) |
+  | LIN-4276 | `f7f76444` | `5e2dae6d` | q1–q6, plus a tidy-after q7 |
+
+- **The tidy-after q7, new:** "This ticket was a tidy-after: a small follow-on, filed straight after an earlier ticket merged, to gather the copies that earlier ticket had left at its edges. Was doing it as its own task, then, worth it, or would it have been cheaper inside the earlier ticket, or later, or not at all? What would have made it smaller?" It's the after-step's own question, asked of the one who did it. It goes to every tidy-after from now on (LIN-4277; the third trial).
+
+### 15:05 UTC: LIN-4277 merged (`0c3d3448`); its blind reads sent
+- The second after-trial, LIN-4251's tidy-after (one endpoint-hint ladder, one closing lead-in), merged at 15:03.
+- Four blind reads, code-only, sent on the LIN-4276 template: LIN-4277 alone, passes W (`c66d62d8`) and X (`dcfde954`); LIN-4251 + LIN-4277 as one change, passes Y (`8cf1cc3c`) and Z (`7cc5d678`). The question is the same as for the first trial: does a small tidy-after of the named edges turn a "better, mixed" area into "better, better"?
+- Its after-questions (q1–q6 plus the tidy-after q7) go when its lineage ends.
+
+### 15:20 UTC: the second "after" step lifts its area too; what the three builders said
+- **LIN-4277: better, better (W, X). LIN-4251 + LIN-4277: better, better (Y, Z).** LIN-4251 alone was better, mixed. That's two of two tidy-afters turning their area to better in both blind reads (the first was LIN-4263 → LIN-4276). Ledger: "The 'after' step (5 Nov), summary".
+- **Cost, from `/cost?perDispatch=true`:** the tidy-afters cost $6.77 and $5.93 against parents of $14.37 and $11.94, about +45–50% each. The build was $1.74 and $0.77 of those; LIN-4277's two Surveys ($1.98) cost more than its build. It's the paper's floor again: the small move pays the whole floor.
+- **LIN-4276's builder on the new tidy-after q7:** "Barely, on cost": two Surveys, a plan, a ~9-minute CI and a review around a 20-line change. It would have been cheaper inside LIN-4263, but the separate pass found a real double listing (a `loopId`-only row counted as fetched and missing, which can null `totalUsd`) that "a quick in-PR tidy would probably have missed". What would have made it smaller: checking the blind read's NaN claim before filing, and a census rule that flags a private helper restating a rule an imported module owns.
+- **LIN-4246's builder (q7, the larger scope):** "Yes, on balance": the shared vm world with real focus is why the revision was cheap to witness. But narrowing a test's witness to text (the added blur) silently removed coverage of the focus claim. Its line: **"any piece narrowing what a test witnesses ships with a test for whatever it stops witnessing."** Taken as a scope rule.
+- **LIN-4263's builder:** the change bound on the replay pins, not the code. `goldens.json` is stale against HEAD, so a 3-key additive change showed 12,057 differing paths, and the builder chased a figure that wasn't theirs. "Dump the replay at HEAD first, diff against that." The ideal: the pins assert figure paths and leave new keys to their own tests. Also: the Models page counts an Opus after-answer as implementation spend (our own follow-ups are polluting a product readout).
+- **What changes:**
+  - **A stop rule for the recursion.** Both tidy-afters' blind reads and builders name further edges. A tidy-after that reads better, better gets no tidy-after of its own; its residues go into the notebook for the next ticket in the area to pull. (Hanoi again: the stack moves, and you don't chase every disc.)
+  - **Check the blind read's specific claims before filing a tidy-after.** It's cheaper than having the Survey find them, and it cost a Done-when rewrite last time.
+  - **The third trial batches.** LIN-4247's and LIN-4246's edges are both in `public/prompt-section.js`: one tidy-after, one floor, two parents.
+  - **Kept for the next capability ticket (candidate, for John):** the "after" inside the lineage: a blind read of the PR head before merge, its named edges sent to the builder while it holds the context, so the tidy-after pays one review round rather than a whole floor. It loses the fresh builder that found the double listing.
+- **Pulled, not filed (the notebook):** the stale `goldens.json` and whole-object replay pins (LIN-4263's builder) go to the next ticket that changes the `/cost` route body; `byDispatchOrder`'s two unknowing sorts (`dispatch-lineage.js:162`, `recent-runs.js:46-47`) and row identity beside `anchorOf` (LIN-4276's builder) to the next lineage-order ticket; line-number citations in `plumbing.md` going stale (two blind reads) to the next Drift run.
+
+### 15:12 UTC: a ruling from LIN-4269 (a LIN-4255 piece)
+- `lin4269-4016-move`: the plan expected `lin-4016` to stop on the shared fake's unsupported `<select>.value`, but a scratch port passes 29/29, because the suite never reaches that path. **Proposed `move`** (census 47 → 46): the stop was a prediction, and the plan's own stop rule is evidence-based. `lin-3833-run-control` stays as the honest stop. The census has gone from 56 to 47 so far, and the ratchet is doing its job: each stop is named with the API that caused it.
+- 15:13: LIN-4277's after-questions sent to its builder (`54f7b466` → `a6201160`), q1–q6 plus the tidy-after q7.
+
+### 15:20 UTC: LIN-4277's builder on its tidy-after
+- **q7: worth it, but cheaper inside LIN-4251.** "The code change was cheap: one file, an hour of real work. It was dwarfed by the two Surveys, the plan and the witnesses around it." That's two of two builders saying the same thing: the tidy-after lifts the area, but its floor costs more than the fix.
+- **Its root cause is mine.** The copy in LIN-4251 came from the byte-identical rule I set, plus a deleted "only these differ" test. "Keep the guarding test when you split a path, and **pin wording rather than wrapping**, so a second layout never looks safer than sharing one." That's the same lesson as 11:25's "a proof-of-no-change rule can invite a copy", now with the remedy: pin the normalised text, not the layout.
+- **The plan's predicted witness couldn't exist** (a failing-at-base test under a compare-normalised rule). The builder captured the 108 non-work blocks before and after and diffed them. Ask, before writing a witness, whether it can fail at base at all (LIN-4276's builder found the same with its order pin).
+- **Residues (to the notebook, per the stop rule):** the 16 endpoint variants enumerated twice in `proxy-preamble.js` plus a third copy in the fixture test; `updateClause`'s always-`'.'` `otherwise`; change-log rows still saying "PR pending"; `plumbing.md` line citations.
+- **What it means for the loop.** Both builders and the cost table point the same way. The cheapest "after" is **not making the copy**, the "make no new mess" dial: two of the four copies the after-steps gathered came from constraints in my own scope calls. The next cheapest is the "after" inside the lineage, while the builder holds the context. The separate tidy-after is the dear but sure fallback, and it finds things a warm builder misses (the double listing). The candidate for John stands: try the blind read on the PR head before merge on the next capability ticket.
+
+### 15:25 UTC: John on cost; the LIN-4269 ruling closed itself
+- **The ruling** `lin4269-4016-move` was withdrawn at 15:16 by the lineage itself: "the orchestrator ruled move, and lin-4016 is ported in commit d4895ca4". That's the same answer as my proposal. A ruling that autopilot answers within its own authority can be gone before John looks. That's fine; my proposal is the record.
+- **John: cost is an optimisation for later.** "Right now we just want to know: does the task actually leave the codebase cleaner? We're happy to pay a premium for that at the moment, to prove the central idea is holding and worth pursuing." So:
+  - the separate tidy-after stays the "after" step as it is, floor and all;
+  - "the after inside the lineage" (a blind read of the PR head, edges back to the warm builder) is **parked** as a later cost optimisation, not tried now;
+  - cost is still recorded per ticket (`/cost?perDispatch=true`), as a measure for the paper's v2, not as a reason to change the loop.
+  - The tidy-after q7 still goes to tidy-afters, since the builders' answers find root causes (LIN-4277's "pin wording, not wrapping"). Their cost verdicts are noted, not acted on.
+
+### 15:30 UTC: a CI ruling from LIN-4269, which is really a merge conflict
+- `lin4269-ci-trigger`: "PR 2306 has no CI run after about 6 minutes"; options: an empty commit, investigate, or accept local evidence. **Checked first:** the PR's `mergeable_state` is `dirty`. Its sibling LIN-4268 (`8369461c`, census 55 → 52) merged at 15:05 and touched the same two files (`fake-dom-census.test.js`, `helpers/fake-dom.js`), and GitHub starts no `pull_request` run on a conflicted PR. **Proposed `investigate`**, with the cause and the fix: merge main, keep both sides' list changes (census 52 − 9 = 43), rerun the suite. An empty commit wouldn't help, and merging without `ci-success` is against the house rule.
+- **A place finding about pieces:** every LIN-4255 piece edits one hand-kept list (`HAND_WRITTEN_FAKE_DOM_FILES`) and one header comment. Pieces built in parallel will conflict on them every time. A ratchet that's a list needs its pieces in sequence, or one owner of the list edits. For the scope rules: **pieces that share a hand-edited list run in sequence.**
+
+### 16:15 UTC: a push ruling from LIN-4267, already overtaken
+- `lin-4267-push-rejected`: the builder's push of merge commit `16f31604` was rejected ("fatal error in commit_refs_rules"), leaving PR #2305 "conflicting". **Checked first:** the PR head is already `6d91a37c`, a merge of origin/main including LIN-4269, pushed at 16:06. Main is its ancestor, and the PR reads `blocked` (awaiting checks), not `dirty`. `16f31604` never reached the remote, and GitHub was returning 502s around then. **Proposed `update-branch`** (proceed, no admin needed), with how to reconcile: drop `16f31604` if it's identical, else push the delta as a normal commit.
+- That's the third ruling in an hour from LIN-4255's parallel pieces, and all three were about mechanics (one stop decision, two conflict-or-push problems on the shared census list), not the move itself. Census on main: 46 after LIN-4269; LIN-4267 takes it to 43.
+
+### 17:05 UTC: LIN-4255 nearly done; the census is halved
+- The LIN-4267 push ruling withdrew itself ("ticket-closed") when LIN-4267 merged at 16:16: the push had gone through after all.
+- Merged since 16:00: LIN-4269, LIN-4267, LIN-4284, LIN-4283, LIN-4282, LIN-4285. **The census of hand-written fake DOMs on main is 28, down from 56 this morning**, past the 40 the rulings aimed at. LIN-4281 (the observation suites) is the last piece in flight. The pieces found real things on the way: a task-surface copy button that was never styled (fixed), several tests that passed vacuously or pressed controls production never draws, and a possibly dead `__autopilot__` branch in `prompt-section.js`.
+- At LIN-4255's end: two blind reads of the whole move (LIN-4252 + LIN-4255, the area read); then the third after-trial, LIN-4247's and LIN-4246's edges in `public/prompt-section.js`, Surveyed first.
+
+### 18:20 UTC: LIN-4255 done (census 56 → 25); its area reads sent; the third "after" trial filed
+- **The move is merged:** fourteen pieces from LIN-4265 to LIN-4272, the close-out. **The census of hand-written fake DOMs fell from 56 to 25** (16 "not attempted" single-element stubs, 9 stopped on an API the fake doesn't model). The close-out filed **LIN-4292**: remove the seventeen `querySelector ?`/`&&` guards in `prompt-section.js`, and make `loadWorld` the cheap default for a new witness, since a census treats the symptom ("the cause is that `loadWorld` costs more to write than a stub").
+- **Four blind reads, the test of "partial plus ratchet trends":** LIN-4255 alone, passes AA (`30fb5104`) and AB (`4f458730`); LIN-4252 + LIN-4255 as one change, passes AC (`356a2127`) and AD (`8f6c286d`). LIN-4252 alone was mixed, mixed.
+- **The third "after" trial, LIN-4293:** LIN-4247's and LIN-4246's edges in `public/prompt-section.js`, one ticket for two parents. **Claims checked by hand at `591bb959` before filing,** per the new rule. All hold: about eight `state.go` literals; four "in progress" answers under a docblock that says three; `run.item = null` in three places; two focus captures; "focus inside the card" across two files via `hadFocus`. The `render()` path's missing witness can't be checked by reading, so it's left to the Survey. LIN-4292's guards sit in the same functions, so it runs after LIN-4293, in sequence. Surveys sent: `survey-task` `5a759302`, `survey-place` `13af9b24`.
+
+### 18:40 UTC: track A turned around; LIN-4293 scoped and started
+- **LIN-4255: better, better (AA, AB). LIN-4252 + LIN-4255: better, better (AC, AD).** LIN-4252 alone was mixed, mixed. "A partial move leaves a ratchet", then the big move in pieces: the area now reads better in all four passes. With the two after-trials, every area today that had its tidy *finished* reads better, better.
+- **Residues** (an unguarded consumer roll-call in the fake's header, `clickOn` bypassed, three ways to load `common.js`, a dead entity decode, a stale `CLAUDE.md:58`): by the stop rule, no tidy-after. They're appended to **LIN-4292** as claims for its Survey, because its "make `loadWorld` the cheap default" half is where they bind. That's pull, not a new ticket.
+- **LIN-4293's Surveys** corrected the ticket:
+  - 11 Go writes, not about 8, and the constructor must return fresh objects (the poll's stale-reply guard is by identity);
+  - "in progress" is three server fields read from two different replies, so the owner is a thin reader that keeps each reader's inputs, with the offer reading left out;
+  - the run-item *sets* are copies too;
+  - the two focus captures do different jobs (keep the node; re-find by test id), and both voices warn a merged helper could be worse;
+  - the double keep is real but almost unreachable, and the `render()` witness belongs on the real `render()` callers.
+- **The scope call (big moves early):** witness first, red at base; `goState`; the thin reader; one run-item helper; one exported focus-inside rule (with `hadFocus` gone); the two captures kept and named; the keep moved into `if (slot)`. Then **the larger extra as its own last piece, with a stop rule:** decide the keep before the slot write, so `readerFocusIn` and `restoreReaderFocus` go. It's the "make the change easy" move both voices named behind these copies. Not this ticket (to the notebook): moving the Go/run lifecycle out of the 2.9k-line closure; the server sending one "in progress" fact. Moved to Todo, and autopilot started (`8b90bb20`).
+- LIN-4255's after-questions go to LIN-4272's builder (the close-out, which saw the whole census) when LIN-4255 closes, with q7 (the scope was the big move).
+- 18:45: LIN-4255 closed at 18:36. Its after-questions went to LIN-4272's builder (`406cd032` → `f01eaf85`), q1–q7, asked to answer for the move as a whole where it helps (the close-out saw the whole census).
+
+### 19:10 UTC: LIN-4293 merged (`af55cb73`); step 7 stopped by its rule
+- The third after-trial landed steps 1–6 in about 25 minutes of build:
+  - `goState` returns fresh objects (mutation-checked: a shared object turns a LIN-4247 test red);
+  - `InProgress.{busy, liveNow, ended}` keeps each reader's inputs, and the docblock names `sessionFactsOf` as the source;
+  - `runItemOf` and `clearRunItem(why)`;
+  - `QuestionCards.focusInCard`, with `hadFocus` gone;
+  - the two captures kept and named;
+  - the no-slot fallback keeps the card once;
+  - a new witness file.
+- **Step 7 stopped, as its stop rule asked:** `render()` detaches the card through `container.innerHTML`, so deciding the keep before the write needs a change outside the question-slot functions. That's the honest stop, recorded in the PR. It goes to the notebook with the closure extraction (both Surveys' "better still").
+- **Blind reads sent:** LIN-4293 alone, AE (`4211ba2d`) and AF (`6647c437`); LIN-4247 + LIN-4246 + LIN-4293 as one change, AG (`5a53b65a`) and AH (`2054f8f2`). LIN-4247 and LIN-4246 were each mixed, mixed.
+- **LIN-4292's Surveys sent** (it waited on LIN-4293's question-slot functions).
+
+### 19:25 UTC: the third "after" step lifts its area too; LIN-4292 split into three
+- **LIN-4293: better, better (AE, AF). LIN-4247 + LIN-4246 + LIN-4293: better, better (AG, AH).** Each parent alone was mixed, mixed. That's three of three tidy-afters turning their area to better in both blind reads, and the first one to serve two parents. AH's "only a comment protects goState's fresh object" is false: review's mutation table shows a shared object turns a LIN-4247 test red. That's the rule about claims again.
+- **One cross-cutting finding for John: ticket-history comments.** At least six blind reads today say comments are growing faster than code is shrinking, and that they tell "how the code got here" (LIN-numbers, "Round-3 fix 1A") rather than what it does. The tidy-afters make code simpler but add prose that will drift. It's a house habit across builders, so it belongs to the prompts or conventions, not to a ticket. Raised, not acted on.
+- **LIN-4272's builder (the LIN-4255 close-out) on q7:** classifying all 25 remaining files paid; it found four stops nobody had recorded. "The facts kept moving": 13 PRs in four hours, so the ticket's family list was stale on arrival, and the reasons lived in PR bodies with different section names. Advice: one shared evidence template for every move PR; stop reasons as data the census asserts; **"file one ticket per concern"**; split LIN-4292.
+- **LIN-4292's Surveys (at `af55cb737`):** removing the guards is behaviour- and test-neutral and **unblocks nothing**. Every stub that reaches those lines defines `querySelector` and returns null. The real unblocker is the fake modelling `<select>.value`. The witness-default check, built naively, catches 18 existing files, contradicts a pinned negative fixture, and risks a third hand-kept list. It needs LIN-4289 first. `15061f40` had already fixed `CLAUDE.md:58`.
+- **The scope call (one ticket per concern, big moves early, list-sharing pieces in sequence):**
+  1. **LIN-4292**, now the guards only: all 20, plus their paired `.matches`/`getAttribute`/`closest` guards in the same statements; reasons where one stays. Started (`e9f43af6`).
+  2. **LIN-4296**, new: the fake models `<select>.value`; the suites stopped on it move. Surveys sent.
+  3. **LIN-4254**: the 16 single-element stubs, after LIN-4296.
+  4. **LIN-4297**, new: `loadWorld` as the cheap path (LIN-4289's markup option, one `common.js` route, `clickOn` adopted, a derived consumer list, asserted stop reasons, then the check if it needs no new list), after LIN-4254.
+
+  LIN-4292 touches only `public/`, so it runs beside LIN-4296. Tickets 2–4 share the census list, so they run in sequence.
+
+### 19:35 UTC: LIN-4296 scoped and started; LIN-4293's after-questions sent
+- **LIN-4296's Surveys** corrected my ticket:
+  - its two select rules conflict (the reset default against a no-match write), so model dirty selectedness like `checked`;
+  - probably only 1–2 of the 3 listed stops are really `<select>`: `task-mode` never reads one and may stop on `createElement('a').click()`;
+  - model `.options` too;
+  - the real reader loses the `calls.readers` assert unless it's wrapped in a spy.
+  - **The voices disagree on a fact:** whether an untouched harness select reads `''` or a pre-selected `'claude-code'`. Scoped as "check it with a test and pin what's true", not argued.
+- **The scope call:** pins first, each **checked once in Chromium** (Playwright is in the repo), so the fake pins the right browser; then `options`; then the probes cheapest first, crediting moves honestly (moved for the select model, versus relabelled); `lin-3833-run-control` last, in its own commit, with a stop rule; the reader stubs become the real reader wrapped in a spy; the dead `browserMarkup` and the stale line references in the same PR. Started (`6e5b4473`).
+- **LIN-4293's after-questions** sent (`3714f5f7` → `917a5f09`): q1–q6, the tidy-after q7, and a new q8 on the stopped larger step ("was the stop rule drawn in the right place? what would that move take?").
+
+### 19:50 UTC: Periodicals as the independent check; an easier way to run them
+- **John:** "early days, but the idea has legs"; dispatch Periodicals as I see fit, and make that easier if I like.
+- **Why now:** today's blind reads are partly circular. A reader names copies, we fix them, and a reader of the same prompt says better. The Periodicals are a different instrument, so they're the independent check. Three were minted over the window since this morning's runs: **Drift & Coherence** (`5fc839b1`), **Seams & Tangles** (`a9a0fef9`) and **Comprehension-Debt** (`6f8752ff`). Comprehension-Debt was given **no hint** about the ticket-history comments the blind reads flagged: if it finds them unprompted, that's independent; if it's handed the hypothesis, it will probably confirm it.
+- **Easier:** this morning's runs were 2,000-word briefs I researched and wrote by hand. Harbour already has the two-stage path the UI's "Mint" button uses: the registry's `generatePrompt()` tells a session to research the window itself and mint one review task. `scratchpad/periodical.sh <id> ["note"]` now renders that prompt from a fresh worktree at `origin/main`, adds a short header (what the reading is for, and to measure from the previous edition), and posts it with `kind: "periodical"` plus the `periodicalId`, so `/periodicals` run state sees it. `--list` shows the ids and their state. A proxy worker is a leaf, so the minted task is started by hand with `/autopilot/kickoff`. No new code in Harbour. The next step, if wanted: a proxy route that does the same server-side, so no checkout is needed.
+- 19:55: the three mints finished in 3–5 minutes each and minted **LIN-4298** (Seams & Tangles run 8), **LIN-4299** (Drift & Coherence run 4) and **LIN-4300** (Comprehension-Debt run 5). Each set its own window from its previous edition and carried the operator note (context, not scope; don't shape findings). None mentions ticket-history comments, so the Comprehension-Debt check stays blind to it. All three started with autopilot. The research and the window were the session's own work: mine was one command each.
+
+### 20:15 UTC: Comprehension-Debt run 5 (LIN-4300, `ed46a714`), the first independent reading
+- **Window:** 23 Oct → 5 Nov, 263 LinearViewer commits, so wider than today. **Headline:** "the window left its areas more legible, not less": of 21 areas, 12 better, 6 unchanged, 1 mixed, 2 worse. Today's areas: **Costs & usage, better** ("one cost read, named as such in five places"); **`prompt-section.js`, unchanged** (its in-window constraints are recoverable, for example `goState`'s identity rule, but the module header still describes a four-state prompt picker, L8).
+- **On the comments question, unprompted** (it was told nothing of the blind reads' pattern):
+  - **R1, its top finding: stale status claims recur at about one a day.** "Code still lands in beats ('piece 1 … piece 4', 'until LIN-3855 retires them'). Each beat writes a present-tense status, and the next beat wires the code up without retiring it." At least 15 new sites, 11 re-read false, every one in the direction that lowers a reader's caution ("inert", "nothing calls this yet"). LIN-3827 retired the last batch but ruled the guard out of scope; a forward-reference spike catches 4 of 11 with 1 false positive. Minted **LIN-4301** (the Harbour sites).
+  - **A refinement of the blind reads:** ticket tags that paraphrase the reason locally are "not debt". The debt is the *status claim* that goes stale, plus line-number pointers that rot (R3, cite by symbol: the same thing two blind reads said of `plumbing.md`).
+- **What it means for the loop.** It partly confirms the blind reads (comments are where debt grows) and sharpens them (stale status claims, not ticket tags as such). It also points at a mechanism our method uses heavily: **work landing in pieces.** Every piece that says "until the next piece" writes a claim the next piece must retire. A new scope rule: **a piece that makes an earlier claim false ("inert", "until X", "nothing calls this yet") retires that claim in the same change; cite code by symbol, not by line.**
+
+### 20:20 UTC: Seams & Tangles run 8 (LIN-4298, `8f97e18e`), today's window exactly
+- **Window `2eb73ae0..af55cb73`,** which is today's loop: 29 commits, 10 of them production. The graph barely moved: two cross-area edges added, none removed, knot pairs 12 → 12, no wrong-way edge. **Area by area, the operator's question:**
+
+  | Area | Seams run 8 | The blind reads today |
+  |---|---|---|
+  | LLM & prompts | **better** (each template declares its route and `writes` once) | LIN-4253 better, better |
+  | Agent API | **better** (the preamble kind-free; one endpoint-hint ladder) | LIN-4251 + LIN-4277 better, better |
+  | Runs & dispatch | **slightly better** (one posting-key list; `cost-read.js` +111 lines, size is Code Quality's) | LIN-4263 + LIN-4276 better, better |
+  | Browser code | **mixed:** Go state and the focus rule each have one owner, but `window.QuestionCards` read sites went from 1 to 2 (LIN-4293's `focusInCard`), a coupling with no import edge | LIN-4247 + LIN-4246 + LIN-4293 better, better |
+  | Other features | **worse as a map:** `lib/stage-writes.js` (LIN-4253) isn't placed by the guide, so the catch-all goes 16 → 17. A guide gap, not a tangle | (not seen: the blind reads don't read the guide) |
+
+- **The window's main positive, newly named:** `seam:stage-contract`, healthy. A new `map:stage-kind-roster` (Low–Medium): adding a kind touched 9 files in 4 areas with no import between them, visible only in change coupling. That's LIN-4248's Survey kinds, and LIN-4253 took out two of those lists. Handed to Drift (LIN-4299), which owns the duplicated decision.
+- **The fake-DOM harness**, the window's largest change by volume (71 test files, +47k / −8k), is out of the guide's remit and ungraded. Seams names it as "the only machine-checked way to exercise `public/` scripts without a browser, which is a precondition for refactoring F6" (the browser-globals knot).
+- **Read against the blind reads:** the two instruments agree in direction on three areas. Seams is more cautious on the browser, because it sees a cross-script coupling the per-change blind reads didn't name (a window global read in one more place). It also sees a map gap the blind reads can't see. That's the value of a second instrument: **the blind reads judge copies inside a change; Seams judges couplings between areas.** A blind "better" isn't the whole picture. No follow-ups minted.
+- Two small things for the notebook (pull, not filed): place `lib/stage-writes.js` in `areas.json` (a guide edit, Seams's own proposal, §7); `focusInCard` as a cross-script read, for whoever next touches F6.
+
+### 20:30 UTC: Drift & Coherence run 4 (LIN-4299, `6c6bada5`); the three instruments together
+- **Drift, written from the code at `af55cb73` before it read the ledger** (its draft is committed as evidence): **"Better, small."** Four areas moved, each toward one owner. No `mustRule` group joined or left; no new cycle; 0 upward edges hold. By area: stage templates and preamble **better**; cost read **better (small)**; Go state **better on Go, the in-progress rule still split across the server/client seam**; Home and task page **neutral**; client test tree **better, with one unguarded half**; delivery scripts better in the touched file. One follow-up minted: **LIN-4302** (the VERB OVERRIDE key list in `proxy-instructions.js` lists 15 of 19 keys; LIN-4248 added its two Survey keys without deriving it).
+- **Against the place ledger, per ticket:** agrees on 10 of 11. **Partly disagrees on LIN-4247:** it found no copy LIN-4247 added (the Go literals predate the window). So the blind reads' "mixed, mixed" may have charged LIN-4247 with debt it inherited. **On LIN-4293:** agrees on the consolidation, but **"adds no rule of its own" is false**, because `InProgress.liveNow` adds a `'waiting'` literal to the server's `live`. **That sentence was mine, in the scope; the builder made it a comment.** It's the same class as Comprehension-Debt's R1, born from a scope. Its home is LIN-4256.
+- **The three instruments together, today's window:**
+
+  | Area | Blind reads (merge) | Seams run 8 | Drift run 4 | Comprehension-Debt run 5 (13-day window) |
+  |---|---|---|---|---|
+  | Prompt plumbing (LIN-4253 / 4251 / 4277) | better, better | LLM & prompts **better**; Agent API **better** | **better** | (not singled out) |
+  | `/cost` (LIN-4263 / 4276) | better, better | Runs & dispatch **slightly better** | **better (small)** | Costs & usage **better** |
+  | `prompt-section.js` Go/run/focus (LIN-4247 / 4246 / 4293) | better, better | Browser **mixed** (a window-global read +1) | **better on Go**; the in-progress rule split across the seam | **unchanged** (stale header) |
+  | Client test tree (LIN-4252 / 4255) | better, better | out of remit; "a precondition for refactoring F6" | **better**, one unguarded half (row 133) | (not singled out) |
+
+  **No instrument says worse for any area the loop touched.** Where they differ, the blind reads are the most generous, about the browser file in particular. Seams sees a cross-script coupling, Drift a seam split, and Comprehension-Debt a stale header: things a change-by-change reader can't see. **Overall: better, small,** which is the honest size of it.
+- **Lessons for me (the human):**
+  - **My scope text becomes the builder's comments.** Don't write claims into a scope that would be false as a comment ("adds no rules of its own"). Write instructions ("keep each reader's inputs"), not descriptions.
+  - **The blind reads overcharge a change for inherited debt** (LIN-4247). They read one diff and its surroundings, so a copy that predates the change can look like the change's. Drift checks against the base. Keep both.
+- **Pulled:** Drift's row 133 goes into LIN-4297 (64 of 68 vm suites don't use `loadWorld`; 38 build non-tree `document` stubs the census excludes by design, so the check has to decide about those).
+
+### 20:35 UTC: LIN-4292 merged (`b389f9b0`), the guards
+- All the `querySelector`/`matches`/`closest`/`getAttribute` method-presence guards are gone from the four files (the grep is empty at main). Every object null-check the old expressions had is kept, so each line returns the same value on a real DOM. Paired spellings went together. Left, with reasons: `slot.contains &&` and two `typeof … === 'function'` checks (outside the four named methods). The PR says plainly that **this unblocks no suite**. Unit 23,749 pass, the same name list as base; E2E 2,004 pass on a second run (one `lin-4010` Escape-drawer flake on the first, passing 5/5 in isolation on branch and base).
+- Blind reads sent: AI and AJ (LIN-4292 alone; it isn't a tidy-after, so there's no area read).
+- **LIN-4293's builder (q1–q8):**
+  - **"The existing Go tests are the witness" was not true.** Two of the three `InProgress` views survived mutation (`liveNow` counting `sessions.busy`; `busy` hard-wired false) and needed new pins before the refactor meant anything. "Run the mutants before touching code: one per view, plus a shared `goState` object. That shows in ten minutes which behaviour is actually pinned." It's the third time today a scope's "the existing tests witness it" was weaker than it read (LIN-4276's order pin, LIN-4277's normalised compare).
+  - **Step 7's stop rule was in the right place:** the keep-before-write needs `render()` writing slot by slot, which is the closure's core. "I wouldn't do it as a tidy-after. I would do it together with moving question-slot keeping out of the closure." That's the next large move for `prompt-section.js`, to the notebook with the Go/run lifecycle extraction that both of its Surveys named.
+  - **q7: "Modestly"** worth it as its own task. The cost was in witnesses, which found the two unpinned views. It would have been cheaper inside the parents, and smaller still with "the blind read happening before those merged". That's the parked "after inside the lineage" again, now from a third builder.
+  - Residues: `clearRunItem(why)`'s unread reason; the render witness should assert that the repaint happened; its test copies LIN-4246's mount harness (that belongs in `client-world`, for LIN-4297); `goState`'s `|| null` normalisation.
+
+### 20:45 UTC: LIN-4292 is better, mixed (AI, AJ); my scope broke my own rule; tidy-after LIN-4304
+- **Blind: better, mixed.** Both reads give one reason: the sweep was drawn by file and method name, not by idiom. About 17 sites in 10 other `public/` files keep the guard (checked by hand at `b389f9b0`). Two functions LIN-4292 edited now mix both spellings (`paintRun`'s `slot.contains &&`, `keepFocusInDrawer`'s `!drawer.querySelectorAll`). Nothing stops the idiom coming back. "On its own it moves where the inconsistency sits more than it removes it."
+- **That's my scope call:** "the other method-presence guards across `public/` … are not this ticket; count them." It's a partial move with no ratchet, which the 11:35 rule forbids. I exempted a "small mechanical" sweep from it, wrongly. **The rule has no size exemption.** A sweep scoped to some files leaves two spellings in the place, and a reader can no longer tell the house style.
+- **Tidy-after LIN-4304** (filed and Surveyed): finish the sweep across `public/`; keep real non-Element checks (`flight-companion.js:950` walks `parentNode`, an `e.target` can be a Text node) with **an inline marker and reason on the line, not a list**; a source-shape check that fails an unmarked guard, pinned by fixtures. It touches `public/` and one new test file, not the census list, so it runs beside LIN-4296.
+
+### 20:55 UTC: LIN-4304 scoped and started
+- **Its Surveys corrected three claims in my ticket, all checked from code:**
+  - `.matches` on a `MediaQueryList` is a property, not a method, so removing `phone.matches ?` would change phone-width behaviour;
+  - there's a fourth spelling, `typeof x.m === 'function'`;
+  - **"an `e.target` can be a Text node" is wrong** for click, input, change and focus events, which the browser retargets to Elements. Taken literally, it would have put the exception on most sites.
+
+  Also: `close-out.js`'s `typeof` checks are a real unit seam; and **the house already has an exception convention** (an allow-list inside the test, as in `no-page-wide-label-listener.test.js`), so my inline marker would have been a second convention, a new noun.
+- **The scope call:**
+  - the check first, as an acorn AST scan ("tested, then the same member called"), covering four spellings, with fixtures including a `matchMedia` non-guard; its hit list is the work list;
+  - the rule decided once: delegated `e.target` is trusted, a `contains` guard is removable, a `parentNode` walk is judged on evidence;
+  - the close-out seams stay, and LIN-4254 removes them when it moves that suite (noted on LIN-4254);
+  - exceptions go in the house allow-list with present-tense reasons, with no `CLAUDE.md` change.
+
+  Started (`0ccb38fa`).
+- **For me:** I checked the blind reads' *counts* by grep, but not their *kinds*: what each hit is. A grep says where; only reading says what. My claims checks now include one look at each kind of hit.
+
+### 21:00 UTC: LIN-4296 merged (`b581ac92`); census 25 → 22
+- The shared fake now models `<select>` selectedness per option, with a dirty flag. **Each rule is pinned with the result a scratch Chromium probe returned** (Playwright 1.57), so the fake pins the real browser. The tree-change matrix caught a real spec bug: `replaceChild` now removes before it inserts. The unmodelled select APIs throw, naming themselves, rather than reading `undefined`.
+- **The disputed fact was checked, not argued:** an untouched disclosure dispatches no harness and no model (`harnessDefault ''`). open-0 was right. It's pinned by a new witness, and a mutant that restores the old stub fails it.
+- run-quota and runner-link read the real reader through a recording spy; the dead `browserMarkup` is gone; the stale `common.js:1263` citation now names the reader rather than a line (cite by symbol). Census **25 → 22.**
+- Blind reads sent: AK (`e6ea859e`) and AL (`2df14e2c`). LIN-4254 (the 16 stubs) is next in sequence, so its Surveys were sent.
+
+### 21:10 UTC: LIN-4296 better, better; LIN-4254 scoped and started
+- **LIN-4296: better, better (AK, AL).** One owner for selectedness, pinned against Chromium; three fakes and two second copies deleted. By the stop rule, no tidy-after: its residues (the off-tree press shim in two suites, a `PROXY_PROMPT_BOX` copy, two stale comments) go into LIN-4297, the next ticket in the area.
+- **Another rule-induced copy, mine:** "names and counts unchanged" led the builder to put one new case in its own file, `lin-4296-scope-pick`, which then copied its parent's fixture. "A rule about counts led to duplicated code." It's the second today, after the byte-identical rule (LIN-4251/4277). **Revised:** every moved test keeps its name; a test may move to a better-placed suite and a new case may join one; the PR maps every name; don't split a file to keep a count.
+- **LIN-4254's Surveys:** the premise ("single-element stubs the fake can serve as it stands") understates it. None of the 16 uses `loadWorld` (each has its own `vm` sandbox). The shapes are seams, routers and **auto-vivifiers** (every selector returns an element, so whole page inits run as no-ops; stops will surface there). `querySelector: () => null` in at least six files hides dead paths. The question-cards suites avoid the `dispatchEvent` stop only because `CustomEvent` is absent.
+- **The scope call:**
+  - **piece 0 is a probe plus a derivation:** tag every shape, probe the three auto-vivifiers on `loadWorld`, and make the census derive and assert the fake's consumer list (moved here from LIN-4297, so the 16 moves don't hand-edit it);
+  - then five groups by client script, in sequence; "moved" means on `loadWorld`, with each private sandbox deleted;
+  - router markup from the real renderer; red tests classified as findings;
+  - no fake widening (a stop stays listed, named);
+  - `close-out-client` last, after LIN-4304, with its production seams removed as their own step.
+
+  Started (`2cff163e`).
+
+### 21:15 UTC: LIN-4304 merged (`f742e5ac`); the guard sweep finished, with a ratchet
+- **The scan's hit list at the base was the work list:** 23 guards in four spellings. 20 removed, each verdict written in the commit (delegated targets trusted; `contains` is on Node; the `flight-companion.js` walk stops at `modelListEl`, so it was removable after all). 3 allow-listed (the `close-out.js` unit seams, for LIN-4254's last group). `matchMedia(...).matches` was correctly passed as a non-guard.
+- **The ratchet:** `public-element-method-guards.test.js`, an acorn AST scan, pinned by fixtures for each spelling, a multi-line guard, the `matchMedia` negative, and the allow-list rules. That includes **a stale-entry check, so an allow-list entry whose guard is gone fails.** The reasons can't go stale silently, which answers Comprehension-Debt's R1 for this list. The unedited base fails with 23 hits; two mutants turn their fixtures red. Unit 23,828 (+17, the new file only); E2E 2,004.
+- Blind reads sent: LIN-4304 alone, AM (`bfe90477`) and AN (`7a720dcd`); LIN-4292 + LIN-4304 as one change, AO (`3bba1012`) and AP (`50396736`). LIN-4292 alone was better, mixed.
+
+### 21:20 UTC: the fourth "after" step lifts its area too (LIN-4292 + LIN-4304 better, better)
+- **LIN-4304: better, better (AM, AN). LIN-4292 + LIN-4304: better, better (AO, AP).** "Taken on its own, b389f9b02 would be mixed … f742e5acb fills those gaps and adds the check." That's four of four tidy-afters today, and the first one made after a parent whose mixed reading came from **my own scope**.
+- **Residues, by the stop rule (no tidy-after):**
+  - **a fifth hand-rolled acorn walker** across the source-shape tests (`acorn-walk` is already a dependency), pulled into LIN-4297's step 6 as "extract one shared walker first, don't add a sixth";
+  - **allow-list reasons that cite tickets and line numbers**, despite the scope saying "present tense, true of the line now". The stale-entry check catches a removed guard but not a stale reason, so this goes to the notebook as a next guard to consider;
+  - the same idiom on `.focus` and `dispatchEvent` (notebook);
+  - one entry its own reason calls unneeded.
+- **A pattern in the residues:** each tidy-after's leftovers are smaller and more test-side than its parent's. From second copies of production rules, to a shared test walker and stale reasons in an allow-list. The stack is moving.
+
+### 21:35 UTC: LIN-4254 piece 0 merged (LIN-4306, `165c61e7`); its probe resized the ticket favourably
+- **The census now computes the fake's consumers from imports**, to a fixpoint through helpers. It found two consumers the hand list missed (`lin-4293-tidy-after-repaint`, `live-console-client-facts`). The header names only its pointer, and a paragraph hand-listing a consumer goes red. The hand-kept list, which drifted in every blind read since noon, is gone.
+- **The probe: all three auto-vivifiers move,** on real markup from the server renderers, with no stop hit. Instead it found four **loader** gaps: `loadWorld`'s `window` is a copy, not the global; delegated clicks on `document` don't bubble; Live Console's two stubs; a private lane template.
+- **My call, written onto LIN-4307 (piece 1):** fix each gap once, in `client-world.js`, in piece 1, so pieces 2–6 inherit it. The probe suggested "bridge with `Object.assign(globalThis, window)`" per suite, which would put a copy in every moved file. No bubbling in the fake; export the lane template rather than copying it. If a loader fix changes an existing `loadWorld` suite, stop and say so.
+
+### 22:05 UTC: a ruling from LIN-4307 (piece 1): the stop rule worked
+- `lin4307-window-global`: making `loadWorld`'s `window` the global breaks `observation-ruling-delivery`, whose stub of the bare `relativeTime` (set before `common.js`) is overwritten by `common.js`'s `window.relativeTime`. The builder stopped and asked, as the 21:35 call said to.
+- **Proposed `fix-suite-stub-order`:** in a browser `common.js` would overwrite that stub too, so the suite relied on the copy model's isolation, which isn't browser-faithful. The stub goes after `common.js` and before the script under test (in case it captures `relativeTime` at load), names and asserts kept. The global goes into `loadWorld` once, pinned in `client-world.test.js`, and later pieces inherit it.
+
+### 00:05 UTC, 6 Nov: held on two rulings
+- LIN-4307 (piece 1) has been blocked since 22:05 on two `resume` rulings. My `fix-suite-stub-order` is on `lin4307-window-global`; its own review's `fix-here` is on `lin4307-loader-scope` (do loader fix #1 here, move `laneNode` to LIN-4310, swap `lin-3254`'s hand-drawn card for `renderSessionPage` markup), and I agree with it. The chain waits for John. The watcher reached its two-hour limit and wasn't restarted. The notes' in-flight list is refreshed.
+- 00:10: after-questions sent:
+  - LIN-4292 (`17204c9a` → `7cc9f827`): q1–q6, plus a new q7 for a scope drawn **narrower** than the idiom ("where should the line have been drawn?");
+  - LIN-4296 (`c964ff42` → `3cbc85f7`): q1–q6;
+  - LIN-4304 (`ca1f6297` → `9ac8a3f5`): q1–q6 plus the tidy-after q7.
+
+### 00:20 UTC: three builders answer; one rule for sweeps
+- **LIN-4292's builder, on the new q7 (a scope drawn narrower than the idiom):** "The four files were the right call … The four method names were the wrong axis. The line should have been the behaviour in any spelling." And: "the grep was the definition of done … Drawing it by spelling made 'done' mean 'the regex is empty', a weaker claim than the ticket's goal." The narrow line "cost a second PR that evening, editing lines two away from mine."
+- **LIN-4304's builder, on the tidy-after q7:** the removals alone, no (21 lines carried by Surveys, reads, a plan and a full verification cycle); the check is the lasting part. "What would have made this smaller: building the scanner first in LIN-4292, so its edges came from a list rather than from a reviewer's read." Also honest about a departure: it ran the full suite once at the end rather than each owning suite after each file. The scan found 23 sites against my hand count of about 17.
+- **LIN-4296's builder:** fidelity bound twice where the spec reading disagreed with Chromium (`option.selected = true` wins whatever the order; removing the `selected` attribute unselects even a dirty option). Only the probes caught that. **A new untracked stop:** `public/ship.js:1154` calls `select.remove(1)`, which the fake now refuses by name. The plan's "witnesses inside the moved suites" collided with "counts unchanged", which is why the ticket-named files exist (the 21:10 rule revision covers it).
+- **The rule, from two builders independently:** **a sweep starts by writing its check. The check's hit list at the base is the work list, and the check passing is done. A grep is not a definition of done.** It also generalises the census ratchet: the check that holds the line afterwards is the same thing that defines the work before.
+
+### 08:00 UTC, 6 Nov: John on the next steps
+- **The Periodical route: filed as LIN-4313** (Backlog), Surveyed (`38b987e2`, `328f041d`). It's a proxy route that mints a Periodical by registry id, plain or + Autopilot, as the UI does, with an optional operator note. It retires `periodical.sh`'s checkout render and the hand kickoff. Scope when the Surveys land.
+- **Integration:** John: "perhaps *how* we do this is best left until after the write-up", and it's a new feature, so adding or tweaking things is fine. The human calls stay human, either "a human call (nice UI, etc)" or "like this session runs: a human instructs/gives authority to an agent". So the authority grant is itself one of the human calls. Deferred until after the write-up, as he says.
+- **The write-up, in two pieces:**
+  - **a technical paper covering everything;**
+  - **an essay for a fresh human reader:** narrative, big-picture framing, visual storytelling.
+
+  The paper comes first, and the essay draws on it and cites it.
+- 08:15: **LIN-4314** (notebook sync to main, pinned to branch `24ac197f`, notebook paths only, no merge or cherry-pick) and **LIN-4315** (the technical paper) filed and Surveyed. The paper is blocked on the sync, so its citations land at main. It freezes at that commit; log entries after it aren't cited. The essay follows the paper. LIN-4254 goes in as "in flight" if it hasn't closed by the freeze.
