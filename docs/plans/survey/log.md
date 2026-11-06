@@ -2527,3 +2527,12 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   `seam:periodical-mint` is named healthy, its residue owned by LIN-4318. No follow-ups. The import graph moved by one edge, pointing the existing direction.
 - 14:00: **LIN-4312 merged (`ce42e721`), LIN-4254's last piece.** The census is now **6, all `// stop:` files** (they need a browser API the fake doesn't model: bubbling `dispatchEvent` and the like). **56 → 6 in two days, with every movable file moved.** The `close-out.js` `typeof` seams were removed from production along with their allow-list entries, so the guard allow-list is now empty. Blind reads sent: LIN-4254 as one move (its 7 merges), BE and BF; LIN-4296 + LIN-4254 as the test-fake area, BG and BH.
 - 14:15: **LIN-4254: better, better (BE, BF). LIN-4296 + LIN-4254: better, better (BG, BH).** That's seven areas better in both passes, against the baseline's 1 of 4. **A new residue pattern: production bent to the test fake.** `close-out.js` switched to `replaceChildren` because the fake lacks `firstChild`; production comments name unit suites; a test-only `window.LiveConsoleLane`. In each case a gap in the fake was worked around where a suite hit it, not fixed in the fake. All pulled into LIN-4297, with a rule: **fix a gap in the fake (modelled and pinned against Chromium, or made to throw), never by bending production.** Also the doctype/body cut in four copies, three ways to click, fixtures in two homes.
+- 14:30: **LIN-4322 merged (`badec1fb`):**
+  - **the check first** (a source-level test: every gql connection carries `first:`/`last:` or is allow-listed with a reason). It found **36 unbounded connections at base**, and the remainder are allow-listed with follow-ups LIN-4325–4328 filed by the builder;
+  - one `pageConnection` (100 a page, cap 1,000, terminates on every input);
+  - the detail read, `relations()` and **`fetchIssueComments`, the close-out gate, which now throws at the cap rather than return a prefix missing the latest review**;
+  - a top-level `truncated` flag that survives `flattenIssue`;
+  - a test of the gate reading the latest review past index 50;
+  - docs that make no claim about which end a cut loses.
+
+  Not verified against live Linear's complexity limit, so the check is `GET /issues/LIN-4150` after deploy. Blind reads sent: BI and BJ.
