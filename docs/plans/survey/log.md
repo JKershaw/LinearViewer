@@ -2633,3 +2633,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - close the body on the direction, with the human calls as authority grants.
 
   Two fresh readers: one new to Harbour (does it still feel defensive?), one for accuracy (nothing widened).
+- **John: more narrative, fewer task IDs,** so it's easier for a human to read. Added to LIN-4335: describe each change by what it did; keep IDs, hashes and paths for a "where to check" table and the reading list; relabel Figure 2's rows with plain names (regenerated from the same data, with the IDs in the caption).
