@@ -79,6 +79,21 @@
     ],
     "title_shape": "baseline pair <N> pass <ID>",
     "rule": "production files are lib/, routes/, public/ and server.js; in date order, pair each unused merge with the next unused merge within 48 h that shares a production file; take the first four; parse times as Date (the list mixes +01:00 and Z)",
+    "rule_params": {
+      "production": [
+        "lib/",
+        "routes/",
+        "public/",
+        "server.js"
+      ],
+      "window_hours": 48,
+      "take": 4,
+      "time_parse": "Date (source mixes +01:00 and Z)"
+    },
+    "rule_commits": [
+      "e8442b96",
+      "3b7b4f0b"
+    ],
     "rule_source": "docs/plans/survey/log.md@1c894016:2498 (the rule as logged, 6 Nov 12:30 entry). Committed as e8442b96 (11:06:53Z) on claude/cool-rubin-6acj5j, not an ancestor of main; frozen as text into git/ in beat 2.",
     "fixed_before_results": "e8442b96 committed 11:06:53Z; first pass AW posted 11:09:06Z; result 3b7b4f0b committed 11:15:01Z",
     "commit_times": "all eight pair commits are 20 Oct 2026, 00:41Z to 13:27Z",
@@ -137,5 +152,7 @@
   "named_costs": {
     "LIN_4271_own_usd": "LIN-4271",
     "parent_LIN_4255_usd": "LIN-4255"
-  }
+  },
+  "v1_reference": "docs/papers/harbour/cleaner-than-it-started-evidence/2026-11-06/analysis.json",
+  "v1_reference_note": "v1's frozen analysis.json, read by analyse.mjs only for the v1_vs_v2 comparison and the Survey split; its sha256 is recorded in analysis.json."
 }

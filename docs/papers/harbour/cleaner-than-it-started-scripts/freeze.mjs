@@ -83,6 +83,9 @@ async function main() {
   const CONTEXT = need(I, 'context');
   const PACE_MS = I.pace_ms ?? 1100;  // proxy limit 60/min; an inputs file may name a different pace (tests do)
   const cutoffMs = blindCutoff(I);
+  // Pair-baseline inputs (LIN-4334, v2). Absent for v1, so v1's freeze reads none of them.
+  const PAIR = I.pair_baseline ?? null;
+  const PAIR_TICKETS = I.pair_baseline_tickets ?? [];
 
   const outDir = positional[0];
   if (!outDir || outDir.startsWith('--')) { console.error('usage: freeze.mjs <out-dir> --inputs <file.json> [--sd <path>]'); process.exit(2); }
@@ -188,8 +191,18 @@ async function main() {
     });
     saveGit(o.file, ['full_sha\tshort\tcommitted\tsubject\tfiles', ...rows].join('\n') + '\n');
   }
+  // The pair rule's own text (LIN-4334 v2): the log at the pin, and the two branch-only commits that fixed the rule
+  // and its result, frozen as text because they are not on main. Read only when the inputs name a pair_baseline.
+  if (PAIR) {
+    saveGit('git/log.at-pin.snapshot', git(REPO_ROOT, ['show', `${LV_PIN}:docs/plans/survey/log.md`]));
+    for (const sha of PAIR.rule_commits) {
+      const full = git(REPO_ROOT, ['rev-parse', sha]).trim();
+      const patch = git(REPO_ROOT, ['show', '--format=%H%n%cI%n%s', '--patch', full]);
+      saveGit(`git/pair-rule-${full.slice(0, 8)}.patch`, patch);
+    }
+  }
 
-  const extras = [...BASELINE_3NOV, ...UI_FOUR, ...FOLDED, ...CONTEXT];
+  const extras = [...BASELINE_3NOV, ...UI_FOUR, ...FOLDED, ...CONTEXT, ...PAIR_TICKETS];
   const population = [...new Set([...subjectIds, ...PARENTS, ...extras])].sort((a, b) => Number(a.slice(4)) - Number(b.slice(4)));
   // Every ledger id must be frozen. Only CONTEXT ids may be absent from the merge subjects.
   const unexplained = [...ledgerIds].filter((id) => !population.includes(id));
@@ -198,9 +211,17 @@ async function main() {
 
   // ---- 3. per ticket: issue, cost, dispatch history ----
   const dispatchRows = {};
+  // LIN-4334 decision: the pair-baseline tickets are read for their issue only. Their cost and dispatch history
+  // are not frozen, because the pair claim uses only the merges and the passes.
+  const issueOnly = new Set(PAIR_TICKETS.filter((id) => !subjectIds.has(id)));
   for (const id of population) {
     const iss = await getJson(`/issues/${id}`);
     save(`issue/${id}.json`, iss.text, iss.readAt, iss.status);
+    if (issueOnly.has(id)) {
+      dispatchRows[id] = [];
+      process.stderr.write(`${id}: state=${iss.body.state?.name} (pair-baseline ticket: issue only)\n`);
+      continue;
+    }
     const cost = await getJson(`/issues/${id}/cost?perDispatch=true`);
     save(`cost/${id}.json`, cost.text, cost.readAt, cost.status);
     const disp = await getJson(`/dispatch?issueIdentifier=${id}`);
