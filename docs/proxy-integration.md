@@ -122,7 +122,8 @@ token, a Proxy-page token generated as read-only or read-write, and every worker
 ### Enqueue routes and the dispatch grant (LIN-3136)
 
 `POST /api/proxy/dispatch` (including `abort`, `cascade` and `followUpTo`),
-`POST /api/proxy/recommend-and-dispatch` and `POST /api/proxy/autopilot/kickoff` each require a
+`POST /api/proxy/recommend-and-dispatch`, `POST /api/proxy/autopilot/kickoff` and
+`POST /api/proxy/periodicals/{id}/mint` (LIN-4313) each require a
 `readWrite` token that **also** holds `dispatch`. The chain on each is rate limit → token → scope
 → grant → handler, so the grant is checked after the scope and **before any body validation**:
 a token without it gets the same `403` whatever the body, and nothing is enqueued.
@@ -140,7 +141,12 @@ in the workspace your token was minted for, re-checking ownership at the mint. I
 changed since: `403 GRANT_OWNER_ONLY`; no recorded owner: `409 WORKSPACE_OWNER_UNSET`; a token
 with no workspace binding: `400 INVALID_GRANTS`. Nothing is enqueued on any of these. A plain
 `POST /dispatch` (even with `kind: "autopilot"`) launches a grant-less worker; to launch an
-orchestrator, use the kickoff.
+orchestrator, use the kickoff, or the periodical mint's `"autopilot": true` variant below.
+
+The periodical mint declares `dispatch` only for its `"autopilot": true` variant, for your token's
+own owner, with the same owner re-check and the same refusals as the kickoff, worded for its own
+credential ("a periodical + Autopilot launch credential"). A plain mint is a grant-less worker, as
+the app's plain Mint is. Nothing is enqueued on a refusal.
 
 Three `POST /api/proxy/dispatch` body fields the endpoint reference below does not spell out:
 
@@ -1503,6 +1509,56 @@ decide for itself whether a periodical is due.
   either the top level or per lane — it has no declared consumer today; add it if/when one
   needs it rather than reshaping a field already in the wild.
 - **503** when dispatch is not configured on this deployment.
+
+#### Mint a Periodical
+
+```
+POST /api/proxy/periodicals/{id}/mint
+```
+
+Mints a Periodical run by its registry id, as the app's own **Mint** and **Mint + Autopilot**
+actions do (LIN-4313). The server renders the registry's prompt, so the caller never needs a
+checkout and never sees the prompt. The ids are listed by `GET /api/proxy/periodicals`; an unknown
+id is a `404` that names that route, and is refused before anything is read or minted.
+
+The chain is rate limit, token, write scope, the `dispatch` grant, handler. The `dispatch` grant
+is required (see "Enqueue routes and the dispatch grant" above).
+
+```json
+{ "autopilot": true, "note": "Also read as a drift check on the Seams & Tangles run; context, not scope.", "target": "cli" }
+```
+
+All fields are optional. `target`, `repo`, `model`, `harness` and `effort` are the execution fields
+the other enqueue routes take.
+
+- **`autopilot`** (boolean, default `false`). `true` is the Mint + Autopilot variant: the prompt
+  carries the autopilot handoff, and the run is dispatched holding the `dispatch` grant for your
+  token's owner (see the enqueue section). `false` or absent is the plain Mint: a grant-less
+  worker.
+- **`note`** (string, optional). A short operator note: one line, at most 500 characters, with no
+  control characters (a line break, a tab or any other control is refused rather than stripped).
+  The server places it before the template text, and asks the minting agent to carry it into the
+  minted task's description, below the gate-marker line and above the review contract, as context
+  and not as scope. The template text is never changed, and without a note the prompt is the
+  app's own, byte for byte. The minting agent writes that description, so this is an instruction
+  to it and not a guarantee.
+
+The prompt this route dispatches begins with exactly the text the app's own action sends for the
+same id and variant; the proxy-context block is appended after it, as for every proxy dispatch.
+
+```json
+{ "success": true, "id": "...", "status": "queued", "kind": "periodical",
+  "promptName": "Seams & Tangles + Autopilot", "periodicalId": "seams-tangles",
+  "autopilot": true, "target": "cli" }
+```
+
+The run appears in `GET /api/proxy/periodicals` as that template's `recent` run, because the
+stored row carries its `periodicalId`.
+
+Refusals, with nothing enqueued: `400` for a bad body or note; `403 DISPATCH_GRANT_REQUIRED`
+without the grant; `403 GRANT_OWNER_ONLY` (and the other owner-check codes the kickoff gives) for an
+`autopilot: true` mint by a token whose owner has changed; `429` when the free-tier daily run limit
+is reached.
 
 #### Rulings
 
