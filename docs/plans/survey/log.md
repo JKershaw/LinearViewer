@@ -2461,3 +2461,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 
   **The real cure filed as LIN-4318:** the app mints Periodicals by id, so no grant decision reads prompt text. It runs after LIN-4317, one ticket per concern.
 - 11:00: LIN-4309 (piece 3, `question-card-task-bound`) merged (`8b84a8fe`). The paper (LIN-4315) is held on John's `lin4315-blind-prompt` ruling (suggested: supply).
+- 11:05: **LIN-4313 is live** (production at `c491eca5`). An unknown id gives 404 with nothing enqueued. `periodical.sh` is now a one-call wrapper over the route (no checkout, no render, and with `--autopilot` no manual kickoff). The process John asked to make easier is now Harbour's own.
