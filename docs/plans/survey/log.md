@@ -2437,3 +2437,9 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - an operator note of at most 500 characters on one line, placed before the template.
 
   Not deployed yet (production is at `1d10f9b3`). Blind reads sent: AQ and AR. Once it's live, `periodical.sh` retires to a one-line call.
+- 10:25: **LIN-4313: mixed, mixed (AQ, AR).** Checked by hand at `c491eca5`, and both reads' main claims hold:
+  - the periodical "+ Autopilot" grant is decided by **two rules** (the session lane's tail-in-prompt check at `dispatch-entrance.js` ~1228, the mint lane's flag);
+  - `lin-3136-dispatch-gate`'s header claims "four enqueue mounts" but its `MOUNTS` lists three (`lin-3133` also three). The mint's grant *is* tested in the grant sweep and its own suite, so it isn't unguarded, but **two guards on the authority gate make a false claim**;
+  - near-copy structural rules; the byte witness pins the old functions rather than the renderer; a third way to mint with no pointer.
+
+  **Tidy-after LIN-4317** filed and Surveyed: one rule for the grant (mutation-checked first), the gate suites list the mint mount, one structural rule, the renderer pinned, a docs pointer. Not this ticket: one derived list of enqueue mounts, which goes to the notebook (each new entrance costs about 10 files of hand edits).
