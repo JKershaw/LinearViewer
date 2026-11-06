@@ -5,8 +5,8 @@
  *
  * The lane's words (title, stage, "waiting on you", the run link) are driven through the real updateLaneNode in a
  * vm world over the shared fake DOM (tests/unit/helpers/fake-dom.js, through client-world.js), loaded by the Live
- * Console loader in helpers/live-console-world.js. The lane is supplied as markup (makeLaneNode), pinned to the client
- * source (pinLaneMarkupToClient). Reduced motion is pinned at the source: the one-shot constant is gone and a live
+ * Console loader in helpers/live-console-world.js. The lane is the client's own `laneNode`, built through makeLaneNode
+ * (LIN-4310), with its markup pinned to the client source (pinLaneMarkupToClient). Reduced motion is pinned at the source: the one-shot constant is gone and a live
  * `change` listener re-applies it.
  *
  * Pending feed: `window.api` never resolves here (helpers/live-console-world.js), so poll() never reaches applyFeed
@@ -121,6 +121,7 @@ describe('reduced motion is read live, not once at load', () => {
   test('the lane node reads the live flag, so a reused node follows the change', () => {
     const { api, world } = loadLiveConsole();
     const li = makeLaneNode(world);
+    li.classList.remove('lc-lane--pulse');
     // The lane starts without the pulse class, so the class on the node is the client's write, not the fixture's.
     api.updateLaneNode(li, { task: 'LIN-5', workspaceUrlKey: 'ws', workspaceName: 'WS', summary: '', heartbeat: null });
     assert.equal(li.classList.contains('lc-lane--pulse'), true);

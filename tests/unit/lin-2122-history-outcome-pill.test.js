@@ -172,11 +172,12 @@ describe('renderDispatchHistoryList renders the outcome word (LIN-2122)', () => 
     assert.ok(html.includes('data-status="done"'));
   });
 
-  // The word lands as text in the label and as a class fragment, both escaped. Read off the live tree (LIN-4310): a
+  // The word lands as text in the label, as a class fragment and as data-status, all escaped. It leads with a `"` so an
+  // unescaped attribute site breaks out and creates the <img>; without a quote, only the label site could show it. Read off the live tree (LIN-4310): a
   // browser's serializer leaves `<` bare inside an attribute value, so the markup string cannot show "escaped" the way
   // the old plain-string container did. No element is created, and the label reads back the word exactly.
   test('an outcome word is escaped, never injected as markup', () => {
-    const word = '<img src=x onerror=alert(1)>';
+    const word = '"><img src=x onerror=alert(1)>';
     const world = makeWorld();
     const container = world.makeContainer();
     world.sandbox.renderDispatchHistoryList(container, [itemFor(word)], 1, 0, 'acme');
