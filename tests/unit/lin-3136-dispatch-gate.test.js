@@ -36,10 +36,14 @@ import { createKickoffRoutes } from '../../routes/proxy-kickoff.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = join(__dirname, '../..');
 
+// `route` is the registered pattern (the source pin and the router.use check read it); `path` is the URL the
+// tests call. They differ for the mint, whose id is a parameter (LIN-4317).
 const MOUNTS = [
-  { name: 'POST /api/proxy/dispatch', path: '/api/proxy/dispatch', file: 'routes/proxy-dispatch.js', body: { prompt: 'run me', kind: 'implementation' }, enqueues201: true },
-  { name: 'POST /api/proxy/recommend-and-dispatch', path: '/api/proxy/recommend-and-dispatch', file: 'routes/proxy-dispatch.js', body: { issueIdentifier: 'TEST-1', kind: 'implementation' }, enqueues201: true },
-  { name: 'POST /api/proxy/autopilot/kickoff', path: '/api/proxy/autopilot/kickoff', file: 'routes/proxy-kickoff.js', body: { goal: 'walk the stack', target: 'cli' }, enqueues201: true }
+  { name: 'POST /api/proxy/dispatch', route: '/api/proxy/dispatch', path: '/api/proxy/dispatch', file: 'routes/proxy-dispatch.js', body: { prompt: 'run me', kind: 'implementation' }, enqueues201: true },
+  { name: 'POST /api/proxy/recommend-and-dispatch', route: '/api/proxy/recommend-and-dispatch', path: '/api/proxy/recommend-and-dispatch', file: 'routes/proxy-dispatch.js', body: { issueIdentifier: 'TEST-1', kind: 'implementation' }, enqueues201: true },
+  { name: 'POST /api/proxy/autopilot/kickoff', route: '/api/proxy/autopilot/kickoff', path: '/api/proxy/autopilot/kickoff', file: 'routes/proxy-kickoff.js', body: { goal: 'walk the stack', target: 'cli' }, enqueues201: true },
+  // A plain mint (body {}, 201 as a leaf): `autopilot: true` would pull in the owner and mintGrantBootstrap fakes.
+  { name: 'POST /api/proxy/periodicals/:id/mint', route: '/api/proxy/periodicals/:id/mint', path: '/api/proxy/periodicals/seams-tangles/mint', file: 'routes/proxy-dispatch.js', body: {}, enqueues201: true }
 ];
 
 const SCOPE_403 = { error: 'This endpoint requires a read-write token' };
@@ -170,12 +174,12 @@ describe('LIN-3136 criterion 12(a) — one registration per path, gate in place'
   for (const mount of MOUNTS) {
     test(`${mount.name}: exactly one router.post, with the grant after the scope`, () => {
       const src = readFileSync(join(REPO, mount.file), 'utf8');
-      const quoted = mount.path.replace(/[/.*+?^${}()|[\]\\]/g, '\\$&');
+      const quoted = mount.route.replace(/[/.*+?^${}()|[\]\\]/g, '\\$&');
       const regs = [...src.matchAll(new RegExp(`router\\.post\\('${quoted}',\\s*([^\\n]*)`, 'g'))];
       assert.equal(regs.length, 1, `exactly one POST registration for ${mount.path}`);
       assert.equal(regs[0][1].trim().replace(/\s*\{$/, ''), EXPECTED);
       for (const m of src.matchAll(/router\.use\(\s*['"]([^'"]+)['"]/g)) {
-        assert.ok(!mount.path.startsWith(m[1]) && !m[1].startsWith('/api/proxy/dispatch'), `no path-scoped router.use over ${m[1]}`);
+        assert.ok(!mount.route.startsWith(m[1]) && !m[1].startsWith('/api/proxy/dispatch'), `no path-scoped router.use over ${m[1]}`);
       }
     });
   }
