@@ -2738,3 +2738,39 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 
   Against v3 (written to a checklist on the default model), this is the clearest evidence so far for the plain brief and the right contractor. Not merged; John reads it first.
 - **LIN-4340 merged** on John's go-ahead (`e63c2f69`, PR #2343) and live in the Library as *Clearing up as it goes*. LIN-4340 is Done. My length rule slipped back in, and the writer was right to ignore it.
+
+### 7 Nov, afternoon: round 1 of "Harbour carries the loop" filed
+- **I re-read the thread in date order** before proposing anything: *Like a skilled developer* (3 Oct), *Why work spirals* (29 Oct), *One feature twice* (1 Nov), *Tasks are tasks* (2 Nov), `survey.md`, the 5 Nov notes, the size-and-cost paper, the cleaner paper (v2) and the v4 essay.
+  - The same diagnosis has come three times from different sides: the stages see the cause and write it down instead of fixing it (3 Oct); intent is lost at the first hand-off (1 Nov); and no one owns the place (2 Nov).
+  - What's new this week is that the shape was run by hand, so we can see which moments the hand carried. Most of them were moments where information moves between steps.
+- **John's calls:**
+  - size: "err larger", as the standing answer;
+  - file the upgrades following our own practices, and run them through the loop;
+  - then a set of real tasks on the new loop (costs and UI: LIN-4341, LIN-4342, LIN-4343);
+  - then another step-back review.
+
+  In John's words, "The hard part is constantly keeping it moving in the right way, not trending back towards lists and drills."
+- **The briefs.** Each is a plain brief: the purpose, what only the client knows, the appetite ("err larger") and what done looks like, with the how left to the builder.
+  - **The parrot** (a fresh reader with John's verbatim words) caught real drift:
+    - unattributed decisions;
+    - "strong writer" losing John's "Opus at a minimum";
+    - the missing reason Haiku is the code default;
+    - the missing skilled-developer aim, and "an area with no tickets is fine";
+    - too many bullet lists in three of the briefs;
+    - the area notes with no clear owner.
+
+    All of that was folded in. Two of its points were wrong for lack of context, and were kept with their sources named: "err larger" *is* John's standing answer, and Periodicals not minting tickets is his design from 2 Nov.
+- **Filed:**
+  - **LIN-4344**, a record ticket (not to be dispatched), with six children:
+  - **LIN-4345**: every step reads what the person asked (the hub; close-out's prune keeps the asker's words);
+  - **LIN-4346**: deciding the size of the move becomes part of the run (Surveys, then a size step; a ruling or a standing policy; plain what and why);
+  - **LIN-4347**: after the merge, read it blind, ask the builder, tidy what it left. It owns the area notes on main, and it answers LIN-4316;
+  - **LIN-4348**: choose the contractor by the kind of work (Opus at a minimum for writing; the path and model visible on the ticket);
+  - **LIN-4349**: the Periodicals run when work lands, and feed the look-first step (below real work in autopilot's order);
+  - **LIN-4350**: fold rules together (last).
+- **The order:**
+  - LIN-4345 and LIN-4348 run together, then 4346, then 4347, then 4349, then 4350;
+  - each ticket is Surveyed at its own base just before it runs;
+  - my size calls are plain (what and why, not how) until LIN-4346 lands, after which Harbour sizes the rest itself;
+  - I'm logging which version of the loop each ticket ran on.
+- **Surveys dispatched** for LIN-4345 (`e4cde439`, `13aef125`) and LIN-4348 (`0c83fa99`, `71ea3e38`).
