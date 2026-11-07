@@ -2895,3 +2895,7 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **LIN-4345 attempt 2 (PR #2351):** autopilot built the upstream rule on LIN-4345 itself. Scoping now names a cut to the ask (3/3 raise a decision, against 0/3), and review flags a named cut (3/3). But no run names the guide's size cap (the prompt-size budget applied to a public guide), and no review judges sufficiency.
   - Ruling `lin4345-attempt2-size-cut`: suggested **drop-size-with-reason**. The cap is a rule used outside its purpose, so fix that cause where it lives (the budget rule's reach, as a follow-up) rather than adding "name every ceiling" beside the rules.
   - LIN-4346's note will need updating once #2351 lands: the cut naming exists at scoping, so the size step carries it rather than rebuilding it.
+- **~22:00 UTC: LIN-4354, the tidy-after, is Done.** LIN-4360 (`9a29dd55`), LIN-4361 (`93a37ab6`), LIN-4362 (`4654832f`: one owner for the block's words and the brief hint, reason comments, retirement notes) and a final piece (`d65d8af0`: one `issueAccess` adapter).
+  - **Area read sent:** all eight merges of LIN-4345 and its tidy as one change, `fdd57fe9..d65d8af0` (BQ `a76c80c2`, BR `8b51edd1`). Per-piece reads were skipped for the tidy, since the area read is the one that answers the question.
+  - LIN-4345 waits on John for `lin4345-attempt2-size-cut` (PR #2351 open).
+  - **LIN-4358 kicked off** (autopilot `3c973a3f`, Opus).
