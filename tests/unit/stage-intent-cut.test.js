@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { generatePrompt, PROMPT_TEMPLATES } from '../../lib/prompt-templates.js';
 import { STAGE_INTENT } from '../../lib/prompts/stage-intent.js';
+import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 
 const CUT_RULE = 'Cutting the `## As asked` block is not yours';
 const LICENCE = /fixing at the cause and refactoring included, are yours/; // DECIDE's own clause
@@ -40,12 +41,14 @@ describe('the cut rule has one home (LIN-4345)', () => {
     }
   });
 
-  test('the rule carries all three parts: what a cut is, quote it where you write, one ruling unagreed until answered', () => {
+  test('the rule carries all three parts: what a cut is, quote it where you write, one ruling through the closing contract, unagreed until answered', () => {
     const line = STAGE_INTENT.plan[0];
     assert.match(line, /any sentence or clause not delivered in full/);
     assert.match(line, /scope, assumption, design, size limit or another ticket, is a cut/);
     assert.match(line, /Quote each where you write/);
-    assert.match(line, /raise them as one ruling; unanswered, a cut is not agreed/);
+    // The route is named: a plan that can go on building otherwise ends DONE: with the ruling
+    // left in its comment, and Harbour records rulings only from a DECISION: line (replay r06, r13, r14).
+    assert.match(line, /raise them as one ruling, a `DECISION:` before `BLOCKED:`; unanswered, a cut is not agreed/);
   });
 
   test('no other prompt source carries a copy of the rule', () => {
@@ -67,5 +70,10 @@ describe('scoping and plan give the cuts a place (LIN-4345)', () => {
   test('plan opens with the block\'s problem, then each cut, inherited too, with its ruling, or none', () => {
     const { prompt } = generatePrompt('plan', ISSUE, CONTEXT);
     assert.match(prompt, /It opens with the problem as the `## As asked` block puts it and what done will look like: .*marked as the plan's own\. It lists each cut to the block, inherited too, quoted with its ruling, or says none\. If what the ticket asks for has drifted/);
+  });
+
+  test('scoping and plan each carry a completion signal for the cuts', () => {
+    assert.ok(COMPLETION_SIGNALS.scoping.signals.includes('Each cut to the `## As asked` block quoted with its ruling, or none'), 'scoping');
+    assert.ok(COMPLETION_SIGNALS.plan.signals.includes('Each cut to the `## As asked` block, its own or inherited, quoted with its ruling, or none'), 'plan');
   });
 });
