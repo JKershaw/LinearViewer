@@ -147,3 +147,76 @@ open". The rule pushed toward delivering the ask in full, not toward asking abou
   network, given `brief.md` verbatim (the runner's closing contract included), apart from its
   directory and the stage's name. Outputs are in `runs/<id>-<arm>/`; `run-map.tsv` maps the
   opaque ids to arms.
+
+## Route re-run (review finding 1, 7 November)
+
+Review of PR #2351 scored the plan arm 0/3 by the plan's own route, because the three NEW plan
+runs left the ruling in their comment and ended `DONE:`. `CUT` now ends "raise them as one
+ruling, a `DECISION:` before `BLOCKED:`; unanswered, a cut is not agreed". The plan arm and the
+LIN-998 control were run again under that wording.
+
+- **Pre-registration:** `_evidence-2026-11-07-lin4345-upstream-cut/preregistration-route.md`,
+  pushed in `45ffebd0` with the change-log row, before any run started.
+- **Prompts:** `prompt-4085-plan-new2.md` and `prompt-998-plan-new2.md`. Each differs from the
+  first NEW arm's prompt by the 33-byte route clause and nothing else.
+- **Inputs, brief and isolation:** as in the first replay. Six fresh Opus 5.5 subagents, run
+  directories `r19`–`r24` in shuffled order, each with its own clone holding history only up to
+  its start commit (one ref).
+
+### Result
+
+| Stage | First NEW arm (`dfdbb0a8`) | NEW2 (route named) |
+| -- | -- | -- |
+| LIN-4085 plan: cut named | 3 of 3 | **2 of 3** |
+| LIN-4085 plan: cut named **and** `DECISION:` + `BLOCKED:` (review's pass line) | 0 of 3 | **2 of 3** |
+| LIN-998 control: no ruling, `DONE:` | 3 of 3 | **3 of 3** |
+
+| Run | Ticket | Outcome | Cut rulings | Scored |
+| -- | -- | -- | -- | -- |
+| r20 plan | LIN-4085 | `DECISION:` + `BLOCKED:` | 1 (2 cuts: the human clicks; Harbour's settings, which no agent-API route exposes) | pass |
+| r21 plan | LIN-4085 | `DECISION:` + `BLOCKED:` | 1 (1 cut: the human clicks) | pass |
+| r23 plan | LIN-4085 | `DONE:` | 0 ("Cuts to the `## As asked` block: None.") | **fail**: it quotes the human-steps clause and judges it delivered in full |
+| r19 control | LIN-998 | `DONE:` | 0 ("Nothing in the request is cut.") | pass |
+| r22 control | LIN-998 | `DONE:` | 0 ("Cuts: none.") | pass |
+| r24 control | LIN-998 | `DONE:` | 0 ("nothing is cut from what was asked") | pass |
+
+**The route works when a cut is named.** Every run that named a cut ended `DECISION:` +
+`BLOCKED:`, 2 of 2, against 0 of 3 before. Each ruling quotes the clause, recommends accepting
+it, and says the cut is unagreed until answered. Neither plan run put the ruling only in comment
+text. On LIN-998, where the delivered work met the ask in full, all three runs ended `DONE:`
+with no ruling, as before. Naming the route did not make a stage park on a ticket with nothing
+cut.
+
+**Naming the cut fell from 3/3 to 2/3.** r23 quotes "without the user needing to follow those
+steps" and argues the clause is delivered in full. In its words: "the person never reads or
+follows the guide. The agent reads it and asks for each human action at the moment it is
+needed. … Each is a single press the agent asks for, which is 'using the agent naturally'."
+The plan keeps the same human clicks as r20 and r21: OAuth sign-in, the person's own key and the
+runner-key mint. It calls them no cut. This is the stage's own judgement that a reduction is
+not a cut, the same move r06 and r13 made on self-host in the first replay. The route clause
+cannot change this, because the route applies only after a cut is named. With n = 3 per arm, 3/3
+against 2/3 cannot separate a wording effect from run-to-run variance. Each arm has one
+plausible reading that misses.
+
+**Recorded, not scored (feeds `lin4345-attempt2-size-cut`).**
+- **Size: named as a cut in 0 of 3 runs again.** All three LIN-4085 plans add frozen
+  size ceilings for the guide at its measured size (r20 and r21: "the new size ceilings carry
+  their reason"; r23: three ceilings in `prompt-size-budget.test.js`). None names a ceiling as
+  a cut to "a full guide". Across both NEW plan arms, size is 0 of 6.
+- **Self-host: named as a cut in 0 of 3 runs.**
+  - r21 closes the inherited "pointer, not a walkthrough" cut instead of keeping it. It gives
+    the guide a self-host path the agent carries out. That is delivery in full, so there is
+    nothing to name.
+  - r20 and r23 send self-hosters to the README. They argue the README *is* the full guide,
+    so the clause is delivered, not cut.
+
+### Reading, by the pre-registered rule
+
+The plan arm is below 3/3, so by `preregistration-route.md` the result is recorded as it is and
+returns to review, with no more text added in this pass. Finding 1's route gap is closed for
+every cut a stage names: 2 of 2 rulings now reach Harbour as `DECISION:` lines. The control
+shows no over-asking: 0 rulings in 3 runs. What remains open is naming, not routing. A plan
+can still judge a reduction to be delivery and so name nothing (r23 here; r06 and r13 on
+self-host before). The size reduction behind 1 November's thin guide is still named in 0 of 6
+NEW plan runs. Whether that keeps LIN-4345 open is John's ruling `lin4345-attempt2-size-cut`.
+This re-run gives it one more data point and does not settle it.
