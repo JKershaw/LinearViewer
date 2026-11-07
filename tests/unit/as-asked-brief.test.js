@@ -370,4 +370,23 @@ describe('the mock brief builders quote the parent\'s block the same way (LIN-43
     const brief = buildMockBrief({ ...contextOf(sealAsAsked('The child\'s slice.')), parent });
     assert.ok(brief.startsWith(`${sealAsAsked('The child\'s slice.')}\n\n## As asked on the parent, ENG-4345\n\nThe parent's ask.\n\n*End of what was asked on the parent.*\n\n## Current`), brief.slice(0, 300));
   });
+
+  // Review mutation M5 (LIN-4345): the proxy's own test-mode builder must hand the parent
+  // to composeBrief. Driven through the route, so the fixture context must carry the parent
+  // as the live providers do (fixtureParent), not a hard-coded null.
+  test('the proxy route in test mode: a fixture subtask of a sealed parent opens with both quotes', async () => {
+    const child = testMockData.issues.find(i => i.identifier === 'TEST-2');
+    const parent = testMockData.issues.find(i => i.id === child.parent.id);
+    const saved = [child.description, parent.description];
+    child.description = sealAsAsked('The child\'s slice.');
+    parent.description = sealAsAsked('The parent\'s ask.');
+    try {
+      const app = proxyApp({ provider: new FakeContextProvider('as-asked-proxy-mock-parent', ''), token: 'test-token', briefCacheStore: new InMemoryBriefCacheStore() });
+      const { status, body } = await call(app, 'GET', '/api/proxy/issues/TEST-2/brief');
+      assert.equal(status, 200, JSON.stringify(body));
+      assert.ok(body.brief.startsWith(`${sealAsAsked('The child\'s slice.')}\n\n## As asked on the parent, ${parent.identifier}\n\nThe parent's ask.\n\n*End of what was asked on the parent.*\n\n## Current`), body.brief.slice(0, 300));
+    } finally {
+      [child.description, parent.description] = saved;
+    }
+  });
 });
