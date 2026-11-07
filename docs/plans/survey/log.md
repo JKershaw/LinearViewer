@@ -2729,3 +2729,11 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - the spirit of the earlier versions and the data.
 
   These went into the brief as one plain paragraph, rather than as a follow-up mid-draft. I stopped `14a57475` and redispatched as `2bbf7360` (`opus`, `custom`).
+- **LIN-4340 draft up** as [PR #2343](https://github.com/JKershaw/LinearViewer/pull/2343), *Clearing up as it goes*. It was written in about 11 minutes by one writer on `opus`, from the plain brief. CI is green. I read all of it and rendered the new and relabelled figures.
+  - **It answers the question in its first line.**
+  - **The centre is a new figure of the two pipelines,** carried by a kitchen ("clean as you go"), a ratchet and a junk drawer.
+  - **There are no ticket IDs in the body.**
+  - **The overturn reads as a story,** and the morning's observations are marked as observations.
+  - **The two claims I checked hold:** the pair rule was fixed before any result, and "network of tasks" and the two dials are John's.
+
+  Against v3 (written to a checklist on the default model), this is the clearest evidence so far for the plain brief and the right contractor. Not merged; John reads it first.
