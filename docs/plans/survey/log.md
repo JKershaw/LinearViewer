@@ -2706,3 +2706,19 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - 13 limit bullets meet "every limit" but weigh against "don't undersell";
     - a few clumsy lines.
   - The global Survey predicted this: "a v3 written whole from [a checklist brief] could reproduce [the seams]". Discussed with John before any further rewrite.
+
+- **7 Nov, morning: stepping back.** Discussed with John.
+  - **The photocopy.** Each hand-off loses intent and gains detail. In the stage templates:
+    - the Surveys are plain (1–2k characters) and gave the best judgement;
+    - review checks against the plan, and close-out reads only review's ledger;
+    - the prune deletes the plan's reasons;
+    - Survey findings reach the pipeline only through my hand-written scope.
+  - **My habit mirrors the agents'.** I add rules beside rules, as they add code beside code.
+  - **The counterweights:**
+    - plain briefs in the client's words, which every step reads directly (a hub, not a relay);
+    - a rule-of-three consolidation, keeping the incidents as test cases;
+    - the parrot on briefs.
+  - **The model.** `implementation` routes to Haiku by default, which suits a strict list and is wrong for an essay.
+- **LIN-4340 filed and dispatched** (essay version 4). It went directly to one writer on `opus`, as a `custom` dispatch, not through autopilot (`14a57475`).
+  - The brief is plain, about 440 words, parroted against John's words before it went out.
+  - The writer gets one fresh reader, then opens a PR; John reads it before the merge.
