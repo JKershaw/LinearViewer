@@ -143,13 +143,13 @@ describe('an unsealed ticket reads as today', () => {
     assert.equal(trailPlan('plan-review due: no\n\n## Implementation Plan\n\nplan-review due: yes').planReviewDue, 'no');
   });
 
-  test('round-trips still finds a yes anywhere in the description', () => {
-    assert.equal(gateDue('plan-review due: no\n\nplan-review due: yes'), true);
+  test('round-trips reads the due line as the selector does: the first line, plain or bold, value on that line', () => {
+    assert.equal(gateDue('plan-review due: no\n\nplan-review due: yes'), false, 'due-line case 2: a no line followed by a yes line now counts as not due (the first line wins)');
     assert.equal(gateDue('plan-review due: no'), false);
-    assert.equal(gateDue('**plan-review due:** yes'), false, 'the bold form never matched GATE_DUE_MARKER; unchanged');
+    assert.equal(gateDue('**plan-review due:** yes'), true, 'due-line case 1: the bold form now counts as due');
     assert.equal(gateDue('no due line at all'), false);
-    assert.equal(gateDue('plan-review due:\nyes'), true, 'GATE_DUE_MARKER\'s \\s* spans a newline; unchanged');
-    assert.equal(gateDue('plan-review due: yesterday'), true, 'GATE_DUE_MARKER has no \\b; unchanged');
+    assert.equal(gateDue('plan-review due:\nyes'), false, 'due-line case 3: yes on the next line no longer counts');
+    assert.equal(gateDue('plan-review due: yesterday'), false, 'due-line case 4: `yesterday` no longer counts');
   });
 
   test('session fit keeps its priority order over the whole description', () => {

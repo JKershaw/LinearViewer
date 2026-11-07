@@ -53,7 +53,7 @@ import { extractPeriodicalGateId } from '../lib/periodicals.js';
 import { flattenIssue, MAX_ATTACHMENT_BYTES } from '../lib/proxy-wire.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
-import { checkAsAsked, splitAsAsked, hasMarkerLine } from '../lib/as-asked.js';
+import { checkAsAsked, splitAsAsked, hasMarkerLine, askedText } from '../lib/as-asked.js';
 import { sealForFiling } from '../lib/as-asked-seal.js';
 import { jsonError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
@@ -315,7 +315,7 @@ export function createProxyWriteRoutes({
     const check = checkAsAsked(live, next);
     if (check.ok) return false;
     const quote = (line) => (line === null || line === undefined ? '(no line)' : JSON.stringify(line));
-    const firstLine = (text) => splitAsAsked(text)?.words.split('\n')[0];
+    const firstLine = (text) => askedText(text).split('\n')[0];
     const what = {
       changed: `line ${check.line?.number} of the block would change from ${quote(check.line?.expected)} to ${quote(check.line?.actual)}`,
       removed: `the new description drops the block, starting at its line 1, ${quote(firstLine(live))}`,

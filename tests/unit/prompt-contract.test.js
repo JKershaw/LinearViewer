@@ -9,7 +9,7 @@ import { formatStageContract } from '../../lib/prompt-contract.js';
 import { latestReviewComment, readRunLedger } from '../../lib/run-ledger.js';
 import { extractPlanSection } from '../../lib/file-pointer.js';
 import { extractSessionFit } from '../../lib/recommendation-facts.js';
-import { extractVerdict, __internal as roundTrips } from '../../lib/plan-review-round-trips.js';
+import { extractVerdict, planReviewDueOf } from '../../lib/plan-review-round-trips.js';
 import { AS_ASKED_HEADING } from '../../lib/as-asked.js';
 import { extractPrUrls } from '../../lib/run-evidence.js';
 
@@ -38,8 +38,8 @@ test('plan: the heading, session-fit phrase and gate line are the ones their rea
   assert.strictEqual(extractPlanSection(`Intro\n\n${heading}\n\n- lib/a.js: change\n`).trim(), '- lib/a.js: change');
   assert.strictEqual(extractSessionFit(`${heading}\n\n${fits}`), 'fits one session');
   assert.strictEqual(extractSessionFit(`${heading}\n\n${multi}`), 'needs multiple sessions');
-  assert.ok(roundTrips.GATE_DUE_MARKER.test(dueYes));
-  assert.ok(!roundTrips.GATE_DUE_MARKER.test(dueNo));
+  assert.strictEqual(planReviewDueOf(dueYes), 'yes');
+  assert.strictEqual(planReviewDueOf(dueNo), 'no');
 });
 
 test('plan-review: the verdict comment shape resolves its verdict, even when a finding names another word', () => {
@@ -107,7 +107,7 @@ test('close-out: the literals it keeps through the prune are the ones the reader
   const stub = `Shipped in PR 12.\n\n## ${ticks(c)[1]}\n\n- lib/a.js\n\nfits one session\n\n${ticks(c)[4]} yes`;
   assert.strictEqual(extractPlanSection(stub).trim().split('\n')[0], '- lib/a.js');
   assert.strictEqual(extractSessionFit(stub), 'fits one session');
-  assert.ok(roundTrips.GATE_DUE_MARKER.test(stub));
+  assert.strictEqual(planReviewDueOf(stub), 'yes');
   // LIN-4353: the block it says is never pruned is the one lib/as-asked.js reads.
   assert.strictEqual(ticks(c)[5], AS_ASKED_HEADING);
 });
