@@ -1,27 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="960" height="640" viewBox="0 0 960 640" font-family="Inter, system-ui, sans-serif" font-size="12" role="img" aria-label="Nine finished-move area readings, all better in both blind passes, beside four ordinary pre-loop pairs, of which one is better in both passes. Each row has two cells, pass 1 and pass 2."><style data-figure-theme="1">@media (prefers-color-scheme: dark){rect[fill="#fff"]:not([fill-opacity]),rect[fill="#ffffff"]:not([fill-opacity]),rect[fill="white"]:not([fill-opacity]){fill:#16181d}[stroke="#fff"],[stroke="#ffffff"],[stroke="white"]{stroke:#16181d}circle[fill="#fff"]:not([fill-opacity]),circle[fill="#ffffff"]:not([fill-opacity]),circle[fill="white"]:not([fill-opacity]){fill:#16181d}path[fill="#fff"]:not([fill-opacity]),path[fill="#ffffff"]:not([fill-opacity]),path[fill="white"]:not([fill-opacity]){fill:#16181d}polygon[fill="#fff"]:not([fill-opacity]),polygon[fill="#ffffff"]:not([fill-opacity]),polygon[fill="white"]:not([fill-opacity]){fill:#16181d}ellipse[fill="#fff"]:not([fill-opacity]),ellipse[fill="#ffffff"]:not([fill-opacity]),ellipse[fill="white"]:not([fill-opacity]){fill:#16181d}text[fill="#111827"]:not([data-on-fill]),text[fill="#1f2937"]:not([data-on-fill]),text[fill="#333"]:not([data-on-fill]),text[fill="#1f2328"]:not([data-on-fill]),text[fill="#555"]:not([data-on-fill]),text[fill="#475569"]:not([data-on-fill]){fill:#e6e6e6}[stroke="#111827"],[stroke="#1f2937"],[stroke="#333"],[stroke="#1f2328"],[stroke="#555"],[stroke="#475569"]{stroke:#e6e6e6}text[fill="#6b7280"]:not([data-on-fill]),text[fill="#666"]:not([data-on-fill]),text[fill="#667085"]:not([data-on-fill]),text[fill="#888"]:not([data-on-fill]),text[fill="#6e7781"]:not([data-on-fill]),text[fill="#999"]:not([data-on-fill]),text[fill="#aaa"]:not([data-on-fill]),text[fill="#bbb"]:not([data-on-fill]),text[fill="#9ca3af"]:not([data-on-fill]),text[fill="#94a3b8"]:not([data-on-fill]){fill:#9aa0a6}[stroke="#6b7280"],[stroke="#666"],[stroke="#667085"],[stroke="#888"],[stroke="#6e7781"],[stroke="#999"],[stroke="#aaa"],[stroke="#bbb"],[stroke="#9ca3af"],[stroke="#94a3b8"]{stroke:#9aa0a6}[stroke="#e5e7eb"],[stroke="#eee"],[stroke="#d1d5db"],[stroke="#f0f0f0"],[stroke="#cbd5e1"],[stroke="#d9d9d9"]{stroke:#2c313a}[fill="#f3f4f6"],[fill="#f9fafb"]{fill:#1f222a}rect[fill="#f0f0f0"],rect[fill="#d1d5db"],rect[fill="#e5e7eb"],rect[fill="#eee"]{fill:#2c313a}text:not([fill]):not([class]):not([data-on-fill]){fill:#e6e6e6}rect[fill="#1f2937"],circle[fill="#1f2937"],path[fill="#1f2937"]{fill:#4b5563}rect[fill="#3b1f5e"],circle[fill="#3b1f5e"],path[fill="#3b1f5e"]{fill:#553185}svg .t,svg .h{fill:#e6e6e6}svg .a,svg .s{fill:#9aa0a6}svg .f{fill:#1f222a;stroke:#2c313a}svg .g{stroke:#2c313a}rect[fill="#dbeafe"]{fill:#1d2d44}rect[fill="#93c5fd"]{fill:#2a5a9a}rect[fill="#fff7ed"]{fill:#2a2118}}</style><rect x="0" y="0" width="960" height="640" fill="#fff"/>
 <text x="20" y="28" font-size="14" font-weight="600" fill="#111827">Finished moves, read as one area each</text>
 <text x="20" y="46" font-size="11" fill="#6b7280">Nine readings over fifteen tickets. Two tickets sit in two readings each, so the tickets are counted once.</text>
-<text x="476" y="66" font-size="10.5" fill="#6b7280" text-anchor="middle">pass 1</text>
-<text x="578" y="66" font-size="10.5" fill="#6b7280" text-anchor="middle">pass 2</text>
+<text x="476" y="66" font-size="10.5" fill="#6b7280" text-anchor="middle">reader 1</text>
+<text x="578" y="66" font-size="10.5" fill="#6b7280" text-anchor="middle">reader 2</text>
 <text x="20" y="95" font-size="11.5" fill="#111827">run-end and repaint, then tidy</text>
 <text x="290" y="95" font-size="10.5" fill="#6b7280">3 tickets</text>
 <rect x="430" y="81" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="476" y="96" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
 <rect x="532" y="81" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="578" y="96" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
-<text x="20" y="125" font-size="11.5" fill="#111827">preamble PR wording, then its tidy</text>
+<text x="20" y="125" font-size="11.5" fill="#111827">pull-request wording, then its tidy</text>
 <text x="290" y="125" font-size="10.5" fill="#6b7280">2 tickets</text>
 <rect x="430" y="111" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="476" y="126" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
 <rect x="532" y="111" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="578" y="126" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
-<text x="20" y="155" font-size="11.5" fill="#111827">test stand-in + its follow-on</text>
+<text x="20" y="155" font-size="11.5" fill="#111827">shared test helper, then its follow-on</text>
 <text x="290" y="155" font-size="10.5" fill="#6b7280">2 tickets</text>
 <rect x="430" y="141" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="476" y="156" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
 <rect x="532" y="141" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="578" y="156" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
-<text x="20" y="185" font-size="11.5" fill="#111827">the census move</text>
+<text x="20" y="185" font-size="11.5" fill="#111827">moving the last fake pages</text>
 <text x="290" y="185" font-size="10.5" fill="#6b7280">1 ticket</text>
 <rect x="430" y="171" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="476" y="186" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
@@ -33,56 +33,56 @@
 <text x="476" y="216" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
 <rect x="532" y="201" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="578" y="216" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
-<text x="20" y="245" font-size="11.5" fill="#111827">cost read + tidy-after</text>
+<text x="20" y="245" font-size="11.5" fill="#111827">cost split, then its tidy</text>
 <text x="290" y="245" font-size="10.5" fill="#6b7280">2 tickets</text>
 <rect x="430" y="231" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="476" y="246" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
 <rect x="532" y="231" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="578" y="246" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
-<text x="20" y="275" font-size="11.5" fill="#111827">guards removed + one spelling</text>
+<text x="20" y="275" font-size="11.5" fill="#111827">defensive checks removed, one rule</text>
 <text x="290" y="275" font-size="10.5" fill="#6b7280">2 tickets</text>
 <rect x="430" y="261" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="476" y="276" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
 <rect x="532" y="261" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="578" y="276" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
-<text x="20" y="305" font-size="11.5" fill="#111827">fake DOM models select; suites move</text>
+<text x="20" y="305" font-size="11.5" fill="#111827">shared fake gains dropdowns; tests move</text>
 <text x="290" y="305" font-size="10.5" fill="#6b7280">2 tickets</text>
 <rect x="430" y="291" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="476" y="306" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
 <rect x="532" y="291" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="578" y="306" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
-<text x="20" y="335" font-size="11.5" fill="#111827">mint route, then one grant rule</text>
+<text x="20" y="335" font-size="11.5" fill="#111827">review-run route, then one rule</text>
 <text x="290" y="335" font-size="10.5" fill="#6b7280">2 tickets</text>
 <rect x="430" y="321" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="476" y="336" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
 <rect x="532" y="321" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="578" y="336" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
-<text x="20" y="388" font-size="14" font-weight="600" fill="#111827">Ordinary pre-loop pairs, read the same way</text>
+<text x="20" y="388" font-size="14" font-weight="600" fill="#111827">Ordinary earlier pairs, read the same way</text>
 <text x="20" y="406" font-size="11" fill="#6b7280">Four pairs of consecutive changes to the same files, from 20 October. Pairs are not untouched areas.</text>
-<text x="20" y="427" font-size="11.5" fill="#111827">free-tier seam, urlKey registry</text>
+<text x="20" y="427" font-size="11.5" fill="#111827">free-tier check, then a key registry</text>
 <text x="290" y="427" font-size="10.5" fill="#6b7280">shares 1 file</text>
 <rect x="430" y="413" width="92" height="22" rx="4" fill="#9ca3af"/>
 <text x="476" y="428" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">mixed</text>
 <rect x="532" y="413" width="92" height="22" rx="4" fill="#9ca3af"/>
 <text x="578" y="428" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">mixed</text>
-<text x="20" y="457" font-size="11.5" fill="#111827">KPI trend charts + cost figure</text>
+<text x="20" y="457" font-size="11.5" fill="#111827">stats charts, then a cost figure</text>
 <text x="290" y="457" font-size="10.5" fill="#6b7280">shares 3 files</text>
 <rect x="430" y="443" width="92" height="22" rx="4" fill="#9ca3af"/>
 <text x="476" y="458" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">mixed</text>
 <rect x="532" y="443" width="92" height="22" rx="4" fill="#9ca3af"/>
 <text x="578" y="458" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">mixed</text>
-<text x="20" y="487" font-size="11.5" fill="#111827">loop-terminal checks, one stop rule</text>
+<text x="20" y="487" font-size="11.5" fill="#111827">end-of-run checks, then one stop rule</text>
 <text x="290" y="487" font-size="10.5" fill="#6b7280">a consolidation</text>
 <rect x="430" y="473" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="476" y="488" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
 <rect x="532" y="473" width="92" height="22" rx="4" fill="#2a78d6"/>
 <text x="578" y="488" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">better</text>
-<text x="20" y="517" font-size="11.5" fill="#111827">workspace KPI charts + PR times</text>
+<text x="20" y="517" font-size="11.5" fill="#111827">workspace charts, then PR times</text>
 <text x="290" y="517" font-size="10.5" fill="#6b7280">shares 4 files</text>
 <rect x="430" y="503" width="92" height="22" rx="4" fill="#9ca3af"/>
 <text x="476" y="518" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">mixed</text>
 <rect x="532" y="503" width="92" height="22" rx="4" fill="#9ca3af"/>
 <text x="578" y="518" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">mixed</text>
-<text x="20" y="600" font-size="11" fill="#111827">Not loop against no loop. Each pair was scored by the same prompt as the areas, so the two groups share one instrument.</text>
-<text x="20" y="618" font-size="11" fill="#6b7280">Blue: better. Grey: mixed (no pass read any subject worse). Source: cleaner-than-it-started-evidence/2026-11-06-v2/analysis.json.</text>
+<text x="20" y="600" font-size="11" fill="#111827">Not a comparison with untouched code. Both groups were judged by the same readers with the same instructions.</text>
+<text x="20" y="618" font-size="11" fill="#6b7280">Blue: better. Grey: mixed (no reader judged any of these worse). Source: cleaner-than-it-started-evidence/2026-11-06-v2/analysis.json.</text>
 </svg>
