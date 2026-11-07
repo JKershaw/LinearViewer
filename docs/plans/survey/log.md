@@ -2796,3 +2796,7 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - done includes "the essay reads well".
 - **The order is revised:** LIN-4348 runs after LIN-4345 (they share the templates and the size budget), with a note on LIN-4344.
 - **LIN-4345 kicked off:** autopilot `f42b8d02`, Opus at every stage. Loop version: hand-sized (v0).
+- **~10:15 UTC, John: everything new runs on Opus for now.** The loop working matters more than its cost, and tuning down comes later.
+  - The routing table now has every agent step on Opus: the job overrides on implementation (Haiku), plan, close-out, autopilot and triage (Sonnet) are cleared to their groups (routing log 22–26, undoable).
+  - There's a note on LIN-4348: its cost ruling isn't needed, and the Haiku default is moot for now.
+  - Harbour's own calls are unchanged. Noted for John: `brief`, the distilled brief every stage reads first (the photocopy step LIN-4345 is about), runs on `openai/gpt-5.4-mini`.
