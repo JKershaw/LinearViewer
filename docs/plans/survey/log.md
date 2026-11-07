@@ -2822,3 +2822,9 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **Found:** the brief model (`gpt-5.4-mini`) repeated a block phrase and restated the ask's formatting in its own sections, despite being told not to. This was passed to LIN-4353, and it bears on John's open call on the brief model.
   - Close-out filed LIN-4355 (Jira can't hold the block) and LIN-4356 (a local live-console width test on macOS) as follow-ons.
   - At-merge reads sent: BM `73e48ea6`, BN `9981b3aa`, after-questions `346213bb` into `7c3d07b0`.
+- **LIN-4352 at merge: mixed, mixed (BM, BN).** The seal decision has one owner (`sealForFiling` across four lanes), with a provider capability rather than a list of names, and the registries were updated carefully. But it deletes nothing (+1846/−32) and puts a provider write inside the crowded `createDispatchItem`.
+  - The copies (`settleWithin`, `hasDispatchForIssue`, `carriesStageState`, three access adapters, two as-asked modules) are named by the reads and the builder alike, and were added to tidy-after LIN-4354.
+  - BN: the close-out prompt still points at the PATCH the guard refuses. That's piece C's job, already building.
+  - **A pattern returns:** the code comments cite the plan's labels ("beat 3", "witness 4", "likeliest break 2"), which is the plan's detail leaking into the code (cf. LIN-4255's false comment). It went to LIN-4354, and it's a candidate for the step-back: should a plan's labels ever reach the code?
+  - The builder on q7: the larger scope paid, because the guard and the seals prove nothing apart.
+- **LIN-4353 (piece C) is building** (since 13:42).
