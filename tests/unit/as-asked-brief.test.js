@@ -320,3 +320,54 @@ describe('the session brief route serves the quoted brief, fresh and cached', ()
     assert.equal(body.brief, MODEL_BRIEF);
   });
 });
+
+// John's ruling on LIN-4345 (whose words count, 7 Nov): the brief also quotes the parent's
+// block for breakdown children. A breakdown child's own block holds the agent's slice of the
+// plan; the person's words are on the parent. So a subtask whose parent carries a block gets
+// that block quoted too, byte for byte, under its own labelled heading after the child's quote.
+// Every subtask is covered, not only breakdown children: they carry no durable marker beyond
+// template prose, and the quote is labelled as the parent's, so it cannot misattribute words.
+describe('a subtask\'s brief also quotes its parent\'s block (LIN-4353, the whose-words ruling)', () => {
+  const PARENT_ASK = 'Write a full guide on how to properly configure Harbour.\n\n## Current\nThe parent person\'s own heading.';
+  const CHILD_SLICE = 'Piece A of the parent\'s plan: the guide route.';
+  const parentOf = (description) => ({ id: 'uuid-p', identifier: 'ENG-4345', title: 'Parent', description, state: { type: 'started' } });
+  const childContext = (childDesc, parentDesc) => ({ ...contextOf(childDesc), parent: parentOf(parentDesc) });
+  const PARENT_QUOTE = `## As asked on the parent, ENG-4345\n\n${PARENT_ASK}\n\n*End of what was asked on the parent.*`;
+
+  test('a sealed child under a sealed parent: the child\'s words, then the parent\'s, then the model', async () => {
+    installModelStub();
+    const { brief } = await generateBrief(issueOf(sealAsAsked(CHILD_SLICE)), childContext(sealAsAsked(CHILD_SLICE), sealAsAsked(PARENT_ASK)), { apiKey: 'sk-test' });
+    assert.equal(brief, `${sealAsAsked(CHILD_SLICE)}\n\n${PARENT_QUOTE}\n\n${MODEL_BRIEF}`);
+    assert.equal(briefCurrentSection(brief), MODEL_CURRENT, 'the parent\'s own ## Current is not the brief\'s Current');
+    assert.equal(brief.slice(briefQuoteEnd(brief)).trimStart(), MODEL_BRIEF, 'the quotes end where the model begins');
+  });
+
+  test('an unsealed child under a sealed parent still gets the parent\'s words', () => {
+    const brief = composeBrief(CHILD_SLICE, MODEL_BRIEF, parentOf(sealAsAsked(PARENT_ASK)));
+    assert.equal(brief, `${PARENT_QUOTE}\n\n${MODEL_BRIEF}`);
+    assert.equal(briefCurrentSection(brief), MODEL_CURRENT);
+  });
+
+  test('a parent with no block adds nothing, and no model output still stays empty', () => {
+    assert.equal(composeBrief(sealAsAsked(CHILD_SLICE), MODEL_BRIEF, parentOf(PARENT_ASK)), `${sealAsAsked(CHILD_SLICE)}\n\n${MODEL_BRIEF}`);
+    assert.equal(composeBrief(sealAsAsked(CHILD_SLICE), '', parentOf(sealAsAsked(PARENT_ASK))), '');
+  });
+
+  test('the cache key follows the parent\'s words, and is unchanged for a parent with no block', async () => {
+    const { hashContext } = await import('../../lib/brief-cache.js');
+    const plain = childContext(CHILD_SLICE, PARENT_ASK);
+    const legacy = { ...plain, parent: { id: 'uuid-p', identifier: 'ENG-4345', state: { type: 'started' } } };
+    assert.equal(hashContext(plain), hashContext(legacy), 'an unsealed parent leaves the key as it was (no cache churn)');
+    const sealed = hashContext(childContext(CHILD_SLICE, sealAsAsked(PARENT_ASK)));
+    assert.notEqual(sealed, hashContext(plain));
+    assert.notEqual(sealed, hashContext(childContext(CHILD_SLICE, sealAsAsked(`${PARENT_ASK} Edited.`))), 'a person editing the parent\'s ask regenerates the child\'s brief');
+  });
+});
+
+describe('the mock brief builders quote the parent\'s block the same way (LIN-4353)', () => {
+  test('buildMockBrief: a subtask of a sealed parent opens with both quotes', () => {
+    const parent = { id: 'uuid-p', identifier: 'ENG-4345', title: 'Parent', description: sealAsAsked('The parent\'s ask.'), state: { type: 'started' } };
+    const brief = buildMockBrief({ ...contextOf(sealAsAsked('The child\'s slice.')), parent });
+    assert.ok(brief.startsWith(`${sealAsAsked('The child\'s slice.')}\n\n## As asked on the parent, ENG-4345\n\nThe parent's ask.\n\n*End of what was asked on the parent.*\n\n## Current`), brief.slice(0, 300));
+  });
+});

@@ -221,7 +221,7 @@ export function createComputeRoutes({
       lines.push('- _None._');
     }
 
-    return composeBrief(issue.description, lines.join('\n'));
+    return composeBrief(issue.description, lines.join('\n'), context.parent);
   }
 
   // =========================================================================
