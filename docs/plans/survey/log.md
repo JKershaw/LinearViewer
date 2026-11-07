@@ -2837,3 +2837,18 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - The parrot narrowed my first draft back to John's two asks (choose well from the data, and automate), marked the truncation's cause as unconfirmed (the check already reads the catalog first), and took "the brief runs on Haiku" out of done, since which model is John's call.
   - Surveys dispatched (`201f6028`, `89a41339`). It can run beside LIN-4353 (different files) and before LIN-4348 (which touches routing).
 - **John: "If we find a model that's better and cheaper, I'm happy to move the free tier to it."** This is a standing grant for LIN-4358, folded into its size call as one hand-off: move the free tier's default when the evidence shows a model that is both cheaper and better, with the evidence in the PR and every free-tier job working whole. Other changes to free-tier spending are still a ruling.
+- **14:20 UTC, LIN-4353 ruling `lin4353-agreed-narrowing`.** LIN-4353's own LIN-4085 replay found that the new review prompt *still* approved the thin guide, reading scoping's scope and the plan as agreement to narrow. Options: tighten (only the person's comment or a ruling counts as agreement; rerun the replay and record both runs) or ledger (record the miss). I suggested **tighten**. It waits on John. The replay witness did its job before merge.
+- **LIN-4358's Surveys:**
+  - The brief never asks for a reasoning budget (a bare 3,000 cap), and nor do most Harbour calls. Only roadmap and ship-biscuit use `resolveReasoningBudget`.
+  - `finishReason` is discarded, so partials are cached as whole.
+  - The catalog reader was written against an unverified shape, with no limit fields.
+  - The catalog has no quality data.
+- **LIN-4358's size call**, parroted twice, is posted. Err larger:
+  - confirm the cause from the call log;
+  - give every call a catalog-sized budget;
+  - make cut-offs loud, with no cached partials;
+  - read model facts from the catalog, with each remaining list saying why;
+  - recommend a model per call from the Library's benchmark analysis, for John to choose;
+  - bring the free-tier move as a recommendation John confirms, with the price-ceiling rule as a ruling.
+
+  Order: after LIN-4353, which is changing `lib/brief.js`.
