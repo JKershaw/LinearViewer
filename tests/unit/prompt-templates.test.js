@@ -4421,6 +4421,17 @@ describe('judging verdicts state how the work met what was asked (LIN-4353)', ()
     });
   }
 
+  // LIN-4353 replay: with "a narrowing nobody agreed to is Needs Discussion" alone, the reviewer
+  // read scoping's Scope and the approved plan as agreement and approved LIN-4085's thin guide.
+  // Only the person who asked can agree: their own comment or an answered ruling.
+  for (const key of ['review', 'plan-review']) {
+    test(`${key}: only the person's comment or an answered ruling is agreement, never a stage's scope or plan`, () => {
+      const { prompt } = generatePrompt(key, issue, context);
+      assert.ok(sentenceWith(prompt, [/agree/i, /comment/i, /answered ruling/i, /scope or plan/i]),
+        `${key} must say that only the person's own comment or an answered ruling counts as agreement, not a stage's scope or plan`);
+    });
+  }
+
   test('review names any narrowing, and an unagreed narrowing is Needs Discussion', () => {
     const { prompt } = generatePrompt('review', issue, context);
     assert.ok(sentenceWith(prompt, [/narrow/i, /Needs Discussion/]),
