@@ -225,12 +225,12 @@ function proxyApp({ provider, token = 'real-token', briefCacheStore }) {
   return app;
 }
 
-function sessionApp({ providerName, briefCacheStore }) {
+function sessionApp({ providerName, briefCacheStore, token = 'real-token' }) {
   const app = express();
   app.use(express.json());
   app.use(createWorkspaceApiRoutes({
     workspaceFromUrl: (req, _res, next) => {
-      req.workspace = { accessToken: 'real-token', urlKey: 'acme', provider: providerName };
+      req.workspace = { accessToken: token, urlKey: 'acme', provider: providerName };
       req.session = { features: {}, openRouterApiKey: 'sk-test' };
       next();
     },
@@ -383,6 +383,27 @@ describe('the mock brief builders quote the parent\'s block the same way (LIN-43
     try {
       const app = proxyApp({ provider: new FakeContextProvider('as-asked-proxy-mock-parent', ''), token: 'test-token', briefCacheStore: new InMemoryBriefCacheStore() });
       const { status, body } = await call(app, 'GET', '/api/proxy/issues/TEST-2/brief');
+      assert.equal(status, 200, JSON.stringify(body));
+      assert.ok(body.brief.startsWith(`${sealAsAsked('The child\'s slice.')}\n\n## As asked on the parent, ${parent.identifier}\n\nThe parent's ask.\n\n*End of what was asked on the parent.*\n\n## Current`), body.brief.slice(0, 300));
+    } finally {
+      [child.description, parent.description] = saved;
+    }
+  });
+
+  // Review mutation M7 (LIN-4345): the in-app twin. Under a test token the session brief
+  // route loads its context from buildMockRecapContext (lib/workspace-api-mocks.js, via
+  // loadContext in routes/workspace-api-steps.js), which must carry the fixture's parent
+  // as the live providers do. With that builder's parent set to null, this goes red.
+  test('the in-app brief route in test mode: a fixture subtask of a sealed parent opens with both quotes', async () => {
+    const child = testMockData.issues.find(i => i.identifier === 'TEST-2');
+    const parent = testMockData.issues.find(i => i.id === child.parent.id);
+    const saved = [child.description, parent.description];
+    child.description = sealAsAsked('The child\'s slice.');
+    parent.description = sealAsAsked('The parent\'s ask.');
+    try {
+      registerProvider(new FakeContextProvider('as-asked-session-mock-parent', ''));
+      const app = sessionApp({ providerName: 'as-asked-session-mock-parent', token: 'test-token', briefCacheStore: new InMemoryBriefCacheStore() });
+      const { status, body } = await call(app, 'POST', '/workspace/acme/api/brief/TEST-2', {});
       assert.equal(status, 200, JSON.stringify(body));
       assert.ok(body.brief.startsWith(`${sealAsAsked('The child\'s slice.')}\n\n## As asked on the parent, ${parent.identifier}\n\nThe parent's ask.\n\n*End of what was asked on the parent.*\n\n## Current`), body.brief.slice(0, 300));
     } finally {
