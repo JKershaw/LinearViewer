@@ -53,7 +53,7 @@ import { extractPeriodicalGateId } from '../lib/periodicals.js';
 import { flattenIssue, MAX_ATTACHMENT_BYTES } from '../lib/proxy-wire.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
-import { checkAsAsked, splitAsAsked, hasMarkerLine, askedText } from '../lib/as-asked.js';
+import { checkAsAsked, splitAsAsked, hasMarkerLine, askedText, AS_ASKED_HEADING } from '../lib/as-asked.js';
 import { sealForFiling } from '../lib/as-asked-seal.js';
 import { jsonError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
@@ -63,7 +63,7 @@ const BAD_ISSUE_ID = 'Invalid issue ID format';
 const COMMENT_TOO_LONG = `body exceeds maximum length of ${MAX_COMMENT_LENGTH}`;
 const RELATION_TYPES = ['blocks', 'blocked-by', 'duplicate', 'related'];
 // LIN-4352: the As asked guard's refusal wording, shared by every refused write.
-const AS_ASKED_LEAD = 'The "## As asked" block holds the words as filed, and no step may change them';
+const AS_ASKED_LEAD = 'The "' + AS_ASKED_HEADING + '" block holds the words as filed, and no step may change them';
 const AS_ASKED_REMEDY = 'Write around it: append, replace a span below the block, or use description/below.';
 
 // Body-size exception, scoped to the attachments route only (mirrors the feedback
@@ -359,7 +359,7 @@ export function createProxyWriteRoutes({
     // or escaped). Code seals the block; a marker in the body would forge one, or
     // end a later seal early.
     if (hasMarkerLine(description)) {
-      return refuse(ctx, 422, `${AS_ASKED_LEAD}: this description already contains an As asked marker line ("## As asked" or the end sentence), and only code writes those. Remove that line and file again.`, { code: 'AS_ASKED_IMMUTABLE', kind: 'marker' });
+      return refuse(ctx, 422, `${AS_ASKED_LEAD}: this description already contains an As asked marker line ("${AS_ASKED_HEADING}" or the end sentence), and only code writes those. Remove that line and file again.`, { code: 'AS_ASKED_IMMUTABLE', kind: 'marker' });
     }
 
     // LIN-2352: a create has no fetched issue to derive a team from, so supply
@@ -626,7 +626,7 @@ export function createProxyWriteRoutes({
   function keepBlockThen(current, body) {
     const parts = splitAsAsked(current);
     if (!parts) {
-      throw new DescriptionEditError('NO_AS_ASKED_BLOCK', 'This description has no "## As asked" block, so there is nothing to write below. To rewrite the whole body, use PATCH /api/proxy/issues/{issueId} with { "description": "..." }; to add to it, use description/append.', undefined);
+      throw new DescriptionEditError('NO_AS_ASKED_BLOCK', 'This description has no "' + AS_ASKED_HEADING + '" block, so there is nothing to write below. To rewrite the whole body, use PATCH /api/proxy/issues/{issueId} with { "description": "..." }; to add to it, use description/append.', undefined);
     }
     const kept = current.slice(0, parts.end);
     return body ? `${kept}\n\n${body}` : kept;
