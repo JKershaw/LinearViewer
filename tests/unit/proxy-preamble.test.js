@@ -101,6 +101,10 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
     // "supersedes stale wording": it opens with the person's words, quoted by code from the
     // description's `## As asked` block, which the proxy refuses to change; the rest is the
     // present state. Every other line of the block is unchanged.
+    //
+    // NOTE (LIN-4362): a deliberate re-pin of the same hint. Its wording is now BRIEF_HINT in
+    // lib/as-asked.js, shared with the four other surfaces that point at the brief, so the two
+    // lines it was wrapped across join into one. The words are the same; every other line is unchanged.
     const expected = [
       '',
       '',
@@ -119,8 +123,7 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
       'Full endpoint catalog: GET https://host/api/proxy/instructions',
       '',
       'Start from the distilled brief: GET https://host/api/proxy/brief/LIN-42',
-      "(it opens with the person's words, quoted from the description's `## As asked` block;",
-      'no step may change them; the rest is the present state; read it before the raw',
+      "(it opens with the person's words, quoted from the description's `## As asked` block; no step may change them; the rest is the present state; read it before the raw",
       'description). Use GET https://host/api/proxy/issues/LIN-42 for full raw detail',
       'and /relations/LIN-42, and update the workspace as you work (status, comments, labels).',
       '',

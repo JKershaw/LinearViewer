@@ -1,6 +1,5 @@
 /**
- * LIN-4352 (LIN-4345 plan rev 2, step 6), witness 4 — the dispatch part: a ticket
- * filed outside Harbour is sealed at its TRUE first dispatch, by
+ * LIN-4352, the first-dispatch seal: a ticket filed outside Harbour is sealed at its TRUE first dispatch, by
  * `createDispatchItem` (lib/dispatch-factory.js), through the lane's own provider
  * access (`issueAccess`).
  *
@@ -117,7 +116,7 @@ function dispatch({ issueIdentifier = 'TEST-1', issueAccess = localAccess(), kin
 // The factory decides
 // ---------------------------------------------------------------------------
 
-describe('witness 4 (dispatch) — the factory seals a fresh issue once, and only then', () => {
+describe('first-dispatch seal — the factory seals a fresh issue once, and only then', () => {
   test('a first dispatch on a fresh issue seals its description verbatim, then enqueues', async () => {
     await dispatch();
     assert.equal(await described('TEST-1'), sealAsAsked(WORDS));
@@ -199,7 +198,7 @@ describe('witness 4 (dispatch) — the factory seals a fresh issue once, and onl
   });
 });
 
-describe('witness 4 (dispatch) — no access, failed and hung writes still enqueue', () => {
+describe('first-dispatch seal — no access, failed and hung writes still enqueue', () => {
   test('no issueAccess: logs `seal skipped: no access`, enqueues, leaves the ticket alone', async () => {
     await dispatch({ issueAccess: null });
     assert.equal(await described('TEST-1'), WORDS);
@@ -249,7 +248,8 @@ describe('witness 4 (dispatch) — no access, failed and hung writes still enque
     assert.equal(await described('TEST-2'), sealAsAsked(`${WORDS} (child)`));
   });
 
-  // Builder note 1, second half, through a provider that is strict about it: LocalStore
+  // The write must use the id the read returned, checked through a provider that is strict
+  // about it: LocalStore
   // accepts either key, so the test above cannot tell `id` from `issueIdentifier`.
   // This provider takes its write ONLY by the id its read returned (as Linear's
   // uuid, GitHub's and Jira's own ids do).
@@ -273,7 +273,7 @@ describe('witness 4 (dispatch) — no access, failed and hung writes still enque
   });
 });
 
-describe('witness 4 (dispatch) — the Jira fake (builder note 5)', () => {
+describe('first-dispatch seal — the Jira fake', () => {
   const SCOPE = { email: 'ada@acme.com', apiToken: 'tok', site: 'https://acme.atlassian.net' };
   const kept = { client: jiraProvider.client, clientFactory: jiraProvider.clientFactory, site: jiraProvider.site };
   afterEach(() => Object.assign(jiraProvider, kept));
@@ -376,7 +376,7 @@ const LANES = [
   ['kickoff', () => call(proxyApp(), 'POST', '/api/proxy/autopilot/kickoff', { issueIdentifier: 'TEST-1', goal: 'walk it', appendProxyContext: false }), 'TEST-1'],
 ];
 
-describe('witness 4 (dispatch) — every lane that names an issue seals it, through its own access', () => {
+describe('first-dispatch seal — every lane that names an issue seals it, through its own access', () => {
   for (const [lane, run, sealed] of LANES) {
     test(`${lane}: a first dispatch seals ${sealed}`, async () => {
       const before = { 'TEST-1': await described('TEST-1'), 'TEST-2': await described('TEST-2') };
@@ -392,7 +392,7 @@ describe('witness 4 (dispatch) — every lane that names an issue seals it, thro
   }
 });
 
-describe('witness 4 (dispatch) — feedback\'s dispatch on its already-sealed ticket', () => {
+describe('first-dispatch seal — feedback\'s dispatch on its already-sealed ticket', () => {
   const kept = {};
   beforeEach(() => {
     localProvider.configure({ store: issues });
@@ -437,9 +437,9 @@ describe('witness 4 (dispatch) — feedback\'s dispatch on its already-sealed ti
 // The entrance census
 // ---------------------------------------------------------------------------
 
-// Callers that never start a ticket, so they pass no issueAccess. Each reason is the
-// plan's (LIN-4345 rev 2, step 6); a caller that stops matching its reason belongs off
-// this list.
+// Callers that never start a ticket, so they pass no issueAccess. Each reason says why
+// that caller can never make a ticket's first dispatch; a caller that stops matching its
+// reason belongs off this list.
 const NEVER_FIRST = {
   'lib/follow-up-dispatch.js': 'always carries followUpTo: a follow-up beat, never a first row',
   'lib/chat-tools.js': 'always carries followUpTo: a Task Chat follow-up, never a first row',
@@ -477,7 +477,7 @@ function callArguments(src, name) {
   return calls;
 }
 
-describe('witness 4 (dispatch) — the entrance census', () => {
+describe('first-dispatch seal — the entrance census', () => {
   test('every createDispatchItem( caller in lib/routes passes issueAccess or is never-first with a reason', () => {
     const found = [];
     for (const file of [...sourceFiles('lib'), ...sourceFiles('routes')]) {

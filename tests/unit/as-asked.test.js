@@ -1,10 +1,10 @@
 /**
- * Unit tests for lib/as-asked.js (LIN-4351, piece A of LIN-4345).
+ * Unit tests for lib/as-asked.js (LIN-4351).
  *
  * The `## As asked` block holds the description as filed, byte for byte. These
  * tests pin its fixed shape (seal), how a description splits around it, how its
  * two marker lines are found (after normalizeEscaping, so Linear's backslash
- * escapes still match), the edit check piece B's proxy guard uses, and the fact
+ * escapes still match), the edit check the proxy guard uses, and the fact
  * reader every code-read line goes through ("below the block wins").
  *
  * Run with: node --test tests/unit/as-asked.test.js

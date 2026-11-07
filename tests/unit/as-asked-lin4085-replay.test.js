@@ -1,6 +1,5 @@
 /**
- * Witness 6 for LIN-4353 (LIN-4345 plan, piece C): the LIN-4085 replay, the
- * deterministic part. On 1 November LIN-4085 asked for "a full guide on how to
+ * LIN-4353: the LIN-4085 replay, the deterministic part. On 1 November LIN-4085 asked for "a full guide on how to
  * properly configure" Harbour; scoping thinned it, the plan budgeted it, and review
  * approved the thin guide because "the deliverable meets the plan"
  * (docs/papers/harbour/one-feature-twice.md). Replayed through the As-asked change,
@@ -8,7 +7,9 @@
  * from them before it reads the plan.
  *
  * The fixture is the request exactly as filed (tests/fixtures/lin-4085-filed-request.txt,
- * copied from docs/reviews/lin-4085-ab-run-2026-11-01.md, slips kept). The brief
+ * copied from docs/reviews/lin-4085-ab-run-2026-11-01.md, slips kept). The test does
+ * not read that record: the fixture is its input, and the record is a doc that may
+ * move, so the provenance lives here and is not re-checked at run time. The brief
  * model is a stub that thins the ask the way scoping did, so the only way the
  * phrase survives is code quoting the block. Whether a model then catches the thin
  * guide is not a CI question; it is the hand-run replay recorded in the PR.
@@ -25,7 +26,6 @@ import { generateBrief } from '../../lib/brief.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 
 const FILED = fs.readFileSync(new URL('../fixtures/lin-4085-filed-request.txt', import.meta.url), 'utf8');
-const RECORD = fs.readFileSync(new URL('../../docs/reviews/lin-4085-ab-run-2026-11-01.md', import.meta.url), 'utf8');
 const PHRASE = 'a full guide on how to properly configure';
 
 // What LIN-4085's description looked like once sealed and worked: the block, then
@@ -79,9 +79,8 @@ function processOf(prompt) {
   return end > -1 ? rest.slice(0, end) : rest;
 }
 
-describe('witness 6: the LIN-4085 replay, deterministic part (LIN-4353)', () => {
-  test('the fixture is LIN-4085\'s request as filed, not a paraphrase', () => {
-    assert.ok(RECORD.includes(`> ${FILED}`), 'the fixture is the record\'s verbatim request line');
+describe('the LIN-4085 replay, deterministic part (LIN-4353)', () => {
+  test('the fixture carries the phrase the run lost', () => {
     assert.ok(FILED.includes(PHRASE), 'the filed request carries the phrase the run lost');
   });
 

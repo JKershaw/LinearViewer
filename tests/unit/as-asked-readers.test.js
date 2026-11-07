@@ -1,5 +1,5 @@
 /**
- * Witness 2 for LIN-4351 (LIN-4345 plan step 2): below the block wins.
+ * LIN-4351: below the block wins.
  *
  * A breakdown child is filed with `Session fit:` and `Plan-review due: no — covered
  * by …` inside its `## As asked` block. A revised plan written below the block must

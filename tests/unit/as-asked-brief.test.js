@@ -1,5 +1,5 @@
 /**
- * Witness 1 for LIN-4351 (LIN-4345 plan step 7): the asker's words reach a step
+ * LIN-4351: the asker's words reach a step
  * unchanged. The brief model paraphrases; code quotes the `## As asked` block's
  * words, byte for byte, ahead of the model's four sections, so every brief reader
  * (proxy route, session route, task page) gets them verbatim, fresh and cached.

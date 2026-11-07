@@ -1,5 +1,5 @@
 /**
- * LIN-4352 (LIN-4345 plan rev 2), witness 5: a whole ticket keeps the words.
+ * LIN-4352: a whole ticket keeps the words.
  *
  * One ticket on a REAL LocalStore, walked through the REAL proxy routes and the
  * REAL dispatch factory over a REAL DispatchQueueStore:
@@ -28,7 +28,7 @@ import { createMockCollection } from '../fixtures/mock-collection.js';
 const URL_KEY = 'local-workspace';
 const WORDS = 'Please write a full guide on how to properly configure it.\nCover **both** modes, and say what each one is for.';
 
-test('witness 5: seed → dispatch (sealed) → plan below → close-out PATCH refused → below prune; the words survive', async () => {
+test('a whole ticket: seed → dispatch (sealed) → plan below → close-out PATCH refused → below prune; the words survive', async () => {
   const { store: issues } = createLocalStore();
   await issues.seed(URL_KEY, {
     projects: [{ id: 'p1', name: 'Alpha', content: 'a', sortOrder: 1 }],
