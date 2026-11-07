@@ -297,7 +297,7 @@ export function createProxyWriteRoutes({
   const refuseBadUuid = (ctx, value, noun) => !UUID_REGEX.test(value) && refuse(ctx, 400, `Invalid ${noun} ID format`);
 
   /**
-   * The `## As asked` guard (LIN-4345 step 3, LIN-4352): the agent lane may not
+   * The `## As asked` guard (LIN-4352): the agent lane may not
    * change the block that holds the words as filed, drop it, or forge one onto a
    * ticket that has none. `live` is the description the provider holds NOW (one
    * fresh read per write, never a stored copy) and `next` the body the write would
@@ -308,7 +308,7 @@ export function createProxyWriteRoutes({
    * Only this proxy lane is guarded. The session lane (routes/workspace-api-issue-
    * write.js, the task-edit page), edits made in Linear or GitHub directly, and an
    * agent writing to the provider without the proxy are people's lanes by design,
-   * or out of scope (step 5); the first-dispatch seal writes through the provider,
+   * or outside what Harbour can see; the first-dispatch seal writes through the provider,
    * so this guard does not see it either.
    */
   function refusedByAsAsked(ctx, live, next) {

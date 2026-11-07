@@ -2724,7 +2724,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       'a 200 from the archive call is explicitly NOT treated as proof it captured anything');
   });
 
-  // LIN-4353 (witness 7): g4 pinned the never-prune list and its pointer to a scoping
+  // LIN-4353: g4 pinned the never-prune list and its pointer to a scoping
   // instruction that no longer exists. Since LIN-4352 the person's words sit in a
   // sealed `## As asked` block the proxy refuses to change, so the prune's behaviour
   // is what matters: it writes below the block through `description/below` (never a
@@ -4404,7 +4404,7 @@ function sentenceWith(text, patterns) {
   return text.split(/(?<=\.)\s+|\n/).some(s => patterns.every(p => p.test(s)));
 }
 
-// LIN-4353 (witness 7, LIN-4345 plan step 9): every judging verdict says, in one
+// LIN-4353: every judging verdict says, in one
 // line, how the work met what was asked, the `## As asked` block the person filed.
 // On LIN-4085 review approved a thin guide because it "meets the plan"; this line
 // makes each judge hold the work beside the person's words, not only the step before.
