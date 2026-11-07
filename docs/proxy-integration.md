@@ -469,7 +469,7 @@ left no way to tell that apart from a garbage/never-issued bearer:
 
 Before this, both classes of `401` were undocumented and easy to conflate — a caller-token rejection carried no `code`/`category`/`stage` at all, and the distinction lived only in Harbour's own server-side logs (`[credential-rejected]`), invisible to the very agent that has to pick a remedy.
 
-**`PARTIAL_WRITE`** (LIN-2012) is the fourth adopter. Jira's `updateIssue` is necessarily two upstream calls — a field update, then a status transition — because Jira offers no multi-write transaction. A failure between them (or in the confirmation re-read that follows) can leave the issue **partially** updated: some of what you sent landed, some did not. Rather than reporting that as an indistinguishable total failure, the affected write endpoints (`PATCH /issues/{id}`, `POST /issues/{id}/description/append`, `POST /issues/{id}/description/replace`) return:
+**`PARTIAL_WRITE`** (LIN-2012) is the fourth adopter. Jira's `updateIssue` is necessarily two upstream calls — a field update, then a status transition — because Jira offers no multi-write transaction. A failure between them (or in the confirmation re-read that follows) can leave the issue **partially** updated: some of what you sent landed, some did not. Rather than reporting that as an indistinguishable total failure, the affected write endpoints (`PATCH /issues/{id}`, `POST /issues/{id}/description/append`, `POST /issues/{id}/description/replace`, `POST /issues/{id}/description/below`) return:
 
 ```json
 {
@@ -2133,10 +2133,41 @@ Response. As with create, the echoed `issue` is the **same flat shape as `GET /i
 ```
 
 > **Editing the description?** Passing `description` here **replaces the whole
-> body**. For anything other than a deliberate full rewrite, prefer the two
+> body**. For anything other than a deliberate full rewrite, prefer the
 > splice endpoints below: you supply only the new content and the server reads
 > the live body and merges it, so you never re-emit (and risk corrupting) the
 > existing description.
+
+#### The `## As asked` block (LIN-4345)
+
+A description may open with a block that holds the words as filed, byte for byte:
+
+```
+## As asked
+
+<the description as filed>
+
+*End of what was asked. Steps write below this line; nothing above it changes.*
+```
+
+Code writes it, when a ticket is filed or first dispatched, and no step may
+change it. Every description write through this proxy (`PATCH` with
+`description`, `description/append`, `description/replace`,
+`description/below`, and an attachment with `"target": "description"`) reads the
+live description and compares its block with the block the write would store.
+Both sides are compared after removing backslash escapes (Linear stores `\#\#`),
+never against a stored copy. The write is refused when the block would change:
+
+| Status | `code` | Meaning |
+|--------|--------|---------|
+| `422` | `AS_ASKED_IMMUTABLE` | the write changes the block (`kind: "changed"`, with `line: { number, expected, actual }` naming the first line that differs), drops it (`"removed"`), adds one to a ticket that has none (`"added"`), or — on `POST /issues` — files a body that already contains a marker line (`"marker"`). The message ends with the remedy: write around it — append, replace a span below the block, or use `description/below`. |
+| `422` | `NO_AS_ASKED_BLOCK` | `description/below` on a description with no block: there is nothing to write below; use `PATCH` to rewrite the whole body. |
+
+Only this proxy is guarded. A person editing their own words in Harbour's task
+editor (the session lane), or in Linear or GitHub directly, is not refused, and
+neither is an agent that writes to the provider without going through this proxy.
+A `PATCH` whose body carries `description` makes one extra description read for
+the comparison; a `PATCH` without it does not.
 
 #### Append to Description
 
@@ -2182,9 +2213,31 @@ It **fails loud — never a silent no-op**:
 |--------|--------|---------|
 | `422` | `NOT_FOUND` | `oldString` didn't match — re-read the description and quote an exact span |
 | `422` | `NOT_UNIQUE` | matched `matchCount` places — quote a longer, unique span |
+| `422` | `AS_ASKED_IMMUTABLE` | the replacement would change the `## As asked` block — replace a span below it |
 
 To swap *every* occurrence of a string at once, rewrite the whole body via
 `PATCH` instead. On success, returns `{ "success": true, "issue": {...} }`.
+
+#### Write Below the As Asked Block
+
+```
+POST /api/proxy/issues/{issueId}/description/below
+Content-Type: application/json
+
+{ "body": "## Summary\n\nShipped in #123." }
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `body` | string | Yes | Markdown that replaces everything after the block's end line (max 100K chars; `""` clears it) |
+
+Replaces everything after the `## As asked` block's end line with `body`, after a
+blank line. The block (and anything above it) is kept exactly as read, so the
+person's words are never re-sent: this is the route for pruning or rewriting what
+steps wrote below them. It makes the same description read and the same length and
+character checks as append and replace. On a description with no block it answers
+`422 NO_AS_ASKED_BLOCK`, naming `PATCH` as the full-rewrite route. On success,
+returns `{ "success": true, "issue": {...} }`.
 
 #### Add Comment
 
