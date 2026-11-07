@@ -247,6 +247,29 @@ describe('witness 4 (dispatch) — no access, failed and hung writes still enque
     assert.deepEqual(seen, [['read', 'TEST-2'], ['write', 'TEST-2', 'i2']]);
     assert.equal(await described('TEST-2'), sealAsAsked(`${WORDS} (child)`));
   });
+
+  // Builder note 1, second half, at the sealAccessFrom layer itself: LocalStore
+  // accepts either key, so the test above cannot tell `id` from `issueIdentifier`.
+  // This provider takes its write ONLY by the id its read returned (as Linear's
+  // uuid, GitHub's and Jira's own ids do).
+  test('sealAccessFrom writes by the id issueDescription returned, not the identifier', async () => {
+    const written = [];
+    const fake = {
+      name: 'fake',
+      async issueDescription(token, identifier) {
+        return identifier === 'TEST-9' ? { id: 'uuid-9', description: 'words' } : null;
+      },
+      async updateIssue(token, id, input) {
+        if (id !== 'uuid-9') return { success: false, issue: null };
+        written.push(input.description);
+        return { success: true, issue: { id, description: input.description } };
+      },
+    };
+    await dispatch({ issueIdentifier: 'TEST-9', sealAccess: sealAccessFrom(() => ({ provider: fake, token: 't' })) });
+    assert.ok(logs.some((l) => l.includes('[as-asked] sealed at first dispatch')), JSON.stringify(logs));
+    assert.deepEqual(written, [sealAsAsked('words')]);
+    assert.equal((await queuedRows()).length, 1);
+  });
 });
 
 describe('witness 4 (dispatch) — the Jira fake (builder note 5)', () => {
