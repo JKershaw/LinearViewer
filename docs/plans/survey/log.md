@@ -2873,3 +2873,13 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - The brief's no-echo check passed live.
   - **Not run:** a real close-out pruning a sealed ticket. That waits for the first one; LIN-4354 will be sealed at first dispatch.
   - **The whole of LIN-4345's code has now landed.** At-merge reads: BO `70a2e91c`, BP `3e80be08`, after-questions `495c84cb` into `4ddf35b5` (the five-beat build). LIN-4354's Surveys are at the new base (`a071aa71`, `bce7e35b`). The area read of LIN-4351 + 4352 + 4353 + 4354 follows the tidy-after.
+- **LIN-4353 at merge: mixed, mixed (BO, BP).** It deleted close-out's never-prune list and its dead pointer, paid its prompt bytes by cutting restatements, and fixed the stale reader name.
+  - But the new rules are restated across the template, completion signals, contract and kickoff (regex-pinned).
+  - The `## As asked` marker is spelled in about 15 agent-facing strings, and the brief hint copied into five files.
+  - The replay test reads `docs/reviews/` at runtime.
+  - The ceiling comments are turning into a second change-log.
+  - Its after-answer never posted (the five-beat session was likely gone); retried into `6000653b`.
+- **LIN-4354's Surveys checked every claim** and kept six (one due pattern, which fixes a real bold-`yes` disagreement between the selector and the round-trip measure; one "below wins"; a pure composer; one mock brief; one `*Within`; one access for seal and plan read, which fixes the E2E 401), plus the plan-label comments. They dropped four (deliberate, or by convention).
+  - **They corrected my end-condition note:** the first-dispatch seal is how tickets filed directly in Linear get a block, and the blockless reader serves Jira and deliberate skips. So: no bulk seal. Write down the retirement conditions beside the code.
+  - Size call posted, and the restated-rules fold and the ceiling-comment log went to LIN-4350. **LIN-4354 kicked off** (autopilot `fb292032`, Opus).
+  - This size call was not parroted: it is derived closely from the two Surveys, and I'm noting the skip here.
