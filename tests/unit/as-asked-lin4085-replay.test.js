@@ -109,9 +109,12 @@ describe('witness 6: the LIN-4085 replay, deterministic part (LIN-4353)', () => 
     assert.ok(askedAt < planAt && askedAt < notesAt, `the block comes before the plan and the notes; got:\n${process}`);
   });
 
-  test('review\'s verdict must say in one line how the work meets what was asked', () => {
+  // LIN-4345: arm A3's one quoted line cut at an ellipsis before the narrowed clause, so the
+  // verdict now accounts for every sentence of the block. Whether a model then catches the
+  // thin guide is the hand-run replay (docs/reviews/lin-4345-per-sentence-replay-2026-11-07.md).
+  test('review\'s verdict must account for each sentence of the block, none skipped or cut short', () => {
     const { prompt } = generatePrompt('review', ISSUE, CONTEXT);
-    const oneLine = prompt.split(/(?<=\.)\s+|\n/).some(s => /one line/i.test(s) && /what was asked/i.test(s) && /\bmee?ts?\b|\bmet\b/i.test(s));
-    assert.ok(oneLine, 'review\'s verdict states, in one line, how the work meets what was asked');
+    const each = prompt.split(/\n/).some(s => /what was asked/i.test(s) && /each sentence of the block/i.test(s) && /none skipped or cut short/i.test(s) && /\bmee?ts?\b|\bmet\b/i.test(s));
+    assert.ok(each, 'review\'s verdict takes each sentence of the block and says where the work meets it');
   });
 });

@@ -1047,7 +1047,8 @@ and pivots, the brief folds in signal from comments and subtask state; on confli
 the most recent/specific signal wins. On a description with an `## As asked` block
 (the person's words as filed, which no step may change), the brief opens with those
 words, quoted verbatim by code ahead of the four sections; the model's sections never
-restate them. Read it before trusting the raw description.
+restate them. A subtask whose parent has a block also gets the parent's words, after its
+own, under `## As asked on the parent, <identifier>`. Read it before trusting the raw description.
 
 `GET` returns the cached brief and auto-regenerates when missing or stale; pass
 `?noRefresh=1` to read without regenerating. `POST` force-regenerates (it keeps the

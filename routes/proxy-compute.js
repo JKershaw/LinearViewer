@@ -18,6 +18,7 @@ import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshnes
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief, composeBrief } from '../lib/brief.js';
 import { askedText } from '../lib/as-asked.js';
+import { fixtureParent } from '../lib/sample-data/fixture-parent.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
 import { buildTaskStack } from '../lib/task-stack.js';
@@ -140,7 +141,9 @@ export function createComputeRoutes({
         labels,
         url: mockIssue.url
       },
-      parent: null,
+      // The parent as the live providers return it (identifier, title and description), so
+      // test mode reaches the brief's parent quote the way production does (LIN-4345).
+      parent: fixtureParent(mockData.issues, mockIssue),
       siblings: [],
       project: project ? { id: project.id, name: project.name } : null,
       children,
@@ -221,7 +224,7 @@ export function createComputeRoutes({
       lines.push('- _None._');
     }
 
-    return composeBrief(issue.description, lines.join('\n'));
+    return composeBrief(issue.description, lines.join('\n'), context.parent);
   }
 
   // =========================================================================

@@ -4413,13 +4413,26 @@ describe('judging verdicts state how the work met what was asked (LIN-4353)', ()
   const context = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
   const ONE_LINE = [/one line/i, /what was asked/i, /\b(met|meets|meet)\b/i];
 
-  for (const key of ['review', 'plan-review', 'close-out']) {
-    test(`${key}: the verdict says in one line how the work met what was asked`, () => {
-      const { prompt } = generatePrompt(key, { ...issue, labels: key === 'close-out' ? ['close-out'] : [] }, context);
-      assert.ok(sentenceWith(prompt, ONE_LINE),
-        `${key} must tell its verdict to state, in one line, how the work met what was asked`);
-    });
-  }
+  test('plan-review: the verdict says in one line how the plan meets what was asked', () => {
+    const { prompt } = generatePrompt('plan-review', issue, context);
+    assert.ok(sentenceWith(prompt, ONE_LINE),
+      'plan-review must tell its verdict to state, in one line, how the plan meets what was asked');
+  });
+
+  // LIN-4345: replay arm A3 quoted the block selectively, cutting at an ellipsis before the
+  // clause the build had narrowed. So review's verdict accounts for every sentence of the
+  // block in order, and a sentence met only in part is a narrowing.
+  test('review: the verdict accounts for each sentence of the block, none skipped or cut short', () => {
+    const { prompt } = generatePrompt('review', issue, context);
+    assert.ok(sentenceWith(prompt, [/what was asked/i, /each sentence of the block/i, /none skipped or cut short/i, /met in part or not at all is a narrowing/i, /Needs Discussion/]),
+      'review\'s verdict must take each sentence of the block in order, and call one met in part a narrowing');
+  });
+
+  test('close-out: the summary says how the work met what was asked, citing review', () => {
+    const { prompt } = generatePrompt('close-out', { ...issue, labels: ['close-out'] }, context);
+    assert.ok(sentenceWith(prompt, [/how it meets what was asked/i, /review\'s account/i]),
+      'close-out\'s summary must say how the work met what was asked, citing review\'s account');
+  });
 
   // LIN-4353 replay: with "a narrowing nobody agreed to is Needs Discussion" alone, the reviewer
   // read scoping's Scope and the approved plan as agreement and approved LIN-4085's thin guide.
@@ -4434,13 +4447,11 @@ describe('judging verdicts state how the work met what was asked (LIN-4353)', ()
 
   // LIN-4353 replay arm A2: told to judge against the block, the reviewer restated the ask in its
   // own words, and the restatement dropped what had been narrowed. The verdict quotes the block.
-  for (const key of ['review', 'plan-review']) {
-    test(`${key}: the verdict's one line quotes what was asked from the block, not a summary`, () => {
-      const { prompt } = generatePrompt(key, issue, context);
-      assert.ok(sentenceWith(prompt, [/one line/i, /what was asked/i, /quoted from the block/i]),
-        `${key}'s verdict line must quote what was asked from the block`);
-    });
-  }
+  test('plan-review: the verdict\'s one line quotes what was asked from the block, not a summary', () => {
+    const { prompt } = generatePrompt('plan-review', issue, context);
+    assert.ok(sentenceWith(prompt, [/one line/i, /what was asked/i, /quoted from the block/i]),
+      'plan-review\'s verdict line must quote what was asked from the block');
+  });
 
   // LIN-4353 (review ledger item 2): plan opens with the problem as the block puts it, the
   // only edit to LIN-4021's agreed plan text (the asker clause).

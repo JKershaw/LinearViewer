@@ -368,7 +368,10 @@ describe('judging signals read the As asked block (LIN-4353)', () => {
     test(`${type}: the verdict signal says how the ${what} meets what was asked and names any narrowing`, () => {
       const verdict = doneSignal(type, /^Explicit verdict issued/);
       assert.ok(verdict, `${type} has a verdict signal`);
-      assert.match(verdict, new RegExp(`in one line how the ${what} meets what was asked`));
+      // LIN-4345: review accounts for each sentence of the block; plan-review keeps one line.
+      assert.match(verdict, type === 'review'
+        ? /where the work meets each sentence of what was asked/
+        : new RegExp(`in one line how the ${what} meets what was asked`));
       assert.match(verdict, /`## As asked` block/);
       assert.match(verdict, /naming any narrowing/);
     });
