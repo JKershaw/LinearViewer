@@ -25,6 +25,8 @@ together with the change-log row (expected direction `down`).
 | review link @ 18:19:44, plan replaced by NEW plan r13 | n/a | **3 of 3** pass (Needs Discussion, `DECISION:` + `BLOCKED:`) |
 | over-asking control: LIN-998 plan @ 09:14:33 | n/a | **3 of 3** pass (0 cut rulings) |
 
+Superseded for plan by the route re-run below: scored by the `DECISION:` route, the first NEW plan arm was 0 of 3 and NEW2 is 2 of 3, so plan does not show a clean separation; scoping's 3/3 against 0/3 stands.
+
 By the pre-registered reading (only NEW 3/3 against OLD 0/3 on at least one stage counts), this
 is a **clean separation on both stages**. On a plan that names the cut, review returns Needs
 Discussion every time, because nobody has agreed to the cut. The control raised no ruling on a
