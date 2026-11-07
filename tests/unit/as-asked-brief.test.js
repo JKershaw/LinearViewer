@@ -63,8 +63,24 @@ function installModelStub(text = MODEL_BRIEF) {
   restoreFetch = () => { globalThis.fetch = realFetch; };
 }
 
-beforeEach(() => { modelCalls = 0; });
-afterEach(() => { if (restoreFetch) restoreFetch(); restoreFetch = null; });
+// With a proxy configured, streamChat routes through an https-proxy-agent instead of
+// global fetch, so the stub would be bypassed (CI's hermetic:proxy arm sets
+// HTTPS_PROXY). Clear the proxy vars per test and restore them after, as
+// tests/unit/feedback-title.test.js does.
+const PROXY_VARS = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy'];
+let savedProxy = {};
+beforeEach(() => {
+  modelCalls = 0;
+  savedProxy = Object.fromEntries(PROXY_VARS.map(k => [k, process.env[k]]));
+  for (const k of PROXY_VARS) delete process.env[k];
+});
+afterEach(() => {
+  if (restoreFetch) restoreFetch();
+  restoreFetch = null;
+  for (const [k, v] of Object.entries(savedProxy)) {
+    if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  }
+});
 
 const issueOf = (description) => ({ id: 'uuid-4351', identifier: 'ENG-4351', title: 'Proxy guide', description, state: { type: 'started' }, labels: [] });
 const contextOf = (description) => ({ issue: issueOf(description), comments: [], children: [], parent: null, focusedChild: null });
