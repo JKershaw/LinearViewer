@@ -2737,3 +2737,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **The two claims I checked hold:** the pair rule was fixed before any result, and "network of tasks" and the two dials are John's.
 
   Against v3 (written to a checklist on the default model), this is the clearest evidence so far for the plain brief and the right contractor. Not merged; John reads it first.
+- **LIN-4340 merged** on John's go-ahead (`e63c2f69`, PR #2343) and live in the Library as *Clearing up as it goes*. LIN-4340 is Done. My length rule slipped back in, and the writer was right to ignore it.
