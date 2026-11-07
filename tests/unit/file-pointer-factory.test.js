@@ -3,6 +3,9 @@
  * createDispatchItem.
  *
  * All reads are injected: the store count, the plan reader and the PR reader.
+ * The plan reader reaches the factory the way every lane's does, as an
+ * `issueAccess` resolver (`planAccess`): the factory reads the row's issue once
+ * through the provider's `issueDescription` and takes its description.
  * The timing caps are overridden to small values so the cap tests run against
  * real timers quickly; the production constants remain the single source and
  * are pinned in tests/unit/file-pointer.test.js.
@@ -60,6 +63,13 @@ function baseArgs(store, extra = {}) {
   };
 }
 
+// The lane-shaped access whose one issue read answers `read()` as the description.
+// `read` keeps its own call count and timing (a spy, a late rejection).
+const planAccess = (read) => () => ({
+  provider: { name: 'plan-reader', issueDescription: async () => ({ id: 'i1', description: await read() }) },
+  token: 't'
+});
+
 const planReader = (text) => {
   const spy = async () => text;
   spy.calls = 0;
@@ -87,7 +97,7 @@ describe('file-pointer seam — flag and eligibility', () => {
     const { store, state } = pilotStore({ counts: [0, 0] });
     await createDispatchItem(baseArgs(store, {
       filePointerEnabled: false,
-      readPlanBlock: async () => '## Implementation Plan\nlib/x.js'
+      issueAccess: planAccess(async () => '## Implementation Plan\nlib/x.js')
     }));
 
     assert.deepEqual(state.addItemArg, plainState.addItemArg);
@@ -102,7 +112,7 @@ describe('file-pointer seam — flag and eligibility', () => {
       await createDispatchItem(baseArgs(store, {
         kind,
         filePointerEnabled: true,
-        readPlanBlock: async () => '## Implementation Plan\nlib/x.js',
+        issueAccess: planAccess(async () => '## Implementation Plan\nlib/x.js'),
         fields: { promptName: kind, issueIdentifier: 'LIN-1' }
       }));
       assert.equal(state.countCalls, 0, `${kind} must not consume an ordinal`);
@@ -113,14 +123,14 @@ describe('file-pointer seam — flag and eligibility', () => {
   test('follow-up and abort are never touched', async () => {
     for (const fields of [{ promptName: 'implementation', issueIdentifier: 'LIN-1', followUpTo: 'p' }, { promptName: 'implementation', issueIdentifier: 'LIN-1', abort: true, abortTo: 'a' }]) {
       const { store, state } = pilotStore({ counts: [0, 0] });
-      await createDispatchItem(baseArgs(store, { filePointerEnabled: true, readPlanBlock: async () => 'plan', fields }));
+      await createDispatchItem(baseArgs(store, { filePointerEnabled: true, issueAccess: planAccess(async () => 'plan'), fields }));
       assert.equal(state.countCalls, 0);
     }
   });
 
   test('store without countPilotEligible ⇒ no-op, no throw', async () => {
     const { store, state } = pilotStore({ omitCount: true });
-    await createDispatchItem(baseArgs(store, { filePointerEnabled: true, readPlanBlock: async () => '## Implementation Plan\nlib/x.js' }));
+    await createDispatchItem(baseArgs(store, { filePointerEnabled: true, issueAccess: planAccess(async () => '## Implementation Plan\nlib/x.js') }));
     assert.equal(state.addItemArg.prompt, 'BODY');
   });
 });
@@ -130,7 +140,7 @@ describe('file-pointer seam — arm decision', () => {
     const { store, state } = pilotStore({ counts: [0, 0] });
     const plan = spyReader('## Implementation Plan\nlib/plan.js');
     const pr = spyReader([{ repo: 'LinearViewer', path: 'lib/pr.js' }]);
-    await createDispatchItem(baseArgs(store, { filePointerEnabled: true, readPlanBlock: plan, fetchPilotPrFiles: pr }));
+    await createDispatchItem(baseArgs(store, { filePointerEnabled: true, issueAccess: planAccess(plan), fetchPilotPrFiles: pr }));
     assert.ok(state.addItemArg.prompt.startsWith(FILE_POINTER_MARKER));
     assert.match(state.addItemArg.prompt, /- lib\/plan\.js/);
     assert.match(state.addItemArg.prompt, /- lib\/pr\.js/);
@@ -141,7 +151,7 @@ describe('file-pointer seam — arm decision', () => {
     const { store, state } = pilotStore({ counts: [1] });
     const plan = spyReader('## Implementation Plan\nlib/plan.js');
     const pr = spyReader([{ repo: 'LinearViewer', path: 'lib/pr.js' }]);
-    await createDispatchItem(baseArgs(store, { filePointerEnabled: true, readPlanBlock: plan, fetchPilotPrFiles: pr }));
+    await createDispatchItem(baseArgs(store, { filePointerEnabled: true, issueAccess: planAccess(plan), fetchPilotPrFiles: pr }));
     assert.equal(state.addItemArg.prompt, 'BODY');
     assert.equal(state.countCalls, 1);
     assert.equal(plan.calls, 0);
@@ -150,7 +160,7 @@ describe('file-pointer seam — arm decision', () => {
 
   test('both inputs empty ⇒ byte-identical (still pointer-assigned)', async () => {
     const { store, state } = pilotStore({ counts: [0, 0] });
-    await createDispatchItem(baseArgs(store, { filePointerEnabled: true, readPlanBlock: async () => null, fetchPilotPrFiles: async () => [] }));
+    await createDispatchItem(baseArgs(store, { filePointerEnabled: true, issueAccess: planAccess(async () => null), fetchPilotPrFiles: async () => [] }));
     assert.equal(state.addItemArg.prompt, 'BODY');
     assert.equal(state.countCalls, 2);
   });
@@ -159,20 +169,20 @@ describe('file-pointer seam — arm decision', () => {
 describe('file-pointer seam — recount (M4)', () => {
   test('c0 even, recount c0+1 ⇒ flips to control, pointer discarded', async () => {
     const { store, state } = pilotStore({ counts: [0, 1] });
-    await createDispatchItem(baseArgs(store, { filePointerEnabled: true, readPlanBlock: async () => '## Implementation Plan\nlib/x.js' }));
+    await createDispatchItem(baseArgs(store, { filePointerEnabled: true, issueAccess: planAccess(async () => '## Implementation Plan\nlib/x.js') }));
     assert.equal(state.addItemArg.prompt, 'BODY');
     assert.equal(state.countCalls, 2);
   });
 
   test('c0 even, recount c0+2 ⇒ stays pointer, prepended', async () => {
     const { store, state } = pilotStore({ counts: [0, 2] });
-    await createDispatchItem(baseArgs(store, { filePointerEnabled: true, readPlanBlock: async () => '## Implementation Plan\nlib/x.js' }));
+    await createDispatchItem(baseArgs(store, { filePointerEnabled: true, issueAccess: planAccess(async () => '## Implementation Plan\nlib/x.js') }));
     assert.ok(state.addItemArg.prompt.startsWith(FILE_POINTER_MARKER));
   });
 
   test('the recount runs even when the pointer is empty', async () => {
     const { store, state } = pilotStore({ counts: [0, 0] });
-    await createDispatchItem(baseArgs(store, { filePointerEnabled: true, readPlanBlock: async () => null, fetchPilotPrFiles: async () => [] }));
+    await createDispatchItem(baseArgs(store, { filePointerEnabled: true, issueAccess: planAccess(async () => null), fetchPilotPrFiles: async () => [] }));
     assert.equal(state.countCalls, 2);
   });
 });
@@ -187,7 +197,7 @@ describe('file-pointer seam — hard caps and fail-open', () => {
       await createDispatchItem(baseArgs(store, {
         filePointerEnabled: true,
         filePointerTimeouts: timeouts,
-        readPlanBlock: () => new Promise((_, reject) => setTimeout(() => reject(new Error('late')), 80)),
+        issueAccess: planAccess(() => new Promise((_, reject) => setTimeout(() => reject(new Error('late')), 80))),
         fetchPilotPrFiles: () => new Promise(() => {})
       }));
       assert.equal(state.addItemArg.prompt, 'BODY');
@@ -202,7 +212,7 @@ describe('file-pointer seam — hard caps and fail-open', () => {
     const { store, state } = pilotStore({ counts: () => new Promise(() => {}) });
     const logs = captureLogs();
     try {
-      await createDispatchItem(baseArgs(store, { filePointerEnabled: true, filePointerTimeouts: timeouts, readPlanBlock: async () => 'plan' }));
+      await createDispatchItem(baseArgs(store, { filePointerEnabled: true, filePointerTimeouts: timeouts, issueAccess: planAccess(async () => 'plan') }));
       assert.equal(state.addItemArg.prompt, 'BODY');
       const entry = logs.parsed().at(-1);
       assert.equal(entry.failOpen, true);
@@ -217,7 +227,7 @@ describe('file-pointer seam — hard caps and fail-open', () => {
     store.countPilotEligible = async () => { throw new Error('boom'); };
     const logs = captureLogs();
     try {
-      await createDispatchItem(baseArgs(store, { filePointerEnabled: true, filePointerTimeouts: timeouts, readPlanBlock: async () => 'plan' }));
+      await createDispatchItem(baseArgs(store, { filePointerEnabled: true, filePointerTimeouts: timeouts, issueAccess: planAccess(async () => 'plan') }));
       assert.equal(state.addItemArg.prompt, 'BODY');
       assert.equal(logs.parsed().at(-1).failOpen, true);
     } finally {
@@ -235,7 +245,7 @@ describe('file-pointer seam — hard caps and fail-open', () => {
       await createDispatchItem(baseArgs(store, {
         filePointerEnabled: true,
         filePointerTimeouts: timeouts,
-        readPlanBlock: async () => '## Implementation Plan\nlib/x.js'
+        issueAccess: planAccess(async () => '## Implementation Plan\nlib/x.js')
       }));
       assert.equal(state.addItemArg.prompt, 'BODY', 'prompt must be untouched on recount fail-open');
       assert.equal(state.addItemCalls, 1);
@@ -260,7 +270,7 @@ describe('file-pointer seam — hard caps and fail-open', () => {
     };
     const capturingAdd = store.addItem;
     store.addItem = async (urlKey, item) => { addItemAt = Date.now(); return capturingAdd(urlKey, item); };
-    await createDispatchItem(baseArgs(store, { filePointerEnabled: true, filePointerTimeouts: timeouts, readPlanBlock: async () => '## Implementation Plan\nlib/x.js' }));
+    await createDispatchItem(baseArgs(store, { filePointerEnabled: true, filePointerTimeouts: timeouts, issueAccess: planAccess(async () => '## Implementation Plan\nlib/x.js') }));
     assert.ok(addItemAt - lastCountAt < timeouts.count, `gap ${addItemAt - lastCountAt}ms must be below the count cap`);
     assert.equal(state.countCalls, 2);
   });
@@ -272,7 +282,7 @@ describe('file-pointer seam — refusals consume no ordinal', () => {
     const logs = captureLogs();
     try {
       await assert.rejects(
-        createDispatchItem(baseArgs(store, { filePointerEnabled: true, readPlanBlock: async () => 'plan' })),
+        createDispatchItem(baseArgs(store, { filePointerEnabled: true, issueAccess: planAccess(async () => 'plan') })),
         /created moments ago/
       );
       assert.equal(state.countCalls, 0);
@@ -287,7 +297,7 @@ describe('file-pointer seam — refusals consume no ordinal', () => {
     await assert.rejects(
       createDispatchItem(baseArgs(store, {
         filePointerEnabled: true,
-        readPlanBlock: async () => 'plan',
+        issueAccess: planAccess(async () => 'plan'),
         finalizePrompt: async () => { throw new Error('refused'); }
       })),
       /refused/
@@ -302,7 +312,7 @@ describe('file-pointer seam — no row field stamped', () => {
     const { store: offStore, state: offState } = pilotStore({ counts: [0, 0] });
     await createDispatchItem(baseArgs(offStore, { filePointerEnabled: false }));
     const { store: onStore, state: onState } = pilotStore({ counts: [0, 0] });
-    await createDispatchItem(baseArgs(onStore, { filePointerEnabled: true, readPlanBlock: async () => '## Implementation Plan\nlib/x.js' }));
+    await createDispatchItem(baseArgs(onStore, { filePointerEnabled: true, issueAccess: planAccess(async () => '## Implementation Plan\nlib/x.js') }));
     assert.deepEqual(Object.keys(onState.addItemArg).sort(), Object.keys(offState.addItemArg).sort());
   });
 });
