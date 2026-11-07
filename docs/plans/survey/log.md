@@ -2860,3 +2860,10 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - The miss is the finding: **prompt wording alone doesn't make a reviewer judge against the ask.**
     - LIN-4345 stays open. The next try is structural (review accounts for every sentence of the block), replayed on several tickets and runs.
   - **For the step-back:** this is the first measured case in the round of instruction failing where structure might succeed. It's the same lesson as the seal (code inserts the words, rather than asking the model to keep them), now at the judging end.
+- **~15:00 UTC, John: build the everyday loop, not the research rig.** "We want to make it easy for us, or anyone, to run the loop simply. Whilst building it we have extra checks, but these may not be needed in the product." And: "opus where we're unsure. If it's a typical harbour operation we know the settings are good."
+  - **Routing restored:** implementation on Haiku; plan, close-out, autopilot and triage on Sonnet (undoing 10:15's clears). Opus is now given per ticket for new or uncertain work, via the kickoff goal.
+  - **Notes posted:**
+    - **LIN-4347:** the everyday version is one read of what was left behind (perhaps review's job), the left-behind question and the tidy inside the run where it pays. Research reads stay hand-run outside Harbour, and good area notes are the lasting part.
+    - **LIN-4354:** an end condition for LIN-4345's migration scaffolding (the first-dispatch seal and the unsealed readers): seal open old tickets once, then remove what serves only them.
+    - **LIN-4344:** the principle itself.
+  - **For the step-back:** are two separate Surveys needed, or was that research design? One look at both the task and the place might do, at half the fixed cost.
