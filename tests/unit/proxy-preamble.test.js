@@ -96,6 +96,11 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
     // "currently backed by X" clause is now correctly ABSENT here; the Linear
     // byte-parity case (a caller that HAS resolved Linear) is pinned separately
     // below, passing `providerDisplayName: 'Linear'` explicitly.
+    //
+    // NOTE (LIN-4353): a deliberate re-pin of the brief hint only. The brief no longer
+    // "supersedes stale wording": it opens with the person's words, quoted by code from the
+    // description's `## As asked` block, which the proxy refuses to change; the rest is the
+    // present state. Every other line of the block is unchanged.
     const expected = [
       '',
       '',
@@ -114,7 +119,8 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
       'Full endpoint catalog: GET https://host/api/proxy/instructions',
       '',
       'Start from the distilled brief: GET https://host/api/proxy/brief/LIN-42',
-      '(present-state — folds in comments, supersedes stale wording; read it before the raw',
+      "(it opens with the person's words, quoted from the description's `## As asked` block;",
+      'no step may change them; the rest is the present state; read it before the raw',
       'description). Use GET https://host/api/proxy/issues/LIN-42 for full raw detail',
       'and /relations/LIN-42, and update the workspace as you work (status, comments, labels).',
       '',

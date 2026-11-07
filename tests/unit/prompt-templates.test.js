@@ -2616,7 +2616,9 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     const closeout = generatePrompt('close-out', issue, context).prompt;
     // Review still emits the structured heading — helpful structure when present.
     assert.ok(review.includes('### What CI Did Not Prove'), 'review writes the ### What CI Did Not Prove ledger');
-    assert.ok(/record it in one summary comment: the ledger/i.test(review),
+    // LIN-4353: Completion's "Record it in one summary comment: the ledger, the verdict,
+    // and the CI state" restated the stage contract and was cut; Hand Off carries the claim.
+    assert.ok(/your deliverable is the ledger plus the verdict, recorded in the summary comment/i.test(review),
       'review records the ledger into its summary comment (the carrier)');
     assert.ok(/Put the ledger under `### What CI Did Not Prove`/.test(review),
       'the ledger heading is the stage contract\'s (LIN-3292)');
@@ -2722,17 +2724,25 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       'a 200 from the archive call is explicitly NOT treated as proof it captured anything');
   });
 
-  test('(g4) prune uses a full PATCH rewrite, and the never-prune list explicitly carries scope', () => {
+  // LIN-4353 (witness 7): g4 pinned the never-prune list and its pointer to a scoping
+  // instruction that no longer exists. Since LIN-4352 the person's words sit in a
+  // sealed `## As asked` block the proxy refuses to change, so the prune's behaviour
+  // is what matters: it writes below the block through `description/below` (never a
+  // whole-body PATCH that re-sends the block), and on a description with no block it
+  // does not prune at all. Only "any section a follow-up ticket references" survives.
+  test('(g4) the prune writes below the As asked block through description/below, and skips with no block', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
-    assert.ok(/PATCH \/api\/proxy\/issues\/:id/.test(prompt), 'prune uses the full-body PATCH rewrite');
-    assert.ok(/\*\*Never prune\*\*/.test(prompt), 'a never-prune carve-out is named');
-    assert.ok(/original problem statement, acceptance criteria, reproduction steps, scope/i.test(prompt),
-      'never-prune explicitly lists scope alongside problem statement/acceptance criteria/repro steps');
-    assert.ok(/single source of truth.*stands/i.test(prompt),
-      'never-prune cross-references the scoping template\'s single-source-of-truth wording rather than contradicting it');
+    const prune = prompt.slice(prompt.indexOf('### Archive & Prune Superseded Stage Artifacts'), prompt.indexOf('Comments are untouched by policy'));
+    assert.ok(/\/api\/proxy\/issues\/LIN-901\/description\/below/.test(prune), 'the prune writes through description/below');
+    assert.ok(!/PATCH/.test(prune), 'the prune never rewrites the whole body with PATCH (that would re-send the block)');
+    assert.ok(sentenceWith(prune, [/no `## As asked` block|without an? `## As asked` block/i, /(do not|don't|never|skip)[^.]*prune|prune[^.]*skip/i]),
+      'with no `## As asked` block on the description, the prune is skipped');
+    assert.ok(/any section a follow-up ticket references/i.test(prune), 'sections a follow-up references are kept');
+    assert.ok(!/single source of truth/i.test(prompt), 'the dangling pointer to the scoping template is gone');
+    assert.ok(!/original problem statement/i.test(prompt), 'never-prune rule 5 is gone: the block, not a guess, keeps the person\'s words');
   });
 
-  test('(g5) the stub must preserve the session-fit phrase or Implementation Plan heading verbatim', () => {
+  test('(g5) the stub must preserve the session-fit phrase or Implementation Plan heading verbatim, and the block', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
     // Carried by the stage contract (LIN-3292), appended by code after the brief.
     assert.ok(/keep word for word any `Implementation Plan` heading/i.test(prompt),
@@ -2741,6 +2751,9 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     assert.ok(/any `plan-review due:` line/.test(prompt), 'LIN-3296: the plan-review gate marker survives the prune');
     assert.ok(/code reads them there/i.test(prompt),
       'the prompt explains WHY the literals matter, so an implementer does not "clean up" the wording');
+    // LIN-4353: the contract's kept set now names the As asked block too.
+    const contract = formatStageContract('close-out', 'LIN-901');
+    assert.ok(/`## As asked` block/.test(contract), 'the close-out contract keeps the `## As asked` block');
   });
 
   test('(g6) archive+prune runs only on the all-clear path, never on the cannot-close branch', () => {
@@ -4379,5 +4392,38 @@ describe('stage rules moved from the deleted meta-prompt (LIN-3300)', () => {
     const bug = generatePrompt('close-out', { ...issue, labels: ['Bug'] }, context).prompt;
     assert.ok(bug.includes(`set the task to Done. ${rule}`), 'beside the Done transition');
     assert.ok(!prompt('close-out').includes(rule));
+  });
+});
+
+/**
+ * True when one sentence of `text` (split at a full stop, colon-free newline or
+ * list break) matches every pattern: a behaviour stated as one instruction, not
+ * scattered words that happen to co-occur in a long prompt (LIN-4353).
+ */
+function sentenceWith(text, patterns) {
+  return text.split(/(?<=\.)\s+|\n/).some(s => patterns.every(p => p.test(s)));
+}
+
+// LIN-4353 (witness 7, LIN-4345 plan step 9): every judging verdict says, in one
+// line, how the work met what was asked, the `## As asked` block the person filed.
+// On LIN-4085 review approved a thin guide because it "meets the plan"; this line
+// makes each judge hold the work beside the person's words, not only the step before.
+describe('judging verdicts state how the work met what was asked (LIN-4353)', () => {
+  const issue = { id: 'i-4353', identifier: 'LIN-4353', title: 'Judge against the block', description: 'D', labels: [], comments: [] };
+  const context = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+  const ONE_LINE = [/one line/i, /what was asked/i, /\b(met|meets|meet)\b/i];
+
+  for (const key of ['review', 'plan-review', 'close-out']) {
+    test(`${key}: the verdict says in one line how the work met what was asked`, () => {
+      const { prompt } = generatePrompt(key, { ...issue, labels: key === 'close-out' ? ['close-out'] : [] }, context);
+      assert.ok(sentenceWith(prompt, ONE_LINE),
+        `${key} must tell its verdict to state, in one line, how the work met what was asked`);
+    });
+  }
+
+  test('review names any narrowing, and an unagreed narrowing is Needs Discussion', () => {
+    const { prompt } = generatePrompt('review', issue, context);
+    assert.ok(sentenceWith(prompt, [/narrow/i, /Needs Discussion/]),
+      'review: a narrowing nobody agreed to makes the verdict Needs Discussion');
   });
 });

@@ -106,12 +106,14 @@ const FEEDBACK_ORIGIN_FRAMING =
 // context (LIN-2818), but this call site passes none — it threads the framing in
 // via the dedicated `originNote` seam, which stays the distinct, system-authored
 // carrier. It tells the run the ticket is a raw, un-triaged user report whose
-// first job is understanding.
-const FEEDBACK_AUTOPILOT_ORIGIN_NOTE =
+// first job is understanding. LIN-4353: the report is sealed in the `## As asked` block
+// (LIN-4352), and is the person's own words, no longer "a starting hypothesis".
+export const FEEDBACK_AUTOPILOT_ORIGIN_NOTE =
   `**Origin — raw feedback:** ${FEEDBACK_ORIGIN_FRAMING}. Before driving toward a fix, ` +
-  'your first job is to *understand* it: read the report closely, reproduce or ground the problem ' +
-  'against the current code, and work out what is actually being asked. Treat the description as a ' +
-  'starting hypothesis, not a specification.';
+  'your first job is to *understand* it: read the report closely and reproduce or ground the problem ' +
+  'against the current code. The description\'s `## As asked` block is the person\'s own report: work ' +
+  'out what they need from it, and where a fix they suggest looks wrong, say so rather than quietly ' +
+  'narrowing the report.';
 
 // Persisted origin/triage marker written into every widget-filed feedback
 // description (LIN-947). Unlike FEEDBACK_AUTOPILOT_ORIGIN_NOTE — which is only

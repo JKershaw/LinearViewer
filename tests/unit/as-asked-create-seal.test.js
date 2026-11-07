@@ -27,6 +27,7 @@ import { jiraProvider } from '../../lib/providers/jira/index.js';
 import { createLocalStore } from '../fixtures/local-harness.js';
 import { sealAsAsked, splitAsAsked, AS_ASKED_HEADING } from '../../lib/as-asked.js';
 import { providerHoldsAsAsked } from '../../lib/as-asked-seal.js';
+import { FEEDBACK_AUTOPILOT_ORIGIN_NOTE } from '../../routes/workspace-api-feedback.js';
 
 // Must match TEST_LOCAL_URL_KEY in routes/proxy.js (and LOCAL_WORKSPACE_URL_KEY).
 const URL_KEY = 'local-workspace';
@@ -232,4 +233,15 @@ describe('witness 4 (create) — a provider that cannot hold the block is skippe
     assert.equal(logs.length, 1, JSON.stringify(logs));
     assert.match(logs[0], /\[as-asked\] seal skipped: provider local cannot hold the block/);
   });
+});
+
+// LIN-4353 (LIN-4345 plan step 9): the feedback → autopilot note no longer calls the
+// report "a starting hypothesis, not a specification". The report is sealed in the
+// block above, as the person's own words: the run works out what they need from it,
+// and says so when a fix they suggest looks wrong instead of quietly narrowing it.
+test('the feedback → autopilot note reads the sealed block as the person\'s own report', () => {
+  assert.match(FEEDBACK_AUTOPILOT_ORIGIN_NOTE, /`## As asked` block is the person's own report/);
+  assert.match(FEEDBACK_AUTOPILOT_ORIGIN_NOTE, /where a fix they suggest looks wrong, say so rather than quietly narrowing the report/);
+  assert.doesNotMatch(FEEDBACK_AUTOPILOT_ORIGIN_NOTE, /starting hypothesis|not a specification/);
+  assert.ok(FEEDBACK_AUTOPILOT_ORIGIN_NOTE.includes(AS_ASKED_HEADING), 'the note names the marker the seal writes');
 });

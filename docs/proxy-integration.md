@@ -1043,9 +1043,11 @@ POST /api/proxy/brief/{identifier}
 A current-state **brief**: a distilled, present-tense version of the task —
 `## Current`, `## Constraints`, `## Open questions`, `## Changelog` — intended as the
 starting context for an agent picking up an aged task. As a description grows, drifts,
-and pivots, the brief supersedes stale wording and folds in signal from comments and
-subtask state; on conflict the most recent/specific signal wins. Read it before
-trusting the raw description.
+and pivots, the brief folds in signal from comments and subtask state; on conflict
+the most recent/specific signal wins. On a description with an `## As asked` block
+(the person's words as filed, which no step may change), the brief opens with those
+words, quoted verbatim by code ahead of the four sections; the model's sections never
+restate them. Read it before trusting the raw description.
 
 `GET` returns the cached brief and auto-regenerates when missing or stale; pass
 `?noRefresh=1` to read without regenerating. `POST` force-regenerates (it keeps the
