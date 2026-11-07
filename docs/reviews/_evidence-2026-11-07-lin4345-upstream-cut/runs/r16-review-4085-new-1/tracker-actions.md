@@ -1,0 +1,3 @@
+- status: no change. LIN-4085 stays In Progress, waiting on ruling `lin4085-human-steps-cut`. Next action: the ruling, then close-out (if the cut is accepted) or plan (if it is rejected).
+- comment: post output/comment.md on LIN-4085.
+- ruling: open `lin4085-human-steps-cut` on LIN-4085, the question in the DECISION line of output/final.md (recommended: accept).
