@@ -2800,3 +2800,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - The routing table now has every agent step on Opus: the job overrides on implementation (Haiku), plan, close-out, autopilot and triage (Sonnet) are cleared to their groups (routing log 22–26, undoable).
   - There's a note on LIN-4348: its cost ruling isn't needed, and the Haiku default is moot for now.
   - Harbour's own calls are unchanged. Noted for John: `brief`, the distilled brief every stage reads first (the photocopy step LIN-4345 is about), runs on `openai/gpt-5.4-mini`.
+- **~10:20 UTC, John: open to improving the brief endpoint.** Posted to LIN-4345 as a grant, not a new requirement: improve the brief, including how it's written and its model (currently `gpt-5.4-mini`), for the ticket's own purpose. Removing it is still a ruling. The plan was mid-write (dispatched 10:09), so plan-review and later steps will read it.
