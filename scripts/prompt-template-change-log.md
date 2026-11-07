@@ -75,6 +75,8 @@ Two reasons recur, so they are written once here:
 - LIN-4353: -145 (107510 -> 107365). Pays `lib/prompt-contract.js`. The file itself fell 211 bytes (107299): the judging stages point at the `## As asked` block, close-out's never-prune list and scoping pointer left, and two restatements were cut.
 - LIN-4362: +74 (107365 -> 107439). The four `## As asked` spellings interpolate AS_ASKED_HEADING from `lib/as-asked.js`, plus its import. Code, not prompt text: rendered bytes are unchanged, and the block's words have one owner, so a change to them cannot leave a stage prompt spelling the old ones.
 - LIN-4345: +30 (107439 -> 107469). Measured: the file was 107342 under a 107365 ceiling before this change, and the change added 30 source bytes, 23 of which the old headroom had absorbed. Scoping's lead loses its in-and-out-of-scope licence (-105), its Out of Scope bullet holds each cut with its ruling (+50), and plan's opening lists the cuts or none (+62 source). The cut rule itself lives in `stage-intent.js`. Reason: (cut).
+- LIN-4367: -64 (107469 -> 107405). Scoping's Out of Scope bullet and plan's opening say only where their cuts go; the rule is CUT's.
+- LIN-4368: +189 (107405 -> 107594). Close-out's prune keeps the `## Size of the move` section verbatim (+78, interpolated from `lib/size-of-move.js`; the proxy guard refuses a prune that drops it, so the line tells close-out before it meets the 422), scoping renders the standing size policy (+45) and the import (+66). The policy line's value is code; the stage's weighing of it is judgement.
 
 **Templates source, `lib/prompt-templates.js`**
 - LIN-3378: +20. defer's whenNot names plan-review (+36); its requires was tightened (-16).
@@ -97,6 +99,8 @@ Two reasons recur, so they are written once here:
 - LIN-4353: plan +32 (9679 -> 9711). The contract's plan line says to write below any `## As asked` block (claim 2 of the piece-A blind reads: the agent-facing text did not say it). The plan body's only edit, the asker clause, nets 0. Paid by close-out.
 - LIN-4345: +252 on research (11433 -> 11685), design (2562 -> 2814), spike (2581 -> 2833), breakdown (5025 -> 5277), implementation (7798 -> 8050) and blocked (3244 -> 3496): the DECIDE scope line gains the cut rule. plan +337 (9711 -> 10048): the same, plus +85 for the opening asker clause (the only part of LIN-4021's agreed plan text touched), which lists each cut, inherited too, or says none. scoping +197 (2427 -> 2624): the same, net of -55 in scoping itself (its lead loses "What is in and out of scope is yours to decide ... flag for the human only product or intent questions", -105, and its Out of Scope bullet holds each cut with its ruling, +50). Reason: (cut).
 - LIN-4345: +33 on each of the eight, (route).
+- LIN-4367: plan -39 (10081 -> 10042), scoping -25 (2657 -> 2632): each says only where its cuts go; the rule is CUT's.
+- LIN-4368: scoping +89 (2632 -> 2721), the standing size policy line (`formatSizePolicyLine`, `lib/size-of-move.js`): "no standing policy" until a person sets `err-larger` in Settings → Running. Code reads and renders the policy; what scoping does with it is its judgement (piece 3, LIN-4369).
 
 **Templates rendered, `plan-review`**
 - LIN-3615: -99 (7955). The pin-conversion rule (+209), paid by cutting Verdict's restated opening, Completion's restated record line and the planner-owns-the-edit clause.
@@ -127,6 +131,8 @@ Two reasons recur, so they are written once here:
 - LIN-3279: +156 (9545). research and design whenNot say a filer's own fix is not completed prep.
 - LIN-3906: +97 (9701). implementation's whenNot names a review Approve (close-out makes its fixes), and breakdown's names one PR in ordered commits (LIN-3854, LIN-3861). The selector reads the verdict and the commits as judgement, and no code path routes on them; no equal-length cut in the stage texts was found that keeps both not-whens.
 - LIN-4021: -18 (9798 -> 9780). The agreed plan and plan-review leads and descriptions, which the routing prompt quotes, and the plan route's whenNot names places, not surfaces (-2).
+- LIN-4021 (the replaced reason): the agreed plan and plan-review leads and descriptions, which the routing prompt quotes.
+- LIN-4368: +33 (9780 -> 9813). The trail facts gain "Size of the move: not recorded / pending a ruling / chosen X (by …)", computed in code from the description's size record (`lib/size-of-move.js` `sizeFact`), never from comments.
 
 **Stage intent source, `lib/prompts/stage-intent.js`**
 - LIN-3300: the file was `lib/prompts/brief-writer.js` (ceiling 4779). The writer's prompt left with the writer, and the ceiling moved with the scope lines that stayed.
@@ -156,6 +162,7 @@ Two reasons recur, so they are written once here:
 - LIN-4248: +9236 (332910 -> 342146): template defs +5712, formatters +144, stage intent +57, and the two Survey renders +1204 and +2119.
 - LIN-4253: -5 (342146 -> 342141), net of defs +606 and prompt-templates -611. LIN-4251: +250 (342141 -> 342391), net of defs +16 and prompt-templates +234. LIN-4345: -4 (342391 -> 342387), review -2 and close-out -2. LIN-4362: +148 (342387 -> 342535), defs +74 and prompt-contract +74.
 - LIN-4345 (attempt 2): +2396 (342387 -> 344783): stage intent source +343, defs +7, six deciding stages +252 each, plan +337 and scoping +197. LIN-4345 (route): +297 (344783 -> 345080): +33 on each of the eight deciding stages and on stage intent source. Merged with LIN-4362: +171 (345080 -> 345251), its defs +74 and prompt-contract +74, plus defs +23 because both changes had counted the same 23 bytes of headroom (merged defs measured at 107469). LIN-4345 merged with LIN-4362: +65 (345251 -> 345316), stage intent source, CUT interpolates AS_ASKED_HEADING.
+- LIN-4367: -114 (345316 -> 345202). LIN-4368: +311 (345202 -> 345513): defs +189, scoping +89, routing prompt +33.
 
 ## Rows
 

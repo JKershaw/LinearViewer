@@ -1532,7 +1532,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
           // (LIN-772/773); dropping it here silently hid the section on the LLM
           // recommendation path autopilot drives by default — the sibling of the
           // deterministic LIN-776 fix. `focusedChild` stays (the router reads it).
-          await prepareRecommendationInput(context, { dispatchQueueStore, urlKey, identifier: issue.identifier }),
+          await prepareRecommendationInput(context, { dispatchQueueStore, workspacePreferencesStore, urlKey, identifier: issue.identifier }),
           {
             apiKey: resolvedApiKey,
             model: selectedModel,

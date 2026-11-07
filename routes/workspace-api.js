@@ -226,7 +226,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
   // ## Attachments section on every hop, matching the proxy recommendation path.
   async function modelCallArgs(ctx, { signal, ...call }) {
     const identifier = ctx.issue.identifier;
-    const input = await prepareRecommendationInput(ctx, { dispatchQueueStore, urlKey: call.workspace.urlKey, identifier });
+    const input = await prepareRecommendationInput(ctx, { dispatchQueueStore, workspacePreferencesStore, urlKey: call.workspace.urlKey, identifier });
     return [ctx.issue, input, recommendCallOptions({ ...call, identifier, signal })];
   }
 
