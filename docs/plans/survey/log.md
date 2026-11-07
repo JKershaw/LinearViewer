@@ -2774,3 +2774,25 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - my size calls are plain (what and why, not how) until LIN-4346 lands, after which Harbour sizes the rest itself;
   - I'm logging which version of the loop each ticket ran on.
 - **Surveys dispatched** for LIN-4345 (`e4cde439`, `13aef125`) and LIN-4348 (`0c83fa99`, `71ea3e38`).
+- **~10:10 UTC: LIN-4345's and LIN-4348's Surveys read.** The best finding is the photocopy, caught live.
+  - Every stage first reads a distilled brief (`lib/brief.js`) that is told to "supersede stale original wording". It reversed LIN-4345's own brief: "should come out of the prompts" became "prefer moving the change into prompts/process".
+  - The description is also one shared buffer that four stages write into, so nothing marks the person's words.
+  - The cause is upstream of anything the ticket named.
+- **The size calls are posted as comments, not written into the description**, since editing the description is what LIN-4345 is about. They were parroted twice; the second pass made them prose rather than lists and added the following.
+  - **LIN-4345 (err larger):**
+    - the person's words are made unchangeable by construction;
+    - the brief carries them word for word;
+    - a check fails on paraphrase;
+    - review and close-out judge against them, while plan and plan-review lose text;
+    - "whose words" is decided in the PR, with a ruling where it turns on values;
+    - whether the distilled brief should exist at all is a ruling for John.
+  - **LIN-4348 (err larger):**
+    - the kind of work lives on the ticket;
+    - there are writer and fresh-reader steps, on Opus at a minimum;
+    - the whole path shows before a run;
+    - it takes on two traps that would defeat it: cold resume sends no model (simple-dispatcher, so both repositories, with a runtime witness), and the runner kit can't map Fable;
+    - moving the judging steps to a stronger model is a cost ruling;
+    - the Haiku code default is not this ticket's to change;
+    - done includes "the essay reads well".
+- **The order is revised:** LIN-4348 runs after LIN-4345 (they share the templates and the size budget), with a note on LIN-4344.
+- **LIN-4345 kicked off:** autopilot `f42b8d02`, Opus at every stage. Loop version: hand-sized (v0).
