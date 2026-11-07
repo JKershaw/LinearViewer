@@ -2884,3 +2884,9 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - Size call posted, and the restated-rules fold and the ceiling-comment log went to LIN-4350. **LIN-4354 kicked off** (autopilot `fb292032`, Opus).
   - This size call was not parroted: it is derived closely from the two Surveys, and I'm noting the skip here.
 - **17:14 UTC, two rulings.** LIN-4354 broke into LIN-4360 (one due reader, the outside-block helper, a pure composer, one mock brief; carries the named behaviour change), LIN-4361 (one issue access for seal and plan read) and LIN-4362 (markers and the brief hint defined once, reasons not labels, retirement conditions). Suggested **pr2348-first** on `lin4354-pr2348-order` (finished, green work lands first; the tidy absorbs it) and **accept-all-subtasks** on `lin4345-parent-quote-scope` (the parent's words matter to any subtask, and a breakdown marker would be machinery for no gain).
+- **~17:40 UTC, the per-sentence replay (LIN-4345, PR #2348 `53f476b3`/`e8ef01b1`; `docs/reviews/lin-4345-per-sentence-replay-2026-11-07.md`).** 12 runs: old and new wording, LIN-4085 and LIN-1596, three runs each.
+  - LIN-4085 was 0/3 under both wordings; LIN-1596 was 3/3 under both.
+  - The selective quote is gone: new runs quote "a full guide" whole, then judge the 577-word guide to meet it.
+  - **Finding: review catches a cut that was named** (LIN-1596's scoping wrote "Out of scope — split out") **and misses one that wasn't, whatever its wording.** The lever is upstream, where the cut happens. That is the one-feature-twice remedy ("turn any narrowing into a ruling") arrived at by measurement.
+  - Ruling `lin4345-per-sentence-outcome`: suggested **keep-upstream** (keep the wording, which shrank the prompt; done-when unmet; build the naming of cuts into LIN-4346's size step rather than adding a step).
+  - Rulings `lin4354-pr2348-order` and `lin4345-parent-quote-scope` were applied as suggested.
