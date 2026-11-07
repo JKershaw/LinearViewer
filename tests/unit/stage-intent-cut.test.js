@@ -80,13 +80,22 @@ describe('the cut rule has one home (LIN-4345)', () => {
 
 describe('a template says only where its cuts go (LIN-4345, LIN-4367)', () => {
   // The words that belong to the rule: what quoting and ruling mean is CUT's to say.
-  const RULE_WORDS = /\bquot|\bruling/i;
+  // A paraphrase restates the rule too (review M6 on LIN-4367), so its other words count.
+  const RULE_WORDS = /\bquot|\bruling|not yours|\bagreed\b|DECISION:/i;
   const cutLines = (text) => text.split('\n').filter(l => /\bcuts?\b/i.test(l) && !l.includes(CUT));
 
   test('scoping and plan each name a place for their cuts', () => {
     const scoping = generatePrompt('scoping', ISSUE, CONTEXT).prompt;
     assert.ok(cutLines(scoping).some(l => l.includes('**Out of Scope**')), 'scoping writes its cuts under Out of Scope');
     assert.ok(cutLines(generatePrompt('plan', ISSUE, CONTEXT).prompt).length > 0, 'plan lists its cuts');
+  });
+
+  test('scoping no longer owns what is in and out of scope, and still reads the code first', () => {
+    // LIN-4345's regression guards, restored in LIN-4367 close-out: short fragments, not the rule.
+    const scoping = generatePrompt('scoping', ISSUE, CONTEXT).prompt;
+    assert.doesNotMatch(scoping, /in and out of scope is yours to decide/);
+    assert.doesNotMatch(scoping, /flag for the human only product or intent questions/);
+    assert.match(scoping, /Read the code first\./);
   });
 
   test('no deciding stage restates the rule outside its scope line', () => {
