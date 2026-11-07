@@ -31,6 +31,7 @@ import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { requestOriginOrNull, ORIGIN_UNRESOLVED_REFUSAL } from '../lib/public-origin.js';
 import { buildMockFeedbackTitle } from '../lib/workspace-api-mocks.js';
 import { normalizeWritePayload } from '../lib/proxy-graphql-errors.js';
+import { sealForFiling } from '../lib/as-asked-seal.js';
 
 // ===========================================================================
 // Feedback intake constants (LIN-636 route / LIN-635 widget)
@@ -482,19 +483,25 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
       // never filed. 0 ("No priority") is indistinguishable from "unset", so it is
       // never folded or forwarded.
       const canSetPriority = provider.apiWriteFields().includes('priority');
+      const belowParts = [];
       if (priority > 0 && !canSetPriority) {
-        parts.push(`---\n**Reported priority:** ${PRIORITY_OPTION_LABELS[priority]}`);
+        belowParts.push(`---\n**Reported priority:** ${PRIORITY_OPTION_LABELS[priority]}`);
       }
 
       // Origin/triage marker (LIN-947): always last, so the stored ticket announces
       // itself as raw, un-triaged feedback and the meta-prompt's triage routing
       // activates. It never alters the message, capture block or screenshot above.
-      parts.push(`---\n${FEEDBACK_ORIGIN_TRIAGE_MARKER}`);
+      const below = [...belowParts, `---\n${FEEDBACK_ORIGIN_TRIAGE_MARKER}`];
 
+      // LIN-4352: the person's report (message, capture, screenshot) is sealed into
+      // the As asked block; the priority line and the triage marker are code's own
+      // text and go after its end line. A report that already holds a marker line,
+      // or a provider that cannot hold the block, is filed in the unsealed layout
+      // with one log line (lib/as-asked-seal.js).
       const createInput = {
         teamId: resolvedTeamId,
         title: await resolveFeedbackTitle(req, workspace, { title, message }),
-        description: parts.join('\n\n'),
+        description: sealForFiling({ provider, words: parts.join('\n\n'), below: below.join('\n\n'), lane: 'feedback' }).description,
       };
       if (resolvedProjectId) createInput.projectId = resolvedProjectId;
       if (priority > 0 && canSetPriority) createInput.priority = priority;

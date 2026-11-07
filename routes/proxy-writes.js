@@ -54,6 +54,7 @@ import { flattenIssue, MAX_ATTACHMENT_BYTES } from '../lib/proxy-wire.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 import { checkAsAsked, splitAsAsked, hasMarkerLine } from '../lib/as-asked.js';
+import { sealForFiling } from '../lib/as-asked-seal.js';
 import { jsonError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
 
@@ -380,7 +381,10 @@ export function createProxyWriteRoutes({
 
     const input = { title };
     if (requiresTeam) input.teamId = resolvedTeamId;
-    if (description) input.description = description;
+    // LIN-4352: code seals the filed words into the As asked block where the
+    // ticket starts (a marker body was refused above; a provider that cannot hold
+    // the block is filed unsealed, with its own log line).
+    if (description) input.description = sealForFiling({ provider, words: description, lane: 'proxy create' }).description;
 
     // In request order: each field is gated on the provider's write contract, then
     // converted (LIN-556: projectId / stateId accept symbolic names, state scoped
