@@ -208,17 +208,40 @@ describe('readFact', () => {
     assert.strictEqual(readFact(desc, readDue), 'no');
   });
 
-  test('a fact read as false or undefined counts as absent below, so the block is read', () => {
-    const has = (t) => /needle/.test(t);
-    assert.strictEqual(readFact(sealAsAsked('needle'), has), true);
-    assert.strictEqual(readFact(`${sealAsAsked('hay')}\n\nhay`, has), false);
+  test('block yes, below no reads no: a negative answer below is not absence', () => {
+    const desc = `${sealAsAsked('plan-review due: yes')}\n\nplan-review due: no`;
+    assert.strictEqual(readFact(desc, readDue), 'no');
+    // A reader whose negative answer is `false` (and absence `null`) must keep it.
+    const dueBool = (t) => { const m = t.match(DUE); return m ? m[1].toLowerCase() === 'yes' : null; };
+    assert.strictEqual(readFact(desc, dueBool), false);
+    assert.strictEqual(readFact(sealAsAsked('plan-review due: yes'), dueBool), true);
+  });
+
+  test('only null and undefined count as absent below; false is an answer', () => {
     const maybe = (t) => (t.includes('needle') ? 'found' : undefined);
     assert.strictEqual(readFact(sealAsAsked('needle'), maybe), 'found');
+    const orNull = (t) => (t.includes('needle') ? 'found' : null);
+    assert.strictEqual(readFact(sealAsAsked('needle'), orNull), 'found');
+    // A presence predicate says "absent" with null, not false (see readFact's doc).
+    const has = (t) => /needle/.test(t) || null;
+    assert.strictEqual(readFact(sealAsAsked('needle'), has), true);
+    assert.strictEqual(readFact(`${sealAsAsked('hay')}\n\nhay`, has), null);
+    assert.strictEqual(readFact(`${sealAsAsked('needle')}\n\nhay`, (t) => /needle/.test(t)), false);
   });
 
   test('text above a block reads with the text below, ahead of the block', () => {
     const desc = `plan-review due: yes\n\n${block}`;
     assert.strictEqual(readFact(desc, readDue), 'yes');
+  });
+
+  test('`after` text (a plan comment) reads with the text below, ahead of the block', () => {
+    const block = sealAsAsked('plan-review due: no');
+    assert.strictEqual(readFact(block, readDue, { after: 'plan-review due: yes' }), 'yes');
+    assert.strictEqual(readFact(block, readDue, { after: 'no line here' }), 'no');
+    // Unsealed: the description then the after text, joined as callers joined them before.
+    const seen = [];
+    readFact('desc', (t) => { seen.push(t); return null; }, { after: 'comment' });
+    assert.deepStrictEqual(seen, ['desc\n\ncomment']);
   });
 
   test('an empty or missing description is read as the empty string', () => {
