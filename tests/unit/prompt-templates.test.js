@@ -4432,6 +4432,16 @@ describe('judging verdicts state how the work met what was asked (LIN-4353)', ()
     });
   }
 
+  // LIN-4353 replay arm A2: told to judge against the block, the reviewer restated the ask in its
+  // own words, and the restatement dropped what had been narrowed. The verdict quotes the block.
+  for (const key of ['review', 'plan-review']) {
+    test(`${key}: the verdict's one line quotes what was asked from the block, not a summary`, () => {
+      const { prompt } = generatePrompt(key, issue, context);
+      assert.ok(sentenceWith(prompt, [/one line/i, /what was asked/i, /quoted from the block/i]),
+        `${key}'s verdict line must quote what was asked from the block`);
+    });
+  }
+
   test('review names any narrowing, and an unagreed narrowing is Needs Discussion', () => {
     const { prompt } = generatePrompt('review', issue, context);
     assert.ok(sentenceWith(prompt, [/narrow/i, /Needs Discussion/]),

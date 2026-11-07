@@ -5,9 +5,10 @@ The model half of LIN-4353's witness 6, run by hand as LIN-4345's plan asked. Th
 was missed: "Replay LIN-4085's review with the original request attached, and see whether it catches
 the thin guide." It is one model run per arm. It is evidence for review, not a CI result.
 
-**Result: no arm caught the thin guide.** The old review prompt, the new one, and the new one with
-the tightened agreement rule all approved Harbour's LIN-4085 build (conditionally, on unrelated
-ledger items). None of the three mentions "a full guide". The deterministic half of witness 6
+**Result: no arm caught the thin guide.** The old review prompt, the new one, the new one with the
+tightened agreement rule, and the new one that also asks the verdict to quote the block all approved
+Harbour's LIN-4085 build (conditionally, on unrelated ledger items). None of the four counts the
+missing "full guide" as a narrowing. The deterministic half of witness 6
 (`tests/unit/as-asked-lin4085-replay.test.js`) passes: the words reach review intact and review is
 told to start from them. What these runs show is that a reviewer told so still judged against the
 plan's reading of the ask.
@@ -32,6 +33,8 @@ plan's reading of the ask.
   - Arm A2: rendered by LIN-4353 with the agreement rule ("naming any narrowing; only the person's
     comment or answered ruling agrees to one, not a stage's scope or plan, else **Needs
     Discussion**").
+  - Arm A3: as A2, with the verdict's one line "on how the work meets what was asked, quoted from the
+    block" (and one Gap Analysis restatement cut to pay for it).
 
 ## What each arm said (verbatim)
 
@@ -54,6 +57,16 @@ what was asked without narrowing it". Findings beside it: no test reaches the gu
 server, the flag wiring is untested, the logout landing lacks the block, and the navbar keeps its own
 door list.
 
+**Arm A3, new prompt with the agreement rule and the quote.** Verdict: "`Approve — conditional on
+close-out discharging the ledger`". Its section is headed "Scope against the plan". Its verdict line
+quotes the block, selectively: "The work delivers what was asked: \"a prompt that the person passes
+to their agent… linking to a harbour.cat slash getting started page which walks an agent through
+onboarding project and the user to Harbour\"." It then names what it does not count as narrowing:
+"I don't count the static prompt or the README pointer for self-hosting as narrowings". Findings
+beside it: the guide is wrong for the email door (it names `/account`), the 320px test cannot fail
+(a mutation left a 1953px-wide `<pre>` in a 246px box and the test stayed green), and the cold-agent
+walk's outcome is not recorded.
+
 ## Reading
 
 - Arm A shows that the verdict line alone did not stop a stage's narrowing being read as agreement,
@@ -62,6 +75,10 @@ door list.
   restated the ask in its own words, and that restatement already dropped "essentially a full guide on
   how to properly configure Harper for whatever your situation is". Against its own summary, nothing
   was narrowed. This is the same thinning the brief used to do, now done by the reviewer.
+- Arm A3 shows the quote moving the miss once more, into the choice of what to quote. The reviewer
+  quoted the block's words, but chose the clauses the build met and cut at an ellipsis before "we
+  can have essentially a full guide on how to properly configure Harper for whatever your situation
+  is". A verbatim quote is not a whole quote: a reviewer can still judge against the part it picked.
 - Every arm found real defects the 1 November review did not, and all three approved conditionally.
   The prompt's catch of real defects is not in question here; its catch of a narrowed ask is.
 
@@ -71,8 +88,9 @@ This is a ledger item for review, not a settled witness. Three runs on one ticke
 any prompt wording makes a reviewer hold a build to the words of the ask. Ways forward, none of
 them built here:
 
-- Have review quote the block's own words where it states what was asked, instead of summarising
-  them. That turns the reviewer's restatement, the step that thinned the ask in arm A2, into a copy
-  code can check.
+- Quoting was tried (arm A3) and is in the shipped prompt; it did not catch the thin guide, because
+  the quote was selective. A next attempt would have to make the whole ask unavoidable in the
+  verdict, for example by asking the reviewer to account for each sentence of the block, at a cost
+  in prompt bytes and reviewer effort that this ticket did not weigh.
 - Replay more than one ticket, and more than one run per arm, before reading anything into a
   difference between arms.
