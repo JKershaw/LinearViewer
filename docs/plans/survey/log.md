@@ -2914,3 +2914,23 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - LIN-4346's note was updated: carry the cut rule, don't rebuild it, and a size that cuts the ask is a named cut.
   - LIN-4346's Surveys are at the new base (`cb696ba2`, `a0389745`).
   - LIN-4358 waits on John (`lin4358-decisive-row`), and LIN-4348 waits behind it (routing overlap), so LIN-4346 runs tonight.
+- **~22:30 UTC: PR #2351 at merge: mixed, mixed (BS, BT).** The cut rule has one owner (`CUT` in `stage-intent.js`), and scoping's contradicting licence is deleted.
+  - BT proved the new one-home test can never fire: a planted copy that uses the shared heading passes.
+  - The cut idea is re-worded in four more places, and a change-log row still says "PR pending".
+  - `prompt-size-budget.test.js` grew from 36 to 50 KB of pasted rationale: the third change in a row where the budget test acts as a second change log.
+- **LIN-4346's Surveys:**
+  - The Surveys are `route: null` and pinned unrunnable, and there's no seam before the first stage.
+  - **The operator's scope rules were "how" and caused copies, so auto-writing scope repeats it unless the format forbids how.**
+  - Make sizing *scoping's* job, not a sibling: one place for cut rulings, since `CUT` already exists.
+  - Trigger the Surveys by a code fact plus the stage description; put the standing policy in workspace preferences.
+  - Replay before wiring.
+- **The size call** (parroted twice) and **kickoff** (autopilot, Opus):
+  - sizing goes inside scoping, written as what and why, held by more than prompt wording;
+  - smaller is a cut, through the same ruling;
+  - "err larger" means lean larger where the look shows it pays, not by default; small stays small;
+  - Surveys on every ticket are accepted spend for now, recorded for tuning;
+  - replay on LIN-4178, 4252, 4253 and a control, judged by a fresh reader;
+  - **PR #2351's leftovers are folded in**, since it's the same code;
+  - done: running the loop means setting the policy once and filing a ticket.
+  - The kickoff goal now carries "settle engineering questions yourself; rulings only for John's calls".
+- **For the notebook (Survey):** `docs/plans/survey.md`'s "John is asked only when the large option is recommended" is now the reverse. Under the policy, larger goes ahead, and smaller than asked is a cut that raises a ruling.
