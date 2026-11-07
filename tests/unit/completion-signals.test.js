@@ -358,3 +358,35 @@ describe('Integration', () => {
     }
   });
 });
+
+// LIN-4353 (review ledger item 2): the judging signals carry the As-asked rule the
+// stage templates carry, so the done-check a worker reads agrees with its prompt.
+describe('judging signals read the As asked block (LIN-4353)', () => {
+  const doneSignal = (type, re) => COMPLETION_SIGNALS[type].signals.find(s => re.test(s));
+
+  for (const [type, what] of [['review', 'work'], ['plan-review', 'plan']]) {
+    test(`${type}: the verdict signal says how the ${what} meets what was asked and names any narrowing`, () => {
+      const verdict = doneSignal(type, /^Explicit verdict issued/);
+      assert.ok(verdict, `${type} has a verdict signal`);
+      assert.match(verdict, new RegExp(`in one line how the ${what} meets what was asked`));
+      assert.match(verdict, /`## As asked` block/);
+      assert.match(verdict, /naming any narrowing/);
+    });
+  }
+
+  test('review: a narrowing nobody agreed to is Needs Discussion', () => {
+    assert.match(doneSignal('review', /^Explicit verdict issued/), /nobody agreed to is Needs Discussion/);
+  });
+
+  test('close-out: the summary says how the work meets what was asked', () => {
+    assert.ok(doneSignal('close-out', /^Summary comment posted, saying how the merged work meets what was asked/));
+    assert.match(COMPLETION_SIGNALS['close-out'].readinessCheck, /how the work meets what was asked/);
+  });
+
+  test('close-out: the prune writes below the block through description/below, and not at all with no block', () => {
+    const prune = doneSignal('close-out', /pre-prune snapshot/);
+    assert.match(prune, /below the `## As asked` block, through `description\/below`/);
+    assert.match(prune, /with no block, no prune/);
+    assert.match(COMPLETION_SIGNALS['close-out'].readinessCheck, /below the `## As asked` block only/);
+  });
+});

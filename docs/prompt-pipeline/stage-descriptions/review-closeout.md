@@ -9,6 +9,12 @@ Read at the working tree in `/home/user/LinearViewer` on 2026-10-03 (no git chec
 > post-deploy step close-out does after the merge, never a condition on it. Where B2's "What you may
 > write yourself", B5's numeric bound and the LIN-3033 floor below say otherwise, the templates in
 > `lib/prompt-template-defs.js` are current.
+>
+> **Superseded in part by LIN-4353 (2026-11-07).** Close-out now prunes only below the description's
+> `## As asked` block, through `POST /api/proxy/issues/{identifier}/description/below`, and does not
+> prune a description with no block. The never-prune list and the `PATCH` prune described below are
+> history; only "any section a follow-up ticket references" is still kept.
+
 Sources read in full:
 
 - `review` `generate()` at `lib/prompt-template-defs.js:997-1128` and `close-out` `generate()` at

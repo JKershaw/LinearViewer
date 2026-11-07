@@ -4442,6 +4442,15 @@ describe('judging verdicts state how the work met what was asked (LIN-4353)', ()
     });
   }
 
+  // LIN-4353 (review ledger item 2): plan opens with the problem as the block puts it, the
+  // only edit to LIN-4021's agreed plan text (the asker clause).
+  test('plan: it opens with the problem as the `## As asked` block puts it', () => {
+    const { prompt } = generatePrompt('plan', issue, context);
+    assert.ok(sentenceWith(prompt, [/opens with the problem/i, /`## As asked` block/]),
+      'plan must open with the problem as the `## As asked` block puts it');
+    assert.ok(!/the asker\'s terms/.test(prompt), 'the asker clause now points at the block');
+  });
+
   test('review names any narrowing, and an unagreed narrowing is Needs Discussion', () => {
     const { prompt } = generatePrompt('review', issue, context);
     assert.ok(sentenceWith(prompt, [/narrow/i, /Needs Discussion/]),
