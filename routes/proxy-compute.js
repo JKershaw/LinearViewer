@@ -16,7 +16,8 @@ import { resolveRecommendation } from '../lib/recommend-recurse.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshness, ROADMAP_REPORT_MAX_AGE_DAYS, getNorthStarDocVersion } from '../lib/north-star-resolver.js';
 import { generateRecap } from '../lib/recap.js';
-import { generateBrief } from '../lib/brief.js';
+import { generateBrief, composeBrief } from '../lib/brief.js';
+import { askedText } from '../lib/as-asked.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
 import { buildTaskStack } from '../lib/task-stack.js';
@@ -189,7 +190,8 @@ export function createComputeRoutes({
   /**
    * Build a small deterministic brief (fixed-section Markdown) for test mode.
    * Mirrors buildMockBrief in lib/workspace-api-mocks.js so the proxy and in-app
-   * paths return the same shape under test.
+   * paths return the same shape under test, including the quoted As-asked block
+   * (composeBrief) and a summary taken from the block's words (LIN-4351).
    */
   function buildMockBriefFromContext(context) {
     const issue = context.issue || {};
@@ -197,7 +199,7 @@ export function createComputeRoutes({
 
     const lines = [];
     lines.push('## Current');
-    lines.push(`${issue.title || 'Untitled task'} — ${issue.description ? issue.description.split('\n')[0] : 'No description provided.'}`);
+    lines.push(`${issue.title || 'Untitled task'} — ${issue.description ? askedText(issue.description).split('\n')[0] : 'No description provided.'}`);
     if (remaining.length > 0) {
       lines.push('');
       lines.push(`Remaining: ${remaining.map(c => c.identifier).join(', ')}.`);
@@ -219,7 +221,7 @@ export function createComputeRoutes({
       lines.push('- _None._');
     }
 
-    return lines.join('\n');
+    return composeBrief(issue.description, lines.join('\n'));
   }
 
   // =========================================================================

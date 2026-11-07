@@ -1,0 +1,293 @@
+/**
+ * Witness 1 for LIN-4351 (LIN-4345 plan step 7): the asker's words reach a step
+ * unchanged. The brief model paraphrases; code quotes the `## As asked` block's
+ * words, byte for byte, ahead of the model's four sections, so every brief reader
+ * (proxy route, session route, task page) gets them verbatim, fresh and cached.
+ *
+ * The model is a stub at the one network seam, `fetch` to openrouter.ai (the
+ * pattern tests/unit/feedback-title.test.js uses), so the REAL generateBrief runs
+ * inside the REAL routes. Every comparison here is on raw bytes: none goes
+ * through normalizeEscaping, so the Linear-escaped case proves the escapes are
+ * kept, not merely tolerated.
+ *
+ * Run with: node --test tests/unit/as-asked-brief.test.js
+ */
+process.env.NODE_ENV = 'test';
+
+import { test, describe, beforeEach, afterEach } from 'node:test';
+import assert from 'node:assert/strict';
+import express from 'express';
+import { sealAsAsked } from '../../lib/as-asked.js';
+import { generateBrief, composeBrief, briefQuoteEnd, DEFAULT_BRIEF_MODEL } from '../../lib/brief.js';
+import { briefCurrentSection, briefWithoutCurrent } from '../../lib/task-page-loader.js';
+import { toStackHeadline } from '../../lib/task-stack.js';
+import { buildMockBrief } from '../../lib/workspace-api-mocks.js';
+import { InMemoryBriefCacheStore } from '../../lib/brief-cache.js';
+import { createProxyRoutes } from '../../routes/proxy.js';
+import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
+import { ProviderInterface } from '../../lib/providers/interface.js';
+import { registerProvider } from '../../lib/providers/registry.js';
+import { testMockData } from '../../lib/sample-data/mock-data.js';
+
+// The person's words: a `## Current` heading of their own, and a phrase the stub
+// model will thin out ("a full guide" → "a short guide").
+const ASK = 'Please write a full guide on how to properly configure the proxy.\n\n## Current\nMy setup: two workspaces, one token.';
+// The same ask as Linear stores it: markdown punctuation backslash-escaped.
+const LINEAR_ASK = 'Write a \\*full\\* guide on how to properly configure it\\.\n\n\\#\\# Current\nTwo workspaces\\.';
+const LINEAR_SEALED = `\\#\\# As asked\n\n${LINEAR_ASK}\n\n\\*End of what was asked\\. Steps write below this line; nothing above it changes\\.\\*`;
+
+const MODEL_CURRENT = 'Write a short guide to the proxy.';
+const MODEL_BRIEF = `## Current\n${MODEL_CURRENT}\n\n## Constraints\n- _None._\n\n## Open questions\n- _None._\n\n## Changelog\n- _None._`;
+
+/** The brief must open with the quoted block: heading, blank, the words' exact bytes, blank. */
+function assertQuoted(brief, words) {
+  const head = `## As asked\n\n${words}\n\n`;
+  assert.ok(typeof brief === 'string' && brief.startsWith(head), `brief must start with the quoted words byte for byte; got:\n${String(brief).slice(0, 300)}`);
+}
+
+let modelCalls = 0;
+let restoreFetch = null;
+function installModelStub(text = MODEL_BRIEF) {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (typeof url === 'string' && url.includes('openrouter.ai')) {
+      modelCalls++;
+      async function* gen() {
+        yield new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`);
+        yield new TextEncoder().encode('data: [DONE]\n\n');
+      }
+      return { ok: true, status: 200, body: gen(), text: async () => '', json: async () => ({}) };
+    }
+    return realFetch(url, options);
+  };
+  restoreFetch = () => { globalThis.fetch = realFetch; };
+}
+
+beforeEach(() => { modelCalls = 0; });
+afterEach(() => { if (restoreFetch) restoreFetch(); restoreFetch = null; });
+
+const issueOf = (description) => ({ id: 'uuid-4351', identifier: 'ENG-4351', title: 'Proxy guide', description, state: { type: 'started' }, labels: [] });
+const contextOf = (description) => ({ issue: issueOf(description), comments: [], children: [], parent: null, focusedChild: null });
+
+describe('generateBrief quotes the block ahead of a paraphrasing model', () => {
+  test('the brief starts with ## As asked and the block\'s exact bytes; the model\'s sections follow', async () => {
+    installModelStub();
+    const { brief, model } = await generateBrief(issueOf(sealAsAsked(ASK)), contextOf(sealAsAsked(ASK)), { apiKey: 'sk-test' });
+    assertQuoted(brief, ASK);
+    assert.ok(brief.endsWith(MODEL_BRIEF), 'the model\'s four sections follow the quote unchanged');
+    assert.equal(model, 'openai/gpt-5.4-mini', 'the brief model stays gpt-5.4-mini');
+    assert.equal(DEFAULT_BRIEF_MODEL, 'openai/gpt-5.4-mini');
+  });
+
+  test('briefCurrentSection returns the model\'s ## Current, not the person\'s', async () => {
+    installModelStub();
+    const { brief } = await generateBrief(issueOf(sealAsAsked(ASK)), contextOf(sealAsAsked(ASK)), { apiKey: 'sk-test' });
+    assert.equal(briefCurrentSection(brief), MODEL_CURRENT);
+    const panel = briefWithoutCurrent(brief);
+    assertQuoted(panel, ASK);
+    assert.ok(!panel.includes(MODEL_CURRENT), 'the panel drops the model\'s Current (the header shows it)');
+    assert.ok(panel.includes('My setup: two workspaces, one token.'), 'the person\'s own ## Current text stays in the quote');
+  });
+
+  test('a Linear-escaped ask keeps its backslash escapes, byte for byte against what is stored', async () => {
+    installModelStub();
+    const { brief } = await generateBrief(issueOf(LINEAR_SEALED), contextOf(LINEAR_SEALED), { apiKey: 'sk-test' });
+    // Raw comparison on purpose: the words are the STORED bytes, escapes included.
+    assertQuoted(brief, LINEAR_ASK);
+    assert.equal(briefCurrentSection(brief), MODEL_CURRENT, 'an escaped `\\#\\# Current` in the ask is not the brief\'s Current');
+  });
+
+  test('an unsealed ticket\'s brief is the model\'s output, unchanged', async () => {
+    installModelStub();
+    const { brief } = await generateBrief(issueOf(ASK), contextOf(ASK), { apiKey: 'sk-test' });
+    assert.equal(brief, MODEL_BRIEF);
+  });
+
+  test('the system prompt says code quotes the block and the model must not restate it', async () => {
+    const { buildBriefMessages } = await import('../../lib/brief.js');
+    const system = buildBriefMessages(issueOf(ASK), contextOf(ASK))[0].content;
+    assert.match(system, /As asked/);
+    assert.match(system, /not restate/i);
+    assert.match(system, /Open questions/);
+  });
+});
+
+describe('composeBrief and briefQuoteEnd', () => {
+  test('the quote ends where the model\'s output begins', () => {
+    const brief = composeBrief(sealAsAsked(ASK), MODEL_BRIEF);
+    assert.equal(brief.slice(briefQuoteEnd(brief)).trimStart(), MODEL_BRIEF);
+    assert.equal(briefQuoteEnd(MODEL_BRIEF), 0, 'an unquoted brief has no quote');
+  });
+
+  test('no usable model output stays empty (no quote-only brief is cached)', () => {
+    assert.equal(composeBrief(sealAsAsked(ASK), ''), '');
+  });
+});
+
+describe('first-line readers show the person\'s first line on a sealed ticket', () => {
+  test('toStackHeadline', () => {
+    assert.equal(toStackHeadline(sealAsAsked(ASK)), toStackHeadline(ASK));
+    assert.ok(toStackHeadline(sealAsAsked(ASK)).startsWith('Please write a full guide'));
+  });
+
+  test('buildMockBrief (session mock): quotes the block, and its summary is the first line of the words', () => {
+    const brief = buildMockBrief(contextOf(sealAsAsked(ASK)));
+    assertQuoted(brief, ASK);
+    assert.equal(briefCurrentSection(brief), `Proxy guide — ${ASK.split('\n')[0]}`);
+  });
+
+  test('unsealed: headline and mock brief unchanged', () => {
+    assert.equal(toStackHeadline('First line.\nSecond.'), 'First line.');
+    assert.equal(buildMockBrief(contextOf(ASK)).split('\n').slice(0, 2).join('\n'), `## Current\nProxy guide — ${ASK.split('\n')[0]}`);
+  });
+});
+
+// ─── The routes, fresh and cached ────────────────────────────────────────────
+
+class FakeContextProvider extends ProviderInterface {
+  constructor(name, description) {
+    super();
+    this.name = name;
+    this.description = description;
+  }
+  async fetchRecommendationContext() { return contextOf(this.description); }
+}
+
+async function call(app, method, path, body) {
+  const realSetTimeout = global.setTimeout;
+  global.setTimeout = (...args) => realSetTimeout(...args).unref?.();
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  const { port } = server.address();
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+      method,
+      headers: { Authorization: 'Bearer anything', 'content-type': 'application/json' },
+      ...(body ? { body: JSON.stringify(body) } : {})
+    });
+    let json = {};
+    try { json = await res.json(); } catch { /* empty */ }
+    return { status: res.status, body: json };
+  } finally {
+    global.setTimeout = realSetTimeout;
+    await new Promise(resolve => server.close(resolve));
+  }
+}
+
+function proxyApp({ provider, token = 'real-token', briefCacheStore }) {
+  const app = express();
+  app.use(express.json());
+  app.use(createProxyRoutes({
+    proxyTokenStore: { validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'read', createdBy: 'u1' }) },
+    proxyEventStore: { recordEvent: async () => {} },
+    resolveWorkspaceAccess: async () => ({ token, reason: 'ok' }),
+    getWorkspaceAccessToken: async () => token,
+    getWorkspaceOpenRouterKey: async () => 'sk-test',
+    agentStatusStore: {},
+    recapCacheStore: { get: async () => null, put: async () => {} },
+    briefCacheStore,
+    taskSnapshotStore: {},
+    dispatchQueueStore: {},
+    workspaceFromUrl: (req, res, next) => next(),
+    workspacePreferencesStore: null,
+    freeTierStore: { tryUse: async () => ({ allowed: true }) },
+    provider,
+  }));
+  return app;
+}
+
+function sessionApp({ providerName, briefCacheStore }) {
+  const app = express();
+  app.use(express.json());
+  app.use(createWorkspaceApiRoutes({
+    workspaceFromUrl: (req, _res, next) => {
+      req.workspace = { accessToken: 'real-token', urlKey: 'acme', provider: providerName };
+      req.session = { features: {}, openRouterApiKey: 'sk-test' };
+      next();
+    },
+    freeTierStore: {},
+    getOpenRouterSource: () => null,
+    userPreferencesStore: {},
+    workspacePreferencesStore: null,
+    customPromptsStore: {},
+    recapCacheStore: {},
+    briefCacheStore,
+    reportHistoryStore: {},
+    dispatchQueueStore: {},
+    agentStatusStore: {},
+    promptTraceStore: {},
+    proxyTokenStore: {},
+  }));
+  return app;
+}
+
+describe('the proxy brief route serves the quoted brief, fresh and cached', () => {
+  test('sealed: fresh, then cached without a second model call', async () => {
+    installModelStub();
+    const provider = new FakeContextProvider('as-asked-proxy', sealAsAsked(ASK));
+    const app = proxyApp({ provider, briefCacheStore: new InMemoryBriefCacheStore() });
+    const fresh = await call(app, 'GET', '/api/proxy/issues/ENG-4351/brief');
+    assert.equal(fresh.status, 200, JSON.stringify(fresh.body));
+    assertQuoted(fresh.body.brief, ASK);
+    assert.equal(modelCalls, 1);
+    const cached = await call(app, 'GET', '/api/proxy/issues/ENG-4351/brief');
+    assert.equal(cached.status, 200);
+    assert.equal(modelCalls, 1, 'served from the cache');
+    assert.equal(cached.body.brief, fresh.body.brief);
+    assertQuoted(cached.body.brief, ASK);
+  });
+
+  test('the forced POST regenerate quotes the block too', async () => {
+    installModelStub();
+    const provider = new FakeContextProvider('as-asked-proxy-post', sealAsAsked(ASK));
+    const { status, body } = await call(proxyApp({ provider, briefCacheStore: new InMemoryBriefCacheStore() }), 'POST', '/api/proxy/brief/ENG-4351');
+    assert.equal(status, 200, JSON.stringify(body));
+    assertQuoted(body.brief, ASK);
+  });
+
+  test('test mode (the proxy\'s own mock builder) quotes a sealed fixture', async () => {
+    const fixture = testMockData.issues.find(i => i.identifier);
+    const saved = fixture.description;
+    fixture.description = sealAsAsked(ASK);
+    try {
+      const app = proxyApp({ provider: new FakeContextProvider('as-asked-proxy-mock', ''), token: 'test-token', briefCacheStore: new InMemoryBriefCacheStore() });
+      const { status, body } = await call(app, 'GET', `/api/proxy/issues/${fixture.identifier}/brief`);
+      assert.equal(status, 200, JSON.stringify(body));
+      assertQuoted(body.brief, ASK);
+      assert.ok(briefCurrentSection(body.brief).endsWith(`— ${ASK.split('\n')[0]}`), 'the mock summary is the words\' first line');
+    } finally {
+      fixture.description = saved;
+    }
+  });
+
+  test('unsealed: the brief is the model\'s, unchanged', async () => {
+    installModelStub();
+    const provider = new FakeContextProvider('as-asked-proxy-plain', ASK);
+    const { body } = await call(proxyApp({ provider, briefCacheStore: new InMemoryBriefCacheStore() }), 'GET', '/api/proxy/issues/ENG-4351/brief');
+    assert.equal(body.brief, MODEL_BRIEF);
+  });
+});
+
+describe('the session brief route serves the quoted brief, fresh and cached', () => {
+  test('sealed: POST generates fresh, GET serves the cached brief', async () => {
+    installModelStub();
+    registerProvider(new FakeContextProvider('as-asked-session', sealAsAsked(ASK)));
+    const app = sessionApp({ providerName: 'as-asked-session', briefCacheStore: new InMemoryBriefCacheStore() });
+    const fresh = await call(app, 'POST', '/workspace/acme/api/brief/ENG-4351', {});
+    assert.equal(fresh.status, 200, JSON.stringify(fresh.body));
+    assertQuoted(fresh.body.brief, ASK);
+    const cached = await call(app, 'GET', '/workspace/acme/api/brief/ENG-4351');
+    assert.equal(cached.status, 200);
+    assert.equal(cached.body.status, 'fresh');
+    assert.equal(cached.body.brief, fresh.body.brief);
+    assert.equal(modelCalls, 1);
+  });
+
+  test('unsealed: the brief is the model\'s, unchanged', async () => {
+    installModelStub();
+    registerProvider(new FakeContextProvider('as-asked-session-plain', ASK));
+    const app = sessionApp({ providerName: 'as-asked-session-plain', briefCacheStore: new InMemoryBriefCacheStore() });
+    const { body } = await call(app, 'POST', '/workspace/acme/api/brief/ENG-4351', {});
+    assert.equal(body.brief, MODEL_BRIEF);
+  });
+});
