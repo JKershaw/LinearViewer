@@ -1,14 +1,16 @@
-// Generates the five figures for docs/papers/harbour/the-place-became-somebodys-job.md.
-//   figure 1 census (data), figure 2 loop (drawing), figure 3 copy at the edge (drawing),
-//   figure 4 owner or finishing (drawing), figure 5 area readings and pairs (data).
+// Generates the five figures for docs/papers/harbour/the-place-became-somebodys-job.md (version 4).
+//   figure 1 two pipelines (drawing), figure 2 copy at the edge (drawing), figure 3 owner or finishing (drawing),
+//   figure 4 census (data), figure 5 area readings and pairs (data).
+// Version 4 replaced version 3's loop figure (loop-before-during-after.svg) with the two-pipelines drawing.
+// The function comments below keep their version 3 figure numbers; the essay numbers them as above.
 //   node docs/papers/harbour/the-place-became-somebodys-job-scripts/charts.mjs docs/papers/harbour/figures/the-place-became-somebodys-job && npm run figures:theme
 //
 // Data is read IN PLACE from the paper's version 2 evidence folder (cleaner-than-it-started-evidence/2026-11-06-v2/),
 // located relative to this file. Nothing is copied into this folder.
 //   analysis.json           single_and_area_reads (9 area readings over 15 tickets; 16 singles), pair_baseline.readings (4 pairs)
 //   git/census-by-merge.json  the census count at each LinearViewer first-parent merge (git show at each merge)
-// The loop figure (figure 2) is a drawing of docs/plans/survey/notes-2026-11-05.md@1c894016:132-152 and carries no numbers.
-// Figures 3 and 4 are Claude's drawings of the copy at the edge and of owner-versus-finishing: no data, no numbers.
+// The two-pipelines figure draws docs/plans/survey/notes-2026-11-05.md@1c894016:132-152 and 182-185 (the loop; "a network of tasks rather than a line") and carries no numbers.
+// The copy-at-the-edge and owner-or-finishing figures are Claude's drawings of the copy at the edge and of owner-versus-finishing: no data, no numbers.
 // Every value plotted is asserted below; a changed input fails the script instead of drawing a different claim.
 import { readFileSync, writeFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
@@ -59,20 +61,20 @@ assert.ok(census.slice(0, firstStopSplit).every(m => m.stop_count === 0), 'no st
 // "Where to check" table, keyed here by the same subject strings the analysis uses. Every row must have a name.
 const AREA_NAMES = {
   'LIN-4247+LIN-4246+LIN-4293': 'run-end and repaint, then tidy',
-  'LIN-4251+LIN-4277': 'preamble PR wording, then its tidy',
-  'LIN-4252+LIN-4255': 'test stand-in + its follow-on',
-  'LIN-4254': 'the census move',
+  'LIN-4251+LIN-4277': 'pull-request wording, then its tidy',
+  'LIN-4252+LIN-4255': 'shared test helper, then its follow-on',
+  'LIN-4254': 'moving the last fake pages',
   'LIN-4255': 'hand-written fakes onto shared fake',
-  'LIN-4263+LIN-4276': 'cost read + tidy-after',
-  'LIN-4292+LIN-4304': 'guards removed + one spelling',
-  'LIN-4296+LIN-4254': 'fake DOM models select; suites move',
-  'LIN-4313+LIN-4317': 'mint route, then one grant rule',
+  'LIN-4263+LIN-4276': 'cost split, then its tidy',
+  'LIN-4292+LIN-4304': 'defensive checks removed, one rule',
+  'LIN-4296+LIN-4254': 'shared fake gains dropdowns; tests move',
+  'LIN-4313+LIN-4317': 'review-run route, then one rule',
 };
 const PAIR_NAMES = {
-  '0eb4a2d1→a6e0ae11': 'free-tier seam, urlKey registry',
-  'c1d5c700→71a42131': 'KPI trend charts + cost figure',
-  'd10e7398→8ddb0f3b': 'loop-terminal checks, one stop rule',
-  '0da144c8→c5295b42': 'workspace KPI charts + PR times',
+  '0eb4a2d1→a6e0ae11': 'free-tier check, then a key registry',
+  'c1d5c700→71a42131': 'stats charts, then a cost figure',
+  'd10e7398→8ddb0f3b': 'end-of-run checks, then one stop rule',
+  '0da144c8→c5295b42': 'workspace charts, then PR times',
 };
 assert.equal(Object.keys(AREA_NAMES).length, 9, 'a name for each of the nine areas');
 assert.ok(areas.every(s => AREA_NAMES[s.subject]), 'every area subject has a plain name');
@@ -86,8 +88,8 @@ function areaAndPairFigure() {
   const o = [svgOpen(W, H, 'Nine finished-move area readings, all better in both blind passes, beside four ordinary pre-loop pairs, of which one is better in both passes. Each row has two cells, pass 1 and pass 2.')];
   o.push(`<text x="20" y="28" font-size="14" font-weight="600" fill="${INK}">Finished moves, read as one area each</text>`);
   o.push(`<text x="20" y="46" font-size="11" fill="${MUTED}">Nine readings over fifteen tickets. Two tickets sit in two readings each, so the tickets are counted once.</text>`);
-  o.push(`<text x="${X_CELL1 + cellW / 2}" y="${groupA - 12}" font-size="10.5" fill="${MUTED}" text-anchor="middle">pass 1</text>`);
-  o.push(`<text x="${X_CELL2 + cellW / 2}" y="${groupA - 12}" font-size="10.5" fill="${MUTED}" text-anchor="middle">pass 2</text>`);
+  o.push(`<text x="${X_CELL1 + cellW / 2}" y="${groupA - 12}" font-size="10.5" fill="${MUTED}" text-anchor="middle">reader 1</text>`);
+  o.push(`<text x="${X_CELL2 + cellW / 2}" y="${groupA - 12}" font-size="10.5" fill="${MUTED}" text-anchor="middle">reader 2</text>`);
   areas.forEach((s, i) => {
     const y = groupA + i * rowH;
     o.push(`<text x="20" y="${y + 17}" font-size="11.5" fill="${INK}">${esc(AREA_NAMES[s.subject])}</text>`);
@@ -98,7 +100,7 @@ function areaAndPairFigure() {
       o.push(`<text x="${x + cellW / 2}" y="${y + 18}" font-size="11" fill="#fff" text-anchor="middle" font-family="${MONO}">${esc(p.sign)}</text>`);
     });
   });
-  o.push(`<text x="20" y="${groupB - 22}" font-size="14" font-weight="600" fill="${INK}">Ordinary pre-loop pairs, read the same way</text>`);
+  o.push(`<text x="20" y="${groupB - 22}" font-size="14" font-weight="600" fill="${INK}">Ordinary earlier pairs, read the same way</text>`);
   o.push(`<text x="20" y="${groupB - 4}" font-size="11" fill="${MUTED}">Four pairs of consecutive changes to the same files, from 20 October. Pairs are not untouched areas.</text>`);
   pairs.forEach((p, i) => {
     const sel = selected.find(x => x.pair === p.selected_pair);
@@ -113,8 +115,8 @@ function areaAndPairFigure() {
       o.push(`<text x="${x + cellW / 2}" y="${y + 18}" font-size="11" fill="#fff" text-anchor="middle" font-family="${MONO}">${esc(ps.sign)}</text>`);
     });
   });
-  o.push(`<text x="20" y="${H - 40}" font-size="11" fill="${INK}">Not loop against no loop. Each pair was scored by the same prompt as the areas, so the two groups share one instrument.</text>`);
-  o.push(`<text x="20" y="${H - 22}" font-size="11" fill="${MUTED}">Blue: better. Grey: mixed (no pass read any subject worse). Source: cleaner-than-it-started-evidence/2026-11-06-v2/analysis.json.</text>`);
+  o.push(`<text x="20" y="${H - 40}" font-size="11" fill="${INK}">Not a comparison with untouched code. Both groups were judged by the same readers with the same instructions.</text>`);
+  o.push(`<text x="20" y="${H - 22}" font-size="11" fill="${MUTED}">Blue: better. Grey: mixed (no reader judged any of these worse). Source: cleaner-than-it-started-evidence/2026-11-06-v2/analysis.json.</text>`);
   o.push('</svg>');
   return o.join('\n') + '\n';
 }
@@ -130,7 +132,7 @@ function censusFigure() {
     o.push(`<line x1="${X0}" y1="${y(v)}" x2="${X1}" y2="${y(v)}" stroke="${RULE}"/>`);
     o.push(`<text x="${X0 - 10}" y="${y(v) + 4}" font-size="10.5" fill="${MUTED}" text-anchor="end" font-family="${MONO}">${v}</text>`);
   }
-  o.push(`<text x="20" y="${(Y0 + Y1) / 2}" font-size="11" fill="${MUTED}" transform="rotate(-90 20 ${(Y0 + Y1) / 2})" text-anchor="middle">hand-written fake DOMs on the list</text>`);
+  o.push(`<text x="20" y="${(Y0 + Y1) / 2}" font-size="11" fill="${MUTED}" transform="rotate(-90 20 ${(Y0 + Y1) / 2})" text-anchor="middle">hand-written fake pages on the list</text>`);
   // stop split begins at firstStopSplit; before it, one total only
   const pts = census.map((m, i) => ({ ...m, i }));
   const before = pts.filter(p => p.i < firstStopSplit);
@@ -147,60 +149,79 @@ function censusFigure() {
     const m = at(short), p = pts.find(q => q.short === short);
     o.push(`<text x="${(x(p.i) + dx).toFixed(1)}" y="${(y(m.count) + dy).toFixed(1)}" font-size="11" fill="${INK}" font-family="${MONO}">${esc(text)}</text>`);
   };
-  note('69e8f1754', '56 · 5 Nov 13:18Z', 10, -10);
-  note('af55cb737', '25 at af55cb73 (9 stops)', 10, -12);
+  note('69e8f1754', '56 · 5 Nov, afternoon', 10, -10);
+  note('af55cb737', '25 · 5 Nov, evening (9 marked stop)', 10, -12);
   // the six: label above the falling line, with a leader down to the point
   { const p = pts.find(q => q.short === 'ce42e7217');
     o.push(`<line x1="${x(p.i).toFixed(1)}" y1="${y(30).toFixed(1)}" x2="${x(p.i).toFixed(1)}" y2="${(y(6) - 6).toFixed(1)}" stroke="${MUTED}" stroke-width="1"/>`);
-    o.push(`<text x="${(x(p.i) - 8).toFixed(1)}" y="${y(31).toFixed(1)}" font-size="11" fill="${INK}" font-family="${MONO}" text-anchor="end">6 · 6 Nov 11:41Z</text>`); }
+    o.push(`<text x="${(x(p.i) - 8).toFixed(1)}" y="${y(31).toFixed(1)}" font-size="11" fill="${INK}" font-family="${MONO}" text-anchor="end">6 · 6 Nov, before noon</text>`); }
   o.push(`<line x1="${x(firstStopSplit).toFixed(1)}" y1="${Y1 - 6}" x2="${x(firstStopSplit).toFixed(1)}" y2="${Y0}" stroke="${MUTED}" stroke-dasharray="4 4"/>`);
-  o.push(`<text x="${(x(firstStopSplit) + 6).toFixed(1)}" y="${Y1 + 8}" font-size="10.5" fill="${MUTED}">stops first marked (591bb9596)</text>`);
-  o.push(`<text x="${X0}" y="${Y0 + 18}" font-size="10.5" fill="${MUTED}">merge 1 · 5 Nov 13:18Z</text>`);
-  o.push(`<text x="${X1}" y="${Y0 + 18}" font-size="10.5" fill="${MUTED}" text-anchor="end">merge ${n} · 6 Nov 13:51Z</text>`);
+  o.push(`<text x="${(x(firstStopSplit) + 6).toFixed(1)}" y="${Y1 + 8}" font-size="10.5" fill="${MUTED}">files first marked stop</text>`);
+  o.push(`<text x="${X0}" y="${Y0 + 18}" font-size="10.5" fill="${MUTED}">first merge counted · 5 Nov</text>`);
+  o.push(`<text x="${X1}" y="${Y0 + 18}" font-size="10.5" fill="${MUTED}" text-anchor="end">merge ${n} · 6 Nov</text>`);
   // legend
   o.push(`<circle cx="${X0}" cy="${H - 70}" r="4" fill="${GREY}"/><text x="${X0 + 10}" y="${H - 66}" font-size="11" fill="${INK}">total, before the stops were marked</text>`);
   o.push(`<circle cx="${X0 + 250}" cy="${H - 70}" r="4" fill="${BLUE}"/><text x="${X0 + 260}" y="${H - 66}" font-size="11" fill="${INK}">movable entries</text>`);
   o.push(`<circle cx="${X0 + 380}" cy="${H - 70}" r="4" fill="${ORANGE}"/><text x="${X0 + 390}" y="${H - 66}" font-size="11" fill="${INK}">marked stop (cannot move yet)</text>`);
-  o.push(`<text x="${X0}" y="${H - 20}" font-size="11" fill="${MUTED}">This is the census's own count of files on its list. It is not a count of copies, and it is not the crude grep (46 to 51), which is a different measure.</text>`);
+  o.push(`<text x="${X0}" y="${H - 20}" font-size="11" fill="${MUTED}">This counts the files on the test suite's list. It is not a count of copies, and a cruder text count over the same tests (46 to 51) is a different measure.</text>`);
   o.push('</svg>');
   return o.join('\n') + '\n';
 }
 
-// ---------- figure 2: the loop, before / during / after ----------
-function loopFigure() {
-  const W = 960, H = 350;
-  const o = [svgOpen(W, H, 'The loop as it ran on 5 November, in three stages: before the work a read-only Survey and a scope call; during the work a tidy first where the change binds, then the change; at merge two blind reads and the builder\'s answers; after the merge a tidy-after of the copies left at the edges. A dashed line returns from the tidy-after to the next ticket in the same area.')];
-  o.push(`<defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="${MUTED}"/></marker></defs>`);
-  const wrap = (t, n) => { const words = t.split(' '); const lines = ['']; for (const w of words) { if ((lines[lines.length - 1] + ' ' + w).trim().length > n) lines.push(w); else lines[lines.length - 1] = (lines[lines.length - 1] + ' ' + w).trim(); } return lines; };
-  const cols = [
-    { title: 'Before the work', x: 20, items: ['A read-only Survey of the ticket, posted on it', 'The scope call, written onto the ticket: how big the move is, and the checks to run at merge'], fill: '#eef4fd', stroke: BLUE },
-    { title: 'During the work', x: 330, items: ['A tidy first, as its own task, where the change binds', 'Then the change itself, re-surveyed on the tidied ground'], fill: '#f3f4f6', stroke: GREY },
-    { title: 'At merge', x: 640, items: ['Two blind reads of the commit, from its code alone', "The builder's after-answers, once the work's lineage has ended"], fill: '#f3f4f6', stroke: GREY },
-  ];
-  const colW = 290, colY = 58, colH = 150;
-  for (const c of cols) {
-    o.push(`<rect x="${c.x}" y="${colY}" width="${colW}" height="${colH}" rx="8" fill="${c.fill}" stroke="${c.stroke}" stroke-width="1.4"/>`);
-    o.push(`<text x="${c.x + 16}" y="${colY + 28}" font-size="14" font-weight="600" fill="${INK}">${esc(c.title)}</text>`);
-    let line = 0;
-    c.items.forEach((t, i) => {
-      line = i === 0 ? 0 : line + 1;
-      wrap(t, 46).forEach(seg => { o.push(`<text x="${c.x + 16}" y="${colY + 56 + line * 17 + i * 6}" font-size="12" fill="${INK}">${esc(seg)}</text>`); line++; });
-      line--;
-    });
+// ---------- figure 1 (version 4): two pipelines, a drawing with no data ----------
+// The old line of tickets, where each agent finishes its own ticket and leaves, so leftovers pile up between
+// tickets; and the new pipeline, where each change is looked at, sized, made, and then tidied after. The
+// leftover counts drawn are illustrative (one more per ticket), not measured.
+function twoPipelinesFigure() {
+  const W = 960, H = 470;
+  const o = [svgOpen(W, H, 'Two pipelines, a drawing with no data. Top, the old line: four tickets in a row, each done by an agent that then leaves; small orange leftovers pile up between the tickets, one more each time, and clearing them is no one\'s job. Bottom, the new pipeline: for each change, a look first, then a decision on how big the move should be, then the change, then a tidy of what the change left behind; the leftovers from the change are cleared by the tidy, and the next change starts on a clearer floor.')];
+  o.push(`<defs><marker id="ar2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="${MUTED}"/></marker></defs>`);
+  const LEFT = '#fff7f3';
+  const scrap = (x, y) => `<rect x="${x}" y="${y}" width="12" height="12" rx="2" fill="${ORANGE}"/>`;
+  const ghost = (x, y) => `<rect x="${x}" y="${y}" width="12" height="12" rx="2" fill="none" stroke="${ORANGE}" stroke-width="1.2" stroke-dasharray="3 2"/>`;
+  // --- top: the old line ---
+  o.push(`<text x="20" y="30" font-size="14" font-weight="600" fill="${INK}">The old line: each agent finishes its own ticket and leaves</text>`);
+  const TY = 52, TW = 170, TH = 58, GAP = 62;
+  for (let i = 0; i < 4; i++) {
+    const x = 20 + i * (TW + GAP);
+    o.push(`<rect x="${x}" y="${TY}" width="${TW}" height="${TH}" rx="8" fill="#f3f4f6" stroke="${GREY}" stroke-width="1.4"/>`);
+    o.push(`<text x="${x + 14}" y="${TY + 24}" font-size="13" font-weight="600" fill="${INK}">Ticket ${i + 1}</text>`);
+    o.push(`<text x="${x + 14}" y="${TY + 44}" font-size="11.5" fill="${MUTED}">done, and the agent leaves</text>`);
+    if (i < 3) o.push(`<line x1="${x + TW + 4}" y1="${TY + TH / 2}" x2="${x + TW + GAP - 6}" y2="${TY + TH / 2}" stroke="${MUTED}" stroke-width="1.6" marker-end="url(#ar2)"/>`);
+    // the floor under each ticket: leftovers so far, one more per ticket
+    for (let k = 0; k <= i; k++) o.push(scrap(x + 14 + k * 18, TY + TH + 22));
   }
-  // arrows between columns
-  o.push(`<line x1="311" y1="${colY + colH / 2}" x2="328" y2="${colY + colH / 2}" stroke="${MUTED}" stroke-width="1.6" marker-end="url(#ar)"/>`);
-  o.push(`<line x1="621" y1="${colY + colH / 2}" x2="638" y2="${colY + colH / 2}" stroke="${MUTED}" stroke-width="1.6" marker-end="url(#ar)"/>`);
-  // after box
-  o.push(`<rect x="640" y="236" width="290" height="72" rx="8" fill="#fff7f3" stroke="${ORANGE}" stroke-width="1.4"/>`);
-  o.push(`<text x="656" y="260" font-size="14" font-weight="600" fill="${INK}">After the merge</text>`);
-  o.push(`<text x="656" y="282" font-size="12" fill="${INK}">A tidy-after: the copies left at the</text>`);
-  o.push(`<text x="656" y="299" font-size="12" fill="${INK}">edges, gathered straight away</text>`);
-  o.push(`<line x1="785" y1="${colY + colH}" x2="785" y2="232" stroke="${MUTED}" stroke-width="1.6" marker-end="url(#ar)"/>`);
-  // loop back: tidy-after to next ticket in the area
-  o.push(`<path d="M640 266 C 520 300, 240 300, 170 ${colY + colH + 4}" fill="none" stroke="${ORANGE}" stroke-width="1.6" stroke-dasharray="6 5" marker-end="url(#ar)"/>`);
-  o.push(`<text x="400" y="312" font-size="11" fill="${MUTED}" text-anchor="middle">the next ticket in the same area starts from what was left in the notebook</text>`);
-  o.push(`<text x="20" y="${H - 14}" font-size="11" fill="${MUTED}">The Periodical reviews sit outside the loop: an occasional read of the whole codebase, the film rather than the still.</text>`);
+  o.push(`<line x1="20" y1="${TY + TH + 38}" x2="${20 + 4 * TW + 3 * GAP}" y2="${TY + TH + 38}" stroke="${RULE}" stroke-width="2"/>`);
+  o.push(`<text x="20" y="${TY + TH + 60}" font-size="11.5" fill="${INK}">Leftovers (a second copy of a rule, a list nobody updated) pile up between tickets. Each ticket is done; clearing them is no one's job.</text>`);
+  // --- bottom: the new pipeline ---
+  const BY = 230;
+  o.push(`<text x="20" y="${BY - 12}" font-size="14" font-weight="600" fill="${INK}">The new pipeline: four steps for each change</text>`);
+  const steps = [
+    { t: '1. Look first', s: ['a read-only look at the code', 'around the ticket'], fill: '#eef4fd', stroke: BLUE },
+    { t: '2. Decide the size', s: ['how big a move: just the', 'task, or tidy the area too'], fill: '#eef4fd', stroke: BLUE },
+    { t: '3. Make the change', s: ['the work itself, which may', 'leave copies at its edges'], fill: '#f3f4f6', stroke: GREY },
+    { t: '4. Tidy what it left', s: ['straight after, a small', 'follow-on clears them'], fill: LEFT, stroke: ORANGE },
+  ];
+  const SW = 196, SH = 74, SG = 32;
+  steps.forEach((st, i) => {
+    const x = 20 + i * (SW + SG);
+    o.push(`<rect x="${x}" y="${BY}" width="${SW}" height="${SH}" rx="8" fill="${st.fill}" stroke="${st.stroke}" stroke-width="1.4"/>`);
+    o.push(`<text x="${x + 14}" y="${BY + 24}" font-size="13" font-weight="600" fill="${INK}">${esc(st.t)}</text>`);
+    st.s.forEach((line, j) => o.push(`<text x="${x + 14}" y="${BY + 44 + j * 16}" font-size="11.5" fill="${MUTED}">${esc(line)}</text>`));
+    if (i < 3) o.push(`<line x1="${x + SW + 3}" y1="${BY + SH / 2}" x2="${x + SW + SG - 5}" y2="${BY + SH / 2}" stroke="${MUTED}" stroke-width="1.6" marker-end="url(#ar2)"/>`);
+  });
+  // floor: leftovers appear after step 3 and are cleared by step 4
+  const FY = BY + SH + 22;
+  const x3 = 20 + 2 * (SW + SG), x4 = 20 + 3 * (SW + SG);
+  o.push(scrap(x3 + 14, FY)); o.push(scrap(x3 + 32, FY));
+  o.push(`<text x="${x3 + 54}" y="${FY + 10}" font-size="11" fill="${MUTED}">left at the edges</text>`);
+  o.push(ghost(x4 + 14, FY)); o.push(ghost(x4 + 32, FY));
+  o.push(`<text x="${x4 + 54}" y="${FY + 10}" font-size="11" fill="${MUTED}">cleared</text>`);
+  o.push(`<line x1="20" y1="${FY + 18}" x2="${x4 + SW}" y2="${FY + 18}" stroke="${RULE}" stroke-width="2"/>`);
+  // loop back to the next change
+  o.push(`<path d="M${x4 + SW / 2} ${FY + 26} C ${x4 + SW / 2} ${FY + 62}, 120 ${FY + 62}, 118 ${BY + SH + 8}" fill="none" stroke="${MUTED}" stroke-width="1.4" stroke-dasharray="6 5" marker-end="url(#ar2)"/>`);
+  o.push(`<text x="${(x4 + SW / 2 + 118) / 2}" y="${FY + 72}" font-size="11" fill="${MUTED}" text-anchor="middle">the next change starts on a clearer floor; anything still left is written down for it</text>`);
+  o.push(`<text x="20" y="${H - 14}" font-size="11" fill="${MUTED}">A drawing, not data. Orange squares: leftovers, drawn one more per ticket to show the build-up, not counted. Dashed: cleared.</text>`);
   o.push('</svg>');
   return o.join('\n') + '\n';
 }
@@ -279,7 +300,7 @@ function ownerOrFinishingFigure() {
 }
 
 const outFiles = {
-  'loop-before-during-after.svg': loopFigure(),
+  'two-pipelines.svg': twoPipelinesFigure(),
   'copy-at-the-edge.svg': copyAtEdgeFigure(),
   'owner-or-finishing.svg': ownerOrFinishingFigure(),
   'area-readings-and-pairs.svg': areaAndPairFigure(),

@@ -13,7 +13,7 @@
 <text x="60" y="90.33333333333334" font-size="10.5" fill="#6b7280" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace">50</text>
 <line x1="70" y1="40" x2="910" y2="40" stroke="#e5e7eb"/>
 <text x="60" y="44" font-size="10.5" fill="#6b7280" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace">60</text>
-<text x="20" y="179" font-size="11" fill="#6b7280" transform="rotate(-90 20 179)" text-anchor="middle">hand-written fake DOMs on the list</text>
+<text x="20" y="179" font-size="11" fill="#6b7280" transform="rotate(-90 20 179)" text-anchor="middle">hand-written fake pages on the list</text>
 <polyline fill="none" stroke="#9ca3af" stroke-width="1.6" points="70.0,58.5 90.5,58.5 111.0,58.5 131.5,63.2 152.0,63.2 172.4,63.2 192.9,77.1 213.4,100.2 233.9,100.2 254.4,141.9 274.9,155.8 295.4,165.1 315.9,174.4 336.3,179.0 356.8,188.3 377.3,202.2 397.8,202.2 418.3,202.2 438.8,202.2 459.3,202.2 479.8,202.2 500.2,202.2 520.7,202.2 541.2,216.1 561.7,216.1 582.2,216.1 602.7,234.6 623.2,234.6 643.7,248.5 664.1,248.5 684.6,253.1 705.1,253.1 725.6,271.7 746.1,271.7 766.6,285.6 787.1,285.6 807.6,290.2 828.0,290.2 848.5,290.2 869.0,290.2 889.5,290.2 910.0,290.2"/>
 <circle cx="70.0" cy="58.5" r="3.6" fill="#9ca3af"/>
 <circle cx="90.5" cy="58.5" r="3.6" fill="#9ca3af"/>
@@ -83,16 +83,16 @@
 <circle cx="889.5" cy="290.2" r="3.6" fill="#eb6834"/>
 <circle cx="910.0" cy="318.0" r="3.6" fill="#2a78d6"/>
 <circle cx="910.0" cy="290.2" r="3.6" fill="#eb6834"/>
-<text x="80.0" y="48.5" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace">56 · 5 Nov 13:18Z</text>
-<text x="448.8" y="190.2" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace">25 at af55cb73 (9 stops)</text>
+<text x="80.0" y="48.5" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace">56 · 5 Nov, afternoon</text>
+<text x="448.8" y="190.2" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace">25 · 5 Nov, evening (9 marked stop)</text>
 <line x1="807.6" y1="179.0" x2="807.6" y2="284.2" stroke="#6b7280" stroke-width="1"/>
-<text x="799.6" y="174.4" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace" text-anchor="end">6 · 6 Nov 11:41Z</text>
+<text x="799.6" y="174.4" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace" text-anchor="end">6 · 6 Nov, before noon</text>
 <line x1="397.8" y1="34" x2="397.8" y2="318" stroke="#6b7280" stroke-dasharray="4 4"/>
-<text x="403.8" y="48" font-size="10.5" fill="#6b7280">stops first marked (591bb9596)</text>
-<text x="70" y="336" font-size="10.5" fill="#6b7280">merge 1 · 5 Nov 13:18Z</text>
-<text x="910" y="336" font-size="10.5" fill="#6b7280" text-anchor="end">merge 42 · 6 Nov 13:51Z</text>
+<text x="403.8" y="48" font-size="10.5" fill="#6b7280">files first marked stop</text>
+<text x="70" y="336" font-size="10.5" fill="#6b7280">first merge counted · 5 Nov</text>
+<text x="910" y="336" font-size="10.5" fill="#6b7280" text-anchor="end">merge 42 · 6 Nov</text>
 <circle cx="70" cy="360" r="4" fill="#9ca3af"/><text x="80" y="364" font-size="11" fill="#111827">total, before the stops were marked</text>
 <circle cx="320" cy="360" r="4" fill="#2a78d6"/><text x="330" y="364" font-size="11" fill="#111827">movable entries</text>
 <circle cx="450" cy="360" r="4" fill="#eb6834"/><text x="460" y="364" font-size="11" fill="#111827">marked stop (cannot move yet)</text>
-<text x="70" y="410" font-size="11" fill="#6b7280">This is the census's own count of files on its list. It is not a count of copies, and it is not the crude grep (46 to 51), which is a different measure.</text>
+<text x="70" y="410" font-size="11" fill="#6b7280">This counts the files on the test suite's list. It is not a count of copies, and a cruder text count over the same tests (46 to 51) is a different measure.</text>
 </svg>
