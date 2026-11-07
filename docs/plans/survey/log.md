@@ -2909,3 +2909,8 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - Options: read-row (an operator runs a production query), grant-key (give the build stage an OpenRouter key: authority, so John's), or build-anyway.
   - Suggested **build-anyway**: the proven fix is needed whatever the cause, and blocks on no one. Replay Haiku at review, where a key would be John's morning call. A production query needs a credential sessions shouldn't handle.
   - **For the step-back:** this is an engineering call raised as a ruling. LIN-4358's kickoff predates the "settle engineering questions yourself; rulings only for John's calls" goal, so it blocks overnight on a choice Harbour could have made. LIN-4347/4346 should carry that line in their own design: when is a question the person's?
+- **22:11 UTC: PR #2351 merged (`11dc1d7bd`, LIN-4345 attempt 2).** Deciding stages name each cut to the ask and raise one ruling.
+  - Blind reads BS `c7f1d148`, BT `197d315c`.
+  - LIN-4346's note was updated: carry the cut rule, don't rebuild it, and a size that cuts the ask is a named cut.
+  - LIN-4346's Surveys are at the new base (`cb696ba2`, `a0389745`).
+  - LIN-4358 waits on John (`lin4358-decisive-row`), and LIN-4348 waits behind it (routing overlap), so LIN-4346 runs tonight.
