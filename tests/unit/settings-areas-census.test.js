@@ -133,12 +133,13 @@ describe('sidebar states', () => {
     assert.equal(getArea('running').state({ ...ctx, haltMode: 'stop' }).text, 'Stopped');
     assert.equal(getArea('running').state({ ...ctx, haltMode: 'pause' }).tone, 'warn');
     assert.equal(getArea('running').state({ ...ctx, haltMode: 'stop' }).tone, 'warn');
-    assert.equal(getArea('running').state({ ...ctx, hasRunner: false }).text, 'No runner');
-    assert.equal(getArea('running').state(ctx).text, 'Runner ready');
-    // LIN-4368: the standing size policy shows when one is set; a halt still outranks it.
+    // LIN-4368: the state names the standing size policy too; no policy stored reads as `ask`.
+    assert.equal(getArea('running').state({ ...ctx, hasRunner: false }).text, 'No runner · ask');
+    assert.equal(getArea('running').state(ctx).text, 'Ready · ask');
+    // A halt still outranks the policy.
     assert.equal(getArea('running').state({ ...ctx, sizePolicy: 'err-larger' }).text, 'Ready · larger');
     assert.equal(getArea('running').state({ ...ctx, hasRunner: false, sizePolicy: 'err-larger' }).text, 'No run · larger');
-    assert.equal(getArea('running').state({ ...ctx, sizePolicy: 'ask' }).text, 'Runner ready');
+    assert.equal(getArea('running').state({ ...ctx, sizePolicy: 'ask' }).text, 'Ready · ask');
     assert.equal(getArea('running').state({ ...ctx, haltMode: 'pause', sizePolicy: 'err-larger' }).text, 'Paused');
     assert.equal(getArea('models').state(ctx).text, 'Sonnet 5.5');
     assert.equal(getArea('agent-access').state({ keyCount: 1 }).text, '1 live key');

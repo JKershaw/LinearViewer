@@ -388,20 +388,20 @@ describe('the index and the areas', () => {
     assert.equal(unknown.status, 404);
   });
 
-  test('a workspace with only a live queue token reads "Runner ready" and shows the queue token as the last poll', async () => {
+  test('a workspace with only a live queue token reads "Ready" and shows the queue token as the last poll', async () => {
     // plan-review B4: Settings and the Dispatch run controls must agree on "has a runner".
     // The route wires hasLiveRunnerKey || hasLiveQueueToken itself, so this goes through the route.
     state.proxyRows = [];
     state.dispatchRows = [{ tokenId: 'q', label: 'legacy', hasOwner: true, createdAt: new Date(Date.now() - 864e5).toISOString(), lastUsedAt: new Date(Date.now() - 6e4).toISOString(), expiresAt: new Date(Date.now() + 864e5).toISOString() }];
     const index = await (await fetch(`${base}/workspace/alpha/settings`)).text();
-    assert.match(index, /data-testid="settings-state-running"[^>]*>\s*Runner ready/);
+    assert.match(index, /data-testid="settings-state-running"[^>]*>\s*Ready · ask/);
     const running = await (await fetch(`${base}/workspace/alpha/settings/running`)).text();
     assert.match(running, /data-testid="settings-runner-last-poll"[\s\S]*?queue token/);
   });
 
-  test('with no keys at all the Running state reads "No runner"', async () => {
+  test('with no keys at all the Running state reads "No runner" (and the size policy, LIN-4368)', async () => {
     const index = await (await fetch(`${base}/workspace/alpha/settings`)).text();
-    assert.match(index, /data-testid="settings-state-running"[^>]*>\s*No runner/);
+    assert.match(index, /data-testid="settings-state-running"[^>]*>\s*No runner · ask/);
   });
 
   test('a provider return on the bare index goes to Sources with its query intact', async () => {
@@ -458,10 +458,10 @@ describe('the standing size policy (Settings → Running)', () => {
     assert.equal((await stored()).value, 'ask');
   });
 
-  test('with no policy set, the Running page reads "Ask each time" and the state is unchanged', async () => {
+  test('with no policy set, the Running page reads "Ask each time" and the state says ask', async () => {
     const running = await (await fetch(`${base}/workspace/alpha/settings/running`)).text();
     assert.match(running, /data-testid="settings-size-policy-state"[^>]*>\s*Ask each time/);
     const index = await (await fetch(`${base}/workspace/alpha/settings`)).text();
-    assert.match(index, /data-testid="settings-state-running"[^>]*>\s*No runner/);
+    assert.match(index, /data-testid="settings-state-running"[^>]*>\s*No runner · ask/);
   });
 });
