@@ -2722,3 +2722,10 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - **LIN-4340 filed and dispatched** (essay version 4). It went directly to one writer on `opus`, as a `custom` dispatch, not through autopilot (`14a57475`).
   - The brief is plain, about 440 words, parroted against John's words before it went out.
   - The writer gets one fresh reader, then opens a PR; John reads it before the merge.
+- **LIN-4340 restarted with one complete brief.** John's review points arrived four minutes after dispatch, before the writer had posted anything:
+  - the picture of the old pipeline against the new;
+  - improvements explained by their ideas and reasons;
+  - plain descriptions, not task IDs, and no Harbour internals;
+  - the spirit of the earlier versions and the data.
+
+  These went into the brief as one plain paragraph, rather than as a follow-up mid-draft. I stopped `14a57475` and redispatched as `2bbf7360` (`opus`, `custom`).
