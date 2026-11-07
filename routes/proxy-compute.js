@@ -16,8 +16,8 @@ import { resolveRecommendation } from '../lib/recommend-recurse.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshness, ROADMAP_REPORT_MAX_AGE_DAYS, getNorthStarDocVersion } from '../lib/north-star-resolver.js';
 import { generateRecap } from '../lib/recap.js';
-import { generateBrief, composeBrief } from '../lib/brief.js';
-import { askedText } from '../lib/as-asked.js';
+import { generateBrief } from '../lib/brief.js';
+import { buildMockBrief } from '../lib/workspace-api-mocks.js';
 import { fixtureParent } from '../lib/sample-data/fixture-parent.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
@@ -188,43 +188,6 @@ export function createComputeRoutes({
       });
     }
     return { done, pending, deviations };
-  }
-
-  /**
-   * Build a small deterministic brief (fixed-section Markdown) for test mode.
-   * Mirrors buildMockBrief in lib/workspace-api-mocks.js so the proxy and in-app
-   * paths return the same shape under test, including the quoted As-asked block
-   * (composeBrief) and a summary taken from the block's words (LIN-4351).
-   */
-  function buildMockBriefFromContext(context) {
-    const issue = context.issue || {};
-    const remaining = (context.children || []).filter(c => !isTerminalState(c.state?.type));
-
-    const lines = [];
-    lines.push('## Current');
-    lines.push(`${issue.title || 'Untitled task'} — ${issue.description ? askedText(issue.description).split('\n')[0] : 'No description provided.'}`);
-    if (remaining.length > 0) {
-      lines.push('');
-      lines.push(`Remaining: ${remaining.map(c => c.identifier).join(', ')}.`);
-    }
-    lines.push('');
-
-    lines.push('## Constraints');
-    lines.push('- _None._');
-    lines.push('');
-
-    lines.push('## Open questions');
-    lines.push('- _None._');
-    lines.push('');
-
-    lines.push('## Changelog');
-    if ((context.comments || []).length > 0) {
-      lines.push(`- **Discussion captured in ${context.comments.length} comment(s)** — context lives in the thread, not yet folded into the spec.`);
-    } else {
-      lines.push('- _None._');
-    }
-
-    return composeBrief(issue.description, lines.join('\n'), context.parent);
   }
 
   // =========================================================================
@@ -1455,7 +1418,7 @@ export function createComputeRoutes({
         let brief;
         let modelUsed;
         if (isTestMode) {
-          brief = buildMockBriefFromContext(context);
+          brief = buildMockBrief(context);
           modelUsed = selectedModel;
         } else {
           const result = await withTimeout(
@@ -1578,7 +1541,7 @@ export function createComputeRoutes({
         let brief;
         let modelUsed;
         if (isTestMode) {
-          brief = buildMockBriefFromContext(context);
+          brief = buildMockBrief(context);
           modelUsed = selectedModel;
         } else {
           const result = await withTimeout(
