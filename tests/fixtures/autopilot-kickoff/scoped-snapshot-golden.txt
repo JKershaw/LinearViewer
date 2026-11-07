@@ -15,7 +15,7 @@ Do not pull other tasks off the stack.
 **Proxy:** base https://example.com/api/proxy · Bearer token supplied alongside this prompt (the +proxy block) · full
 verb catalog at `GET https://example.com/api/proxy/instructions`.
 
-**Your first act:** read **LIN-42** (`GET /brief/LIN-42` — distilled current state, folds in comments and supersedes stale wording; `GET /issues/LIN-42` for full raw detail), then trigger
+**Your first act:** read **LIN-42** (`GET /brief/LIN-42` — the person's words from its `## As asked` block, which no step may change, then the current state; `GET /issues/LIN-42` for full raw detail), then trigger
 `POST /recommend-and-dispatch` (`{ issueIdentifier: "LIN-42", sessionId }`) for the next step.
 Announce your choice in a line and go — the prompt is dispatched server-side; you never hold it. The
 human is watching asynchronously, not live; being dispatched into this run was already their go-ahead.

@@ -126,6 +126,19 @@ describe('generateBrief quotes the block ahead of a paraphrasing model', () => {
     assert.match(system, /not restate/i);
     assert.match(system, /Open questions/);
   });
+
+  // LIN-4353: on LIN-4357 (sealed, nothing yet but the ask) the model's sections re-quoted a
+  // phrase of the ask twice and paraphrased it in Constraints. The prompt asked Current for
+  // "what the task is now", which on a fresh ticket IS the ask, so the two rules pulled apart.
+  // The sections now cover what the rest of the source adds; with nothing added, Current says
+  // so in one line instead of retelling the ask.
+  test('the sections cover what the source adds beyond the block, and a fresh ticket does not retell the ask', async () => {
+    const { buildBriefMessages } = await import('../../lib/brief.js');
+    const system = buildBriefMessages(issueOf(ASK), contextOf(ASK))[0].content;
+    assert.match(system, /do not restate, quote or paraphrase it/);
+    assert.match(system, /covering what the rest of the source adds/);
+    assert.match(system, /Where nothing has been added yet, `## Current` says so in one line rather than retelling the ask/);
+  });
 });
 
 describe('composeBrief and briefQuoteEnd', () => {

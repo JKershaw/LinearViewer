@@ -1259,3 +1259,25 @@ describe('resolvePeriodicalIdFromGateMarker (LIN-2575)', () => {
     assert.strictEqual(resolvePeriodicalIdFromGateMarker('mentioning harbour-periodical-gate in prose'), null);
   });
 });
+
+// LIN-4353: a proxy create seals the minted task's description into the `## As asked`
+// block (LIN-4352), so the gate marker is the block's first line, not the description's.
+// The gate regex is unanchored on purpose and still finds it there.
+describe('the gate marker inside a sealed As asked block (LIN-4353)', () => {
+  test('a sealed description still resolves to its periodical', async () => {
+    const { sealAsAsked } = await import('../../lib/as-asked.js');
+    const p = PERIODICALS[0];
+    const sealed = sealAsAsked(`${buildPeriodicalGateMarker(p.title)}\n\nRun the review.`);
+    assert.ok(!sealed.startsWith('<!--'), 'the marker is no longer the description\'s first line');
+    assert.strictEqual(resolvePeriodicalIdFromGateMarker(sealed), p.id);
+  });
+
+  test('the mint prompt asks for the marker as the first line inside the block', () => {
+    for (const p of PERIODICALS) {
+      const minted = p.generatePrompt({});
+      if (!minted.includes(buildPeriodicalGateMarker(p.title))) continue;
+      assert.ok(/as the first line of the new task's description \(once Harbour seals it, the first line inside its `## As asked` block\)/.test(minted), `${p.id}: the marker goes first inside the block`);
+      assert.ok(!/very first line of the new task's description/.test(minted), `${p.id}: the old "very first line" wording is gone`);
+    }
+  });
+});
