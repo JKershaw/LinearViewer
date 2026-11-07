@@ -4,7 +4,7 @@ A walk through every page of Harbour after round 3 (LIN-4040) and its follow-ups
 
 This is feedback, not a build plan. It describes what is wrong now and how each page should feel. How to get there is the builder's call.
 
-**Navigation has its own review.** The header, the footer, the page frame (one left edge, headings, tab titles) and the way back from a drilled-in page are covered by the navigation work, which John is choosing from a prototype. This document covers what sits inside each page.
+**Navigation has its own review.** The header, the footer, the page frame (one left edge, headings, tab titles) and the way back from a drilled-in page are covered by [the navigation review](../navigation-2026-11-07/README.md): John chose a side rail on 7 Nov. This document covers what sits inside each page.
 
 ## How this was checked
 
