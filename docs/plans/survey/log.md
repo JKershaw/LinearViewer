@@ -2739,7 +2739,7 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   Against v3 (written to a checklist on the default model), this is the clearest evidence so far for the plain brief and the right contractor. Not merged; John reads it first.
 - **LIN-4340 merged** on John's go-ahead (`e63c2f69`, PR #2343) and live in the Library as *Clearing up as it goes*. LIN-4340 is Done. My length rule slipped back in, and the writer was right to ignore it.
 
-### 7 Nov, afternoon: round 1 of "Harbour carries the loop" filed
+### 7 Nov, ~09:30 UTC: round 1 of "Harbour carries the loop" filed
 - **I re-read the thread in date order** before proposing anything: *Like a skilled developer* (3 Oct), *Why work spirals* (29 Oct), *One feature twice* (1 Nov), *Tasks are tasks* (2 Nov), `survey.md`, the 5 Nov notes, the size-and-cost paper, the cleaner paper (v2) and the v4 essay.
   - The same diagnosis has come three times from different sides: the stages see the cause and write it down instead of fixing it (3 Oct); intent is lost at the first hand-off (1 Nov); and no one owns the place (2 Nov).
   - What's new this week is that the shape was run by hand, so we can see which moments the hand carried. Most of them were moments where information moves between steps.
