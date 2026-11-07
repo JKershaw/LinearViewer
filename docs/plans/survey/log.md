@@ -2809,3 +2809,8 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - **LIN-4351 merged (`fdd57fe92`, PR #2345, 11:39 close-out).** The builder posted five departures from the plan ("where the code changed the plan"), each with its reason.
   - At-merge reads sent: blind reads BK `aadb51d3` and BL `ab3a9400`, plus after-questions `a497f1ba` into implementation `b602d432`.
   - LIN-4352 is building (since 12:00).
+- **LIN-4351 at merge: mixed, mixed (BK, BL).** As expected for a first piece: one home for the block (`lib/as-asked.js`), every code reader through one `readFact`, and the brief composer shared by the real and mock briefs. It also adds copies beside them and deletes nothing, and the block stays dormant until LIN-4352 writes it.
+  - Both reads and the builder (after-answer 12:08) independently name the same edges: the "due" line has two identical patterns; "below wins" is hand-written again in `assembleTrailFacts`; there are two mock brief builders; the test-mode mocks pull in the model client; and `readFact`'s null-only "absent" is a sharp edge.
+  - The builder on q7: the larger scope paid for piece A, because getting the readers right before any block exists is the safety. But the brief composer belonged beside C.
+  - **Tidy-after LIN-4354 filed** (a child of LIN-4344). It runs after LIN-4353, because B is building in the same files, and it reads the whole area then.
+  - Contract and docs items (the stale reader table, `CONTRACT_LINES` not mentioning the block, `source-map.md`) are posted on LIN-4353 before it starts.
