@@ -2852,3 +2852,11 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - bring the free-tier move as a recommendation John confirms, with the price-ceiling rule as a ruling.
 
   Order: after LIN-4353, which is changing `lib/brief.js`.
+- **~14:45 UTC, LIN-4353's rulings, with suggestions posted at John's request.**
+  - The narrowing ruling has closed; tighten appears to have been applied. But the **replay still approved the thin guide**, across four arms with one run each: the reviewer quoted the block selectively, stopping just before "a full guide".
+  - **`lin4345-whose-words`:** suggested **parent-quote**. A breakdown child's filing is a slice of the plan, which is the photocopy, so its brief also quotes the parent's block.
+  - **`lin4353-done-when-miss`** (raised on two loops; suggested on both): suggested **merge-carry**.
+    - C's other changes are needed: without them close-out is still told to make the PATCH the guard refuses.
+    - The miss is the finding: **prompt wording alone doesn't make a reviewer judge against the ask.**
+    - LIN-4345 stays open. The next try is structural (review accounts for every sentence of the block), replayed on several tickets and runs.
+  - **For the step-back:** this is the first measured case in the round of instruction failing where structure might succeed. It's the same lesson as the seal (code inserts the words, rather than asking the model to keep them), now at the judging end.
