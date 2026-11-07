@@ -1,0 +1,2 @@
+- Set LIN-4085 status: Backlog → In Progress
+- Add relation: LIN-4085 related to LIN-3058 (headless/agent discoverability; onboarding review R3-8)

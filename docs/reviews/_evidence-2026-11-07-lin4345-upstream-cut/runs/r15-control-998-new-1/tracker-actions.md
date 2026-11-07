@@ -1,0 +1,1 @@
+- No status change: LIN-998 is already "In Progress".
