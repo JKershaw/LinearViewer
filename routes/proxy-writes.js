@@ -3,8 +3,13 @@
  * routes/proxy.js; rebuilt design-first in LIN-3573 / LIN-3576).
  *
  * Consumer-API write endpoints: POST /issues, PATCH /issues/:issueId,
- * description append/replace, comments create/delete/patch, attachments
+ * description append/replace/below, comments create/delete/patch, attachments
  * upload, relations create/delete, labels add/remove.
+ *
+ * The description writes (PATCH `description`, append, replace, below and the
+ * description-target attachment) and the create carry the As asked guard
+ * (LIN-4352, `refusedByAsAsked`): the block holding the words as filed cannot be
+ * changed, dropped or forged through this lane.
  *
  * Shape. Every route is one literal registration whose handler runs through
  * `guarded(spec, handler)`, which owns the part they all share, in this order:
@@ -20,7 +25,7 @@
  *    400s on comment create/delete/edit, relation create/delete and label
  *    add/remove; the comment body type/character/length 400s; the relatedIssueId
  *    400; and the field-validation 400s on create/update.
- *  - Order deviations: append/replace validate their body BEFORE resolving
+ *  - Order deviations: append/replace/below validate their body BEFORE resolving
  *    (a 400 beats a 503); labels resolve the label ref before the trashed read;
  *    comment create refuses a trashed target before its dedupe lookup; the
  *    attachments `target` check runs after the 503 and the uploadFile gate.
@@ -48,6 +53,8 @@ import { extractPeriodicalGateId } from '../lib/periodicals.js';
 import { flattenIssue, MAX_ATTACHMENT_BYTES } from '../lib/proxy-wire.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
+import { checkAsAsked, splitAsAsked, hasMarkerLine } from '../lib/as-asked.js';
+import { sealForFiling } from '../lib/as-asked-seal.js';
 import { jsonError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
 
@@ -55,6 +62,9 @@ const TRASHED_MESSAGE = 'Issue is trashed; refusing to modify a deleted issue';
 const BAD_ISSUE_ID = 'Invalid issue ID format';
 const COMMENT_TOO_LONG = `body exceeds maximum length of ${MAX_COMMENT_LENGTH}`;
 const RELATION_TYPES = ['blocks', 'blocked-by', 'duplicate', 'related'];
+// LIN-4352: the As asked guard's refusal wording, shared by every refused write.
+const AS_ASKED_LEAD = 'The "## As asked" block holds the words as filed, and no step may change them';
+const AS_ASKED_REMEDY = 'Write around it: append, replace a span below the block, or use description/below.';
 
 // Body-size exception, scoped to the attachments route only (mirrors the feedback
 // route's own parser, routes/workspace-api-feedback.js): the global
@@ -102,6 +112,7 @@ const SPEC = {
   updateIssue: { endpoint: '/api/proxy/issues/:id', needs: 'updateIssue', source: true, issueId: 'logged', failure: 'Failed to update issue', label: 'update issue', refs: true, partial: true },
   appendDescription: { endpoint: '/api/proxy/issues/:id/description/append', needs: 'updateIssue', source: true, issueId: 'logged', failure: 'Failed to update description', label: 'description edit', refs: true, partial: true },
   replaceDescription: { endpoint: '/api/proxy/issues/:id/description/replace', needs: 'updateIssue', source: true, issueId: 'logged', failure: 'Failed to update description', label: 'description edit', refs: true, partial: true },
+  belowDescription: { endpoint: '/api/proxy/issues/:id/description/below', needs: 'updateIssue', source: true, issueId: 'logged', failure: 'Failed to update description', label: 'description edit', refs: true, partial: true },
   createComment: { endpoint: '/api/proxy/issues/comments', needs: 'createComment', source: true, issueId: 'silent', failure: 'Failed to create comment', label: 'create comment' },
   deleteComment: { endpoint: '/api/proxy/issues/comments', needs: 'deleteComment', source: true, issueId: 'silent', failure: 'Failed to delete comment', label: 'delete comment' },
   updateComment: { endpoint: '/api/proxy/issues/comments', needs: 'updateComment', source: true, issueId: 'silent', failure: 'Failed to update comment', label: 'update comment' },
@@ -285,6 +296,34 @@ export function createProxyWriteRoutes({
 
   const refuseBadUuid = (ctx, value, noun) => !UUID_REGEX.test(value) && refuse(ctx, 400, `Invalid ${noun} ID format`);
 
+  /**
+   * The `## As asked` guard (LIN-4345 step 3, LIN-4352): the agent lane may not
+   * change the block that holds the words as filed, drop it, or forge one onto a
+   * ticket that has none. `live` is the description the provider holds NOW (one
+   * fresh read per write, never a stored copy) and `next` the body the write would
+   * store; lib/as-asked.js checkAsAsked compares the two blocks normalised, so a
+   * provider whose round trip re-escapes the text is not refused for it. Answers
+   * 422 AS_ASKED_IMMUTABLE and returns true once it has refused.
+   *
+   * Only this proxy lane is guarded. The session lane (routes/workspace-api-issue-
+   * write.js, the task-edit page), edits made in Linear or GitHub directly, and an
+   * agent writing to the provider without the proxy are people's lanes by design,
+   * or out of scope (step 5); the first-dispatch seal writes through the provider,
+   * so this guard does not see it either.
+   */
+  function refusedByAsAsked(ctx, live, next) {
+    const check = checkAsAsked(live, next);
+    if (check.ok) return false;
+    const quote = (line) => (line === null || line === undefined ? '(no line)' : JSON.stringify(line));
+    const firstLine = (text) => splitAsAsked(text)?.words.split('\n')[0];
+    const what = {
+      changed: `line ${check.line?.number} of the block would change from ${quote(check.line?.expected)} to ${quote(check.line?.actual)}`,
+      removed: `the new description drops the block, starting at its line 1, ${quote(firstLine(live))}`,
+      added: 'the new description adds a block this ticket does not have; only code seals one, when the ticket is filed or first dispatched',
+    }[check.kind];
+    return refuse(ctx, 422, `${AS_ASKED_LEAD}: ${what}. ${AS_ASKED_REMEDY}`, { code: 'AS_ASKED_IMMUTABLE', kind: check.kind, ...(check.line ? { line: check.line } : {}) });
+  }
+
   // ---------------------------------------------------------------------------
   // Issues
   // ---------------------------------------------------------------------------
@@ -316,6 +355,13 @@ export function createProxyWriteRoutes({
     const fieldError = validateIssueWriteFields({ title, description }, { mode: 'create' });
     if (fieldError) return refuse(ctx, 400, fieldError, { log: false });
 
+    // LIN-4352: an agent may not file a body carrying an As asked marker line (raw
+    // or escaped). Code seals the block; a marker in the body would forge one, or
+    // end a later seal early.
+    if (hasMarkerLine(description)) {
+      return refuse(ctx, 422, `${AS_ASKED_LEAD}: this description already contains an As asked marker line ("## As asked" or the end sentence), and only code writes those. Remove that line and file again.`, { code: 'AS_ASKED_IMMUTABLE', kind: 'marker' });
+    }
+
     // LIN-2352: a create has no fetched issue to derive a team from, so supply
     // provider.name when the contract excludes teamId — a real non-empty string
     // every teamless states() implementation accepts and ignores (mirrors
@@ -335,7 +381,10 @@ export function createProxyWriteRoutes({
 
     const input = { title };
     if (requiresTeam) input.teamId = resolvedTeamId;
-    if (description) input.description = description;
+    // LIN-4352: code seals the filed words into the As asked block where the
+    // ticket starts (a marker body was refused above; a provider that cannot hold
+    // the block is filed unsealed, with its own log line).
+    if (description) input.description = sealForFiling({ provider, words: description, lane: 'proxy create' }).description;
 
     // In request order: each field is gated on the provider's write contract, then
     // converted (LIN-556: projectId / stateId accept symbolic names, state scoped
@@ -417,6 +466,18 @@ export function createProxyWriteRoutes({
     const guard = target.issue;
     const teamId = guard?.team?.id || null;
 
+    // LIN-4352: a PATCH that writes `description` makes one dedicated
+    // issueDescription read (the read editDescription makes), so the As asked guard
+    // compares the live block with the one being written. issueWriteGuard is not
+    // grown for this (lib/providers/linear/index.js says why), and a PATCH without
+    // `description` makes no extra read. A missing issue compares as an empty body
+    // and proceeds, so the provider's own not-found still maps as before.
+    if (description !== undefined) {
+      const live = await guardTarget(ctx, 'issueDescription', { onNull: 'proceed' });
+      if (!live) return;
+      if (refusedByAsAsked(ctx, live.issue?.description || '', description)) return;
+    }
+
     const input = {};
     if (title) input.title = title;
     if (description !== undefined) input.description = description;
@@ -484,11 +545,13 @@ export function createProxyWriteRoutes({
    */
   async function editDescription(ctx, merge) {
     const { req, res, endpoint, token, provider } = ctx;
+    let current;
     let next;
     try {
       const target = await guardTarget(ctx, 'issueDescription', { onNull: 'notFound' });
       if (!target) return;
-      next = merge(target.issue.description || '');
+      current = target.issue.description || '';
+      next = merge(current);
     } catch (err) {
       if (err instanceof DescriptionEditError) {
         return refuse(ctx, 422, err.message, { code: err.code, matchCount: err.matchCount });
@@ -498,6 +561,9 @@ export function createProxyWriteRoutes({
 
     if (next.length > MAX_DESCRIPTION_LENGTH) return refuse(ctx, 400, 'resulting description exceeds maximum length');
     if (DANGEROUS_CHARS_REGEX.test(next)) return refuse(ctx, 400, 'resulting description contains invalid characters');
+    // LIN-4352: the merged body must keep the live As asked block (append,
+    // replace, below and the description-target attachment all pass here).
+    if (refusedByAsAsked(ctx, current, next)) return;
 
     try {
       const updated = normalizeWritePayload(await provider.updateIssue(token, req.params.issueId, { description: next }), 'issue');
@@ -541,6 +607,37 @@ export function createProxyWriteRoutes({
       const { oldString, newString } = ctx.req.body;
       return editDescription(ctx, (current) => replaceInDescription(current, oldString, newString));
     }));
+
+  /** Body check for description/below, before resolution like append/replace. An empty body clears everything below. */
+  const refuseBadBelow = (ctx) => {
+    const { body } = ctx.req.body;
+    if (typeof body !== 'string') return refuse(ctx, 400, 'body is required');
+    if (body.length > MAX_DESCRIPTION_LENGTH) return refuse(ctx, 400, 'body exceeds maximum length');
+    if (DANGEROUS_CHARS_REGEX.test(body)) return refuse(ctx, 400, 'body contains invalid characters');
+    return false;
+  };
+
+  /**
+   * Everything up to the As asked block's end line, kept exactly as read, then
+   * `body` after a blank line (nothing after the end line when `body` is empty).
+   * Text above the block, if any, is kept too. A ticket with no block has nothing
+   * to write below: a loud 422 naming PATCH, the full-rewrite route.
+   */
+  function keepBlockThen(current, body) {
+    const parts = splitAsAsked(current);
+    if (!parts) {
+      throw new DescriptionEditError('NO_AS_ASKED_BLOCK', 'This description has no "## As asked" block, so there is nothing to write below. To rewrite the whole body, use PATCH /api/proxy/issues/{issueId} with { "description": "..." }; to add to it, use description/append.', undefined);
+    }
+    const kept = current.slice(0, parts.end);
+    return body ? `${kept}\n\n${body}` : kept;
+  }
+
+  // POST /api/proxy/issues/:issueId/description/below (LIN-4352): replace
+  // everything after the As asked block's end line, keeping the block exactly as
+  // read, so a prune never re-sends the person's words. Shares editDescription's
+  // read, length and character checks (and the As asked guard, which it passes).
+  router.post('/api/proxy/issues/:issueId/description/below', ...writeAuth,
+    guarded({ ...SPEC.belowDescription, pre: refuseBadBelow }, (ctx) => editDescription(ctx, (current) => keepBlockThen(current, ctx.req.body.body))));
 
   // ---------------------------------------------------------------------------
   // Comments

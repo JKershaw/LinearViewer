@@ -36,6 +36,7 @@ import { RULING_SETTLED_REFUSAL } from '../lib/ruling-settled.js';
 import { dedupeKey, createDedupeCache } from '../lib/proxy-dedupe.js';
 import { commentDedupe, commentDedupeGenerations } from './proxy.js';
 import { isTestToken, refuseCapability } from './workspace-api-steps.js';
+import { sealForFiling } from '../lib/as-asked-seal.js';
 
 
 // LIN-2208: whether the decision-answer stamp(s) for a given comment-dedupe
@@ -783,8 +784,12 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
       // LIN-1972: forward only optional fields the provider declares AND the
       // caller sent — restrictive but lossless (every in-tree provider already
       // drops an undeclared field one layer down). Refs resolve in this order.
+      // LIN-4352: the description is filed sealed into the As asked block. A body
+      // that already holds a marker line, or a provider that cannot hold the block,
+      // is filed unsealed with one log line, never refused: this is a person's own
+      // filing (lib/as-asked-seal.js).
       const optional = [
-        ['description', description, (v) => v],
+        ['description', description, (v) => sealForFiling({ provider, words: v, lane: 'session create' }).description],
         ['projectId', projectId, (v) => resolveIssueProjectRef(provider, token, v)],
         ['stateId', stateId, (v) => resolveIssueStateRef(provider, token, scopeTeam, v)]
       ];

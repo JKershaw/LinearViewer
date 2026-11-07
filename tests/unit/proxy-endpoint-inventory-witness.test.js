@@ -265,6 +265,12 @@ const ROWS = [
     run: () => call(buildApp(), 'POST', '/api/proxy/issues/LIN-1/description/replace', { body: {} }),
   },
   {
+    group: 'E', method: 'POST', url: '/api/proxy/issues/LIN-1/description/below', expect: 400,
+    note: 'LIN-4352: body required (refuseBadBelow, before resolution)',
+    expectBody: { error: 'body is required' },
+    run: () => call(buildApp(), 'POST', '/api/proxy/issues/LIN-1/description/below', { body: {} }),
+  },
+  {
     group: 'E', method: 'POST', url: '/api/proxy/issues/LIN-1/comments', expect: 400,
     note: 'body required, canonical form (:2998)',
     run: () => call(buildApp(), 'POST', '/api/proxy/issues/LIN-1/comments', { body: {} }),

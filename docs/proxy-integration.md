@@ -469,7 +469,7 @@ left no way to tell that apart from a garbage/never-issued bearer:
 
 Before this, both classes of `401` were undocumented and easy to conflate — a caller-token rejection carried no `code`/`category`/`stage` at all, and the distinction lived only in Harbour's own server-side logs (`[credential-rejected]`), invisible to the very agent that has to pick a remedy.
 
-**`PARTIAL_WRITE`** (LIN-2012) is the fourth adopter. Jira's `updateIssue` is necessarily two upstream calls — a field update, then a status transition — because Jira offers no multi-write transaction. A failure between them (or in the confirmation re-read that follows) can leave the issue **partially** updated: some of what you sent landed, some did not. Rather than reporting that as an indistinguishable total failure, the affected write endpoints (`PATCH /issues/{id}`, `POST /issues/{id}/description/append`, `POST /issues/{id}/description/replace`) return:
+**`PARTIAL_WRITE`** (LIN-2012) is the fourth adopter. Jira's `updateIssue` is necessarily two upstream calls — a field update, then a status transition — because Jira offers no multi-write transaction. A failure between them (or in the confirmation re-read that follows) can leave the issue **partially** updated: some of what you sent landed, some did not. Rather than reporting that as an indistinguishable total failure, the affected write endpoints (`PATCH /issues/{id}`, `POST /issues/{id}/description/append`, `POST /issues/{id}/description/replace`, `POST /issues/{id}/description/below`) return:
 
 ```json
 {
@@ -2043,6 +2043,8 @@ Content-Type: application/json
 | `priority` | int | No | Issue priority on Linear's **native** scale (descending urgency): `0` = No priority, `1` = Urgent, `2` = High, `3` = Medium, `4` = Low. Prefer `priorityLevel` below for a provider-neutral scale — sending both is refused `400` |
 | `priorityLevel` | int | No | Issue priority on the **canonical** scale (ascending, shared across every provider — LIN-2239): `0` = unknown, `1` = lowest … `4` = highest (Linear: `4` = Urgent, `1` = Low). Maps to the provider's native scale at the write boundary; mutually exclusive with `priority` |
 
+**The description is filed sealed (LIN-4352).** A non-empty `description` is stored inside the `## As asked` block (see Update Issue), byte for byte, so it is kept as the words as filed. A `description` that already contains a marker line (`## As asked` or the end sentence) is refused `422 AS_ASKED_IMMUTABLE`. On a provider whose description round trip cannot hold the block (Jira: its ADF conversion rewrites the end line), the description is filed exactly as sent, unsealed, and the server logs `[as-asked] seal skipped`.
+
 **Provider compatibility.** Not every optional field above is honoured by every provider. An unsupported one is **refused with `400`** rather than silently dropped on a false `201` (a behavior change — earlier versions of this endpoint accepted and silently discarded these fields):
 
 - **GitHub-backed workspaces** do not support `teamId`, `stateId`, `assigneeId`, `parentId`, `cycleId`, `priority`/`priorityLevel` (both map to the same provider capability).
@@ -2133,10 +2135,41 @@ Response. As with create, the echoed `issue` is the **same flat shape as `GET /i
 ```
 
 > **Editing the description?** Passing `description` here **replaces the whole
-> body**. For anything other than a deliberate full rewrite, prefer the two
+> body**. For anything other than a deliberate full rewrite, prefer the
 > splice endpoints below: you supply only the new content and the server reads
 > the live body and merges it, so you never re-emit (and risk corrupting) the
 > existing description.
+
+#### The `## As asked` block (LIN-4345)
+
+A description may open with a block that holds the words as filed, byte for byte:
+
+```
+## As asked
+
+<the description as filed>
+
+*End of what was asked. Steps write below this line; nothing above it changes.*
+```
+
+Code writes it, when a ticket is filed or first dispatched, and no step may
+change it. Every description write through this proxy (`PATCH` with
+`description`, `description/append`, `description/replace`,
+`description/below`, and an attachment with `"target": "description"`) reads the
+live description and compares its block with the block the write would store.
+Both sides are compared after removing backslash escapes (Linear stores `\#\#`),
+never against a stored copy. The write is refused when the block would change:
+
+| Status | `code` | Meaning |
+|--------|--------|---------|
+| `422` | `AS_ASKED_IMMUTABLE` | the write changes the block (`kind: "changed"`, with `line: { number, expected, actual }` naming the first line that differs), drops it (`"removed"`), adds one to a ticket that has none (`"added"`), or — on `POST /issues` — files a body that already contains a marker line (`"marker"`). The message ends with the remedy: write around it — append, replace a span below the block, or use `description/below`. |
+| `422` | `NO_AS_ASKED_BLOCK` | `description/below` on a description with no block: there is nothing to write below; use `PATCH` to rewrite the whole body. |
+
+Only this proxy is guarded. A person editing their own words in Harbour's task
+editor (the session lane), or in Linear or GitHub directly, is not refused, and
+neither is an agent that writes to the provider without going through this proxy.
+A `PATCH` whose body carries `description` makes one extra description read for
+the comparison; a `PATCH` without it does not.
 
 #### Append to Description
 
@@ -2182,9 +2215,31 @@ It **fails loud — never a silent no-op**:
 |--------|--------|---------|
 | `422` | `NOT_FOUND` | `oldString` didn't match — re-read the description and quote an exact span |
 | `422` | `NOT_UNIQUE` | matched `matchCount` places — quote a longer, unique span |
+| `422` | `AS_ASKED_IMMUTABLE` | the replacement would change the `## As asked` block — replace a span below it |
 
 To swap *every* occurrence of a string at once, rewrite the whole body via
 `PATCH` instead. On success, returns `{ "success": true, "issue": {...} }`.
+
+#### Write Below the As Asked Block
+
+```
+POST /api/proxy/issues/{issueId}/description/below
+Content-Type: application/json
+
+{ "body": "## Summary\n\nShipped in #123." }
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `body` | string | Yes | Markdown that replaces everything after the block's end line (max 100K chars; `""` clears it) |
+
+Replaces everything after the `## As asked` block's end line with `body`, after a
+blank line. The block (and anything above it) is kept exactly as read, so the
+person's words are never re-sent: this is the route for pruning or rewriting what
+steps wrote below them. It makes the same description read and the same length and
+character checks as append and replace. On a description with no block it answers
+`422 NO_AS_ASKED_BLOCK`, naming `PATCH` as the full-rewrite route. On success,
+returns `{ "success": true, "issue": {...} }`.
 
 #### Add Comment
 
@@ -2430,6 +2485,8 @@ Returns `201`:
 ```json
 { "id": "uuid", "status": "queued", "...": "...", "consumerLastSeenAt": null, "warning": "No consumer has ever polled this workspace — this dispatch was enqueued but may sit unclaimed until a runner starts." }
 ```
+
+**A ticket's first dispatch seals its description (LIN-4352).** A fresh dispatch that names an `issueIdentifier` seals that issue's description into the `## As asked` block when no dispatch row has ever named the issue (queue or history), the description is non-empty with no block, and it carries no `Implementation Plan` heading, session-fit phrase or `plan-review due:` line. It runs after every refusal above, within about 3 seconds, and never refuses or delays the enqueue beyond that: a failed or skipped seal is logged (`[as-asked] seal …`) and the dispatch is queued as usual. Every dispatch lane that names an issue does this (this route, `recommend-and-dispatch`, `autopilot/kickoff`, the app's dispatch and feedback).
 
 **This does not refuse the dispatch — it still enqueues.** A runner may come up later; the warning is read-only telemetry so you can tell "queued, nothing polling yet" apart from "queued, a runner will pick this up any second." The same `consumerLastSeenAt` stamp is also readable later, alongside a `consumerPollWarning` derived from live poll recency while the row is queued (LIN-3367), via `GET /api/proxy/dispatch/{id}` and `GET /api/proxy/dispatch` — see below.
 

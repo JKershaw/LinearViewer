@@ -31,6 +31,7 @@ import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { requestOriginOrNull, ORIGIN_UNRESOLVED_REFUSAL } from '../lib/public-origin.js';
 import { buildMockFeedbackTitle } from '../lib/workspace-api-mocks.js';
 import { normalizeWritePayload } from '../lib/proxy-graphql-errors.js';
+import { sealForFiling, sealAccessFrom } from '../lib/as-asked-seal.js';
 
 // ===========================================================================
 // Feedback intake constants (LIN-636 route / LIN-635 widget)
@@ -261,6 +262,8 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
         // LIN-3238 free-tier run gate, built by the route at the dispatch point;
         // a refusal leaves the filed ticket intact.
         runGate: overrides.runGate || null,
+        // LIN-4352: the first-dispatch seal's access (the ticket's create access).
+        sealAccess: sealAccessFrom(() => overrides.access || null),
         model: overrides.model,
         harness: overrides.harness,
         // LIN-4251: the stage's `writes`, resolved from the kind the factory dispatches (`triage`:
@@ -327,6 +330,8 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
         kind: 'autopilot',
         // LIN-3238: a refusal leaves the filed ticket intact and mints nothing.
         runGate: overrides.runGate || null,
+        // LIN-4352: the first-dispatch seal's access (the ticket's create access).
+        sealAccess: sealAccessFrom(() => overrides.access || null),
         model: overrides.model,
         harness: overrides.harness,
         finalizePrompt: (harness, kind) => attachProxyContext({
@@ -482,19 +487,25 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
       // never filed. 0 ("No priority") is indistinguishable from "unset", so it is
       // never folded or forwarded.
       const canSetPriority = provider.apiWriteFields().includes('priority');
+      const belowParts = [];
       if (priority > 0 && !canSetPriority) {
-        parts.push(`---\n**Reported priority:** ${PRIORITY_OPTION_LABELS[priority]}`);
+        belowParts.push(`---\n**Reported priority:** ${PRIORITY_OPTION_LABELS[priority]}`);
       }
 
       // Origin/triage marker (LIN-947): always last, so the stored ticket announces
       // itself as raw, un-triaged feedback and the meta-prompt's triage routing
       // activates. It never alters the message, capture block or screenshot above.
-      parts.push(`---\n${FEEDBACK_ORIGIN_TRIAGE_MARKER}`);
+      const below = [...belowParts, `---\n${FEEDBACK_ORIGIN_TRIAGE_MARKER}`];
 
+      // LIN-4352: the person's report (message, capture, screenshot) is sealed into
+      // the As asked block; the priority line and the triage marker are code's own
+      // text and go after its end line. A report that already holds a marker line,
+      // or a provider that cannot hold the block, is filed in the unsealed layout
+      // with one log line (lib/as-asked-seal.js).
       const createInput = {
         teamId: resolvedTeamId,
         title: await resolveFeedbackTitle(req, workspace, { title, message }),
-        description: parts.join('\n\n'),
+        description: sealForFiling({ provider, words: parts.join('\n\n'), below: below.join('\n\n'), lane: 'feedback' }).description,
       };
       if (resolvedProjectId) createInput.projectId = resolvedProjectId;
       if (priority > 0 && canSetPriority) createInput.priority = priority;
@@ -525,7 +536,10 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
       // the SAME resolved binding that produced `provider` / `token`, so the source
       // the issue is created in and the stamped one cannot drift. Selection-only
       // provenance, never a credential (B1).
-      const overrides = { model, harness, runGate, bindingPair: provider?.name ? { issueSource: provider.name } : {} };
+      // LIN-4352: `access` is the provider and token that just created the ticket, for
+      // the first-dispatch seal. The ticket is already sealed, so the seal finds a block
+      // and does nothing; passing it means "no access" in the log is always a real gap.
+      const overrides = { model, harness, runGate, bindingPair: provider?.name ? { issueSource: provider.name } : {}, access: { provider, token } };
 
       // LIN-3383: both lanes enqueue a `cli` row for the owner's runner, so only the
       // workspace owner may start one. Checked only when a lane will actually run —

@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
 import { expectNoClippedOverflow } from '../helpers.js';
 import { defaultJiraSeed, JIRA_SITE } from '../fixtures/jira-harness.js';
+import { sealAsAsked } from '../../lib/as-asked.js';
 
 // LIN-3329: the task page, owner view
 // (GET /workspace/:urlKey/task/:identifier), at a 360px phone width.
@@ -46,7 +47,9 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
 async function seedTasks(page, { omit = [], reviewed = false } = {}) {
   const id = (raw) => localSeedId(URL_KEY, raw);
   const issue = (raw, identifier, title, state, extra = {}) => ({
-    id: id(raw), identifier, title, description: `Seeded ${title}`, projectId: id('tp-proj'), sortOrder: 1, state,
+    // LIN-4352: seeded already sealed, so no test here depends on whether its dispatch is the
+    // ticket's first (the dispatch store is not cleared per test; that would decide a seal).
+    id: id(raw), identifier, title, description: sealAsAsked(`Seeded ${title}`), projectId: id('tp-proj'), sortOrder: 1, state,
     url: `/workspace/${URL_KEY}/issue/${id(raw)}`, ...extra,
   });
   const resp = await page.request.post('/test/set-local-session', {
@@ -485,7 +488,10 @@ test.describe('Task page, owner view (LIN-3329)', () => {
         projects: [{ id: id('tp-proj'), name: 'Task page project', content: 'A project', sortOrder: 1 }],
         issues: [{
           id: TASK_UUID, identifier: 'LOCAL-TP1', title: 'A task with a running build',
-          description: 'The **task** description.', projectId: id('tp-proj'), sortOrder: 1,
+          // LIN-4352: seeded already sealed, so the page renders the same block whether or
+          // not this run's anchor dispatch is the ticket's first (the dispatch store is not
+          // cleared per test, so an earlier spec's rows decide that otherwise).
+          description: sealAsAsked('The **task** description.'), projectId: id('tp-proj'), sortOrder: 1,
           state: { name: 'In Progress', type: 'started' }, url: `/workspace/${URL_KEY}/issue/${TASK_UUID}`,
           comments: [
             { id: 'c-pr', body: `Opened the pull request: ${PR_URL}`, createdAt: '2026-10-06T09:00:00Z', user: 'Runner' },
@@ -558,7 +564,9 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(guest.locator('[data-testid="task-page-pr-lead"]')).toHaveText('PR #41 is approved and ready to merge.');
     await expect(guest.locator('[data-action="closeout-press"]')).toHaveCount(0);
     await expect(guest.locator('[data-testid="task-page-owner-widgets"]')).toHaveCount(0);
-    await expect(guest.locator('[data-testid="task-page-description-body"] p')).toHaveCount(1);
+    // The sealed description renders as the block: its words, then the end line (LIN-4352).
+    await expect(guest.locator('[data-testid="task-page-description-body"] p')).toHaveCount(2);
+    await expect(guest.locator('[data-testid="task-page-description-body"] p').first()).toHaveText('The task description.');
     await guestCtx.close();
     await page.request.get('/test/clear-pr-status');
   });
