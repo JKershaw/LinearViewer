@@ -2867,3 +2867,9 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - **LIN-4354:** an end condition for LIN-4345's migration scaffolding (the first-dispatch seal and the unsealed readers): seal open old tickets once, then remove what serves only them.
     - **LIN-4344:** the principle itself.
   - **For the step-back:** are two separate Surveys needed, or was that research design? One look at both the task and the place might do, at half the fixed cost.
+- **LIN-4353 merged (`cdc324bc1`, PR #2347; deployed 16:41).** Each judging verdict now says how the work met the block, and close-out prunes through `description/below`.
+  - The replay miss is recorded on LIN-4345 (comment f551a3bb), which stays open until a per-sentence-accounting attempt is replayed on several tickets and runs.
+  - Six mutations were checked against the new completion-signal pins.
+  - The brief's no-echo check passed live.
+  - **Not run:** a real close-out pruning a sealed ticket. That waits for the first one; LIN-4354 will be sealed at first dispatch.
+  - **The whole of LIN-4345's code has now landed.** At-merge reads: BO `70a2e91c`, BP `3e80be08`, after-questions `495c84cb` into `4ddf35b5` (the five-beat build). LIN-4354's Surveys are at the new base (`a071aa71`, `bce7e35b`). The area read of LIN-4351 + 4352 + 4353 + 4354 follows the tidy-after.
