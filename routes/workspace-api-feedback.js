@@ -31,7 +31,7 @@ import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { requestOriginOrNull, ORIGIN_UNRESOLVED_REFUSAL } from '../lib/public-origin.js';
 import { buildMockFeedbackTitle } from '../lib/workspace-api-mocks.js';
 import { normalizeWritePayload } from '../lib/proxy-graphql-errors.js';
-import { sealForFiling } from '../lib/as-asked-seal.js';
+import { sealForFiling, sealAccessFrom } from '../lib/as-asked-seal.js';
 
 // ===========================================================================
 // Feedback intake constants (LIN-636 route / LIN-635 widget)
@@ -262,6 +262,8 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
         // LIN-3238 free-tier run gate, built by the route at the dispatch point;
         // a refusal leaves the filed ticket intact.
         runGate: overrides.runGate || null,
+        // LIN-4352: the first-dispatch seal's access (the ticket's create access).
+        sealAccess: sealAccessFrom(() => overrides.access || null),
         model: overrides.model,
         harness: overrides.harness,
         // LIN-4251: the stage's `writes`, resolved from the kind the factory dispatches (`triage`:
@@ -328,6 +330,8 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
         kind: 'autopilot',
         // LIN-3238: a refusal leaves the filed ticket intact and mints nothing.
         runGate: overrides.runGate || null,
+        // LIN-4352: the first-dispatch seal's access (the ticket's create access).
+        sealAccess: sealAccessFrom(() => overrides.access || null),
         model: overrides.model,
         harness: overrides.harness,
         finalizePrompt: (harness, kind) => attachProxyContext({
@@ -532,7 +536,10 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
       // the SAME resolved binding that produced `provider` / `token`, so the source
       // the issue is created in and the stamped one cannot drift. Selection-only
       // provenance, never a credential (B1).
-      const overrides = { model, harness, runGate, bindingPair: provider?.name ? { issueSource: provider.name } : {} };
+      // LIN-4352: `access` is the provider and token that just created the ticket, for
+      // the first-dispatch seal. The ticket is already sealed, so the seal finds a block
+      // and does nothing; passing it means "no access" in the log is always a real gap.
+      const overrides = { model, harness, runGate, bindingPair: provider?.name ? { issueSource: provider.name } : {}, access: { provider, token } };
 
       // LIN-3383: both lanes enqueue a `cli` row for the owner's runner, so only the
       // workspace owner may start one. Checked only when a lane will actually run —
