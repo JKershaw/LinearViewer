@@ -2,7 +2,7 @@
  * LIN-4352 (LIN-4345 plan rev 2, step 6), witness 4 — the dispatch part: a ticket
  * filed outside Harbour is sealed at its TRUE first dispatch, by
  * `createDispatchItem` (lib/dispatch-factory.js), through the lane's own provider
- * access (`sealAccess`).
+ * access (`issueAccess`).
  *
  * Everything runs on a REAL LocalStore (the issues) and a REAL DispatchQueueStore
  * over mock collections (the queue and history), reading the stored description
@@ -16,10 +16,11 @@
  *     earlier row still queued; a description that already holds a plan heading,
  *     session-fit phrase or `plan-review due:` line; an empty description; an issue
  *     whose history read throws; a dispatch the duplicate guard refuses;
- *   - no sealAccess logs `seal skipped: no access` and still enqueues; a failed or a
- *     hung write still enqueues and logs it; the Jira fake is skipped, unreformatted.
+ *   - no issueAccess logs `seal skipped: no access` and still enqueues; a provider write
+ *     that fails or hangs still enqueues and logs it; the Jira fake is skipped,
+ *     unreformatted.
  * And the entrance census: every `createDispatchItem(` caller (and every
- * `enqueueRow(` lane, which forwards to it) passes `sealAccess` or is on the
+ * `enqueueRow(` lane, which forwards to it) passes `issueAccess` or is on the
  * never-first list with its reason.
  */
 process.env.NODE_ENV = 'test';
@@ -39,7 +40,6 @@ import { LocalProvider, localProvider } from '../../lib/providers/local/index.js
 import { jiraProvider } from '../../lib/providers/jira/index.js';
 import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js';
 import { markdownToAdf } from '../../lib/providers/jira/adf.js';
-import { sealAccessFrom } from '../../lib/as-asked-seal.js';
 import { sealAsAsked, splitAsAsked } from '../../lib/as-asked.js';
 import { createLocalStore } from '../fixtures/local-harness.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
@@ -95,18 +95,20 @@ afterEach(() => {
 });
 
 const described = async (identifier) => (await issues.getIssue(TOKEN, identifier)).description;
-const localAccess = () => sealAccessFrom(() => ({ provider, token: TOKEN }));
+const localAccess = () => () => ({ provider, token: TOKEN });
+/** The LocalProvider over the seeded issues, with its own `updateIssue` replaced. */
+const withUpdateIssue = (updateIssue) => Object.create(provider, { updateIssue: { value: updateIssue } });
 const queuedRows = async () => queue.find({}).toArray();
 
 /** One fresh dispatch straight through the factory. */
-function dispatch({ issueIdentifier = 'TEST-1', sealAccess = localAccess(), kind = 'research', onStore = store, ...rest } = {}) {
+function dispatch({ issueIdentifier = 'TEST-1', issueAccess = localAccess(), kind = 'research', onStore = store, ...rest } = {}) {
   return createDispatchItem({
     store: onStore,
     urlKey: URL_KEY,
     kind,
     prompt: 'do the work',
     fields: { promptName: 'Research', issueIdentifier, target: 'cli' },
-    sealAccess,
+    issueAccess,
     ...rest,
   });
 }
@@ -198,61 +200,60 @@ describe('witness 4 (dispatch) — the factory seals a fresh issue once, and onl
 });
 
 describe('witness 4 (dispatch) — no access, failed and hung writes still enqueue', () => {
-  test('no sealAccess: logs `seal skipped: no access`, enqueues, leaves the ticket alone', async () => {
-    await dispatch({ sealAccess: null });
+  test('no issueAccess: logs `seal skipped: no access`, enqueues, leaves the ticket alone', async () => {
+    await dispatch({ issueAccess: null });
     assert.equal(await described('TEST-1'), WORDS);
     assert.equal((await queuedRows()).length, 1);
     assert.ok(logs.some((l) => l.includes('[as-asked] seal skipped: no access')), JSON.stringify(logs));
   });
 
   test('a lane resolver with no token: also `seal skipped: no access`', async () => {
-    await dispatch({ sealAccess: sealAccessFrom(() => ({ provider, token: null })) });
+    await dispatch({ issueAccess: () => ({ provider, token: null }) });
     assert.equal(await described('TEST-1'), WORDS);
     assert.ok(logs.some((l) => l.includes('[as-asked] seal skipped: no access')), JSON.stringify(logs));
   });
 
   test('a write that throws: enqueues and logs `seal failed`', async () => {
-    const access = localAccess();
-    access.write = async () => { throw new Error('provider refused'); };
-    await dispatch({ sealAccess: access });
+    const failing = withUpdateIssue(async () => { throw new Error('provider refused'); });
+    await dispatch({ issueAccess: () => ({ provider: failing, token: TOKEN }) });
     assert.equal((await queuedRows()).length, 1);
     assert.ok(logs.some((l) => l.includes('[as-asked] seal failed: write failed (provider refused)')), JSON.stringify(logs));
   });
 
   test('a write the provider does not accept: enqueues and logs `seal failed`', async () => {
-    const access = localAccess();
-    access.write = async () => false;
-    await dispatch({ sealAccess: access });
+    const refusing = withUpdateIssue(async () => ({ success: false, issue: null }));
+    await dispatch({ issueAccess: () => ({ provider: refusing, token: TOKEN }) });
     assert.equal((await queuedRows()).length, 1);
     assert.ok(logs.some((l) => l.includes('[as-asked] seal failed: write was not accepted')), JSON.stringify(logs));
   });
 
   test('a write that hangs past the cap: enqueues and logs "seal timed out (write may still land)"', async () => {
-    const access = localAccess();
-    access.write = () => new Promise(() => {});
+    const hanging = withUpdateIssue(() => new Promise(() => {}));
     const started = Date.now();
-    await dispatch({ sealAccess: access, sealTimeoutMs: 50 });
+    await dispatch({ issueAccess: () => ({ provider: hanging, token: TOKEN }), sealTimeoutMs: 50 });
     assert.ok(Date.now() - started < 2000, 'bounded by the cap');
     assert.equal((await queuedRows()).length, 1);
     assert.ok(logs.some((l) => l.includes('[as-asked] seal timed out (write may still land)')), JSON.stringify(logs));
   });
 
   test('the write is keyed by the id the read returned, and both get the row\'s identifier', async () => {
+    // Recorded at the provider: the key each read asked for, and for each write the
+    // issue its id lands on (looked up in the store) beside the id itself.
     const seen = [];
-    const access = localAccess();
-    const { read, write } = access;
-    access.read = async (args) => { seen.push(['read', args.issueIdentifier]); return read(args); };
-    access.write = async (args) => { seen.push(['write', args.issueIdentifier, args.id]); return write(args); };
-    await dispatch({ issueIdentifier: 'TEST-2', sealAccess: access });
+    const recording = Object.create(provider, {
+      issueDescription: { value: async (token, key) => { seen.push(['read', key]); return provider.issueDescription(token, key); } },
+      updateIssue: { value: async (token, id, patch) => { seen.push(['write', (await issues.getIssue(TOKEN, id))?.identifier, id]); return provider.updateIssue(token, id, patch); } },
+    });
+    await dispatch({ issueIdentifier: 'TEST-2', issueAccess: () => ({ provider: recording, token: TOKEN }) });
     assert.deepEqual(seen, [['read', 'TEST-2'], ['write', 'TEST-2', 'i2']]);
     assert.equal(await described('TEST-2'), sealAsAsked(`${WORDS} (child)`));
   });
 
-  // Builder note 1, second half, at the sealAccessFrom layer itself: LocalStore
+  // Builder note 1, second half, through a provider that is strict about it: LocalStore
   // accepts either key, so the test above cannot tell `id` from `issueIdentifier`.
   // This provider takes its write ONLY by the id its read returned (as Linear's
   // uuid, GitHub's and Jira's own ids do).
-  test('sealAccessFrom writes by the id issueDescription returned, not the identifier', async () => {
+  test('the seal writes by the id issueDescription returned, not the identifier', async () => {
     const written = [];
     const fake = {
       name: 'fake',
@@ -265,7 +266,7 @@ describe('witness 4 (dispatch) — no access, failed and hung writes still enque
         return { success: true, issue: { id, description: input.description } };
       },
     };
-    await dispatch({ issueIdentifier: 'TEST-9', sealAccess: sealAccessFrom(() => ({ provider: fake, token: 't' })) });
+    await dispatch({ issueIdentifier: 'TEST-9', issueAccess: () => ({ provider: fake, token: 't' }) });
     assert.ok(logs.some((l) => l.includes('[as-asked] sealed at first dispatch')), JSON.stringify(logs));
     assert.deepEqual(written, [sealAsAsked('words')]);
     assert.equal((await queuedRows()).length, 1);
@@ -293,7 +294,7 @@ describe('witness 4 (dispatch) — the Jira fake (builder note 5)', () => {
     });
     jiraProvider.configure({ client: fake, clientFactory: () => fake, site: SCOPE.site });
     const before = structuredClone((await fake.getIssue('ENG-1')).fields.description);
-    await dispatch({ issueIdentifier: 'ENG-1', sealAccess: sealAccessFrom(() => ({ provider: jiraProvider, token: SCOPE })) });
+    await dispatch({ issueIdentifier: 'ENG-1', issueAccess: () => ({ provider: jiraProvider, token: SCOPE }) });
     assert.deepEqual((await fake.getIssue('ENG-1')).fields.description, before, 'never reformatted');
     assert.equal((await queuedRows()).length, 1);
     assert.ok(logs.some((l) => l.includes('[as-asked] seal skipped: provider jira cannot hold the block')), JSON.stringify(logs));
@@ -436,7 +437,7 @@ describe('witness 4 (dispatch) — feedback\'s dispatch on its already-sealed ti
 // The entrance census
 // ---------------------------------------------------------------------------
 
-// Callers that never start a ticket, so they pass no sealAccess. Each reason is the
+// Callers that never start a ticket, so they pass no issueAccess. Each reason is the
 // plan's (LIN-4345 rev 2, step 6); a caller that stops matching its reason belongs off
 // this list.
 const NEVER_FIRST = {
@@ -477,7 +478,7 @@ function callArguments(src, name) {
 }
 
 describe('witness 4 (dispatch) — the entrance census', () => {
-  test('every createDispatchItem( caller in lib/routes passes sealAccess or is never-first with a reason', () => {
+  test('every createDispatchItem( caller in lib/routes passes issueAccess or is never-first with a reason', () => {
     const found = [];
     for (const file of [...sourceFiles('lib'), ...sourceFiles('routes')]) {
       if (file === join('lib', 'dispatch-factory.js')) continue;
@@ -485,19 +486,19 @@ describe('witness 4 (dispatch) — the entrance census', () => {
       for (const c of callArguments(src, 'createDispatchItem')) found.push({ file: relative('.', file), ...c });
     }
     assert.ok(found.length >= 6, `the census must find the callers, found ${found.length}`);
-    const missing = found.filter((c) => !/\bsealAccess\b/.test(c.text) && !NEVER_FIRST[c.file]);
+    const missing = found.filter((c) => !/\bissueAccess\b/.test(c.text) && !NEVER_FIRST[c.file]);
     assert.deepEqual(missing.map((c) => `${c.file}:${c.at}`), [],
-      'each of these must pass sealAccess, or be added to NEVER_FIRST with the reason it can never make a first row');
+      'each of these must pass issueAccess, or be added to NEVER_FIRST with the reason it can never make a first row');
   });
 
-  test('every enqueueRow( lane passes sealAccess, except the periodical mint (no issue)', () => {
+  test('every enqueueRow( lane passes issueAccess, except the periodical mint (no issue)', () => {
     const src = readFileSync(join(ROOT, 'lib/dispatch-entrance.js'), 'utf8');
     const lanes = callArguments(src, 'enqueueRow');
     assert.ok(lanes.length >= 6, `the census must find the lanes, found ${lanes.length}`);
-    const missing = lanes.filter((c) => !/\bsealAccess\b|\.\.\.issueAccessOf\(/.test(c.text));
+    const missing = lanes.filter((c) => !/\bissueAccess\b/.test(c.text));
     assert.equal(missing.length, 1, `only the periodical mint may pass no access: ${missing.map((c) => `:${c.at}`)}`);
     assert.match(missing[0].text, /attachIssue: null/, NEVER_FIRST['lib/dispatch-entrance.js#periodical-mint']);
-    assert.match(src, /sealAccess: spec\.sealAccess/, 'enqueueRow forwards the lane\'s access to the factory');
+    assert.match(src, /issueAccess: spec\.issueAccess/, 'enqueueRow forwards the lane\'s access to the factory');
   });
 
   test('the never-first callers still match their reasons', () => {

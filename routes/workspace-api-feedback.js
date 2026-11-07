@@ -31,7 +31,7 @@ import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { requestOriginOrNull, ORIGIN_UNRESOLVED_REFUSAL } from '../lib/public-origin.js';
 import { buildMockFeedbackTitle } from '../lib/workspace-api-mocks.js';
 import { normalizeWritePayload } from '../lib/proxy-graphql-errors.js';
-import { sealForFiling, sealAccessFrom } from '../lib/as-asked-seal.js';
+import { sealForFiling } from '../lib/as-asked-seal.js';
 
 // ===========================================================================
 // Feedback intake constants (LIN-636 route / LIN-635 widget)
@@ -264,8 +264,8 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
         // LIN-3238 free-tier run gate, built by the route at the dispatch point;
         // a refusal leaves the filed ticket intact.
         runGate: overrides.runGate || null,
-        // LIN-4352: the first-dispatch seal's access (the ticket's create access).
-        sealAccess: sealAccessFrom(() => overrides.access || null),
+        // The first-dispatch seal's access to the issue (the ticket's create access).
+        issueAccess: () => overrides.access || null,
         model: overrides.model,
         harness: overrides.harness,
         // LIN-4251: the stage's `writes`, resolved from the kind the factory dispatches (`triage`:
@@ -332,8 +332,8 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
         kind: 'autopilot',
         // LIN-3238: a refusal leaves the filed ticket intact and mints nothing.
         runGate: overrides.runGate || null,
-        // LIN-4352: the first-dispatch seal's access (the ticket's create access).
-        sealAccess: sealAccessFrom(() => overrides.access || null),
+        // The first-dispatch seal's access to the issue (the ticket's create access).
+        issueAccess: () => overrides.access || null,
         model: overrides.model,
         harness: overrides.harness,
         finalizePrompt: (harness, kind) => attachProxyContext({
