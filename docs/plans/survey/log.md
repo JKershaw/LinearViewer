@@ -2814,3 +2814,11 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - The builder on q7: the larger scope paid for piece A, because getting the readers right before any block exists is the safety. But the brief composer belonged beside C.
   - **Tidy-after LIN-4354 filed** (a child of LIN-4344). It runs after LIN-4353, because B is building in the same files, and it reads the whole area then.
   - Contract and docs items (the stale reader table, `CONTRACT_LINES` not mentioning the block, `source-map.md`) are posted on LIN-4353 before it starts.
+- **LIN-4352 merged (`d81e13e7d`, PR #2346; deployed 13:36).** The close-out ran every live check review asked for, on LIN-4357, a ticket filed after deploy:
+  - the seal round trip holds;
+  - the guard refuses a real edit and a removal with a 422, and leaves the description's sha unchanged;
+  - `description/below` writes beneath the block.
+  - **Found:** Linear canonicalises markdown (`_x_` becomes `*x*`, `-` bullets become `*`) on every description. The block is stable once stored, but a writer that rebuilt the block from the filing text would get a false 422, which is the safe direction.
+  - **Found:** the brief model (`gpt-5.4-mini`) repeated a block phrase and restated the ask's formatting in its own sections, despite being told not to. This was passed to LIN-4353, and it bears on John's open call on the brief model.
+  - Close-out filed LIN-4355 (Jira can't hold the block) and LIN-4356 (a local live-console width test on macOS) as follow-ons.
+  - At-merge reads sent: BM `73e48ea6`, BN `9981b3aa`, after-questions `346213bb` into `7c3d07b0`.
