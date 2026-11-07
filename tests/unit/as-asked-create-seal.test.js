@@ -1,6 +1,6 @@
 /**
- * LIN-4352 (LIN-4345 plan rev 2, step 6), witness 4 — the create part: code seals
- * the `## As asked` block where a ticket starts.
+ * LIN-4352, the create lanes: code seals the `## As asked` block where a ticket
+ * starts, so the words as filed are kept from the first write.
  *
  * Drives the three create lanes over a REAL seeded LocalStore and reads the stored
  * description back from the store:
@@ -11,7 +11,7 @@
  * backslash-escaped body). Feedback keeps the message, capture and screenshot
  * inside the block, and the reported-priority line and its triage marker after the
  * end line. A session or feedback body that already holds a marker line is filed
- * unsealed with exactly one log line (the proxy refuses it: beat 1). A provider
+ * unsealed with exactly one log line (the proxy create refuses it outright). A provider
  * that cannot hold the block (Jira's ADF round trip) is filed unsealed with its own
  * log line, never reformatted.
  */
@@ -135,7 +135,7 @@ function feedbackCapableLocal() {
 }
 
 for (const { name, text } of VARIANTS) {
-  describe(`witness 4 (create) on LocalStore — ${name}`, () => {
+  describe(`create seal on LocalStore — ${name}`, () => {
     test('proxy POST /issues stores the text verbatim inside the block', async () => {
       const res = await createProxy(text);
       assert.equal(res.status, 201, JSON.stringify(res.body));
@@ -174,7 +174,7 @@ for (const { name, text } of VARIANTS) {
   });
 }
 
-describe('witness 4 (create) on LocalStore — bodies that already hold a marker line are filed unsealed', () => {
+describe('create seal on LocalStore — bodies that already hold a marker line are filed unsealed', () => {
   test('session create: filed as written, with exactly one log line', async () => {
     const body = `My notes\n${linearEscape(AS_ASKED_HEADING)}\nmore`;
     const res = await createSession(body);
@@ -203,7 +203,7 @@ describe('witness 4 (create) on LocalStore — bodies that already hold a marker
   });
 });
 
-describe('witness 4 (create) — a provider that cannot hold the block is skipped, with its own log line', () => {
+describe('create seal — a provider that cannot hold the block is skipped, with its own log line', () => {
   test('the Jira provider cannot hold the block (its ADF round trip turns the end line into _…_); Local and GitHub-style verbatim stores can', () => {
     assert.equal(typeof jiraProvider.descriptionRoundTrip, 'function', 'Jira declares its markdown round trip');
     assert.equal(providerHoldsAsAsked(jiraProvider, sealAsAsked(TEXT)), false);
@@ -235,7 +235,7 @@ describe('witness 4 (create) — a provider that cannot hold the block is skippe
   });
 });
 
-// LIN-4353 (LIN-4345 plan step 9): the feedback → autopilot note no longer calls the
+// LIN-4353: the feedback → autopilot note no longer calls the
 // report "a starting hypothesis, not a specification". The report is sealed in the
 // block above, as the person's own words: the run works out what they need from it,
 // and says so when a fix they suggest looks wrong instead of quietly narrowing it.

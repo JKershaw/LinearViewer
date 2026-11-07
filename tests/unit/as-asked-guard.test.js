@@ -1,5 +1,5 @@
 /**
- * LIN-4352 (LIN-4345 plan rev 2, steps 3–5), witness 3: no step can alter the words.
+ * LIN-4352, the proxy guard: no step can alter the words.
  *
  * Drives the REAL proxy write routes over a REAL seeded LocalStore (the
  * tests/unit/proxy-local-target.test.js seam), and the session lane's PATCH over
@@ -10,13 +10,14 @@
  *     block's bytes are unchanged.
  *   - description/below on an unsealed ticket is refused 422 NO_AS_ASKED_BLOCK.
  *   - a PATCH that adds a block, and a proxy create carrying a marker line, are refused.
- *   - a session-lane PATCH that edits the block succeeds (a person's lane, step 5).
+ *   - a session-lane PATCH that edits the block succeeds (a person's lane, unguarded by design).
  * Every case runs twice: on a plain body and on a Linear-style backslash-escaped
  * one (Linear stores `\#\# As asked`, `\*\*` …). The guard compares the two blocks
  * after normalizeEscaping, so a PATCH that writes the block back unescaped over an
  * escaped live block is NOT refused — that case is here too.
  *
- * The guard is also run against the Jira provider's fake (likeliest break 1); see
+ * The guard is also run against the Jira provider's fake, whose ADF round trip
+ * loses the end line; see
  * the Jira describe block at the end for what that proves and what it does not.
  */
 process.env.NODE_ENV = 'test';
@@ -114,7 +115,7 @@ async function call(app, method, path, body) {
 }
 
 for (const variant of VARIANTS) {
-  describe(`witness 3 on LocalStore — ${variant.name}`, () => {
+  describe(`the guard on LocalStore — ${variant.name}`, () => {
     const sealed = variant.store(`${sealAsAsked(WORDS)}\n\n${BELOW}`);
     const unsealed = variant.store(`${WORDS}\n\n${BELOW}`);
     let store;
@@ -236,7 +237,7 @@ for (const variant of VARIANTS) {
   });
 }
 
-describe('witness 3 on LocalStore — the PATCH guard read', () => {
+describe('the guard on LocalStore — the PATCH guard read', () => {
   let store;
   const savedRead = localProvider.issueDescription;
   beforeEach(async () => {
@@ -262,7 +263,7 @@ describe('witness 3 on LocalStore — the PATCH guard read', () => {
 });
 
 // ---------------------------------------------------------------------------
-// The guard against the Jira provider's fake (likeliest break 1). Jira stores
+// The guard against the Jira provider's fake. Jira stores
 // ADF, and the provider converts markdown ↔ ADF on every write and read. What the
 // round trip does to the block decides what the guard can do on Jira:
 //   - The words and the heading survive, but the END line does not: ADF has one
@@ -276,7 +277,7 @@ describe('witness 3 on LocalStore — the PATCH guard read', () => {
 //     item the plan names (the first-dispatch and create seals must skip Jira).
 // ---------------------------------------------------------------------------
 
-describe('witness 3 against the Jira fake', () => {
+describe('the guard against the Jira fake', () => {
   const SITE = 'https://acme.atlassian.net';
   const SCOPE = { email: 'ada@acme.com', apiToken: 'tok-123', site: SITE };
   const saved = { client: jiraProvider.client, clientFactory: jiraProvider.clientFactory, site: jiraProvider.site };

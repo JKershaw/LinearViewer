@@ -32,6 +32,7 @@ import { requestOriginOrNull, ORIGIN_UNRESOLVED_REFUSAL } from '../lib/public-or
 import { buildMockFeedbackTitle } from '../lib/workspace-api-mocks.js';
 import { normalizeWritePayload } from '../lib/proxy-graphql-errors.js';
 import { sealForFiling } from '../lib/as-asked-seal.js';
+import { AS_ASKED_HEADING } from '../lib/as-asked.js';
 
 // ===========================================================================
 // Feedback intake constants (LIN-636 route / LIN-635 widget)
@@ -111,7 +112,7 @@ const FEEDBACK_ORIGIN_FRAMING =
 export const FEEDBACK_AUTOPILOT_ORIGIN_NOTE =
   `**Origin — raw feedback:** ${FEEDBACK_ORIGIN_FRAMING}. Before driving toward a fix, ` +
   'your first job is to *understand* it: read the report closely and reproduce or ground the problem ' +
-  'against the current code. The description\'s `## As asked` block is the person\'s own report: work ' +
+  'against the current code. The description\'s `' + AS_ASKED_HEADING + '` block is the person\'s own report: work ' +
   'out what they need from it, and where a fix they suggest looks wrong, say so rather than quietly ' +
   'narrowing the report.';
 
