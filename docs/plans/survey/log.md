@@ -2899,3 +2899,9 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **Area read sent:** all eight merges of LIN-4345 and its tidy as one change, `fdd57fe9..d65d8af0` (BQ `a76c80c2`, BR `8b51edd1`). Per-piece reads were skipped for the tidy, since the area read is the one that answers the question.
   - LIN-4345 waits on John for `lin4345-attempt2-size-cut` (PR #2351 open).
   - **LIN-4358 kicked off** (autopilot `3c973a3f`, Opus).
+- **~22:05 UTC: the LIN-4345 area read is better, better (BQ, BR).** All eight merges (the three pieces, #2348, and the tidy-after's four), `fdd57fe9..d65d8af0`. Every single piece had read mixed. **Finishing the move turned the area, the same pattern as 5–6 Nov.**
+  - Both readers credit one owner for the concept (`as-asked.js`, plus census tests holding the wording there) and the removal of old duplicates: proxy-compute's mock brief, the disagreeing due-line regexes, and four hand-written plan reads.
+  - The residues (a third test-token check, `provider.name === 'linear'` in the factory, `GATE_DUE_MARKER` alive in effort-readout output, a misplaced doc in recap-cache, a thrice-repeated paragraph) were posted on LIN-4347 as the first area-note entries. Under the stop rule they get no further tidy-after.
+  - Comments carrying process history (ticket ids, a named person's dated ruling in a doc) went to LIN-4350.
+  - BQ: "the end state is clean, but the code took several passes in one day to get there", which is the price of the build pieces adding before the tidy.
+- **John, overnight:** "ideally not blocking the work on me where possible." Running independent tickets side by side; kickoff goals ask autopilot to settle engineering questions itself, and to raise rulings only for John's calls.
