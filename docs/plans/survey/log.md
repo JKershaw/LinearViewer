@@ -2934,3 +2934,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - done: running the loop means setting the policy once and filing a ticket.
   - The kickoff goal now carries "settle engineering questions yourself; rulings only for John's calls".
 - **For the notebook (Survey):** `docs/plans/survey.md`'s "John is asked only when the large option is recommended" is now the reverse. Under the policy, larger goes ahead, and smaller than asked is a cut that raises a ruling.
+- **23:20 UTC: LIN-4346 broken into four.** Piece 1, LIN-4367 (`9c2a378a`, PR #2354), simplified what PR #2351 left around the cut rule: big moves early, and the tidy first. Area read of #2351 + LIN-4367 sent (BU, BV).
