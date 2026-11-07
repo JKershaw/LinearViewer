@@ -2801,3 +2801,11 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - There's a note on LIN-4348: its cost ruling isn't needed, and the Haiku default is moot for now.
   - Harbour's own calls are unchanged. Noted for John: `brief`, the distilled brief every stage reads first (the photocopy step LIN-4345 is about), runs on `openai/gpt-5.4-mini`.
 - **~10:20 UTC, John: open to improving the brief endpoint.** Posted to LIN-4345 as a grant, not a new requirement: improve the brief, including how it's written and its model (currently `gpt-5.4-mini`), for the ticket's own purpose. Removing it is still a ruling. The plan was mid-write (dispatched 10:09), so plan-review and later steps will read it.
+- **LIN-4345 planned and split (10:09–10:39).**
+  - Plan review sent it back twice. Both were real bugs, not longer lists: a seal that would lock plan text in on tickets already in flight, and a seal that would never run on autopilot's lanes. The third version was approved.
+  - It was broken into LIN-4351 (the block and the brief composer), LIN-4352 (the proxy guard and seals) and LIN-4353 (the stage prompts judge against the block, and the prompt text is trimmed), run in sequence.
+  - The plan kept the brief model on `gpt-5.4-mini`, reasoning that the words no longer pass through the model. That runs against John's "Opus for now"; I've offered him the routing change.
+  - "Whose words count" goes to a ruling in piece C's PR.
+- **LIN-4351 merged (`fdd57fe92`, PR #2345, 11:39 close-out).** The builder posted five departures from the plan ("where the code changed the plan"), each with its reason.
+  - At-merge reads sent: blind reads BK `aadb51d3` and BL `ab3a9400`, plus after-questions `a497f1ba` into implementation `b602d432`.
+  - LIN-4352 is building (since 12:00).
