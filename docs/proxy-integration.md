@@ -2043,6 +2043,8 @@ Content-Type: application/json
 | `priority` | int | No | Issue priority on Linear's **native** scale (descending urgency): `0` = No priority, `1` = Urgent, `2` = High, `3` = Medium, `4` = Low. Prefer `priorityLevel` below for a provider-neutral scale — sending both is refused `400` |
 | `priorityLevel` | int | No | Issue priority on the **canonical** scale (ascending, shared across every provider — LIN-2239): `0` = unknown, `1` = lowest … `4` = highest (Linear: `4` = Urgent, `1` = Low). Maps to the provider's native scale at the write boundary; mutually exclusive with `priority` |
 
+**The description is filed sealed (LIN-4352).** A non-empty `description` is stored inside the `## As asked` block (see Update Issue), byte for byte, so it is kept as the words as filed. A `description` that already contains a marker line (`## As asked` or the end sentence) is refused `422 AS_ASKED_IMMUTABLE`. On a provider whose description round trip cannot hold the block (Jira: its ADF conversion rewrites the end line), the description is filed exactly as sent, unsealed, and the server logs `[as-asked] seal skipped`.
+
 **Provider compatibility.** Not every optional field above is honoured by every provider. An unsupported one is **refused with `400`** rather than silently dropped on a false `201` (a behavior change — earlier versions of this endpoint accepted and silently discarded these fields):
 
 - **GitHub-backed workspaces** do not support `teamId`, `stateId`, `assigneeId`, `parentId`, `cycleId`, `priority`/`priorityLevel` (both map to the same provider capability).
@@ -2483,6 +2485,8 @@ Returns `201`:
 ```json
 { "id": "uuid", "status": "queued", "...": "...", "consumerLastSeenAt": null, "warning": "No consumer has ever polled this workspace — this dispatch was enqueued but may sit unclaimed until a runner starts." }
 ```
+
+**A ticket's first dispatch seals its description (LIN-4352).** A fresh dispatch that names an `issueIdentifier` seals that issue's description into the `## As asked` block when no dispatch row has ever named the issue (queue or history), the description is non-empty with no block, and it carries no `Implementation Plan` heading, session-fit phrase or `plan-review due:` line. It runs after every refusal above, within about 3 seconds, and never refuses or delays the enqueue beyond that: a failed or skipped seal is logged (`[as-asked] seal …`) and the dispatch is queued as usual. Every dispatch lane that names an issue does this (this route, `recommend-and-dispatch`, `autopilot/kickoff`, the app's dispatch and feedback).
 
 **This does not refuse the dispatch — it still enqueues.** A runner may come up later; the warning is read-only telemetry so you can tell "queued, nothing polling yet" apart from "queued, a runner will pick this up any second." The same `consumerLastSeenAt` stamp is also readable later, alongside a `consumerPollWarning` derived from live poll recency while the row is queued (LIN-3367), via `GET /api/proxy/dispatch/{id}` and `GET /api/proxy/dispatch` — see below.
 
