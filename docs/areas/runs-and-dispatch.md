@@ -23,11 +23,15 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - "This run's PR" is what the session reported, not the PR it mentioned most:
   `prUrlOfFeedback` (`lib/dispatch-wake.js`) reads a PR on a `DONE:` or `[done]` line
   before the `[done]` entry's `url`, which older runners filled by mention count. A build
-  that read a sibling's PR more often got that PR in its leftover prompt (LIN-4375).
+  that read a sibling's PR more often got that PR in its leftover prompt (LIN-4375). The
+  runner's `sessionPrs` uses the same order: newest line, then first PR on it.
 - Two `[done]` posts can reach a decide-then-enqueue at once, so a "no row yet" read is
   not a guard: claim first with a compare-and-set on the row (`claimLeftoverFor` in
   `lib/dispatch-store.js`, the `_mintWake` idiom). LIN-4373 relied on the read and could
   queue two leftover rows (LIN-4375).
+- A claim whose holder skips is given back on every path out (`releaseLeftoverClaim`).
+  The skip's own wake can be withdrawn on a transient fault for the re-report to retry,
+  and a stamp left in place made that re-report hold forever (LIN-4375 review).
 - Any session can park `[pending]` on CI and finish on a ci-wake `custom` row
   (`lib/ci-wake-sweep.js`). A rule keyed on the producing row's kind misses that ending:
   read the lineage instead (`_heldLeftoverOf`, `resolveFollowUpRoot`). LIN-4373 handled it
@@ -40,10 +44,10 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 ## Waiting
 
 - `lib/dispatch-leftover-hook.js`: a claim with no row. If the server dies between
-  `claimLeftoverFor` and the enqueue, the build's wake stays held and nothing releases
-  it: no `leftover` row exists to cancel or expire. A sweep that releases a claim older
-  than the queue TTL with no `leftover` row would close it. (LIN-4375, from LIN-4347's
-  review.)
+  `claimLeftoverFor` and the enqueue, or a release write fails, the build's wake stays
+  held and nothing releases it: no `leftover` row exists to cancel or expire. A sweep
+  that releases a claim older than the queue TTL with no `leftover` row would close it.
+  (LIN-4375, from LIN-4347's review.)
 - `lib/dispatch-wake.js`: the `DONE:` line is matched in two places with different rules:
   `REPORT_LINE_RE` here (case-sensitive, `[done]` too) and `DONE_LINE` in
   `lib/plan-review-round-trips.js` (case-insensitive). One shared pattern would keep

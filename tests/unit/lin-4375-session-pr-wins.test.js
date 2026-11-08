@@ -21,6 +21,7 @@ installHermeticLinearTransport();
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { createLeftoverStep } from '../../lib/dispatch-leftover-hook.js';
+import { enqueueFollowUp } from '../../lib/follow-up-dispatch.js';
 import { lineagePrUrl, LEFTOVERS_HEADING } from '../../lib/dispatch-leftover.js';
 import { prUrlOfFeedback } from '../../lib/dispatch-wake.js';
 
@@ -52,6 +53,16 @@ describe('LIN-4375 — prUrlOfFeedback: the session-reported PR wins', () => {
       { message: `DONE: opened ${READ_PR}` },
       { message: `DONE: superseded by ${OWN_PR}` }
     ]), OWN_PR);
+  });
+
+  test('two PRs on one DONE: line: the first named wins (simple-dispatcher sessionPrs reads the same one)', () => {
+    const LV = 'https://github.com/JKershaw/LinearViewer/pull/2360';
+    const SD = 'https://github.com/JKershaw/simple-dispatcher/pull/330';
+    assert.equal(prUrlOfFeedback([{ message: `DONE: opened ${LV} and ${SD}` }]), LV);
+  });
+
+  test('two DONE: lines in one message: the newest line wins, as across entries', () => {
+    assert.equal(prUrlOfFeedback([{ message: `DONE: opened ${READ_PR}\n\nDONE: superseded by ${OWN_PR}` }]), OWN_PR);
   });
 
   test('a PR mentioned mid-line beside the word DONE is not a report; only a line that starts with it is', () => {
@@ -108,8 +119,8 @@ async function runAndBuild(world) {
   return { a, b };
 }
 
-const post = (world, row, entry) =>
-  world.store.addFeedback(row._id, URL_KEY, entry, TOKEN, undefined, { leftoverHook: world.hook });
+const post = (world, row, entry, provision = undefined) =>
+  world.store.addFeedback(row._id, URL_KEY, entry, TOKEN, provision, { leftoverHook: world.hook });
 
 const all = (world) => [...world.collection._docs, ...world.historyCollection._docs];
 const wakesTo = (world, runId) => all(world).filter(d => d.kind === 'wake' && d.followUpTo === runId);
@@ -159,6 +170,60 @@ describe('LIN-4375 — two concurrent [done] posts on one build queue one leftov
 
     assert.equal(leftovers(world).length, 0);
     assert.equal(wakesTo(world, a._id).length, 1, 'one wake: the winner skipped, the loser held');
+  });
+
+  // The review's repro: two [done] posts in sequence, not concurrent. The first meets a
+  // correlated outage (an owner-check fault refuses the enqueue AND the declared-grant
+  // mint), so the hook skips and `_deliverWake` withdraws the wake for the runner's
+  // LIN-3805 re-report to retry. A claim left stamped would make that re-report lose
+  // to it and hold forever with no leftover row: the parent never wakes.
+  const transientMint = async () => ({ token: null, reason: 'grant-mint-transient:x' });
+  const healthyMint = async () => ({ token: 'tok' });
+
+  test('a claim winner that skipped releases its claim: after a withdrawn wake, the re-report queues one leftover row', async () => {
+    let enqueueFails = true;
+    const world = makeWorld({
+      enqueue: async (args) => enqueueFails
+        ? { status: 503, body: { code: 'OWNER_CHECK_UNAVAILABLE' } }
+        : enqueueFollowUp(args)
+    });
+    const { a, b } = await runAndBuild(world);
+
+    await post(world, b, DONE, transientMint);
+    assert.equal(wakesTo(world, a._id).length, 0, 'the transient mint withdrew the wake');
+    assert.equal(leftovers(world).length, 0);
+    assert.ok(world.logs.some(l => l.startsWith(`[leftover] skipped reason=enqueue-503`)), JSON.stringify(world.logs));
+
+    enqueueFails = false;
+    await post(world, b, DONE, healthyMint);
+    assert.ok(!world.logs.some(l => l.includes('claim-lost')), `no stale claim holds the re-report; logs ${JSON.stringify(world.logs)}`);
+    assert.equal(leftovers(world).length, 1, 'the re-report queues exactly one leftover row');
+    assert.equal(wakesTo(world, a._id).length, 0, 'and holds the build wake for it');
+  });
+
+  test('a claim winner that skipped releases its claim: when the re-report skips too, it wakes the parent once', async () => {
+    const world = makeWorld({ enqueue: async () => ({ status: 503, body: { code: 'OWNER_CHECK_UNAVAILABLE' } }) });
+    const { a, b } = await runAndBuild(world);
+
+    await post(world, b, DONE, transientMint);
+    assert.equal(wakesTo(world, a._id).length, 0, 'the transient mint withdrew the wake');
+
+    await post(world, b, DONE, healthyMint);
+    assert.equal(wakesTo(world, a._id).length, 1, `the re-report wakes the parent once; logs ${JSON.stringify(world.logs)}`);
+    assert.ok(!world.logs.some(l => l.includes('claim-lost')), JSON.stringify(world.logs));
+
+    await post(world, b, DONE, healthyMint);
+    assert.equal(wakesTo(world, a._id).length, 1, 'a further re-report adds no second wake');
+  });
+
+  test('releaseLeftoverClaim: a released claim can be won again; a release scoped to another workspace does nothing', async () => {
+    const world = makeWorld();
+    const { b } = await runAndBuild(world);
+    assert.equal(await world.store.claimLeftoverFor(URL_KEY, b._id), true);
+    await world.store.releaseLeftoverClaim('other', b._id);
+    assert.equal(await world.store.claimLeftoverFor(URL_KEY, b._id), false, 'another workspace cannot release it');
+    await world.store.releaseLeftoverClaim(URL_KEY, b._id);
+    assert.equal(await world.store.claimLeftoverFor(URL_KEY, b._id), true, 'released, the next claim wins');
   });
 
   test('claimLeftoverFor: the first claim wins, every later one loses', async () => {
