@@ -203,7 +203,9 @@ export function createShipBiscuitRoutes({
         let finishReason = null;
         await streamChat(
           buildEditorMessages(model),
-          { apiKey: apiKeyToUse, model: modelId, maxTokens, reasoning, temperature: 0.5,
+          // LIN-4358: assessEditorOutcome below judges a cut-off reply itself and
+          // throws, so this call takes partials.
+          { apiKey: apiKeyToUse, model: modelId, maxTokens, reasoning, temperature: 0.5, allowPartial: true,
             callMeta: { urlKey: workspace.urlKey, feature: 'ship-biscuit' } },
           (type, data) => {
             if (type === 'token' && data?.token) buffer += data.token;

@@ -40,8 +40,26 @@
     return window.api(recapUrl(urlKey, identifier, source), { on401: false });
   }
 
+  // LIN-4358: a generation that outlives the keepalive's first byte has already sent
+  // HTTP 200, so its failure arrives in the body with a `statusCode` field
+  // (lib/http-keepalive.js) and `window.api` resolves it. Throw it like any other error,
+  // or the panel draws an empty "fresh" recap.
   async function postRecap(urlKey, identifier, source) {
-    return window.api(recapUrl(urlKey, identifier, source), { method: 'POST', on401: false });
+    const body = await window.api(recapUrl(urlKey, identifier, source), { method: 'POST', on401: false });
+    if (body && Object.prototype.hasOwnProperty.call(body, 'statusCode')) {
+      const err = new Error(body.error || `HTTP ${body.statusCode}`);
+      err.status = body.statusCode;
+      err.body = body;
+      throw err;
+    }
+    return body;
+  }
+
+  // A cut-off answer (502 OUTPUT_TRUNCATED) names the model and where its tokens went in
+  // `message`; show that rather than the one-line summary in `error`.
+  function errorText(err) {
+    if (err && err.body && err.body.code === 'OUTPUT_TRUNCATED' && err.body.message) return err.body.message;
+    return err && err.message;
   }
 
   function renderItems(items, { marker, markerClass }) {
@@ -152,7 +170,7 @@
       const data = await postRecap(urlKey, identifier, source);
       applyState(container, renderFresh(data), 'fresh');
     } catch (err) {
-      applyState(container, renderError(err && err.message), 'error');
+      applyState(container, renderError(errorText(err)), 'error');
     }
     wireRefresh(container, urlKey, identifier, source);
   }
@@ -185,7 +203,7 @@
         applyState(container, renderMissing(), 'missing');
       }
     } catch (err) {
-      applyState(container, renderError(err && err.message), 'error');
+      applyState(container, renderError(errorText(err)), 'error');
     }
     wireRefresh(container, urlKey, identifier, source);
   }

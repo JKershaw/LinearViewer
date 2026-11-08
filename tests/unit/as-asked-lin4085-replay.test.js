@@ -43,7 +43,7 @@ function installModelStub(text) {
   globalThis.fetch = async (url, options) => {
     if (typeof url === 'string' && url.includes('openrouter.ai')) {
       async function* gen() {
-        yield new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`);
+        yield new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: text }, finish_reason: 'stop' }] })}\n\n`);
         yield new TextEncoder().encode('data: [DONE]\n\n');
       }
       return { ok: true, status: 200, body: gen(), text: async () => '', json: async () => ({}) };

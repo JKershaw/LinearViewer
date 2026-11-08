@@ -143,7 +143,7 @@ function installFetchStub(tokens, { ok = true, counter = null } = {}) {
       if (!ok) return { ok: false, status: 500, text: async () => 'boom', json: async () => ({}) };
       async function* gen() {
         for (const t of tokens) {
-          yield new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\n`);
+          yield new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: t }, finish_reason: 'stop' }] })}\n\n`);
         }
         yield new TextEncoder().encode('data: [DONE]\n\n');
       }
