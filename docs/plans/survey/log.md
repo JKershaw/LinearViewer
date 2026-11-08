@@ -2981,3 +2981,14 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - **~08:20 UTC, John applied the overnight suggestions:** structural-arm (LIN-4346), park (LIN-4369), accept-both (LIN-4347) and build-anyway (LIN-4358). A duplicate `lin4347-cuts` stays on LIN-4347's autopilot loop (`6c181a75`), so the same suggestion is posted there. **For the step-back:** the same ruling raised on two loops (the child session and its autopilot) asks John twice. This happened on `lin4353-done-when-miss` too.
 - **~08:30 UTC, ruling `lin4369-park-vs-arm3`:** my two suggestions conflicted. "Park" on `lin4369-after-arm2` was meant as "keep #2356 as evidence", but its label also parked LIN-4346, against the structural-arm I suggested on the parent. **My error: I read an option by its first half.** Suggested **structural-arm**. Lesson: read every option label whole before suggesting; when two rulings touch one move, check that the suggestions agree.
 - **~08:40 UTC, John: keep going, and review once round 1 has landed.** Remaining: LIN-4346 (arm 3, then 4369 and 4370), LIN-4358 (building), LIN-4347 (second area read retried after a blocked session; possibly one more tidy), LIN-4348 (after 4358), LIN-4349 (Surveyed now), LIN-4350 (last). Then a Periodical over the round's window and a short results note for the review.
+- **~08:50 UTC: the full LIN-4347 area read is mixed, mixed (BY; BZ retried after a blocked session).** It's the first area this week where a tidy-after didn't turn it better.
+  - Both credit the series for picking up after itself, with duplicates removed in the next merge.
+  - Most of the cost is in `dispatch-store.js` (4,129 → 4,540 lines, a `release` flag through `_deliverWake`), and **an area note now defends that code staying put: notes can harden into rules.**
+  - The two repos agree only in prose: README drift, a second `DONE:` matcher in SD, and "the session's own PR" tied only by comments.
+  - `leftoverClaimedAt` is undeclared; registry ownership is inverted (the path constant lives in scripts).
+  - **Second tidy-after LIN-4377 filed and Surveyed** (re-examine the defending note rather than obey it). Prompt bytes +6.5 KB, unpaid, went to LIN-4350.
+- **LIN-4349's Surveys:**
+  - The two-stage contract exists to mint; nothing dispatches Periodicals; there's no template→area map; the order is prose in four docs.
+  - A rank under the stack starves while a Backlog exists; the notes are near their cap; the Surveys are code-only.
+  - **Output first, then trigger, then rank.** Landed work feeds the existing due fold, with no sixth entrance.
+- **Size call** (parroted: John's 2 Nov design cited; the film lives in reports; a larger tidy goes to a person as a size of move; the floor stays where it is unless ruled; "Surveys read notes" would be a ruling) and **kickoff** (autopilot, Opus).
