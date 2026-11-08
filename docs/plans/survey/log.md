@@ -3092,3 +3092,7 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **LIN-4345's seal held:** filing with a hand-written "## As asked" was refused ("only code writes those"). I refiled without it, and Harbour sealed the words itself.
   - **The Surveys:** `26ea49ac` (task) and `2430d226` (place).
   - **For the discussion:** settings in general.
+- **15:00 UTC: LIN-4393's Surveys, size call and kickoff.** Both Surveys found the same trap. Hands-off running depends only on John's stored value. The built-in fallback is "ask", so a plain deletion would stop every task for a size ruling while every Settings test still passed. What has to survive is err larger as Harbour's behaviour. They also found that John's old change-log row would offer a broken Undo.
+  - **The parrot cut the size call a second time.** It removed my list of places to change (how), my chosen fix for the old row ("without Undo"), a "code ends smaller" condition John never set, and a design call on the cut rule.
+  - **Kicked off** as autopilot `aac50384` on opus.
+  - **For the step-back:** both parrot passes today cut how out of my drafts, the habit behind the setting. The parrot is catching it now because I asked it to look for how specifically, not only for drift from John's words.
