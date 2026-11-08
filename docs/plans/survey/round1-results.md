@@ -27,15 +27,34 @@ These are blind reads of each area's code: two readers on Opus at high effort, w
 | LIN-4347 leftovers and notes | mixed, mixed | better, better | 2 (LIN-4376, LIN-4377) | 180 |
 | LIN-4378 rate limit | mixed, mixed | better, better | 1 (rode the close-out) | 24 |
 | LIN-4358 models from catalogue | better, better | n/a | 0 | 60 |
-| LIN-4349 Periodicals | slightly better, slightly better | n/a | 0 | 83 |
-| LIN-4346 size of the move | mixed, mixed | mixed, mixed | 1 (LIN-4393) | 211+ |
+| LIN-4349 Periodicals | slightly better, slightly better | n/a | 0 (its own review corrected the tail in place) | 95 |
+| LIN-4346 size of the move | mixed, mixed | mixed, mixed | 1 (LIN-4393) | 215 |
 
-**Five areas ended better and one ended mixed.** The total is about $857 across 36 tickets, including pieces, tidies and two Periodicals. The blind reads themselves aren't counted.
+**Five areas ended better and one ended mixed.** The total is about $880 across 37 tickets, including pieces, tidies and three Periodicals ($25 between them). The blind reads themselves aren't counted. The figures are Harbour's own `/cost`.
 
 Patterns:
 - **Size and result move in opposite directions.** LIN-4378, kept small on purpose, was the cheapest area and read better. LIN-4346 was the largest move (four pieces plus a pre-registered replay; the replay alone cost $111) and the only area that ended mixed.
 - **One leftover appeared in every read:** ticket and ruling history written into code comments. It's the loop's own habit, and it comes back after each cleanup.
 - **The leftovers that remain are recorded,** as Waiting entries in the area notes, not as tickets.
+
+## The independent check: the round's Periodical
+
+The Stability Review (LIN-4394, run 5, advisory) read the project's trajectory over the round's window: 114 landings in 4.45 days, compared with its previous run on 4 November. Its headline:
+
+> **Not converging yet. The rate of change went up in this window, and the trajectory that tracks it most directly (CI wall time, driven by suite growth) is still climbing.** Nothing here is spiralling in the sense of a feature built and then reversed at scale, and rewriting has eased. But the project is growing faster than it was in run 4.
+
+- **Converging:** rewriting in place fell from 2.7 to 0.67 events a day, with no repeats. The delete/add ratio on source fell from 0.63 to 0.35. The task page is settling in size.
+- **Not converging:**
+  - CI median time went from 7.87 to 8.55 minutes, and runtime tests from 22,757 to 24,772 in four days.
+  - The landing rate went from 17.1 to 25.6 a day.
+  - Prompt-contract churn: 28% of landings touch it (the previous run saw 13%), and the size-ceiling test was edited in 19 of 114 landings.
+  - `docs/reviews` grew 6.5 MB a day and is now 38% of repository bytes. With `docs/papers`, the evidence trees took 93% of the window's growth.
+
+The blind reads ask whether each area ended in better shape, and five of six did. The Stability Review asks whether the whole project is settling, and it isn't yet. Both can be true: each change leaves its area tidier, while the project as a whole grows faster, carries more tests, and holds more evidence and more prompt text. That's the step-back point for the discussion. **Cleaner-than-it-started holds per move. Converging doesn't yet hold for the whole.**
+
+The run itself also showed two gaps:
+- Its orchestrator waited about an hour on a worker that had already finished, until a failsafe re-ask woke it.
+- The look-first route then ran both Surveys on an advisory review ticket before planning it. That's cheap ($7 for the whole run) but probably not needed.
 
 ## The spiral, and how it was reined in
 
@@ -47,7 +66,7 @@ Patterns:
   - a check that fails twice goes to John;
   - "err larger" means one fuller change, not more tickets;
   - LIN-4348 and LIN-4350 parked.
-- **After that,** every tidy rode its own ticket's close-out or a single ticket. Three Periodicals ran under the new contract (LIN-4387, LIN-4391, LIN-4394) and none minted a ticket.
+- **After that,** every tidy rode its own ticket's close-out or a single ticket. Three Periodicals ran under the new contract (LIN-4387, LIN-4391, LIN-4394) and none minted a ticket. The last was picked by autopilot's own order ("oldest-last-run landed lane").
 - **What still leaked:** Harbour's own close-outs filed four tickets during the round (LIN-4388, 4389, 4390, 4392). The counterweights lived in this session's briefs, not in the product, so stages that never read those briefs still filed finds as tickets.
 
 ## How Harbour came to ship an unusable setting
@@ -72,4 +91,5 @@ The fix went through the loop. A ticket carried John's words. The parrot was tol
 6. **Evidence in git.** Two Periodicals today committed about 87k and 118k lines of raw evidence; `docs/reviews/` is 77 MB of a 210 MB tree.
 7. **Engineering calls raised as rulings,** and rulings asked more than once about one blocker (three deploy rulings).
 8. **The four session-filed tickets** (LIN-4388, 4389, 4390, 4392): run them, fold them into the notes, or let them wait?
-9. **Does a Survey pair earn its cost on every ticket,** or would one look do for small moves?
+9. **Does a Survey pair earn its cost on every ticket,** or would one look do for small moves? (It also ran on a Periodical's review ticket.)
+10. **Per-move better, whole not converging** (the Stability Review): CI time, suite growth, prompt churn and evidence weight. Which of these is Harbour's job to bend, and how would we know it was?
