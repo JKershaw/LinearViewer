@@ -10,8 +10,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - Grounding note lists in `lib/prompt-formatters.js` are shared (`WORK` serves several
   stages; `GROUNDING_NOTES` is the unknown-kind fallback): give one stage its own list
   rather than edit a shared one (LIN-4371).
-- Keep the scoping and the two Survey renders byte-identical unless the ticket is about
-  them: replays compare them byte for byte (LIN-4369).
+- Keep scoping and both Survey renders byte-identical unless the ticket is about them:
+  replays compare them byte for byte (LIN-4369).
 - `lib/prompt-template-defs.js` and the budget test change in almost every merge: rebase,
   then re-measure. Its fixture passes no context, so it measures a prompt's empty-context
   branch: dropping one can raise a ceiling while real renders shrink (LIN-4393). Measure.
@@ -21,16 +21,16 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   (a cycle). Shared words live in an import-free leaf under `lib/prompts/` both import, as
   `lib/prompts/leftover-words.js` holds `LEFTOVER_RULE` (LIN-4376) and
   `lib/prompts/autopilot-precedence.js` autopilot's order: never restate a rank (LIN-4382).
-- Prompt words that ban a kind of how do not hold it. Two replay arms of scoping's record
-  (LIN-4369) banned definitions and lists in prose; runs wrote them anyway. The guard in
-  `lib/size-of-move.js` sees only code-shaped how, so arm 3 holds the shape there: four
-  lines, any other refused (`SIZE_RECORD_SHAPE`). Hold a shape in code or a test.
+- Prompt words that ban a kind of how do not hold it: in LIN-4369's replay, runs wrote the
+  banned how anyway, and closing one channel moved it into the next (done-means, comments,
+  the `[done]` report). Hold a shape in code or a test, as `SIZE_RECORD_SHAPE` in
+  `lib/size-of-move.js` does (arm 3), or hold the reader's side (arm 4).
 - A stage lead's first sentence is the selector's purpose line. Changing it changes the
   routing prompt: regenerate the router snapshots and `scripts/eval/meta-prompt.baseline.txt`,
   and move the routing ceiling (LIN-4369).
-- In LIN-4369's replay, closing one channel moved the how into the next: done-means,
-  definitions, comments, the `[done]` report. Close every channel a stage writes to, or
-  hold the reader's side (arm 4).
+- `lib/prompts/autopilot-precedence.js`: before prompt text routes round a server guard,
+  check real rows reach it: scoped runs carry `maxTasks: null`, so P4's detour round
+  `guardBudget` cost a session (LIN-4349).
 - Model facts come from the OpenRouter catalog: add no model list or rate (LIN-4358).
   Tests seed `tests/unit/helpers/pinned-catalog.js`.
 
