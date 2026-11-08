@@ -39,6 +39,15 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 
 ## Waiting
 
+- `lib/dispatch-leftover-hook.js`: a claim with no row. If the server dies between
+  `claimLeftoverFor` and the enqueue, the build's wake stays held and nothing releases
+  it: no `leftover` row exists to cancel or expire. A sweep that releases a claim older
+  than the queue TTL with no `leftover` row would close it. (LIN-4375, from LIN-4347's
+  review.)
+- `lib/dispatch-wake.js`: the `DONE:` line is matched in two places with different rules:
+  `REPORT_LINE_RE` here (case-sensitive, `[done]` too) and `DONE_LINE` in
+  `lib/plan-review-round-trips.js` (case-insensitive). One shared pattern would keep
+  "what the session reported" one rule. (LIN-4375 leftovers.)
 - `lib/dispatch-factory.js`: tests `provider.name === 'linear'` beside
   `isHermeticTestToken`, because of a test-only transport. (John, 7 Nov, on LIN-4347.)
 - `lib/effort-readout.js`: still outputs the deleted name `GATE_DUE_MARKER` (replaced by
