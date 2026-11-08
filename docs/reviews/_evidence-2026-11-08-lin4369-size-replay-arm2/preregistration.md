@@ -95,3 +95,18 @@ own piece that may stop; and the Surveys' cost.
 The result is recorded as it is. Per the ruling, there is no third arm: the run stops, piece 4
 (LIN-4370) stays unstarted, and both arms' evidence is handed back to John on LIN-4346 and
 LIN-4369. Arm 1's evidence stays in the PR either way.
+
+## Addendum: a setup error on the LIN-4178 runs (written before any rerun)
+
+Arm 1's LIN-4178 run directories held the parent's description as `parent-LIN-4176.md` beside
+`ticket.md`, and `ticket.md` points to it. Arm 2's setup left it out of `a01`, `a07` and
+`a12`. That is an input this file promises ("LIN-4178's parent LIN-4176 as arm 1 read it"), so
+the three are **void, whatever they wrote**, and are not scored. Found when `a01` finished and
+said the file was missing; `a07` and `a12` were stopped unfinished. The decision to void all
+three does not depend on any output.
+
+They are replaced by `a13`, `a14` and `a15` (cells `scoping-4178-1`, `-2`, `-3`), set up as
+arm 1's: the same prompt, `ticket.md` and `parent-LIN-4176.md` (byte-identical to arm 1's
+`tickets/parent-4176.md`), and a fresh clone at `10b2c82fb`. Every other run's inputs match arm
+1's run directories (prompt, `ticket.md`, code; nothing else). `a01`'s output is kept with the
+evidence, marked void. The criteria, the judge and the count (12 scored runs) are unchanged.
