@@ -11,10 +11,16 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - Every way a row leaves the queue, other than a take, archives through `_archiveItem` in
   `lib/dispatch-store.js`. Something that must happen when a row is cancelled or expires
   belongs there; a new exit must archive through it too.
-- `addFeedback`'s wake block holds guards from LIN-1059, 1165, 1357, 2297, 4080 and 4166,
-  in an order that matters. Move it only as a whole and keep the existing wake suites
-  passing unchanged.
-- Row-only kinds such as `wake` stay out of `DISPATCH_KINDS` (`lib/prompt-templates.js`),
+- The wake path is `_planWake` (decide) then `_deliverWake` (deliver) in
+  `lib/dispatch-store.js`, shared by `addFeedback` and the held-wake release (LIN-4373). They
+  hold guards from LIN-1059, 1165, 1357, 2297, 4080 and 4166, in an order that matters.
+  Change them only as a whole and keep the existing wake suites passing unchanged. Two
+  censuses pin the function that writes a wake (`lin-3134-declared-mint-census`,
+  `lin-4080-addItem-census`); moving the write means updating their pins.
+- A parent wake can be held (LIN-4373): a `leftover` row's `heldWakeFor` is the whole hold
+  record, released by its own terminal or by `_archiveItem` on cancel or expiry. A new way
+  for a held wake to end must release it under the build's guard key, so it stays once.
+- Row-only kinds (`wake`, `leftover`) stay out of `DISPATCH_KINDS` (`lib/prompt-templates.js`),
   so no `/dispatch` caller can create one.
 - Price a pulled extra like any other piece. Making the cost read load its own inputs
   rode along with LIN-4201 and did not land there; it landed as its own piece, LIN-4226.

@@ -335,6 +335,10 @@
     "disposition": "global-only",
     "exception": "kpi-cache"
   },
+  "server.js::leftoverStep": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level); the workspace resolver it wraps is reset on every call (LIN-4373)."
+  },
   "server.js::listAuthorizedAccountConnectionsFor": {
     "disposition": "not-state",
     "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
