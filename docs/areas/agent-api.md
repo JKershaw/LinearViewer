@@ -28,3 +28,8 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
 - `lib/proxy-instructions.js`: the rate-limit rule (60/min per token; on a 429 wait
   `Retry-After`) is restated in about eight places: here three times, both kickoff prompts,
   and three docs. One sentence, quoted from one place. (Area reads CE/CF, LIN-4378.)
+- `routes/proxy.js`: the `proxyLimiter` window (60 seconds) and the runner broker's wait cap
+  (`EXCHANGE_MAX_WAIT_SECONDS` in `lib/runner-kit/broker.mjs`) are matched by a comment only.
+  No test pins one against the other, so a change to either can silently break the broker's
+  retry budget. A test that reads the limiter's `windowMs` beside the contract's exchange cap row (`lib/runner-kit/contract.json`) would move the match out of comments. (Seams &
+  Tangles, 8 Nov.) `docs/reviews/seams-tangles-review-2026-11-08-run10.md`
