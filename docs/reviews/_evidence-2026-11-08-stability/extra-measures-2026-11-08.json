@@ -1,0 +1,120 @@
+{
+ "pins": {
+  "LV": "9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f",
+  "SD": "5d8489e7fd8434f0e69af7df11a3746790abbe64"
+ },
+ "prompt_contract": {
+  "run3 6be148a8..f25aa127": {
+   "landings": 141,
+   "touching": 12,
+   "share": 0.085,
+   "added_lines": 204
+  },
+  "run4 f25aa127..5334c81a": {
+   "landings": 243,
+   "touching": 32,
+   "share": 0.132,
+   "added_lines": 510
+  },
+  "run5 delta 5334c81a..pin": {
+   "landings": 114,
+   "touching": 32,
+   "share": 0.281,
+   "added_lines": 1299
+  },
+  "run5 rolling f25aa127..pin": {
+   "landings": 357,
+   "touching": 64,
+   "share": 0.179,
+   "added_lines": 1809
+  }
+ },
+ "review_weight": {
+  "run3 6be148a8..f25aa127": {
+   "landings": 141,
+   "review_landings": 7,
+   "review_added_lines": 43355,
+   "review_added_per_landing": 6194
+  },
+  "run4 f25aa127..5334c81a": {
+   "landings": 243,
+   "review_landings": 44,
+   "review_added_lines": 209016,
+   "review_added_per_landing": 4750
+  },
+  "run5 delta 5334c81a..pin": {
+   "landings": 114,
+   "review_landings": 20,
+   "review_added_lines": 625411,
+   "review_added_per_landing": 31271
+  },
+  "run5 rolling f25aa127..pin": {
+   "landings": 357,
+   "review_landings": 64,
+   "review_added_lines": 834427,
+   "review_added_per_landing": 13038
+  },
+  "blob_bytes_docs_reviews": {
+   "f25aa127": {
+    "review_bytes": 27540751,
+    "review_files": 943,
+    "repo_blob_bytes": 132330777,
+    "share_of_repo": 0.208
+   },
+   "5334c81a": {
+    "review_bytes": 55219029,
+    "review_files": 2077,
+    "repo_blob_bytes": 168663679,
+    "share_of_repo": 0.327
+   },
+   "pin": {
+    "review_bytes": 84360955,
+    "review_files": 3648,
+    "repo_blob_bytes": 219666421,
+    "share_of_repo": 0.384
+   }
+  }
+ },
+ "sd": {
+  "run3 bb1da78..67ff5c3b": {
+   "landings": 35,
+   "by_day": {
+    "2026-10-23": 3,
+    "2026-10-24": 3,
+    "2026-10-29": 1,
+    "2026-10-30": 4,
+    "2026-10-31": 7,
+    "2026-11-01": 3,
+    "2026-11-03": 7,
+    "2026-11-04": 7
+   },
+   "test_added": 12634,
+   "src_added_approx": 914
+  },
+  "run4 67ff5c3b..pin": {
+   "landings": 20,
+   "by_day": {
+    "2026-11-04": 13,
+    "2026-11-08": 7
+   },
+   "test_added": 32071,
+   "src_added_approx": 310
+  },
+  "rolling bb1da78..pin": {
+   "landings": 55,
+   "by_day": {
+    "2026-10-23": 3,
+    "2026-10-24": 3,
+    "2026-10-29": 1,
+    "2026-10-30": 4,
+    "2026-10-31": 7,
+    "2026-11-01": 3,
+    "2026-11-03": 7,
+    "2026-11-04": 20,
+    "2026-11-08": 7
+   },
+   "test_added": 44705,
+   "src_added_approx": 1224
+  }
+ }
+}

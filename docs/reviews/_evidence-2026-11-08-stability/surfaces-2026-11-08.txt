@@ -1,0 +1,47 @@
+== window 5334c81a7207b9f2cc85ca429a2c6b18e1635c0e..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f
+.github/ landings=0 added_lines=0
+docs/plans/ landings=9 added_lines=4040
+public/ landings=20 added_lines=857
+tests/ landings=88 added_lines=73448
+lib/ landings=55 added_lines=8812
+routes/ landings=27 added_lines=841
+scripts/ landings=27 added_lines=1581
+docs/reviews landings=20
+experiments/**/replay/work landings=0
+== window f25aa127..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f
+.github/ landings=3 added_lines=21
+docs/plans/ landings=18 added_lines=5592
+public/ landings=89 added_lines=11017
+tests/ landings=273 added_lines=247357
+lib/ landings=197 added_lines=30963
+routes/ landings=101 added_lines=9787
+scripts/ landings=63 added_lines=3375
+docs/reviews landings=64
+experiments/**/replay/work landings=0
+== Periodicals, dispatch-store, server.js (delta window 5334c81a7207b9f2cc85ca429a2c6b18e1635c0e..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f)
+lib/periodicals.js touches=7 lines@5334c81a7207b9f2cc85ca429a2c6b18e1635c0e=1151 lines@9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f=1353
+lib/dispatch-store.js touches=11 lines@5334c81a7207b9f2cc85ca429a2c6b18e1635c0e=3967 lines@9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f=4530
+server.js touches=7 lines@5334c81a7207b9f2cc85ca429a2c6b18e1635c0e=4668 lines@9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f=4757
+lib/prompt-template-defs.js touches=15 lines@5334c81a7207b9f2cc85ca429a2c6b18e1635c0e=1160 lines@9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f=1271
+public/prompt-section.js touches=7 lines@5334c81a7207b9f2cc85ca429a2c6b18e1635c0e=2867 lines@9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f=2967
+== tests/ file and test-call growth at pins
+f25aa127 unit_files=882 static_test_calls=1194
+5334c81a7207b9f2cc85ca429a2c6b18e1635c0e unit_files=1149 static_test_calls=1624
+9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f unit_files=1227 static_test_calls=1662
+== cluster (Home / task page) unique landings, delta and rolling; docs/areas, fixtures, budget test, proxy, runner, source-map, llms
+cluster unique landings 5334c81a7207b9f2cc85ca429a2c6b18e1635c0e..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f: 14
+docs/areas landings 5334c81a7207b9f2cc85ca429a2c6b18e1635c0e..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f: 20
+tests/fixtures landings 5334c81a7207b9f2cc85ca429a2c6b18e1635c0e..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f: 23
+prompt-size-budget test landings 5334c81a7207b9f2cc85ca429a2c6b18e1635c0e..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f: 19
+routes/proxy.js landings 5334c81a7207b9f2cc85ca429a2c6b18e1635c0e..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f: 7
+lib/runner-kit/runner.mjs landings 5334c81a7207b9f2cc85ca429a2c6b18e1635c0e..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f: 1
+source-map.md landings 5334c81a7207b9f2cc85ca429a2c6b18e1635c0e..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f: 29
+llms.txt landings 5334c81a7207b9f2cc85ca429a2c6b18e1635c0e..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f: 9
+cluster unique landings f25aa127..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f: 62
+docs/areas landings f25aa127..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f: 20
+tests/fixtures landings f25aa127..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f: 75
+prompt-size-budget test landings f25aa127..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f: 24
+routes/proxy.js landings f25aa127..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f: 20
+lib/runner-kit/runner.mjs landings f25aa127..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f: 6
+source-map.md landings f25aa127..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f: 89
+llms.txt landings f25aa127..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f: 49

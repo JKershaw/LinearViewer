@@ -1,0 +1,343 @@
+{
+ "repro_weeks": {
+  "2026-W40": 141,
+  "2026-W41": 104,
+  "2026-W42": 98,
+  "2026-W43": 73,
+  "2026-W44": 0,
+  "2026-W45": 0
+ },
+ "run3_window_6be148a8_f25aa127": 141,
+ "window_f25aa127_HEAD_landings": 114,
+ "window_commits_all": 452,
+ "window_first_date": "2026-11-04T08:24:45Z",
+ "window_last_date": "2026-11-08T17:10:36Z",
+ "daily_landings": {
+  "2026-11-04": 13,
+  "2026-11-05": 42,
+  "2026-11-06": 21,
+  "2026-11-07": 11,
+  "2026-11-08": 27
+ },
+ "weekly_window": {
+  "2026-W45": 114
+ },
+ "buckets_window": {
+  "docs": {
+   "added": 5141,
+   "deleted": 426,
+   "files": 46
+  },
+  "src": {
+   "added": 10635,
+   "deleted": 3697,
+   "files": 168
+  },
+  "tests": {
+   "added": 29203,
+   "deleted": 8053,
+   "files": 289
+  },
+  "scripts": {
+   "added": 1578,
+   "deleted": 206,
+   "files": 16
+  },
+  "excluded": {
+   "added": 714871,
+   "deleted": 5137,
+   "files": 2677
+  },
+  "research": {
+   "added": 42,
+   "deleted": 3,
+   "files": 2
+  }
+ },
+ "buckets_rolling": {
+  "docs": {
+   "added": 8547,
+   "deleted": 939,
+   "files": 82
+  },
+  "src": {
+   "added": 52802,
+   "deleted": 30373,
+   "files": 475
+  },
+  "tests": {
+   "added": 103671,
+   "deleted": 21258,
+   "files": 872
+  },
+  "scripts": {
+   "added": 3365,
+   "deleted": 287,
+   "files": 43
+  },
+  "excluded": {
+   "added": 1121505,
+   "deleted": 7747,
+   "files": 4552
+  },
+  "research": {
+   "added": 2421,
+   "deleted": 38,
+   "files": 19
+  },
+  "ci-config": {
+   "added": 21,
+   "deleted": 6,
+   "files": 2
+  },
+  "generated": {
+   "added": 33486,
+   "deleted": 0,
+   "files": 13
+  }
+ },
+ "rolling_landings": 357,
+ "run4_window_repro_f25aa127_5334c81a": 243,
+ "daily_rolling": {
+  "2026-10-21": 12,
+  "2026-10-23": 40,
+  "2026-10-24": 41,
+  "2026-10-25": 46,
+  "2026-10-26": 17,
+  "2026-10-29": 7,
+  "2026-10-30": 12,
+  "2026-10-31": 21,
+  "2026-11-01": 6,
+  "2026-11-02": 26,
+  "2026-11-03": 10,
+  "2026-11-04": 18,
+  "2026-11-05": 42,
+  "2026-11-06": 21,
+  "2026-11-07": 11,
+  "2026-11-08": 27
+ },
+ "buckets_run3_corrected": {
+  "excluded": {
+   "added": 73157,
+   "deleted": 124,
+   "files": 124
+  },
+  "tests": {
+   "added": 25192,
+   "deleted": 2388,
+   "files": 233
+  },
+  "docs": {
+   "added": 1959,
+   "deleted": 137,
+   "files": 26
+  },
+  "src": {
+   "added": 24740,
+   "deleted": 21210,
+   "files": 198
+  },
+  "scripts": {
+   "added": 3888,
+   "deleted": 102,
+   "files": 38
+  },
+  "ci-config": {
+   "added": 12,
+   "deleted": 1,
+   "files": 1
+  },
+  "research": {
+   "added": 513995,
+   "deleted": 2,
+   "files": 570
+  }
+ },
+ "buckets_prior30_09-12..10-12": {
+  "excluded": {
+   "added": 271038,
+   "deleted": 9030,
+   "files": 1095
+  },
+  "tests": {
+   "added": 141716,
+   "deleted": 27378,
+   "files": 669
+  },
+  "src": {
+   "added": 63866,
+   "deleted": 22408,
+   "files": 358
+  },
+  "docs": {
+   "added": 9254,
+   "deleted": 1236,
+   "files": 42
+  },
+  "scripts": {
+   "added": 25673,
+   "deleted": 940,
+   "files": 214
+  },
+  "ci-config": {
+   "added": 51,
+   "deleted": 5,
+   "files": 2
+  }
+ },
+ "hot_src_scripts_ge6": [
+  {
+   "file": "scripts/prompt-template-change-log.md",
+   "touches": 20,
+   "lines_at_f25aa127": 347,
+   "lines_at_HEAD": 560
+  },
+  {
+   "file": "lib/proxy-instructions.js",
+   "touches": 15,
+   "lines_at_f25aa127": 1183,
+   "lines_at_HEAD": 1312
+  },
+  {
+   "file": "lib/prompt-template-defs.js",
+   "touches": 15,
+   "lines_at_f25aa127": 1233,
+   "lines_at_HEAD": 1271
+  },
+  {
+   "file": "routes/proxy-compute.js",
+   "touches": 14,
+   "lines_at_f25aa127": 1597,
+   "lines_at_HEAD": 1682
+  },
+  {
+   "file": "lib/dispatch-entrance.js",
+   "touches": 12,
+   "lines_at_f25aa127": 1812,
+   "lines_at_HEAD": 2057
+  },
+  {
+   "file": "lib/dispatch-store.js",
+   "touches": 11,
+   "lines_at_f25aa127": 3050,
+   "lines_at_HEAD": 4530
+  },
+  {
+   "file": "lib/completion-signals.js",
+   "touches": 9,
+   "lines_at_f25aa127": 326,
+   "lines_at_HEAD": 354
+  },
+  {
+   "file": "public/llms.txt",
+   "touches": 9,
+   "lines_at_f25aa127": 788,
+   "lines_at_HEAD": 845
+  },
+  {
+   "file": "routes/proxy.js",
+   "touches": 7,
+   "lines_at_f25aa127": 1614,
+   "lines_at_HEAD": 1676
+  },
+  {
+   "file": "lib/periodicals.js",
+   "touches": 7,
+   "lines_at_f25aa127": 1145,
+   "lines_at_HEAD": 1353
+  },
+  {
+   "file": "server.js",
+   "touches": 7,
+   "lines_at_f25aa127": 4657,
+   "lines_at_HEAD": 4757
+  },
+  {
+   "file": "routes/proxy-writes.js",
+   "touches": 7,
+   "lines_at_f25aa127": 747,
+   "lines_at_HEAD": 908
+  },
+  {
+   "file": "lib/proxy-preamble.js",
+   "touches": 7,
+   "lines_at_f25aa127": 822,
+   "lines_at_HEAD": 931
+  },
+  {
+   "file": "public/question-cards.js",
+   "touches": 7,
+   "lines_at_f25aa127": 312,
+   "lines_at_HEAD": 550
+  },
+  {
+   "file": "public/prompt-section.js",
+   "touches": 7,
+   "lines_at_f25aa127": 1479,
+   "lines_at_HEAD": 2967
+  },
+  {
+   "file": "lib/recommendation-facts.js",
+   "touches": 6,
+   "lines_at_f25aa127": 652,
+   "lines_at_HEAD": 718
+  }
+ ],
+ "rewrite_events": [
+  {
+   "sha": "bad9d719",
+   "date": "2026-11-08",
+   "file": "lib/pricing-conformance-sweep.js",
+   "added": 81,
+   "deleted": 194,
+   "prev_lines": 253,
+   "subject": "LIN-4358: model facts from the OpenRouter catalog, not hand lists (#2367)"
+  },
+  {
+   "sha": "526bca66",
+   "date": "2026-11-08",
+   "file": "scripts/code-shape/areas.json",
+   "added": 0,
+   "deleted": 86,
+   "prev_lines": 86,
+   "subject": "LIN-4371: area notes (1/3, LinearViewer): product-owned area registry, notes with guard te"
+  },
+  {
+   "sha": "2ee4e600",
+   "date": "2026-11-04",
+   "file": "lib/founder-lookup.js",
+   "added": 0,
+   "deleted": 61,
+   "prev_lines": 61,
+   "subject": "LIN-4201: the cost read sums request records (records-first cutover, LIN-4195 piece 4) (#2"
+  }
+ ],
+ "rewrite_files_with_repeats": {},
+ "short_lived_src": {},
+ "stagnation": {
+  "candidates_ge4_0401_0625": 110,
+  "present_at_f25aa127": 95,
+  "silent_since_0812_at_HEAD": [
+   "lib/harbour-spawn.js",
+   "lib/providers/registry.js",
+   "lib/render-custom-prompts.js"
+  ],
+  "silent_since_0812_at_f25aa127": 10
+ },
+ "review_layer": {
+  "prior30_touching": 19,
+  "run3_window_touching": 7,
+  "window_touching": 20,
+  "window_weekly": {
+   "2026-W45": 20
+  },
+  "window_day_counts": {
+   "2026-11-04": 6,
+   "2026-11-05": 6,
+   "2026-11-06": 2,
+   "2026-11-07": 3,
+   "2026-11-08": 3
+  },
+  "window_reviews_lines_added": 625411
+ }
+}

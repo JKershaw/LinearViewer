@@ -1,0 +1,352 @@
+{
+ "range": "f25aa127..5334c81a7207b9f2cc85ca429a2c6b18e1635c0e",
+ "landings": 243,
+ "events": 38,
+ "whole_file": 28,
+ "in_place": 10,
+ "repeats_in_place": {},
+ "list": [
+  {
+   "sha": "72305215",
+   "date": "2026-11-04",
+   "file": "lib/llm-call-log.js",
+   "prev_lines": 305,
+   "deleted": 193,
+   "added": 71,
+   "whole_file": false
+  },
+  {
+   "sha": "72305215",
+   "date": "2026-11-04",
+   "file": "lib/task-cost.js",
+   "prev_lines": 33,
+   "deleted": 33,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "10b2c82f",
+   "date": "2026-11-03",
+   "file": "lib/task-cost.js",
+   "prev_lines": 207,
+   "deleted": 198,
+   "added": 24,
+   "whole_file": false
+  },
+  {
+   "sha": "30db2052",
+   "date": "2026-11-02",
+   "file": "lib/plan-fee-config.js",
+   "prev_lines": 20,
+   "deleted": 20,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "30db2052",
+   "date": "2026-11-02",
+   "file": "lib/terminal-marked-task-cost.js",
+   "prev_lines": 689,
+   "deleted": 418,
+   "added": 103,
+   "whole_file": false
+  },
+  {
+   "sha": "30db2052",
+   "date": "2026-11-02",
+   "file": "lib/weekly-budget.js",
+   "prev_lines": 225,
+   "deleted": 196,
+   "added": 13,
+   "whole_file": false
+  },
+  {
+   "sha": "b72fadce",
+   "date": "2026-10-26",
+   "file": "lib/model-routing-summary.js",
+   "prev_lines": 48,
+   "deleted": 24,
+   "added": 27,
+   "whole_file": false
+  },
+  {
+   "sha": "74ad4f4c",
+   "date": "2026-10-26",
+   "file": "public/task-chat.js",
+   "prev_lines": 458,
+   "deleted": 420,
+   "added": 449,
+   "whole_file": false
+  },
+  {
+   "sha": "dfeabc20",
+   "date": "2026-10-25",
+   "file": "lib/components/settings-change-panel.js",
+   "prev_lines": 59,
+   "deleted": 59,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "dfeabc20",
+   "date": "2026-10-25",
+   "file": "public/settings-models.js",
+   "prev_lines": 121,
+   "deleted": 71,
+   "added": 6,
+   "whole_file": false
+  },
+  {
+   "sha": "d53bb5bc",
+   "date": "2026-10-25",
+   "file": "routes/settings-model.js",
+   "prev_lines": 201,
+   "deleted": 159,
+   "added": 62,
+   "whole_file": false
+  },
+  {
+   "sha": "8bbd6b5f",
+   "date": "2026-10-25",
+   "file": "lib/render-settings-shell.js",
+   "prev_lines": 185,
+   "deleted": 185,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "lib/next-run.js",
+   "prev_lines": 1003,
+   "deleted": 1003,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "lib/render-next-run.js",
+   "prev_lines": 146,
+   "deleted": 146,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/README.md",
+   "prev_lines": 128,
+   "deleted": 128,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/chat-next.css",
+   "prev_lines": 372,
+   "deleted": 372,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/chat-next.js",
+   "prev_lines": 482,
+   "deleted": 482,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/compare.mjs",
+   "prev_lines": 109,
+   "deleted": 109,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/mock-agent.js",
+   "prev_lines": 80,
+   "deleted": 80,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/scenes.js",
+   "prev_lines": 140,
+   "deleted": 140,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/shape-a.html",
+   "prev_lines": 208,
+   "deleted": 208,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/shape-b.html",
+   "prev_lines": 190,
+   "deleted": 190,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/shoot.mjs",
+   "prev_lines": 95,
+   "deleted": 95,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/lin-1412-chat/verify.mjs",
+   "prev_lines": 290,
+   "deleted": 290,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/swim-flow/data.js",
+   "prev_lines": 52,
+   "deleted": 52,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/swim-flow/index.html",
+   "prev_lines": 30,
+   "deleted": 30,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/swim-flow/layout.js",
+   "prev_lines": 301,
+   "deleted": 301,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/swim-flow/shoot.mjs",
+   "prev_lines": 31,
+   "deleted": 31,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "prototypes/swim-flow/styles.css",
+   "prev_lines": 237,
+   "deleted": 237,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "public/next-run.css",
+   "prev_lines": 421,
+   "deleted": 421,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "public/next-run.js",
+   "prev_lines": 569,
+   "deleted": 569,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2c836676",
+   "date": "2026-10-25",
+   "file": "routes/next-run.js",
+   "prev_lines": 223,
+   "deleted": 223,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "9f7acff7",
+   "date": "2026-10-24",
+   "file": "routes/settings-workspace-features.js",
+   "prev_lines": 68,
+   "deleted": 68,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "b133a713",
+   "date": "2026-10-24",
+   "file": "routes/dashboard.js",
+   "prev_lines": 3027,
+   "deleted": 2277,
+   "added": 122,
+   "whole_file": false
+  },
+  {
+   "sha": "bfb7ea21",
+   "date": "2026-10-24",
+   "file": "lib/render-swipe.js",
+   "prev_lines": 626,
+   "deleted": 354,
+   "added": 8,
+   "whole_file": false
+  },
+  {
+   "sha": "d81aebd2",
+   "date": "2026-10-23",
+   "file": "public/chart.umd.min.js",
+   "prev_lines": 14,
+   "deleted": 14,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "d81aebd2",
+   "date": "2026-10-23",
+   "file": "public/marked.min.js",
+   "prev_lines": 74,
+   "deleted": 74,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "d81aebd2",
+   "date": "2026-10-23",
+   "file": "public/purify.min.js",
+   "prev_lines": 3,
+   "deleted": 3,
+   "added": 0,
+   "whole_file": true
+  }
+ ]
+}
