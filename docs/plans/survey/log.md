@@ -2940,3 +2940,11 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - Both readers say #2351 alone would read mixed, so the pair is the fair unit. **The same pattern a third time today: finishing turns the area.**
   - Residues went to the LIN-4347 notes: `prompt-system.md` lists the deciding stages by name; "cut" vs "narrowing" are two names for one rule; the ceiling history sits in the follow-on log; `CUT` vs `ASK` take different shapes.
 - **00:13 UTC: LIN-4368 merged** (`eeda7e44`, PR #2355): the size record, its proxy guard and the `sizePolicy` preference (LIN-4346 piece 2/4).
+- **01:04 UTC: LIN-4369's pre-registered replay FAILED, and the build stopped itself correctly** (PR #2356 held; `docs/reviews/lin-4369-size-replay-2026-11-08.md`; judged by a separate subagent).
+  - **The control grew:** LIN-998 was "just the task" 0/3, and all three runs chose to consolidate. Its Surveys found the logic in four places, and under err larger scoping took that in.
+  - **The records turned into plans:** "what done means" and "settled for the builder" sections, which is where the how gets in. 7 of 9 carry how, and only 5 of 12 pass the guard on first write.
+  - Cuts raise a `DECISION:` 6/6 when read literally, though three more cuts were unflagged on substance.
+  - Scoping's lead still asks it to settle "what done means".
+  - **This is the risk the Surveys predicted: an agent writing scope drifts into how, just as my hand-written scopes did.**
+  - Ruling `lin4369-replay-failed-next`: suggested **new-arm, made structural**. The size is one of the fixed sizes plus one sentence of why, with cuts and who decided, so there's nowhere for how to go (the lesson of the seal and of named cuts). Re-examine the control: with four copies found, err larger may rightly consolidate LIN-998, so use a control whose Surveys find nothing to tidy. If it fails again, close and re-plan.
+  - Waits on John. **LIN-4347 Surveyed meanwhile** (independent of sizing), to keep work moving.
