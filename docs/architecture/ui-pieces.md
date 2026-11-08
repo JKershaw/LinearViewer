@@ -2,7 +2,7 @@ Scope: where each shared UI decision Settings stands on lives (its one owner), h
 
 # UI pieces: who owns each shared decision
 
-This is a note, not code. Nothing under `public/`, `lib/`, `routes/` or `server.js` changed to write it, and `scripts/code-shape/areas.json` still files all of `public/` under one area, so the ownership of CSS lives **here**, not in the area map.
+This is a note, not code. Nothing under `public/`, `lib/`, `routes/` or `server.js` changed to write it, and the area registry (`docs/areas/areas.json`) still files all of `public/` under one area, so the ownership of CSS lives **here**, not in the area map.
 
 Method: Theseus (`docs/theseus-method-long.md`, sections 5 and 13). This move only **owns**: it decides and writes down. Consolidate (LIN-3889) deletes the losing copies. Rebuild (LIN-3890) designs the Settings pieces in `/styleguide` first, then rebuilds Sources, Health and Account on them.
 

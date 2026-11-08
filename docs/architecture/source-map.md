@@ -367,6 +367,14 @@ tests/
   judge/               visual-replay.mjs: the visual replay judge, base commit against head on two exports at zero tolerance (own Playwright config, no committed images); `pages.mjs` is its page list (`node --test tests/judge/pages.test.mjs` for its helpers). Not in `npm test` (LIN-3887)
 docs/
   architecture/ui-pieces.md    Who owns each shared UI decision Settings stands on, how to count its sites, what Consolidate deletes, and the measures at the series base (LIN-3886/LIN-3887)
+  areas/                       The product's area registry and area notes (LIN-4371). `areas.json` lists the areas
+                               in order, first match wins over code paths, each with a `name` and a `slug`; the
+                               code-shape tools (`scripts/code-shape/`) and the placement tests read it (it was
+                               `scripts/code-shape/areas.json`). `<slug>.md` is one area's notes (lessons for changing
+                               it, and waiting work), optional; `README.md` owns the format and the one-home rule.
+                               `tests/unit/area-notes.test.js` checks every note against the registry and the tree;
+                               the seven work stages' prompts point at them (`formatAreaNotesPointer`,
+                               lib/prompt-formatters.js). The Survey tally (`plans/survey/broad-options.md`) moved here.
   reviews/                     Periodical review reports (LIN-1967). Canonical, discoverable location: a
                                periodical's report lives on `main` at `docs/reviews/<periodical-name>-<date>.md`
                                (e.g. `docs/reviews/documentation-review-2026-08-23.md`), landed via a normal

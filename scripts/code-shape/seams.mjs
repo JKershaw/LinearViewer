@@ -8,7 +8,7 @@ import { parse } from 'acorn';
 import { simple } from 'acorn-walk';
 import { readCommit } from './code-shape-lib.mjs';
 
-const DEFAULT_GUIDE = fileURLToPath(new URL('./areas.json', import.meta.url));
+const DEFAULT_GUIDE = fileURLToPath(new URL('../../docs/areas/areas.json', import.meta.url)); // the product's area registry (LIN-4371)
 
 export const inScope = (p) =>
   /\.m?js$/.test(p) && !/\.min\.js$/.test(p) &&

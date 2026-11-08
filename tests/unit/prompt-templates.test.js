@@ -2111,7 +2111,7 @@ describe('Scale to the task (handwritten path)', () => {
 // LIN-177 S4/S5: Capability-aware prompts (provider.ui threaded into the stage and router prompts)
 // =============================================================================
 import { generateCustomPrompt } from '../../lib/prompt-templates.js';
-import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubtaskSummary, appendGroundingSections, formatPlanFidelityCheck, formatAttachmentsSection, formatAttachmentPerceptionCheck, formatIfBlocked } from '../../lib/prompt-formatters.js';
+import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubtaskSummary, appendGroundingSections, formatAreaNotesPointer, formatPlanFidelityCheck, formatAttachmentsSection, formatAttachmentPerceptionCheck, formatIfBlocked } from '../../lib/prompt-formatters.js';
 import { formatIssueContext, buildSelectorArgs } from '../../lib/openrouter.js';
 import { buildRouterPrompt } from '../../lib/stage-router.js';
 
@@ -3449,7 +3449,8 @@ describe('grounding is one seam (LIN-435)', () => {
   const context = { children: [], comments: [] };
 
   test('the stage prompt ends with the contract, then the shared grounding sections', () => {
-    const grounding = appendGroundingSections('', issue, context);
+    // The stage's own notes (LIN-4371: implementation's list now adds the area pointer to the unknown-kind set).
+    const grounding = appendGroundingSections('', issue, context, 'implementation');
     assert.ok(grounding.length > 0, 'fixture produces a non-empty grounding (staleness is unconditional)');
     const hw = generatePrompt('implementation', issue, context).prompt;
     assert.ok(hw.endsWith(grounding), 'the prompt ends with the shared grounding sections');
@@ -3493,14 +3494,16 @@ describe('grounding is one seam (LIN-435)', () => {
 // to "close out", triage to re-ground code it never reads, and the bug
 // investigation to "move to implementing the fix". The expected matrix below is
 // the spec, written independently of the table in lib/prompt-formatters.js:
-// S staleness, T terminal-state, C all-subtasks-complete, B bug-investigated.
+// S staleness, T terminal-state, C all-subtasks-complete, B bug-investigated,
+// A the area notes pointer (LIN-4371: the seven stages that read or change code in an
+// area; scoping, the Survey stages and close-out are left out on purpose).
 // =============================================================================
 describe('grounding notes chosen per stage (LIN-3296)', () => {
   const EXPECTED = {
-    implementation: 'STCB',
-    blocked: 'STC', bug: 'STC', plan: 'STC', breakdown: 'STC', research: 'STC',
-    scoping: 'STC', design: 'STC', spike: 'STC', 'plan-review': 'STC',
-    review: 'STC', 'close-out': 'STC',
+    implementation: 'STCBA',
+    blocked: 'STC', bug: 'STCA', plan: 'STCA', breakdown: 'STC', research: 'STCA',
+    scoping: 'STC', design: 'STCA', spike: 'STCA', 'plan-review': 'STC',
+    review: 'STCA', 'close-out': 'STC',
     'look-into': 'S', context: 'S',
     'retrospective-audit': 'S', retro: 'S',
     'survey-task': '', 'survey-place': '',
@@ -3510,7 +3513,8 @@ describe('grounding notes chosen per stage (LIN-3296)', () => {
     S: '## Re-ground the Ticket (staleness check)',
     T: '## Task Already Complete',
     C: '## All Subtasks Complete',
-    B: "## Prior Investigation On Record — Don't Loop"
+    B: "## Prior Investigation On Record — Don't Loop",
+    A: '## Area Notes'
   };
   const base = {
     id: 'issue-g', identifier: 'LIN-3296', title: 'Grounding fixture', description: 'Some work',
@@ -3544,6 +3548,8 @@ describe('grounding notes chosen per stage (LIN-3296)', () => {
       assert.strictEqual(present(a, 'T'), want.includes('T'), `${kind}: terminal-state on a Done task`);
       assert.strictEqual(present(a, 'B'), want.includes('B'), `${kind}: bug-investigated on a bug with comments`);
       assert.strictEqual(present(b, 'C'), want.includes('C'), `${kind}: children-complete on an open parent`);
+      assert.strictEqual(present(a, 'A'), want.includes('A'), `${kind}: area notes pointer`);
+      assert.strictEqual(present(b, 'A'), want.includes('A'), `${kind}: area notes pointer, open parent`);
     });
 
   }
@@ -3551,9 +3557,44 @@ describe('grounding notes chosen per stage (LIN-3296)', () => {
   test('an unknown kind keeps every note (custom prompts unchanged)', () => {
     const all = appendGroundingSections('', doneBug.issue, doneBug.context);
     for (const letter of 'STB') assert.ok(present(all, letter), `no kind: ${letter} kept`);
+    assert.ok(!present(all, 'A'), 'no kind: the fallback stays GROUNDING_NOTES, without the area pointer (LIN-4371)');
     assert.strictEqual(appendGroundingSections('', doneBug.issue, doneBug.context, 'custom'), all);
     assert.strictEqual(appendGroundingSections('', doneBug.issue, doneBug.context, 'toString'), all,
       'an Object.prototype key is not a table row');
+  });
+});
+
+// LIN-4371: the area notes pointer. One fixed line naming no repository, so the same prompt serves
+// every repository that keeps docs/areas/; it is a pointer, so its text never depends on the task.
+describe('the area notes pointer (LIN-4371)', () => {
+  const issue = {
+    id: 'issue-a', identifier: 'LIN-4371', title: 'Area fixture', description: 'Some work',
+    url: 'https://linear.app/test/issue/LIN-4371', createdAt: '2026-03-01T00:00:00.000Z',
+    state: { name: 'Todo', type: 'unstarted' }, labels: []
+  };
+  const context = { parent: null, siblings: [], children: [], comments: [] };
+  const line = formatAreaNotesPointer();
+
+  test('implementation, plan and review prompts carry the pointer, once', () => {
+    for (const kind of ['implementation', 'plan', 'review']) {
+      const prompt = generatePrompt(kind, issue, context).prompt;
+      assert.strictEqual(prompt.split(line).length - 1, 1, `${kind}: the pointer once`);
+    }
+  });
+
+  test('it says what the notes are for and names no repository', () => {
+    assert.match(line, /docs\/areas\/README\.md/);
+    assert.match(line, /docs\/areas\/areas\.json/);
+    assert.match(line, /Lessons bind how you work/);
+    assert.match(line, /Waiting entries are context, not scope, unless the size of the move takes them on/);
+    assert.ok(!/LinearViewer|simple-dispatcher|Harbour|Linear/.test(line), 'no repository or provider named');
+  });
+
+  test('scoping, the Survey stages, close-out and an unknown kind do not carry it', () => {
+    for (const kind of ['scoping', 'survey-task', 'survey-place', 'close-out']) {
+      assert.ok(!generatePrompt(kind, issue, context).prompt.includes('## Area Notes'), kind);
+    }
+    assert.ok(!appendGroundingSections('', issue, context, 'custom').includes('## Area Notes'), 'unknown kind');
   });
 });
 

@@ -86,6 +86,8 @@ Two reasons recur, so they are written once here:
 **Templates source, `lib/prompt-formatters.js`**
 - LIN-3299: +34. The hypothesis sentence covers a proposed solution or limit.
 - LIN-4021: -4374 (50224 -> 45850; source 45987 -> 45850). The agreed fidelity check (`proposed-prompts.md` A2) replaces the old Re-ground body. It is the approved wording itself.
+- LIN-4248: +144 (45850 -> 45994). The two Survey kinds' empty GROUNDING_BY_KIND entries, so the forecasts get no re-ground or implement notes.
+- LIN-4371: +939 (45994 -> 46933). `formatAreaNotesPointer` (+308 of text) and the seven stages' own grounding lists, so `WORK` and `GROUNDING_NOTES` stay byte-identical for the stages that share them.
 
 **Templates source, `lib/prompt-contract.js`**
 - LIN-3300: at 3424 since the one-path recommendation change.
@@ -100,7 +102,12 @@ Two reasons recur, so they are written once here:
 - LIN-4345: +252 on research (11433 -> 11685), design (2562 -> 2814), spike (2581 -> 2833), breakdown (5025 -> 5277), implementation (7798 -> 8050) and blocked (3244 -> 3496): the DECIDE scope line gains the cut rule. plan +337 (9711 -> 10048): the same, plus +85 for the opening asker clause (the only part of LIN-4021's agreed plan text touched), which lists each cut, inherited too, or says none. scoping +197 (2427 -> 2624): the same, net of -55 in scoping itself (its lead loses "What is in and out of scope is yours to decide ... flag for the human only product or intent questions", -105, and its Out of Scope bullet holds each cut with its ruling, +50). Reason: (cut).
 - LIN-4345: +33 on each of the eight, (route).
 - LIN-4367: plan -39 (10081 -> 10042), scoping -25 (2657 -> 2632): each says only where its cuts go; the rule is CUT's.
+- LIN-4371: +308 on research (11718 -> 12026), design (2847 -> 3155), spike (2866 -> 3174), plan (10042 -> 10350) and implementation (8083 -> 8391), the area notes pointer; their replaced comments were the LIN-4345 and LIN-4367 reasons above. Scoping, breakdown and blocked are byte-identical. Why not code: which note entries bind a change is the agent's reading of a repository file `generatePrompt` cannot read; a fixed pointer keeps the bytes predictable where injected notes would not.
 - LIN-4368: scoping +89 (2632 -> 2721), the standing size policy line (`formatSizePolicyLine`, `lib/size-of-move.js`): "no standing policy" until a person sets `err-larger` in Settings → Running. Code reads and renders the policy; what scoping does with it is its judgement (piece 3, LIN-4369).
+
+**Templates rendered, `bug`**
+- LIN-3299: at 4744 since Scope and Authority on every path.
+- LIN-4371: +308 (4744 -> 5052), the area notes pointer, as for the deciding stages above.
 
 **Templates rendered, `plan-review`**
 - LIN-3615: -99 (7955). The pin-conversion rule (+209), paid by cutting Verdict's restated opening, Completion's restated record line and the planner-owns-the-edit clause.
@@ -115,6 +122,7 @@ Two reasons recur, so they are written once here:
 - LIN-4021: -11 (15165 -> 15154). The agreed A3 clause adds 3 bytes to the 15153 rendered before, so the ceiling fell by 9 rather than rising to fit it; and the scope line reads the plan's places, not surfaces (-2).
 - LIN-4353: -109 (15154 -> 15045). Pays plan-review's agreement clause (-86) and quote clause (-23). Review itself gained the one line on how the work meets what was asked, the same agreement rule and the quote clause, paid by cutting restatements (Completion's record line and its approve/stay-open sentence, the Verdict's authorizes-not-performs line, Gap Analysis's focus-on-these-gaps bullet).
 - LIN-4345: -2 (15045 -> 15043). The verdict accounts for each sentence of the `## As asked` block in order, none skipped or cut short, in place of one line quoted from the block (+100): replay arm A3 met the one quoted line by quoting selectively, cutting before the narrowed clause. Whether a sentence of the ask is met is the reviewer's judgement; `docs/reviews/lin-4345-per-sentence-replay-2026-11-07.md` is its evidence. Paid in review itself by cutting two Gap Analysis restatements (-55); the ceiling fell to the measured size.
+- LIN-4371: +308 (15043 -> 15351), the area notes pointer: review reads the notes of the areas the change touches, as the builder did.
 
 **Templates rendered, `close-out`**
 - LIN-3326: -7893. Close-out finishes the work: no authoring bound, no hard gate, one statement of each floor.
@@ -163,6 +171,7 @@ Two reasons recur, so they are written once here:
 - LIN-4253: -5 (342146 -> 342141), net of defs +606 and prompt-templates -611. LIN-4251: +250 (342141 -> 342391), net of defs +16 and prompt-templates +234. LIN-4345: -4 (342391 -> 342387), review -2 and close-out -2. LIN-4362: +148 (342387 -> 342535), defs +74 and prompt-contract +74.
 - LIN-4345 (attempt 2): +2396 (342387 -> 344783): stage intent source +343, defs +7, six deciding stages +252 each, plan +337 and scoping +197. LIN-4345 (route): +297 (344783 -> 345080): +33 on each of the eight deciding stages and on stage intent source. Merged with LIN-4362: +171 (345080 -> 345251), its defs +74 and prompt-contract +74, plus defs +23 because both changes had counted the same 23 bytes of headroom (merged defs measured at 107469). LIN-4345 merged with LIN-4362: +65 (345251 -> 345316), stage intent source, CUT interpolates AS_ASKED_HEADING.
 - LIN-4367: -114 (345316 -> 345202). LIN-4368: +311 (345202 -> 345513): defs +189, scoping +89, routing prompt +33.
+- LIN-4371: +3095 (345513 -> 348608): formatters +939, and +308 on each of bug, plan, research, design, spike, implementation and review.
 
 ## Rows
 
