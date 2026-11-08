@@ -2935,3 +2935,8 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - The kickoff goal now carries "settle engineering questions yourself; rulings only for John's calls".
 - **For the notebook (Survey):** `docs/plans/survey.md`'s "John is asked only when the large option is recommended" is now the reverse. Under the policy, larger goes ahead, and smaller than asked is a cut that raises a ruling.
 - **23:20 UTC: LIN-4346 broken into four.** Piece 1, LIN-4367 (`9c2a378a`, PR #2354), simplified what PR #2351 left around the cut rule: big moves early, and the tidy first. Area read of #2351 + LIN-4367 sent (BU, BV).
+- **~00:15 UTC, 8 Nov: the area read of PR #2351 + LIN-4367 is better, better (BU, BV).**
+  - The cut rule has one owner; the test finds deciding stages by identity and proves its scan with a planted copy; the budget test went from 50 KB to 21 KB.
+  - Both readers say #2351 alone would read mixed, so the pair is the fair unit. **The same pattern a third time today: finishing turns the area.**
+  - Residues went to the LIN-4347 notes: `prompt-system.md` lists the deciding stages by name; "cut" vs "narrowing" are two names for one rule; the ceiling history sits in the follow-on log; `CUT` vs `ASK` take different shapes.
+- **00:13 UTC: LIN-4368 merged** (`eeda7e44`, PR #2355): the size record, its proxy guard and the `sizePolicy` preference (LIN-4346 piece 2/4).
