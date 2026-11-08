@@ -3157,3 +3157,15 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **Close-out's four tickets followed Harbour's own `LEFTOVER_RULE`** (outside the area: a follow-up). My "notes, not tickets" was an operator rule that contradicted it.
   - **About 22 thread tickets are still open.**
   - **Proposed next:** a coherence reading over the round's window; a triage of the open tickets; only the fixes that would block the next round; then the real tasks one at a time (LIN-4341 first) with this session recording only.
+- **~19:40 UTC: the "Toward Settled" page, and LIN-4395 filed.** John asked for the review as a mobile-first page with visual storytelling, then a section on how sessions carry the motion, then future versions of the one-task session timeline that optimise the graph of nodes.
+  - The page: https://claude.ai/artifact/V8oXDLMwks2w3nN48nmhAq (private).
+  - Its timeline is LIN-4393's own per-session cost record: eight sessions, $14.94, 54 minutes from the first Survey to merge. Sessions read back about 200 tokens for every token they wrote.
+  - The two future versions are designs, not measurements: "Next" (no new mess) and "Later" (fewer, warmer contexts).
+  - **John: "Yes, file (avoid describing the 'how')."** Filed as **LIN-4395** (Backlog, no parent), "A task shows the sessions that ran it, on one clock".
+  - **The parrot cut three things:**
+    - a compare-two-tasks feature John hadn't asked for;
+    - a rephrasing of his "optimise the graph of nodes";
+    - an aims sentence that read as his words and had dropped one aim.
+
+    It added a plain description of the drawing for a builder who hasn't seen it.
+  - The seal wrote "## As asked" itself. Not started; no size call posted.
