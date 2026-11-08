@@ -18,6 +18,8 @@
  *
  * Also supports `{ $in: [...] }` (used by the Observation materializer's
  * followUpTo BFS batch lookups, LIN-1307).
+ * And `{ $exists: true|false }` (LIN-4383: the stopped-run cleanup's
+ * `heldWakeFor: { $exists: true }`): presence, so `null` exists and absent does not.
  *
  * `$set` supports dot-path keys (e.g. `"wakeWitnessMeta.<id>.mintedWakeId"`),
  * writing/creating only the named leaf without clobbering sibling keys under
@@ -43,6 +45,12 @@ export function createMockCollection() {
       }
       if ('$in' in condition) {
         return Array.isArray(condition.$in) && condition.$in.includes(value);
+      }
+      // $exists (LIN-4383): presence, as in Mongo/MangoDB. A field set to `null` exists;
+      // only an absent (`undefined`) one does not. Use it, never `{$ne: null}`, to ask
+      // "carries the field": `$ne` above reads an absent field as `undefined !== null`.
+      if ('$exists' in condition) {
+        return (value !== undefined) === Boolean(condition.$exists);
       }
       // $nin (LIN-3812): the complement of $in; an absent field is "not in".
       if ('$nin' in condition) {

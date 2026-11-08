@@ -74,7 +74,7 @@ import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
 export const TEMPLATES_SOURCE_CEILINGS = {
   'lib/prompt-template-defs.js': 110395, // LIN-4369: +1907 (108488 -> 110395), scoping's output becomes the four-line size record; arms 1–4 in scripts/prompt-template-change-log.md
   'lib/prompt-templates.js': 19593, // LIN-4251: the `stageWrites(kind)` lookup every entrance uses (code, not prompt text)
-  'lib/prompt-formatters.js': 47035, // LIN-4379: +102, one sentence in `formatAreaNotesPointer`: name a note entry the work used (file and source) where it records its decisions
+  'lib/prompt-formatters.js': 47095, // LIN-4383: +60 (47035 -> 47095), code not prompt text: the pointer reads the product's one registry-path spelling (lib/prompts/area-registry-path.js); rendered bytes unchanged
   'lib/prompt-contract.js': 3875, // LIN-4362: the `## As asked` spellings interpolate AS_ASKED_HEADING (code, not prompt text)
 };
 
@@ -139,7 +139,7 @@ export const LEFTOVER_PROMPT_RENDERED_CEILING = 1352; // LIN-4376: +157, where e
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 356217; // LIN-4379: +816 (355401 -> 356217), the pointer sentence: prompt-formatters.js source +102 and the seven stages that render it +102 each
+export const FROZEN_TOTAL_BYTES = 356277; // LIN-4383: +60 (356217 -> 356277), prompt-formatters source only (an import line, no prompt text)
 
 const BASE_URL = 'https://harbour.example';
 

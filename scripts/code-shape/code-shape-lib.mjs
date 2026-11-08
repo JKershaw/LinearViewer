@@ -5,11 +5,12 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { REGISTRY_PATH } from '../../lib/prompts/area-registry-path.js';
 
 // The area registry is the product's (LIN-4371), which the area notes beside it are keyed on. REGISTRY_PATH is
-// the one spelling of its repo-relative path (LIN-4376): the kit's tools, the census experiment and the
-// tests' registry helper all take it from here.
-export const REGISTRY_PATH = 'docs/areas/areas.json';
+// the one spelling of its repo-relative path, in the product's zero-import leaf (LIN-4383); the kit re-exports it
+// for its tools and the census experiment.
+export { REGISTRY_PATH };
 export const DEFAULT_AREAS = fileURLToPath(new URL(`../../${REGISTRY_PATH}`, import.meta.url));
 
 // Defaults: JavaScript minus dependencies, vendored dirs, minified files, tests, and pinned replay snapshots and work copies.

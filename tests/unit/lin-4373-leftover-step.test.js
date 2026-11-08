@@ -80,7 +80,7 @@ async function build(world, runId, extra = {}) {
 }
 
 const post = (world, row, message, { hook = world.hook, provision } = {}) =>
-  world.store.addFeedback(row._id, URL_KEY, { message }, TOKEN, provision, { leftoverHook: hook });
+  world.store.addFeedback(row._id, URL_KEY, { message }, TOKEN, provision, { wakeHook: hook });
 
 const all = (world) => [...world.collection._docs, ...world.historyCollection._docs];
 const wakesTo = (world, runId) => all(world).filter(d => d.kind === 'wake' && d.followUpTo === runId);
@@ -256,7 +256,7 @@ describe('LIN-4373 — release when the leftover row never runs', () => {
     assert.equal(wakes.length, 1);
     assert.strictEqual(wakes[0].bootstrapToken, null);
     assert.deepEqual(calls, [{ urlKey: URL_KEY, createdBy: OWNER }], "keyed on the root's dispatchedBy");
-    assert.ok(lines.some(l => l.includes('[leftover] release-degraded')), JSON.stringify(lines));
+    assert.ok(lines.some(l => l.includes('[dispatch-wake] no-retry-degraded')), JSON.stringify(lines));
   });
 
   test('no provisioner factory: the release still wakes, and says it degraded', async () => {
@@ -264,7 +264,7 @@ describe('LIN-4373 — release when the leftover row never runs', () => {
     const { a } = await heldBuild(world);
     const { lines } = await captureLogs(() => world.store.removeItem(URL_KEY, queuedLeftover(world)._id));
     assert.equal(wakesTo(world, a._id).length, 1);
-    assert.ok(lines.some(l => l.includes('[leftover] release-degraded') && l.includes('no-provisioner')));
+    assert.ok(lines.some(l => l.includes('[dispatch-wake] no-retry-degraded') && l.includes('no-provisioner')));
   });
 
   test('a release that faults the first time is recovered by a re-reported build [done]: exactly one wake', async () => {
@@ -441,7 +441,7 @@ describe('LIN-4373 — every fallback wakes the parent exactly as today', () => 
     const world = makeWorld();
     const { a, lines } = await fallback(world, { hook: async () => { throw new Error('boom'); } });
     assert.equal(wakesTo(world, a._id).length, 1);
-    assert.ok(lines.some(l => l.includes('[leftover] skipped reason=hook-threw')));
+    assert.ok(lines.some(l => l.includes('[held-wake] hook-threw')));
   });
 
   test('a hook that throws after its enqueue succeeded: the wake still goes', async () => {
@@ -450,7 +450,7 @@ describe('LIN-4373 — every fallback wakes the parent exactly as today', () => 
     assert.equal(wakesTo(world, a._id).length, 1, 'a throw is a fallback whatever the hook did first');
   });
 
-  test('a hook answering anything but queued or hold: one wake', async () => {
+  test('a hook answering anything but withhold: one wake', async () => {
     const world = makeWorld();
     const { a } = await fallback(world, { hook: async () => ({ outcome: 'queue' }) });
     assert.equal(wakesTo(world, a._id).length, 1);

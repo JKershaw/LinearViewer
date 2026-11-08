@@ -10,8 +10,8 @@
  *    The newest report line wins, and the first PR on it: the order simple-dispatcher's
  *    `sessionPrs` uses for the `[done]` url.
  * 2. Two `[done]` posts on one build row at the same moment queue exactly one
- *    `leftover` row (`claimLeftoverFor`), and the build still wakes the parent once.
- * 3. A claim winner that skips gives the claim back (`releaseLeftoverClaim`), so the
+ *    `leftover` row (`claimHeldWake`), and the build still wakes the parent once.
+ * 3. A claim winner that skips gives the claim back (`releaseHeldWakeClaim`), so the
  *    runner's re-report after a withdrawn wake can queue the step or wake the parent,
  *    never hold forever on `claim-lost` (the LIN-4375 review's repro).
  */
@@ -126,7 +126,7 @@ async function runAndBuild(world) {
 }
 
 const post = (world, row, entry, provision = undefined) =>
-  world.store.addFeedback(row._id, URL_KEY, entry, TOKEN, provision, { leftoverHook: world.hook });
+  world.store.addFeedback(row._id, URL_KEY, entry, TOKEN, provision, { wakeHook: world.hook });
 
 const all = (world) => [...world.collection._docs, ...world.historyCollection._docs];
 const wakesTo = (world, runId) => all(world).filter(d => d.kind === 'wake' && d.followUpTo === runId);
@@ -222,21 +222,21 @@ describe('LIN-4375 — two concurrent [done] posts on one build queue one leftov
     assert.equal(wakesTo(world, a._id).length, 1, 'a further re-report adds no second wake');
   });
 
-  test('releaseLeftoverClaim: a released claim can be won again; a release scoped to another workspace does nothing', async () => {
+  test('releaseHeldWakeClaim: a released claim can be won again; a release scoped to another workspace does nothing', async () => {
     const world = makeWorld();
     const { b } = await runAndBuild(world);
-    assert.equal(await world.store.claimLeftoverFor(URL_KEY, b._id), true);
-    await world.store.releaseLeftoverClaim('other', b._id);
-    assert.equal(await world.store.claimLeftoverFor(URL_KEY, b._id), false, 'another workspace cannot release it');
-    await world.store.releaseLeftoverClaim(URL_KEY, b._id);
-    assert.equal(await world.store.claimLeftoverFor(URL_KEY, b._id), true, 'released, the next claim wins');
+    assert.equal(await world.store.claimHeldWake(URL_KEY, b._id), true);
+    await world.store.releaseHeldWakeClaim('other', b._id);
+    assert.equal(await world.store.claimHeldWake(URL_KEY, b._id), false, 'another workspace cannot release it');
+    await world.store.releaseHeldWakeClaim(URL_KEY, b._id);
+    assert.equal(await world.store.claimHeldWake(URL_KEY, b._id), true, 'released, the next claim wins');
   });
 
-  test('claimLeftoverFor: the first claim wins, every later one loses', async () => {
+  test('claimHeldWake: the first claim wins, every later one loses', async () => {
     const world = makeWorld();
     const { b } = await runAndBuild(world);
-    assert.equal(await world.store.claimLeftoverFor(URL_KEY, b._id), true);
-    assert.equal(await world.store.claimLeftoverFor(URL_KEY, b._id), false);
-    assert.equal(await world.store.claimLeftoverFor('other', b._id), false, 'scoped to the workspace');
+    assert.equal(await world.store.claimHeldWake(URL_KEY, b._id), true);
+    assert.equal(await world.store.claimHeldWake(URL_KEY, b._id), false);
+    assert.equal(await world.store.claimHeldWake('other', b._id), false, 'scoped to the workspace');
   });
 });
