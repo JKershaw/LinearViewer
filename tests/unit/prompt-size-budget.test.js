@@ -72,7 +72,7 @@ import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
 /** Templates, source bytes. Same files `steady-base-growth.mjs` GROUPS as
  * "worker templates". */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 110530, // LIN-4369 merged with main at LIN-4376: +2042 on main's 108488, arm 1's size record (+1316) and arm 2's wording (+726), both measured unchanged
+  'lib/prompt-template-defs.js': 110197, // LIN-4369 (replay arm 3): -333, scoping's record becomes four lines whose shape the proxy guard holds (lib/size-of-move.js recordShape), so arm 2's long list of what the record may not say goes
   'lib/prompt-templates.js': 19593, // LIN-4251: the `stageWrites(kind)` lookup every entrance uses (code, not prompt text)
   'lib/prompt-formatters.js': 46933, // LIN-4371: +939, `formatAreaNotesPointer` and the seven stages' own grounding lists, so WORK and GROUNDING_NOTES stay byte-identical
   'lib/prompt-contract.js': 3875, // LIN-4362: the `## As asked` spellings interpolate AS_ASKED_HEADING (code, not prompt text)
@@ -89,14 +89,14 @@ export const TEMPLATES_RENDERED_CEILINGS = {
   triage: 2429, // LIN-3299: at 2429 since Scope and Authority on every path
   breakdown: 5310, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
   research: 12026, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
-  scoping: 4358, // LIN-4369 (replay arm 2): +617, when a finding binds, and the record is not a plan (which size is judgement; the guard holds only code-shaped how)
+  scoping: 4027, // LIN-4369 (replay arm 3): -331, the record is four lines rendered from lib/size-of-move.js and held by the proxy guard (code), not a list of what it may not say
   design: 3155, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
   spike: 3174, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
   context: 2021, // LIN-3300: at 2021 since the stage rules only the meta-prompt carried moved into their templates
   'plan-review': 7601, // LIN-4353: the verdict quotes the ask and says how the plan meets it; only the person agrees to a narrowing (the reviewer's judgement)
   implementation: 8391, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
   review: 16052, // LIN-4376: +186, the class check renders the shared LEFTOVER_RULE (routes and one home) verbatim, so the three readers of a leftover say it the same way; which home an edge belongs in is the reviewer's judgement no code sees
-  'close-out': 12140, // LIN-4376: +178, Follow-up Triage renders the shared LEFTOVER_RULE (routes and one home) verbatim in place of its own one-home sentence; which item is which is judgement no code sees
+  'close-out': 12182, // LIN-4369 (replay arm 3): +42, the prune puts its stub under a heading of its own, because the guard now refuses any line inside the size section but its four
   'retrospective-audit': 4619, // LIN-3279: FOLLOW_UP_SHAPE rendered
   retro: 4265, // LIN-3299: at 4265 since Scope and Authority on every path
   'survey-task': 1204, // LIN-4248: new at 1204; the hand-tuned task-view Survey wording, verbatim but for the {BASE} sentence and the Goal/Process frame
@@ -139,7 +139,7 @@ export const LEFTOVER_PROMPT_RENDERED_CEILING = 1352; // LIN-4376: +157, where e
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 355658; // LIN-4369 merged with main at LIN-4376: +3657 (352001 -> 355658), defs +2042, scoping +1637, routing prompt -22
+export const FROZEN_TOTAL_BYTES = 355036; // LIN-4369 (replay arm 3): -622 (355658 -> 355036), defs -333, scoping -331, close-out +42
 
 const BASE_URL = 'https://harbour.example';
 

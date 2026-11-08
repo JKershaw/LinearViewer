@@ -3,7 +3,8 @@
  *
  * Scoping no longer writes an In / Out / Assumptions / Success block. It reads the Surveys and
  * the trail, weighs the sizes from "just the task" to "wrong work", recommends one, and writes
- * one `## Size of the move` section, whose words come from lib/size-of-move.js. With a standing
+ * one `## Size of the move` section of four lines (arm 3), whose words and shape come from
+ * lib/size-of-move.js and whose shape the proxy guard holds. With a standing
  * policy (rendered by code) it applies it; without one the size is pending a ruling and raised as
  * a `DECISION:`. A size that cuts the ask is a cut under CUT, which stays rendered once.
  */
@@ -16,8 +17,8 @@ import { CUT } from '../../lib/prompts/stage-intent.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 import { AS_ASKED_HEADING } from '../../lib/as-asked.js';
 import {
-  SIZE_OF_MOVE_HEADING, SIZES, DECIDED_BY, SIZE_LABEL, DECIDED_BY_LABEL, RECORD_PARTS, WRONG_WORK,
-  readSizeRecord, checkSizeRecord
+  SIZE_OF_MOVE_HEADING, SIZES, DECIDED_BY, SIZE_LABEL, WHY_LABEL, CUTS_LABEL, DECIDED_BY_LABEL, RECORD_LINES, NO_CUTS, WRONG_WORK,
+  readSizeRecord, checkSizeRecord, recordShape
 } from '../../lib/size-of-move.js';
 
 const END = '*End of what was asked. Steps write below this line; nothing above it changes.*';
@@ -41,13 +42,15 @@ describe('scoping writes the size record (LIN-4369)', () => {
     }
   });
 
-  test('it writes one size section, every size, every decided-by value and every record part, from the module', () => {
+  test('it writes one size section, in the record\'s shape rendered from the module, every size and decided-by value in it', () => {
     const p = processOf(render());
     assert.equal(count(p, `\`${SIZE_OF_MOVE_HEADING}\``), 1, 'names the one section it writes');
+    const lines = p.split('\n');
+    const at = lines.indexOf(recordShape()[0]);
+    assert.ok(at > 0, 'the shape is rendered line for line');
+    assert.deepEqual(lines.slice(at, at + RECORD_LINES.length), recordShape(), 'the four lines, in order, each on its own line');
     assert.ok(p.includes(SIZES.join(' / ')), 'lays out every size, smallest first');
-    for (const part of RECORD_PARTS) assert.ok(p.includes(part), `record part: ${part}`);
-    assert.ok(p.includes(`\`**${SIZE_LABEL}:** <size>\``), 'the size line code reads');
-    assert.ok(p.includes(`\`**${DECIDED_BY_LABEL}:** ${Object.values(DECIDED_BY).join(' / ')}\``), 'the decided-by line code reads');
+    assert.ok(p.includes(`**${DECIDED_BY_LABEL}:** ${Object.values(DECIDED_BY).join(' / ')}`), 'every decided-by value');
   });
 
   test('the template keeps no second spelling of the sizes or decided-by values', () => {
@@ -60,11 +63,9 @@ describe('scoping writes the size record (LIN-4369)', () => {
   test('a record written with the lines the prompt names reads back through the parser and passes the guard', () => {
     const record = [
       SIZE_OF_MOVE_HEADING, '',
-      `**${SIZE_LABEL}:** ${SIZES[0]}`, '',
-      'Why: the Surveys find nothing this task binds on.', '',
-      `- ${SIZES[0]}: delivers what was asked.`,
-      `- ${SIZES[1]}: buys this task nothing.`, '',
-      'Cuts to the ask: none. Open questions: none.', '',
+      `**${SIZE_LABEL}:** ${SIZES[0]}`,
+      `**${WHY_LABEL}:** The Surveys find nothing this task binds on, so doing it as asked delivers what was asked.`,
+      `**${CUTS_LABEL}:** ${NO_CUTS}`,
       `**${DECIDED_BY_LABEL}:** ${DECIDED_BY.policy} (err larger)`
     ].join('\n');
     const next = `${ISSUE.description}\n\n${record}`;
@@ -80,23 +81,36 @@ describe('scoping writes the size record (LIN-4369)', () => {
   });
 
   // Arm 2 (LIN-4369 ruling efde8688): the first replay's control sized up on Survey findings that
-  // were deeper or nearby, and its records turned into plans. These pin the revised wording.
-  test('arm 2: a finding binds only when the asked change would not work, or would leave its problem in place, without it', () => {
+  // were deeper or nearby. Arm 3 keeps the definition of "binds"; such findings stay in the Surveys.
+  test('a finding binds only when the asked change would not work, or would leave its problem in place, without it', () => {
     const p = processOf(render());
     assert.match(p, /A finding binds on this task only when the asked change would not work, or would leave the problem it fixes in place, without it;/);
-    assert.match(p, /a finding that is nearby, deeper or merely worth doing does not, and goes in open questions as a possible ticket of its own\./);
+    assert.match(p, /a finding that is nearby, deeper or merely worth doing does not, and stays in the Surveys\./);
   });
 
   test('arm 2: the standing policy weighs the sizes a binding finding opens and never makes a finding bind', () => {
     assert.match(processOf(render(ERR_LARGER)), /apply it and say so: it weighs the sizes a binding finding opens, and never makes a finding bind\./);
   });
 
-  test('arm 2: the record is short and is not a plan', () => {
+  // Arm 3 (John's structural ruling, decision lin4346-size-after-arm2): the record is four lines and
+  // nothing else. The proxy guard holds the shape (tests/unit/size-of-move.test.js); this pins what
+  // the prompt tells scoping about it.
+  test('arm 3: the record is its four lines and nothing else, and the prompt says the proxy refuses any other line', () => {
     const p = processOf(render());
-    assert.match(p, new RegExp(`Write one \`${SIZE_OF_MOVE_HEADING}\` section \\(append it, or replace your own\\), under 200 words: what and why, never how\\.`));
-    assert.match(p, /It is not a plan, and plan writes what done means: no done conditions, settled details, figures, definitions, lists of cases or places to cover, wording a builder could copy into code or a comment, or facts about this machine\./);
-    assert.match(p, /Name an extra by the behaviour it changes, in one sentence\./);
-    assert.match(p, /No backticks, paths, code names or numbered lists: the proxy refuses them\./);
+    assert.ok(p.includes(`Write one \`${SIZE_OF_MOVE_HEADING}\` section (append it, or replace your own) of these four lines and nothing else: the proxy refuses any other line, so no sizes weighed, plan, definitions or open questions.`));
+    assert.match(p, /The why says what and why, never how: name an extra by the behaviour it changes, with no backticks, paths or code names\./);
+    for (const gone of ['under 200 words', 'It is not a plan', 'open questions as a possible ticket', 'Code reads two lines']) {
+      assert.ok(!p.includes(gone), `arm 2's "${gone}" is gone`);
+    }
+  });
+
+  test('arm 3: a record of the lines the prompt asks for is accepted, and a line it rules out is refused', () => {
+    const base = `${ISSUE.description}\n\n${SIZE_OF_MOVE_HEADING}\n\n`;
+    const four = [`**${SIZE_LABEL}:** ${SIZES[1]}`, `**${WHY_LABEL}:** A small tidy first lets the asked change land on one home.`, `**${CUTS_LABEL}:** ${NO_CUTS}`, `**${DECIDED_BY_LABEL}:** ${DECIDED_BY.pending}`];
+    assert.deepEqual(checkSizeRecord(ISSUE.description, base + four.join('\n')), { ok: true });
+    for (const ruledOut of [`- ${SIZES[0]}: delivers the ask.`, 'Open questions: none.', 'Done means both sections fill on open.']) {
+      assert.equal(checkSizeRecord(ISSUE.description, `${base}${four.join('\n')}\n${ruledOut}`).code, 'SIZE_RECORD_SHAPE', ruledOut);
+    }
   });
 
   test('arm 2: scoping\'s lead settles the size of the move, not "what done means"', () => {
@@ -157,7 +171,7 @@ describe('scoping\'s completion signals (LIN-4369)', () => {
 
   test('they check the size record, not the old block', () => {
     assert.match(coreOutcome, /size of the move/i);
-    assert.ok(signals.some(s => s.includes(SIZE_OF_MOVE_HEADING) && /no how/.test(s)), 'one section, with no how in it');
+    assert.ok(signals.some(s => s.includes(SIZE_OF_MOVE_HEADING) && s.includes(`only the record's ${RECORD_LINES.length} lines`)), 'one section, holding only its lines');
     assert.ok(signals.some(s => s.includes(SIZES[0]) && s.includes(WRONG_WORK)), 'sizes weighed from just the task to wrong work');
     assert.ok(signals.some(s => /standing policy/.test(s) && s.includes('`DECISION:`')), 'policy, or pending with a DECISION:');
     assert.ok(signals.some(s => /Survey comments/.test(s)), 'Surveys read');

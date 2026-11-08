@@ -7,6 +7,7 @@
  *   - PATCH, append, replace and description/below that add or change a
  *     `## Size of the move` section carrying how are refused 422 SIZE_RECORD_HOW naming the line;
  *   - the standing policy deciding "wrong work" is refused 422 SIZE_RECORD_POLICY_CUT;
+ *   - (LIN-4369 arm 3) a record that is not its four lines is refused 422 SIZE_RECORD_SHAPE;
  *   - a close-out prune (description/below) whose body drops the section is refused
  *     422 SIZE_RECORD_DROPPED, and a prune that keeps it verbatim succeeds;
  *   - a plain record is accepted, and an unrelated write beside an old section that
@@ -23,7 +24,7 @@ import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { localProvider } from '../../lib/providers/local/index.js';
 import { createLocalStore } from '../fixtures/local-harness.js';
 import { sealAsAsked } from '../../lib/as-asked.js';
-import { SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK } from '../../lib/size-of-move.js';
+import { SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK, recordShape } from '../../lib/size-of-move.js';
 
 // Must match TEST_LOCAL_URL_KEY in routes/proxy.js (and LOCAL_WORKSPACE_URL_KEY).
 const LOCAL_URL_KEY = 'local-workspace';
@@ -33,13 +34,9 @@ const RECORD = [
   SIZE_OF_MOVE_HEADING,
   '',
   '**Size:** just the task',
-  `**Decided by:** ${DECIDED_BY.policy} (err larger)`,
-  '',
-  'We do the task as asked, because nothing near it binds on this change.',
-  '',
-  '**Sizes weighed:**',
-  '- just the task: delivers the ask.',
-  '- rebuild the area: buys this task nothing.'
+  '**Why:** We do the task as asked, because nothing near it binds on this change.',
+  '**Cuts:** none',
+  `**Decided by:** ${DECIDED_BY.policy} (err larger)`
 ].join('\n');
 const PLAN = '## Implementation Plan\n\n1. a plan step, outside the record';
 
@@ -137,17 +134,37 @@ describe('the size record guard on the proxy lane', () => {
       assert.equal(res.status, 422, JSON.stringify(res.body));
       assert.equal(res.body.code, SIZE_RECORD_CODES.how);
       assert.equal(res.body.kind, 'code-span');
-      assert.deepEqual(res.body.line, { number: 11, text: 'Reuse `outsideAsAsked` here.' });
-      assert.match(res.body.error, /what is being done and why, never how: its line 11 carries a code span/);
+      assert.deepEqual(res.body.line, { number: 7, text: 'Reuse `outsideAsAsked` here.' });
+      assert.match(res.body.error, /what is being done and why, never how: its line 7 carries a code span/);
     }
     assert.equal(await stored('i1'), before);
   });
 
   test('changing a record to carry numbered steps is refused', async () => {
-    const res = await proxy('POST', 'LOCAL-2/description/replace', { oldString: '- rebuild the area: buys this task nothing.', newString: '1. add the module\n2. wire the guard' });
+    const res = await proxy('POST', 'LOCAL-2/description/replace', { oldString: '**Cuts:** none', newString: '**Cuts:** none\n1. add the module\n2. wire the guard' });
     assert.equal(res.status, 422);
     assert.equal(res.body.code, SIZE_RECORD_CODES.how);
     assert.equal(res.body.kind, 'numbered-steps');
+  });
+
+  // LIN-4369 arm 3: the record is four lines and nothing else, held here rather than by the prompt alone.
+  test('a line beyond the record\'s four is refused 422 SIZE_RECORD_SHAPE naming the line and the four lines; the store is unchanged', async () => {
+    const before = await stored('i2');
+    const res = await proxy('POST', 'LOCAL-2/description/replace', { oldString: '**Cuts:** none', newString: '**Cuts:** none\nThe trait means what the preamble gates today.' });
+    assert.equal(res.status, 422, JSON.stringify(res.body));
+    assert.equal(res.body.code, SIZE_RECORD_CODES.shape);
+    assert.equal(res.body.kind, 'extra-line');
+    assert.deepEqual(res.body.line, { number: 6, text: 'The trait means what the preamble gates today.' });
+    assert.ok(res.body.error.includes(`holds four lines and nothing else: its line 6 is not one of the record's lines. The lines: ${recordShape().join(' | ')}.`), res.body.error);
+    assert.equal(await stored('i2'), before);
+  });
+
+  test('a why of two sentences, and a record missing its cuts line, are refused SIZE_RECORD_SHAPE', async () => {
+    const two = await proxy('POST', 'LOCAL-2/description/replace', { oldString: 'binds on this change.', newString: 'binds on this change. The builder defines the trait.' });
+    assert.deepEqual([two.status, two.body.code, two.body.kind], [422, SIZE_RECORD_CODES.shape, 'why-sentences']);
+    const missing = await proxy('POST', 'LOCAL-2/description/replace', { oldString: '**Cuts:** none\n', newString: '' });
+    assert.deepEqual([missing.status, missing.body.code, missing.body.kind], [422, SIZE_RECORD_CODES.shape, 'missing-line']);
+    assert.match(missing.body.error, /comes before a line the record is missing \(Cuts\)/);
   });
 
   test('the standing policy deciding "wrong work" is refused 422 SIZE_RECORD_POLICY_CUT', async () => {
@@ -164,9 +181,14 @@ describe('the size record guard on the proxy lane', () => {
     assert.equal(dropped.body.code, SIZE_RECORD_CODES.dropped);
     assert.ok((await stored('i2')).includes(PLAN), 'nothing was pruned');
 
-    const kept = await proxy('POST', 'LOCAL-2/description/below', { body: `${RECORD}\n\n${stub}` });
+    // LIN-4369 arm 3: text below the record with no heading of its own is inside the section, so the
+    // shape check refuses it; close-out's prune line says to put its stub under a heading of its own.
+    const glued = await proxy('POST', 'LOCAL-2/description/below', { body: `${RECORD}\n\n${stub}` });
+    assert.deepEqual([glued.status, glued.body.code, glued.body.kind], [422, SIZE_RECORD_CODES.shape, 'extra-line']);
+
+    const kept = await proxy('POST', 'LOCAL-2/description/below', { body: `${RECORD}\n\n## Implemented\n\n${stub}` });
     assert.equal(kept.status, 200, JSON.stringify(kept.body));
-    assert.equal(await stored('i2'), `${SEALED}\n\n${RECORD}\n\n${stub}`);
+    assert.equal(await stored('i2'), `${SEALED}\n\n${RECORD}\n\n## Implemented\n\n${stub}`);
   });
 
   test('an unrelated write beside an old section that breaks the rules is accepted', async () => {
