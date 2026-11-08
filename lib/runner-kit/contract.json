@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "LIN-3451: Simple Dispatcher is the reference; a row where kit differs from sd carries a difference. Test fixture only: the kit never loads this file. Byte-copied to simple-dispatcher test/fixtures/runner-contract.json.",
+  "note": "LIN-3451: Simple Dispatcher is the reference; each row pins sd plus kit and/or harbour (LIN-4384), and a column that differs from sd carries a difference. Test fixture only: the kit never loads this file. Byte-copied to simple-dispatcher test/fixtures/runner-contract.json.",
   "rows": [
     {
       "area": "halt",

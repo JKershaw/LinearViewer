@@ -38,7 +38,13 @@ import { SESSION_TARGETS as HARBOUR_SESSION_TARGETS } from '../../lib/dispatch-t
 import { HALT_MODES } from '../../lib/workspace-halt.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const TABLE = JSON.parse(fs.readFileSync(path.join(ROOT, 'lib', 'runner-kit', 'contract.json'), 'utf8'));
+const CONTRACT_PATH = path.join(ROOT, 'lib', 'runner-kit', 'contract.json');
+const TABLE = JSON.parse(fs.readFileSync(CONTRACT_PATH, 'utf8'));
+
+// LIN-4384: the sha256 of contract.json's own bytes. simple-dispatcher pins the same value
+// (FIXTURE_SHA256 beside LV_COMMIT in test/runner-contract.test.js), so an edit here that is not
+// re-copied there would go unnoticed on this side without this tripwire.
+const CONTRACT_SHA256 = '86795d9f7f05ded6d707e055bc90f7aab2ad0aeab8d7983276532301b871115d';
 
 const OWNER = 'acct-owner-1111';
 const NOW = Date.parse('2026-10-18T12:00:00.000Z');
@@ -230,6 +236,12 @@ function checkRowShape(row) {
 }
 
 describe('contract table shape', () => {
+  test('contract.json matches its pinned sha256 (the copy in simple-dispatcher must follow it)', () => {
+    const sha = crypto.createHash('sha256').update(fs.readFileSync(CONTRACT_PATH)).digest('hex');
+    assert.equal(sha, CONTRACT_SHA256,
+      'lib/runner-kit/contract.json changed: re-copy into simple-dispatcher `test/fixtures/runner-contract.json` and re-pin `LV_COMMIT`/`FIXTURE_SHA256` there, then update CONTRACT_SHA256 here');
+  });
+
   test('is versioned and every row has the declared fields', () => {
     assert.equal(TABLE.version, 1);
     for (const r of TABLE.rows) assert.deepEqual(checkRowShape(r), [], `${r.area}: ${r.case}`);
