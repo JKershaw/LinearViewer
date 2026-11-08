@@ -1,0 +1,13 @@
+run	cell	guard	kind	line	size	decidedBy
+b01	scoping-1512-3	SIZE_RECORD_SHAPE	why-sentences	3	just the task	policy
+b02	scoping-1512-2	SIZE_RECORD_SHAPE	why-sentences	4	just the task	policy
+b03	scoping-4253-3	SIZE_RECORD_SHAPE	why-sentences	3	just the task	policy
+b04	scoping-4253-1	SIZE_RECORD_SHAPE	why-sentences	4	just the task	policy
+b05	scoping-4253-2	SIZE_RECORD_SHAPE	why-sentences	4	just the task	policy
+b06	scoping-1512-1	SIZE_RECORD_SHAPE	why-sentences	4	just the task	policy
+b07	scoping-4252-3	SIZE_RECORD_SHAPE	why-sentences	4	just the task	policy
+b08	scoping-4252-1	SIZE_RECORD_SHAPE	why-sentences	3	just the task	policy
+b09	scoping-4178-2	SIZE_RECORD_SHAPE	why-too-long	4	consolidate the decision this task touches	policy
+b10	scoping-4178-1	pass			consolidate the decision this task touches	policy
+b11	scoping-4252-2	SIZE_RECORD_SHAPE	why-sentences	3	just the task	policy
+b12	scoping-4178-3	pass			a small tidy	policy

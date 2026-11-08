@@ -17,3 +17,6 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   over `isTerminalLoop`) instead of `liveOnAnchor` from `lib/live-anchor.js`, and its own
   comment names an earlier incident from that class. One live-run predicate. (Survey
   tally: LIN-4143.)
+- `routes/proxy-compute.js`: the recap/brief GET and POST handlers each repeat the same
+  error-mapping chain (not found, `OUTPUT_TRUNCATED`, OpenRouter, fallback). One helper
+  beside `failureOf` would hold it. (Review, 8 Nov, on LIN-4358.)

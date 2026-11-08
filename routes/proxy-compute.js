@@ -17,6 +17,7 @@ import { resolveAiOperationModel, loadSizePolicy } from '../lib/workspace-prefer
 import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshness, ROADMAP_REPORT_MAX_AGE_DAYS, getNorthStarDocVersion } from '../lib/north-star-resolver.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
+import { truncationFailureOf } from '../lib/openrouter.js';
 import { buildMockBrief } from '../lib/workspace-api-mocks.js';
 import { fixtureParent } from '../lib/sample-data/fixture-parent.js';
 import { hashContext } from '../lib/recap-cache.js';
@@ -1170,6 +1171,11 @@ export function createComputeRoutes({
         if (err.message?.includes('not found')) {
           status = 404;
           body = { error: 'Issue not found' };
+        } else if (truncationFailureOf(err)) {
+          // LIN-4358: the model's output was cut off; nothing was cached.
+          const [code, message, extra] = truncationFailureOf(err);
+          status = code;
+          body = { error: message, detail: err.message, ...extra };
         } else if (err.message?.includes('OpenRouter')) {
           status = 503;
           body = { error: 'AI service temporarily unavailable', detail: err.message };
@@ -1294,6 +1300,11 @@ export function createComputeRoutes({
         if (err.message?.includes('not found')) {
           status = 404;
           body = { error: 'Issue not found' };
+        } else if (truncationFailureOf(err)) {
+          // LIN-4358: the model's output was cut off; nothing was cached.
+          const [code, message, extra] = truncationFailureOf(err);
+          status = code;
+          body = { error: message, detail: err.message, ...extra };
         } else if (err.message?.includes('OpenRouter')) {
           status = 503;
           body = { error: 'AI service temporarily unavailable', detail: err.message };
@@ -1454,6 +1465,11 @@ export function createComputeRoutes({
         if (err.message?.includes('not found')) {
           status = 404;
           body = { error: 'Issue not found' };
+        } else if (truncationFailureOf(err)) {
+          // LIN-4358: the model's output was cut off; nothing was cached.
+          const [code, message, extra] = truncationFailureOf(err);
+          status = code;
+          body = { error: message, detail: err.message, ...extra };
         } else if (err.message?.includes('OpenRouter')) {
           status = 503;
           body = { error: 'AI service temporarily unavailable', detail: err.message };
@@ -1577,6 +1593,11 @@ export function createComputeRoutes({
         if (err.message?.includes('not found')) {
           status = 404;
           body = { error: 'Issue not found' };
+        } else if (truncationFailureOf(err)) {
+          // LIN-4358: the model's output was cut off; nothing was cached.
+          const [code, message, extra] = truncationFailureOf(err);
+          status = code;
+          body = { error: message, detail: err.message, ...extra };
         } else if (err.message?.includes('OpenRouter')) {
           status = 503;
           body = { error: 'AI service temporarily unavailable', detail: err.message };

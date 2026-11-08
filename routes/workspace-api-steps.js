@@ -12,6 +12,7 @@
 import { badRequest, jsonError, keepaliveError } from '../lib/errors.js';
 import { freeTierRefusalBlock } from '../lib/chat-request.js';
 import { buildMockRecapContext } from '../lib/workspace-api-mocks.js';
+import { truncationFailureOf } from '../lib/openrouter.js';
 import { isValidIssueId, resolveIssueBinding } from '../lib/workspace.js';
 
 /**
@@ -31,6 +32,9 @@ export const isTestToken = (workspace) => process.env.NODE_ENV === 'test' && wor
 export function failureOf(error, fallbackMessage, { notFound: hasNotFoundArm = true, openRouter: hasOpenRouterArm = false } = {}) {
   if (error.response?.status === 401) return [401, 'Token expired or invalid'];
   if (hasNotFoundArm && error.message?.includes('not found')) return [404, error.message];
+  // LIN-4358: a cut-off model answer is its own failure, named as such, whatever the arms.
+  const truncated = truncationFailureOf(error);
+  if (truncated) return truncated;
   if (hasOpenRouterArm && error.message?.includes('OpenRouter')) return [503, 'AI service temporarily unavailable', { message: error.message }];
   return [500, fallbackMessage, { message: error.message }];
 }

@@ -19,6 +19,7 @@ import { isTerminalLoop, loopIsTerminal, enrichLoop, sessionIsTerminal } from '.
 import { resolveChatCredential, checkFreeTierGate, freeTierRefusalBlock } from '../lib/chat-request.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { generateRunSummary, parseRunSummaryResponse } from '../lib/run-summary.js';
+import { truncationFailureOf } from '../lib/openrouter.js';
 import { hashLoop } from '../lib/run-summary-cache.js';
 import { generateSessionSummary, parseSessionSummaryResponse, childLoops } from '../lib/session-summary.js';
 import { hashSession } from '../lib/session-summary-cache.js';
@@ -92,6 +93,9 @@ async function generateRunSummaryReply(ctx, req, res, { loop, inputHash }) {
     res.json({ status: 'fresh', loopId, summary, model, generatedAt: new Date().toISOString() });
   } catch (error) {
     console.error('Dashboard run-summary generation error:', error);
+    // LIN-4358: a cut-off answer says so (nothing was cached).
+    const truncated = truncationFailureOf(error);
+    if (truncated) return jsonError(res, ...truncated);
     jsonError(res, 502, 'Could not generate the run summary');
   }
 }
@@ -280,6 +284,9 @@ async function generateSessionSummaryReply(ctx, req, res, { session, inputHash }
     res.json({ status: 'fresh', sessionId, live: false, summary, model, generatedAt: new Date().toISOString() });
   } catch (error) {
     console.error('Dashboard session-summary generation error:', error);
+    // LIN-4358: a cut-off answer says so (nothing was cached).
+    const truncated = truncationFailureOf(error);
+    if (truncated) return jsonError(res, ...truncated);
     jsonError(res, 502, 'Could not generate the session summary');
   }
 }

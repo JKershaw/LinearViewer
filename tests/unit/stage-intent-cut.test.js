@@ -18,6 +18,7 @@ import { generatePrompt, PROMPT_TEMPLATES } from '../../lib/prompt-templates.js'
 import { STAGE_INTENT, CUT, DECIDE } from '../../lib/prompts/stage-intent.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 import { AS_ASKED_HEADING } from '../../lib/as-asked.js';
+import { CUTS_LABEL } from '../../lib/size-of-move.js';
 
 const decides = (kind) => Object.hasOwn(STAGE_INTENT, kind) && STAGE_INTENT[kind][0] === DECIDE;
 const DECIDING = Object.keys(STAGE_INTENT).filter(decides);
@@ -86,7 +87,8 @@ describe('a template says only where its cuts go (LIN-4345, LIN-4367)', () => {
 
   test('scoping and plan each name a place for their cuts', () => {
     const scoping = generatePrompt('scoping', ISSUE, CONTEXT).prompt;
-    assert.ok(cutLines(scoping).some(l => l.includes('**Out of Scope**')), 'scoping writes its cuts under Out of Scope');
+    // LIN-4369: scoping's cuts live in the size record's Cuts line, not an Out of Scope bullet.
+    assert.ok(cutLines(scoping).some(l => l.startsWith(`**${CUTS_LABEL}:**`)), 'scoping writes its cuts in the size record');
     assert.ok(cutLines(generatePrompt('plan', ISSUE, CONTEXT).prompt).length > 0, 'plan lists its cuts');
   });
 

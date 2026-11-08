@@ -51,7 +51,10 @@ describe('LIN-3359 call-log telemetry', () => {
   test('streamChat final-answer row carries maxTokens + reasoningTokens through the usage merge', async () => {
     global.fetch = mock.fn(async () => sseResponse('length', USAGE));
     const events = [];
-    await streamChat([{ role: 'user', content: 'hi' }], { apiKey: 'k', maxTokens: 4000 }, (t, d) => events.push([t, d]));
+    // allowPartial: these rows are the Flight Companion's, which takes a cut-off answer
+    // and shows its note (LIN-3359); the strict default is witnessed in
+    // stream-chat-whole-or-loud.test.js (LIN-4358).
+    await streamChat([{ role: 'user', content: 'hi' }], { apiKey: 'k', maxTokens: 4000, allowPartial: true }, (t, d) => events.push([t, d]));
     assert.strictEqual(records.length, 1);
     assert.strictEqual(records[0].finishReason, 'length');
     assert.strictEqual(records[0].maxTokens, 4000);
@@ -74,7 +77,7 @@ describe('LIN-3359 call-log telemetry', () => {
         choices: [{ finish_reason: 'length', message: { content: 'cut' } }]
       })
     }));
-    await streamChat([{ role: 'user', content: 'hi' }], { apiKey: 'k', maxTokens: 4000 }, () => {});
+    await streamChat([{ role: 'user', content: 'hi' }], { apiKey: 'k', maxTokens: 4000, allowPartial: true }, () => {});
     assert.strictEqual(records.length, 1);
     assert.strictEqual(records[0].finishReason, 'length');
     assert.strictEqual(records[0].maxTokens, 4000);
@@ -98,7 +101,7 @@ describe('LIN-3359 call-log telemetry', () => {
     }));
     await streamChatWithTools(
       [{ role: 'user', content: 'hi' }],
-      { apiKey: 'k', maxTokens: 4000, tools: [{ type: 'function', function: { name: 't', parameters: { type: 'object', properties: {} } } }], executeTool: async () => ({}) },
+      { apiKey: 'k', maxTokens: 4000, allowPartial: true, tools: [{ type: 'function', function: { name: 't', parameters: { type: 'object', properties: {} } } }], executeTool: async () => ({}) },
       () => {}
     );
     const hop = records.find((r) => r.finishReason === 'length');
