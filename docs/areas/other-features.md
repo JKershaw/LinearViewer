@@ -24,3 +24,8 @@ Area notes for `other-features` in the registry. Format and rules: README.md.
 - `lib/key-state-holders.js`: per-key state is reset through this test-side registry; a
   per-workspace state container in production would let a reset drop the container
   instead. (Survey tally: LIN-4168.)
+- `lib/as-asked-seal.js`: homeless by a deliberate pin in `tests/unit/area-map-placement.test.js`,
+  so it sits in this catch-all. It opens the Agent API ↔ Other features pair (2/1, through
+  `routes/proxy-writes.js` and `lib/proxy-graphql-errors.js`). Moving it to LLM & prompts
+  closes the pair, but reverses the pin and moves this entry, so it is a size of move for the
+  guide's owner, not a tidy. (Seams & Tangles, 8 Nov.) `docs/reviews/seams-tangles-review-2026-11-08-run10.md`
