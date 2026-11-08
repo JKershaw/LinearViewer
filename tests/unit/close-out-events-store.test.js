@@ -10,7 +10,7 @@
  */
 import { test, describe, beforeEach, before, after } from 'node:test';
 import assert from 'node:assert';
-import { CloseOutEventsStore, validateCloseOutEvent, CLOSE_OUT_BY } from '../../lib/close-out-events-store.js';
+import { CloseOutEventsStore, validateCloseOutEvent, CLOSE_OUT_BY, MERGED_SINCE_LIMIT } from '../../lib/close-out-events-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
 const PR_URL = 'https://github.com/JKershaw/LinearViewer/pull/41';
@@ -343,5 +343,68 @@ describe('firstPressAt (LIN-3500)', () => {
     const failing = new CloseOutEventsStore({ collection: { find: () => { throw new Error('db down'); } } });
     await assert.rejects(() => failing.firstPressAt({ accountIds: ['a'] }), /db down/);
     await assert.rejects(() => new CloseOutEventsStore({}).firstPressAt({ accountIds: ['a'] }), /not available/);
+  });
+});
+
+describe('CloseOutEventsStore.listMergedSince (LIN-4381)', () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const NOW = Date.parse('2026-11-08T12:00:00Z');
+  const daysAgo = n => new Date(NOW - n * DAY_MS);
+  const pr = n => `https://github.com/JKershaw/LinearViewer/pull/${n}`;
+  let store;
+  beforeEach(() => {
+    store = new CloseOutEventsStore({ collection: harness.freshDb().collection('close-out-events') });
+  });
+
+  test('returns merged events at or after `since`, newest first, as {prUrl, issueIdentifier, mergedAt} only', async () => {
+    await store.record(personMerge({ prUrl: pr(1), issueIdentifier: 'LIN-1', prMergedAt: daysAgo(3) }));
+    await store.record(personMerge({ prUrl: pr(2), issueIdentifier: 'LIN-2', by: 'close-out', prMergedAt: daysAgo(1) }));
+    await store.record(personMerge({ prUrl: pr(3), issueIdentifier: 'LIN-3', prMergedAt: daysAgo(40) })); // before since
+    const rows = await store.listMergedSince({ urlKey: 'ws', since: daysAgo(30) });
+    assert.deepStrictEqual(rows, [
+      { prUrl: pr(2), issueIdentifier: 'LIN-2', mergedAt: daysAgo(1).toISOString() },
+      { prUrl: pr(1), issueIdentifier: 'LIN-1', mergedAt: daysAgo(3).toISOString() },
+    ]);
+  });
+
+  test('the bound is inclusive at `since` (the $gte boundary)', async () => {
+    await store.record(personMerge({ prUrl: pr(1), prMergedAt: daysAgo(30) }));
+    const rows = await store.listMergedSince({ urlKey: 'ws', since: daysAgo(30) });
+    assert.strictEqual(rows.length, 1);
+  });
+
+  test('skips a press (merged: false), an event with no forge merge time, and another workspace', async () => {
+    await store.record(pressEvent({ prUrl: pr(1), prMergedAt: daysAgo(1) }));
+    await store.record(personMerge({ prUrl: pr(2) })); // pre-LIN-3713 shape: no prMergedAt
+    await store.record(personMerge({ urlKey: 'other', prUrl: pr(3), prMergedAt: daysAgo(1) }));
+    assert.deepStrictEqual(await store.listMergedSince({ urlKey: 'ws', since: daysAgo(30) }), []);
+    assert.strictEqual((await store.listMergedSince({ urlKey: 'other', since: daysAgo(30) })).length, 1);
+  });
+
+  test('a limit caps the read and keeps the newest; the cap never exceeds MERGED_SINCE_LIMIT', async () => {
+    for (let n = 1; n <= 4; n += 1) {
+      await store.record(personMerge({ prUrl: pr(n), issueIdentifier: `LIN-${n}`, prMergedAt: daysAgo(n) }));
+    }
+    const rows = await store.listMergedSince({ urlKey: 'ws', since: daysAgo(30), limit: 2 });
+    assert.deepStrictEqual(rows.map(r => r.issueIdentifier), ['LIN-1', 'LIN-2']);
+    let seenLimit;
+    const spy = new CloseOutEventsStore({ collection: {
+      find: () => ({ sort: () => ({ limit: (n) => { seenLimit = n; return { toArray: async () => [] }; } }) }),
+    } });
+    await spy.listMergedSince({ urlKey: 'ws', since: daysAgo(30), limit: MERGED_SINCE_LIMIT * 10 });
+    assert.strictEqual(seenLimit, MERGED_SINCE_LIMIT);
+  });
+
+  test('never throws: a failing collection, a missing collection and bad input all answer []', async () => {
+    const failing = new CloseOutEventsStore({ collection: { find: () => { throw new Error('db down'); } } });
+    assert.deepStrictEqual(await failing.listMergedSince({ urlKey: 'ws', since: daysAgo(30) }), []);
+    const rejecting = new CloseOutEventsStore({ collection: {
+      find: () => ({ sort: () => ({ limit: () => ({ toArray: async () => { throw new Error('db down'); } }) }) }),
+    } });
+    assert.deepStrictEqual(await rejecting.listMergedSince({ urlKey: 'ws', since: daysAgo(30) }), []);
+    assert.deepStrictEqual(await new CloseOutEventsStore({}).listMergedSince({ urlKey: 'ws', since: daysAgo(30) }), []);
+    assert.deepStrictEqual(await store.listMergedSince({ urlKey: '', since: daysAgo(30) }), []);
+    assert.deepStrictEqual(await store.listMergedSince({ urlKey: 'ws', since: 'yesterday' }), []);
+    assert.deepStrictEqual(await store.listMergedSince({ urlKey: 'ws', since: new Date(NaN) }), []);
   });
 });
