@@ -175,7 +175,7 @@ lib/
   prompts/
     stage-intent.js          Every stage's Scope and Authority lines (STAGE_INTENT), which withStageIntent places after the Goal's lead (LIN-3291/LIN-3299)
     leftover-words.js        The leftover words (LIN-4376): `LEFTOVERS_HEADING` and `LEFTOVER_RULE` (where a leftover goes, and the one-home line), rendered verbatim by `leftoverPrompt` (lib/dispatch-leftover.js), review and close-out. A leaf that imports nothing, so the template defs can import it without a cycle through lib/prompt-templates.js
-    area-registry-path.js    The area registry's path, `REGISTRY_PATH` = docs/areas/areas.json (LIN-4383), spelled once and owned by the product: `formatAreaNotesPointer` (lib/prompt-formatters.js) interpolates it, and scripts/code-shape/code-shape-lib.mjs and the tests' registry helper import it. A leaf that imports nothing
+    area-registry-path.js    The area registry's path, `REGISTRY_PATH` = docs/areas/areas.json (LIN-4383), spelled once and owned by the product: the area notes pointers' shared opening (`AREA_NOTES_WHERE`, lib/prompt-formatters.js) interpolates it, and scripts/code-shape/code-shape-lib.mjs and the tests' registry helper import it. A leaf that imports nothing
     autopilot-kickoff.js     Autopilot kickoff briefing template
     autopilot-manual.js      Autopilot operating manual ("handbook")
     collective-participant.js  Collective discussion participant prompt (experimental, LIN-450)

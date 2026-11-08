@@ -14,8 +14,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - Keep the scoping and the two Survey renders byte-identical unless the ticket is about
   them: replays compare them byte for byte (LIN-4369).
 - The Surveys get no area notes pointer: survey-place reads no reports on the codebase's
-  shape, and those reports feed the notes. Scoping weighs the notes against both Surveys,
-  in its own pointer: its record takes no fifth line, so it cites in its final message (LIN-4346).
+  shape, which feed the notes. Scoping's own pointer cites in its final message (its record
+  takes no fifth line); both share `AREA_NOTES_WHERE`, so say where notes are there (LIN-4346).
 - `lib/prompt-template-defs.js` and the budget test change in almost every merge: rebase,
   then re-measure. Its fixture passes no context, so it measures a prompt's empty-context
   branch: dropping one can raise a ceiling while real renders shrink (LIN-4393). Measure.
