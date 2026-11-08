@@ -343,7 +343,9 @@ export function createRoadmapRoutes({ workspaceFromUrl, freeTierStore, userPrefe
     try {
       await streamChat(
         messages,
-        { apiKey, model, maxTokens: budget, reasoning, callMeta: { urlKey: urlKey || null, feature: 'roadmap', issueIdentifier: layer || null } },
+        // LIN-4358: the layer streams live and reports its own finishReason in
+        // `layer-done` (the client marks a `length` layer), so it takes partials.
+        { apiKey, model, maxTokens: budget, reasoning, allowPartial: true, callMeta: { urlKey: urlKey || null, feature: 'roadmap', issueIdentifier: layer || null } },
         (type, data) => {
           if (type === 'token') {
             const token = (data && data.token) || '';
@@ -861,7 +863,9 @@ export function createRoadmapRoutes({ workspaceFromUrl, freeTierStore, userPrefe
       const { reasoning, maxTokens } = resolveReasoningBudget({ model: selectedModel, proseTokens: ROADMAP_LAYER_MAX_TOKENS });
       await streamChat(
         messages,
-        { apiKey: apiKeyToUse, model: selectedModel, maxTokens, reasoning,
+        // LIN-4358: the chat streams to the person and forwards `done` with its
+        // finishReason, so it takes partials.
+        { apiKey: apiKeyToUse, model: selectedModel, maxTokens, reasoning, allowPartial: true,
           callMeta: { urlKey: req.workspace?.urlKey || null, feature: 'roadmap-chat' } },
         (type, data) => {
           sendSSE(res, type, data);

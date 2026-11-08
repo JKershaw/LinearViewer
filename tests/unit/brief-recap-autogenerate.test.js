@@ -156,3 +156,41 @@ for (const S of SECTIONS) {
     assert.match(posts[0].url, /[?&]source=github(&|$)/, 'manual POST forwards source');
   });
 }
+
+// LIN-4358 review ledger 6: a cut-off answer must read as one in the panel. The route
+// answers 502 OUTPUT_TRUNCATED, but a generation that ran past the keepalive's first
+// byte (20s) has already sent HTTP 200, so the same failure arrives as a resolved body
+// with `statusCode` — which drew an empty "fresh" panel ("Nothing to brief yet.").
+const CUT_MESSAGE = 'OpenRouter output cut off: anthropic/claude-haiku-5.5 stopped with finish_reason \'length\' (6000 of 6000 output tokens, 5800 of them hidden reasoning), after one retry with a larger budget. The partial result was not kept.';
+const TRUNCATED_BODY = {
+  error: 'The model\'s output was cut off, so nothing was kept',
+  code: 'OUTPUT_TRUNCATED', message: CUT_MESSAGE, model: 'anthropic/claude-haiku-5.5', finishReason: 'length',
+};
+
+for (const S of SECTIONS) {
+  const cases = [
+    ['after the keepalive flushed (200 with statusCode)', () => ({ ...TRUNCATED_BODY, statusCode: 502 })],
+    ['as a plain 502', () => { const err = new Error(TRUNCATED_BODY.error); err.status = 502; err.body = TRUNCATED_BODY; throw err; }],
+  ];
+  for (const [how, post] of cases) {
+    test(`${S.name}: a cut-off answer ${how} shows the model's cut-off message, never a fresh panel`, async () => {
+      const responder = (url, method) => (method === 'POST' ? post() : { status: 'missing' });
+      const { section, makeContainer } = loadSection(S.file, S.global, responder);
+      const container = makeContainer();
+      await section.init(container, OPTS);
+      await pressDrawn(container, S.press);
+      assert.equal(container.getAttribute('data-state'), 'error');
+      assert.ok(container.innerHTML.includes(CUT_MESSAGE), 'the panel names the model and where its tokens went');
+    });
+  }
+
+  test(`${S.name}: any other late failure (200 with statusCode) is an error too, with its own words`, async () => {
+    const responder = (url, method) => (method === 'POST' ? { error: 'AI service temporarily unavailable', statusCode: 503 } : { status: 'missing' });
+    const { section, makeContainer } = loadSection(S.file, S.global, responder);
+    const container = makeContainer();
+    await section.init(container, OPTS);
+    await pressDrawn(container, S.press);
+    assert.equal(container.getAttribute('data-state'), 'error');
+    assert.ok(container.innerHTML.includes('AI service temporarily unavailable'));
+  });
+}
