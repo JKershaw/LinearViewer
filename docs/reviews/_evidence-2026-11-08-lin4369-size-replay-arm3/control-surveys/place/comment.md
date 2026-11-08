@@ -1,0 +1,17 @@
+## Survey global: LIN-3960 @ 9da9bc2ba
+
+**Where it lands.** All of it is in `lib/render-styleguide.js`. The fix goes in `settingsPieceSection` (lines 191-202), which writes `piece.name/purpose/parts/sizes/states/theme` straight into `<h4>`/`<dd>`. The test belongs in `tests/unit/lin-3890-styleguide-settings-anatomy.test.js`, which already loops over every piece and every anatomy key. I checked all ten pieces, and only one string contains `<`, `>` or `&`: `group-title.purpose` at line 129. `role="switch"` in `switch-row.parts` renders correctly either way.
+
+The area is getting better. LIN-3890 and LIN-3950 replaced hand-drawn samples with output from the real builders (`SETTINGS_SAMPLES`), and tests now pin the samples and keep the page byte-stable. The one thing that hasn't caught up is the house rule that every other builder follows: plain text goes through `escapeHtml` (`lib/utils/html.js`), and only `*Html` props are trusted markup. The `settings-group.js` builders that this anatomy describes escape their `title`. The styleguide's own template escapes nothing and doesn't import `escapeHtml`. Every other interpolation in it is a constant token name or value, so this is the first piece of prose in the file that the lack of escaping actually breaks.
+
+**Done the obvious way.** There are two obvious fixes, and one is worse.
+- Writing `&lt;workspace&gt;` into the data fixes one string and puts HTML into `SETTINGS_PIECES`. That array is exported and read as plain text by two test files. The next placeholder anyone writes breaks again.
+- Wrapping the six fields in `escapeHtml(...)` and importing it from `utils/html.js` fixes the whole class. Don't write a local `esc` helper; that would make a second copy of something the codebase already has.
+
+**The test trap.** The ticket's test, "the rendered page contains the literal text `For everyone in <workspace>`", passes on the buggy base if it's written as `html.includes(...)` on the raw string, because the raw HTML already contains `<workspace>`. The assertion has to check the escaped form (`For everyone in &lt;workspace&gt;`). Better still, assert `html.includes(escapeHtml(piece[key]))` for every piece and key in the existing loop. That covers every anatomy string, now and later.
+
+Nothing needs updating in a registry or doc. The `source-map.md` entry (line 131) is generic. `tests/screenshots/pages/styleguide-*.png` are output from non-asserting generators, so only a person comparing them would notice. The judge page list (`tests/judge/pages.mjs:57`) needs no change.
+
+**Better, at a cost this task can carry.** Escape at render as described, and put the escaping rule in the `SETTINGS_PIECES` comment (lines 67-70): anatomy fields are plain text and the template escapes them. Optionally, make the `group-title` sample (line 175) draw a second `group({ title: 'For everyone in <workspace>' })`. The live builder would then show the same placeholder, escaped by the code the Settings pages actually use.
+
+**Better still, not this task's.** `render-styleguide.js` (626 lines) is a trusted-markup template written in raw template literals. Every page renderer has to remember to call `escapeHtml` at each text interpolation, and nothing checks that it does. A tagged-template or text/`Html` split enforced across `lib/render-*.js` would close the gap behind this symptom. That's a separate sweep, not a styleguide fix.

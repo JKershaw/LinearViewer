@@ -1,0 +1,12 @@
+{
+ "identifier": "LIN-3960",
+ "title": "/styleguide: the anatomy text puts an unescaped <workspace> in the page HTML",
+ "description": "## As asked\n\nFound in the LIN-3958 review (PR #2144) as an out-of-scope finding.\n\n`lib/render-styleguide.js:129` (the Settings piece anatomy for the group note, `purpose`) holds the string `\u201cFor everyone in <workspace>\u201d`. The anatomy text is written into the page as HTML without escaping, so `<workspace>` is parsed as an unknown element and the text reads \u201cFor everyone in \u201d.\n\nThis happens on base too (it predates LIN-3958). Fix: escape the anatomy text, or write the placeholder as `&lt;workspace&gt;`, and add a unit test that the rendered `/styleguide` contains the literal text \u201cFor everyone in <workspace>\u201d.\n\nFound by: review of LIN-3958.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*",
+ "base": "9da9bc2ba",
+ "comments": [
+  {
+   "createdAt": "2026-10-25T16:39:40.235Z",
+   "body": "Priority Low: one placeholder in the /styleguide anatomy copy renders as \"For everyone in .\"; it is cosmetic, on an internal reference page, predates LIN-3958 and does not recur. Type: Bug (rendered text is wrong). Related: LIN-3958 (found in its review)."
+  }
+ ]
+}

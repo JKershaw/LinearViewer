@@ -58,7 +58,7 @@ import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 import { checkAsAsked, splitAsAsked, hasMarkerLine, askedText, AS_ASKED_HEADING } from '../lib/as-asked.js';
 import { sealForFiling } from '../lib/as-asked-seal.js';
-import { checkSizeRecord, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK } from '../lib/size-of-move.js';
+import { checkSizeRecord, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK, RECORD_LINES, WHY_MAX } from '../lib/size-of-move.js';
 import { jsonError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
 
@@ -343,11 +343,13 @@ export function createProxyWriteRoutes({
     if (check.ok) return false;
     const lead = `The "${SIZE_OF_MOVE_HEADING}" section`;
     const message = {
-      [SIZE_RECORD_CODES.how]: `${lead} says what is being done and why, never how: its line ${check.line?.number} carries ${SIZE_HOW_WORDS[check.kind]} (${JSON.stringify(check.token)}). Say it in plain words, with the sizes weighed as bullets; a quotation may carry such text only when it matches the As asked block word for word.`,
+      [SIZE_RECORD_CODES.how]: `${lead} says what is being done and why, never how: its line ${check.line?.number} carries ${SIZE_HOW_WORDS[check.kind]} (${JSON.stringify(check.token)}). Say it in plain words; a quotation may carry such text only when it matches the As asked block word for word.`,
       [SIZE_RECORD_CODES.policyCut]: `${lead} cannot be decided by ${DECIDED_BY.policy} when the size is "${WRONG_WORK}": that cuts the ask, and a cut needs a person's ruling. Record it as ${DECIDED_BY.pending} and raise the ruling.`,
       [SIZE_RECORD_CODES.dropped]: `${lead} is kept once written: the new description drops it. Keep it, or replace it in place.`,
+      // LIN-4369 arm 3: the record is four lines and nothing else (RECORD_LINES); `reason` names the part that broke.
+      [SIZE_RECORD_CODES.shape]: `${lead} is exactly these lines, in order, and nothing else: ${RECORD_LINES.join('; ')}. The why is one sentence of at most ${WHY_MAX} characters, and each cut bullet quotes the "${AS_ASKED_HEADING}" block word for word. ${check.line ? `Line ${check.line.number} breaks it (${check.reason}).` : `It breaks at: ${check.reason}.`} Put the sizes weighed and open questions in a comment, and any other text after the record under its own heading.`,
     }[check.code];
-    return refuse(ctx, 422, message, { code: check.code, ...(check.kind ? { kind: check.kind } : {}), ...(check.line ? { line: check.line } : {}) });
+    return refuse(ctx, 422, message, { code: check.code, ...(check.kind ? { kind: check.kind } : {}), ...(check.reason ? { reason: check.reason } : {}), ...(check.line ? { line: check.line } : {}) });
   }
 
   // ---------------------------------------------------------------------------

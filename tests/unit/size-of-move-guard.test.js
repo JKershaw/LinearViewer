@@ -33,13 +33,9 @@ const RECORD = [
   SIZE_OF_MOVE_HEADING,
   '',
   '**Size:** just the task',
-  `**Decided by:** ${DECIDED_BY.policy} (err larger)`,
-  '',
-  'We do the task as asked, because nothing near it binds on this change.',
-  '',
-  '**Sizes weighed:**',
-  '- just the task: delivers the ask.',
-  '- rebuild the area: buys this task nothing.'
+  '**Why:** We do the task as asked, because nothing near it binds on this change.',
+  '**Cuts:** none',
+  `**Decided by:** ${DECIDED_BY.policy} (err larger)`
 ].join('\n');
 const PLAN = '## Implementation Plan\n\n1. a plan step, outside the record';
 
@@ -137,14 +133,14 @@ describe('the size record guard on the proxy lane', () => {
       assert.equal(res.status, 422, JSON.stringify(res.body));
       assert.equal(res.body.code, SIZE_RECORD_CODES.how);
       assert.equal(res.body.kind, 'code-span');
-      assert.deepEqual(res.body.line, { number: 11, text: 'Reuse `outsideAsAsked` here.' });
-      assert.match(res.body.error, /what is being done and why, never how: its line 11 carries a code span/);
+      assert.deepEqual(res.body.line, { number: 7, text: 'Reuse `outsideAsAsked` here.' });
+      assert.match(res.body.error, /what is being done and why, never how: its line 7 carries a code span/);
     }
     assert.equal(await stored('i1'), before);
   });
 
   test('changing a record to carry numbered steps is refused', async () => {
-    const res = await proxy('POST', 'LOCAL-2/description/replace', { oldString: '- rebuild the area: buys this task nothing.', newString: '1. add the module\n2. wire the guard' });
+    const res = await proxy('POST', 'LOCAL-2/description/replace', { oldString: '**Cuts:** none', newString: '**Cuts:** none\n1. add the module\n2. wire the guard' });
     assert.equal(res.status, 422);
     assert.equal(res.body.code, SIZE_RECORD_CODES.how);
     assert.equal(res.body.kind, 'numbered-steps');
@@ -164,9 +160,27 @@ describe('the size record guard on the proxy lane', () => {
     assert.equal(dropped.body.code, SIZE_RECORD_CODES.dropped);
     assert.ok((await stored('i2')).includes(PLAN), 'nothing was pruned');
 
-    const kept = await proxy('POST', 'LOCAL-2/description/below', { body: `${RECORD}\n\n${stub}` });
+    // LIN-4369 arm 3: the stub goes above the record, which stays last (close-out's prune says so).
+    const kept = await proxy('POST', 'LOCAL-2/description/below', { body: `${stub}\n\n${RECORD}` });
     assert.equal(kept.status, 200, JSON.stringify(kept.body));
-    assert.equal(await stored('i2'), `${SEALED}\n\n${RECORD}\n\n${stub}`);
+    assert.equal(await stored('i2'), `${SEALED}\n\n${stub}\n\n${RECORD}`);
+
+    const after = await proxy('POST', 'LOCAL-2/description/below', { body: `${RECORD}\n\n${stub}` });
+    assert.equal(after.status, 422, 'a stub run on under the record, with no heading, becomes part of it');
+    assert.equal(after.body.code, SIZE_RECORD_CODES.shape);
+  });
+
+  test('a line beyond the four is refused 422 SIZE_RECORD_SHAPE, naming the reason and the line (LIN-4369 arm 3)', async () => {
+    const before = await stored('i1');
+    const extra = `${RECORD}\nThe trait means the mandate the preamble gates.`;
+    const res = await proxy('POST', 'LOCAL-1/description/below', { body: extra });
+    assert.equal(res.status, 422, JSON.stringify(res.body));
+    assert.equal(res.body.code, SIZE_RECORD_CODES.shape);
+    assert.equal(res.body.reason, 'extra-line');
+    assert.deepEqual(res.body.line, { number: 7, text: 'The trait means the mandate the preamble gates.' });
+    assert.match(res.body.error, /exactly these lines, in order, and nothing else/);
+    assert.match(res.body.error, /under its own heading/);
+    assert.equal(await stored('i1'), before);
   });
 
   test('an unrelated write beside an old section that breaks the rules is accepted', async () => {

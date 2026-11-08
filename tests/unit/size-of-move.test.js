@@ -23,7 +23,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  SIZE_OF_MOVE_HEADING, SIZES, DECIDED_BY, SIZE_RECORD_CODES, WRONG_WORK,
+  SIZE_OF_MOVE_HEADING, SIZES, DECIDED_BY, SIZE_RECORD_CODES, WRONG_WORK, RECORD_LINES, WHY_MAX, CUT_NOTE_MAX,
   readSizeRecord, sizeFact, checkSizeRecord, formatSizePolicyLine
 } from '../../lib/size-of-move.js';
 import { sealAsAsked } from '../../lib/as-asked.js';
@@ -36,19 +36,13 @@ const FIXTURES = join(ROOT, 'tests', 'fixtures', 'size-of-move');
 const ASK = 'Keep the look-first step as advice (on main: `docs/plans/survey.md`). Write a full guide.';
 const SEALED = sealAsAsked(ASK);
 
-/** A record body in the shape scoping will write. */
+/** A record body in the shape scoping writes (LIN-4369 arm 3: four lines, RECORD_LINES). */
+const WHY = '**Why:** We are doing the task as asked, because nothing near it binds on this change and a larger move buys this task nothing.';
 const PLAIN = [
   `**Size:** ${SIZES[0]}`,
-  `**Decided by:** ${DECIDED_BY.policy} (err larger)`,
-  '',
-  'We are doing the task as asked, because nothing near it binds on this change and a larger move buys this task nothing.',
-  '',
-  '**Sizes weighed:**',
-  `- ${SIZES[0]}: delivers what was asked and nothing more.`,
-  `- ${SIZES[1]}: would tidy the neighbouring wording, which this task does not need.`,
-  `- ${SIZES[3]}: would settle the whole area, but this task does not depend on it.`,
-  '',
-  '**Cuts:** none.'
+  WHY,
+  '**Cuts:** none.',
+  `**Decided by:** ${DECIDED_BY.policy} (err larger)`
 ].join('\n');
 
 const withRecord = (body, { ask = SEALED, after = '\n\n## Implementation Plan\n\n1. a plan step is not part of the record' } = {}) =>
@@ -125,7 +119,7 @@ describe('the check: what it refuses', () => {
     assert.equal(r.code, SIZE_RECORD_CODES.how);
     assert.equal(r.kind, 'path');
     assert.equal(r.token, 'lib/size-of-move.js');
-    assert.equal(r.line.number, 14);
+    assert.equal(r.line.number, 7);
     assert.equal(r.line.text, 'Start in lib/size-of-move.js where the record lives.');
   });
 
@@ -173,13 +167,63 @@ describe('the check: what it refuses', () => {
   });
 });
 
+describe('the check: the four-line shape (LIN-4369 arm 3)', () => {
+  const shape = (body) => {
+    const r = checkSizeRecord(SEALED, withRecord(body));
+    return r.ok ? 'ok' : `${r.code}:${r.reason}`;
+  };
+  const S = SIZE_RECORD_CODES.shape;
+
+  test('any line beyond the four is refused, naming it: plain-word how has nowhere to go', () => {
+    const r = checkSizeRecord(SEALED, withRecord(`${PLAIN}\nThe trait means the mandate the preamble gates, apart from the reading-pass wording.`));
+    assert.deepEqual([r.ok, r.code, r.reason, r.line.number], [false, S, 'extra-line', 7]);
+    assert.equal(shape(`${PLAIN}\n\n**Sizes weighed:**\n- ${SIZES[0]}: the ask.`), `${S}:extra-line`);
+  });
+
+  test('the size is one of the sizes, and comes first', () => {
+    assert.equal(shape(PLAIN.replace(`**Size:** ${SIZES[0]}`, '**Size:** a medium move')), `${S}:size-value`);
+    assert.equal(shape(PLAIN.split('\n').slice(1).join('\n')), `${S}:size-line`);
+  });
+
+  test('the why is one sentence, at most WHY_MAX characters', () => {
+    assert.equal(shape(PLAIN.replace(WHY, '**Why:** It binds. The read prices nothing.')), `${S}:why-sentences`);
+    assert.equal(shape(PLAIN.replace(WHY, `**Why:** ${'a'.repeat(WHY_MAX + 1)}`)), `${S}:why-length`);
+    assert.equal(shape(PLAIN.replace(WHY, '**Why:**')), `${S}:why-line`);
+  });
+
+  test('cuts: "none", or bullets that each quote the ask word for word', () => {
+    assert.equal(shape(PLAIN.replace('**Cuts:** none.', '**Cuts:**\n- the guide part is dropped; pending a ruling')), `${S}:cut-quote`);
+    assert.equal(shape(PLAIN.replace('**Cuts:** none.', '**Cuts:**')), `${S}:cuts-value`);
+    assert.equal(shape(PLAIN.replace('**Cuts:** none.', '**Cuts:** none.\n- "Write a full guide."')), `${S}:cuts-value`);
+    assert.equal(shape(PLAIN.replace('**Cuts:** none.', `**Cuts:**\n- "Write a full guide." ${'x'.repeat(CUT_NOTE_MAX + 1)}`)), `${S}:cut-note`);
+  });
+
+  test('who decided is one of the decided-by values, and closes the record', () => {
+    assert.equal(shape(PLAIN.replace(`${DECIDED_BY.policy} (err larger)`, 'John')), `${S}:decided-by`);
+  });
+
+  test('the record lines the prompt prints are the ones the check holds', () => {
+    assert.deepEqual(RECORD_LINES.map(l => l.match(/^\*\*([^:]+):/)[1]), ['Size', 'Why', 'Cuts', 'Decided by']);
+  });
+
+  test('a code-shaped token or a policy cut keeps its own, more specific refusal', () => {
+    assert.equal(checkSizeRecord(SEALED, withRecord(`${PLAIN}\nReuse \`outsideAsAsked\`.`)).code, SIZE_RECORD_CODES.how);
+    assert.equal(checkSizeRecord(SEALED, withRecord(PLAIN.replace(`**Size:** ${SIZES[0]}`, `**Size:** ${WRONG_WORK}`))).code, SIZE_RECORD_CODES.policyCut);
+  });
+
+  test('a heading after the record closes it, so a plan below is not part of it', () => {
+    assert.deepEqual(checkSizeRecord(SEALED, withRecord(PLAIN, { after: '\n\n## Notes\n\nA note for the next step.' })), { ok: true });
+  });
+});
+
 describe('the check: what it permits', () => {
-  test('plain what-and-why prose, with the sizes weighed as bullets', () => {
+  test('the four lines: a size, one sentence of why, cuts, who decided', () => {
     assert.deepEqual(checkSizeRecord(SEALED, withRecord(PLAIN)), { ok: true });
   });
 
   test('prose that only looks technical: and/or, size(s), a parenthesis, "e.g."', () => {
-    assert.deepEqual(checkSizeRecord(SEALED, withRecord(`${PLAIN}\nThe what and/or the why of the size(s) (as asked), e.g. this one, stays plain.`)), { ok: true });
+    const why = '**Why:** The what and/or the why of the size(s) (as asked), e.g. this one, stays plain.';
+    assert.deepEqual(checkSizeRecord(SEALED, withRecord(PLAIN.replace(WHY, why))), { ok: true });
   });
 
   test('a ruling and a pending record are fine with "wrong work"', () => {
@@ -190,10 +234,8 @@ describe('the check: what it permits', () => {
   });
 
   test('a quoted cut whose quote carries a code span from the ask; the same span not in the ask is refused', () => {
-    const quoted = `${PLAIN.replace('**Cuts:** none.', '')}**Cuts:**\n- "Write a full guide." and "on main: \`docs/plans/survey.md\`" stay; ruled by John.`;
+    const quoted = PLAIN.replace('**Cuts:** none.', '**Cuts:**\n- "Write a full guide." and "on main: \`docs/plans/survey.md\`" stay; ruled by John.');
     assert.deepEqual(checkSizeRecord(SEALED, withRecord(quoted)), { ok: true });
-    const blockquote = `${PLAIN}\n> Keep the look-first step as advice (on main: \`docs/plans/survey.md\`).`;
-    assert.deepEqual(checkSizeRecord(SEALED, withRecord(blockquote)), { ok: true }, 'a > quotation of the ask');
     const notInAsk = quoted.replace('docs/plans/survey.md', 'docs/plans/other.md');
     const r = checkSizeRecord(SEALED, withRecord(notInAsk));
     assert.deepEqual([r.ok, r.kind], [false, 'code-span']);

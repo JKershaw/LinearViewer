@@ -69,7 +69,7 @@ import { signInDoors } from '../../lib/components/landing-hero.js';
 /** Templates, source bytes. Same files `steady-base-growth.mjs` GROUPS as
  * "worker templates". */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 109636, // LIN-4369 (replay arm 2): +726, scoping defines when a Survey finding binds and keeps its size record short and not a plan
+  'lib/prompt-template-defs.js': 109432, // LIN-4369 (replay arm 3): -204, scoping's record becomes four lines the proxy holds (lib/size-of-move.js RECORD_LINES), replacing arm 2's prose limits
   'lib/prompt-templates.js': 19593, // LIN-4251: the `stageWrites(kind)` lookup every entrance uses (code, not prompt text)
   'lib/prompt-formatters.js': 45994, // LIN-4248: the two Survey kinds' empty GROUNDING_BY_KIND entries, so the forecasts get no re-ground or implement notes
   'lib/prompt-contract.js': 3875, // LIN-4362: the `## As asked` spellings interpolate AS_ASKED_HEADING (code, not prompt text)
@@ -86,7 +86,7 @@ export const TEMPLATES_RENDERED_CEILINGS = {
   triage: 2429, // LIN-3299: at 2429 since Scope and Authority on every path
   breakdown: 5310, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
   research: 11718, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
-  scoping: 4358, // LIN-4369 (replay arm 2): +617, when a finding binds, and the record is not a plan (which size is judgement; the guard holds only code-shaped how)
+  scoping: 4011, // LIN-4369 (replay arm 3): -347, the record's four lines replace arm 2's prose limits; the proxy's shape check holds them, so the prompt need not
   design: 2847, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
   spike: 2866, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
   context: 2021, // LIN-3300: at 2021 since the stage rules only the meta-prompt carried moved into their templates
@@ -134,7 +134,7 @@ export const LANDING_AGENT_PROMPT_CEILING = 584; // LIN-4085: new at 584 (the co
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 349170; // LIN-4369 (replay arm 2): +1321 (347849 -> 349170), the exact sum of the ceilings above
+export const FROZEN_TOTAL_BYTES = 348619; // LIN-4369 (replay arm 3): -551 (349170 -> 348619), the exact sum of the ceilings above
 
 const BASE_URL = 'https://harbour.example';
 

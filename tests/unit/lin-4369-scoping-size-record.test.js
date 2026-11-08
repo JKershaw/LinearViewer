@@ -16,7 +16,7 @@ import { CUT } from '../../lib/prompts/stage-intent.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 import { AS_ASKED_HEADING } from '../../lib/as-asked.js';
 import {
-  SIZE_OF_MOVE_HEADING, SIZES, DECIDED_BY, SIZE_LABEL, DECIDED_BY_LABEL, RECORD_PARTS, WRONG_WORK,
+  SIZE_OF_MOVE_HEADING, SIZES, DECIDED_BY, SIZE_LABEL, WHY_LABEL, CUTS_LABEL, DECIDED_BY_LABEL, RECORD_LINES, WRONG_WORK,
   readSizeRecord, checkSizeRecord
 } from '../../lib/size-of-move.js';
 
@@ -41,11 +41,11 @@ describe('scoping writes the size record (LIN-4369)', () => {
     }
   });
 
-  test('it writes one size section, every size, every decided-by value and every record part, from the module', () => {
+  test('it writes one size section, every size, and every record line, from the module', () => {
     const p = processOf(render());
     assert.equal(count(p, `\`${SIZE_OF_MOVE_HEADING}\``), 1, 'names the one section it writes');
     assert.ok(p.includes(SIZES.join(' / ')), 'lays out every size, smallest first');
-    for (const part of RECORD_PARTS) assert.ok(p.includes(part), `record part: ${part}`);
+    for (const line of RECORD_LINES) assert.ok(p.includes(`\`${line}\``), `record line: ${line}`);
     assert.ok(p.includes(`\`**${SIZE_LABEL}:** <size>\``), 'the size line code reads');
     assert.ok(p.includes(`\`**${DECIDED_BY_LABEL}:** ${Object.values(DECIDED_BY).join(' / ')}\``), 'the decided-by line code reads');
   });
@@ -60,11 +60,9 @@ describe('scoping writes the size record (LIN-4369)', () => {
   test('a record written with the lines the prompt names reads back through the parser and passes the guard', () => {
     const record = [
       SIZE_OF_MOVE_HEADING, '',
-      `**${SIZE_LABEL}:** ${SIZES[0]}`, '',
-      'Why: the Surveys find nothing this task binds on.', '',
-      `- ${SIZES[0]}: delivers what was asked.`,
-      `- ${SIZES[1]}: buys this task nothing.`, '',
-      'Cuts to the ask: none. Open questions: none.', '',
+      `**${SIZE_LABEL}:** ${SIZES[0]}`,
+      `**${WHY_LABEL}:** The Surveys find nothing this task binds on, so the ask as written is the move.`,
+      `**${CUTS_LABEL}:** none`,
       `**${DECIDED_BY_LABEL}:** ${DECIDED_BY.policy} (err larger)`
     ].join('\n');
     const next = `${ISSUE.description}\n\n${record}`;
@@ -91,12 +89,26 @@ describe('scoping writes the size record (LIN-4369)', () => {
     assert.match(processOf(render(ERR_LARGER)), /apply it and say so: it weighs the sizes a binding finding opens, and never makes a finding bind\./);
   });
 
-  test('arm 2: the record is short and is not a plan', () => {
+  // Arm 3 (ruling lin4346-size-after-arm2, "structural-arm"): the record is four lines, held by the proxy.
+  test('arm 3: the record is exactly four lines and nothing else, and the proxy holds that', () => {
     const p = processOf(render());
-    assert.match(p, new RegExp(`Write one \`${SIZE_OF_MOVE_HEADING}\` section \\(append it, or replace your own\\), under 200 words: what and why, never how\\.`));
-    assert.match(p, /It is not a plan, and plan writes what done means: no done conditions, settled details, figures, definitions, lists of cases or places to cover, wording a builder could copy into code or a comment, or facts about this machine\./);
-    assert.match(p, /Name an extra by the behaviour it changes, in one sentence\./);
-    assert.match(p, /No backticks, paths, code names or numbered lists: the proxy refuses them\./);
+    assert.match(p, new RegExp(`Write one \`${SIZE_OF_MOVE_HEADING}\` section \\(append it, or replace your own\\) of exactly these lines, in order, and nothing else; the proxy refuses any other line:`));
+    assert.match(p, /The why is one plain sentence of what and why, never how; it names a larger size's extra\./);
+    assert.match(p, /The sizes weighed, one line each, and open questions go in your comment\./);
+    assert.ok(!/under 200 words|It is not a plan/.test(p), 'arm 2\'s prose limits are replaced by the shape');
+  });
+
+  test('arm 3: a record carrying a plain-word definition beyond the four lines is refused by the guard', () => {
+    const record = [
+      SIZE_OF_MOVE_HEADING, '',
+      `**${SIZE_LABEL}:** ${SIZES[0]}`,
+      `**${WHY_LABEL}:** Nothing nearby binds on this change.`,
+      `**${CUTS_LABEL}:** none`,
+      `**${DECIDED_BY_LABEL}:** ${DECIDED_BY.policy}`,
+      'The trait must carry the one meaning the dispatch preamble gates today.'
+    ].join('\n');
+    const r = checkSizeRecord(ISSUE.description, `${ISSUE.description}\n\n${record}`);
+    assert.deepEqual([r.ok, r.code, r.reason], [false, 'SIZE_RECORD_SHAPE', 'extra-line']);
   });
 
   test('arm 2: scoping\'s lead settles the size of the move, not "what done means"', () => {

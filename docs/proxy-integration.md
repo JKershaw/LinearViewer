@@ -2170,6 +2170,7 @@ never against a stored copy. The write is refused when the block would change:
 | `422` | `SIZE_RECORD_HOW` | (LIN-4368) the write adds or changes the `## Size of the move` section below the block, and a line of it carries a file path, a code span, call syntax or a numbered step (`kind`: `"path"`, `"code-span"`, `"call"`, `"numbered-steps"`; `line: { number, text }`, 1-based within the section, the heading being line 1). The record says what and why, never how. A quotation (`"…"`, `“…”` or a `>` line) that matches the `## As asked` block word for word is exempt, so a cut can be quoted. |
 | `422` | `SIZE_RECORD_POLICY_CUT` | (LIN-4368) the section's size is "wrong work" and it says it was decided by "the standing policy": a cut needs a person's ruling. Record it as "pending a ruling". |
 | `422` | `SIZE_RECORD_DROPPED` | (LIN-4368) the write drops an existing `## Size of the move` section (a close-out prune included). Keep it, or replace it in place. A write that leaves the section unchanged is never refused for it. |
+| `422` | `SIZE_RECORD_SHAPE` | (LIN-4369) the section added or changed is not exactly four lines, in order: `**Size:**` one of the sizes; `**Why:**` one sentence (at most 300 characters); `**Cuts:** none`, or `**Cuts:**` then one bullet per cut, each quoting the As-asked block word for word; `**Decided by:**` one of the decided-by values. `reason` names the part that broke (`size-line`, `size-value`, `why-line`, `why-length`, `why-sentences`, `cuts-line`, `cuts-value`, `cut-quote`, `cut-note`, `decided-by`, `extra-line`) and `line` the line. The sizes weighed and open questions go in a comment. |
 
 Only this proxy is guarded. A person editing their own words in Harbour's task
 editor (the session lane), or in Linear or GitHub directly, is not refused, and
@@ -2222,7 +2223,7 @@ It **fails loud — never a silent no-op**:
 | `422` | `NOT_FOUND` | `oldString` didn't match — re-read the description and quote an exact span |
 | `422` | `NOT_UNIQUE` | matched `matchCount` places — quote a longer, unique span |
 | `422` | `AS_ASKED_IMMUTABLE` | the replacement would change the `## As asked` block — replace a span below it |
-| `422` | `SIZE_RECORD_HOW` / `SIZE_RECORD_POLICY_CUT` / `SIZE_RECORD_DROPPED` | the replacement adds how to the `## Size of the move` section, has the standing policy decide "wrong work", or drops the section (see Update Issue) |
+| `422` | `SIZE_RECORD_HOW` / `SIZE_RECORD_POLICY_CUT` / `SIZE_RECORD_DROPPED` / `SIZE_RECORD_SHAPE` | the replacement adds how to the `## Size of the move` section, has the standing policy decide "wrong work", drops the section, or breaks its four-line shape (see Update Issue) |
 
 To swap *every* occurrence of a string at once, rewrite the whole body via
 `PATCH` instead. On success, returns `{ "success": true, "issue": {...} }`.

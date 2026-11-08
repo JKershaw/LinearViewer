@@ -1,0 +1,9 @@
+I wrote the survey comment for LIN-3960 at 9da9bc2ba to `/private/tmp/claude-504/-Users-autopilot-development-simple-dispatcher-workspaces-e1edc5d5-ae4a-4be9-a75a-15a0f33a8af0/e1edc5d5-ae4a-4be9-a75a-15a0f33a8af0/scratchpad/arm3/runs/s3960-task/output/comment.md` (under 500 words). The code checkout is unchanged. I didn't fetch or create a worktree; I read the code in the provided clone at 9da9bc2ba instead.
+
+Findings:
+- **Cause:** `settingsPieceSection` (`lib/render-styleguide.js:211-221`) writes the five anatomy fields and the piece name into the page without escaping them. The live Settings builders do escape their text (`group()` runs `escapeHtml` on its title), so the real Settings page, which shows "For everyone in ${workspaceName}", is safe. The bug only affects the styleguide's description of the pieces.
+- **Main trap:** the obvious test, `html.includes('For everyone in <workspace>')`, passes on the broken code, because those raw bytes are the bug. The repo has no HTML parser, so the test has to check that the escaped form `&lt;workspace&gt;` is present and that raw `<workspace>` is absent. It should fail on base before the fix goes in.
+- **Fix:** escape all fields in `settingsPieceSection`, not only line 129. It's safe because line 129 is the only anatomy string with a markup character. `role="switch"` becomes `&quot;`, which looks the same on screen. No existing test matches raw anatomy text. The live samples must stay unescaped.
+- **Visual baseline:** the screenshot spec only captures images and doesn't compare them, and the baseline PNGs date from July, so the visible text change won't fail anything.
+
+DONE: Survey comment for LIN-3960 @ 9da9bc2ba written to output/comment.md; main risk is that the suggested test passes on the broken code, and the fix is to escape all fields in settingsPieceSection.
