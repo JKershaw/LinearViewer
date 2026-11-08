@@ -280,7 +280,7 @@ const queryText = (value) => (typeof value === 'string' && value.trim() ? value 
  *   closed with OWNER_CHECK_UNAVAILABLE. Never consulted on the verify path.
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null, taskModeStore = null, freeTierStore = null, accountStore = null, consumerHeartbeatStore = null, closeOut = null, installationTokenFor = null, requestUsageStore = null, requestUsageLoader = null }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null, taskModeStore = null, freeTierStore = null, accountStore = null, consumerHeartbeatStore = null, closeOut = null, installationTokenFor = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null }) {
   const router = Router();
 
   // =========================================================================
@@ -1630,7 +1630,10 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         req.dispatchUrlKey,
         { message, url: url || null, urlLabel: urlLabel || null, kind: sanitizedKind, rootItemId: sanitizedRootItemId },
         req.dispatchTokenLabel,
-        provisionWakeCredential
+        provisionWakeCredential,
+        // LIN-4373: the leftover step, the same one the runner feedback route uses. This
+        // route has no workspace id, so the step resolves it from the urlKey.
+        { leftoverHook: leftoverStep?.forRequest({ baseUrl }) }
       );
 
       if (!result) {

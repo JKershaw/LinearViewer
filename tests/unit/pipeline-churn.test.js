@@ -51,6 +51,20 @@ test('the stage path is seven dispatches, each wake counted under the worker it 
   assert.equal(summarizeChurn([r]).extraOverStagePath, 0);
 });
 
+// LIN-4373: the leftover step follows the build into its own session, once per ticket, by
+// design. Without its own branch it read as a follow-up into a worker: a stall recovery.
+test('the leftover step is a stage of the path, not a stall recovery, and adds nothing over it', () => {
+  const ap = autopilot();
+  const impl = worker('implementation', 1, 10);
+  const left = worker('leftover', 10.2, 12, { followUpTo: impl.id, text: 'DONE: ### Leftovers: nothing.' });
+  const rev = worker('review', 13, 14, { text: 'DONE: review posted, verdict Approve.' });
+  const r = classifyTicket({ identifier: 'LIN-1', rows: [ap, impl, left, wake(12, ap.id), rev] });
+  const entry = r.entries.find((e) => e.kind === 'leftover');
+  assert.equal(entry.cause, 'stage-path');
+  assert.equal(entry.note, 'leftover step');
+  assert.equal(summarizeChurn([r]).extraOverStagePath, 0);
+});
+
 test('a plan sent back by plan-review costs a re-plan and a re-review, read structurally when no verdict text is anchored', () => {
   const ap = autopilot();
   const rows = [ap,

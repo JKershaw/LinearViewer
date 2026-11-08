@@ -36,6 +36,8 @@
  *   - Stage intent      : lib/prompts/stage-intent.js, source — every stage's Scope
  *                         and Authority lines (was lib/prompts/brief-writer.js)
  *   - Served runner     : docs/runner-prompt.md, source + buildRunnerKickoff() rendered
+ *   - Leftover step     : leftoverPrompt() rendered (lib/dispatch-leftover.js, LIN-4373), the
+ *                         one question a resumed builder is asked at its build's [done]
  *
  * The router's byte snapshots (stage-router-prompt-snapshots.test.js) and the
  * `meta-prompt.baseline.txt` guard in rulings-resolution-contract-drift.test.js pin
@@ -59,6 +61,7 @@ import { buildSelectorArgs } from '../../lib/openrouter.js';
 import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
 import { buildAgentOnboarding, renderLandingAgentPrompt, GUIDE_PATH } from '../../lib/prompts/agent-onboarding.js';
 import { signInDoors } from '../../lib/components/landing-hero.js';
+import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
 
 // ─── Ceilings, measured at the freeze (LIN-3203) ─────────────────────────────
 // Each is the surface's UTF-8 byte count on the freeze branch. A ceiling is a
@@ -128,13 +131,15 @@ export const AGENT_ONBOARDING_SOURCE_CEILING = 4669; // LIN-4085: new at 4207, r
 export const AGENT_ONBOARDING_RENDERED_CEILING = 3691; // LIN-4085: new at 3207, raised to 3691 (+484) for the same walk fixes; the all-doors, no-free-tier rendering is the largest
 /** Landing agent prompt, rendered bytes at BASE_URL (renderLandingAgentPrompt). LIN-4085: new. Copied by a person into their own agent, so it is wording the agent reads, not code. */
 export const LANDING_AGENT_PROMPT_CEILING = 584; // LIN-4085: new at 584 (the copied prompt under the sign-in buttons)
+/** The leftover step's prompt, rendered bytes at the fixture ticket and PR below (leftoverPrompt, lib/dispatch-leftover.js). */
+export const LEFTOVER_PROMPT_RENDERED_CEILING = 1195; // LIN-4373: new at 1195; the one question a resumed builder is asked (what its change left at its edges) and where each answer goes. What counts as a leftover, and whether it is fix-sized, is the builder's judgement no code sees
 
 /**
  * The total: the sum of every ceiling above. A PR that raises a ceiling raises
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 348608; // LIN-4371: +3095 (345513 -> 348608), formatters +939 and seven renders +308 each
+export const FROZEN_TOTAL_BYTES = 349803; // LIN-4373: +1195 (348608 -> 349803), the new leftover prompt surface
 
 const BASE_URL = 'https://harbour.example';
 
@@ -264,6 +269,13 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
       `${LANDING_AGENT_PROMPT_CEILING}-byte ceiling. ${OVER_CEILING_FIX}`);
   });
 
+  test('leftover step prompt rendered bytes', () => {
+    const actual = Buffer.byteLength(leftoverPrompt({ issueIdentifier: 'LIN-0000', prUrl: 'https://github.com/example/repo/pull/1' }));
+    assert.ok(actual <= LEFTOVER_PROMPT_RENDERED_CEILING,
+      `The leftover prompt renders to ${actual} bytes, ${actual - LEFTOVER_PROMPT_RENDERED_CEILING} over its ` +
+      `${LEFTOVER_PROMPT_RENDERED_CEILING}-byte ceiling. ${OVER_CEILING_FIX}`);
+  });
+
   test('the rendered budget covers exactly the live PROMPT_TEMPLATES key set', () => {
     // A new template without a budget (or a stale budget for a removed one) is a
     // failure: adding a template means giving it a ceiling with its reason beside it.
@@ -287,6 +299,7 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
       AGENT_ONBOARDING_SOURCE_CEILING,
       AGENT_ONBOARDING_RENDERED_CEILING,
       LANDING_AGENT_PROMPT_CEILING,
+      LEFTOVER_PROMPT_RENDERED_CEILING,
     ].reduce((sum, n) => sum + n, 0);
     assert.ok(ceilingSum <= FROZEN_TOTAL_BYTES,
       `The ceilings sum to ${ceilingSum} bytes, ${ceilingSum - FROZEN_TOTAL_BYTES} over the frozen total ` +
@@ -317,8 +330,9 @@ describe('every ceiling carries its reason (LIN-3633)', () => {
 
   test('the matcher sees every ceiling, so a pass is not vacuous', () => {
     // Source and rendered keys, router source and rendered, intent, runner source and rendered, the three
-    // LIN-4085 onboarding ceilings (guide source, guide rendered, landing prompt), the total.
-    const expected = Object.keys(TEMPLATES_SOURCE_CEILINGS).length + Object.keys(TEMPLATES_RENDERED_CEILINGS).length + 5 + 3 + 1;
+    // LIN-4085 onboarding ceilings (guide source, guide rendered, landing prompt), the LIN-4373 leftover
+    // prompt, the total.
+    const expected = Object.keys(TEMPLATES_SOURCE_CEILINGS).length + Object.keys(TEMPLATES_RENDERED_CEILINGS).length + 5 + 3 + 1 + 1;
     assert.equal(ceilingLines(real).length, expected,
       'A ceiling is in a shape the matcher misses (or the matcher over-matches). Keep ceilings as `NAME = <digits>` or `key: <digits>`.');
   });

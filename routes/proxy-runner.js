@@ -66,6 +66,8 @@ const USAGE_ROUTE = '/api/proxy/runner/usage/:id';
  * @param {Object} [deps.sessionsFeedCache] - Sessions-feed cache; cleared on decision-withdrawn
  * @param {Object} [deps.consumerHeartbeatStore] - Consumer heartbeat store (LIN-1952)
  * @param {number} [deps.haltReadTimeoutMs] - Bounded halt-read timeout (default POLL_HALT_READ_TIMEOUT_MS)
+ * @param {{forRequest: Function}} [deps.leftoverStep] - LIN-4373: the leftover step, built once in
+ *   server.js (lib/dispatch-leftover-hook.js); absent means no leftover step (today's wake)
  */
 export function createProxyRunnerRoutes({
   proxyLimiter,
@@ -78,6 +80,7 @@ export function createProxyRunnerRoutes({
   workspaceHaltStore,
   sessionsFeedCache = null,
   consumerHeartbeatStore = null,
+  leftoverStep = null,
   requestUsageStore = null,
   haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS
 }) {
@@ -204,6 +207,10 @@ export function createProxyRunnerRoutes({
       baseUrl,
       createdBy
     });
+    // LIN-4373: the same leftover step as the dispatch feedback route, bound to this
+    // request's origin (never resolveEmailLinkOrigin, which may be unset) and the token's
+    // own workspace.
+    const leftoverHook = leftoverStep?.forRequest({ baseUrl, workspaceId: req.proxyWorkspaceId ?? null });
 
     const validation = validateFeedbackBody(req.body);
     if (validation.error) {
@@ -219,7 +226,7 @@ export function createProxyRunnerRoutes({
         feedback,
         req.proxyTokenLabel,
         provisionWakeCredential,
-        { takenByTokenId: req.proxyTokenId }
+        { takenByTokenId: req.proxyTokenId, leftoverHook }
       );
 
       if (!result) {
