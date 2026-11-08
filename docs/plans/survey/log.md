@@ -3005,3 +3005,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - a broker that hides statuses kept the cause invisible;
   - follow-ups can't interrupt a busy session, so abort is the only stop;
   - the investigation agent was the right tool: it found the cause from logs in 15 minutes.
+- **09:55 UTC: LIN-4349 planned** (output first, to notes plus a report in one docs PR; a `landed` lane state in the run ledger, at most one extra run per lane per day, a Periodical's own PR not counting; the order written once). Ruling `lin4349-scoped-tail`: may a scoped autopilot run, its task done, take one due or landed Periodical lane before stopping? Suggested **yes** (the idle-time chisel where idle time actually is; bounded).
