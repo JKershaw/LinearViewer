@@ -36,6 +36,7 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   side (LIN-4369 arm 4).
 - Model facts come from the OpenRouter catalog: add no model list or rate (LIN-4358).
   Tests seed `tests/unit/helpers/pinned-catalog.js`.
+
 ## Waiting
 
 - `lib/size-of-move.js`: what counts as code-shaped how is written twice: the checker's
@@ -79,6 +80,3 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   snap.json anthropic/claude-haiku-5.5. Pass: block [2] WHOLE, four sections, final
   finishReason=stop, any retry's reasoning bound accepted (no 400). REFUSED: change the
   rule first. Line [1] says why Haiku stopped on 7 Nov. (John, 8 Nov, LIN-4358.)
-- `lib/openrouter.js`: the routing call (`getRecommendationStream`) sends its own 8000
-  cap outside `lib/call-budget.js`: no catalog headroom or output-limit clamp. It reads
-  its own finish reason. (LIN-4358 leftovers.)
