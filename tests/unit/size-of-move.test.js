@@ -242,6 +242,8 @@ describe('close-out keeps the record', () => {
     assert.ok(prune, 'close-out has its prune step');
     assert.match(prune, /description\/below/);
     assert.ok(prune.includes(`Keep the \`${SIZE_OF_MOVE_HEADING}\` section verbatim`), prune);
+    // LIN-4369 arm 3: a stub straight below the record would sit inside its section and be refused.
+    assert.ok(prune.includes(`section verbatim, with your stub under a heading of its own`), prune);
   });
 });
 
