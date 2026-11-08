@@ -523,8 +523,9 @@ inline orchestrator pass — closing is something you *dispatch and verify*, nev
 
 A run ends for a reason, and naming the reasons keeps you from both quitting early and grinding on
 forever. A **scoped** run — "drive this one task to done" — stops when that task is *verified*
-complete; when you conclude on that clean finish you simply stop — there's **no end-of-run cascade to
-issue**, because on the completion axis you close nothing: the runner has already reaped each DONE
+complete and has taken the precedence policy's tail (at most one Periodical: the kickoff's Orient
+step, `AUTOPILOT_PRECEDENCE`); when you conclude on that clean finish you simply stop — there's **no
+end-of-run cascade to issue**, because on the completion axis you close nothing: the runner has already reaped each DONE
 window as it finalized, and the non-DONE windows are deliberately left open (see *Closing a session —
 the runner's job now, not yours*). An **open-ended** run — "keep the
 stack moving" — has no natural finish line, and that's its

@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../../lib/prompts/autopilot-manual.js';
+import { AUTOPILOT_PRECEDENCE } from '../../lib/prompts/autopilot-precedence.js';
 
 const BASE_URL = 'https://example.com';
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -342,39 +343,56 @@ describe('buildAutopilotKickoff (general / stack-walk)', () => {
     assert.ok(periodicalsIdx < stackIdx, 'periodicals pointer must precede the stack fetch');
   });
 
-  test('states the three-level precedence order: goal -> overdue periodical -> stack', () => {
+  // LIN-4382: the order is AUTOPILOT_PRECEDENCE, rendered once in Orient. The general first act
+  // only points at it, so the old three-level list and its "supersedes" clause are gone (pinned
+  // absent in tests/unit/lin-4382-precedence-written-once.test.js).
+  test('the first act points at the precedence policy in step 1, and restates no order of its own', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
-    assert.ok(text.includes('an explicit goal from the human, else **(2)** a\nperiodical reading `due` (a lane reading `due`, if the template has more than one), else\n**(3)** the top of the stack'));
+    const firstAct = text.slice(text.indexOf('**Your first act:**'));
+    assert.ok(firstAct.includes('pick under the precedence policy in step 1 above'));
+    assert.ok(!firstAct.includes('supersedes'));
+    assert.ok(!firstAct.includes('`due`'), 'lane states are the policy\'s to explain, not the first act\'s');
   });
 
-  test('states the explicit supersedes clause resolving G3, closing with the "not a judgment call" phrase', () => {
+  test('ranks `landed` under the stack, only when no stack work can move now (LIN-4382)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
-    assert.ok(text.includes('This supersedes the Orient step\'s two-level order'));
-    assert.ok(text.includes('still a policy, not a judgment call, so don\'t improvise it'));
+    const stack = text.indexOf('3. the top of the stack');
+    const landed = text.indexOf('4. a Periodical lane reading `landed`');
+    assert.ok(stack > 0 && landed > stack);
+    assert.ok(text.includes('only when no stack work can move now: every remaining task is in Backlog, waiting on a person, blocked or already running'));
   });
 
-  test('glosses `never` as bounded ("no evidence in the full retained window"), not "ever ran"', () => {
+  test('glosses `never` as bounded (no evidence in the 30-day read window), not "never ran", and takes a repo-scoped one as the most overdue `due`', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
-    assert.ok(text.includes('no evidence in the full retained\nhistory window, not "ever ran"'));
+    assert.ok(text.includes('reading `never` (no evidence in the 30-day read window, not "never ran") is the most overdue `due`'));
   });
 
-  // LIN-1932: the periodicals pointer now surfaces per-repo lanes, since the
-  // top-level state alone can no longer tell an operator WHICH repo is
-  // overdue on a multi-repo workspace.
-  test('the periodicals pointer names the per-repo `repos[]` breakdown, not just the per-template state', () => {
+  // LIN-1932: the periodicals pointer surfaces per-repo lanes, since the top-level state alone
+  // cannot tell an operator WHICH repo is overdue on a multi-repo workspace.
+  test('the policy names the per-repo `repos[]` lanes and says to act on a lane\'s own state', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
-    assert.ok(text.includes('per-repo `repos[]` breakdown'));
-    assert.ok(text.includes('WHICH repo is overdue'));
+    assert.ok(text.includes("Each template's `repos[]` holds one lane per repo with its own `state`"));
+    assert.ok(text.includes("act on a lane's state, not the template's top-level one"));
+  });
+
+  test('ranks 2 and 4 dispatch through the mint route and keep the opening `periodicalId` stamp', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    assert.ok(text.includes('mint the lane with `POST /periodicals/{id}/mint` (`repo` set for a named lane)'));
+    assert.ok(text.includes('passing `periodicalId` (the template\'s `id`) on the `POST /recommend-and-dispatch` that opens that task\'s chain, and on no later call'));
   });
 });
 
 describe('buildAutopilotKickoff (scoped to an issue)', () => {
   const issue = { identifier: 'LIN-42', title: 'Fix login bug' };
 
-  test('goal is pinned to the task and the precedence policy is moot', () => {
+  // LIN-4382: inverted on purpose. A scoped run is no longer told the policy is moot: once its
+  // task is complete it takes the policy's tail (one Periodical, then stop).
+  test('goal is pinned to the task, then the policy\'s tail — the policy is not moot', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue });
     assert.ok(text.includes('run on autopilot until **LIN-42** (Fix login bug)'));
-    assert.ok(text.includes('precedence policy is moot'));
+    assert.ok(!text.includes('precedence policy is moot'));
+    assert.ok(text.includes("Do not pull other tasks off the stack. Once it is complete, take the policy's tail (one Periodical,\nthen stop); at a point that wants the human, just stop."));
+    assert.ok(text.includes("that's your natural stopping point: take the policy's tail (step 1), report and\n     stop."), 'step 5\'s complete branch says the same');
   });
 
   test('first act reads the issue and triggers recommend-and-dispatch for it', () => {
@@ -491,15 +509,14 @@ describe('buildAutopilotKickoff (providerUi capability gate, LIN-2804)', () => {
   });
 });
 
-// LIN-1829, plan step 5f. The golden fixture (tests/fixtures/autopilot-kickoff/
-// scoped-snapshot-golden.txt) was captured from the PRE-CHANGE
-// lib/prompts/autopilot-kickoff.js (commit 8891b0b8, before the periodicals
-// pointer edit landed) — the whole point of that sequencing was to compare the
-// post-edit scoped output against a fixture that predates the edit, not one
-// captured after it (which would certify a regression instead of catching one).
-describe('buildAutopilotKickoff (periodicals pointer — scoped byte-identity, LIN-1829)', () => {
+// LIN-1829 pinned the scoped snapshot byte for byte so the general-only periodicals pointer could
+// never leak into it. LIN-4382 changes it ON PURPOSE: a scoped run now takes the precedence
+// policy's tail, so the scoped goal block no longer says "the precedence policy is moot" and
+// names the tail instead. The golden (tests/fixtures/autopilot-kickoff/scoped-snapshot-golden.txt)
+// was re-captured for that one change, and the assertions below say what may and may not differ.
+describe('buildAutopilotKickoff (scoped snapshot, LIN-1829 golden updated for LIN-4382)', () => {
   const SEP = '\n\n---\n\n';
-  // Must match the exact params the golden was generated with (beat 1).
+  // Must match the exact params the golden was generated with.
   const GOLDEN_ISSUE = { identifier: 'LIN-42', title: 'Fix the thing' };
 
   function scopedSnapshotSection(params) {
@@ -508,24 +525,49 @@ describe('buildAutopilotKickoff (periodicals pointer — scoped byte-identity, L
     return sections[sections.length - 1];
   }
 
-  test('scoped snapshot section is byte-identical to the pre-change golden fixture', () => {
+  test('scoped snapshot section is byte-identical to the golden fixture', () => {
     const golden = readFileSync(join(__dirname, '../fixtures/autopilot-kickoff/scoped-snapshot-golden.txt'), 'utf8');
     assert.strictEqual(scopedSnapshotSection(), golden);
   });
 
-  test('the periodicals pointer never appears in scoped output (general-only branch)', () => {
-    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue: GOLDEN_ISSUE });
-    assert.ok(!text.includes('/api/proxy/periodicals'));
-    assert.ok(!text.includes('overdue periodical'));
+  test('the scoped snapshot names the tail but carries no periodicals read of its own', () => {
+    const snapshot = scopedSnapshotSection();
+    assert.ok(snapshot.includes("take the policy's tail (one Periodical,\nthen stop)"));
+    assert.ok(!snapshot.includes('/periodicals'), 'the read lives in the policy, once, not in the snapshot');
   });
 
-  // NOTE: this reconstitutes `text` from its own sections plus the golden, so it
-  // can only fail when `golden !== sections.at(-1)` — exactly what the preceding
-  // test already asserts. It is a structural sanity check on the reconstitution
-  // itself (that `SEP`-joining the untouched sections back together is lossless),
-  // not independent full-text coverage: only the `snapshot` section is golden-
-  // pinned here; `intro`/`manual`/`guide` are covered separately by the
-  // `guide`-verbatim test below, not by this one.
+  // Inverted from "the periodicals pointer never appears in scoped output": scoped output now
+  // carries the periodicals read, but only in the tail, gated on the task being finished.
+  test('the scoped periodicals read happens only after the task is merged and verified, and after that check', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue: GOLDEN_ISSUE });
+    const tail = text.slice(text.indexOf('**The tail: a scoped run ends with one Periodical.**'));
+    const finished = tail.indexOf('Once its task is merged and verified');
+    const read = tail.indexOf('read `GET /periodicals`');
+    assert.ok(finished >= 0 && read > finished, 'the read is conditioned on completion');
+    assert.ok(tail.includes('(after that check, not in the same beat as the Done write: a merge is recorded asynchronously)'));
+    assert.ok(tail.includes('A run stopped for the human, or before the merge, takes no tail.'));
+    // The scoped first act still starts on the task, never on the periodicals.
+    const firstAct = text.slice(text.indexOf('**Your first act:**'));
+    assert.ok(!firstAct.includes('periodicals'));
+  });
+
+  test('the tail handles `never` beside `due`, ahead of `landed`, and takes repo-scoped lanes only', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue: GOLDEN_ISSUE });
+    const tail = text.slice(text.indexOf('**The tail: a scoped run ends with one Periodical.**'));
+    assert.ok(tail.includes('take at most one lane of a `scope: "repo"` template: `due` (including `never`) before `landed`, then the oldest last run'));
+    assert.ok(tail.includes('Mint it with `POST /periodicals/{id}/mint` and `"autopilot": true`'));
+    assert.ok(tail.includes('then stop'));
+  });
+
+  test('the scoped run still never pulls other tasks off the stack', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue: GOLDEN_ISSUE });
+    assert.ok(text.includes('Do not pull other tasks off the stack.'));
+    assert.ok(text.includes('A run scoped to one task takes nothing else from the stack.'));
+  });
+
+  // NOTE: this reconstitutes `text` from its own sections plus the golden, so it can only fail
+  // when `golden !== sections.at(-1)`, which the first test already asserts. It is a structural
+  // sanity check on the reconstitution itself, not independent full-text coverage.
   test('reconstituting scoped output from its own sections plus the golden snapshot is lossless (structural, not independent full-text coverage)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue: GOLDEN_ISSUE });
     const sections = text.split(SEP);
@@ -534,12 +576,18 @@ describe('buildAutopilotKickoff (periodicals pointer — scoped byte-identity, L
     assert.strictEqual(reconstituted, text);
   });
 
-  test('`guide`\'s original two-level Orient list still renders verbatim, unconditionally (guide was NOT edited)', () => {
+  // Replaces "guide's original two-level Orient list still renders verbatim, unconditionally":
+  // the guide WAS edited (LIN-4382). Its Orient step now renders AUTOPILOT_PRECEDENCE, still
+  // unconditionally, and the two-level list is gone from both modes.
+  test('Orient renders AUTOPILOT_PRECEDENCE in both modes, and the two-level list is gone', () => {
     const scopedText = buildAutopilotKickoff({ baseUrl: BASE_URL, issue: GOLDEN_ISSUE });
     const generalText = buildAutopilotKickoff({ baseUrl: BASE_URL });
     const TWO_LEVEL_ORIENT = '(1) an explicit goal from the human, else (2) the top of';
-    assert.ok(scopedText.includes(TWO_LEVEL_ORIENT), 'guide renders unconditionally — scoped output must still carry it');
-    assert.ok(generalText.includes(TWO_LEVEL_ORIENT), 'guide renders unconditionally — general output must still carry it');
+    const FIRST_LINE = AUTOPILOT_PRECEDENCE.split('\n')[0];
+    for (const text of [scopedText, generalText]) {
+      assert.ok(!text.includes(TWO_LEVEL_ORIENT));
+      assert.ok(text.includes(`   ${FIRST_LINE}`));
+    }
   });
 });
 

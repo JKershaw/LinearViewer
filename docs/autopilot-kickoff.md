@@ -86,42 +86,25 @@ and a fresh session is dispatched into the same wall.
 
 ## How a loop goes
 
-1. **Orient.** Read the snapshot. Pick what's next in this order — it's a policy, not a
-   judgment call, so don't improvise it: (1) an explicit goal from the human, else (2) the
-   top of the stack. Say what you picked and why, in a line. The human can veto. Orient is also
-   your beat to re-read the handbook: a quick `GET ${proxyBase}/autopilot/manual` at the top of
-   the loop keeps your altitude fresh as the run gets long — cheap, and the first thing worth
-   doing here.
+1. **Orient.** Read the snapshot and pick what's next under the policy that follows. Say what
+   you picked and why, in a line. The human can veto. Orient is also your beat to re-read the
+   handbook: a quick `GET ${proxyBase}/autopilot/manual` at the top of the loop keeps your
+   altitude fresh as the run gets long — cheap, and the first thing worth doing here.
 
-<!-- MAINTAINER NOTE — periodicals precedence has shipped, but NOT into this list.
-     LIN-1827/LIN-1829 (sub-tickets of LIN-373 Approach C) shipped the cadence data source
-     this note used to say did not exist: GET /api/proxy/periodicals derives each template's
-     due/recent/never/unknown state from the live dispatch queue + history (foldPeriodicalRuns,
-     lib/periodical-runs.js) — no separate store. The three-level precedence — (1) explicit
-     goal, else (2) a periodical reading `due`, else (3) top of stack — is real and live.
+   *(The precedence policy renders here, from `AUTOPILOT_PRECEDENCE`.)*
 
-     LIN-1932 split that state per repo: each template's response entry also carries a
-     `repos[]` array (one lane per observed repo, plus a default `repo: null` lane), each
-     with its own due/landed/recent/never/unknown state — a template can read `due` for repo A while
-     reading `recent` for repo B. The top-level `due`/`landed`/`recent`/`never`/`unknown` field stays an
-     aggregate across all of a template's lanes (unchanged shape, so an existing caller
-     reading only the top level sees the same behaviour); "a periodical reading `due`" in the
-     precedence above now means *any lane* of that template reading `due` when more than one
-     lane exists.
+<!-- MAINTAINER NOTE — the precedence policy is not mirrored in this doc.
+     It is written once, as `AUTOPILOT_PRECEDENCE` in lib/prompts/autopilot-precedence.js
+     (LIN-4382), an import-free leaf the kickoff renders verbatim in this Orient step, in
+     scoped, general and stepper runs alike. That includes the scoped-run tail. Read the
+     ranks there; do not copy them into this doc, the generator or any other file in lib/
+     or routes/: tests/unit/lin-4382-precedence-written-once.test.js fails on a copy.
 
-     LIN-4381 added `landed`: a lane that would read `recent` reads `landed` when work has
-     merged in its repo since its last run (merged close-out events; a Periodical's own PR
-     excluded). The top level reads `landed` when any lane does. It is not in the precedence
-     above yet; the first act says to rank it as `recent` until LIN-4382 gives it a rank.
-
-     It was deliberately NOT added to the Orient list above. It lives instead as an explicit
-     supersedes clause in the kickoff's general-mode first-act text
-     (lib/prompts/autopilot-kickoff.js, the `firstAct` else-branch), fetched and applied before
-     this Orient step even runs. That was a deliberate choice (LIN-1829): this list renders
-     UNCONDITIONALLY in both scoped and general kickoffs, so editing it would silently break a
-     scoped run's byte-identical output; confining the change to the general-only `firstAct`
-     branch keeps scoped output untouched by construction, not by discipline. `never` is a
-     BOUNDED claim (no evidence in the store's retained history window) — never "ever ran". -->
+     History: LIN-1829 shipped the Periodicals' rank as a general-only first-act clause that
+     superseded this list, to keep scoped output unchanged by construction; LIN-1932 split
+     lane state per repo; LIN-4381 added `landed`. LIN-4382 removed the second order and the
+     supersedes clause: a scoped run now carries the policy too, because it takes the tail
+     once its own task is merged and verified. -->
 
 
 2. **Trigger the next step.** `POST /recommend-and-dispatch` with `{ issueIdentifier, target, sessionId }`
@@ -184,7 +167,8 @@ and a fresh session is dispatched into the same wall.
    - **continue** — the arc isn't finished (plan's done, implementation's next; review
      found a blocker, resolve it and go on). This is the common case — keep the work moving.
    - **complete** — evidence confirms this task/feature is genuinely done. If you're working
-     a scoped goal, that's your natural stopping point: report and stop. If you're walking
+     a scoped goal, that's your natural stopping point: take the policy's tail (step 1), report
+     and stop. If you're walking
      the stack open-ended, move to the next item.
    - **pause for the human** — anything that's theirs: a review that raises a direction or
      judgment question, a change big or risky enough to want eyes before it lands, a blocker

@@ -1442,6 +1442,7 @@ decide for itself whether a periodical is due.
       "id": "documentation-review",
       "title": "Documentation Review",
       "mode": "corrective",
+      "scope": "repo",
       "cadence": "weekly",
       "state": "due",
       "lastDispatchedAt": "2026-07-24T10:00:00Z",
@@ -1471,7 +1472,10 @@ decide for itself whether a periodical is due.
 
 - **`id`** is the template's stable registry id (the fold's own `periodicalId`, renamed at
   the wire boundary).
-- **`mode`**/**`cadence`** are **carried through from the matched template** by the fold
+- **`scope`** (LIN-4382) is what a run reads: a codebase (`repo`) or this workspace's own
+  tracker (`workspace`). The precedence policy (`AUTOPILOT_PRECEDENCE`) counts a `never` lane
+  as overdue, and lets the scoped-run tail take a lane, only when it is `repo`.
+- **`mode`**/**`scope`**/**`cadence`** are **carried through from the matched template** by the fold
   itself, never re-joined against the registry here — so this endpoint can never publish a
   `cadence` that disagrees with the one its own `due`/`recent` boundary actually used.
 - **`state`** (top-level) is one of five values: `"recent"` — a live (queued, not yet

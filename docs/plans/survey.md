@@ -113,7 +113,7 @@ The ruling card with the recommended answer as its main button (LIN-4114) is the
 **Periodicals in this design** stop minting tickets into the queue. They become:
 - the place's film: trend over time, and where it stands now;
 - the Survey's map;
-- the idle-time chisel. *Correction from essay v5:* autopilot's order is "a goal a person has set, else a periodical reading `due`, else the top of the stack", so a due periodical runs *ahead* of real tasks, not in idle time. A tidying move given that rank would be pushed, not pulled. The rank that fits pull is a new one *under* the stack: no goal set, nothing due, nothing waiting. The order has no such rank today.
+- the idle-time chisel. *Correction from essay v5:* autopilot's order is "a goal a person has set, else a periodical reading `due`, else the top of the stack", so a due periodical runs *ahead* of real tasks, not in idle time. A tidying move given that rank would be pushed, not pulled. The rank that fits pull is a new one *under* the stack: no goal set, nothing due, nothing waiting. *Since LIN-4382 the order has that rank:* a Periodical made due by landed work is taken only when no stack work can move. The order is written once, as `AUTOPILOT_PRECEDENCE` (`lib/prompts/autopilot-precedence.js`).
 
 **What else it implies:**
 - **Review** must expect "made the change easy, then made the easy change" as the normal shape of a PR, or it reads the tidy as creep.
