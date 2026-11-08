@@ -7,8 +7,13 @@
  *    entry's `url`, which older runners filled with the PR mentioned most often. The
  *    witness is LIN-4374's build: it read #2357 26 times, opened #2359 and reported
  *    #2359 on its `DONE:` line, and its leftover prompt and parent wake named #2357.
+ *    The newest report line wins, and the first PR on it: the order simple-dispatcher's
+ *    `sessionPrs` uses for the `[done]` url.
  * 2. Two `[done]` posts on one build row at the same moment queue exactly one
  *    `leftover` row (`claimLeftoverFor`), and the build still wakes the parent once.
+ * 3. A claim winner that skips gives the claim back (`releaseLeftoverClaim`), so the
+ *    runner's re-report after a withdrawn wake can queue the step or wake the parent,
+ *    never hold forever on `claim-lost` (the LIN-4375 review's repro).
  */
 process.env.NODE_ENV = 'test';
 
