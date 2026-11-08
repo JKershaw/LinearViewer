@@ -2958,3 +2958,7 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - Suggested **accept-both**.
   - The plan: the builder is resumed with "what did your change leave behind?" before review (a new `leftover` run kind, once per ticket); review supplies the edge read; close-out writes the notes on the same PR; `docs/areas/areas.json` becomes product-owned, with one notes file per area in both repos.
   - **For the step-back:** a cut ruling holds the ticket overnight, which is by design. But should cuts that only defer to a sibling in the same round need John?
+- **01:33 UTC: LIN-4369 arm 2 ran (revised wording, with scoping's lead changed).** The control is 3/3 "just the task" (from 0/3), the guard 12/12 (from 5/12), and "no how" 5/9 (from 2/9). That fails only criterion 3: how comes back as plain-word definitions.
+  - Rulings `lin4346-size-after-arm2` (suggested **structural-arm**: a fixed size, one sentence why, cuts and who decided; keep LIN-998 as the control, since it passed; don't change a pre-registered criterion after the fact) and `lin4369-after-arm2` (suggested **park**: keep #2356 as evidence while the structural arm runs).
+  - `lin4369-replay-failed-next` is overtaken by arm 2.
+  - **The pattern again:** wording got most of the way, and the last part needs structure (the seal, named cuts, and now the size record).
