@@ -2966,3 +2966,13 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - **02:53 UTC: LIN-4372 merged in simple-dispatcher** (`4aee0c9f`, PR #329): the same `docs/areas/` shape there (registry, README, guard test, seeds). LIN-4347 piece 1 is complete in both repos.
 - **04:11 UTC: LIN-4373 merged** (`4ba6c817`, PR #2358; LIN-4347 piece 2/3): the builder is asked what its change left behind at `[done]`, and the parent's wake is held until it answers. Piece 3 (review's edge read, close-out writing the notes) is next.
 - **05:07 UTC: LIN-4374 merged** (`d5d18e6d`, PR #2359; piece 3/3): review reads the leftovers, and close-out writes the notes. **All of LIN-4347 has landed in both repos. From now on Harbour asks each builder what it left behind, and writes area notes, so the hand-run after-questions retire.** Area read sent across LV `526bca66..d5d18e6d` and SD `4aee0c9f` (BW, BX).
+- **~06:35 UTC: the LIN-4347 area read is mixed, mixed (BW, BX)** (LV `526bca66..d5d18e6d` + SD `4aee0c9f`).
+  - A clean centre: one area registry, one test helper, the wake block moved rather than copied, and a pure/I-O split.
+  - Edges grew: `dispatch-store.js` +357 lines of leftover-only knowledge, another PR-URL extractor, the leftover routing rule in 3–4 places, `LEFTOVERS_HEADING` misplaced, two near-copy guards across repos (LV lacks the every-module check), and script registry paths.
+  - **Bug:** `wall-clock-summary` `BUCKET_OF_KIND` lacks `leftover`, so it's counted as orchestration.
+  - The capability pattern again: an owner at the centre, copies at the edge. **Tidy-after LIN-4376 filed and Surveyed.**
+- **The product loop is live, unprompted.**
+  - Leftover runs fired on LIN-4374 (`8aefde03`, $0.99 shown separately beside the build's $3.43) and LIN-4375 (06:18).
+  - Each posted `### Leftovers`, tidied inside its own PR (test headers, the dispatch doc), and wrote lessons into `docs/areas/runs-and-dispatch.md` and SD's notes.
+  - Its first live run named the wrong PR (#2357, read 26 times, instead of #2359), and close-out filed **LIN-4375** (High). It was fixed in both repos and merged (`459f8711`), with every check mutation-tested.
+  - **The loop found and fixed its own bug within two hours, with no hand on it.**
