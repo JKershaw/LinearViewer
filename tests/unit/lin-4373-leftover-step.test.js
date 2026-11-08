@@ -378,6 +378,29 @@ describe('LIN-4373 — a leftover step that parks on CI and ends on its ci-wake 
     assert.doesNotMatch(wakes[1].prompt, /leftover step/);
     assert.equal(leftovers(world).length, 0);
   });
+
+  test('a fix round after the finished leftover is not leftover lineage: its continuation [failed] wakes as itself', async () => {
+    // The walk up from a continuation crosses only `custom` rows. An `implementation` fix
+    // round sitting between the continuation and the (finished) leftover stops it, so a real
+    // fix-round failure is never hidden behind the earlier build's [done].
+    const world = makeWorld();
+    const { a } = await heldBuild(world);
+    const l = await takeLeftover(world);
+    await post(world, l, `[done] ${LEFTOVERS_HEADING}: nothing. ${PR}`);
+    const fix = await world.store.addItem(URL_KEY, {
+      prompt: 'fix', kind: 'implementation', promptName: 'implementation', issueIdentifier: 'LIN-7',
+      target: 'cli', dispatchedBy: OWNER, followUpTo: l._id, subscription: 'terminal-only', sessionId: a._id
+    });
+    await world.store.takeItem(fix._id, URL_KEY, TOKEN);
+    await post(world, fix, `[pending] waiting on CI ${PR}`);
+    const c = await createDispatchItem({ store: world.store, urlKey: URL_KEY, prompt: `CI finished on ${PR}`, applyDefaultHarness: false, fields: { followUpTo: fix._id, target: 'cli', force: true, dispatchedBy: OWNER } });
+    await world.store.takeItem(c._id, URL_KEY, TOKEN);
+    await post(world, c, '[failed] fix round CI red');
+    const wakes = wakesTo(world, a._id);
+    const prompt = wakes[wakes.length - 1].prompt;
+    assert.ok(prompt.includes('Outcome: [failed] fix round CI red'), prompt);
+    assert.doesNotMatch(prompt, /leftover step/);
+  });
 });
 
 describe('LIN-4373 — every fallback wakes the parent exactly as today', () => {
