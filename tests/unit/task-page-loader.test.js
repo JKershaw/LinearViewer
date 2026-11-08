@@ -18,6 +18,7 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTaskPageLoader, buildTaskPageModel, sessionMessage, buildTaskStages, briefCurrentSection, deriveHeader, deriveReadyHeader, fmtWhen } from '../../lib/task-page-loader.js';
 import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
+import { ROW_ONLY_KINDS } from '../../lib/dispatch-fields.js';
 import { ORCHESTRATION_KINDS } from '../../lib/effort-readout.js';
 import { stageLabel } from '../../lib/run-view.js';
 import { STATE_ORDER } from '../../lib/providers/models.js';
@@ -628,9 +629,9 @@ describe('buildTaskStages (LIN-3356)', () => {
     assert.equal(stages[0].checkIns.length, 0);
   });
 
-  // The row-only kinds (`wake`, and LIN-4373's `leftover`) are not in DISPATCH_KINDS, so they are named here.
-  test('every DISPATCH_KINDS member (and the row-only wake and leftover) is either folded or forms a stage', () => {
-    const all = [...new Set([...DISPATCH_KINDS, 'wake', 'leftover'])];
+  // The row-only kinds (`wake`, `leftover`) are not in DISPATCH_KINDS; they come from ROW_ONLY_KINDS (LIN-4376).
+  test('every DISPATCH_KINDS and ROW_ONLY_KINDS member is either folded or forms a stage', () => {
+    const all = [...new Set([...DISPATCH_KINDS, ...ROW_ONLY_KINDS])];
     for (const kind of all) {
       const alone = buildTaskStages([sess('x', kind, 'done', 0, 1), sess('y', 'review', 'done', 2, 3)], { trackerType: 'completed' });
       if (ORCHESTRATION_KINDS.has(kind)) {
