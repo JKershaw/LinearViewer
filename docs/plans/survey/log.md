@@ -2952,3 +2952,9 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - No merge event exists; the merging worker can't dispatch; builder sessions are usually stopped by the time they're asked (409); notes on main mean every write is a PR; `areas.json` is research tooling and covers LinearViewer only; `retrospective-audit` and `retro` already read after merge.
   - **Both favour the tidy inside the run, with the leftover read before merge** (review, by John's hint), the builder asked while live, and tidy plus notes in the change's own PR.
 - **The size call** (parroted: folding the two after-merge readers is a ruling, simplifying is not; both repos granted; John's review hint kept; extra checks left to judgement; what a good note is; done = the next ticket *uses* the note) and **kickoff** (autopilot, Opus). It runs alongside LIN-4346, which is held on its ruling.
+- **01:25 UTC: LIN-4347 planned. The cut rule works on live work:** its plan named two cuts and raised one ruling, `lin4347-cuts`.
+  - (1) Automatic look-first for follow-ons arrives with LIN-4370.
+  - (2) The stop rule is restated for notes.
+  - Suggested **accept-both**.
+  - The plan: the builder is resumed with "what did your change leave behind?" before review (a new `leftover` run kind, once per ticket); review supplies the edge read; close-out writes the notes on the same PR; `docs/areas/areas.json` becomes product-owned, with one notes file per area in both repos.
+  - **For the step-back:** a cut ruling holds the ticket overnight, which is by design. But should cuts that only defer to a sibling in the same round need John?
