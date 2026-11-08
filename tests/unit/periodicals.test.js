@@ -419,10 +419,13 @@ describe('prompt census: no Periodical mints a follow-up (LIN-4380)', () => {
 
   // A clause that names follow-up work or minting and carries no negation reads as an order to
   // create it. This catches wording the phrase list has not seen yet.
-  const MINT_WORD = /\bfollow-ups?\b|\bfix-tasks?\b|\bmint(?:s|ed|ing)?\b|\bnew (?:Linear )?tasks?\b|\bLinear tasks?\b/i;
+  // LIN-4380 review: "File a Linear ticket for each objective breakage" passed, because tickets and
+  // issues were missing here and a bold header ending ".**" did not split, so its "never" shielded
+  // the next sentence. Ticket/issue vocabulary added; the split now allows closing "**".
+  const MINT_WORD = /\bfollow-ups?\b|\bfix-tasks?\b|\bmint(?:s|ed|ing)?\b|\bnew (?:Linear )?tasks?\b|\bLinear tasks?\b|\btickets?\b|\bissues?\b/i;
   const NEGATION = /\b(?:no|not|never|nothing|none|nor)\b/i;
   const unnegatedMintClauses = text =>
-    text.split(/(?<=[.;:!?])\s+|\n+/).filter(c => MINT_WORD.test(c) && !NEGATION.test(c));
+    text.split(/(?<=[.;:!?]\**)\s+|\n+/).filter(c => MINT_WORD.test(c) && !NEGATION.test(c));
 
   const corrective = PERIODICALS.filter(t => t.mode === 'corrective');
   const advisory = PERIODICALS.filter(t => t.mode === 'advisory');
