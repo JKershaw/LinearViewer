@@ -30,6 +30,10 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - A stage lead's first sentence is the selector's purpose line for that stage. Changing it
   changes the routing prompt: regenerate the router snapshots and
   `scripts/eval/meta-prompt.baseline.txt`, and raise or lower the routing ceiling (LIN-4369).
+- Closing one channel moved the how into the next one in every arm of LIN-4369's replay:
+  done-means, then definitions, then comments, then the final `[done]` report. When a
+  stage must not hand over how, close every channel it writes to, or hold the reader's
+  side (LIN-4369 arm 4).
 
 ## Waiting
 
@@ -39,8 +43,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   shape is rendered from `recordShape()` everywhere. (LIN-4369 leftovers.)
 - `lib/prompt-formatters.js`: scoping, survey-task and survey-place are left out of the
   area notes pointer so LIN-4369's replay renders unchanged, while scoping's own prose
-  says to read the area's notes. Give them the pointer, and drop the prose, once that
-  replay passes or is abandoned. (LIN-4371; LIN-4369 leftovers.)
+  says to read the area's notes. Replay arm 4 passed (PR #2356), so this can be done now:
+  give scoping and both Surveys the pointer and drop scoping's "the area's notes" prose in
+  the next change to scoping's prompt. (LIN-4371; LIN-4369 leftovers.)
 
 - `lib/should-mock-ai.js`: `isHermeticTestToken` is a third spelling of the test-token
   check, beside `isTestToken` in `routes/workspace-api-steps.js` and the inline
