@@ -72,8 +72,9 @@ this copy; ask John or check Settings):
   `fresh | stale | absent | unscored`. Branch on the state, never null-check beside it.
   `stale` means say "this guidance is aged" plainly; `absent` is a fixed answer, not an
   error to retry.
-- `GET /periodicals` → per-template `state`: `due | recent | never | unknown`. Report
+- `GET /periodicals` → per-template `state`: `due | landed | recent | never | unknown`. Report
   `never` as "no run recorded in the retained window (30 days)" — never "has never run".
+  `landed` means work merged in that repo since the reading last ran: a reason to read again.
   An all-`never` board can also mean a transient store failure: observe it, hold it lightly.
 - `GET /stack?limit=15&view=digest` → one-line headlines with a `why[]` array
   (e.g. `"bug"`, `"unblocks 6"`). Quote `why[]` verbatim; where it's empty, say "the digest

@@ -906,12 +906,20 @@ export function createComputeRoutes({
   /**
    * GET /api/proxy/periodicals  (LIN-1829, sub-ticket of LIN-373 Approach C)
    *
-   * Read-only: per-template periodical run state (`due`/`recent`/`never`/
-   * `unknown`) derived from the live dispatch queue + history via
+   * Read-only: per-template periodical run state (`due`/`landed`/`recent`/
+   * `never`/`unknown`) derived from the live dispatch queue + history via
    * foldPeriodicalRuns (LIN-1827, lib/periodical-runs.js). This route owns
    * the async reads the fold is pure about — it computes no trigger and
    * dispatches nothing (LIN-1629, not yet built, owns turning this evidence
    * into a dispatch decision).
+   *
+   * LIN-4381: it also reads the workspace's landings (merged close-out events,
+   * `CloseOutEventsStore.listMergedSince`) over the same horizon and hands them
+   * to the fold as data. A lane that would read `recent` reads `landed` when
+   * work has landed in its repo since its last run (rules in the fold). A
+   * landing on an issue a Periodical row names is the Periodical's own PR and
+   * is ignored, which is why PERIODICAL_PROJECTION grants `issueIdentifier`. A
+   * failed landings read is no landings, so a lane fails toward `recent`.
    *
    * Guards mirror GET /api/proxy/north-star (LIN-1810, :3820 above): proxyLimiter
    * + authenticateProxyToken, `read` scope (no requireWriteScope — its absence
