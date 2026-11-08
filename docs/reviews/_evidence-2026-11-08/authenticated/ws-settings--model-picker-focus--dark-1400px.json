@@ -1,0 +1,136 @@
+{
+  "key": "ws-settings|model-picker-focus|dark|1400",
+  "registryId": "ws-settings",
+  "state": "model-picker-focus",
+  "theme": "dark",
+  "viewport": 1400,
+  "path": "/workspace/test-workspace/settings",
+  "populated": null,
+  "note": "model-picker <select> focused; native popup list is not rendered in headless captures (named limit) — option sets and computed styles are in the JSON",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/settings",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Test Workspace - Settings",
+    "h1": null,
+    "headings": {
+      "h2": 5
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "kpis",
+      "passage planner",
+      "ship's biscuit",
+      "ship journey",
+      "roadmap",
+      "live console",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "flight companion",
+      "Sources\n            Linear›",
+      "Models\n            GPT-5.4 Mini›",
+      "Running\n            Ready · ask›",
+      "Agent access\n            5 live keys›",
+      "Health\n            All clear›",
+      "Change log\n            Empty›",
+      "Features\n            11 on›",
+      "Account\n            Not connected›"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 975
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 86,
+    "belowThreshold": []
+  },
+  "extra": [
+    {
+      "cls": "feedback-priority",
+      "name": "",
+      "options": [
+        "No priority",
+        "Urgent",
+        "High",
+        "Medium",
+        "Low"
+      ],
+      "fontSize": "16px",
+      "h": 0,
+      "w": 0,
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22, 24, 29)",
+      "focused": false
+    },
+    {
+      "cls": "dispatch-exec-harness-select",
+      "name": "",
+      "options": [
+        "—",
+        "claude-code",
+        "opencode"
+      ],
+      "fontSize": "13.6px",
+      "h": 0,
+      "w": 0,
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22, 24, 29)",
+      "focused": false
+    },
+    {
+      "cls": "dispatch-exec-model",
+      "name": "",
+      "options": [
+        "— model —",
+        "haiku",
+        "sonnet",
+        "opus",
+        "fable",
+        "other…"
+      ],
+      "fontSize": "13.6px",
+      "h": 0,
+      "w": 0,
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22, 24, 29)",
+      "focused": false
+    }
+  ],
+  "consoleErrors": [],
+  "failedRequests": []
+}

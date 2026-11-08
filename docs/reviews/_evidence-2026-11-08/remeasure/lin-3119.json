@@ -1,0 +1,94 @@
+{
+  "id": "lin-3119",
+  "base": "http://localhost:3199",
+  "head": "c998cf4c5",
+  "question": "dark theme: bare .action-btn / a.settings-action / a.stat-link / UA-blue links below AA?",
+  "rows": {
+    "dispatch": {
+      "status": 200,
+      "htmlClass": "theme-dark",
+      "themeAssertion": true,
+      "actionBtn": [],
+      "settingsAction": [],
+      "statLink": [],
+      "namedLinks": [
+        {
+          "tag": "a",
+          "cls": "",
+          "text": "set up a runner ›",
+          "color": "rgb(158, 158, 255)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 6.51,
+          "fontSize": "16px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        }
+      ]
+    },
+    "settings": {
+      "status": 200,
+      "htmlClass": "theme-dark",
+      "themeAssertion": true,
+      "actionBtn": [],
+      "settingsAction": [],
+      "statLink": [],
+      "namedLinks": []
+    },
+    "runner": {
+      "status": 200,
+      "htmlClass": "theme-dark",
+      "themeAssertion": true,
+      "actionBtn": [
+        {
+          "tag": "button",
+          "cls": "action-btn save runner-setup-btn",
+          "text": "create runner prompt",
+          "color": "rgb(46, 230, 95)",
+          "bg": "rgb(35,59,47)",
+          "ratio": 7.25,
+          "fontSize": "16px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        },
+        {
+          "tag": "button",
+          "cls": "action-btn runner-setup-btn",
+          "text": "copy",
+          "color": "rgb(255, 255, 255)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 15.54,
+          "fontSize": "16px",
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+        }
+      ],
+      "settingsAction": [],
+      "statLink": [],
+      "namedLinks": []
+    },
+    "proxy": {
+      "status": 200,
+      "htmlClass": "theme-dark",
+      "themeAssertion": true,
+      "actionBtn": [],
+      "settingsAction": [],
+      "statLink": [],
+      "namedLinks": []
+    }
+  },
+  "actionBtnRuleLines": [
+    [
+      8,
+      "/* Action buttons (.action-btn and its tones) live in style.css with the Button (LIN-3889, decision 6). */"
+    ]
+  ],
+  "summary": {
+    "elementsBelow4_5": 0,
+    "worst": null,
+    "namedLinksFound": {
+      "dispatch": [
+        "set up a runner › rgb(158, 158, 255) 6.51:1"
+      ],
+      "settings": [],
+      "runner": [],
+      "proxy": []
+    }
+  }
+}

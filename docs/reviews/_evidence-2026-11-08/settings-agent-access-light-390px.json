@@ -1,0 +1,162 @@
+{
+  "surface": "settings-agent-access",
+  "label": "Settings: Agent access",
+  "kind": "auth",
+  "theme": "light",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/workspace/test-workspace/settings/agent-access",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "expectedTheme": "light",
+  "darkMode": "cookie",
+  "themeAssertion": {
+    "expected": "(no theme-dark)",
+    "actual": "",
+    "passed": true
+  },
+  "title": "Test Workspace - Settings",
+  "headings": {
+    "h1": 0,
+    "h2": 6,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 6,
+    "a11y": {
+      "roleHeading": 4,
+      "levels": {
+        "h1": 0,
+        "h2": 4,
+        "h3": 0,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "innerWidth": 390,
+    "bodyOver": 0,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 1,
+  "linksIntoProduct": {
+    "total": 44,
+    "toRoot": 0,
+    "toWorkspace": 37,
+    "toAppNav": 6,
+    "sample": [
+      "/workspace/test-workspace/",
+      "/workspace/test-workspace/observation?view=rulings",
+      "/workspace/test-workspace/",
+      "/workspace/test-workspace/swipe",
+      "/workspace/test-workspace/swim",
+      "/workspace/test-workspace/observation",
+      "/workspace/test-workspace/kpis",
+      "/workspace/test-workspace/roadmap",
+      "/workspace/test-workspace/live-console",
+      "/workspace/test-workspace/dispatch",
+      "/workspace/test-workspace/proxy",
+      "/workspace/test-workspace/collective"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "harbour.cat\n      \n        \n      worksp"
+    },
+    {
+      "selector": "p",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "The keys agents and runners use to reach"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "harbour.cat"
+    },
+    {
+      "selector": "button",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "Test Workspace"
+    },
+    {
+      "selector": ".nav-action",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "feedback"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "kpis",
+      "roadmap",
+      "live console",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "ship journey",
+      "Sources\n            Linear›",
+      "Models\n            GPT-5.4 Mini›",
+      "Running\n            Ready · ask›",
+      "Agent access\n            5 live keys›",
+      "Health\n            All clear›",
+      "Change log\n            Empty›",
+      "Features\n            11 on›",
+      "Account\n            Not connected›"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": true,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

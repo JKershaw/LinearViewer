@@ -1,0 +1,71 @@
+{
+ "probe": "library-table-reach.mjs",
+ "rows": [
+  {
+   "slug": "/library/which-rules-pay",
+   "width": 390,
+   "status": 200,
+   "tables": 2,
+   "scrollerClass": "library-doc__table-wrap",
+   "scrollerClientWidth": 318,
+   "scrollerScrollWidth": 1201,
+   "scrolledTo": 883,
+   "reachable": true
+  },
+  {
+   "slug": "/library/coherence-as-it-grows",
+   "width": 390,
+   "status": 200,
+   "tables": 7,
+   "scrollerClass": "library-doc__table-wrap",
+   "scrollerClientWidth": 318,
+   "scrollerScrollWidth": 731,
+   "scrolledTo": 413,
+   "reachable": true
+  },
+  {
+   "slug": "/library/between-the-sessions-check",
+   "width": 390,
+   "status": 200,
+   "tables": 2,
+   "scrollerClass": "library-doc__table-wrap",
+   "scrollerClientWidth": 318,
+   "scrollerScrollWidth": 424,
+   "scrolledTo": 106,
+   "reachable": true
+  },
+  {
+   "slug": "/library/which-rules-pay",
+   "width": 320,
+   "status": 200,
+   "tables": 2,
+   "scrollerClass": "library-doc__table-wrap",
+   "scrollerClientWidth": 248,
+   "scrollerScrollWidth": 1201,
+   "scrolledTo": 953,
+   "reachable": true
+  },
+  {
+   "slug": "/library/coherence-as-it-grows",
+   "width": 320,
+   "status": 200,
+   "tables": 7,
+   "scrollerClass": "library-doc__table-wrap",
+   "scrollerClientWidth": 248,
+   "scrollerScrollWidth": 731,
+   "scrolledTo": 483,
+   "reachable": true
+  },
+  {
+   "slug": "/library/between-the-sessions-check",
+   "width": 320,
+   "status": 200,
+   "tables": 2,
+   "scrollerClass": "library-doc__table-wrap",
+   "scrollerClientWidth": 248,
+   "scrollerScrollWidth": 424,
+   "scrolledTo": 176,
+   "reachable": true
+  }
+ ]
+}

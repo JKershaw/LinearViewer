@@ -1,0 +1,99 @@
+{
+  "key": "ws-settings|empty|light|390",
+  "registryId": "ws-settings",
+  "state": "empty",
+  "theme": "light",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/settings",
+  "populated": false,
+  "note": "default seed (empty) state",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/settings",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Test Workspace - Settings",
+    "h1": null,
+    "headings": {
+      "h2": 5
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "kpis",
+      "roadmap",
+      "live console",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "ship journey",
+      "Sources\n            Linear›",
+      "Models\n            GPT-5.4 Mini›",
+      "Running\n            Ready · ask›",
+      "Agent access\n            5 live keys›",
+      "Health\n            All clear›",
+      "Change log\n            Empty›",
+      "Features\n            11 on›",
+      "Account\n            Not connected›"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 387
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 49,
+    "belowThreshold": [
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "11.05px",
+        "fontWeight": "600",
+        "count": 2,
+        "samples": [
+          ".cat",
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

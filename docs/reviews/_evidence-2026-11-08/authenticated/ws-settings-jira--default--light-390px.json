@@ -1,0 +1,88 @@
+{
+  "key": "ws-settings-jira|default|light|390",
+  "registryId": "ws-settings-jira",
+  "state": "default",
+  "theme": "light",
+  "viewport": 390,
+  "path": "/workspace/jira-workspace/settings",
+  "populated": null,
+  "note": "provider twin via /test/set-jira-session",
+  "httpStatus": 200,
+  "finalPath": "/workspace/jira-workspace/settings",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Jira Workspace - Settings",
+    "h1": null,
+    "headings": {
+      "h2": 5
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "kpis",
+      "proxy",
+      "Sources\n            Jira›",
+      "Models\n            GPT-5.4 Mini›",
+      "Running\n            No runner · ask›",
+      "Agent access\n            0 live keys›",
+      "Health\n            All clear›",
+      "Change log\n            Empty›",
+      "Features\n            1 on›",
+      "Account\n            Not connected›"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 379
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 48,
+    "belowThreshold": [
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "11.05px",
+        "fontWeight": "600",
+        "count": 2,
+        "samples": [
+          ".cat",
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

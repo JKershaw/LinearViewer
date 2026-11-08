@@ -1,0 +1,144 @@
+{
+  "surface": "jira-settings",
+  "label": "Settings under Jira",
+  "kind": "auth",
+  "theme": "light",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/workspace/jira-workspace/settings",
+  "viewport": {
+    "width": 1400,
+    "height": 1000
+  },
+  "expectedTheme": "light",
+  "darkMode": "cookie",
+  "themeAssertion": {
+    "expected": "(no theme-dark)",
+    "actual": "",
+    "passed": true
+  },
+  "title": "Jira Workspace - Settings",
+  "headings": {
+    "h1": 0,
+    "h2": 5,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 5,
+    "a11y": {
+      "roleHeading": 5,
+      "levels": {
+        "h1": 0,
+        "h2": 5,
+        "h3": 0,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 1400,
+    "clientWidth": 1400,
+    "innerWidth": 1400,
+    "bodyOver": 0,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 1,
+  "linksIntoProduct": {
+    "total": 27,
+    "toRoot": 0,
+    "toWorkspace": 19,
+    "toAppNav": 7,
+    "sample": [
+      "/workspace/jira-workspace/",
+      "/workspace/jira-workspace/",
+      "/workspace/jira-workspace/swipe",
+      "/workspace/jira-workspace/swim",
+      "/workspace/jira-workspace/observation",
+      "/workspace/jira-workspace/kpis",
+      "/workspace/jira-workspace/proxy",
+      "/workspace/jira-workspace/settings",
+      "/auth/linear",
+      "/auth/github?heldConnection=1",
+      "/auth/jira/oauth?mode=new",
+      "/workspace/jira-workspace/settings/sources"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "harbour.cat\n      \n        \n      worksp"
+    },
+    {
+      "selector": "p",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "Where Harbour reads from. Each source is"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "harbour.cat"
+    },
+    {
+      "selector": "button",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "Jira Workspace"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [
+      "harbour.cat",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "kpis",
+      "proxy",
+      "Sources\n            Jira›",
+      "Models\n            GPT-5.4 Mini›",
+      "Running\n            No runner · ask›",
+      "Agent access\n            0 live keys›",
+      "Health\n            All clear›",
+      "Change log\n            Empty›",
+      "Features\n            1 on›",
+      "Account\n            Not connected›"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

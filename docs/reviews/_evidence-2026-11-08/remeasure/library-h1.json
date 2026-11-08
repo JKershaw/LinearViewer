@@ -1,0 +1,828 @@
+{
+ "probe": "library-h1.mjs",
+ "documents": 117,
+ "h1CountHistogram": {
+  "2": 117
+ },
+ "rows": [
+  {
+   "slug": "/library/between-the-sessions",
+   "h1": [
+    "Harbour",
+    "The Cost Lives Between the Sessions"
+   ]
+  },
+  {
+   "slug": "/library/between-the-sessions-check",
+   "h1": [
+    "Harbour",
+    "Does \"The Cost Lives Between the Sessions\" report its source"
+   ]
+  },
+  {
+   "slug": "/library/browser-flakes",
+   "h1": [
+    "Harbour",
+    "Which browser specs flake, why, and what do they cost?"
+   ]
+  },
+  {
+   "slug": "/library/capability-ledger-method",
+   "h1": [
+    "Harbour",
+    "How should Harbour learn which model can do which task?"
+   ]
+  },
+  {
+   "slug": "/library/capability-ledger",
+   "h1": [
+    "Harbour",
+    "What has each model been seen to do on Harbour's tasks?"
+   ]
+  },
+  {
+   "slug": "/library/cheap-implementer",
+   "h1": [
+    "Harbour",
+    "Can a cheap model implement Harbour tickets to Opus's review"
+   ]
+  },
+  {
+   "slug": "/library/cheaper-capacity",
+   "h1": [
+    "Harbour",
+    "Which models and plans could carry more of Harbour's work fo"
+   ]
+  },
+  {
+   "slug": "/library/cleaner-than-it-started",
+   "h1": [
+    "Harbour",
+    "Can a task finish with the codebase cleaner than it started?"
+   ]
+  },
+  {
+   "slug": "/library/clear-the-bar",
+   "h1": [
+    "Harbour",
+    "Clear the Bar, Not the Frontier"
+   ]
+  },
+  {
+   "slug": "/library/close-out-claims",
+   "h1": [
+    "Harbour",
+    "When a close-out files its own unfinished scope next door, d"
+   ]
+  },
+  {
+   "slug": "/library/coherence-as-it-grows-check",
+   "h1": [
+    "Harbour",
+    "Does \"coherence as it grows\" (version 2) hold up?"
+   ]
+  },
+  {
+   "slug": "/library/coherence-as-it-grows",
+   "h1": [
+    "Harbour",
+    "Does a codebase built by agents lose coherence as it grows, "
+   ]
+  },
+  {
+   "slug": "/library/consolidate-then-rebuild",
+   "h1": [
+    "Harbour",
+    "Does consolidating scattered decisions before a rebuild impr"
+   ]
+  },
+  {
+   "slug": "/library/cost-mix",
+   "h1": [
+    "Harbour",
+    "Where does Harbour's weekly budget go by kind of change, and"
+   ]
+  },
+  {
+   "slug": "/library/developer-adoption-ladder-earlier-dates",
+   "h1": [
+    "Harbour",
+    "Where did the developer population sit on the ladder in Sept"
+   ]
+  },
+  {
+   "slug": "/library/developer-adoption-ladder",
+   "h1": [
+    "Harbour",
+    "What is known about how developers adopt AI coding tools, an"
+   ]
+  },
+  {
+   "slug": "/library/drawing-the-ship",
+   "h1": [
+    "Harbour",
+    "Drawing the ship"
+   ]
+  },
+  {
+   "slug": "/library/efficiency-levers",
+   "h1": [
+    "Harbour",
+    "What levers to make a task faster or cheaper are already wri"
+   ]
+  },
+  {
+   "slug": "/library/fleet-complexity-read",
+   "h1": [
+    "Harbour",
+    "Is the fleet overcomplicated? A read of three landed tickets"
+   ]
+  },
+  {
+   "slug": "/library/flow-and-convergence",
+   "h1": [
+    "Harbour",
+    "Flow and convergence"
+   ]
+  },
+  {
+   "slug": "/library/growth-atlas",
+   "h1": [
+    "Harbour",
+    "The growth atlas — how has Harbour grown since January, and "
+   ]
+  },
+  {
+   "slug": "/library/held-or-fresh",
+   "h1": [
+    "Harbour",
+    "What does a Harbour supervisor cost held open and woken, aga"
+   ]
+  },
+  {
+   "slug": "/library/how-a-task-is-composed-check",
+   "h1": [
+    "Harbour",
+    "Does \"how a task is composed\" (version 1) hold up?"
+   ]
+  },
+  {
+   "slug": "/library/how-a-task-is-composed",
+   "h1": [
+    "Harbour",
+    "How is a task composed, and does that shape the way it runs?"
+   ]
+  },
+  {
+   "slug": "/library/how-the-charter-got-complicated",
+   "h1": [
+    "Harbour",
+    "How did the charter's work get complicated?"
+   ]
+  },
+  {
+   "slug": "/library/jev-decision-model",
+   "h1": [
+    "Harbour",
+    "Is Jev, a model that decides but cannot write, a fit for Har"
+   ]
+  },
+  {
+   "slug": "/library/how-process-changes-land",
+   "h1": [
+    "Harbour",
+    "When Harbour's process has changed, how did each change land"
+   ]
+  },
+  {
+   "slug": "/library/learning-while-the-tools-change-check",
+   "h1": [
+    "Harbour",
+    "Do the eleven sources in \"Learning While the Tools Change\" s"
+   ]
+  },
+  {
+   "slug": "/library/learning-while-the-tools-change",
+   "h1": [
+    "Harbour",
+    "Learning While the Tools Change"
+   ]
+  },
+  {
+   "slug": "/library/like-a-skilled-developer",
+   "h1": [
+    "Harbour",
+    "Harbour Should Fix Things Like a Skilled Developer"
+   ]
+  },
+  {
+   "slug": "/library/measuring-throughput",
+   "h1": [
+    "Harbour",
+    "How should Harbour measure its throughput of correct work, a"
+   ]
+  },
+  {
+   "slug": "/library/model-choice-by-call",
+   "h1": [
+    "Harbour",
+    "Which model should each Harbour call run on, and which shoul"
+   ]
+  },
+  {
+   "slug": "/library/never-worked-pile",
+   "h1": [
+    "Harbour",
+    "What is in the never-worked pile, and what do the worked cha"
+   ]
+  },
+  {
+   "slug": "/library/model-choice",
+   "h1": [
+    "Harbour",
+    "What does each model tier really cost per correct change, on"
+   ]
+  },
+  {
+   "slug": "/library/one-feature-twice",
+   "h1": [
+    "Harbour",
+    "One feature, built twice"
+   ]
+  },
+  {
+   "slug": "/library/one-job-many-paths",
+   "h1": [
+    "Harbour",
+    "Why does Harbour keep several paths for one job?"
+   ]
+  },
+  {
+   "slug": "/library/paid-where-written-check",
+   "h1": [
+    "Harbour",
+    "Does \"Every Fix Is Paid Where It Is Written\" hold up?"
+   ]
+  },
+  {
+   "slug": "/library/paid-where-written",
+   "h1": [
+    "Harbour",
+    "Every Fix Is Paid Where It Is Written"
+   ]
+  },
+  {
+   "slug": "/library/persistent-mind-ephemeral-hands",
+   "h1": [
+    "Harbour",
+    "Persistent Mind, Ephemeral Hands"
+   ]
+  },
+  {
+   "slug": "/library/plain-language",
+   "h1": [
+    "Harbour",
+    "Could Harbour adopt the plain-language standard, ISO 24495-1"
+   ]
+  },
+  {
+   "slug": "/library/prompt-kinds",
+   "h1": [
+    "Harbour",
+    "Why does Harbour use only about six of its seventeen prompt "
+   ]
+  },
+  {
+   "slug": "/library/proportional-process-backtest",
+   "h1": [
+    "Harbour",
+    "Had a simple size-and-risk classifier sorted Harbour's past "
+   ]
+  },
+  {
+   "slug": "/library/prototype-concepts",
+   "h1": [
+    "Harbour",
+    "Which ideas from John's prototypes would serve the levers th"
+   ]
+  },
+  {
+   "slug": "/library/rebuild-ladder",
+   "h1": [
+    "Harbour",
+    "Can chunks of Harbour be rebuilt from scratch safely, and ho"
+   ]
+  },
+  {
+   "slug": "/library/replay-small-work-preregistration",
+   "h1": [
+    "Harbour",
+    "Pre-registration: replaying small finished tickets with a le"
+   ]
+  },
+  {
+   "slug": "/library/rebuild-round",
+   "h1": [
+    "Harbour",
+    "Is a design-first rebuild a viable, cheap way to improve Har"
+   ]
+  },
+  {
+   "slug": "/library/reliability-baseline",
+   "h1": [
+    "Harbour",
+    "How reliable is Harbour's output today, and has that changed"
+   ]
+  },
+  {
+   "slug": "/library/replay-small-work",
+   "h1": [
+    "Harbour",
+    "For small changes, how does a lean pipeline compare with wha"
+   ]
+  },
+  {
+   "slug": "/library/root-task-ratio",
+   "h1": [
+    "Harbour",
+    "Does the system run out of tasks, or generate them forever?"
+   ]
+  },
+  {
+   "slug": "/library/review-loops",
+   "h1": [
+    "Harbour",
+    "Why does a plan go round plan-review more than once?"
+   ]
+  },
+  {
+   "slug": "/library/review-consumption",
+   "h1": [
+    "Harbour",
+    "Which of a review's sentences does the close-out actually ci"
+   ]
+  },
+  {
+   "slug": "/library/runner-for-strangers",
+   "h1": [
+    "Harbour",
+    "Which runner and which credential lane can run a stranger's "
+   ]
+  },
+  {
+   "slug": "/library/sessions-without-usage",
+   "h1": [
+    "Harbour",
+    "Can model, effort, kind and run time estimate the cost of a "
+   ]
+  },
+  {
+   "slug": "/library/steady-base-check",
+   "h1": [
+    "Harbour",
+    "Does the steady-base paper hold up?"
+   ]
+  },
+  {
+   "slug": "/library/starting-context",
+   "h1": [
+    "Harbour",
+    "How much of a Harbour session goes on finding its starting c"
+   ]
+  },
+  {
+   "slug": "/library/steady-base-menu",
+   "h1": [
+    "Harbour",
+    "Taken together, what did the steady-base expedition find, an"
+   ]
+  },
+  {
+   "slug": "/library/steady-base",
+   "h1": [
+    "Harbour",
+    "Patches on patches — does Harbour converge to a steady base,"
+   ]
+  },
+  {
+   "slug": "/library/step-overlap",
+   "h1": [
+    "Harbour",
+    "How much does each Harbour step redo the one before it, and "
+   ]
+  },
+  {
+   "slug": "/library/survey-check-10",
+   "h1": [
+    "Harbour",
+    "Do the prototype-concepts and what-hides-between-sessions pa"
+   ]
+  },
+  {
+   "slug": "/library/survey-check-11",
+   "h1": [
+    "Harbour",
+    "Does the replay-small-work paper hold up?"
+   ]
+  },
+  {
+   "slug": "/library/survey-check-12",
+   "h1": [
+    "Harbour",
+    "Does the steady-base menu hold up?"
+   ]
+  },
+  {
+   "slug": "/library/survey-check-13",
+   "h1": [
+    "Harbour",
+    "Does the prompt-kinds paper hold up?"
+   ]
+  },
+  {
+   "slug": "/library/survey-check-2",
+   "h1": [
+    "Harbour",
+    "Do the supervisor, test-estate and throughput papers hold up"
+   ]
+  },
+  {
+   "slug": "/library/survey-check-3",
+   "h1": [
+    "Harbour",
+    "Do the throughput-halving and rules-that-pay papers hold up?"
+   ]
+  },
+  {
+   "slug": "/library/survey-check-4",
+   "h1": [
+    "Harbour",
+    "Do the model-choice, doubling and proportional-backtest pape"
+   ]
+  },
+  {
+   "slug": "/library/survey-check-5",
+   "h1": [
+    "Harbour",
+    "Do the wake-inventory and browser-flakes papers hold up?"
+   ]
+  },
+  {
+   "slug": "/library/survey-check-6",
+   "h1": [
+    "Harbour",
+    "Does the why-legs-repeat paper hold up?"
+   ]
+  },
+  {
+   "slug": "/library/survey-check-7",
+   "h1": [
+    "Harbour",
+    "Do the held-or-fresh and where-judgement-happens papers hold"
+   ]
+  },
+  {
+   "slug": "/library/survey-check-8",
+   "h1": [
+    "Harbour",
+    "Do the starting-context and step-overlap papers hold up?"
+   ]
+  },
+  {
+   "slug": "/library/survey-check-9",
+   "h1": [
+    "Harbour",
+    "Do the cost-mix and how-process-changes-land papers hold up?"
+   ]
+  },
+  {
+   "slug": "/library/survey-check",
+   "h1": [
+    "Harbour",
+    "Do the three survey papers — growth, effort and reliability "
+   ]
+  },
+  {
+   "slug": "/library/task-size-and-cost",
+   "h1": [
+    "Harbour",
+    "How does the size of a task relate to its cost?"
+   ]
+  },
+  {
+   "slug": "/library/tasks-are-tasks",
+   "h1": [
+    "Harbour",
+    "Tasks are tasks, and the codebase is a place"
+   ]
+  },
+  {
+   "slug": "/library/tasks-generate-tasks",
+   "h1": [
+    "Harbour",
+    "How do tasks generate tasks, and at what rate?"
+   ]
+  },
+  {
+   "slug": "/library/test-estate",
+   "h1": [
+    "Harbour",
+    "Which of Harbour's tests earn their keep, and what does the "
+   ]
+  },
+  {
+   "slug": "/library/test-surplus",
+   "h1": [
+    "Harbour",
+    "Have Harbour's tests taken on a life of their own?"
+   ]
+  },
+  {
+   "slug": "/library/the-place-became-somebodys-job",
+   "h1": [
+    "Harbour",
+    "Clearing up as it goes"
+   ]
+  },
+  {
+   "slug": "/library/the-second-copy",
+   "h1": [
+    "Harbour",
+    "The Second Copy"
+   ]
+  },
+  {
+   "slug": "/library/the-price-of-tomorrow",
+   "h1": [
+    "Harbour",
+    "The Price of Tomorrow"
+   ]
+  },
+  {
+   "slug": "/library/theseus-method",
+   "h1": [
+    "Harbour",
+    "The Theseus Method"
+   ]
+  },
+  {
+   "slug": "/library/theseus",
+   "h1": [
+    "Harbour",
+    "Can Harbour be rebuilt plank by plank, and which plank first"
+   ]
+  },
+  {
+   "slug": "/library/unwedge-or-breakdown",
+   "h1": [
+    "Harbour",
+    "When a plan keeps failing review, does unwedging beat breakd"
+   ]
+  },
+  {
+   "slug": "/library/ticket-record-and-quality",
+   "h1": [
+    "Harbour",
+    "Could the way tickets are written and updated be simplified "
+   ]
+  },
+  {
+   "slug": "/library/wake-inventory",
+   "h1": [
+    "Harbour",
+    "What are all the paths that wake a Harbour supervisor, and w"
+   ]
+  },
+  {
+   "slug": "/library/what-a-run-must-show",
+   "h1": [
+    "Harbour",
+    "What does a person expect while one task runs, and what must"
+   ]
+  },
+  {
+   "slug": "/library/what-doubled-the-dispatches",
+   "h1": [
+    "Harbour",
+    "What doubled dispatches per correct change at 12 July, and w"
+   ]
+  },
+  {
+   "slug": "/library/what-hides-between-sessions",
+   "h1": [
+    "Harbour",
+    "Which failures in Harbour are invisible to any single sessio"
+   ]
+  },
+  {
+   "slug": "/library/what-lowers-the-verification-cost",
+   "h1": [
+    "Harbour",
+    "What lowers the cost of verifying agent work, and does a ver"
+   ]
+  },
+  {
+   "slug": "/library/what-should-an-agent-leave-behind-check",
+   "h1": [
+    "Harbour",
+    "Does the evidence support the agent-retention paper’s conclu"
+   ]
+  },
+  {
+   "slug": "/library/what-should-an-agent-leave-behind-evidence",
+   "h1": [
+    "Harbour",
+    "Evidence register: what should an agent leave behind?"
+   ]
+  },
+  {
+   "slug": "/library/what-should-an-agent-leave-behind",
+   "h1": [
+    "Harbour",
+    "What should an agent leave behind?"
+   ]
+  },
+  {
+   "slug": "/library/what-supervisors-do",
+   "h1": [
+    "Harbour",
+    "What do Harbour's supervision layers actually do, and how mu"
+   ]
+  },
+  {
+   "slug": "/library/what-the-reviews-checked",
+   "h1": [
+    "Harbour",
+    "What did the reviews behind the thirteen later-found misses "
+   ]
+  },
+  {
+   "slug": "/library/what-the-selector-needs",
+   "h1": [
+    "Harbour",
+    "What is the stage selector given, and what does it actually "
+   ]
+  },
+  {
+   "slug": "/library/where-harbour-joins",
+   "h1": [
+    "Harbour",
+    "Where does Harbour join the party — how fast is the frontier"
+   ]
+  },
+  {
+   "slug": "/library/where-judgement-happens",
+   "h1": [
+    "Harbour",
+    "Where in a ticket's life does a model's judgement change the"
+   ]
+  },
+  {
+   "slug": "/library/where-the-effort-goes",
+   "h1": [
+    "Harbour",
+    "Where does a ticket's effort go, and does it scale with the "
+   ]
+  },
+  {
+   "slug": "/library/which-rules-pay",
+   "h1": [
+    "Harbour",
+    "Which review and close-out rules have ever changed a line of"
+   ]
+  },
+  {
+   "slug": "/library/why-legs-repeat",
+   "h1": [
+    "Harbour",
+    "Why do Harbour's planning, review and close-out legs repeat,"
+   ]
+  },
+  {
+   "slug": "/library/why-throughput-halved",
+   "h1": [
+    "Harbour",
+    "Why did the weekly count of correct, complete changes halve "
+   ]
+  },
+  {
+   "slug": "/library/why-work-spirals",
+   "h1": [
+    "Harbour",
+    "Why does Harbour's work spiral instead of converging?"
+   ]
+  },
+  {
+   "slug": "/library/doc/the-folded-loop",
+   "h1": [
+    "Harbour",
+    "The Folded Loop: an outside take"
+   ]
+  },
+  {
+   "slug": "/library/writing-length",
+   "h1": [
+    "Harbour",
+    "Does the writing get longer faster than the ideas do?"
+   ]
+  },
+  {
+   "slug": "/library/doc/drift-at-every-altitude",
+   "h1": [
+    "Harbour",
+    "Drift at Every Altitude: A Synthesis"
+   ]
+  },
+  {
+   "slug": "/library/doc/ladder",
+   "h1": [
+    "Harbour",
+    "The ladder: how people come to trust AI agents with their wo"
+   ]
+  },
+  {
+   "slug": "/library/doc/escalation-philosophy",
+   "h1": [
+    "Harbour",
+    "An Escalation Philosophy for Harbour"
+   ]
+  },
+  {
+   "slug": "/library/doc/executive-summary-agent-dev-controls",
+   "h1": [
+    "Harbour",
+    "Executive Summary"
+   ]
+  },
+  {
+   "slug": "/library/doc/north-star",
+   "h1": [
+    "Harbour",
+    "North star — v3, the self-funding loop, one step at a time"
+   ]
+  },
+  {
+   "slug": "/library/doc/charter",
+   "h1": [
+    "Harbour",
+    "The Harbour Charter — v0.2 (draft)"
+   ]
+  },
+  {
+   "slug": "/library/doc/v1",
+   "h1": [
+    "Harbour",
+    "Harbour v1: one person, one task, one proven merge"
+   ]
+  },
+  {
+   "slug": "/library/doc/autopilot",
+   "h1": [
+    "Harbour",
+    "Autopilot — A Thinking Document"
+   ]
+  },
+  {
+   "slug": "/library/doc/autopilot-operating-manual-v2",
+   "h1": [
+    "Harbour",
+    "The Autopilot Handbook"
+   ]
+  },
+  {
+   "slug": "/library/doc/direction-layer-proposal",
+   "h1": [
+    "Harbour",
+    "Adding a Direction Layer to Harbour"
+   ]
+  },
+  {
+   "slug": "/library/doc/flight-companion-session-2026-08-02",
+   "h1": [
+    "Harbour",
+    "Flight-companion session, 2026-08-01 → 2026-08-02: the syste"
+   ]
+  },
+  {
+   "slug": "/library/doc/collective-session-2026-06-12",
+   "h1": [
+    "Harbour",
+    "Collective Session — 2026-06-12"
+   ]
+  },
+  {
+   "slug": "/library/doc/passage-planner-session-2026-08-03",
+   "h1": [
+    "Harbour",
+    "Passage-planning session, 2026-08-03: v0 met a human"
+   ]
+  },
+  {
+   "slug": "/library/doc/theseus-method-long",
+   "h1": [
+    "Harbour",
+    "The Theseus Method: the long version"
+   ]
+  }
+ ]
+}

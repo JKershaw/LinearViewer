@@ -1,0 +1,133 @@
+{
+  "surface": "archive-9",
+  "label": "Archive #9",
+  "kind": "cold",
+  "theme": "light",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/archive/9",
+  "viewport": {
+    "width": 320,
+    "height": 720
+  },
+  "expectedTheme": "light",
+  "darkMode": "media",
+  "themeAssertion": {
+    "expected": "media-emulated (prefers-color-scheme: dark)",
+    "actual": "",
+    "passed": true,
+    "note": "media dark, not cookie"
+  },
+  "title": "Surgery at Sea · Harbour Archive #9",
+  "headings": {
+    "h1": 1,
+    "h2": 14,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 15,
+    "a11y": {
+      "roleHeading": 15,
+      "levels": {
+        "h1": 1,
+        "h2": 14,
+        "h3": 0,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 320,
+    "clientWidth": 320,
+    "innerWidth": 320,
+    "bodyOver": 0,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 0,
+  "linksIntoProduct": {
+    "total": 39,
+    "toRoot": 0,
+    "toWorkspace": 0,
+    "toAppNav": 0,
+    "sample": [
+      "/archive/8",
+      "/library/growth-atlas",
+      "/library/why-throughput-halved",
+      "/library/measuring-throughput",
+      "/library/what-supervisors-do",
+      "/library/where-the-effort-goes",
+      "/library/which-rules-pay",
+      "/library/prompt-kinds",
+      "/library/what-hides-between-sessions",
+      "/library/steady-base",
+      "/library/like-a-skilled-developer",
+      "/library/coherence-as-it-grows"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(28, 36, 48)",
+      "bg": "rgb(250,249,246)",
+      "ratio": 14.84,
+      "text": "Harbour Archive · Document 9 · A passage"
+    },
+    {
+      "selector": "p",
+      "color": "rgb(92, 102, 114)",
+      "bg": "rgb(250,249,246)",
+      "ratio": 5.54,
+      "text": "Harbour set out on 26 September to reach"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(11, 111, 184)",
+      "bg": "rgb(250,249,246)",
+      "ratio": 5.01,
+      "text": "Archive #8"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [],
+    "footerLinks": [
+      "Harbour Library",
+      "Growth Atlas",
+      "process-vs-product.svg",
+      "Why Throughput Halved",
+      "Measuring Throughput",
+      "Where the Effort Goes",
+      "prompt-size-budget.test.js",
+      "Coherence as It Grows",
+      "What Doubled the Dispatches",
+      "What Supervisors Do",
+      "Which Rules Pay",
+      "Reliability Baseline",
+      "Prompt Kinds",
+      "What Hides Between Sessions",
+      "Steady Base",
+      "One Job, Many Paths",
+      "Harbour Should Fix Things Like a Skilled Developer",
+      "the first read of the fleet's complexity",
+      "docs/reviews/v1-passage-debrief-2026-10-10/"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500"
+  ]
+}

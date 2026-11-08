@@ -1,0 +1,55 @@
+{
+  "id": "lin-3121-f5",
+  "base": "http://localhost:3199",
+  "head": "c998cf4c5",
+  "question": "upstream prose contradicts its own diagnostic (3121); \"Linear\" hardcoded for every backend (F5)?",
+  "cases": {
+    "state-upstream-429": {
+      "title": "Trouble Reaching Linear - Projects",
+      "h": "Harbour",
+      "message": "Linear is limiting how often Harbour can ask just now. Your connection is fine and nothing was lost. Wait a few minutes, then try again.",
+      "diagnostic": "Reason Linear rate-limited the request; it should recover shortly. Type upstream · retryable Code LINEAR_RATE_LIMITED Time 2026-11-08T00:00:00.000Z"
+    },
+    "state-upstream-5xx": {
+      "title": "Trouble Reaching Linear - Projects",
+      "h": "Harbour",
+      "message": "Linear returned a server error just now. Your connection is fine and nothing was lost. Try again in a few minutes.",
+      "diagnostic": "Reason Linear returned a 502 server error. Type upstream · retryable Code LINEAR_UPSTREAM_5XX Time 2026-11-08T00:00:00.000Z"
+    },
+    "state-upstream-auth": {
+      "title": "Re-authentication Needed - Projects",
+      "h": "Harbour",
+      "message": "Linear rejected your session as unauthenticated — your sign-in has expired or been revoked. Log out and sign in again to continue.",
+      "diagnostic": "Reason Linear rejected the request as unauthenticated. Type auth Code LINEAR_AUTH Time 2026-11-08T00:00:00.000Z"
+    },
+    "state-upstream-internal": {
+      "title": "Something Went Wrong - Projects",
+      "h": "Harbour",
+      "message": "Something went wrong. Please try again.",
+      "diagnostic": "Reason An unexpected error occurred while preparing the page. Type internal Code INTERNAL_ERROR Time 2026-11-08T00:00:00.000Z"
+    }
+  },
+  "sourceLines": [
+    "815:  LINEAR_UNREACHABLE: \"We couldn't reach Linear's API just now — the connection closed before it responded. This is usually temporary; try again in a moment.\",",
+    "819:const UPSTREAM_SENTENCE_NEUTRAL = \"We couldn't reach Linear's API just now. This is usually temporary; try again in a moment.\";",
+    "849:  // An auth failure (Linear rejected the token as unauthenticated — 401/403)",
+    "858:      'Linear rejected your session as unauthenticated — your sign-in has expired or been revoked. Log out and sign in again to continue.',",
+    "868:  const title = isUpstream ? 'Trouble Reaching Linear' : 'Something Went Wrong';"
+  ],
+  "sourceExcerpt": " * The ONE \"Workspace Limit Reached\" 400 page (LIN-3125 Phase 3). Shared by the\n * credentials-mode GitHub new-container arm (`lib/github-install-flow.js`) and\n * the held `mode=new` picker arm (`routes/held-connection.js`) so the two sites\n * cannot drift in title, message or action.\n * @returns {string} Full HTML document\n */\nexport const WORKSPACE_LIMIT_TITLE = 'Workspace Limit Reached';\nexport const WORKSPACE_LIMIT_MESSAGE = 'You have reached the maximum number of connected workspaces. Please remove one before adding another.';\nexport function renderWorkspaceLimitPage() {\n  return renderErrorPage(WORKSPACE_LIMIT_TITLE, WORKSPACE_LIMIT_MESSAGE, { action: 'Go to dashboard', actionUrl: '/' });\n}\n\nexport const SERVICE_UNAVAILABLE_TITLE = 'Service Unavailable';\nexport const SERVICE_UNAVAILABLE_MESSAGE = 'Service temporarily unavailable. Please try again later.';\n/** The ONE 503 page (LIN-3466): delegates to renderErrorPage, not a second writer. */\nexport function renderServiceUnavailablePage() {\n  return renderErrorPage(SERVICE_UNAVAILABLE_TITLE, SERVICE_UNAVAILABLE_MESSAGE);\n}\n\n/**\n * LIN-3775: the source-aware 503 page for the data-source failure exits in\n * server.js (`ensureValidToken`, `handleUnauthorizedError`). It says which source\n * failed, the HTTP status when one came back, and a reference that matches the\n",
+  "commitsTouchingFileSinceGrounding": [
+    "c3918f179 LIN-3121: upstream error page sentence says what the Reason line says (#2217)",
+    "847e5bf76 LIN-3995: Landing round two: previews say they are previews, sign-in doors carry the wordmark, plainer Try copy (#2166)",
+    "c93e2d41b LIN-3980: Landing: say plainly what Harbour is, keep the glimpses true, and carry the look into sign-in (#2161)",
+    "686dd07bc LIN-3956: Account home on the Plain layout; rows and form kinds proven (#2151)",
+    "9f7acff7d LIN-3846: Settings is a page per area, built from three kinds of row (#2099)",
+    "0b5afa6f4 LIN-3775: error pages say what failed: source, status, log reference (#2044)"
+  ],
+  "summary": {
+    "prose429": "Linear is limiting how often Harbour can ask just now. Your connection is fine and nothing was lost. Wait a few minutes, then try again.",
+    "diagnostic429": "Reason Linear rate-limited the request; it should recover shortly. Type upstream · retryable Code LINEAR_RATE_LIMITED Time 2026-11-08T00:00:00.000Z",
+    "prose5xx": "Linear returned a server error just now. Your connection is fine and nothing was lost. Try again in a few minutes.",
+    "diagnostic5xx": "Reason Linear returned a 502 server error. Type upstream · retryable Code LINEAR_UPSTREAM_5XX Time 2026-11-08T00:00:00.000Z",
+    "linearInTitleForNonLinearBackend": false
+  }
+}

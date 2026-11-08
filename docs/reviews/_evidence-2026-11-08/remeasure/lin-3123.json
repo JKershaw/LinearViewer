@@ -1,0 +1,432 @@
+{
+  "id": "lin-3123",
+  "base": "http://localhost:3199",
+  "head": "c998cf4c5",
+  "question": "light: --yellow/--green/--amber fill tokens used as text below AA?",
+  "censusSource": "census.json (light, 1400, own-background composited)",
+  "censusHits": [
+    {
+      "id": "account",
+      "token": "--green",
+      "element": "span.status-pill__label",
+      "ratio": 3.08,
+      "samples": [
+        "done"
+      ]
+    },
+    {
+      "id": "account",
+      "token": "--green",
+      "element": "span.status-pill__char",
+      "ratio": 3.3,
+      "samples": [
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "landing",
+      "token": "--green",
+      "element": "span.status-pill__label",
+      "ratio": 3.08,
+      "samples": [
+        "done"
+      ]
+    },
+    {
+      "id": "landing",
+      "token": "--green",
+      "element": "span.status-pill__char",
+      "ratio": 3.3,
+      "samples": [
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "email-register",
+      "token": "--green",
+      "element": "span.status-pill__label",
+      "ratio": 3.08,
+      "samples": [
+        "done"
+      ]
+    },
+    {
+      "id": "email-register",
+      "token": "--green",
+      "element": "span.status-pill__char",
+      "ratio": 3.3,
+      "samples": [
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "email-reproof",
+      "token": "--green",
+      "element": "span.status-pill__label",
+      "ratio": 3.08,
+      "samples": [
+        "done"
+      ]
+    },
+    {
+      "id": "email-reproof",
+      "token": "--green",
+      "element": "span.status-pill__char",
+      "ratio": 3.3,
+      "samples": [
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "swim-public",
+      "token": "--yellow",
+      "element": "span.swim-fc-prio.p3",
+      "ratio": 2.27,
+      "samples": [
+        "Medium",
+        "Medium"
+      ]
+    },
+    {
+      "id": "styleguide",
+      "token": "--yellow",
+      "element": "span.sg-glyph",
+      "ratio": 2.27,
+      "samples": [
+        "◐",
+        "◐"
+      ]
+    },
+    {
+      "id": "styleguide",
+      "token": "--green",
+      "element": "span.btn__label",
+      "ratio": 2.89,
+      "samples": [
+        "save",
+        "save"
+      ]
+    },
+    {
+      "id": "styleguide",
+      "token": "--green",
+      "element": "span.status-pill__char",
+      "ratio": 3.08,
+      "samples": [
+        "✓",
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "styleguide",
+      "token": "--green",
+      "element": "span.status-pill__label",
+      "ratio": 3.08,
+      "samples": [
+        "done",
+        "done",
+        "done"
+      ]
+    },
+    {
+      "id": "styleguide",
+      "token": "--green",
+      "element": "span.status-pill__warn",
+      "ratio": 3.08,
+      "samples": [
+        "⚠",
+        "⚠"
+      ]
+    },
+    {
+      "id": "styleguide",
+      "token": "--green",
+      "element": "span.sg-glyph",
+      "ratio": 3.3,
+      "samples": [
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "styleguide",
+      "token": "--green",
+      "element": "span.status-pill__char",
+      "ratio": 3.3,
+      "samples": [
+        "✓"
+      ]
+    },
+    {
+      "id": "styleguide",
+      "token": "--green",
+      "element": "span.toggle-state",
+      "ratio": 3.3,
+      "samples": [
+        "● on",
+        "● on",
+        "● on"
+      ]
+    },
+    {
+      "id": "ws-dashboard",
+      "token": "--green",
+      "element": "span.obs-poll-status",
+      "ratio": 3.3,
+      "samples": [
+        "● live"
+      ]
+    },
+    {
+      "id": "ws-flight-companion",
+      "token": "--green",
+      "element": "button.action-btn.save.fc-start-btn",
+      "ratio": 2.71,
+      "samples": [
+        "start"
+      ]
+    },
+    {
+      "id": "ws-flight-companion",
+      "token": "--green",
+      "element": "button.action-btn.save",
+      "ratio": 2.71,
+      "samples": [
+        "send",
+        "copy prompt"
+      ]
+    },
+    {
+      "id": "ws-observation",
+      "token": "--green",
+      "element": "span.obs-poll-status",
+      "ratio": 3.3,
+      "samples": [
+        "● live"
+      ]
+    },
+    {
+      "id": "ws-collective",
+      "token": "--green",
+      "element": "button.action-btn.save",
+      "ratio": 2.71,
+      "samples": [
+        "start discussion",
+        "say"
+      ]
+    },
+    {
+      "id": "ws-passage-planner",
+      "token": "--green",
+      "element": "button.action-btn.save",
+      "ratio": 2.71,
+      "samples": [
+        "copy prompt"
+      ]
+    },
+    {
+      "id": "ws-dispatch",
+      "token": "--green",
+      "element": "button.btn--quiet.btn--green",
+      "ratio": 2.71,
+      "samples": [
+        "generate"
+      ]
+    },
+    {
+      "id": "ws-dispatch",
+      "token": "--green",
+      "element": "button.prompt-proxy-toggle",
+      "ratio": 3.08,
+      "samples": [
+        "+proxy"
+      ]
+    },
+    {
+      "id": "ws-prompts-custom",
+      "token": "--green",
+      "element": "button.action-btn.save.custom-prompt-new-btn",
+      "ratio": 2.89,
+      "samples": [
+        "+ new prompt"
+      ]
+    },
+    {
+      "id": "ws-proxy",
+      "token": "--green",
+      "element": "button.btn--quiet.btn--green",
+      "ratio": 2.71,
+      "samples": [
+        "generate"
+      ]
+    },
+    {
+      "id": "ws-proxy",
+      "token": "--green",
+      "element": "button.btn--quiet.btn--green",
+      "ratio": 2.75,
+      "samples": [
+        "generate & copy"
+      ]
+    },
+    {
+      "id": "ws-roadmap",
+      "token": "--green",
+      "element": "span.status-pill__char",
+      "ratio": 3.3,
+      "samples": [
+        "✓",
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "ws-runner",
+      "token": "--green",
+      "element": "button.action-btn.save.runner-setup-btn",
+      "ratio": 2.71,
+      "samples": [
+        "create runner prompt"
+      ]
+    },
+    {
+      "id": "ws-ship-biscuit",
+      "token": "--amber",
+      "element": "p.ship-biscuit-warning",
+      "ratio": 1.68,
+      "samples": [
+        "⚠ AI is not configured on the server (connect Open"
+      ]
+    },
+    {
+      "id": "ws-ship-biscuit",
+      "token": "--amber",
+      "element": "code",
+      "ratio": 1.68,
+      "samples": [
+        "OPENROUTER_API_KEY"
+      ]
+    },
+    {
+      "id": "ws-ship-biscuit",
+      "token": "--green",
+      "element": "button.action-btn.save",
+      "ratio": 2.71,
+      "samples": [
+        "run the presses"
+      ]
+    },
+    {
+      "id": "ws-swim",
+      "token": "--yellow",
+      "element": "span.swim-fc-prio.p3",
+      "ratio": 2.15,
+      "samples": [
+        "Medium"
+      ]
+    },
+    {
+      "id": "ws-swim",
+      "token": "--yellow",
+      "element": "span.swim-fc-prio.p3",
+      "ratio": 2.27,
+      "samples": [
+        "Medium",
+        "Medium"
+      ]
+    },
+    {
+      "id": "ws-task-chat",
+      "token": "--green",
+      "element": "button.action-btn.save",
+      "ratio": 2.71,
+      "samples": [
+        "ask"
+      ]
+    },
+    {
+      "id": "ws-settings-features",
+      "token": "--green",
+      "element": "span.toggle-state",
+      "ratio": 3.3,
+      "samples": [
+        "● on",
+        "● on",
+        "● on"
+      ]
+    },
+    {
+      "id": "ws-settings-jira",
+      "token": "--green",
+      "element": "span.provider-active",
+      "ratio": 3.13,
+      "samples": [
+        "●"
+      ]
+    },
+    {
+      "id": "ws-roadmap-local",
+      "token": "--green",
+      "element": "span.status-pill__char",
+      "ratio": 3.3,
+      "samples": [
+        "✓"
+      ]
+    },
+    {
+      "id": "archive-3",
+      "token": "--green",
+      "element": "span.glyph",
+      "ratio": 3.13,
+      "samples": [
+        "◐",
+        "◐",
+        "◐"
+      ]
+    }
+  ],
+  "treeInProgress": [],
+  "runnerCss": "}\n\n.runner-setup-feedback {\n  font-family: var(--font-structural);\n  color: var(--green);\n}\n\n.runner-setup-output {\n  display: block;\n  width: 100%;\n  box-sizing: border-box;\n",
+  "runnerMintedLightGroups": [
+    {
+      "element": "button.action-btn.runner-setup-btn.save",
+      "color": "rgb(22, 163, 74)",
+      "bg": "rgb(198,229,209)",
+      "ratio": 2.44,
+      "need": 4.5,
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "count": 1,
+      "samples": [
+        "copy"
+      ]
+    },
+    {
+      "element": "span.runner-setup-feedback",
+      "color": "rgb(22, 163, 74)",
+      "bg": "rgb(247,247,247)",
+      "ratio": 3.08,
+      "need": 4.5,
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "count": 1,
+      "samples": [
+        "copied ✓"
+      ]
+    }
+  ],
+  "summary": {
+    "pagesWithFillTokenAsText": 23,
+    "treeInProgressRatio": null,
+    "byToken": {
+      "--green": 34,
+      "--yellow": 4,
+      "--amber": 2
+    }
+  }
+}

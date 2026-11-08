@@ -1,0 +1,2360 @@
+{
+ "base": "http://localhost:3199",
+ "documents": 117,
+ "widths": {
+  "320": {
+   "documentsWithOverflowPastViewport": 0,
+   "documentsWithUnscrolledTableOverflow": 0,
+   "non200": 0,
+   "total": 117
+  },
+  "390": {
+   "documentsWithOverflowPastViewport": 0,
+   "documentsWithUnscrolledTableOverflow": 0,
+   "non200": 0,
+   "total": 117
+  }
+ },
+ "perDoc": [
+  {
+   "width": 390,
+   "slug": "/library/between-the-sessions",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/between-the-sessions-check",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 390,
+   "slug": "/library/browser-flakes",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 3
+  },
+  {
+   "width": 390,
+   "slug": "/library/capability-ledger-method",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/capability-ledger",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/cheap-implementer",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/cheaper-capacity",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 3
+  },
+  {
+   "width": 390,
+   "slug": "/library/cleaner-than-it-started",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/clear-the-bar",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/close-out-claims",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/coherence-as-it-grows-check",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/coherence-as-it-grows",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 7
+  },
+  {
+   "width": 390,
+   "slug": "/library/consolidate-then-rebuild",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 3
+  },
+  {
+   "width": 390,
+   "slug": "/library/cost-mix",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 9
+  },
+  {
+   "width": 390,
+   "slug": "/library/developer-adoption-ladder-earlier-dates",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 390,
+   "slug": "/library/developer-adoption-ladder",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/drawing-the-ship",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/efficiency-levers",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/fleet-complexity-read",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 8
+  },
+  {
+   "width": 390,
+   "slug": "/library/flow-and-convergence",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 390,
+   "slug": "/library/growth-atlas",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 390,
+   "slug": "/library/held-or-fresh",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 390,
+   "slug": "/library/how-a-task-is-composed-check",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 390,
+   "slug": "/library/how-a-task-is-composed",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/how-the-charter-got-complicated",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/jev-decision-model",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 390,
+   "slug": "/library/how-process-changes-land",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 9
+  },
+  {
+   "width": 390,
+   "slug": "/library/learning-while-the-tools-change-check",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/learning-while-the-tools-change",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/like-a-skilled-developer",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/measuring-throughput",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 390,
+   "slug": "/library/model-choice-by-call",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 390,
+   "slug": "/library/never-worked-pile",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/model-choice",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 390,
+   "slug": "/library/one-feature-twice",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/one-job-many-paths",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/paid-where-written-check",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/paid-where-written",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/persistent-mind-ephemeral-hands",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/plain-language",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/prompt-kinds",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 390,
+   "slug": "/library/proportional-process-backtest",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 390,
+   "slug": "/library/prototype-concepts",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 390,
+   "slug": "/library/rebuild-ladder",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 390,
+   "slug": "/library/replay-small-work-preregistration",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 390,
+   "slug": "/library/rebuild-round",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 390,
+   "slug": "/library/reliability-baseline",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 390,
+   "slug": "/library/replay-small-work",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 390,
+   "slug": "/library/root-task-ratio",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/review-loops",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/review-consumption",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/runner-for-strangers",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/sessions-without-usage",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/steady-base-check",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 390,
+   "slug": "/library/starting-context",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 390,
+   "slug": "/library/steady-base-menu",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 7
+  },
+  {
+   "width": 390,
+   "slug": "/library/steady-base",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 10
+  },
+  {
+   "width": 390,
+   "slug": "/library/step-overlap",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 390,
+   "slug": "/library/survey-check-10",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 390,
+   "slug": "/library/survey-check-11",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 390,
+   "slug": "/library/survey-check-12",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 390,
+   "slug": "/library/survey-check-13",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 7
+  },
+  {
+   "width": 390,
+   "slug": "/library/survey-check-2",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 390,
+   "slug": "/library/survey-check-3",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 390,
+   "slug": "/library/survey-check-4",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 390,
+   "slug": "/library/survey-check-5",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 390,
+   "slug": "/library/survey-check-6",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 7
+  },
+  {
+   "width": 390,
+   "slug": "/library/survey-check-7",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 390,
+   "slug": "/library/survey-check-8",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 390,
+   "slug": "/library/survey-check-9",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 390,
+   "slug": "/library/survey-check",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 390,
+   "slug": "/library/task-size-and-cost",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/tasks-are-tasks",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/tasks-generate-tasks",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/test-estate",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 390,
+   "slug": "/library/test-surplus",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 8
+  },
+  {
+   "width": 390,
+   "slug": "/library/the-place-became-somebodys-job",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/the-second-copy",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/the-price-of-tomorrow",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 390,
+   "slug": "/library/theseus-method",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/theseus",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 390,
+   "slug": "/library/unwedge-or-breakdown",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/ticket-record-and-quality",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 390,
+   "slug": "/library/wake-inventory",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 390,
+   "slug": "/library/what-a-run-must-show",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 390,
+   "slug": "/library/what-doubled-the-dispatches",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 7
+  },
+  {
+   "width": 390,
+   "slug": "/library/what-hides-between-sessions",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 390,
+   "slug": "/library/what-lowers-the-verification-cost",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/what-should-an-agent-leave-behind-check",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/what-should-an-agent-leave-behind-evidence",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 390,
+   "slug": "/library/what-should-an-agent-leave-behind",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/what-supervisors-do",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/what-the-reviews-checked",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/what-the-selector-needs",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 390,
+   "slug": "/library/where-harbour-joins",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 390,
+   "slug": "/library/where-judgement-happens",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 390,
+   "slug": "/library/where-the-effort-goes",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 390,
+   "slug": "/library/which-rules-pay",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 390,
+   "slug": "/library/why-legs-repeat",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 390,
+   "slug": "/library/why-throughput-halved",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/why-work-spirals",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 390,
+   "slug": "/library/doc/the-folded-loop",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/writing-length",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/doc/drift-at-every-altitude",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 390,
+   "slug": "/library/doc/ladder",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/doc/escalation-philosophy",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/doc/executive-summary-agent-dev-controls",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/doc/north-star",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/doc/charter",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/doc/v1",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/doc/autopilot",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 390,
+   "slug": "/library/doc/autopilot-operating-manual-v2",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/doc/direction-layer-proposal",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/doc/flight-companion-session-2026-08-02",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/doc/collective-session-2026-06-12",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 390,
+   "slug": "/library/doc/passage-planner-session-2026-08-03",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 390,
+   "slug": "/library/doc/theseus-method-long",
+   "status": 200,
+   "vw": 390,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 3
+  },
+  {
+   "width": 320,
+   "slug": "/library/between-the-sessions",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/between-the-sessions-check",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 320,
+   "slug": "/library/browser-flakes",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 3
+  },
+  {
+   "width": 320,
+   "slug": "/library/capability-ledger-method",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/capability-ledger",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/cheap-implementer",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/cheaper-capacity",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 3
+  },
+  {
+   "width": 320,
+   "slug": "/library/cleaner-than-it-started",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/clear-the-bar",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/close-out-claims",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/coherence-as-it-grows-check",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/coherence-as-it-grows",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 7
+  },
+  {
+   "width": 320,
+   "slug": "/library/consolidate-then-rebuild",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 3
+  },
+  {
+   "width": 320,
+   "slug": "/library/cost-mix",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 9
+  },
+  {
+   "width": 320,
+   "slug": "/library/developer-adoption-ladder-earlier-dates",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 320,
+   "slug": "/library/developer-adoption-ladder",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/drawing-the-ship",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/efficiency-levers",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/fleet-complexity-read",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 8
+  },
+  {
+   "width": 320,
+   "slug": "/library/flow-and-convergence",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 320,
+   "slug": "/library/growth-atlas",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 320,
+   "slug": "/library/held-or-fresh",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 320,
+   "slug": "/library/how-a-task-is-composed-check",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 320,
+   "slug": "/library/how-a-task-is-composed",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/how-the-charter-got-complicated",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/jev-decision-model",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 320,
+   "slug": "/library/how-process-changes-land",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 9
+  },
+  {
+   "width": 320,
+   "slug": "/library/learning-while-the-tools-change-check",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/learning-while-the-tools-change",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/like-a-skilled-developer",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/measuring-throughput",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 320,
+   "slug": "/library/model-choice-by-call",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 320,
+   "slug": "/library/never-worked-pile",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/model-choice",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 320,
+   "slug": "/library/one-feature-twice",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/one-job-many-paths",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/paid-where-written-check",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/paid-where-written",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/persistent-mind-ephemeral-hands",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/plain-language",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/prompt-kinds",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 320,
+   "slug": "/library/proportional-process-backtest",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 320,
+   "slug": "/library/prototype-concepts",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 320,
+   "slug": "/library/rebuild-ladder",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 320,
+   "slug": "/library/replay-small-work-preregistration",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 320,
+   "slug": "/library/rebuild-round",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 320,
+   "slug": "/library/reliability-baseline",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 320,
+   "slug": "/library/replay-small-work",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 320,
+   "slug": "/library/root-task-ratio",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/review-loops",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/review-consumption",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/runner-for-strangers",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/sessions-without-usage",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/steady-base-check",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 320,
+   "slug": "/library/starting-context",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 320,
+   "slug": "/library/steady-base-menu",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 7
+  },
+  {
+   "width": 320,
+   "slug": "/library/steady-base",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 10
+  },
+  {
+   "width": 320,
+   "slug": "/library/step-overlap",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 320,
+   "slug": "/library/survey-check-10",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 320,
+   "slug": "/library/survey-check-11",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 320,
+   "slug": "/library/survey-check-12",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 320,
+   "slug": "/library/survey-check-13",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 7
+  },
+  {
+   "width": 320,
+   "slug": "/library/survey-check-2",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 320,
+   "slug": "/library/survey-check-3",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 320,
+   "slug": "/library/survey-check-4",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 320,
+   "slug": "/library/survey-check-5",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 320,
+   "slug": "/library/survey-check-6",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 7
+  },
+  {
+   "width": 320,
+   "slug": "/library/survey-check-7",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 320,
+   "slug": "/library/survey-check-8",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 320,
+   "slug": "/library/survey-check-9",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 320,
+   "slug": "/library/survey-check",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 320,
+   "slug": "/library/task-size-and-cost",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/tasks-are-tasks",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/tasks-generate-tasks",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/test-estate",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 320,
+   "slug": "/library/test-surplus",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 8
+  },
+  {
+   "width": 320,
+   "slug": "/library/the-place-became-somebodys-job",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/the-second-copy",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/the-price-of-tomorrow",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 320,
+   "slug": "/library/theseus-method",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/theseus",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 320,
+   "slug": "/library/unwedge-or-breakdown",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/ticket-record-and-quality",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 320,
+   "slug": "/library/wake-inventory",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 320,
+   "slug": "/library/what-a-run-must-show",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 320,
+   "slug": "/library/what-doubled-the-dispatches",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 7
+  },
+  {
+   "width": 320,
+   "slug": "/library/what-hides-between-sessions",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 320,
+   "slug": "/library/what-lowers-the-verification-cost",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/what-should-an-agent-leave-behind-check",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/what-should-an-agent-leave-behind-evidence",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 320,
+   "slug": "/library/what-should-an-agent-leave-behind",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/what-supervisors-do",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/what-the-reviews-checked",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/what-the-selector-needs",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 320,
+   "slug": "/library/where-harbour-joins",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 320,
+   "slug": "/library/where-judgement-happens",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 6
+  },
+  {
+   "width": 320,
+   "slug": "/library/where-the-effort-goes",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 320,
+   "slug": "/library/which-rules-pay",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 320,
+   "slug": "/library/why-legs-repeat",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 5
+  },
+  {
+   "width": 320,
+   "slug": "/library/why-throughput-halved",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/why-work-spirals",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 320,
+   "slug": "/library/doc/the-folded-loop",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/writing-length",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/doc/drift-at-every-altitude",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 2
+  },
+  {
+   "width": 320,
+   "slug": "/library/doc/ladder",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/doc/escalation-philosophy",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/doc/executive-summary-agent-dev-controls",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/doc/north-star",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/doc/charter",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/doc/v1",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/doc/autopilot",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 1
+  },
+  {
+   "width": 320,
+   "slug": "/library/doc/autopilot-operating-manual-v2",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/doc/direction-layer-proposal",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/doc/flight-companion-session-2026-08-02",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/doc/collective-session-2026-06-12",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 4
+  },
+  {
+   "width": 320,
+   "slug": "/library/doc/passage-planner-session-2026-08-03",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 0
+  },
+  {
+   "width": 320,
+   "slug": "/library/doc/theseus-method-long",
+   "status": 200,
+   "vw": 320,
+   "overCount": 0,
+   "sample": [],
+   "tableOver": false,
+   "tables": 3
+  }
+ ]
+}

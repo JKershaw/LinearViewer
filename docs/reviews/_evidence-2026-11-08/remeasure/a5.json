@@ -1,0 +1,200 @@
+{
+  "base": "http://localhost:3199",
+  "head": "c998cf4c5",
+  "question": "mono used for prose (>=12 words in a monospace element)",
+  "rows": [
+    {
+      "name": "landing",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "library",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "guest-404",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "email-signin",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "kpis-public",
+      "monoProseCount": 9,
+      "examples": [
+        "\"JetBrains Mono\", \"S 12.8px \"Landed rate is done ÷ (done + failed + aborted) fo\"",
+        "\"JetBrains Mono\", \"S 12.8px \"A week with nothing resolved has no rate, so the l\"",
+        "\"JetBrains Mono\", \"S 12.8px \"Each task counts once, in the week it started, wit\""
+      ]
+    },
+    {
+      "name": "ship-public",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "swim-public",
+      "monoProseCount": 8,
+      "examples": [
+        "\"JetBrains Mono\", \"S 11.5px \"AI made writing code cheap—it didn't make knowing \"",
+        "\"JetBrains Mono\", \"S 11.5px \"Explore the backlog as a collapsible tree, one tas\"",
+        "\"JetBrains Mono\", \"S 11.5px \"Watch your agent runs live as they pick up work, r\""
+      ]
+    },
+    {
+      "name": "swipe-public",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "templates",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "styleguide",
+      "monoProseCount": 2,
+      "examples": [
+        "\"JetBrains Mono\", \"S 13.6px \"6rem (7.75rem ≤640px, 13rem ≤480px) — the floor, a\"",
+        "\"JetBrains Mono\", \"S 13.6px \"max(floor, measured header) — sticky header cleara\""
+      ]
+    },
+    {
+      "name": "terms",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "privacy",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws-tree",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/settings",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/dispatch",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/proxy",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/roadmap",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/kpis",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/runner",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/ship",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/swim",
+      "monoProseCount": 2,
+      "examples": [
+        "\"JetBrains Mono\", \"S 11.5px \"Extract auth logic into separate service for bette\"",
+        "\"JetBrains Mono\", \"S 11.5px \"Implement cursor-based pagination for the user lis\""
+      ]
+    },
+    {
+      "name": "ws/swipe",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/audit",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/prompts",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/collective",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/observation",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/live-console",
+      "monoProseCount": 1,
+      "examples": [
+        "\"JetBrains Mono\", \"S 13.12px \"○ all quiet — agents will appear here the moment t\""
+      ]
+    },
+    {
+      "name": "ws/ship-biscuit",
+      "monoProseCount": 1,
+      "examples": [
+        "\"JetBrains Mono\", \"S 16px \"○ no edition yet — press \"run the presses\" to gene\""
+      ]
+    },
+    {
+      "name": "ws/flight-companion",
+      "monoProseCount": 0,
+      "examples": []
+    },
+    {
+      "name": "ws/passage-planner",
+      "monoProseCount": 0,
+      "examples": []
+    }
+  ],
+  "summary": {
+    "pagesWithMonoProse": [
+      "kpis-public:9",
+      "swim-public:8",
+      "styleguide:2",
+      "ws/swim:2",
+      "ws/live-console:1",
+      "ws/ship-biscuit:1"
+    ]
+  },
+  "named": {
+    "dispatch .guide-halt-note": {
+      "sel": ".guide-halt-note",
+      "fontFamily": "Inter, -apple-system, \"system-ui\", \"Sego",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "words": 31,
+      "sectionTitle": {
+        "text": "Integration Guide",
+        "fontSize": "16px",
+        "fontFamily": "Inter, -apple-system, \"system-"
+      }
+    },
+    "settings .model-workspace-note": null
+  }
+}

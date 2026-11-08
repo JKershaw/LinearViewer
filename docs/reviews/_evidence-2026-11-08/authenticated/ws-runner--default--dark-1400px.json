@@ -1,0 +1,85 @@
+{
+  "key": "ws-runner|default|dark|1400",
+  "registryId": "ws-runner",
+  "state": "default",
+  "theme": "dark",
+  "viewport": 1400,
+  "path": "/workspace/test-workspace/runner",
+  "populated": null,
+  "note": "default render",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/runner",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Run on my machine",
+    "h1": "Run on my machine",
+    "headings": {
+      "h1": 1,
+      "h2": 4
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "ship's biscuit",
+      "ship journey",
+      "roadmap",
+      "live console",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "flight companion",
+      "passage planner"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 2163
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 61,
+    "belowThreshold": []
+  },
+  "extra": {
+    "feedbackEl": true,
+    "feedbackText": "",
+    "feedbackHidden": false,
+    "feedbackColor": "rgb(46, 230, 95)",
+    "feedbackBg": "rgb(22,24,29)",
+    "feedbackRatio": 10.66,
+    "greenToken": "#2ee65f"
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}
