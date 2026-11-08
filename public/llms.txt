@@ -257,7 +257,7 @@ relationship between the tasks, not as a label.
 - `bug` - bug: Find root cause and potential fixes
 - `triage` - triage: Review and update metadata (labels, priority)
 - `breakdown` - breakdown: Break large tasks into actionable subtasks
-- `scoping` - scoping: Define boundaries and success criteria
+- `scoping` - scoping: Settle the size of the move, and why
 - `design` - design: Evaluate approaches and recommend architecture
 - `spike` - spike: Time-boxed exploration for proof-of-concept
 - `context` - context: Synthesize current state when joining mid-task
