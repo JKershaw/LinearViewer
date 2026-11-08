@@ -3216,3 +3216,14 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - without the gate it was 1.9 and 3.4 weeks at about $2,000 a week. The gate costs about 1.3 weeks and removes the hand as the risk at four in flight.
   - Nothing is decided yet. D1 waits for John to confirm the recap.
 - **~21:55 UTC: D1 decided.** John: "Agreed, perfect." Recorded in `discussion.md` (D1 and "Decisions made"). D2 (roles) is next.
+- **~22:20 UTC: Plotting the Course v4.** At John's ask ("Extend the artifact to include all of this") the page has a new section, "The course we chose":
+  - D1 as recorded;
+  - the first outside team;
+  - Jira's readiness, read from the code;
+  - the gate and the hand's six remaining jobs, each with the hop that retires it;
+  - the gate's cost, drawn live from the model;
+  - the course stage by stage;
+  - money;
+  - what the model counts and what it doesn't.
+
+  The "one first audience" lever now names the chosen team. One correction to my chat figures: with the Jira gaps in every row, the gate costs about a week (3.8 weeks becomes 4.8), not "a week and a bit", and the spare comes to about $1,800 a week once measuring is counted, not $1,900. D1's notes are corrected to match. The page's comment watch failed to register again (mint_failed). D2 is next.

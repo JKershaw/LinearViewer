@@ -71,8 +71,8 @@ The roadmap's measures start from these.
 - **How we got here.** The four proposed measures became five when John asked about speed ("fast tickets"). The destinations came from his "different optimums… working backwards… given a weekly budget". The hops came from "hops… making later steps more efficient". The gate came from his "what if we gate on an agent running not needing to do anything complex?".
 - **The model behind it.** Shown on the page *Plotting the Course* (claude.ai artifact, private). Scripts are in the session scratchpad (`model/push.js`, `model/gate.js`).
   - **With the gate:** two weeks at two in flight doing the hops and the Jira gaps, then four in flight with the four levers that remove work (sort hard, one first audience, Theseus moves, bring your own runner).
-  - **Result:** milestone 1 (anyone can sign in and get a good prompt) lands in about week 3; milestone 2 (an outside team can hand Harbour a task) in about week 4.7, at about $1,600 a week.
-  - **Without the gate:** 1.9 and 3.4 weeks. The gate costs a little over a week and removes the hand as the main risk at four in flight.
+  - **Result:** milestone 1 (anyone can sign in and get a good prompt) lands in about week 3; milestone 2 (an outside team can hand Harbour a task) in about week 4.8, at about $1,600 a week, leaving about $1,800 a week spare once measuring is counted.
+  - **Without the gate**, with the Jira gaps also included: 2.3 and 3.8 weeks. The gate costs about a week and removes the hand as the main risk at four in flight. (The 1.9 and 3.4 weeks quoted in chat on 8 Nov left the Jira gaps out of the ungated row.) At two in flight the whole way, milestone 2 is about week 7.6.
   - **The floor:** about 2.5 weeks (things that must happen in order, plus a week of real use).
 - **Jira, read from the code on 8 Nov:**
   - Harbour reads, edits, comments on and labels Jira issues, with OAuth sign-in.
