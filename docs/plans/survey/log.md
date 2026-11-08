@@ -3076,3 +3076,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - Every check in the loop reads from the same altitude as the brief, so none of them could see that the feature itself was the mistake.
     - The remedy is upstream: say what and why, and when something isn't working, put the person's words on a ticket rather than hand-steer a running session.
   - **For the discussion:** what becomes of the setting, and how this session works from here.
+- **13:58 UTC: LIN-4380 merged** (`c998cf4c5`, PR #2375, LIN-4349 P2: the other corrective Periodicals feed the notes and mint nothing, with a census test that no Periodical files tickets). P3 (LIN-4381) and P4 (LIN-4382) remain.
