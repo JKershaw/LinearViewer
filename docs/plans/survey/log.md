@@ -3201,3 +3201,17 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - The floor is about 2.5 weeks: things that must happen in order, plus a week of real people using it.
   - **Weight:** 82,154 of Harbour's 207,338 production JavaScript lines (40%) are comment-only (46% in runs and dispatch, 50% in auth).
   - D1's wording and the first course are still to confirm.
+- **~21:40 UTC: John asks for a gate, and names the first outside test.** His question: should we gate on the agent running the plan "not needing to do anything complex"? Can all this run through Harbour now? Should we finish more of the Survey improvements first, and is that leverage in the model? He also named the first real outside test: a small team that already uses agents and wants agents building its product. They use Jira, and their setup is like Harbour's.
+  - **What the code says about Jira today** (read from `lib/providers/jira/`, about 3,500 lines):
+    - Harbour can read Jira, edit issues, comment and label, with OAuth sign-in.
+    - It can't create a Jira issue (`createIssue` isn't built). So on Jira the loop can't file a follow-up, mint a Periodical or file a sealed task.
+    - LIN-4355 (Jira can't hold the As asked block) is in Backlog.
+    - LIN-2805: the ticket walk only knows `LIN-123`-style IDs.
+    - Checks against a real Atlassian tenant are still open (LIN-2094, LIN-2026, LIN-2170); most testing so far ran against the fake client.
+    - Boards and sprints aren't modelled (LIN-2008).
+    - 37 open tickets have Jira in the title.
+  - **The model, run with the gate** (`model/gate.js`, rough):
+    - two weeks at two in flight doing the hops first, plus the Jira gap (about one real task and eight small items), then four in flight with the four levers that remove work;
+    - milestone 1 lands in about week 3, milestone 2 in about week 4.7 (week 5.7 at three in flight), averaging about $1,600 a week;
+    - without the gate it was 1.9 and 3.4 weeks at about $2,000 a week. The gate costs about 1.3 weeks and removes the hand as the risk at four in flight.
+  - Nothing is decided yet. D1 waits for John to confirm the recap.
