@@ -3130,3 +3130,14 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **Across every read this round, the same leftover:** ticket and ruling history in code comments. It's the loop's own habit, coming back after each cleanup.
 - **16:15 UTC: the round's Periodical.** `GET /periodicals` already shows four lanes as `landed` (Code Quality, Drift & Coherence, Comprehension-Debt, Stability). That's LIN-4381 working live. Production is on `393c7686b`, without LIN-4382's order of work yet. Once it deploys, I'll kick off one autopilot run to take the first Periodical that Harbour's own order picks. It won't name which one, and it won't take anything else from the stack. That tests LIN-4349 as a person would use it: findings should go to the notes, with no tickets.
 - **16:18 UTC: Harbour's order picked the Stability Review** (dispatch `8407fcd1`) from the four lanes marked landed, about a minute after the kickoff (autopilot `9b2c9062`, goal: run the first Periodical Harbour's own order picks among those landed work made due, nothing else). Stability is one of the three advisory templates, so it reports to a person rather than to the notes. The check is the same either way: no tickets minted.
+- **16:22 UTC: the round's Periodical is running as LIN-4394** (Stability Review, run 5, advisory). Autopilot `9b2c9062` explained its pick: of the four lanes marked landed, stability-review had the oldest last run (4 Nov). It took nothing else from the stack. The ticket is the review itself, under the two-stage contract, and it says "mint NO follow-up tasks".
+- **16:22 UTC: ruling `lin4349-tail-spend`.** The scoped-run tail is built as mint-and-stop, which adds one orchestrator session (three per run, each lane at most once a day). The options are accept, or revert and rebuild within two sessions. I suggested **accept**: each Periodical run costs about $8–10 and the orchestrator is a small share; reverting is more work, not less; and accept is record-only, so it needs no hand action. (Loop id: the anchor's `loopId`, not `stampLoopId`.)
+- **Cost so far (Harbour's `/cost`, API-equivalent USD, all tickets in each area including pieces and tidies; blind reads not counted):**
+  - LIN-4345: $282 (9 tickets)
+  - LIN-4346: about $211 (6; its parent autopilot is still running, so this is a floor)
+  - LIN-4347: $180 (11)
+  - LIN-4349: $83 (5)
+  - LIN-4358: $60 (1)
+  - LIN-4378: $24 (1)
+  - Periodicals: $18 (2)
+  - **About $857 in total.** LIN-4369's pre-registered replay alone was $111. The cheapest area, LIN-4378 (small on purpose), read better. The second most expensive, LIN-4346, ended mixed.
