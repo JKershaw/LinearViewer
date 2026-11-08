@@ -256,7 +256,7 @@ describe('LIN-4373 — release when the leftover row never runs', () => {
     assert.equal(wakes.length, 1);
     assert.strictEqual(wakes[0].bootstrapToken, null);
     assert.deepEqual(calls, [{ urlKey: URL_KEY, createdBy: OWNER }], "keyed on the root's dispatchedBy");
-    assert.ok(lines.some(l => l.includes('[leftover] release-degraded')), JSON.stringify(lines));
+    assert.ok(lines.some(l => l.includes('[dispatch-wake] no-retry-degraded')), JSON.stringify(lines));
   });
 
   test('no provisioner factory: the release still wakes, and says it degraded', async () => {
@@ -264,7 +264,7 @@ describe('LIN-4373 — release when the leftover row never runs', () => {
     const { a } = await heldBuild(world);
     const { lines } = await captureLogs(() => world.store.removeItem(URL_KEY, queuedLeftover(world)._id));
     assert.equal(wakesTo(world, a._id).length, 1);
-    assert.ok(lines.some(l => l.includes('[leftover] release-degraded') && l.includes('no-provisioner')));
+    assert.ok(lines.some(l => l.includes('[dispatch-wake] no-retry-degraded') && l.includes('no-provisioner')));
   });
 
   test('a release that faults the first time is recovered by a re-reported build [done]: exactly one wake', async () => {
