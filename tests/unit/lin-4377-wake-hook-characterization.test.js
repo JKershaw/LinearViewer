@@ -46,7 +46,7 @@ function makeWorld() {
 }
 
 /** The hook option on `addFeedback`. */
-const hookOpts = (hook) => ({ leftoverHook: hook });
+const hookOpts = (hook) => ({ wakeHook: hook });
 
 const post = (world, row, message, hook = world.hook) =>
   world.store.addFeedback(row._id, URL_KEY, { message }, TOKEN, undefined, hookOpts(hook));

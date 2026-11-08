@@ -1633,7 +1633,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         provisionWakeCredential,
         // LIN-4373: the leftover step, the same one the runner feedback route uses. This
         // route has no workspace id, so the step resolves it from the urlKey.
-        { leftoverHook: leftoverStep?.forRequest({ baseUrl }) }
+        { wakeHook: leftoverStep?.forRequest({ baseUrl }) }
       );
 
       if (!result) {

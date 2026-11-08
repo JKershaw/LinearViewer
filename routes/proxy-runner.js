@@ -210,7 +210,7 @@ export function createProxyRunnerRoutes({
     // LIN-4373: the same leftover step as the dispatch feedback route, bound to this
     // request's origin (never resolveEmailLinkOrigin, which may be unset) and the token's
     // own workspace.
-    const leftoverHook = leftoverStep?.forRequest({ baseUrl, workspaceId: req.proxyWorkspaceId ?? null });
+    const wakeHook = leftoverStep?.forRequest({ baseUrl, workspaceId: req.proxyWorkspaceId ?? null });
 
     const validation = validateFeedbackBody(req.body);
     if (validation.error) {
@@ -226,7 +226,7 @@ export function createProxyRunnerRoutes({
         feedback,
         req.proxyTokenLabel,
         provisionWakeCredential,
-        { takenByTokenId: req.proxyTokenId, leftoverHook }
+        { takenByTokenId: req.proxyTokenId, wakeHook }
       );
 
       if (!result) {

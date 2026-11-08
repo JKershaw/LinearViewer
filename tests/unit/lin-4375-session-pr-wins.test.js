@@ -126,7 +126,7 @@ async function runAndBuild(world) {
 }
 
 const post = (world, row, entry, provision = undefined) =>
-  world.store.addFeedback(row._id, URL_KEY, entry, TOKEN, provision, { leftoverHook: world.hook });
+  world.store.addFeedback(row._id, URL_KEY, entry, TOKEN, provision, { wakeHook: world.hook });
 
 const all = (world) => [...world.collection._docs, ...world.historyCollection._docs];
 const wakesTo = (world, runId) => all(world).filter(d => d.kind === 'wake' && d.followUpTo === runId);
