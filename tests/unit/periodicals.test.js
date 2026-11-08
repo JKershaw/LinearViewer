@@ -327,6 +327,96 @@ describe('corrective reviews: bounded follow-up creation', () => {
   }
 });
 
+// LIN-4380 (LIN-4349 P2): the prompt census. No Periodical mints a follow-up: a corrective
+// template feeds the area notes and routes the rest to the person; an advisory one reports to
+// a person. This census fails while any template's Stage-2 contract tells the run to create
+// follow-up tasks, or while a corrective template still carries the report-only or
+// minted-follow-up wording the shared builders render by default. It selects by mode, never
+// by a converted-template list, so a template cannot opt out of it by being left off a list.
+// Repeatable search for what it guards: grep -n "follow-up task\|mint\b" lib/periodicals.js
+describe('prompt census: no Periodical mints a follow-up (LIN-4380)', () => {
+  const STAGE2_OPEN = 'Write a Linear task whose description directs whoever runs it to:';
+  const STAGE2_CLOSE = 'Include this exact line as the first line';
+  // Stage 1 keeps minting the ONE review task (the plan keeps the two-stage shape), so the
+  // census reads only the review task's contract: the bullets between these two lines.
+  const stage2 = prompt => {
+    const open = prompt.indexOf(STAGE2_OPEN);
+    const close = prompt.indexOf(STAGE2_CLOSE);
+    assert.ok(open > 0 && close > open, 'the Stage-2 contract is delimited');
+    return prompt.slice(open + STAGE2_OPEN.length, close);
+  };
+
+  // Instructions to create follow-up work, by the exact shapes the templates have used. Each
+  // is a positive instruction or a sentence that presumes the run mints; none is a negation.
+  const MINTING_PHRASES = [
+    /Mint a bounded set of follow-up tasks/i,
+    /into new Linear tasks yourself/i,
+    /before minting a task/i,
+    /mint a fix-task/i,
+    /mints work only for/i,
+    /corrective minting half/i,
+    /a finding for a follow-up task/i,
+    /Prose and follow-up tasks/i,
+    /follow-up tasks you minted/i,
+    /highest-severity work is on the stack/i
+  ];
+
+  // The shared builders' default wording, which a corrective template must no longer render:
+  // it says Stage 2 writes only its report, or that it minted follow-ups.
+  const UNCONVERTED_WORDING = [
+    /no docs beyond writing the report artifact/i,
+    /follow-up tasks you minted/i,
+    /follow-up work this review mints/i,
+    /\(and any follow-up tasks\)/i
+  ];
+
+  // A clause that names follow-up work or minting and carries no negation reads as an order to
+  // create it. This catches wording the phrase list has not seen yet.
+  const MINT_WORD = /\bfollow-ups?\b|\bfix-tasks?\b|\bmint(?:s|ed|ing)?\b|\bnew (?:Linear )?tasks?\b|\bLinear tasks?\b/i;
+  const NEGATION = /\b(?:no|not|never|nothing|none|nor)\b/i;
+  const unnegatedMintClauses = text =>
+    text.split(/(?<=[.;:!?])\s+|\n+/).filter(c => MINT_WORD.test(c) && !NEGATION.test(c));
+
+  const corrective = PERIODICALS.filter(t => t.mode === 'corrective');
+  const advisory = PERIODICALS.filter(t => t.mode === 'advisory');
+
+  test('the registry splits into the 13 corrective and the 3 advisory templates the plan names', () => {
+    assert.strictEqual(corrective.length, 13);
+    assert.deepStrictEqual(advisory.map(t => t.id).sort(), ['integration-surface-maturity', 'recent-headwinds', 'stability-review']);
+  });
+
+  for (const template of PERIODICALS) {
+    test(`${template.title}: Stage 2 gives no instruction to create follow-up tasks`, () => {
+      const contract = stage2(template.generatePrompt());
+      const hits = MINTING_PHRASES.filter(re => re.test(contract)).map(String);
+      assert.deepStrictEqual(hits, [], `${template.id} still tells the run to mint`);
+    });
+  }
+
+  // Advisory templates stay as they are (the plan): they already mint nothing and say so, and
+  // they keep the shared builders' default gap-audit and second-read wording, which names
+  // follow-up work only as a bound. So the clause scan and the unconverted-wording check apply
+  // to the corrective templates; the advisory ones must still say they mint nothing.
+  for (const template of advisory) {
+    test(`${template.title} (advisory): still reports to a person and mints NO follow-up tasks`, () => {
+      assert.match(template.generatePrompt(), /mint NO follow-up tasks/);
+    });
+  }
+
+  for (const template of corrective) {
+    test(`${template.title} (corrective): no clause names follow-up work or minting without negating it`, () => {
+      const clauses = unnegatedMintClauses(stage2(template.generatePrompt()));
+      assert.deepStrictEqual(clauses, [], `${template.id} has minting clauses`);
+    });
+
+    test(`${template.title} (corrective): none of the report-only or minted-follow-up wording`, () => {
+      const prompt = template.generatePrompt();
+      const hits = UNCONVERTED_WORDING.filter(re => re.test(prompt)).map(String);
+      assert.deepStrictEqual(hits, [], `${template.id} carries unconverted wording`);
+    });
+  }
+});
+
 describe('Documentation Review specifics', () => {
   const prompt = PERIODICALS.find(t => t.id === 'documentation-review').generatePrompt();
 
