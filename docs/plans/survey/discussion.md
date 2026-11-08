@@ -38,7 +38,7 @@ The roadmap's measures start from these.
 
 ## Part 1: the frame
 
-### D1. The goal and its measures ○
+### D1. The goal and its measures ✓
 **What we know.**
 - Goal: Harbour brings codebases toward settled, including its own.
 - John's tipping point: on average a task leaves the code a little better, and the bigger improvements can come from Periodical-type work.
@@ -53,13 +53,44 @@ The roadmap's measures start from these.
 
 **Recommendation:** adopt these four, with the baseline above. Make the curve the Stability Review's headline.
 
-**Decision:** —
+**Decision (8 Nov, John: "Agreed, perfect"):**
+- **Goal:** Harbour brings codebases toward settled, including its own. Settled is a balance, not smallness.
+- **How we plan:** pick a destination for each four-week stretch and work back from it. Take hops early, because they make every later step cheaper. Read the curves weekly and adjust.
+- **First stretch, "open the door":** a small outside team on Jira, who already use agents, can hand Harbour real tasks on their own runner.
+- **Gate:** stay at two in flight until a week's work needs nothing from the agent running it beyond filing words, starting runs and recording results.
+- **Budget:** $3,500 a week at list prices, about $100 of it for measuring.
+- **Five measures, read weekly, in this order when they clash:**
+  1. **No new mess:** ordinary tickets read neutral or better in a blind read.
+  2. **The curve:** net production lines a week is the headline; deletions per addition, CI time, Waiting entries and tickets per landing sit beside it.
+  3. **Speed:** time and sessions per ticket.
+  4. **Your seat:** questions that were really yours, and runs that needed no operator.
+  5. **Cost per finished task:** measured, not optimised, for now.
+- **No targets yet:** keep the 8 November baseline above and set targets at each gate.
 
-**Notes:** —
+**Notes:**
+- **How we got here.** The four proposed measures became five when John asked about speed ("fast tickets"). The destinations came from his "different optimums… working backwards… given a weekly budget". The hops came from "hops… making later steps more efficient". The gate came from his "what if we gate on an agent running not needing to do anything complex?".
+- **The model behind it.** Shown on the page *Plotting the Course* (claude.ai artifact, private). Scripts are in the session scratchpad (`model/push.js`, `model/gate.js`).
+  - **With the gate:** two weeks at two in flight doing the hops and the Jira gaps, then four in flight with the four levers that remove work (sort hard, one first audience, Theseus moves, bring your own runner).
+  - **Result:** milestone 1 (anyone can sign in and get a good prompt) lands in about week 3; milestone 2 (an outside team can hand Harbour a task) in about week 4.7, at about $1,600 a week.
+  - **Without the gate:** 1.9 and 3.4 weeks. The gate costs a little over a week and removes the hand as the main risk at four in flight.
+  - **The floor:** about 2.5 weeks (things that must happen in order, plus a week of real use).
+- **Jira, read from the code on 8 Nov:**
+  - Harbour reads, edits, comments on and labels Jira issues, with OAuth sign-in.
+  - It can't create a Jira issue, so on Jira the loop can't file a follow-up, mint a Periodical or file a sealed task.
+  - Also open: LIN-4355 (the As asked block), LIN-2805 (the ticket walk knows only `LIN-` IDs), the real-site checks (LIN-2094, LIN-2026, LIN-2170) and boards and sprints (LIN-2008).
+- **What still needs the hand**, and so stands between us and the gate:
+  - the blind read before merge;
+  - filtering rulings;
+  - noticing stalled waits;
+  - piecing together a task's sessions (LIN-4395);
+  - scheduling the Waiting notes;
+  - reading the curve each week.
 
-**Leads to:** the roadmap's measures (D17); the Stability Review's headline (D16).
+  Each has a hop in the plan.
 
-### D2. Roles: you, this session, Harbour ○
+**Leads to:** the roadmap's measures and first stretch (D17, whose phases now start with the gate); the Stability Review's headline (D16); D2 (the operator's four allowed actions are the gate); D11 (the backlog sorted against "open the door"); the Jira gaps as tickets in your words, at D10.
+
+### D2. Roles: you, this session, Harbour ◐
 *(earlier list: 8 and 17)*
 
 **What we know.**
@@ -518,6 +549,7 @@ The north star counts false escalations as a headline cost.
 | Item | Date | Decision | Follow-up |
 |---|---|---|---|
 | (LIN-4395) | 8 Nov | File: a task shows the sessions that ran it, on one clock | Filed, Backlog; placed in D8 |
+| D1 | 8 Nov | Goal: toward settled, a balance. Five measures (no new mess, the curve, speed, your seat, cost), read weekly. First stretch: "open the door" for a small Jira team on their own runner. Gate: two in flight until running it needs nothing complex. $3,500 a week. Targets set at gates. | D17's phases start with the gate; Jira gaps to D10 |
 
 ## Appendix A: open tickets from this work (8 Nov)
 

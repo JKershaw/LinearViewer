@@ -3215,3 +3215,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - milestone 1 lands in about week 3, milestone 2 in about week 4.7 (week 5.7 at three in flight), averaging about $1,600 a week;
     - without the gate it was 1.9 and 3.4 weeks at about $2,000 a week. The gate costs about 1.3 weeks and removes the hand as the risk at four in flight.
   - Nothing is decided yet. D1 waits for John to confirm the recap.
+- **~21:55 UTC: D1 decided.** John: "Agreed, perfect." Recorded in `discussion.md` (D1 and "Decisions made"). D2 (roles) is next.
