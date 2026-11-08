@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "LIN-3451: Simple Dispatcher is the reference; a row where kit differs from sd carries a difference. Test fixture only: the kit never loads this file. Byte-copied to simple-dispatcher test/fixtures/runner-contract.json.",
+  "note": "LIN-3451: Simple Dispatcher is the reference; each row pins sd plus kit and/or harbour (LIN-4384), and a column that differs from sd carries a difference. Test fixture only: the kit never loads this file. Byte-copied to simple-dispatcher test/fixtures/runner-contract.json.",
   "rows": [
     {
       "area": "halt",
@@ -428,6 +428,133 @@
       "sd": "5xx",
       "kit": "error",
       "difference": "LIN-3699: same reply, each side's own vocabulary. SD counts a retryable 5xx toward host-wide auto-pause and never latches; the kit's wait returns reason `error` (re-arm), and `login` says Harbour could not check the bootstrap."
+    },
+    {
+      "area": "report",
+      "case": "one DONE: line naming one PR",
+      "item": {
+        "message": "Opened the PR and CI is green.\n\nDONE: opened https://github.com/JKershaw/LinearViewer/pull/101"
+      },
+      "sd": "https://github.com/JKershaw/LinearViewer/pull/101",
+      "harbour": "https://github.com/JKershaw/LinearViewer/pull/101"
+    },
+    {
+      "area": "report",
+      "case": "two PRs on one DONE: line: the first PR named on it",
+      "item": {
+        "message": "Both halves are up.\n\nDONE: opened https://github.com/JKershaw/LinearViewer/pull/101 and https://github.com/JKershaw/simple-dispatcher/pull/202"
+      },
+      "sd": "https://github.com/JKershaw/LinearViewer/pull/101",
+      "harbour": "https://github.com/JKershaw/LinearViewer/pull/101"
+    },
+    {
+      "area": "report",
+      "case": "an indented DONE: line still counts",
+      "item": {
+        "message": "Summary (see https://github.com/JKershaw/LinearViewer/pull/2357):\n  DONE: opened https://github.com/JKershaw/LinearViewer/pull/101"
+      },
+      "sd": "https://github.com/JKershaw/LinearViewer/pull/101",
+      "harbour": "https://github.com/JKershaw/LinearViewer/pull/101"
+    },
+    {
+      "area": "report",
+      "case": "two DONE: lines: the PR on the newest line",
+      "item": {
+        "message": "DONE: opened https://github.com/JKershaw/LinearViewer/pull/101\n\nThat one was superseded.\n\nDONE: opened https://github.com/JKershaw/LinearViewer/pull/102"
+      },
+      "sd": "https://github.com/JKershaw/LinearViewer/pull/102",
+      "harbour": "https://github.com/JKershaw/LinearViewer/pull/102"
+    },
+    {
+      "area": "report",
+      "case": "a DONE: inside a DECISION block, then a real DONE: line: the real (newest) line's PR",
+      "item": {
+        "message": "DECISION:\n{\"question\": \"Which way?\",\nDONE: https://github.com/JKershaw/LinearViewer/pull/109\n\"options\": [\"a\", \"b\"]}\n\nDONE: opened https://github.com/JKershaw/LinearViewer/pull/103"
+      },
+      "sd": "https://github.com/JKershaw/LinearViewer/pull/103",
+      "harbour": "https://github.com/JKershaw/LinearViewer/pull/103"
+    },
+    {
+      "area": "report",
+      "case": "a DONE: only inside a DECISION block: its PR, not one mentioned before it",
+      "item": {
+        "message": "Need a ruling first; the pattern is in https://github.com/JKershaw/LinearViewer/pull/2357.\n\nDECISION:\n{\"question\": \"Which way?\",\nDONE: https://github.com/JKershaw/LinearViewer/pull/109\n\"options\": [\"a\", \"b\"]}"
+      },
+      "sd": "https://github.com/JKershaw/LinearViewer/pull/109",
+      "harbour": "https://github.com/JKershaw/LinearViewer/pull/109"
+    },
+    {
+      "area": "report",
+      "case": "the session's own PR on its DONE: line beats a PR it mentioned more often (LIN-4375)",
+      "item": {
+        "message": "Read https://github.com/JKershaw/LinearViewer/pull/2357 for context.\nAgain https://github.com/JKershaw/LinearViewer/pull/2357, and https://github.com/JKershaw/LinearViewer/pull/2357 once more.\nThe sibling https://github.com/JKershaw/LinearViewer/pull/2357 sets the pattern.\n\nDONE: opened https://github.com/JKershaw/LinearViewer/pull/2359"
+      },
+      "sd": "https://github.com/JKershaw/LinearViewer/pull/2359",
+      "harbour": "https://github.com/JKershaw/LinearViewer/pull/2359"
+    },
+    {
+      "area": "sentinel",
+      "case": "one DONE: line",
+      "item": {
+        "message": "Opened the PR and CI is green.\n\nDONE: opened https://github.com/JKershaw/LinearViewer/pull/101"
+      },
+      "sd": "finished",
+      "kit": "finished"
+    },
+    {
+      "area": "sentinel",
+      "case": "a DONE: line naming two PRs",
+      "item": {
+        "message": "Both halves are up.\n\nDONE: opened https://github.com/JKershaw/LinearViewer/pull/101 and https://github.com/JKershaw/simple-dispatcher/pull/202"
+      },
+      "sd": "finished",
+      "kit": "finished"
+    },
+    {
+      "area": "sentinel",
+      "case": "an indented DONE: line still counts",
+      "item": {
+        "message": "Summary (see https://github.com/JKershaw/LinearViewer/pull/2357):\n  DONE: opened https://github.com/JKershaw/LinearViewer/pull/101"
+      },
+      "sd": "finished",
+      "kit": "finished"
+    },
+    {
+      "area": "sentinel",
+      "case": "two DONE: lines",
+      "item": {
+        "message": "DONE: opened https://github.com/JKershaw/LinearViewer/pull/101\n\nThat one was superseded.\n\nDONE: opened https://github.com/JKershaw/LinearViewer/pull/102"
+      },
+      "sd": "finished",
+      "kit": "finished"
+    },
+    {
+      "area": "sentinel",
+      "case": "a DONE: inside a DECISION block, then a real DONE: line last",
+      "item": {
+        "message": "DECISION:\n{\"question\": \"Which way?\",\nDONE: https://github.com/JKershaw/LinearViewer/pull/109\n\"options\": [\"a\", \"b\"]}\n\nDONE: opened https://github.com/JKershaw/LinearViewer/pull/103"
+      },
+      "sd": "finished",
+      "kit": "finished"
+    },
+    {
+      "area": "sentinel",
+      "case": "a DONE: only inside a DECISION block, the block's closing brace last",
+      "item": {
+        "message": "Need a ruling first; the pattern is in https://github.com/JKershaw/LinearViewer/pull/2357.\n\nDECISION:\n{\"question\": \"Which way?\",\nDONE: https://github.com/JKershaw/LinearViewer/pull/109\n\"options\": [\"a\", \"b\"]}"
+      },
+      "sd": "finished",
+      "kit": "not finished",
+      "difference": "LIN-4377: SD's parseCompletionSentinel (hook.js) takes the first trimmed line anywhere in the turn that starts with DONE:, so a DONE: inside the DECISION JSON ends the turn. The kit's transcriptFinished reads only the last non-empty line (here the block's closing brace), so the turn is not over. Pinned as found; neither reader changes. SD's DECISION_EMIT_INSTRUCTION tells a session never to start a line in the block with DONE:."
+    },
+    {
+      "area": "sentinel",
+      "case": "a DONE: line after text that mentions another PR four times",
+      "item": {
+        "message": "Read https://github.com/JKershaw/LinearViewer/pull/2357 for context.\nAgain https://github.com/JKershaw/LinearViewer/pull/2357, and https://github.com/JKershaw/LinearViewer/pull/2357 once more.\nThe sibling https://github.com/JKershaw/LinearViewer/pull/2357 sets the pattern.\n\nDONE: opened https://github.com/JKershaw/LinearViewer/pull/2359"
+      },
+      "sd": "finished",
+      "kit": "finished"
     },
     {
       "area": "store",
