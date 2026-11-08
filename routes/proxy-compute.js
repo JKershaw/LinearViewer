@@ -504,7 +504,8 @@ export function createComputeRoutes({
           prompt: rec.prompt,
           truncated: rec.truncated,
           recommendedAction: rec.recommendedAction,
-          kind: deriveDispatchKind(rec.recommendedAction),
+          // LIN-4370: a look-first wait names no stage (deriveDispatchKind(null) would say `custom`).
+          kind: rec.lookFirstWait ? null : deriveDispatchKind(rec.recommendedAction),
           deferredVia,
           deferTruncated,
           deferStopReason,

@@ -536,6 +536,67 @@ describe('wired: while a look-first step is live, recommend-and-dispatch sends n
   });
 });
 
+describe('wired: the read surfaces carry the wait too (review fix 1: the proxy GET, the buffered GET, a parent\'s stream)', () => {
+  const noModel = () => setFetchImpl(async () => { throw new Error('the model must not be asked on a look-first wait'); });
+  const silentRow = (kind, dispatched) => ({ id: `${kind}-${dispatched}`, kind, status: 'taken', issueIdentifier: 'LF-1', dispatchedAt: T(dispatched), rootItemId: `${kind}-${dispatched}`,
+    feedback: [{ kind: 'progress', message: '[working] started', timestamp: T(dispatched) }] });
+  const queuedRow = (kind, dispatched) => ({ id: `${kind}-${dispatched}`, kind, issueIdentifier: 'LF-1', dispatchedAt: T(dispatched) });
+  // Close-out shape (a): survey-task taken and silent, survey-place queued.
+  const shapeA = () => ({ rows: [silentRow('survey-task', '10:00')], live: [queuedRow('survey-place', '10:05')] });
+  const WAIT = { kind: 'survey-place', id: 'survey-place-10:05', dispatchedAt: T('10:05'), outcome: 'queued' };
+
+  test('(a) GET /api/proxy/issues/:id/recommend: 200, prompt and kind null, lookFirstWait naming the live dispatch', async () => {
+    noModel();
+    setIssue(leaf({ identifier: 'LF-1' }));
+    const res = await request(proxyApp(shapeA()), '/api/proxy/issues/LF-1/recommend');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.prompt, null);
+    assert.equal(res.body.recommendedAction, null);
+    assert.equal(res.body.kind, null, JSON.stringify(res.body));
+    assert.deepEqual(res.body.lookFirstWait, WAIT);
+  });
+
+  test('(b) the workspace buffered recommendation GET carries lookFirstWait, with no prompt', async () => {
+    noModel();
+    setIssue(leaf({ identifier: 'LF-1' }));
+    const res = await request(uiApp(shapeA()), '/workspace/acme/api/recommend/LF-1');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.prompt, null);
+    assert.deepEqual(res.body.lookFirstWait, WAIT);
+  });
+
+  test('(c) a parent\'s task-page stream that descends to the waiting child emits LOOK_FIRST_IN_FLIGHT, not the generic unresolved error', async () => {
+    setIssue(leaf({ identifier: 'LF-1' }));
+    const childRef = { id: 'id-LF-1', identifier: 'LF-1', title: 'Export CSV', state: OPEN };
+    setIssue({ identifier: 'LF-P', title: 'Export container', description: 'Container body.', state: OPEN, labels: [] });
+    Object.assign(ISSUES['LF-P'], { children: [childRef], focusedChild: childRef });
+    const enc = new TextEncoder();
+    const DEFER = '## Reasoning\nLF-P is a container.\n→ **defer**\n**DeferTo:** LF-1';
+    const calls = [];
+    setFetchImpl(async (url, opts = {}) => {
+      const content = JSON.parse(opts.body).messages[0].content;
+      calls.push(content);
+      if (!content.includes('Container body.')) throw new Error('only the parent hop may ask the model');
+      const blocks = [
+        `data: ${JSON.stringify({ choices: [{ delta: { content: DEFER }, finish_reason: null }] })}\n\n`,
+        `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { completion_tokens: 3 } })}\n\n`,
+        'data: [DONE]\n\n'
+      ];
+      return { ok: true, body: (async function* () { for (const b of blocks) yield enc.encode(b); })(),
+        json: async () => ({ choices: [{ message: { content: DEFER }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } }) };
+    });
+    const ui = await request(uiApp(shapeA()), '/workspace/acme/api/recommend/LF-P/stream');
+    assert.equal(ui.status, 200);
+    assert.equal(calls.length, 1, 'the parent hop asked the model once; the child hop did not');
+    assert.match(ui.text, /↳ LF-P is a container → routing to LF-1/);
+    assert.equal(streamedPrompt(ui.text), '', 'no prompt is streamed');
+    assert.match(ui.text, /event: error/);
+    assert.match(ui.text, /LOOK_FIRST_IN_FLIGHT/);
+    assert.match(ui.text, /survey-place-10:05/, 'the refusal names the live dispatch');
+    assert.doesNotMatch(ui.text, /did not resolve/);
+  });
+});
+
 describe('LIN-4369 handoff: scoping\'s final message never reaches the stage after it; the size record does', () => {
   const NOTES = 'NOTES FOR THE BUILDER: sweep these names in lib/export.js line 42, rename exportCsv to downloadCsv, and pin this test rule';
 
