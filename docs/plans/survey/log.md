@@ -2963,3 +2963,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - `lin4369-replay-failed-next` is overtaken by arm 2.
   - **The pattern again:** wording got most of the way, and the last part needs structure (the seal, named cuts, and now the size record).
 - **02:30 UTC: LIN-4371 merged** (`526bca66`, PR #2357; LIN-4347 piece 1/3, LinearViewer): a product-owned area registry, notes with a guard test, the seeded entries, and a grounding pointer. **LIN-4347 kept moving on the pieces its cut ruling doesn't touch**, as asked. An area read follows at LIN-4347's end.
+- **02:53 UTC: LIN-4372 merged in simple-dispatcher** (`4aee0c9f`, PR #329): the same `docs/areas/` shape there (registry, README, guard test, seeds). LIN-4347 piece 1 is complete in both repos.
