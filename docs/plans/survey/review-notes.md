@@ -547,3 +547,9 @@ These are the reading notes, written as I go. The report comes after.
 
 ### Final synthesis → see `review-2026-11-08.md`
 The report and my view (short and long term) are written up there from these notes.
+
+### 15. Checked at the end: the paper v2 itself (`cleaner-than-it-started.md`, headline, limits and Next read directly)
+- **The headline matches the log's account:** "Areas read better in both passes, where one of four ordinary pairs did; the Periodicals broadly agree on direction; tasks on average: not shown."
+- **Its Next 1 is its own top recommendation:** "Test whether larger standalone tidies move the worst areas… against the same areas left alone. **That is the test that could move the net direction, and this window cannot make it.**" Never run.
+- **Its Next 2** (an untouched-area baseline) and **Next 6** ("test the structure argument": would a guard or a derived list have stopped the operator's mistakes?) are also unrun. Next 6 is the same conclusion as this review's "structure worked; wording didn't".
+- The later essays (*The place became somebody's job*, *Clearing up as it goes*) I read through the log's record of them, not in full.
