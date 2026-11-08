@@ -388,20 +388,20 @@ describe('the index and the areas', () => {
     assert.equal(unknown.status, 404);
   });
 
-  test('a workspace with only a live queue token reads "Ready" and shows the queue token as the last poll', async () => {
+  test('a workspace with only a live queue token reads "Runner ready" and shows the queue token as the last poll', async () => {
     // plan-review B4: Settings and the Dispatch run controls must agree on "has a runner".
     // The route wires hasLiveRunnerKey || hasLiveQueueToken itself, so this goes through the route.
     state.proxyRows = [];
     state.dispatchRows = [{ tokenId: 'q', label: 'legacy', hasOwner: true, createdAt: new Date(Date.now() - 864e5).toISOString(), lastUsedAt: new Date(Date.now() - 6e4).toISOString(), expiresAt: new Date(Date.now() + 864e5).toISOString() }];
     const index = await (await fetch(`${base}/workspace/alpha/settings`)).text();
-    assert.match(index, /data-testid="settings-state-running"[^>]*>\s*Ready · ask/);
+    assert.match(index, /data-testid="settings-state-running"[^>]*>\s*Runner ready</);
     const running = await (await fetch(`${base}/workspace/alpha/settings/running`)).text();
     assert.match(running, /data-testid="settings-runner-last-poll"[\s\S]*?queue token/);
   });
 
-  test('with no keys at all the Running state reads "No runner" (and the size policy, LIN-4368)', async () => {
+  test('with no keys at all the Running state reads "No runner"', async () => {
     const index = await (await fetch(`${base}/workspace/alpha/settings`)).text();
-    assert.match(index, /data-testid="settings-state-running"[^>]*>\s*No runner · ask/);
+    assert.match(index, /data-testid="settings-state-running"[^>]*>\s*No runner</);
   });
 
   test('a provider return on the bare index goes to Sources with its query intact', async () => {
@@ -411,57 +411,62 @@ describe('the index and the areas', () => {
   });
 });
 
-// LIN-4368: the standing size policy is set from Settings → Running, for everyone, so it asks
-// why, lands in the change log with Undo, and is stored with who set it and when.
-describe('the standing size policy (Settings → Running)', () => {
-  const stored = async () => (await fx.preferencesStore.getWorkspacePreferences('alpha')).sizePolicy;
+// LIN-4393: the size-of-the-move setting (LIN-4368) is removed. Settings no longer offers it, its
+// route is gone, and a change row already in the log (John's "err larger" of 7 Nov) still reads but
+// cannot be undone: a change to a setting that no longer exists is history. The stored preference
+// is left as it was, unread.
+describe('the retired size-of-the-move setting', () => {
+  const JOHNS = { sizePolicy: { value: 'err-larger', setBy: { via: 'page', id: OWNER }, setAt: '2026-11-07T22:18:14.300Z' } };
+  const storedPrefs = () => fx.preferencesStore.getWorkspacePreferences('alpha');
+  const seedJohnsRow = async () => {
+    await fx.preferencesStore.saveWorkspacePreferences('alpha', { ...(await storedPrefs()), ...JOHNS });
+    await logStore.collection.insertOne({
+      _id: 'size-1', urlKey: 'alpha', at: new Date(Date.now() - 864e5), actor: { via: 'page', id: OWNER },
+      setting: 'sizePolicy', kind: 'change', reason: 'John\'s standing answer', from: 'ask', to: 'err-larger'
+    });
+  };
 
-  test('an unknown value is a 400 and nothing changes', async () => {
-    const res = await post('running/size-policy', { value: 'huge', reason: 'why not' });
-    assert.equal(res.status, 400);
-    assert.equal(await stored(), undefined);
+  test('Running no longer offers it: no row, no "set" row, and the state is the runner\'s alone', async () => {
+    await seedJohnsRow();
+    const running = await (await fetch(`${base}/workspace/alpha/settings/running`)).text();
+    for (const id of ['settings-toggle-sizePolicy', 'settings-size-policy-state', 'settings-size-policy-set']) {
+      assert.doesNotMatch(running, new RegExp(`data-testid="${id}`), id);
+    }
+    assert.doesNotMatch(running, /Size of the move/);
+    const index = await (await fetch(`${base}/workspace/alpha/settings`)).text();
+    assert.match(index, /data-testid="settings-state-running"[^>]*>\s*No runner</);
+  });
+
+  test('its route is gone: a POST is a 404 and the stored preference is unchanged', async () => {
+    await fx.preferencesStore.saveWorkspacePreferences('alpha', JOHNS);
+    const res = await post('running/size-policy', { value: 'ask', reason: 'try the old route' });
+    assert.equal(res.status, 404);
+    assert.deepEqual((await storedPrefs()).sizePolicy, JOHNS.sizePolicy);
     assert.equal((await logStore.getLog('alpha')).length, 0);
   });
 
-  test('without a reason it goes back to ask why and nothing changes', async () => {
-    const res = await post('running/size-policy', { value: 'err-larger' });
-    assert.equal(res.headers.get('location'), '/workspace/alpha/settings/running?error=reason');
-    assert.equal(await stored(), undefined);
-  });
-
-  test('a member sets err-larger: stored with who and when, logged, shown in the Running state and page', async () => {
-    state.accountId = MEMBER;
-    const res = await post('running/size-policy', { value: 'err-larger', reason: 'John\'s standing answer' });
-    assert.equal(res.status, 302);
-    assert.equal(res.headers.get('location'), '/workspace/alpha/settings/running?changed=1');
-    const policy = await stored();
-    assert.equal(policy.value, 'err-larger');
-    assert.deepEqual(policy.setBy, { via: 'page', id: MEMBER });
-    assert.ok(!Number.isNaN(Date.parse(policy.setAt)), 'set with a time');
-    const [entry] = await logStore.getLog('alpha');
-    assert.deepEqual([entry.setting, entry.from, entry.to, entry.reason], ['sizePolicy', 'ask', 'err-larger', 'John\'s standing answer']);
-
-    const index = await (await fetch(`${base}/workspace/alpha/settings`)).text();
-    assert.match(index, /data-testid="settings-state-running"[^>]*>\s*No runner·larger/);
-    const running = await (await fetch(`${base}/workspace/alpha/settings/running`)).text();
-    assert.match(running, /data-testid="settings-size-policy-state"[^>]*>\s*Err larger/);
-    assert.match(running, /data-testid="settings-size-policy-set"/);
+  test('John\'s old change row still reads, with no Undo on the Change log or on Running', async () => {
+    await seedJohnsRow();
     const log = await (await fetch(`${base}/workspace/alpha/settings/change-log`)).text();
     assert.match(log, /Size of the move: err larger/);
-  });
-
-  test('Undo puts the policy back to ask', async () => {
-    await post('running/size-policy', { value: 'err-larger', reason: 'on' });
-    const [entry] = await logStore.getLog('alpha');
-    const res = await post(`change-log/workspace/${entry._id}/undo`, { reason: 'not yet' });
-    assert.equal(res.headers.get('location'), '/workspace/alpha/settings/change-log?undone=1');
-    assert.equal((await stored()).value, 'ask');
-  });
-
-  test('with no policy set, the Running page reads "Ask each time" and the state says ask', async () => {
+    assert.match(log, /data-change-id="size-1"/);
+    assert.doesNotMatch(log, /data-testid="settings-undo-size-1"/);
+    assert.doesNotMatch(log, /change-log\/workspace\/size-1\/undo/);
     const running = await (await fetch(`${base}/workspace/alpha/settings/running`)).text();
-    assert.match(running, /data-testid="settings-size-policy-state"[^>]*>\s*Ask each time/);
-    const index = await (await fetch(`${base}/workspace/alpha/settings`)).text();
-    assert.match(index, /data-testid="settings-state-running"[^>]*>\s*No runner · ask/);
+    assert.doesNotMatch(running, /settings-undo-size-1/);
+  });
+
+  test('a forged Undo of the old row is refused not_undoable: no undo entry, preference and features unchanged', async () => {
+    await seedJohnsRow();
+    const before = await storedPrefs();
+    const res = await post('change-log/workspace/size-1/undo', { reason: 'forged' });
+    assert.equal(res.status, 302);
+    assert.match(res.headers.get('location'), /error=not_undoable/);
+    const rows = await logStore.getLog('alpha');
+    assert.deepEqual(rows.map(r => r.kind), ['change'], 'no undo entry was written');
+    const after = await storedPrefs();
+    assert.deepEqual(after.sizePolicy, JOHNS.sizePolicy, 'the stored preference is untouched');
+    assert.deepEqual(after.features, before.features, 'no feature flag was written');
+    assert.equal('sizePolicy' in (await getWorkspaceFeatures({ urlKey: 'alpha', store: fx.preferencesStore })), false);
   });
 });

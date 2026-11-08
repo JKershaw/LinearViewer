@@ -13,7 +13,7 @@ import { requireRequestUsageLoader } from '../lib/request-usage-loader.js';
 import { anchorOf, isMember } from '../lib/lineage-membership.js';
 import { resolveChatCredential, isAiUnavailable } from '../lib/chat-request.js';
 import { resolveRecommendation } from '../lib/recommend-recurse.js';
-import { resolveAiOperationModel, loadSizePolicy } from '../lib/workspace-preferences.js';
+import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshness, ROADMAP_REPORT_MAX_AGE_DAYS, getNorthStarDocVersion } from '../lib/north-star-resolver.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
@@ -319,9 +319,7 @@ export function createComputeRoutes({
       // formatAttachmentsSection post-pass surfaces the worker-facing Attachments
       // section (LIN-776) — fetchIssueContext now carries it at top-level (LIN-772),
       // and dropping it here is what silently hid the section on this route.
-      // LIN-4368: the standing size policy, from the one loader, so a scoping prompt reads it here too.
-      const sizePolicy = await loadSizePolicy(workspacePreferencesStore, req.proxyUrlKey);
-      const result = generatePrompt(templateKey, issue, { parent, siblings, project, children, comments, attachments, sizePolicy }, {}, provider?.ui || null);
+      const result = generatePrompt(templateKey, issue, { parent, siblings, project, children, comments, attachments }, {}, provider?.ui || null);
 
       if (!result) {
         logEvent(req, '/api/proxy/prompt', 500);
@@ -475,8 +473,7 @@ export function createComputeRoutes({
             return keepaliveError(keepalive, 404, 'Issue not found');
           }
           const { issue, parent, siblings, project, children, comments, attachments } = ctx;
-          const sizePolicy = await loadSizePolicy(workspacePreferencesStore, req.proxyUrlKey);
-          const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments, attachments, sizePolicy }, {}, provider?.ui || null);
+          const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {}, provider?.ui || null);
           if (!generated) {
             logEvent(req, '/api/proxy/recommend', 500);
             return keepaliveError(keepalive, 500, 'Failed to generate prompt');

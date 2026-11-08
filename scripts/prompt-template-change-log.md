@@ -87,6 +87,7 @@ Two reasons recur, so they are written once here:
 - LIN-4369 (replay arm 4): +198 (110197 -> 110395). John's ruling `lin4369-after-arm3`. Scoping posts no comment, because arm 3's how moved into its comment; its reasoning goes in its final message (+133 rendered). The why's shape line, interpolated from `lib/size-of-move.js` `RECORD_PARTS`, says a semicolon may join clauses and a full stop ends it, and the guard's sentence rule now matches. Arm 3 refused 8 one-sentence whys for a semicolon the prompt never mentioned. Plus a reason comment.
 - LIN-4369 (the replaced reason, at LIN-4370): +1907 (108488 -> 110395), scoping's output becomes the four-line size record; arms 1–4 above.
 - LIN-4370: +261 (110395 -> 110656). Scoping's `route.when` gains one case, a size ruling answered while the record still reads pending (interpolated from `DECIDED_BY.pending`, +142, rendered in the routing prompt only). The two Survey descriptions and three comments say the look-first route sends them, not only a person (+119). Rendered stage prompts are unchanged.
+- LIN-4393: -103 (110656 -> 110553). The size-of-the-move setting is removed (John, 8 Nov: "remove the feature cleanly"). Scoping renders `STANDING_POLICY_LINE` from `lib/size-of-move.js` in place of `formatSizePolicyLine(context.sizePolicy)`, and its process sentence loses "Without one, the size is pending a ruling: raise it as a `DECISION:`". The cut sentence is unchanged. The replaced reason is LIN-4370's +261 (scoping's `route.when` and the Surveys' look-first wording).
 
 **Templates source, `lib/prompt-templates.js`**
 - LIN-3378: +20. defer's whenNot names plan-review (+36); its requires was tightened (-16).
@@ -123,6 +124,7 @@ Two reasons recur, so they are written once here:
 - LIN-4369 (replay arm 3): scoping -331 (4358 -> 4027). The record is four lines (Size, Why, Cuts, Decided by) rendered from `lib/size-of-move.js`, and the proxy guard refuses any other line (`SIZE_RECORD_SHAPE`), so the prompt no longer lists what the record may not hold. The definition of binds stays; findings that do not bind stay in the Surveys rather than in open questions. Witness: the arm-3 tests in `tests/unit/lin-4369-scoping-size-record.test.js` and the shape tests in `tests/unit/size-of-move.test.js`. Behaviour: `docs/reviews/lin-4369-size-replay-arm3-2026-11-08.md`. The replaced reason is arm 2's +617 (when a finding binds, and the record is not a plan).
 - LIN-4369 (replay arm 4): scoping +167 (4027 -> 4194). No comment: the record is all scoping writes on the ticket, and its reasoning goes in its final message. The why's line says what one sentence means. Code holds the sentence rule; whether a stage obeys "no comment" is not visible to the proxy guard, so the replay measures it. Witness: the arm-4 assertions in `tests/unit/size-of-move.test.js` and `tests/unit/lin-4369-scoping-size-record.test.js`. Behaviour: `docs/reviews/lin-4369-size-replay-arm4-2026-11-08.md`. The replaced reason is arm 3's -331.
 - LIN-4379: +102 on research (12026 -> 12128), design (3155 -> 3257), spike (3174 -> 3276), plan (10350 -> 10452) and implementation (8391 -> 8493), the pointer's citation sentence (see `lib/prompt-formatters.js` above). Scoping, breakdown and blocked are byte-identical. Replaced the LIN-4371 reasons above.
+- LIN-4393: scoping +29 (4194 -> 4223). The setting is removed and the standing policy is built in as err larger, so the budget's fixture, which stores no policy, now renders the err-larger line (+106 over "no standing policy"), and the process sentence loses its no-policy clause (-77, net of its new lead); nothing else moves. A hands-off workspace's real render, with John's stored `err-larger`, falls 94 bytes (4181 -> 4087 in a minimal fixture): no `(set …)` date and no no-policy clause. Why not code: the line is code (one constant on every path); what scoping does with the policy stays its judgement. Witness: `tests/unit/size-policy-render.test.js`. The replaced reason is arm 4's +1473 summary (2721 -> 4194, the four-line size record and no comment; arms 1–4 above).
 
 **Templates rendered, `bug`**
 - LIN-3299: at 4744 since Scope and Authority on every path.
@@ -219,6 +221,7 @@ Two reasons recur, so they are written once here:
 - LIN-4379: +816 (355401 -> 356217), the pointer sentence: prompt-formatters.js source +102 and the seven stages that render it +102 each.
 - LIN-4383: +60 (356217 -> 356277): prompt-formatters source only, an import line of the product's registry path; no prompt text and no rendered byte changed.
 - LIN-4370: +601 (356277 -> 356878): defs +261, prompt-templates +69, stage-router source +175, routing prompt +96.
+- LIN-4393: -74 (356878 -> 356804): defs -103, scoping +29.
 
 ## Rows
 

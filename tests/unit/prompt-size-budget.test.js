@@ -72,7 +72,7 @@ import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
 /** Templates, source bytes. Same files `steady-base-growth.mjs` GROUPS as
  * "worker templates". */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 110656, // LIN-4370: +261 (110395 -> 110656), scoping's route.when covers an answered size ruling on a pending record, and the Surveys say the look-first route sends them (descriptions and comments; rendered bytes unchanged)
+  'lib/prompt-template-defs.js': 110553, // LIN-4393: -103 (110656 -> 110553), the size-of-the-move setting is removed: scoping renders the one built-in policy line and loses its no-policy clause
   'lib/prompt-templates.js': 19662, // LIN-4370: +69, the never-offered comment says the look-first route sends the Surveys (a comment, not prompt text)
   'lib/prompt-formatters.js': 47095, // LIN-4383: +60 (47035 -> 47095), code not prompt text: the pointer reads the product's one registry-path spelling (lib/prompts/area-registry-path.js); rendered bytes unchanged
   'lib/prompt-contract.js': 3875, // LIN-4362: the `## As asked` spellings interpolate AS_ASKED_HEADING (code, not prompt text)
@@ -89,7 +89,7 @@ export const TEMPLATES_RENDERED_CEILINGS = {
   triage: 2429, // LIN-3299: at 2429 since Scope and Authority on every path
   breakdown: 5310, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
   research: 12128, // LIN-4379: +102, the pointer asks the work to name a note entry it used (file and source) where it records its decisions, so the next look-first step citing a finding is checkable; which entry bears on the work is the agent's judgement no code sees
-  scoping: 4194, // LIN-4369: +1473 (2721 -> 4194), scoping's output becomes the four-line size record and it posts no comment; arms 1–4 in scripts/prompt-template-change-log.md
+  scoping: 4223, // LIN-4393: +29 (4194 -> 4223), the fixture has no stored policy, so it now renders the built-in err-larger line in place of "no standing policy"; the render a hands-off workspace got falls 94 bytes (no setting date, no no-policy clause)
   design: 3257, // LIN-4379: +102, the pointer asks the work to name a note entry it used (file and source) where it records its decisions, so the next look-first step citing a finding is checkable; which entry bears on the work is the agent's judgement no code sees
   spike: 3276, // LIN-4379: +102, the pointer asks the work to name a note entry it used (file and source) where it records its decisions, so the next look-first step citing a finding is checkable; which entry bears on the work is the agent's judgement no code sees
   context: 2021, // LIN-3300: at 2021 since the stage rules only the meta-prompt carried moved into their templates
@@ -139,7 +139,7 @@ export const LEFTOVER_PROMPT_RENDERED_CEILING = 1352; // LIN-4376: +157, where e
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 356878; // LIN-4370: +601 (356277 -> 356878): defs +261, prompt-templates +69, stage-router source +175, routing prompt +96
+export const FROZEN_TOTAL_BYTES = 356804; // LIN-4393: -74 (356878 -> 356804): defs -103, scoping +29
 
 const BASE_URL = 'https://harbour.example';
 

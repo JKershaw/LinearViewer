@@ -38,6 +38,7 @@ describe('record', () => {
 
   test('an unknown setting and a missing actor are refused', async () => {
     await assert.rejects(() => rec({ setting: 'theme' }), { code: 'INVALID' });
+    await assert.rejects(() => rec({ setting: 'sizePolicy', from: 'ask', to: 'err-larger' }), { code: 'INVALID' }, 'a retired setting takes no new change');
     await assert.rejects(() => rec({ actor: { via: 'bogus' } }), { code: 'INVALID' });
   });
 });
@@ -65,6 +66,19 @@ describe('undo', () => {
     await assert.rejects(() => undoer('nope'), { code: 'NOT_FOUND' });
     const h = await store.record({ urlKey: 'a', setting: 'halt', reason: 'r', actor, from: 'unknown', to: 'stop' });
     await assert.rejects(() => undoer(h._id), { code: 'NOT_UNDOABLE' });
+  });
+
+  // LIN-4393: a change to a setting no longer in SETTINGS (the retired `sizePolicy`) is history.
+  // The refusal comes before either callback, so no route's fallback write can be reached.
+  test('refuses NOT_UNDOABLE for a retired setting, before readCurrent or apply runs', async () => {
+    await store.collection.insertOne({ _id: 'old', urlKey: 'a', at: new Date(), actor, setting: 'sizePolicy', kind: 'change', reason: 'r', from: 'ask', to: 'err-larger' });
+    const called = [];
+    await assert.rejects(
+      () => store.undo('old', { urlKey: 'a', reason: 'back', actor, readCurrent: async () => { called.push('readCurrent'); return 'err-larger'; }, apply: async () => { called.push('apply'); } }),
+      { code: 'NOT_UNDOABLE' }
+    );
+    assert.deepEqual(called, []);
+    assert.equal(await store.collection.findOne({ urlKey: 'a', undoes: 'old' }), null, 'no undo entry');
   });
 
   test('needs a reason, and an entry of another workspace is not found', async () => {
@@ -95,6 +109,13 @@ describe('mergeChangeLog', () => {
     assert.equal(by.w3.undoable, false, 'unknown previous value: nothing to restore');
     assert.equal(by.m1.undoable, true); assert.equal(by.m1.source, 'model');
     assert.equal(by.m2.undoable, false, 'a preset save changed nothing to restore');
+  });
+
+  test('a change to a retired setting reads, and is not undoable (LIN-4393)', () => {
+    const [row] = mergeChangeLog([{ _id: 's1', at: new Date(), setting: 'sizePolicy', kind: 'change', from: 'ask', to: 'err-larger', reason: 'r', actor: { name: 'Jo' } }]);
+    assert.equal(row.summary, 'Size of the move: err larger');
+    assert.equal(row.undoable, false);
+    assert.equal(row.undone, false);
   });
 
   test('summaries say what changed', () => {
