@@ -24,7 +24,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe, beforeEach, afterEach } from 'node:test';
+import { test, describe, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import express from 'express';
@@ -38,6 +38,7 @@ import {
 import { planCallBudget, planRetryBudget, canReason } from '../../lib/call-budget.js';
 import { generateBrief } from '../../lib/brief.js';
 import { InMemoryBriefCacheStore } from '../../lib/brief-cache.js';
+import { LlmCallLogStore } from '../../lib/llm-call-log.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProviderInterface } from '../../lib/providers/interface.js';
 
@@ -300,6 +301,108 @@ describe('streamChatWithTools: a cut-off first hop does not short-circuit as the
     replies(hop('Whole hop answer.', 'stop'));
     await streamChatWithTools(MSGS, { apiKey: 'k', model: HAIKU, maxTokens: 500, tools: TOOLS, executeTool: async () => ({}) }, () => {});
     assert.equal(bodies[0].max_tokens, 2500);
+  });
+});
+
+describe('streamChatWithTools: a tool hop cut at length runs no tool', () => {
+  const TOOLS = [{ type: 'function', function: { name: 'get_issue', parameters: { type: 'object', properties: { id: { type: 'string' } } } } }];
+
+  test('cut JSON arguments: zero tool executions, OUTPUT_TRUNCATED, no further request', async () => {
+    replies({ ok: true, json: async () => ({
+      model: HAIKU, usage: REASONING_CAP,
+      choices: [{ finish_reason: 'length', message: { content: null, tool_calls: [
+        { id: 'c1', type: 'function', function: { name: 'get_issue', arguments: '{"id": "LIN-43' } }
+      ] } }]
+    }) });
+    let executed = 0;
+    const events = [];
+    const { error } = await collect(streamChatWithTools(MSGS, {
+      apiKey: 'k', model: HAIKU, maxTokens: 500, tools: TOOLS, executeTool: async () => { executed++; return {}; }
+    }, (t, d) => events.push([t, d])), events);
+    assert.ok(error instanceof TruncatedOutputError, `expected TruncatedOutputError, got ${error}`);
+    assert.equal(error.code, 'OUTPUT_TRUNCATED');
+    assert.equal(error.finishReason, 'length');
+    assert.equal(error.reasoningTokens, 2600);
+    assert.equal(executed, 0, 'the tool never ran on cut arguments');
+    assert.equal(bodies.length, 1, 'no further hop or final answer was bought');
+    assert.ok(!events.some(([t]) => t === 'done' || t === 'token'));
+  });
+
+  test('allowPartial callers keep today\'s behaviour: the tool still runs', async () => {
+    replies(
+      { ok: true, json: async () => ({ model: HAIKU, usage: PROSE_CAP, choices: [{ finish_reason: 'length', message: { content: null, tool_calls: [
+        { id: 'c1', type: 'function', function: { name: 'get_issue', arguments: '{"id": "LIN-4358"}' } }
+      ] } }] }) },
+      { ok: true, json: async () => ({ model: HAIKU, usage: WHOLE, choices: [{ finish_reason: 'stop', message: { content: 'Done.' } }] }) },
+      sse({ text: 'Done.', finishReason: 'stop', usage: WHOLE }),
+    );
+    let executed = 0;
+    await streamChatWithTools(MSGS, {
+      apiKey: 'k', model: HAIKU, maxTokens: 500, tools: TOOLS, allowPartial: true, executeTool: async () => { executed++; return {}; }
+    }, () => {});
+    assert.equal(executed, 1);
+  });
+});
+
+describe('the call log keeps the retry marker', () => {
+  test('a recovered length stop persists retry: \'length\' on the retry row, null on the first', async () => {
+    const store = new LlmCallLogStore({ collection: null });
+    const persisted = [];
+    setLlmCallRecorder(async (r) => { persisted.push(await store.record(r)); });
+    replies(
+      sse({ text: 'cut', finishReason: 'length', usage: PROSE_CAP }),
+      sse({ text: 'whole', finishReason: 'stop', usage: WHOLE }),
+    );
+    await streamChat(MSGS, { apiKey: 'k', model: 'unlisted/model', maxTokens: 1500, callMeta: { urlKey: 'acme', feature: 'brief' } }, () => {});
+    await new Promise(r => setImmediate(r));
+    assert.equal(persisted.length, 2);
+    assert.equal(persisted[0].retry, null);
+    assert.equal(persisted[1].retry, 'length');
+    assert.equal(persisted[1].feature, 'brief');
+  });
+});
+
+describe('streamChat: a stalled response body has its own deadline', () => {
+  afterEach(() => mock.timers.reset());
+
+  test('the deadline restarts on every chunk, and silence after the last one rejects with a timeout and no done', async () => {
+    mock.timers.enable({ apis: ['setTimeout'] });
+    const enc = new TextEncoder();
+    let pulled; const firstPull = new Promise(r => { pulled = r; });
+    let release; const gate = new Promise(r => { release = r; });
+    let stalled; const stall = new Promise(r => { stalled = r; });
+    setFetchImpl(async (_url, init) => ({
+      ok: true,
+      body: (async function* () {
+        pulled();
+        await gate;
+        yield enc.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: 'Piece B is' }, finish_reason: null }] })}\n\n`);
+        stalled();
+        // Never sends another byte; only an abort ends it, as real fetch does.
+        await new Promise((_, reject) => init.signal.addEventListener('abort', () => {
+          const e = new Error('aborted'); e.name = 'AbortError'; reject(e);
+        }));
+      })()
+    }));
+    const events = [];
+    let settled = null;
+    streamChat(MSGS, { apiKey: 'k', model: 'unlisted/model', maxTokens: 1500 }, (t, d) => events.push([t, d]))
+      .then(v => { settled = { v }; }, e => { settled = { e }; });
+    const flush = async () => { for (let i = 0; i < 20; i++) await new Promise(r => setImmediate(r)); };
+
+    await firstPull;
+    mock.timers.tick(100000);        // 100s of silence before the first chunk: inside the deadline
+    release();
+    await stall;
+    await flush();
+    mock.timers.tick(100000);        // 200s since the headers, 100s since the chunk
+    await flush();
+    assert.equal(settled, null, 'the chunk restarted the deadline, so 100s after it the call is still open');
+    mock.timers.tick(20000);         // 120s of silence since the chunk
+    await flush();
+    assert.ok(settled?.e, 'the stalled body rejected');
+    assert.match(settled.e.message, /OpenRouter request timed out/);
+    assert.ok(!events.some(([t]) => t === 'done'), 'no done fired');
   });
 });
 
