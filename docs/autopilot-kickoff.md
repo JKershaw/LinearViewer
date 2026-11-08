@@ -102,12 +102,17 @@ and a fresh session is dispatched into the same wall.
 
      LIN-1932 split that state per repo: each template's response entry also carries a
      `repos[]` array (one lane per observed repo, plus a default `repo: null` lane), each
-     with its own due/recent/never/unknown state — a template can read `due` for repo A while
-     reading `recent` for repo B. The top-level `due`/`recent`/`never`/`unknown` field stays an
+     with its own due/landed/recent/never/unknown state — a template can read `due` for repo A while
+     reading `recent` for repo B. The top-level `due`/`landed`/`recent`/`never`/`unknown` field stays an
      aggregate across all of a template's lanes (unchanged shape, so an existing caller
      reading only the top level sees the same behaviour); "a periodical reading `due`" in the
      precedence above now means *any lane* of that template reading `due` when more than one
      lane exists.
+
+     LIN-4381 added `landed`: a lane that would read `recent` reads `landed` when work has
+     merged in its repo since its last run (merged close-out events; a Periodical's own PR
+     excluded). The top level reads `landed` when any lane does. It is not in the precedence
+     above yet; the first act says to rank it as `recent` until LIN-4382 gives it a rank.
 
      It was deliberately NOT added to the Orient list above. It lives instead as an explicit
      supersedes clause in the kickoff's general-mode first-act text

@@ -65,6 +65,7 @@ function buildApp({
   history = {},  // { [urlKey]: rows }
   historyTtl = HISTORY_TTL_SECONDS,
   dispatchQueueStore: dispatchQueueStoreOverride,
+  closeOutEventsStore = undefined, // LIN-4381: absent unless a case passes one
   tokenScope = 'read',
   tokenUrlKey = 'acme',
   validateToken: validateTokenOverride
@@ -103,6 +104,7 @@ function buildApp({
     recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore,
+    closeOutEventsStore,
     workspaceFromUrl: (req, res, next) => next(),
     freeTierStore: { tryUse: async () => ({ allowed: true }) }
   }));
@@ -510,5 +512,51 @@ describe('GET /api/proxy/periodicals', () => {
     const { body } = await get(app);
     const item = findTemplateResult(body);
     assert.equal(item.state, 'recent');
+  });
+});
+
+// LIN-4381: the route reads the workspace's landings (merged close-out events)
+// over the same 30-day horizon. The fold's use of them is pinned beside the
+// fold; these pin the read itself and its two failure directions.
+describe('GET /api/proxy/periodicals — landings read (LIN-4381)', () => {
+  test('reads landings from the events store, scoped to the token\'s workspace and bounded by the 30-day horizon', async () => {
+    const calls = [];
+    const closeOutEventsStore = { listMergedSince: async (args) => { calls.push(args); return []; } };
+    const { app } = buildApp({ closeOutEventsStore, history: { acme: [historyRow()] } });
+    const before = Date.now();
+    const { status } = await get(app);
+    assert.equal(status, 200);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].urlKey, 'acme');
+    assert.ok(calls[0].since instanceof Date, 'since must be a Date (the store compares it against stored Dates)');
+    const ageMs = before - calls[0].since.getTime();
+    assert.ok(Math.abs(ageMs - 30 * DAY_MS) < 60 * 1000, `since must be the 30-day horizon, got ${ageMs} ms back`);
+  });
+
+  test('a store whose read rejects still answers 200 with the states it would have read without landings', async () => {
+    const history = { acme: [historyRow({ dispatchedAt: daysAgo(2) })] };
+    const { app: plain } = buildApp({ history });
+    const { app: failing } = buildApp({ history, closeOutEventsStore: { listMergedSince: async () => { throw new Error('db down'); } } });
+    const a = await get(plain);
+    const b = await get(failing);
+    assert.equal(b.status, 200);
+    assert.deepEqual(b.body, a.body);
+    assert.equal(findTemplateResult(b.body).state, 'recent');
+  });
+
+  test('without a store the route still answers, and says once (not per request) that it read no landings', async () => {
+    const warnings = [];
+    const original = console.warn;
+    console.warn = (...args) => { warnings.push(args.join(' ')); };
+    try {
+      const { app } = buildApp({ history: { acme: [historyRow()] } });
+      assert.equal((await get(app)).status, 200);
+      assert.equal((await get(app)).status, 200);
+    } finally {
+      console.warn = original;
+    }
+    const ours = warnings.filter(w => w.includes('no closeOutEventsStore'));
+    assert.equal(ours.length, 1, `expected exactly one warning, got ${ours.length}`);
+    assert.match(ours[0], /no lane can read landed/);
   });
 });

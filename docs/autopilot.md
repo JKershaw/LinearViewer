@@ -348,7 +348,8 @@ A specific focus is just the goal field, or a hand-written prompt followed by th
   C; per-repo lanes added by LIN-1932).** The snapshot needs "code review last ran 14d ago" —
   shipped as **derived, never persisted**: `foldPeriodicalRuns()` (`lib/periodical-runs.js`) is
   a pure fold over the live dispatch **queue + history**, joined to the registry on a mint-time
-  `periodicalId`, producing each template's `due`/`recent`/`never`/`unknown` state — now keyed
+  `periodicalId`, producing each template's `due`/`landed`/`recent`/`never`/`unknown` state
+  (`landed`, LIN-4381: work merged in the lane's repo since its last run) — now keyed
   per `(periodicalId, repo)` lane, so a run against one repo no longer silently marks every
   other repo's lane `recent` too; the top-level state stays an aggregate across a template's
   lanes, unchanged in shape. No separate cadence store, and no derivation from `foreman/status`

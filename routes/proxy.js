@@ -81,9 +81,7 @@ import { snapshotFromContext } from '../lib/task-snapshot-store.js';
 import { isBlocked, isTerminalState } from '../lib/providers/state-map.js';
 import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
-import { getPeriodicals, resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
-import { foldPeriodicalRuns, DEFAULT_HORIZON_MS } from '../lib/periodical-runs.js';
-import { PERIODICAL_PROJECTION, PERIODICAL_HISTORY_PROJECTION } from '../lib/dispatch-store.js';
+import { resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
 import { attachProxyContext, shouldUseMcpTokenField, provisionBootstrapToken } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
@@ -480,6 +478,9 @@ async function fetchWithTimeout(workFn, ms) {
  * @param {Object} [options.dispatchTokenStore] - Consumer-token store (LIN-2885), threaded into the
  *   kickoff/dispatch sub-routers' `createDispatchItem` calls to stamp `consumerLastSeenAt`. Absent →
  *   every dispatch stamps null (never seen), same as no store configured at all.
+ * @param {Object} [options.closeOutEventsStore] - Merged close-out events (LIN-4381), threaded into
+ *   `createComputeRoutes` for GET /api/proxy/periodicals' landings. Absent → that route reads no
+ *   landings and logs it once; server.js passes it (pinned by lin-4381-close-out-store-wiring).
  * @param {Object} [options.provider] - TEST-ONLY provider override (LIN-581). In production this is
  *   unset and the active provider is resolved per-workspace via getProviderForWorkspace inside
  *   resolveProviderAccess. Tests that need a non-registered fake provider (e.g. to observe ref
@@ -488,7 +489,7 @@ async function fetchWithTimeout(workFn, ms) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore = null, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, workspaceOwnerCheck = null, modelRoutingStore = null, livenessAlarmStore = null, onTicketWrite = null, recordPipelineMerge = null, consumerHeartbeatStore = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore = null, closeOutEventsStore = null, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, workspaceOwnerCheck = null, modelRoutingStore = null, livenessAlarmStore = null, onTicketWrite = null, recordPipelineMerge = null, consumerHeartbeatStore = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null }) {
   const router = Router();
 
   /**
@@ -1597,7 +1598,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group F compute (LIN-679 Stage 4 / LIN-2538): extracted to
   // routes/proxy-compute.js, mounted at its original position.
-  router.use(createComputeRoutes({ recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, requestUsageLoader, llmCallLogStore, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, proxyLimiter, authenticateProxyToken, resolveProviderAccess, denyIfUnsupported, logEvent, logOpenRouterCredentialSource, workspaceUnavailable, graphqlErrorStatus, captureTaskSnapshot, chargeFreeTierOrReject, computeRecommendation, recommendErrorResponse, resolvePromptIssueContext, withTimeout, LINEAGE_QUERY_LIMIT, RECOMMEND_DESCENT_BUDGET_MS, LLM_TIMEOUT_MS, getTestMockData, fetchWithTimeout, CONTEXT_FETCH_TIMEOUT_MS }));
+  router.use(createComputeRoutes({ recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, closeOutEventsStore, requestUsageLoader, llmCallLogStore, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, proxyLimiter, authenticateProxyToken, resolveProviderAccess, denyIfUnsupported, logEvent, logOpenRouterCredentialSource, workspaceUnavailable, graphqlErrorStatus, captureTaskSnapshot, chargeFreeTierOrReject, computeRecommendation, recommendErrorResponse, resolvePromptIssueContext, withTimeout, LINEAGE_QUERY_LIMIT, RECOMMEND_DESCENT_BUDGET_MS, LLM_TIMEOUT_MS, getTestMockData, fetchWithTimeout, CONTEXT_FETCH_TIMEOUT_MS }));
 
 
   // Group G agent-status (LIN-679 Stage 1 / LIN-2533): extracted to
