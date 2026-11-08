@@ -69,7 +69,7 @@ import { signInDoors } from '../../lib/components/landing-hero.js';
 /** Templates, source bytes. Same files `steady-base-growth.mjs` GROUPS as
  * "worker templates". */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 107594, // LIN-4368: +189, close-out's prune keeps the size record verbatim, scoping renders the standing size policy, both read from lib/size-of-move.js
+  'lib/prompt-template-defs.js': 108910, // LIN-4369: +1316, scoping's process becomes the size record, its words read from lib/size-of-move.js; the Survey headings are one constant
   'lib/prompt-templates.js': 19593, // LIN-4251: the `stageWrites(kind)` lookup every entrance uses (code, not prompt text)
   'lib/prompt-formatters.js': 45994, // LIN-4248: the two Survey kinds' empty GROUNDING_BY_KIND entries, so the forecasts get no re-ground or implement notes
   'lib/prompt-contract.js': 3875, // LIN-4362: the `## As asked` spellings interpolate AS_ASKED_HEADING (code, not prompt text)
@@ -86,7 +86,7 @@ export const TEMPLATES_RENDERED_CEILINGS = {
   triage: 2429, // LIN-3299: at 2429 since Scope and Authority on every path
   breakdown: 5310, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
   research: 11718, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
-  scoping: 2721, // LIN-4368: +89, the standing size policy line (code renders the policy; the stage weighs it as judgement)
+  scoping: 3741, // LIN-4369: +1020, scoping writes the size record (which size, and why, is the stage's judgement; the record's no-how line is held by the proxy guard)
   design: 2847, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
   spike: 2866, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
   context: 2021, // LIN-3300: at 2021 since the stage rules only the meta-prompt carried moved into their templates
@@ -134,7 +134,7 @@ export const LANDING_AGENT_PROMPT_CEILING = 584; // LIN-4085: new at 584 (the co
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 345513; // LIN-4368: +311 (345202 -> 345513), the exact sum of the ceilings above
+export const FROZEN_TOTAL_BYTES = 347849; // LIN-4369: +2336 (345513 -> 347849), the exact sum of the ceilings above
 
 const BASE_URL = 'https://harbour.example';
 
