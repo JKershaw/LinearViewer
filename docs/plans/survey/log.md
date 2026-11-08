@@ -3096,3 +3096,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **The parrot cut the size call a second time.** It removed my list of places to change (how), my chosen fix for the old row ("without Undo"), a "code ends smaller" condition John never set, and a design call on the cut rule.
   - **Kicked off** as autopilot `aac50384` on opus.
   - **For the step-back:** both parrot passes today cut how out of my drafts, the habit behind the setting. The parrot is catching it now because I asked it to look for how specifically, not only for drift from John's words.
+- **15:03 UTC: LIN-4381 merged** (`3272fe4a6`, PR #2376, LIN-4349 P3: a Periodical lane reads "landed" when work has landed in its repo, with a real-store route witness that a Periodical's own landing doesn't trigger another). P4 (LIN-4382) remains, then LIN-4349's area reads.
