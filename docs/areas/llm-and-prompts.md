@@ -50,3 +50,12 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   tables (`GROUNDING_BY_KIND`, the rendered ceilings, completion signals, stage labels and
   more), some unguarded. `route: null` now says "never offered" (LIN-4253); folding the
   per-kind tables into the stage's one definition is open. (Survey tally, LIN-4248.)
+- `lib/call-budget.js`: the budget rule (catalog headroom, then one retry with an explicit
+  reasoning bound) has never run live on Haiku 5.5 (anthropic/claude-haiku-5.5). Before any
+  call moves back to Haiku 5.5, replay LIN-4352's brief: save GET
+  /api/proxy/issues/LIN-4352/snapshots?limit=1 (snapshot 82b963e0) as snap.json, then run
+  OPENROUTER_API_KEY=… node `scripts/replay-brief.mjs` snap.json anthropic/claude-haiku-5.5.
+  It passes when block [2] prints WHOLE with four sections and a final finishReason=stop,
+  and any retry row shows the reasoning bound accepted (not a 400). REFUSED means the rule
+  changes first. Line [1] says why Haiku stopped on 7 Nov. (John, 8 Nov, on LIN-4358: "Let
+  it merge"; the replay gates the next move to Haiku 5.5, not PR #2362.)
