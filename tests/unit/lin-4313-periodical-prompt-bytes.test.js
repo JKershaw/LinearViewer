@@ -17,6 +17,11 @@
  * (LIN-4352), so it reads "the first line … (once Harbour seals it, the first line inside its
  * `## As asked` block)". Swapping the old phrase back into each new prompt reproduces every old
  * hash, so that phrase is the only change.
+ *
+ * LIN-4379 re-pinned seams-tangles only: it feeds the area notes and mints no follow-ups
+ * (LIN-4349 P1). Its mint and one-move bullets went, the notes and routes bullets came in, and its
+ * gap-audit, conclude and review-only bullets take their `notes` wording. The other 15 hashes are
+ * unchanged, which is the witness that only Seams & Tangles moved.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -41,7 +46,7 @@ const PINNED = {
   "data-fetch-architecture": { plain: "0d20cb9eef94bd9ab6e0863faecfa7ba4323a9f2830ad52a8ddb858b1ebb9bc3", autopilot: "3ccb4658335669cb84cd1d08c3abad114de0b5961fbe36f3ee784a96feec4105" },
   "integration-surface-maturity": { plain: "56f99610e57e22362dd19ba8fae37b6d2b409b709e549b3b2c4eb152b9d49815", autopilot: "f73ba50c5fc8f0746217303a22653e259de5f8407a08b8fa3e6818e63716a2e8" },
   "onboarding-journey": { plain: "58451ff660b499a3bba2573ba8871e992ad9312a536ab07d04950978f543be69", autopilot: "ce24d062b6a28236016b7ef63da83b9151f06a1238dabebc9b60c926b8925553" },
-  "seams-tangles": { plain: "346210840ea14332b5be4ffdb67b1a7b3869ada03cdcc5aec8ba3d46aa630ade", autopilot: "443c75b18a46be9f592f95b0d5ef88f46ff2fbc627a25c92f894065c6d1bb208" },
+  "seams-tangles": { plain: "3def2815fbda045fa5126a1420e71cd1d81090d3220df030d821d0911dc3accf", autopilot: "d19173e937f5b624bb77b32fb210f5ce7162a0c8bdfb9b86e098f74845795450" },
 };
 
 test('LIN-4313: every registry id has a pinned plain and Mint + Autopilot prompt, byte for byte', () => {

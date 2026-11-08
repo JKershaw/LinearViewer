@@ -39,11 +39,5 @@ test('research and design skip guards do not accept a filer-written fix as prep'
   assert.match(design.route.whenNot, /research write-up or approved plan/);
 });
 
-test('Seams & Tangles puts the move under the Unvalidated idea heading', () => {
-  const seams = PERIODICALS.find(p => p.title === 'Seams & Tangles');
-  assert.ok(seams, 'Seams & Tangles periodical exists');
-  const bullet = seams.generatePrompt().split('\n').find(l => l.includes('Shape each follow-up as one move'));
-  assert.ok(bullet, 'bullet present');
-  assert.match(bullet, /Unvalidated idea/);
-  assert.doesNotMatch(bullet, /names a single move/);
-});
+// Seams & Tangles' "Shape each follow-up as one move" bullet went with its follow-ups (LIN-4379):
+// it feeds the area notes and mints nothing, which tests/unit/periodicals.test.js pins.
