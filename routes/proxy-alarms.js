@@ -21,7 +21,7 @@ const MAX_LIMIT = 1000;
 /**
  * @param {Object} deps
  * @param {Object} deps.livenessAlarmStore - Durable liveness-alarm store (lib/liveness-alarm-store.js)
- * @param {Function} deps.proxyLimiter - Per-IP rate limiter middleware
+ * @param {Function} deps.proxyLimiter - Proxy rate limiter middleware (per proven credential, else per IP)
  * @param {Function} deps.authenticateProxyToken - Proxy bearer-token auth middleware
  * @param {Function} deps.logEvent - Proxy event/audit logger
  */

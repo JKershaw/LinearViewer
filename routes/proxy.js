@@ -13,6 +13,7 @@
  */
 
 import { Router } from 'express';
+import { createHash } from 'node:crypto';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { createDedupeCache, createGenerationTracker } from '../lib/proxy-dedupe.js';
 import { createCredentialTrail } from '../lib/proxy-credential-trail.js';
@@ -229,61 +230,61 @@ export const commentDedupe = createDedupeCache();
  */
 export const commentDedupeGenerations = createGenerationTracker();
 
-// Rate limiters
-// Note: proxyLimiter is applied before authenticateProxyToken on consumer
-// endpoints intentionally. This ensures unauthenticated/malicious requests
-// are counted against the per-IP limit, mitigating DoS attacks that would
-// otherwise bypass rate limiting by failing at auth.
+// Rate limiters (LIN-4378). proxyLimiter runs BEFORE authenticateProxyToken on
+// purpose: a request that then fails auth still counts, and a flood never reaches
+// the token store. It keys on a credential only once that credential has proved
+// itself: authenticateProxyToken records the bearer's sha256 here on success and
+// drops it on a 401. So sessions sharing one host address each get their own
+// budget, while anything unproven (no bearer, a junk bearer, a bootstrap exchange,
+// a token's first request) counts against the client IP exactly as before.
+const PROVEN_CREDENTIALS_CAP = 10000;
+const provenCredentials = new Set(); // hashes only; least recently proven dropped first
+const hashCredential = (token) => createHash('sha256').update(token).digest('hex');
+function noteCredential(hash, proven) {
+  provenCredentials.delete(hash);
+  if (!proven) return;
+  provenCredentials.add(hash);
+  if (provenCredentials.size > PROVEN_CREDENTIALS_CAP) provenCredentials.delete(provenCredentials.values().next().value);
+}
+function proxyLimiterKey(req) {
+  const auth = req.headers.authorization;
+  const hash = auth?.startsWith('Bearer ') && auth.length > 7 ? hashCredential(auth.slice(7)) : null;
+  return hash && provenCredentials.has(hash) ? `credential:${hash}` : ipKeyGenerator(req.ip);
+}
+const LIMITER_DEFAULTS = { standardHeaders: true, legacyHeaders: false };
+const TOKEN_CREATION_MESSAGE = { error: 'Too many token creation requests, please try again later' };
 const proxyLimiter = rateLimit({
+  ...LIMITER_DEFAULTS,
   windowMs: 60 * 1000,
   max: 60,
-  standardHeaders: true,
-  legacyHeaders: false,
   message: { error: 'Too many proxy requests, please try again later' },
+  keyGenerator: proxyLimiterKey,
   skip: () => process.env.NODE_ENV === 'test'
 });
 
-// Module scope (not inside createProxyRoutes) so its budget is
-// process-global across every createProxyRoutes() instance, unlike
-// proxyLimiter above: two composer calls share one limiter, they don't each
-// get their own. Declaring this inside the factory would make it
-// per-instance instead, which is a behaviour change (LIN-679 Stage 2 /
-// LIN-2534 plan-review R4). Group A's sub-router (routes/proxy-tokens-admin.js)
-// receives this instance injected, never redeclares it.
+// Module scope, so each budget is process-global across every createProxyRoutes()
+// instance; declared inside the factory it would be per-instance, a behaviour
+// change (LIN-679 Stage 2 / LIN-2534 plan-review R4). Group A's sub-router
+// (routes/proxy-tokens-admin.js) receives these injected, never redeclares them.
 //
-// LIN-2944 P3 (ruling lin2944-p3-r1-mint-limit): this per-IP budget stays the
-// bound for every token creation EXCEPT the default ("prompt-proxy") copy
-// mint, which is now default-on and gets its own per-account budget below. A
-// default-copy request that carries a session account is skipped here; one
-// without an account still falls through to this per-IP limit.
+// LIN-2944 P3 (ruling lin2944-p3-r1-mint-limit): token creation is limited per IP
+// (10 / 15 min, shared by everyone behind one address) EXCEPT the default-on
+// ("prompt-proxy") copy mint carrying a session account, which gets its own higher,
+// still bounded, per-account budget below. A default-copy mint with no account
+// still counts against the per-IP limit.
 const proxyTokenCreationLimiter = rateLimit({
+  ...LIMITER_DEFAULTS,
   windowMs: 15 * 60 * 1000,
   max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many token creation requests, please try again later' },
+  message: TOKEN_CREATION_MESSAGE,
   skip: (req) => process.env.NODE_ENV === 'test' || (isDefaultCopyMint(req) && !!req.session?.accountId)
 });
-
-// LIN-2944 P3 (ruling lin2944-p3-r1-mint-limit): the proxy is on by default, so
-// every task-prompt copy/download mints the default-copy token. The per-IP
-// proxyTokenCreationLimiter above (10 / 15 min, shared by everyone behind one
-// address) is too small for that default-on path — the 11th copy got a 429.
-// The default-copy mint therefore gets its OWN allowance, keyed per account
-// (`req.session.accountId`, resolved by the session middleware mounted before
-// the proxy router), HIGHER than the per-IP limit but still bounded — an
-// account cannot mint without limit (the `skip` below removes exactly one
-// clause from the unbounded set). Every other token creation keeps the per-IP
-// limit above. Mounted as path-scoped middleware in routes/proxy-tokens-admin.js;
-// `skip` excludes any non-default-copy mint and any no-account default-copy
-// (which the per-IP limiter still counts).
 const DEFAULT_COPY_TOKEN_LIMIT = 60;
 const defaultCopyTokenCreationLimiter = rateLimit({
+  ...LIMITER_DEFAULTS,
   windowMs: 15 * 60 * 1000,
   max: DEFAULT_COPY_TOKEN_LIMIT,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many token creation requests, please try again later' },
+  message: TOKEN_CREATION_MESSAGE,
   keyGenerator: (req) => req.session?.accountId
     ? `account:${req.session.accountId}`
     : ipKeyGenerator(req.ip),
@@ -552,6 +553,10 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
     try {
       const result = await proxyTokenStore.validateToken(token, tokenValidationOptions(req));
+      // LIN-4378: a proven credential gets its own proxyLimiter budget; a rejected
+      // one (401) goes back to the IP's. The 503 below is a store fault, not a
+      // rejection, so it leaves the record alone.
+      noteCredential(hashCredential(token), !!result);
       if (!result) {
         // A rejected CALLER token and a rejected WORKSPACE credential are
         // both 401 and were, until LIN-1985, distinguishable ONLY in Harbour's
