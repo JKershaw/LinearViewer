@@ -1,0 +1,732 @@
+{
+  "id": "synthetic-merge-reauth",
+  "base": "http://localhost:3199",
+  "head": "c998cf4c5",
+  "label": "SYNTHETIC: production renderers, non-Linear identityLabel, served by request interception at a real origin. /test/set-merge-conflict-session hardcodes linear (routes/test.js:360/380/382); no seam added.",
+  "rows": [
+    {
+      "cell": "merge-github--light-1400px",
+      "renderer": "renderMergeConfirmPage",
+      "label": "synthetic",
+      "pngKept": true,
+      "title": "Confirm account merge - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Merge these accounts?"
+      ],
+      "text": "Harbour Merge these accounts? This GitHub account is already connected to a different Harbour account — which may itself already include other previously-merged identities and data — merge them? Yes, merge these accounts No, keep them separate",
+      "htmlClass": "",
+      "bodyBg": "rgb(255, 255, 255)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Yes, merge these accounts",
+          "w": 255,
+          "top": 254,
+          "bottom": 300
+        },
+        {
+          "text": "No, keep them separate",
+          "w": 231,
+          "top": 300,
+          "bottom": 346
+        }
+      ],
+      "buttonGapPx": 0,
+      "scrollW": 1400,
+      "clientW": 1400
+    },
+    {
+      "cell": "merge-github--light-390px",
+      "renderer": "renderMergeConfirmPage",
+      "label": "synthetic",
+      "pngKept": false,
+      "title": "Confirm account merge - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Merge these accounts?"
+      ],
+      "text": "Harbour Merge these accounts? This GitHub account is already connected to a different Harbour account — which may itself already include other previously-merged identities and data — merge them? Yes, merge these accounts No, keep them separate",
+      "htmlClass": "",
+      "bodyBg": "rgb(255, 255, 255)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Yes, merge these accounts",
+          "w": 255,
+          "top": 275,
+          "bottom": 321
+        },
+        {
+          "text": "No, keep them separate",
+          "w": 231,
+          "top": 321,
+          "bottom": 367
+        }
+      ],
+      "buttonGapPx": 0,
+      "scrollW": 390,
+      "clientW": 390
+    },
+    {
+      "cell": "merge-github--dark-1400px",
+      "renderer": "renderMergeConfirmPage",
+      "label": "synthetic",
+      "pngKept": false,
+      "title": "Confirm account merge - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Merge these accounts?"
+      ],
+      "text": "Harbour Merge these accounts? This GitHub account is already connected to a different Harbour account — which may itself already include other previously-merged identities and data — merge them? Yes, merge these accounts No, keep them separate",
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Yes, merge these accounts",
+          "w": 255,
+          "top": 254,
+          "bottom": 300
+        },
+        {
+          "text": "No, keep them separate",
+          "w": 231,
+          "top": 300,
+          "bottom": 346
+        }
+      ],
+      "buttonGapPx": 0,
+      "scrollW": 1400,
+      "clientW": 1400
+    },
+    {
+      "cell": "merge-github--dark-390px",
+      "renderer": "renderMergeConfirmPage",
+      "label": "synthetic",
+      "pngKept": true,
+      "title": "Confirm account merge - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Merge these accounts?"
+      ],
+      "text": "Harbour Merge these accounts? This GitHub account is already connected to a different Harbour account — which may itself already include other previously-merged identities and data — merge them? Yes, merge these accounts No, keep them separate",
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Yes, merge these accounts",
+          "w": 255,
+          "top": 275,
+          "bottom": 321
+        },
+        {
+          "text": "No, keep them separate",
+          "w": 231,
+          "top": 321,
+          "bottom": 367
+        }
+      ],
+      "buttonGapPx": 0,
+      "scrollW": 390,
+      "clientW": 390
+    },
+    {
+      "cell": "merge-jira--light-1400px",
+      "renderer": "renderMergeConfirmPage",
+      "label": "synthetic",
+      "pngKept": true,
+      "title": "Confirm account merge - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Merge these accounts?"
+      ],
+      "text": "Harbour Merge these accounts? This Jira account is already connected to a different Harbour account — which may itself already include other previously-merged identities and data — merge them? Yes, merge these accounts No, keep them separate",
+      "htmlClass": "",
+      "bodyBg": "rgb(255, 255, 255)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Yes, merge these accounts",
+          "w": 255,
+          "top": 254,
+          "bottom": 300
+        },
+        {
+          "text": "No, keep them separate",
+          "w": 231,
+          "top": 300,
+          "bottom": 346
+        }
+      ],
+      "buttonGapPx": 0,
+      "scrollW": 1400,
+      "clientW": 1400
+    },
+    {
+      "cell": "merge-jira--light-390px",
+      "renderer": "renderMergeConfirmPage",
+      "label": "synthetic",
+      "pngKept": false,
+      "title": "Confirm account merge - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Merge these accounts?"
+      ],
+      "text": "Harbour Merge these accounts? This Jira account is already connected to a different Harbour account — which may itself already include other previously-merged identities and data — merge them? Yes, merge these accounts No, keep them separate",
+      "htmlClass": "",
+      "bodyBg": "rgb(255, 255, 255)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Yes, merge these accounts",
+          "w": 255,
+          "top": 275,
+          "bottom": 321
+        },
+        {
+          "text": "No, keep them separate",
+          "w": 231,
+          "top": 321,
+          "bottom": 367
+        }
+      ],
+      "buttonGapPx": 0,
+      "scrollW": 390,
+      "clientW": 390
+    },
+    {
+      "cell": "merge-jira--dark-1400px",
+      "renderer": "renderMergeConfirmPage",
+      "label": "synthetic",
+      "pngKept": false,
+      "title": "Confirm account merge - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Merge these accounts?"
+      ],
+      "text": "Harbour Merge these accounts? This Jira account is already connected to a different Harbour account — which may itself already include other previously-merged identities and data — merge them? Yes, merge these accounts No, keep them separate",
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Yes, merge these accounts",
+          "w": 255,
+          "top": 254,
+          "bottom": 300
+        },
+        {
+          "text": "No, keep them separate",
+          "w": 231,
+          "top": 300,
+          "bottom": 346
+        }
+      ],
+      "buttonGapPx": 0,
+      "scrollW": 1400,
+      "clientW": 1400
+    },
+    {
+      "cell": "merge-jira--dark-390px",
+      "renderer": "renderMergeConfirmPage",
+      "label": "synthetic",
+      "pngKept": true,
+      "title": "Confirm account merge - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Merge these accounts?"
+      ],
+      "text": "Harbour Merge these accounts? This Jira account is already connected to a different Harbour account — which may itself already include other previously-merged identities and data — merge them? Yes, merge these accounts No, keep them separate",
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Yes, merge these accounts",
+          "w": 255,
+          "top": 275,
+          "bottom": 321
+        },
+        {
+          "text": "No, keep them separate",
+          "w": 231,
+          "top": 321,
+          "bottom": 367
+        }
+      ],
+      "buttonGapPx": 0,
+      "scrollW": 390,
+      "clientW": 390
+    },
+    {
+      "cell": "merge-email--light-1400px",
+      "renderer": "renderMergeConfirmPage",
+      "label": "synthetic",
+      "pngKept": true,
+      "title": "Confirm account merge - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Merge these accounts?"
+      ],
+      "text": "Harbour Merge these accounts? This email account is already connected to a different Harbour account — which may itself already include other previously-merged identities and data — merge them? Yes, merge these accounts No, keep them separate",
+      "htmlClass": "",
+      "bodyBg": "rgb(255, 255, 255)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Yes, merge these accounts",
+          "w": 255,
+          "top": 254,
+          "bottom": 300
+        },
+        {
+          "text": "No, keep them separate",
+          "w": 231,
+          "top": 300,
+          "bottom": 346
+        }
+      ],
+      "buttonGapPx": 0,
+      "scrollW": 1400,
+      "clientW": 1400
+    },
+    {
+      "cell": "merge-email--light-390px",
+      "renderer": "renderMergeConfirmPage",
+      "label": "synthetic",
+      "pngKept": false,
+      "title": "Confirm account merge - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Merge these accounts?"
+      ],
+      "text": "Harbour Merge these accounts? This email account is already connected to a different Harbour account — which may itself already include other previously-merged identities and data — merge them? Yes, merge these accounts No, keep them separate",
+      "htmlClass": "",
+      "bodyBg": "rgb(255, 255, 255)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Yes, merge these accounts",
+          "w": 255,
+          "top": 275,
+          "bottom": 321
+        },
+        {
+          "text": "No, keep them separate",
+          "w": 231,
+          "top": 321,
+          "bottom": 367
+        }
+      ],
+      "buttonGapPx": 0,
+      "scrollW": 390,
+      "clientW": 390
+    },
+    {
+      "cell": "merge-email--dark-1400px",
+      "renderer": "renderMergeConfirmPage",
+      "label": "synthetic",
+      "pngKept": false,
+      "title": "Confirm account merge - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Merge these accounts?"
+      ],
+      "text": "Harbour Merge these accounts? This email account is already connected to a different Harbour account — which may itself already include other previously-merged identities and data — merge them? Yes, merge these accounts No, keep them separate",
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Yes, merge these accounts",
+          "w": 255,
+          "top": 254,
+          "bottom": 300
+        },
+        {
+          "text": "No, keep them separate",
+          "w": 231,
+          "top": 300,
+          "bottom": 346
+        }
+      ],
+      "buttonGapPx": 0,
+      "scrollW": 1400,
+      "clientW": 1400
+    },
+    {
+      "cell": "merge-email--dark-390px",
+      "renderer": "renderMergeConfirmPage",
+      "label": "synthetic",
+      "pngKept": true,
+      "title": "Confirm account merge - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Merge these accounts?"
+      ],
+      "text": "Harbour Merge these accounts? This email account is already connected to a different Harbour account — which may itself already include other previously-merged identities and data — merge them? Yes, merge these accounts No, keep them separate",
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Yes, merge these accounts",
+          "w": 255,
+          "top": 275,
+          "bottom": 321
+        },
+        {
+          "text": "No, keep them separate",
+          "w": 231,
+          "top": 321,
+          "bottom": 367
+        }
+      ],
+      "buttonGapPx": 0,
+      "scrollW": 390,
+      "clientW": 390
+    },
+    {
+      "cell": "reauth-github--light-1400px",
+      "renderer": "renderMergeReauthRequiredPage",
+      "label": "synthetic",
+      "pngKept": true,
+      "title": "Sign in again to confirm - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Sign in again to confirm"
+      ],
+      "text": "Harbour Sign in again to confirm This GitHub account is already connected to a different Harbour account. To merge them, we need to confirm you're recently signed in on BOTH — please sign in again on your current account, then reconnect this one. Sign in again Go to homepage",
+      "htmlClass": "",
+      "bodyBg": "rgb(255, 255, 255)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Sign in again",
+          "w": 147,
+          "top": 334,
+          "bottom": 386
+        }
+      ],
+      "buttonGapPx": null,
+      "scrollW": 1400,
+      "clientW": 1400
+    },
+    {
+      "cell": "reauth-github--light-390px",
+      "renderer": "renderMergeReauthRequiredPage",
+      "label": "synthetic",
+      "pngKept": false,
+      "title": "Sign in again to confirm - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Sign in again to confirm"
+      ],
+      "text": "Harbour Sign in again to confirm This GitHub account is already connected to a different Harbour account. To merge them, we need to confirm you're recently signed in on BOTH — please sign in again on your current account, then reconnect this one. Sign in again Go to homepage",
+      "htmlClass": "",
+      "bodyBg": "rgb(255, 255, 255)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Sign in again",
+          "w": 147,
+          "top": 307,
+          "bottom": 358
+        }
+      ],
+      "buttonGapPx": null,
+      "scrollW": 390,
+      "clientW": 390
+    },
+    {
+      "cell": "reauth-github--dark-1400px",
+      "renderer": "renderMergeReauthRequiredPage",
+      "label": "synthetic",
+      "pngKept": false,
+      "title": "Sign in again to confirm - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Sign in again to confirm"
+      ],
+      "text": "Harbour Sign in again to confirm This GitHub account is already connected to a different Harbour account. To merge them, we need to confirm you're recently signed in on BOTH — please sign in again on your current account, then reconnect this one. Sign in again Go to homepage",
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Sign in again",
+          "w": 147,
+          "top": 334,
+          "bottom": 386
+        }
+      ],
+      "buttonGapPx": null,
+      "scrollW": 1400,
+      "clientW": 1400
+    },
+    {
+      "cell": "reauth-github--dark-390px",
+      "renderer": "renderMergeReauthRequiredPage",
+      "label": "synthetic",
+      "pngKept": true,
+      "title": "Sign in again to confirm - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Sign in again to confirm"
+      ],
+      "text": "Harbour Sign in again to confirm This GitHub account is already connected to a different Harbour account. To merge them, we need to confirm you're recently signed in on BOTH — please sign in again on your current account, then reconnect this one. Sign in again Go to homepage",
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Sign in again",
+          "w": 147,
+          "top": 307,
+          "bottom": 358
+        }
+      ],
+      "buttonGapPx": null,
+      "scrollW": 390,
+      "clientW": 390
+    },
+    {
+      "cell": "reauth-jira--light-1400px",
+      "renderer": "renderMergeReauthRequiredPage",
+      "label": "synthetic",
+      "pngKept": true,
+      "title": "Sign in again to confirm - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Sign in again to confirm"
+      ],
+      "text": "Harbour Sign in again to confirm This Jira account is already connected to a different Harbour account. To merge them, we need to confirm you're recently signed in on BOTH — please sign in again on your current account, then reconnect this one. Sign in again Go to homepage",
+      "htmlClass": "",
+      "bodyBg": "rgb(255, 255, 255)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Sign in again",
+          "w": 147,
+          "top": 334,
+          "bottom": 386
+        }
+      ],
+      "buttonGapPx": null,
+      "scrollW": 1400,
+      "clientW": 1400
+    },
+    {
+      "cell": "reauth-jira--light-390px",
+      "renderer": "renderMergeReauthRequiredPage",
+      "label": "synthetic",
+      "pngKept": false,
+      "title": "Sign in again to confirm - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Sign in again to confirm"
+      ],
+      "text": "Harbour Sign in again to confirm This Jira account is already connected to a different Harbour account. To merge them, we need to confirm you're recently signed in on BOTH — please sign in again on your current account, then reconnect this one. Sign in again Go to homepage",
+      "htmlClass": "",
+      "bodyBg": "rgb(255, 255, 255)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Sign in again",
+          "w": 147,
+          "top": 307,
+          "bottom": 358
+        }
+      ],
+      "buttonGapPx": null,
+      "scrollW": 390,
+      "clientW": 390
+    },
+    {
+      "cell": "reauth-jira--dark-1400px",
+      "renderer": "renderMergeReauthRequiredPage",
+      "label": "synthetic",
+      "pngKept": false,
+      "title": "Sign in again to confirm - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Sign in again to confirm"
+      ],
+      "text": "Harbour Sign in again to confirm This Jira account is already connected to a different Harbour account. To merge them, we need to confirm you're recently signed in on BOTH — please sign in again on your current account, then reconnect this one. Sign in again Go to homepage",
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Sign in again",
+          "w": 147,
+          "top": 334,
+          "bottom": 386
+        }
+      ],
+      "buttonGapPx": null,
+      "scrollW": 1400,
+      "clientW": 1400
+    },
+    {
+      "cell": "reauth-jira--dark-390px",
+      "renderer": "renderMergeReauthRequiredPage",
+      "label": "synthetic",
+      "pngKept": true,
+      "title": "Sign in again to confirm - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Sign in again to confirm"
+      ],
+      "text": "Harbour Sign in again to confirm This Jira account is already connected to a different Harbour account. To merge them, we need to confirm you're recently signed in on BOTH — please sign in again on your current account, then reconnect this one. Sign in again Go to homepage",
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [
+        {
+          "text": "Sign in again",
+          "w": 147,
+          "top": 307,
+          "bottom": 358
+        }
+      ],
+      "buttonGapPx": null,
+      "scrollW": 390,
+      "clientW": 390
+    },
+    {
+      "cell": "reauth-email-noproof--light-1400px",
+      "renderer": "renderMergeReauthRequiredPage",
+      "label": "synthetic",
+      "pngKept": true,
+      "title": "Account conflict - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Can't confirm this merge here"
+      ],
+      "text": "Harbour Can't confirm this merge here This email account is already connected to a different Harbour account, but this account can't be re-proved here — it has no provider sign-in and no email address we can send a sign-in link to. Sign in with the account that owns this address instead. The sign-in link you used has already been spent. Go to homepage",
+      "htmlClass": "",
+      "bodyBg": "rgb(255, 255, 255)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [],
+      "buttonGapPx": null,
+      "scrollW": 1400,
+      "clientW": 1400
+    },
+    {
+      "cell": "reauth-email-noproof--light-390px",
+      "renderer": "renderMergeReauthRequiredPage",
+      "label": "synthetic",
+      "pngKept": false,
+      "title": "Account conflict - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Can't confirm this merge here"
+      ],
+      "text": "Harbour Can't confirm this merge here This email account is already connected to a different Harbour account, but this account can't be re-proved here — it has no provider sign-in and no email address we can send a sign-in link to. Sign in with the account that owns this address instead. The sign-in link you used has already been spent. Go to homepage",
+      "htmlClass": "",
+      "bodyBg": "rgb(255, 255, 255)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [],
+      "buttonGapPx": null,
+      "scrollW": 390,
+      "clientW": 390
+    },
+    {
+      "cell": "reauth-email-noproof--dark-1400px",
+      "renderer": "renderMergeReauthRequiredPage",
+      "label": "synthetic",
+      "pngKept": false,
+      "title": "Account conflict - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Can't confirm this merge here"
+      ],
+      "text": "Harbour Can't confirm this merge here This email account is already connected to a different Harbour account, but this account can't be re-proved here — it has no provider sign-in and no email address we can send a sign-in link to. Sign in with the account that owns this address instead. The sign-in link you used has already been spent. Go to homepage",
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [],
+      "buttonGapPx": null,
+      "scrollW": 1400,
+      "clientW": 1400
+    },
+    {
+      "cell": "reauth-email-noproof--dark-390px",
+      "renderer": "renderMergeReauthRequiredPage",
+      "label": "synthetic",
+      "pngKept": true,
+      "title": "Account conflict - Projects",
+      "headings": [
+        "H1:Harbour",
+        "H2:Can't confirm this merge here"
+      ],
+      "text": "Harbour Can't confirm this merge here This email account is already connected to a different Harbour account, but this account can't be re-proved here — it has no provider sign-in and no email address we can send a sign-in link to. Sign in with the account that owns this address instead. The sign-in link you used has already been spent. Go to homepage",
+      "htmlClass": "theme-dark",
+      "bodyBg": "rgb(22, 24, 29)",
+      "sampled": 5,
+      "contrastBelow": [],
+      "buttons": [],
+      "buttonGapPx": null,
+      "scrollW": 390,
+      "clientW": 390
+    }
+  ],
+  "summary": {
+    "rendered": 24,
+    "buttonGaps": [
+      "merge-github--light-1400px: 0px",
+      "merge-github--light-390px: 0px",
+      "merge-github--dark-1400px: 0px",
+      "merge-github--dark-390px: 0px",
+      "merge-jira--light-1400px: 0px",
+      "merge-jira--light-390px: 0px",
+      "merge-jira--dark-1400px: 0px",
+      "merge-jira--dark-390px: 0px",
+      "merge-email--light-1400px: 0px",
+      "merge-email--light-390px: 0px",
+      "merge-email--dark-1400px: 0px",
+      "merge-email--dark-390px: 0px"
+    ],
+    "contrastGroupsBelow": [],
+    "themeClassDark": [
+      "merge-github--dark-1400px: theme-dark bg rgb(22, 24, 29)",
+      "merge-github--dark-390px: theme-dark bg rgb(22, 24, 29)",
+      "merge-jira--dark-1400px: theme-dark bg rgb(22, 24, 29)",
+      "merge-jira--dark-390px: theme-dark bg rgb(22, 24, 29)",
+      "merge-email--dark-1400px: theme-dark bg rgb(22, 24, 29)",
+      "merge-email--dark-390px: theme-dark bg rgb(22, 24, 29)",
+      "reauth-github--dark-1400px: theme-dark bg rgb(22, 24, 29)",
+      "reauth-github--dark-390px: theme-dark bg rgb(22, 24, 29)",
+      "reauth-jira--dark-1400px: theme-dark bg rgb(22, 24, 29)",
+      "reauth-jira--dark-390px: theme-dark bg rgb(22, 24, 29)",
+      "reauth-email-noproof--dark-1400px: theme-dark bg rgb(22, 24, 29)",
+      "reauth-email-noproof--dark-390px: theme-dark bg rgb(22, 24, 29)"
+    ]
+  }
+}

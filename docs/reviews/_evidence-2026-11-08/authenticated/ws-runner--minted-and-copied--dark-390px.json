@@ -1,0 +1,87 @@
+{
+  "key": "ws-runner|minted-and-copied|dark|390",
+  "registryId": "ws-runner",
+  "state": "minted-and-copied",
+  "theme": "dark",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/runner",
+  "populated": null,
+  "note": "mint then copy pressed (clipboard granted) so .runner-setup-feedback \"copied ✓\" (color: var(--green), runner-setup.css:76) is on screen",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/runner",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Run on my machine",
+    "h1": "Run on my machine",
+    "headings": {
+      "h1": 1,
+      "h2": 4
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "live console",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 2092
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 55,
+    "belowThreshold": []
+  },
+  "extra": {
+    "feedbackEl": true,
+    "feedbackText": "copied ✓",
+    "feedbackHidden": false,
+    "feedbackColor": "rgb(46, 230, 95)",
+    "feedbackBg": "rgb(22,24,29)",
+    "feedbackRatio": 10.66,
+    "greenToken": "#2ee65f"
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

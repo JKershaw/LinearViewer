@@ -1,0 +1,29 @@
+{
+ "probe": "ship-public-type.mjs",
+ "out": {
+  "390": {
+   "leafTextElements": 52,
+   "fontSizeHistogram": {
+    "9px": 15,
+    "10px": 1,
+    "11px": 11,
+    "11.7px": 6,
+    "12px": 14,
+    "13.6px": 5
+   },
+   "zoomLabel": null
+  },
+  "1400": {
+   "leafTextElements": 53,
+   "fontSizeHistogram": {
+    "9px": 16,
+    "10px": 1,
+    "11px": 11,
+    "12px": 14,
+    "13.6px": 5,
+    "14.4px": 6
+   },
+   "zoomLabel": "45%"
+  }
+ }
+}

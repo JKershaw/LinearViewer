@@ -1,0 +1,77 @@
+{
+  "key": "ws-proxy|populated|dark|1400",
+  "registryId": "ws-proxy",
+  "state": "populated",
+  "theme": "dark",
+  "viewport": 1400,
+  "path": "/workspace/test-workspace/proxy",
+  "populated": true,
+  "note": "seed-proxy-event ×5; the Event Log disclosure (#proxy-events-collapsible, closed by default) opened",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/proxy",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Test Workspace - Proxy",
+    "h1": "Proxy",
+    "headings": {
+      "h1": 1,
+      "h2": 5
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "passage planner",
+      "ship's biscuit",
+      "ship journey",
+      "roadmap",
+      "live console",
+      "dispatch",
+      "collective",
+      "task chat",
+      "ship",
+      "flight companion"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 1711
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 85,
+    "belowThreshold": []
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

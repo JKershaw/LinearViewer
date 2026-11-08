@@ -1,0 +1,69 @@
+{
+  "id": "a4",
+  "base": "http://localhost:3199",
+  "head": "c998cf4c5",
+  "question": "per-page nav order",
+  "distinctOrders": {
+    "← Harbour | Sign in → | GitHub → | Jira → | Email →": [
+      "ship-public",
+      "swim-public",
+      "swipe-public"
+    ],
+    "Sources\n            › | Models\n            › | Running\n            › | Agent access\n            › | Health\n            › | Change log\n            › | Features\n            › | Account\n            › | Sources\n            ok› | Models\n            › | Running\n            paused› | Agent access\n            › | Health\n            stopped› | Change log\n            › | Features\n            › | Account\n            ›": [
+      "styleguide"
+    ],
+    "harbour.cat | search | swipe | swim | observation | settings | kpis | passage planner | ship's biscuit | ship journey | roadmap | live console | dispatch | proxy": [
+      "ws-tree"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | kpis | passage planner | ship's biscuit | ship journey | roadmap | live console | dispatch | proxy | Sources\n            Linear› | Models\n            GPT-5.4 Mini› | Running\n            Ready · ask› | Agent access\n            5 live keys› | Health\n            All clear› | Change log\n            Empty› | Features\n            11 on› | Account\n            Not connected›": [
+      "ws/settings"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | passage planner | ship's biscuit | ship journey | roadmap | live console | proxy": [
+      "ws/dispatch"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | passage planner | ship's biscuit | ship journey | roadmap | live console | dispatch": [
+      "ws/proxy",
+      "ws/collective"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | passage planner | ship's biscuit | ship journey | live console | dispatch | proxy": [
+      "ws/roadmap"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | passage planner | ship's biscuit | ship journey | roadmap | live console | dispatch | proxy": [
+      "ws/kpis"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | passage planner | ship's biscuit | ship journey | roadmap | live console | dispatch | proxy": [
+      "ws/runner",
+      "ws/audit"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | ship journey | roadmap | live console | dispatch | proxy | collective | task chat | flight companion": [
+      "ws/ship"
+    ],
+    "harbour.cat | tasks | swipe | observation | settings | kpis | ship journey | roadmap | live console | dispatch | proxy | collective | task chat | ship | flight companion": [
+      "ws/swim"
+    ],
+    "harbour.cat | tasks | swim | observation | settings | kpis | collective | task chat | ship | flight companion | roadmap | live console | dispatch | proxy": [
+      "ws/swipe"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | collective | task chat | ship | flight companion | roadmap | live console | dispatch | proxy": [
+      "ws/prompts"
+    ],
+    "harbour.cat | tasks | swipe | swim | settings | kpis | passage planner | ship's biscuit | ship journey | roadmap | live console | dispatch | proxy": [
+      "ws/observation"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | passage planner | ship's biscuit | ship journey | roadmap | dispatch | proxy": [
+      "ws/live-console"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | flight companion | passage planner | ship journey | roadmap | live console": [
+      "ws/ship-biscuit"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | dispatch | proxy | collective | task chat | ship | roadmap | live console": [
+      "ws/flight-companion"
+    ],
+    "harbour.cat | tasks | swipe | swim | observation | settings | kpis | flight companion | ship's biscuit | ship journey | roadmap | live console": [
+      "ws/passage-planner"
+    ]
+  },
+  "summary": {
+    "distinctOrderCount": 18
+  }
+}

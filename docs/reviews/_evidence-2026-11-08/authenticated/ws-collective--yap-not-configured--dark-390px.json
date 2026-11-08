@@ -1,0 +1,88 @@
+{
+  "key": "ws-collective|yap-not-configured|dark|390",
+  "registryId": "ws-collective",
+  "state": "yap-not-configured",
+  "theme": "dark",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/collective",
+  "populated": null,
+  "note": "poll answered 503 via request interception (synthetic): \"Yap not configured\"",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/collective",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Collective - Experimental",
+    "h1": "Collective",
+    "headings": {
+      "h1": 1,
+      "h2": 2
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "live console",
+      "dispatch",
+      "proxy",
+      "task chat",
+      "ship",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 1583
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 75,
+    "belowThreshold": []
+  },
+  "extra": {
+    "present": true,
+    "text": "Yap not configured",
+    "color": "rgb(154, 160, 166)",
+    "bg": "rgb(22,24,29)",
+    "ratio": 6.73,
+    "className": "collective-poll-status",
+    "fontSize": "13.6px"
+  },
+  "consoleErrors": [],
+  "failedRequests": [
+    "503 /workspace/test-workspace/api/collective/state"
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "key": "ws-tree|workspace-switcher-open|dark|390",
+  "registryId": "ws-tree",
+  "state": "workspace-switcher-open",
+  "theme": "dark",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/",
+  "populated": null,
+  "note": "workspace switcher opened, two workspaces, \"add\" rows visible",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Test Workspace - Projects",
+    "h1": "Test Workspace",
+    "headings": {
+      "h1": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "0 waiting on you",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "live console",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "reset",
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": true,
+    "hasAssigneeSelector": true,
+    "bodyText": 681
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 65,
+    "belowThreshold": [
+      {
+        "element": "span.option-prefix",
+        "color": "rgb(44, 49, 58)",
+        "bg": "rgb(31,34,42)",
+        "ratio": 1.22,
+        "need": 4.5,
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "count": 6,
+        "samples": [
+          "├─",
+          "├─",
+          "├─"
+        ]
+      }
+    ]
+  },
+  "extra": {
+    "toggleExists": true,
+    "expanded": "true",
+    "panelExists": true,
+    "panelVisible": true,
+    "panelBox": {
+      "x": 22,
+      "y": 227,
+      "w": 356,
+      "h": 172,
+      "clippedRight": false
+    },
+    "options": [
+      "● Test Workspace",
+      "remove",
+      "○ Second Workspace",
+      "+ Linear",
+      "+ GitHub Issues",
+      "+ Jira",
+      "+local workspace"
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

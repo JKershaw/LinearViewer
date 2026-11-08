@@ -1,0 +1,97 @@
+{
+  "key": "ws-tree|nav-more-expanded|dark|1400",
+  "registryId": "ws-tree",
+  "state": "nav-more-expanded",
+  "theme": "dark",
+  "viewport": 1400,
+  "path": "/workspace/test-workspace/",
+  "populated": null,
+  "note": "⋯ more expander opened",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Test Workspace - Projects",
+    "h1": "Test Workspace",
+    "headings": {
+      "h1": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "0 waiting on you",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "passage planner",
+      "ship's biscuit",
+      "ship journey",
+      "roadmap",
+      "live console",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "flight companion"
+    ],
+    "footerLinks": [
+      "reset",
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": true,
+    "hasAssigneeSelector": true,
+    "bodyText": 694
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 61,
+    "belowThreshold": []
+  },
+  "extra": {
+    "toggleExists": true,
+    "expanded": "true",
+    "panelExists": true,
+    "panelVisible": true,
+    "panelBox": {
+      "x": 126,
+      "y": 140,
+      "w": 1147,
+      "h": 162,
+      "clippedRight": false
+    },
+    "options": [
+      "collective",
+      "task chat",
+      "ship",
+      "flight companion"
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

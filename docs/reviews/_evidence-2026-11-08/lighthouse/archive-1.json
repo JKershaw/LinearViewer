@@ -1,0 +1,80 @@
+{
+ "id": "archive-1",
+ "url": "/archive/1",
+ "lighthouseVersion": "12.8.2",
+ "fetchTime": "2026-11-08T14:44:23.264Z",
+ "finalUrl": "/archive/1",
+ "runtimeError": null,
+ "scores": {
+  "performance": 1,
+  "accessibility": 1,
+  "best-practices": 1,
+  "seo": 1
+ },
+ "metrics": {
+  "first-contentful-paint": 979.3771,
+  "largest-contentful-paint": 1007.8771000000002,
+  "cumulative-layout-shift": 0,
+  "total-blocking-time": 21.000000000000114
+ },
+ "failing": [
+  {
+   "id": "max-potential-fid",
+   "score": 0.97,
+   "title": "Max Potential First Input Delay",
+   "items": []
+  },
+  {
+   "id": "unminified-css",
+   "score": 0.5,
+   "title": "Minify CSS",
+   "items": [
+    {
+     "url": ":root {\n  --paper: #faf9f6;\n  --card: #fffefb;\n  --ink: #1c2430;\n  --muted: #5c6672;\n  --faint: #66…"
+    }
+   ]
+  },
+  {
+   "id": "unminified-javascript",
+   "score": 0.5,
+   "title": "Minify JavaScript",
+   "items": [
+    {
+     "url": "inline: \n(function () {\n  'use strict';\n\n  /* -…"
+    }
+   ]
+  },
+  {
+   "id": "uses-text-compression",
+   "score": 0,
+   "title": "Enable text compression",
+   "items": [
+    {
+     "url": "http://localhost:3199/archive/1"
+    }
+   ]
+  },
+  {
+   "id": "dom-size",
+   "score": 0,
+   "title": "Avoid an excessive DOM size",
+   "items": [
+    {},
+    {
+     "selector": "table > tbody > tr > th",
+     "snippet": "<th>"
+    },
+    {
+     "selector": "section.cabinet > figure.figure > div#chartB > svg",
+     "snippet": "<svg viewBox=\"0 0 760 300\" role=\"img\" aria-label=\"Bar chart comparing all monthl"
+    }
+   ]
+  },
+  {
+   "id": "document-latency-insight",
+   "score": 0.5,
+   "title": "Document request latency",
+   "items": []
+  }
+ ]
+}

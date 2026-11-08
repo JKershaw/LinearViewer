@@ -1,0 +1,119 @@
+{
+  "key": "ws-tree|nav-more-expanded|light|390",
+  "registryId": "ws-tree",
+  "state": "nav-more-expanded",
+  "theme": "light",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/",
+  "populated": null,
+  "note": "⋯ more expander opened",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "no theme-dark",
+    "actual": "",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "",
+    "title": "Test Workspace - Projects",
+    "h1": "Test Workspace",
+    "headings": {
+      "h1": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "0 waiting on you",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "live console",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "reset",
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": true,
+    "hasAssigneeSelector": true,
+    "bodyText": 694
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 61,
+    "belowThreshold": [
+      {
+        "element": "span.wordmark-accent",
+        "color": "rgb(13, 148, 136)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 3.74,
+        "need": 4.5,
+        "fontSize": "11.05px",
+        "fontWeight": "600",
+        "count": 2,
+        "samples": [
+          ".cat",
+          ".cat"
+        ]
+      }
+    ]
+  },
+  "extra": {
+    "toggleExists": true,
+    "expanded": "true",
+    "panelExists": true,
+    "panelVisible": true,
+    "panelBox": {
+      "x": 12,
+      "y": 208,
+      "w": 366,
+      "h": 542,
+      "clippedRight": false
+    },
+    "options": [
+      "roadmap",
+      "live console",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "ship journey"
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

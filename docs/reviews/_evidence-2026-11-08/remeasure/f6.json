@@ -1,0 +1,217 @@
+{
+  "id": "f6",
+  "base": "http://localhost:3199",
+  "head": "c998cf4c5",
+  "question": "archive sign-offs at 2.94:1?",
+  "census": "census.json",
+  "rows": [
+    {
+      "id": "archive-3",
+      "theme": "light",
+      "element": "span.branch",
+      "ratio": 1.6,
+      "color": "rgb(195, 200, 205)",
+      "bg": "rgb(248,249,250)",
+      "samples": [
+        "├─",
+        "├─",
+        "├─"
+      ]
+    },
+    {
+      "id": "archive-3",
+      "theme": "light",
+      "element": "span.glyph",
+      "ratio": 1.82,
+      "color": "rgb(187, 187, 187)",
+      "bg": "rgb(248,249,250)",
+      "samples": [
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "archive-3",
+      "theme": "light",
+      "element": "span.glyph",
+      "ratio": 3.13,
+      "color": "rgb(22, 163, 74)",
+      "bg": "rgb(248,249,250)",
+      "samples": [
+        "◐",
+        "◐",
+        "◐"
+      ]
+    },
+    {
+      "id": "archive-3",
+      "theme": "light",
+      "element": "span.glyph",
+      "ratio": 3.86,
+      "color": "rgb(154, 122, 0)",
+      "bg": "rgb(248,249,250)",
+      "samples": [
+        "○",
+        "○",
+        "○"
+      ]
+    },
+    {
+      "id": "archive-3",
+      "theme": "dark",
+      "element": "span.branch",
+      "ratio": 1.62,
+      "color": "rgb(61, 68, 80)",
+      "bg": "rgb(31,34,42)",
+      "samples": [
+        "├─",
+        "├─",
+        "├─"
+      ]
+    },
+    {
+      "id": "archive-3",
+      "theme": "dark",
+      "element": "span.glyph",
+      "ratio": 2.63,
+      "color": "rgb(92, 99, 112)",
+      "bg": "rgb(31,34,42)",
+      "samples": [
+        "✓",
+        "✓"
+      ]
+    },
+    {
+      "id": "archive-5",
+      "theme": "light",
+      "element": "span.lever",
+      "ratio": 4.19,
+      "color": "rgb(187, 95, 16)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "Lever one · uptime",
+        "Lever two · context",
+        "Lever three · price"
+      ]
+    },
+    {
+      "id": "archive-7",
+      "theme": "light",
+      "element": "span.num.sec",
+      "ratio": 4.19,
+      "color": "rgb(187, 95, 16)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "1",
+        "2",
+        "3"
+      ]
+    },
+    {
+      "id": "archive-7",
+      "theme": "light",
+      "element": "span.num",
+      "ratio": 4.19,
+      "color": "rgb(187, 95, 16)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "Sources",
+        "Beyond",
+        "Next"
+      ]
+    },
+    {
+      "id": "archive-7",
+      "theme": "light",
+      "element": "span.rn",
+      "ratio": 4.19,
+      "color": "rgb(187, 95, 16)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "1",
+        "2",
+        "3"
+      ]
+    },
+    {
+      "id": "archive-7",
+      "theme": "light",
+      "element": "code",
+      "ratio": 4.46,
+      "color": "rgb(11, 111, 184)",
+      "bg": "rgb(238,236,229)",
+      "samples": [
+        "proposals.md",
+        "developer-adoption-ladder.md",
+        "what-lowers-the-verification-cost.md"
+      ]
+    },
+    {
+      "id": "archive-7",
+      "theme": "light",
+      "element": "a",
+      "ratio": 4.49,
+      "color": "rgb(11, 111, 184)",
+      "bg": "rgb(227,238,248)",
+      "samples": [
+        "1",
+        "2",
+        "3"
+      ]
+    },
+    {
+      "id": "archive-6",
+      "theme": "light",
+      "element": "span.glyph",
+      "ratio": 3.74,
+      "color": "rgb(13, 148, 136)",
+      "bg": "rgb(255,255,255)",
+      "samples": [
+        "├─",
+        "├─",
+        "├─"
+      ]
+    },
+    {
+      "id": "archive-8",
+      "theme": "light",
+      "element": "td.v.up",
+      "ratio": 4.19,
+      "color": "rgb(187, 95, 16)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "2.5×"
+      ]
+    },
+    {
+      "id": "archive-9",
+      "theme": "light",
+      "element": "b",
+      "ratio": 4.19,
+      "color": "rgb(187, 95, 16)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "Keep",
+        "Keep",
+        "Keep"
+      ]
+    },
+    {
+      "id": "archive-9",
+      "theme": "light",
+      "element": "span.n",
+      "ratio": 4.19,
+      "color": "rgb(187, 95, 16)",
+      "bg": "rgb(250,249,246)",
+      "samples": [
+        "1",
+        "2",
+        "3"
+      ]
+    }
+  ],
+  "summary": {
+    "signOffRows": [],
+    "anyGroupBelow": 16
+  }
+}

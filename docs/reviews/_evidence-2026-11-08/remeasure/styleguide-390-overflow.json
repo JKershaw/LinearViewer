@@ -1,0 +1,38 @@
+{
+ "probe": "styleguide-overflow.mjs",
+ "viewport": 390,
+ "out": {
+  "light": {
+   "clientWidth": 390,
+   "scrollWidth": 390,
+   "bodyOver": 1,
+   "bodyWidth": 390,
+   "bodyRight": 390,
+   "themeDark": false,
+   "offenders": [
+    {
+     "tag": "SPAN",
+     "cls": "sg-value",
+     "right": 390.73
+    }
+   ],
+   "offenderCount": 1
+  },
+  "dark": {
+   "clientWidth": 390,
+   "scrollWidth": 390,
+   "bodyOver": 1,
+   "bodyWidth": 390,
+   "bodyRight": 390,
+   "themeDark": true,
+   "offenders": [
+    {
+     "tag": "SPAN",
+     "cls": "sg-value",
+     "right": 390.73
+    }
+   ],
+   "offenderCount": 1
+  }
+ }
+}

@@ -1,0 +1,87 @@
+{
+ "id": "archive-7",
+ "url": "/archive/7",
+ "lighthouseVersion": "12.8.2",
+ "fetchTime": "2026-11-08T14:45:25.485Z",
+ "finalUrl": "/archive/7",
+ "runtimeError": null,
+ "scores": {
+  "performance": 0.98,
+  "accessibility": 0.96,
+  "best-practices": 1,
+  "seo": 1
+ },
+ "metrics": {
+  "first-contentful-paint": 1801.3601,
+  "largest-contentful-paint": 1801.3601,
+  "cumulative-layout-shift": 0,
+  "total-blocking-time": 0
+ },
+ "failing": [
+  {
+   "id": "first-contentful-paint",
+   "score": 0.89,
+   "title": "First Contentful Paint",
+   "items": []
+  },
+  {
+   "id": "largest-contentful-paint",
+   "score": 0.98,
+   "title": "Largest Contentful Paint",
+   "items": []
+  },
+  {
+   "id": "color-contrast",
+   "score": 0,
+   "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+   "items": [
+    {
+     "selector": "section > p > sup.ref > a#c12-1",
+     "snippet": "<a href=\"#r12\" id=\"c12-1\" aria-label=\"Reading list entry 12\">",
+     "explanation": "Fix any of the following:\n  Element has insufficient color contrast of 4.48 (foreground color: #0b6fb8, background color: #e3eef8, font size: 7.9pt (10.5px), fo"
+    },
+    {
+     "selector": "section > p > sup.ref > a#c12-2",
+     "snippet": "<a href=\"#r12\" id=\"c12-2\" aria-label=\"Reading list entry 12\">",
+     "explanation": "Fix any of the following:\n  Element has insufficient color contrast of 4.48 (foreground color: #0b6fb8, background color: #e3eef8, font size: 7.9pt (10.5px), fo"
+    },
+    {
+     "selector": "section > p > sup.ref > a#c11-1",
+     "snippet": "<a href=\"#r11\" id=\"c11-1\" aria-label=\"Reading list entry 11\">",
+     "explanation": "Fix any of the following:\n  Element has insufficient color contrast of 4.48 (foreground color: #0b6fb8, background color: #e3eef8, font size: 7.9pt (10.5px), fo"
+    },
+    {
+     "selector": "section > p > sup.ref > a#c10-1",
+     "snippet": "<a href=\"#r10\" id=\"c10-1\" aria-label=\"Reading list entry 10\">",
+     "explanation": "Fix any of the following:\n  Element has insufficient color contrast of 4.48 (foreground color: #0b6fb8, background color: #e3eef8, font size: 7.9pt (10.5px), fo"
+    }
+   ]
+  },
+  {
+   "id": "uses-text-compression",
+   "score": 0,
+   "title": "Enable text compression",
+   "items": [
+    {
+     "url": "http://localhost:3199/archive/7"
+    }
+   ]
+  },
+  {
+   "id": "document-latency-insight",
+   "score": 0.5,
+   "title": "Document request latency",
+   "items": []
+  },
+  {
+   "id": "network-dependency-tree-insight",
+   "score": 0,
+   "title": "Network dependency tree",
+   "items": [
+    {},
+    {},
+    {}
+   ]
+  }
+ ]
+}

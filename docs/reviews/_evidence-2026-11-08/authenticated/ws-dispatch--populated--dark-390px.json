@@ -1,0 +1,77 @@
+{
+  "key": "ws-dispatch|populated|dark|390",
+  "registryId": "ws-dispatch",
+  "state": "populated",
+  "theme": "dark",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/dispatch",
+  "populated": true,
+  "note": "seed-dispatch-preset ×1 (plus the 3 dispatch sessions)",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/dispatch",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Test Workspace - Dispatch",
+    "h1": "Dispatch",
+    "headings": {
+      "h1": 1,
+      "h2": 7
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "live console",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "bodyText": 3518
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 155,
+    "belowThreshold": []
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

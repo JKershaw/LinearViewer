@@ -1,0 +1,104 @@
+{
+  "key": "ws-tree|nav-more-expanded|dark|390",
+  "registryId": "ws-tree",
+  "state": "nav-more-expanded",
+  "theme": "dark",
+  "viewport": 390,
+  "path": "/workspace/test-workspace/",
+  "populated": null,
+  "note": "⋯ more expander opened",
+  "httpStatus": 200,
+  "finalPath": "/workspace/test-workspace/",
+  "themeAssertion": {
+    "mode": "cookie",
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "expected": {
+    "status": 200
+  },
+  "outcome": "as-expected",
+  "read": {
+    "htmlClass": "theme-dark",
+    "title": "Test Workspace - Projects",
+    "h1": "Test Workspace",
+    "headings": {
+      "h1": 1
+    },
+    "geometry": {
+      "bodyOver": 0,
+      "spill": [],
+      "overflows": false
+    },
+    "mainCount": 1,
+    "footerCount": 1,
+    "navLinks": [
+      "harbour.cat",
+      "search",
+      "0 waiting on you",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "kpis",
+      "roadmap",
+      "live console",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "reset",
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "library"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": true,
+    "hasAssigneeSelector": true,
+    "bodyText": 694
+  },
+  "clip": [],
+  "contrast": {
+    "sampled": 61,
+    "belowThreshold": []
+  },
+  "extra": {
+    "toggleExists": true,
+    "expanded": "true",
+    "panelExists": true,
+    "panelVisible": true,
+    "panelBox": {
+      "x": 12,
+      "y": 208,
+      "w": 366,
+      "h": 542,
+      "clippedRight": false
+    },
+    "options": [
+      "roadmap",
+      "live console",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "ship journey"
+    ]
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

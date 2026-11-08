@@ -1,0 +1,371 @@
+{
+  "id": "f4",
+  "base": "http://localhost:3199",
+  "head": "c998cf4c5",
+  "question": "UA-default controls on the error/consent family (Jira API-token form, provider selects, workspace-not-found link)?",
+  "note": "SYNTHETIC production-renderer output via interception",
+  "pages": {
+    "jira-link-form": {
+      "light": {
+        "controls": [
+          {
+            "tag": "input",
+            "type": "url",
+            "text": "https://yourteam.atlassian.net",
+            "color": "rgb(26, 26, 26)",
+            "bg": "rgb(255,255,255)",
+            "border": "1px solid rgb(221, 221, 221)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 17.4
+          },
+          {
+            "tag": "input",
+            "type": "email",
+            "text": "you@example.com",
+            "color": "rgb(26, 26, 26)",
+            "bg": "rgb(255,255,255)",
+            "border": "1px solid rgb(221, 221, 221)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 17.4
+          },
+          {
+            "tag": "input",
+            "type": "password",
+            "text": "",
+            "color": "rgb(26, 26, 26)",
+            "bg": "rgb(255,255,255)",
+            "border": "1px solid rgb(221, 221, 221)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 17.4
+          }
+        ],
+        "links": [
+          {
+            "tag": "a",
+            "type": null,
+            "text": "id.atlassian.com",
+            "color": "rgb(37, 99, 235)",
+            "bg": "rgb(255,255,255)",
+            "border": "0px none rgb(37, 99, 235)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 5.17
+          }
+        ]
+      },
+      "dark": {
+        "controls": [
+          {
+            "tag": "input",
+            "type": "url",
+            "text": "https://yourteam.atlassian.net",
+            "color": "rgb(230, 230, 230)",
+            "bg": "rgb(22,24,29)",
+            "border": "1px solid rgb(44, 49, 58)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 14.23
+          },
+          {
+            "tag": "input",
+            "type": "email",
+            "text": "you@example.com",
+            "color": "rgb(230, 230, 230)",
+            "bg": "rgb(22,24,29)",
+            "border": "1px solid rgb(44, 49, 58)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 14.23
+          },
+          {
+            "tag": "input",
+            "type": "password",
+            "text": "",
+            "color": "rgb(230, 230, 230)",
+            "bg": "rgb(22,24,29)",
+            "border": "1px solid rgb(44, 49, 58)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 14.23
+          }
+        ],
+        "links": [
+          {
+            "tag": "a",
+            "type": null,
+            "text": "id.atlassian.com",
+            "color": "rgb(110, 168, 254)",
+            "bg": "rgb(22,24,29)",
+            "border": "0px none rgb(110, 168, 254)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 7.35
+          }
+        ]
+      }
+    },
+    "jira-site-picker": {
+      "light": {
+        "controls": [
+          {
+            "tag": "select",
+            "type": "select-one",
+            "text": "acme (https://acme.atlassian.n",
+            "color": "rgb(26, 26, 26)",
+            "bg": "rgb(255,255,255)",
+            "border": "1px solid rgb(221, 221, 221)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 17.4
+          }
+        ],
+        "links": []
+      },
+      "dark": {
+        "controls": [
+          {
+            "tag": "select",
+            "type": "select-one",
+            "text": "acme (https://acme.atlassian.n",
+            "color": "rgb(230, 230, 230)",
+            "bg": "rgb(22,24,29)",
+            "border": "1px solid rgb(44, 49, 58)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 14.23
+          }
+        ],
+        "links": []
+      }
+    },
+    "github-repo-picker": {
+      "light": {
+        "controls": [
+          {
+            "tag": "input",
+            "type": "radio",
+            "text": "",
+            "color": "rgb(0, 0, 0)",
+            "bg": "rgb(255,255,255)",
+            "border": "0px none rgb(0, 0, 0)",
+            "font": "Arial",
+            "ratio": 21
+          }
+        ],
+        "links": [
+          {
+            "tag": "a",
+            "type": null,
+            "text": "Don't see the repo? Add it to ",
+            "color": "rgb(15, 118, 110)",
+            "bg": "rgb(255,255,255)",
+            "border": "0px none rgb(15, 118, 110)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 5.47
+          }
+        ]
+      },
+      "dark": {
+        "controls": [
+          {
+            "tag": "input",
+            "type": "radio",
+            "text": "",
+            "color": "rgb(255, 255, 255)",
+            "bg": "rgb(22,24,29)",
+            "border": "0px none rgb(255, 255, 255)",
+            "font": "Arial",
+            "ratio": 17.76
+          }
+        ],
+        "links": [
+          {
+            "tag": "a",
+            "type": null,
+            "text": "Don't see the repo? Add it to ",
+            "color": "rgb(45, 212, 191)",
+            "bg": "rgb(22,24,29)",
+            "border": "0px none rgb(45, 212, 191)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 9.54
+          }
+        ]
+      }
+    },
+    "github-projects-picker": {
+      "light": {
+        "controls": [
+          {
+            "tag": "select",
+            "type": "select-one",
+            "text": "Roadmap board (acme/4)",
+            "color": "rgb(26, 26, 26)",
+            "bg": "rgb(255,255,255)",
+            "border": "1px solid rgb(221, 221, 221)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 17.4
+          }
+        ],
+        "links": []
+      },
+      "dark": {
+        "controls": [
+          {
+            "tag": "select",
+            "type": "select-one",
+            "text": "Roadmap board (acme/4)",
+            "color": "rgb(230, 230, 230)",
+            "bg": "rgb(22,24,29)",
+            "border": "1px solid rgb(44, 49, 58)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 14.23
+          }
+        ],
+        "links": []
+      }
+    },
+    "workspace-not-found": {
+      "light": {
+        "controls": [
+          {
+            "tag": "input",
+            "type": "text",
+            "text": "Local Workspace",
+            "color": "rgb(26, 26, 26)",
+            "bg": "rgb(255,255,255)",
+            "border": "1px solid rgb(238, 238, 238)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 17.4
+          }
+        ],
+        "links": [
+          {
+            "tag": "a",
+            "type": null,
+            "text": "Demo Workspace (demo)",
+            "color": "rgb(37, 99, 235)",
+            "bg": "rgb(255,255,255)",
+            "border": "0px none rgb(37, 99, 235)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 5.17
+          },
+          {
+            "tag": "a",
+            "type": null,
+            "text": "Go to homepage",
+            "color": "rgb(255, 255, 255)",
+            "bg": "rgb(15,118,110)",
+            "border": "1px solid rgb(15, 118, 110)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 5.47
+          },
+          {
+            "tag": "a",
+            "type": null,
+            "text": "Connect a new workspace",
+            "color": "rgb(102, 102, 102)",
+            "bg": "rgb(255,255,255)",
+            "border": "0px none rgb(102, 102, 102)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 5.74
+          }
+        ]
+      },
+      "dark": {
+        "controls": [
+          {
+            "tag": "input",
+            "type": "text",
+            "text": "Local Workspace",
+            "color": "rgb(230, 230, 230)",
+            "bg": "rgb(22,24,29)",
+            "border": "1px solid rgb(44, 49, 58)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 14.23
+          }
+        ],
+        "links": [
+          {
+            "tag": "a",
+            "type": null,
+            "text": "Demo Workspace (demo)",
+            "color": "rgb(110, 168, 254)",
+            "bg": "rgb(22,24,29)",
+            "border": "0px none rgb(110, 168, 254)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 7.35
+          },
+          {
+            "tag": "a",
+            "type": null,
+            "text": "Go to homepage",
+            "color": "rgb(22, 24, 29)",
+            "bg": "rgb(45,212,191)",
+            "border": "1px solid rgb(45, 212, 191)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 9.54
+          },
+          {
+            "tag": "a",
+            "type": null,
+            "text": "Connect a new workspace",
+            "color": "rgb(154, 160, 166)",
+            "bg": "rgb(22,24,29)",
+            "border": "0px none rgb(154, 160, 166)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 6.73
+          }
+        ]
+      }
+    },
+    "email-signin": {
+      "light": {
+        "controls": [
+          {
+            "tag": "input",
+            "type": "text",
+            "text": "",
+            "color": "rgb(0, 0, 0)",
+            "bg": "rgb(255,255,255)",
+            "border": "2px inset rgb(118, 118, 118)",
+            "font": "Arial",
+            "ratio": 21
+          },
+          {
+            "tag": "input",
+            "type": "email",
+            "text": "you@example.com",
+            "color": "rgb(26, 26, 26)",
+            "bg": "rgb(255,255,255)",
+            "border": "1px solid rgb(221, 221, 221)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 17.4
+          }
+        ],
+        "links": []
+      },
+      "dark": {
+        "controls": [
+          {
+            "tag": "input",
+            "type": "text",
+            "text": "",
+            "color": "rgb(255, 255, 255)",
+            "bg": "rgb(59,59,59)",
+            "border": "2px inset rgb(133, 133, 133)",
+            "font": "Arial",
+            "ratio": 11.2
+          },
+          {
+            "tag": "input",
+            "type": "email",
+            "text": "you@example.com",
+            "color": "rgb(230, 230, 230)",
+            "bg": "rgb(22,24,29)",
+            "border": "1px solid rgb(44, 49, 58)",
+            "font": "Inter, -apple-system, \"system-",
+            "ratio": 14.23
+          }
+        ],
+        "links": []
+      }
+    }
+  },
+  "summary": {
+    "uaDefaultBlueLinks": [],
+    "whiteControlsOnDark": []
+  }
+}

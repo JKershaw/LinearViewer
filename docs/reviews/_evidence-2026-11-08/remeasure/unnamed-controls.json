@@ -1,0 +1,677 @@
+{
+ "probe": "unnamed-controls.mjs",
+ "rows": [
+  {
+   "path": "/workspace/test-workspace/settings/sources",
+   "status": 200,
+   "controls": 19,
+   "unnamed": []
+  },
+  {
+   "path": "/workspace/test-workspace/settings/models",
+   "status": 200,
+   "controls": 280,
+   "unnamed": [
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-preset-name-input",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-preset-name-input",
+     "testid": null,
+     "placeholder": "Preset name"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "harness-select",
+     "testid": null,
+     "placeholder": null
+    },
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "dispatch-effort-input",
+     "testid": null,
+     "placeholder": "effort (blank = inherit)"
+    }
+   ]
+  },
+  {
+   "path": "/workspace/test-workspace/settings/running",
+   "status": 200,
+   "controls": 15,
+   "unnamed": []
+  },
+  {
+   "path": "/workspace/test-workspace/settings/agent-access",
+   "status": 200,
+   "controls": 12,
+   "unnamed": []
+  },
+  {
+   "path": "/workspace/test-workspace/settings/health",
+   "status": 200,
+   "controls": 6,
+   "unnamed": []
+  },
+  {
+   "path": "/workspace/test-workspace/settings/change-log",
+   "status": 200,
+   "controls": 6,
+   "unnamed": []
+  },
+  {
+   "path": "/workspace/test-workspace/settings/features",
+   "status": 200,
+   "controls": 26,
+   "unnamed": []
+  },
+  {
+   "path": "/workspace/test-workspace/settings/account",
+   "status": 200,
+   "controls": 8,
+   "unnamed": []
+  },
+  {
+   "path": "/workspace/test-workspace/proxy",
+   "status": 200,
+   "controls": 9,
+   "unnamed": [
+    {
+     "tag": "input",
+     "type": "text",
+     "cls": "token-label-input",
+     "testid": null,
+     "placeholder": "Label (optional)"
+    },
+    {
+     "tag": "select",
+     "type": "select-one",
+     "cls": "proxy-scope-select",
+     "testid": null,
+     "placeholder": null
+    }
+   ]
+  }
+ ]
+}
