@@ -1,5 +1,6 @@
 // Change coupling (LIN-3860): which areas land in the same change. Pure: git log text and a compiled
-// area guide in, a report of facts out. No git, no fs, no acorn. It reports and never gates.
+// area guide in, a report of facts out. No git, no fs, no acorn (code-shape-lib supplies only the area lookup). It reports and never gates.
+import { claimedBy } from './code-shape-lib.mjs';
 
 const HEADER = /^@([0-9a-f]{40}|[0-9a-f]{64})$/;
 
@@ -16,9 +17,8 @@ export const parseChangeLog = (text) => {
   return changes;
 };
 
-// First matching area, as in the area registry (docs/areas/areas.json). Unlike code-shape-lib's areaOf, a file no area claims is
-// null, not its top-level directory: tests/ and docs/ must not become areas.
-const claimedBy = (guide, path) => guide.find((a) => a.rx.some((r) => r.test(path)))?.name ?? null;
+// A file's area is code-shape-lib's claimedBy: unlike its areaOf, a file no area claims is null, not its
+// top-level directory, so tests/ and docs/ do not become areas.
 
 const byCode = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 

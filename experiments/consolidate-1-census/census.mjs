@@ -2,6 +2,8 @@
 // census.mjs — a census of decisions held in many places ("specks").
 //
 // Usage: node census.mjs <repoDir> <commit> [--out file.json] [--areas path/in/repo/areas.json]
+//        (default: the live registry path, REGISTRY_PATH in scripts/code-shape/code-shape-lib.mjs,
+//        or the pre-LIN-4371 scripts/code-shape/areas.json at a commit that has only that one)
 //        [--areas-commit <sha>] [--churn-days 90]
 //
 // Reads every production JS file straight from git objects at <commit> (so it runs at any
@@ -22,6 +24,7 @@ import { writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
+import { REGISTRY_PATH } from '../../scripts/code-shape/code-shape-lib.mjs';
 
 // ── args ─────────────────────────────────────────────────────────────────────
 const argv = process.argv.slice(2);
@@ -34,7 +37,10 @@ if (!repoArg || !commitArg) {
 }
 const REPO = resolve(repoArg);
 const OUT = flag('--out', null);
-const AREAS_PATH = flag('--areas', 'scripts/code-shape/areas.json');
+// An explicit --areas is read exactly. By default the live registry path is tried first and then the
+// path the registry had before LIN-4371 moved it, so the recorded runs at 2a07f3ea still reproduce (LIN-4376).
+const LEGACY_AREAS_PATH = 'scripts/code-shape/areas.json';
+const AREAS_PATHS = flag('--areas', null) != null ? [flag('--areas', null)] : [REGISTRY_PATH, LEGACY_AREAS_PATH];
 const CHURN_DAYS = Number(flag('--churn-days', '90'));
 
 // acorn is resolved from the target repository's own node_modules (no install needed here).
@@ -101,8 +107,12 @@ const files = readBlobs(paths);
 let areaGuide = null;
 try {
   const areasCommit = flag('--areas-commit', SHA);
-  const raw = git(['show', `${areasCommit}:${AREAS_PATH}`]);
-  areaGuide = JSON.parse(raw).areas.map((a) => ({ name: a.name, rx: a.match.map((m) => new RegExp(m)) }));
+  const present = new Set(git(['ls-tree', '-r', '--name-only', areasCommit, '--', ...AREAS_PATHS]).split('\n').filter(Boolean));
+  const areasPath = AREAS_PATHS.find((p) => present.has(p));
+  if (areasPath) {
+    const raw = git(['show', `${areasCommit}:${areasPath}`]);
+    areaGuide = JSON.parse(raw).areas.map((a) => ({ name: a.name, rx: a.match.map((m) => new RegExp(m)) }));
+  }
 } catch { /* no area map: every file is its own top-level directory */ }
 const areaOf = (p) => (areaGuide ? areaGuide.find((a) => a.rx.some((r) => r.test(p)))?.name : null) ?? p.split('/')[0];
 

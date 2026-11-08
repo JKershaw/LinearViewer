@@ -146,7 +146,7 @@ No other test is converted. The five ticket candidates stay unedited and are in 
 1. This note (only this file).
 2. Sandbox declarations (the four lines above); suite green on unchanged production.
 3. New tests, shown failing on unchanged production: `tests/unit/free-tier-allowance-fronts.test.js` (characterization through public APIs; green at base, its scratch mutations shown failing), `tests/unit/plan-allowance.test.js` (red at base: module absent), `tests/unit/plan-allowance-leaf.test.js` (with a positive control).
-4. Production: `lib/plan-allowance.js`, the fronts, `scripts/code-shape/areas.json`, then docs.
+4. Production: `lib/plan-allowance.js`, the fronts, `scripts/code-shape/areas.json` (now `docs/areas/areas.json`, LIN-4371), then docs.
 
 ## LIN-3663: the question, the recommendation, the exact edits
 
