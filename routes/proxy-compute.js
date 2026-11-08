@@ -18,6 +18,7 @@ import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshnes
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { truncationFailureOf } from '../lib/openrouter.js';
+import { extractPrUrls } from '../lib/run-evidence.js';
 import { buildMockBrief } from '../lib/workspace-api-mocks.js';
 import { fixtureParent } from '../lib/sample-data/fixture-parent.js';
 import { hashContext } from '../lib/recap-cache.js';
@@ -123,11 +124,19 @@ export function createComputeRoutes({
     }
     // The store never throws; the catch keeps a failed read pointed at `recent`
     // even for a store that does.
+    let merged;
     try {
-      return await closeOutEventsStore.listMergedSince({ urlKey, since });
+      merged = await closeOutEventsStore.listMergedSince({ urlKey, since });
     } catch {
       return [];
     }
+    // The fold takes landings as data: the PR's `owner/name` (parsed by the one
+    // PR-URL reader, `extractPrUrls`), the forge merge time and the issue.
+    return (Array.isArray(merged) ? merged : []).map(event => ({
+      repo: extractPrUrls([{ body: event.prUrl }])[0]?.repo ?? null,
+      mergedAt: event.mergedAt,
+      issueIdentifier: event.issueIdentifier ?? null
+    }));
   };
 
   // Longer timeout for Linear endpoints that make multiple sequential GraphQL
