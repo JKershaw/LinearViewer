@@ -92,7 +92,8 @@ test('normalizeModel keeps supported_parameters and the reasoning object', async
   ] }) });
   try { await getModelCatalog(); } finally { globalThis.fetch = realFetch; }
   assert.deepEqual(getCachedCatalogModel('x/a').supported_parameters, ['tools']);
-  assert.deepEqual(getCachedCatalogModel('x/a').reasoning, { mandatory: false, default_enabled: true, supports_max_tokens: false });
+  // LIN-4358: the live shape has no supports_max_tokens; efforts are kept, absent ones read null.
+  assert.deepEqual(getCachedCatalogModel('x/a').reasoning, { mandatory: false, default_enabled: true, supported_efforts: null, default_effort: null });
   assert.equal(getCachedCatalogModel('x/b').supported_parameters, null);
   assert.equal(getCachedCatalogModel('x/b').reasoning, null);
 });
