@@ -74,3 +74,4 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - `lib/runner-kit/runner.mjs`: the per-message transcript fold is here and in
   simple-dispatcher; one shared fold would be where a transcript becomes requests.
   (Survey tally: LIN-4203, LIN-4195.)
+- `routes/dispatch.js`: feedback and heartbeat limiters stay 100/min per host IP. (LIN-4378.)

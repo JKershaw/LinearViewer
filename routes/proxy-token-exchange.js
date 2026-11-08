@@ -15,7 +15,7 @@ import { WORKING_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
  * @param {Object} deps
  * @param {Object} deps.proxyTokenStore - Proxy token storage instance
  * @param {Object} deps.proxyEventStore - Proxy event/audit storage instance
- * @param {Function} deps.proxyLimiter - Per-IP rate limiter middleware (module-scope in routes/proxy.js, shared as-is; injected here rather than redeclared so that lifetime is preserved)
+ * @param {Function} deps.proxyLimiter - Proxy rate limiter middleware (per proven credential, else per IP) (module-scope in routes/proxy.js, shared as-is; injected here rather than redeclared so that lifetime is preserved)
  * @param {Object} deps.PROXY_TOKEN_REJECTED_EXTRA - Structured-error-envelope extra fields for a proxy-token rejection (closure-local in createProxyRoutes, built from STAGE_PROXY_TOKEN; injected here rather than duplicating the literal)
  * @param {Object} deps.PROXY_TOKEN_STORE_UNAVAILABLE_EXTRA - The retryable 503 envelope for a token-store failure (LIN-3699; same closure, same reason)
  */

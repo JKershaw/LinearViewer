@@ -14,7 +14,7 @@ The API is **source-neutral**: it exposes one provider-backed contract (flat sha
 - Single-use token support (consumed after first request)
 - Full CRUD: issues, comments, relations, labels, cycles
 - Event audit logging (audit events are **retained for the life of the project**)
-- Rate limiting (60 requests/minute per IP)
+- Rate limiting (60 requests/minute per credential once it has authenticated; per IP before that, LIN-4378)
 - Workspace isolation (tokens are scoped to a single workspace)
 
 ## Quick Start
@@ -2874,7 +2874,7 @@ Read scope is enough. `state` defaults to `open`; `limit` defaults to 200 (max 1
 | 409 | `This task has had 30 fresh sessions in this run. That looks like a runaway…` (`code: TASK_SESSION_RUNAWAY`) | A fresh worker dispatch stamped with a `sessionId` would be the 31st fresh session to ONE task within that run — a fixed server-side failsafe, not a setting (creation endpoints only). An **alarm, not a finish**: stop the run and report `[blocked]` so a person can look at it. **Not retryable**, and `force: true` does not bypass it. Follow-ups and aborts are never counted. See LIN-3461. |
 | 422 | `This workspace's provider does not support this` (`code: CAPABILITY_NOT_SUPPORTED`) | The workspace's backend cannot perform this operation. `capability` names the specific provider operation that is missing — sometimes the write itself (`createRelation`, `uploadFile`), sometimes an internal read the write depends on, sometimes a read a `GET` directly asked for (`viewer`, `issueDetail`, `projects`, `issues`, `search`, `states`, `labels`, `cycles`, `cycleDetail`, `relations`). **Never retryable, and never a 500** — branch on `code`, not on the `capability` value, and treat any value as "this backend can't do this". |
 | 422 | `Cannot resolve <kind> '<ref>'` | A symbolic reference (state / label / project / team) could not be resolved against this workspace's backend; `candidates` lists the accepted values when the ref was ambiguous or the vocabulary is small. **Never retryable** — fix the reference. |
-| 429 | `Too many proxy requests` | Rate limit exceeded (60/minute). Also passes through the **provider's** own rate limit: a Jira or GitHub 429, and GitHub's secondary limit (a 403 whose message says "rate limit", reported here). No provider's 429 carries `retryable` yet, so back off using the standard delay |
+| 429 | `Too many proxy requests` | Rate limit exceeded (60/minute per credential). Carries `Retry-After` (seconds, at most 60) and `RateLimit-*` headers: wait that long before the next call. Also passes through the **provider's** own rate limit: a Jira or GitHub 429, and GitHub's secondary limit (a 403 whose message says "rate limit", reported here). No provider's 429 carries `retryable` yet, so back off using the standard delay |
 | 500 | `Failed to ...` | Server error. Also every Jira, GitHub and GitHub Projects 5xx, and the provider's 400, 409 and 422. Those stay a 500 rather than being relayed (a provider 5xx passed through as 503 would tell the agent to re-authenticate), so they are not yet distinguishable from a Harbour fault (LIN-2040 follow-up) |
 | 502 | `Failed to ...` | Upstream write was rejected (the create/update did not land) |
 | 503 | `Workspace not available` | Workspace access token expired or unavailable |
@@ -2960,7 +2960,7 @@ curl -s -X POST -H "$AUTH" -H "Content-Type: application/json" \
 
     **Don't park on a single `401` snapshot — and the two `stage`s need opposite treatment (LIN-1938).** A `stage: "provider-lane"` `401` can be a transient upstream OAuth-refresh window (minutes, not permanent) — retry over 10-15 minutes (two attempts is enough) before concluding the workspace is genuinely disconnected, and if you still give up, record *both* observation timestamps (`T1`, `T2`) in the park message rather than a single snapshot; a worker that parks on one 401 during a five-minute blip has cost the whole session for nothing. A `stage: "proxy-token"` `401` is the opposite case: it is `retryable: false` and will not recover on its own no matter how long you wait — retrying it wastes the window instead of using it. Its only recovery today is an operator-minted replacement token (see `proxyTokenState`/`proxyTokenExpiredAt` above and LIN-2602/LIN-2603 for the tracked self-service work).
 
-6. **Respect rate limits** — 60 requests/minute per IP. Add backoff on 429 responses.
+6. **Respect rate limits** — 60 requests/minute per credential. On a 429, wait the `Retry-After` seconds before calling again; never retry in a tight loop.
 
 7. **Use readWrite tokens sparingly** — prefer read-only tokens for monitoring and reporting. Only use readWrite when your agent needs to create or modify data.
 
@@ -2975,7 +2975,7 @@ curl -s -X POST -H "$AUTH" -H "Content-Type: application/json" \
 
 ## Rate Limits
 
-- **Consumer endpoints:** 60 requests per minute per IP address
+- **Consumer endpoints:** 60 requests per minute per credential (LIN-4378). The limiter runs before authentication, so a bearer that has not yet authenticated (a bootstrap exchange, a token's first request, a junk or revoked bearer) counts against its IP address; once a token has authenticated, its requests count against its own budget, so sessions sharing one host address no longer share one limit. A 429 carries `Retry-After` in seconds.
 - **Token creation:** 10 tokens per 15 minutes per IP address
 - Rate limits are enforced before authentication (prevents DoS via auth failures)
 - Returns `429` with `Retry-After` header when exceeded

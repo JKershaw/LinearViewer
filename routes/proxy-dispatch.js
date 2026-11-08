@@ -161,7 +161,7 @@ function dispatchWatchChanged(baseline, item) {
  * @param {Function} deps.graphqlErrorStatus - Maps a provider/GraphQL error to an HTTP status (closure-local, the route's own registry-bound error mapper)
  * @param {Function} deps.logEvent - Audit/witness event logger (closure-local)
  * @param {Function} deps.logOpenRouterCredentialSource - Logs which OpenRouter credential source served a request (closure-local)
- * @param {Function} deps.proxyLimiter - Per-IP rate limiter middleware (module-scope in routes/proxy.js, shared as-is)
+ * @param {Function} deps.proxyLimiter - Proxy rate limiter middleware (per proven credential, else per IP) (module-scope in routes/proxy.js, shared as-is)
  * @param {string} deps.PROXY_ATTACH_FAILED_MESSAGE - 503 message when the out-of-band bootstrap token could not be minted (module-scope)
  * @param {Object} deps.proxyTokenStore - Proxy token storage instance
  * @param {Function} deps.recommendErrorResponse - Shapes a recommendation-path error into a status+body pair (closure-local)

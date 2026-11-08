@@ -275,6 +275,10 @@
     "disposition": "delegated",
     "to": "lib/proxy-dedupe.js::generations"
   },
+  "routes/proxy.js::provenCredentials": {
+    "disposition": "global-only",
+    "exception": "rate-limiters"
+  },
   "routes/runner-kit.js::cache": {
     "disposition": "global-only",
     "exception": "runner-kit-cache"

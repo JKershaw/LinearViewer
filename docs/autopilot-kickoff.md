@@ -240,7 +240,7 @@ becoming a halt you didn't need — recognise these known quirks, don't debug th
   ticket naming the bound that was hit and the ledger** (sessions used, tasks touched, priced
   spend for worker + orchestrator), post the run summary, and stop — that is the run's clean,
   expected finish, not something to retry, work around, or count as a strike.
-- **Rate limit: 60 requests/minute.** Space your polls.
+- **Rate limit: 60 requests/minute per token.** Space your polls; on a 429, wait the `Retry-After` seconds before the next call.
 
 A broken signal in *your own* calls is a halt, not a puzzle: a network error, timeout, or 5xx
 from any verb — even after a retry or two — a response you can't parse, or an evidence source you

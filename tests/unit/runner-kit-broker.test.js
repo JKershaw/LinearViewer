@@ -53,7 +53,10 @@ import {
   isHeartbeatStale,
   createLifetimeWatch,
   startBroker,
-  stopBroker
+  stopBroker,
+  exchangeBootstrap,
+  EXCHANGE_RETRIES,
+  EXCHANGE_MAX_WAIT_SECONDS
 } from '../../lib/runner-kit/broker.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -916,6 +919,137 @@ describe('the broker CLI (spawned, bootstrap on stdin)', () => {
     } finally {
       await harbour.close();
       rmSync(home, { recursive: true, force: true });
+    }
+  });
+});
+
+// LIN-4378: Harbour's proxy limiter answers 429 with a Retry-After of at most its
+// 60 s window. The broker waits that out for its own bootstrap exchange (at most
+// twice) and passes a forwarded 429 through with its wait headers, never retrying
+// a forward. The same cases (B1-B5) are in simple-dispatcher's
+// test/harbour-token-mcp-server.test.js; keep the two lists matched.
+describe('LIN-4378: a rate-limited exchange waits and retries; a forwarded 429 passes through', () => {
+  const res429 = (retryAfter) => ({
+    status: 429, ok: false,
+    headers: new Headers(retryAfter === undefined ? {} : { 'retry-after': String(retryAfter) }),
+    arrayBuffer: async () => new ArrayBuffer(0)
+  });
+  const res200 = (token) => ({ status: 200, ok: true, headers: new Headers(), json: async () => ({ token, expiresAt: null }) });
+  const resStatus = (status) => ({ status, ok: false, headers: new Headers(), arrayBuffer: async () => new ArrayBuffer(0) });
+  /** A fetch that answers from a script (the last entry repeats), recording sleeps and log lines. */
+  function scripted(...responses) {
+    const world = { fetches: 0, sleeps: [], logs: [] };
+    world.fetchImpl = async () => {
+      const r = responses[Math.min(world.fetches, responses.length - 1)];
+      world.fetches += 1;
+      if (r instanceof Error) throw r;
+      return r;
+    };
+    world.sleep = async (ms) => { world.sleeps.push(ms); };
+    world.log = (line) => world.logs.push(line);
+    return world;
+  }
+  const exchange = (w, bootstrap) => exchangeBootstrap({ base: 'http://127.0.0.1:1', bootstrap, fetchImpl: w.fetchImpl, sleep: w.sleep, log: w.log });
+
+  test('the policy constants match simple-dispatcher\'s broker: 2 retries, 60 s cap', () => {
+    assert.equal(EXCHANGE_RETRIES, 2);
+    assert.equal(EXCHANGE_MAX_WAIT_SECONDS, 60);
+  });
+
+  test('B1: 429 with Retry-After: 1, then 200 resolves after two fetches; the log names 429 and the wait, never the bootstrap', async () => {
+    const bootstrap = freshToken();
+    const working = freshToken();
+    const w = scripted(res429(1), res200(working));
+    const out = await exchange(w, bootstrap);
+    assert.equal(out.token, working);
+    assert.equal(w.fetches, 2);
+    assert.deepEqual(w.sleeps, [1000]);
+    assert.equal(w.logs.length, 1);
+    assert.match(w.logs[0], /HTTP 429; waiting 1s \(retry 1 of 2\)/);
+    assert.ok(!w.logs.join('\n').includes(bootstrap) && !w.logs.join('\n').includes(working));
+  });
+
+  for (const [label, retryAfter] of [['no Retry-After', undefined], ['Retry-After: 3600', 3600], ['an HTTP-date Retry-After', 'Wed, 21 Oct 2026 07:28:00 GMT']]) {
+    test(`B2: 429 with ${label} is not retried: one fetch, an error naming HTTP 429`, async () => {
+      const bootstrap = freshToken();
+      const w = scripted(res429(retryAfter), res200(freshToken()));
+      await assert.rejects(exchange(w, bootstrap), (err) => /HTTP 429/.test(err.message) && /rate-limited/.test(err.message) && !err.message.includes(bootstrap));
+      assert.equal(w.fetches, 1);
+      assert.deepEqual(w.sleeps, []);
+    });
+  }
+
+  test('B3: 429 with Retry-After: 1 every time stops after three fetches and ends in an error naming HTTP 429 and the wait', async () => {
+    const w = scripted(res429(1));
+    await assert.rejects(exchange(w, freshToken()), /HTTP 429.*Retry-After: 1/);
+    assert.equal(w.fetches, 1 + EXCHANGE_RETRIES);
+    assert.deepEqual(w.sleeps, [1000, 1000]);
+    assert.equal(w.logs.length, 2);
+  });
+
+  test('B4: a 503 or a transport failure is never retried (the bootstrap may be spent)', async () => {
+    const w503 = scripted(resStatus(503), res200(freshToken()));
+    await assert.rejects(exchange(w503, freshToken()), /HTTP 503/);
+    assert.equal(w503.fetches, 1);
+    const wThrow = scripted(Object.assign(new Error('boom'), { code: 'ECONNRESET' }), res200(freshToken()));
+    await assert.rejects(exchange(wThrow, freshToken()), /could not connect to Harbour \(ECONNRESET\)/);
+    assert.equal(wThrow.fetches, 1);
+    assert.deepEqual([...w503.sleeps, ...wThrow.sleeps], []);
+  });
+
+  test('B5: startup recovers from a 429 exchange; a forwarded 429 reaches the agent with its wait headers, fetched once and logged', TIMEOUT, async () => {
+    const tmp = shortTmp();
+    const bootstrap = freshToken();
+    const working = freshToken();
+    let exchanges = 0;
+    let forwards = 0;
+    const upstream = track(http.createServer((req, res) => {
+      if (req.url === '/api/proxy/token') {
+        exchanges += 1;
+        if (exchanges === 1) {
+          res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '1' });
+          return res.end('{"error":"Too many proxy requests, please try again later"}');
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ token: working }));
+      }
+      forwards += 1;
+      res.writeHead(429, {
+        'Content-Type': 'application/json', 'Retry-After': '17',
+        'RateLimit-Limit': '60', 'RateLimit-Remaining': '0', 'RateLimit-Reset': '17', 'RateLimit-Policy': '60;w=60'
+      });
+      res.end('{"error":"Too many proxy requests, please try again later"}');
+    }));
+    await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+    const sleeps = [];
+    const logLines = [];
+    let broker;
+    try {
+      broker = await startBroker({
+        base: `http://127.0.0.1:${upstream.address().port}`, urlKey: URL_KEY, itemId: ITEM_ID, home: tmp, bootstrap,
+        log: (line) => logLines.push(line), autoTick: false, sleep: async (ms) => { sleeps.push(ms); }
+      });
+      assert.equal(exchanges, 2, 'the broker waited out the 429 and exchanged again');
+      assert.deepEqual(sleeps, [1000]);
+
+      const r = await brokerRequest(broker.socketPath, { path: '/api/proxy/issues?first=50' });
+      assert.equal(r.status, 429);
+      assert.equal(r.headers['retry-after'], '17');
+      assert.equal(r.headers['ratelimit-limit'], '60');
+      assert.equal(r.headers['ratelimit-remaining'], '0');
+      assert.equal(r.headers['ratelimit-reset'], '17');
+      assert.equal(r.headers['ratelimit-policy'], '60;w=60');
+      assert.equal(forwards, 1, 'a forwarded 429 is never retried');
+
+      const all = logLines.join('\n');
+      assert.match(all, /bootstrap exchange got HTTP 429; waiting 1s \(retry 1 of 2\)/);
+      assert.match(all, /GET \/api\/proxy\/issues 429 retry-after 17/);
+      assert.ok(!all.includes('first=50'), 'the log has the pathname, not the query');
+      assert.ok(!all.includes(bootstrap) && !all.includes(working));
+    } finally {
+      await broker?.stop('test-done');
+      await new Promise((resolve) => upstream.close(resolve));
+      rmSync(tmp, { recursive: true, force: true });
     }
   });
 });

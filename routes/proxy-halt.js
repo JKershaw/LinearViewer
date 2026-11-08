@@ -40,7 +40,7 @@ export const PROXY_TOKEN_UNBOUND_MESSAGE =
 /**
  * @param {Object} deps
  * @param {Object} deps.workspaceHaltStore - Durable per-workspace operator halt store (lib/workspace-halt.js)
- * @param {Function} deps.proxyLimiter - Per-IP rate limiter middleware
+ * @param {Function} deps.proxyLimiter - Proxy rate limiter middleware (per proven credential, else per IP)
  * @param {Function} deps.authenticateProxyToken - Proxy bearer-token auth middleware
  * @param {Function} deps.requireWriteScope - Middleware requiring a readWrite-scoped token
  * @param {Function} deps.logEvent - Proxy event/audit logger

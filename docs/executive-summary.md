@@ -200,7 +200,7 @@ Any addition should respect:
 4. **Workspace isolation** — all data is scoped by workspace URL key
 5. **Security model** — session auth for users, bearer tokens for consumers, hashed storage for secrets
 6. **Feature gating** — new capabilities behind toggles, off by default for disruptive features
-7. **Rate limiting** — all public endpoints have per-IP throttling; free tier has usage caps
+7. **Rate limiting** — every public endpoint is throttled: the agent proxy per credential (per IP until a credential has authenticated), the others per IP or per account; free tier has usage caps
 
 ---
 

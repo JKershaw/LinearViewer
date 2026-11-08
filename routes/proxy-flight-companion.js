@@ -54,8 +54,8 @@ const MAX_MESSAGE_LENGTH = CHAT_MESSAGE_MAX_LENGTH;
 const PROXY_INSTANCE_SUFFIX = ':proxy';
 
 // Named caps (ticket 2620): a per-token hourly bound and a per-workspace
-// daily bound, independent of and in addition to `proxyLimiter`'s per-IP
-// 60/min. In-memory, like `proxyLimiter` itself (routes/proxy.js) — process-
+// daily bound, independent of and in addition to `proxyLimiter`'s 60/min
+// per credential. In-memory, like `proxyLimiter` itself (routes/proxy.js) — process-
 // local budgets that reset on restart, not a durable per-workspace store
 // (lib/free-tier-store.js's shape) — simple and safe, and easy to graduate
 // to a durable store later if the in-memory bound proves too loose in
@@ -121,7 +121,7 @@ function mergeToolEvents(events) {
 
 /**
  * @param {Object} deps
- * @param {Function} deps.proxyLimiter - Per-IP rate limiter middleware (module-scope in routes/proxy.js, shared as-is)
+ * @param {Function} deps.proxyLimiter - Proxy rate limiter middleware (per proven credential, else per IP) (module-scope in routes/proxy.js, shared as-is)
  * @param {Function} deps.authenticateProxyToken - Consumer-token auth middleware (closure-local in createProxyRoutes)
  * @param {Function} deps.resolveProviderAccess - Resolves {token, reason, provider} for the active workspace/provider (closure-local)
  * @param {Function} deps.workspaceUnavailable - 503 envelope for an unresolvable workspace credential (closure-local)

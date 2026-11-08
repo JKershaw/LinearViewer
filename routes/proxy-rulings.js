@@ -148,7 +148,7 @@ function optionRefusal(row, optionId) {
 
 /**
  * @param {Object} deps
- * @param {Function} deps.proxyLimiter - Per-IP rate limiter middleware
+ * @param {Function} deps.proxyLimiter - Proxy rate limiter middleware (per proven credential, else per IP)
  * @param {Function} deps.authenticateProxyToken - Proxy bearer-token auth middleware
  * @param {Function} deps.requireWriteScope - Middleware requiring a readWrite-scoped token
  * @param {Function} deps.logEvent - Proxy event/audit logger
@@ -182,9 +182,10 @@ export function createRulingsRoutes({
    * reconstructs from a 30-day dispatch-history window with NO row cap — the
    * read `lib/pipeline-loops.js` itself flags as the LIN-615 truncation-footgun
    * guard, and the one this repo blames for the LIN-608 OOM. The only other
-   * limit on this route is `proxyLimiter`, which is per-IP and shared across
-   * every proxy endpoint, so N agents on N addresses would each get their own
-   * full reconstruction. A distinct `view` namespace keeps this payload from
+   * limit on this route is `proxyLimiter`, which is per credential (per IP
+   * before a credential has proved itself) and shared across every proxy
+   * endpoint, so N agents with N tokens would each get their own full
+   * reconstruction. A distinct `view` namespace keeps this payload from
    * colliding with the dashboard's on the same workspace key.
    */
   async function readRulings(urlKey, { includeResolved = false } = {}) {
