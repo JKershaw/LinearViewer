@@ -1,5 +1,5 @@
 {
- "_source": "GET https://openrouter.ai/api/v1/models, unauthenticated, read 2026-11-08T11:14Z (461 models). Trimmed to the ids Harbour tests price or offer, plus two time-window-priced models (minimax/minimax-m3.1-flash, tencent/hy3) and one variable-priced router (openrouter/auto, pricing -1). Fields kept verbatim; description, links, endpoints and design_arena benchmarks dropped. LIN-4358. openai/gpt-6-luna was added from a read of 2026-11-08T12:41Z for the free-tier move (LIN-4358), same fields kept.",
+ "_source": "GET https://openrouter.ai/api/v1/models, unauthenticated, read 2026-11-08T11:14Z (461 models). Trimmed to the ids Harbour tests price or offer, plus two time-window-priced models (minimax/minimax-m3.1-flash, tencent/hy3) and one variable-priced router (openrouter/auto, pricing -1). Fields kept verbatim; description, links, endpoints and design_arena benchmarks dropped. LIN-4358.",
  "data": [
   {
    "id": "openai/gpt-5.4-mini",
@@ -1489,80 +1489,6 @@
     "top_p",
     "web_search_options"
    ]
-  },
-  {
-   "id": "openai/gpt-6-luna",
-   "canonical_slug": "openai/gpt-6-luna-20260922",
-   "name": "OpenAI: GPT-6 Luna",
-   "created": 1790100786,
-   "context_length": 1050000,
-   "architecture": {
-    "modality": "text+image+file->text",
-    "input_modalities": [
-     "file",
-     "image",
-     "text"
-    ],
-    "output_modalities": [
-     "text"
-    ],
-    "tokenizer": "GPT",
-    "instruct_type": null
-   },
-   "pricing": {
-    "prompt": "0.0000001",
-    "completion": "0.0000005",
-    "web_search": "0.01",
-    "input_cache_read": "0.00000001",
-    "input_cache_write": "0.000000125",
-    "overrides": [
-     {
-      "min_prompt_tokens": 272000,
-      "prompt": "0.0000002",
-      "completion": "0.00000075",
-      "input_cache_read": "0.00000002",
-      "input_cache_write": "0.00000025"
-     }
-    ]
-   },
-   "top_provider": {
-    "context_length": 1050000,
-    "max_completion_tokens": 128000,
-    "is_moderated": true
-   },
-   "supported_parameters": [
-    "include_reasoning",
-    "max_completion_tokens",
-    "max_tokens",
-    "reasoning",
-    "reasoning_effort",
-    "response_format",
-    "seed",
-    "structured_outputs",
-    "tool_choice",
-    "tools",
-    "verbosity"
-   ],
-   "benchmarks": {
-    "artificial_analysis": {
-     "intelligence_index": 27.9,
-     "coding_index": null,
-     "agentic_index": null
-    }
-   },
-   "reasoning": {
-    "mandatory": false,
-    "default_enabled": true,
-    "supported_efforts": [
-     "max",
-     "xhigh",
-     "high",
-     "medium",
-     "low",
-     "none"
-    ],
-    "default_effort": "medium"
-   }
   }
  ]
 }

@@ -156,19 +156,12 @@ Mini's $0.75/$4.50.
 That is 7.5–8.5 times cheaper per call. The 8,300-token brief input is the ticket
 discussion's figure; this paper did not measure it.
 
-**What has to change** (none of it done here; the allowlist and suggestion entries landed later the same day, see the note below): add `openai/gpt-6-luna` to
+**What has to change** (none of it done here): add `openai/gpt-6-luna` to
 `FREE_TIER_MODEL_IDS`, whose comment says membership waits on John's ruling; add it to
 `SUGGESTED_MODEL_IDS` for the cold-catalog tool fallback; set
 `OPENROUTER_FREE_TIER_MODEL=openai/gpt-6-luna` and check that
 `getFreeTierModelConfigWarning()` reports nothing at startup. Moving the free tier also
 moves free-tier `recommend`, which this paper otherwise keeps on Mini.
-
-**Note, 8 Nov, after #2367.** John's rule for the free tier is "If we find a model that's better
-and cheaper, I'm happy to move the free tier to it." Luna meets it on both sources above, so
-close-out added it to `FREE_TIER_MODEL_IDS` and `SUGGESTED_MODEL_IDS` and pointed
-`OPENROUTER_FREE_TIER_MODEL` at it. The whole-output demonstrations below were not run first
-(no OpenRouter key in that session). The call layer (#2362) makes a cut-off loud instead of
-silent. Rollback is one variable: set it back to `openai/gpt-5.4-mini`.
 
 **What must be shown whole before switching.** Every free-tier job, on Luna, through a
 free-tier session: recommend (its gate above); brief (`replay-brief.mjs` on LIN-4352 with

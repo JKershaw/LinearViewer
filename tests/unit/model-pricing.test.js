@@ -610,7 +610,7 @@ describe('rate table shape (LIN-1495)', () => {
     }
   });
 
-  test('long-context overrides are on exactly the 6 openai rows gated at 272000 and the Haiku 5.5 row gated at 100000 (LIN-2403, LIN-3916)', () => {
+  test('long-context overrides are on exactly the 5 openai rows gated at 272000 and the Haiku 5.5 row gated at 100000 (LIN-2403, LIN-3916)', () => {
     // Sibling of the cacheWrite1h-only-on-anthropic test above. Haiku 5.5 (LIN-3916) is the
     // first anthropic row with an override tier, so the LIN-2403 cumulative-guard question is
     // live: a claude-code Haiku session over 100k prices to null (open question in the PR).
@@ -621,7 +621,6 @@ describe('rate table shape (LIN-1495)', () => {
       'openai/gpt-5.6-sol': 272000,
       'openai/gpt-5.6-terra': 272000,
       'openai/gpt-6.1-sol': 272000,
-      'openai/gpt-6-luna': 272000, // LIN-4358 free-tier move
       'anthropic/claude-haiku-5.5': 100000,
     };
     // LIN-4358: the pinned catalog also carries two time-of-day-priced models; they have no prompt-size gate.
@@ -652,8 +651,6 @@ describe('SUGGESTED derives its pricing from this table (LIN-993 charter preserv
     // LIN-4358: suggested since this ticket.
     'openai/gpt-6.1-sol': { prompt: 2.00, completion: 10.00 },
     'anthropic/claude-haiku-5.5': { prompt: 0.10, completion: 0.50 },
-    // LIN-4358: suggested with the free-tier move.
-    'openai/gpt-6-luna': { prompt: 0.10, completion: 0.50 },
   };
 
   test('every curated entry deep-equals its known-good pricing', () => {
@@ -687,7 +684,6 @@ describe('SUGGESTED derives its pricing from this table (LIN-993 charter preserv
       'openai/gpt-5.6-sol': '$4.00 in / $20.00 out per 1M tokens',
       'openai/gpt-6.1-sol': '$2.00 in / $10.00 out per 1M tokens',
       'anthropic/claude-haiku-5.5': '$0.10 in / $0.50 out per 1M tokens',
-      'openai/gpt-6-luna': '$0.10 in / $0.50 out per 1M tokens',
     };
     for (const m of SUGGESTED) {
       assert.strictEqual(formatModelPricing(m), expected[m.id], `${m.id} hint is byte-identical`);
