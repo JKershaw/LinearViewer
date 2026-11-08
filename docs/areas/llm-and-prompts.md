@@ -33,7 +33,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - Closing one channel moved the how into the next one in every arm of LIN-4369's replay:
   done-means, then definitions, then comments, then the final `[done]` report. When a
   stage must not hand over how, close every channel it writes to, or hold the reader's
-  side (LIN-4369 arm 4).
+  side (LIN-4369 arm 4). Run facts carry no run's messages, which holds scoping's report
+  back (`tests/unit/lin-4370-look-first-route.test.js`).
 
 ## Waiting
 
