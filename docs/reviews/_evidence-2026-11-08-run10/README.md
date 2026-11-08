@@ -45,5 +45,5 @@ Every `.stderr` file is empty except the cochange ones, which hold the one-line 
 
 ## Not in this folder
 
-- `supplementary-figures.py` (run 9's S0–S19) was **not** re-run: it hard-codes run 9's commits and its S13 needs the Simple Dispatcher clone. The report says which ledger items were carried from run 9 for this reason.
+- `supplementary-figures.py` (run 9's script with the commits, guide and file names changed for run 10; its S13 needs the Simple Dispatcher clone, `SD_DIR=<clone>`) and its output `supplementary-figures.txt`: added at close-out (LIN-4387 review item C1). It re-measures F5, F7, F6, N7, N8, N9, N11, `hub:render-run-steps.js` and the named hubs at `90542b2c` and `bad9d719`; every carried figure is unchanged.
 - The run-8 strict F6 method: the report uses a grep count of `window.X =` lines in `public/`, which is 67 at both commits.

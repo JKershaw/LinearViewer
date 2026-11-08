@@ -2,7 +2,7 @@
 
 Task: LIN-4387 · Parent: LIN-3549 · Operator note: LIN-4349 (first live run under the LIN-4379 contract) · Previous: `seams-tangles-review-2026-11-06-run9.md` (run 9, LIN-4323, PR #2333, merge `fa3bd87a`) · Tools: `scripts/code-shape/seams.mjs` and `scripts/code-shape/cochange.mjs`, HEAD versions at both commits · Evidence: `docs/reviews/_evidence-2026-11-08-run10/` (see its `README.md`). "E/" below means that folder.
 
-Review-only. The changes in this PR are this report, E/, and one note entry in `docs/areas/other-features.md`. No code, config, guide (`docs/areas/areas.json`) or other doc was edited.
+Review-only. The changes in this PR are this report, E/, and one Waiting entry each in `docs/areas/other-features.md` and `docs/areas/agent-api.md`. No code, config, guide (`docs/areas/areas.json`) or other doc was edited.
 
 ## Headline
 
@@ -16,7 +16,7 @@ Review-only. The changes in this PR are this report, E/, and one note entry in `
   5. **New watches:** `hub:openrouter.js` (33 importers in 7 areas, up from 30), `hub:workspace-preferences.js` (16 → 20 importers, all cross-area), `hub:dispatch-factory.js` (outbound 14 → 18). **New healthy seams:** `seam:as-asked` (a door by design), the leftover step, the call budget, and LIN-4358's catalog cluster.
 - **Change coupling: 891 / 393 / 76 → 929 / 413 / 76.** The window is a strict superset (0 commits left, 38 entered), so this is 38 themed commits, not a trend. The 19 no-link pairs are the same 19. Every pair that grew has an import link, so none is a candidate seam.
 - **Follow-ups minted: none** (§9). Every finding is either owned by an open ticket, a watch, or a note entry.
-- **Notes:** one Waiting entry added to `docs/areas/other-features.md` (the seal). No entry for `llm-and-prompts.md` or `runs-and-dispatch.md`: the F1 growth is vocabulary-leaf growth that gives a builder no rule to follow (§3.1).
+- **Notes:** one Waiting entry added to `docs/areas/other-features.md` (the seal) and one to `docs/areas/agent-api.md` (the limiter window against the broker's cap, §3.0). No entry for `llm-and-prompts.md` or `runs-and-dispatch.md`: the F1 growth is vocabulary-leaf growth that gives a builder no rule to follow (§3.1).
 - **Adversarial second read:** Tier 2, fresh-context sub-agent (§Adversarial Second-Read).
 
 ## 0. What was measured
@@ -155,7 +155,7 @@ Counted as `window.X =` lines in `public/` (a grep, not the run-8 strict method;
 - **`wiring: server.js` · Low, watch.** 4713 → 4757 lines; outbound 200 → 204. The four new edges are `dispatch-leftover-hook.js`, `wake-credential.js`, `model-pricing.js` and `model-routing-harnesses.js`. The composition root growing is expected; LIN-1249 (Backlog) owns decomposition.
 - **Guide hygiene · Low (pre-existing).** `wake-credential` is named in Auth's pattern, but Runs' `wake-[^/]*` claims it first, so Auth's name is dead. No area file to cite (it is the registry's issue), so it goes in the closing comment only.
 - **F3 `knot:providers->upward`, F4 `knot:runs->agent-api(proxy-preamble)`, F8, N4, N5, N6, `hub:tree.js`:** unchanged in the edge data (F4's pair stays 45/10; F8 stays 4 unresolved; `hub:run-controls.js` 21 in; `hub:cost-read.js` 11 in / 7 out; `hub:tree.js` 8 in). Providers → LLM stays 4.
-- **Not re-measured this run:** F5 (routes as libraries, dashboard, 53), F7 (dead imports, `routes/proxy.js`), N7, N8, N9, N11, N12, `seam:stage-contract`, `map:stage-kind-roster`, `hub:render-run-steps.js`. Their numbers came from run 9's supplementary figures (E/`supplementary-figures.py`), which hard-code run 9's commits and must be adapted before a re-run. Carried as run 9 measured them; this is a disclosed gap.
+- **Carried rows, re-measured (E/`supplementary-figures.py`, output in E/`supplementary-figures.txt`, `90542b2c` → `bad9d719`, the HEAD registry for both):** F5 route → route edges **53 → 53** (cross-area 3 → 3); F7 `routes/proxy.js` named lib imports **96 / 45 unused → 96 / 45**; F6 strict `window.X =` in `public/` 108 → 108, assignments only **67 → 67**; Runs → Pages 8 → 8; N7 `request-usage-intake.js` 3 in → 3; N9 `request-usage-loader.js` 7 in → 7; N8 the `task-cost` alias is still in the guide, with 2 comment references to `lib/task-cost.js`; `hub:render-run-steps.js` 4 in / 4 out → 4 / 4; `hub:cost-read.js` 11 in / 7 out → 11 / 7; N11 `waiting-section.js` 2 in → 2 (and `home-row-states.js` 1 in → 1). `map:stage-kind-roster`: `git grep -l survey-place` still names 9 files at both commits. N12 `map:rulings-family-split` and `seam:stage-contract` are read from the edge diff: of the 76 new edges none touches a `ruling` file, and the one new edge on a `stage-` file is `lib/prompts/stage-intent.js → lib/as-asked.js` (an LLM-area leaf into the new door); `routes/proxy-rulings.js` changed in the window by content only. Every carried figure is **unchanged**. Moved and now named: `lib/dispatch-entrance.js` outbound **23 → 25** (cross-area 13 → 15; noted, not ranked; the two new edges are `lib/should-mock-ai.js`, an import-free LLM leaf, and `lib/workspace-preferences.js`, which is already a watch hub in §3.4), and `lib/proxy-preamble.js` outbound 5 → 6 (cross 3 → 4; the new edge is `lib/as-asked.js`, the new door), the file F4 is anchored on.
 
 ## 4. Ways in and rebuild readiness
 
@@ -168,7 +168,7 @@ Counted as `window.X =` lines in `public/` (a grep, not the run-8 strict method;
 - **Data-carried seam: the leftover heading.** Checked by `tests/unit/lin-4374-review-leftover-read.test.js`, which reads the leftover word from the one spelling in `lib/prompts/leftover-words.js`. Passes at HEAD (run in §12).
 - **Route-to-tool seams** (a route reads a prompt's text, or a client holds a token's shape) are not in the graph. The window's `public/llms.txt` change (LIN-4369) names scoping's new job and is text, not a seam.
 - **Simple Dispatcher clone**: read for the runner contract only. Its `FIXTURE_SHA256`, its harbour-token broker constants and the contract's 429 rows all match this repo at HEAD (§3.0). It was not read for LIN-4322 (nested paging), which is known only through its import edges.
-- **Seams have no full home in the notes yet.** The notes carry what binds a builder or waits in an area; the cross-area seams in this report are in this report only, except the one Waiting entry in `other-features.md`.
+- **Seams have no full home in the notes yet.** The notes carry what binds a builder or waits in an area; the cross-area seams in this report are in this report only, except the Waiting entries in `other-features.md` (§3.2) and `agent-api.md` (§3.0).
 
 ## 6. Change coupling beside import coupling
 
@@ -238,8 +238,8 @@ Stable names are run 9's, where the row existed. New names are marked **new**.
 | `wiring: server.js` | Low, watch | 4713 lines; out 200 | 4757 lines; out 204 | unchanged in kind (§3.8) |
 | F4 `knot:runs->agent-api(proxy-preamble)` | Medium | pair 45/10 | 45/10 | unchanged |
 | F3 `knot:providers->upward` | Medium | Providers → LLM 4 | 4 | unchanged; LLM ↔ Providers 11/4 → 13/4 (LIN-3923) |
-| F5 `knot:routes-as-libraries(dashboard)` | Medium | 53 | not re-measured | disclosed (§3.8) |
-| F7 `knot:dead-import-inflation(routes/proxy.js)` | Low | 45 unused of 96 | not re-measured | disclosed |
+| F5 `knot:routes-as-libraries(dashboard)` | Medium | 53 | 53 | unchanged (§3.8) |
+| F7 `knot:dead-import-inflation(routes/proxy.js)` | Low | 45 unused of 96 | 45 unused of 96 | unchanged (§3.8) |
 | F8 `knot:production-loads-routes/test.js` | Low | 4 unresolved | 4 | unchanged |
 | N2 `hub:task-page-loader.js` | Medium | 8 in (7 cross); 20 out (9 cross) | 8 in (7 cross); 21 out (10 cross) | worse by one (§3.4) |
 | N3 `knot:auth->llm(model-routing)` | Low–Medium | 4/3 | **6/4** | worse (§3.3) |
@@ -284,11 +284,10 @@ Totals: 891 / 393 / 76 → 929 / 413 / 76. No-link pairs 19 → 19.
 - **Commits and guides.** Baseline `90542b2c79016d2a1d64f75cb5d3e9037080eae7`; HEAD `bad9d719ba01ffea2ba5339c32ea354e67bf5682`. Blobs: run 9's guide `642e9405`, HEAD registry `4011e82a`, research registry `c988f5c5`. Full list in E/README.md.
 - **Reproductions.** The HEAD tool at the baseline with run 9's guide: seams and cochange JSON equal run 9's files key for key (apart from commit, `areaMapSource`, and cochange window dates). The guide-only check at the baseline: identical.
 - **Corrections to research (E/ and the research comment).** Edges +70 → **+76**; cross-area links 1313 → **1316**; production files changed 86 → **98** (the ten added files include `catalog-rate.js`, which came in #2367); Other 18 at HEAD unchanged; the research's "strict superset" held. Research's figures at `32da8d58` are superseded by this run's measurements at `bad9d719`.
-- **Not done in this run** (the build's plan asked for them; they are disclosed here instead): the run-8 strict F6 method (the grep count above is used); `supplementary-figures.py` re-run (hard-codes run 9's commits); LIN-4322 (nested paging) read only through its import edges. The Simple Dispatcher clone was read for the runner contract (§3.0), not for the rest of its contract tests.
+- **Not done in this run** (the build's plan asked for them; they are disclosed here instead): the run-8 strict F6 method (the grep count above is used); LIN-4322 (nested paging) read only through its import edges. The Simple Dispatcher clone was read for the runner contract (§3.0), not for the rest of its contract tests.
 - **Second read.** The first fresh-context read named the runner contract as the largest missed item and disagreed with the first draft's ranking; §3.0 and the ranking above were changed in place (§Adversarial Second-Read).
-- **Tests run locally.** `npm run test:unit` at HEAD `bad9d719`: 24513 tests, 0 failing (log in the build session). `tests/unit/area-notes.test.js` passes with the `other-features.md` edit, and the note is under its 6144-byte cap.
+- **Tests run locally.** `npm run test:unit` at HEAD `bad9d719`: 24513 tests, 0 failing (log in the build session). `tests/unit/area-notes.test.js` passes with both note edits (`other-features.md` and `agent-api.md`), and both notes are under their 6144-byte cap. `tests/unit/lin-4374-review-leftover-read.test.js` was also run before the PR.
 - **Parse and unresolved counts** are reported, not hidden: 0 parse failures, 0 non-literal dynamic imports, 0 unmapped source, 4 unresolved relative imports (F8).
-- **Test run.** `tests/unit/area-notes.test.js` and `tests/unit/lin-4374-review-leftover-read.test.js` run locally before the PR (result in the PR description).
 
 ## Adversarial Second-Read
 
