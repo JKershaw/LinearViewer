@@ -175,7 +175,7 @@ lib/
   prompts/
     stage-intent.js          Every stage's Scope and Authority lines (STAGE_INTENT), which withStageIntent places after the Goal's lead (LIN-3291/LIN-3299)
     leftover-words.js        The leftover words (LIN-4376): `LEFTOVERS_HEADING` and `LEFTOVER_RULE` (where a leftover goes, and the one-home line), rendered verbatim by `leftoverPrompt` (lib/dispatch-leftover.js), review and close-out. A leaf that imports nothing, so the template defs can import it without a cycle through lib/prompt-templates.js
-    area-registry-path.js    The area registry's path, `REGISTRY_PATH` = docs/areas/areas.json (LIN-4383), spelled once and owned by the product: `formatAreaNotesPointer` (lib/prompt-formatters.js) interpolates it, and scripts/code-shape/code-shape-lib.mjs and the tests' registry helper import it. A leaf that imports nothing
+    area-registry-path.js    The area registry's path, `REGISTRY_PATH` = docs/areas/areas.json (LIN-4383), spelled once and owned by the product: the area notes pointers' shared opening (`AREA_NOTES_WHERE`, lib/prompt-formatters.js) interpolates it, and scripts/code-shape/code-shape-lib.mjs and the tests' registry helper import it. A leaf that imports nothing
     autopilot-kickoff.js     Autopilot kickoff briefing template. Renders `AUTOPILOT_PRECEDENCE` once, in its Orient step, for every mode; `periodicalReview` (passed by `POST /autopilot/kickoff`, resolved from the issue's gate marker) adds the scoped run's no-tail line on a Periodical's own review task (LIN-4382)
     autopilot-precedence.js  Autopilot's order, written once (LIN-4382): `AUTOPILOT_PRECEDENCE`, the ranks and the scoped-run tail, which the kickoff renders verbatim. A leaf that imports nothing; guide text, not a decision engine. `tests/unit/lin-4382-precedence-written-once.test.js` fails when another file in lib/ or routes/ spells out the ranks, or when the docs that point here stop naming it
     autopilot-manual.js      Autopilot operating manual ("handbook")
@@ -383,7 +383,8 @@ docs/
                                one-home rule) is `LEFTOVER_RULE` in lib/prompts/leftover-words.js (LIN-4376).
                                `tests/unit/area-notes.test.js` checks every note against the registry and the tree;
                                the seven work stages' prompts point at them (`formatAreaNotesPointer`,
-                               lib/prompt-formatters.js). The Survey tally (`plans/survey/broad-options.md`) moved here.
+                               lib/prompt-formatters.js), and scoping's in its own words
+                               (`formatScopingAreaNotesPointer`, LIN-4346). The Survey tally (`plans/survey/broad-options.md`) moved here.
   reviews/                     Periodical review reports (LIN-1967). Canonical, discoverable location: a
                                periodical's report lives on `main` at `docs/reviews/<periodical-name>-<date>.md`
                                (e.g. `docs/reviews/documentation-review-2026-08-23.md`), landed via a normal
