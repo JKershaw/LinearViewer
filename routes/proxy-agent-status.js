@@ -13,7 +13,7 @@ import { MAX_NAME_LENGTH, DANGEROUS_CHARS_REGEX } from '../lib/issue-write-valid
 /**
  * @param {Object} deps
  * @param {Object} deps.agentStatusStore - Agent status storage instance
- * @param {Function} deps.proxyLimiter - Per-IP rate limiter middleware
+ * @param {Function} deps.proxyLimiter - Proxy rate limiter middleware (per proven credential, else per IP)
  * @param {Function} deps.authenticateProxyToken - Proxy bearer-token auth middleware
  * @param {Function} deps.requireWriteScope - Middleware requiring a readWrite-scoped token
  * @param {Function} deps.logEvent - Proxy event/audit logger

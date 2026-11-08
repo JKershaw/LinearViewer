@@ -48,7 +48,7 @@ import { badRequest, jsonError, keepaliveError, notFound } from '../lib/errors.j
  *   resolving the doc-hash stamp recorded for this workspace's northStar, if any (LIN-2254).
  * @param {Object} [deps.reportHistoryStore] - Durable per-workspace roadmap report history store (LIN-1810).
  * @param {Object} deps.workspacePreferencesStore - Workspace-level preference storage
- * @param {Function} deps.proxyLimiter - Per-IP rate limiter middleware (module-scope in routes/proxy.js, shared as-is; injected here rather than redeclared so that lifetime is preserved)
+ * @param {Function} deps.proxyLimiter - Proxy rate limiter middleware (per proven credential, else per IP) (module-scope in routes/proxy.js, shared as-is; injected here rather than redeclared so that lifetime is preserved)
  * @param {Function} deps.authenticateProxyToken - Consumer-token auth middleware (closure-local in createProxyRoutes)
  * @param {Function} deps.resolveProviderAccess - Resolves {token, reason, provider} for the active workspace/provider (closure-local)
  * @param {Function} deps.denyIfUnsupported - Capability gate; 422s an unsupported provider method (closure-local)

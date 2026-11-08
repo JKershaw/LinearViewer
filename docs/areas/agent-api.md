@@ -2,6 +2,15 @@
 
 Area notes for `agent-api` in the registry. Format and rules: README.md.
 
+## Lessons
+
+- `proxyLimiter` runs before `authenticateProxyToken` on purpose, so its key may trust a
+  bearer only after auth has proved it (`provenCredentials` in `routes/proxy.js`). A key
+  built from an unverified bearer gives every junk bearer a fresh bucket and lets floods
+  reach the token store (LIN-4378). The limiters skip under `NODE_ENV=test`, so a limiter
+  test drives the real route chain with it flipped off, as
+  `tests/unit/lin-4378-proxy-limiter-per-credential.test.js` does.
+
 ## Waiting
 
 - `routes/proxy-rulings.js`: writes its own live-run predicate (`liveDispatchOnAnchor`
