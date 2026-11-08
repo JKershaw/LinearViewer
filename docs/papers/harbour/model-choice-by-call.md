@@ -1,9 +1,10 @@
 ---
 title: Which model should each Harbour call run on, and which should the free tier run on?
 kind: paper
-version: 1
+version: 2
 date: 2026-11-08
 authors: [Claude, for John Kershaw]
+revision: "Version 2 (LIN-4358 close-out, 8 Nov 2026) adds the Disposition section under The free tier (John's rulings of 12:41 and 12:54 UTC) and updates what the allowlist's comment says. No figure or recommendation changes."
 model: frontier tier, a Claude Code subagent on LIN-4358; reads only, no model calls, no spend
 grounded_at: 936f52b7d (LinearViewer, branch feat/lin-4358-catalog-models)
 cites: [https://openrouter.ai/api/v1/models (461 models, read 2026-11-08 11:14 UTC), docs/papers/harbour/cheaper-capacity.md (2026-10-23), docs/papers/harbour/cheaper-capacity-benchmarks.csv (AA rows accessed 2026-10-23; Vals rows 2026-10-12 to 2026-10-22), docs/papers/harbour/model-choice.md, scripts/eval/lin-263-findings.md, scripts/eval/recommend-baseline/2026-10-01-dense-paid/calls.jsonl, docs/areas/llm-and-prompts.md (the Haiku 5.5 Waiting entry), lib/llm-jobs.js, lib/model-routing.js, lib/openrouter.js, lib/call-budget.js, lib/workspace-preferences.js, lib/agent-turn.js, lib/brief.js, lib/recap.js, lib/scan.js, lib/session-summary.js, lib/run-summary.js, lib/run-paragraph.js, lib/feedback-title.js, lib/observer-pass.js, routes/workspace-api-roadmap.js, routes/ship-biscuit.js, routes/workspace-api-scan.js, routes/task-chat.js, scripts/replay-brief.mjs]
@@ -157,7 +158,7 @@ That is 7.5–8.5 times cheaper per call. The 8,300-token brief input is the tic
 discussion's figure; this paper did not measure it.
 
 **What has to change** (none of it done here): add `openai/gpt-6-luna` to
-`FREE_TIER_MODEL_IDS`, whose comment says membership waits on John's ruling; add it to
+`FREE_TIER_MODEL_IDS`, whose comment names this gate; add it to
 `SUGGESTED_MODEL_IDS` for the cold-catalog tool fallback; set
 `OPENROUTER_FREE_TIER_MODEL=openai/gpt-6-luna` and check that
 `getFreeTierModelConfigWarning()` reports nothing at startup. Moving the free tier also
@@ -169,6 +170,15 @@ free-tier session: recommend (its gate above); brief (`replay-brief.mjs` on LIN-
 run-summary, session-summary, run-paragraph and feedback-title (W); task-chat and
 flight-companion (T); the three roadmap calls and ship-biscuit (R). The tier has one model,
 so if any job fails it stays where it is.
+
+**Disposition (8 Nov 2026, John's rulings on LIN-4358).** The free tier stays on GPT-5.4
+Mini. `FREE_TIER_MODEL_IDS` stays an allowlist, not a price ceiling, and pickers get no
+benchmark column (ruling `lin4358-free-tier-and-quality-source`, 12:41 UTC). GPT-6 Luna stays
+this paper's recommendation, **evidence pending**: no free-tier job has been run on it, and
+LIN-4358 closed without that run (ruling `lin4358-luna-evidence`, option `stay-mini`, 12:54
+UTC). The move needs the whole-job run above, done with an OpenRouter key, followed by the
+changes listed under What has to change. The per-call rows above are still recommendations,
+each behind its own gate. No call moved with this paper.
 
 **Alternative, conditional.** Claude Haiku 5.5 has the same base price and scores higher
 in both sources. It is not in the free-tier allowlist either: `lib/openrouter.js` says it
