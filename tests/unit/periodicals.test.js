@@ -358,7 +358,10 @@ describe('prompt census: no Periodical mints a follow-up (LIN-4380)', () => {
     /a finding for a follow-up task/i,
     /Prose and follow-up tasks/i,
     /follow-up tasks you minted/i,
-    /highest-severity work is on the stack/i
+    /highest-severity work is on the stack/i,
+    /earns a fix-task/i,
+    /promoted to a task/i,
+    /promoted set/i
   ];
 
   // The shared builders' default wording, which a corrective template must no longer render:
@@ -625,9 +628,11 @@ describe('Drift & Coherence Review specifics (LIN-369)', () => {
       assert.match(census, /List the table groups in one compact table, no ruling/);
     });
 
-    test('a ruling is the finding, not a question to anyone; prose and follow-ups only for real groups and changes', () => {
+    // LIN-4380: real groups get prose and note entries now, not follow-up tasks.
+    test('a ruling is the finding, not a question to anyone; prose and note entries only for real groups and changes', () => {
       assert.match(census, /a ruling is your finding, not a question to anyone/);
-      assert.match(census, /Prose and follow-up tasks only for real groups and for changes since the previous edition/);
+      assert.match(census, /Prose and note entries only for real groups and for changes since the previous edition/);
+      assert.doesNotMatch(census, /follow-up tasks/i);
     });
 
     test('falls back to the old review when the repo has no tool or it cannot run', () => {
@@ -959,10 +964,13 @@ describe('Design & Interface Review specifics (LIN-520)', () => {
     assert.match(prompt, /design-system reference page the app ships/i);
     // Minimalism-is-working stays a valid explicit verdict.
     assert.match(prompt, /looks good as-is|minimalism is working/i);
-    // The design-quality dimensions never mint fix-tasks — advisory only, cap unchanged.
-    assert.match(prompt, /advisory half hands these judgement calls to a maintainer and mints nothing/i);
-    assert.match(prompt, /objective breakage only|objective breakage/i);
-    assert.match(prompt, /top ~3 by severity/i);
+    // The design-quality dimensions stay advisory; only objective breakage takes the route to the
+    // person (LIN-4380: no fix-tasks, no cap to keep — the route mints nothing).
+    assert.match(prompt, /advisory half hands these judgement calls to a maintainer through the report/i);
+    assert.match(prompt, /corrective half routes only objective breakage to the person and the notes/i);
+    assert.match(prompt, /feed the advisory tail, never the objective-breakage route/i);
+    assert.match(prompt, /Route objective breakage to the person — never to a ticket/);
+    assert.match(prompt, /This route never covers a subjective design-direction call, which stays in the report's advisory tail/);
   });
 
   test('stays general: no file literals, route names, or tool names leak in', () => {
@@ -1204,10 +1212,11 @@ describe('Onboarding & Cold-Start Review specifics (LIN-1689)', () => {
     assert.match(prompt, /do not double-flag/i);
   });
 
-  test('mints fix-tasks for objective breakage only, keeps subjective friction advisory', () => {
-    assert.match(prompt, /objective breakage/i);
-    assert.match(prompt, /top ~3 by severity/i);
-    // The minting bullet must name onboarding's OWN breakage classes, not the
+  // LIN-4380: objective breakage goes to the person (and the notes), never to a fix-task.
+  test('routes objective breakage only to the person, keeps subjective friction advisory', () => {
+    assert.match(prompt, /Route objective breakage to the person — never to a ticket/);
+    assert.match(prompt, /This route never covers friction — a step that merely required guessing/);
+    // The breakage route must name onboarding's OWN breakage classes, not the
     // Design & Interface Review's — otherwise the corrective half is pointed
     // at territory the altitude bullet above just deferred away.
     assert.match(prompt, /dead link/i);
@@ -1371,8 +1380,10 @@ describe('Seams & Tangles feeds the area notes, mints nothing (LIN-4379)', () =>
   });
 });
 
-describe('templates other than Seams & Tangles carry none of the notes wording (LIN-4379)', () => {
-  for (const template of PERIODICALS.filter(t => !FEEDS_AREA_NOTES.has(t.id))) {
+// LIN-4380: every corrective template now feeds the notes, so the advisory three are the ones
+// that must carry none of its wording (they stay as they are, reporting to a person).
+describe('the advisory templates carry none of the notes wording (LIN-4379, LIN-4380)', () => {
+  for (const template of PERIODICALS.filter(t => t.mode === 'advisory')) {
     test(template.title, () => {
       const prompt = template.generatePrompt();
       assert.doesNotMatch(prompt, /Feed the area notes|area-note|Route each finding that has no area note/i);
