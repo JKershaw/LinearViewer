@@ -99,6 +99,8 @@ describe('scoping writes the size record (LIN-4369)', () => {
     const p = processOf(render());
     assert.ok(p.includes(`Write one \`${SIZE_OF_MOVE_HEADING}\` section (append it, or replace your own) of these four lines and nothing else: the proxy refuses any other line, so no sizes weighed, plan, definitions or open questions.`));
     assert.match(p, /The why says what and why, never how: name an extra by the behaviour it changes, with no backticks, paths or code names\./);
+    // Arm 4 (John's ruling lin4369-after-arm3): arm 3's how moved into scoping's comment, so it writes none.
+    assert.match(p, /Post no comment: the record is all you write on the ticket, and your reasoning goes in your final message\./);
     for (const gone of ['under 200 words', 'It is not a plan', 'open questions as a possible ticket', 'Code reads two lines']) {
       assert.ok(!p.includes(gone), `arm 2's "${gone}" is gone`);
     }

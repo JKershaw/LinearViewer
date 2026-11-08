@@ -287,7 +287,10 @@ describe('the shape: four lines and nothing else (LIN-4369 arm 3)', () => {
 
   test('the why is one sentence of at most WHY_MAX_WORDS words', () => {
     assert.equal(kindOf(swap(WHY_LABEL, 'It is fine as asked. The builder decides the rest.')), `${S}:why-sentences`);
-    assert.equal(kindOf(swap(WHY_LABEL, 'It is fine as asked; the trait means what it gates today.')), `${S}:why-sentences`, 'a semicolon joins two sentences');
+    // Arm 4 (John's ruling lin4369-after-arm3): a semicolon joins clauses inside the one sentence.
+    assert.equal(kindOf(swap(WHY_LABEL, 'It delivers the ask in full; no finding binds, so nothing rides along.')), 'ok', 'a semicolon-joined sentence');
+    assert.equal(kindOf(swap(WHY_LABEL, 'It delivers the ask in full; no finding binds. The builder decides the rest.')), `${S}:why-sentences`, 'a full stop still ends it');
+    assert.ok(RECORD_PARTS[WHY_LABEL].includes('a semicolon may join clauses and a full stop ends it'), 'the prompt says so');
     assert.equal(kindOf(swap(WHY_LABEL, Array(WHY_MAX_WORDS + 1).fill('word').join(' '))), `${S}:why-too-long`);
     assert.equal(kindOf(swap(WHY_LABEL, Array(WHY_MAX_WORDS).fill('word').join(' '))), 'ok');
     assert.equal(kindOf(swap(WHY_LABEL, '')), `${S}:why-empty`);
