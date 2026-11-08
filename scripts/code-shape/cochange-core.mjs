@@ -16,7 +16,7 @@ export const parseChangeLog = (text) => {
   return changes;
 };
 
-// First matching area, as in areas.json. Unlike code-shape-lib's areaOf, a file no area claims is
+// First matching area, as in the area registry (docs/areas/areas.json). Unlike code-shape-lib's areaOf, a file no area claims is
 // null, not its top-level directory: tests/ and docs/ must not become areas.
 const claimedBy = (guide, path) => guide.find((a) => a.rx.some((r) => r.test(path)))?.name ?? null;
 

@@ -19,6 +19,7 @@ import {
 } from '../../lib/request-usage-store.js';
 import { INDEX_SPECS, tierOf, sameKeySpec } from '../../lib/db-indexes.js';
 import { INVENTORY } from '../../lib/account-erasure.js';
+import { areaNameOf as areaOf } from './helpers/area-registry.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const NOW = new Date('2026-11-04T03:00:00.000Z');
@@ -363,9 +364,6 @@ describe('LIN-4198 registers: code-shape area, source map, endpoint catalogue, a
   const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 
   test('the usage modules land in the Runs & dispatch code-shape area (first match wins)', () => {
-    const areas = JSON.parse(read('scripts/code-shape/areas.json'));
-    const list = areas.areas || areas;
-    const areaOf = (file) => list.find((a) => (a.match || []).some((m) => new RegExp(m).test(file)))?.name;
     assert.equal(areaOf('lib/request-usage-store.js'), 'Runs & dispatch');
     assert.equal(areaOf('lib/request-usage-intake.js'), 'Runs & dispatch');
   });

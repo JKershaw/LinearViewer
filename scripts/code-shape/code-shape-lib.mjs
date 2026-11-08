@@ -6,7 +6,8 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-export const DEFAULT_AREAS = fileURLToPath(new URL('./areas.json', import.meta.url));
+// The area registry is the product's (LIN-4371): docs/areas/areas.json, which the area notes beside it are keyed on.
+export const DEFAULT_AREAS = fileURLToPath(new URL('../../docs/areas/areas.json', import.meta.url));
 
 // Defaults: JavaScript minus dependencies, vendored dirs, minified files, tests, and pinned replay snapshots and work copies.
 // Pinned snapshots are frozen copies of live code: a live file whose size changed paired with its own old
@@ -25,7 +26,7 @@ export const compileScope = ({ include, exclude } = {}) => {
 
 export class UsageError extends Error {}
 
-// Area guide in the seams.mjs format. Without --areas the file beside the tool is used if present;
+// Area guide in the seams.mjs format. Without --areas the registry (DEFAULT_AREAS) is used if present;
 // an explicit path that is missing or malformed is a usage error, never a silent fallback.
 export const loadAreas = (path) => {
   const explicit = path != null;

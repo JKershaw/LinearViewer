@@ -71,7 +71,7 @@ import { signInDoors } from '../../lib/components/landing-hero.js';
 export const TEMPLATES_SOURCE_CEILINGS = {
   'lib/prompt-template-defs.js': 107594, // LIN-4368: +189, close-out's prune keeps the size record verbatim, scoping renders the standing size policy, both read from lib/size-of-move.js
   'lib/prompt-templates.js': 19593, // LIN-4251: the `stageWrites(kind)` lookup every entrance uses (code, not prompt text)
-  'lib/prompt-formatters.js': 45994, // LIN-4248: the two Survey kinds' empty GROUNDING_BY_KIND entries, so the forecasts get no re-ground or implement notes
+  'lib/prompt-formatters.js': 46933, // LIN-4371: +939, `formatAreaNotesPointer` and the seven stages' own grounding lists, so WORK and GROUNDING_NOTES stay byte-identical
   'lib/prompt-contract.js': 3875, // LIN-4362: the `## As asked` spellings interpolate AS_ASKED_HEADING (code, not prompt text)
 };
 
@@ -80,19 +80,19 @@ export const TEMPLATES_SOURCE_CEILINGS = {
  * Close-out's bug-label line renders only for a bug-labelled task, so not here. */
 export const TEMPLATES_RENDERED_CEILINGS = {
   blocked: 3529, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
-  bug: 4744, // LIN-3299: at 4744 since Scope and Authority on every path
-  plan: 10042, // LIN-4367: -39, its opening says only where its cuts go; the rule is CUT's
+  bug: 5052, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
+  plan: 10350, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
   'look-into': 1762, // LIN-3299: at 1762 since Scope and Authority on every path
   triage: 2429, // LIN-3299: at 2429 since Scope and Authority on every path
   breakdown: 5310, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
-  research: 11718, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
+  research: 12026, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
   scoping: 2721, // LIN-4368: +89, the standing size policy line (code renders the policy; the stage weighs it as judgement)
-  design: 2847, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
-  spike: 2866, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
+  design: 3155, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
+  spike: 3174, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
   context: 2021, // LIN-3300: at 2021 since the stage rules only the meta-prompt carried moved into their templates
   'plan-review': 7601, // LIN-4353: the verdict quotes the ask and says how the plan meets it; only the person agrees to a narrowing (the reviewer's judgement)
-  implementation: 8083, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
-  review: 15043, // LIN-4345: the verdict accounts for each sentence of the `## As asked` block in order (the reviewer's judgement)
+  implementation: 8391, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
+  review: 15351, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
   'close-out': 11694, // LIN-4345: the summary cites review's account of what was asked
   'retrospective-audit': 4619, // LIN-3279: FOLLOW_UP_SHAPE rendered
   retro: 4265, // LIN-3299: at 4265 since Scope and Authority on every path
@@ -134,7 +134,7 @@ export const LANDING_AGENT_PROMPT_CEILING = 584; // LIN-4085: new at 584 (the co
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 345513; // LIN-4368: +311 (345202 -> 345513), the exact sum of the ceilings above
+export const FROZEN_TOTAL_BYTES = 348608; // LIN-4371: +3095 (345513 -> 348608), formatters +939 and seven renders +308 each
 
 const BASE_URL = 'https://harbour.example';
 
