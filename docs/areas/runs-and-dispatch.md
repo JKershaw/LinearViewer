@@ -54,6 +54,15 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   stops retrying within 60 s); a sweep needs a history scan or a new index over stamps
   never cleared; clearing stamps on success reopens the LIN-4375 double queue. (LIN-4375,
   LIN-4377.)
+- `lib/dispatch-store.js`: `releaseHeldWake` still prepends `formatHeldWakeNote({status})`
+  ("The leftover step did not run…"), so the store's release path still picks leftover
+  wording; `lin-4377-store-knows-no-leftover` counts the spelling, not the dependency.
+  (Operator, on LIN-4377, 8 Nov.)
+- `lib/dispatch-store.js`: `addFeedback` takes one `wakeHook`; a second held-wake feature
+  first needs hooks to compose. (Operator, on LIN-4377, 8 Nov.)
+- `lib/runner-kit/contract.json`: the row-shape rule is written twice, `checkRowShape`
+  in its unit test and simple-dispatcher's `columnProblems`. `CONTRACT_SHA256` pins the
+  bytes, not the rule, so the rules can drift unseen. (Operator, on LIN-4377, 8 Nov.)
 - `lib/dispatch-factory.js`: tests `provider.name === 'linear'` beside
   `isHermeticTestToken`, for a test-only transport. (John, 7 Nov, on LIN-4347.)
 - `lib/effort-readout.js`: still outputs the deleted name `GATE_DUE_MARKER` (now
