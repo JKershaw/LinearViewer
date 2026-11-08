@@ -40,6 +40,10 @@ import {
 import { LIN4197_CASES } from '../fixtures/cost-replay/corpus.js';
 import { priceRequest } from '../../lib/model-pricing.js';
 import { postUsage, requestUsageStoreFor, USAGE_MAX_RECORDS_PER_CALL } from '../../lib/request-usage-intake.js';
+import { seedPinnedCatalog } from './helpers/pinned-catalog.js';
+
+// LIN-4358: rates and names come from the catalog; price from the pinned 8 Nov 2026 snapshot.
+seedPinnedCatalog();
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const KIT_FIXTURES = join(ROOT, 'tests', 'fixtures', 'runner-kit');

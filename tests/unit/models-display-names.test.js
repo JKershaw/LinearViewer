@@ -16,6 +16,10 @@ import { modelChangeLines } from '../../lib/components/model-change-lines.js';
 import { SURFACES } from '../../lib/llm-jobs.js';
 import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 import { agentSpendByJobOf } from '../fixtures/cost-read-cores.js';
+import { seedPinnedCatalog } from './helpers/pinned-catalog.js';
+
+// LIN-4358: rates and names come from the catalog; price from the pinned 8 Nov 2026 snapshot.
+seedPinnedCatalog();
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
 const agentSpendByJob = agentSpendByJobOf;
 

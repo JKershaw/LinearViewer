@@ -14,7 +14,7 @@ MONGODB_TEST_URI        Test-only: real MongoDB for tests/unit/mongo-smoke.test.
 OPENROUTER_API_KEY      Server-side OpenRouter API key (optional, users can connect via OAuth)
 OPENROUTER_REDIRECT_URI Callback URL for OpenRouter OAuth (optional, defaults to /auth/openrouter/callback)
 OPENROUTER_FREE_TIER_KEY Server-side API key for free tier users (optional, enables free-tier access: runs per day per account, prompts unlimited)
-OPENROUTER_FREE_TIER_MODEL  Model free-tier requests are clamped to (optional, default openai/gpt-5.4-mini). Must be a curated AVAILABLE_MODELS id; anything else is ignored (warned at startup) and the free tier stays on the default. Free-tier only — does not move the default for workspaces with no stored model preference
+OPENROUTER_FREE_TIER_MODEL  Model free-tier requests are clamped to (optional, default openai/gpt-5.4-mini). Must be an id in FREE_TIER_MODEL_IDS (lib/openrouter.js), the free-tier allowlist, which is a spending choice and not the picker suggestions; anything else is ignored (warned at startup) and the free tier stays on the default. Free-tier only — does not move the default for workspaces with no stored model preference
 FREE_TIER_RUN_LIMIT   Max fresh runs per account per UTC day on the free tier (optional, default 10; read once at startup by `readAllowanceEnv` in `lib/plan-allowance.js`, parsed `parseInt(x, 10) || 10`, so `0` or junk gives 10 and a negative number is kept)
 FREE_TIER_HOURLY_LIMIT  Global hourly free-prompt limit across all workspaces — the service safety net (optional, default 50; read and parsed the same way as `FREE_TIER_RUN_LIMIT`)
 GITHUB_CLIENT_ID        GitHub App user-to-server OAuth client ID (required for GitHub login/binding)

@@ -11,6 +11,10 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { priceRequest, computeUsageCostUsd } from '../../lib/model-pricing.js';
+import { seedPinnedCatalog } from './helpers/pinned-catalog.js';
+
+// LIN-4358: rates and names come from the catalog; price from the pinned 8 Nov 2026 snapshot.
+seedPinnedCatalog();
 
 /** A record as the store holds it: identity and metadata, then the five counters. */
 const record = (fields = {}) => ({

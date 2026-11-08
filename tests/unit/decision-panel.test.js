@@ -17,6 +17,10 @@ import { DISPATCH_EFFORT_LEVELS } from '../../lib/dispatch-validation.js';
 import { typicalByModel as typicalByModel__unplumbed } from '../../lib/model-routing-spend.js';
 import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 import { typicalByModelOf } from '../fixtures/cost-read-cores.js';
+import { seedPinnedCatalog } from './helpers/pinned-catalog.js';
+
+// LIN-4358: rates and names come from the catalog; price from the pinned 8 Nov 2026 snapshot.
+seedPinnedCatalog();
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
 const typicalByModel = typicalByModelOf;
 

@@ -126,7 +126,7 @@ export function createSettingsRouter(deps) {
   const {
     workspaceFromUrl, getOpenRouterSource, getDeployInfo, userPreferencesStore, workspacePreferencesStore,
     llmCallLogStore, promptTraceStore, accountStore, requestFeatureFlags,
-    getWorkspaceFeatures, setWorkspaceFeature, getModelCatalog, shouldMockAi, AVAILABLE_MODELS,
+    getWorkspaceFeatures, setWorkspaceFeature, getModelCatalog, shouldMockAi, suggestedModels,
     getProvider, getProviderForWorkspace, getBindingsForWorkspace, getBindingCredentials, isActiveBinding,
     dispatchPresetsStore, proxyTokenStore, dispatchTokenStore, proxyEventStore, workspaceHaltStore,
     workspaceChangeLogStore, modelRoutingStore, workspaceOwnerCheck, dispatchStore, requestUsageLoader
@@ -333,7 +333,8 @@ export function createSettingsRouter(deps) {
         presets,
         log,
         catalog: dispatchModelCatalog,
-        availableModels: AVAILABLE_MODELS,
+        // LIN-4358: read per request, since names and prices come from the live catalog.
+        availableModels: typeof suggestedModels === 'function' ? suggestedModels() : [],
         filter: req.query.filter === 'set' ? 'set' : 'all',
         // A refused save comes back in the session (its values kept); a refused undo comes back in `?error=`.
         flash: flash ? { message: flash.message, values: flash.values } : (CHANGE_ERRORS[req.query.error] ? { message: CHANGE_ERRORS[req.query.error], values: null } : null),

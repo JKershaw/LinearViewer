@@ -6,14 +6,23 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import {
-  MODEL_PRICING,
   getModelRate,
   getDisplayPricing,
   resolveWorkerModelId,
   computeUsageCostUsd,
   selectRateForPrompt,
 } from '../../lib/model-pricing.js';
-import { AVAILABLE_MODELS, formatModelPricing } from '../../lib/openrouter.js';
+import { suggestedModels, formatModelPricing } from '../../lib/openrouter.js';
+import { seedPinnedCatalog, clearCatalog, PINNED_CATALOG_BODY } from './helpers/pinned-catalog.js';
+
+// LIN-4358: there is no hand-written rate card. Rates are read from the OpenRouter catalog;
+// these tests price from the pinned 8 Nov 2026 snapshot. PINNED_RATES is what getModelRate
+// returns for every model in it, so the shape tests below still read every rate Harbour has.
+seedPinnedCatalog();
+const PINNED_RATES = Object.fromEntries(
+  PINNED_CATALOG_BODY.data.map(m => [m.id, getModelRate(m.id)]).filter(([, rate]) => rate)
+);
+const SUGGESTED = suggestedModels();
 
 // A real dispatched worker's shape: cache-read dominates the input side.
 const WORKER_USAGE = {
@@ -394,10 +403,10 @@ describe('computeUsageCostUsd — long-context override tier (LIN-2403)', () => 
   });
 
   test('the rows with no override tier price byte-identically to HEAD', () => {
-    for (const id of Object.keys(MODEL_PRICING)) {
-      if (Array.isArray(MODEL_PRICING[id].overrides)) continue;
+    for (const id of Object.keys(PINNED_RATES)) {
+      if (Array.isArray(PINNED_RATES[id].overrides)) continue;
       const usage = { model: id, harness: 'claude-code', inputTokens: 1_000_000, outputTokens: 1 };
-      const rate = MODEL_PRICING[id];
+      const rate = PINNED_RATES[id];
       const expected = (1_000_000 * rate.prompt + 1 * rate.completion) / 1e6;
       assert.strictEqual(computeUsageCostUsd(usage), expected, `${id} must price unchanged`);
     }
@@ -488,7 +497,7 @@ describe('resolveWorkerModelId (LIN-1495)', () => {
 
 describe('rate table shape (LIN-1495)', () => {
   test('every row carries well-formed non-negative prompt/completion rates', () => {
-    for (const [id, rate] of Object.entries(MODEL_PRICING)) {
+    for (const [id, rate] of Object.entries(PINNED_RATES)) {
       assert.strictEqual(typeof rate.prompt, 'number', `${id} prompt rate is a number`);
       assert.strictEqual(typeof rate.completion, 'number', `${id} completion rate is a number`);
       assert.ok(rate.prompt >= 0 && rate.completion >= 0, `${id} rates are non-negative`);
@@ -501,7 +510,7 @@ describe('rate table shape (LIN-1495)', () => {
   });
 
   test('every anthropic/claude-* row carries all three cache tiers — they are the point of this table', () => {
-    for (const [id, rate] of Object.entries(MODEL_PRICING)) {
+    for (const [id, rate] of Object.entries(PINNED_RATES)) {
       if (!id.startsWith('anthropic/claude-')) continue;
       assert.ok(Number.isFinite(rate.cacheRead), `${id} must price cache reads`);
       assert.ok(Number.isFinite(rate.cacheWrite), `${id} must price cache writes (5m)`);
@@ -516,13 +525,13 @@ describe('rate table shape (LIN-1495)', () => {
     // the LIN-3916 anthropic/claude-haiku-5.5 row comes from the operator-pasted OpenRouter catalog (24 Oct 2026), where input_cache_write_1h is also prompt x 2;
     // openai/gpt-5.6-sol carries input_cache_write but no 1h key, and the other three
     // OpenAI rows carry neither.
-    const anthropicRows = Object.keys(MODEL_PRICING).filter(id => id.startsWith('anthropic/claude-'));
+    const anthropicRows = Object.keys(PINNED_RATES).filter(id => id.startsWith('anthropic/claude-'));
     assert.strictEqual(anthropicRows.length, 10, 'expected exactly 10 anthropic/claude-* rows (LIN-3094 added 3, LIN-3916 added Haiku 5.5)');
     for (const id of anthropicRows) {
-      const rate = MODEL_PRICING[id];
+      const rate = PINNED_RATES[id];
       assert.strictEqual(rate.cacheWrite1h, rate.prompt * 2, `${id} cacheWrite1h must be prompt x 2`);
     }
-    for (const [id, rate] of Object.entries(MODEL_PRICING)) {
+    for (const [id, rate] of Object.entries(PINNED_RATES)) {
       if (id.startsWith('anthropic/claude-')) continue;
       assert.strictEqual(rate.cacheWrite1h, undefined, `${id} must NOT carry cacheWrite1h`);
     }
@@ -537,7 +546,7 @@ describe('rate table shape (LIN-1495)', () => {
     // LIN-3882: corrected again to the catalog rate the operator pasted on 2026-10-24
     // ($4/$20; the catalog moved since LIN-2384). The override cache tiers (0.80 / 10.00)
     // are the operator-pasted pricing.overrides[0] values, twice the base cache rates.
-    assert.deepStrictEqual(MODEL_PRICING['openai/gpt-5.6-sol'], {
+    assert.deepStrictEqual(PINNED_RATES['openai/gpt-5.6-sol'], {
       prompt: 4.00,
       completion: 20.00,
       cacheRead: 0.40,
@@ -547,19 +556,19 @@ describe('rate table shape (LIN-1495)', () => {
   });
 
   test('gpt-6.1-sol and gpt-5.6-terra rows match the operator-pasted catalog rates (LIN-3882)', () => {
-    assert.deepStrictEqual(MODEL_PRICING['openai/gpt-6.1-sol'], {
+    assert.deepStrictEqual(PINNED_RATES['openai/gpt-6.1-sol'], {
       prompt: 2.00, completion: 10.00, cacheRead: 0.10, cacheWrite: 2.50,
       overrides: [{ minPromptTokens: 272000, prompt: 4.00, completion: 15.00, cacheRead: 0.20, cacheWrite: 5.00 }],
     });
-    assert.deepStrictEqual(MODEL_PRICING['openai/gpt-5.6-terra'], {
+    assert.deepStrictEqual(PINNED_RATES['openai/gpt-5.6-terra'], {
       prompt: 2.00, completion: 12.00, cacheRead: 0.20, cacheWrite: 2.50,
       overrides: [{ minPromptTokens: 272000, prompt: 4.00, completion: 18.00, cacheRead: 0.40, cacheWrite: 5.00 }],
     });
   });
 
-  test('the table and its rows are frozen — a rate card a caller can mutate is not one representation', () => {
-    assert.ok(Object.isFrozen(MODEL_PRICING));
-    for (const [id, rate] of Object.entries(MODEL_PRICING)) {
+  test('every rate and its overrides are frozen — a rate a caller can mutate is not one representation', () => {
+    // LIN-4358: there is no table to freeze; each rate lib/catalog-rate.js builds is frozen, overrides included.
+    for (const [id, rate] of Object.entries(PINNED_RATES)) {
       assert.ok(Object.isFrozen(rate), `${id}'s rate row is frozen`);
       if (Array.isArray(rate.overrides)) {
         assert.ok(Object.isFrozen(rate.overrides), `${id}'s overrides array is frozen`);
@@ -584,11 +593,14 @@ describe('rate table shape (LIN-1495)', () => {
     assert.strictEqual(getModelRate('toString'), null); // no prototype-chain leak
   });
 
-  test('every overrides entry is well-formed (finite non-negative tiers, finite minPromptTokens) — LIN-2403', () => {
-    for (const [id, rate] of Object.entries(MODEL_PRICING)) {
+  test('every overrides entry is well-formed (finite non-negative tiers, at least one well-formed gate) — LIN-2403, LIN-4358', () => {
+    for (const [id, rate] of Object.entries(PINNED_RATES)) {
       if (!Array.isArray(rate.overrides)) continue;
       for (const entry of rate.overrides) {
-        assert.ok(Number.isFinite(entry.minPromptTokens) && entry.minPromptTokens >= 0, `${id} override minPromptTokens is well-formed`);
+        const prompt = entry.minPromptTokens === undefined || (Number.isFinite(entry.minPromptTokens) && entry.minPromptTokens >= 0);
+        const window = entry.utcStart === undefined || (Number.isInteger(entry.utcStart) && Number.isInteger(entry.utcEnd));
+        assert.ok(prompt && window, `${id} override gates are well-formed`);
+        assert.ok(entry.minPromptTokens !== undefined || entry.utcStart !== undefined || entry.utcDays !== undefined, `${id} override states a gate`);
         for (const tier of ['prompt', 'completion', 'cacheRead', 'cacheWrite', 'cacheWrite1h']) {
           if (entry[tier] !== undefined) {
             assert.ok(Number.isFinite(entry[tier]) && entry[tier] >= 0, `${id} override ${tier} is well-formed`);
@@ -598,7 +610,7 @@ describe('rate table shape (LIN-1495)', () => {
     }
   });
 
-  test('overrides are present on exactly the 5 openai rows gated at 272000 and the Haiku 5.5 row gated at 100000 (LIN-2403, LIN-3916)', () => {
+  test('long-context overrides are on exactly the 5 openai rows gated at 272000 and the Haiku 5.5 row gated at 100000 (LIN-2403, LIN-3916)', () => {
     // Sibling of the cacheWrite1h-only-on-anthropic test above. Haiku 5.5 (LIN-3916) is the
     // first anthropic row with an override tier, so the LIN-2403 cumulative-guard question is
     // live: a claude-code Haiku session over 100k prices to null (open question in the PR).
@@ -611,16 +623,17 @@ describe('rate table shape (LIN-1495)', () => {
       'openai/gpt-6.1-sol': 272000,
       'anthropic/claude-haiku-5.5': 100000,
     };
-    const overrideRows = Object.keys(MODEL_PRICING).filter(id => Array.isArray(MODEL_PRICING[id].overrides));
+    // LIN-4358: the pinned catalog also carries two time-of-day-priced models; they have no prompt-size gate.
+    const overrideRows = Object.keys(PINNED_RATES).filter(id => (PINNED_RATES[id].overrides || []).some(e => e.minPromptTokens !== undefined));
     assert.deepStrictEqual(overrideRows.sort(), Object.keys(expectedThreshold).sort());
     for (const id of overrideRows) {
-      assert.strictEqual(MODEL_PRICING[id].overrides.length, 1, `${id} carries exactly one override entry today`);
-      assert.strictEqual(MODEL_PRICING[id].overrides[0].minPromptTokens, expectedThreshold[id], `${id} gates at ${expectedThreshold[id]}`);
+      assert.strictEqual(PINNED_RATES[id].overrides.length, 1, `${id} carries exactly one override entry today`);
+      assert.strictEqual(PINNED_RATES[id].overrides[0].minPromptTokens, expectedThreshold[id], `${id} gates at ${expectedThreshold[id]}`);
     }
   });
 });
 
-describe('AVAILABLE_MODELS derives its pricing from this table (LIN-993 charter preserved)', () => {
+describe('SUGGESTED derives its pricing from this table (LIN-993 charter preserved)', () => {
   // Known-good pricing for every currently curated entry (LIN-1763 widened this
   // past the original 5-id extraction snapshot; see the superset invariant test
   // below for what actually must hold going forward).
@@ -635,21 +648,24 @@ describe('AVAILABLE_MODELS derives its pricing from this table (LIN-993 charter 
     'anthropic/claude-fable-5': { prompt: 10.00, completion: 50.00 },
     'anthropic/claude-haiku-4.5': { prompt: 1.00, completion: 5.00 },
     'openai/gpt-5.6-sol': { prompt: 4.00, completion: 20.00 },
+    // LIN-4358: suggested since this ticket.
+    'openai/gpt-6.1-sol': { prompt: 2.00, completion: 10.00 },
+    'anthropic/claude-haiku-5.5': { prompt: 0.10, completion: 0.50 },
   };
 
   test('every curated entry deep-equals its known-good pricing', () => {
     assert.deepStrictEqual(
-      AVAILABLE_MODELS.map(m => m.id).sort(),
+      SUGGESTED.map(m => m.id).sort(),
       Object.keys(CURRENT_PRICING).sort(),
       'the curated allowlist must match the known-good pricing snapshot exactly — update both together'
     );
-    for (const m of AVAILABLE_MODELS) {
+    for (const m of SUGGESTED) {
       assert.deepStrictEqual(m.pricing, CURRENT_PRICING[m.id], `${m.id} pricing is unchanged`);
     }
   });
 
   test('the derived view is exactly two tiers — no cache keys leak into the display shape', () => {
-    for (const m of AVAILABLE_MODELS) {
+    for (const m of SUGGESTED) {
       assert.deepStrictEqual(Object.keys(m.pricing).sort(), ['completion', 'prompt']);
     }
   });
@@ -666,14 +682,16 @@ describe('AVAILABLE_MODELS derives its pricing from this table (LIN-993 charter 
       'anthropic/claude-fable-5': '$10.00 in / $50.00 out per 1M tokens',
       'anthropic/claude-haiku-4.5': '$1.00 in / $5.00 out per 1M tokens',
       'openai/gpt-5.6-sol': '$4.00 in / $20.00 out per 1M tokens',
+      'openai/gpt-6.1-sol': '$2.00 in / $10.00 out per 1M tokens',
+      'anthropic/claude-haiku-5.5': '$0.10 in / $0.50 out per 1M tokens',
     };
-    for (const m of AVAILABLE_MODELS) {
+    for (const m of SUGGESTED) {
       assert.strictEqual(formatModelPricing(m), expected[m.id], `${m.id} hint is byte-identical`);
     }
   });
 
-  test('MODEL_PRICING is a superset of AVAILABLE_MODELS — every curated id is priceable (membership flows one way)', () => {
-    for (const m of AVAILABLE_MODELS) {
+  test('PINNED_RATES is a superset of SUGGESTED — every curated id is priceable (membership flows one way)', () => {
+    for (const m of SUGGESTED) {
       assert.ok(getModelRate(m.id), `${m.id} must be priceable — a curated entry with no rate row is a charter violation`);
     }
   });
@@ -685,14 +703,14 @@ describe('AVAILABLE_MODELS derives its pricing from this table (LIN-993 charter 
 
   test('getDisplayPricing stays exactly two tiers — overrides never leak into the display shape (LIN-2403)', () => {
     // openai/gpt-5.5, openai/gpt-5.5-pro and openai/gpt-5.6-sol now carry an
-    // overrides array on their MODEL_PRICING row; OpenRouter's own rule is that
+    // overrides array on their PINNED_RATES row; OpenRouter's own rule is that
     // top-level keys are the default-condition price, so the display hint must
     // keep showing the base rate and must not gain a third key.
     for (const id of ['openai/gpt-5.5', 'openai/gpt-5.5-pro', 'openai/gpt-5.6-sol']) {
       const display = getDisplayPricing(id);
       assert.deepStrictEqual(Object.keys(display).sort(), ['completion', 'prompt']);
-      assert.strictEqual(display.prompt, MODEL_PRICING[id].prompt);
-      assert.strictEqual(display.completion, MODEL_PRICING[id].completion);
+      assert.strictEqual(display.prompt, PINNED_RATES[id].prompt);
+      assert.strictEqual(display.completion, PINNED_RATES[id].completion);
     }
   });
 });
@@ -712,18 +730,22 @@ describe('models in use are priced (LIN-3094)', () => {
     });
   }
 
-  test('rows carry Anthropic\'s published rates, cache-read exceptions included', () => {
-    assert.deepStrictEqual({ ...MODEL_PRICING['anthropic/claude-fable-5.1'] },
+  // LIN-4358: these three were typed from Anthropic's published rates (18 Oct 2026). They are now read
+  // from the OpenRouter catalog, which on 8 Nov 2026 agrees for Fable 5.1 and Opus 5.5 and prices Sonnet
+  // 5.5's cache read at $0.10, not the $0.20 the hand row held. The catalog is the one source now.
+  test('rows carry the catalog\'s rates, cache-read exceptions included', () => {
+    assert.deepStrictEqual({ ...PINNED_RATES['anthropic/claude-fable-5.1'] },
       { prompt: 10.00, completion: 50.00, cacheRead: 0.25, cacheWrite: 12.50, cacheWrite1h: 20.00 });
-    assert.deepStrictEqual({ ...MODEL_PRICING['anthropic/claude-opus-5.5'] },
+    assert.deepStrictEqual({ ...PINNED_RATES['anthropic/claude-opus-5.5'] },
       { prompt: 4.00, completion: 20.00, cacheRead: 0.20, cacheWrite: 5.00, cacheWrite1h: 8.00 });
-    assert.deepStrictEqual({ ...MODEL_PRICING['anthropic/claude-sonnet-5.5'] },
-      { prompt: 2.00, completion: 10.00, cacheRead: 0.20, cacheWrite: 2.50, cacheWrite1h: 4.00 });
+    assert.deepStrictEqual({ ...PINNED_RATES['anthropic/claude-sonnet-5.5'] },
+      { prompt: 2.00, completion: 10.00, cacheRead: 0.10, cacheWrite: 2.50, cacheWrite1h: 4.00 });
   });
 
-  test('pricing rows are not permissions: none of the new ids is in AVAILABLE_MODELS', () => {
-    const ids = AVAILABLE_MODELS.map(m => m.id);
-    for (const id of ['anthropic/claude-fable-5.1', 'anthropic/claude-opus-5.5', 'anthropic/claude-sonnet-5.5', 'anthropic/claude-haiku-5.5', 'deepseek/deepseek-v4.1-flash-1017', 'z-ai/glm-5.3-flash', 'xiaomi/mimo-v2.6-flash']) {
+  test('pricing rows are not permissions: none of the new ids is in SUGGESTED', () => {
+    const ids = SUGGESTED.map(m => m.id);
+    // LIN-4358: anthropic/claude-haiku-5.5 became a suggestion (a person's choice), so it left this list.
+    for (const id of ['anthropic/claude-fable-5.1', 'anthropic/claude-opus-5.5', 'anthropic/claude-sonnet-5.5', 'deepseek/deepseek-v4.1-flash-1017', 'z-ai/glm-5.3-flash', 'xiaomi/mimo-v2.6-flash']) {
       assert.ok(!ids.includes(id), `${id} must not be selectable`);
     }
   });
@@ -741,21 +763,23 @@ describe('LIN-3916 rows: Haiku 5.5, DeepSeek V4.1 Flash 1017, GLM-5.3 Flash, MiM
   });
 
   test('Haiku 5.5 row carries the catalog rates and its over-100k override', () => {
-    assert.deepStrictEqual({ ...MODEL_PRICING['anthropic/claude-haiku-5.5'] }, {
+    assert.deepStrictEqual({ ...PINNED_RATES['anthropic/claude-haiku-5.5'] }, {
       prompt: 0.10, completion: 0.50, cacheRead: 0.01, cacheWrite: 0.125, cacheWrite1h: 0.20,
-      overrides: MODEL_PRICING['anthropic/claude-haiku-5.5'].overrides,
+      overrides: PINNED_RATES['anthropic/claude-haiku-5.5'].overrides,
     });
-    assert.deepStrictEqual(JSON.parse(JSON.stringify(MODEL_PRICING['anthropic/claude-haiku-5.5'].overrides)), [
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(PINNED_RATES['anthropic/claude-haiku-5.5'].overrides)), [
       { minPromptTokens: 100000, prompt: 0.50, completion: 2.50, cacheRead: 0.05, cacheWrite: 0.625, cacheWrite1h: 1.00 },
     ]);
   });
 
+  // LIN-4358: the hand rows (24 Oct 2026) had gone stale by 8 Nov: the catalog dropped DeepSeek from
+  // $0.15/$0.60 to $0.006/$0.50 (and its time-of-day windows) and GLM from $0.15/$0.50 to $0.0335/$0.083.
   test('DeepSeek, GLM and MiMo rows carry the catalog base rates and no write tiers or overrides', () => {
-    assert.deepStrictEqual({ ...MODEL_PRICING['deepseek/deepseek-v4.1-flash-1017'] },
-      { prompt: 0.15, completion: 0.60, cacheRead: 0.003 });
-    assert.deepStrictEqual({ ...MODEL_PRICING['z-ai/glm-5.3-flash'] },
-      { prompt: 0.15, completion: 0.50, cacheRead: 0.03 });
-    assert.deepStrictEqual({ ...MODEL_PRICING['xiaomi/mimo-v2.6-flash'] },
+    assert.deepStrictEqual({ ...PINNED_RATES['deepseek/deepseek-v4.1-flash-1017'] },
+      { prompt: 0.006, completion: 0.50, cacheRead: 0.005 });
+    assert.deepStrictEqual({ ...PINNED_RATES['z-ai/glm-5.3-flash'] },
+      { prompt: 0.0335, completion: 0.083, cacheRead: 0.03 });
+    assert.deepStrictEqual({ ...PINNED_RATES['xiaomi/mimo-v2.6-flash'] },
       { prompt: 0.14, completion: 0.28, cacheRead: 0.0028 });
   });
 
@@ -764,8 +788,8 @@ describe('LIN-3916 rows: Haiku 5.5, DeepSeek V4.1 Flash 1017, GLM-5.3 Flash, MiM
     const usage = { inputTokens: 10_000, outputTokens: 2_000, cacheReadInputTokens: 5_000, harness: 'opencode' };
     const expected = {
       'anthropic/claude-haiku-5.5': 0.00205,  // 10000*0.10 + 2000*0.50 + 5000*0.01 = 2050 /1e6
-      'deepseek/deepseek-v4.1-flash-1017': 0.002715, // 10000*0.15 + 2000*0.60 + 5000*0.003 = 2715 /1e6
-      'z-ai/glm-5.3-flash': 0.00265,          // 10000*0.15 + 2000*0.50 + 5000*0.03 = 2650 /1e6
+      'deepseek/deepseek-v4.1-flash-1017': 0.001085, // 10000*0.006 + 2000*0.50 + 5000*0.005 = 1085 /1e6
+      'z-ai/glm-5.3-flash': 0.000651,         // 10000*0.0335 + 2000*0.083 + 5000*0.03 = 651 /1e6
       'xiaomi/mimo-v2.6-flash': 0.001974,     // 10000*0.14 + 2000*0.28 + 5000*0.0028 = 1974 /1e6
     };
     for (const [model, want] of Object.entries(expected)) {

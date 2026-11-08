@@ -34,7 +34,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   done-means, then definitions, then comments, then the final `[done]` report. When a
   stage must not hand over how, close every channel it writes to, or hold the reader's
   side (LIN-4369 arm 4).
-
+- Model facts come from the OpenRouter catalog: add no model list or rate (LIN-4358).
+  Tests seed `tests/unit/helpers/pinned-catalog.js`.
 ## Waiting
 
 - `lib/size-of-move.js`: what counts as code-shaped how is written twice: the checker's

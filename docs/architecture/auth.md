@@ -198,7 +198,7 @@ When `OPENROUTER_FREE_TIER_KEY` is set, users without an OpenRouter connection g
   returns **before** the prefs lookup, so it fails closed. `resolveRoadmapModelOverride`
   (`routes/workspace-api-roadmap.js`) is the same gate on the LIN-819 per-request override path.
 - The **value** it clamps to is `resolveFreeTierModel()` (`lib/openrouter.js`, LIN-1333):
-  `OPENROUTER_FREE_TIER_MODEL` when set to a curated `AVAILABLE_MODELS` id, else
+  `OPENROUTER_FREE_TIER_MODEL` when set to an id in the free-tier allowlist `FREE_TIER_MODEL_IDS`, else
   `DEFAULT_MODEL`. Only that value is configurable — the precedence above is unchanged.
   It **fails closed**: an uncurated value is ignored (never passed unchecked to
   OpenRouter) and warned about once at startup via `getFreeTierModelConfigWarning()`,

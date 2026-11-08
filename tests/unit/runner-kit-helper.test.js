@@ -84,6 +84,10 @@ import * as runnerKit from '../../lib/runner-kit/runner.mjs';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { attachProxyContext } from '../../lib/proxy-preamble.js';
 import { buildCollectiveParticipantPrompt } from '../../lib/prompts/collective-participant.js';
+import { seedPinnedCatalog } from './helpers/pinned-catalog.js';
+
+// LIN-4358: rates and names come from the catalog; price from the pinned 8 Nov 2026 snapshot.
+seedPinnedCatalog();
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FIXTURE = join(ROOT, 'tests', 'fixtures', 'runner-kit', 'subagent.jsonl');

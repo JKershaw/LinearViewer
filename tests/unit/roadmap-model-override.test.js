@@ -4,22 +4,26 @@
 // used by the generate endpoint's resolveRoadmapLLM. Two gates are load-bearing:
 //   1. Free tier is clamped — a body-supplied model is ALWAYS ignored so it can
 //      never bill an expensive model against the operator's shared key (LIN-513).
-//   2. Allow-list — only a curated AVAILABLE_MODELS id is honored; anything else
+//   2. Allow-list — only a curated SUGGESTED_MODELS id is honored; anything else
 //      falls back to the already-resolved workspace default, so nothing unchecked
 //      reaches OpenRouter.
+import { seedPinnedCatalog } from './helpers/pinned-catalog.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveRoadmapModelOverride } from '../../routes/workspace-api-roadmap.js';
-import { AVAILABLE_MODELS, DEFAULT_MODEL } from '../../lib/openrouter.js';
+import { suggestedModels, DEFAULT_MODEL } from '../../lib/openrouter.js';
+// LIN-4358: the suggested models, with names and prices read from the catalog (the pinned 8 Nov 2026 snapshot).
+seedPinnedCatalog();
+const SUGGESTED_MODELS = suggestedModels();
 import { renderRoadmapPage } from '../../lib/render-roadmap.js';
 
 // A curated non-default model id (the whole point of the feature) and the
 // workspace default the endpoint would otherwise use.
-const STRONGER = AVAILABLE_MODELS.find(m => m.id !== DEFAULT_MODEL)?.id;
+const STRONGER = SUGGESTED_MODELS.find(m => m.id !== DEFAULT_MODEL)?.id;
 const WORKSPACE_DEFAULT = 'openai/gpt-5.4-mini';
 
 test('sanity: a curated non-default model exists to override with', () => {
-  assert.ok(STRONGER, 'AVAILABLE_MODELS must offer at least one non-default model');
+  assert.ok(STRONGER, 'SUGGESTED_MODELS must offer at least one non-default model');
 });
 
 test('non-free-tier + valid curated override: uses the override', () => {
@@ -30,8 +34,8 @@ test('non-free-tier + valid override trims surrounding whitespace', () => {
   assert.equal(resolveRoadmapModelOverride(`  ${STRONGER}  `, WORKSPACE_DEFAULT, false), STRONGER);
 });
 
-test('every curated model id is accepted as an override (allow-list is AVAILABLE_MODELS)', () => {
-  for (const m of AVAILABLE_MODELS) {
+test('every curated model id is accepted as an override (allow-list is SUGGESTED_MODELS)', () => {
+  for (const m of SUGGESTED_MODELS) {
     assert.equal(resolveRoadmapModelOverride(m.id, WORKSPACE_DEFAULT, false), m.id);
   }
 });
@@ -70,12 +74,12 @@ test('free-tier clamp wins regardless of what workspace default was passed', () 
 test('render: model selector appears (with Workspace default + curated options) when AI is connected', () => {
   const html = renderRoadmapPage(
     { roadmapModel: {}, organizationName: 'Test Org' },
-    { urlKey: 'test-ws', openRouterSource: 'session', availableModels: AVAILABLE_MODELS }
+    { urlKey: 'test-ws', openRouterSource: 'session', availableModels: SUGGESTED_MODELS }
   );
   assert.ok(html.includes('roadmap-model-select'), 'should render the model select');
   assert.ok(html.includes('>Workspace default<'), 'should offer the workspace-default option');
   assert.ok(html.includes('value=""'), 'workspace-default option carries the empty value');
-  for (const m of AVAILABLE_MODELS) {
+  for (const m of SUGGESTED_MODELS) {
     assert.ok(html.includes(`value="${m.id}"`), `should offer curated model ${m.id}`);
     assert.ok(html.includes(`>${m.name}<`), `should label curated model ${m.name}`);
   }
@@ -87,9 +91,9 @@ test('render: model selector appears (with Workspace default + curated options) 
 test('render: every model option carries its rate as data-pricing, never in option text (LIN-997)', () => {
   const html = renderRoadmapPage(
     { roadmapModel: {}, organizationName: 'Test Org' },
-    { urlKey: 'test-ws', openRouterSource: 'session', availableModels: AVAILABLE_MODELS }
+    { urlKey: 'test-ws', openRouterSource: 'session', availableModels: SUGGESTED_MODELS }
   );
-  for (const m of AVAILABLE_MODELS) {
+  for (const m of SUGGESTED_MODELS) {
     // Opening tag only: the visible-text guard below is a separate assertion.
     const re = new RegExp(`<option value="${m.id}"[^>]*data-pricing="[^"]+"[^>]*>`);
     assert.match(html, re, `${m.id} should carry data-pricing`);
@@ -104,7 +108,7 @@ test('render: every model option carries its rate as data-pricing, never in opti
 test('render: no visible <option> text contains pricing (LIN-997)', () => {
   const html = renderRoadmapPage(
     { roadmapModel: {}, organizationName: 'Test Org' },
-    { urlKey: 'test-ws', openRouterSource: 'session', availableModels: AVAILABLE_MODELS }
+    { urlKey: 'test-ws', openRouterSource: 'session', availableModels: SUGGESTED_MODELS }
   );
   assert.doesNotMatch(html, /<option[^>]*>[^<]*per 1M tokens[^<]*<\/option>/);
 });
@@ -112,7 +116,7 @@ test('render: no visible <option> text contains pricing (LIN-997)', () => {
 test('render: no model selector when AI is not connected (no openRouterSource)', () => {
   const html = renderRoadmapPage(
     { roadmapModel: {}, organizationName: 'Test Org' },
-    { urlKey: 'test-ws', availableModels: AVAILABLE_MODELS }
+    { urlKey: 'test-ws', availableModels: SUGGESTED_MODELS }
   );
   assert.ok(!html.includes('roadmap-model-select'), 'no selector without AI');
 });

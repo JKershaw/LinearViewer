@@ -12,6 +12,10 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeUsageCostUsd } from '../../lib/model-pricing.js';
+import { seedPinnedCatalog } from './helpers/pinned-catalog.js';
+
+// LIN-4358: rates and names come from the catalog; price from the pinned 8 Nov 2026 snapshot.
+seedPinnedCatalog();
 
 describe('snapshot pricing (legacy path) — hand-worked figures', () => {
   test('Haiku 5.5 below the 100k threshold: base rates (prompt 0.10, completion 0.50)', () => {

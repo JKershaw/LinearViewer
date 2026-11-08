@@ -18,7 +18,7 @@ process.env.NODE_ENV = 'test';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { DEFAULT_MODEL, AVAILABLE_MODELS } from '../../lib/openrouter.js';
+import { DEFAULT_MODEL, FREE_TIER_MODEL_IDS } from '../../lib/openrouter.js';
 import { JOBS } from '../../lib/llm-jobs.js';
 import { AI_OPERATION_KINDS, UNROUTED_JOBS } from '../../lib/model-routing.js';
 import { DEFAULT_SESSION_SUMMARY_MODEL } from '../../lib/session-summary.js';
@@ -124,7 +124,7 @@ async function fixtureFor(index, prefs) {
   return { ...fx, urlKey, oldStore: { getWorkspacePreferences: async () => structuredClone(prefs) } };
 }
 
-const FREE_TIER_MODEL = AVAILABLE_MODELS.find((m) => m.id !== DEFAULT_MODEL)?.id;
+const FREE_TIER_MODEL = FREE_TIER_MODEL_IDS.find((id) => id !== DEFAULT_MODEL);
 
 // LIN-3856 (D2): the one hand-written table of what changed. `run-paragraph` was
 // hard-coded to DEFAULT_MODEL with no clamp; it now resolves like every other job.

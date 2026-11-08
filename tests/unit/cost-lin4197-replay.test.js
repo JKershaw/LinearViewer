@@ -21,6 +21,10 @@ import { diffReplay } from '../fixtures/cost-replay/diff.js';
 import { recordLin4197 } from '../fixtures/cost-replay/lin4197-replay.js';
 import { LIN4197_CASES, LIN4197_MIXED_CONTROL, buildMixedHarnessControl } from '../fixtures/cost-replay/corpus.js';
 import { computeUsageCostUsd } from '../../lib/model-pricing.js';
+import { seedPinnedCatalog } from './helpers/pinned-catalog.js';
+
+// LIN-4358: rates and names come from the catalog; price from the pinned 8 Nov 2026 snapshot.
+seedPinnedCatalog();
 
 const SIBLING = fileURLToPath(new URL('../fixtures/cost-replay/goldens-lin4197.json', import.meta.url));
 const close = (a, b, message) => assert.ok(Math.abs(a - b) < 1e-9, `${message}: ${a} vs ${b}`);

@@ -80,6 +80,9 @@ import { ObserverShadowLogStore } from './lib/observer-shadow-log.js'
 import { createCredentialInvariantSweepRun } from './lib/credential-invariant-sweep.js'
 import { createHourlyCleanupRun } from './lib/hourly-cleanup.js'
 import { createPricingConformanceSweepRun } from './lib/pricing-conformance-sweep.js'
+import { readFileSync } from 'node:fs'
+import { DISPATCH_MODEL_SUGGESTIONS, DISPATCH_CLAUDE_ALIAS_MODELS } from './lib/model-routing-harnesses.js'
+import { resolveWorkerModelId } from './lib/model-pricing.js'
 import { getSeenModels } from './lib/unpriced-models.js' // LIN-3094: models whose derived cost was null
 import { LivenessAlarmStore } from './lib/liveness-alarm-store.js'
 import { createLivenessAlarmSweepRun } from './lib/liveness-alarm-sweep.js'
@@ -144,7 +147,7 @@ import { createGettingStartedRouter } from './routes/getting-started.js'
 import { createTestRoutes, installTestTokenLinearTransport } from './routes/test.js'
 import { createWorkspaceApiRoutes, decisionStampDedupe } from './routes/workspace-api.js'
 import { shouldMockAi } from './lib/should-mock-ai.js'
-import { getModelCatalog, CATALOG_CACHE_TTL_MS } from './lib/openrouter-catalog.js'
+import { getModelCatalog, CATALOG_CACHE_TTL_MS, _seedCatalogFromBodyForTests } from './lib/openrouter-catalog.js'
 import { createLegacyRedirects } from './routes/legacy-redirects.js'
 import { testMockTeams, testMockData } from './lib/sample-data/mock-data.js'
 import { swimSampleData } from './lib/sample-data/swim-sample-data.js'
@@ -207,7 +210,7 @@ import { buildSessionCounts } from './lib/sessions-view.js'
 import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
-import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, getFreeTierModelConfigWarning, streamChatWithTools } from './lib/openrouter.js'
+import { suggestedModels, SUGGESTED_MODEL_IDS, FREE_TIER_MODEL_IDS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, getFreeTierModelConfigWarning, streamChatWithTools } from './lib/openrouter.js'
 import { resolveOpenRouterSource, isFreeTierOffered } from './lib/chat-request.js'
 import { resolveWorkspaceModel, resolveAiOperationModel, jobModelResolver, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
@@ -1013,13 +1016,12 @@ scheduler.register({
   console.error(`[credential-invariant-sweep] scheduler.register failed — the sweep will NOT run this boot: ${err.message}`)
 })
 
-// Pricing conformance sweep (LIN-2384): diffs every lib/model-pricing.js
-// MODEL_PRICING row against the live OpenRouter catalog's own pricing (via
-// lib/openrouter-catalog.js, which retains it as of this ticket), converting
-// silent table drift — like the openai/gpt-5.6-sol transcription error this
-// ticket found and fixed — into a loud, periodic signal instead. Interval
-// matches CATALOG_CACHE_TTL_MS: no value polling faster than the catalog
-// itself refreshes.
+// Pricing conformance sweep (LIN-2384, repointed by LIN-4358): rates now come
+// from the live OpenRouter catalog itself, so the sweep says out loud what can
+// still go wrong — a catalog price gate the parser does not model, a model in
+// use that prices to null, and a hand-kept choice list naming a model the
+// catalog no longer lists. Interval matches CATALOG_CACHE_TTL_MS: no value
+// polling faster than the catalog itself refreshes.
 const PRICING_CONFORMANCE_SWEEP_INTERVAL_MS = CATALOG_CACHE_TTL_MS
 
 // LIN-3882: the capability lookups (lib/openrouter.js supportsTools /
@@ -1030,13 +1032,27 @@ const PRICING_CONFORMANCE_SWEEP_INTERVAL_MS = CATALOG_CACHE_TTL_MS
 if (process.env.NODE_ENV !== 'test') {
   getModelCatalog().catch(() => {})
   setInterval(() => { getModelCatalog().catch(() => {}) }, CATALOG_CACHE_TTL_MS / 2).unref()
+} else {
+  // LIN-4358: names, prices, tools and budgets are read from the catalog, so a test
+  // server holds the pinned 8 Nov 2026 snapshot instead of making a live call.
+  _seedCatalogFromBodyForTests(JSON.parse(readFileSync(new URL('./tests/fixtures/openrouter-models-2026-11-08.json', import.meta.url), 'utf8')))
 }
 const PRICING_CONFORMANCE_SWEEP_LEASE_MS = 15 * 60 * 1000
 scheduler.register({
   name: 'pricing-conformance-sweep',
   intervalMs: PRICING_CONFORMANCE_SWEEP_INTERVAL_MS,
   leaseMs: PRICING_CONFORMANCE_SWEEP_LEASE_MS,
-  run: createPricingConformanceSweepRun({ getCatalog: getModelCatalog, getSeenModels })
+  run: createPricingConformanceSweepRun({
+    getCatalog: getModelCatalog,
+    getSeenModels,
+    // The hand lists that remain (LIN-4358): choices, checked against the catalog each tick.
+    getChoiceLists: () => ({
+      SUGGESTED_MODEL_IDS,
+      DISPATCH_MODEL_SUGGESTIONS,
+      FREE_TIER_MODEL_IDS,
+      DISPATCH_CLAUDE_ALIAS_MODELS: Object.values(DISPATCH_CLAUDE_ALIAS_MODELS).map(resolveWorkerModelId)
+    })
+  })
 // Same discipline as the two sweeps above: not awaited (a failed seed write
 // must not abort server boot), with a purpose-written catch so a
 // silent-never-runs state is diagnosable rather than inferred.
@@ -4043,7 +4059,7 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
         workspaces: req.session.workspaces,
         workspace,
         featureFlags,
-        availableModels: AVAILABLE_MODELS,
+        availableModels: suggestedModels(),
         teams,
         selectedTeamId: resolvedTeamId
       }
@@ -4212,7 +4228,7 @@ app.use(createSettingsModelRoutes({ workspaceFromUrl, modelRoutingStore }))
 app.use(createSettingsRouter({
   workspaceFromUrl, getOpenRouterSource, getDeployInfo, userPreferencesStore, workspacePreferencesStore,
   llmCallLogStore, promptTraceStore, accountStore, requestFeatureFlags,
-  getWorkspaceFeatures, setWorkspaceFeature, getModelCatalog, shouldMockAi, AVAILABLE_MODELS,
+  getWorkspaceFeatures, setWorkspaceFeature, getModelCatalog, shouldMockAi, suggestedModels,
   getProvider, getProviderForWorkspace, getBindingsForWorkspace, getBindingCredentials, isActiveBinding,
   dispatchPresetsStore, proxyTokenStore, dispatchTokenStore, proxyEventStore, workspaceHaltStore,
   workspaceChangeLogStore, modelRoutingStore, workspaceOwnerCheck, dispatchStore: dispatchQueueStore, requestUsageLoader

@@ -10,6 +10,10 @@ import {
   percentileOf, distributionOf, bucketCountsOf, summarizeExplain, fitLinear, projectMs,
   steadyStateRecordsOf, sumRecordsByLineage, hostPortOf, assertScratchTarget, deltaPctOf
 } from '../../scripts/lin-4200-d13-volume-timing.mjs';
+import { seedPinnedCatalog } from './helpers/pinned-catalog.js';
+
+// LIN-4358: rates and names come from the catalog; price from the pinned 8 Nov 2026 snapshot.
+seedPinnedCatalog();
 
 describe('timing delta', () => {
   test('deltaPctOf is the percentage change from the stamped base to the loader (positive = slower)', () => {

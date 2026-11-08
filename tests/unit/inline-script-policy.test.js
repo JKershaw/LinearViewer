@@ -17,7 +17,9 @@ import { APP_CSP } from '../../lib/security-headers.js';
 import { renderPage, scriptBodyHash } from '../../lib/components/page.js';
 import { renderGitHubRepoSelectPage } from '../../lib/render-pages.js';
 import { renderAllAreas as renderSettingsPage } from '../helpers/render-settings-areas.js';
-import { AVAILABLE_MODELS } from '../../lib/openrouter.js';
+import { suggestedModels } from '../../lib/openrouter.js';
+// LIN-4358: the suggested models, with names and prices read from the catalog.
+const SUGGESTED_MODELS = suggestedModels();
 import { renderEscalationKpisPage } from '../../lib/render-escalation-kpis.js';
 import * as emailAuth from '../../lib/render-email-auth.js';
 
@@ -77,7 +79,7 @@ describe('rendered inline code is covered by APP_CSP', () => {
 
   test('settings page: no model-pricing script (retired with the forms, LIN-3855); every inline script is covered', () => {
     const html = renderSettingsPage('Acme', {
-      urlKey: 'acme', workspaces: [], availableModels: AVAILABLE_MODELS,
+      urlKey: 'acme', workspaces: [], availableModels: SUGGESTED_MODELS,
     });
     assert.ok(!inlineScriptBodies(html).some(b => b.includes('data-model-price')), 'no pricing script');
     assertCovered('settings', html);
