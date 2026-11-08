@@ -93,10 +93,9 @@ The long argument is the essay `docs/papers/harbour/tasks-are-tasks.md` (v5, LIN
 - the periodicals' maps (Seams & Tangles knots, change coupling, the coherence census);
 - the area's notebook.
 
-**How the choice is made** (LIN-4346, since LIN-4370). Code runs the look-first sequence on a fresh ticket with no size of the move: survey-task, then survey-place, then scoping, each once and one at a time: while a step is still queued or running, nothing else is sent on the ticket (recommend-and-dispatch answers `LOOK_FIRST_IN_FLIGHT`), so scoping always comes after both Surveys have ended (`lib/recommendation-look-first.js`). Scoping reads both Surveys and writes the size record, and the workspace's standing size policy (Settings → Running) decides who settles it:
-- under the policy (`err-larger`), a larger size or just the task goes ahead, decided by the standing policy;
-- a size smaller than asked, or wrong work, is a cut and gets a ruling, policy or not;
-- with no policy (`ask`), every size is a ruling: the record reads pending until a person answers.
+**How the choice is made** (LIN-4346, since LIN-4370). Code runs the look-first sequence on a fresh ticket with no size of the move: survey-task, then survey-place, then scoping, each once and one at a time: while a step is still queued or running, nothing else is sent on the ticket (recommend-and-dispatch answers `LOOK_FIRST_IN_FLIGHT`), so scoping always comes after both Surveys have ended (`lib/recommendation-look-first.js`). Scoping reads both Surveys and writes the size record, and the standing size policy, built in as err larger (LIN-4393 removed the setting that once chose it), decides who settles it:
+- a larger size or just the task goes ahead, decided by the standing policy;
+- a size smaller than asked, or wrong work, is a cut and gets a ruling: the record reads pending until a person answers.
 The ruling card with the recommended answer as its main button (LIN-4114) is the surface for those rulings. The Surveys stay advice: code reads only whether each ran, never what it said.
 
 **What the Surveys cost per ticket.** `GET /api/proxy/issues/{id}/cost` lists every worker session on the ticket with its `kind`, so the two Surveys read there as `survey-task` and `survey-place` beside scoping and the rest; add up the sessions of those kinds.

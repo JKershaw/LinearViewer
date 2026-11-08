@@ -19,7 +19,7 @@ import { renderSettingsPage } from '../../lib/render-settings.js';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ALL_AREAS = AREAS.map(a => a.id);
 
-const SETTINGS = [...Object.keys(FEATURE_DEFAULTS), ...WORKSPACE_FEATURE_KEYS, 'proxyDefault', 'theme', 'consent', 'sizePolicy'];
+const SETTINGS = [...Object.keys(FEATURE_DEFAULTS), ...WORKSPACE_FEATURE_KEYS, 'proxyDefault', 'theme', 'consent'];
 
 // How each setting shows on its area's page.
 const MARKER = (key) => {
@@ -133,14 +133,9 @@ describe('sidebar states', () => {
     assert.equal(getArea('running').state({ ...ctx, haltMode: 'stop' }).text, 'Stopped');
     assert.equal(getArea('running').state({ ...ctx, haltMode: 'pause' }).tone, 'warn');
     assert.equal(getArea('running').state({ ...ctx, haltMode: 'stop' }).tone, 'warn');
-    // LIN-4368: the state names the standing size policy too; no policy stored reads as `ask`.
-    assert.equal(getArea('running').state({ ...ctx, hasRunner: false }).text, 'No runner · ask');
-    assert.equal(getArea('running').state(ctx).text, 'Ready · ask');
-    // A halt still outranks the policy.
-    assert.equal(getArea('running').state({ ...ctx, sizePolicy: 'err-larger' }).text, 'Ready · larger');
-    assert.equal(getArea('running').state({ ...ctx, hasRunner: false, sizePolicy: 'err-larger' }).text, 'No runner·larger');
-    assert.equal(getArea('running').state({ ...ctx, sizePolicy: 'ask' }).text, 'Ready · ask');
-    assert.equal(getArea('running').state({ ...ctx, haltMode: 'pause', sizePolicy: 'err-larger' }).text, 'Paused');
+    assert.equal(getArea('running').state({ ...ctx, hasRunner: false }).text, 'No runner');
+    assert.equal(getArea('running').state(ctx).text, 'Runner ready');
+    assert.equal(getArea('running').state({ ...ctx, haltMode: 'pause', hasRunner: false }).text, 'Paused');
     assert.equal(getArea('models').state(ctx).text, 'Sonnet 5.5');
     assert.equal(getArea('agent-access').state({ keyCount: 1 }).text, '1 live key');
     assert.equal(getArea('account').state({ openRouterSource: 'free' }).text, 'Free tier');
