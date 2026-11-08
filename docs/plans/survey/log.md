@@ -3174,3 +3174,30 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - Each item has what we know, options, a recommendation and blank Decision/Notes lines.
   - It also has the 8 Nov baseline, the roadmap's streams and phases, and the open tickets.
   - From here, each decision is written there first, with one line here pointing to it.
+- **~21:00 UTC: the discussion, D1 under way; the "Plotting the Course" page** (https://claude.ai/artifact/VVDnqDJAf6CMq7j66nJNUQ, private).
+  - **John confirmed the planning budget: $3,500 a week**, in API list prices.
+  - **John's ideas, worked into a model:**
+    - destinations per four-week stretch, worked backwards;
+    - hops that make later steps cheaper;
+    - the backlog plotted toward "complete enough for others to use";
+    - paths told in plain words;
+    - and "why not two weeks?"
+  - **The model is a toy, with every assumption shown.** It runs on capacity (things in flight, 60 hours a week each) and money, using round 1's unit costs.
+  - **Findings at the defaults:**
+    - Money isn't the binding limit; things in flight and John's decisions are.
+    - The known work runs out around weeks 5–7 at two in flight.
+  - **The backlog, read through the proxy:**
+    - 1,358 open (1,068 Backlog, 286 Todo, 4 In Progress);
+    - 629 marked follow-up or review leftover;
+    - about two-thirds older than five weeks;
+    - 385 about the loop itself;
+    - the August "Path" programme (P0–P4, 27 tickets), with one done.
+  - **The rough road** (2 in flight, hops on, half the older backlog still mattering):
+    - milestone 1, anyone can sign in and get a good prompt: about week 7;
+    - milestone 2, anyone can hand Harbour a task: about week 16;
+    - milestone 3: about week 18.
+  - **Pushing it:**
+    - With the levers (sort hard, one first audience, Theseus the clusters, bring your own runner, six in flight), milestone 2 comes in about 3.2 weeks and milestone 1 in about 1.8.
+    - The floor is about 2.5 weeks: things that must happen in order, plus a week of real people using it.
+  - **Weight:** 82,154 of Harbour's 207,338 production JavaScript lines (40%) are comment-only (46% in runs and dispatch, 50% in auth).
+  - D1's wording and the first course are still to confirm.
