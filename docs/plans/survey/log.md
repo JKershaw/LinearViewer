@@ -3108,3 +3108,16 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **I'm not acting on them.** Whether they run, fold into the notes or wait is for the discussion.
 - **15:36 UTC: LIN-4393 merged** (`393c7686b`, PR #2377): the size-of-the-move setting is removed. 28 files, +267/−404, so the area's code is smaller by 137 lines. The leftovers went to the notes: an llm-and-prompts Waiting entry on the five hand-built prompt contexts (the reads' biggest worse item, now one fewer field to carry), a lesson that the budget fixture passes no context, and a new auth-accounts-and-workspaces note on retiring a logged setting. Nothing was filed. It took about 45 minutes from John's call to merge, through the parrot, two Surveys, the size call and autopilot, with no hand-steering.
   - **Area reads CK (`1de4be82`) and CL (`c5bd5030`)** read LIN-4346's whole area (the four pieces plus the tidy) as one change.
+- **15:40 UTC: LIN-4346 area after its tidy, CK and CL: mixed, mixed.** Both readers credit the removal: done cleanly, with all five policy loads gone and a general rule for retired settings (old rows show but can't be undone). It doesn't flip the area. What's still worse, agreed by both:
+  - `lookFirstWait` is threaded by hand through six or seven seams;
+  - the how patterns live in the checker and again in proxy-instructions;
+  - `isLiveRun` sits beside `liveOnAnchor`;
+  - scoping's description and when-line still describe its old job (named in all four reads);
+  - ticket and ruling history is back in code comments;
+  - about 120 lines of tuned prose parsing sit in the size guard;
+  - the docs name `lookFirstStep`, but production calls `lookFirstRoute`.
+
+  Both note that the area notes already hold two of these as Waiting, and that the batch added about four acknowledged debts.
+  - **Round-1 count:** four areas ended better (LIN-4345, LIN-4347, LIN-4378, LIN-4358). **LIN-4346 ends mixed after its one tidy.** That's the first area this round where the counterweight's limit (one tidy) bit.
+  - It's also the area whose brief carried the most of my how, the standing policy. And it's the largest move of the round: four pieces, a replay, about 25 files.
+  - **Not acting:** nothing filed, nothing steered. The leftovers are recorded here. Whether "one tidy per area" should accept a mixed end, and where these leftovers go, is put to John.
