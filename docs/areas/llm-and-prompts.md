@@ -33,8 +33,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - Closing one channel moved the how into the next one in every arm of LIN-4369's replay:
   done-means, then definitions, then comments, then the final `[done]` report. When a
   stage must not hand over how, close every channel it writes to, or hold the reader's
-  side (LIN-4369 arm 4). Run facts carry no run's messages, which holds scoping's report
-  back (`tests/unit/lin-4370-look-first-route.test.js`).
+  side (LIN-4369 arm 4).
+- Model facts come from the OpenRouter catalog: add no model list or rate (LIN-4358).
+  Tests seed `tests/unit/helpers/pinned-catalog.js`.
 
 ## Waiting
 
@@ -47,13 +48,10 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   says to read the area's notes. Replay arm 4 passed (PR #2356), so this can be done now:
   give scoping and both Surveys the pointer and drop scoping's "the area's notes" prose in
   the next change to scoping's prompt. (LIN-4371; LIN-4369 leftovers.)
-
 - `lib/should-mock-ai.js`: `isHermeticTestToken` is a third spelling of the test-token
   check, beside `isTestToken` in `routes/workspace-api-steps.js` and the inline
   `isTestMode` checks in `routes/proxy-compute.js` and `routes/task-chat.js`. A new owner
   nothing has moved to yet. (John, 7 Nov, on LIN-4347.)
-- `lib/recap-cache.js`: `parentAsked` sits between `extractHashableContext` and that
-  function's doc comment, so the comment now reads as `parentAsked`'s. (John, 7 Nov.)
 - `lib/as-asked.js`: the "When it could go" paragraph is repeated three times, once per
   function. (John, 7 Nov.)
 - `lib/prompts/stage-intent.js`: `docs/architecture/prompt-system.md` lists the eight
@@ -73,12 +71,15 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   tables (`GROUNDING_BY_KIND`, the rendered ceilings, completion signals, stage labels and
   more), some unguarded. `route: null` now says "never offered" (LIN-4253); folding the
   per-kind tables into the stage's one definition is open. (Survey tally, LIN-4248.)
-- `lib/call-budget.js`: the budget rule (catalog headroom, then one retry with an explicit
-  reasoning bound) has never run live on Haiku 5.5 (anthropic/claude-haiku-5.5). Before any
-  call moves back to Haiku 5.5, replay LIN-4352's brief: save GET
-  /api/proxy/issues/LIN-4352/snapshots?limit=1 (snapshot 82b963e0) as snap.json, then run
-  OPENROUTER_API_KEY=… node `scripts/replay-brief.mjs` snap.json anthropic/claude-haiku-5.5.
-  It passes when block [2] prints WHOLE with four sections and a final finishReason=stop,
-  and any retry row shows the reasoning bound accepted (not a 400). REFUSED means the rule
-  changes first. Line [1] says why Haiku stopped on 7 Nov. (John, 8 Nov, on LIN-4358: "Let
-  it merge"; the replay gates the next move to Haiku 5.5, not PR #2362.)
+- `lib/call-budget.js`: the budget rule has never run live on anthropic/claude-haiku-5.5.
+  Before a call moves to it, save GET /api/proxy/issues/LIN-4352/snapshots?limit=1
+  (82b963e0) as snap.json and run OPENROUTER_API_KEY=… node `scripts/replay-brief.mjs`
+  snap.json anthropic/claude-haiku-5.5. Pass: block [2] WHOLE, four sections, final
+  finishReason=stop, any retry's reasoning bound accepted (no 400). REFUSED: change the
+  rule first. (John, 8 Nov, LIN-4358.)
+- `lib/call-budget.js`: split rule: `resolveReasoningBudget`/`isReasoningModel` stay in
+  `lib/openrouter.js`; tool hops and the routing pair get the budget, not the retry;
+  `canReason` has test callers only. (Area reads CG/CH, 8 Nov.)
+- `lib/openrouter.js`: `SUGGESTED_MODEL_IDS` and `DISPATCH_MODEL_SUGGESTIONS`
+  (`lib/model-routing-harnesses.js`) repeat ids by hand, unchecked; the first doubles as
+  the cold-catalog tool fallback. (Area reads CG/CH, 8 Nov.)

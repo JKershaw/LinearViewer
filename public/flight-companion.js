@@ -2094,7 +2094,7 @@
       // native <select> silently ignored a stored value matching none of its
       // options; a text-backed combobox does not, so the stored id is checked
       // explicitly against the rendered (offered) list. A stale id (a model since
-      // removed from AVAILABLE_MODELS or the catalog, or a cold catalog on this
+      // removed from SUGGESTED_MODEL_IDS or the catalog, or a cold catalog on this
       // load) leaves the committed value '' — the same safe "no override" state
       // a fresh session starts in — and the session is re-saved so the stale id
       // does not linger and 400 the next turn.

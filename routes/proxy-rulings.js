@@ -148,7 +148,7 @@ function optionRefusal(row, optionId) {
 
 /**
  * @param {Object} deps
- * @param {Function} deps.proxyLimiter - Proxy rate limiter middleware (per proven credential, else per IP)
+ * @param {Function} deps.proxyLimiter - The proxy rate limiter, injected (see `proxyLimiter` in routes/proxy.js)
  * @param {Function} deps.authenticateProxyToken - Proxy bearer-token auth middleware
  * @param {Function} deps.requireWriteScope - Middleware requiring a readWrite-scoped token
  * @param {Function} deps.logEvent - Proxy event/audit logger

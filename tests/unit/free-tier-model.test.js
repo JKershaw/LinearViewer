@@ -7,17 +7,17 @@
 // workspace-model-clamp.test.js. The load-bearing property here is FAIL CLOSED:
 // free-tier calls bill against the operator's shared OPENROUTER_FREE_TIER_KEY, so an
 // uncurated value must degrade to DEFAULT_MODEL rather than reach OpenRouter — the
-// env var must not become the one path that bypasses the AVAILABLE_MODELS gate that
+// env var must not become the one path that bypasses the allowlist (FREE_TIER_MODEL_IDS) that
 // resolveRoadmapModelOverride already enforces on the per-request override path.
 //
 // getFreeTierModelConfigWarning is the counterpart: because the resolver fails
 // closed *silently*, a typo would otherwise be invisible to the operator who set it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveFreeTierModel, getFreeTierModelConfigWarning, DEFAULT_MODEL, AVAILABLE_MODELS } from '../../lib/openrouter.js';
+import { resolveFreeTierModel, getFreeTierModelConfigWarning, DEFAULT_MODEL, FREE_TIER_MODEL_IDS, SUGGESTED_MODEL_IDS } from '../../lib/openrouter.js';
 
 // A curated non-default id — the whole point of the feature.
-const CURATED = AVAILABLE_MODELS.find(m => m.id !== DEFAULT_MODEL)?.id;
+const CURATED = FREE_TIER_MODEL_IDS.find(id => id !== DEFAULT_MODEL);
 
 // Set/restore the var around one assertion body. The resolver reads process.env per
 // call (rather than at module load) precisely so this works without re-importing.
@@ -34,7 +34,7 @@ function withEnv(value, fn) {
 }
 
 test('sanity: a curated non-default model exists to point the free tier at', () => {
-  assert.ok(CURATED, 'AVAILABLE_MODELS must offer at least one non-default model');
+  assert.ok(CURATED, 'FREE_TIER_MODEL_IDS must allow at least one non-default model');
 });
 
 // --- resolveFreeTierModel ---------------------------------------------------
@@ -47,9 +47,21 @@ test('valid curated id: honored', () => {
   withEnv(CURATED, () => assert.equal(resolveFreeTierModel(), CURATED));
 });
 
-test('every curated id is accepted (the allow-list is AVAILABLE_MODELS)', () => {
-  for (const m of AVAILABLE_MODELS) {
-    withEnv(m.id, () => assert.equal(resolveFreeTierModel(), m.id));
+test('every allowlisted id is accepted (the allow-list is FREE_TIER_MODEL_IDS)', () => {
+  for (const id of FREE_TIER_MODEL_IDS) {
+    withEnv(id, () => assert.equal(resolveFreeTierModel(), id));
+  }
+});
+
+// LIN-4358: being suggested in a picker is not permission to spend the operator's key. The
+// suggestions gained openai/gpt-6.1-sol and anthropic/claude-haiku-5.5; the allowlist did not,
+// pending John's free-tier ruling. If this fails because a suggestion was added to the
+// allowlist, that is a spending change: it needs the ruling first.
+test('a model that is suggested but not allowlisted fails closed (suggesting is not allowing)', () => {
+  const suggestedOnly = SUGGESTED_MODEL_IDS.filter(id => !FREE_TIER_MODEL_IDS.includes(id));
+  assert.deepEqual(suggestedOnly, ['openai/gpt-6.1-sol', 'anthropic/claude-haiku-5.5']);
+  for (const id of suggestedOnly) {
+    withEnv(id, () => assert.equal(resolveFreeTierModel(), DEFAULT_MODEL));
   }
 });
 

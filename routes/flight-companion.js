@@ -86,7 +86,7 @@ import { DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../lib/flight-companion-gate.
 import { buildCensusSeedText } from '../lib/flight-companion-census-seed.js';
 export { buildCensusSeedText };
 import { filterChatTurns } from '../lib/chat-transcript.js';
-import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, AVAILABLE_MODELS, getModelPricingHint } from '../lib/openrouter.js';
+import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, SUGGESTED_MODEL_IDS, isSuggestedModel, getModelDisplayName, getModelPricingHint } from '../lib/openrouter.js';
 import { buildModelOptions, getModelCatalog as defaultGetModelCatalog } from '../lib/openrouter-catalog.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS } from '../lib/chat-tools.js';
@@ -127,7 +127,7 @@ const SWEEP_INSTANCE_PREFIX = 'sweep:v1:';
 
 /**
  * Validate the turn endpoint's optional per-turn `model` override: it must be a
- * curated AVAILABLE_MODELS id OR an id present in the cached model catalog
+ * suggested id (SUGGESTED_MODEL_IDS) OR an id present in the cached model catalog
  * (the same list Settings' dispatch rows offer) — LIN-2623 beat 2, widened by
  * LIN-3363/LIN-3370.
  *
@@ -162,7 +162,7 @@ export async function resolveTurnModelOverride(rawModel, { loadCatalog } = {}) {
   }
   const id = rawModel.trim();
   if (!id) return { model: null, error: null };
-  if (AVAILABLE_MODELS.some(m => m.id === id)) {
+  if (isSuggestedModel(id)) {
     return { model: id, error: null };
   }
   let catalog = [];
@@ -206,16 +206,16 @@ export async function resolveTurnModelOverride(rawModel, { loadCatalog } = {}) {
  * established phrase, rather than re-deriving the no-census classification.
  *
  * LIN-2623 beat 3 adds the per-turn model picker's own data: `modelOptions`
- * (curated `AVAILABLE_MODELS` ids plus the cached model catalog — the set
+ * (suggested `SUGGESTED_MODEL_IDS` ids plus the cached model catalog — the set
  * `resolveTurnModelOverride`, routes/flight-companion.js, accepts, so no
  * option can 400. Built via the shared `buildModelOptions` merge (lib/
  * openrouter-catalog.js), reused rather than forked. Each option carries
  * `curated`; the renderer offers every option (LIN-3363 S2: a searchable
  * combobox, entries that are not tool-capable tagged tools-off; LIN-3882: a
  * catalog-only id is tool-capable when its `supported_parameters` lists
- * `tools`). Curated display name/pricing come straight from
- * `AVAILABLE_MODELS`; a catalog-only id uses its catalog label and
- * `getModelPricingHint`'s rate-card row, else its catalog price (LIN-3882))
+ * `tools`). Every display name and price is read from the catalog
+ * (LIN-4358: `getModelDisplayName`, `getModelPricingHint`); a catalog-only id
+ * keeps its catalog label)
  * and `currentPricing` (the resolved default's
  * own rate-card hint, `null` when unpriced — never fabricated, matching
  * `getModelPricingHint`'s own contract).
@@ -237,16 +237,16 @@ export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, 
   const lastCheckInAt = lastTurnAt ? new Date(lastTurnAt).toISOString() : null;
 
   // LIN-3363: the option set is curated ids plus the cached catalog, deduped
-  // by `buildModelOptions` (curated first). Curated entries keep their
-  // AVAILABLE_MODELS name/pricing; a catalog-only id uses its catalog label and
-  // `getModelPricingHint` (its rate-card row, else its catalog price, LIN-3882).
+  // by `buildModelOptions` (suggested first). LIN-4358: every name and price is
+  // read from the catalog (`getModelDisplayName`, `getModelPricingHint`), suggested
+  // or not; a catalog-only id keeps its catalog label.
   // `curated` marks the two
   // apart (the renderer offers both); `toolsOn`/`free` are per-option facts.
-  const modelOptions = buildModelOptions({ curatedIds: AVAILABLE_MODELS.map((m) => m.id), catalog }).map((d) => {
-    const curated = AVAILABLE_MODELS.find((m) => m.id === d.id);
+  const modelOptions = buildModelOptions({ curatedIds: SUGGESTED_MODEL_IDS, catalog }).map((d) => {
+    const curated = isSuggestedModel(d.id);
     return {
       id: d.id,
-      name: curated ? curated.name : (d.label ?? d.id),
+      name: curated ? getModelDisplayName(d.id) : (d.label ?? d.id),
       pricing: getModelPricingHint(d.id),
       toolsOn: isToolCapableModel(d.id),
       free: !!d.free,

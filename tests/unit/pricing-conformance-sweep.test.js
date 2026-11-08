@@ -1,266 +1,70 @@
 /**
- * Unit tests for lib/pricing-conformance-sweep.js (LIN-2384).
+ * Unit tests for lib/pricing-conformance-sweep.js (LIN-2384; repointed by LIN-4358).
  *
- * Zero network: findPricingConformanceViolations is pure over an
- * already-fetched catalog array, and the wrapper tests inject a fake
- * getCatalog. Run with: node --test tests/unit/pricing-conformance-sweep.test.js
+ * The sweep no longer diffs a hand-typed rate card against the catalog: rates are read from
+ * the catalog itself. It now reports what can still go wrong: a price gate the parser does
+ * not model, a model in use that prices to null, and a hand-kept choice list naming a model
+ * the catalog no longer lists.
+ *
+ * Zero network: the classifiers are pure over an already-fetched catalog array, and the
+ * wrapper tests inject a fake getCatalog. Rates come from the pinned 8 Nov 2026 snapshot.
+ * Run with: node --test tests/unit/pricing-conformance-sweep.test.js
  */
-import { test, describe } from 'node:test';
+import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { findPricingConformanceViolations, findUnpricedModels, createPricingConformanceSweepRun } from '../../lib/pricing-conformance-sweep.js';
-import { MODEL_PRICING } from '../../lib/model-pricing.js';
+import {
+  findUnmodelledPricing, findUnpricedModels, findListedModelsMissing, createPricingConformanceSweepRun,
+} from '../../lib/pricing-conformance-sweep.js';
 import { parseUsage } from '../../lib/session-telemetry.js';
 import { recordUnpricedModel, getSeenModels, resetSeenModels, MAX_SEEN_MODELS } from '../../lib/unpriced-models.js';
+import { getModelCatalog } from '../../lib/openrouter-catalog.js';
+import { seedPinnedCatalog, clearCatalog } from './helpers/pinned-catalog.js';
 
-// A live-catalog-shaped fixture matching the corrected MODEL_PRICING table
-// exactly, for every id the table carries. Built once here rather than
-// hand-typed per test, so "zero violations" stays true even if the table
-// gains rows later.
-const FIELD_MAP = {
-  prompt: 'prompt',
-  completion: 'completion',
-  cacheRead: 'input_cache_read',
-  cacheWrite: 'input_cache_write',
-  cacheWrite1h: 'input_cache_write_1h',
-};
-
-function catalogRawFromTable() {
-  return Object.entries(MODEL_PRICING).map(([id, rate]) => {
-    const pricing = {};
-    for (const [tier, field] of Object.entries(FIELD_MAP)) {
-      if (Number.isFinite(rate[tier])) pricing[field] = String(rate[tier] / 1e6);
-    }
-    // LIN-2403: mirror the table's own overrides array into the catalog's raw
-    // shape (min_prompt_tokens + snake_case tier fields) so a table gaining an
-    // overrides entry doesn't spuriously go "table models a threshold the
-    // catalog no longer publishes" against this fixture.
-    if (Array.isArray(rate.overrides) && rate.overrides.length > 0) {
-      pricing.overrides = rate.overrides.map(entry => {
-        const raw = { min_prompt_tokens: entry.minPromptTokens };
-        for (const [tier, field] of Object.entries(FIELD_MAP)) {
-          if (Number.isFinite(entry[tier])) raw[field] = String(entry[tier] / 1e6);
-        }
-        return raw;
-      });
-    }
-    return { id, name: id, pricing };
-  });
+function fakeLogger() {
+  const calls = { warn: [], error: [] };
+  return { logger: { warn: (...a) => calls.warn.push(a), error: (...a) => calls.error.push(a) }, calls };
 }
 
-describe('findPricingConformanceViolations', () => {
-  test('empty catalog ⇒ not verified, zero violations, zero checked — never reads as "all clear"', () => {
-    assert.deepStrictEqual(findPricingConformanceViolations([]), { verified: false, violations: [], checked: 0, comparisons: 0 });
+let PINNED = [];
+beforeEach(async () => { seedPinnedCatalog(); PINNED = await getModelCatalog(); });
+afterEach(() => clearCatalog());
+
+describe('findUnmodelledPricing (LIN-4358)', () => {
+  test('the pinned 8 Nov 2026 catalog has no gate the parser does not model', () => {
+    assert.ok(PINNED.length > 0);
+    assert.deepEqual(findUnmodelledPricing(PINNED), []);
   });
 
-  test('non-array input ⇒ not verified (defensive)', () => {
-    assert.deepStrictEqual(findPricingConformanceViolations(null), { verified: false, violations: [], checked: 0, comparisons: 0 });
-    assert.deepStrictEqual(findPricingConformanceViolations(undefined), { verified: false, violations: [], checked: 0, comparisons: 0 });
-  });
-
-  test('a catalog matching the table exactly ⇒ verified, zero violations', () => {
-    const result = findPricingConformanceViolations(catalogRawFromTable());
-    assert.strictEqual(result.verified, true);
-    assert.deepStrictEqual(result.violations, []);
-    assert.strictEqual(result.checked, Object.keys(MODEL_PRICING).length);
-  });
-
-  test('a mismatched tier is reported as a violation', () => {
-    const catalog = catalogRawFromTable();
-    const sol = catalog.find(m => m.id === 'openai/gpt-5.6-sol');
-    sol.pricing.completion = '0.00003'; // 30.00 per 1M — the pre-fix stale value
-    const result = findPricingConformanceViolations(catalog);
-    assert.strictEqual(result.verified, true);
-    assert.deepStrictEqual(result.violations, [
-      { id: 'openai/gpt-5.6-sol', tier: 'completion', tableValue: 20.00, catalogValue: 30.00 },
-    ]);
-  });
-
-  test('a table id absent from the live catalog is skipped, not reported', () => {
-    const catalog = catalogRawFromTable().filter(m => m.id !== 'openai/gpt-5.6-sol');
-    const result = findPricingConformanceViolations(catalog);
-    assert.strictEqual(result.verified, true);
-    assert.deepStrictEqual(result.violations, []);
-    assert.strictEqual(result.checked, Object.keys(MODEL_PRICING).length - 1);
-  });
-
-  test('a catalog entry with pricing: null is skipped, not reported (catalog fetch degraded for that id)', () => {
-    const catalog = catalogRawFromTable();
-    const sol = catalog.find(m => m.id === 'openai/gpt-5.6-sol');
-    sol.pricing = null;
-    const result = findPricingConformanceViolations(catalog);
-    assert.strictEqual(result.verified, true);
-    assert.deepStrictEqual(result.violations, []);
-    assert.strictEqual(result.checked, Object.keys(MODEL_PRICING).length - 1);
-  });
-
-  test('a tier present on only one side is skipped, not flagged', () => {
-    const catalog = catalogRawFromTable();
-    const sol = catalog.find(m => m.id === 'openai/gpt-5.6-sol');
-    // sol's table row has no cacheWrite1h; give the catalog one anyway.
-    sol.pricing.input_cache_write_1h = '0.000004';
-    const result = findPricingConformanceViolations(catalog);
-    assert.strictEqual(result.verified, true);
-    assert.deepStrictEqual(result.violations, []);
-  });
-
-  test('float precision: 0.000002 * 1e6 compares equal to 2, not 1.9999999999998', () => {
-    const catalog = [{ id: 'anthropic/claude-sonnet-5', name: 'x', pricing: { prompt: '0.000002' } }];
-    // Real rate row: prompt 2.00 exactly.
-    const result = findPricingConformanceViolations(catalog);
-    assert.strictEqual(result.verified, true);
-    assert.deepStrictEqual(result.violations, []);
-  });
-});
-
-describe('findPricingConformanceViolations — override tiers (LIN-2403)', () => {
-  test('an override tier the table does not model is a VIOLATION, not a skip', () => {
-    const catalog = catalogRawFromTable();
-    const mini = catalog.find(m => m.id === 'openai/gpt-5.4-mini'); // no overrides in the table
-    mini.pricing.overrides = [{ min_prompt_tokens: 100000, prompt: '0.000002' }];
-    const result = findPricingConformanceViolations(catalog);
-    assert.strictEqual(result.verified, true);
-    assert.deepStrictEqual(result.violations, [
-      { id: 'openai/gpt-5.4-mini', tier: 'overrides[100000]', tableValue: null, catalogValue: 'present' },
-    ]);
-  });
-
-  test('an override the table models but the catalog no longer publishes is also a violation', () => {
-    const catalog = catalogRawFromTable();
-    delete catalog.find(m => m.id === 'openai/gpt-5.6-sol').pricing.overrides;
-    const result = findPricingConformanceViolations(catalog);
-    assert.strictEqual(result.verified, true);
-    assert.deepStrictEqual(result.violations, [
-      { id: 'openai/gpt-5.6-sol', tier: 'overrides[272000]', tableValue: 'present', catalogValue: null },
-    ]);
-  });
-
-  test('a drifted override value is reported with its threshold in the tier label', () => {
-    const catalog = catalogRawFromTable();
-    catalog.find(m => m.id === 'openai/gpt-5.6-sol').pricing.overrides[0].prompt = '0.000009'; // 9.00 vs the table's 8.00
-    const result = findPricingConformanceViolations(catalog);
-    assert.strictEqual(result.verified, true);
-    assert.deepStrictEqual(result.violations, [
-      { id: 'openai/gpt-5.6-sol', tier: 'overrides[272000]:prompt', tableValue: 8.00, catalogValue: 9.00 },
-    ]);
-  });
-
-  test('a matching threshold with a tier present on only one side is skipped within that threshold, not flagged', () => {
-    const catalog = catalogRawFromTable();
-    // gpt-5.5's override table entry has no cacheWrite; give the catalog one anyway.
-    catalog.find(m => m.id === 'openai/gpt-5.5').pricing.overrides[0].input_cache_write = '0.000012';
-    const result = findPricingConformanceViolations(catalog);
-    assert.strictEqual(result.verified, true);
-    assert.deepStrictEqual(result.violations, []);
-  });
-
-  test('a time-window override (no min_prompt_tokens) is ignored, never treated as an always-on tier', () => {
-    const catalog = catalogRawFromTable();
-    // Shaped like the real deepseek/deepseek-v4-flash-vision-exp catalog entries
-    // (LIN-2403 research): time-gated, no min_prompt_tokens at all.
-    catalog.find(m => m.id === 'openai/gpt-5.4-mini').pricing.overrides = [
-      { utc_days: [1, 2, 3, 4, 5], utc_start: '0000', utc_end: '0800', prompt: '0.0000005' },
+  test('an override gated on an unknown key is named, with the key', () => {
+    const models = [
+      { id: 'x/region', pricing: { prompt: '0.000001', completion: '0.000002', overrides: [{ region: 'eu', prompt: '0.000002' }] } },
+      { id: 'x/plain', pricing: { prompt: '0.000001', completion: '0.000002' } },
     ];
-    const result = findPricingConformanceViolations(catalog);
-    assert.strictEqual(result.verified, true);
-    assert.deepStrictEqual(result.violations, []);
+    assert.deepEqual(findUnmodelledPricing(models), [{ id: 'x/region', gates: ['region'] }]);
   });
 
-  test('override comparisons count toward comparisons — the zero-work guard covers the new layer', () => {
-    const withOverrides = findPricingConformanceViolations(catalogRawFromTable());
-    const withoutOverrides = findPricingConformanceViolations(
-      catalogRawFromTable().map(m => ({ ...m, pricing: { ...m.pricing, overrides: undefined } }))
-    );
-    assert.deepStrictEqual(withOverrides.violations, []);
-    assert.strictEqual(withOverrides.checked, withoutOverrides.checked, 'checked counts rows, unaffected by overrides');
-    // The exact delta, not a hardcoded literal (per the LIN-2403 research): one
-    // comparison per non-threshold key across every table override entry.
-    const overrideTierCount = Object.values(MODEL_PRICING)
-      .flatMap(rate => (Array.isArray(rate.overrides) ? rate.overrides : []))
-      .reduce((sum, entry) => sum + Object.keys(entry).filter(k => k !== 'minPromptTokens').length, 0);
-    assert.ok(overrideTierCount > 0, 'sanity: the table has at least one override tier to count');
-    assert.strictEqual(withOverrides.comparisons - withoutOverrides.comparisons, overrideTierCount);
+  test('a priced tier the usage does not count (web_search, image, audio) is not a gate', () => {
+    const models = [{ id: 'x/tiers', pricing: { prompt: '0.000001', completion: '0.000002', overrides: [{ min_prompt_tokens: 10, audio: '0.1', web_search: '0.01' }] } }];
+    assert.deepEqual(findUnmodelledPricing(models), []);
+  });
+
+  test('tolerates junk input', () => {
+    assert.deepEqual(findUnmodelledPricing(undefined), []);
+    assert.deepEqual(findUnmodelledPricing([null, { id: 3 }, { id: 'x/no-pricing', pricing: null }]), []);
   });
 });
 
-describe('createPricingConformanceSweepRun', () => {
-  function fakeLogger() {
-    const calls = { warn: [], error: [] };
-    return { logger: { warn: (...a) => calls.warn.push(a), error: (...a) => calls.error.push(a) }, calls };
-  }
-
-  test('unavailable catalog (empty array) ⇒ warn branch, never error', async () => {
-    const { logger, calls } = fakeLogger();
-    const run = createPricingConformanceSweepRun({ getCatalog: async () => [], logger });
-    await run();
-    assert.strictEqual(calls.warn.length, 1);
-    assert.match(calls.warn[0][0], /not verified this tick/);
-    assert.strictEqual(calls.error.length, 0);
+describe('findListedModelsMissing (LIN-4358)', () => {
+  test('an id the catalog lists is fine; one it does not list is named with its list', () => {
+    assert.deepEqual(
+      findListedModelsMissing(PINNED, { SUGGESTED_MODEL_IDS: ['openai/gpt-6.1-sol', 'openai/gpt-retired'], FREE_TIER_MODEL_IDS: ['openai/gpt-5.4-mini'] }),
+      [{ list: 'SUGGESTED_MODEL_IDS', id: 'openai/gpt-retired' }]
+    );
   });
 
-  test('non-empty catalog with zero checkable rows ⇒ warn branch identifying that condition, never a silent all-clear (LIN-2384 F1)', async () => {
-    const { logger, calls } = fakeLogger();
-    // Non-empty catalog, but no id overlaps MODEL_PRICING at all — checked stays 0.
-    const catalog = [{ id: 'unrelated/model-not-in-table', name: 'x', pricing: { prompt: '0.000001' } }];
-    const run = createPricingConformanceSweepRun({ getCatalog: async () => catalog, logger });
-    await run();
-    assert.strictEqual(calls.warn.length, 1);
-    assert.match(calls.warn[0][0], /not verified this tick/);
-    assert.match(calls.warn[0][0], /zero checkable rows/);
-    assert.strictEqual(calls.error.length, 0);
-  });
-
-  test('verified with zero violations ⇒ no log at all (steady state)', async () => {
-    const { logger, calls } = fakeLogger();
-    const run = createPricingConformanceSweepRun({ getCatalog: async () => catalogRawFromTable(), logger });
-    await run();
-    assert.strictEqual(calls.warn.length, 0);
-    assert.strictEqual(calls.error.length, 0);
-  });
-
-  test('verified with a violation ⇒ loud error log, one per violation', async () => {
-    const { logger, calls } = fakeLogger();
-    const catalog = catalogRawFromTable();
-    catalog.find(m => m.id === 'openai/gpt-5.6-sol').pricing.completion = '0.00003';
-    const run = createPricingConformanceSweepRun({ getCatalog: async () => catalog, logger });
-    await run();
-    assert.strictEqual(calls.warn.length, 0);
-    assert.strictEqual(calls.error.length, 1);
-    assert.match(calls.error[0][0], /violation/);
-    assert.match(calls.error[0][0], /gpt-5\.6-sol/);
-  });
-
-  test('rows matched but pricing fields renamed upstream ⇒ zero tier comparisons, warn branch, never a silent all-clear', async () => {
-    const { logger, calls } = fakeLogger();
-    // Every row matches by id and carries a non-null pricing object, but the
-    // field names inside it were renamed upstream — no TIER_MAP field lines
-    // up, so every tier is skipped and zero comparisons happen despite
-    // checked > 0.
-    const catalog = Object.entries(MODEL_PRICING).map(([id, rate]) => ({
-      id,
-      name: id,
-      pricing: {
-        input_price: String(rate.prompt / 1e6),
-        output_price: String(rate.completion / 1e6),
-      },
-    }));
-    const pure = findPricingConformanceViolations(catalog);
-    assert.ok(pure.checked > 0);
-    assert.strictEqual(pure.comparisons, 0);
-
-    const run = createPricingConformanceSweepRun({ getCatalog: async () => catalog, logger });
-    await run();
-    assert.strictEqual(calls.warn.length, 1);
-    assert.match(calls.warn[0][0], /not verified this tick/);
-    assert.match(calls.warn[0][0], /zero tier comparisons/);
-    assert.strictEqual(calls.error.length, 0);
-  });
-
-  test('a throwing getCatalog is swallowed — the wrapper never rejects', async () => {
-    const { logger, calls } = fakeLogger();
-    const run = createPricingConformanceSweepRun({ getCatalog: async () => { throw new Error('boom'); }, logger });
-    await assert.doesNotReject(run());
-    assert.strictEqual(calls.error.length, 1);
-    assert.match(calls.error[0][0], /sweep tick failed/);
+  test('tolerates junk input', () => {
+    assert.deepEqual(findListedModelsMissing(undefined, undefined), []);
+    assert.deepEqual(findListedModelsMissing([], { L: [null, '', 7] }), []);
   });
 });
 
@@ -269,7 +73,7 @@ describe('findUnpricedModels (LIN-3094)', () => {
     assert.deepStrictEqual(findUnpricedModels(['claude-opus-5-5', 'claude-opus-5-5-20251001', '<synthetic>']), { unpriced: [], unresolvable: [] });
   });
 
-  test('a resolvable id with no row is unpriced; a bare alias is unresolvable', () => {
+  test('a resolvable id the catalog does not list is unpriced; a bare alias is unresolvable', () => {
     assert.deepStrictEqual(findUnpricedModels(['claude-opus-9-9', 'opus', 'claude-opus-9-9']), {
       unpriced: ['anthropic/claude-opus-9.9'],
       unresolvable: ['opus'],
@@ -285,32 +89,70 @@ describe('findUnpricedModels (LIN-3094)', () => {
   });
 });
 
-describe('createPricingConformanceSweepRun unpriced-model check (LIN-3094)', () => {
-  function fakeLogger() {
-    const calls = { warn: [], error: [] };
-    return { logger: { warn: (...a) => calls.warn.push(a), error: (...a) => calls.error.push(a) }, calls };
-  }
-
-  test('logs each unpriced id even when the catalog is unavailable (no early-return skip)', async () => {
+describe('createPricingConformanceSweepRun', () => {
+  test('unavailable catalog (empty array) ⇒ warn branch, never error, and no unpriced report', async () => {
+    // LIN-4358: rates come from the catalog, so with none every model would read as unpriced.
+    // The unpriced check waits for the catalog instead of crying wolf (it ran first before).
     const { logger, calls } = fakeLogger();
-    const run = createPricingConformanceSweepRun({ getCatalog: async () => [], getSeenModels: () => ['claude-opus-9-9', 'claude-opus-5-5'], logger });
+    const run = createPricingConformanceSweepRun({ getCatalog: async () => [], getSeenModels: () => ['claude-opus-9-9'], logger });
     await run();
-    assert.deepStrictEqual(calls.error.map(a => a[0]), ['[pricing-conformance] unpriced model in use: anthropic/claude-opus-9.9']);
+    assert.strictEqual(calls.warn.length, 1);
     assert.match(calls.warn[0][0], /not verified this tick/);
+    assert.strictEqual(calls.error.length, 0);
   });
 
-  test('logs on every tick it is seen', async () => {
+  test('a healthy catalog with nothing wrong ⇒ no log at all (steady state)', async () => {
     const { logger, calls } = fakeLogger();
-    const run = createPricingConformanceSweepRun({ getCatalog: async () => [], getSeenModels: () => ['opus'], logger });
+    const run = createPricingConformanceSweepRun({
+      getCatalog: async () => PINNED, getSeenModels: () => ['claude-opus-5-5'],
+      getChoiceLists: () => ({ SUGGESTED_MODEL_IDS: ['openai/gpt-6.1-sol'] }), logger,
+    });
+    await run();
+    assert.deepEqual(calls, { warn: [], error: [] });
+  });
+
+  test('each kind of problem is one loud error line', async () => {
+    const { logger, calls } = fakeLogger();
+    const catalog = [...PINNED, { id: 'x/region', pricing: { prompt: '0.000001', completion: '0.000002', overrides: [{ region: 'eu' }] } }];
+    const run = createPricingConformanceSweepRun({
+      getCatalog: async () => catalog,
+      getSeenModels: () => ['claude-opus-9-9'],
+      getChoiceLists: () => ({ FREE_TIER_MODEL_IDS: ['openai/gpt-retired'] }),
+      logger,
+    });
+    await run();
+    assert.deepEqual(calls.error.map(a => a[0]), [
+      '[pricing-conformance] unmodelled pricing gate: x/region (region) — that tier is priced at the base rate',
+      '[pricing-conformance] unpriced model in use: anthropic/claude-opus-9.9',
+      '[pricing-conformance] FREE_TIER_MODEL_IDS names a model the catalog does not list: openai/gpt-retired',
+    ]);
+  });
+
+  test('logs an unpriced model on every tick it is seen', async () => {
+    const { logger, calls } = fakeLogger();
+    const run = createPricingConformanceSweepRun({ getCatalog: async () => PINNED, getSeenModels: () => ['opus'], logger });
     await run(); await run();
     assert.strictEqual(calls.error.length, 2);
     assert.match(calls.error[0][0], /unpriced model in use: opus/);
   });
 
-  test('default (empty) reader logs nothing', async () => {
+  test('a throwing getCatalog is swallowed — the wrapper never rejects', async () => {
     const { logger, calls } = fakeLogger();
-    await createPricingConformanceSweepRun({ getCatalog: async () => [], logger })();
-    assert.strictEqual(calls.error.length, 0);
+    const run = createPricingConformanceSweepRun({ getCatalog: async () => { throw new Error('boom'); }, logger });
+    await assert.doesNotReject(run());
+    assert.strictEqual(calls.error.length, 1);
+    assert.match(calls.error[0][0], /sweep tick failed/);
+  });
+
+  test('a throwing seen-models reader is reported and the other checks still run', async () => {
+    const { logger, calls } = fakeLogger();
+    const run = createPricingConformanceSweepRun({
+      getCatalog: async () => PINNED, getSeenModels: () => { throw new Error('reader'); },
+      getChoiceLists: () => ({ L: ['x/gone'] }), logger,
+    });
+    await run();
+    assert.match(calls.error[0][0], /unpriced-model check failed/);
+    assert.match(calls.error[1][0], /L names a model the catalog does not list: x\/gone/);
   });
 });
 
@@ -323,7 +165,7 @@ describe('unpriced-model registry wiring (LIN-3094)', () => {
     parseUsage(usageFeedback('claude-opus-5-5')); // priced: must not be recorded
     assert.deepStrictEqual(getSeenModels(), ['claude-opus-9-9']);
     const errors = [];
-    await createPricingConformanceSweepRun({ getCatalog: async () => [], logger: { warn() {}, error: (...a) => errors.push(a[0]) } })();
+    await createPricingConformanceSweepRun({ getCatalog: async () => PINNED, logger: { warn() {}, error: (...a) => errors.push(a[0]) } })();
     assert.deepStrictEqual(errors, ['[pricing-conformance] unpriced model in use: anthropic/claude-opus-9.9']);
     resetSeenModels();
   });

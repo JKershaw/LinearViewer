@@ -20,23 +20,29 @@ import {
   formatModelPricing,
   getModelPricingHint,
   isToolCapableModel,
-  AVAILABLE_MODELS,
+  SUGGESTED_MODEL_IDS,
+  suggestedModels,
   getPaidEnvKey,
   hasPaidEnvKey,
   isRecommendationEnabled,
   DEFAULT_MODEL,
   resolveReasoningBudget,
   isReasoningModel,
-  REASONING_MIN_TOKENS,
-  REASONING_MAX_TOKENS,
   EPIC_CHILD_THRESHOLD,
   COUSIN_CAP,
   SIBLING_CAP,
   EPIC_TITLE_PATTERN
 } from '../../lib/openrouter.js';
+import { REASONING_MIN_TOKENS, REASONING_MAX_TOKENS } from '../../lib/call-budget.js';
 import { getSelectableStages, deriveDispatchKind, isValidDispatchKind, DISPATCH_KIND_DEFAULT, generatePrompt } from '../../lib/prompt-templates.js';
 const actionNames = () => getSelectableStages().map(s => s.name);
 import { guardNetwork } from '../fixtures/network-guard.js';
+import { seedPinnedCatalog, clearCatalog } from './helpers/pinned-catalog.js';
+
+// LIN-4358: the explicit reasoning split now applies only where the catalog says thinking is
+// on by default. openai/gpt-6.1-sol is `mandatory` in the pinned 8 Nov 2026 snapshot;
+// gpt-5.4-mini (the default) says `default_enabled: false` and so no longer splits.
+const SPLIT_MODEL = 'openai/gpt-6.1-sol';
 
 // =============================================================================
 // formatSubtaskOverview Tests
@@ -171,7 +177,11 @@ describe('formatSubtaskOverview', () => {
 // =============================================================================
 
 describe('getModelDisplayName', () => {
-  test('returns the curated name for a known model id', () => {
+  // LIN-4358: names and rates come from the catalog (the pinned 8 Nov 2026 snapshot).
+  beforeEach(() => seedPinnedCatalog());
+  afterEach(() => clearCatalog());
+
+  test('returns the catalog name, without its provider prefix, for a known model id', () => {
     assert.strictEqual(getModelDisplayName('openai/gpt-5.4-mini'), 'GPT-5.4 Mini');
     assert.strictEqual(getModelDisplayName('anthropic/claude-opus-4.8'), 'Claude Opus 4.8');
     assert.strictEqual(getModelDisplayName('openai/gpt-5.5'), 'GPT-5.5');
@@ -208,13 +218,19 @@ describe('formatModelPricing / getModelPricingHint (LIN-993)', () => {
     assert.strictEqual(formatModelPricing({ pricing: { prompt: 'x', completion: 'y' } }), null);
   });
 
-  test('getModelPricingHint resolves a curated id, null for unknown', () => {
-    assert.strictEqual(getModelPricingHint('openai/gpt-5.4-mini'), '$0.75 in / $4.50 out per 1M tokens');
-    assert.strictEqual(getModelPricingHint('some-provider/unknown-model'), null);
+  test('getModelPricingHint resolves a catalog id, null for unknown (LIN-4358: from the catalog)', () => {
+    seedPinnedCatalog();
+    try {
+      assert.strictEqual(getModelPricingHint('openai/gpt-5.4-mini'), '$0.75 in / $4.50 out per 1M tokens');
+      assert.strictEqual(getModelPricingHint('some-provider/unknown-model'), null);
+    } finally { clearCatalog(); }
   });
 
-  test('every curated model carries a well-formed pricing rate', () => {
-    for (const m of AVAILABLE_MODELS) {
+  test('every suggested model carries a well-formed pricing rate in the pinned catalog', () => {
+    seedPinnedCatalog();
+    let models;
+    try { models = suggestedModels(); } finally { clearCatalog(); }
+    for (const m of models) {
       assert.ok(m.pricing, `model ${m.id} must carry a pricing rate`);
       assert.strictEqual(typeof m.pricing.prompt, 'number', `${m.id} prompt rate is a number`);
       assert.strictEqual(typeof m.pricing.completion, 'number', `${m.id} completion rate is a number`);
@@ -224,9 +240,9 @@ describe('formatModelPricing / getModelPricingHint (LIN-993)', () => {
 });
 
 describe('isToolCapableModel (LIN-990)', () => {
-  test('returns true for every curated model in AVAILABLE_MODELS', () => {
-    for (const m of AVAILABLE_MODELS) {
-      assert.strictEqual(isToolCapableModel(m.id), true, `${m.id} should be tool-capable`);
+  test('returns true for every suggested model (a cold catalog keeps their tools)', () => {
+    for (const id of SUGGESTED_MODEL_IDS) {
+      assert.strictEqual(isToolCapableModel(id), true, `${id} should be tool-capable`);
     }
   });
 
@@ -933,12 +949,26 @@ describe('LLM call recorder (LIN-418)', () => {
 // every sibling path is provably unaffected; (2) the helper's arithmetic reserves
 // reasoning headroom on top of the prose budget for reasoning models only.
 // ===========================================================================
-describe('isReasoningModel (LIN-1000)', () => {
-  test('the default model and the gpt-5 family are reasoning models', () => {
-    assert.strictEqual(isReasoningModel(DEFAULT_MODEL), true);
-    assert.strictEqual(isReasoningModel('openai/gpt-5.4-mini'), true);
-    assert.strictEqual(isReasoningModel('openai/gpt-5.5'), true);
-    assert.strictEqual(isReasoningModel('openai/o3-mini'), true);
+describe('isReasoningModel (LIN-1000, catalog-only since LIN-4358)', () => {
+  beforeEach(() => seedPinnedCatalog());
+  afterEach(() => clearCatalog());
+
+  test('a model whose catalog entry says thinking is on by default splits', () => {
+    assert.strictEqual(isReasoningModel('openai/gpt-6.1-sol'), true, 'mandatory');
+    assert.strictEqual(isReasoningModel('openai/gpt-5.5'), true, 'default_enabled: true');
+    assert.strictEqual(isReasoningModel('openai/gpt-5.5-pro'), true, 'mandatory');
+  });
+
+  test('a model that can reason but is off (or silent) by default does not: the call layer gives it headroom instead', () => {
+    assert.strictEqual(isReasoningModel(DEFAULT_MODEL), false, 'gpt-5.4-mini: default_enabled false (LIN-1665)');
+    assert.strictEqual(isReasoningModel('anthropic/claude-haiku-5.5'), false, 'no default_enabled at all');
+  });
+
+  test('the OpenAI prefix list is gone: an unlisted gpt-5/o-series id gives no signal', () => {
+    assert.strictEqual(isReasoningModel('openai/o3-mini'), false);
+    assert.strictEqual(isReasoningModel('openai/gpt-5-unlisted'), false);
+    clearCatalog();
+    assert.strictEqual(isReasoningModel('openai/gpt-6.1-sol'), false, 'cold catalog');
   });
 
   test('non-reasoning models and junk are not', () => {
@@ -951,8 +981,11 @@ describe('isReasoningModel (LIN-1000)', () => {
 });
 
 describe('resolveReasoningBudget (LIN-1000)', () => {
+  beforeEach(() => seedPinnedCatalog());
+  afterEach(() => clearCatalog());
+
   test('a reasoning model splits the budget: reasoning headroom ON TOP of prose', () => {
-    const { reasoning, maxTokens } = resolveReasoningBudget({ model: DEFAULT_MODEL, proseTokens: 3000 });
+    const { reasoning, maxTokens } = resolveReasoningBudget({ model: SPLIT_MODEL, proseTokens: 3000 });
     // Prose is protected: max_tokens covers prose PLUS the reserved reasoning.
     assert.deepStrictEqual(reasoning, { max_tokens: 3000 });
     assert.strictEqual(maxTokens, 3000 + 3000, 'max_tokens = prose + reasoning');
@@ -960,18 +993,18 @@ describe('resolveReasoningBudget (LIN-1000)', () => {
 
   test('the default reasoning reserve is the prose budget clamped to [MIN, MAX]', () => {
     // Below the floor → clamped up to MIN.
-    const small = resolveReasoningBudget({ model: DEFAULT_MODEL, proseTokens: 400 });
+    const small = resolveReasoningBudget({ model: SPLIT_MODEL, proseTokens: 400 });
     assert.strictEqual(small.reasoning.max_tokens, REASONING_MIN_TOKENS);
     assert.strictEqual(small.maxTokens, 400 + REASONING_MIN_TOKENS);
 
     // Above the ceiling → clamped down to MAX.
-    const big = resolveReasoningBudget({ model: DEFAULT_MODEL, proseTokens: 16000 });
+    const big = resolveReasoningBudget({ model: SPLIT_MODEL, proseTokens: 16000 });
     assert.strictEqual(big.reasoning.max_tokens, REASONING_MAX_TOKENS);
     assert.strictEqual(big.maxTokens, 16000 + REASONING_MAX_TOKENS);
   });
 
   test('an explicit reasoningTokens overrides the default reserve', () => {
-    const { reasoning, maxTokens } = resolveReasoningBudget({ model: DEFAULT_MODEL, proseTokens: 3000, reasoningTokens: 500 });
+    const { reasoning, maxTokens } = resolveReasoningBudget({ model: SPLIT_MODEL, proseTokens: 3000, reasoningTokens: 500 });
     assert.deepStrictEqual(reasoning, { max_tokens: 500 });
     assert.strictEqual(maxTokens, 3500);
   });
@@ -1046,11 +1079,15 @@ describe('streamChat reasoning wire body (LIN-1000)', () => {
   test('the helper output threaded into streamChat reproduces the roadmap wire shape', async () => {
     // This is exactly what the 3 roadmap call sites do: derive {reasoning, maxTokens}
     // from a prose budget, then pass both to streamChat.
-    const { reasoning, maxTokens } = resolveReasoningBudget({ model: DEFAULT_MODEL, proseTokens: 5000 });
-    const body = await captureBody({ reasoning, maxTokens });
-    const parsed = JSON.parse(body);
-    assert.deepStrictEqual(parsed.reasoning, { max_tokens: 5000 });
-    assert.strictEqual(parsed.max_tokens, 10000, 'prose (5000) + reasoning (5000)');
+    // LIN-4358: on a model whose catalog entry has thinking on by default.
+    seedPinnedCatalog();
+    try {
+      const { reasoning, maxTokens } = resolveReasoningBudget({ model: SPLIT_MODEL, proseTokens: 5000 });
+      const body = await captureBody({ model: SPLIT_MODEL, reasoning, maxTokens });
+      const parsed = JSON.parse(body);
+      assert.deepStrictEqual(parsed.reasoning, { max_tokens: 5000 });
+      assert.strictEqual(parsed.max_tokens, 10000, 'prose (5000) + reasoning (5000)');
+    } finally { clearCatalog(); }
   });
 
   test('streamChatWithTools tool-less final answer carries NO reasoning (delegation unaffected)', async () => {
@@ -1670,10 +1707,14 @@ describe('stage descriptions: approved-parent-plan child exemption (LIN-3049)', 
   });
 });
 
-// LIN-3962: getModelDisplayName is extended in place. Curated first (unchanged), then the catalog's name, then
+// LIN-3962: getModelDisplayName is extended in place. The catalog's name first (LIN-4358: no curated names), then
 // an alias's family in title case (with "ran as" only from the job's own runs), then the provider-stripped slug.
 describe('getModelDisplayName: one name per model (LIN-3962)', () => {
-  test('a curated id keeps its curated name', () => {
+  // LIN-4358: names and rates come from the catalog (the pinned 8 Nov 2026 snapshot).
+  beforeEach(() => seedPinnedCatalog());
+  afterEach(() => clearCatalog());
+
+  test('a suggested id reads its catalog name without the provider prefix', () => {
     assert.equal(getModelDisplayName('openai/gpt-5.4-mini'), 'GPT-5.4 Mini');
   });
 
@@ -1704,6 +1745,10 @@ describe('getModelDisplayName: one name per model (LIN-3962)', () => {
 
 // LIN-3987: a bare Claude Code alias has the rate of the model it runs, through the same resolution a run is priced by.
 describe('getModelPricingHint: a bare Claude Code alias prices as the model it runs (LIN-3987)', () => {
+  // LIN-4358: names and rates come from the catalog (the pinned 8 Nov 2026 snapshot).
+  beforeEach(() => seedPinnedCatalog());
+  afterEach(() => clearCatalog());
+
   test('an alias has the rate of its mapped model, in the same form as the opencode suggestions', () => {
     assert.equal(getModelPricingHint('sonnet'), '$2.00 in / $10.00 out per 1M tokens');
     assert.equal(getModelPricingHint('opus'), '$4.00 in / $20.00 out per 1M tokens');

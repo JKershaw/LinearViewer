@@ -1,0 +1,386 @@
+# Supplementary figures, Seams & Tangles run 10 (LIN-4387)
+measured commits 90542b2c79016d2a1d64f75cb5d3e9037080eae7 (baseline) and bad9d719ba01ffea2ba5339c32ea354e67bf5682; one guide, the HEAD registry docs/areas/areas.json (blob 4011e82a, areas.head-registry.json)
+
+## S0. Window facts
+bad9d719b 2026-11-08T12:25:05Z LIN-4358: model facts from the OpenRouter catalog, not hand lists (#2367)
+3d2046ac8 2026-11-08T12:14:31Z Merge pull request #2369 from JKershaw/feat/lin-4378-close-out-tidy
+32da8d583 2026-11-08T12:12:18Z Merge pull request #2368 from JKershaw/chore/lin-4383-area-notes-after-tidy
+400d7890e 2026-11-08T12:05:37Z LIN-4383 follow-up: one prefix for a degraded release; three Waiting entries from the operator's area read
+5ef9484f6 2026-11-08T12:05:35Z LIN-4378 close-out tidy: the brokers' 429 policy gets one owner in the runner contract
+f8b946d40 2026-11-08T11:54:36Z Merge pull request #2366 from JKershaw/feat/lin-4383-held-wake-primitives
+5450c9ba3 2026-11-08T11:44:25Z Merge remote-tracking branch 'origin/main' into feat/lin-4383-held-wake-primitives
+c2db1da30 2026-11-08T11:44:25Z LIN-4383: close-out witnesses M5 (no reads when no wake is owed) and M8 (holder by heldWakeFor, not kind); re-wrap two comments
+d6af02c7b 2026-11-08T11:24:14Z LIN-4383: re-pin A7 to the pointer bytes after LIN-4379 landed
+caa38c695 2026-11-08T11:23:56Z LIN-4383: product-owned registry path; docs and the area note state the new boundary (beat 4/5, slice items 9-10)
+b88990ed3 2026-11-08T11:22:51Z LIN-4383: the leftover policy moves to the hook; the store knows no leftovers (beat 3/5, slice items 6-8)
+df5d5e757 2026-11-08T11:22:51Z LIN-4383: characterize the unpinned held-wake behaviours before the hook move
+9301ecd51 2026-11-08T11:22:51Z LIN-4383: store keeps generic held-wake primitives (beat 2/5, slice items 1-5)
+63b4cb566 2026-11-08T11:22:51Z LIN-4383: witnesses for the held-wake seam (beat 1/5, red by design)
+2d5d6c285 2026-11-08T11:22:38Z Merge pull request #2363 from JKershaw/feat/lin-4378-per-credential-rate-limit
+6ca60a79b 2026-11-08T11:11:41Z Merge remote-tracking branch 'origin/main' into feat/lin-4378-per-credential-rate-limit
+936f52b7d 2026-11-08T11:10:25Z LIN-4384: runner contract pins report and sentinel cases, with shape check and hash tripwire (#2365)
+519ce6e3a 2026-11-08T11:03:16Z Merge origin/main into feat/lin-4378-per-credential-rate-limit
+066e85cb9 2026-11-08T10:59:52Z Merge pull request #2364 from JKershaw/feat/lin-4379-seams-tangles-area-notes
+0bccdc897 2026-11-08T10:52:53Z LIN-4379: "except a take" in the _archiveItem Lesson
+695ced0a4 2026-11-08T10:52:53Z Merge origin/main (LIN-4369, d294a190) into LIN-4379
+ed9afdc62 2026-11-08T10:52:06Z Merge remote-tracking branch 'origin/main' into feat/lin-4378-per-credential-rate-limit
+d294a190e 2026-11-08T10:45:18Z Merge pull request #2356 from JKershaw/feat/lin-4369-scoping-writes-size-record
+717fa3bae 2026-11-08T10:38:45Z Merge remote-tracking branch 'origin/main' into feat/lin-4369-scoping-writes-size-record
+26006bd6b 2026-11-08T10:37:39Z LIN-4378 leftovers: proxyLimiter keys only on a proven credential, as an area lesson
+64c2ca26d 2026-11-08T10:36:34Z LIN-4358: whole or loud at the call layer; budget sized from the catalog (#2362)
+54dcf443e 2026-11-08T10:32:03Z LIN-4379: change-log row names PR #2364
+fc51ef144 2026-11-08T10:29:53Z LIN-4379: header comment names the notes option on adversarialRead too
+aa8d14c1c 2026-11-08T10:29:09Z LIN-4369: close-out — ceiling comments show the net change against main; area notes follow arm 4
+b41f99ced 2026-11-08T10:28:39Z LIN-4379: the area notes pointer asks the work to cite a note entry it used (beat 3/4)
+f7d1923e6 2026-11-08T10:24:58Z LIN-4378: rate limit per proven credential, not per host; the kit broker waits out a rate-limited exchange
+94c9d2e39 2026-11-08T10:23:13Z LIN-4379: area-notes README names Periodical readings; runs-and-dispatch headroom (beat 2/4)
+51ec35aad 2026-11-08T10:17:03Z LIN-4379: Seams & Tangles feeds the area notes, mints no follow-ups (beat 1/4)
+99c542198 2026-11-08T10:10:14Z LIN-4369: replay arm 4 PASSES every pre-registered condition; fresh reader's verdict and results
+03cd671f3 2026-11-08T10:07:20Z LIN-4369: arm 4 run outputs, guard results and comment check (12 scored runs), before the judge's verdict
+18dc80e01 2026-11-08T10:02:21Z LIN-4369: replay arm 4 pre-registration, before any arm-4 scoping run
+b1416f879 2026-11-08T10:02:20Z LIN-4369: replay arm 4, a semicolon joins the why's one sentence, and scoping posts no comment
+a8da03f4f 2026-11-08T08:46:50Z LIN-4369: replay arm 3 FAILS criterion 2; fresh reader's verdict and results
+89a295b8c 2026-11-08T08:43:23Z LIN-4369: arm 3 run outputs and guard results (12 scored runs), before the judge's verdict
+779bf990e 2026-11-08T08:36:47Z LIN-4369: area notes follow arm 3 (the guard holds the record's shape; the prompt's list is gone)
+2707ba3d0 2026-11-08T08:36:47Z Merge remote-tracking branch 'origin/feat/lin-4369-scoping-writes-size-record' into feat/lin-4369-scoping-writes-size-record
+f4547e844 2026-11-08T08:36:24Z LIN-4369: replay arm 3 pre-registration, before any arm-3 scoping run
+f3df8d601 2026-11-08T08:35:21Z LIN-4369: replay arm 3, the size record is four lines and the proxy guard holds the shape
+96ad5a3c4 2026-11-08T08:35:21Z LIN-4369: arm 3 control selection, LIN-1512's Survey pair and the fresh judge's verdict (qualifies)
+eecffe071 2026-11-08T08:25:09Z LIN-4369: leftovers — the refused-how entry cites the scoping prompt's list without quoting arm 2's words
+fe6b2dfbb 2026-11-08T08:25:00Z LIN-4369: leftovers — llms.txt names scoping's new job; the size record owner gets its area; two notes, two lessons
+5202fba9d 2026-11-08T08:22:48Z LIN-4369: arm 3 control-selection protocol, candidates and Survey prompts, before any candidate Survey
+d433f253a 2026-11-08T08:21:45Z Merge origin/main (LIN-4371..LIN-4376) into LIN-4369
+110e35e05 2026-11-08T07:49:48Z LIN-4376: one home for each leftover-step rule; the leftover time bucket (#2361)
+459f8711a 2026-11-08T06:33:07Z LIN-4375: the leftover step names the PR the build opened, and queues once (#2360)
+d5d18e6d0 2026-11-08T05:06:18Z LIN-4374: review reads the leftovers, close-out writes the notes (3/3) (#2359)
+4ba6c8172 2026-11-08T04:10:33Z LIN-4373: leftover step (2/3): the builder is asked what its change left behind at [done], the wake held until it ends (#2358)
+526bca66c 2026-11-08T02:29:09Z LIN-4371: area notes (1/3, LinearViewer): product-owned area registry, notes with guard test, seeds, grounding pointer (#2357)
+5c3c5d2c3 2026-11-08T01:20:46Z LIN-4369: replay arm 2 FAILS criterion 3; fresh reader's verdict and results
+1b2fed283 2026-11-08T01:17:35Z LIN-4369: arm 2 run outputs and guard results (12 scored runs, a01 void), before the judge's verdict
+8ea4b988a 2026-11-08T01:13:06Z LIN-4369: arm 2 addendum, void the three LIN-4178 runs that lacked the parent file; rerun as a13-a15
+5965fd4d9 2026-11-08T01:09:16Z LIN-4369: replay arm 2, scoping's revised wording, pre-registered before any run
+554ae7d42 2026-11-08T00:52:24Z LIN-4369: the size replay's runs, guard check, fresh reader's verdict and results
+70e9ec9e4 2026-11-08T00:34:58Z LIN-4369: scoping writes the size record; replay pre-registered before any run
+eeda7e448 2026-11-08T00:12:19Z LIN-4368: the size record, its proxy guard, and the sizePolicy preference (size of the move 2/4) (#2355)
+9c2a378a0 2026-11-07T23:19:37Z LIN-4367: simplify what PR #2351 left around the cut rule (size of the move 1/4) (#2354)
+11dc1d7bd 2026-11-07T22:09:54Z LIN-4345: deciding stages name each cut to the ask and raise one ruling (attempt 2, upstream) (#2351)
+d65d8af01 2026-11-07T21:07:45Z LIN-4354: one issueAccess adapter for the credentialFor lanes (#2353)
+4654832ff 2026-11-07T20:43:51Z LIN-4362: As-asked tidy (C): one owner for the block's words and brief hint, reason comments, retirement notes (#2352)
+9a29dd553 2026-11-07T19:26:22Z LIN-4360: As-asked tidy (A): one due-line reader, outsideAsAsked, pure brief composer and one mock brief (#2350)
+8198bd400 2026-11-07T18:33:05Z LIN-4345: parent quote in the brief, per-sentence review verdict, and its replay (#2348)
+93a37ab68 2026-11-07T17:52:48Z LIN-4361: one issue access and one read per dispatch, for the seal and the plan read (#2349)
+cdc324bc1 2026-11-07T16:32:05Z LIN-4353: As asked (C): judging stages read the block; preamble, close-out prune, contract and docs (#2347)
+d81e13e7d 2026-11-07T13:28:21Z LIN-4352: As asked (B): proxy guard, description/below, and seals at create and first dispatch (#2346)
+fdd57fe92 2026-11-07T11:47:50Z LIN-4351: As asked (A): the block module, below-the-block reader rule and brief composer (#2345)
+e63c2f69d 2026-11-07T08:52:45Z LIN-4340: essay v4, Clearing up as it goes (#2343)
+aec9e16be 2026-11-06T22:24:40Z LIN-4338: essay v3, the place became somebody's job, in one voice (#2342)
+f90488d06 2026-11-06T20:51:11Z LIN-4335: essay v2, the place became somebody's job reads as a story (#2341)
+b76d52399 2026-11-06T16:35:01Z LIN-4330: essay, what happened when the place became somebody's job (#2340)
+50e17b36e 2026-11-06T16:03:27Z LIN-4331: close-out text fixes F1 and F2 for paper v2 (#2339)
+ea3523068 2026-11-06T15:49:00Z LIN-4334: paper v2 (2/2): pair baseline, v2 evidence, rewrite, registries, fresh readers (#2338)
+509f797e6 2026-11-06T13:51:33Z LIN-4333: one script set for both paper versions (--inputs, strict title parser, freeze hardening) (1/2) (#2337)
+1c894016b 2026-11-06T12:57:05Z LIN-4332: sync Survey notebook to ad935b8df (baseline + 6 Nov readings) (#2336)
+afe9074fd 2026-11-06T12:09:10Z LIN-4254: correct five stale census stop-comment line anchors (#2335)
+b9fc60abc 2026-11-06T12:03:08Z LIN-4324: Drift & Coherence review run 5 (trend vs run 4) (#2334)
+badec1fb7 2026-11-06T11:57:46Z LIN-4322: page nested Linear issue connections; flag truncation (#2332)
+ce42e7217 2026-11-06T11:41:32Z LIN-4312: close-out-client onto loadWorld; remove close-out.js typeof seams (#2331)
+fa3bd87ab 2026-11-06T11:39:13Z LIN-4323: seams & tangles run 9 report (af55cb73 → 90542b2c, delta vs run 8) (#2333)
+- 98 files changed, 5244 insertions(+), 1486 deletions(-)
+- A	lib/as-asked-seal.js
+- A	lib/as-asked.js
+- A	lib/call-budget.js
+- A	lib/catalog-rate.js
+- A	lib/dispatch-leftover-hook.js
+- A	lib/dispatch-leftover.js
+- A	lib/prompts/area-registry-path.js
+- A	lib/prompts/leftover-words.js
+- A	lib/sample-data/fixture-parent.js
+- A	lib/size-of-move.js
+- unchanged in window (empty diff = unchanged): scripts/code-shape/: CHANGED, lib/runner-kit/: CHANGED, docs/runner-prompt.md: unchanged, docs/architecture/source-map.md: CHANGED, docs/dispatch-integration.md: unchanged
+- 90542b2c: lib/cost-read.js lines 762; server.js lines 4713, top-level import lines 209, inline app.<verb>( routes 30
+- bad9d719: lib/cost-read.js lines 762; server.js lines 4757, top-level import lines 214, inline app.<verb>( routes 30
+
+## S1. lib/ -> routes/ imports
+- 90542b2c: edge-dump lib->routes 0; git grep 0
+- bad9d719: edge-dump lib->routes 0; git grep 0
+
+## S2. route -> route file edges (run 5 definition)
+- 90542b2c: 53 (cross-area 3)
+- bad9d719: 53 (cross-area 3)
+
+## S3. F7 dead named lib imports in routes/proxy.js (run 4 heuristic)
+- 90542b2c: named lib imports 96, unused 45
+- bad9d719: named lib imports 96, unused 45
+
+## S4. F6 browser globals and the cost-format script lists
+- 90542b2c: window.X = in public/ 108; in public/common.js 55 (strict =[^=] 51); assignments only in public/ 67; /cost-format.js script-list lines 6: lib/render-flight-companion.js, lib/render-observation.js, lib/render-swipe.js, lib/render-task-page.js, lib/render-workspace-kpis.js, lib/render.js
+- bad9d719: window.X = in public/ 108; in public/common.js 55 (strict =[^=] 51); assignments only in public/ 67; /cost-format.js script-list lines 6: lib/render-flight-companion.js, lib/render-observation.js, lib/render-swipe.js, lib/render-task-page.js, lib/render-workspace-kpis.js, lib/render.js
+- public/ files changed in window: 5: public/brief.js, public/close-out.js, public/flight-companion.js, public/llms.txt, public/recap.js
+- window.X = lines added or removed in the window, by file (A = assignment, R = a read the loose pattern also matches):
+
+## S5. N8: the deleted task-cost module still named
+- 90542b2c: guide alias task-cost| present=True; comment refs 2
+    lib/model-routing-spend.js:5: * Both readers keep the rule the rest of the app keeps (lib/task-cost.js, LIN-1086): a run whose
+    lib/wall-clock-summary.js:99:  // `lib/task-cost.js`'s `buildTaskCost`, which merges a whole lineage's
+- bad9d719: guide alias task-cost| present=True; comment refs 2
+    lib/model-routing-spend.js:5: * Both readers keep the rule the rest of the app keeps (lib/task-cost.js, LIN-1086): a run whose
+    lib/wall-clock-summary.js:107:  // `lib/task-cost.js`'s `buildTaskCost`, which merges a whole lineage's
+
+## S6. Carried anchors (HEAD)
+- lib/render-run-steps.js:258:export function fmtDuration(ms) {
+- lib/render-task-page.js:58:import { renderContextPanel, fmtDuration } from './render-run-steps.js';
+- lib/task-page-loader.js:50:import { fmtDuration } from './render-run-steps.js';
+- lib/task-state.js:22:import { fmtDuration } from './render-run-steps.js';
+- lib/proxy-preamble.js:154:export function applyDefaultDispatchHarness(resolvedHarness) {
+- lib/tree.js:189:export { selectFocusSubtask, computeFrontierFacts, compareByIdentifier } from './recommendation-facts.js'
+- lib/recommendation-facts.js:228:export function parentNextOf(children, own = null) {
+- lib/providers/jira/index.js:104:import { parentNextOf } from '../../recommendation-facts.js'
+- lib/providers/linear/index.js:29:import { parentNextOf } from '../../recommendation-facts.js'
+- lib/providers/local/index.js:40:import { parentNextOf } from '../../recommendation-facts.js'
+- lib/proxy-ref-resolver.js:80:export class RefResolutionError extends Error {
+- lib/proxy-wire.js:285:export function collectIssueAttachments({ description, comments, formalAttachmentNodes } = {}) {
+- lib/recap-cache.js:28:export function stableStringify(value) {
+- lib/recap-cache.js:104:export function hashContext(context) {
+- lib/run-summary-cache.js:32:export function stableStringify(value) {
+- server.js:147:import { createTestRoutes, installTestTokenLinearTransport } from './routes/test.js'
+- server.js:1260:  installTestTokenLinearTransport()
+- lib/dispatch-store.js:59:import { countUsageSnapshotPost } from './usage-snapshot-intake.js';
+- lib/dispatch-store.js:4183:          await countUsageSnapshotPost(this.usageSnapshotCollection, { urlKey });
+- lib/dispatch-store.js:343:export async function lineageIdentityOfRows(collections, rows = []) {
+- lib/workspace-kpi-stats.js:40:import { lineageIdentityOfRows } from './dispatch-store.js';
+- lib/workspace-kpi-stats.js:176:  // (batched per urlKey, lib/dispatch-store.js lineageIdentityOfRows). Keyed on the same `urlKey`-scoped collections.
+- lib/workspace-kpi-stats.js:183:    identityRows: lineageIdentityOfRows([dispatchHistory, dispatchQueue], dispatchDocs),
+- server.js:162:import { lineageIdentityOfRows } from './lib/dispatch-store.js'
+- server.js:2551:    // path gets its output only; the query lives in lib/dispatch-store.js (lineageIdentityOfRows).
+- server.js:2552:    lineageIdentity: rows => lineageIdentityOfRows([dispatchHistoryCollection, dispatchQueueCollection], rows),
+- server.js:141:import { requestUsageLoader as createRequestUsageLoader } from './lib/request-usage-loader.js'
+- server.js:592:const requestUsageLoader = createRequestUsageLoader(requestUsageStore)
+- server.js:595:  requestUsageLoader,
+- server.js:2555:    requestSource: requestUsageLoader,
+- server.js:2625:app.use(createDispatchRoutes({ installationTokenFor, dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenSt
+- server.js:2636:const workspaceKpisCache = workspaceKpisCacheFor({ collections: workspaceKpisCollections, requestUsageLoader })
+- server.js:2637:app.use(createWorkspaceKpisRoutes({ workspaceFromUrl, requestUsageLoader, workspaceKpisCache, collections: workspaceKpisCollections }))
+- server.js:3279:app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, di
+- server.js:3305:app.use(createDashboardRoutes({ installationTokenFor, workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterial
+- lib/cost-read.js:36: * total. Pure: no store, clock or network.
+- lib/request-usage-loader.js:91:export function requireRequestUsageLoader(loader, caller) {
+
+## S7. lib Runs -> server-rendered pages edges
+- 90542b2c: Runs->Pages 8: lib/live-console.js->lib/timeline-zoom.js, lib/task-page-loader.js->lib/render-run-steps.js, lib/task-stack.js->lib/tree.js, routes/dispatch.js->lib/components/decision-panel.js, routes/live-console.js->lib/render-live-console.js, routes/live-console.js->lib/render.js, routes/runner-setup.js->lib/render-runner-setup.js, routes/runner-setup.js->lib/render.js
+- bad9d719: Runs->Pages 8: lib/live-console.js->lib/timeline-zoom.js, lib/task-page-loader.js->lib/render-run-steps.js, lib/task-stack.js->lib/tree.js, routes/dispatch.js->lib/components/decision-panel.js, routes/live-console.js->lib/render-live-console.js, routes/live-console.js->lib/render.js, routes/runner-setup.js->lib/render-runner-setup.js, routes/runner-setup.js->lib/render.js
+
+## S8. F1 (LLM <-> Runs) edges that touch the cost family
+- 90542b2c LLM -> Runs: 31 edges, cost-family 6: lib/model-pricing.js->lib/row-usage.js, lib/model-routing-history.js->lib/cost-read.js, lib/model-routing-history.js->lib/lineage-membership.js, lib/model-routing-history.js->lib/request-usage-loader.js, lib/model-routing-spend.js->lib/cost-read.js, lib/scan.js->lib/session-telemetry.js
+- 90542b2c Runs -> LLM: 37 edges, cost-family 6: lib/cost-read.js->lib/llm-call-log.js, lib/request-usage-fold.js->lib/model-pricing.js, lib/request-usage-intake.js->lib/model-pricing.js, lib/session-telemetry.js->lib/model-pricing.js, routes/dispatch.js->lib/model-routing-history.js, routes/dispatch.js->lib/model-routing-spend.js
+- bad9d719 LLM -> Runs: 31 edges, cost-family 6: lib/model-pricing.js->lib/row-usage.js, lib/model-routing-history.js->lib/cost-read.js, lib/model-routing-history.js->lib/lineage-membership.js, lib/model-routing-history.js->lib/request-usage-loader.js, lib/model-routing-spend.js->lib/cost-read.js, lib/scan.js->lib/session-telemetry.js
+- bad9d719 Runs -> LLM: 49 edges, cost-family 6: lib/cost-read.js->lib/llm-call-log.js, lib/request-usage-fold.js->lib/model-pricing.js, lib/request-usage-intake.js->lib/model-pricing.js, lib/session-telemetry.js->lib/model-pricing.js, routes/dispatch.js->lib/model-routing-history.js, routes/dispatch.js->lib/model-routing-spend.js
+
+## S9. The workspace- pattern (Auth): workspace-* files it places, and workspace-api-mocks importers
+- 90542b2c: workspace-api-mocks.js=Auth; workspace-change-log.js=Auth; workspace-halt.js=Runs; workspace-issues-memo.js=Auth; workspace-kpi-stats.js=Reports; workspace-kpis-cache.js=Reports; workspace-lookup.js=Auth; workspace-owner.js=Auth; workspace-preferences.js=Auth; workspace-registry.js=Auth; workspace-removal-revocation.js=Auth; workspace-store.js=Auth; workspace-title-resolver.js=Auth; workspace-token-cache.js=Auth; workspace-token-refresh.js=Auth; workspace-token-resolver.js=Auth; workspace-urlkey.js=Auth | workspace-api-mocks importers 6
+- bad9d719: workspace-api-mocks.js=Auth; workspace-change-log.js=Auth; workspace-halt.js=Runs; workspace-issues-memo.js=Auth; workspace-kpi-stats.js=Reports; workspace-kpis-cache.js=Reports; workspace-lookup.js=Auth; workspace-owner.js=Auth; workspace-preferences.js=Auth; workspace-registry.js=Auth; workspace-removal-revocation.js=Auth; workspace-store.js=Auth; workspace-title-resolver.js=Auth; workspace-token-cache.js=Auth; workspace-token-refresh.js=Auth; workspace-token-resolver.js=Auth; workspace-urlkey.js=Auth | workspace-api-mocks importers 7
+
+## S10. Scripts outside the tool scope that import lib/ cost modules (HEAD)
+- scripts/lin-4200-d13-volume-timing.mjs:39:import { RequestUsageStore, LIST_PROJECTION, REQUEST_USAGE_COLLECTION } from '../lib/request-usage-store.js'
+- scripts/lin-4200-d13-volume-timing.mjs:41:import { priceRequest } from '../lib/model-pricing.js';
+- scripts/lin-4200-d13-volume-timing.mjs:43:import { ACTIVITY_WINDOW_DAYS } from '../lib/kpi-stats.js';
+- scripts/lin-4200-measure-records-vs-snapshots.mjs:41:import { lineageRecords, lineageFigure } from '../lib/cost-read.js';
+- scripts/lin-4200-measure-records-vs-snapshots.mjs:42:import { NO_REQUEST_RECORDS } from '../lib/request-usage-loader.js';
+- scripts/lin-4200-measure-records-vs-snapshots.mjs:43:import { RequestUsageStore } from '../lib/request-usage-store.js';
+- scripts/lin-4200-measure-records-vs-snapshots.mjs:44:import { lastUsageEntry } from '../lib/row-usage.js';
+- scripts/lin-4200-measure-records-vs-snapshots.mjs:45:import { USAGE_TOKEN_FIELDS } from '../lib/request-usage-vocabulary.js';
+- scripts/lin-4200-measure-records-vs-snapshots.mjs:46:import { priceRequest, resolveWorkerModelId, promptTokensOf } from '../lib/model-pricing.js';
+- scripts/lin4178-founder-timing.mjs:18:import { loadDispatchHistory } from '../lib/kpi-stats.js';
+
+## S11. Change-coupling window overlap
+- windows 2026-09-07T11:12:59.000Z..2026-11-06T11:12:59.000Z and 2026-09-09T12:25:05.000Z..2026-11-08T12:25:05.000Z: overlap 57.950 of 60 days (96.58%)
+- commits 891 vs 929 (cochange changes 891 / 929); shared 891; only 90542b2c 0; only bad9d719 38
+- true top 12 by count at each commit :
+    90542b2c: browser code + server-rendered pages 137; Runs + Web routes 112; Agent API + Runs 107; browser code + Web routes 100; server-rendered pages + Web routes 96; server-rendered pages + Runs 94; Web routes + Wiring 92; LLM + Runs 89; browser code + Runs 87; Runs + Wiring 82; server-rendered pages + Wiring 80; Agent API + Web routes 75
+    bad9d719: browser code + server-rendered pages 138; Agent API + Runs 119; Runs + Web routes 118; LLM + Runs 105; browser code + Web routes 102; server-rendered pages + Web routes 98; server-rendered pages + Runs 96; Web routes + Wiring 93; browser code + Runs 89; Runs + Wiring 84; server-rendered pages + Wiring 81; LLM + Web routes 81
+
+## S12. No-link pairs: commits in the bad9d719 window that touch both areas, for the non-browser no-link pairs
+- Agent API + Reports: 14 commits; most recent 6: c55f0fb33 LIN-4226: the cost read loads its request records through a ; 2ee4e6006 LIN-4201: the cost read sums request records (records-first ; 9cc5ff9cb LIN-4198: request-usage intake, store and per-request pricin; 46b43b3ba LIN-4147: one answer to which rows belong to a lineage (#224; 30db20520 LIN-4129: remove cost code that nothing reads (#2234); 343d34ec0 LIN-3827: retire stale landing-status comments (#2146)
+- Agent API + Other features: 17 commits; most recent 6: 2d5d6c285 Merge pull request #2363 from JKershaw/feat/lin-4378-per-cre; 4654832ff LIN-4362: As-asked tidy (C): one owner for the block's words; d81e13e7d LIN-4352: As asked (B): proxy guard, description/below, and ; 2f0c9d5b0 LIN-4251: a stage's preamble says what it may write, for eve; d9c0f1cae LIN-4253: a stage's route and writes are declared once, on i; 2ee4e6006 LIN-4201: the cost read sums request records (records-first 
+- Other features + Reports: 5 commits; most recent 6: 2ee4e6006 LIN-4201: the cost read sums request records (records-first ; 0dc1620ea LIN-4178: /kpis, workspace KPIs and the run page on the cost; 30db20520 LIN-4129: remove cost code that nothing reads (#2234); cb470984f LIN-3500: the funnel reads the merge click from the close-ou; 325064ee2 Merge pull request #1713 from JKershaw/lin-2952-milestone-fu
+- in-window (90542b2c..bad9d719) commits per browser-code pair partner:
+    bad9d719: LLM, Reports, Runs, Web routes, Wiring, browser code, server-rendered pages
+    3d2046ac: Agent API, LLM, Runs
+    32da8d58: Runs
+    f8b946d4: Agent API, LLM, Runs
+    2d5d6c28: Agent API, Other features, Runs
+    936f52b7: Runs
+    066e85cb: LLM
+    d294a190: Agent API, LLM, Runs, browser code
+    64c2ca26: Agent API, LLM, Web routes, browser code
+    110e35e0: LLM, Runs
+    459f8711: Runs
+    d5d18e6d: LLM, Runs
+    4ba6c817: Agent API, Runs, Wiring
+    526bca66: LLM
+    eeda7e44: Agent API, Auth, LLM, Runs, Web routes, server-rendered pages
+    9c2a378a: LLM, Runs
+    11dc1d7b: LLM, Runs
+    d65d8af0: Runs
+    4654832f: Agent API, LLM, Other features, Providers, Runs, Web routes
+    9a29dd55: Agent API, Auth, LLM, Runs
+    8198bd40: Agent API, Auth, LLM, Providers, Runs
+    93a37ab6: LLM, Other features, Runs, Web routes
+    cdc324bc: Agent API, LLM, Runs, Web routes
+    d81e13e7: Agent API, LLM, Other features, Providers, Runs, Web routes
+    fdd57fe9: Agent API, Auth, LLM, Runs
+    e63c2f69: 
+    aec9e16b: 
+    f90488d0: 
+    b76d5239: 
+    50e17b36: 
+    ea352306: 
+    509f797e: 
+    1c894016: 
+    afe9074f: 
+    b9fc60ab: 
+    badec1fb: Agent API, Providers
+    ce42e721: browser code
+    fa3bd87a: 
+
+## S13. Simple Dispatcher module format (outside seams.mjs)
+- simple-dispatcher origin/main 5d8489e7fd8434f0e69af7df11a3746790abbe64 (2026-11-08T12:43:31Z): dispatcher.js require( lines 35; import/export lines 0; package.json "type": None; JS files 375, with top-level import/export 2: scripts/floor-report.mjs, test/helpers/transcript-corpus-oracle.mjs
+
+## S14. Survey place ledger rows this report cross-links (read only)
+- origin/claude/cool-rubin-6acj5j = c2d18904147b2b1a077080d249d40da34a149361; 228 lines
+    place-ledger.md:35: | LIN-4226 (loading part of the cost read, split off from LIN-4201) | Harbour: +2 cross-area; **LLM↔Runs (F1) +1**; no new files | prod +252 / −151; the read loads through a `requestSource` passed in 
+    place-ledger.md:43: | LIN-4234 (erasure gap, LIN-4203's tidy-after; **no routed findings, scope large**) | no change (1261 → 1261, no pair moved, no new production file) | **one source of collection names** (`tests/helpe
+    place-ledger.md:44: | LIN-4239 (LIN-4233 piece 1, simple-dispatcher; **no routed findings**) | no map | `statusLastTrailingTool` gone; **a table rule** (every posting row that isn't status-first ends in `S`) in one helpe
+    place-ledger.md:45: | LIN-4240 (LIN-4233 piece 2, Harbour; the larger extra, **no routed findings**) | no change (1261, no pair moved, no new file) | **a park is read past non-state entries** (tool, usage, resources, `[t
+    place-ledger.md:46: | LIN-4241 (LIN-4144 piece A, the settled-ruling guard; **the ordinary feature's first piece**, LIN-4142 folded in; no routed findings) | +3 cross-area imports; **one new file without a home** (`lib/r
+    place-ledger.md:47: | LIN-4242 (LIN-4144 piece B, the live section; ordinary feature; no routed findings) | +5 cross-area imports; **Pages↔Other grew 8/6 → 9/8**; **one new file without a home** (`lib/waiting-section.js`
+    place-ledger.md:48: | LIN-4243 (LIN-4144 piece C, Home placement follows the Waiting set; the larger extra; no routed findings) | no change (1269, no pair moved); **the new file has a home** (`public/home-placement.js`, 
+    place-ledger.md:49: | LIN-4151 (`/backlog` lead roots ranked; **the second ordinary ticket**; code-only global, no routed findings) | no change (1269, no pair moved, no new file) | **one ranking** (`rankKeysOf` + `compar
+    place-ledger.md:50: | LIN-4048 (the task page on a finished task; **the third ordinary ticket**; the Survey found the reported bug already fixed; code-only global, no routed findings) | no change (1269, no pair moved, no
+    place-ledger.md:51: | LIN-4143 (the task page's ruling reads; **the fourth ordinary ticket**; premise stale, confirmed by a witness green at base; code-only global, no routed findings) | no change (1269, no pair moved, n
+    place-ledger.md:58:   - LIN-4203's `usage-snapshot-intake` collection is missing from the account-erasure inventory (`erasure-inventory-lockstep-gap`, LOW-MEDIUM, minted LIN-4234), so a full wipe leaves its documents;
+    place-ledger.md:82: | LIN-4226 | forward | + (small) | better | |
+    place-ledger.md:89: | LIN-4234 | forward | + | better | |
+    place-ledger.md:90: | LIN-4239 (+ LIN-4240) | forward | + / + | mixed (scored together) | a park's readability has an owner on each side; a third marker regex |
+    place-ledger.md:91: | LIN-4241 | forward | + (small) | **worse** | the scan-row settled check goes from 2 copies to 5; a third stamp parser; two 409 codes |
+    place-ledger.md:92: | LIN-4242 | forward | + (mixed) | mixed | the card merge copies `observation.js`'s; a second title rule |
+    place-ledger.md:93: | LIN-4243 | forward | + (mixed) | mixed | |
+    place-ledger.md:94: | LIN-4151 | forward | + | better | |
+    place-ledger.md:95: | LIN-4048 | forward | + | **neutral** | "finished but held" now decided in three places |
+    place-ledger.md:96: | LIN-4143 | forward | + | better | |
+    place-ledger.md:125: - **Rows both passes rate better:** LIN-4168, LIN-4173, LIN-4179 (baseline), and LIN-4203, LIN-4218, LIN-4234, LIN-4151, LIN-4143 (forward). **Worse in both:** LIN-4241. **Neutral in both:** LIN-4048.
+    place-ledger.md:126: - **What the forward rows rated better have in common:** a deletion (LIN-4203), a priced tally row done as its own task (LIN-4218), a tidy-after as its own ticket (LIN-4234), and two features whose ch
+    place-ledger.md:135: **Seams run 7 (LIN-4249, `d7ceb373..2eb73ae0`) as a check on the overnight rows:** the catch-all grew 14 → 16 from `ruling-settled.js` (LIN-4241) and `waiting-section.js` (LIN-4242), and Pages ↔ Other
+    place-ledger.md:138: - **Resolved:** `erasure-inventory-lockstep-gap` (LIN-4234, "the fix reaches the cause").
+    place-ledger.md:139: - **Improved:** `live-anchor-old-home-alive` (LIN-4143: the flag is gone, one inline copy left); `home-next-answer-split` (LIN-4151, partly); `coherence-loop-stalled` (its first movement in four editi
+    place-ledger.md:140: - **New, from LIN-4241:** `ruling-settled-row-predicate-inline`, the settled check inline at **5 sites, up from 2**. That's the blind scorer's finding, which my `+ (small)` missed; the Periodical side
+    place-ledger.md:141: - LIN-4226 edited two files with stale snapshot prose and left it.
+
+## S15. Entry files / files / internal imports per area (seams.areas)
+| area | 90542b2c | bad9d719 |
+| Agent API (proxy) | 13/32 int 45 | 13/32 int 45 |
+| Auth, accounts & workspaces | 57/64 int 115 | 57/64 int 115 |
+| Front end: browser code | 0/44 int 0 | 0/44 int 0 |
+| Front end: server-rendered pages | 55/91 int 286 | 55/91 int 286 |
+| LLM & prompts | 69/78 int 68 | 73/84 int 89 |
+| Other features | 16/17 int 6 | 17/18 int 6 |
+| Platform & plumbing | 23/25 int 2 | 23/25 int 2 |
+| Providers (Linear, GitHub, Jira, local) | 31/36 int 40 | 32/37 int 40 |
+| Reports & operator tools | 6/8 int 3 | 6/8 int 3 |
+| Runs & dispatch | 93/108 int 187 | 94/110 int 198 |
+| Task model | 2/2 int 1 | 2/2 int 1 |
+| Web routes (pages & workspace API) | 22/38 int 31 | 22/38 int 31 |
+| Wiring (server.js) | 0/1 int 0 | 0/1 int 0 |
+
+## S16. Named hubs and doors: importers / outbound, total and cross-area, each commit
+| file (area) | in 90542b2c (cross / areas) | in bad9d719 (cross / areas) | out 90542b2c (cross) | out bad9d719 (cross) |
+| lib/cost-read.js (Runs) | 11 (7 / 4) | 11 (7 / 4) | 7 (2) | 7 (2) |
+| lib/request-usage-loader.js (Runs) | 7 (6 / 5) | 7 (6 / 5) | 1 (0) | 1 (0) |
+| lib/request-usage-intake.js (Runs) | 3 (2 / 2) | 3 (2 / 2) | 4 (2) | 4 (2) |
+| lib/request-usage-store.js (Runs) | 1 (0 / 0) | 1 (0 / 0) | 1 (0) | 1 (0) |
+| lib/dispatch-store.js (Runs) | 8 (7 / 4) | 8 (7 / 4) | 10 (3) | 10 (3) |
+| lib/task-page-loader.js (Runs) | 8 (7 / 4) | 8 (7 / 4) | 20 (9) | 21 (10) |
+| lib/run-controls.js (Runs) | 21 (19 / 3) | 21 (19 / 3) | 3 (3) | 3 (3) |
+| lib/tree.js (server-rendered pages) | 8 (6 / 3) | 8 (6 / 3) | 3 (3) | 3 (3) |
+| lib/proxy-preamble.js (Agent API) | 11 (10 / 3) | 11 (10 / 3) | 5 (3) | 6 (4) |
+| lib/render-run-steps.js (server-rendered pages) | 4 (2 / 2) | 4 (2 / 2) | 4 (4) | 4 (4) |
+| lib/usage-snapshot-intake.js (Other features) | 2 (2 / 2) | 2 (2 / 2) | 0 (0) | 0 (0) |
+| lib/model-pricing.js (LLM) | 5 (4 / 2) | 6 (5 / 3) | 1 (1) | 3 (1) |
+| lib/utils/time.js (Platform) | 47 (46 / 6) | 47 (46 / 6) | 0 (0) | 0 (0) |
+| lib/ruling-standing.js (Other features) | 2 (1 / 1) | 2 (1 / 1) | 1 (1) | 1 (1) |
+| lib/unanswered-decisions.js (Runs) | 11 (7 / 4) | 11 (7 / 4) | 4 (2) | 4 (2) |
+| lib/home-row-states.js (Other features) | 1 (1 / 1) | 1 (1 / 1) | 5 (3) | 5 (3) |
+| lib/render.js (server-rendered pages) | 28 (20 / 4) | 28 (20 / 4) | 24 (11) | 24 (11) |
+| lib/question-card.js (server-rendered pages) | 3 (1 / 1) | 3 (1 / 1) | 1 (1) | 1 (1) |
+| lib/task-page-href.js (server-rendered pages) | 5 (1 / 1) | 5 (1 / 1) | 0 (0) | 0 (0) |
+| lib/utils/html.js (Platform) | 74 (74 / 4) | 74 (74 / 4) | 0 (0) | 0 (0) |
+| lib/ruling-settled.js (Other features) | 3 (3 / 1) | 3 (3 / 1) | 0 (0) | 0 (0) |
+| lib/waiting-section.js (Other features) | 2 (2 / 2) | 2 (2 / 2) | 3 (3) | 3 (3) |
+| lib/recommendation-facts.js (LLM) | 8 (5 / 3) | 9 (6 / 4) | 5 (4) | 7 (4) |
+| lib/errors.js (Platform) | 63 (63 / 7) | 63 (63 / 7) | 0 (0) | 0 (0) |
+| lib/workspace-api-mocks.js (Auth) | 6 (6 / 1) | 7 (7 / 2) | 3 (3) | 5 (5) |
+| lib/periodicals.js (LLM) | 8 (8 / 4) | 8 (8 / 4) | 1 (0) | 2 (0) |
+| lib/dispatch-entrance.js (Runs) | 3 (2 / 1) | 3 (2 / 1) | 23 (13) | 25 (15) |
+| lib/proxy-scopes.js (Agent API) | 11 (5 / 4) | 11 (5 / 4) | 0 (0) | 0 (0) |
+| lib/dispatch-validation.js (Runs) | 12 (7 / 4) | 12 (7 / 4) | 6 (4) | 6 (4) |
+| lib/proxy-instructions.js (Agent API) | 1 (0 / 0) | 1 (0 / 0) | 2 (0) | 4 (2) |
+| routes/proxy-dispatch.js (Agent API) | 1 (0 / 0) | 1 (0 / 0) | 8 (8) | 8 (8) |
+| lib/stage-writes.js (Other features) | 2 (2 / 2) | 2 (2 / 2) | 0 (0) | 0 (0) |
+- lib/cost-read.js cross-area importers at bad9d719: lib/kpi-stats.js [Reports], lib/model-routing-history.js [LLM], lib/model-routing-spend.js [LLM], lib/workspace-kpi-stats.js [Reports], routes/proxy-compute.js [Agent API], routes/settings.js [Web routes], routes/ship-biscuit.js [Web routes]
+- lib/periodicals.js cross-area importers at bad9d719: lib/dispatch-entrance.js [Runs], lib/dispatch-validation.js [Runs], lib/periodical-report-gate.js [Runs], lib/render.js [server-rendered pages], routes/proxy-compute.js [Agent API], routes/proxy-writes.js [Agent API], routes/proxy.js [Agent API], server.js [Wiring]
+- lib/dispatch-entrance.js cross-area importers at bad9d719: routes/proxy-dispatch.js [Agent API], routes/proxy-kickoff.js [Agent API]
+
+## S17. Top 12 files by cross-area importers at bad9d719 (with 90542b2c)
+- lib/utils/html.js: 74 -> 74
+- lib/errors.js: 63 -> 63
+- lib/utils/time.js: 46 -> 46
+- lib/workspace.js: 36 -> 36
+- lib/providers/state-map.js: 26 -> 26
+- lib/openrouter.js: 22 -> 25
+- lib/workspace-preferences.js: 16 -> 20
+- lib/render.js: 20 -> 20
+- lib/read-horizon.js: 19 -> 19
+- lib/run-controls.js: 19 -> 19
+- lib/chat-request.js: 18 -> 18
+- lib/prompt-templates.js: 17 -> 18
+- every file whose cross-area importer count moved: lib/as-asked-seal.js 0->4; lib/as-asked.js 0->12; lib/catalog-rate.js 0->1; lib/description-edit.js 1->3; lib/dispatch-leftover-hook.js 0->1; lib/model-pricing.js 4->5; lib/model-routing-harnesses.js 6->7; lib/openrouter.js 22->25; lib/prompt-templates.js 17->18; lib/prompts/leftover-words.js 0->1; lib/proxy-graphql-errors.js 2->3; lib/recommendation-facts.js 5->6; lib/sample-data/fixture-parent.js 0->2; lib/should-mock-ai.js 9->11; lib/size-of-move.js 0->5; lib/wake-credential.js 1->2; lib/workspace-api-mocks.js 6->7; lib/workspace-preferences.js 16->20
+
+## S18. Wiring (server.js) outbound by area, each commit
+- 90542b2c: Agent API 6, Auth 48, LLM 21, Other features 9, Platform 13, Providers 9, Reports 3, Runs 45, Web routes 22, server-rendered pages 24
+- bad9d719: Agent API 6, Auth 48, LLM 23, Other features 9, Platform 13, Providers 9, Reports 3, Runs 47, Web routes 22, server-rendered pages 24
+
+## S19. The browser seam for public/home-placement.js and the settled-ruling code
+- 90542b2c lib/render-audit.js:56: 3 scripts; home-placement at None; app.js at 1; question-cards at None
+- 90542b2c lib/render-custom-prompts.js:116: 3 scripts; home-placement at None; app.js at 1; question-cards at None
+- 90542b2c lib/render-dispatch.js:80: 4 scripts; home-placement at None; app.js at 1; question-cards at None
+- 90542b2c lib/render-effort-readout.js:229: 2 scripts; home-placement at None; app.js at 1; question-cards at None
+- 90542b2c lib/render-escalation-kpis.js:130: 3 scripts; home-placement at None; app.js at 1; question-cards at None
+- 90542b2c lib/render-landing.js:513: 3 scripts; home-placement at None; app.js at 1; question-cards at None
+- 90542b2c lib/render-prompts.js:162: 2 scripts; home-placement at None; app.js at 1; question-cards at None
+- 90542b2c lib/render-proxy.js:43: 3 scripts; home-placement at None; app.js at 1; question-cards at None
+- 90542b2c lib/render-settings.js:736: 5 scripts; home-placement at None; app.js at 1; question-cards at None
+- 90542b2c lib/render-workspace-kpis.js:226: 6 scripts; home-placement at None; app.js at 5; question-cards at None
+- 90542b2c lib/render.js:384: 14 scripts; home-placement at 4; app.js at 13; question-cards at 3
+- bad9d719 lib/render-audit.js:56: 3 scripts; home-placement at None; app.js at 1; question-cards at None
+- bad9d719 lib/render-custom-prompts.js:116: 3 scripts; home-placement at None; app.js at 1; question-cards at None
+- bad9d719 lib/render-dispatch.js:80: 4 scripts; home-placement at None; app.js at 1; question-cards at None
+- bad9d719 lib/render-effort-readout.js:229: 2 scripts; home-placement at None; app.js at 1; question-cards at None
+- bad9d719 lib/render-escalation-kpis.js:130: 3 scripts; home-placement at None; app.js at 1; question-cards at None
+- bad9d719 lib/render-landing.js:512: 3 scripts; home-placement at None; app.js at 1; question-cards at None
+- bad9d719 lib/render-prompts.js:162: 2 scripts; home-placement at None; app.js at 1; question-cards at None
+- bad9d719 lib/render-proxy.js:43: 3 scripts; home-placement at None; app.js at 1; question-cards at None
+- bad9d719 lib/render-settings.js:736: 5 scripts; home-placement at None; app.js at 1; question-cards at None
+- bad9d719 lib/render-workspace-kpis.js:226: 6 scripts; home-placement at None; app.js at 5; question-cards at None
+- bad9d719 lib/render.js:384: 14 scripts; home-placement at 4; app.js at 13; question-cards at 3
+- public/app.js:720:      sections: els.filter(Boolean).map(el => window.HomePlacement.sectionFacts(el, active, holds)),
+- public/app.js:816:  return window.HomePlacement.createHomePlacement({
+- public/home-placement.js:7: * window.HomePlacement, and module.exports under node for the unit tests (tests/unit/lin-4243-placement.test.js).
+- public/home-placement.js:120:  if (typeof window !== 'undefined') window.HomePlacement = api;
+- lib/ruling-settled.js:8: * The client keys on `code` ('ruling-settled'), never on the wording.
+- lib/ruling-settled.js:13:  Object.freeze({ code: 'ruling-settled' }),
+- public/question-cards.js:248:  // LIN-4241: the settled-ruling refusal is a 409 whose `code` is 'ruling-settled' (lib/ruling-settled.js). It is not a
+- public/question-cards.js:250:  var RULING_SETTLED_CODE = 'ruling-settled';
+- routes/dashboard-rulings.js:27:import { RULING_SETTLED_REFUSAL } from '../lib/ruling-settled.js';
+- routes/workspace-api-issue-write.js:32:import { RULING_SETTLED_REFUSAL } from '../lib/ruling-settled.js';
+- routes/workspace-api-issue-write.js:97: *   dismissed by an earlier write: the caller refuses with 409 `ruling-settled`
+- routes/workspace-api-scan.js:12:import { RULING_SETTLED_REFUSAL } from '../lib/ruling-settled.js';
+- docs/architecture/source-map.md:355:  home-placement.js     LIN-4243: Home's placement policy (`window.HomePlacement`): `blockedBy(facts)` names what 

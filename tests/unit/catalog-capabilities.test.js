@@ -1,10 +1,12 @@
-// LIN-3882: tool capability, the reasoning split and the pricing hint come from the
-// cached OpenRouter catalog first, curated defaults second. All catalog data is a
-// fake seeded into the module cache; nothing here touches the network.
+// LIN-3882, LIN-4358: tool capability, the reasoning split and the pricing hint come
+// from the cached OpenRouter catalog. Since LIN-4358 the only fallback is the tools one
+// (a suggested model keeps tools while the catalog has no answer); reasoning and price
+// have none. All catalog data is a fake seeded into the module cache; nothing here
+// touches the network.
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  AVAILABLE_MODELS, FREE_TIER_MODEL_IDS, DEFAULT_MODEL, isToolCapableModel, isReasoningModel,
+  SUGGESTED_MODEL_IDS, FREE_TIER_MODEL_IDS, DEFAULT_MODEL, isToolCapableModel, isReasoningModel,
   resolveReasoningBudget, resolveFreeTierModel, getModelPricingHint,
 } from '../../lib/openrouter.js';
 import { runAgentTurn } from '../../lib/agent-turn.js';
@@ -31,21 +33,22 @@ test('a catalog-only model listing tools is tool-capable; one without is not', (
   assert.equal(isToolCapableModel('x/absent'), false);
 });
 
-test('an entry without a supported_parameters array is no signal: curated models keep tools', () => {
+test('an entry without a supported_parameters array is no signal: suggested models keep tools', () => {
   seed(entry(DEFAULT_MODEL, { supported_parameters: null }));
   assert.equal(isToolCapableModel(DEFAULT_MODEL), true);
 });
 
-test('cold or failing catalog: every curated id keeps tools and prefix reasoning', async () => {
+test('cold or failing catalog: every suggested id keeps tools; no model gets the explicit split', async () => {
   const realFetch = globalThis.fetch;
   globalThis.fetch = async () => { throw new Error('offline'); };
   const realErr = console.error; console.error = () => {};
   try {
     assert.deepEqual(await getModelCatalog(), []);
   } finally { globalThis.fetch = realFetch; console.error = realErr; }
-  for (const m of AVAILABLE_MODELS) {
-    assert.equal(isToolCapableModel(m.id), true, m.id);
-    assert.equal(isReasoningModel(m.id), /^openai\/(gpt-5|o[134])/.test(m.id), m.id);
+  for (const id of SUGGESTED_MODEL_IDS) {
+    assert.equal(isToolCapableModel(id), true, id);
+    // LIN-4358: the OpenAI prefix list is gone. With no catalog there is no fact to split on.
+    assert.equal(isReasoningModel(id), false, id);
   }
 });
 
@@ -58,7 +61,8 @@ test('reasoning split follows catalog default_enabled / mandatory, not supported
   assert.equal(isReasoningModel(NEW_ID), true);
   assert.equal(isReasoningModel('x/mandatory'), true);
   assert.equal(isReasoningModel('x/optional'), false, 'accepting a reasoning config is not reasoning by default');
-  assert.equal(isReasoningModel('openai/gpt-5.4-mini'), true, 'prefix half kept');
+  // LIN-4358: the prefix half is gone. Unlisted gpt-5.x gets no explicit split.
+  assert.equal(isReasoningModel('openai/gpt-5.4-mini'), false, 'no prefix list: an unlisted id gives no signal');
   const b = resolveReasoningBudget({ model: NEW_ID, proseTokens: 4000 });
   assert.ok(b.reasoning && b.maxTokens > 4000, 'split applied to 6.1 Sol');
   assert.equal(resolveReasoningBudget({ model: 'x/optional', proseTokens: 4000 }).reasoning, undefined);
@@ -102,19 +106,22 @@ test('free tier stays fail-closed even when the catalog lists the model', () => 
   seed(entry(NEW_ID, { supported_parameters: ['tools'] }));
   process.env.OPENROUTER_FREE_TIER_MODEL = NEW_ID;
   assert.equal(resolveFreeTierModel(), DEFAULT_MODEL);
-  for (const m of AVAILABLE_MODELS) assert.ok(FREE_TIER_MODEL_IDS.includes(m.id), m.id);
 });
 
 test('paid roadmap override accepts a catalog id outside the suggestions; free tier and cold cache do not', () => {
-  assert.equal(resolveRoadmapModelOverride(NEW_ID, DEFAULT_MODEL, false), DEFAULT_MODEL, 'cold cache fails closed');
-  seed(entry(NEW_ID));
-  assert.equal(resolveRoadmapModelOverride(NEW_ID, DEFAULT_MODEL, false), NEW_ID);
-  assert.equal(resolveRoadmapModelOverride(NEW_ID, DEFAULT_MODEL, true), DEFAULT_MODEL);
+  // LIN-4358: openai/gpt-6.1-sol is suggested now, so the outside id is one that is not.
+  const OUTSIDE_ID = 'openai/gpt-5.6-terra';
+  assert.ok(!SUGGESTED_MODEL_IDS.includes(OUTSIDE_ID));
+  assert.equal(resolveRoadmapModelOverride(OUTSIDE_ID, DEFAULT_MODEL, false), DEFAULT_MODEL, 'cold cache fails closed');
+  seed(entry(OUTSIDE_ID));
+  assert.equal(resolveRoadmapModelOverride(OUTSIDE_ID, DEFAULT_MODEL, false), OUTSIDE_ID);
+  assert.equal(resolveRoadmapModelOverride(OUTSIDE_ID, DEFAULT_MODEL, true), DEFAULT_MODEL);
   assert.equal(resolveRoadmapModelOverride('x/not-listed', DEFAULT_MODEL, false), DEFAULT_MODEL);
 });
 
-test('pricing hint shows rate-card rows for uncurated ids (LIN-3882)', () => {
-  assert.equal(getModelPricingHint(NEW_ID), '$2.00 in / $10.00 out per 1M tokens');
+test('pricing hint: with no catalog there is no price, for any model (LIN-4358: no rate card)', () => {
+  assert.equal(getModelPricingHint(NEW_ID), null);
+  assert.equal(getModelPricingHint(DEFAULT_MODEL), null);
 });
 
 test('pricing hint falls back to the catalog and rejects variable (-1) pricing', () => {
@@ -125,9 +132,9 @@ test('pricing hint falls back to the catalog and rejects variable (-1) pricing',
   assert.equal(getModelPricingHint('x/absent'), null);
 });
 
-test('pricing hint: a rate-card row wins over a different catalog price', () => {
-  seed(entry(NEW_ID, { pricing: { prompt: '0.00009', completion: '0.00009' } }));
-  assert.equal(getModelPricingHint(NEW_ID), '$2.00 in / $10.00 out per 1M tokens');
+test('pricing hint: the catalog price is the price, for suggested models too (LIN-4358)', () => {
+  seed(entry(DEFAULT_MODEL, { pricing: { prompt: '0.00009', completion: '0.00009' } }));
+  assert.equal(getModelPricingHint(DEFAULT_MODEL), '$90.00 in / $90.00 out per 1M tokens');
 });
 
 // Done-when 1 at the consumer level: a catalog-only model listing `tools` gets

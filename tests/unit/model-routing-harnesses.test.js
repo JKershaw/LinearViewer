@@ -18,6 +18,10 @@ import { resolveWorkerModelId, getModelRate } from '../../lib/model-pricing.js';
 import { emptyTable, applyChangesToTable } from '../../lib/model-routing.js';
 import { JOBS, SURFACES } from '../../lib/llm-jobs.js';
 import { renderPage } from '../../lib/components/page.js';
+import { seedPinnedCatalog } from './helpers/pinned-catalog.js';
+
+// LIN-4358: rates come from the catalog; the alias targets must price in the pinned 8 Nov 2026 snapshot.
+seedPinnedCatalog();
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -32,7 +36,8 @@ describe('the harness list', () => {
     assert.deepEqual(DISPATCH_HARNESS_SUGGESTIONS, ['claude-code', 'opencode']);
     assert.equal(DEFAULT_HARNESS, 'claude-code');
     assert.deepEqual(DISPATCH_CLAUDE_MODEL_SUGGESTIONS, ['haiku', 'sonnet', 'opus', 'fable']);
-    assert.equal(DISPATCH_MODEL_SUGGESTIONS.length, 10);
+    // LIN-4358: GPT-6.1 Sol and Claude Haiku 5.5 joined the ten.
+    assert.equal(DISPATCH_MODEL_SUGGESTIONS.length, 12);
     assert.equal(DISPATCH_MODEL_OTHER_VALUE, '__other__');
   });
 
@@ -188,13 +193,13 @@ describe('renderPage embeds the list once, on pages that load common.js', () => 
 });
 
 // LIN-3987: a Claude Code alias is priced as the model it runs. The mapping is the one place that says which model,
-// so an alias with no mapping, or a mapping with no rate row, fails here (never as "price unknown" on a screen).
+// so an alias with no mapping, or a mapping the catalog cannot price, fails here (never as "price unknown" on a screen).
 describe('the Claude Code alias mapping prices every alias (LIN-3987)', () => {
   test('every alias in the suggestion list maps to a model that resolves to a rate', () => {
     for (const alias of DISPATCH_CLAUDE_MODEL_SUGGESTIONS) {
       const mapped = claudeAliasModel(alias);
       assert.ok(mapped, `${alias} has a mapping`);
-      assert.ok(getModelRate(resolveWorkerModelId(mapped)), `${alias} runs ${mapped}, which has a rate row`);
+      assert.ok(getModelRate(resolveWorkerModelId(mapped)), `${alias} runs ${mapped}, which the catalog prices`);
     }
   });
 

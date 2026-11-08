@@ -19,6 +19,10 @@ import { fileURLToPath } from 'node:url';
 import { diffReplay } from '../fixtures/cost-replay/diff.js';
 import { recordLin4197 } from '../fixtures/cost-replay/lin4197-replay.js';
 import { LIN4197_CASES, LIN4197_MIXED_CONTROL, LIN4201_RECORDS_ONLY } from '../fixtures/cost-replay/corpus.js';
+import { seedPinnedCatalog } from './helpers/pinned-catalog.js';
+
+// LIN-4358: rates and names come from the catalog; price from the pinned 8 Nov 2026 snapshot.
+seedPinnedCatalog();
 
 const read = async (name) => JSON.parse(await readFile(fileURLToPath(new URL(`../fixtures/cost-replay/${name}`, import.meta.url)), 'utf8'));
 const { header: _header, ...before } = await read('goldens-lin4197.json');

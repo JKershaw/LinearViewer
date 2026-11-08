@@ -11,7 +11,7 @@
  */
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_MODEL, AVAILABLE_MODELS } from '../../lib/openrouter.js';
+import { DEFAULT_MODEL, FREE_TIER_MODEL_IDS } from '../../lib/openrouter.js';
 import { jobModelResolver, resolveAiOperationModel } from '../../lib/workspace-preferences.js';
 import { resolvePrecomputeCredential, createRunParagraphPrecompute as createRunParagraphPrecompute__unplumbed } from '../../lib/run-paragraph-hook.js';
 import { createSessionSummaryPrecompute, createMaterializerPrecompute } from '../../lib/session-materializer-precompute.js';
@@ -22,7 +22,7 @@ const createRunParagraphPrecompute = withDefaults(createRunParagraphPrecompute__
 
 
 const URL_KEY = 'ws-d2';
-const CURATED = AVAILABLE_MODELS.find((m) => m.id !== DEFAULT_MODEL).id;
+const CURATED = FREE_TIER_MODEL_IDS.find((id) => id !== DEFAULT_MODEL);
 const CTX = { urlKey: URL_KEY, reason: 'r', actor: { via: 'page', id: 'acct-1' } };
 const FREE_ENV = { OPENROUTER_FREE_TIER_KEY: 'free' };
 const PAID_ENV = { OPENROUTER_API_KEY: 'paid', OPENROUTER_FREE_TIER_KEY: 'free' };

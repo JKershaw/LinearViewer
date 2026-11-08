@@ -80,7 +80,11 @@ import {
 import { COMPANION_SEED_STATE, buildCompanionSnapshot, RESERVATION_LEASE_MS, DEFAULT_COMPANION_FLOOR_MS, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../../lib/flight-companion-gate.js';
 import { FC_MAX_TOKENS } from '../../lib/agent-turn.js';
 import { ObserverStateStore } from '../../lib/observer-state-store.js';
-import { DEFAULT_MODEL, AVAILABLE_MODELS } from '../../lib/openrouter.js';
+import { DEFAULT_MODEL, suggestedModels } from '../../lib/openrouter.js';
+import { seedPinnedCatalog } from './helpers/pinned-catalog.js';
+// LIN-4358: the suggested models, with names and prices read from the catalog (the pinned 8 Nov 2026 snapshot).
+seedPinnedCatalog();
+const SUGGESTED_MODELS = suggestedModels();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROUTE_SRC = readFileSync(join(__dirname, '../../routes/flight-companion.js'), 'utf8');
@@ -678,7 +682,7 @@ describe('Flight Companion turn endpoint (LIN-2432 beat 4) — live-model-call s
     const observerStateStore = fakeObserverStateStore({ censusDoc: realCensusDoc() });
     const freeTierStore = { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present, isFreeTier must be false'); } };
     // A real, non-tool-capable model id (verified against the actual curated
-    // AVAILABLE_MODELS allowlist by using something NOT in it) — isToolCapableModel
+    // SUGGESTED_MODELS allowlist by using something NOT in it) — isToolCapableModel
     // itself is the REAL function here, not faked.
     const workspacePreferencesStore = { async getWorkspacePreferences() { return { modelId: 'some-vendor/uncurated-model' }; } };
     const app = buildApp({
@@ -2210,9 +2214,9 @@ describe('buildFlightCompanionStripData (LIN-2621) — pure derivation, no I/O',
   });
 
   // LIN-2623 beat 3, widened by LIN-3370
-  test('modelOptions with no catalog is exactly the curated AVAILABLE_MODELS set, each flagged curated', () => {
+  test('modelOptions with no catalog is exactly the curated SUGGESTED_MODELS set, each flagged curated', () => {
     const strip = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null });
-    assert.deepEqual(strip.modelOptions.map((m) => m.id), AVAILABLE_MODELS.map((m) => m.id));
+    assert.deepEqual(strip.modelOptions.map((m) => m.id), SUGGESTED_MODELS.map((m) => m.id));
     for (const m of strip.modelOptions) {
       assert.strictEqual(typeof m.name, 'string');
       assert.ok(m.name.length > 0);
@@ -2226,18 +2230,18 @@ describe('buildFlightCompanionStripData (LIN-2621) — pure derivation, no I/O',
     const catalog = [
       { id: 'mock-provider/catalog-model-one', name: 'Catalog Model One', pricing: { prompt: '0', completion: '0' } },
       { id: 'mock-provider/catalog-model-two', name: 'Catalog Model Two', pricing: { prompt: '0.000002', completion: '0.00001' } },
-      { id: AVAILABLE_MODELS[0].id, name: 'Dup of a curated id' },
+      { id: SUGGESTED_MODELS[0].id, name: 'Dup of a curated id' },
     ];
     const strip = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null, catalog });
-    assert.deepEqual(strip.modelOptions.map((m) => m.id), [...AVAILABLE_MODELS.map((m) => m.id), 'mock-provider/catalog-model-one', 'mock-provider/catalog-model-two']);
+    assert.deepEqual(strip.modelOptions.map((m) => m.id), [...SUGGESTED_MODELS.map((m) => m.id), 'mock-provider/catalog-model-one', 'mock-provider/catalog-model-two']);
     const one = strip.modelOptions.find((m) => m.id === 'mock-provider/catalog-model-one');
     assert.deepStrictEqual(one, { id: 'mock-provider/catalog-model-one', name: 'Catalog Model One', pricing: null, toolsOn: false, free: true, curated: false });
     const two = strip.modelOptions.find((m) => m.id === 'mock-provider/catalog-model-two');
     assert.strictEqual(two.free, false);
     assert.strictEqual(two.curated, false);
-    const dup = strip.modelOptions.find((m) => m.id === AVAILABLE_MODELS[0].id);
+    const dup = strip.modelOptions.find((m) => m.id === SUGGESTED_MODELS[0].id);
     assert.strictEqual(dup.curated, true, 'a catalog duplicate of a curated id is deduped and stays curated');
-    assert.strictEqual(dup.name, AVAILABLE_MODELS[0].name);
+    assert.strictEqual(dup.name, SUGGESTED_MODELS[0].name);
   });
 
   test('currentPricing is the resolved default\'s own rate-card hint, and null for an uncurated default — never fabricated', () => {
@@ -2405,7 +2409,7 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
       flightCompanionEnabled: true,
     });
     const { text } = await get(app, '/workspace/acme/flight-companion');
-    for (const m of AVAILABLE_MODELS) {
+    for (const m of SUGGESTED_MODELS) {
       assert.ok(text.includes(`data-id="${m.id}"`), `expected an option row for ${m.id}`);
     }
   });

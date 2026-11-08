@@ -372,7 +372,8 @@ describe('LIN-4198 registers: code-shape area, source map, endpoint catalogue, a
     const map = read('docs/architecture/source-map.md');
     assert.match(map, /^\s+request-usage-store\.js\s+The `request-usage` collection \(LIN-4198/m);
     assert.match(map, /^\s+request-usage-intake\.js\s+The shared usage intake \(LIN-4198\)/m);
-    assert.match(map, /^\s+model-pricing\.js\s+The rate table/m);
+    // LIN-4358: there is no rate table; the entry says where rates come from.
+    assert.match(map, /^\s+model-pricing\.js\s+Read-time pricing, at rates read from the OpenRouter catalog/m);
   });
 
   test('the endpoint catalogue documents the runner usage route, its limits and that no price is stored', () => {

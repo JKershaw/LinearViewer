@@ -16,7 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveWorkspaceModel, resolveAiOperationModel, AI_OPERATION_KINDS } from '../../lib/workspace-preferences.js';
-import { DEFAULT_MODEL, AVAILABLE_MODELS } from '../../lib/openrouter.js';
+import { DEFAULT_MODEL, FREE_TIER_MODEL_IDS } from '../../lib/openrouter.js';
 import { getJob } from '../../lib/llm-jobs.js';
 
 // A store stub whose getWorkspacePreferences both returns a stored preference AND
@@ -202,7 +202,7 @@ test('resolveAiOperationModel: forceDefault clamps flight-companion and ship-bis
 // old `if` with forceDefault but is not free tier.
 // =============================================================================
 
-const CURATED = AVAILABLE_MODELS.find(m => m.id !== DEFAULT_MODEL).id;
+const CURATED = FREE_TIER_MODEL_IDS.find(id => id !== DEFAULT_MODEL);
 
 function withFreeTierModel(value, fn) {
   const saved = process.env.OPENROUTER_FREE_TIER_MODEL;

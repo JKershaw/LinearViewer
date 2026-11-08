@@ -3,6 +3,10 @@
     "disposition": "database-backed",
     "why": "In-memory fallback inside InMemoryBriefCacheStore; the durable collection is out of scope."
   },
+  "lib/catalog-rate.js::memo": {
+    "disposition": "not-state",
+    "why": "A WeakMap from a catalog pricing object to its converted rate (LIN-4358): a pure function of its key, keyed by the object itself, so it holds nothing per workspace and empties when the catalog snapshot is dropped."
+  },
   "lib/chat-tools.js::prStatusCache": {
     "disposition": "global-only",
     "exception": "pr-status-chat-cache"

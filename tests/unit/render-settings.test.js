@@ -6,7 +6,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { renderAllAreas as renderSettingsPage } from '../helpers/render-settings-areas.js';
-import { AVAILABLE_MODELS } from '../../lib/openrouter.js';
+import { suggestedModels } from '../../lib/openrouter.js';
+// LIN-4358: the suggested models, with names and prices read from the catalog.
+const SUGGESTED_MODELS = suggestedModels();
 import { PROMPT_TEMPLATES } from '../../lib/prompt-template-defs.js';
 import { getProvider } from '../../lib/providers/registry.js';
 // Side-effect import: registers the real Jira provider (LIN-1885), so the

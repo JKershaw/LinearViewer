@@ -138,7 +138,7 @@ const SPEC = {
 
 /**
  * @param {Object} deps
- * @param {Function} deps.proxyLimiter - Proxy rate limiter middleware (per proven credential, else per IP) (module-scope in routes/proxy.js, shared as-is; injected here rather than redeclared so that lifetime is preserved)
+ * @param {Function} deps.proxyLimiter - The proxy rate limiter, injected (see `proxyLimiter` in routes/proxy.js)
  * @param {Object} deps.commentDedupe - Short-window comment create dedupe cache (module-scope singleton in routes/proxy.js; injected, NOT re-exported here — the dependency stays one-way, proxy.js -> proxy-writes.js)
  * @param {Object} deps.commentDedupeGenerations - Per-workspace generation tracker invalidating commentDedupe entries on delete/edit (module-scope singleton in routes/proxy.js; injected, same one-way rule as commentDedupe)
  * @param {Function} deps.authenticateProxyToken - Consumer-token auth middleware (closure-local in createProxyRoutes)
