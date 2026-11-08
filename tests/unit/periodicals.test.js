@@ -304,8 +304,12 @@ describe('Mint + Autopilot variant (LIN-1279)', () => {
 // old propose-but-don't-create + leave-In-Progress contract that looped on
 // `review` forever. The advisory Stability Review is excluded by mode (it mints
 // no follow-ups — see its own specifics block).
+// LIN-4379: a template that feeds the area notes mints no follow-ups, so it leaves this loop.
+// P2 (LIN-4380) moves the other 12 here and turns this loop into a census.
+const FEEDS_AREA_NOTES = new Set(['seams-tangles']);
+
 describe('corrective reviews: bounded follow-up creation', () => {
-  for (const template of PERIODICALS.filter(t => t.mode === 'corrective')) {
+  for (const template of PERIODICALS.filter(t => t.mode === 'corrective' && !FEEDS_AREA_NOTES.has(t.id))) {
     test(`${template.title} mints a capped follow-up set, records every finding`, () => {
       const prompt = template.generatePrompt();
       assert.match(prompt, /follow-up task/i);
@@ -1184,12 +1188,106 @@ describe('Seams & Tangles specifics (LIN-3550)', () => {
     assert.doesNotMatch(prompt, /scripts\/|\.mjs|cochange/i);
   });
 
-  test('hands off to sibling reviews and shapes follow-ups as one move', () => {
+  test('hands off to sibling reviews', () => {
     assert.match(prompt, /Drift & Coherence Review/);
     assert.match(prompt, /Code Quality Review/);
     assert.match(prompt, /Stability Review/);
-    assert.match(prompt, /one move/i);
   });
+});
+
+// LIN-4379 (P1 of LIN-4349): Seams & Tangles feeds the area notes through its own PR and mints
+// no follow-up tasks. The engine names no notes path: the run finds the notes and their rules.
+describe('Seams & Tangles feeds the area notes, mints nothing (LIN-4379)', () => {
+  const template = PERIODICALS.find(t => t.id === 'seams-tangles');
+  const prompt = template.generatePrompt();
+  const lines = prompt.split('\n');
+  const notesBullet = lines.find(l => l.startsWith('- **Feed the area notes'));
+  const routesBullet = lines.find(l => l.startsWith('- **Route each finding that has no area note'));
+
+  test('mints no follow-up tasks: no mint bullet, no one-move bullet, no follow-up shape', () => {
+    assert.doesNotMatch(prompt, /Mint a bounded set of follow-up tasks/i);
+    assert.doesNotMatch(prompt, /Shape each follow-up as one move/i);
+    assert.doesNotMatch(prompt, /into new Linear tasks yourself/i);
+    assert.doesNotMatch(prompt, /before minting a task/i);
+    assert.doesNotMatch(prompt, /Unvalidated idea/);
+  });
+
+  test('Stage 2 carries none of the old report-only or minted-follow-up wording', () => {
+    assert.doesNotMatch(prompt, /report artifact only/i);
+    assert.doesNotMatch(prompt, /no docs beyond writing the report artifact itself/i);
+    assert.doesNotMatch(prompt, /follow-up tasks you minted/i);
+    assert.doesNotMatch(prompt, /follow-up work this review mints/i);
+    assert.doesNotMatch(prompt, /highest-severity work is on the stack/i);
+  });
+
+  test('carries the notes bullet with every Stage 2 duty', () => {
+    assert.ok(notesBullet, 'the notes-output bullet is present');
+    for (const re of [
+      /mint no follow-up tasks/i,
+      /searching the repo/i,
+      /follow their own rules/i,
+      /registry/i, /guard/i, /byte cap/i, /one home/i,
+      /since the commit the previous report measured/i,
+      /map each changed file to its area through the registry/i,
+      /prune entries you find settled or no longer true/i,
+      /distil/i,
+      /Waiting entry/, /Lesson/,
+      /cites the file it is about first/i,
+      /Seams & Tangles, <the date of this run>/,
+      /this report as the second cited path/i,
+      /already filed as a ticket stays in the report only/i,
+      /one docs-only pull request/i,
+      /rebase it onto main/i,
+      /merge it under the merge authority/i
+    ]) assert.match(notesBullet, re);
+  });
+
+  test('carries the routes for findings with no area note, to the person and never to a ticket', () => {
+    assert.ok(routesBullet, 'the routes bullet is present');
+    for (const re of [
+      /larger tidy/i, /size of move/i,
+      /no file in an area to cite/i, /live secret/i, /addressed to the person/i,
+      /cross-area seam/i, /area a change would start from/i, /naming the other side/i, /seams have no full home/i,
+      /repo with no area notes/i, /report and the closing comment only/i,
+      /never (?:to|in) a ticket/i
+    ]) assert.match(routesBullet, re);
+  });
+
+  test('the notes bullet and the routes name no notes path, registry file or note file', () => {
+    for (const bullet of [notesBullet, routesBullet]) {
+      assert.doesNotMatch(bullet, /docs\//);
+      assert.doesNotMatch(bullet, /areas\.json|README/);
+      assert.doesNotMatch(bullet, /\.(?:md|json|js|mjs)\b/);
+      assert.doesNotMatch(bullet, /`[^`]*\/[^`]*`/, 'no backticked path');
+    }
+    assert.doesNotMatch(prompt, /docs\/areas/);
+  });
+
+  test('conclude names the notes PR; review-only allows the report and the note edits; gap audit names the bounded output', () => {
+    assert.match(prompt, /The area-notes pull request carries the findings forward/i);
+    assert.match(prompt, /Stay review-only/);
+    assert.match(prompt, /beyond the report artifact itself and the area-note edits/i);
+    assert.match(prompt, /what this reading writes — the report and its area-note entries — stays within its existing bound/i);
+  });
+
+  test('keeps the report gate marker and the adversarial second read', () => {
+    assert.ok(prompt.includes(buildPeriodicalGateMarker(template.title)));
+    assert.match(prompt, /fresh-context adversarial second-read/i);
+  });
+
+  test('the second read follows the report and its note edits, not follow-up tasks', () => {
+    assert.doesNotMatch(prompt, /\(and any follow-up tasks\)/);
+    assert.match(prompt, /After the report and its area-note edits above are written/);
+  });
+});
+
+describe('templates other than Seams & Tangles carry none of the notes wording (LIN-4379)', () => {
+  for (const template of PERIODICALS.filter(t => !FEEDS_AREA_NOTES.has(t.id))) {
+    test(template.title, () => {
+      const prompt = template.generatePrompt();
+      assert.doesNotMatch(prompt, /Feed the area notes|area-note|Route each finding that has no area note/i);
+    });
+  }
 });
 
 describe('buildPeriodicalNodes()', () => {
