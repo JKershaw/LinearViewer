@@ -6,16 +6,11 @@ import { posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'acorn';
 import { simple } from 'acorn-walk';
-import { readCommit } from './code-shape-lib.mjs';
-
-const DEFAULT_GUIDE = fileURLToPath(new URL('../../docs/areas/areas.json', import.meta.url)); // the product's area registry (LIN-4371)
+import { readCommit, DEFAULT_AREAS, compileGuide, claimedBy } from './code-shape-lib.mjs';
 
 export const inScope = (p) =>
   /\.m?js$/.test(p) && !/\.min\.js$/.test(p) &&
   (p === 'server.js' || /^(lib|routes|public)\//.test(p));
-
-const compileGuide = (areaMap) => areaMap.areas.map((a) => ({ name: a.name, rx: a.match.map((m) => new RegExp(m)) }));
-const areaOf = (guide, path) => guide.find((a) => a.rx.some((r) => r.test(path)))?.name ?? null;
 
 const parseSource = (text) => {
   for (const sourceType of ['module', 'script']) {
@@ -78,7 +73,7 @@ export function measureSeams({ files, areaMap, commit, areaMapSource = null }) {
   const fileArea = new Map();
   const unmappedFiles = [];
   for (const p of paths) {
-    const a = areaOf(guide, p);
+    const a = claimedBy(guide, p);
     if (a) fileArea.set(p, a); else unmappedFiles.push(p);
   }
 
@@ -149,7 +144,7 @@ export function measureSeams({ files, areaMap, commit, areaMapSource = null }) {
 
 // --- CLI: reads the tree from the git object store (the kit's readCommit), no checkout ---
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const [repo, commit, guidePath = DEFAULT_GUIDE] = process.argv.slice(2);
+  const [repo, commit, guidePath = DEFAULT_AREAS] = process.argv.slice(2);
   if (!repo || !commit) { console.error('usage: node seams.mjs <repoDir> <commit> [areaGuidePath]'); process.exit(2); }
   const { sha, files } = readCommit(repo, commit, inScope);
   const areaMap = JSON.parse(readFileSync(guidePath, 'utf8'));

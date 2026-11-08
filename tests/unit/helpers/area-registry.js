@@ -4,9 +4,11 @@
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+// The path's one spelling (LIN-4376); this helper keeps its own lookup, which returns the area object (tests need the slug).
+import { REGISTRY_PATH } from '../../../scripts/code-shape/code-shape-lib.mjs';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-export const REGISTRY_PATH = 'docs/areas/areas.json';
+export { REGISTRY_PATH };
 
 export function loadAreas(root = ROOT) {
   return JSON.parse(readFileSync(join(root, REGISTRY_PATH), 'utf8')).areas;

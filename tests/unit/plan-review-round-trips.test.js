@@ -1170,6 +1170,88 @@ describe('LIN-1653 — an off-spine bug row does not enter the R0 walk', () => {
   });
 });
 
+// ─── LIN-4376: a `leftover` row never enters the walk either ───────────────────
+//
+// The leftover step is the build's own session, run after its `[done]`. LIN-4376
+// moved its wall-clock bucket from the `orchestration` fallback to `after`, which by
+// itself would pull `leftover` rows into this walk the way LIN-1653's bucket move
+// would have pulled `bug` rows in. `OFF_SPINE_KINDS` keeps it out, so no round-trip
+// figure moves with the bucket.
+
+describe('LIN-4376 — an off-spine leftover row does not enter the R0 walk', () => {
+  const ISO = (m) => `2026-08-01T00:${String(m).padStart(2, '0')}:00.000Z`;
+  const strip = (result) => JSON.parse(JSON.stringify(result));
+
+  test('plan-review → bug → leftover → plan reads R0 from the plan re-pass, not from the leftover row', () => {
+    const rows = [
+      row('pr', 'plan-review', 'done', ISO(0), ISO(5)),
+      row('bug', 'bug', 'done', ISO(10), ISO(20)),
+      row('left', 'leftover', 'done', ISO(21), ISO(25)),
+      row('plan2', 'plan', 'done', ISO(30), ISO(40)),
+    ];
+    const result = computeIssueRoundTrips(issue('1', { rows }), { asOf: ASOF });
+    assert.equal(result.R0.nextRow.id, 'plan2', 'nextRow must be the plan re-pass, never the leftover row');
+    assert.equal(result.R0.verdict, 'request changes');
+    assert.equal(result.roundTrips, 1);
+  });
+
+  test('a leftover row between implementation and review leaves the review walk as it was without it', () => {
+    const base = [
+      row('rv1', 'review', 'done', ISO(0), ISO(5)),
+      row('impl', 'implementation', 'done', ISO(10), ISO(20)),
+      row('rv2', 'review', 'done', ISO(30), ISO(35)),
+    ];
+    const withLeftover = [...base, row('left', 'leftover', 'done', ISO(21), ISO(25))];
+    const opts = { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation' };
+    const without = computeIssueRoundTrips(issue('2', { rows: base }), opts);
+    const withIt = computeIssueRoundTrips(issue('2', { rows: withLeftover }), opts);
+    assert.deepEqual(strip(withIt), strip(without));
+    assert.deepEqual(__internal.pipelineRowsOf({ rows: withLeftover }).map((r) => r.id), ['rv1', 'impl', 'rv2']);
+  });
+
+  test('an issue whose only in-window row is a leftover row is not in a windowed read', () => {
+    const rows = [
+      row('pr', 'plan-review', 'done', '2026-06-01T00:00:00.000Z', '2026-06-01T00:05:00.000Z'),
+      row('left', 'leftover', 'done', '2026-08-08T00:00:00.000Z', '2026-08-08T00:05:00.000Z'),
+    ];
+    const result = computePlanReviewRoundTrips([issue('3', { rows })], { asOf: ASOF, windowDays: 7 });
+    assert.equal(result.perIssue.length, 0);
+  });
+});
+
+// ─── LIN-4376: Tier B reads a report line by the wake's rule ───────────────────
+//
+// One rule for "what the session reported": `reportLinesOf` (lib/dispatch-terminal.js),
+// which the wake's PR pick also reads. A `DONE:` line that ends a multi-line message
+// counts (the closing contract puts it last), so does a `[done]` line, and the
+// match is case-sensitive like the contract everywhere else.
+
+describe('LIN-4376 — Tier B reads the shared report-line rule', () => {
+  const ISO = (m) => `2026-08-01T00:${String(m).padStart(2, '0')}:00.000Z`;
+  const tierB = (message) => {
+    const rows = [row('pr', 'plan-review', 'done', ISO(0), ISO(5), feedbackDone(message, ISO(5)))];
+    const result = computeIssueRoundTrips(issue('1', { rows }), { asOf: ASOF });
+    return result.R0 ? { verdict: result.R0.verdict, tier: result.R0.tier } : null;
+  };
+
+  test('a DONE: line that ends a multi-line message is the session\'s report', () => {
+    assert.deepEqual(tierB('Read the plan against the code.\nDONE: Verdict: Approve.'), { verdict: 'approve', tier: 'b' });
+  });
+
+  test('a [done] line is a report line too', () => {
+    assert.deepEqual(tierB('[done] Verdict: Request Changes.'), { verdict: 'request changes', tier: 'b' });
+  });
+
+  test('a message with no report line gives Tier B nothing, and lowercase done: is not one', () => {
+    assert.notEqual(tierB('Verdict: Approve.')?.tier, 'b');
+    assert.notEqual(tierB('done: Verdict: Approve.')?.tier, 'b');
+  });
+
+  test('a DONE: line at the start still counts, as before', () => {
+    assert.deepEqual(tierB('DONE: Verdict: Approve.'), { verdict: 'approve', tier: 'b' });
+  });
+});
+
 // =============================================================================
 // LIN-1871 — a third round is counted, not just the first
 // =============================================================================

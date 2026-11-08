@@ -7,7 +7,9 @@
  *   Changes (the review loop bound is untouched).
  * - Close-out writes review's note entries into `docs/areas/<slug>.md` on the PR branch before
  *   the merge, stays the only filer, and states the one-home rule in Follow-up Triage.
- * - The heading has one spelling, shared by the leftover prompt and review's template.
+ * - The heading and where a leftover goes have one spelling each, in the leaf
+ *   `lib/prompts/leftover-words.js` (LIN-4376), rendered verbatim by the leftover prompt,
+ *   review and close-out.
  * - The two post-merge readers (`retrospective-audit`, `retro`) are left as they were.
  *
  * Run with: node --test tests/unit/lin-4374-review-leftover-read.test.js
@@ -19,8 +21,10 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { generatePrompt } from '../../lib/prompt-templates.js';
-import { LEFTOVERS_HEADING } from '../../lib/dispatch-fields.js';
-import { LEFTOVERS_HEADING as PROMPT_HEADING, leftoverPrompt } from '../../lib/dispatch-leftover.js';
+import { LEFTOVERS_HEADING, LEFTOVER_RULE } from '../../lib/prompts/leftover-words.js';
+import * as dispatchFields from '../../lib/dispatch-fields.js';
+import * as dispatchLeftover from '../../lib/dispatch-leftover.js';
+import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
 import { SIZE_OF_MOVE_HEADING } from '../../lib/size-of-move.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -57,10 +61,9 @@ describe('review: the one read of what the change left at its edges (LIN-4374)',
     assert.match(classCheck, /neither tidied nor in its area's notes/);
   });
 
-  test('each untouched edge has one of three routes', () => {
-    assert.match(classCheck, /inside the change's area and the size of a fix, a fix for close-out/);
-    assert.match(classCheck, /larger, a note entry for close-out to write in `docs\/areas\/<slug>\.md`/);
-    assert.match(classCheck, /outside the area, an outside follow-up/);
+  test('each untouched edge has one of three routes, in the shared words, named for close-out', () => {
+    assert.ok(classCheck.includes(LEFTOVER_RULE), 'renders LEFTOVER_RULE verbatim');
+    assert.match(classCheck, /Name each for close-out with its home; word a note entry as it should land\./);
   });
 
   test('a leftover alone never makes Request Changes, and defects keep their route', () => {
@@ -77,9 +80,9 @@ describe('close-out: writes review\'s note entries and states the one-home rule 
     assert.match(prompt, /Make the fixes and write the note entries review asked for/, 'Workflow step 2 names them');
   });
 
-  test('Follow-up Triage states the one-home rule, and close-out stays the only filer', () => {
+  test('Follow-up Triage states the one-home rule in the shared words, and close-out stays the only filer', () => {
     const triage = section(prompt, 'Follow-up Triage');
-    assert.match(triage, /One home for each leftover: a filed follow-up will be done, a note is known but not scheduled, and a leftover inside the change's area is never filed\./);
+    assert.ok(triage.includes(LEFTOVER_RULE), 'renders LEFTOVER_RULE verbatim');
     assert.match(triage, /Only outside items are filed here/);
   });
 
@@ -88,26 +91,41 @@ describe('close-out: writes review\'s note entries and states the one-home rule 
   });
 });
 
-describe('the leftover heading has one spelling (LIN-4374)', () => {
-  test('the leftover prompt and review read the same constant', () => {
-    assert.equal(PROMPT_HEADING, LEFTOVERS_HEADING);
-    assert.ok(leftoverPrompt({ issueIdentifier: 'LIN-9001', prUrl: 'https://github.com/o/r/pull/1' }).includes('`' + LEFTOVERS_HEADING + '`'));
+describe('the leftover heading and rule have one spelling each (LIN-4374, LIN-4376)', () => {
+  const OWNER = 'lib/prompts/leftover-words.js';
+  const PROMPT = leftoverPrompt({ issueIdentifier: 'LIN-9001', prUrl: 'https://github.com/o/r/pull/1' });
+
+  test('the leftover prompt, review and close-out each render the heading or rule from the leaf', () => {
+    assert.ok(PROMPT.includes('`' + LEFTOVERS_HEADING + '`'), 'leftover prompt: the heading');
+    assert.ok(PROMPT.includes(LEFTOVER_RULE), 'leftover prompt: the rule');
+    assert.ok(render('review').includes(LEFTOVER_RULE), 'review: the rule');
+    assert.ok(render('close-out').includes(LEFTOVER_RULE), 'close-out: the rule');
   });
 
-  test('no other file in lib/ or routes/ spells the heading', () => {
+  test('the heading has left lib/dispatch-fields.js and is not re-exported by lib/dispatch-leftover.js', () => {
+    assert.equal(dispatchFields.LEFTOVERS_HEADING, undefined);
+    assert.equal(dispatchLeftover.LEFTOVERS_HEADING, undefined);
+  });
+
+  // Distinctive pieces of the rule: a file that retypes any of them restates it.
+  const RULE_PIECES = [LEFTOVER_RULE, 'a note is known but not scheduled', 'a follow-up only close-out files'];
+
+  test('no other file in lib/ or routes/ spells the heading or the rule', () => {
     const offenders = [];
     for (const dir of ['lib', 'routes']) {
       const walk = (rel) => {
         for (const ent of readdirSync(join(ROOT, rel), { withFileTypes: true })) {
           const path = `${rel}/${ent.name}`;
           if (ent.isDirectory()) walk(path);
-          else if (ent.name.endsWith('.js') && path !== 'lib/dispatch-fields.js'
-            && readFileSync(join(ROOT, path), 'utf8').includes(LEFTOVERS_HEADING)) offenders.push(path);
+          else if (ent.name.endsWith('.js') && path !== OWNER) {
+            const text = readFileSync(join(ROOT, path), 'utf8');
+            if (text.includes(LEFTOVERS_HEADING) || RULE_PIECES.some((piece) => text.includes(piece))) offenders.push(path);
+          }
         }
       };
       walk(dir);
     }
-    assert.deepEqual(offenders, [], 'import LEFTOVERS_HEADING from lib/dispatch-fields.js instead of retyping it');
+    assert.deepEqual(offenders, [], `import LEFTOVERS_HEADING and LEFTOVER_RULE from ${OWNER} instead of retyping them`);
   });
 });
 
