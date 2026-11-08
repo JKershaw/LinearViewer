@@ -29,8 +29,10 @@ import {
   capFeedbackMessage,
   runCommand,
   dispatchEvidence,
+  transcriptFinished,
   SESSION_TARGETS
 } from '../../lib/runner-kit/runner.mjs';
+import { prUrlOfFeedback } from '../../lib/dispatch-wake.js';
 import { credentialStore } from '../../lib/runner-kit/broker.mjs';
 import { SESSION_TARGETS as HARBOUR_SESSION_TARGETS } from '../../lib/dispatch-targets.js';
 import { HALT_MODES } from '../../lib/workspace-halt.js';
@@ -121,6 +123,30 @@ async function kitStoreOutcome(row) {
 
 const isDir = (repo) => (dir) => repo === 'found' && dir === path.join(ROOT_DIR, 'found');
 
+// LIN-4384: the `report` and `sentinel` rows read one assistant message, `item.message`. A
+// transcript holds it as one assistant JSONL line, which is how the kit reads it here and how
+// simple-dispatcher's `sessionPrs` reads it there. The `sd` cells were filled by running SD's
+// readers at simple-dispatcher cb79e00. Here they are data: simple-dispatcher's own contract test
+// asserts them (LIN-4385), as it does `sd` on every other area.
+const assistantLine = (message) => JSON.stringify({
+  type: 'assistant', isSidechain: false,
+  message: { role: 'assistant', content: [{ type: 'text', text: message }] }
+});
+
+// Is the turn over, in the contract's vocabulary: the kit's watchdog reading of the transcript.
+const kitSentinelOutcome = (row) => (transcriptFinished([assistantLine(row.item.message)]) ? 'finished' : 'not finished');
+
+// Which PR did the run open, as Harbour reads it: the message as one feedback entry, read by the
+// wake's PR pick (`prUrlOfFeedback`, whose report lines are `reportLinesOf`'s).
+function harbourFor(row) {
+  switch (row.area) {
+    case 'report':
+      return prUrlOfFeedback([{ message: row.item.message }]);
+    default:
+      throw new Error(`unknown harbour area ${row.area}`);
+  }
+}
+
 function kitFor(row) {
   switch (row.area) {
     case 'halt':
@@ -152,6 +178,8 @@ function kitFor(row) {
       return kitStoreOutcome(row);
     case 'heartbeat':
       return 'not sent (the runner-kit producer, POST /api/proxy/runner/heartbeat, is a follow-up)';
+    case 'sentinel':
+      return kitSentinelOutcome(row);
     default:
       throw new Error(`unknown area ${row.area}`);
   }
@@ -214,10 +242,21 @@ describe('contract table shape', () => {
   });
 
   test('the table records the deliberate differences it was written to carry', () => {
-    const diffs = TABLE.rows.filter((r) => r.kit !== r.sd).map((r) => r.case);
+    const diffs = TABLE.rows.filter((r) => 'kit' in r && r.kit !== r.sd).map((r) => r.case);
     assert.ok(diffs.some((c) => /abort row under an unknown halt mode/.test(c)));
     assert.ok(diffs.some((c) => /line posted/.test(c)));
     assert.ok(diffs.some((c) => /decision message/.test(c)));
+    // LIN-4384: SD's hook reads a DONE: inside a DECISION block as the turn's end; the kit does not.
+    assert.ok(TABLE.rows.some((r) => r.area === 'sentinel' && /only inside a DECISION block/.test(r.case) && r.kit !== r.sd));
+  });
+
+  // LIN-4384: the cases both repos must read the same way, each in both areas.
+  test('report has the seven reported-DONE: cases, and sentinel the same messages', () => {
+    const report = TABLE.rows.filter((r) => r.area === 'report');
+    const sentinel = TABLE.rows.filter((r) => r.area === 'sentinel');
+    assert.equal(report.length, 7);
+    assert.deepEqual(sentinel.map((r) => r.item.message), report.map((r) => r.item.message));
+    assert.ok(report.every((r) => r.harbour === r.sd), 'the PR readers agree on every report row');
   });
 
   // LIN-3650: adding a mode to HALT_MODES fails here until the table says what each side does with it.
@@ -276,10 +315,19 @@ describe('checkRowShape rejects a half-specified row and accepts each area\'s sh
   });
 });
 
+// Every row of a runner area carries `kit` (checkRowShape), so only `report` rows skip this loop.
 describe('the kit follows the contract table', () => {
-  for (const row of TABLE.rows) {
+  for (const row of TABLE.rows.filter((r) => 'kit' in r)) {
     test(`${row.area}: ${row.case}`, async () => {
       assert.equal(await kitFor(row), row.kit);
+    });
+  }
+});
+
+describe('Harbour follows the contract table (LIN-4384)', () => {
+  for (const row of TABLE.rows.filter((r) => 'harbour' in r)) {
+    test(`${row.area}: ${row.case}`, () => {
+      assert.equal(harbourFor(row), row.harbour);
     });
   }
 });
