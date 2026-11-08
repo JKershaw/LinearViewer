@@ -20,6 +20,10 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - A parent wake can be held (LIN-4373): a `leftover` row's `heldWakeFor` is the whole hold
   record, released by its own terminal or by `_archiveItem` on cancel or expiry. A new way
   for a held wake to end must release it under the build's guard key, so it stays once.
+- Any session can park `[pending]` on CI and finish on a ci-wake `custom` row
+  (`lib/ci-wake-sweep.js`). A rule keyed on the producing row's kind misses that ending:
+  read the lineage instead (`_heldLeftoverOf`, `resolveFollowUpRoot`). LIN-4373 handled it
+  for eligibility but not for the held wake's terminals, and review caught it.
 - Row-only kinds (`wake`, `leftover`) stay out of `DISPATCH_KINDS` (`lib/prompt-templates.js`),
   so no `/dispatch` caller can create one.
 - Price a pulled extra like any other piece. Making the cost read load its own inputs

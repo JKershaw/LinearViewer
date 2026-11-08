@@ -2,10 +2,12 @@
  * LIN-4373 (piece 2 of LIN-4347): the leftover step, and the build wake it holds.
  *
  * At an eligible build's terminal `[done]`, Harbour queues a `leftover` follow-up into the
- * build's own lineage and withholds the build's parent wake until that row ends. The wake
- * is then given by exactly one of: the leftover row's own terminal (`[done]` as itself;
+ * build's own lineage and withholds the build's parent wake until that row ends. The
+ * build's terminal wake is then given by exactly one of: the leftover row's own terminal (`[done]` as itself;
  * `[failed]`/`[blocked]` as the build's outcome plus one line), or the release when the
- * row is cancelled (`removeItem`) or expires (`cleanup()`).
+ * row is cancelled (`removeItem`) or expires (`cleanup()`). "The leftover row's own terminal"
+ * includes its ci-wake `custom` continuation after it parked on CI; a `[pending]` park in
+ * the step's lineage wakes the parent at once, labelled as the leftover step.
  *
  * Store-level through `addFeedback`, `removeItem` and `cleanup()`, on a real
  * DispatchQueueStore over mock collections, with the real leftover hook and the real
@@ -264,6 +266,31 @@ describe('LIN-4373 — release when the leftover row never runs', () => {
     assert.ok(lines.some(l => l.includes('[leftover] release-degraded') && l.includes('no-provisioner')));
   });
 
+  test('a release that faults the first time is recovered by a re-reported build [done]: exactly one wake', async () => {
+    const world = makeWorld();
+    const { a, b } = await heldBuild(world);
+    const realDeliver = world.store._deliverWake.bind(world.store);
+    let calls = 0;
+    world.store._deliverWake = async (...args) => {
+      if (calls++ === 0) throw new Error('transient enqueue fault');
+      return realDeliver(...args);
+    };
+    const row = queuedLeftover(world);
+    const { result } = await captureLogs(() => world.store.removeItem(URL_KEY, row._id));
+    assert.equal(result, true, 'the archive stands');
+    assert.equal(wakesTo(world, a._id).length, 0, 'the first release faulted: nothing minted');
+    // The build re-reports its [done]: the hook answers hold on an archived (cancelled)
+    // leftover, and the hold path re-runs the release.
+    await captureLogs(() => post(world, b, DONE));
+    const wakes = wakesTo(world, a._id);
+    assert.equal(wakes.length, 1, 'the re-report recovers the held wake');
+    assert.match(wakes[0].prompt, /^The leftover step did not run \(its row was cancelled\)\./);
+    assert.ok(wakes[0].prompt.includes(`Outcome: ${DONE}`));
+    await captureLogs(() => post(world, b, DONE));
+    assert.equal(wakesTo(world, a._id).length, 1, 'and a further re-report adds none');
+    assert.equal(leftovers(world).length, 1, 'no second leftover row');
+  });
+
   test('a release that throws never fails the archive', async () => {
     const world = makeWorld();
     await heldBuild(world);
@@ -272,6 +299,84 @@ describe('LIN-4373 — release when the leftover row never runs', () => {
     const { result } = await captureLogs(() => world.store.removeItem(URL_KEY, row._id));
     assert.equal(result, true);
     assert.equal(world.historyCollection._docs.find(d => d._id === row._id).status, 'cancelled');
+  });
+});
+
+describe('LIN-4373 — a leftover step that parks on CI and ends on its ci-wake continuation', () => {
+  /** The step pushed a tidy and parked; the ci-wake sweep continued it on a custom row, taken. */
+  async function parkedLeftover(world) {
+    const { a, b } = await heldBuild(world);
+    const l = await takeLeftover(world);
+    await post(world, l, `[pending] pushed a tidy, waiting on CI for ${PR}`);
+    // The ci-wake sweep's row, made the way enqueueFollowUp makes it.
+    const c = await createDispatchItem({ store: world.store, urlKey: URL_KEY, prompt: `CI finished on ${PR}`, applyDefaultHarness: false, fields: { followUpTo: l._id, target: 'cli', force: true, dispatchedBy: OWNER } });
+    await world.store.takeItem(c._id, URL_KEY, TOKEN);
+    assert.equal(world.historyCollection._docs.find(d => d._id === c._id).kind, 'custom');
+    return { a, b, l, c };
+  }
+
+  test("[pending] in the step's lineage wakes at once, naming the leftover step and the build's [done] and PR; the build wake stays held", async () => {
+    const world = makeWorld();
+    const { a, b } = await parkedLeftover(world);
+    const wakes = wakesTo(world, a._id);
+    assert.equal(wakes.length, 1, 'a parked child wakes its parent, as today');
+    const prompt = wakes[0].prompt;
+    assert.ok(prompt.startsWith('The leftover step is paused [pending]: [pending] pushed a tidy'), prompt);
+    assert.ok(prompt.includes(`The build already finished: ${DONE}`), prompt);
+    assert.ok(prompt.includes(PR));
+    assert.match(prompt, /the build's own wake is still held until the step ends/);
+    const edge = world.historyCollection._docs.find(d => d._id === b._id);
+    assert.ok(!(edge.terminalWakeItems || []).includes(b._id), "the build's guard key is still not burned");
+  });
+
+  for (const [marker, message, expected] of [
+    ['failed', '[failed] my tidy broke CI on the branch', /^The leftover step ended \[failed\]: \[failed\] my tidy broke CI/],
+    ['blocked', '[blocked] CI needs a secret I cannot set', /^The leftover step ended blocked: \[blocked\] CI needs a secret/],
+    ['aborted', '[aborted] Cancelled running session.', /^The leftover step ended \[aborted\]: \[aborted\] Cancelled running session/]
+  ]) {
+    test(`[${marker}] on the continuation row wakes once with the BUILD's [done] outcome and PR, and the ${marker} line`, async () => {
+      const world = makeWorld();
+      const { a, c } = await parkedLeftover(world);
+      const before = wakesTo(world, a._id).length;
+      await post(world, c, message);
+      const wakes = wakesTo(world, a._id);
+      assert.equal(wakes.length, before + 1);
+      const prompt = wakes[wakes.length - 1].prompt;
+      assert.match(prompt, expected);
+      assert.ok(prompt.includes(`Outcome: ${DONE}`), `the build's outcome, not the continuation's: ${prompt}`);
+      assert.ok(prompt.includes(PR));
+      await post(world, c, message);
+      assert.equal(wakesTo(world, a._id).length, before + 1, 'a re-report adds nothing');
+      assert.equal(leftovers(world).length, 1, 'and asks nothing again');
+    });
+  }
+
+  test('[done] on the continuation row wakes once as itself', async () => {
+    const world = makeWorld();
+    const { a, c } = await parkedLeftover(world);
+    const before = wakesTo(world, a._id).length;
+    await post(world, c, `[done] ${LEFTOVERS_HEADING}: tidied one copy. ${PR} head abc1234`);
+    const wakes = wakesTo(world, a._id);
+    assert.equal(wakes.length, before + 1);
+    assert.match(wakes[wakes.length - 1].prompt, /Outcome: \[done\] ### Leftovers: tidied one copy/);
+    assert.doesNotMatch(wakes[wakes.length - 1].prompt, /leftover step (ended|did not run|is paused)/);
+    assert.equal(leftovers(world).length, 1);
+  });
+
+  test("a build's own ci-wake continuation (no leftover in its lineage) wakes exactly as today", async () => {
+    const world = makeWorld();
+    const a = await run(world);
+    const b = await build(world, a._id);
+    await post(world, b, `[pending] waiting on CI for ${PR}`);
+    assert.doesNotMatch(wakesTo(world, a._id)[0].prompt, /leftover step/, 'a build pause is not labelled');
+    const c = await createDispatchItem({ store: world.store, urlKey: URL_KEY, prompt: `CI finished on ${PR}`, applyDefaultHarness: false, fields: { followUpTo: b._id, target: 'cli', force: true, dispatchedBy: OWNER } });
+    await world.store.takeItem(c._id, URL_KEY, TOKEN);
+    await post(world, c, '[failed] CI red on the build');
+    const wakes = wakesTo(world, a._id);
+    assert.equal(wakes.length, 2);
+    assert.match(wakes[1].prompt, /Outcome: \[failed\] CI red on the build/);
+    assert.doesNotMatch(wakes[1].prompt, /leftover step/);
+    assert.equal(leftovers(world).length, 0);
   });
 });
 
