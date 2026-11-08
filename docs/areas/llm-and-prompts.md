@@ -18,6 +18,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   before the rebase.
 - The `## As asked` block's words have one owner, `lib/as-asked.js`. Import its spellings;
   never retype the heading or the end line (LIN-4362).
+- `lib/prompt-template-defs.js` cannot import a module that imports `lib/prompt-templates.js`
+  (a cycle). A spelling a template shares with such a module lives in a leaf module both
+  import, as `LEFTOVERS_HEADING` does in `lib/dispatch-fields.js` (LIN-4374).
 
 ## Waiting
 
@@ -46,3 +49,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   tables (`GROUNDING_BY_KIND`, the rendered ceilings, completion signals, stage labels and
   more), some unguarded. `route: null` now says "never offered" (LIN-4253); folding the
   per-kind tables into the stage's one definition is open. (Survey tally, LIN-4248.)
+- `lib/prompt-template-defs.js`: where a leftover goes (in-area fix-sized: tidied or a fix;
+  larger: a note; outside the area: filed by close-out) is spelled three times, in review's
+  class check, in `leftoverPrompt` (`lib/dispatch-leftover.js`) and in the one-home section of
+  `docs/areas/README.md`, which close-out's triage sentence restates. No test links them.
+  (LIN-4374 leftover step.)
