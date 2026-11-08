@@ -93,7 +93,13 @@ The long argument is the essay `docs/papers/harbour/tasks-are-tasks.md` (v5, LIN
 - the periodicals' maps (Seams & Tangles knots, change coupling, the coherence census);
 - the area's notebook.
 
-**How the choice is made.** The Survey recommends; small options just proceed; John is asked only when the large option is recommended. The ruling card with the recommended answer as its main button (LIN-4114) is the natural surface for that.
+**How the choice is made** (LIN-4346, since LIN-4370). Code runs the look-first sequence on a fresh ticket with no size of the move: survey-task, then survey-place, then scoping, each once (`lib/recommendation-look-first.js`). Scoping reads both Surveys and writes the size record, and the workspace's standing size policy (Settings → Running) decides who settles it:
+- under the policy (`err-larger`), a larger size or just the task goes ahead, decided by the standing policy;
+- a size smaller than asked, or wrong work, is a cut and gets a ruling, policy or not;
+- with no policy (`ask`), every size is a ruling: the record reads pending until a person answers.
+The ruling card with the recommended answer as its main button (LIN-4114) is the surface for those rulings. The Surveys stay advice: code reads only whether each ran, never what it said.
+
+**What the Surveys cost per ticket.** `GET /api/proxy/issues/{id}/cost` lists every worker session on the ticket with its `kind`, so the two Surveys read there as `survey-task` and `survey-place` beside scoping and the rest; add up the sessions of those kinds.
 
 **Asked twice.** The Survey asks before the task. The builder answers the same question after merge, when nothing is at stake. The Survey doesn't need to be right; it needs to be wrong in a way the after-answer can show. The pairs over time are the area's film, without a viewer.
 
