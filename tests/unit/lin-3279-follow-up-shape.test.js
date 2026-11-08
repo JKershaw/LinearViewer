@@ -25,10 +25,19 @@ for (const key of ['close-out', 'retrospective-audit']) {
   });
 }
 
-test('every task-minting periodical carries FOLLOW_UP_SHAPE', () => {
-  const minting = PERIODICALS.map(p => [p.id, p.generatePrompt()]).filter(([, text]) => /Mint a bounded set/.test(text));
-  assert.ok(minting.length > 0);
-  for (const [id, text] of minting) assert.ok(text.includes(defs.FOLLOW_UP_SHAPE), id);
+// LIN-4380 (LIN-4349 P2): this used to pin "every task-minting periodical carries FOLLOW_UP_SHAPE".
+// No Periodical files a ticket now (the 13 corrective ones feed the area notes, the 3 advisory ones
+// report to a person), so the shape's carriers are exactly the filing prompts above. This pins
+// that: no Periodical prompt tells the run to file follow-ups, none carries the filing shape, and
+// each says positively that it mints none. A Periodical that starts filing again fails here.
+test('no Periodical files a follow-up, so none carries FOLLOW_UP_SHAPE (LIN-4380)', () => {
+  assert.strictEqual(PERIODICALS.length, 16);
+  for (const p of PERIODICALS) {
+    const text = p.generatePrompt();
+    assert.doesNotMatch(text, /Mint a bounded set|into new Linear tasks yourself|before minting a task/i, `${p.id} tells the run to file follow-ups`);
+    assert.ok(!text.includes(defs.FOLLOW_UP_SHAPE), `${p.id} carries the filing shape`);
+    assert.match(text, p.mode === 'advisory' ? /mint NO follow-up tasks/ : /mint no follow-up tasks/, `${p.id} says it mints none`);
+  }
 });
 
 test('research and design skip guards do not accept a filer-written fix as prep', () => {

@@ -299,30 +299,74 @@ describe('Mint + Autopilot variant (LIN-1279)', () => {
   }
 });
 
-// Bounded follow-up creation is a CORRECTIVE-mode concern only: those reviews
-// turn findings into a capped set of fix-tasks itself (LIN-386), rather than the
-// old propose-but-don't-create + leave-In-Progress contract that looped on
-// `review` forever. The advisory Stability Review is excluded by mode (it mints
-// no follow-ups — see its own specifics block).
-// LIN-4379: a template that feeds the area notes mints no follow-ups, so it leaves this loop.
-// P2 (LIN-4380) moves the other 12 here and turns this loop into a census.
-const FEEDS_AREA_NOTES = new Set(['seams-tangles']);
+// LIN-4380 (LIN-4349 P2): every CORRECTIVE review feeds the area notes and mints nothing. This
+// loop replaces the LIN-386 "bounded follow-up creation" loop, keeping what each of its
+// assertions protected under the new output:
+//   - "every finding is recorded in the report" -> the report stays uncapped (everything found);
+//   - "bounded / cap it"                         -> what the reading writes stays within its bound,
+//                                                   each note under its cap;
+//   - "search for an existing ticket before minting" (LIN-2991/LIN-3022 §5a, no re-raise)
+//                                                -> a finding already filed as a ticket stays in
+//                                                   the report only, never also in a note.
+// It selects by mode, so a corrective template that stops feeding the notes fails here. The
+// advisory reviews (Stability, Recent Headwinds, Integration & Surface Maturity) report to a
+// person instead; see their specifics blocks and the census below.
+describe('corrective reviews: feed the notes, mint nothing (LIN-4380)', () => {
+  const corrective = PERIODICALS.filter(t => t.mode === 'corrective');
 
-describe('corrective reviews: bounded follow-up creation', () => {
-  for (const template of PERIODICALS.filter(t => t.mode === 'corrective' && !FEEDS_AREA_NOTES.has(t.id))) {
-    test(`${template.title} mints a capped follow-up set, records every finding`, () => {
-      const prompt = template.generatePrompt();
-      assert.match(prompt, /follow-up task/i);
-      assert.match(prompt, /bounded|cap it|at most/i);
-      // Every finding still lands in the report even if not promoted to a task.
-      assert.match(prompt, /every finding|not promote|nothing is lost/i);
+  test('covers all 13 corrective templates', () => {
+    assert.strictEqual(corrective.length, 13);
+  });
+
+  for (const template of corrective) {
+    const prompt = template.generatePrompt();
+    const lines = prompt.split('\n');
+    const notesBullet = lines.find(l => l.startsWith('- **Feed the area notes'));
+    const routesBullet = lines.find(l => l.startsWith('- **Route each finding that has no area note'));
+
+    test(`${template.title} feeds the area notes through one docs-only PR, citing file then reading`, () => {
+      assert.ok(notesBullet, `${template.id}: the notes bullet is present`);
+      for (const re of [
+        /mint no follow-up tasks/i,
+        /searching the repo/i,
+        /follow their own rules/i,
+        /since the commit the previous report measured/i,
+        /map each changed file to its area through the registry/i,
+        /prune entries you find settled or no longer true/i,
+        /Waiting entry/, /Lesson/,
+        /cites the file it is about first/i,
+        /this report as the second cited path/i,
+        /one docs-only pull request/i,
+        /rebase it onto main/i
+      ]) assert.match(notesBullet, re, `${template.id}: ${re}`);
+      // The source tag names this template's own title (P1's citation contract).
+      assert.ok(notesBullet.includes(`"${template.title}, <the date of this run>"`), `${template.id}: source tag names its title`);
     });
 
-    // LIN-2991/LIN-3022 §5 clause (a): before minting, check the finding
-    // doesn't already have a ticket — never a re-raise of the same file/finding.
-    test(`${template.title} checks for an existing ticket before minting`, () => {
-      const prompt = template.generatePrompt();
-      assert.match(prompt, /before minting a task, search for an existing ticket already naming the same finding/i);
+    test(`${template.title} routes what has no area note to the person, never to a ticket`, () => {
+      assert.ok(routesBullet, `${template.id}: the routes bullet is present`);
+      for (const re of [/larger tidy/i, /no file in an area to cite/i, /addressed to the person/i, /cross-area seam/i, /repo with no area notes/i, /never (?:to|in) a ticket/i]) {
+        assert.match(routesBullet, re, `${template.id}: ${re}`);
+      }
+    });
+
+    test(`${template.title} concludes on the notes PR, stays review-only around the note edits, keeps its output bounded`, () => {
+      assert.match(prompt, /The area-notes pull request carries the findings forward/);
+      assert.match(prompt, /beyond the report artifact itself and the area-note edits described above/);
+      assert.match(prompt, /After the report and its area-note edits above are written/);
+      assert.match(prompt, /what this reading writes — the report and its area-note entries — stays within its existing bound/);
+      assert.match(prompt, /each note under its cap/);
+    });
+
+    test(`${template.title} still records every finding in the report and never re-raises a filed one`, () => {
+      assert.match(prompt, /report of everything found/i);
+      assert.match(prompt, /A finding already filed as a ticket stays in the report only, never also in a note/);
+    });
+
+    test(`${template.title} gives no instruction to mint follow-up tasks`, () => {
+      for (const re of [/Mint a bounded set of follow-up tasks/i, /into new Linear tasks yourself/i, /before minting a task/i, /top ~3 by severity/i, /follow-up tasks you minted/i]) {
+        assert.doesNotMatch(prompt, re, `${template.id}: ${re}`);
+      }
     });
   }
 });
