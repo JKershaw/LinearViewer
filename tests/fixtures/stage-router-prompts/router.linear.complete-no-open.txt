@@ -32,6 +32,7 @@ Approve — conditional on close-out.
 - PRs linked on the trail: https://github.com/o/r/pull/7
 - Latest person's comment (not an agent note, landing report, review, verdict or close-out): none
 - Latest ruling recorded via Harbour: none
+- Size of the move: not recorded
 - Subtasks: 2 (2 done, 0 in progress, 0 remaining)
 - Session fit stated in the plan: none
 

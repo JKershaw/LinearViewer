@@ -7,6 +7,7 @@
  *   GET  /workspace/:urlKey/settings/:area                   one area (lib/settings-areas.js)
  *   POST /workspace/:urlKey/settings/workspace-features      periodic reviews and agents-can-change-models; asks why, logs, Undo
  *   POST /workspace/:urlKey/settings/running/halt            pause / stop / resume; OWNER-ONLY
+ *   POST /workspace/:urlKey/settings/running/size-policy     the standing size policy (LIN-4368); asks why, logs, Undo
  *   POST /workspace/:urlKey/settings/change-log/:source/:id/undo
  *
  * Halt is a request the runner honours, so both halt writers here
@@ -40,6 +41,8 @@ import { readModelsHistory } from '../lib/model-routing-history.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 import { CREDENTIAL_DEAD_VERDICT } from '../lib/credential-state.js';
 import { badRequest, serverError } from '../lib/errors.js';
+import { loadSizePolicy, setSizePolicy } from '../lib/workspace-preferences.js';
+import { SIZE_POLICIES } from '../lib/size-of-move.js';
 
 /**
  * Provider-action notice from the redirect's query (LIN-634/LIN-2803).
@@ -242,13 +245,14 @@ export function createSettingsRouter(deps) {
     }));
 
     // Keys, the runner's presence and the halt, for Running / Agent access / Health.
-    const [proxyRows, dispatchRows, haltMode, isOwner, changeRows, credentialHealth] = await Promise.all([
+    const [proxyRows, dispatchRows, haltMode, isOwner, changeRows, credentialHealth, sizePolicy] = await Promise.all([
       proxyTokenStore.listTokens(workspace.urlKey),
       dispatchTokenStore.listTokens(workspace.urlKey),
       readHaltMode(workspace.urlKey),
       ownerOf(req),
       readChangeRows(workspace.urlKey),
-      proxyEventStore ? proxyEventStore.listCredentialHealth(workspace.urlKey) : { tokens: [] }
+      proxyEventStore ? proxyEventStore.listCredentialHealth(workspace.urlKey) : { tokens: [] },
+      loadSizePolicy(workspacePreferencesStore, workspace.urlKey)
     ]);
     const hasRunner = hasLiveRunnerKey(proxyRows) || hasLiveQueueToken(dispatchRows);
     const keys = buildKeyList({ proxyRows, dispatchRows, isOwner, urlKey: workspace.urlKey });
@@ -260,7 +264,7 @@ export function createSettingsRouter(deps) {
     const stateCtx = {
       providerBindings,
       modelsSummary,
-      haltMode, hasRunner,
+      haltMode, hasRunner, sizePolicy: sizePolicy.value,
       // Person-made live keys only: per-run keys are a separate row (LIN-3890).
       keyCount: keys.filter(k => !k.run).length,
       healthProblems: problems.length,
@@ -378,7 +382,7 @@ export function createSettingsRouter(deps) {
       proxyDefault,
       flash,
       isOwner,
-      running: { runSetup: isOwner && !hasRunner, hasRunner, lastPoll, haltMode },
+      running: { runSetup: isOwner && !hasRunner, hasRunner, lastPoll, haltMode, sizePolicy },
       keys,
       health: { problems, lastPoll },
       changeLogRows: changeRows,
@@ -486,6 +490,38 @@ export function createSettingsRouter(deps) {
   });
 
   // -------------------------------------------------------------------------
+  // The standing size policy (LIN-4368): the workspace's standing answer to "how
+  // big a move?", stored with who set it and when (lib/workspace-preferences.js
+  // setSizePolicy). For everyone, so it asks why and lands in the change log, with
+  // Undo; any member may set it, as with periodic reviews (John, 24 Oct).
+  // -------------------------------------------------------------------------
+  router.post('/workspace/:urlKey/settings/running/size-policy', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const value = req.body?.value;
+    if (!SIZE_POLICIES.includes(value)) {
+      return badRequest.json(res, `Invalid size policy (one of: ${SIZE_POLICIES.join(', ')})`);
+    }
+    const reason = reasonOf(req);
+    if (!reasonOk(reason)) return res.redirect(backTo(workspace, 'running', { error: 'reason' }));
+
+    const before = (await loadSizePolicy(workspacePreferencesStore, workspace.urlKey)).value;
+    try {
+      const ok = await setSizePolicy({ urlKey: workspace.urlKey, value, setBy: actorOf(req), store: workspacePreferencesStore });
+      if (!ok) throw new Error('setSizePolicy returned false');
+    } catch (err) {
+      console.error('Failed to save the size policy:', err);
+      return serverError.json(res, 'Failed to save the size policy');
+    }
+    try {
+      await workspaceChangeLogStore.record({ urlKey: workspace.urlKey, setting: 'sizePolicy', reason, actor: actorOf(req), from: before, to: value });
+    } catch (err) {
+      console.error('workspace-change-log: the size policy changed but its log entry could not be written', err);
+      return res.redirect(backTo(workspace, 'running', { error: 'log_failed' }));
+    }
+    return res.redirect(backTo(workspace, 'running', { changed: '1' }));
+  });
+
+  // -------------------------------------------------------------------------
   // Undo, for either log. `source=model` goes to ModelRoutingStore.undo
   // unchanged (it refuses on a conflict). `source=workspace` undoes a
   // periodicals change (any member) or a halt change (OWNER-ONLY: undoing a
@@ -523,18 +559,28 @@ export function createSettingsRouter(deps) {
     }
     if (!reasonOk(reason)) return toLog('reason');
 
-    const applyValue = entry.setting === 'halt'
-      ? async (value) => {
-        const refusal = await writeHalt(req, value, { quiet: true });
-        if (refusal) throw new ChangeLogError('NOT_UNDOABLE', refusal.error);
+    // Each logged setting's write and read: the halt, the size policy (LIN-4368), and a workspace feature switch.
+    const sinks = {
+      halt: {
+        apply: async (value) => {
+          const refusal = await writeHalt(req, value, { quiet: true });
+          if (refusal) throw new ChangeLogError('NOT_UNDOABLE', refusal.error);
+        },
+        read: () => readHaltMode(workspace.urlKey)
+      },
+      sizePolicy: {
+        apply: async (value) => {
+          const ok = await setSizePolicy({ urlKey: workspace.urlKey, value, setBy: actorOf(req), store: workspacePreferencesStore });
+          if (!ok) throw new ChangeLogError('NOT_UNDOABLE', `the size policy cannot be set to ${JSON.stringify(value)}`);
+        },
+        read: async () => (await loadSizePolicy(workspacePreferencesStore, workspace.urlKey)).value
       }
-      : async (value) => {
-        const ok = await setWorkspaceFeature({ urlKey: workspace.urlKey, featureKey: entry.setting, enabled: value === true, store: workspacePreferencesStore });
-        if (!ok) throw new Error('setWorkspaceFeature returned false');
-      };
-    const readCurrent = entry.setting === 'halt'
-      ? () => readHaltMode(workspace.urlKey)
-      : async () => !!(await getWorkspaceFeatures({ urlKey: workspace.urlKey, store: workspacePreferencesStore }))[entry.setting];
+    };
+    const applyValue = sinks[entry.setting]?.apply || (async (value) => {
+      const ok = await setWorkspaceFeature({ urlKey: workspace.urlKey, featureKey: entry.setting, enabled: value === true, store: workspacePreferencesStore });
+      if (!ok) throw new Error('setWorkspaceFeature returned false');
+    });
+    const readCurrent = sinks[entry.setting]?.read || (async () => !!(await getWorkspaceFeatures({ urlKey: workspace.urlKey, store: workspacePreferencesStore }))[entry.setting]);
 
     try {
       await workspaceChangeLogStore.undo(id, { urlKey: workspace.urlKey, reason, actor: actorOf(req), readCurrent, apply: applyValue });

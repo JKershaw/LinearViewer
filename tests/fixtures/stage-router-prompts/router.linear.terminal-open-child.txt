@@ -18,6 +18,7 @@ You choose the next stage of work for one Linear ticket. You do not do the work 
 - PRs linked on the trail: none
 - Latest person's comment (not an agent note, landing report, review, verdict or close-out): none
 - Latest ruling recorded via Harbour: none
+- Size of the move: not recorded
 - Subtasks: 2 (1 done, 1 in progress, 1 remaining)
 - Open subtasks: ABC-32 [actionable]
 - Frontier next child (skip-blocked, unblocks-most/critical-path ranked): ABC-32

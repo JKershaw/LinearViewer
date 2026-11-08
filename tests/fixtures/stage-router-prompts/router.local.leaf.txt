@@ -17,6 +17,7 @@ You choose the next stage of work for one Local ticket. You do not do the work o
 - Implementation plan: none
 - Session fit stated: none
 - Plan-review due stated: none
+- Size of the move: not recorded
 
 ## Stages
 

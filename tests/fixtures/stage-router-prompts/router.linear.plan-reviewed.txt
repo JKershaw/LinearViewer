@@ -36,6 +36,7 @@ F1 is right; take the narrow revision.
 - Implementation plan: in the description
 - Session fit stated: fits one session
 - Plan-review due stated: yes
+- Size of the move: not recorded
 - Recent runs on this task, from Harbour's dispatch record (oldest first):
   - plan-review: done, 2026-10-01 10:00
   - plan: done, 2026-10-03 10:00

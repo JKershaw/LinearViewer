@@ -230,6 +230,7 @@ Today the two surfaces share no implementation, only the halt store and the chan
 | -- | -- | -- | -- |
 | Dispatch | `lib/render-dispatch.js:120-123` (server markup, `.halt-form .action-btn`, `dispatch.css:478`) | `public/dispatch.js:835-910` (fetch) | `routes/dispatch.js:776` (GET), `:795` (POST), `:823` (DELETE) at `/workspace/:urlKey/api/dispatch/halt` |
 | Settings › Running | `lib/render-settings-workspace.js:57-65` (`askInPlace` forms, owner-only, with a reason) | none (form post) | `routes/settings.js:412` (`POST /settings/running/halt`) |
+| Settings › Running, size of the move (LIN-4368) | `lib/render-settings-workspace.js` `runningBody` (`askInPlace`, any member, with a reason) | none (form post) | `routes/settings.js` (`POST /settings/running/size-policy`) |
 | Proxy API (writer, no UI) | none | none | `routes/proxy-halt.js:120` (POST), `:155` (DELETE) at `/api/proxy/dispatch/halt` |
 
 "Keep both, one implementation" is therefore a requirement on Consolidate: choose the shared layer (the markup, the route handler, or both) and move both surfaces onto it. The Proxy API is a third writer and is listed so it is not forgotten.
