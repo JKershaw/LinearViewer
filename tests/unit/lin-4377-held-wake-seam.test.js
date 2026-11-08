@@ -13,6 +13,10 @@
  *     (the hook now sees every marker; it must return quietly on a pending).
  * A4. A hook answering `rewrite` when `_planWake` owed no wake leaves the wake null: the
  *     hook never creates a wake the plan did not owe.
+ * M5. With no wake owed (`wakeFollowUp: null`), the real hook's outcome wake reads
+ *     neither the holder nor the producer, on a `[pending]` or a `[failed]` (slice item 7).
+ * M8. `heldWakeHolderOf` recognises a holder by `heldWakeFor`, never by kind, on the doc
+ *     itself and along the `custom` walk (slice item 2).
  *
  * Store-level, on a real DispatchQueueStore over mock collections.
  */
@@ -212,4 +216,57 @@ describe('A4 — a rewrite never creates a wake the plan did not owe', () => {
       assert.ok(result, 'the feedback write landed');
     });
   }
+});
+
+// ─── Close-out witnesses (LIN-4383 review, M5 and M8) ─────────────────────────
+
+describe('M5 — the outcome wake reads nothing when the plan owes no wake (slice item 7)', () => {
+  for (const [marker, message] of [['pending', PENDING], ['failed', '[failed] Could not finish the step for LIN-7.']]) {
+    test(`a [${marker}] with wakeFollowUp: null reads neither the holder nor the producer`, async () => {
+      const world = makeWorld();
+      const b = await build(world, null);
+      // A held row in b's lineage: were the hook to read, both reads would resolve to rows.
+      const held = await world.store.addItem(URL_KEY, {
+        prompt: 'held step', kind: 'custom', issueIdentifier: 'LIN-7', target: 'cli',
+        dispatchedBy: OWNER, followUpTo: b._id, heldWakeFor: b._id
+      });
+      const reads = { holder: 0, producer: 0 };
+      const { heldWakeHolderOf, heldWakeProducerOf } = world.store;
+      world.store.heldWakeHolderOf = (...a) => { reads.holder++; return heldWakeHolderOf.apply(world.store, a); };
+      world.store.heldWakeProducerOf = (...a) => { reads.producer++; return heldWakeProducerOf.apply(world.store, a); };
+
+      await captureLogs(() => world.hook({
+        urlKey: URL_KEY, doc: held, entry: { message }, marker, wakeFollowUp: null, edgeDoc: null
+      }));
+
+      assert.deepEqual(reads, { holder: 0, producer: 0 }, 'no held-wake read when no wake is owed');
+    });
+  }
+});
+
+describe('M8 — heldWakeHolderOf walks by lineage, never by kind (slice item 2)', () => {
+  const seed = async (world, rows) => {
+    for (const row of rows) await world.historyCollection.insertOne({ urlKey: URL_KEY, ...row });
+  };
+
+  test('(a) a non-leftover doc carrying heldWakeFor is its own holder', async () => {
+    const { store } = makeWorld();
+    const doc = { _id: 'impl-held', urlKey: URL_KEY, kind: 'implementation', heldWakeFor: 'build-1' };
+    assert.equal(await store.heldWakeHolderOf(URL_KEY, doc), doc);
+  });
+
+  test('(b) a custom row under a non-leftover holder returns that holder', async () => {
+    const world = makeWorld();
+    await seed(world, [{ _id: 'impl-held', kind: 'implementation', heldWakeFor: 'build-1' }]);
+    const doc = { _id: 'ci-wake', urlKey: URL_KEY, kind: 'custom', followUpTo: 'impl-held' };
+    const holder = await world.store.heldWakeHolderOf(URL_KEY, doc);
+    assert.equal(holder?._id, 'impl-held');
+  });
+
+  test('(c) a custom row under an implementation row without heldWakeFor has no holder', async () => {
+    const world = makeWorld();
+    await seed(world, [{ _id: 'impl-plain', kind: 'implementation' }]);
+    const doc = { _id: 'ci-wake', urlKey: URL_KEY, kind: 'custom', followUpTo: 'impl-plain' };
+    assert.equal(await world.store.heldWakeHolderOf(URL_KEY, doc), null);
+  });
 });
