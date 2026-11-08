@@ -4,13 +4,12 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 
 ## Lessons
 
-- Prompt size is frozen (`tests/unit/prompt-size-budget.test.js`). A lesson lands as code
-  or a test first. Text grows only with its ticket and reason beside the ceiling it raises,
-  and `FROZEN_TOTAL_BYTES` with it; the replaced reason moves to "Ceiling history" in
-  `scripts/prompt-template-change-log.md`.
-- Grounding note lists in `lib/prompt-formatters.js` are shared: `WORK` serves several
-  stages and `GROUNDING_NOTES` is also the unknown-kind fallback. To change what one stage
-  gets, give it its own list; don't edit a shared one (LIN-4371).
+- Prompt size is frozen (`tests/unit/prompt-size-budget.test.js`): text grows only with its
+  ticket and reason beside the ceiling it raises, and `FROZEN_TOTAL_BYTES` with it; the
+  replaced reason moves to "Ceiling history" in `scripts/prompt-template-change-log.md`.
+- Grounding note lists in `lib/prompt-formatters.js` are shared (`WORK` serves several
+  stages; `GROUNDING_NOTES` is the unknown-kind fallback): give one stage its own list
+  rather than edit a shared one (LIN-4371).
 - Keep the scoping and the two Survey renders byte-identical unless the ticket is about
   them: replays compare them byte for byte (LIN-4369).
 - `lib/prompt-template-defs.js` and the budget test change in almost every merge: rebase,
@@ -20,7 +19,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   never retype the heading or the end line (LIN-4362).
 - `lib/prompt-template-defs.js` cannot import a module that imports `lib/prompt-templates.js`
   (a cycle). Shared words live in an import-free leaf under `lib/prompts/` both import, as
-  `lib/prompts/leftover-words.js` holds `LEFTOVER_RULE` (LIN-4376).
+  `lib/prompts/leftover-words.js` holds `LEFTOVER_RULE` (LIN-4376) and
+  `lib/prompts/autopilot-precedence.js` autopilot's order: never restate a rank (LIN-4382).
 - Prompt words that ban a kind of how do not hold it. Two replay arms of scoping's record
   (LIN-4369) banned definitions and lists in prose; runs wrote them anyway. The guard in
   `lib/size-of-move.js` sees only code-shaped how, so arm 3 holds the shape there: four
@@ -52,10 +52,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   was sized just the task, so left it. (LIN-4371, LIN-4369.)
 - `lib/should-mock-ai.js`: `isHermeticTestToken` is a third spelling of the test-token
   check, beside `isTestToken` in `routes/workspace-api-steps.js` and the inline
-  `isTestMode` checks in `routes/proxy-compute.js` and `routes/task-chat.js`: a new owner
-  nothing uses yet. (John, 7 Nov, LIN-4347.)
-- `lib/as-asked.js`: the "When it could go" paragraph is repeated in each of three
-  functions. (John, 7 Nov.)
+  `isTestMode` checks in `routes/proxy-compute.js` and `routes/task-chat.js`; nothing uses
+  it yet. (John, 7 Nov, LIN-4347.)
+- `lib/as-asked.js`: "When it could go" is repeated in each of three functions. (John, 7 Nov.)
 - `lib/prompts/stage-intent.js`: `docs/architecture/prompt-system.md` names the eight
   deciding stages, an unwatched second copy of `DECIDE`'s membership. (John, 8 Nov.)
 - `lib/prompt-template-defs.js`: who may agree to a reduced ask has two names, "cut" in
