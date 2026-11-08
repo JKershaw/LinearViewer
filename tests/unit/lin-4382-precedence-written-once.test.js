@@ -252,3 +252,46 @@ describe('the tail skips a Periodical\'s own review task (LIN-4382)', () => {
     });
   });
 });
+
+// LIN-4349 correction (parent review b6641b4d, coordinator's call after it): every real
+// scoped run declares no `maxTasks`, so `guardBudget` would admit the review task the tail's
+// mint opens. The tail drives that review in place (the ruled "one Periodical run, two
+// sessions") and keeps Mint + Autopilot only for a run that declares a task budget, where
+// the review would be a task past it. The chain guard stays as the backstop.
+describe('the tail drives its review in place unless a task budget is declared (LIN-4349)', () => {
+  const tailOf = (text) => squash(text.slice(text.indexOf('**The tail: a scoped run ends with one Periodical.**')));
+  const issue = { identifier: 'LIN-42', title: 'Some task' };
+
+  test('no budget declared: plain mint, then the run drives the review itself with periodicalId', () => {
+    const tail = tailOf(AUTOPILOT_PRECEDENCE);
+    assert.ok(tail.includes('Mint it with `POST /periodicals/{id}/mint` (`repo` set for a named lane).'),
+      'the mint itself carries no autopilot flag');
+    assert.ok(tail.includes('With no task budget declared in your snapshot, drive the review task the mint opens yourself'),
+      'the unbudgeted branch drives in place');
+    assert.ok(tail.includes('`periodicalId` on the `POST /recommend-and-dispatch` that opens its chain'),
+      'the in-place drive stamps periodicalId, so self-exclusion keeps working');
+    assert.ok(tail.includes('until it is merged and verified, then stop: that review is the tail and takes no tail of its own'),
+      'the in-place review cannot chain another reading');
+  });
+
+  test('budget declared: Mint + Autopilot, then stop; never the unconditional handoff', () => {
+    const tail = tailOf(AUTOPILOT_PRECEDENCE);
+    assert.ok(tail.includes('With a task budget declared, that review would be a task past it (`BUDGET_EXHAUSTED`), so mint with `"autopilot": true` instead, so a run of its own drives the review, then stop.'));
+    assert.ok(!tail.includes('Mint it with `POST /periodicals/{id}/mint` and `"autopilot": true`'),
+      'the P4 mint-and-stop is no longer the only path');
+    const inPlace = tail.indexOf('With no task budget declared');
+    const handoff = tail.indexOf('"autopilot": true');
+    assert.ok(inPlace >= 0 && handoff > inPlace, 'Mint + Autopilot appears only in the budgeted branch, after the default');
+    assert.ok(tail.includes('Nor does a run whose own task is a Periodical\'s review'), 'the chain guard stays');
+  });
+
+  test('the budget signal the tail names is the line the kickoff renders for a declared budget, and only then', () => {
+    // The kickoff renders the policy indented under its Orient step.
+    const rendered = AUTOPILOT_PRECEDENCE.replace(/^(?=.)/gm, '   ');
+    const unbudgeted = buildAutopilotKickoff({ baseUrl: BASE_URL, issue });
+    const budgeted = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, maxTasks: 1 });
+    assert.ok(unbudgeted.includes(rendered) && budgeted.includes(rendered), 'both render the policy, tail included');
+    assert.ok(!/task budget:/i.test(unbudgeted), 'an unbudgeted scoped run states no budget, so the tail drives in place');
+    assert.ok(budgeted.includes('**Task budget: up to 1 distinct task this run.**'), 'a budgeted one states it, so the tail hands off');
+  });
+});

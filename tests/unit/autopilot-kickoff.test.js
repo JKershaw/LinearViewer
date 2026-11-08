@@ -555,7 +555,10 @@ describe('buildAutopilotKickoff (scoped snapshot, LIN-1829 golden updated for LI
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue: GOLDEN_ISSUE });
     const tail = text.slice(text.indexOf('**The tail: a scoped run ends with one Periodical.**'));
     assert.ok(tail.includes('take at most one lane of a `scope: "repo"` template: `due` (including `never`) before `landed`, then the oldest last run'));
-    assert.ok(tail.includes('Mint it with `POST /periodicals/{id}/mint` and `"autopilot": true`'));
+    // LIN-4349 correction: the mint carries no autopilot flag by default; the run drives the
+    // review itself unless a task budget is declared (pinned in lin-4382-precedence-written-once).
+    assert.ok(tail.includes('Mint it with `POST /periodicals/{id}/mint` (`repo` set for a named lane).'));
+    assert.ok(tail.includes('drive the review task the mint opens yourself'));
     assert.ok(tail.includes('then stop'));
   });
 
