@@ -508,7 +508,9 @@ export function createComputeRoutes({
           deferredVia,
           deferTruncated,
           deferStopReason,
-          ...(rec.override ? { override: true } : {})
+          ...(rec.override ? { override: true } : {}),
+          // LIN-4370: present only when a look-first run is live (no step, no prompt).
+          ...(rec.lookFirstWait ? { lookFirstWait: rec.lookFirstWait } : {})
         });
       } catch (err) {
         // A hang-up aborts the model call, which surfaces as a timeout: the client

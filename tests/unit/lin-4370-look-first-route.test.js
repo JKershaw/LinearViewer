@@ -19,7 +19,11 @@
  *     model call, the Survey reading by kind in GET /issues/{id}/cost, and the trace naming the
  *     route;
  *   - the LIN-4369 handoff: a scoping run's final message with builder notes never reaches the
- *     prompt of the stage after it, while the size record does.
+ *     prompt of the stage after it, while the size record does;
+ *   - waiting on a live run (close-out ledger item 2): while a look-first step is queued or
+ *     running, nothing else is sent, scoping included, and the ticket is not handed to the
+ *     selector; recommend-and-dispatch refuses 409 LOOK_FIRST_IN_FLIGHT naming the live dispatch,
+ *     the UI stream says the same, and aborting a wedged step moves the sequence on.
  *
  * Run with: node --test tests/unit/lin-4370-look-first-route.test.js
  */
@@ -28,7 +32,7 @@ process.env.NODE_ENV = 'test';
 import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { lookFirstStep, lookFirstOff, holdingComment, isSurveyComment, LOOK_FIRST_STEPS } from '../../lib/recommendation-look-first.js';
+import { lookFirstStep, lookFirstRoute, lookFirstOff, holdingComment, isSurveyComment, LOOK_FIRST_STEPS, LOOK_FIRST_IN_FLIGHT_CODE } from '../../lib/recommendation-look-first.js';
 import { getRecommendation, getRecommendationStream, setFetchImpl, setPromptTraceRecorder, buildSelectorArgs } from '../../lib/openrouter.js';
 import { generatePrompt, PROMPT_TEMPLATES, deriveDispatchKind } from '../../lib/prompt-templates.js';
 import { SURVEY_HEADINGS } from '../../lib/prompt-template-defs.js';
@@ -106,6 +110,53 @@ describe('step choice: survey-task, then survey-place, then scoping, each once',
     assert.ok(!isSurveyComment(surveyTask('10:00').body, 'survey-place'));
     assert.ok(!isSurveyComment(`${SURVEY_HEADINGS['survey-task']}x: T-1`, 'survey-task'), 'a longer heading is another heading');
     assert.ok(!isSurveyComment('Survey open-0 looks fine', 'survey-task'), 'prose naming it is not the report');
+  });
+});
+
+describe('waiting on a live run: nothing is sent beside it, and the selector is not asked', () => {
+  const live = (stage, dispatched, outcome = 'running') => ({ ...run(stage, dispatched, outcome), id: `${stage}-${dispatched}` });
+  const waitOf = (issue, context) => lookFirstRoute(issue, context)?.wait ?? null;
+
+  test('survey-task running and survey-place queued: wait on survey-place, never scoping (review\'s repro)', () => {
+    const context = ctx([], [live('survey-task', '10:00'), live('survey-place', '10:05', 'queued')]);
+    assert.equal(lookFirstStep(leaf(), context), null, 'no step is sent');
+    assert.deepEqual(waitOf(leaf(), context), { kind: 'survey-place', id: 'survey-place-10:05', dispatchedAt: T('10:05'), outcome: 'queued' });
+  });
+
+  test('survey-task taken and silent, survey-place not yet sent: wait on survey-task (close-out shape a)', () => {
+    const context = ctx([], [live('survey-task', '10:00')]);
+    assert.equal(lookFirstStep(leaf(), context), null);
+    assert.equal(waitOf(leaf(), context).kind, 'survey-task');
+    assert.match(lookFirstRoute(leaf(), context).why, /survey-task is still running .*survey-place follows once it ends/);
+  });
+
+  test('survey-task done with its comment, survey-place taken and silent: wait, not scoping (close-out shape b)', () => {
+    const context = ctx([surveyTask('10:20')], [run('survey-task', '10:00', 'done', '10:20'), live('survey-place', '10:30')]);
+    assert.equal(lookFirstStep(leaf(), context), null);
+    assert.equal(waitOf(leaf(), context).kind, 'survey-place');
+  });
+
+  test('scoping queued or running after both Surveys: wait on it (the selector could otherwise start a build beside it)', () => {
+    const surveys = [surveyTask('10:00'), surveyPlace('10:30')];
+    for (const outcome of ['queued', 'running']) {
+      const context = ctx(surveys, [run('survey-task', '09:50'), run('survey-place', '10:20'), live('scoping', '11:00', outcome)]);
+      assert.equal(lookFirstStep(leaf(), context), null, outcome);
+      assert.equal(waitOf(leaf(), context).kind, 'scoping', outcome);
+    }
+  });
+
+  test('another stage live while a step is still to come: wait on it; with every step attempted, it is the selector\'s', () => {
+    assert.equal(waitOf(leaf(), ctx([], [live('research', '10:00')])).kind, 'research');
+    const surveys = [surveyTask('10:00'), surveyPlace('10:30')];
+    const finished = [run('survey-task', '09:50'), run('survey-place', '10:20'), run('scoping', '11:00', 'failed', '11:20'), live('implementation', '12:00')];
+    assert.equal(lookFirstRoute(leaf(), ctx(surveys, finished)), null, 'all three attempted and none live: stand aside, as before');
+  });
+
+  test('an ended run waits on nothing; waiting on a person, an off-switch, or a holding comment turn the route off instead', () => {
+    assert.equal(waitOf(leaf(), ctx([], [run('survey-task', '10:00', 'failed', '10:10')])), null);
+    assert.equal(lookFirstRoute(leaf(), ctx([], [run('survey-task', '10:00', 'waiting on a person', '10:10')])), null);
+    assert.equal(lookFirstRoute(leaf({ description: ASKED + RECORD() }), ctx([], [live('survey-task', '10:00')])), null, 'sized');
+    assert.equal(lookFirstRoute(leaf(), ctx([person('10:30')], [live('survey-task', '10:00')])), null, "a person's word outranks the wait too");
   });
 });
 
@@ -233,6 +284,25 @@ describe('both seams take the same code route, with no model call', () => {
     });
   }
 
+  test('a look-first wait: both seams return no step and no prompt, ask no model, and trace it apart', async () => {
+    noModel();
+    const traces = [];
+    setPromptTraceRecorder((t) => { traces.push(t); });
+    const context = ctx([surveyTask('10:20')], [run('survey-task', '10:00', 'done', '10:20'), { ...run('survey-place', '10:30', 'running'), id: 'sp-1' }]);
+    const buffered = await getRecommendation(leaf(), context, { apiKey: 'stub', model: 'x' });
+    const events = [];
+    const streamed = await getRecommendationStream(leaf(), context, { apiKey: 'stub', model: 'x' }, (type, data) => events.push([type, data]));
+    for (const rec of [buffered, streamed]) {
+      assert.equal(rec.codeRoute, 'look-first-wait');
+      assert.equal(rec.recommendedAction, null);
+      assert.equal(rec.prompt, null);
+      assert.deepEqual(rec.lookFirstWait, { kind: 'survey-place', id: 'sp-1', dispatchedAt: T('10:30'), outcome: 'running' });
+    }
+    assert.deepEqual(events.filter(([t]) => t === 'delta').map(([, d]) => d.section), ['reasoning'], 'no prompt is streamed');
+    assert.equal(events.at(-1)[0], 'done');
+    assert.deepEqual(traces.map(t => [t.codeRoute, t.finalPrompt]), [['look-first-wait', null], ['look-first-wait', null]], 'never counted as a look-first step sent');
+  });
+
   test('the trace store keeps which code route fired (it used to drop the field)', async () => {
     const store = new PromptTraceStore();
     assert.equal((await store.record({ finishReason: 'code-route', codeRoute: 'look-first' })).codeRoute, 'look-first');
@@ -276,12 +346,12 @@ const setIssue = (issue, comments = []) => {
   ISSUES[c.issue.id] = c;
 };
 
-const runStore = (rows) => ({
-  listItems: async () => [],
+const runStore = (rows, live = []) => ({
+  listItems: async (urlKey, { issueIdentifier } = {}) => live.filter(r => r.issueIdentifier === issueIdentifier),
   listHistory: async (urlKey, { issueIdentifier } = {}) => ({ items: rows.filter(r => r.issueIdentifier === issueIdentifier), total: rows.length })
 });
 
-function proxyApp({ rows = [], items = [] } = {}) {
+function proxyApp({ rows = [], items = [], live = [] } = {}) {
   const app = express();
   app.use(express.json());
   app.use(withDefaults(createProxyRoutes, 0, { requestUsageLoader: NO_REQUEST_RECORDS })({
@@ -296,7 +366,7 @@ function proxyApp({ rows = [], items = [] } = {}) {
     dispatchQueueStore: {
       addItem: async (urlKey, item) => { const row = { _id: `disp-${items.length + 1}`, id: `disp-${items.length + 1}`, dispatchedAt: T('13:00'), ...item }; items.push(row); return row; },
       lineageIdentityRows: stubLineageIdentity(() => rows),
-      ...runStore(rows)
+      ...runStore(rows, live)
     },
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
@@ -305,7 +375,7 @@ function proxyApp({ rows = [], items = [] } = {}) {
   return app;
 }
 
-function uiApp({ rows = [] } = {}) {
+function uiApp({ rows = [], live = [] } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createWorkspaceApiRoutes({
@@ -314,7 +384,7 @@ function uiApp({ rows = [] } = {}) {
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     getOpenRouterSource: () => null,
     userPreferencesStore: {}, customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {}, reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {},
-    dispatchQueueStore: runStore(rows)
+    dispatchQueueStore: runStore(rows, live)
   }));
   return app;
 }
@@ -392,6 +462,77 @@ describe('wired: recommend-and-dispatch dispatches the code-routed step, the UI 
     const { status, body } = await request(proxyApp({ rows: [ran] }), '/api/proxy/issues/LF-1/cost');
     assert.equal(status, 200, JSON.stringify(body));
     assert.deepEqual(body.workerSessions.map(s => s.kind), ['survey-task']);
+  });
+});
+
+describe('wired: while a look-first step is live, recommend-and-dispatch sends nothing (close-out ledger item 2)', () => {
+  const noModel = () => setFetchImpl(async () => { throw new Error('neither the model nor the selector may be asked while a look-first step is live'); });
+  const silentRow = (kind, dispatched) => ({ id: `${kind}-${dispatched}`, kind, status: 'taken', issueIdentifier: 'LF-1', dispatchedAt: T(dispatched), rootItemId: `${kind}-${dispatched}`,
+    feedback: [{ kind: 'progress', message: '[working] started', timestamp: T(dispatched) }] });
+  const queuedRow = (kind, dispatched) => ({ id: `${kind}-${dispatched}`, kind, issueIdentifier: 'LF-1', dispatchedAt: T(dispatched) });
+  const recommendAndDispatch = (opts, body = { issueIdentifier: 'LF-1' }) => request(proxyApp(opts), '/api/proxy/recommend-and-dispatch', { method: 'POST', body });
+
+  test('(a) survey-task taken and silent, survey-place pending: 409 LOOK_FIRST_IN_FLIGHT, nothing enqueued', async () => {
+    noModel();
+    setIssue(leaf({ identifier: 'LF-1' }));
+    const items = [];
+    const res = await recommendAndDispatch({ rows: [silentRow('survey-task', '10:00')], live: [queuedRow('survey-place', '10:05')], items });
+    assert.equal(res.status, 409, JSON.stringify(res.body));
+    assert.equal(res.body.code, LOOK_FIRST_IN_FLIGHT_CODE);
+    assert.equal(res.body.kind, 'survey-place');
+    assert.equal(res.body.id, 'survey-place-10:05', 'names the live dispatch to adopt');
+    assert.equal(res.body.issueIdentifier, 'LF-1');
+    assert.match(res.body.error, /abort it/);
+    assert.equal(items.length, 0, 'no scoping row beside the live Surveys');
+  });
+
+  test('(b) survey-task done with its comment, survey-place taken and silent: 409, no scoping; the UI stream says the same', async () => {
+    noModel();
+    setIssue(leaf({ identifier: 'LF-1' }), [surveyTask('10:20')]);
+    const rows = [doneRow('survey-task', '10:00', '10:20'), silentRow('survey-place', '10:30')];
+    const items = [];
+    const res = await recommendAndDispatch({ rows, items });
+    assert.equal(res.status, 409, JSON.stringify(res.body));
+    assert.equal(res.body.code, LOOK_FIRST_IN_FLIGHT_CODE);
+    assert.equal(res.body.kind, 'survey-place');
+    assert.equal(res.body.id, 'survey-place-10:30');
+    assert.equal(items.length, 0);
+
+    const ui = await request(uiApp({ rows }), '/workspace/acme/api/recommend/LF-1/stream');
+    assert.equal(ui.status, 200);
+    assert.equal(streamedPrompt(ui.text), '', 'no prompt is streamed');
+    assert.match(ui.text, /event: error/);
+    assert.match(ui.text, /LOOK_FIRST_IN_FLIGHT/);
+  });
+
+  test('scoping live after both Surveys: 409 on scoping, and the selector is not asked', async () => {
+    noModel();
+    setIssue(leaf({ identifier: 'LF-1' }), [surveyTask('10:20'), surveyPlace('10:50')]);
+    const items = [];
+    const res = await recommendAndDispatch({ rows: [doneRow('survey-task', '10:00', '10:20'), doneRow('survey-place', '10:30', '10:50'), silentRow('scoping', '11:00')], items });
+    assert.equal(res.status, 409, JSON.stringify(res.body));
+    assert.equal(res.body.kind, 'scoping');
+    assert.equal(items.length, 0);
+  });
+
+  test('wedge recovery: once the silent survey-place is aborted, the next recommend-and-dispatch sends scoping', async () => {
+    noModel();
+    setIssue(leaf({ identifier: 'LF-1' }), [surveyTask('10:20')]);
+    const abort = { id: 'abort-1', kind: 'custom', abort: true, abortTo: 'survey-place-10:30', status: 'taken', issueIdentifier: 'LF-1', dispatchedAt: T('11:05'),
+      feedback: [{ kind: 'progress', message: '[aborted] cancelled by the orchestrator', timestamp: T('11:06') }] };
+    const items = [];
+    const res = await recommendAndDispatch({ rows: [doneRow('survey-task', '10:00', '10:20'), silentRow('survey-place', '10:30'), abort], items });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(items[0].kind, 'scoping', 'the aborted survey-place counts as attempted');
+  });
+
+  test('re-sending the live step by hand stays possible: the "kind" override is not the route', async () => {
+    noModel();
+    setIssue(leaf({ identifier: 'LF-1' }), [surveyTask('10:20')]);
+    const items = [];
+    const res = await recommendAndDispatch({ rows: [doneRow('survey-task', '10:00', '10:20'), silentRow('survey-place', '10:30')], items }, { issueIdentifier: 'LF-1', kind: 'survey-place' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(items[0].kind, 'survey-place');
   });
 });
 

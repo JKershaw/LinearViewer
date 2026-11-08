@@ -1572,7 +1572,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // description — this hop's fetched context is the only place it is in hand.
       periodicalId: resolvePeriodicalIdFromGateMarker(issue.description),
       // LIN-4034: this hop's own title. The descent stamps the terminal hop's, never the parent's.
-      title: issue.title
+      title: issue.title,
+      // LIN-4370: a look-first run is live, so there is no step; recommend-and-dispatch refuses it.
+      ...(recommendation.lookFirstWait ? { lookFirstWait: recommendation.lookFirstWait } : {})
     };
   }
 

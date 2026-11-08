@@ -58,18 +58,19 @@ describe('recentRuns (LIN-3300)', () => {
 
   test('loadRecentRuns reads the queue and the history, and never throws', async () => {
     const store = {
-      listItems: async (urlKey, { issueIdentifier }) => (issueIdentifier === 'LIN-1' ? [row('implementation', { dispatchedAt: '2026-10-05T00:00:00.000Z', status: undefined })] : []),
+      listItems: async (urlKey, { issueIdentifier }) => (issueIdentifier === 'LIN-1' ? [row('implementation', { id: 'disp-7', dispatchedAt: '2026-10-05T00:00:00.000Z', status: undefined })] : []),
       listHistory: async () => ({ items: [done('plan', '2026-10-04T00:00:00.000Z')] })
     };
-    // LIN-4370: one read, two lists. `runs` is the selector's slice; `allRuns` adds each run's dispatch time.
+    // LIN-4370: one read, two lists. `runs` is the selector's slice; `allRuns` adds each run's dispatch time and
+    // dispatch id (a live run the look-first route waits on is named by it; a row with no id reads null).
     assert.deepEqual(await loadRecentRuns(store, 'acme', 'LIN-1'), {
       runs: [
         { stage: 'plan', at: '2026-10-04T00:00:00.000Z', outcome: 'done' },
         { stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued' }
       ],
       allRuns: [
-        { stage: 'plan', at: '2026-10-04T00:00:00.000Z', outcome: 'done', dispatchedAt: '2026-10-04T14:00:00.000Z' },
-        { stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued', dispatchedAt: '2026-10-05T00:00:00.000Z' }
+        { stage: 'plan', at: '2026-10-04T00:00:00.000Z', outcome: 'done', dispatchedAt: '2026-10-04T14:00:00.000Z', id: null },
+        { stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued', dispatchedAt: '2026-10-05T00:00:00.000Z', id: 'disp-7' }
       ]
     });
     // No store, or a failed read: no runs for the selector, and attempts unknown (null) for the look-first route.

@@ -22,8 +22,8 @@ describe('prepareRecommendationInput (LIN-3469)', () => {
     assert.equal(input.parent, ctx.parent);
     assert.equal(input.attachments, ctx.attachments);
     assert.deepEqual(input.runs, [{ stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued' }]);
-    // LIN-4370: the same read's unsliced runs, with dispatch times, for the look-first route's attempts.
-    assert.deepEqual(input.allRuns, [{ stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued', dispatchedAt: '2026-10-05T00:00:00.000Z' }]);
+    // LIN-4370: the same read's unsliced runs, with dispatch times and ids, for the look-first route's attempts and waits.
+    assert.deepEqual(input.allRuns, [{ stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued', dispatchedAt: '2026-10-05T00:00:00.000Z', id: null }]);
   });
 
   test('does not leak other context fields (issue, siblingsTotal)', async () => {
