@@ -72,8 +72,8 @@ import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
 /** Templates, source bytes. Same files `steady-base-growth.mjs` GROUPS as
  * "worker templates". */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 110395, // LIN-4369: +1907 (108488 -> 110395), scoping's output becomes the four-line size record; arms 1–4 in scripts/prompt-template-change-log.md
-  'lib/prompt-templates.js': 19593, // LIN-4251: the `stageWrites(kind)` lookup every entrance uses (code, not prompt text)
+  'lib/prompt-template-defs.js': 110656, // LIN-4370: +261 (110395 -> 110656), scoping's route.when covers an answered size ruling on a pending record, and the Surveys say the look-first route sends them (descriptions and comments; rendered bytes unchanged)
+  'lib/prompt-templates.js': 19662, // LIN-4370: +69, the never-offered comment says the look-first route sends the Surveys (a comment, not prompt text)
   'lib/prompt-formatters.js': 47095, // LIN-4383: +60 (47035 -> 47095), code not prompt text: the pointer reads the product's one registry-path spelling (lib/prompts/area-registry-path.js); rendered bytes unchanged
   'lib/prompt-contract.js': 3875, // LIN-4362: the `## As asked` spellings interpolate AS_ASKED_HEADING (code, not prompt text)
 };
@@ -108,14 +108,14 @@ export const TEMPLATES_RENDERED_CEILINGS = {
  * rules, its prompt and the reply parse. The stage options it lists are each stage's
  * `route`, counted in the template defs.
  */
-export const STAGE_ROUTER_SOURCE_CEILING = 8069; // LIN-3378: -46, Why clauses of rules 1-3 tightened (rules 6 and 8 keep theirs: measured, HAR-697 and the parent-plan points)
+export const STAGE_ROUTER_SOURCE_CEILING = 8244; // LIN-4370: +175, the rules' comment restates the invariant (code settles the review loop bound and the look-first sequence); a comment, not prompt text
 /**
  * The routing prompt, rendered bytes for the eval baseline's leaf (a leaf with no
  * comments and no plan, its view a placeholder). It also catches growth in the stage
  * options and the facts code renders (lib/recommendation-facts.js), which no source
  * ceiling covers.
  */
-export const ROUTER_PROMPT_RENDERED_CEILING = 9791; // LIN-4369 (replay arm 2): -22, scoping's lead, whose first sentence the selector quotes, names the size of the move
+export const ROUTER_PROMPT_RENDERED_CEILING = 9887; // LIN-4370: +96, scoping's `when` covers a size ruling answered after the look-first route's one scoping run; whether a comment answers the ruling is the selector's reading, so code cannot settle it
 
 /** Every stage's Scope and Authority lines, source bytes (lib/prompts/stage-intent.js). */
 export const STAGE_INTENT_SOURCE_CEILING = 3423; // LIN-4367: +14, CUT and DECIDE are exported so the cut test reads the rule and finds deciding stages by identity (code, not prompt text)
@@ -139,7 +139,7 @@ export const LEFTOVER_PROMPT_RENDERED_CEILING = 1352; // LIN-4376: +157, where e
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 356277; // LIN-4383: +60 (356217 -> 356277), prompt-formatters source only (an import line, no prompt text)
+export const FROZEN_TOTAL_BYTES = 356878; // LIN-4370: +601 (356277 -> 356878): defs +261, prompt-templates +69, stage-router source +175, routing prompt +96
 
 const BASE_URL = 'https://harbour.example';
 

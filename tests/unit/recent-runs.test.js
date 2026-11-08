@@ -58,19 +58,45 @@ describe('recentRuns (LIN-3300)', () => {
 
   test('loadRecentRuns reads the queue and the history, and never throws', async () => {
     const store = {
-      listItems: async (urlKey, { issueIdentifier }) => (issueIdentifier === 'LIN-1' ? [row('implementation', { dispatchedAt: '2026-10-05T00:00:00.000Z', status: undefined })] : []),
+      listItems: async (urlKey, { issueIdentifier }) => (issueIdentifier === 'LIN-1' ? [row('implementation', { id: 'disp-7', dispatchedAt: '2026-10-05T00:00:00.000Z', status: undefined })] : []),
       listHistory: async () => ({ items: [done('plan', '2026-10-04T00:00:00.000Z')] })
     };
-    assert.deepEqual(await loadRecentRuns(store, 'acme', 'LIN-1'), [
-      { stage: 'plan', at: '2026-10-04T00:00:00.000Z', outcome: 'done' },
-      { stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued' }
-    ]);
-    assert.deepEqual(await loadRecentRuns(null, 'acme', 'LIN-1'), []);
-    assert.deepEqual(await loadRecentRuns({ listItems: async () => { throw new Error('down'); } }, 'acme', 'LIN-1'), []);
+    // LIN-4370: one read, two lists. `runs` is the selector's slice; `allRuns` adds each run's dispatch time and
+    // dispatch id (a live run the look-first route waits on is named by it; a row with no id reads null).
+    assert.deepEqual(await loadRecentRuns(store, 'acme', 'LIN-1'), {
+      runs: [
+        { stage: 'plan', at: '2026-10-04T00:00:00.000Z', outcome: 'done' },
+        { stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued' }
+      ],
+      allRuns: [
+        { stage: 'plan', at: '2026-10-04T00:00:00.000Z', outcome: 'done', dispatchedAt: '2026-10-04T14:00:00.000Z', id: null },
+        { stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued', dispatchedAt: '2026-10-05T00:00:00.000Z', id: 'disp-7' }
+      ]
+    });
+    // No store, or a failed read: no runs for the selector, and attempts unknown (null) for the look-first route.
+    assert.deepEqual(await loadRecentRuns(null, 'acme', 'LIN-1'), { runs: [], allRuns: null });
+    assert.deepEqual(await loadRecentRuns({ listItems: async () => { throw new Error('down'); } }, 'acme', 'LIN-1'), { runs: [], allRuns: null });
     const asked = [];
     const projecting = { listItems: async (u, q) => { asked.push(q.projection); return []; }, listHistory: async (u, q) => { asked.push(q.projection); return { items: [] }; } };
     await loadRecentRuns(projecting, 'acme', 'LIN-1');
     assert.deepEqual(asked, [{ prompt: 0 }, { prompt: 0 }], 'prompt bodies are projected out of both reads');
+  });
+
+  test('LIN-4370: allRuns is unsliced from the same single read; runs stays the selector\'s five, byte for byte', async () => {
+    const many = Array.from({ length: 8 }, (_, i) => done(i === 0 ? 'survey-task' : 'plan', `2026-10-0${i + 1}T00:00:00.000Z`));
+    let reads = 0;
+    const asked = [];
+    const store = {
+      listItems: async () => { reads++; return []; },
+      listHistory: async (u, q) => { reads++; asked.push(q.limit); return { items: many }; }
+    };
+    const { runs, allRuns } = await loadRecentRuns(store, 'acme', 'LIN-1');
+    assert.equal(reads, 2, 'one queue read and one history read, as before');
+    assert.deepEqual(asked, [20], 'the history read is 20 rows, counted before non-stage rows are dropped');
+    assert.equal(allRuns.length, 8);
+    assert.equal(allRuns[0].stage, 'survey-task', 'an attempt older than the selector\'s five is still seen');
+    assert.deepEqual(runs, recentRuns(many));
+    assert.equal(formatRecentRuns(runs), formatRecentRuns(recentRuns(many)), 'the selector lines are unchanged');
   });
 
   test('no runs, no lines', () => {

@@ -1,9 +1,11 @@
 /**
- * LIN-4248: the Survey as two hand-triggered, read-only stage templates (`survey-task`,
- * `survey-place`). These pin what the plan promised: the templates render the hand-tuned
- * wording and nothing that makes a forecast change things; neither kind is routed, and the
+ * LIN-4248: the Survey as two read-only stage templates (`survey-task`, `survey-place`).
+ * These pin what the plan promised: the templates render the hand-tuned wording and nothing
+ * that makes a forecast change things; the selector never offers either kind, and the
  * router, the "Another step" list and the stage selector all refuse or hide them; and the
- * notebook keeps one live copy of the text, in the templates.
+ * notebook keeps one live copy of the text, in the templates. Since LIN-4370 code sends them
+ * (the look-first sequence, tests/unit/lin-4370-look-first-route.test.js), not only a person;
+ * the selector's refusal below stays true.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,7 +27,7 @@ import { BUCKET_OF_KIND } from '../../lib/wall-clock-summary.js';
 // lin-4253-stage-traits.test.js holds each kind's writes value, with its reason.
 // LIN-4277 (why this stays a literal): deriving the set from `writes` plus `route === null` would
 // make the "neither Survey has a route" assert below prove itself, since the set would be
-// defined by that same `route` check. And a future hand-only one-comment stage would join the set
+// defined by that same `route` check. And a future never-offered one-comment stage would join the set
 // silently instead of being named here. The literal is the decision; the test checks it.
 const SURVEYS = ['survey-task', 'survey-place'];
 const FIXTURE_ISSUE = {
@@ -45,11 +47,13 @@ describe('LIN-4248 Survey templates: registry and routing', () => {
       assert.ok(COMPLETION_SIGNALS[kind], `${kind} has a completion signal`);
       assert.deepEqual(STAGE_INTENT[kind], [STAGE_INTENT.retro[0]], `${kind} has the reading-pass scope line`);
       assert.equal(BUCKET_OF_KIND[kind], 'before', `${kind} runs before work starts`);
-      assert.ok(PROMPT_TEMPLATES[kind].description.includes('never routed'), `${kind} says it is never routed`);
+      // LIN-4370: code sends them (the look-first route) or a person does; the selector never does.
+      assert.ok(PROMPT_TEMPLATES[kind].description.startsWith('Sent by the look-first route or by hand, never by the selector.'), `${kind} says who sends it`);
+      assert.ok(!/hand-triggered|never routed/i.test(PROMPT_TEMPLATES[kind].description), `${kind} no longer claims to be hand-only`);
     }
   });
 
-  test('neither Survey has a route (hand-only: route null), so the stage selector never lists it', () => {
+  test('neither Survey has a route (route null: never offered), so the stage selector never lists it', () => {
     for (const kind of SURVEYS) assert.equal(PROMPT_TEMPLATES[kind].route, null, kind);
     const keys = getSelectableStages().map(s => s.key);
     for (const kind of SURVEYS) assert.ok(!keys.includes(kind), `${kind} is not a selectable stage`);
@@ -69,7 +73,7 @@ describe('LIN-4248 Survey templates: registry and routing', () => {
     for (const kind of SURVEYS) assert.ok(excluded.includes(kind), kind);
   });
 
-  test('both Surveys are hand-triggerable dispatch kinds, not derived from anything else', () => {
+  test('both Surveys are dispatch kinds a person or the look-first route can send, not derived from anything else', () => {
     for (const kind of SURVEYS) {
       assert.ok(DISPATCH_KINDS.includes(kind), kind);
       assert.ok(isValidDispatchKind(kind), kind);

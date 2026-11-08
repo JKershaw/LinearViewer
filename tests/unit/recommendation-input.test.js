@@ -18,10 +18,12 @@ describe('prepareRecommendationInput (LIN-3469)', () => {
   test('forwards exactly the prompt-read fields plus the task\'s runs and the size policy', async () => {
     const input = await prepareRecommendationInput(ctx, { dispatchQueueStore: store, urlKey: 'acme', identifier: 'LIN-1' });
     assert.deepEqual(Object.keys(input).sort(),
-      ['attachments', 'children', 'comments', 'focusedChild', 'parent', 'project', 'runs', 'siblings', 'sizePolicy']);
+      ['allRuns', 'attachments', 'children', 'comments', 'focusedChild', 'parent', 'project', 'runs', 'siblings', 'sizePolicy']);
     assert.equal(input.parent, ctx.parent);
     assert.equal(input.attachments, ctx.attachments);
     assert.deepEqual(input.runs, [{ stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued' }]);
+    // LIN-4370: the same read's unsliced runs, with dispatch times and ids, for the look-first route's attempts and waits.
+    assert.deepEqual(input.allRuns, [{ stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued', dispatchedAt: '2026-10-05T00:00:00.000Z', id: null }]);
   });
 
   test('does not leak other context fields (issue, siblingsTotal)', async () => {
@@ -34,6 +36,7 @@ describe('prepareRecommendationInput (LIN-3469)', () => {
   test('a missing store is no runs, never a throw', async () => {
     const input = await prepareRecommendationInput(ctx, { dispatchQueueStore: null, urlKey: 'acme', identifier: 'LIN-1' });
     assert.deepEqual(input.runs, []);
+    assert.equal(input.allRuns, null, 'attempts unknown: the look-first route stands aside');
   });
 
   // LIN-4368: the standing size policy comes from the one loader, so every scoping render reads it.

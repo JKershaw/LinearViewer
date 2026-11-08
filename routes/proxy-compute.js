@@ -504,11 +504,14 @@ export function createComputeRoutes({
           prompt: rec.prompt,
           truncated: rec.truncated,
           recommendedAction: rec.recommendedAction,
-          kind: deriveDispatchKind(rec.recommendedAction),
+          // LIN-4370: a look-first wait names no stage (deriveDispatchKind(null) would say `custom`).
+          kind: rec.lookFirstWait ? null : deriveDispatchKind(rec.recommendedAction),
           deferredVia,
           deferTruncated,
           deferStopReason,
-          ...(rec.override ? { override: true } : {})
+          ...(rec.override ? { override: true } : {}),
+          // LIN-4370: present only when a look-first run is live (no step, no prompt).
+          ...(rec.lookFirstWait ? { lookFirstWait: rec.lookFirstWait } : {})
         });
       } catch (err) {
         // A hang-up aborts the model call, which surfaces as a timeout: the client

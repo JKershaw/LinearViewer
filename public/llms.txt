@@ -266,8 +266,8 @@ relationship between the tasks, not as a label.
 - `close-out` - close-out: Discharge the review ledger, then merge, set Done, post the summary, and file follow-ups
 - `retro` - retro: Retrospective look-back (or in-flight reorient) — reconstruct what happened, assess downstream effects/risks, surface lessons; presents findings without writing back
 - `retrospective-audit` - retrospective audit: Audit a merged change's claims and test integrity after the fact; presents findings without writing back
-- `survey-task` - survey-task: Hand-triggered only, never routed. Read-only forecast before work starts: why this task will be difficult and what would be done first; posts one comment on the surveyed ticket and changes nothing else
-- `survey-place` - survey-place: Hand-triggered only, never routed. Read-only forecast of the codebase as a place: where the task lands, what the obvious way would add, move or tangle, and what would leave the place better; posts one comment on the surveyed ticket and changes nothing else
+- `survey-task` - survey-task: Sent by the look-first route (first on a fresh, unsized ticket) or by hand, never by the selector. Read-only forecast before work starts: why this task will be difficult and what would be done first; posts one comment on the surveyed ticket and changes nothing else
+- `survey-place` - survey-place: Sent by the look-first route (after survey-task) or by hand, never by the selector. Read-only forecast of the codebase as a place: where the task lands, what the obvious way would add, move or tangle, and what would leave the place better; posts one comment on the surveyed ticket and changes nothing else
 
 ### Public Templates Page
 

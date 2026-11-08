@@ -236,7 +236,7 @@ describe('D2: excluded kinds are refused (LIN-3309 S5)', () => {
   });
 });
 
-describe('the review loop bound: the one route code settles (LIN-3309)', () => {
+describe('the review loop bound: the first route code settles (LIN-3309; the look-first sequence is LIN-4370)', () => {
   const open = { name: 'In Progress', type: 'started' };
   const leaf = (over = {}) => ({ identifier: 'T-9', title: 't', description: 'A plan.', state: open, labels: [], ...over });
   const bundle = (comments) => ({ parent: null, siblings: [], project: null, children: [], comments, focusedChild: null });
