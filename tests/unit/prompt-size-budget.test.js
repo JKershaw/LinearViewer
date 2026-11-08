@@ -74,7 +74,7 @@ import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
 export const TEMPLATES_SOURCE_CEILINGS = {
   'lib/prompt-template-defs.js': 110395, // LIN-4369: +1907 (108488 -> 110395), scoping's output becomes the four-line size record; arms 1–4 in scripts/prompt-template-change-log.md
   'lib/prompt-templates.js': 19593, // LIN-4251: the `stageWrites(kind)` lookup every entrance uses (code, not prompt text)
-  'lib/prompt-formatters.js': 46933, // LIN-4371: +939, `formatAreaNotesPointer` and the seven stages' own grounding lists, so WORK and GROUNDING_NOTES stay byte-identical
+  'lib/prompt-formatters.js': 47035, // LIN-4379: +102, one sentence in `formatAreaNotesPointer`: name a note entry the work used (file and source) where it records its decisions
   'lib/prompt-contract.js': 3875, // LIN-4362: the `## As asked` spellings interpolate AS_ASKED_HEADING (code, not prompt text)
 };
 
@@ -83,19 +83,19 @@ export const TEMPLATES_SOURCE_CEILINGS = {
  * Close-out's bug-label line renders only for a bug-labelled task, so not here. */
 export const TEMPLATES_RENDERED_CEILINGS = {
   blocked: 3529, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
-  bug: 5052, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
-  plan: 10350, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
+  bug: 5154, // LIN-4379: +102, the pointer asks the work to name a note entry it used (file and source) where it records its decisions, so the next look-first step citing a finding is checkable; which entry bears on the work is the agent's judgement no code sees
+  plan: 10452, // LIN-4379: +102, the pointer asks the work to name a note entry it used (file and source) where it records its decisions, so the next look-first step citing a finding is checkable; which entry bears on the work is the agent's judgement no code sees
   'look-into': 1762, // LIN-3299: at 1762 since Scope and Authority on every path
   triage: 2429, // LIN-3299: at 2429 since Scope and Authority on every path
   breakdown: 5310, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
-  research: 12026, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
+  research: 12128, // LIN-4379: +102, the pointer asks the work to name a note entry it used (file and source) where it records its decisions, so the next look-first step citing a finding is checkable; which entry bears on the work is the agent's judgement no code sees
   scoping: 4194, // LIN-4369: +1473 (2721 -> 4194), scoping's output becomes the four-line size record and it posts no comment; arms 1–4 in scripts/prompt-template-change-log.md
-  design: 3155, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
-  spike: 3174, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
+  design: 3257, // LIN-4379: +102, the pointer asks the work to name a note entry it used (file and source) where it records its decisions, so the next look-first step citing a finding is checkable; which entry bears on the work is the agent's judgement no code sees
+  spike: 3276, // LIN-4379: +102, the pointer asks the work to name a note entry it used (file and source) where it records its decisions, so the next look-first step citing a finding is checkable; which entry bears on the work is the agent's judgement no code sees
   context: 2021, // LIN-3300: at 2021 since the stage rules only the meta-prompt carried moved into their templates
   'plan-review': 7601, // LIN-4353: the verdict quotes the ask and says how the plan meets it; only the person agrees to a narrowing (the reviewer's judgement)
-  implementation: 8391, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
-  review: 16052, // LIN-4376: +186, the class check renders the shared LEFTOVER_RULE (routes and one home) verbatim, so the three readers of a leftover say it the same way; which home an edge belongs in is the reviewer's judgement no code sees
+  implementation: 8493, // LIN-4379: +102, the pointer asks the work to name a note entry it used (file and source) where it records its decisions, so the next look-first step citing a finding is checkable; which entry bears on the work is the agent's judgement no code sees
+  review: 16154, // LIN-4379: +102, the pointer asks the work to name a note entry it used (file and source) where it records its decisions, so the next look-first step citing a finding is checkable; which entry bears on the work is the agent's judgement no code sees
   'close-out': 12182, // LIN-4369 (replay arm 3): +42, the prune puts its stub under a heading of its own, because the guard now refuses any line inside the size section but its four
   'retrospective-audit': 4619, // LIN-3279: FOLLOW_UP_SHAPE rendered
   retro: 4265, // LIN-3299: at 4265 since Scope and Authority on every path
@@ -139,7 +139,7 @@ export const LEFTOVER_PROMPT_RENDERED_CEILING = 1352; // LIN-4376: +157, where e
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 355401; // LIN-4369: +3400 (352001 -> 355401): defs +1907, scoping +1473, close-out +42, routing -22; arms 1–4 in scripts/prompt-template-change-log.md
+export const FROZEN_TOTAL_BYTES = 356217; // LIN-4379: +816 (355401 -> 356217), the pointer sentence: prompt-formatters.js source +102 and the seven stages that render it +102 each
 
 const BASE_URL = 'https://harbour.example';
 
