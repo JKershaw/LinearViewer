@@ -193,7 +193,7 @@ describe('renderPage embeds the list once, on pages that load common.js', () => 
 });
 
 // LIN-3987: a Claude Code alias is priced as the model it runs. The mapping is the one place that says which model,
-// so an alias with no mapping, or a mapping with no rate row, fails here (never as "price unknown" on a screen).
+// so an alias with no mapping, or a mapping the catalog cannot price, fails here (never as "price unknown" on a screen).
 describe('the Claude Code alias mapping prices every alias (LIN-3987)', () => {
   test('every alias in the suggestion list maps to a model that resolves to a rate', () => {
     for (const alias of DISPATCH_CLAUDE_MODEL_SUGGESTIONS) {

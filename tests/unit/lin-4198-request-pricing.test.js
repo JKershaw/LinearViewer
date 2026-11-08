@@ -3,7 +3,7 @@
  * request, so it takes the tier rate for its OWN prompt size (selectRateForPrompt), whatever
  * its `harness` says. Native `costUsd` on a record wins over the read-time price.
  *
- * Expected figures are hand-worked from the rate rows in lib/model-pricing.js (USD per 1M
+ * Expected figures are hand-worked from the pinned catalog's rates (LIN-4358; USD per 1M
  * tokens, divided by 1e6 once), never taken from the code under test.
  *
  * Run with: node --test tests/unit/lin-4198-request-pricing.test.js

@@ -118,7 +118,7 @@ test('shows the localhost setup notice only when requested', () => {
 
 // LIN-1161: "try it for well under $1" — the honest low-cost trial hook. These
 // pin the section's placement, that its dollar figure is derived from the
-// pricing rate card (never a second hardcoded price), and both branches of the
+// catalog price, through getModelPricingHint (never a second hardcoded price; LIN-4358), and both branches of the
 // free-tier-vs-BYOK copy fork.
 
 test('places the "try it" section after grounded prompts and before providers', () => {
@@ -129,10 +129,10 @@ test('places the "try it" section after grounded prompts and before providers', 
   assert.ok(promptIdx < tryIdx && tryIdx < providersIdx, 'landing-try sits between landing-prompt and landing-providers');
 });
 
-test('grounds the dollar claim in formatModelPricing(DEFAULT_MODEL), not a second hardcoded price', () => {
+test('grounds the dollar claim in getModelPricingHint(DEFAULT_MODEL), not a second hardcoded price', () => {
   const html = renderLandingPage({});
   const expectedPricing = getModelPricingHint(DEFAULT_MODEL);
-  assert.ok(expectedPricing, 'sanity: DEFAULT_MODEL has a known rate card entry');
+  assert.ok(expectedPricing, 'sanity: the pinned catalog prices DEFAULT_MODEL');
   assert.ok(html.includes(expectedPricing), 'renders the live pricing hint verbatim');
 });
 

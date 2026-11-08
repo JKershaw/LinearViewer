@@ -14,7 +14,7 @@ import { buildTaskCost } from '../fixtures/task-cost-adapter.js';
 // A `[usage]` feedback entry. `costUsd` is embedded directly in the payload
 // (parseUsagePayload prefers a native cost over deriving one), so tests can
 // pin an exact price without needing a real model-pricing rate. Omit it (and
-// use a model with no rate-card row) to exercise the unpriced path.
+// use a model the catalog does not price) to exercise the unpriced path.
 function usageEntry({ model = 'anthropic/claude-sonnet-5', costUsd, timestamp, rootItemId, effort } = {}) {
   const payload = { model };
   if (costUsd !== undefined) payload.costUsd = costUsd;

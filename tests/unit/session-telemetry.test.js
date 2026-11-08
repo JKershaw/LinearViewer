@@ -540,7 +540,7 @@ describe('parseUsage (LIN-1425)', () => {
       // LIN-1766: absent from the payload, so null (closed enum, no default lane).
       lane: null,
       // LIN-1495: claude-code posts costUsd: null (it has no native cost), so the
-      // figure is derived here from the four token counts + the static rate card.
+      // figure is derived here from the four token counts + the catalog rates (LIN-4358).
       costUsd: DEFAULT_PAYLOAD_COST,
     });
     // Assert the exact value, not merely non-null, so an arithmetic regression —
@@ -624,7 +624,7 @@ describe('parseUsage (LIN-1425)', () => {
   });
 
   test('LIN-2403: the stored read path is unchanged — parsed usage gains no key on an override-bearing model', () => {
-    // openai/gpt-5.6-sol now carries a MODEL_PRICING overrides array (LIN-2403);
+    // openai/gpt-5.6-sol's catalog rate carries an overrides array (LIN-2403);
     // the parsed usage shape itself (the wire payload every stored row already
     // carries) must stay exactly the same set of keys regardless.
     const usage = parseUsage([{ message: usageMessage({ model: 'openai/gpt-5.6-sol' }), kind: 'usage' }]);
