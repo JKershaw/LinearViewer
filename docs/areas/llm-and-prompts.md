@@ -33,9 +33,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 ## Waiting
 
 - `lib/size-of-move.js`: what the size record may not carry is written three ways: the
-  checker's patterns here, the scoping prompt's "No backticks, paths, code names or
-  numbered lists" in `lib/prompt-template-defs.js`, and the `SIZE_RECORD_HOW` line in
-  `lib/proxy-instructions.js`. No test links them. (LIN-4369 leftovers.)
+  checker's patterns here, the scoping prompt's own list in `lib/prompt-template-defs.js`,
+  and the `SIZE_RECORD_HOW` line in `lib/proxy-instructions.js`. No test links them.
+  (LIN-4369 leftovers.)
 - `lib/prompt-formatters.js`: scoping, survey-task and survey-place are left out of the
   area notes pointer so LIN-4369's replay renders unchanged, while scoping's own prose
   says to read the area's notes. Give them the pointer, and drop the prose, once that
