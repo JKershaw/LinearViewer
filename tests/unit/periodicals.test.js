@@ -299,30 +299,170 @@ describe('Mint + Autopilot variant (LIN-1279)', () => {
   }
 });
 
-// Bounded follow-up creation is a CORRECTIVE-mode concern only: those reviews
-// turn findings into a capped set of fix-tasks itself (LIN-386), rather than the
-// old propose-but-don't-create + leave-In-Progress contract that looped on
-// `review` forever. The advisory Stability Review is excluded by mode (it mints
-// no follow-ups — see its own specifics block).
-// LIN-4379: a template that feeds the area notes mints no follow-ups, so it leaves this loop.
-// P2 (LIN-4380) moves the other 12 here and turns this loop into a census.
-const FEEDS_AREA_NOTES = new Set(['seams-tangles']);
+// LIN-4380 (LIN-4349 P2): every CORRECTIVE review feeds the area notes and mints nothing. This
+// loop replaces the LIN-386 "bounded follow-up creation" loop, keeping what each of its
+// assertions protected under the new output:
+//   - "every finding is recorded in the report" -> the report stays uncapped (everything found);
+//   - "bounded / cap it"                         -> what the reading writes stays within its bound,
+//                                                   each note under its cap;
+//   - "search for an existing ticket before minting" (LIN-2991/LIN-3022 §5a, no re-raise)
+//                                                -> a finding already filed as a ticket stays in
+//                                                   the report only, never also in a note.
+// It selects by mode, so a corrective template that stops feeding the notes fails here. The
+// advisory reviews (Stability, Recent Headwinds, Integration & Surface Maturity) report to a
+// person instead; see their specifics blocks and the census below.
+describe('corrective reviews: feed the notes, mint nothing (LIN-4380)', () => {
+  const corrective = PERIODICALS.filter(t => t.mode === 'corrective');
 
-describe('corrective reviews: bounded follow-up creation', () => {
-  for (const template of PERIODICALS.filter(t => t.mode === 'corrective' && !FEEDS_AREA_NOTES.has(t.id))) {
-    test(`${template.title} mints a capped follow-up set, records every finding`, () => {
-      const prompt = template.generatePrompt();
-      assert.match(prompt, /follow-up task/i);
-      assert.match(prompt, /bounded|cap it|at most/i);
-      // Every finding still lands in the report even if not promoted to a task.
-      assert.match(prompt, /every finding|not promote|nothing is lost/i);
+  test('covers all 13 corrective templates', () => {
+    assert.strictEqual(corrective.length, 13);
+  });
+
+  for (const template of corrective) {
+    const prompt = template.generatePrompt();
+    const lines = prompt.split('\n');
+    const notesBullet = lines.find(l => l.startsWith('- **Feed the area notes'));
+    const routesBullet = lines.find(l => l.startsWith('- **Route each finding that has no area note'));
+
+    test(`${template.title} feeds the area notes through one docs-only PR, citing file then reading`, () => {
+      assert.ok(notesBullet, `${template.id}: the notes bullet is present`);
+      for (const re of [
+        /mint no follow-up tasks/i,
+        /searching the repo/i,
+        /follow their own rules/i,
+        /since the commit the previous report measured/i,
+        /map each changed file to its area through the registry/i,
+        /prune entries you find settled or no longer true/i,
+        /Waiting entry/, /Lesson/,
+        /cites the file it is about first/i,
+        /this report as the second cited path/i,
+        /one docs-only pull request/i,
+        /rebase it onto main/i
+      ]) assert.match(notesBullet, re, `${template.id}: ${re}`);
+      // The source tag names this template's own title (P1's citation contract).
+      assert.ok(notesBullet.includes(`"${template.title}, <the date of this run>"`), `${template.id}: source tag names its title`);
     });
 
-    // LIN-2991/LIN-3022 §5 clause (a): before minting, check the finding
-    // doesn't already have a ticket — never a re-raise of the same file/finding.
-    test(`${template.title} checks for an existing ticket before minting`, () => {
+    test(`${template.title} routes what has no area note to the person, never to a ticket`, () => {
+      assert.ok(routesBullet, `${template.id}: the routes bullet is present`);
+      for (const re of [/larger tidy/i, /no file in an area to cite/i, /addressed to the person/i, /cross-area seam/i, /repo with no area notes/i, /never (?:to|in) a ticket/i]) {
+        assert.match(routesBullet, re, `${template.id}: ${re}`);
+      }
+    });
+
+    test(`${template.title} concludes on the notes PR, stays review-only around the note edits, keeps its output bounded`, () => {
+      assert.match(prompt, /The area-notes pull request carries the findings forward/);
+      assert.match(prompt, /beyond the report artifact itself and the area-note edits described above/);
+      assert.match(prompt, /After the report and its area-note edits above are written/);
+      assert.match(prompt, /what this reading writes — the report and its area-note entries — stays within its existing bound/);
+      assert.match(prompt, /each note under its cap/);
+    });
+
+    test(`${template.title} still records every finding in the report and never re-raises a filed one`, () => {
+      assert.match(prompt, /report of everything found/i);
+      assert.match(prompt, /A finding already filed as a ticket stays in the report only, never also in a note/);
+    });
+
+    test(`${template.title} gives no instruction to mint follow-up tasks`, () => {
+      for (const re of [/Mint a bounded set of follow-up tasks/i, /into new Linear tasks yourself/i, /before minting a task/i, /top ~3 by severity/i, /follow-up tasks you minted/i]) {
+        assert.doesNotMatch(prompt, re, `${template.id}: ${re}`);
+      }
+    });
+  }
+});
+
+// LIN-4380 (LIN-4349 P2): the prompt census. No Periodical mints a follow-up: a corrective
+// template feeds the area notes and routes the rest to the person; an advisory one reports to
+// a person. This census fails while any template's Stage-2 contract tells the run to create
+// follow-up tasks, or while a corrective template still carries the report-only or
+// minted-follow-up wording the shared builders render by default. It selects by mode, never
+// by a converted-template list, so a template cannot opt out of it by being left off a list.
+// Repeatable search for what it guards: grep -n "follow-up task\|mint\b" lib/periodicals.js
+describe('prompt census: no Periodical mints a follow-up (LIN-4380)', () => {
+  const STAGE2_OPEN = 'Write a Linear task whose description directs whoever runs it to:';
+  const STAGE2_CLOSE = 'Include this exact line as the first line';
+  // Stage 1 keeps minting the ONE review task (the plan keeps the two-stage shape), so the
+  // census reads only the review task's contract: the bullets between these two lines.
+  const stage2 = prompt => {
+    const open = prompt.indexOf(STAGE2_OPEN);
+    const close = prompt.indexOf(STAGE2_CLOSE);
+    assert.ok(open > 0 && close > open, 'the Stage-2 contract is delimited');
+    return prompt.slice(open + STAGE2_OPEN.length, close);
+  };
+
+  // Instructions to create follow-up work, by the exact shapes the templates have used. Each
+  // is a positive instruction or a sentence that presumes the run mints; none is a negation.
+  const MINTING_PHRASES = [
+    /Mint a bounded set of follow-up tasks/i,
+    /into new Linear tasks yourself/i,
+    /before minting a task/i,
+    /mint a fix-task/i,
+    /mints work only for/i,
+    /corrective minting half/i,
+    /a finding for a follow-up task/i,
+    /Prose and follow-up tasks/i,
+    /follow-up tasks you minted/i,
+    /highest-severity work is on the stack/i,
+    /earns a fix-task/i,
+    /promoted to a task/i,
+    /promoted set/i
+  ];
+
+  // The shared builders' default wording, which a corrective template must no longer render:
+  // it says Stage 2 writes only its report, or that it minted follow-ups.
+  const UNCONVERTED_WORDING = [
+    /no docs beyond writing the report artifact/i,
+    /follow-up tasks you minted/i,
+    /follow-up work this review mints/i,
+    /\(and any follow-up tasks\)/i
+  ];
+
+  // A clause that names follow-up work or minting and carries no negation reads as an order to
+  // create it. This catches wording the phrase list has not seen yet.
+  // LIN-4380 review: "File a Linear ticket for each objective breakage" passed, because tickets and
+  // issues were missing here and a bold header ending ".**" did not split, so its "never" shielded
+  // the next sentence. Ticket/issue vocabulary added; the split now allows closing "**".
+  const MINT_WORD = /\bfollow-ups?\b|\bfix-tasks?\b|\bmint(?:s|ed|ing)?\b|\bnew (?:Linear )?tasks?\b|\bLinear tasks?\b|\btickets?\b|\bissues?\b/i;
+  const NEGATION = /\b(?:no|not|never|nothing|none|nor)\b/i;
+  const unnegatedMintClauses = text =>
+    text.split(/(?<=[.;:!?]\**)\s+|\n+/).filter(c => MINT_WORD.test(c) && !NEGATION.test(c));
+
+  const corrective = PERIODICALS.filter(t => t.mode === 'corrective');
+  const advisory = PERIODICALS.filter(t => t.mode === 'advisory');
+
+  test('the registry splits into the 13 corrective and the 3 advisory templates the plan names', () => {
+    assert.strictEqual(corrective.length, 13);
+    assert.deepStrictEqual(advisory.map(t => t.id).sort(), ['integration-surface-maturity', 'recent-headwinds', 'stability-review']);
+  });
+
+  for (const template of PERIODICALS) {
+    test(`${template.title}: Stage 2 gives no instruction to create follow-up tasks`, () => {
+      const contract = stage2(template.generatePrompt());
+      const hits = MINTING_PHRASES.filter(re => re.test(contract)).map(String);
+      assert.deepStrictEqual(hits, [], `${template.id} still tells the run to mint`);
+    });
+  }
+
+  // Advisory templates stay as they are (the plan): they already mint nothing and say so, and
+  // they keep the shared builders' default gap-audit and second-read wording, which names
+  // follow-up work only as a bound. So the clause scan and the unconverted-wording check apply
+  // to the corrective templates; the advisory ones must still say they mint nothing.
+  for (const template of advisory) {
+    test(`${template.title} (advisory): still reports to a person and mints NO follow-up tasks`, () => {
+      assert.match(template.generatePrompt(), /mint NO follow-up tasks/);
+    });
+  }
+
+  for (const template of corrective) {
+    test(`${template.title} (corrective): no clause names follow-up work or minting without negating it`, () => {
+      const clauses = unnegatedMintClauses(stage2(template.generatePrompt()));
+      assert.deepStrictEqual(clauses, [], `${template.id} has minting clauses`);
+    });
+
+    test(`${template.title} (corrective): none of the report-only or minted-follow-up wording`, () => {
       const prompt = template.generatePrompt();
-      assert.match(prompt, /before minting a task, search for an existing ticket already naming the same finding/i);
+      const hits = UNCONVERTED_WORDING.filter(re => re.test(prompt)).map(String);
+      assert.deepStrictEqual(hits, [], `${template.id} carries unconverted wording`);
     });
   }
 });
@@ -535,9 +675,11 @@ describe('Drift & Coherence Review specifics (LIN-369)', () => {
       assert.match(census, /List the table groups in one compact table, no ruling/);
     });
 
-    test('a ruling is the finding, not a question to anyone; prose and follow-ups only for real groups and changes', () => {
+    // LIN-4380: real groups get prose and note entries now, not follow-up tasks.
+    test('a ruling is the finding, not a question to anyone; prose and note entries only for real groups and changes', () => {
       assert.match(census, /a ruling is your finding, not a question to anyone/);
-      assert.match(census, /Prose and follow-up tasks only for real groups and for changes since the previous edition/);
+      assert.match(census, /Prose and note entries only for real groups and for changes since the previous edition/);
+      assert.doesNotMatch(census, /follow-up tasks/i);
     });
 
     test('falls back to the old review when the repo has no tool or it cannot run', () => {
@@ -869,10 +1011,13 @@ describe('Design & Interface Review specifics (LIN-520)', () => {
     assert.match(prompt, /design-system reference page the app ships/i);
     // Minimalism-is-working stays a valid explicit verdict.
     assert.match(prompt, /looks good as-is|minimalism is working/i);
-    // The design-quality dimensions never mint fix-tasks — advisory only, cap unchanged.
-    assert.match(prompt, /advisory half hands these judgement calls to a maintainer and mints nothing/i);
-    assert.match(prompt, /objective breakage only|objective breakage/i);
-    assert.match(prompt, /top ~3 by severity/i);
+    // The design-quality dimensions stay advisory; only objective breakage takes the route to the
+    // person (LIN-4380: no fix-tasks, no cap to keep — the route mints nothing).
+    assert.match(prompt, /advisory half hands these judgement calls to a maintainer through the report/i);
+    assert.match(prompt, /corrective half routes only objective breakage to the person and the notes/i);
+    assert.match(prompt, /feed the advisory tail, never the objective-breakage route/i);
+    assert.match(prompt, /Route objective breakage to the person — never to a ticket/);
+    assert.match(prompt, /This route never covers a subjective design-direction call, which stays in the report's advisory tail/);
   });
 
   test('stays general: no file literals, route names, or tool names leak in', () => {
@@ -1114,10 +1259,11 @@ describe('Onboarding & Cold-Start Review specifics (LIN-1689)', () => {
     assert.match(prompt, /do not double-flag/i);
   });
 
-  test('mints fix-tasks for objective breakage only, keeps subjective friction advisory', () => {
-    assert.match(prompt, /objective breakage/i);
-    assert.match(prompt, /top ~3 by severity/i);
-    // The minting bullet must name onboarding's OWN breakage classes, not the
+  // LIN-4380: objective breakage goes to the person (and the notes), never to a fix-task.
+  test('routes objective breakage only to the person, keeps subjective friction advisory', () => {
+    assert.match(prompt, /Route objective breakage to the person — never to a ticket/);
+    assert.match(prompt, /This route never covers friction — a step that merely required guessing/);
+    // The breakage route must name onboarding's OWN breakage classes, not the
     // Design & Interface Review's — otherwise the corrective half is pointed
     // at territory the altitude bullet above just deferred away.
     assert.match(prompt, /dead link/i);
@@ -1281,8 +1427,10 @@ describe('Seams & Tangles feeds the area notes, mints nothing (LIN-4379)', () =>
   });
 });
 
-describe('templates other than Seams & Tangles carry none of the notes wording (LIN-4379)', () => {
-  for (const template of PERIODICALS.filter(t => !FEEDS_AREA_NOTES.has(t.id))) {
+// LIN-4380: every corrective template now feeds the notes, so the advisory three are the ones
+// that must carry none of its wording (they stay as they are, reporting to a person).
+describe('the advisory templates carry none of the notes wording (LIN-4379, LIN-4380)', () => {
+  for (const template of PERIODICALS.filter(t => t.mode === 'advisory')) {
     test(template.title, () => {
       const prompt = template.generatePrompt();
       assert.doesNotMatch(prompt, /Feed the area notes|area-note|Route each finding that has no area note/i);
