@@ -49,6 +49,10 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { __internal } from '../../lib/pipeline-loops.js';
 import { digestFeedback } from '../../lib/digest-feedback.js';
+import { seedPinnedCatalog } from './helpers/pinned-catalog.js';
+
+// LIN-4358: rates and names come from the catalog; price from the pinned 8 Nov 2026 snapshot.
+seedPinnedCatalog();
 
 const { _buildLoops } = __internal;
 

@@ -46,9 +46,11 @@ import { armKeepalive } from '../lib/http-keepalive.js';
  * reply on busy weeks (`finish_reason: 'length'`) → unparseable JSON → the route
  * silently degraded to a quiet "slow news day" edition = the user-visible "no
  * results" bug. This budget is the *prose* floor; it is routed through
- * `resolveReasoningBudget` so a reasoning model (the default `gpt-5.4-mini`) gets
- * dedicated reasoning headroom on top instead of the hidden reasoning tokens
- * eating the visible-output budget — exactly as the roadmap LLM layers do.
+ * `resolveReasoningBudget`, which bounds reasoning explicitly for a model whose
+ * catalog entry has thinking on by default, and the call layer (lib/call-budget.js)
+ * adds headroom for any other model that can reason (the default `gpt-5.4-mini`
+ * among them, LIN-4358), so hidden reasoning does not eat the visible-output
+ * budget — exactly as the roadmap LLM layers do.
  */
 const EDITOR_PROSE_MAX_TOKENS = 6000;
 

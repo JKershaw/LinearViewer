@@ -1,12 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderLandingPage } from '../../lib/render-landing.js';
-import { DEFAULT_MODEL, AVAILABLE_MODELS, formatModelPricing } from '../../lib/openrouter.js';
+import { DEFAULT_MODEL, getModelPricingHint } from '../../lib/openrouter.js';
 import { START_HERE } from '../../lib/library-metadata.js';
 import { escapeHtml } from '../../lib/utils/html.js';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { seedPinnedCatalog } from './helpers/pinned-catalog.js';
+
+// LIN-4358: rates and names come from the catalog; price from the pinned 8 Nov 2026 snapshot.
+seedPinnedCatalog();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -114,7 +118,7 @@ test('shows the localhost setup notice only when requested', () => {
 
 // LIN-1161: "try it for well under $1" — the honest low-cost trial hook. These
 // pin the section's placement, that its dollar figure is derived from the
-// pricing rate card (never a second hardcoded price), and both branches of the
+// catalog price, through getModelPricingHint (never a second hardcoded price; LIN-4358), and both branches of the
 // free-tier-vs-BYOK copy fork.
 
 test('places the "try it" section after grounded prompts and before providers', () => {
@@ -125,10 +129,10 @@ test('places the "try it" section after grounded prompts and before providers', 
   assert.ok(promptIdx < tryIdx && tryIdx < providersIdx, 'landing-try sits between landing-prompt and landing-providers');
 });
 
-test('grounds the dollar claim in formatModelPricing(DEFAULT_MODEL), not a second hardcoded price', () => {
+test('grounds the dollar claim in getModelPricingHint(DEFAULT_MODEL), not a second hardcoded price', () => {
   const html = renderLandingPage({});
-  const expectedPricing = formatModelPricing(AVAILABLE_MODELS.find((m) => m.id === DEFAULT_MODEL));
-  assert.ok(expectedPricing, 'sanity: DEFAULT_MODEL has a known rate card entry');
+  const expectedPricing = getModelPricingHint(DEFAULT_MODEL);
+  assert.ok(expectedPricing, 'sanity: the pinned catalog prices DEFAULT_MODEL');
   assert.ok(html.includes(expectedPricing), 'renders the live pricing hint verbatim');
 });
 

@@ -16,12 +16,14 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createRoadmapRoutes } from '../../routes/workspace-api-roadmap.js';
 import { registerProvider } from '../../lib/providers/registry.js';
-import { setFetchImpl, AVAILABLE_MODELS, DEFAULT_MODEL } from '../../lib/openrouter.js';
+import { setFetchImpl, suggestedModels, DEFAULT_MODEL } from '../../lib/openrouter.js';
+// LIN-4358: the suggested models, with names and prices read from the catalog.
+const SUGGESTED_MODELS = suggestedModels();
 import { routingFixture } from './helpers/routing-fakes.js';
 
 const URL_KEY = 'acme';
 const PROVIDER_NAME = 'roadmap-orientation-fake-provider';
-const [MODEL_A, MODEL_B] = AVAILABLE_MODELS.filter((m) => m.id !== DEFAULT_MODEL).map((m) => m.id);
+const [MODEL_A, MODEL_B] = SUGGESTED_MODELS.filter((m) => m.id !== DEFAULT_MODEL).map((m) => m.id);
 
 const sse = (text) => new Response(
   `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\ndata: [DONE]\n\n`,

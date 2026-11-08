@@ -12,6 +12,10 @@ import { lineageRecords as lineageRecords__unplumbed } from '../../lib/cost-read
 import { classifyLineage, modelsOf, oplogCounters, requestRecordAudit, readWorkspace, sharesOf, tokenSums, recordCostUsd, oplogCrossCheck, parseFlushes } from '../../scripts/lin-4200-measure-records-vs-snapshots.mjs';
 import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 import { lineageRecordsOf } from '../fixtures/cost-read-cores.js';
+import { seedPinnedCatalog } from './helpers/pinned-catalog.js';
+
+// LIN-4358: rates and names come from the catalog; price from the pinned 8 Nov 2026 snapshot.
+seedPinnedCatalog();
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
 const lineageRecords = lineageRecordsOf;
 

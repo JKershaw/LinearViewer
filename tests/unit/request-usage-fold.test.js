@@ -11,6 +11,10 @@ import assert from 'node:assert/strict';
 import { foldRequestUsage } from '../../lib/request-usage-fold.js';
 import { foldLineageUsage } from '../../lib/row-usage.js';
 import { priceRequest, computeUsageCostUsd } from '../../lib/model-pricing.js';
+import { seedPinnedCatalog } from './helpers/pinned-catalog.js';
+
+// LIN-4358: rates and names come from the catalog; price from the pinned 8 Nov 2026 snapshot.
+seedPinnedCatalog();
 
 const at = (minute) => new Date(Date.UTC(2026, 10, 4, 9, minute));
 // One stored request record, in the loader's projection shape (its LIST_PROJECTION).

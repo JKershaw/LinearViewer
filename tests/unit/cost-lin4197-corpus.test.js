@@ -17,6 +17,10 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeUsageCostUsd } from '../../lib/model-pricing.js';
 import { LIN4197_CASES, buildLin4197Corpus } from '../fixtures/cost-replay/corpus.js';
+import { seedPinnedCatalog } from './helpers/pinned-catalog.js';
+
+// LIN-4358: rates and names come from the catalog; price from the pinned 8 Nov 2026 snapshot.
+seedPinnedCatalog();
 
 const TOKEN_KEYS = ['inputTokens', 'outputTokens', 'cacheCreationInputTokens', 'cacheCreation1hInputTokens', 'cacheReadInputTokens'];
 

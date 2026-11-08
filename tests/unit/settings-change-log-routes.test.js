@@ -62,7 +62,7 @@ before(async () => {
       projectLegacy,
       getModelCatalog: async () => [],
       shouldMockAi: () => true,
-      AVAILABLE_MODELS: [],
+      suggestedModels: () => [],
       getProvider,
       getProviderForWorkspace,
       getBindingsForWorkspace: () => [],
