@@ -2962,3 +2962,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - Rulings `lin4346-size-after-arm2` (suggested **structural-arm**: a fixed size, one sentence why, cuts and who decided; keep LIN-998 as the control, since it passed; don't change a pre-registered criterion after the fact) and `lin4369-after-arm2` (suggested **park**: keep #2356 as evidence while the structural arm runs).
   - `lin4369-replay-failed-next` is overtaken by arm 2.
   - **The pattern again:** wording got most of the way, and the last part needs structure (the seal, named cuts, and now the size record).
+- **02:30 UTC: LIN-4371 merged** (`526bca66`, PR #2357; LIN-4347 piece 1/3, LinearViewer): a product-owned area registry, notes with a guard test, the seeded entries, and a grounding pointer. **LIN-4347 kept moving on the pieces its cut ruling doesn't touch**, as asked. An area read follows at LIN-4347's end.
