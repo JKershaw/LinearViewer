@@ -22,7 +22,8 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   for a held wake to end must release it under the build's guard key, so it stays once.
 - "This run's PR" is what the session reported, not the PR it mentioned most:
   `prUrlOfFeedback` (`lib/dispatch-wake.js`) reads a PR on a `DONE:` or `[done]` line
-  before the `[done]` entry's `url`, which older runners filled by mention count. A build
+  (`reportLinesOf`, `lib/dispatch-terminal.js`) before the `[done]` entry's `url`, which
+  older runners filled by mention count. A build
   that read a sibling's PR more often got that PR in its leftover prompt (LIN-4375). The
   runner's `sessionPrs` uses the same order: newest line, then first PR on it.
 - Two `[done]` posts can reach a decide-then-enqueue at once, so a "no row yet" read is
@@ -36,8 +37,13 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   (`lib/ci-wake-sweep.js`). A rule keyed on the producing row's kind misses that ending:
   read the lineage instead (`_heldLeftoverOf`, `resolveFollowUpRoot`). LIN-4373 handled it
   for eligibility but not for the held wake's terminals, and review caught it.
-- Row-only kinds (`wake`, `leftover`) stay out of `DISPATCH_KINDS` (`lib/prompt-templates.js`),
-  so no `/dispatch` caller can create one.
+- Row-only kinds stay out of `DISPATCH_KINDS` (`lib/prompt-templates.js`), so no `/dispatch`
+  caller can create one. `ROW_ONLY_KINDS` (`lib/dispatch-fields.js`) lists them; kind-keyed
+  maps are tested against both lists, since `leftover` once had no bucket (LIN-4376). A new
+  bucket can pull a kind into the round-trip walk; `OFF_SPINE_KINDS` keeps it out.
+- The leftover methods stay in `lib/dispatch-store.js`: no move takes `release` out of
+  `_deliverWake` (it acts at three of its guards), and a module handed the store only
+  exposes its privates (LIN-4376).
 - Price a pulled extra like any other piece. Making the cost read load its own inputs
   rode along with LIN-4201 and did not land there; it landed as its own piece, LIN-4226.
 
@@ -48,10 +54,6 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   held and nothing releases it: no `leftover` row exists to cancel or expire. A sweep
   that releases a claim older than the queue TTL with no `leftover` row would close it.
   (LIN-4375, from LIN-4347's review.)
-- `lib/dispatch-wake.js`: the `DONE:` line is matched in two places with different rules:
-  `REPORT_LINE_RE` here (case-sensitive, `[done]` too) and `DONE_LINE` in
-  `lib/plan-review-round-trips.js` (case-insensitive). One shared pattern would keep
-  "what the session reported" one rule. (LIN-4375 leftovers.)
 - `lib/dispatch-factory.js`: tests `provider.name === 'linear'` beside
   `isHermeticTestToken`, because of a test-only transport. (John, 7 Nov, on LIN-4347.)
 - `lib/effort-readout.js`: still outputs the deleted name `GATE_DUE_MARKER` (replaced by
