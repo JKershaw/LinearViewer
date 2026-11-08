@@ -3023,3 +3023,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - a check that fails twice goes to John as a size question;
     - "err larger" means one fuller change, not more tickets.
   - **For the retro:** count tickets opened against closed, tagged as tidy, incident or expansion; check retries; rulings that were really engineering calls; and read each area's blind reads against its cost. That shows whether these counterweights belong in the product or only in this session.
+- **10:38 UTC: LIN-4358 piece 1 merged** (`64c2ca26d`, PR #2362: whole or loud at the call layer; budget sized from the catalog). The replay command and its pass rule now sit in the llm-and-prompts area notes. The hand-list piece is the ticket's original ask, so it stays in the round. The blind reads wait until the ticket is done, so the area is read as one change.
