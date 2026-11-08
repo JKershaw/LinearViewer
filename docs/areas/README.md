@@ -30,10 +30,17 @@ is optional: no file means nothing is known yet, and that is fine. Each note has
 parts, under these two headings:
 
 - `## Lessons`: what binds how you work in the area. A lesson is a rule a builder
-  follows, learned from a change that went wrong or nearly did. Say why.
+  follows, learned from a change that went wrong or nearly did, or from a Periodical
+  reading. Say why.
 - `## Waiting`: work known in the area but not scheduled. One bullet per entry. Each
   entry **starts by citing the file it is about**, as a repo-relative path in
-  backticks, and says what is waiting and where it came from (a ticket or comment).
+  backticks, and says what is waiting and where it came from (a ticket, a comment or
+  a reading).
+
+An entry from a Periodical reading names its source as the Periodical's title and the
+reading's date, for example "(Seams & Tangles, 8 Nov.)". It cites the area's file first
+and the reading's report second, so the guard checks the first path against the area
+and the report path must exist in the same change.
 
 Cite files, never line numbers: lines move, and the docs anchor sweep reads this
 directory. A cited path is a backtick span holding a repo-relative path: it has a `/`
@@ -53,9 +60,11 @@ leftover step, review and close-out each render it word for word. For the notes:
   its move does.
 
 Who writes here: the builder's leftover step tidies or notes what its change left
-(`lib/dispatch-leftover.js`), review names any edge it left untouched, and close-out
-writes review's note entries on the PR branch before the merge (LIN-4374). Close-out
-is the only one that files a follow-up.
+(`lib/dispatch-leftover.js`), review names any edge it left untouched, close-out
+writes review's note entries on the PR branch before the merge (LIN-4374), and Stage 2
+of a Periodical writes its reading's entries in the same docs-only PR as its report
+(`lib/periodicals.js`, LIN-4379). Close-out is the only one that files a follow-up;
+a Periodical that writes here files none.
 
 The Survey notebook's tally (`docs/plans/survey/broad-options.md`) moved here; the rest
 of `docs/plans/survey/` stays as frozen research.

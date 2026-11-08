@@ -1274,6 +1274,11 @@ describe('Seams & Tangles feeds the area notes, mints nothing (LIN-4379)', () =>
     assert.ok(prompt.includes(buildPeriodicalGateMarker(template.title)));
     assert.match(prompt, /fresh-context adversarial second-read/i);
   });
+
+  test('the second read follows the report and its note edits, not follow-up tasks', () => {
+    assert.doesNotMatch(prompt, /\(and any follow-up tasks\)/);
+    assert.match(prompt, /After the report and its area-note edits above are written/);
+  });
 });
 
 describe('templates other than Seams & Tangles carry none of the notes wording (LIN-4379)', () => {
