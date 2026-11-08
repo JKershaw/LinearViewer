@@ -3086,3 +3086,9 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **Most of the worse side traces to the size-policy setting,** which is on the discussion list to rethink or remove.
   - **No action taken:** nothing filed, nothing steered. LIN-4370's own close-out (`87a2af0a`) and LIN-4346's autopilot are still running. The question of where the one tidy goes is put to John.
 - **14:36 UTC: LIN-4377 is Done.** Its parent close-out has finished.
+- **Side note on compaction (John):** after the second compaction I skipped the first request, which repeated the summary of goals, story and method. I treated it as already answered, because my last message before compacting held the summary. John asks for that repeat on purpose: restating after compaction improves performance afterwards. Lesson: after a compaction, answer the repeated request anyway, because the restatement is the point.
+- **14:50 UTC: John's call on the size-policy setting: "I'd be happy to remove the feature cleanly, and we add settings to the list for discussion."** I filed it as **LIN-4393** under LIN-4344, carrying his words. This is LIN-4346's one tidy.
+  - **The parrot cut my draft in three ways.** It removed my design calls (what "stays"). It dropped the area reads' extra scope, so the ticket is the removal plus whatever tidying falls out of it. It corrected a misattribution: in John's words, "err larger" is the value he chose, not a standing answer. That's the same slip that made the setting in the first place, caught this time.
+  - **LIN-4345's seal held:** filing with a hand-written "## As asked" was refused ("only code writes those"). I refiled without it, and Harbour sealed the words itself.
+  - **The Surveys:** `26ea49ac` (task) and `2430d226` (place).
+  - **For the discussion:** settings in general.
