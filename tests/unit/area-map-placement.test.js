@@ -79,7 +79,7 @@ describe('code-shape area map placement (LIN-3729)', () => {
   });
 
   // LIN-4383: the registry's path is the product's, spelled once in a zero-import leaf under lib/prompts/, so the
-  // existing `^lib/prompts/` pattern files it with the prompt that names it (`formatAreaNotesPointer`) and the
+  // existing `^lib/prompts/` pattern files it with the prompt that names it (`AREA_NOTES_WHERE`, LIN-4346) and the
   // registry needs no new pattern. The scripts and the tests' helper import it from there, never the other way.
   test('the registry path leaf lands in LLM & prompts, imports nothing, and is the one spelling its readers use', () => {
     const LEAF = 'lib/prompts/area-registry-path.js';

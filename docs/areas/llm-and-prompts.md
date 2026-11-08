@@ -12,6 +12,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   rather than edit a shared one (LIN-4371).
 - Keep scoping and both Survey renders byte-identical unless the ticket is about them:
   replays compare them byte for byte (LIN-4369).
+- The Surveys get no area notes pointer: survey-place reads no reports on the codebase's
+  shape, which feed the notes. Scoping's own pointer cites in its final message (its record
+  takes no fifth line); both share `AREA_NOTES_WHERE`, so say where notes are there (LIN-4346).
 - `lib/prompt-template-defs.js` and the budget test change in almost every merge: rebase,
   then re-measure. Its fixture passes no context, so it measures a prompt's empty-context
   branch: dropping one can raise a ceiling while real renders shrink (LIN-4393). Measure.
@@ -46,10 +49,6 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - `lib/size-of-move.js`: what counts as code-shaped how is written twice: the checker's
   patterns here, and the `SIZE_RECORD_HOW` line in `lib/proxy-instructions.js`. No test links
   them; arm 3 removed the prompt's third copy. (LIN-4369 leftovers.)
-- `lib/prompt-formatters.js`: scoping and both Surveys lack the area notes pointer (kept out
-  for LIN-4369's replay, which passed), while scoping's prose says to read the area's notes.
-  Give the three the pointer and drop that prose in a change to scoping's prompt; LIN-4393
-  was sized just the task, so left it. (LIN-4371, LIN-4369.)
 - `lib/should-mock-ai.js`: `isHermeticTestToken` is a third spelling of the test-token
   check, beside `isTestToken` in `routes/workspace-api-steps.js` and the inline
   `isTestMode` checks in `routes/proxy-compute.js` and `routes/task-chat.js`; nothing uses

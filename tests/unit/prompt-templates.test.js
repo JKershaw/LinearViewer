@@ -3502,7 +3502,7 @@ describe('grounding notes chosen per stage (LIN-3296)', () => {
   const EXPECTED = {
     implementation: 'STCBA',
     blocked: 'STC', bug: 'STCA', plan: 'STCA', breakdown: 'STC', research: 'STCA',
-    scoping: 'STC', design: 'STCA', spike: 'STCA', 'plan-review': 'STC',
+    scoping: 'STCA', design: 'STCA', spike: 'STCA', 'plan-review': 'STC',
     review: 'STCA', 'close-out': 'STC',
     'look-into': 'S', context: 'S',
     'retrospective-audit': 'S', retro: 'S',
@@ -3599,8 +3599,12 @@ describe('the area notes pointer (LIN-4371)', () => {
     }
   });
 
+  // LIN-4346: scoping carries its own wording instead (tests/unit/lin-4346-scoping-area-notes.test.js).
   test('scoping, the Survey stages, close-out and an unknown kind do not carry it', () => {
     for (const kind of ['scoping', 'survey-task', 'survey-place', 'close-out']) {
+      assert.ok(!generatePrompt(kind, issue, context).prompt.includes(line), kind);
+    }
+    for (const kind of ['survey-task', 'survey-place', 'close-out']) {
       assert.ok(!generatePrompt(kind, issue, context).prompt.includes('## Area Notes'), kind);
     }
     assert.ok(!appendGroundingSections('', issue, context, 'custom').includes('## Area Notes'), 'unknown kind');
