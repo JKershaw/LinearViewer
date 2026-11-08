@@ -39,6 +39,10 @@ import { badRequest, jsonError, keepaliveError, notFound } from '../lib/errors.j
  * @param {Object} deps.briefCacheStore - Brief cache storage instance
  * @param {Object} deps.taskSnapshotStore - Task-history snapshot storage instance
  * @param {Object} deps.dispatchQueueStore - Dispatch queue storage instance
+ * @param {Object|null} [deps.closeOutEventsStore] - Merged close-out events (lib/close-out-events-store.js),
+ *   read by GET /api/proxy/periodicals for landings (LIN-4381). server.js passes it; without it the route
+ *   reads no landings, logs that once, and no lane can read `landed`
+ *   (`tests/unit/lin-4381-close-out-store-wiring.test.js` pins the production pass-through).
  * @param {Object} deps.requestUsageLoader - the request-usage loader (lib/request-usage-loader.js); `/cost` throws without it (LIN-4201)
  * @param {Object} deps.llmCallLogStore - Per-LLM-call metadata log
  * @param {Function} deps.getWorkspaceOpenRouterKey - Function to get OpenRouter API key from workspace sessions
@@ -74,6 +78,7 @@ export function createComputeRoutes({
   briefCacheStore,
   taskSnapshotStore,
   dispatchQueueStore,
+  closeOutEventsStore = null,
   requestUsageLoader,
   llmCallLogStore,
   getWorkspaceOpenRouterKey,
@@ -103,6 +108,27 @@ export function createComputeRoutes({
   CONTEXT_FETCH_TIMEOUT_MS,
 }) {
   const router = Router();
+
+  // LIN-4381: a route running without the events store reads no landings, so no
+  // Periodical lane can read `landed` and nothing else says so. Say it once per
+  // router, not per request.
+  let warnedNoCloseOutEventsStore = false;
+  const readLandings = async (urlKey, since) => {
+    if (!closeOutEventsStore) {
+      if (!warnedNoCloseOutEventsStore) {
+        warnedNoCloseOutEventsStore = true;
+        console.warn('[periodicals] no closeOutEventsStore: GET /api/proxy/periodicals reads no landings, so no lane can read landed (LIN-4381)');
+      }
+      return [];
+    }
+    // The store never throws; the catch keeps a failed read pointed at `recent`
+    // even for a store that does.
+    try {
+      return await closeOutEventsStore.listMergedSince({ urlKey, since });
+    } catch {
+      return [];
+    }
+  };
 
   // Longer timeout for Linear endpoints that make multiple sequential GraphQL
   // calls (e.g. the projects + issues fetch behind /stack-style pagination).
@@ -957,7 +983,7 @@ export function createComputeRoutes({
       // only window and nothing can widen it.
       const effectiveHorizonMs = Math.min(DEFAULT_HORIZON_MS, READ_HORIZON_MS);
 
-      const [queueRows, history] = await Promise.all([
+      const [queueRows, history, landings] = await Promise.all([
         dispatchQueueStore.listItems(req.proxyUrlKey, { projection: PERIODICAL_PROJECTION }),
         dispatchQueueStore.listHistory(req.proxyUrlKey, {
           // A Date, not a raw number: `dispatchedAt` is stored as a real Date
@@ -976,7 +1002,11 @@ export function createComputeRoutes({
           // gets no such predicate: it never gains `feedback` (see the read-
           // safety note above), so it needs no row-bounding for this purpose.
           periodicalEvidenceRow: true
-        })
+        }),
+        // LIN-4381: the workspace's landings (merged close-out events) over the
+        // same horizon, as data for the fold. A failed read is [] (no landings),
+        // so a lane fails toward `recent`, never toward a false `landed`.
+        readLandings(req.proxyUrlKey, new Date(now - effectiveHorizonMs))
       ]);
 
       // JS-side admission filter — a CORRECTNESS guard (stops a human prompt
@@ -996,7 +1026,8 @@ export function createComputeRoutes({
 
       const results = foldPeriodicalRuns(getPeriodicals(), {
         queueRows: filteredQueue,
-        historyRows: filteredHistory
+        historyRows: filteredHistory,
+        landings
       }, {
         now,
         // LIN-3161 (LIN-3157 A1) / LIN-3163 (B): the fold's retention input is
