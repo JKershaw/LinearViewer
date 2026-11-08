@@ -72,7 +72,7 @@ import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
 /** Templates, source bytes. Same files `steady-base-growth.mjs` GROUPS as
  * "worker templates". */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 107594, // LIN-4368: +189, close-out's prune keeps the size record verbatim, scoping renders the standing size policy, both read from lib/size-of-move.js
+  'lib/prompt-template-defs.js': 108717, // LIN-4374: +1123, review's leftover read and close-out's note-writing and one-home sentence (rendered below), the LEFTOVERS_HEADING import and two one-line reason comments
   'lib/prompt-templates.js': 19593, // LIN-4251: the `stageWrites(kind)` lookup every entrance uses (code, not prompt text)
   'lib/prompt-formatters.js': 46933, // LIN-4371: +939, `formatAreaNotesPointer` and the seven stages' own grounding lists, so WORK and GROUNDING_NOTES stay byte-identical
   'lib/prompt-contract.js': 3875, // LIN-4362: the `## As asked` spellings interpolate AS_ASKED_HEADING (code, not prompt text)
@@ -95,8 +95,8 @@ export const TEMPLATES_RENDERED_CEILINGS = {
   context: 2021, // LIN-3300: at 2021 since the stage rules only the meta-prompt carried moved into their templates
   'plan-review': 7601, // LIN-4353: the verdict quotes the ask and says how the plan meets it; only the person agrees to a narrowing (the reviewer's judgement)
   implementation: 8391, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
-  review: 15351, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
-  'close-out': 11694, // LIN-4345: the summary cites review's account of what was asked
+  review: 15866, // LIN-4374: +515, the one read of what the change left at its edges, routed fix / note / outside follow-up; whether an edge is a leftover, and fix-sized, is the reviewer's judgement no code sees
+  'close-out': 11962, // LIN-4374: +268, close-out writes review's note entries before the merge, and the one-home rule (follow-up done, note unscheduled, in-area never filed); which item is which is judgement no code sees
   'retrospective-audit': 4619, // LIN-3279: FOLLOW_UP_SHAPE rendered
   retro: 4265, // LIN-3299: at 4265 since Scope and Authority on every path
   'survey-task': 1204, // LIN-4248: new at 1204; the hand-tuned task-view Survey wording, verbatim but for the {BASE} sentence and the Goal/Process frame
@@ -139,7 +139,7 @@ export const LEFTOVER_PROMPT_RENDERED_CEILING = 1195; // LIN-4373: new at 1195; 
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 349803; // LIN-4373: +1195 (348608 -> 349803), the new leftover prompt surface
+export const FROZEN_TOTAL_BYTES = 351709; // LIN-4374: +1906 (349803 -> 351709), defs +1123, review +515, close-out +268
 
 const BASE_URL = 'https://harbour.example';
 

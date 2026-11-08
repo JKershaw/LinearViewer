@@ -52,6 +52,11 @@ names, have neither, so they are never read as paths.
 - Waiting entries are context, not scope. A ticket takes one on only when the size of
   its move does.
 
+Who writes here: the builder's leftover step tidies or notes what its change left
+(`lib/dispatch-leftover.js`), review names any edge it left untouched, and close-out
+writes review's note entries on the PR branch before the merge (LIN-4374). Close-out
+is the only one that files a follow-up.
+
 The Survey notebook's tally (`docs/plans/survey/broad-options.md`) moved here; the rest
 of `docs/plans/survey/` stays as frozen research.
 
