@@ -267,6 +267,17 @@ describe('LIN-4373 — release when the leftover row never runs', () => {
     assert.ok(lines.some(l => l.includes('[dispatch-wake] no-retry-degraded') && l.includes('no-provisioner')));
   });
 
+  test('a provisioner factory that throws: the degraded release logs under one prefix, [dispatch-wake]', async () => {
+    const world = makeWorld();
+    world.store.setWakeCredentialProvisionerFactory(() => { throw new Error('factory down'); });
+    const { a } = await heldBuild(world);
+    const { lines } = await captureLogs(() => world.store.removeItem(URL_KEY, queuedLeftover(world)._id));
+    assert.equal(wakesTo(world, a._id).length, 1, 'the release still wakes');
+    const degraded = lines.filter(l => l.includes('no-retry-degraded'));
+    assert.ok(degraded.some(l => l.includes('provisioner-factory-threw:factory down')), JSON.stringify(lines));
+    assert.deepEqual(degraded.filter(l => !l.startsWith('[dispatch-wake] no-retry-degraded')), [], 'no other prefix for the same event');
+  });
+
   test('a release that faults the first time is recovered by a re-reported build [done]: exactly one wake', async () => {
     const world = makeWorld();
     const { a, b } = await heldBuild(world);
