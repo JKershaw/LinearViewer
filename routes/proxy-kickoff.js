@@ -16,7 +16,7 @@ import { jsonError } from '../lib/errors.js';
 
 /**
  * @param {Object} deps
- * @param {Function} deps.proxyLimiter - Proxy rate limiter middleware (per proven credential, else per IP) (module-scope in routes/proxy.js, shared as-is; injected here rather than redeclared so that lifetime is preserved)
+ * @param {Function} deps.proxyLimiter - The proxy rate limiter, injected (see `proxyLimiter` in routes/proxy.js)
  * @param {Function} deps.authenticateProxyToken - Consumer-token auth middleware (closure-local in createProxyRoutes)
  * @param {Function} deps.requireWriteScope - Requires readWrite scope on the token (closure-local)
  * @param {Function} deps.requireGrant - The grant gate middleware factory (module-scope in routes/proxy.js); gates POST /autopilot/kickoff on the `dispatch` grant, after the scope check (LIN-3136)

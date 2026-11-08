@@ -60,7 +60,7 @@ const createdAtMs = (comment) => new Date(comment.createdAt).getTime() || 0;
 
 /**
  * @param {Object} deps
- * @param {Function} deps.proxyLimiter - Proxy rate limiter middleware (per proven credential, else per IP) (module-scope in routes/proxy.js, shared as-is; injected here rather than redeclared so that lifetime is preserved)
+ * @param {Function} deps.proxyLimiter - The proxy rate limiter, injected (see `proxyLimiter` in routes/proxy.js)
  * @param {Function} deps.authenticateProxyToken - Consumer-token auth middleware (closure-local in createProxyRoutes)
  * @param {Function} deps.resolveProviderAccess - Resolves {token, reason, provider} for the active workspace/provider (closure-local)
  * @param {Function} deps.denyIfUnsupported - Capability gate; 422s an unsupported provider method (closure-local)

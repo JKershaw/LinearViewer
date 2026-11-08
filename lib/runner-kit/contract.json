@@ -611,6 +611,251 @@
       "sd": "not read",
       "kit": "unreadable",
       "difference": "LIN-3805: the same 503 DISPATCH_STORE_UNAVAILABLE reply (retryable:true), each side's own vocabulary. The kit reads GET /api/proxy/dispatch/:id for settled evidence (LIN-3676): a 503 is `unreadable` (defer, post nothing), unlike a 404 which is `gone`. SD does not read it."
+    },
+    {
+      "area": "exchange",
+      "case": "429 with Retry-After: 1, then a token",
+      "item": {
+        "replies": [
+          {
+            "status": 429,
+            "retryAfter": "1"
+          },
+          {
+            "status": 200
+          }
+        ]
+      },
+      "sd": "token; fetches 2; waits 1s",
+      "kit": "token; fetches 2; waits 1s"
+    },
+    {
+      "area": "exchange",
+      "case": "429 with Retry-After: 60 (the cap), then a token",
+      "item": {
+        "replies": [
+          {
+            "status": 429,
+            "retryAfter": "60"
+          },
+          {
+            "status": 200
+          }
+        ]
+      },
+      "sd": "token; fetches 2; waits 60s",
+      "kit": "token; fetches 2; waits 60s"
+    },
+    {
+      "area": "exchange",
+      "case": "429 twice with Retry-After: 1, then a token (the last allowed retry)",
+      "item": {
+        "replies": [
+          {
+            "status": 429,
+            "retryAfter": "1"
+          },
+          {
+            "status": 429,
+            "retryAfter": "1"
+          },
+          {
+            "status": 200
+          }
+        ]
+      },
+      "sd": "token; fetches 3; waits 1s, 1s",
+      "kit": "token; fetches 3; waits 1s, 1s"
+    },
+    {
+      "area": "exchange",
+      "case": "429 with Retry-After: 1 on every attempt (the retry cap)",
+      "item": {
+        "replies": [
+          {
+            "status": 429,
+            "retryAfter": "1"
+          }
+        ]
+      },
+      "sd": "refused HTTP 429; fetches 3; waits 1s, 1s",
+      "kit": "refused HTTP 429; fetches 3; waits 1s, 1s"
+    },
+    {
+      "area": "exchange",
+      "case": "429 with Retry-After: 61 (over the cap)",
+      "item": {
+        "replies": [
+          {
+            "status": 429,
+            "retryAfter": "61"
+          },
+          {
+            "status": 200
+          }
+        ]
+      },
+      "sd": "refused HTTP 429; fetches 1; waits none",
+      "kit": "refused HTTP 429; fetches 1; waits none"
+    },
+    {
+      "area": "exchange",
+      "case": "429 with no Retry-After",
+      "item": {
+        "replies": [
+          {
+            "status": 429
+          },
+          {
+            "status": 200
+          }
+        ]
+      },
+      "sd": "refused HTTP 429; fetches 1; waits none",
+      "kit": "refused HTTP 429; fetches 1; waits none"
+    },
+    {
+      "area": "exchange",
+      "case": "429 with an HTTP-date Retry-After",
+      "item": {
+        "replies": [
+          {
+            "status": 429,
+            "retryAfter": "Wed, 21 Oct 2026 07:28:00 GMT"
+          },
+          {
+            "status": 200
+          }
+        ]
+      },
+      "sd": "refused HTTP 429; fetches 1; waits none",
+      "kit": "refused HTTP 429; fetches 1; waits none"
+    },
+    {
+      "area": "exchange",
+      "case": "429 with a fractional Retry-After (1.5)",
+      "item": {
+        "replies": [
+          {
+            "status": 429,
+            "retryAfter": "1.5"
+          },
+          {
+            "status": 200
+          }
+        ]
+      },
+      "sd": "refused HTTP 429; fetches 1; waits none",
+      "kit": "refused HTTP 429; fetches 1; waits none"
+    },
+    {
+      "area": "exchange",
+      "case": "503 with Retry-After: 1 (the bootstrap may be spent)",
+      "item": {
+        "replies": [
+          {
+            "status": 503,
+            "retryAfter": "1"
+          },
+          {
+            "status": 200
+          }
+        ]
+      },
+      "sd": "refused HTTP 503; fetches 1; waits none",
+      "kit": "refused HTTP 503; fetches 1; waits none"
+    },
+    {
+      "area": "exchange",
+      "case": "401 (the bootstrap is already spent)",
+      "item": {
+        "replies": [
+          {
+            "status": 401
+          },
+          {
+            "status": 200
+          }
+        ]
+      },
+      "sd": "refused HTTP 401; fetches 1; waits none",
+      "kit": "refused HTTP 401; fetches 1; waits none"
+    },
+    {
+      "area": "exchange",
+      "case": "connection reset (the bootstrap may be spent)",
+      "item": {
+        "replies": [
+          {
+            "error": "ECONNRESET"
+          },
+          {
+            "status": 200
+          }
+        ]
+      },
+      "sd": "refused: no connection; fetches 1; waits none",
+      "kit": "refused: no connection; fetches 1; waits none"
+    },
+    {
+      "area": "forward",
+      "case": "a forwarded 429 carries Retry-After and RateLimit-* and is not retried",
+      "item": {
+        "exchange": [
+          {
+            "status": 200
+          }
+        ],
+        "upstream": {
+          "status": 429,
+          "headers": {
+            "retry-after": "17",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "17",
+            "ratelimit-policy": "60;w=60"
+          }
+        }
+      },
+      "sd": "429; retry-after 17, ratelimit-limit 60, ratelimit-remaining 0, ratelimit-reset 17, ratelimit-policy 60;w=60; upstream calls 1",
+      "kit": "429; retry-after 17, ratelimit-limit 60, ratelimit-remaining 0, ratelimit-reset 17, ratelimit-policy 60;w=60; upstream calls 1"
+    },
+    {
+      "area": "forward",
+      "case": "a forwarded 200 carries RateLimit-*",
+      "item": {
+        "exchange": [
+          {
+            "status": 200
+          }
+        ],
+        "upstream": {
+          "status": 200,
+          "headers": {
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "57",
+            "ratelimit-reset": "40",
+            "ratelimit-policy": "60;w=60"
+          }
+        }
+      },
+      "sd": "200; ratelimit-limit 60, ratelimit-remaining 57, ratelimit-reset 40, ratelimit-policy 60;w=60; upstream calls 1",
+      "kit": "200; ratelimit-limit 60, ratelimit-remaining 57, ratelimit-reset 40, ratelimit-policy 60;w=60; upstream calls 1"
+    },
+    {
+      "area": "forward",
+      "case": "the exchange is refused 429 (Retry-After: 1) on every attempt",
+      "item": {
+        "exchange": [
+          {
+            "status": 429,
+            "retryAfter": "1"
+          }
+        ]
+      },
+      "sd": "the agent's request is answered 429; retry-after 1",
+      "kit": "start fails naming HTTP 429 and Retry-After: 1",
+      "difference": "LIN-4378: each side answers whoever asked for the exchange. The kit exchanges once in `start`, before the broker serves any agent request, so the runner that called `start` gets the refusal (an error naming HTTP 429 and the wait) and can start again. SD exchanges lazily on the agent's first request, so that request is answered 429 with its Retry-After. Neither turns the 429 into a generic failure."
     }
   ]
 }

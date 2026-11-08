@@ -55,8 +55,7 @@ import {
   startBroker,
   stopBroker,
   exchangeBootstrap,
-  EXCHANGE_RETRIES,
-  EXCHANGE_MAX_WAIT_SECONDS
+  EXCHANGE_RETRIES
 } from '../../lib/runner-kit/broker.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -926,8 +925,9 @@ describe('the broker CLI (spawned, bootstrap on stdin)', () => {
 // LIN-4378: Harbour's proxy limiter answers 429 with a Retry-After of at most its
 // 60 s window. The broker waits that out for its own bootstrap exchange (at most
 // twice) and passes a forwarded 429 through with its wait headers, never retrying
-// a forward. The same cases (B1-B5) are in simple-dispatcher's
-// test/harbour-token-mcp-server.test.js; keep the two lists matched.
+// a forward. The policy itself is owned by contract.json's `exchange` and
+// `forward` rows (tests/unit/runner-kit-contract.test.js); these cases add what
+// the rows do not show: the log lines, and that no token reaches them.
 describe('LIN-4378: a rate-limited exchange waits and retries; a forwarded 429 passes through', () => {
   const res429 = (retryAfter) => ({
     status: 429, ok: false,
@@ -950,11 +950,6 @@ describe('LIN-4378: a rate-limited exchange waits and retries; a forwarded 429 p
     return world;
   }
   const exchange = (w, bootstrap) => exchangeBootstrap({ base: 'http://127.0.0.1:1', bootstrap, fetchImpl: w.fetchImpl, sleep: w.sleep, log: w.log });
-
-  test('the policy constants match simple-dispatcher\'s broker: 2 retries, 60 s cap', () => {
-    assert.equal(EXCHANGE_RETRIES, 2);
-    assert.equal(EXCHANGE_MAX_WAIT_SECONDS, 60);
-  });
 
   test('B1: 429 with Retry-After: 1, then 200 resolves after two fetches; the log names 429 and the wait, never the bootstrap', async () => {
     const bootstrap = freshToken();

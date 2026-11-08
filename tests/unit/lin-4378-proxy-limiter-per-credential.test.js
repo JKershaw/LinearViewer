@@ -29,48 +29,11 @@ import { randomBytes } from 'node:crypto';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
+import { createMockCollection } from '../fixtures/mock-collection.js';
 
 const realNodeEnv = process.env.NODE_ENV;
 const LIMIT = 60;
 const PATH = '/api/proxy/agent/status';
-
-function createMockCollection() {
-  let docs = [];
-  const matches = (d, query) => Object.keys(query).every(k => {
-    if (k === '$or') return query.$or.some(sub => matches(d, sub));
-    const val = query[k];
-    if (val && typeof val === 'object') {
-      if ('$lt' in val && '$ne' in val) {
-        return d[k] !== val.$ne && d[k] !== null && new Date(d[k]) < new Date(val.$lt);
-      }
-      if ('$lt' in val) return d[k] !== null && new Date(d[k]) < new Date(val.$lt);
-      return true;
-    }
-    return d[k] === val;
-  });
-  return {
-    async insertOne(doc) { docs.push({ ...doc }); return { insertedId: doc._id }; },
-    async findOne(query) { return docs.find(d => matches(d, query)) || null; },
-    async updateOne(query, update) {
-      const idx = docs.findIndex(d => matches(d, query));
-      if (idx === -1) return { matchedCount: 0, modifiedCount: 0 };
-      if (update.$set) Object.assign(docs[idx], update.$set);
-      return { matchedCount: 1, modifiedCount: 1 };
-    },
-    async deleteOne(query) {
-      const idx = docs.findIndex(d => matches(d, query));
-      if (idx === -1) return { deletedCount: 0 };
-      docs.splice(idx, 1);
-      return { deletedCount: 1 };
-    },
-    async deleteMany(query) {
-      const before = docs.length;
-      docs = docs.filter(d => !matches(d, query));
-      return { deletedCount: before - docs.length };
-    },
-    find(query = {}) { return { toArray: async () => docs.filter(d => matches(d, query)) }; }
-  };
-}
 
 const proxyTokenStore = new ProxyTokenStore({ collection: createMockCollection() });
 

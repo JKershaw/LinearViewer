@@ -33,7 +33,8 @@ import {
   SESSION_TARGETS
 } from '../../lib/runner-kit/runner.mjs';
 import { prUrlOfFeedback } from '../../lib/dispatch-wake.js';
-import { credentialStore } from '../../lib/runner-kit/broker.mjs';
+import http from 'node:http';
+import { credentialStore, exchangeBootstrap, startBroker, BROKER_HOST } from '../../lib/runner-kit/broker.mjs';
 import { SESSION_TARGETS as HARBOUR_SESSION_TARGETS } from '../../lib/dispatch-targets.js';
 import { HALT_MODES } from '../../lib/workspace-halt.js';
 
@@ -44,7 +45,7 @@ const TABLE = JSON.parse(fs.readFileSync(CONTRACT_PATH, 'utf8'));
 // LIN-4384: the sha256 of contract.json's own bytes. simple-dispatcher pins the same value
 // (FIXTURE_SHA256 beside LV_COMMIT in test/runner-contract.test.js), so an edit here that is not
 // re-copied there would go unnoticed on this side without this tripwire.
-const CONTRACT_SHA256 = '250b6ebf7d0cd38b0cd0524ead48553906062dbabed291ef28f510744ba3be8c';
+const CONTRACT_SHA256 = '602ab014062857bfba3e9aa543088472c3ba5dbc7cb0673da909e67ed727eb40';
 
 const OWNER = 'acct-owner-1111';
 const NOW = Date.parse('2026-10-18T12:00:00.000Z');
@@ -142,6 +143,85 @@ const assistantLine = (message) => JSON.stringify({
 // Is the turn over, in the contract's vocabulary: the kit's watchdog reading of the transcript.
 const kitSentinelOutcome = (row) => (transcriptFinished([assistantLine(row.item.message)]) ? 'finished' : 'not finished');
 
+// LIN-4378: the brokers' 429 policy, in the contract's vocabulary. `item.replies` scripts Harbour's
+// answers to the bootstrap exchange (the last one repeats); the outcome is how the exchange ended,
+// how many times it asked, and how long it waited between asks. simple-dispatcher drives its own
+// broker (`makeTokenProvider`) over the same rows.
+const TOKEN_MINT = '/api/proxy/token';
+function exchangeReply(r) {
+  if (r.error) throw Object.assign(new Error('connect failed'), { code: r.error });
+  const headers = r.retryAfter === undefined ? {} : { 'retry-after': r.retryAfter };
+  const body = r.status === 200 ? JSON.stringify({ token: 'contract-working-token', expiresAt: null }) : '{}';
+  return new Response(body, { status: r.status, headers });
+}
+function scriptedExchange(replies) {
+  const w = { fetches: 0, sleeps: [] };
+  w.fetchImpl = async () => exchangeReply(replies[Math.min(w.fetches++, replies.length - 1)]);
+  w.sleep = async (ms) => { w.sleeps.push(ms); };
+  return w;
+}
+const waitsText = (sleeps) => (sleeps.length ? sleeps.map((ms) => `${ms / 1000}s`).join(', ') : 'none');
+const refusalText = (message) => {
+  const m = /HTTP (\d+)/.exec(message);
+  return m ? `refused HTTP ${m[1]}` : 'refused: no connection';
+};
+
+async function kitExchangeOutcome(row) {
+  const w = scriptedExchange(row.item.replies);
+  let result;
+  try {
+    await exchangeBootstrap({ base: 'http://127.0.0.1:1', bootstrap: 'contract-bootstrap', fetchImpl: w.fetchImpl, sleep: w.sleep });
+    result = 'token';
+  } catch (err) { result = refusalText(err.message); }
+  return `${result}; fetches ${w.fetches}; waits ${waitsText(w.sleeps)}`;
+}
+
+// What reaches the agent through the kit's broker: `item.exchange` scripts the bootstrap exchange,
+// `item.upstream` Harbour's answer to the forwarded request. Driven through the real `startBroker`
+// and its socket; only fetch and sleep are injected.
+function socketGet(socketPath, reqPath) {
+  return new Promise((resolve, reject) => {
+    const req = http.request({ socketPath, method: 'GET', path: reqPath, headers: { Host: BROKER_HOST } }, (res) => {
+      res.resume();
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+const forwardedText = (status, headers, names, calls) =>
+  `${status}; ${names.filter((n) => headers[n] !== undefined).map((n) => `${n} ${headers[n]}`).join(', ')}; upstream calls ${calls}`;
+
+async function kitForwardOutcome(row) {
+  const { exchange, upstream } = row.item;
+  const home = fs.mkdtempSync(path.join(fs.existsSync('/tmp') ? '/tmp' : os.tmpdir(), 'rkc-fw-'));
+  const ex = scriptedExchange(exchange);
+  let calls = 0;
+  const fetchImpl = async (url, init) => {
+    if (String(url).endsWith(TOKEN_MINT)) return ex.fetchImpl(url, init);
+    calls += 1;
+    return new Response('{}', { status: upstream.status, headers: upstream.headers });
+  };
+  let broker;
+  try {
+    try {
+      broker = await startBroker({
+        base: 'http://127.0.0.1:1', urlKey: 'acme', itemId: ITEM_ID, home, bootstrap: 'contract-bootstrap',
+        autoTick: false, fetchImpl, sleep: ex.sleep
+      });
+    } catch (err) {
+      const wait = /Retry-After: ([^)]+)\)/.exec(err.message);
+      return `start fails naming ${refusalText(err.message).replace('refused ', '')}${wait ? ` and Retry-After: ${wait[1]}` : ''}`;
+    }
+    if (!upstream) return 'started';
+    const r = await socketGet(broker.socketPath, '/api/proxy/agent/status');
+    return forwardedText(r.status, r.headers, Object.keys(upstream.headers), calls);
+  } finally {
+    await broker?.stop('contract-done');
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+}
+
 // Which PR did the run open, as Harbour reads it: the message as one feedback entry, read by the
 // wake's PR pick (`prUrlOfFeedback`, whose report lines are `reportLinesOf`'s).
 function harbourFor(row) {
@@ -186,6 +266,10 @@ function kitFor(row) {
       return 'not sent (the runner-kit producer, POST /api/proxy/runner/heartbeat, is a follow-up)';
     case 'sentinel':
       return kitSentinelOutcome(row);
+    case 'exchange':
+      return kitExchangeOutcome(row);
+    case 'forward':
+      return kitForwardOutcome(row);
     default:
       throw new Error(`unknown area ${row.area}`);
   }
@@ -207,7 +291,12 @@ const AREA_SHAPES = {
   store: RUNNER_AREA,
   heartbeat: RUNNER_AREA,
   report: { inputs: [], columns: ['harbour'] },
-  sentinel: { inputs: [], columns: ['kit'] }
+  sentinel: { inputs: [], columns: ['kit'] },
+  // LIN-4378: the brokers' 429 policy. The rows are its one owner: the kit's broker.mjs and
+  // simple-dispatcher's harbour-token-mcp-server.js each keep their own constants (the kit loads
+  // no fixture at runtime) and are pinned against these rows.
+  exchange: { inputs: [], columns: ['kit'] },
+  forward: { inputs: [], columns: ['kit'] }
 };
 const COLUMNS = ['kit', 'harbour'];
 
@@ -260,6 +349,9 @@ describe('contract table shape', () => {
     assert.ok(diffs.some((c) => /decision message/.test(c)));
     // LIN-4384: SD's hook reads a DONE: inside a DECISION block as the turn's end; the kit does not.
     assert.ok(TABLE.rows.some((r) => r.area === 'sentinel' && /only inside a DECISION block/.test(r.case) && r.kit !== r.sd));
+    // LIN-4378: a final exchange 429 reaches whoever asked for the exchange: the runner at the kit's
+    // `start`, the agent's first request in SD.
+    assert.ok(TABLE.rows.some((r) => r.area === 'forward' && /refused 429/.test(r.case) && r.kit !== r.sd));
   });
 
   // LIN-4384: the cases both repos must read the same way, each in both areas.
