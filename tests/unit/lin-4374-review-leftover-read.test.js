@@ -102,7 +102,7 @@ describe('the leftover heading has one spelling (LIN-4374)', () => {
           const path = `${rel}/${ent.name}`;
           if (ent.isDirectory()) walk(path);
           else if (ent.name.endsWith('.js') && path !== 'lib/dispatch-fields.js'
-            && readFileSync(join(ROOT, path), 'utf8').includes("'" + LEFTOVERS_HEADING + "'")) offenders.push(path);
+            && readFileSync(join(ROOT, path), 'utf8').includes(LEFTOVERS_HEADING)) offenders.push(path);
         }
       };
       walk(dir);
