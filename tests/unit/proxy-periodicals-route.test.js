@@ -168,11 +168,25 @@ describe('GET /api/proxy/periodicals', () => {
     assert.ok(item, 'template result present');
     assert.deepEqual(
       Object.keys(item).sort(),
-      ['cadence', 'daysSince', 'id', 'lastDispatchedAt', 'mode', 'repos', 'state', 'title'].sort()
+      ['cadence', 'daysSince', 'id', 'lastDispatchedAt', 'mode', 'repos', 'scope', 'state', 'title'].sort()
     );
     assert.equal(item.id, TEMPLATE.id);
     assert.equal('periodicalId' in item, false);
     assert.equal('runs' in item, false);
+  });
+
+  // LIN-4382: `scope` is published so the precedence policy's repo-only rules
+  // (a `never` lane counts as overdue; the scoped-run tail) can be applied from
+  // this response alone. Every template carries the registry's own value.
+  test('each template publishes the registry\'s `scope` (repo | workspace)', async () => {
+    const { app } = buildApp({});
+    const { body } = await get(app);
+    for (const t of TEMPLATES) {
+      const item = body.periodicals.find(p => p.id === t.id);
+      assert.ok(item, `${t.id} present`);
+      assert.equal(item.scope, t.scope, `${t.id}: scope`);
+    }
+    assert.ok(body.periodicals.some(p => p.scope === 'workspace'), 'the workspace-scoped template is told apart');
   });
 
   // LIN-1932 B5, part 2 (§7): a `repos[]` lane entry's own key set. Without

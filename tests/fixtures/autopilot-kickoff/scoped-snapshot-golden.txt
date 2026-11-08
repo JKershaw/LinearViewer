@@ -7,10 +7,11 @@ Pause for the human at a review that raises a direction question, or before anyt
 lands.
 
 **Goal from the human:** run on autopilot until **LIN-42** (Fix the thing)
-is done. This run is scoped to that one task — the precedence policy is moot. Orient by reading the
-task, then trigger `POST /recommend-and-dispatch` with `{ issueIdentifier: "LIN-42", sessionId }`;
-loop until it's complete (verified) or you hit a point that wants the human, then stop.
-Do not pull other tasks off the stack.
+is done. This run is scoped to that one task. Orient by reading the task, then trigger
+`POST /recommend-and-dispatch` with `{ issueIdentifier: "LIN-42", sessionId }`; loop until
+it's complete (verified) or you hit a point that wants the human.
+Do not pull other tasks off the stack. Once it is complete, take the policy's tail (one Periodical,
+then stop); at a point that wants the human, just stop.
 
 **Proxy:** base https://example.com/api/proxy · Bearer token supplied alongside this prompt (the +proxy block) · full
 verb catalog at `GET https://example.com/api/proxy/instructions`.

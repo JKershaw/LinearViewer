@@ -168,24 +168,20 @@ contains at least:
   or nothing.
 
 The autopilot's **first act is to orient**: apply a fixed precedence to the snapshot and
-announce what it will work on. A sensible default precedence:
+announce what it will work on. The order itself is written once, as `AUTOPILOT_PRECEDENCE`
+in `lib/prompts/autopilot-precedence.js` (LIN-4382), and the kickoff renders it in its
+Orient step for every run; read it there rather than here. It ranks a human's goal first,
+keeps the Periodicals' weekly floor ahead of the stack, puts a Periodical made due by landed
+work *under* the stack (taken only when nothing on it can move), and gives a run scoped to
+one task a tail: once that task is merged and verified, at most one Periodical, then stop.
 
-1. an explicit human instruction, else
-2. a periodical past its cadence threshold (maintenance debt), else
-3. the top of the stack (north-star-aligned first).
-
-**Shipped note (LIN-1827/LIN-1829, §8.C):** periodical cadence state ships as a **live
-pointer**, not text baked into the snapshot at generation time — the kickoff's general-mode
-first act tells Autopilot to fetch `GET /api/proxy/periodicals` itself, ahead of the stack
-digest, rather than embedding a computed cadence line in the prompt body. The three-level
-precedence above is exactly what shipped, stated explicitly in that same first-act text and
-declared to supersede the guide's own (unconditional, two-level) Orient-step wording for a
-general run. **LIN-1932** split that state per repo — each template's response entry also
-carries a `repos[]` breakdown (one lane per observed repo, plus a default lane), so a
-multi-repo workspace no longer has one repo's run silently satisfy the cadence for every
-other repo. The top-level state stays an aggregate across a template's lanes, so "a
-periodical reading `due`" above means any lane reading `due` once a template has more than
-one.
+**Shipped note (LIN-1827/LIN-1829, §8.C; LIN-1932; LIN-4381; LIN-4382):** periodical cadence
+state ships as a **live pointer**, not text baked into the snapshot at generation time — the
+kickoff tells Autopilot to fetch `GET /api/proxy/periodicals` itself rather than embedding a
+computed cadence line in the prompt body. LIN-1932 split that state per repo (`repos[]`, one
+lane per observed repo plus a default lane), and LIN-4381 added the `landed` lane state.
+Until LIN-4382 the kickoff carried two orders, the Orient step's and a general first act
+that superseded it; now there is one.
 
 This sits right on invariant 1: "what's worth doing next" is normative-adjacent, so the
 precedence must be a **human-authored policy the autopilot executes**, not a judgment it
@@ -356,18 +352,17 @@ A specific focus is just the goal field, or a hand-written prompt followed by th
   history, git log, or a periodical-tagged Linear search — those were the pre-implementation
   guess; the actual source is the dispatch queue/history rows Harbour already persists for every
   dispatch. That fold (lanes included) is published two ways: a consumer-proxy reader via
-  `GET /api/proxy/periodicals`, and a pointer in the kickoff's general-mode first act
-  (`lib/prompts/autopilot-kickoff.js`) that Autopilot fetches live as its own first orient
-  action, ahead of the stack digest — full three-level precedence (goal → overdue periodical →
-  top of stack), not the two-level goal-or-stack order the kickoff shipped with initially. The
+  `GET /api/proxy/periodicals`, and a pointer in the kickoff (`lib/prompts/autopilot-kickoff.js`)
+  that Autopilot fetches live as its own first orient action, ahead of the stack digest, and
+  reads under `AUTOPILOT_PRECEDENCE` (LIN-4382). The
   **ledger stays separate from the trigger**: this surfaces evidence only, never a dispatch
   decision — turning it into one is **LIN-1629**'s still-unbuilt job.
 
 ### What is just guide text (no build)
 
 - The **watchable external recap** (one high-level line per loop boundary).
-- The **precedence policy** (human instruction → overdue periodical → top of stack); the
-  goal field is the override branch.
+- The **precedence policy**, written once as `AUTOPILOT_PRECEDENCE`
+  (`lib/prompts/autopilot-precedence.js`); the goal field is the override branch.
 - The **evidence discipline** — instruct the orchestrator to confirm a dispatched worker's
   `complete` against a real check / PR before accepting it.
 

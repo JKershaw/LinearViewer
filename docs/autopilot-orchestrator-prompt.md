@@ -66,6 +66,10 @@ one-line-per-task view of the whole stack without pulling every task's full body
 into the one you pick with `GET /brief/{id}`). Apply the **precedence policy** — do not improvise
 "what's worth doing"; that's normative:
 
+> *Historical (LIN-4382): the order below is this Stage B draft's and is kept as written. The
+> live order is `AUTOPILOT_PRECEDENCE` in `lib/prompts/autopilot-precedence.js`, which the
+> kickoff renders; it adds the rank under the stack and the scoped-run tail.*
+
 1. an explicit human instruction/goal, else
 2. a periodical past its cadence threshold (maintenance debt), else
 3. the top of the stack (north-star-aligned first).
