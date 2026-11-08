@@ -1219,6 +1219,39 @@ describe('LIN-4376 — an off-spine leftover row does not enter the R0 walk', ()
   });
 });
 
+// ─── LIN-4376: Tier B reads a report line by the wake's rule ───────────────────
+//
+// One rule for "what the session reported": `reportLinesOf` (lib/dispatch-terminal.js),
+// which the wake's PR pick also reads. A `DONE:` line that ends a multi-line message
+// counts (the closing contract puts it last), so does a `[done]` line, and the
+// match is case-sensitive like the contract everywhere else.
+
+describe('LIN-4376 — Tier B reads the shared report-line rule', () => {
+  const ISO = (m) => `2026-08-01T00:${String(m).padStart(2, '0')}:00.000Z`;
+  const tierB = (message) => {
+    const rows = [row('pr', 'plan-review', 'done', ISO(0), ISO(5), feedbackDone(message, ISO(5)))];
+    const result = computeIssueRoundTrips(issue('1', { rows }), { asOf: ASOF });
+    return result.R0 ? { verdict: result.R0.verdict, tier: result.R0.tier } : null;
+  };
+
+  test('a DONE: line that ends a multi-line message is the session\'s report', () => {
+    assert.deepEqual(tierB('Read the plan against the code.\nDONE: Verdict: Approve.'), { verdict: 'approve', tier: 'b' });
+  });
+
+  test('a [done] line is a report line too', () => {
+    assert.deepEqual(tierB('[done] Verdict: Request Changes.'), { verdict: 'request changes', tier: 'b' });
+  });
+
+  test('a message with no report line gives Tier B nothing, and lowercase done: is not one', () => {
+    assert.notEqual(tierB('Verdict: Approve.')?.tier, 'b');
+    assert.notEqual(tierB('done: Verdict: Approve.')?.tier, 'b');
+  });
+
+  test('a DONE: line at the start still counts, as before', () => {
+    assert.deepEqual(tierB('DONE: Verdict: Approve.'), { verdict: 'approve', tier: 'b' });
+  });
+});
+
 // =============================================================================
 // LIN-1871 — a third round is counted, not just the first
 // =============================================================================

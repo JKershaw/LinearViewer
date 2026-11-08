@@ -10,7 +10,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { findTerminalFeedback, deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, isWakeEvent, findWakeEvent, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback, selectLineageMembers, isLiveParkedWaiter, derivePendingPark } from '../../lib/dispatch-terminal.js';
+import { findTerminalFeedback, deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, isWakeEvent, findWakeEvent, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback, selectLineageMembers, isLiveParkedWaiter, derivePendingPark, reportLinesOf } from '../../lib/dispatch-terminal.js';
 
 describe('deriveTerminalStatus', () => {
   test('null when feedback is missing or not an array', () => {
@@ -802,5 +802,26 @@ describe('selectLineageMembers (LIN-4137)', () => {
     const members = selectLineageMembers(own, siblings, ANCHOR, SINCE);
     members[0].entries.push(entry('pushed', T));
     assert.equal(JSON.stringify({ own, siblings }), snapshot);
+  });
+});
+
+// LIN-4376: the one rule for what a session reported, read by the wake's PR pick and
+// the plan-review round-trips' Tier B.
+describe('reportLinesOf (LIN-4376)', () => {
+  test('returns the text after every DONE: or [done] line, in order, anywhere in the message', () => {
+    assert.deepStrictEqual(
+      reportLinesOf('Working.\n  DONE: first https://github.com/o/r/pull/1\nmore\n[done] second'),
+      [' first https://github.com/o/r/pull/1', ' second']
+    );
+  });
+
+  test('is case-sensitive and line-anchored', () => {
+    assert.deepStrictEqual(reportLinesOf('done: lower\n[DONE] upper\nsaid DONE: inline'), []);
+  });
+
+  test('a non-string or a message with no report line gives none', () => {
+    assert.deepStrictEqual(reportLinesOf(undefined), []);
+    assert.deepStrictEqual(reportLinesOf(null), []);
+    assert.deepStrictEqual(reportLinesOf('[failed] nope'), []);
   });
 });
