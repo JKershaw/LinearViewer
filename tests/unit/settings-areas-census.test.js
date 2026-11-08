@@ -138,7 +138,7 @@ describe('sidebar states', () => {
     assert.equal(getArea('running').state(ctx).text, 'Ready · ask');
     // A halt still outranks the policy.
     assert.equal(getArea('running').state({ ...ctx, sizePolicy: 'err-larger' }).text, 'Ready · larger');
-    assert.equal(getArea('running').state({ ...ctx, hasRunner: false, sizePolicy: 'err-larger' }).text, 'No run · larger');
+    assert.equal(getArea('running').state({ ...ctx, hasRunner: false, sizePolicy: 'err-larger' }).text, 'No runner·larger');
     assert.equal(getArea('running').state({ ...ctx, sizePolicy: 'ask' }).text, 'Ready · ask');
     assert.equal(getArea('running').state({ ...ctx, haltMode: 'pause', sizePolicy: 'err-larger' }).text, 'Paused');
     assert.equal(getArea('models').state(ctx).text, 'Sonnet 5.5');

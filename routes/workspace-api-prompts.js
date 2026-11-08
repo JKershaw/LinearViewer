@@ -21,6 +21,7 @@ import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPIL
 import { validateRunField } from '../lib/dispatch-fields.js';
 import { isValidIssueId, resolveIssueBinding } from '../lib/workspace.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
+import { loadSizePolicy } from '../lib/workspace-preferences.js';
 import { testMockData } from '../lib/sample-data/mock-data.js';
 import { publicOrigin } from '../lib/public-origin.js';
 import { buildMockPromptInput } from '../lib/workspace-api-mocks.js';
@@ -76,8 +77,9 @@ const autopilotTitle = (stepper) => (stepper ? 'Autopilot (stepped)' : 'Autopilo
  * @param {Function} deps.workspaceFromUrl - Middleware resolving req.workspace from :urlKey
  * @param {Object} deps.promptTraceStore - Debug/eval trace store (optional; 503-free empty read when absent)
  * @param {Object} deps.customPromptsStore - Custom prompt template CRUD store
+ * @param {Object} [deps.workspacePreferencesStore] - Read for the standing size policy (LIN-4368)
  */
-export function createPromptsRoutes({ workspaceFromUrl, promptTraceStore, customPromptsStore }) {
+export function createPromptsRoutes({ workspaceFromUrl, promptTraceStore, customPromptsStore, workspacePreferencesStore }) {
   const router = Router();
 
   /**
@@ -241,7 +243,10 @@ export function createPromptsRoutes({ workspaceFromUrl, promptTraceStore, custom
         identifier = issue.identifier;
         // Forward `attachments` (LIN-776) so the in-app /prompt endpoint surfaces the
         // worker-facing Attachments section, matching the proxy /prompt route.
-        context = { parent, siblings, project, children, comments, attachments };
+        // LIN-4368: the standing size policy, from the one loader, so a scoping prompt
+        // started from the UI ("run a step now", the prompt panel) carries it too.
+        const sizePolicy = isCustomPrompt ? undefined : await loadSizePolicy(workspacePreferencesStore, workspace.urlKey);
+        context = { parent, siblings, project, children, comments, attachments, sizePolicy };
       }
 
       let result;

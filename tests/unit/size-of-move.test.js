@@ -150,6 +150,12 @@ describe('the check: what it refuses', () => {
     assert.deepEqual(r, { ok: false, code: SIZE_RECORD_CODES.policyCut });
   });
 
+  test('the standing policy deciding "wrong work" in a second section appended to a valid live record', () => {
+    const live = withRecord(PLAIN);
+    const next = `${live}\n\n${SIZE_OF_MOVE_HEADING}\n\n**Size:** ${WRONG_WORK}\n**Decided by:** ${DECIDED_BY.policy}`;
+    assert.deepEqual(checkSizeRecord(live, next), { ok: false, code: SIZE_RECORD_CODES.policyCut });
+  });
+
   test('a write that drops an existing section', () => {
     assert.deepEqual(checkSizeRecord(withRecord(PLAIN), `${SEALED}\n\nA short stub: implemented in PR 1.`), { ok: false, code: SIZE_RECORD_CODES.dropped });
   });

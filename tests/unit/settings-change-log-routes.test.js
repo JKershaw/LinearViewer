@@ -442,7 +442,7 @@ describe('the standing size policy (Settings → Running)', () => {
     assert.deepEqual([entry.setting, entry.from, entry.to, entry.reason], ['sizePolicy', 'ask', 'err-larger', 'John\'s standing answer']);
 
     const index = await (await fetch(`${base}/workspace/alpha/settings`)).text();
-    assert.match(index, /data-testid="settings-state-running"[^>]*>\s*No run · larger/);
+    assert.match(index, /data-testid="settings-state-running"[^>]*>\s*No runner·larger/);
     const running = await (await fetch(`${base}/workspace/alpha/settings/running`)).text();
     assert.match(running, /data-testid="settings-size-policy-state"[^>]*>\s*Err larger/);
     assert.match(running, /data-testid="settings-size-policy-set"/);

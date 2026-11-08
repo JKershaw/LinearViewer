@@ -8,7 +8,9 @@
  *     (composeRoutedRecommendation). Both callers of prepareRecommendationInput pass the store;
  *   - the pinned-kind entrances: recommend-and-dispatch with `kind` (lib/dispatch-entrance.js,
  *     the override arm), GET /api/proxy/prompt/:id/:kind and GET /api/proxy/recommend/:id?kind=
- *     (routes/proxy-compute.js).
+ *     (routes/proxy-compute.js);
+ *   - the in-app prompt route the UI's "run a step now" and the prompt panel use:
+ *     GET /workspace/:urlKey/api/prompt/:issueId/scoping (routes/workspace-api-prompts.js).
  * Each shows the policy when it is set and "no standing policy" when it is not. The routing
  * prompt itself does not carry the policy.
  */
@@ -24,6 +26,8 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 import { prepareRecommendationInput } from '../../lib/recommendation-input.js';
 import { composeRoutedRecommendation, buildSelectorArgs } from '../../lib/openrouter.js';
 import { buildRouterPrompt } from '../../lib/stage-router.js';
+import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
+import { registerProvider } from '../../lib/providers/registry.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SET = /\*\*Standing size policy:\*\* err larger: take the larger move when the look shows it pays, and when in doubt/;
@@ -135,4 +139,46 @@ describe('the pinned-kind entrances', () => {
       assert.match(await render({}), UNSET);
     });
   }
+});
+
+describe('the in-app prompt route (the UI\'s "run a step now" and the prompt panel)', () => {
+  const issue = { id: 'size-ui-1', identifier: 'UI-1', title: 'A ticket', description: 'Do the thing.', state: { name: 'Todo', type: 'unstarted' }, labels: [] };
+  const providerName = 'fake-size-policy-ui';
+  registerProvider({
+    name: providerName,
+    ui: {},
+    supports: () => true,
+    fetchIssueContext: async (_scope, issueId) => {
+      if (issueId !== issue.id) throw new Error(`Issue not found: ${issueId}`);
+      return { issue, parent: null, siblings: [], project: null, children: [], comments: [], attachments: [] };
+    }
+  });
+  // A real (non-test-token) workspace, so the provider branch runs, not the fixtures.
+  const workspace = { urlKey: 'acme', provider: providerName, accessToken: 'real-token', bindings: [{ provider: providerName, scope: 'acme', credentials: { token: 'real-token' } }] };
+
+  async function renderScoping(prefs) {
+    const app = express();
+    app.use(createWorkspaceApiRoutes({
+      workspaceFromUrl: (req, _res, next) => { req.workspace = workspace; req.session = { features: {} }; next(); },
+      freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
+      workspacePreferencesStore: prefsStore(prefs),
+      customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {}, reportHistoryStore: {},
+      dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {}, proxyTokenStore: {}
+    }));
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise((resolve) => server.once('listening', resolve));
+    try {
+      const res = await fetch(`http://127.0.0.1:${server.address().port}/workspace/acme/api/prompt/${issue.id}/scoping`);
+      const body = await res.json();
+      assert.equal(res.status, 200, JSON.stringify(body));
+      return body.prompt;
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+  }
+
+  test('GET /workspace/:k/api/prompt/:id/scoping: the policy when set, "no standing policy" when not', async () => {
+    assert.match(await renderScoping(ERR_LARGER), SET);
+    assert.match(await renderScoping({}), UNSET);
+  });
 });
