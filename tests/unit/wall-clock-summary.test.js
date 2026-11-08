@@ -4,11 +4,12 @@ import {
   bucketOf, decomposeEffort, summarizeSteps, groupBySession, median,
   BUCKET_OF_KIND,
 } from '../../lib/wall-clock-summary.js';
-import { PROMPT_TEMPLATES } from '../../lib/prompt-template-defs.js';
+import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
+import { ROW_ONLY_KINDS } from '../../lib/dispatch-fields.js';
 
-// LIN-1653: the dispatch meta-kinds that BUCKET_OF_KIND maps but no prompt
-// template generates. Everything else in the map must be a PROMPT_TEMPLATES key.
-const DISPATCH_META_BUCKET_KINDS = ['autopilot', 'wake', 'custom', 'periodical'];
+// LIN-4376: every kind a run row can carry: the dispatch vocabulary plus the
+// row-only kinds, read from their one declaration rather than written out here.
+const ALL_ROW_KINDS = [...new Set([...DISPATCH_KINDS, ...ROW_ONLY_KINDS])];
 
 // A realistic heartbeat log (mirrors the live proxy shape verified for LIN-987):
 // onboarding (24s, 0 tools) → active (32s, 7 tools) → waiting (2m, 0 tools — a
@@ -186,17 +187,24 @@ test('median handles empty and even-length arrays', () => {
   assert.equal(median([1, 2, 3, 4]), 2.5);
 });
 
-// ─── LIN-1653: the bucket map covers every prompt template, and a test keeps it so ───
+// ─── LIN-1653 / LIN-4376: the bucket map covers every kind a row can carry, and a test keeps it so ───
 
-test('every PROMPT_TEMPLATES key has a BUCKET_OF_KIND entry (no template falls through to orchestration)', () => {
-  const missing = Object.keys(PROMPT_TEMPLATES).filter((k) => !Object.hasOwn(BUCKET_OF_KIND, k));
-  assert.deepEqual(missing, [], `template kinds missing from BUCKET_OF_KIND: ${missing.join(', ')}`);
+test('every DISPATCH_KINDS and ROW_ONLY_KINDS member has its own BUCKET_OF_KIND entry (none falls through to orchestration)', () => {
+  const missing = ALL_ROW_KINDS.filter((k) => !Object.hasOwn(BUCKET_OF_KIND, k));
+  assert.deepEqual(missing, [], `kinds missing from BUCKET_OF_KIND: ${missing.join(', ')}`);
 });
 
-test('every BUCKET_OF_KIND entry is either a PROMPT_TEMPLATES key or a known dispatch meta-kind (no stale entries)', () => {
-  const stale = Object.keys(BUCKET_OF_KIND)
-    .filter((k) => !Object.hasOwn(PROMPT_TEMPLATES, k) && !DISPATCH_META_BUCKET_KINDS.includes(k));
-  assert.deepEqual(stale, [], `BUCKET_OF_KIND keys that match no template or meta-kind: ${stale.join(', ')}`);
+test('every BUCKET_OF_KIND entry is a DISPATCH_KINDS or ROW_ONLY_KINDS member (no stale entries)', () => {
+  const stale = Object.keys(BUCKET_OF_KIND).filter((k) => !ALL_ROW_KINDS.includes(k));
+  assert.deepEqual(stale, [], `BUCKET_OF_KIND keys that match no kind: ${stale.join(', ')}`);
+});
+
+test('LIN-4376: a leftover step is after-the-diff time, not orchestration', () => {
+  assert.equal(bucketOf('leftover'), 'after');
+});
+
+test('LIN-4376: defer keeps the orchestration bucket it fell back to', () => {
+  assert.equal(bucketOf('defer'), 'orchestration');
 });
 
 test('bug lands in the before-the-diff bucket, not orchestration (its investigation precedes the fix)', () => {

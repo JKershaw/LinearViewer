@@ -33,6 +33,7 @@ import {
 } from '../../lib/account-erasure.js';
 import { REFRESH_WORST_CASE_MS } from '../../lib/workspace-token-cache.js';
 import { INDEX_SPECS } from '../../lib/db-indexes.js';
+import { areasMatching } from './helpers/area-registry.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { sessionWorkspaceRefs } from '../../lib/urlkey-holders.js';
 import { URLKEY_SOURCES, ACTOR_SOURCES, UNENUMERATED_SOURCES } from '../../scripts/dry-run-urlkey-duplicates.mjs';
@@ -1066,14 +1067,12 @@ describe('runbook (LIN-3423)', () => {
   });
 
   test('lib/account-erasure.js lands in the Reports & operator tools code-shape area (an operator data tool, LIN-3708; own area LIN-3730), ahead of Auth and Other features', () => {
-    const areas = JSON.parse(readFileSync(join(ROOT, 'scripts/code-shape/areas.json'), 'utf8'));
-    const list = areas.areas || areas;
-    const hits = list.filter((a) => (a.match || []).some((m) => new RegExp(m).test('lib/account-erasure.js'))).map((a) => a.name);
+    const hits = areasMatching('lib/account-erasure.js').map((a) => a.name);
     assert.strictEqual(hits[0], 'Reports & operator tools');
     // First match wins: the Auth pattern (account-[^/]*) also matches this file, so Reports & operator tools must stay ahead of it.
     assert.ok(hits.includes('Auth, accounts & workspaces'));
     // lib/public-origin.js stays in Auth: Runs imports it, but Auth does not import Runs because of it.
-    const originHits = list.filter((a) => (a.match || []).some((m) => new RegExp(m).test('lib/public-origin.js'))).map((a) => a.name);
+    const originHits = areasMatching('lib/public-origin.js').map((a) => a.name);
     assert.strictEqual(originHits[0], 'Auth, accounts & workspaces');
   });
 });

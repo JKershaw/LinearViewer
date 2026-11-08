@@ -893,13 +893,16 @@ describe('C2 (iv) — the wake routes through the helper', () => {
   // lin-3134-wake-declared.test.js, which drives createDispatchRoutes' feedback route
   // and fails when the provisioner argument is removed from addFeedback's call (shown
   // in a scratch copy, PR evidence). routes/proxy-runner.js (not E) is still checked.
-  test('wake-credential calls the helper; addFeedback passes the record; both builders remain', () => {
+  // LIN-4373: the wake's delivery sequence moved from addFeedback into `_deliverWake`, which
+  // addFeedback and the held-wake release both call, so the record is passed there.
+  test('wake-credential calls the helper; _deliverWake (addFeedback\'s delivery) passes the record; both builders remain', () => {
     const src = (file) => PRODUCTION.find(f => f.file === file).src;
     assert.ok(maskSource(src('lib/wake-credential.js')).includes('provisionResumeCredential('), 'wake-credential mints through the helper');
     const store = maskSource(src('lib/dispatch-store.js'));
-    const start = store.indexOf('async addFeedback(');
-    const body = store.slice(start, matchClose(store, store.indexOf('{', store.indexOf(')', start))) + 1);
-    assert.match(body, /provisionWakeCredential\([^)]*,\s*grantDeclaration\)/, 'addFeedback passes the record to the provider');
+    const start = store.indexOf('async _deliverWake(');
+    const body = store.slice(start, matchClose(store, store.indexOf('{', store.indexOf(') {', start))) + 1);
+    assert.match(body, /provisionWakeCredential\([^)]*,\s*grantDeclaration\)/, '_deliverWake passes the record to the provider');
+    assert.match(maskSource(src('lib/dispatch-store.js')), /this\._deliverWake\(urlKey, doc, updated, plan, provisionWakeCredential\)/, 'addFeedback hands its provisioner to _deliverWake');
     for (const file of ['routes/proxy-runner.js']) {
       assert.ok(maskSource(src(file)).includes('buildWakeCredentialProvisioner('), `${file} still builds the wake provisioner`);
     }
@@ -1103,7 +1106,7 @@ const ADD_ITEM_WRITERS = {
   'lib/dispatch-factory.js | createDispatchItem': 1,   // the factory chokepoint (LIN-1139)
   'lib/dispatch-store.js | expandCascadeAborts': 1,    // abort items: no followUpTo, no credential
   'lib/dispatch-store.js | _mintWake': 1,              // the wake (Class F eleventh member)
-  'lib/dispatch-store.js | addFeedback': 1             // a [pending] wake's direct enqueue (no witness CAS)
+  'lib/dispatch-store.js | _deliverWake': 1            // a [pending] wake's direct enqueue (no witness CAS); moved out of addFeedback by LIN-4373
 };
 
 function scanAddItemWriters(files) {

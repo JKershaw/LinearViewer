@@ -81,3 +81,21 @@ test('ownChurnByPattern: -G keeps only commits whose changed lines match; --sinc
     assert.equal(ownChurnByPattern(repo.dir, head, date, 90, ['lib/a.js'], 'next[[:space:]]+steps'), 0);
   } finally { repo.cleanup(); }
 });
+
+// LIN-4376: one registry path and one first-match lookup for the kit.
+test('REGISTRY_PATH is the one spelling of the registry path, and DEFAULT_AREAS resolves it', async () => {
+  const lib = await import('./code-shape-lib.mjs');
+  assert.equal(lib.REGISTRY_PATH, 'docs/areas/areas.json');
+  assert.ok(lib.DEFAULT_AREAS.endsWith(`/${lib.REGISTRY_PATH}`), lib.DEFAULT_AREAS);
+  const helper = await import('../../tests/unit/helpers/area-registry.js');
+  assert.equal(helper.REGISTRY_PATH, lib.REGISTRY_PATH);
+});
+
+test('claimedBy is null for a file no area claims; areaOf falls back to its top-level directory', async () => {
+  const { claimedBy, areaOf, compileGuide } = await import('./code-shape-lib.mjs');
+  const guide = compileGuide({ areas: [{ name: 'Lib', match: ['^lib/'] }, { name: 'Also lib', match: ['^lib/x'] }] });
+  assert.equal(claimedBy(guide, 'lib/x.js'), 'Lib', 'first match wins');
+  assert.equal(claimedBy(guide, 'tests/a.js'), null);
+  assert.equal(areaOf(guide, 'tests/a.js'), 'tests');
+  assert.equal(areaOf(null, 'docs/a.md'), 'docs');
+});

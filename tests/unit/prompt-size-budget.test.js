@@ -36,6 +36,8 @@
  *   - Stage intent      : lib/prompts/stage-intent.js, source — every stage's Scope
  *                         and Authority lines (was lib/prompts/brief-writer.js)
  *   - Served runner     : docs/runner-prompt.md, source + buildRunnerKickoff() rendered
+ *   - Leftover step     : leftoverPrompt() rendered (lib/dispatch-leftover.js, LIN-4373), the
+ *                         one question a resumed builder is asked at its build's [done]
  *
  * The router's byte snapshots (stage-router-prompt-snapshots.test.js) and the
  * `meta-prompt.baseline.txt` guard in rulings-resolution-contract-drift.test.js pin
@@ -59,6 +61,7 @@ import { buildSelectorArgs } from '../../lib/openrouter.js';
 import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
 import { buildAgentOnboarding, renderLandingAgentPrompt, GUIDE_PATH } from '../../lib/prompts/agent-onboarding.js';
 import { signInDoors } from '../../lib/components/landing-hero.js';
+import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
 
 // ─── Ceilings, measured at the freeze (LIN-3203) ─────────────────────────────
 // Each is the surface's UTF-8 byte count on the freeze branch. A ceiling is a
@@ -69,9 +72,9 @@ import { signInDoors } from '../../lib/components/landing-hero.js';
 /** Templates, source bytes. Same files `steady-base-growth.mjs` GROUPS as
  * "worker templates". */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 109636, // LIN-4369 (replay arm 2): +726, scoping defines when a Survey finding binds and keeps its size record short and not a plan
+  'lib/prompt-template-defs.js': 110530, // LIN-4369 merged with main at LIN-4376: +2042 on main's 108488, arm 1's size record (+1316) and arm 2's wording (+726), both measured unchanged
   'lib/prompt-templates.js': 19593, // LIN-4251: the `stageWrites(kind)` lookup every entrance uses (code, not prompt text)
-  'lib/prompt-formatters.js': 45994, // LIN-4248: the two Survey kinds' empty GROUNDING_BY_KIND entries, so the forecasts get no re-ground or implement notes
+  'lib/prompt-formatters.js': 46933, // LIN-4371: +939, `formatAreaNotesPointer` and the seven stages' own grounding lists, so WORK and GROUNDING_NOTES stay byte-identical
   'lib/prompt-contract.js': 3875, // LIN-4362: the `## As asked` spellings interpolate AS_ASKED_HEADING (code, not prompt text)
 };
 
@@ -80,20 +83,20 @@ export const TEMPLATES_SOURCE_CEILINGS = {
  * Close-out's bug-label line renders only for a bug-labelled task, so not here. */
 export const TEMPLATES_RENDERED_CEILINGS = {
   blocked: 3529, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
-  bug: 4744, // LIN-3299: at 4744 since Scope and Authority on every path
-  plan: 10042, // LIN-4367: -39, its opening says only where its cuts go; the rule is CUT's
+  bug: 5052, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
+  plan: 10350, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
   'look-into': 1762, // LIN-3299: at 1762 since Scope and Authority on every path
   triage: 2429, // LIN-3299: at 2429 since Scope and Authority on every path
   breakdown: 5310, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
-  research: 11718, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
+  research: 12026, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
   scoping: 4358, // LIN-4369 (replay arm 2): +617, when a finding binds, and the record is not a plan (which size is judgement; the guard holds only code-shaped how)
-  design: 2847, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
-  spike: 2866, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
+  design: 3155, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
+  spike: 3174, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
   context: 2021, // LIN-3300: at 2021 since the stage rules only the meta-prompt carried moved into their templates
   'plan-review': 7601, // LIN-4353: the verdict quotes the ask and says how the plan meets it; only the person agrees to a narrowing (the reviewer's judgement)
-  implementation: 8083, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
-  review: 15043, // LIN-4345: the verdict accounts for each sentence of the `## As asked` block in order (the reviewer's judgement)
-  'close-out': 11694, // LIN-4345: the summary cites review's account of what was asked
+  implementation: 8391, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
+  review: 16052, // LIN-4376: +186, the class check renders the shared LEFTOVER_RULE (routes and one home) verbatim, so the three readers of a leftover say it the same way; which home an edge belongs in is the reviewer's judgement no code sees
+  'close-out': 12140, // LIN-4376: +178, Follow-up Triage renders the shared LEFTOVER_RULE (routes and one home) verbatim in place of its own one-home sentence; which item is which is judgement no code sees
   'retrospective-audit': 4619, // LIN-3279: FOLLOW_UP_SHAPE rendered
   retro: 4265, // LIN-3299: at 4265 since Scope and Authority on every path
   'survey-task': 1204, // LIN-4248: new at 1204; the hand-tuned task-view Survey wording, verbatim but for the {BASE} sentence and the Goal/Process frame
@@ -128,13 +131,15 @@ export const AGENT_ONBOARDING_SOURCE_CEILING = 4669; // LIN-4085: new at 4207, r
 export const AGENT_ONBOARDING_RENDERED_CEILING = 3691; // LIN-4085: new at 3207, raised to 3691 (+484) for the same walk fixes; the all-doors, no-free-tier rendering is the largest
 /** Landing agent prompt, rendered bytes at BASE_URL (renderLandingAgentPrompt). LIN-4085: new. Copied by a person into their own agent, so it is wording the agent reads, not code. */
 export const LANDING_AGENT_PROMPT_CEILING = 584; // LIN-4085: new at 584 (the copied prompt under the sign-in buttons)
+/** The leftover step's prompt, rendered bytes at the fixture ticket and PR below (leftoverPrompt, lib/dispatch-leftover.js). */
+export const LEFTOVER_PROMPT_RENDERED_CEILING = 1352; // LIN-4376: +157, where each answer goes is the shared LEFTOVER_RULE, rendered verbatim with its one-home line. What counts as a leftover, and whether it is fix-sized, is the builder's judgement no code sees
 
 /**
  * The total: the sum of every ceiling above. A PR that raises a ceiling raises
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 349170; // LIN-4369 (replay arm 2): +1321 (347849 -> 349170), the exact sum of the ceilings above
+export const FROZEN_TOTAL_BYTES = 355658; // LIN-4369 merged with main at LIN-4376: +3657 (352001 -> 355658), defs +2042, scoping +1637, routing prompt -22
 
 const BASE_URL = 'https://harbour.example';
 
@@ -264,6 +269,13 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
       `${LANDING_AGENT_PROMPT_CEILING}-byte ceiling. ${OVER_CEILING_FIX}`);
   });
 
+  test('leftover step prompt rendered bytes', () => {
+    const actual = Buffer.byteLength(leftoverPrompt({ issueIdentifier: 'LIN-0000', prUrl: 'https://github.com/example/repo/pull/1' }));
+    assert.ok(actual <= LEFTOVER_PROMPT_RENDERED_CEILING,
+      `The leftover prompt renders to ${actual} bytes, ${actual - LEFTOVER_PROMPT_RENDERED_CEILING} over its ` +
+      `${LEFTOVER_PROMPT_RENDERED_CEILING}-byte ceiling. ${OVER_CEILING_FIX}`);
+  });
+
   test('the rendered budget covers exactly the live PROMPT_TEMPLATES key set', () => {
     // A new template without a budget (or a stale budget for a removed one) is a
     // failure: adding a template means giving it a ceiling with its reason beside it.
@@ -287,6 +299,7 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
       AGENT_ONBOARDING_SOURCE_CEILING,
       AGENT_ONBOARDING_RENDERED_CEILING,
       LANDING_AGENT_PROMPT_CEILING,
+      LEFTOVER_PROMPT_RENDERED_CEILING,
     ].reduce((sum, n) => sum + n, 0);
     assert.ok(ceilingSum <= FROZEN_TOTAL_BYTES,
       `The ceilings sum to ${ceilingSum} bytes, ${ceilingSum - FROZEN_TOTAL_BYTES} over the frozen total ` +
@@ -317,8 +330,9 @@ describe('every ceiling carries its reason (LIN-3633)', () => {
 
   test('the matcher sees every ceiling, so a pass is not vacuous', () => {
     // Source and rendered keys, router source and rendered, intent, runner source and rendered, the three
-    // LIN-4085 onboarding ceilings (guide source, guide rendered, landing prompt), the total.
-    const expected = Object.keys(TEMPLATES_SOURCE_CEILINGS).length + Object.keys(TEMPLATES_RENDERED_CEILINGS).length + 5 + 3 + 1;
+    // LIN-4085 onboarding ceilings (guide source, guide rendered, landing prompt), the LIN-4373 leftover
+    // prompt, the total.
+    const expected = Object.keys(TEMPLATES_SOURCE_CEILINGS).length + Object.keys(TEMPLATES_RENDERED_CEILINGS).length + 5 + 3 + 1 + 1;
     assert.equal(ceilingLines(real).length, expected,
       'A ceiling is in a shape the matcher misses (or the matcher over-matches). Keep ceilings as `NAME = <digits>` or `key: <digits>`.');
   });

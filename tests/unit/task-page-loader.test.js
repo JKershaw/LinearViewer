@@ -18,7 +18,9 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTaskPageLoader, buildTaskPageModel, sessionMessage, buildTaskStages, briefCurrentSection, deriveHeader, deriveReadyHeader, fmtWhen } from '../../lib/task-page-loader.js';
 import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
+import { ROW_ONLY_KINDS } from '../../lib/dispatch-fields.js';
 import { ORCHESTRATION_KINDS } from '../../lib/effort-readout.js';
+import { stageLabel } from '../../lib/run-view.js';
 import { STATE_ORDER } from '../../lib/providers/models.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
 import { readRunEvidence } from '../../lib/run-evidence.js';
@@ -594,6 +596,20 @@ describe('buildTaskStages (LIN-3356)', () => {
     assert.equal(one.durationMs, 6 * 60 * 1000);
   });
 
+  // LIN-4373: the leftover step is a costed session of its own, so the task page shows it as a
+  // stage between the build and review, under its own word, never folded as a check-in.
+  test('a leftover session is its own stage, labelled Leftovers', () => {
+    const stages = buildTaskStages([
+      sess('b1', 'implementation', 'done', 0, 10),
+      sess('l1', 'leftover', 'done', 10, 14),
+      sess('w1', 'wake', 'done', 14, 15),
+      sess('r1', 'review', 'done', 15, 20),
+    ], { trackerType: 'completed' });
+    assert.deepEqual(kinds(stages), ['implementation', 'leftover', 'review']);
+    assert.deepEqual(stages.map(st => st.checkIns.map(c => c.loopId)), [[], [], ['w1']], 'the check-in folds into the next stage, as any check-in does');
+    assert.equal(stageLabel('leftover'), 'Leftovers');
+  });
+
   test('a trailing check-in folds into the last stage; a running stage has no end or duration', () => {
     const stages = buildTaskStages([
       sess('co', 'close-out', 'running', 0),
@@ -613,8 +629,9 @@ describe('buildTaskStages (LIN-3356)', () => {
     assert.equal(stages[0].checkIns.length, 0);
   });
 
-  test('every DISPATCH_KINDS member (and wake) is either folded or forms a stage', () => {
-    const all = [...new Set([...DISPATCH_KINDS, 'wake'])];
+  // The row-only kinds (`wake`, `leftover`) are not in DISPATCH_KINDS; they come from ROW_ONLY_KINDS (LIN-4376).
+  test('every DISPATCH_KINDS and ROW_ONLY_KINDS member is either folded or forms a stage', () => {
+    const all = [...new Set([...DISPATCH_KINDS, ...ROW_ONLY_KINDS])];
     for (const kind of all) {
       const alone = buildTaskStages([sess('x', kind, 'done', 0, 1), sess('y', 'review', 'done', 2, 3)], { trackerType: 'completed' });
       if (ORCHESTRATION_KINDS.has(kind)) {

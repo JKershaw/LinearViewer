@@ -6,7 +6,11 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-export const DEFAULT_AREAS = fileURLToPath(new URL('./areas.json', import.meta.url));
+// The area registry is the product's (LIN-4371), which the area notes beside it are keyed on. REGISTRY_PATH is
+// the one spelling of its repo-relative path (LIN-4376): the kit's tools, the census experiment and the
+// tests' registry helper all take it from here.
+export const REGISTRY_PATH = 'docs/areas/areas.json';
+export const DEFAULT_AREAS = fileURLToPath(new URL(`../../${REGISTRY_PATH}`, import.meta.url));
 
 // Defaults: JavaScript minus dependencies, vendored dirs, minified files, tests, and pinned replay snapshots and work copies.
 // Pinned snapshots are frozen copies of live code: a live file whose size changed paired with its own old
@@ -25,7 +29,7 @@ export const compileScope = ({ include, exclude } = {}) => {
 
 export class UsageError extends Error {}
 
-// Area guide in the seams.mjs format. Without --areas the file beside the tool is used if present;
+// Area guide in the seams.mjs format. Without --areas the registry (DEFAULT_AREAS) is used if present;
 // an explicit path that is missing or malformed is a usage error, never a silent fallback.
 export const loadAreas = (path) => {
   const explicit = path != null;
@@ -45,8 +49,12 @@ export const loadAreas = (path) => {
 export const compileGuide = (areaMap) =>
   areaMap.areas.map((a) => ({ name: a.name, rx: a.match.map((m) => new RegExp(m)) }));
 
+// The first area whose pattern matches, as in the registry; null when no area claims the file. Seams and
+// co-change read this: tests/ and docs/ must not become areas there.
+export const claimedBy = (guide, path) => guide.find((a) => a.rx.some((r) => r.test(path)))?.name ?? null;
+
 // The area a file belongs to; a file no area claims (or no map at all) falls under its top-level directory.
-export const areaOf = (guide, path) => (guide ? guide.find((a) => a.rx.some((r) => r.test(path)))?.name : null) ?? path.split('/')[0];
+export const areaOf = (guide, path) => (guide ? claimedBy(guide, path) : null) ?? path.split('/')[0];
 
 // argv -> { positional, flags }. `spec` maps each flag to 'value' or 'bool'; anything else is a usage error.
 export const parseArgs = (argv, spec) => {

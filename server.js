@@ -84,6 +84,8 @@ import { getSeenModels } from './lib/unpriced-models.js' // LIN-3094: models who
 import { LivenessAlarmStore } from './lib/liveness-alarm-store.js'
 import { createLivenessAlarmSweepRun } from './lib/liveness-alarm-sweep.js'
 import { createCiWakeSweepRun, createTickWorkspaceResolver } from './lib/ci-wake-sweep.js'
+import { createLeftoverStep, workspaceIdResolverFrom } from './lib/dispatch-leftover-hook.js'
+import { buildWakeCredentialProvisioner } from './lib/wake-credential.js'
 import { createKpiDailyRollupRun } from './lib/kpi-daily-rollup.js'
 import { SessionSummaryCacheStore } from './lib/session-summary-cache.js'
 import { RunParagraphStore } from './lib/run-paragraph-store.js'
@@ -1104,6 +1106,32 @@ scheduler.register({
 }).catch((err) => {
   console.error(`[ci-wake-sweep] scheduler.register failed — the sweep will NOT run this boot: ${err.message}`)
 })
+
+// The leftover step (LIN-4373): an eligible build's terminal [done] resumes the build's
+// own session through a `leftover` follow-up, and its parent wake is held until that
+// row ends. ONE step for both feedback entrances (routes/proxy-runner.js, routes/dispatch.js);
+// each binds its own request origin. The dispatch-token route has no workspace id, so it is
+// resolved the ci-wake way (a session-derived resolver). The held wake's release, which has
+// no request, mints its credential through the factory bound below, keyed on the lineage
+// root's `dispatchedBy`, with the canonical link origin.
+const leftoverStep = createLeftoverStep({
+  dispatchStore: dispatchQueueStore,
+  workspacePreferencesStore,
+  proxyTokenStore,
+  ownerCheck: workspaceOwnerCheck,
+  haltReader: (urlKey) => workspaceHaltStore.getWorkspaceHalt(urlKey),
+  resolveWorkspaceId: workspaceIdResolverFrom(createTickWorkspaceResolver({
+    sessionsCollection,
+    resolveWorkspaceAccess,
+    getProviderByName: (name) => getProviderForWorkspace({ provider: name })
+  }))
+})
+dispatchQueueStore.setWakeCredentialProvisionerFactory(({ urlKey, createdBy }) => buildWakeCredentialProvisioner({
+  proxyTokenStore,
+  urlKey,
+  baseUrl: resolveEmailLinkOrigin(process.env),
+  createdBy
+}))
 
 // KPI daily rollup (LIN-3724, design LIN-3712): the scheduler is interval-only,
 // so this ticks hourly and the job gates on a marker doc to make ONE full
@@ -2578,7 +2606,7 @@ function workspaceFromUrl(req, res, next) {
 }
 
 // Mount dispatch routes (requires workspaceFromUrl middleware)
-app.use(createDispatchRoutes({ installationTokenFor, dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, workspaceOwnerCheck, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache, taskModeStore, freeTierStore, accountStore, consumerHeartbeatStore, requestUsageStore, requestUsageLoader }))
+app.use(createDispatchRoutes({ installationTokenFor, dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, workspaceOwnerCheck, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache, taskModeStore, freeTierStore, accountStore, consumerHeartbeatStore, requestUsageStore, requestUsageLoader, leftoverStep }))
 
 // Task-mode routes (LIN-2942): the ladder's client-side press record and the
 // per-account per-task mode read.
@@ -3232,7 +3260,7 @@ const recordPipelineMerge = createPipelineMergeRecorder({
   installationTokenFor,
   resolveWorkspaceId: createSessionWorkspaceIdResolver({ sessionsCollection })
 })
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore, requestUsageStore, requestUsageLoader }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore, requestUsageStore, requestUsageLoader, leftoverStep }))
 
 // LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
 // runner prompt to fetch and verify against its sha256 pins (routes/runner-kit.js).

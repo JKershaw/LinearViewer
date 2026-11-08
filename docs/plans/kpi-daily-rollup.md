@@ -149,7 +149,7 @@ One ticket, one PR, after the operator approves this note.
 - `server.js`: `scheduler.register` for `kpi-daily-rollup`.
 - `scripts/backfill-kpi-daily-rollup.mjs` (new).
 - `public/chart-helpers.js`: `rateTotalToggle`; the two chart modules that use it.
-- `scripts/code-shape/areas.json`: a pattern for each new production file, in the same PR, checked to land in its owning area and not "Other features". Run `node scripts/code-shape/seams.mjs . <commit>` at the base and final commit and report the area-pair count both times.
+- `scripts/code-shape/areas.json` (now `docs/areas/areas.json`, LIN-4371): a pattern for each new production file, in the same PR, checked to land in its owning area and not "Other features". Run `node scripts/code-shape/seams.mjs . <commit>` at the base and final commit and report the area-pair count both times.
 - Docs: `docs/plans/kpis-public-design.md:52`; `docs/architecture/source-map.md` (module, job roster entry, collection); the backfill runbook. CLAUDE.md: nothing.
 
 **Tests.**

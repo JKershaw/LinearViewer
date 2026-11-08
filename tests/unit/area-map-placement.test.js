@@ -1,19 +1,9 @@
 // LIN-3729: pin the code-shape area map for files that a name pattern in
-// scripts/code-shape/areas.json used to misfile. First matching area wins.
+// the area registry used to misfile. First matching area wins. The registry is docs/areas/areas.json
+// since LIN-4371 (it was scripts/code-shape/areas.json).
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const areas = JSON.parse(readFileSync(join(ROOT, 'scripts/code-shape/areas.json'), 'utf8'));
-const list = areas.areas || areas;
-
-function areaOf(path) {
-  const hit = list.find((a) => (a.match || []).some((m) => new RegExp(m).test(path)));
-  return hit && hit.name;
-}
+import { areaNameOf as areaOf } from './helpers/area-registry.js';
 
 describe('code-shape area map placement (LIN-3729)', () => {
   // LIN-4201: the cost code gets a real area. The one read, the snapshot fold, the lineage membership and the request-record vocabulary
@@ -70,5 +60,13 @@ describe('code-shape area map placement (LIN-3729)', () => {
   // a page choice; under Task model it would add a new "pages ⇄ Task model" pair.
   test('the task board view model lands in the server-rendered pages', () => {
     assert.strictEqual(areaOf('lib/task-board-view.js'), 'Front end: server-rendered pages');
+  });
+
+  // LIN-4371: the `## As asked` block's owner sits with the prompts that read it (the brief, the stage contract, stage
+  // intent's CUT). It used to fall through to the catch-all `^lib/` in "Other features", which filed every area note about
+  // the block's words under the catch-all. Its seal (as-asked-seal.js, the create lanes) is not moved with it.
+  test('the As-asked block owner lands in LLM & prompts; its seal does not move', () => {
+    assert.strictEqual(areaOf('lib/as-asked.js'), 'LLM & prompts');
+    assert.strictEqual(areaOf('lib/as-asked-seal.js'), 'Other features');
   });
 });

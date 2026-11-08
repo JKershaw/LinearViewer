@@ -10,6 +10,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { SPINE, USUAL_STAGES, STAGE_LABELS, STEP_KIND_WORDS } from '../../lib/run-view.js';
 import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
+import { ROW_ONLY_KINDS } from '../../lib/dispatch-fields.js';
 
 describe('run-view: stage vocabulary (LIN-3328)', () => {
   test('SPINE is unchanged — the run page "n of 4" depends on it', () => {
@@ -21,8 +22,9 @@ describe('run-view: stage vocabulary (LIN-3328)', () => {
     assert.deepEqual(USUAL_STAGES.filter(kind => kind !== 'research' && kind !== 'plan-review'), SPINE);
   });
 
-  test('every dispatch kind carries a non-empty stage label', () => {
-    for (const kind of DISPATCH_KINDS) {
+  // LIN-4376: the row-only kinds (`wake`, `leftover`) come from their one declaration.
+  test('every dispatch kind and row-only kind carries a non-empty stage label', () => {
+    for (const kind of new Set([...DISPATCH_KINDS, ...ROW_ONLY_KINDS])) {
       assert.equal(typeof STAGE_LABELS[kind], 'string', `no STAGE_LABELS entry for "${kind}"`);
       assert.ok(STAGE_LABELS[kind].trim().length > 0, `empty STAGE_LABELS entry for "${kind}"`);
     }
