@@ -3590,6 +3590,15 @@ describe('the area notes pointer (LIN-4371)', () => {
     assert.ok(!/LinearViewer|simple-dispatcher|Harbour|Linear/.test(line), 'no repository or provider named');
   });
 
+  // LIN-4379 (LIN-4349 P1): the next look-first step cites what it used, so "a finding was used"
+  // is checkable from the work's own record of its decisions.
+  test('it asks the work to name a note entry it used, file and source, where it records its decisions', () => {
+    assert.match(line, /Where a note entry bears on this work, name it \(its file and source\) where you record your decisions\./);
+    for (const kind of ['implementation', 'plan', 'review']) {
+      assert.ok(generatePrompt(kind, issue, context).prompt.includes('name it (its file and source) where you record your decisions'), kind);
+    }
+  });
+
   test('scoping, the Survey stages, close-out and an unknown kind do not carry it', () => {
     for (const kind of ['scoping', 'survey-task', 'survey-place', 'close-out']) {
       assert.ok(!generatePrompt(kind, issue, context).prompt.includes('## Area Notes'), kind);
