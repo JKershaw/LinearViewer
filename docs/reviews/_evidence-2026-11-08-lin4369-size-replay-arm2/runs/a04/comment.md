@@ -1,0 +1,3 @@
+Scoping done for LIN-4253. Size record added below the As asked block: **just the task**, decided by the standing policy.
+
+Both Surveys reproduce at HEAD (29f14bf6, no commits since). Offered is already the template's route, so that half is a deletion of the duplicate list. The read-only gate actually selects the Survey mandate and closing wording, so the trait should be named for what it gates; that is a choice inside the task, not a larger move. No cuts to the ask. Two open questions, each a possible ticket of its own: follow-up dispatches carry no kind (a Survey follow-up gets the ordinary mandate, and LIN-4251 inherits this), and the four other senses of read-only in the prompts will drift from this trait.

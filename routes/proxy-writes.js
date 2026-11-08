@@ -58,7 +58,7 @@ import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 import { checkAsAsked, splitAsAsked, hasMarkerLine, askedText, AS_ASKED_HEADING } from '../lib/as-asked.js';
 import { sealForFiling } from '../lib/as-asked-seal.js';
-import { checkSizeRecord, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK } from '../lib/size-of-move.js';
+import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK } from '../lib/size-of-move.js';
 import { jsonError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
 
@@ -71,6 +71,13 @@ const AS_ASKED_LEAD = 'The "' + AS_ASKED_HEADING + '" block holds the words as f
 const AS_ASKED_REMEDY = 'Write around it: append, replace a span below the block, or use description/below.';
 // LIN-4368: the size record guard's refusal wording.
 const SIZE_HOW_WORDS = { 'code-span': 'a code span', path: 'a file path', call: 'call syntax', 'numbered-steps': 'a numbered step' };
+// LIN-4369 arm 3: what a SIZE_RECORD_SHAPE refusal's kind means, for its message.
+const SIZE_SHAPE_WORDS = {
+  'extra-line': 'is not one of the record\'s lines', 'repeated-line': 'repeats a line', 'missing-line': 'comes before a line the record is missing',
+  size: 'names no size from the list', 'why-empty': 'gives no why', 'why-too-long': 'makes the why too long', 'why-sentences': 'makes the why more than one sentence',
+  'cuts-empty': 'opens the cuts with nothing under it', 'cut-unquoted': 'names a cut without quoting the As asked block word for word', 'cut-too-long': 'says too much beside its quotation',
+  'decided-by': 'names no one who decided from the list', 'decided-by-too-long': 'says too much after who decided',
+};
 
 // Body-size exception, scoped to the attachments route only (mirrors the feedback
 // route's own parser, routes/workspace-api-feedback.js): the global
@@ -335,7 +342,7 @@ export function createProxyWriteRoutes({
    * sites and with the same `live` / `next`: lib/size-of-move.js checkSizeRecord acts only when
    * the write adds, changes or drops the `## Size of the move` section, so an older section
    * never blocks an unrelated write. Answers 422 with the code, and the line for a "how"
-   * refusal, and returns true once it has refused. Like the As asked guard, only this proxy
+   * or "shape" refusal, and returns true once it has refused. Like the As asked guard, only this proxy
    * lane is guarded: the session lane and direct provider edits are people's lanes.
    */
   function refusedBySizeRecord(ctx, live, next) {
@@ -343,7 +350,8 @@ export function createProxyWriteRoutes({
     if (check.ok) return false;
     const lead = `The "${SIZE_OF_MOVE_HEADING}" section`;
     const message = {
-      [SIZE_RECORD_CODES.how]: `${lead} says what is being done and why, never how: its line ${check.line?.number} carries ${SIZE_HOW_WORDS[check.kind]} (${JSON.stringify(check.token)}). Say it in plain words, with the sizes weighed as bullets; a quotation may carry such text only when it matches the As asked block word for word.`,
+      [SIZE_RECORD_CODES.how]: `${lead} says what is being done and why, never how: its line ${check.line?.number} carries ${SIZE_HOW_WORDS[check.kind]} (${JSON.stringify(check.token)}). Say it in plain words; a quotation may carry such text only when it matches the As asked block word for word.`,
+      [SIZE_RECORD_CODES.shape]: `${lead} holds four lines and nothing else: its line ${check.line?.number} ${SIZE_SHAPE_WORDS[check.kind]}${check.missing ? ` (${check.missing})` : ''}. The lines: ${recordShape().join(' | ')}.`,
       [SIZE_RECORD_CODES.policyCut]: `${lead} cannot be decided by ${DECIDED_BY.policy} when the size is "${WRONG_WORK}": that cuts the ask, and a cut needs a person's ruling. Record it as ${DECIDED_BY.pending} and raise the ruling.`,
       [SIZE_RECORD_CODES.dropped]: `${lead} is kept once written: the new description drops it. Keep it, or replace it in place.`,
     }[check.code];

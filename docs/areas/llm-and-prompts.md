@@ -22,8 +22,30 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   (a cycle). Words a template shares with such a module live in an import-free leaf under
   `lib/prompts/` both import: `lib/prompts/leftover-words.js` holds the leftover heading and
   `LEFTOVER_RULE`, rendered verbatim by the leftover prompt, review and close-out (LIN-4376).
+- Prompt words that ban a kind of how do not hold it. Two replay arms of scoping's size
+  record (LIN-4369) banned definitions and lists in prose, and runs wrote them anyway. The
+  guard in `lib/size-of-move.js` sees only code-shaped how (backticks, paths, call syntax,
+  numbered steps), so arm 3 holds the record's shape there instead: four lines, any other
+  refused (`SIZE_RECORD_SHAPE`). Hold a shape in code or with a test.
+- A stage lead's first sentence is the selector's purpose line for that stage. Changing it
+  changes the routing prompt: regenerate the router snapshots and
+  `scripts/eval/meta-prompt.baseline.txt`, and raise or lower the routing ceiling (LIN-4369).
+- Closing one channel moved the how into the next one in every arm of LIN-4369's replay:
+  done-means, then definitions, then comments, then the final `[done]` report. When a
+  stage must not hand over how, close every channel it writes to, or hold the reader's
+  side (LIN-4369 arm 4).
 
 ## Waiting
+
+- `lib/size-of-move.js`: what counts as code-shaped how is written twice: the checker's
+  patterns here, and the `SIZE_RECORD_HOW` line in `lib/proxy-instructions.js`. No test links
+  them. Arm 3 removed the scoping prompt's own list, which was the third copy; the record's
+  shape is rendered from `recordShape()` everywhere. (LIN-4369 leftovers.)
+- `lib/prompt-formatters.js`: scoping, survey-task and survey-place are left out of the
+  area notes pointer so LIN-4369's replay renders unchanged, while scoping's own prose
+  says to read the area's notes. Replay arm 4 passed (PR #2356), so this can be done now:
+  give scoping and both Surveys the pointer and drop scoping's "the area's notes" prose in
+  the next change to scoping's prompt. (LIN-4371; LIN-4369 leftovers.)
 
 - `lib/should-mock-ai.js`: `isHermeticTestToken` is a third spelling of the test-token
   check, beside `isTestToken` in `routes/workspace-api-steps.js` and the inline
