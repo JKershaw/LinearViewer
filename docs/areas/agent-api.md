@@ -22,3 +22,9 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   match provider errors by an "OpenRouter" substring in the message. "Whole or loud" has no
   one owner at the edges: one helper beside `failureOf`, keyed on an error code, would hold
   it. (Review, 8 Nov, on LIN-4358; area reads CG/CH, 8 Nov.)
+- `routes/proxy.js`: `hashCredential` (proxyLimiter's key) is a second sha256-of-a-token
+  helper beside `ProxyTokenStore._hashToken`, itself one of three copies (dispatch and
+  feedback tokens too). One exported token hash. (Area reads CE/CF, LIN-4378.)
+- `lib/proxy-instructions.js`: the rate-limit rule (60/min per token; on a 429 wait
+  `Retry-After`) is restated in about eight places: here three times, both kickoff prompts,
+  and three docs. One sentence, quoted from one place. (Area reads CE/CF, LIN-4378.)
