@@ -1474,11 +1474,15 @@ decide for itself whether a periodical is due.
 - **`mode`**/**`cadence`** are **carried through from the matched template** by the fold
   itself, never re-joined against the registry here — so this endpoint can never publish a
   `cadence` that disagrees with the one its own `due`/`recent` boundary actually used.
-- **`state`** (top-level) is one of four values: `"recent"` — a live (queued, not yet
+- **`state`** (top-level) is one of five values: `"recent"` — a live (queued, not yet
   resolved) dispatch for this template, OR a history run inside its cadence window that is
   both `status: "taken"` **and** carries a terminal `done`/`complete` feedback marker
   (LIN-2385) — a claim that was taken and then failed, or never reported, does not count and
-  does not reset the cadence clock; `"due"` — the cadence has elapsed since the last run; `"never"` — **no evidence in the
+  does not reset the cadence clock; `"due"` — the cadence has elapsed since the last run; `"landed"` (LIN-4381) — a lane
+  that would read `"recent"` has had a PR merge in its repo (by forge merge time) since its
+  last run, at least a day after it, on a repo-scoped template with no queued run; a merge on
+  an issue a Periodical row names doesn't count, and `"due"` always wins. The top level reads
+  `"landed"` when it would read `"recent"` and any lane does; `"never"` — **no evidence in the
   30-day read window**, which is a *bounded* claim, not "ever ran" — the window is this
   route's fixed 30-day READ horizon and evidence is **retained for the life of the
   project**, so the bound is a read horizon, not a retention period; `"unknown"` —
