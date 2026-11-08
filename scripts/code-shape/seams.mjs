@@ -6,13 +6,11 @@ import { posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'acorn';
 import { simple } from 'acorn-walk';
-import { readCommit, DEFAULT_AREAS, compileGuide, claimedBy as areaOf } from './code-shape-lib.mjs';
-
+import { readCommit, DEFAULT_AREAS, compileGuide, claimedBy } from './code-shape-lib.mjs';
 
 export const inScope = (p) =>
   /\.m?js$/.test(p) && !/\.min\.js$/.test(p) &&
   (p === 'server.js' || /^(lib|routes|public)\//.test(p));
-
 
 const parseSource = (text) => {
   for (const sourceType of ['module', 'script']) {
@@ -75,7 +73,7 @@ export function measureSeams({ files, areaMap, commit, areaMapSource = null }) {
   const fileArea = new Map();
   const unmappedFiles = [];
   for (const p of paths) {
-    const a = areaOf(guide, p);
+    const a = claimedBy(guide, p);
     if (a) fileArea.set(p, a); else unmappedFiles.push(p);
   }
 
