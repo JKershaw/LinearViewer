@@ -3097,3 +3097,12 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **Kicked off** as autopilot `aac50384` on opus.
   - **For the step-back:** both parrot passes today cut how out of my drafts, the habit behind the setting. The parrot is catching it now because I asked it to look for how specifically, not only for drift from John's words.
 - **15:03 UTC: LIN-4381 merged** (`3272fe4a6`, PR #2376, LIN-4349 P3: a Periodical lane reads "landed" when work has landed in its repo, with a real-store route witness that a Periodical's own landing doesn't trigger another). P4 (LIN-4382) remains, then LIN-4349's area reads.
+- **15:17 UTC: a second Periodical under the new contract, LIN-4391** (design & interface review, tenth run, `3bfa70b29`, PR #2378). It's docs-only: one new area note (front-end-pages: one lesson, seven Waiting entries) and its report. **It minted no tickets.** It also committed 761 files and about 118k lines of evidence (JSON captures, PNGs, capture scripts). That's the second run today with raw evidence at that scale, so it adds weight to the evidence-in-git item for the discussion.
+- **15:20 UTC: retro data. Four tickets were filed during the round by running sessions, not by this session and not by a Periodical:**
+  - LIN-4388 (recent-runs dates an ended run by its end; from LIN-4370's work);
+  - LIN-4389 (advisory Periodicals still describe minting);
+  - LIN-4390 (Periodical prompts grant merge authority that the dispatch gate reserves; both from LIN-4380's work);
+  - LIN-4392 (recommend-and-dispatch's duplicate guard is keyed by kind; from LIN-4370's work).
+  - LIN-4389 and LIN-4390 sit at Todo, the other two at Backlog. Nothing is running on any of them.
+  - **What it shows:** this round's counterweights (nothing new unless it blocks or tidies; leftovers go to the notes) lived in my briefs and goals, so the stages that read them kept to them. Close-outs that found problems still filed tickets. The habit of turning a find into a ticket is in Harbour too, not only in this session. It's quieter there.
+  - **I'm not acting on them.** Whether they run, fold into the notes or wait is for the discussion.
