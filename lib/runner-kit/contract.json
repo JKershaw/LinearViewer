@@ -451,7 +451,7 @@
       "area": "report",
       "case": "an indented DONE: line still counts",
       "item": {
-        "message": "Summary:\n  DONE: opened https://github.com/JKershaw/LinearViewer/pull/101"
+        "message": "Summary (see https://github.com/JKershaw/LinearViewer/pull/2357):\n  DONE: opened https://github.com/JKershaw/LinearViewer/pull/101"
       },
       "sd": "https://github.com/JKershaw/LinearViewer/pull/101",
       "harbour": "https://github.com/JKershaw/LinearViewer/pull/101"
@@ -514,7 +514,7 @@
       "area": "sentinel",
       "case": "an indented DONE: line still counts",
       "item": {
-        "message": "Summary:\n  DONE: opened https://github.com/JKershaw/LinearViewer/pull/101"
+        "message": "Summary (see https://github.com/JKershaw/LinearViewer/pull/2357):\n  DONE: opened https://github.com/JKershaw/LinearViewer/pull/101"
       },
       "sd": "finished",
       "kit": "finished"

@@ -44,7 +44,7 @@ const TABLE = JSON.parse(fs.readFileSync(CONTRACT_PATH, 'utf8'));
 // LIN-4384: the sha256 of contract.json's own bytes. simple-dispatcher pins the same value
 // (FIXTURE_SHA256 beside LV_COMMIT in test/runner-contract.test.js), so an edit here that is not
 // re-copied there would go unnoticed on this side without this tripwire.
-const CONTRACT_SHA256 = '86795d9f7f05ded6d707e055bc90f7aab2ad0aeab8d7983276532301b871115d';
+const CONTRACT_SHA256 = '250b6ebf7d0cd38b0cd0524ead48553906062dbabed291ef28f510744ba3be8c';
 
 const OWNER = 'acct-owner-1111';
 const NOW = Date.parse('2026-10-18T12:00:00.000Z');
