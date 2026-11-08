@@ -157,17 +157,59 @@ function kitFor(row) {
   }
 }
 
+// LIN-4384: what each area's rows carry besides `area`, `case`, `item` and `sd`. `inputs` are
+// the further keys a reader is driven with; `columns` are the readers pinned against `sd`. The
+// runner areas compare SD with the kit under a halt. `report` (which PR did the run open?) is
+// read by Harbour, and the kit picks no PR. `sentinel` (is the turn over?) is read by the kit.
+// Both read one assistant message, `item: {message}`, so a halt has no part in them.
+const RUNNER_AREA = { inputs: ['halt'], columns: ['kit'] };
+const AREA_SHAPES = {
+  halt: RUNNER_AREA,
+  'halt-text': RUNNER_AREA,
+  target: RUNNER_AREA,
+  repo: RUNNER_AREA,
+  cap: RUNNER_AREA,
+  auth: RUNNER_AREA,
+  store: RUNNER_AREA,
+  heartbeat: RUNNER_AREA,
+  report: { inputs: [], columns: ['harbour'] },
+  sentinel: { inputs: [], columns: ['kit'] }
+};
+const COLUMNS = ['kit', 'harbour'];
+
+/**
+ * The problems with one contract row's shape; an empty list means the row is well formed.
+ * Each row needs `sd` and at least one of `kit`/`harbour`; its area names the columns it
+ * carries, and any column that differs from `sd` needs a `difference` saying why.
+ *
+ * @param {object} row
+ * @returns {string[]}
+ */
+function checkRowShape(row) {
+  const name = `${row?.area}: ${row?.case}`;
+  const problems = [];
+  for (const k of ['area', 'case', 'item', 'sd']) if (!(k in row)) problems.push(`${name}: missing ${k}`);
+  if (!COLUMNS.some((c) => c in row)) problems.push(`${name}: has sd but neither kit nor harbour`);
+  for (const c of COLUMNS) {
+    if (c in row && row[c] !== row.sd && !row.difference) problems.push(`${name}: ${c} differs from sd with no difference`);
+  }
+  const shape = AREA_SHAPES[row.area];
+  if (!shape) return [...problems, `${name}: unknown area ${row.area}`];
+  for (const k of [...shape.inputs, ...shape.columns]) if (!(k in row)) problems.push(`${name}: missing ${k}`);
+  const allowed = new Set(['area', 'case', 'item', 'sd', 'difference', ...shape.inputs, ...shape.columns]);
+  for (const k of Object.keys(row)) if (!allowed.has(k)) problems.push(`${name}: ${k} is not a key of area ${row.area}`);
+  return problems;
+}
+
 describe('contract table shape', () => {
   test('is versioned and every row has the declared fields', () => {
     assert.equal(TABLE.version, 1);
-    for (const r of TABLE.rows) {
-      for (const k of ['area', 'case', 'halt', 'item', 'sd', 'kit']) assert.ok(k in r, `${r.case}: missing ${k}`);
-    }
+    for (const r of TABLE.rows) assert.deepEqual(checkRowShape(r), [], `${r.area}: ${r.case}`);
   });
 
-  test('every row where the kit differs from SD says why', () => {
+  test('every row where a column differs from SD says why', () => {
     for (const r of TABLE.rows) {
-      if (r.kit !== r.sd) assert.ok(r.difference, `${r.area}: ${r.case} differs from SD with no difference note`);
+      assert.deepEqual(checkRowShape(r).filter((p) => /no difference/.test(p)), [], `${r.area}: ${r.case}`);
     }
   });
 
@@ -188,6 +230,49 @@ describe('contract table shape', () => {
         );
       }
     }
+  });
+});
+
+// LIN-4384: the shape check loosened from "sd and kit on every row" to "sd plus kit and/or
+// harbour", so it is fed bad rows (each must be rejected, for its own reason) and good rows of
+// each new area (each must be accepted).
+describe('checkRowShape rejects a half-specified row and accepts each area\'s shape', () => {
+  const PR = 'https://github.com/JKershaw/LinearViewer/pull/101';
+  const reportRow = (extra) => ({ area: 'report', case: 'c', item: { message: `DONE: opened ${PR}` }, sd: PR, ...extra });
+  const sentinelRow = (extra) => ({ area: 'sentinel', case: 'c', item: { message: `DONE: opened ${PR}` }, sd: 'finished', ...extra });
+  const rejects = (row, reason) => {
+    const problems = checkRowShape(row);
+    assert.ok(problems.some((p) => reason.test(p)), `expected ${reason} in ${JSON.stringify(problems)}`);
+  };
+
+  test('a row with sd only is rejected: it pins no reader against sd', () => {
+    rejects(reportRow(), /has sd but neither kit nor harbour/);
+    rejects(sentinelRow(), /has sd but neither kit nor harbour/);
+    rejects({ area: 'halt', case: 'c', halt: null, item: { route: 'fresh' }, sd: 'claimed' }, /has sd but neither kit nor harbour/);
+  });
+
+  test('a column that differs from sd with no difference is rejected', () => {
+    rejects(reportRow({ harbour: `${PR}0` }), /harbour differs from sd with no difference/);
+    rejects(sentinelRow({ kit: 'not finished' }), /kit differs from sd with no difference/);
+    rejects({ area: 'halt', case: 'c', halt: null, item: { route: 'fresh' }, sd: 'claimed', kit: 'left' }, /kit differs from sd with no difference/);
+  });
+
+  test('an unknown area is rejected', () => {
+    rejects({ area: 'no-such-area', case: 'c', item: {}, sd: 'x', kit: 'x' }, /unknown area no-such-area/);
+  });
+
+  test('a column, or a halt, that the area does not declare is rejected', () => {
+    rejects(reportRow({ harbour: PR, kit: PR }), /kit is not a key of area report/);
+    rejects(sentinelRow({ kit: 'finished', harbour: 'finished' }), /harbour is not a key of area sentinel/);
+    rejects(reportRow({ harbour: PR, halt: null }), /halt is not a key of area report/);
+    rejects({ area: 'halt', case: 'c', item: { route: 'fresh' }, sd: 'claimed', kit: 'claimed' }, /missing halt/);
+  });
+
+  test('good rows of each new area are accepted, with and without a difference', () => {
+    assert.deepEqual(checkRowShape(reportRow({ harbour: PR })), []);
+    assert.deepEqual(checkRowShape(sentinelRow({ kit: 'finished' })), []);
+    assert.deepEqual(checkRowShape(sentinelRow({ kit: 'not finished', difference: 'the kit reads only the last line' })), []);
+    assert.deepEqual(checkRowShape(reportRow({ harbour: `${PR}0`, difference: 'each side picks its own' })), []);
   });
 });
 
