@@ -79,6 +79,33 @@ describe('scoping writes the size record (LIN-4369)', () => {
     assert.match(p, new RegExp(`"${SIZES[0]}" is as easy to recommend as any, and is the answer when the Surveys find nothing this task binds on`));
   });
 
+  // Arm 2 (LIN-4369 ruling efde8688): the first replay's control sized up on Survey findings that
+  // were deeper or nearby, and its records turned into plans. These pin the revised wording.
+  test('arm 2: a finding binds only when the asked change would not work, or would leave its problem in place, without it', () => {
+    const p = processOf(render());
+    assert.match(p, /A finding binds on this task only when the asked change would not work, or would leave the problem it fixes in place, without it;/);
+    assert.match(p, /a finding that is nearby, deeper or merely worth doing does not, and goes in open questions as a possible ticket of its own\./);
+  });
+
+  test('arm 2: the standing policy weighs the sizes a binding finding opens and never makes a finding bind', () => {
+    assert.match(processOf(render(ERR_LARGER)), /apply it and say so: it weighs the sizes a binding finding opens, and never makes a finding bind\./);
+  });
+
+  test('arm 2: the record is short and is not a plan', () => {
+    const p = processOf(render());
+    assert.match(p, new RegExp(`Write one \`${SIZE_OF_MOVE_HEADING}\` section \\(append it, or replace your own\\), under 200 words: what and why, never how\\.`));
+    assert.match(p, /It is not a plan, and plan writes what done means: no done conditions, settled details, figures, definitions, lists of cases or places to cover, wording a builder could copy into code or a comment, or facts about this machine\./);
+    assert.match(p, /Name an extra by the behaviour it changes, in one sentence\./);
+    assert.match(p, /No backticks, paths, code names or numbered lists: the proxy refuses them\./);
+  });
+
+  test('arm 2: scoping\'s lead settles the size of the move, not "what done means"', () => {
+    const p = render();
+    const lead = p.slice(p.indexOf('## Goal') + '## Goal'.length, p.indexOf('## Scope and Authority')).trim();
+    assert.equal(lead, 'Settle how big a move this ticket makes, and why: what, never how. Read the code first.');
+    assert.ok(!p.includes('what done means. Read the code first'), 'the old lead is gone');
+  });
+
   test('it reads both Survey comments by their headings, the filing comments, and a subtask\'s parent record', () => {
     const p = processOf(render());
     assert.ok(p.includes(`\`${SURVEY_HEADINGS['survey-task']}\``) && p.includes(`\`${SURVEY_HEADINGS['survey-place']}\``));
@@ -99,7 +126,7 @@ describe('policy and no-policy rendering (LIN-4369)', () => {
   test('with err-larger: the policy line is rendered and scoping is told to apply it and say so', () => {
     const p = render(ERR_LARGER);
     assert.match(p, /\*\*Standing size policy:\*\* err larger: take the larger move when the look shows it pays/);
-    assert.match(processOf(p), /With a standing policy, apply it and say so\./);
+    assert.match(processOf(p), /With a standing policy, apply it and say so:/);
   });
 
   test('with no policy: "no standing policy" is rendered, and the size is pending a ruling raised as a `DECISION:`', () => {

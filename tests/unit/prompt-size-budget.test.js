@@ -69,7 +69,7 @@ import { signInDoors } from '../../lib/components/landing-hero.js';
 /** Templates, source bytes. Same files `steady-base-growth.mjs` GROUPS as
  * "worker templates". */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 108910, // LIN-4369: +1316, scoping's process becomes the size record, its words read from lib/size-of-move.js; the Survey headings are one constant
+  'lib/prompt-template-defs.js': 109636, // LIN-4369 (replay arm 2): +726, scoping defines when a Survey finding binds and keeps its size record short and not a plan
   'lib/prompt-templates.js': 19593, // LIN-4251: the `stageWrites(kind)` lookup every entrance uses (code, not prompt text)
   'lib/prompt-formatters.js': 45994, // LIN-4248: the two Survey kinds' empty GROUNDING_BY_KIND entries, so the forecasts get no re-ground or implement notes
   'lib/prompt-contract.js': 3875, // LIN-4362: the `## As asked` spellings interpolate AS_ASKED_HEADING (code, not prompt text)
@@ -86,7 +86,7 @@ export const TEMPLATES_RENDERED_CEILINGS = {
   triage: 2429, // LIN-3299: at 2429 since Scope and Authority on every path
   breakdown: 5310, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
   research: 11718, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
-  scoping: 3741, // LIN-4369: +1020, scoping writes the size record (which size, and why, is the stage's judgement; the record's no-how line is held by the proxy guard)
+  scoping: 4358, // LIN-4369 (replay arm 2): +617, when a finding binds, and the record is not a plan (which size is judgement; the guard holds only code-shaped how)
   design: 2847, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
   spike: 2866, // LIN-4345: DECIDE's cut rule and its `DECISION:` route; whether a stage cut the ask is judgement no code sees
   context: 2021, // LIN-3300: at 2021 since the stage rules only the meta-prompt carried moved into their templates
@@ -112,7 +112,7 @@ export const STAGE_ROUTER_SOURCE_CEILING = 8069; // LIN-3378: -46, Why clauses o
  * options and the facts code renders (lib/recommendation-facts.js), which no source
  * ceiling covers.
  */
-export const ROUTER_PROMPT_RENDERED_CEILING = 9813; // LIN-4368: +33, the trail facts' size-of-the-move line, computed in code
+export const ROUTER_PROMPT_RENDERED_CEILING = 9791; // LIN-4369 (replay arm 2): -22, scoping's lead, whose first sentence the selector quotes, names the size of the move
 
 /** Every stage's Scope and Authority lines, source bytes (lib/prompts/stage-intent.js). */
 export const STAGE_INTENT_SOURCE_CEILING = 3423; // LIN-4367: +14, CUT and DECIDE are exported so the cut test reads the rule and finds deciding stages by identity (code, not prompt text)
@@ -134,7 +134,7 @@ export const LANDING_AGENT_PROMPT_CEILING = 584; // LIN-4085: new at 584 (the co
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 347849; // LIN-4369: +2336 (345513 -> 347849), the exact sum of the ceilings above
+export const FROZEN_TOTAL_BYTES = 349170; // LIN-4369 (replay arm 2): +1321 (347849 -> 349170), the exact sum of the ceilings above
 
 const BASE_URL = 'https://harbour.example';
 
