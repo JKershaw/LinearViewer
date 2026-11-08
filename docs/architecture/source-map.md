@@ -382,7 +382,8 @@ docs/
                                one-home rule) is `LEFTOVER_RULE` in lib/prompts/leftover-words.js (LIN-4376).
                                `tests/unit/area-notes.test.js` checks every note against the registry and the tree;
                                the seven work stages' prompts point at them (`formatAreaNotesPointer`,
-                               lib/prompt-formatters.js). The Survey tally (`plans/survey/broad-options.md`) moved here.
+                               lib/prompt-formatters.js), and scoping's in its own words
+                               (`formatScopingAreaNotesPointer`, LIN-4346). The Survey tally (`plans/survey/broad-options.md`) moved here.
   reviews/                     Periodical review reports (LIN-1967). Canonical, discoverable location: a
                                periodical's report lives on `main` at `docs/reviews/<periodical-name>-<date>.md`
                                (e.g. `docs/reviews/documentation-review-2026-08-23.md`), landed via a normal
