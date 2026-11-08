@@ -3169,3 +3169,8 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 
     It added a plain description of the drawing for a builder who hasn't seen it.
   - The seal wrote "## As asked" itself. Not started; no size call posted.
+- **~20:00 UTC: the discussion set up.** At John's request ("Record all of this, before we discuss and explore each idea, so we can update our notes as we go, and cover everything, leading us onwards through the plan") I wrote `discussion.md`.
+  - It's the live agenda and decision record. Items D1–D21, in an order that runs from the goal, through the loop's rules, the session graph and the next round, to bending the curve and the roadmap.
+  - Each item has what we know, options, a recommendation and blank Decision/Notes lines.
+  - It also has the 8 Nov baseline, the roadmap's streams and phases, and the open tickets.
+  - From here, each decision is written there first, with one line here pointing to it.
