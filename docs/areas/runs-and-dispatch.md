@@ -8,7 +8,7 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   (`lib/dispatch-fields.js`). A sparse field stays a conditional spread in `addItem` and
   `_archiveItem`, so other rows keep their key sets byte-identical. Six fields were once
   dropped on one hop of four.
-- Every way a row leaves the queue but a take archives through `_archiveItem`
+- Every way a row leaves the queue except a take archives through `_archiveItem`
   (`lib/dispatch-store.js`): what must happen on cancel or expiry goes there, and a new
   exit must archive through it too.
 - The wake path is `_planWake` (decide) then `_deliverWake` (deliver) in
