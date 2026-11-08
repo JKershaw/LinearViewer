@@ -2,8 +2,8 @@
 
 What has been learned about changing each area of the code, and what is waiting there,
 kept with the code on main (LIN-4347, LIN-4371). The next ticket in an area reads its
-notes before it changes anything there: every work stage's prompt says so
-(`GROUNDING_BY_KIND` in `lib/prompt-formatters.js`).
+notes before it changes anything there: the research, plan, bug, design, spike,
+implementation and review prompts say so (`GROUNDING_BY_KIND` in `lib/prompt-formatters.js`).
 
 ## The registry
 
