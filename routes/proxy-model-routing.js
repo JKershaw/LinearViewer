@@ -62,7 +62,7 @@ function publicEntry(row) {
  * @param {Object} deps
  * @param {Object} deps.modelRoutingStore - lib/model-routing-store.js
  * @param {Object} deps.workspacePreferencesStore - read for the workspace setting only
- * @param {Function} deps.proxyLimiter
+ * @param {Function} deps.proxyLimiter - The proxy rate limiter, injected (see `proxyLimiter` in routes/proxy.js)
  * @param {Function} deps.authenticateProxyToken
  * @param {Function} deps.requireWriteScope
  * @param {Function} deps.logEvent
