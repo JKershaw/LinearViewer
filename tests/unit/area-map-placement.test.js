@@ -3,7 +3,9 @@
 // since LIN-4371 (it was scripts/code-shape/areas.json).
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { areaNameOf as areaOf } from './helpers/area-registry.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { areaNameOf as areaOf, ROOT } from './helpers/area-registry.js';
 
 describe('code-shape area map placement (LIN-3729)', () => {
   // LIN-4201: the cost code gets a real area. The one read, the snapshot fold, the lineage membership and the request-record vocabulary
@@ -74,5 +76,21 @@ describe('code-shape area map placement (LIN-3729)', () => {
   // and the selector's facts line, beside the As-asked owner. It fell through to the catch-all when LIN-4368 added it.
   test('the size record owner lands in LLM & prompts', () => {
     assert.strictEqual(areaOf('lib/size-of-move.js'), 'LLM & prompts');
+  });
+
+  // LIN-4383: the registry's path is the product's, spelled once in a zero-import leaf under lib/prompts/, so the
+  // existing `^lib/prompts/` pattern files it with the prompt that names it (`formatAreaNotesPointer`) and the
+  // registry needs no new pattern. The scripts and the tests' helper import it from there, never the other way.
+  test('the registry path leaf lands in LLM & prompts, imports nothing, and is the one spelling its readers use', () => {
+    const LEAF = 'lib/prompts/area-registry-path.js';
+    assert.strictEqual(areaOf(LEAF), 'LLM & prompts');
+    const read = (path) => readFileSync(join(ROOT, path), 'utf8');
+    assert.doesNotMatch(read(LEAF), /^\s*import\b/m, 'the leaf imports nothing');
+    for (const reader of ['lib/prompt-formatters.js', 'scripts/code-shape/code-shape-lib.mjs', 'tests/unit/helpers/area-registry.js']) {
+      const src = read(reader);
+      assert.match(src, /import \{ REGISTRY_PATH \} from '[./]+(lib\/)?prompts\/area-registry-path\.js';/, `${reader} imports the leaf`);
+      // A quoted or template spelling (the pointer's is backslash-escaped inside its template literal); prose may name it.
+      assert.doesNotMatch(src, /['"`]docs\/areas\/areas\.json\\?['"`]/, `${reader} does not spell the path itself`);
+    }
   });
 });

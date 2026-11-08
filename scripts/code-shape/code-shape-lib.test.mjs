@@ -82,9 +82,12 @@ test('ownChurnByPattern: -G keeps only commits whose changed lines match; --sinc
   } finally { repo.cleanup(); }
 });
 
-// LIN-4376: one registry path and one first-match lookup for the kit.
+// LIN-4376: one registry path and one first-match lookup for the kit. The spelling is the product's leaf
+// (lib/prompts/area-registry-path.js, LIN-4383); the kit and the tests' helper both re-export it.
 test('REGISTRY_PATH is the one spelling of the registry path, and DEFAULT_AREAS resolves it', async () => {
   const lib = await import('./code-shape-lib.mjs');
+  const leaf = await import('../../lib/prompts/area-registry-path.js');
+  assert.equal(lib.REGISTRY_PATH, leaf.REGISTRY_PATH);
   assert.equal(lib.REGISTRY_PATH, 'docs/areas/areas.json');
   assert.ok(lib.DEFAULT_AREAS.endsWith(`/${lib.REGISTRY_PATH}`), lib.DEFAULT_AREAS);
   const helper = await import('../../tests/unit/helpers/area-registry.js');

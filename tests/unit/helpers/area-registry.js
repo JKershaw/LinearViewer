@@ -4,8 +4,8 @@
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-// The path's one spelling (LIN-4376); this helper keeps its own lookup, which returns the area object (tests need the slug).
-import { REGISTRY_PATH } from '../../../scripts/code-shape/code-shape-lib.mjs';
+// The path's one spelling, product-owned (LIN-4383); this helper keeps its own lookup, which returns the area object (tests need the slug).
+import { REGISTRY_PATH } from '../../../lib/prompts/area-registry-path.js';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 export { REGISTRY_PATH };

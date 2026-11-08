@@ -97,6 +97,7 @@ Two reasons recur, so they are written once here:
 - LIN-4248: +144 (45850 -> 45994). The two Survey kinds' empty GROUNDING_BY_KIND entries, so the forecasts get no re-ground or implement notes.
 - LIN-4371: +939 (45994 -> 46933). `formatAreaNotesPointer` (+308 of text) and the seven stages' own grounding lists, so `WORK` and `GROUNDING_NOTES` stay byte-identical for the stages that share them.
 - LIN-4379: +102 (46933 -> 47035). One sentence in `formatAreaNotesPointer`: where a note entry bears on this work, name it (its file and source) where you record your decisions. Re-measured after LIN-4369 (`d294a190`): no pointer stage moved. Why not code: which note entry bears on a piece of work is the agent's reading; the sentence makes the next look-first step's use of a Periodical's finding checkable from the work's own record (LIN-4349). Replaced the LIN-4371 reason above.
+- LIN-4383: +60 (47035 -> 47095). Code, not prompt text: `formatAreaNotesPointer` interpolates `REGISTRY_PATH` from the product's zero-import leaf `lib/prompts/area-registry-path.js` (an import line, +65; the interpolation, -5). Its rendered bytes are unchanged (`tests/unit/lin-4377-area-notes-pointer-bytes.test.js`).
 
 **Templates source, `lib/prompt-contract.js`**
 - LIN-3300: at 3424 since the one-path recommendation change.
@@ -205,6 +206,8 @@ Two reasons recur, so they are written once here:
 - LIN-4369 merged with main at LIN-4376: +3657 (352001 -> 355658): defs +2042, scoping +1637 (2721 -> 4358), routing prompt -22.
 - LIN-4369 (replay arm 3): -622 (355658 -> 355036): defs -333, scoping -331, close-out +42.
 - LIN-4369 (replay arm 4): +365 (355036 -> 355401): defs +198, scoping +167.
+- LIN-4379: +816 (355401 -> 356217), the pointer sentence: prompt-formatters.js source +102 and the seven stages that render it +102 each.
+- LIN-4383: +60 (356217 -> 356277): prompt-formatters source only, an import line of the product's registry path; no prompt text and no rendered byte changed.
 
 ## Rows
 

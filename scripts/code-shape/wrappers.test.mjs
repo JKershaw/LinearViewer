@@ -257,11 +257,14 @@ test('probe: --rename-map and --perturb-module add rewrites; a bad --target or -
 
 test('without acorn each CLI that parses code prints "run npm install" and exits 2', () => {
   // A copy of the kit in a directory with no node_modules above it. (verbatim.mjs parses nothing, so its core never needs acorn.)
+  // Laid out as in the repo: the kit reads the registry path from the product's leaf, lib/prompts/area-registry-path.js (LIN-4383).
   const dir = mkdtempSync(join(tmpdir(), 'code-shape-noacorn-'));
+  const kit = join(dir, 'scripts', 'code-shape');
   try {
-    cpSync(KIT, dir, { recursive: true, filter: (p) => !p.endsWith('.test.mjs') });
+    cpSync(KIT, kit, { recursive: true, filter: (p) => !p.endsWith('.test.mjs') });
+    cpSync(fileURLToPath(new URL('../../lib/prompts/area-registry-path.js', import.meta.url)), join(dir, 'lib', 'prompts', 'area-registry-path.js'));
     for (const [script, args] of [['census.mjs', [repo.dir, third]], ['shape.mjs', [repo.dir, third]], ['probe.mjs', [repo.dir, third, '--target', 'lib/a.js', '--test-cmd', 'true']], ['retention.mjs', [repo.dir, first, second]]]) {
-      const r = cli(script, args, { kit: dir });
+      const r = cli(script, args, { kit });
       assert.equal(r.status, 2, `${script}: ${r.stderr}`);
       assert.match(r.stderr, /run npm install/, script);
     }
