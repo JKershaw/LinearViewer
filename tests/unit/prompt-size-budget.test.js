@@ -72,7 +72,7 @@ import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
 /** Templates, source bytes. Same files `steady-base-growth.mjs` GROUPS as
  * "worker templates". */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 108717, // LIN-4374: +1123, review's leftover read and close-out's note-writing and one-home sentence (rendered below), the LEFTOVERS_HEADING import and two one-line reason comments
+  'lib/prompt-template-defs.js': 108488, // LIN-4376: -229, review's and close-out's own wording of where a leftover goes left for the shared LEFTOVER_RULE (lib/prompts/leftover-words.js)
   'lib/prompt-templates.js': 19593, // LIN-4251: the `stageWrites(kind)` lookup every entrance uses (code, not prompt text)
   'lib/prompt-formatters.js': 46933, // LIN-4371: +939, `formatAreaNotesPointer` and the seven stages' own grounding lists, so WORK and GROUNDING_NOTES stay byte-identical
   'lib/prompt-contract.js': 3875, // LIN-4362: the `## As asked` spellings interpolate AS_ASKED_HEADING (code, not prompt text)
@@ -95,8 +95,8 @@ export const TEMPLATES_RENDERED_CEILINGS = {
   context: 2021, // LIN-3300: at 2021 since the stage rules only the meta-prompt carried moved into their templates
   'plan-review': 7601, // LIN-4353: the verdict quotes the ask and says how the plan meets it; only the person agrees to a narrowing (the reviewer's judgement)
   implementation: 8391, // LIN-4371: +308, the area notes pointer (read the notes for each area the work touches); which notes bind is the agent's reading of a repository file, and a fixed pointer keeps the bytes predictable where injected notes would not
-  review: 15866, // LIN-4374: +515, the one read of what the change left at its edges, routed fix / note / outside follow-up; whether an edge is a leftover, and fix-sized, is the reviewer's judgement no code sees
-  'close-out': 11962, // LIN-4374: +268, close-out writes review's note entries before the merge, and the one-home rule (follow-up done, note unscheduled, in-area never filed); which item is which is judgement no code sees
+  review: 16052, // LIN-4376: +186, the class check renders the shared LEFTOVER_RULE (routes and one home) verbatim, so the three readers of a leftover say it the same way; which home an edge belongs in is the reviewer's judgement no code sees
+  'close-out': 12140, // LIN-4376: +178, Follow-up Triage renders the shared LEFTOVER_RULE (routes and one home) verbatim in place of its own one-home sentence; which item is which is judgement no code sees
   'retrospective-audit': 4619, // LIN-3279: FOLLOW_UP_SHAPE rendered
   retro: 4265, // LIN-3299: at 4265 since Scope and Authority on every path
   'survey-task': 1204, // LIN-4248: new at 1204; the hand-tuned task-view Survey wording, verbatim but for the {BASE} sentence and the Goal/Process frame
@@ -132,14 +132,14 @@ export const AGENT_ONBOARDING_RENDERED_CEILING = 3691; // LIN-4085: new at 3207,
 /** Landing agent prompt, rendered bytes at BASE_URL (renderLandingAgentPrompt). LIN-4085: new. Copied by a person into their own agent, so it is wording the agent reads, not code. */
 export const LANDING_AGENT_PROMPT_CEILING = 584; // LIN-4085: new at 584 (the copied prompt under the sign-in buttons)
 /** The leftover step's prompt, rendered bytes at the fixture ticket and PR below (leftoverPrompt, lib/dispatch-leftover.js). */
-export const LEFTOVER_PROMPT_RENDERED_CEILING = 1195; // LIN-4373: new at 1195; the one question a resumed builder is asked (what its change left at its edges) and where each answer goes. What counts as a leftover, and whether it is fix-sized, is the builder's judgement no code sees
+export const LEFTOVER_PROMPT_RENDERED_CEILING = 1352; // LIN-4376: +157, where each answer goes is the shared LEFTOVER_RULE, rendered verbatim with its one-home line. What counts as a leftover, and whether it is fix-sized, is the builder's judgement no code sees
 
 /**
  * The total: the sum of every ceiling above. A PR that raises a ceiling raises
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 351709; // LIN-4374: +1906 (349803 -> 351709), defs +1123, review +515, close-out +268
+export const FROZEN_TOTAL_BYTES = 352001; // LIN-4376: +292 (351709 -> 352001), review +186, close-out +178, leftover prompt +157, defs -229
 
 const BASE_URL = 'https://harbour.example';
 

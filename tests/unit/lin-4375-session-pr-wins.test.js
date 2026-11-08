@@ -27,7 +27,8 @@ import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { createLeftoverStep } from '../../lib/dispatch-leftover-hook.js';
 import { enqueueFollowUp } from '../../lib/follow-up-dispatch.js';
-import { lineagePrUrl, LEFTOVERS_HEADING } from '../../lib/dispatch-leftover.js';
+import { lineagePrUrl } from '../../lib/dispatch-leftover.js';
+import { LEFTOVERS_HEADING } from '../../lib/prompts/leftover-words.js';
 import { prUrlOfFeedback } from '../../lib/dispatch-wake.js';
 
 const READ_PR = 'https://github.com/JKershaw/LinearViewer/pull/2357';

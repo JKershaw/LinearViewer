@@ -42,11 +42,11 @@ names, have neither, so they are never read as paths.
 
 ## One home for each leftover
 
-- A leftover inside the area of the change that found it is **tidied in that change,
-  or noted here**. It is never filed as a ticket.
-- A filed follow-up is scheduled work: it will be done. A note is known but not
-  scheduled. The same item never lives in both. When a follow-up is filed for a note
-  entry, remove the entry.
+Where a leftover goes, and why an item never lives both here and in a filed follow-up,
+is written once: `LEFTOVER_RULE` in `lib/prompts/leftover-words.js` (LIN-4376). The
+leftover step, review and close-out each render it word for word. For the notes:
+
+- When a follow-up is filed for a note entry, remove the entry.
 - A change that settles a waiting entry, or makes it untrue, removes it in the same
   change.
 - Waiting entries are context, not scope. A ticket takes one on only when the size of
