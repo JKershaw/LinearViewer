@@ -1,18 +1,20 @@
 /**
- * LIN-4368: the standing size policy reaches every scoping prompt, through both entrances.
+ * LIN-4393: the standing size policy is built in (err larger), so every scoping prompt carries
+ * it with no stored value, and a value still stored from the retired Settings row is ignored.
+ * (LIN-4368 made it a workspace setting whose default was "no standing policy", which stopped
+ * every task for a size ruling; LIN-4393 removed the setting and kept John's answer.)
  *
- * One loader (lib/workspace-preferences.js loadSizePolicy) reads `sizePolicy`. Two kinds of
- * path render a scoping prompt:
+ * The paths that render a scoping prompt:
  *   - the routed entrance: prepareRecommendationInput builds the input, and getRecommendation /
  *     getRecommendationStream compose the routed stage's prompt from it
- *     (composeRoutedRecommendation). Both callers of prepareRecommendationInput pass the store;
+ *     (composeRoutedRecommendation);
  *   - the pinned-kind entrances: recommend-and-dispatch with `kind` (lib/dispatch-entrance.js,
  *     the override arm), GET /api/proxy/prompt/:id/:kind and GET /api/proxy/recommend/:id?kind=
  *     (routes/proxy-compute.js);
  *   - the in-app prompt route the UI's "run a step now" and the prompt panel use:
  *     GET /workspace/:urlKey/api/prompt/:issueId/scoping (routes/workspace-api-prompts.js).
- * Each shows the policy when it is set and "no standing policy" when it is not. The routing
- * prompt itself does not carry the policy.
+ * Each renders the err-larger line and never asks for a size `DECISION:`, with no preferences
+ * and with a stored `sizePolicy: { value: 'ask' }`. The routing prompt does not carry the policy.
  */
 process.env.NODE_ENV = 'test';
 
@@ -30,9 +32,18 @@ import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const SET = /\*\*Standing size policy:\*\* err larger: take the larger move when the look shows it pays, and when in doubt/;
-const UNSET = /\*\*Standing size policy:\*\* no standing policy/;
-const ERR_LARGER = { sizePolicy: { value: 'err-larger', setBy: { via: 'page', id: 'u1' }, setAt: '2026-11-07T22:18:14.300Z' } };
+const ERR_LARGER_LINE = /\*\*Standing size policy:\*\* err larger: take the larger move when the look shows it pays, and when in doubt; it does not mean inflating every ticket, and a small, clear ticket stays just the task\.\n/;
+const CUT_GUARD = 'A size smaller than the ask, or wrong work, is a cut; the standing policy never decides one.';
+// What the scoping prompt said when no policy was stored: every task stopped for a size ruling.
+const ASKS = [/no standing policy/, /Without one, the size is/, /\(set \d{4}-\d{2}-\d{2}\)/];
+// Absent preferences, and the value the retired setting could still have stored.
+const PREFS = { 'no stored value': {}, "a stored sizePolicy of 'ask'": { sizePolicy: { value: 'ask', setBy: { via: 'page' }, setAt: '2026-11-06T10:00:00.000Z' } } };
+
+function assertHandsOff(prompt, label) {
+  assert.match(prompt, ERR_LARGER_LINE, label);
+  assert.ok(prompt.includes(CUT_GUARD), `${label}: the cut sentence is unchanged`);
+  for (const re of ASKS) assert.doesNotMatch(prompt, re, label);
+}
 
 const prefsStore = (prefs) => ({ getWorkspacePreferences: async () => prefs });
 
@@ -40,33 +51,28 @@ describe('the routed entrance', () => {
   const issue = { identifier: 'ABC-1', title: 'A ticket', description: 'Do the thing.', state: { name: 'Todo', type: 'unstarted' }, labels: [] };
   const ctx = { parent: null, siblings: [], project: null, children: [], comments: [], attachments: [] };
   const runsStore = { listItems: async () => [], listHistory: async () => ({ items: [] }) };
-  const routedScoping = async (prefs) => {
-    const input = await prepareRecommendationInput(ctx, { dispatchQueueStore: runsStore, workspacePreferencesStore: prefsStore(prefs), urlKey: 'acme', identifier: 'ABC-1' });
+  const routedScoping = async () => {
+    const input = await prepareRecommendationInput(ctx, { dispatchQueueStore: runsStore, urlKey: 'acme', identifier: 'ABC-1' });
     const parsed = { reasoning: '→ **scoping**', prompt: null, truncated: false, recommendedAction: 'scoping', deferTo: null, completionTokens: null };
     return { input, prompt: composeRoutedRecommendation(parsed, issue, input).prompt };
   };
 
-  test('shows the policy when set', async () => {
-    assert.match((await routedScoping(ERR_LARGER)).prompt, SET);
+  test('renders the built-in err-larger policy with no preferences store at all', async () => {
+    assertHandsOff((await routedScoping()).prompt, 'routed');
   });
 
-  test('shows "no standing policy" when not set, or set to ask', async () => {
-    assert.match((await routedScoping({})).prompt, UNSET);
-    assert.match((await routedScoping({ sizePolicy: { value: 'ask' } })).prompt, UNSET);
+  test('the input carries no policy, so neither prompt can read one', async () => {
+    const { input } = await routedScoping();
+    assert.equal('sizePolicy' in input, false);
+    const routing = buildRouterPrompt(buildSelectorArgs(issue, input));
+    assert.doesNotMatch(routing, /Standing size policy/);
   });
 
-  test('the routing prompt does not carry the policy', async () => {
-    const { input } = await routedScoping(ERR_LARGER);
-    const withPolicy = buildRouterPrompt(buildSelectorArgs(issue, input));
-    const without = buildRouterPrompt(buildSelectorArgs(issue, { ...input, sizePolicy: undefined }));
-    assert.equal(withPolicy, without);
-  });
-
-  test('both callers of prepareRecommendationInput pass the preferences store', () => {
+  test('neither caller of prepareRecommendationInput passes a preferences store', () => {
     for (const file of ['routes/proxy.js', 'routes/workspace-api.js']) {
       const calls = readFileSync(join(ROOT, file), 'utf8').match(/prepareRecommendationInput\([^)]*\)/g) || [];
       assert.ok(calls.length > 0, `${file} calls prepareRecommendationInput`);
-      for (const c of calls) assert.match(c, /workspacePreferencesStore/, `${file}: ${c}`);
+      for (const c of calls) assert.doesNotMatch(c, /workspacePreferencesStore/, `${file}: ${c}`);
     }
   });
 });
@@ -134,16 +140,15 @@ describe('the pinned-kind entrances', () => {
   };
 
   for (const [name, render] of Object.entries(ENTRANCES)) {
-    test(`${name}: the policy when set, "no standing policy" when not`, async () => {
-      assert.match(await render(ERR_LARGER), SET);
-      assert.match(await render({}), UNSET);
+    test(`${name}: err larger, with no stored value and with a stored 'ask'`, async () => {
+      for (const [label, prefs] of Object.entries(PREFS)) assertHandsOff(await render(prefs), `${name}, ${label}`);
     });
   }
 });
 
 describe('the in-app prompt route (the UI\'s "run a step now" and the prompt panel)', () => {
   const issue = { id: 'size-ui-1', identifier: 'UI-1', title: 'A ticket', description: 'Do the thing.', state: { name: 'Todo', type: 'unstarted' }, labels: [] };
-  const providerName = 'fake-size-policy-ui';
+  const providerName = 'fake-scoping-ui';
   registerProvider({
     name: providerName,
     ui: {},
@@ -177,8 +182,7 @@ describe('the in-app prompt route (the UI\'s "run a step now" and the prompt pan
     }
   }
 
-  test('GET /workspace/:k/api/prompt/:id/scoping: the policy when set, "no standing policy" when not', async () => {
-    assert.match(await renderScoping(ERR_LARGER), SET);
-    assert.match(await renderScoping({}), UNSET);
+  test('GET /workspace/:k/api/prompt/:id/scoping: err larger, with no stored value and with a stored \'ask\'', async () => {
+    for (const [label, prefs] of Object.entries(PREFS)) assertHandsOff(await renderScoping(prefs), label);
   });
 });

@@ -4,9 +4,9 @@
  * Scoping no longer writes an In / Out / Assumptions / Success block. It reads the Surveys and
  * the trail, weighs the sizes from "just the task" to "wrong work", recommends one, and writes
  * one `## Size of the move` section of four lines (arm 3), whose words and shape come from
- * lib/size-of-move.js and whose shape the proxy guard holds. With a standing
- * policy (rendered by code) it applies it; without one the size is pending a ruling and raised as
- * a `DECISION:`. A size that cuts the ask is a cut under CUT, which stays rendered once.
+ * lib/size-of-move.js and whose shape the proxy guard holds. It applies the standing policy, which
+ * is built in (err larger, LIN-4393: no setting chooses it). A size that cuts the ask is a cut under
+ * CUT, which stays rendered once, and the policy never decides one.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,7 +18,7 @@ import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 import { AS_ASKED_HEADING } from '../../lib/as-asked.js';
 import {
   SIZE_OF_MOVE_HEADING, SIZES, DECIDED_BY, SIZE_LABEL, WHY_LABEL, CUTS_LABEL, DECIDED_BY_LABEL, RECORD_LINES, NO_CUTS, WRONG_WORK,
-  readSizeRecord, checkSizeRecord, recordShape
+  readSizeRecord, checkSizeRecord, recordShape, STANDING_POLICY_LINE
 } from '../../lib/size-of-move.js';
 
 const END = '*End of what was asked. Steps write below this line; nothing above it changes.*';
@@ -29,8 +29,7 @@ const ISSUE = {
   state: { name: 'Todo', type: 'unstarted' }, labels: []
 };
 const CONTEXT = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
-const ERR_LARGER = { value: 'err-larger', setAt: '2026-11-07T22:18:14.300Z' };
-const render = (sizePolicy) => generatePrompt('scoping', ISSUE, { ...CONTEXT, sizePolicy }).prompt;
+const render = (context = CONTEXT) => generatePrompt('scoping', ISSUE, context).prompt;
 const count = (text, needle) => text.split(needle).length - 1;
 const processOf = (prompt) => prompt.slice(prompt.indexOf('## Process'));
 
@@ -89,7 +88,7 @@ describe('scoping writes the size record (LIN-4369)', () => {
   });
 
   test('arm 2: the standing policy weighs the sizes a binding finding opens and never makes a finding bind', () => {
-    assert.match(processOf(render(ERR_LARGER)), /apply it and say so: it weighs the sizes a binding finding opens, and never makes a finding bind\./);
+    assert.match(processOf(render()), /Apply the standing policy and say so: it weighs the sizes a binding finding opens, and never makes a finding bind\./);
   });
 
   // Arm 3 (John's structural ruling, decision lin4346-size-after-arm2): the record is four lines and
@@ -138,33 +137,34 @@ describe('scoping writes the size record (LIN-4369)', () => {
   });
 });
 
-describe('policy and no-policy rendering (LIN-4369)', () => {
-  test('with err-larger: the policy line is rendered and scoping is told to apply it and say so', () => {
-    const p = render(ERR_LARGER);
+// LIN-4393: the policy is built in. Every render carries err larger and is told to apply it; none
+// says "no standing policy" or sends a non-cut size to a `DECISION:`. A context field named for the
+// retired setting is ignored.
+describe('the built-in policy (LIN-4369, LIN-4393)', () => {
+  test('the err-larger line is rendered and scoping is told to apply it and say so', () => {
+    const p = render();
+    assert.ok(p.includes(`\n${STANDING_POLICY_LINE}\n`));
     assert.match(p, /\*\*Standing size policy:\*\* err larger: take the larger move when the look shows it pays/);
-    assert.match(processOf(p), /With a standing policy, apply it and say so:/);
+    assert.match(processOf(p), /\nApply the standing policy and say so:/);
   });
 
-  test('with no policy: "no standing policy" is rendered, and the size is pending a ruling raised as a `DECISION:`', () => {
-    for (const policy of [undefined, { value: 'ask' }]) {
-      const p = render(policy);
-      assert.match(p, /\*\*Standing size policy:\*\* no standing policy/);
-      assert.ok(processOf(p).includes(`Without one, the size is ${DECIDED_BY.pending}: raise it as a \`DECISION:\`.`));
-    }
+  test('nothing sends a non-cut size to a ruling: no "no standing policy", no "Without one"', () => {
+    const p = render();
+    assert.doesNotMatch(p, /no standing policy/);
+    assert.doesNotMatch(p, /Without one, the size is/);
+    assert.doesNotMatch(p, /With a standing policy/);
+  });
+
+  test('a stale context field from the retired setting changes nothing', () => {
+    assert.equal(render({ ...CONTEXT, sizePolicy: { value: 'ask' } }), render());
   });
 
   test('the policy never decides a cut: a size smaller than the ask, or wrong work, is a cut', () => {
-    assert.ok(processOf(render(ERR_LARGER)).includes(`A size smaller than the ask, or ${WRONG_WORK}, is a cut; the standing policy never decides one.`));
+    assert.ok(processOf(render()).includes(`A size smaller than the ask, or ${WRONG_WORK}, is a cut; the standing policy never decides one.`));
   });
 
-  test('CUT is still rendered exactly once, with and without a policy', () => {
+  test('CUT is still rendered exactly once', () => {
     assert.equal(count(render(), CUT), 1);
-    assert.equal(count(render(ERR_LARGER), CUT), 1);
-  });
-
-  test('the policy changes only the policy line', () => {
-    const strip = (p) => p.split('\n').filter(l => !l.startsWith('**Standing size policy:**')).join('\n');
-    assert.equal(strip(render()), strip(render(ERR_LARGER)));
   });
 });
 
@@ -175,7 +175,7 @@ describe('scoping\'s completion signals (LIN-4369)', () => {
     assert.match(coreOutcome, /size of the move/i);
     assert.ok(signals.some(s => s.includes(SIZE_OF_MOVE_HEADING) && s.includes(`only the record's ${RECORD_LINES.length} lines`)), 'one section, holding only its lines');
     assert.ok(signals.some(s => s.includes(SIZES[0]) && s.includes(WRONG_WORK)), 'sizes weighed from just the task to wrong work');
-    assert.ok(signals.some(s => /standing policy/.test(s) && s.includes('`DECISION:`')), 'policy, or pending with a DECISION:');
+    assert.ok(signals.some(s => /standing policy/.test(s) && /`DECISION:`, only for a size the policy may not decide/.test(s)), 'policy, and pending with a DECISION: only where the policy may not decide (a cut)');
     assert.ok(signals.some(s => /Survey comments/.test(s)), 'Surveys read');
     for (const old of [/In scope items/, /Out of scope items/, /Assumptions stated/, /Success criteria defined/]) {
       assert.ok(!signals.some(s => old.test(s)), `no ${old}`);

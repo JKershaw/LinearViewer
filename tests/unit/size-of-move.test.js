@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 import {
   SIZE_OF_MOVE_HEADING, SIZES, DECIDED_BY, SIZE_RECORD_CODES, WRONG_WORK,
   RECORD_LINES, RECORD_PARTS, SIZE_LABEL, WHY_LABEL, CUTS_LABEL, DECIDED_BY_LABEL, NO_CUTS, WHY_MAX_WORDS, CUT_MAX_OTHER_WORDS,
-  readSizeRecord, sizeFact, checkSizeRecord, formatSizePolicyLine, recordShape
+  readSizeRecord, sizeFact, checkSizeRecord, STANDING_POLICY_LINE, recordShape
 } from '../../lib/size-of-move.js';
 import { sealAsAsked } from '../../lib/as-asked.js';
 import { assembleTrailFacts, formatTrailFactsBlock } from '../../lib/recommendation-facts.js';
@@ -220,17 +220,10 @@ describe('the check: what it permits', () => {
 });
 
 describe('the standing policy line', () => {
-  test('no policy, ask, and an unknown value read as no standing policy', () => {
-    for (const p of [undefined, null, { value: 'ask' }, { value: 'huge' }]) {
-      assert.match(formatSizePolicyLine(p), /no standing policy/);
-    }
-  });
-
-  test('err-larger says what John meant, and when it was set', () => {
-    const line = formatSizePolicyLine({ value: 'err-larger', setAt: '2026-11-07T22:18:14.300Z' });
-    assert.match(line, /err larger: take the larger move when the look shows it pays, and when in doubt/);
-    assert.match(line, /stays just the task/);
-    assert.match(line, /\(set 2026-11-07\)/);
+  // LIN-4393: built in, err larger in John's words of 7 Nov; no setting, so no date and no "ask".
+  test('says what John meant, with no setting date and no "no standing policy"', () => {
+    assert.equal(STANDING_POLICY_LINE, '**Standing size policy:** err larger: take the larger move when the look shows it pays, and when in doubt; it does not mean inflating every ticket, and a small, clear ticket stays just the task.');
+    assert.doesNotMatch(STANDING_POLICY_LINE, /no standing policy|\(set /);
   });
 });
 
