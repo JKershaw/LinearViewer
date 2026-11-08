@@ -3141,3 +3141,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - LIN-4378: $24 (1)
   - Periodicals: $18 (2)
   - **About $857 in total.** LIN-4369's pre-registered replay alone was $111. The cheapest area, LIN-4378 (small on purpose), read better. The second most expensive, LIN-4346, ended mixed.
+- **16:33 UTC: LIN-4346's parent close-out merged a small change** (`6ebadd305`, PR #2380, +123/−23, mostly one new test). Scoping now reads the area notes through its own pointer. That was a Waiting entry in the llm-and-prompts note, deferred by both LIN-4369 and LIN-4393, and this change took it and removed it from the list. **It's the notes doing their job:** a deferred leftover was picked up by the next change in the area, with nothing filed. The cost is a little more prompt in `prompt-template-defs.js`.
