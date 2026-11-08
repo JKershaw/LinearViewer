@@ -1,0 +1,37 @@
+{
+ "range": "5334c81a7207b9f2cc85ca429a2c6b18e1635c0e..9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f",
+ "landings": 114,
+ "events": 3,
+ "whole_file": 2,
+ "in_place": 1,
+ "repeats_in_place": {},
+ "list": [
+  {
+   "sha": "bad9d719",
+   "date": "2026-11-08",
+   "file": "lib/pricing-conformance-sweep.js",
+   "prev_lines": 253,
+   "deleted": 194,
+   "added": 81,
+   "whole_file": false
+  },
+  {
+   "sha": "526bca66",
+   "date": "2026-11-08",
+   "file": "scripts/code-shape/areas.json",
+   "prev_lines": 86,
+   "deleted": 86,
+   "added": 0,
+   "whole_file": true
+  },
+  {
+   "sha": "2ee4e600",
+   "date": "2026-11-04",
+   "file": "lib/founder-lookup.js",
+   "prev_lines": 61,
+   "deleted": 61,
+   "added": 0,
+   "whole_file": true
+  }
+ ]
+}
