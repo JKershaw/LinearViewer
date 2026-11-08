@@ -12,3 +12,7 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   `buildModelOptions` (`lib/openrouter-catalog.js`), since the browser has no build step.
   The lists are not copied (they come from `window.__HARNESS_MODELS__` and the catalog over
   the wire); only the rule is. The endpoint could send merged options instead. (LIN-4358.)
+- `public/brief.js`: its `postBrief`/`errorText` block is identical to `postRecap`/`errorText`
+  in `public/recap.js`, and the check for a `statusCode` inside a keepalive 200 body is now
+  written four times (also `public/scan.js` and `public/observation.js`). One shared reader
+  in `public/common.js`. (Area reads CG/CH, 8 Nov, on LIN-4358.)

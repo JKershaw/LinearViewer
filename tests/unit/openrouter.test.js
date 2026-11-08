@@ -28,13 +28,12 @@ import {
   DEFAULT_MODEL,
   resolveReasoningBudget,
   isReasoningModel,
-  REASONING_MIN_TOKENS,
-  REASONING_MAX_TOKENS,
   EPIC_CHILD_THRESHOLD,
   COUSIN_CAP,
   SIBLING_CAP,
   EPIC_TITLE_PATTERN
 } from '../../lib/openrouter.js';
+import { REASONING_MIN_TOKENS, REASONING_MAX_TOKENS } from '../../lib/call-budget.js';
 import { getSelectableStages, deriveDispatchKind, isValidDispatchKind, DISPATCH_KIND_DEFAULT, generatePrompt } from '../../lib/prompt-templates.js';
 const actionNames = () => getSelectableStages().map(s => s.name);
 import { guardNetwork } from '../fixtures/network-guard.js';
