@@ -20,6 +20,14 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - A parent wake can be held (LIN-4373): a `leftover` row's `heldWakeFor` is the whole hold
   record, released by its own terminal or by `_archiveItem` on cancel or expiry. A new way
   for a held wake to end must release it under the build's guard key, so it stays once.
+- "This run's PR" is what the session reported, not the PR it mentioned most:
+  `prUrlOfFeedback` (`lib/dispatch-wake.js`) reads a PR on a `DONE:` or `[done]` line
+  before the `[done]` entry's `url`, which older runners filled by mention count. A build
+  that read a sibling's PR more often got that PR in its leftover prompt (LIN-4375).
+- Two `[done]` posts can reach a decide-then-enqueue at once, so a "no row yet" read is
+  not a guard: claim first with a compare-and-set on the row (`claimLeftoverFor` in
+  `lib/dispatch-store.js`, the `_mintWake` idiom). LIN-4373 relied on the read and could
+  queue two leftover rows (LIN-4375).
 - Any session can park `[pending]` on CI and finish on a ci-wake `custom` row
   (`lib/ci-wake-sweep.js`). A rule keyed on the producing row's kind misses that ending:
   read the lineage instead (`_heldLeftoverOf`, `resolveFollowUpRoot`). LIN-4373 handled it
