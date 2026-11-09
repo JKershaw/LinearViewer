@@ -523,8 +523,10 @@ The north star counts false escalations as a headline cost.
 
 **Leads to:** the blind reads for D10's lanes; a comparison area picked when the first lane starts.
 
-### D13. Surface census and removals ◐
+### D13. Surface census and removals ✓
 *(curve move 3)*
+
+**The question.** Which surfaces earn their place, and how do they stay affordable?
 
 **What we know.**
 - Retiring a whole surface is the only move that deletes thousands of lines at once.
@@ -538,14 +540,23 @@ The north star counts false escalations as a headline cost.
 
 **Recommendation:** during the rail, a census of every surface with its use. Each one earns its place, goes behind a flag, or is retired, with one ruling from you each. This is where the curve bends fastest, and it's your call because it's product.
 
-**Decision:** —
+**Decision (9 Nov, John: "Yes both"):**
+- **No surfaces are retired by default.** Every view is a candidate for a Theseus move, starting with finding out *why* it got so large. The aim is lots of light little views, each cheap enough to keep. That's also the test of whether the front-end clean-up worked.
+- **It rides on D10's front-end lane, in small slices:** one view or one shared piece per task, with John's size call set to small for this lane rather than the err-larger default. Anything bigger a slice spots goes into the area's note (D3), not into the slice. Done in the right order, it shouldn't be much work.
+- **Retiring stays possible** if a view can't be made light enough to pay its way, but only as John's call, and it's not the plan.
 
-**Notes:** —
+**Notes:**
+- **John:** "Honestly, I like them all, but each is a candidate for Theseus'ing, after checking _why_ they end up so large. Lots of light little views is ideal, but the cost of them has to be balanced… I'd be sad to get rid, but happy to tidy." And: "a great test of if the front end code is actually improved. Done in the right order it might not be too much work. But, very likely to get agents trying really hard to do big things when we want small." The small-slice guard answers that last worry. It's round 1's "err larger read as more pieces" in another form.
+- **Rough sizes on main, by file name only:** Swim ~5,200 lines, Flight Companion ~5,000, Roadmap ~3,700, Collective ~3,000, Swipe ~2,000, Ship Biscuit ~1,700, Task Chat ~1,500, Ship Journey ~1,400. Ship is protected ("not a retirement candidate", `docs/architecture/views.md`).
+- **The working guess,** to check per view: views are large because browser code can't share (D10), so each builds its own fetching, rendering and state.
+- **The recommendation moved** from a census with a keep/flag/retire ruling per surface to tidy-by-default inside the front-end lane.
 
-**Leads to:** rulings during LIN-4342; removal tickets in phase 3.
+**Leads to:** the front-end ask (D10) carries "small slices" and the views; no separate census.
 
-### D14. Finish transitions, retire scaffolding ○
+### D14. Finish transitions, retire scaffolding ✓
 *(curve move 4; earlier list: 12, part)*
+
+**The question.** How do moves get finished, scaffolding included, and which unfinished ones come first?
 
 **What we know.**
 - The north star: "Finish transitions before starting capabilities".
@@ -562,13 +573,24 @@ The north star counts false escalations as a headline cost.
   - research scaffolding retires when the product has its own version.
 - **In phase 3:** un-park LIN-4350; a test-estate pass; a Theseus move on `dispatch-store.js`.
 
-**Decision:** —
+**Decision (9 Nov, John: "Yes both"):**
+- **D8's rule covers it:** every change names what it retires, and a move isn't finished until its scaffolding (temporary guards, snapshots, counts) is gone. Research folders from this work retire once the product does the same job.
+- **The biggest unfinished pieces are the first candidates for D10's two Theseus lanes, in small slices:**
+  - `dispatch-store.js` (the largest file, still growing);
+  - the tests (paired with faster CI after the switch);
+  - folding the prompt rules together (LIN-4350).
 
-**Notes:** —
+**Notes:**
+- **Checked on main, 9 Nov:**
+  - `lib/dispatch-store.js` is 4,530 lines; the next largest server file is 2,468.
+  - `tests/unit` holds 1,232 files.
+  - `experiments/` is 23 MB.
+- **Two Survey voices are no longer scaffolding:** D7 kept them.
+- **The recommendation dropped its four standing rules,** because D8's "names what it retires" covers them.
 
-**Leads to:** phase 3 tickets; rules that live in code or tests rather than prose.
+**Leads to:** targets for D10's Theseus lanes; LIN-4350 un-parked when its lane comes.
 
-### D15. Evidence in git ○
+### D15. Evidence in git ◐
 *(earlier list: 6)*
 
 **What we know.**
@@ -589,7 +611,7 @@ The north star counts false escalations as a headline cost.
 
 **Leads to:** one ticket in your words.
 
-### D16. Measure it weekly ○
+### D16. Measure it weekly ◐
 *(curve move 5; folds into D1)*
 
 **Recommendation:**
@@ -713,6 +735,8 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 | D10 | 9 Nov | Until the switch: D8's loop changes and the backlog sort. After: Jira works for the loop; the front end left better than found (shares rather than restates, still no build step or framework, slice by slice); two Theseus lanes. Runner and Costs not tasks for now. "No build step" read as allowing native browser imports. | Asks: Jira, front end |
 | D11 | 9 Nov | No big sort up front: the backlog shrinks with the code. One quick pass finds anything that breaks, blocks or touches safety; the rest is sorted a chunk at a time alongside work in each area. John approves closes and moves by group. LIN-4390 and LIN-4392 first; LIN-4210 to John. | Ask: the quick pass |
 | D12 | 9 Nov | The drain waits (D8). The larger tidies are D10's front-end and Theseus lanes, each read blind before and after, beside one untouched area read at the same times. | Blind reads with D10's lanes |
+| D13 | 9 Nov | No surfaces retired by default; each view is Theseus'd after finding why it's large, aiming at light little views. Rides on the front-end lane in small slices (size call: small). Retiring only as John's call. | Carried by the front-end ask |
+| D14 | 9 Nov | D8's "names what it retires" covers finishing. First Theseus-lane candidates, in small slices: dispatch-store.js, the tests (with faster CI), folding the prompt rules (LIN-4350). | Targets for D10's lanes |
 
 ## Appendix A: open tickets from this work (8 Nov)
 
