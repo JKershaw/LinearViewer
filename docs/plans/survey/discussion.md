@@ -222,8 +222,10 @@ The roadmap's measures start from these.
 
 **Leads to:** D11 (the sort writes the edges into the notes); no ticket of its own.
 
-### D5. Rulings: what reaches you ◐
+### D5. Rulings: what reaches you ✓
 *(earlier list: 10)*
+
+**The question.** What would make rulings better, given they mostly work today?
 
 **What we know.** Round 1 sent you:
 - engineering calls as rulings (LIN-4358's decisive row; LIN-4370's live-scoping wait);
@@ -241,13 +243,25 @@ The north star counts false escalations as a headline cost.
 
 **Recommendation:** structure, in your words, as one ticket. Wording alone hasn't held anywhere in this work.
 
-**Decision:** —
+**Decision (9 Nov, John: "Agreed on D5"):**
+- Rulings mostly work, so they stay as they are for now. The asker gives its own recommended choice. This session can add a proposal: an answer or a dismiss, with a reason. Nothing applies by itself, and the proposals are D2's light handholding.
+- Duplicates: Harbour already merges the common repeats, and agents are told to check before asking. Nothing more is needed now.
+- Rulings are a good candidate for a simpler version later: one dismiss instead of two, and a dismiss that doesn't wake the agent to tell it "this wasn't worth asking". The other finds go with it: proposals show only on the Rulings tab, and agreeing to one isn't recorded. This is "known, not now" (D3). It goes into the rulings area's note through the backlog sort, ready for a later tidy-up.
+- The "rulings ask only real questions" hop leaves the gate weeks.
 
-**Notes:** —
+**Notes:**
+- **How the answer narrowed.** The structure recommended above was dropped. John: "the rulings aren't actually too bad currently. A 'recommended dismiss' option and preventing duplicates would likely go a long way. Otherwise, it's basically fine and can be polished later."
+- **My three wrong readings** of the recommendation layer led John to ask for a sub-agent to map the code. It did, from main at `b315e0e8f`, and I checked its main claims against the code:
+  - **Two recommendation layers.** The asker's own `recommended` choice must be one of its options (`lib/session-telemetry.js`). Separately, proposals come through `suggest-answer` and `suggest-dismissal` (`routes/proxy-rulings.js`, LIN-2444 and LIN-2790): they need a read-write token and a reason, there's one per ruling, and a new one overwrites the old (`lib/dismissal-suggestions-store.js`). Proposals show only on Observation › Rulings (`public/observation.js`).
+  - **Dismiss differs by surface.** The question card's dismiss sends "not worth asking: proceed on your best judgment" to a waiting run (`public/question-cards.js`, `public/common.js`). The Rulings tab's dismiss posts nothing.
+  - **Duplicates.** Grouping is by lineage plus `decision_id`, plus the worker/autopilot join (LIN-3959, `lib/unanswered-decisions.js`). "Check before asking" and "merge shared causes" are prompt text only. The settled guard (LIN-4241) refuses a second answer.
+  - Agreement to a proposal isn't recorded (`lib/dismissal-suggestions-store.js`).
+- **John on the later tidy:** "A good candidate for a simplified version/tidy up. Eg the two dismiss options should be one, and it shouldn't wake the agent to say 'this wasn't worth asking'. It can be simpler. But, perhaps for later."
+- **On LIN-4368:** it came from this session's authority, not from how rulings work: "not something to dwell on too much".
 
-**Leads to:** one product ticket.
+**Leads to:** a Waiting entry in the rulings area's note, written by the backlog sort (D11); no ticket now.
 
-### D6. Your size choice per task, and settings in general ○
+### D6. Your size choice per task, and settings in general ◐
 *(earlier list: 7)*
 
 **What we know.**
@@ -607,6 +621,7 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 | D2 | 9 Nov | You: destination, asks word for word, the calls that are yours. This session: an agent, not a script; thinks freely, acts lightly, says so when it steps in. Harbour: kickoff to merge, taking on more as hops land. Rulings: light handholding for now. The role thins as work moves into Harbour. | Feeds D8, D10 and the "your seat" measure |
 | D3 | 9 Nov | Outside-area finds become a Waiting entry in that area's note; a ticket only if it breaks, blocks or touches safety. Notes move by sized changes, the drain, and sweeps or tidy-ups outside tasks. | Ask: change the leftover rule; re-home round 1's tickets at D11 |
 | D4 | 9 Nov | Accept LIN-4346's mixed end; its edges go into area notes through the backlog sort, for the "one look" hop or a tidy-up to take on. "One tidy per area" retired: the size chosen at scoping decides how far a move goes. | D11 writes the edges into notes |
+| D5 | 9 Nov | Rulings mostly work and stay as they are. Duplicates handled enough. A simpler version later (one dismiss that doesn't wake the agent; proposals visible; agreement recorded), noted via the sort. | Note via D11; hop leaves the gate weeks |
 
 ## Appendix A: open tickets from this work (8 Nov)
 
