@@ -39,6 +39,8 @@ The roadmap's measures start from these.
 ## Part 1: the frame
 
 ### D1. The goal and its measures ✓
+**The question.** What are we aiming for, how do we plan toward it, and what do we read each week to know it's working?
+
 **What we know.**
 - Goal: Harbour brings codebases toward settled, including its own.
 - John's tipping point: on average a task leaves the code a little better, and the bigger improvements can come from Periodical-type work.
@@ -88,10 +90,12 @@ The roadmap's measures start from these.
 
   Each has a hop in the plan.
 
-**Leads to:** the roadmap's measures and first stretch (D17, whose phases now start with the gate); the Stability Review's headline (D16); D2 (the operator's four allowed actions are the gate); D11 (the backlog sorted against "open the door"); the Jira gaps as tickets in your words, at D10.
+**Leads to:** the roadmap's measures and first stretch (D17, whose phases now start with the gate); the Stability Review's headline (D16); D2 (the four usual actions are what the gate reads, not a rule for the operator); D11 (the backlog sorted against "open the door"); the Jira gaps as tickets in your words, at D10.
 
-### D2. Roles: you, this session, Harbour ◐
+### D2. Roles: you, this session, Harbour ✓
 *(earlier list: 8 and 17)*
+
+**The question.** Who does what from here on: you, this session, or Harbour? In round 1 the worst problems came from this session acting outside its role, while Harbour's own steps behaved, yet some hand work (the blind reads, draining the notes) still matters. What should each of us own now, and where is it heading?
 
 **What we know.**
 - The spiral, the size setting, the click-traps, the copy-inviting wording, my generous scoring and the hand-steering all came from this session. John: "the spiral came from this session (the only non-regimented session in the loop…). That's Harbour's whole value."
@@ -115,17 +119,36 @@ The roadmap's measures start from these.
 - Each remaining hand job either becomes a product feature (through the phases below) or retires as research scaffolding.
 - My own rules: say what and why only; never hand-steer a running session; put your words on a ticket and let the loop run; parrot every brief and look specifically for "how"; never suggest a ruling option that asserts you did something.
 
-**Decision:** —
+**Decision (9 Nov, John: "Yes, spot on"):**
+- **You:** set where we're heading. Write or approve every ask, word for word. Make the calls that are really yours: the size of a move, the rulings that reach you, what to retire, what to hand over. Accept the roadmap.
+- **This session:** an agent, not a script. I think freely and act lightly.
+  - Usually that means filing your words, starting runs, reading the results and recording them.
+  - I still use judgement: I notice what's off, explain it, recommend, and step in where it plainly helps.
+  - Doing less is what makes me reliable, so I lean that way.
+  - When I step in beyond the usual, I say so and note why. Anything that keeps coming up is something for Harbour to carry.
+  - Asks that start as my idea are read back and approved by you before they're filed.
+- **Harbour:** everything from kickoff to merge. It takes on more as the hops land.
+- **Rulings, for now:** a little handholding. I suggest answers, and it becomes a light touch as Harbour settles more engineering calls itself.
+- **Where it ends up:** this session's part thins out as the work moves into Harbour. It isn't cut to a fixed list. The gate in D1 still counts how often running a week needs more than the usual, but that's a reading of Harbour, not a rule for me.
 
-**Notes:** —
+**Notes:**
+- **Close to option (b), but with judgement kept.** My first draft made the gate's four actions (file words, start runs, read results, record) into the whole of this session's role. John: "the point of having this session be an agent not a script is to be flexible and be able to reason. The draft is right, but would be too rigid as written… Simply doing less makes you far more reliable anyway, and this is all slowly moving into Harbour."
+- **On rulings:** "a little bit of handholding is fine for now, but it'll slowly become a light touch."
+- **Recaps from here on** give the question as well as the drafted answer (John's ask on 9 Nov).
+- **The hand jobs listed above now each have a place to go:**
+  - blind reads: the "no new mess" hop (D8);
+  - draining notes: the drain hop (D12);
+  - choosing Opus: D9;
+  - the parrot: retired when only your words, or words you approved, are filed;
+  - where a tidy goes and pricing "not this task's": the size record and the leftover rule (D3, D4, D6).
 
-**Leads to:** D8 (the blind read moves into the product), D10 (how the next round runs).
+**Leads to:** D8 (the blind read moves into the product), D10 (how the next round runs), and the "your seat" measure (steps beyond the usual, noted with why).
 
 ---
 
 ## Part 2: the rules of the loop
 
-### D3. Leftovers outside a change's area: a ticket or a note? ○
+### D3. Leftovers outside a change's area: a ticket or a note? ◐
 *(earlier list: 1)*
 
 **What we know.**
@@ -550,6 +573,7 @@ The north star counts false escalations as a headline cost.
 |---|---|---|---|
 | (LIN-4395) | 8 Nov | File: a task shows the sessions that ran it, on one clock | Filed, Backlog; placed in D8 |
 | D1 | 8 Nov | Goal: toward settled, a balance. Five measures (no new mess, the curve, speed, your seat, cost), read weekly. First stretch: "open the door" for a small Jira team on their own runner. Gate: two in flight until running it needs nothing complex. $3,500 a week. Targets set at gates. | D17's phases start with the gate; Jira gaps to D10 |
+| D2 | 9 Nov | You: destination, asks word for word, the calls that are yours. This session: an agent, not a script; thinks freely, acts lightly, says so when it steps in. Harbour: kickoff to merge, taking on more as hops land. Rulings: light handholding for now. The role thins as work moves into Harbour. | Feeds D8, D10 and the "your seat" measure |
 
 ## Appendix A: open tickets from this work (8 Nov)
 

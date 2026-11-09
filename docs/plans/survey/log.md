@@ -3227,3 +3227,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - what the model counts and what it doesn't.
 
   The "one first audience" lever now names the chosen team. One correction to my chat figures: with the Jira gaps in every row, the gate costs about a week (3.8 weeks becomes 4.8), not "a week and a bit", and the spare comes to about $1,800 a week once measuring is counted, not $1,900. D1's notes are corrected to match. The page's comment watch failed to register again (mint_failed). D2 is next.
+- **9 Nov, D2 decided.** John: "Yes, spot on", after asking for a less rigid draft ("the point of having this session be an agent not a script is to be flexible and be able to reason… Simply doing less makes you far more reliable anyway"). Recorded in `discussion.md`. From now on, each recap gives the question as well as the drafted answer; D1 got its question line too. D3 is next.
