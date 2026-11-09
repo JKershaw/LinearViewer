@@ -184,8 +184,10 @@ The roadmap's measures start from these.
 
 **Leads to:** a product ticket in your words if (b) or (c); triage of the four tickets in D11.
 
-### D4. One tidy per area, and LIN-4346's mixed end ◐
+### D4. One tidy per area, and LIN-4346's mixed end ✓
 *(earlier list: 9)*
+
+**The question.** In round 1 one area ended mixed because the operator limited each area to one tidy. Should we go back and finish it, and is "one tidy per area" the right rule going forward?
 
 **What we know.**
 - Finishing a move turned the area better in every other case (five of five on 5 Nov; four areas in round 1).
@@ -205,13 +207,22 @@ The roadmap's measures start from these.
 
 **Recommendation:** (b) now, and (c) as the rule. The tidy-after is the measured way to finish a move. The limit should come from the size of the move chosen at the start, not from a count afterwards.
 
-**Decision:** —
+**Decision (9 Nov, John: "Agreed"):** (a) now and (c) as the rule.
+- Accept LIN-4346's mixed ending. Its loose edges, named in the blind reads, go into the right area notes as Waiting entries, so the next change there sees them. The "one look" hop in weeks 1–2 passes through the same code and can take them on if its size allows. Otherwise a tidy-up or the drain picks them up later.
+- "One tidy per area" is retired. It was the operator's brake, not Harbour's rule. The size chosen at scoping decides how far a move goes, including its own edges, as Harbour already does.
+- The edges are written into the notes through Harbour, as part of the backlog sort (D11), not by hand.
 
-**Notes:** —
+**Notes:**
+- **John:** "It'd be nice to tidy everything, but for now this is fine and we'll be revisiting the area anyway at some point."
+- **The recommendation changed from (b) now to (a) now** after D1 and D3. The "one look" hop works in the same look-first code during the gate weeks, so a separate tidy there would collide with it. And D3 made notes, not tickets, the home for known-but-not-now work.
+- **Checked on main, 9 Nov:**
+  - None of the edges are in an area note; they're only in the blind reads.
+  - `lookFirstWait` still has 16 mentions across 7 files.
+  - The size record (`lib/size-of-move.js`) picks from a closed list ("just the task", "a small tidy", "consolidate the decision this task touches", "rebuild the area", "wrong work") with err larger built in. Nothing in Harbour counts tidies.
 
-**Leads to:** possibly one ticket; the rule in D6 and D8.
+**Leads to:** D11 (the sort writes the edges into the notes); no ticket of its own.
 
-### D5. Rulings: what reaches you ○
+### D5. Rulings: what reaches you ◐
 *(earlier list: 10)*
 
 **What we know.** Round 1 sent you:
@@ -593,8 +604,9 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 |---|---|---|---|
 | (LIN-4395) | 8 Nov | File: a task shows the sessions that ran it, on one clock | Filed, Backlog; placed in D8 |
 | D1 | 8 Nov | Goal: toward settled, a balance. Five measures (no new mess, the curve, speed, your seat, cost), read weekly. First stretch: "open the door" for a small Jira team on their own runner. Gate: two in flight until running it needs nothing complex. $3,500 a week. Targets set at gates. | D17's phases start with the gate; Jira gaps to D10 |
-| D3 | 9 Nov | Outside-area finds become a Waiting entry in that area's note; a ticket only if it breaks, blocks or touches safety. Notes move by sized changes, the drain, and sweeps or tidy-ups outside tasks. | Ask: change the leftover rule; re-home round 1's tickets at D11 |
 | D2 | 9 Nov | You: destination, asks word for word, the calls that are yours. This session: an agent, not a script; thinks freely, acts lightly, says so when it steps in. Harbour: kickoff to merge, taking on more as hops land. Rulings: light handholding for now. The role thins as work moves into Harbour. | Feeds D8, D10 and the "your seat" measure |
+| D3 | 9 Nov | Outside-area finds become a Waiting entry in that area's note; a ticket only if it breaks, blocks or touches safety. Notes move by sized changes, the drain, and sweeps or tidy-ups outside tasks. | Ask: change the leftover rule; re-home round 1's tickets at D11 |
+| D4 | 9 Nov | Accept LIN-4346's mixed end; its edges go into area notes through the backlog sort, for the "one look" hop or a tidy-up to take on. "One tidy per area" retired: the size chosen at scoping decides how far a move goes. | D11 writes the edges into notes |
 
 ## Appendix A: open tickets from this work (8 Nov)
 
