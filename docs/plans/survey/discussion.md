@@ -459,8 +459,10 @@ The north star counts false escalations as a headline cost.
 
 **Leads to:** asks in John's words for Jira and the front end (after the switch); the reading of the rule into `CLAUDE.md` (with the front-end ask); D11; D13 and D14 for lanes 3 and 4.
 
-### D11. Triage of the open tickets ◐
+### D11. Triage of the open tickets ✓
 *(earlier list: 3; the list is in Appendix A)*
+
+**The question.** How does the backlog become real work without John reading every ticket?
 
 **My first pass, for you to change.**
 - **Run first:** LIN-4390 (Periodical prompts grant merge permission that the dispatch gate withholds: an authority defect) and LIN-4392 (a second stage can start beside a live one).
@@ -470,11 +472,18 @@ The north star counts false escalations as a headline cost.
 - **Probably close:** LIN-4214, if LIN-4203's fix overtook it (check first).
 - **Keep:** LIN-4275 (paper v2, from 12 Nov) as you decide in D21; LIN-4348 (D9) and LIN-4350 (D14), placed in phases.
 
-**Decision:** —
+**Decision (9 Nov, John: "Yes you got it right. And I agree. It's a process"):**
+- A big backlog isn't a problem as long as nothing important is lost. It shrinks as the code does, because consolidation overtakes tickets or makes them redundant. So there's no big sort up front.
+- **First, one quick pass for what matters:** anything that breaks something, blocks work or touches safety is found and stays a ticket.
+- **Then a chunk at a time, alongside the work.** When a task or a Theseus move works in an area, that area's tickets are sorted with it: overtaken ones close with a reason (so they can be reopened), and known-not-now ones go to that area's note (D3). The first chunks follow D10's lanes, Jira and the front end, and pick up the jobs earlier decisions sent here (D3, D4, D5, D9).
+- **John approves what's closed and moved by group.**
+- **Ahead of all this:** LIN-4390 and LIN-4392 run first, as defects. LIN-4210 waits for John's ruling.
 
-**Notes:** —
+**Notes:**
+- **John:** "My hope is the backlog shrinks with the code. A large backlog isn't actually a problem as long as we're not losing important things in the mix. A lot of it can be consolidated, or will be overtaken/made redundant. Trying to figure it all out in advance will be a fool's errand [typed "a good errand"; John confirmed the reading], but tackled in chunks will likely help."
+- **The recommendation moved** from one sort of all ~1,358 tickets before the switch to a quick safety pass plus chunks alongside the work. My first-pass triage of Appendix A above is superseded: the chunks apply D3's rule. The model's "sort hard" lever in Plotting the Course assumed one early sort, so the page needs refreshing.
 
-**Leads to:** the backlog emptied into phases, notes or closed.
+**Leads to:** one ask (the quick pass for what matters); LIN-4390 and LIN-4392 kicked off; LIN-4210 to John; chunked sorting folded into D10's tasks.
 
 ---
 
@@ -488,7 +497,7 @@ The north star counts false escalations as a headline cost.
 4. routine deletion (D12, D14);
 5. a weekly measure (D16).
 
-### D12. The drain ○
+### D12. The drain ◐
 *(earlier list: 2)*
 
 **What we know.**
@@ -679,6 +688,8 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 | D8 | No new mess before merge (a blind read before merge, its findings fixed by the builder) | Waiting for words |
 | D8 | Waiting moves into code: quiet "still waiting" wakes become code, and a stalled wait raises an alarm | Waiting for words |
 | D10 | The front end left better than we found it: browser code that shares rather than restates, still with no build step and no framework, slice by slice; the side rail and the sprinkling on the cleaner frame. After the switch | Waiting for words |
+| D11 | A quick pass over the open tickets for anything that breaks something, blocks work or touches safety, so nothing important is lost; the rest is sorted in chunks alongside the work | Waiting for words |
+| D11 | Kick off LIN-4390 and LIN-4392 (already filed; defects) | Waiting for go-ahead |
 
 ## Decisions made
 
@@ -695,6 +706,7 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 | D8 | 9 Nov | Until the switch, two at a time: see each task's sessions (LIN-4395), no new mess before merge, waiting moves into code; alongside, Periodicals skip the Surveys and the weekly measure as a Periodical. The drain waits. After the switch: cheaper builder, warm builder with fresh judges, faster CI. Each change kept only if the blind read and cost agree, and names what it retires. | Asks for steps 2 and 3 |
 | D9 | 9 Nov | Opus via kickoff until the switch; then back to the reliable cheaper defaults. Same-family cheaper-and-better: just change the default, revert if needed. No new layer (LIN-4348 to close), no new key. | LIN-4348 closes in the sort |
 | D10 | 9 Nov | Until the switch: D8's loop changes and the backlog sort. After: Jira works for the loop; the front end left better than found (shares rather than restates, still no build step or framework, slice by slice); two Theseus lanes. Runner and Costs not tasks for now. "No build step" read as allowing native browser imports. | Asks: Jira, front end |
+| D11 | 9 Nov | No big sort up front: the backlog shrinks with the code. One quick pass finds anything that breaks, blocks or touches safety; the rest is sorted a chunk at a time alongside work in each area. John approves closes and moves by group. LIN-4390 and LIN-4392 first; LIN-4210 to John. | Ask: the quick pass |
 
 ## Appendix A: open tickets from this work (8 Nov)
 
