@@ -80,6 +80,7 @@ The roadmap's measures start from these.
   - Harbour reads, edits, comments on and labels Jira issues, with OAuth sign-in.
   - It can't create a Jira issue, so on Jira the loop can't file a follow-up, mint a Periodical or file a sealed task.
   - Also open: LIN-4355 (the As asked block), LIN-2805 (the ticket walk knows only `LIN-` IDs), the real-site checks (LIN-2094, LIN-2026, LIN-2170) and boards and sprints (LIN-2008).
+- **Refined by later items (9 Nov):** "the gate" is now called **the switch** (D8). "Read weekly" became "read whenever the Stability Review runs, per piece of work" (D16). Several hand jobs listed below found other homes: rulings stay light handholding (D5), and the drain waits (D8, D12).
 - **What still needs the hand**, and so stands between us and the gate:
   - the blind read before merge;
   - filtering rulings;
@@ -590,8 +591,10 @@ The north star counts false escalations as a headline cost.
 
 **Leads to:** targets for D10's Theseus lanes; LIN-4350 un-parked when its lane comes.
 
-### D15. Evidence in git ◐
+### D15. Evidence in git ✓
 *(earlier list: 6)*
+
+**The question.** Should raw evidence keep being committed to the repo?
 
 **What we know.**
 - 55% of repository bytes are evidence, and the two evidence trees took 93% of the window's byte growth.
@@ -605,31 +608,44 @@ The north star counts false escalations as a headline cost.
 
 **Recommendation:** (c) for new evidence, (b) for old.
 
-**Decision:** —
+**Decision (9 Nov, John: "Yes"):** For now, the heavy repo is fine. Later, a separate repo can hold what we want but don't need in the main one, and a streamlined repo will come for distribution anyway. No ask now.
 
-**Notes:** —
+**Notes:**
+- **John:** "I'd honestly be happy with an additional fresh repo for all the things we want, but don't need in the main repo. For now, the heavy repo is fine. And we'll eventually want a fresh repo for distribution anyway that's streamlined."
+- **Measured on main, 9 Nov:** `docs/reviews` 89 MB, `docs/papers` 39 MB.
 
-**Leads to:** one ticket in your words.
+**Leads to:** nothing now; the two repos are for later stretches (D17).
 
-### D16. Measure it weekly ◐
+### D16. Measure it weekly ✓
 *(curve move 5; folds into D1)*
+
+**The question.** How do D1's measures get read, given that a calendar week doesn't match how much happened?
 
 **Recommendation:**
 - The Stability Review runs weekly with the curve as its headline: net lines, deletions per addition, CI time, Waiting entries, tickets per landing.
 - Drift and Seams read coherence at each phase gate.
 - Round 1 has none yet, so one reading over its window opens phase 0.
 
-**Decision:** —
+**Decision (9 Nov, John: "Yes"):**
+- Use the existing Periodicals as they are. The Stability Review reports D1's five measures per landing or per task, not per week, so a reading means the same however busy the period was. Net production lines lead, with code and comments counted separately.
+- Coherence readings (Drift and Seams) are started by hand when a moment matters: once now over round 1 as the baseline, then at the switch. No new scheduling.
+- One small ask for the Stability Review's change, alongside the work before the switch (D8).
 
-**Notes:** —
+**Notes:**
+- **John:** "weekly is sort of the wrong cadence as it's based on how much happened. We have no real way to schedule work, so I'm not sure how to do this other than just using the existing Periodicals feature?"
+- **Checked on main:**
+  - every Periodical's cadence is `'weekly'` (`lib/periodical-runs.js`, "Weekly-only today");
+  - the Stability Review is one of them (`lib/periodicals.js`, LIN-453);
+  - a Periodical can be started on demand through the Mint button or `POST /api/proxy/periodicals/:id/mint` (LIN-4313, `routes/proxy-dispatch.js`).
+- **This refines D1's "read weekly"** to "read whenever the Stability Review runs, per piece of work".
 
-**Leads to:** the Periodicals' cadence; phase 0's coherence reading.
+**Leads to:** one small ask (the Stability Review's measures); the round-1 coherence readings, started by hand; Drift and Seams again at the switch.
 
 ---
 
 ## Part 6: the roadmap
 
-### D17. Shape, and who writes it ○
+### D17. Shape, and who writes it ◐
 
 **Proposal.**
 - **Anchor:** the north star stays. The trig point is the goal, with D1's four measures.
@@ -717,6 +733,8 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 | D10 | The front end left better than we found it: browser code that shares rather than restates, still with no build step and no framework, slice by slice; the side rail and the sprinkling on the cleaner frame. After the switch | Waiting for words |
 | D11 | A quick pass over the open tickets for anything that breaks something, blocks work or touches safety, so nothing important is lost; the rest is sorted in chunks alongside the work | Waiting for words |
 | D11 | Kick off LIN-4390 and LIN-4392 (already filed; defects) | Waiting for go-ahead |
+| D16 | The Stability Review reports D1's five measures per landing or per task, net production lines first, code and comments counted separately | Waiting for words |
+| D16 | Start Drift and Seams now over round 1's window, as the baseline (a usual "start a run") | Waiting for go-ahead |
 
 ## Decisions made
 
@@ -737,6 +755,8 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 | D12 | 9 Nov | The drain waits (D8). The larger tidies are D10's front-end and Theseus lanes, each read blind before and after, beside one untouched area read at the same times. | Blind reads with D10's lanes |
 | D13 | 9 Nov | No surfaces retired by default; each view is Theseus'd after finding why it's large, aiming at light little views. Rides on the front-end lane in small slices (size call: small). Retiring only as John's call. | Carried by the front-end ask |
 | D14 | 9 Nov | D8's "names what it retires" covers finishing. First Theseus-lane candidates, in small slices: dispatch-store.js, the tests (with faster CI), folding the prompt rules (LIN-4350). | Targets for D10's lanes |
+| D15 | 9 Nov | The heavy repo is fine for now. Later: a separate repo for what we want but don't need in main, and a streamlined repo for distribution. | Later stretches |
+| D16 | 9 Nov | Existing Periodicals as they are: the Stability Review reports D1's measures per landing or task (code and comments separate). Drift and Seams started by hand now (round 1 baseline) and at the switch. | Small ask; mint the round-1 readings |
 
 ## Appendix A: open tickets from this work (8 Nov)
 
