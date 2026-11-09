@@ -261,8 +261,10 @@ The north star counts false escalations as a headline cost.
 
 **Leads to:** a Waiting entry in the rulings area's note, written by the backlog sort (D11); no ticket now.
 
-### D6. Your size choice per task, and settings in general ◐
+### D6. Your size choice per task, and settings in general ✓
 *(earlier list: 7)*
+
+**The question.** Who decides how big a move each task makes, and how do they choose? And what's the rule for settings in general?
 
 **What we know.**
 - 4 Nov: "a task is chosen, surveyed, and the user decides how much to tidy up."
@@ -277,13 +279,21 @@ The north star counts false escalations as a headline cost.
 
 **Recommendation:** (c), with the per-task menu as the surface. Settings stay few and plain.
 
-**Decision:** —
+**Decision (9 Nov, John: "Yes, I like it. I'm sure we'll refine it as we go"):**
+- The size of each task is just another ruling: "how much tidying on this task?", with the sizes as options, each with a rough cost from the Survey, and a recommended pick that leans larger. It shows wherever rulings show, so there's no new page and no new system.
+- A setting chooses who answers: ask me, or let the driving agent decide with the default (lean larger where it pays). Even on "ask me", it only asks when there's a real choice. A small, clear task stays just the task.
+- A rule for all settings: a setting must make sense to a new user who doesn't know how Harbour works.
+- One ask in John's words, after the gate. Fuzzy on purpose: what and why, not how.
 
-**Notes:** —
+**Notes:**
+- **The shape is John's:** "I imagined a page a little like the rulings page, as that's our q&a feature really. Sometimes a driving agent will rule, sometimes it'll go to a human… We want to avoid building out some big complex system, and this could simply use rulings? Settings provides a nice few options, allowing users to always be asked, or follow some default." The picture he pointed to is the "How much to tidy" dial in *Toward Settled*.
+- **Most of the plumbing exists** (main, `lib/size-of-move.js`): a person's size comment is already read by scoping as their ruling ("Decided by: a ruling"), and without one the record says "Decided by: the standing policy".
+- **On the removed switch (LIN-4368)**, John: "the setting we removed wasn't wrong per se, just unusable". It was named after an internal concept, showed only the option you'd switch to, demanded a reason, and mixed who decides with which way to lean. The settings rule is what keeps that from recurring.
+- **The recommendation moved** from a per-task menu as its own surface (with the UI work) to a size ruling, which needs no new surface.
 
-**Leads to:** a product ticket (it may belong with the UI work, LIN-4342/4343).
+**Leads to:** one ask (the size question as a ruling, with a plain setting for who answers), after the gate; added to "Asks to file".
 
-### D7. Two Surveys, or one look? ○
+### D7. Two Surveys, or one look? ◐
 *(earlier list: 11)*
 
 **What we know.**
@@ -611,6 +621,7 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 |---|---|---|
 | D3 | Harbour's leftover rule: outside-area finds go into that area's note as a Waiting entry; a ticket only if they break something, block work or touch safety | Waiting for words |
 | D1 → D10 | Harbour can create a Jira issue (no ticket exists yet). The other Jira gaps already have tickets (LIN-4355, LIN-2805, LIN-2094, LIN-2026, LIN-2170, LIN-2008) and go through the sort (D11) | Waiting for words |
+| D6 | The size of each task as a ruling, with a plain setting for who answers (ask me, or follow the default); asks only when there's a real choice. After the gate | Waiting for words |
 
 ## Decisions made
 
@@ -622,6 +633,7 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 | D3 | 9 Nov | Outside-area finds become a Waiting entry in that area's note; a ticket only if it breaks, blocks or touches safety. Notes move by sized changes, the drain, and sweeps or tidy-ups outside tasks. | Ask: change the leftover rule; re-home round 1's tickets at D11 |
 | D4 | 9 Nov | Accept LIN-4346's mixed end; its edges go into area notes through the backlog sort, for the "one look" hop or a tidy-up to take on. "One tidy per area" retired: the size chosen at scoping decides how far a move goes. | D11 writes the edges into notes |
 | D5 | 9 Nov | Rulings mostly work and stay as they are. Duplicates handled enough. A simpler version later (one dismiss that doesn't wake the agent; proposals visible; agreement recorded), noted via the sort. | Note via D11; hop leaves the gate weeks |
+| D6 | 9 Nov | The size of each task is a ruling (sizes as options with rough costs; recommended leans larger). A plain setting chooses who answers: ask me, or the driving agent with the default; it only asks when there's a real choice. Settings must make sense to a new user. | Ask after the gate |
 
 ## Appendix A: open tickets from this work (8 Nov)
 
