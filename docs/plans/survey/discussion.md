@@ -645,7 +645,9 @@ The north star counts false escalations as a headline cost.
 
 ## Part 6: the roadmap
 
-### D17. Shape, and who writes it ◐
+### D17. Shape, and who writes it ✓
+
+**The question.** How do the decisions become a roadmap, and when does Harbour take it on?
 
 **Proposal.**
 - **Anchor:** the north star stays. The trig point is the goal, with D1's four measures.
@@ -670,24 +672,31 @@ The north star counts false escalations as a headline cost.
 
 **Recommendation:** adopt the shape. File the drafting ticket once Parts 1–5 are decided.
 
-**Decision:** —
+**Decision (9 Nov, John: "Agreed!"):**
+- We plan here, outside Harbour's process, and drive it ourselves for now, holding the hand. This record and the asks list are the working plan. There are two stretches, **until the switch** and **open the door**, and what comes after is chosen when we get there.
+- **The north star is updated early,** the way v3 was made. At the end of this discussion this session drafts v4 from it, with the change and John's sentence behind each addition, and John accepts it. It takes the lasting parts: the goal, the measures in order, leaving things better, and using what exists.
+- **The plan-for-now parts** (the outside team, the two stretches, things in flight) go into two Linear projects, one per stretch, at the switch.
+- **The asks** are read back to John word for word at the end of the discussion, then filed.
 
-**Notes:** —
+**Notes:**
+- **John:** "I'd like us to plan somewhat outside of Harbour's process, but once settled fold it on. Eg update the North Star etc. though, we'll still mostly drive it ourselves for now… we're still holding the hand, so it's more bookkeeping than practical, I think?" Then: "I'd be happy to update the North Star earlier. No harm?"
+- **v3's authorship rule** (LIN-2926; `docs/north-star.md` provenance line): drafted with a Claude session from a planning conversation with John, accepted by him, with the diff and his sentence behind each change in a proposal doc. The Roadmap page scores work against the north star (`lib/prompts/roadmap-north-star-template.js`), so an early update keeps Harbour pulling the same way.
+- **The proposed shape above is superseded:** no streams, no phase table, no drafting ticket, and no ~5-ticket cap (D1 and D8 set two in flight, then four).
 
-**Leads to:** the roadmap ticket; Linear projects.
+**Leads to:** north star v4, drafted at the end of the discussion; two Linear projects at the switch; the asks read back and filed.
 
 ---
 
 ## Part 7: retro and housekeeping
 
-### D18. Retro counts ○
+### D18. Retro counts ◐
 *(earlier list: 14)* Tickets opened against closed in round 1, tagged by cause (tidy, incident, expansion); check retries (LIN-4369, arms 1–4); rulings that were engineering calls; times a suggested answer claimed you'd done something; blind reads against cost per area.
 
 **Recommendation:** count once, from the log and `/cost`, and record the counts here.
 
 **Decision:** —  **Notes:** —
 
-### D19. Alarms between sessions ○
+### D19. Alarms between sessions ◐
 *(earlier list: 15)*
 
 **What we know.**
@@ -699,7 +708,7 @@ The north star counts false escalations as a headline cost.
 
 **Decision:** —  **Notes:** —
 
-### D20. Ticket history in code comments ○
+### D20. Ticket history in code comments ◐
 *(earlier list: 16)*
 
 **What we know.** Named in every blind read since 5 Nov. Comprehension-Debt sharpened it: the debt is status claims that go stale, and line-number pointers.
@@ -708,7 +717,7 @@ The north star counts false escalations as a headline cost.
 
 **Decision:** —  **Notes:** —
 
-### D21. Small items ○
+### D21. Small items ◐
 *(earlier list: 18)*
 - **The benchmark column in model pickers:** with LIN-4342/4343.
 - **Paper v2 (LIN-4275):** a scheduled task in this session fires on 12 Nov at 09:41 UTC and needs a fresh proxy token. Keep or cancel?
@@ -757,6 +766,7 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 | D14 | 9 Nov | D8's "names what it retires" covers finishing. First Theseus-lane candidates, in small slices: dispatch-store.js, the tests (with faster CI), folding the prompt rules (LIN-4350). | Targets for D10's lanes |
 | D15 | 9 Nov | The heavy repo is fine for now. Later: a separate repo for what we want but don't need in main, and a streamlined repo for distribution. | Later stretches |
 | D16 | 9 Nov | Existing Periodicals as they are: the Stability Review reports D1's measures per landing or task (code and comments separate). Drift and Seams started by hand now (round 1 baseline) and at the switch. | Small ask; mint the round-1 readings |
+| D17 | 9 Nov | Plan here, drive it ourselves for now. Two stretches (until the switch; open the door), later ones chosen when we get there. North star v4 drafted early from this discussion (lasting parts), John accepts. Stretches become Linear projects at the switch. | Draft v4; read back asks |
 
 ## Appendix A: open tickets from this work (8 Nov)
 
