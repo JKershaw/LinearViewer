@@ -148,8 +148,10 @@ The roadmap's measures start from these.
 
 ## Part 2: the rules of the loop
 
-### D3. Leftovers outside a change's area: a ticket or a note? ◐
+### D3. Leftovers outside a change's area: a ticket or a note? ✓
 *(earlier list: 1)*
+
+**The question.** When a change spots something that needs doing outside its own area, where does it go: a new ticket, or a note in that area?
 
 **What we know.**
 - Harbour's `LEFTOVER_RULE`:
@@ -167,13 +169,22 @@ The roadmap's measures start from these.
 
 **Recommendation:** (b). It converges, keeps one home per item, and puts outside-area finds where the next change in that area reads them. Defects that break something still get a ticket.
 
-**Decision:** —
+**Decision (9 Nov, John: "I agree with b"):**
+- Outside-area finds go into that area's own note as a Waiting entry, not a ticket. They become a ticket only if they break something, block work, or touch safety. One home still holds: never both.
+- Notes move when a change in that area is sized to take one on, through the drain (D12) in spare time, and through larger sweeps and specific tidy-ups run outside tasks. The Waiting count is read weekly beside the curve, so a growing pile shows.
+- This changes Harbour's own leftover rule, so it goes in as an ask in John's words. The round-1 tickets filed under the old rule get re-homed in the backlog sort (D11).
 
-**Notes:** —
+**Notes:**
+- **John's reasons:** "Good to know, not necessarily for now. Reduces a spiral out, especially on large codebases. Larger sweeps and specific tidy ups outside of tasks can still happen, making b fine." The sweeps and tidy-ups clause is his addition to the drafted answer.
+- **Checked on main, 9 Nov:**
+  - `LEFTOVER_RULE` (`lib/prompts/leftover-words.js`) still files outside-area finds as follow-ups at close-out.
+  - `docs/areas/README.md` already says "Waiting entries are context, not scope", and its guard requires an entry's first cited path to map to the note's own area, so an outside find lands in the note of the area it belongs to.
+- **For the outside team:** Harbour can't create a Jira issue yet, so close-out follow-ups would fail there. Notes live in the repo and work whatever the tracker.
+- **Not yet answered:** whether to file the asks as each decision is made or collect them and file together at the end. Until John says, they're collected below in "Asks to file" and nothing is filed.
 
 **Leads to:** a product ticket in your words if (b) or (c); triage of the four tickets in D11.
 
-### D4. One tidy per area, and LIN-4346's mixed end ○
+### D4. One tidy per area, and LIN-4346's mixed end ◐
 *(earlier list: 9)*
 
 **What we know.**
@@ -567,12 +578,22 @@ The north star counts false escalations as a headline cost.
 
 ---
 
+## Asks to file
+
+Collected as decisions are made. Nothing here is filed yet. Each is read back to John word for word before filing.
+
+| From | The ask, in short | State |
+|---|---|---|
+| D3 | Harbour's leftover rule: outside-area finds go into that area's note as a Waiting entry; a ticket only if they break something, block work or touch safety | Waiting for words |
+| D1 → D10 | Harbour can create a Jira issue (no ticket exists yet). The other Jira gaps already have tickets (LIN-4355, LIN-2805, LIN-2094, LIN-2026, LIN-2170, LIN-2008) and go through the sort (D11) | Waiting for words |
+
 ## Decisions made
 
 | Item | Date | Decision | Follow-up |
 |---|---|---|---|
 | (LIN-4395) | 8 Nov | File: a task shows the sessions that ran it, on one clock | Filed, Backlog; placed in D8 |
 | D1 | 8 Nov | Goal: toward settled, a balance. Five measures (no new mess, the curve, speed, your seat, cost), read weekly. First stretch: "open the door" for a small Jira team on their own runner. Gate: two in flight until running it needs nothing complex. $3,500 a week. Targets set at gates. | D17's phases start with the gate; Jira gaps to D10 |
+| D3 | 9 Nov | Outside-area finds become a Waiting entry in that area's note; a ticket only if it breaks, blocks or touches safety. Notes move by sized changes, the drain, and sweeps or tidy-ups outside tasks. | Ask: change the leftover rule; re-home round 1's tickets at D11 |
 | D2 | 9 Nov | You: destination, asks word for word, the calls that are yours. This session: an agent, not a script; thinks freely, acts lightly, says so when it steps in. Harbour: kickoff to merge, taking on more as hops land. Rulings: light handholding for now. The role thins as work moves into Harbour. | Feeds D8, D10 and the "your seat" measure |
 
 ## Appendix A: open tickets from this work (8 Nov)
