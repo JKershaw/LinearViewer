@@ -409,8 +409,10 @@ The north star counts false escalations as a headline cost.
 
 ## Part 4: the next round
 
-### D10. The real tasks ◐
+### D10. The real tasks ✓
 *(earlier list: 4)*
+
+**The question.** What real work runs next, in what order, and how is it sized and measured?
 
 **What we know.**
 - **LIN-4341, Costs:** about ten places show cost. It's the north star's headline number, and it stands on ground the loop already tidied.
@@ -430,13 +432,34 @@ The north star counts false escalations as a headline cost.
   - a blind area read at the end;
   - a Periodical over the window.
 
-**Decision:** —
+**Decision (9 Nov, John: "I like it! We're not redoing it all, but we are cleaning up potentially a significant amount of tech debt"):**
+- **Until the switch:** D8's loop changes, each run through the full loop, plus the backlog sort (D11).
+- **After the switch, four in flight, each in a different area:**
+  1. **Jira works for the loop:** Harbour can create Jira issues and hold the sealed ask, checked on John's Jira, which is already in real use.
+  2. **The front end, left better than we found it:** browser code that shares rather than restates, still with no build step and no framework, taken slice by slice and starting small. The side rail and the sprinkling ride on the cleaner frame. This one wants more of John early: the size call, the first slice, reading the result.
+  3. and 4. **Theseus moves on the next busiest clusters,** from the sort and the census.
+- **Not tasks for now:** the runner (John sets up Simple Dispatcher at the company or uses the in-Claude-Code runner, and anything that breaks gets filed) and Costs (LIN-4341, later: the team is on subscriptions).
+- **The rule:** "no build step, no framework" stays, and it's read as allowing the browser to import, as browsers do natively. That reading goes into the project's own notes, so agents stop restating code.
+- **Sizing:** the default (err larger) unless John comments a size; the front end gets his call. **Measuring:** D1's five measures weekly, plus each task's session graph and blind read.
 
-**Notes:** —
+**Notes:**
+- **John on the first audience** (outside team not named here): "I've logged in with Harbour on Jira and been using it for a few weeks and it's mostly fine except for the gaps that you've identified. I'm happy to set up either Simple Dispatcher internally in the company… and/or we can use the in-Claude-Code runner; both are fine options. We're on subscriptions so cost is less of an issue and Harbour is already significantly more efficient than the way the company's currently using AI. Side rail and other UI improvements are important purely because the current ones are just mostly the original ones and are due a bit of a sprinkling. But! The front end code is messy."
+- **John on the cause:** "my gut says the UI issues trace back to one of my very first rules: no build step… it's the biggest target of the Theseus method… We don't need to tidy it all, but it's a perfect example where we can leave it better than we found it. Likely this will take a fair amount of hand holding."
+- **Checked on main, 9 Nov:**
+  - 44 browser files, about 35,100 lines, plus about 20,500 lines of CSS.
+  - No browser file uses import or export, and there's no `type="module"` anywhere. Pages share through 66 globals on `window`.
+  - The largest file is `public/observation.js` at 5,019 lines.
+  - Nine browser files say they restate server logic. `public/cost-format.js`: "restated here because a browser IIFE has no module graph to lib/".
+  - Seven parity tests exist to keep the copies in step, and 96 unit tests read browser files as text.
+- **The recommendation moved:**
+  - "their own runner" was dropped as a task;
+  - Costs moved later;
+  - the rail and the sweep came back in, on a consolidated front end, after John said the UI matters;
+  - "a real Jira site" became John's own Jira.
 
-**Leads to:** phase 1 and phase 2.
+**Leads to:** asks in John's words for Jira and the front end (after the switch); the reading of the rule into `CLAUDE.md` (with the front-end ask); D11; D13 and D14 for lanes 3 and 4.
 
-### D11. Triage of the open tickets ○
+### D11. Triage of the open tickets ◐
 *(earlier list: 3; the list is in Appendix A)*
 
 **My first pass, for you to change.**
@@ -650,11 +673,12 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 | From | The ask, in short | State |
 |---|---|---|
 | D3 | Harbour's leftover rule: outside-area finds go into that area's note as a Waiting entry; a ticket only if they break something, block work or touch safety | Waiting for words |
-| D1 → D10 | Harbour can create a Jira issue (no ticket exists yet). The other Jira gaps already have tickets (LIN-4355, LIN-2805, LIN-2094, LIN-2026, LIN-2170, LIN-2008) and go through the sort (D11) | Waiting for words |
+| D1 → D10 | Jira works for the loop: Harbour can create a Jira issue (no ticket exists yet) and hold the sealed ask; checked on John's Jira. After the switch. The other Jira gaps already have tickets (LIN-4355, LIN-2805, LIN-2094, LIN-2026, LIN-2170, LIN-2008) and go through the sort (D11) | Waiting for words |
 | D6 | The size of each task as a ruling, with a plain setting for who answers (ask me, or follow the default); asks only when there's a real choice. After the gate | Waiting for words |
 | D7 | Periodical reviews skip the Surveys | Waiting for words |
 | D8 | No new mess before merge (a blind read before merge, its findings fixed by the builder) | Waiting for words |
 | D8 | Waiting moves into code: quiet "still waiting" wakes become code, and a stalled wait raises an alarm | Waiting for words |
+| D10 | The front end left better than we found it: browser code that shares rather than restates, still with no build step and no framework, slice by slice; the side rail and the sprinkling on the cleaner frame. After the switch | Waiting for words |
 
 ## Decisions made
 
@@ -670,6 +694,7 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 | D7 | 9 Nov | Keep both Surveys on tasks that change code; Periodical reviews skip them. A conditional one-look waits as a later optimisation. | Small ask |
 | D8 | 9 Nov | Until the switch, two at a time: see each task's sessions (LIN-4395), no new mess before merge, waiting moves into code; alongside, Periodicals skip the Surveys and the weekly measure as a Periodical. The drain waits. After the switch: cheaper builder, warm builder with fresh judges, faster CI. Each change kept only if the blind read and cost agree, and names what it retires. | Asks for steps 2 and 3 |
 | D9 | 9 Nov | Opus via kickoff until the switch; then back to the reliable cheaper defaults. Same-family cheaper-and-better: just change the default, revert if needed. No new layer (LIN-4348 to close), no new key. | LIN-4348 closes in the sort |
+| D10 | 9 Nov | Until the switch: D8's loop changes and the backlog sort. After: Jira works for the loop; the front end left better than found (shares rather than restates, still no build step or framework, slice by slice); two Theseus lanes. Runner and Costs not tasks for now. "No build step" read as allowing native browser imports. | Asks: Jira, front end |
 
 ## Appendix A: open tickets from this work (8 Nov)
 
