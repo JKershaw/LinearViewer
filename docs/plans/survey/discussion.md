@@ -317,7 +317,7 @@ The north star counts false escalations as a headline cost.
 - This replaces the "one look for small moves" hop with a smaller change: Periodicals skip the Surveys, filed as one small ask in John's words. It touches the look-first code, so it can still take on LIN-4346's edges if its size allows (D4).
 
 **Notes:**
-- **John:** "feels like we're making it more complex by making it conditional (perhaps a later optimisation). And whilst it's tempting to do a single review, we did find benefits from two. Happy to skip for periodicals though."
+- **John:** "feels like we're making it more complex by making it conditional (perhaps a later optimisation). And whilst it's tempted to do a single review, we did find benefits from two. Happy to skip for periodicals though."
 - **Checked on main** (`lib/recommendation-look-first.js`): the sequence runs on any fresh leaf ticket with an As asked block. It's skipped only when there's a size record, a plan, a linked PR, an open blocker, a run waiting on a person, or a person's holding comment. Nothing excludes Periodical reviews.
 - **The skip covers Periodicals only.** My wider "other advisory tickets" was dropped, because it would be another condition.
 
