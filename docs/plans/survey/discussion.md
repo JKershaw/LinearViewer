@@ -497,8 +497,10 @@ The north star counts false escalations as a headline cost.
 4. routine deletion (D12, D14);
 5. a weekly measure (D16).
 
-### D12. The drain ◐
+### D12. The drain ✓
 *(earlier list: 2)*
+
+**The question.** How do the area notes get worked off, and how do we learn whether larger tidies help the codebase settle?
 
 **What we know.**
 - 66 Waiting entries, and nothing schedules them.
@@ -512,13 +514,16 @@ The north star counts false escalations as a headline cost.
 
 **Recommendation:** (c). (b) is the experiment that decides whether the whole codebase can settle. (a) keeps the notes from becoming a second backlog.
 
-**Decision:** —
+**Decision (9 Nov, John: "Agreed, it's a nice and simple solution"):**
+- **The drain waits,** as D8 says. Notes move through changes in their area, sweeps and tidy-ups (D3), and the sorting chunks (D11). The weekly Waiting count tells us if they pile up, and if they do, the first idea is a Periodical using what exists.
+- **The larger tidies on the worst areas are D10's front-end and Theseus lanes.** To learn from them, each gets a blind area read before and after, and one similar area left alone is read at the same times, so we can tell settling from drift. It's paid from the measuring budget.
 
-**Notes:** —
+**Notes:**
+- (a) was set aside by D8. (b) runs as D10's lanes rather than as separate tickets. The comparison with an untouched area is the first paper's "Next 1" design, kept cheap.
 
-**Leads to:** phase 3.
+**Leads to:** the blind reads for D10's lanes; a comparison area picked when the first lane starts.
 
-### D13. Surface census and removals ○
+### D13. Surface census and removals ◐
 *(curve move 3)*
 
 **What we know.**
@@ -707,6 +712,7 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 | D9 | 9 Nov | Opus via kickoff until the switch; then back to the reliable cheaper defaults. Same-family cheaper-and-better: just change the default, revert if needed. No new layer (LIN-4348 to close), no new key. | LIN-4348 closes in the sort |
 | D10 | 9 Nov | Until the switch: D8's loop changes and the backlog sort. After: Jira works for the loop; the front end left better than found (shares rather than restates, still no build step or framework, slice by slice); two Theseus lanes. Runner and Costs not tasks for now. "No build step" read as allowing native browser imports. | Asks: Jira, front end |
 | D11 | 9 Nov | No big sort up front: the backlog shrinks with the code. One quick pass finds anything that breaks, blocks or touches safety; the rest is sorted a chunk at a time alongside work in each area. John approves closes and moves by group. LIN-4390 and LIN-4392 first; LIN-4210 to John. | Ask: the quick pass |
+| D12 | 9 Nov | The drain waits (D8). The larger tidies are D10's front-end and Theseus lanes, each read blind before and after, beside one untouched area read at the same times. | Blind reads with D10's lanes |
 
 ## Appendix A: open tickets from this work (8 Nov)
 
