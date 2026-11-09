@@ -369,8 +369,10 @@ The north star counts false escalations as a headline cost.
 
 **Leads to:** asks in John's words for steps 2 and 3 (LIN-4395 is filed); D12; D16.
 
-### D9. Models ◐
+### D9. Models ✓
 *(earlier list: 4, 5 and 12, part)*
+
+**The question.** Which models run our tasks, and how do we change them over time?
 
 **What we know.**
 - Routing defaults:
@@ -391,17 +393,23 @@ The north star counts false escalations as a headline cost.
 - Opus via your kickoff for the real tasks (your call, per task), with LIN-4348 kept for phase 4.
 - A capped key, yes, small and scoped. It unblocks Luna's evidence and the Costs reconciliation.
 
-**Decision:** —
+**Decision (9 Nov, John: "Perfect"):**
+- **Until the switch:** our tasks run on Opus, given through John's kickoff.
+- **After the switch:** back to the cheaper defaults we know are reliable. When a newer model in the same family is cheaper and better, we just change the default, and revert if it misbehaves. A cut-off answer now fails loudly, so a bad switch shows itself.
+- **No new layer.** "Choose the model by the kind of work" (LIN-4348) isn't needed, and goes to the backlog sort to be closed.
+- **No new key.** Harbour's existing key covers its own calls.
 
-**Notes:** —
+**Notes:**
+- **John:** "Let's switch back to our cheaper options we know are reliable, after the gate. But, if we find a cheaper better model from the same family, we've yet to have a problem just switching. We can always revert. Happy to just change the defaults rather than adding a new layer."
+- **The key was dropped** when John asked what it was for that we don't already have. Harbour already has its own OpenRouter key. The key in question was for a *worker*, to make live test calls before a switch: the "grant-key" option on LIN-4358's ruling `lin4358-decisive-row`, where John chose "build anyway". My Costs-reconciliation reason didn't hold, because only Harbour's own calls go through OpenRouter, and they already use its key. LIN-4358 piece 1 (whole or loud) makes a bad switch visible.
 
-**Leads to:** the kickoffs in D10; one key, set up by you.
+**Leads to:** the kickoffs (D10); LIN-4348 to close in the sort (D11).
 
 ---
 
 ## Part 4: the next round
 
-### D10. The real tasks ○
+### D10. The real tasks ◐
 *(earlier list: 4)*
 
 **What we know.**
@@ -661,6 +669,7 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 | D6 | 9 Nov | The size of each task is a ruling (sizes as options with rough costs; recommended leans larger). A plain setting chooses who answers: ask me, or the driving agent with the default; it only asks when there's a real choice. Settings must make sense to a new user. | Ask after the gate |
 | D7 | 9 Nov | Keep both Surveys on tasks that change code; Periodical reviews skip them. A conditional one-look waits as a later optimisation. | Small ask |
 | D8 | 9 Nov | Until the switch, two at a time: see each task's sessions (LIN-4395), no new mess before merge, waiting moves into code; alongside, Periodicals skip the Surveys and the weekly measure as a Periodical. The drain waits. After the switch: cheaper builder, warm builder with fresh judges, faster CI. Each change kept only if the blind read and cost agree, and names what it retires. | Asks for steps 2 and 3 |
+| D9 | 9 Nov | Opus via kickoff until the switch; then back to the reliable cheaper defaults. Same-family cheaper-and-better: just change the default, revert if needed. No new layer (LIN-4348 to close), no new key. | LIN-4348 closes in the sort |
 
 ## Appendix A: open tickets from this work (8 Nov)
 
