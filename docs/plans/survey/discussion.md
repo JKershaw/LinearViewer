@@ -689,14 +689,20 @@ The north star counts false escalations as a headline cost.
 
 ## Part 7: retro and housekeeping
 
-### D18. Retro counts ◐
+### D18. Retro counts ✓
+**The question.** Should round 1's retro be counted by hand?
+
 *(earlier list: 14)* Tickets opened against closed in round 1, tagged by cause (tidy, incident, expansion); check retries (LIN-4369, arms 1–4); rulings that were engineering calls; times a suggested answer claimed you'd done something; blind reads against cost per area.
 
 **Recommendation:** count once, from the log and `/cost`, and record the counts here.
 
-**Decision:** —  **Notes:** —
+**Decision (9 Nov, John: "I agree with your recommendations"):** No. The review and `round1-results.md` hold the headline numbers: six tickets became about seventeen, LIN-4369 took four arms, and two suggested answers asserted something John hadn't done. From here, the Stability Review per piece of work (D16) and the round-1 coherence baseline do the counting.
 
-### D19. Alarms between sessions ◐
+**Notes:** The recommendation changed from a one-off count to "covered", in the spirit of D2 (act lightly).
+
+### D19. Alarms between sessions ✓
+**The question.** How are stalls between sessions caught?
+
 *(earlier list: 15)*
 
 **What we know.**
@@ -706,24 +712,37 @@ The north star counts false escalations as a headline cost.
 
 **Recommendation:** fold into D8, step 3 (code holds the sequence), with the two round-1 cases as the first alarms.
 
-**Decision:** —  **Notes:** —
+**Decision (9 Nov, John: "I agree with your recommendations"):** Covered by D8: waiting moves into code, and a stalled wait raises an alarm. Round 1's hour-long wait is the first case it should catch.
 
-### D20. Ticket history in code comments ◐
+**Notes:** —
+
+### D20. Ticket history in code comments ✓
+**The question.** Do ticket-history comments need a check?
+
 *(earlier list: 16)*
 
 **What we know.** Named in every blind read since 5 Nov. Comprehension-Debt sharpened it: the debt is status claims that go stale, and line-number pointers.
 
 **Recommendation:** a check in code, not a prompt rule. It fits D14.
 
-**Decision:** —  **Notes:** —
+**Decision (9 Nov, John: "I agree with your recommendations"):** Not yet. The blind read before merge (D8) and the Theseus slices (D10, D13, D14) fix them as they go. D16 counts comments separately, and a check comes back only if the comment share doesn't fall.
 
-### D21. Small items ◐
+**Notes:** 82,154 of 207,338 production JavaScript lines are comment-only (8 Nov). The recommendation moved from a code check now to a check only if the measure shows no fall.
+
+### D21. Small items ✓
+**The question.** What happens to the small leftovers?
+
 *(earlier list: 18)*
 - **The benchmark column in model pickers:** with LIN-4342/4343.
 - **Paper v2 (LIN-4275):** a scheduled task in this session fires on 12 Nov at 09:41 UTC and needs a fresh proxy token. Keep or cancel?
 - **This branch's log is ahead of main by all of round 1.** Sync once at the end of the discussion, or leave the research record on the branch and cite it at a pin?
 
-**Decision:** —  **Notes:** —
+**Decision (9 Nov, John: "I agree with your recommendations"):**
+- The benchmark column waits with the front-end work, as known-not-now.
+- Paper v2 (LIN-4275) runs from the scheduled task on 12 Nov, 09:41 UTC. Its size-against-cost chart is the evidence behind D6's rough cost per size. John provides a fresh proxy token before then.
+- The research record is synced to main once, at the end, as a docs-only pull request carrying just the record and north star v4, cut cleanly so older branch changes don't come along. John approves and merges.
+
+**Notes:** The branch also carries older changes from early in the work (outside `docs/plans/survey/`), which is why the pull request is cut fresh.
 
 ---
 
@@ -767,6 +786,10 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 | D15 | 9 Nov | The heavy repo is fine for now. Later: a separate repo for what we want but don't need in main, and a streamlined repo for distribution. | Later stretches |
 | D16 | 9 Nov | Existing Periodicals as they are: the Stability Review reports D1's measures per landing or task (code and comments separate). Drift and Seams started by hand now (round 1 baseline) and at the switch. | Small ask; mint the round-1 readings |
 | D17 | 9 Nov | Plan here, drive it ourselves for now. Two stretches (until the switch; open the door), later ones chosen when we get there. North star v4 drafted early from this discussion (lasting parts), John accepts. Stretches become Linear projects at the switch. | Draft v4; read back asks |
+| D18 | 9 Nov | No hand count: the review and round-1 results hold the headlines; D16 counts from here. | — |
+| D19 | 9 Nov | Covered by D8 (waiting moves into code; stall alarms). | — |
+| D20 | 9 Nov | No check yet: the blind read before merge and the Theseus slices fix comments as they go; D16 counts them separately. | Revisit if the share doesn't fall |
+| D21 | 9 Nov | Benchmark column waits with the front end. Paper v2 runs 12 Nov (fresh token from John). The record syncs to main once, as a docs-only PR with north star v4. | Token; the PR |
 
 ## Appendix A: open tickets from this work (8 Nov)
 
