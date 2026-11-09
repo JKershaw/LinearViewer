@@ -293,8 +293,10 @@ The north star counts false escalations as a headline cost.
 
 **Leads to:** one ask (the size question as a ruling, with a plain setting for who answers), after the gate; added to "Asks to file".
 
-### D7. Two Surveys, or one look? ◐
+### D7. Two Surveys, or one look? ✓
 *(earlier list: 11)*
+
+**The question.** Do all tasks need both Surveys before work starts?
 
 **What we know.**
 - The pair costs about $1.80 a ticket, roughly 30% of a small ticket.
@@ -308,17 +310,24 @@ The north star counts false escalations as a headline cost.
 
 **Recommendation:** (b) and (c), tried as one change on the session graph (D8, step 2) and measured.
 
-**Decision:** —
+**Decision (9 Nov, John: "D7 looks good"):** (a) for tasks that change code, plus Periodicals skipping the look.
+- Keep both Surveys on every task that changes code. The two voices find different things, and that has been worth it.
+- Periodical reviews skip the Surveys, since they don't change code.
+- A conditional "one look for small tasks" can wait as a later optimisation, because it adds a branch for a small saving.
+- This replaces the "one look for small moves" hop with a smaller change: Periodicals skip the Surveys, filed as one small ask in John's words. It touches the look-first code, so it can still take on LIN-4346's edges if its size allows (D4).
 
-**Notes:** —
+**Notes:**
+- **John:** "feels like we're making it more complex by making it conditional (perhaps a later optimisation). And whilst it's tempting to do a single review, we did find benefits from two. Happy to skip for periodicals though."
+- **Checked on main** (`lib/recommendation-look-first.js`): the sequence runs on any fresh leaf ticket with an As asked block. It's skipped only when there's a size record, a plan, a linked PR, an open blocker, a run waiting on a person, or a person's holding comment. Nothing excludes Periodical reviews.
+- **The skip covers Periodicals only.** My wider "other advisory tickets" was dropped, because it would be another condition.
 
-**Leads to:** D8.
+**Leads to:** one small ask (Periodicals skip the Surveys), added to "Asks to file"; D8.
 
 ---
 
 ## Part 3: the session graph
 
-### D8. The order of changes to the graph ○
+### D8. The order of changes to the graph ◐
 *(earlier list: 13; ticket LIN-4395 filed)*
 
 **What we know.**
@@ -622,6 +631,7 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 | D3 | Harbour's leftover rule: outside-area finds go into that area's note as a Waiting entry; a ticket only if they break something, block work or touch safety | Waiting for words |
 | D1 → D10 | Harbour can create a Jira issue (no ticket exists yet). The other Jira gaps already have tickets (LIN-4355, LIN-2805, LIN-2094, LIN-2026, LIN-2170, LIN-2008) and go through the sort (D11) | Waiting for words |
 | D6 | The size of each task as a ruling, with a plain setting for who answers (ask me, or follow the default); asks only when there's a real choice. After the gate | Waiting for words |
+| D7 | Periodical reviews skip the Surveys | Waiting for words |
 
 ## Decisions made
 
@@ -634,6 +644,7 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 | D4 | 9 Nov | Accept LIN-4346's mixed end; its edges go into area notes through the backlog sort, for the "one look" hop or a tidy-up to take on. "One tidy per area" retired: the size chosen at scoping decides how far a move goes. | D11 writes the edges into notes |
 | D5 | 9 Nov | Rulings mostly work and stay as they are. Duplicates handled enough. A simpler version later (one dismiss that doesn't wake the agent; proposals visible; agreement recorded), noted via the sort. | Note via D11; hop leaves the gate weeks |
 | D6 | 9 Nov | The size of each task is a ruling (sizes as options with rough costs; recommended leans larger). A plain setting chooses who answers: ask me, or the driving agent with the default; it only asks when there's a real choice. Settings must make sense to a new user. | Ask after the gate |
+| D7 | 9 Nov | Keep both Surveys on tasks that change code; Periodical reviews skip them. A conditional one-look waits as a later optimisation. | Small ask |
 
 ## Appendix A: open tickets from this work (8 Nov)
 
