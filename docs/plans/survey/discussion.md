@@ -327,8 +327,10 @@ The north star counts false escalations as a headline cost.
 
 ## Part 3: the session graph
 
-### D8. The order of changes to the graph ◐
+### D8. The order of changes to the graph ✓
 *(earlier list: 13; ticket LIN-4395 filed)*
+
+**The question.** What order should the loop's changes come in, and how do we know each one helped?
 
 **What we know.**
 - The graph's nodes are contexts and its edges are hand-offs through the record.
@@ -350,13 +352,24 @@ The north star counts false escalations as a headline cost.
 
 **Recommendation:** adopt the order. Start step 1 with the next real task (D10). LIN-4395 runs early so the graphs are visible.
 
-**Decision:** —
+**Decision (9 Nov, John: "Yes, and keeps it simple"):**
+- **Until the switch** (when Harbour carries the loop and we go to four in flight), two at a time:
+  1. See each task's sessions (LIN-4395), so every change after is measured.
+  2. No new mess before merge.
+  3. Waiting moves into code: quiet "still waiting" wakes become code, and a stalled wait raises an alarm.
+- **Alongside, two small ones:** Periodicals skip the Surveys (D7), and the weekly measure becomes a Periodical (D16).
+- **The drain waits.** The weekly Waiting count shows whether notes pile up. If they do, D12 decides, and the first idea is a Periodical using what already exists, not a new system.
+- **After the switch:** a cheaper builder where it meets the bar, then a warm builder with fresh judges, and faster CI.
+- **Every change stays only if the blind read and the cost agree, and every change names what it retires.**
 
-**Notes:** —
+**Notes:**
+- **"The gate" is now called "the switch."** John asked what a "gate week" was: "Our milestone to get Harbour carrying more? If so, happy for that to be when we switch." It's D1's gate, the point where running a week needs nothing clever from the agent running it.
+- **The drain moved out** on John's worry that it "turns into a proper chunk of work". D3 already gives notes three ways to move, and D4 and D5 made "known, not now" deliberate. Autopilot already takes a landed Periodical "only when nothing can move" (`AUTOPILOT_PRECEDENCE`), which is idle time, so a drain needn't be a new mechanism.
+- **Two hops left the stretch before the switch:** "rulings ask only real questions" (D5) and "one look" (D7). Plotting the Course still models them, so the page needs a refresh at a natural point.
 
-**Leads to:** step 1 as a ticket in your words; LIN-4395's place in the order.
+**Leads to:** asks in John's words for steps 2 and 3 (LIN-4395 is filed); D12; D16.
 
-### D9. Models ○
+### D9. Models ◐
 *(earlier list: 4, 5 and 12, part)*
 
 **What we know.**
@@ -632,6 +645,8 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 | D1 → D10 | Harbour can create a Jira issue (no ticket exists yet). The other Jira gaps already have tickets (LIN-4355, LIN-2805, LIN-2094, LIN-2026, LIN-2170, LIN-2008) and go through the sort (D11) | Waiting for words |
 | D6 | The size of each task as a ruling, with a plain setting for who answers (ask me, or follow the default); asks only when there's a real choice. After the gate | Waiting for words |
 | D7 | Periodical reviews skip the Surveys | Waiting for words |
+| D8 | No new mess before merge (a blind read before merge, its findings fixed by the builder) | Waiting for words |
+| D8 | Waiting moves into code: quiet "still waiting" wakes become code, and a stalled wait raises an alarm | Waiting for words |
 
 ## Decisions made
 
@@ -645,6 +660,7 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 | D5 | 9 Nov | Rulings mostly work and stay as they are. Duplicates handled enough. A simpler version later (one dismiss that doesn't wake the agent; proposals visible; agreement recorded), noted via the sort. | Note via D11; hop leaves the gate weeks |
 | D6 | 9 Nov | The size of each task is a ruling (sizes as options with rough costs; recommended leans larger). A plain setting chooses who answers: ask me, or the driving agent with the default; it only asks when there's a real choice. Settings must make sense to a new user. | Ask after the gate |
 | D7 | 9 Nov | Keep both Surveys on tasks that change code; Periodical reviews skip them. A conditional one-look waits as a later optimisation. | Small ask |
+| D8 | 9 Nov | Until the switch, two at a time: see each task's sessions (LIN-4395), no new mess before merge, waiting moves into code; alongside, Periodicals skip the Surveys and the weekly measure as a Periodical. The drain waits. After the switch: cheaper builder, warm builder with fresh judges, faster CI. Each change kept only if the blind read and cost agree, and names what it retires. | Asks for steps 2 and 3 |
 
 ## Appendix A: open tickets from this work (8 Nov)
 
