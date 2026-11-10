@@ -8,7 +8,7 @@ A parrot check (a sub-agent, 9 Nov) read the first drafts against the decisions 
 
 ## Batch 1: until the switch
 
-**Approved word for word by John on 10 Nov** ("Those all look good"). Waiting for a fresh proxy token to file.
+**Approved word for word by John on 10 Nov** ("Those all look good"). **Filed 10 Nov, about 07:40 UTC,** each sealed by Harbour: A1 LIN-4396, A2 LIN-4397, A3 LIN-4398, A4 LIN-4399, A5 LIN-4400, A6 LIN-4401. G1 and G2 started the same morning (see `log.md`).
 
 ### A1. No new mess before merge (D8)
 
