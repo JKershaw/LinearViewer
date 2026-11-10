@@ -67,7 +67,7 @@ Nothing in the window adds a new scanner or a new third-party CDN. The runner ki
 
 Ranking is by consequence, with reachability shown beside severity. Severity labels: **Medium** means a plausible path to harm under stated conditions; **Low** means posture or exposure with no demonstrated path; **Info** means recorded for the trend.
 
-### F0 — `railway-build-platform-trust`  ·  **Medium (contained; verification open)**  ·  **new** (ranked first; numbered F0 so the references to F1–F14 stay stable)
+### F0 — `railway-build-platform-trust`  ·  **Medium (contained; verification open)**  ·  **new to the record** (ranked first; numbered F0 so the references to F1–F14 stay stable)
 
 Railway is Harbour's build and run platform, so it sits in the runtime service trust this review covers. Its own disclosure (21 October) said an unauthorised third party "may have accessed encrypted environment variables and, for some of them, obtained the decrypted contents". Its preliminary report adds that the attacker escalated through Railway's build infrastructure and reached its CI credentials, and that Railway cannot say which variables were decrypted. Source: `docs/incidents/2026-10-22-railway-security-disclosure.md`, which records the response; it was created before the 10-23 base by `8e59ed62` (missed by the 10-23 run); amended in the window by `040a3e76` (preliminary report, 23 Oct rotation, GitHub App check).
 
