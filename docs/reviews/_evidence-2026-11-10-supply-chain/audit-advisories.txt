@@ -1,0 +1,57 @@
+# npm audit at main 008d38bb088ca824f433940a227bffc27f3a60a1 (2026-11-10, Node 25.9.0, npm 11.12.1)
+# Text extract of `npm audit --json` (full tree and --omit=dev). Package counts and advisory counts are separate.
+
+## full tree
+metadata.vulnerabilities (packages): {'info': 0, 'low': 0, 'moderate': 2, 'high': 4, 'critical': 1, 'total': 7}
+metadata.dependencies: {'prod': 106, 'dev': 6, 'optional': 2, 'peer': 0, 'peerOptional': 0, 'total': 112}
+- body-parser: worst=high range=<=1.20.8 || 2.0.0-beta.1 - 2.0.2 fixAvailable=True
+    low       https://github.com/advisories/GHSA-v422-hmwv-36x6 range <1.20.6 :: body-parser vulnerable to denial of service when invalid limit value silently disables size enforcement
+    high      https://github.com/advisories/GHSA-27r3-jxmh-p828 range <1.20.9 :: body-parser vulnerable to Denial of Service via trailing bytes after a compressed request body
+- express: worst=moderate range=4.10.0 - 4.22.2 || 5.0.0-alpha.1 - 5.0.1 fixAvailable=True
+- express-rate-limit: worst=high range=8.0.1 - 8.5.0 fixAvailable=True
+    high      https://github.com/advisories/GHSA-46wh-pxpv-q5gq range >=8.2.0 <8.2.2 :: express-rate-limit: IPv4-mapped IPv6 addresses bypass per-client rate limiting on servers with dual-stack network
+- ip-address: worst=high range=<=10.7.3 fixAvailable=True
+    moderate  https://github.com/advisories/GHSA-v2v4-37r5-5v8g range <=10.1.0 :: ip-address has XSS in Address6 HTML-emitting methods
+    high      https://github.com/advisories/GHSA-mwp4-54f8-5fhr range <=10.3.0 :: ip-address: Address4 decodes leading-zero octets as decimal while resolvers decode them as octal, allowing SSRF and trust-boundary bypass
+    moderate  https://github.com/advisories/GHSA-rpw4-54j3-4h4q range <=10.5.0 :: ip-address: Address6.isLinkLocal() recognizes fe80::/64 rather than fe80::/10, allowing SSRF and trust-boundary bypass to on-link hosts
+    moderate  https://github.com/advisories/GHSA-j6r3-76f7-8jcv range <=10.7.0 :: ip-address: isInSubnet() and isHostInSubnet() compare addresses of different families as if they shared an address space, allowing an allowlist check to admit an address outside its range
+    moderate  https://github.com/advisories/GHSA-h3mg-xc3c-68pw range <=10.7.0 :: ip-address: Address6 builds a parse diagnostic proportional to the input with no length bound, allowing a single long string to stall or crash the process
+    moderate  https://github.com/advisories/GHSA-rxp7-6hxx-x8q5 range <=10.7.3 :: ip-address: Address6 matches a zone identifier in quadratic time ahead of its length limit, allowing a single long string to stall the process
+- path-to-regexp: worst=high range=<0.1.13 fixAvailable=True
+    high      https://github.com/advisories/GHSA-37ch-88jc-xwx2 range <0.1.13 :: path-to-regexp vulnerable to Regular Expression Denial of Service via multiple route parameters
+- proxy-addr: worst=critical range=1.1.0 - 2.0.7 fixAvailable=True
+    critical  https://github.com/advisories/GHSA-jqcg-44mw-7w3h range >=1.1.0 <2.0.8 :: proxy-addr vulnerable to IP spoofing via IPv4-mapped IPv6 trust subnet
+- qs: worst=moderate range=2.2.5 - 6.16.0 fixAvailable=True
+    low       https://github.com/advisories/GHSA-w7fw-mjwx-w883 range >=6.7.0 <=6.14.1 :: qs's arrayLimit bypass in comma parsing allows denial of service
+    moderate  https://github.com/advisories/GHSA-q8mj-m7cp-5q26 range >=6.11.1 <=6.15.1 :: qs has a remotely triggerable DoS: qs.stringify crashes with TypeError on null/undefined entries in comma-format arrays when encodeValuesOnly is set
+    moderate  https://github.com/advisories/GHSA-4mjr-xmp4-gh2g range >=2.2.5 <6.16.0 :: qs: Denial of Service via Attacker Controlled isBuffer
+    moderate  https://github.com/advisories/GHSA-6pq8-jhm2-2vcw range >=6.7.0 <=6.16.0 :: qs : qs.stringify with arrayFormat 'comma' throws an uncaught TypeError on array elements carrying a non-callable own toString (DoS)
+advisory tally (unique per package): {'low': 2, 'high': 4, 'moderate': 8, 'critical': 1} total=15
+
+## --omit=dev
+metadata.vulnerabilities (packages): {'info': 0, 'low': 0, 'moderate': 2, 'high': 4, 'critical': 1, 'total': 7}
+metadata.dependencies: {'prod': 106, 'dev': 6, 'optional': 2, 'peer': 0, 'peerOptional': 0, 'total': 112}
+- body-parser: worst=high range=<=1.20.8 || 2.0.0-beta.1 - 2.0.2 fixAvailable=True
+    low       https://github.com/advisories/GHSA-v422-hmwv-36x6 range <1.20.6 :: body-parser vulnerable to denial of service when invalid limit value silently disables size enforcement
+    high      https://github.com/advisories/GHSA-27r3-jxmh-p828 range <1.20.9 :: body-parser vulnerable to Denial of Service via trailing bytes after a compressed request body
+- express: worst=moderate range=4.10.0 - 4.22.2 || 5.0.0-alpha.1 - 5.0.1 fixAvailable=True
+- express-rate-limit: worst=high range=8.0.1 - 8.5.0 fixAvailable=True
+    high      https://github.com/advisories/GHSA-46wh-pxpv-q5gq range >=8.2.0 <8.2.2 :: express-rate-limit: IPv4-mapped IPv6 addresses bypass per-client rate limiting on servers with dual-stack network
+- ip-address: worst=high range=<=10.7.3 fixAvailable=True
+    moderate  https://github.com/advisories/GHSA-v2v4-37r5-5v8g range <=10.1.0 :: ip-address has XSS in Address6 HTML-emitting methods
+    high      https://github.com/advisories/GHSA-mwp4-54f8-5fhr range <=10.3.0 :: ip-address: Address4 decodes leading-zero octets as decimal while resolvers decode them as octal, allowing SSRF and trust-boundary bypass
+    moderate  https://github.com/advisories/GHSA-rpw4-54j3-4h4q range <=10.5.0 :: ip-address: Address6.isLinkLocal() recognizes fe80::/64 rather than fe80::/10, allowing SSRF and trust-boundary bypass to on-link hosts
+    moderate  https://github.com/advisories/GHSA-j6r3-76f7-8jcv range <=10.7.0 :: ip-address: isInSubnet() and isHostInSubnet() compare addresses of different families as if they shared an address space, allowing an allowlist check to admit an address outside its range
+    moderate  https://github.com/advisories/GHSA-h3mg-xc3c-68pw range <=10.7.0 :: ip-address: Address6 builds a parse diagnostic proportional to the input with no length bound, allowing a single long string to stall or crash the process
+    moderate  https://github.com/advisories/GHSA-rxp7-6hxx-x8q5 range <=10.7.3 :: ip-address: Address6 matches a zone identifier in quadratic time ahead of its length limit, allowing a single long string to stall the process
+- path-to-regexp: worst=high range=<0.1.13 fixAvailable=True
+    high      https://github.com/advisories/GHSA-37ch-88jc-xwx2 range <0.1.13 :: path-to-regexp vulnerable to Regular Expression Denial of Service via multiple route parameters
+- proxy-addr: worst=critical range=1.1.0 - 2.0.7 fixAvailable=True
+    critical  https://github.com/advisories/GHSA-jqcg-44mw-7w3h range >=1.1.0 <2.0.8 :: proxy-addr vulnerable to IP spoofing via IPv4-mapped IPv6 trust subnet
+- qs: worst=moderate range=2.2.5 - 6.16.0 fixAvailable=True
+    low       https://github.com/advisories/GHSA-w7fw-mjwx-w883 range >=6.7.0 <=6.14.1 :: qs's arrayLimit bypass in comma parsing allows denial of service
+    moderate  https://github.com/advisories/GHSA-q8mj-m7cp-5q26 range >=6.11.1 <=6.15.1 :: qs has a remotely triggerable DoS: qs.stringify crashes with TypeError on null/undefined entries in comma-format arrays when encodeValuesOnly is set
+    moderate  https://github.com/advisories/GHSA-4mjr-xmp4-gh2g range >=2.2.5 <6.16.0 :: qs: Denial of Service via Attacker Controlled isBuffer
+    moderate  https://github.com/advisories/GHSA-6pq8-jhm2-2vcw range >=6.7.0 <=6.16.0 :: qs : qs.stringify with arrayFormat 'comma' throws an uncaught TypeError on array elements carrying a non-callable own toString (DoS)
+advisory tally (unique per package): {'low': 2, 'high': 4, 'moderate': 8, 'critical': 1} total=15
+
