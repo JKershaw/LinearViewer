@@ -35,10 +35,10 @@
  *
  * LIN-4390 re-pinned all 16: a Periodical run hands off instead of finishing itself. Close-out
  * merges its PR, sets Done and posts the final summary, as the dispatch gate says for every task.
- * The second read (all 16) and the conclude bullets (13 corrective, 3 advisory) reach every
- * template, and the notes bullet (13) hands its PR off instead of merging it. Swapping the old
- * areaNotes, conclude, concludeAdvisory and adversarialRead text back into `lib/periodicals.js`
- * reproduces every old hash, so those four bullets are the only change.
+ * The second read (all 16) and the hand-off bullets (13 corrective, 3 advisory; once conclude and
+ * concludeAdvisory, now handOff and handOffAdvisory) reach every template, and the notes bullet (13)
+ * hands its PR off instead of merging it. Swapping the old text of those four bullets back into
+ * `lib/periodicals.js` reproduces every old hash, so they are the only change.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

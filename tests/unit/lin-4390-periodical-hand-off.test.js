@@ -29,9 +29,9 @@ const RETIRED = [
   /may this task conclude with that PR left open/i, // adversarialRead
   /before the Done transition described above can actually succeed/i, // adversarialRead
   /merge it under the merge authority/i, // areaNotes
-  /move the task to its done/i, // conclude / concludeAdvisory
-  /done\/completed state/i, // conclude / concludeAdvisory
-  /Then conclude this task/, // conclude / concludeAdvisory title
+  /move the task to its done/i, // old conclude() / concludeAdvisory()
+  /done\/completed state/i, // old conclude() / concludeAdvisory()
+  /Then conclude this task/, // the old conclude() / concludeAdvisory() title
   /self-conclud/i,
 ];
 
@@ -48,7 +48,7 @@ for (const p of PERIODICALS) {
     test(`${p.id} (${variant}): the run hands off; close-out merges and sets Done`, () => {
       for (const re of RETIRED) assert.doesNotMatch(text, re, `${p.id} still carries retired self-finish wording ${re}`);
 
-      // The hand-off bullet (conclude / concludeAdvisory): the run neither merges nor sets Done,
+      // The hand-off bullet (handOff / handOffAdvisory): the run neither merges nor sets Done,
       // and the closing comment names who finishes.
       assert.match(text, /Then hand off — do not stop silently, and do not merge or set Done yourself/);
       assert.match(text, /it neither merges nor moves the task to Done, and the task stays In Progress until close-out finishes/);
@@ -64,7 +64,7 @@ for (const p of PERIODICALS) {
       assert.match(text, /AGREE and DISAGREE both end in the normal hand-off/);
 
       if (p.mode === 'advisory') {
-        // concludeAdvisory: no area-notes PR is required of the three advisory templates.
+        // handOffAdvisory: no area-notes PR is required of the three advisory templates.
         assert.doesNotMatch(text, /area-notes pull request|area notes/i, `${p.id} gained the area-notes wording`);
         assert.match(text, /If you open a pull request for the report, post its full URL as a comment on this task/);
         assert.match(text, /hands its decision to the human through that summary/);
