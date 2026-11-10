@@ -22,7 +22,7 @@ describe('prepareRecommendationInput (LIN-3469)', () => {
     assert.equal(input.parent, ctx.parent);
     assert.equal(input.attachments, ctx.attachments);
     assert.deepEqual(input.runs, [{ stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued' }]);
-    // LIN-4370: the same read's unsliced runs, with dispatch times and ids, for the look-first route's attempts and waits.
+    // LIN-4370, LIN-4392: the same read's unsliced runs, with dispatch times and ids, for the look-first route's attempts and the live-stage wait.
     assert.deepEqual(input.allRuns, [{ stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued', dispatchedAt: '2026-10-05T00:00:00.000Z', id: null }]);
   });
 
@@ -36,6 +36,6 @@ describe('prepareRecommendationInput (LIN-3469)', () => {
   test('a missing store is no runs, never a throw', async () => {
     const input = await prepareRecommendationInput(ctx, { dispatchQueueStore: null, urlKey: 'acme', identifier: 'LIN-1' });
     assert.deepEqual(input.runs, []);
-    assert.equal(input.allRuns, null, 'attempts unknown: the look-first route stands aside');
+    assert.equal(input.allRuns, null, 'attempts unknown: the live-stage wait and the look-first route stand aside');
   });
 });

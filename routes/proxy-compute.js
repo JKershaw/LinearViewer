@@ -536,14 +536,14 @@ export function createComputeRoutes({
           prompt: rec.prompt,
           truncated: rec.truncated,
           recommendedAction: rec.recommendedAction,
-          // LIN-4370: a look-first wait names no stage (deriveDispatchKind(null) would say `custom`).
-          kind: rec.lookFirstWait ? null : deriveDispatchKind(rec.recommendedAction),
+          // LIN-4392: a live-stage wait names no stage (deriveDispatchKind(null) would say `custom`).
+          kind: rec.liveWait ? null : deriveDispatchKind(rec.recommendedAction),
           deferredVia,
           deferTruncated,
           deferStopReason,
           ...(rec.override ? { override: true } : {}),
-          // LIN-4370: present only when a look-first run is live (no step, no prompt).
-          ...(rec.lookFirstWait ? { lookFirstWait: rec.lookFirstWait } : {})
+          // LIN-4392: present only when a stage run is live (no step, no prompt).
+          ...(rec.liveWait ? { liveWait: rec.liveWait } : {})
         });
       } catch (err) {
         // A hang-up aborts the model call, which surfaces as a timeout: the client

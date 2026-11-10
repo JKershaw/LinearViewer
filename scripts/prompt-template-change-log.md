@@ -179,6 +179,8 @@ Two reasons recur, so they are written once here:
 **Stage router source, `lib/stage-router.js`**
 - LIN-3378 (the replaced reason, at LIN-4370): -46, Why clauses of rules 1-3 tightened (rules 6 and 8 keep theirs: measured, HAR-697 and the parent-plan points).
 - LIN-4370: +175 (8069 -> 8244). The rules' comment restates the invariant: code settles only the review loop bound and the look-first sequence, neither reads a model's verdict, and a person's comment posted after work started outranks the sequence until a later dispatched run. A comment, not prompt text.
+- LIN-4370 (the replaced reason, at LIN-4392): +175, the rules' comment restates the invariant (code settles the review loop bound and the look-first sequence).
+- LIN-4392: +25 (8244 -> 8269). The rules' comment names the live-stage wait as the first route code settles, before the review loop bound and the look-first sequence (`lib/recommendation-live-wait.js`). A comment, not prompt text: no rendered prompt, router snapshot or `scripts/eval/meta-prompt.baseline.txt` changes.
 
 **Stage intent source, `lib/prompts/stage-intent.js`**
 - LIN-3300: the file was `lib/prompts/brief-writer.js` (ceiling 4779). The writer's prompt left with the writer, and the ceiling moved with the scope lines that stayed.
@@ -224,6 +226,8 @@ Two reasons recur, so they are written once here:
 - LIN-4383: +60 (356217 -> 356277): prompt-formatters source only, an import line of the product's registry path; no prompt text and no rendered byte changed.
 - LIN-4370: +601 (356277 -> 356878): defs +261, prompt-templates +69, stage-router source +175, routing prompt +96.
 - LIN-4393: -74 (356878 -> 356804): defs -103, scoping +29.
+- LIN-4346: +1145 (356804 -> 357949): formatters +710, scoping +435 (the replaced reason, at LIN-4392).
+- LIN-4392: +25 (357949 -> 357974): stage-router source +25, the rules' comment names the live-stage wait; no rendered prompt changed.
 
 ## Rows
 

@@ -39,7 +39,6 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   `docs/reviews/seams-tangles-review-2026-11-10-run11.md`
 - `routes/proxy-writes.js`: "no step may change them" (the `## As asked` words) is written twice,
   in `AS_ASKED_LEAD` and in `BRIEF_HINT` (`lib/as-asked.js`); the census pins the markers, not this
-  rule. `lib/proxy-instructions.js` also spells the look-first sequence by hand, though
-  `lib/recommendation-look-first.js` holds `LOOK_FIRST_STEPS`, and "a day" beside
-  `LANDED_MIN_GAP_MS`. Borderline, LOW. (Drift & Coherence Review, 10 Nov;
+  rule. `lib/proxy-instructions.js` also spells "a day" beside `LANDED_MIN_GAP_MS`.
+  Borderline, LOW. (Drift & Coherence Review, 10 Nov;
   `docs/reviews/drift-coherence-review-2026-11-10.md`.)

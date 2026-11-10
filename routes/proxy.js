@@ -1432,7 +1432,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * with recommendErrorResponse(). `sessionApiKey` may be passed in to avoid a
    * second key lookup when the caller already resolved it for its precheck.
    */
-  async function computeRecommendation({ urlKey, createdBy, identifier, accessToken, provider, isTestMode, sessionApiKey, deadline, noDescend = false, clientSignal = null }) {
+  async function computeRecommendation({ urlKey, createdBy, identifier, accessToken, provider, isTestMode, sessionApiKey, deadline, noDescend = false, clientSignal = null, skipLiveWait = false }) {
     if (sessionApiKey === undefined) {
       sessionApiKey = await getWorkspaceOpenRouterKey(urlKey, createdBy);
     }
@@ -1545,7 +1545,10 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
             featureFlags: {},
             providerUi: provider?.ui || null,
             signal: AbortSignal.any([signal, hop.signal]),
-            callMeta: { urlKey, feature: 'recommend', issueIdentifier: issue.identifier }
+            callMeta: { urlKey, feature: 'recommend', issueIdentifier: issue.identifier },
+            // LIN-4392: recommend-and-dispatch's force/followUpTo skip the live-stage wait on every
+            // hop. A call option, never recommendation context; read surfaces never set it.
+            skipLiveWait: skipLiveWait === true
           }
         ),
         LLM_TIMEOUT_MS
@@ -1574,8 +1577,8 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       periodicalId: resolvePeriodicalIdFromGateMarker(issue.description),
       // LIN-4034: this hop's own title. The descent stamps the terminal hop's, never the parent's.
       title: issue.title,
-      // LIN-4370: a look-first run is live, so there is no step; recommend-and-dispatch refuses it.
-      ...(recommendation.lookFirstWait ? { lookFirstWait: recommendation.lookFirstWait } : {})
+      // LIN-4392: a stage run is live, so there is no step; recommend-and-dispatch refuses it.
+      ...(recommendation.liveWait ? { liveWait: recommendation.liveWait } : {})
     };
   }
 
