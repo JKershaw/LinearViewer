@@ -52,3 +52,8 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   rule. `lib/proxy-instructions.js` also spells "a day" beside `LANDED_MIN_GAP_MS`.
   Borderline, LOW. (Drift & Coherence Review, 10 Nov;
   `docs/reviews/drift-coherence-review-2026-11-10.md`.)
+- `routes/proxy.js`: recommend-and-dispatch's `skipLiveWait` exempts any `followUpTo`, so a
+  follow-up into an *ended* session of a different stage proceeds while another stage is live.
+  Tightening to "followUpTo is in the live row's lineage" needs a lineage read per hop
+  (`lib/dispatch-entrance.js` sets it; the wait and its race entry are in
+  `lib/recommendation-live-wait.js`). (LIN-4392 review.)
