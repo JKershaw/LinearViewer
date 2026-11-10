@@ -752,17 +752,17 @@ Collected as decisions are made. Nothing here is filed yet. Each is read back to
 
 | From | The ask, in short | State |
 |---|---|---|
-| D3 | Harbour's leftover rule: outside-area finds go into that area's note as a Waiting entry; a ticket only if they break something, block work or touch safety | Waiting for words |
-| D1 → D10 | Jira works for the loop: Harbour can create a Jira issue (no ticket exists yet) and hold the sealed ask; checked on John's Jira. After the switch. The other Jira gaps already have tickets (LIN-4355, LIN-2805, LIN-2094, LIN-2026, LIN-2170, LIN-2008) and go through the sort (D11) | Waiting for words |
-| D6 | The size of each task as a ruling, with a plain setting for who answers (ask me, or follow the default); asks only when there's a real choice. After the gate | Waiting for words |
-| D7 | Periodical reviews skip the Surveys | Waiting for words |
-| D8 | No new mess before merge (a blind read before merge, its findings fixed by the builder) | Waiting for words |
-| D8 | Waiting moves into code: quiet "still waiting" wakes become code, and a stalled wait raises an alarm | Waiting for words |
-| D10 | The front end left better than we found it: browser code that shares rather than restates, still with no build step and no framework, slice by slice; the side rail and the sprinkling on the cleaner frame. After the switch | Waiting for words |
-| D11 | A quick pass over the open tickets for anything that breaks something, blocks work or touches safety, so nothing important is lost; the rest is sorted in chunks alongside the work | Waiting for words |
-| D11 | Kick off LIN-4390 and LIN-4392 (already filed; defects) | Waiting for go-ahead |
-| D16 | The Stability Review reports D1's five measures per landing or per task, net production lines first, code and comments counted separately | Waiting for words |
-| D16 | Start Drift and Seams now over round 1's window, as the baseline (a usual "start a run") | Waiting for go-ahead |
+| D3 | Harbour's leftover rule: outside-area finds go into that area's note as a Waiting entry; a ticket only if they break something, block work or touch safety | Approved 10 Nov (asks.md A1–A6); waiting for a token |
+| D1 → D10 | Jira works for the loop: Harbour can create a Jira issue (no ticket exists yet) and hold the sealed ask; checked on John's Jira. After the switch. The other Jira gaps already have tickets (LIN-4355, LIN-2805, LIN-2094, LIN-2026, LIN-2170, LIN-2008) and go through the sort (D11) | Drafted (asks.md A7–A9); read-back pending |
+| D6 | The size of each task as a ruling, with a plain setting for who answers (ask me, or follow the default); asks only when there's a real choice. After the gate | Drafted (asks.md A7–A9); read-back pending |
+| D7 | Periodical reviews skip the Surveys | Approved 10 Nov (asks.md A1–A6); waiting for a token |
+| D8 | No new mess before merge (a blind read before merge, its findings fixed by the builder) | Approved 10 Nov (asks.md A1–A6); waiting for a token |
+| D8 | Waiting moves into code: quiet "still waiting" wakes become code, and a stalled wait raises an alarm | Approved 10 Nov (asks.md A1–A6); waiting for a token |
+| D10 | The front end left better than we found it: browser code that shares rather than restates, still with no build step and no framework, slice by slice; the side rail and the sprinkling on the cleaner frame. After the switch | Drafted (asks.md A7–A9); read-back pending |
+| D11 | A quick pass over the open tickets for anything that breaks something, blocks work or touches safety, so nothing important is lost; the rest is sorted in chunks alongside the work | Approved 10 Nov (asks.md A1–A6); waiting for a token |
+| D11 | Kick off LIN-4390 and LIN-4392 (already filed; defects) | Approved 10 Nov (asks.md G1–G2); waiting for a token |
+| D16 | The Stability Review reports D1's five measures per landing or per task, net production lines first, code and comments counted separately | Approved 10 Nov (asks.md A1–A6); waiting for a token |
+| D16 | Start Drift and Seams now over round 1's window, as the baseline (a usual "start a run") | Approved 10 Nov (asks.md G1–G2); waiting for a token |
 
 ## Decisions made
 

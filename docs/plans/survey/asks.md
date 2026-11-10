@@ -8,6 +8,8 @@ A parrot check (a sub-agent, 9 Nov) read the first drafts against the decisions 
 
 ## Batch 1: until the switch
 
+**Approved word for word by John on 10 Nov** ("Those all look good"). Waiting for a fresh proxy token to file.
+
 ### A1. No new mess before merge (D8)
 
 **Title:** A change is read blind before it merges, and what the read finds is fixed while the work is fresh
@@ -117,6 +119,8 @@ The Stability Review already runs as a Periodical. John: "weekly is sort of the 
 ---
 
 ## Batch 2: filed now, waiting for the switch
+
+**Not yet read back to John.**
 
 ### A7. The loop works on Jira (D1, D10)
 
