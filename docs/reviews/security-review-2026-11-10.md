@@ -62,7 +62,7 @@ Most of the window's closure claims hold as an attacker would test them (fix-cla
 | 19 | Low | **first assessment** | **LIN-4215.** See §G. **Recommend closing as accepted.** Optional hardening: a shorter TTL for member-minted keys, and a membership recheck at use. | LIN-4215 |
 | 20 | Low | **new** | **Saved roadmap prose is re-served to agents.** `POST /workspace/:urlKey/api/roadmap/reports` (`routes/workspace-api-roadmap.js:184-216`) stores whatever `narrative` object the client sends (no check that it is model output). `GET /api/proxy/north-star` (`routes/proxy-compute.js:771`) then serves the digest, the reading and the gap (each capped at 4,000 characters) to any token, and `lib/proxy-instructions.js:421` advertises that route to dispatched agents. The roadmap layers also paste tracker text unfenced, and the gap layer calls it "the source of truth" (`lib/prompts/roadmap-gap-template.js:70`), so public-repo text can be laundered into a field labelled as a reading. A member could write the same text into an issue, so this adds no power. It is the LIN-3402 stance problem (text arrives without a data frame), and is reported only. | LIN-3402 (class) |
 | 21 | Low | **new** | **Test gaps on security controls:** the `proxyLimiter` `PROVEN_CREDENTIALS_CAP` eviction (0/3 *(research)*); SD broker's `127.0.0.1` bind (0/132 bound to all interfaces *(research)*); `urlKey` in model-routing preset/undo filters (0/158) and in the usage-intake filter (0/81) *(research)*; write scope on description/below, append and issue PATCH individually, where only the shared `writeAuth` is pinned. `POST /api/proxy/runner/usage/:id` is `take`-gated without write scope, as are its runner siblings. Runner usage `costUsd` has no upper bound (`lib/request-usage-intake.js:78-85`), so a take holder can inflate its own items' recorded cost. | none (report) |
-| 22 | Low | carried (+3 new members) | #12 the 301 from `req.hostname` (`server.js:1213-1218`, untouched since January; LIN-3643 did not change it). #13 the `local` spawn has no owner gate, because `isRunnerTarget('local')` is false (`lib/runner-owner-gate.js:24-26`); `app.listen(PORT)` binds all interfaces, `server.js:4674`). #14 `/kpis` small counts. #18 `lib/render.js:1119` `issue.url`, **plus a missed member at `:489`** (`project.url`/`linkText`, unescaped; CSP backs both); custom templates raw; `lib/bash-tool.js` still has no importers; `lib/harbour-spawn.js` `clone` without `--`. **New members:** the session transcript link puts an agent-supplied `url` in `href` with HTML escaping but no scheme check (`public/session.js:132`; none in `lib/dispatch-feedback-validation.js`; the CSP's `script-src` without `'unsafe-inline'` should stop it running). `POST /auth/openrouter/consent/clear` has no CSRF token and relies on `sameSite:'lax'`, like its siblings. The run-summary, session-summary and scan POSTs spend LLM calls with no limiter, gated only by the free-tier check (moved, behaviour unchanged). Also LIN-676, LIN-3616/3617 (decided), LIN-3281, LIN-2530, LIN-2642, LIN-1912, LIN-3425, LIN-3836, LIN-3770, LIN-2850, LIN-2853: all carried, none re-rated. | as listed; else report |
+| 22 | Low | carried (+3 new members) | #12 the 301 from `req.hostname` (`server.js:1213-1218`, untouched since January; LIN-3643 did not change it). #13 the `local` spawn has no owner gate, because `isRunnerTarget('local')` is false (`lib/runner-owner-gate.js:24-26`); `app.listen(PORT)` binds all interfaces, `server.js:4674`. #14 `/kpis` small counts. #18 `lib/render.js:1119` `issue.url`, **plus a missed member at `:489`** (`project.url`/`linkText`, unescaped; CSP backs both); custom templates raw; `lib/bash-tool.js` still has no importers; `lib/harbour-spawn.js` `clone` without `--`. **New members:** the session transcript link puts an agent-supplied `url` in `href` with HTML escaping but no scheme check (`public/session.js:132`; none in `lib/dispatch-feedback-validation.js`; the CSP's `script-src` without `'unsafe-inline'` should stop it running). `POST /auth/openrouter/consent/clear` has no CSRF token and relies on `sameSite:'lax'`, like its siblings. The run-summary, session-summary and scan POSTs spend LLM calls with no limiter, gated only by the free-tier check (moved, behaviour unchanged). Also LIN-676, LIN-3616/3617 (decided), LIN-3281, LIN-2530, LIN-2642, LIN-1912, LIN-3425, LIN-3836, LIN-3770, LIN-2850, LIN-2853: all carried, none re-rated. | as listed; else report |
 | 23 | Info | **new** | `docs/reviews/_evidence-2026-11-08/authenticated/lighthouse-*.json` (6 files) commit session cookies minted on `localhost:3199`. They are dead local artifacts, but this is the **second** evidence dir to do it (after `_evidence-2026-10-21`, also 6). `/getting-started(.md)` is a new public page, but it is not in `BASE_PUBLIC_PAGES` (`lib/scan-public-pages.js:21-26`). Dispatch-token usage matches legacy rows by token label (`ownershipFilterOf`, `lib/dispatch-store.js`) when no token id was recorded. | none: person |
 | closed / improved | n/a | n/a | Old #20 vendored libs (remit decision above). Old #15 mostly closed: only `docs/operator-execution.md` carries `MONGO_PUBLIC_URL` commands, under its history banner. **LIN-737 is mitigated in code** (`routes/proxy-reads.js:613-615`: always `application/octet-stream`, `attachment`, `nosniff`), so it is a **candidate to close**. **LIN-3593 is tested** (mutation 1 of 1,542, `tests/unit/authenticated-pr-reads.test.js` *(research)*), also a **candidate to close**. Old #17: erasure covers 59 of 59 collections, new ones included. HSTS without `includeSubDomains` is a recorded decision (`lib/response-headers.js:7-8`, for `os.harbour.cat`), not a finding. | n/a |
 
@@ -220,6 +220,7 @@ All nine are gated by `workspaceFromUrl`, a default-off flag (`roadmap`, `shipBi
 | Controls keyed on `NODE_ENV==='production'` | grep | 8 sites, 7 controls (row 15) |
 | Rate limiters | `rateLimit({` | 12, all in memory |
 | OAuth callbacks | read each | 5: 4 check `state`; OpenRouter is PKCE only (LIN-676) |
+| Session and cookie lifetime | diff `c6c5585a..4d23fa15` of `lib/session-options.js` and `lib/user-preferences.js` for `maxAge`/`expires`/`rolling` | unchanged in window; only LIN-619's secret refusal changed |
 | Outbound, shell, HTML and Mongo sinks added | diff greps (`fetch(`, `spawn\|exec`, `innerHTML`/`${}`, `req.*` in queries) | 6 fetches, none to a user URL; 2 shell, both argv-form; about 21 client and 230 server interpolations, with no new member beyond row 22; 3 Mongo sites, all `Array.find` *(research)* |
 | Mongo collections vs erasure | literal and constant `collection(` | 59/59 |
 | **Could not bound** | n/a | Which production workspaces bind public repos (decides rows 1, 2a, 7). Whether any SD bootstrap file is unconsumed (live secret state) |
@@ -290,23 +291,44 @@ Rules: `docs/areas/README.md`. Guard: `tests/unit/area-notes.test.js`, cap 6,144
 
 **Question:** What is the largest item in this window that this report missed or misfiled?
 
-**Reader's answer** (condensed; nothing material dropped):
+**Reader's answer** (verbatim):
 
-1. **Largest item: the SD credential broker's unauthenticated loopback listener.** High where one SD host runs sessions for more than one workspace, Medium-High otherwise.
-   * The report framed the SD side as a file problem. The bigger channel is the process those files feed.
-   * `harbour-token-mcp-server.js` binds `127.0.0.1` over TCP (`:425`, fallback `:420`). `createBrokerServer` (`:330-347`) forwards every `/api/proxy/*` request with the session's working token injected (`:286`).
-   * No caller check: no per-session secret, no peer check, no Host check. The only gate is the intent header (`:253-254`), which any caller can add.
-   * So any process on the host, under any OS user, can act with a live session's 48 h readWrite credential, and can enqueue if that session holds `dispatch`.
-   * It does not depend on an unconsumed bootstrap. SD runs several workspaces per host (`config.js` loads `workspaces.json`).
-   * The ask named this file and its LIN-4378 change, yet the report mentioned the bind only as a test gap. Harbour's runner broker already uses a Unix socket and takes the bootstrap on stdin.
-   * The report's fix direction (delete the file, or `0600`) does not close it, and its "no cross-workspace" verdict needs qualifying.
-   * The reader would rank it High at row 2, below LIN-3386, and still routed to the person.
-2. Ranking overall: **DISAGREE**, narrowly. LIN-3386 at row 1 is defensible and its citations hold. The SD item is under-ranked and misframed.
-3. Citations: almost all hold at HEAD. Two minor points: `lib/runner-owner-gate.js:24-26` is the predicate, not the missing gate, so it was loosely cited. The "world-readable" emphasis is a misleading lens for a same-user threat.
-4. Other points:
-   * Row 12 misses an amplification: a proxy-written `harness` other than `claude-code` sends every later dispatch down the inline-bootstrap path.
-   * Lineage cost and timeline reads are clean, but the report never said so outright.
-   * The GitHub install flow verifies `installation_id` against `/user/installations` (`lib/github-install-flow.js`), so a public repo does not make anyone a member.
+1. **The largest item this report missed or misfiled is the SD credential broker's unauthenticated loopback listener. I'd rate it High where one SD host runs sessions for more than one workspace, and Medium-High otherwise.**
+
+   Row 6 / §C treats the SD side as a file problem: bootstrap files that are world-readable and never deleted. The bigger channel is the broker process those files feed.
+
+   - **Bind:** `../simple-dispatcher/harbour-token-mcp-server.js:425` (and the fallback at `:420`) binds `127.0.0.1` over TCP. `createBrokerServer` at `:330-347` forwards every `/api/proxy/*` request with the session's working token injected at `:286`.
+   - **No caller check:** the broker never checks who is calling. There is no per-session secret, no peer check and no Host check. The only gate is the `X-Harbour-Intent: write` header (`:253-254`), which any caller can add.
+   - **Reach:** any process on the host, under any OS user, can connect to any live session's port and act with that session's 48 h readWrite credential. That includes a prompt-injected agent from another workspace. If the victim session holds `dispatch` (an autopilot or kickoff child), the attacker can also enqueue.
+   - **Lifetime:** the port is live for the whole session, so it does not depend on an unconsumed bootstrap, which is §C's own "unverified" condition.
+   - **Multi-workspace hosts are normal:** SD runs several workspaces per host (`../simple-dispatcher/config.js:983` loads `workspaces.json`; the comment at `:843` assumes "3 workspaces").
+   - **The ask named this process:** it named `harbour-token-mcp-server.js` and its LIN-4378 change explicitly. The report mentions the bind only as a test gap in row 21.
+   - **Harbour's own design shows the fix:** its runner broker (`lib/runner-kit/broker.mjs:223`) listens on a Unix socket and takes the bootstrap on stdin. SD's broker uses a TCP port and keeps the bootstrap in its env (`:403`).
+   - **The report's fix direction does not close it:** §C's "exchange eagerly, then delete or 0600" closes the file vector only. Mode `0600` does nothing against a same-user agent, and nothing in the fix touches the port.
+   - **It contradicts the verdict:** the verdict says "No cross-workspace read or write on either lane". §C itself says "possibly workspaces". This channel makes the cross-workspace path concrete.
+
+   I would rank it High at row 2, above the area notes. It still routes to the person, since there is no LinearViewer area file to cite.
+
+2. **DISAGREE** with the ranking overall, narrowly. LIN-3386 at row 1 is defensible and its citations hold. But the SD runner-contract item is under-ranked at Medium, framed around file modes rather than the live listener, and its fix is incomplete. **Differed from top finding: YES.**
+
+3. **Cited claims spot-checked.** I checked about 30. Almost all hold at HEAD:
+   - Row 1: `lib/run-ledger.js:49-56`, `lib/recommendation-look-first.js:95-100`, `lib/size-of-move.js:169-181`, `lib/as-asked.js:231`.
+   - Row 1 prompt grants: `lib/prompt-template-defs.js:1034` and `:1039` (the "Nobody reviews what you change after the approval" text is on 1039).
+   - Rows 3, 4, 8, 9, 11: `lib/db-indexes.js:529-533`, `lib/proxy-preamble.js:427-428`, `routes/collective.js:567`, `lib/periodicals.js:1354-1356`, `lib/prompts/autopilot-precedence.js:33`, `lib/runner-kit/runner.mjs:821-825` and `:964`.
+   - Rows 15, 22 and the closed/improved row: `server.js:1208-1218` and `:4674`, `routes/proxy-reads.js:613-615`, `public/common.js:553-556`.
+   - Rows 10, 12, 18, 19: `lib/email-auth.js:89-94`, `lib/feature-defaults.js:202`, `routes/settings.js:418`, `lib/agent-turn.js:273`, `routes/proxy-tokens-admin.js:138` and `:152`.
+   - The hydrate 403 at `routes/dashboard-drilldown.js:122-123`.
+
+   Minor problems:
+   - `lib/runner-owner-gate.js:24-26` (row 22, "`local` spawn has no owner gate") is `isRunnerTarget`. It is the predicate the claim rests on, not the missing gate itself, so it is loosely cited.
+   - §C's "world-readable" emphasis is a misleading lens. File mode only matters across OS users, and the report's own threat is a same-user agent.
+
+4. **Other material points**
+   - **Row 12 misses an amplification.** `harness` is a writable field on the agent-session surface (`lib/model-routing.js:47`, accepted by `routes/proxy-model-routing.js:191`). The table's harness feeds dispatch (`lib/dispatch-factory.js:623`), and any value other than `claude-code` switches to prose delivery (`lib/proxy-preamble.js:32-34`, `:751`, `:773`). So with `modelRoutingProxyWrites` on, any readWrite leaf key can put the bootstrap token inline in every later dispatch prompt in the workspace (the LIN-1410 path) by setting the harness to `opencode`. The switch is default-off, so this stays Low-Medium, but the row should name it.
+   - **Cross-workspace reads within a lineage, which the ask asked about, check out clean.** `lib/task-cost-read.js:68-96` and `lib/task-timeline.js:422-497` are keyed by `urlKey` throughout. The report never says so explicitly, though; it is only implied by row 16's "Same workspace only".
+   - **The GitHub install flow verifies `installation_id` against `/user/installations`** (`lib/github-install-flow.js:637-678`), so a public repo does not make anyone a member.
+
+I made no edits, ran no network calls, and copied no secret values.
 
 **Response.** The listener was verified against SD source and adopted:
 
