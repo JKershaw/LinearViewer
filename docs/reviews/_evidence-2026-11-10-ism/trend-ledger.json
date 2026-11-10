@@ -158,7 +158,7 @@
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
     "idem": "pure and writes nothing, so a retry has no effect to double",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -239,7 +239,7 @@
    },
    "confidence": "Medium",
    "delta_class": "unchanged",
-   "delta": "unchanged — `8cca0193b` (LIN-3906) fixed two stage-selector misroutes (shipped defect, fixed: coverage caveat, R16); `lib/size-of-move.js`, `lib/stage-writes.js`, `lib/recommendation-look-first.js`, `lib/prompts/autopilot-precedence.js` fold; `lib/prompt-template-defs.js` #10 by churn (24 commits)",
+   "delta": "unchanged — `8cca0193b` (LIN-3906) fixed two stage-selector misroutes (shipped defect, fixed: coverage caveat, R16); `lib/size-of-move.js`, `lib/stage-writes.js`, `lib/recommendation-look-first.js`, `lib/prompts/autopilot-precedence.js` fold; `lib/prompt-template-defs.js` #10 by churn (24 commits); the Survey became two read-only stage templates (LIN-4248) and code now runs the look-first sequence, Surveys before scoping, at both recommendation seams (LIN-4370, `recommendation-look-first.js`) — a routing behaviour change inside this id, not a new FLOW (one owner: the stage path)",
    "cites": {
     "chp": "`lib/stage-router.js` + `generatePrompt()` one-path invariant (CLAUDE.md Invariants); routing snapshots regenerated in `8cca0193b`"
    },
@@ -248,7 +248,7 @@
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
     "idem": "pure and writes nothing, so a retry has no effect to double",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -319,7 +319,7 @@
     "sec": 3,
     "test": 3,
     "doc": 3,
-    "cfg": "N/A"
+    "cfg": "3"
    },
    "run4": {
     "chp": "4 / 2-3",
@@ -327,17 +327,17 @@
     "confidence": "Medium"
    },
    "confidence": "Medium/Low",
-   "delta_class": "unchanged",
-   "delta": "unchanged score; **confidence Medium→Medium/Low** — the largest fold this run (31 files: Settings one-page-per-area LIN-3846, Home pipeline LIN-4118, dashboard split LIN-3742 Done, `run-controls` LIN-3849, `vendor-assets` LIN-3787) was dispositioned by header and importers, not read in depth; `lib/render.js` #6 and `public/app.js` #18 by churn; Home lane fails the new-FLOW test (owned by `lib/home-pipeline.js`)",
+   "delta_class": "changed-cfg",
+   "delta": "unchanged score; **confidence Medium→Medium/Low** — the largest fold this run (31 files: Settings one-page-per-area LIN-3846, Home pipeline LIN-4118, dashboard split LIN-3742 Done, `run-controls` LIN-3849, `vendor-assets` LIN-3787) was dispositioned by header and importers, not read in depth; `lib/render.js` #6 and `public/app.js` #18 by churn; Home lane fails the new-FLOW test (owned by `lib/home-pipeline.js`). **CFG N/A → 3**: run 4's N/A* missed the feature-switch surface this layer reads, and this window cut it from 21 switches to 10 (LIN-3848/3849/3912); see cited cells",
    "cites": {
-    "chp": "split score carried (run-2 convention): first-class pages 4, experimental tier 2-3"
+    "chp": "split score carried (run-2 convention): first-class pages 4, experimental tier 2-3",
+    "cfg": "**N/A → 3 (a reportable flip, caught by the second read)**: the user feature switches in `lib/feature-defaults.js` went from 21 to 10 in the window — LIN-3848 (`d738a7678`) removed nine that did nothing or were superseded, LIN-3849 (`00c3e081d`) replaced the `dispatch` and `proxy` switches with run controls derived from facts (`lib/run-controls.js`, `getFeatureFlags` at `:27,127`), LIN-3912 (`2c8366760`) retired `nextRun` with its page and job; 34 renderer, component and run-control files read the remaining flags (`rerun-outputs.md` Q17). Held at 3, not 4: the experimental tier still rides on per-user switches"
    },
    "na": {
     "res": "no outbound I/O of its own: a pure function of what its caller hands it",
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
-    "idem": "pure and writes nothing, so a retry has no effect to double",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "idem": "pure and writes nothing, so a retry has no effect to double"
    },
    "recs": [],
    "severity": "—"
@@ -419,7 +419,7 @@
    "cites": {},
    "na": {
     "auth": "holds and checks no credential; the route or lane that calls it does",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -464,7 +464,7 @@
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
     "idem": "pure and writes nothing, so a retry has no effect to double",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -508,7 +508,7 @@
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
     "idem": "pure and writes nothing, so a retry has no effect to double",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -552,7 +552,7 @@
    "na": {
     "rl": "schedules in-process jobs; no list or rate-limited call of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [
     "R11"
@@ -596,7 +596,7 @@
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
     "idem": "pure and writes nothing, so a retry has no effect to double",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [
     "R8"
@@ -642,7 +642,7 @@
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
     "idem": "pure and writes nothing, so a retry has no effect to double",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -687,7 +687,7 @@
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
     "idem": "pure and writes nothing, so a retry has no effect to double",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -732,7 +732,7 @@
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
     "idem": "pure and writes nothing, so a retry has no effect to double",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [
     "R7"
@@ -779,7 +779,7 @@
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
     "idem": "pure and writes nothing, so a retry has no effect to double",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -824,7 +824,7 @@
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
     "idem": "pure and writes nothing, so a retry has no effect to double",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -866,7 +866,7 @@
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
     "idem": "pure and writes nothing, so a retry has no effect to double",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -914,7 +914,7 @@
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
     "idem": "pure and writes nothing, so a retry has no effect to double",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -956,7 +956,7 @@
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
     "idem": "pure and writes nothing, so a retry has no effect to double",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -1001,7 +1001,7 @@
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
     "idem": "pure and writes nothing, so a retry has no effect to double",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -1082,7 +1082,7 @@
    "run4": null,
    "confidence": "Medium",
    "delta_class": "new",
-   "delta": "new — 17 files (LIN-3852/3853/3962, steps of LIN-3820 Todo): registry `lib/llm-jobs.js`, pure table `lib/model-routing.js` with a witness test proving it answers as the old resolvers did (`:20-22`), store, proxy routes with write scope (`routes/proxy-model-routing.js:40`), change log and undo (`:102`, `:213`); held at 3: the parent design LIN-3820 is still Todo and a blank row deliberately falls through to simple-dispatcher's `workspaces.json` (`lib/model-routing.js:14-15`), so model choice still has two sources; consumer evidence `harnesses.js` (LIN-3830 resumes keep model/effort). CFG 3: per-workspace defaults, no env flag",
+   "delta": "new — 17 files (LIN-3852/3853/3962, steps of LIN-3820 Todo): registry `lib/llm-jobs.js`, pure table `lib/model-routing.js` with a witness test proving it answers as the old resolvers did (`:20-22`), store, proxy routes with write scope (`routes/proxy-model-routing.js:189`), change log and undo (`:102`, `:213`); held at 3: the parent design LIN-3820 is still Todo and a blank row deliberately falls through to simple-dispatcher's `workspaces.json` (`lib/model-routing.js:14-15`), so model choice still has two sources; consumer evidence `harnesses.js` (LIN-3830 resumes keep model/effort). CFG 3: per-workspace defaults, no env flag",
    "cites": {},
    "na": {
     "res": "no outbound I/O of its own: a pure function of what its caller hands it",
@@ -1393,7 +1393,7 @@
    },
    "confidence": "Medium",
    "delta_class": "unchanged",
-   "delta": "**confidence High→Medium**, score unchanged — API Quality 2026-10-23 H1 was fixed in the window (LIN-3805, `ec9eed17e`); Test Coverage 2026-10-23 C1 is open by evidence: LIN-690 reads Done (2026-10-30) but a bounded search finds no test asserting the dispatch-token store's cross-workspace revoke or `tokenHash` exclusion (`tests/unit/dispatch-tokens.test.js` changed only by LIN-3795; the wrong-workspace revoke test is the proxy store's, `tests/unit/proxy-tokens.test.js:674`) (R16); new route `POST /api/dispatch/usage/:itemId` (`routes/dispatch.js:1671`)",
+   "delta": "**confidence High→Medium**, score unchanged — API Quality 2026-10-23 H1 was fixed in the window (LIN-3805, `ec9eed17e`); Test Coverage 2026-10-23 C1 is open by evidence: LIN-690 reads Done (2026-10-30) but a bounded search finds no test asserting the dispatch-token store's cross-workspace revoke or `tokenHash` exclusion (`tests/unit/dispatch-tokens.test.js` changed only by LIN-3795; the wrong-workspace revoke test is the proxy store's, `tests/unit/proxy-tokens.test.js:674`) (R16); new route `POST /api/dispatch/usage/:itemId` (`routes/dispatch.js:1671`); who may dispatch from the UI is no longer a per-user `dispatch` switch but derived from facts (owner + live runner key or queue token, `lib/run-controls.js`, LIN-3849) — CFG 4 held (the server-side gates did not change)",
    "cites": {
     "chp": "run-4 evidence carried; usage intake `routes/dispatch.js:1671`",
     "cfg": "run-4 CFG 4 carried"
@@ -1515,7 +1515,7 @@
    },
    "na": {
     "auth": "holds and checks no credential; the route or lane that calls it does",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [
     "R2"
@@ -1559,7 +1559,7 @@
    "na": {
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -1684,7 +1684,7 @@
    },
    "na": {
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -1852,7 +1852,7 @@
    },
    "na": {
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [
     "R13"
@@ -1944,7 +1944,7 @@
    "na": {
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -1985,7 +1985,7 @@
    },
    "na": {
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -2027,7 +2027,7 @@
    "na": {
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -2063,12 +2063,12 @@
    },
    "confidence": "Medium",
    "delta_class": "unchanged",
-   "delta": "unchanged — R10 still resolved in code (run 3's query: 0 stale production hits; `public/dispatch.js:772` accurate); LIN-3074 still Backlog; `lib/components/halt-controls.js` folds",
+   "delta": "unchanged — R10 still resolved in code (run 3's query: 0 stale production hits; `public/dispatch.js:772` accurate); LIN-3074 still Backlog; `lib/components/halt-controls.js` folds; LIN-3849 (`e336733ee`) shows halt buttons only to those the server lets halt (members see none; a direct halt is still refused)",
    "cites": {},
    "na": {
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -2109,7 +2109,7 @@
    "na": {
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [
     "R7"
@@ -2146,7 +2146,7 @@
    },
    "confidence": "Medium",
    "delta_class": "improved",
-   "delta": "**CHP 3→4** — run 4 held it at 3 for the in-memory per-IP limiter and the live spam bot; LIN-3771 (`c6c5585a8`, Done) and LIN-3789 added a per-address 24 h cap, a site-wide hourly alarm, a honeypot and a minimum form time (`lib/email-auth.js:41-58`, `routes/email-auth.js:97,141`). Per-IP stays per-process (`routes/email-auth.js:88-92`)",
+   "delta": "**CHP 3→4** — run 4 held it at 3 for the in-memory per-IP limiter and the live spam bot; LIN-3771 (`c6c5585a8`, Done) and LIN-3789 added a per-address 24 h cap, a site-wide hourly alarm, a honeypot and a minimum form time (`lib/email-auth.js:41-58`, `routes/email-auth.js:97,141`). Per-IP stays per-process (`routes/email-auth.js:90-95`)",
    "cites": {
     "chp": "`lib/email-auth.js:44-58` layered send defences (LIN-3771/3789); refusals logged without the address (`routes/email-auth.js:97`)",
     "cfg": "run-4 CFG 4 carried (`lib/email-availability.js`)"
@@ -2189,7 +2189,7 @@
    "cites": {},
    "na": {
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [
     "R8"
@@ -2234,7 +2234,7 @@
    "na": {
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
     "auth": "holds and checks no credential; the route or lane that calls it does",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [
     "R15",
@@ -2279,7 +2279,7 @@
    },
    "na": {
     "rl": "returns no paged list and calls no rate-limited dependency of its own",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -2318,7 +2318,7 @@
    "delta": "unchanged — LIN-3795 masks a minted token planted bare in a rendered `/t/` page; the run-4 stale comment `lib/guest-task-path.js:41-43` is fixed (now `:45`)",
    "cites": {},
    "na": {
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [],
    "severity": "—"
@@ -2432,7 +2432,7 @@
    },
    "confidence": "Medium",
    "delta_class": "unchanged",
-   "delta": "unchanged at 3 — gains: scripted, balanced reconciliation (189 sweep rows, 291 citation rows), first full twelve-dimension reading, a JSON ledger. Losses: its own template still describes minting (R18), its top recommendation is at a fifth cycle with no route to owned work (R21), and 12 of 34 done/High ids were hit (R16). See Self-Audit",
+   "delta": "unchanged at 3 — gains: scripted, balanced reconciliation (189 sweep rows, 291 citation rows), first full twelve-dimension reading, a JSON ledger. Losses: its own template still describes minting (R18), its top recommendation is at a fifth cycle with no route to owned work (R21), and 12 of 34 done/High ids were hit (R16). The Tier-2 second read found the window's largest configuration change (feature switches 21 → 10) missing and one carried N/A* note claiming a re-verification that was not done; both fixed in place. See Self-Audit",
    "cites": {
     "test": "`tests/unit/periodicals.test.js:371-372` census regexes miss both advisory minting phrases",
     "doc": "method steps (five-pass sweep, area cross-check, scripted ledger) live only in ticket text, not in `generateIntegrationSurfaceMaturityPrompt` (`lib/periodicals.js:835`)"
@@ -2446,7 +2446,7 @@
     "val": "a review methodology has no runtime surface for this dimension",
     "obs": "a review methodology has no runtime surface for this dimension",
     "sec": "a review methodology has no runtime surface for this dimension",
-    "cfg": "carried N/A* from run 4 (re-verified in place: no environment or flag surface)"
+    "cfg": "carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)"
    },
    "recs": [
     "R16",

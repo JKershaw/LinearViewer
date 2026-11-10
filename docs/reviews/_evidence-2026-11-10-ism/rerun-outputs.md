@@ -11,7 +11,7 @@ local workspace proxy, whose address is omitted.
 
 ### Q1. Pins and windows (LinearViewer)
 
-- run at: `2026-11-10T11:41:35Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
+- run at: `2026-11-10T11:51:18Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
 
 ```bash
 git rev-parse origin/main; git rev-list --count c5694b68..origin/main; git rev-list --count --no-merges c5694b68..origin/main; git rev-list --count 38760071..origin/main; git rev-list --count c5694b68..origin/main -- lib routes server.js; git rev-list --count 38760071..origin/main -- lib routes server.js
@@ -28,7 +28,7 @@ git rev-parse origin/main; git rev-list --count c5694b68..origin/main; git rev-l
 
 ### Q2. Pins and window (simple-dispatcher)
 
-- run at: `2026-11-10T11:41:35Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
+- run at: `2026-11-10T11:51:18Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
 
 ```bash
 git -C /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher rev-parse origin/main; git -C /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher rev-list --count bb1da78..origin/main; git -C /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher diff --shortstat bb1da78 origin/main; git -C /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher diff --name-only bb1da78 origin/main | grep -c '^test/'; git -C /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher diff --diff-filter=A --name-only bb1da78 origin/main -- test | wc -l; git -C /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher log --no-merges --format=%s bb1da78..origin/main | grep -o 'LIN-[0-9]*' | sort -u | wc -l
@@ -45,7 +45,7 @@ git -C /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4
 
 ### Q3. Drift since the mint pin f5b1f5efa
 
-- run at: `2026-11-10T11:41:35Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
+- run at: `2026-11-10T11:51:18Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
 
 ```bash
 git log --oneline f5b1f5efa..origin/main; git diff --name-only f5b1f5efa origin/main; git -C /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher log --oneline --since=2026-11-10T09:54:45Z origin/main | wc -l
@@ -92,7 +92,7 @@ tests/unit/proxy-issue-cost-route.test.js
 
 ### Q4. Sweep inputs: added/deleted/churn rows with area and full-path importers (base.py), then dispositions (dispose.py)
 
-- run at: `2026-11-10T11:41:35Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
+- run at: `2026-11-10T11:51:18Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
 
 ```bash
 python3 -I /private/tmp/claude-504/-Users-autopilot-development-simple-dispatcher-workspaces-032b00de-2bf9-4190-8702-18d08c168be4/032b00de-2bf9-4190-8702-18d08c168be4/scratchpad/scripts/base.py /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher /private/tmp/claude-504/-Users-autopilot-development-simple-dispatcher-workspaces-032b00de-2bf9-4190-8702-18d08c168be4/032b00de-2bf9-4190-8702-18d08c168be4/scratchpad/out >/dev/null && python3 -c "import json;print(json.dumps(json.load(open('/private/tmp/claude-504/-Users-autopilot-development-simple-dispatcher-workspaces-032b00de-2bf9-4190-8702-18d08c168be4/032b00de-2bf9-4190-8702-18d08c168be4/scratchpad/out/base-summary.json')),indent=1))"; git diff --no-renames --diff-filter=A --name-only c5694b68 origin/main -- lib routes public | wc -l; git diff --no-renames --diff-filter=D --name-only c5694b68 origin/main -- lib routes public; python3 -I /private/tmp/claude-504/-Users-autopilot-development-simple-dispatcher-workspaces-032b00de-2bf9-4190-8702-18d08c168be4/032b00de-2bf9-4190-8702-18d08c168be4/scratchpad/scripts/dispose.py /private/tmp/claude-504/-Users-autopilot-development-simple-dispatcher-workspaces-032b00de-2bf9-4190-8702-18d08c168be4/032b00de-2bf9-4190-8702-18d08c168be4/scratchpad/out/base-rows.json /private/tmp/claude-504/-Users-autopilot-development-simple-dispatcher-workspaces-032b00de-2bf9-4190-8702-18d08c168be4/032b00de-2bf9-4190-8702-18d08c168be4/scratchpad/out/sweep-dispositions.csv; echo exit=$?
@@ -134,7 +134,7 @@ exit=0
 
 ### Q5. R7 Done-writer census: updateIssue/createIssue outside lib/providers, gate references, stateId lines
 
-- run at: `2026-11-10T11:42:06Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
+- run at: `2026-11-10T11:51:37Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
 
 ```bash
 git grep -n -E '\.(updateIssue|createIssue)\(' origin/main -- lib routes server.js ':!lib/providers' | cut -c1-170; echo '--- gate'; git grep -n checkPeriodicalReportGate origin/main -- lib routes server.js | cut -c1-140; echo '--- stateId'; git grep -n stateId origin/main -- routes server.js | cut -c1-140; echo '--- run-evidence chain'; grep -n 'settleDone\|closeOutSetsDone\|defaultMarkDone\|router.post' routes/workspace-api-run-evidence.js | cut -c1-140; echo '--- session PATCH'; grep -n -E "router\.patch|input\.stateId|updateIssue|recordPipelineMerge\(" routes/workspace-api-issue-write.js | cut -c1-140
@@ -205,7 +205,7 @@ origin/main:routes/workspace-api-run-evidence.js:60:  return provider.updateIssu
 
 ### Q6. Template drift: render every periodical and scan for minting wording; census patterns
 
-- run at: `2026-11-10T11:42:06Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
+- run at: `2026-11-10T11:51:37Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
 
 ```bash
 node -e "import('./lib/periodicals.js').then(m=>{console.log('registry',m.PERIODICALS.length);for(const p of m.PERIODICALS){const t=m.renderPeriodicalPrompt(p.id);console.log(p.id.padEnd(30),p.mode.padEnd(11),'mints-phrase(:303):',/whatever follow-up work this review mints/.test(t),' any-follow-up(:382):',/\(and any follow-up tasks\)/.test(t))}})"; sed -n '303p;382p;843p' lib/periodicals.js | cut -c1-160; sed -n '114,118p' lib/periodicals.js; sed -n '371,373p' tests/unit/periodicals.test.js | cut -c1-200
@@ -244,7 +244,7 @@ This review is a **portfolio/meta layer over the other periodicals**, not a four
 
 ### Q7. docs/reviews listing (sibling freshness; newest per family) and area-note sources
 
-- run at: `2026-11-10T11:42:06Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
+- run at: `2026-11-10T11:51:37Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
 
 ```bash
 git ls-tree --name-only origin/main docs/reviews/ | sed 's#docs/reviews/##' | grep -E '\.md$' | python3 -c "
@@ -305,7 +305,7 @@ test-run-provenance-review               1 2026-11-02
 
 ### Q8. C9 Arm A (run 4 Q24 query, verbatim) at HEAD
 
-- run at: `2026-11-10T11:42:06Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
+- run at: `2026-11-10T11:51:37Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
 
 ```bash
 git grep -n -i -E '\bdark\b|no consumer|not( yet)? wired|wired to (no|NO)|no read path|NO read path|no (production )?caller|nothing (reads|calls|consumes)|not yet consumed' origin/main -- lib routes server.js | cut -c1-200; echo "--- lines: $(git grep -n -i -E '\bdark\b|no consumer|not( yet)? wired|wired to (no|NO)|no read path|NO read path|no (production )?caller|nothing (reads|calls|consumes)|not yet consumed' origin/main -- lib routes server.js | wc -l | tr -d ' ')"
@@ -374,7 +374,7 @@ origin/main:server.js:805:// the shared writeConnection helper; no read path wir
 
 ### Q9. C9 Arm B (run 4 Q25 patterns, verbatim) at HEAD
 
-- run at: `2026-11-10T11:42:07Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
+- run at: `2026-11-10T11:51:38Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
 
 ```bash
 cnt(){ git grep -n "$@" origin/main -- lib routes server.js | wc -l | tr -d ' '; }; echo "literal cs $(cnt -E '(once|until|pending|awaiting) LIN-[0-9]+') | literal -i $(cnt -i -E '(once|until|pending|awaiting) LIN-[0-9]+') | wider A $(cnt -i -E '(once|until|pending|awaiting)[^.]{0,60}LIN-[0-9]+') | wider B $(cnt -i -E '(once|until|pending|awaiting|blocked on|not yet landed|lands)[^.]{0,80}LIN-[0-9]+')"; git grep -n -i -E '(once|until|pending|awaiting) LIN-[0-9]+' origin/main -- lib routes server.js | cut -c1-180
@@ -398,7 +398,7 @@ origin/main:routes/proxy.js:543:        // both 401 and were, until LIN-1985, di
 
 ### Q10. C9 member presence (run 4's 19 definite) and retirement provenance
 
-- run at: `2026-11-10T11:42:08Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
+- run at: `2026-11-10T11:51:38Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
 
 ```bash
 for c in lib/account-store.js:43 lib/account-workspace-store.js:28 lib/connection-store.js:5 lib/connection-store.js:60 lib/connection-store.js:71 lib/credential-invariant-sweep.js:20 lib/dispatch-store.js:583 lib/held-connection-entry.js:2 lib/kpi-daily-rollup.js:11 lib/periodicals.js:92 lib/prompts/collective-participant.js:126 lib/proxy-preamble.js:444 lib/proxy-preamble.js:692 routes/collective.js:116 server.js:696 server.js:705 server.js:4290 lib/effort-readout.js:597 lib/workspace.js:96 lib/agent-turn.js:585; do f=${c%%:*}; n=${c##*:}; old=$(git show c5694b68:$f | sed -n ${n}p | sed 's/^[[:space:]]*//'); hit=$(git show origin/main:$f | grep -n -F -- "$old" | head -1 | cut -d: -f1); echo "$c -> ${hit:-GONE}"; done; echo '--- provenance'; for pair in 'lib/account-store.js|wired to NO route' 'lib/held-connection-entry.js|dark: no consumer' 'lib/effort-readout.js|does not yet report a realised' 'lib/agent-turn.js|boot once LIN-2622'; do f=${pair%%|*}; s=${pair#*|}; echo "$f: $(git log --format='%h %s' -S"$s" c5694b68..origin/main -- $f | head -1 | cut -c1-90)"; done
@@ -434,7 +434,7 @@ lib/agent-turn.js: a896f183b LIN-3779: disable remember on auto-wake and boot tu
 
 ### Q11. C14 Arm 1 (run 4 Q34 regexes, verbatim) over c5694b68..origin/main
 
-- run at: `2026-11-10T11:42:09Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
+- run at: `2026-11-10T11:51:39Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
 
 ```bash
 python3 -I /private/tmp/claude-504/-Users-autopilot-development-simple-dispatcher-workspaces-032b00de-2bf9-4190-8702-18d08c168be4/032b00de-2bf9-4190-8702-18d08c168be4/scratchpad/scripts/c14.py /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer c5694b68 origin/main
@@ -472,7 +472,7 @@ B f6e6a0233 2026-10-24 LIN-3903: a post-deploy check close-out cannot run never 
 
 ### Q12. Citation re-points (strict + paragraph-local bare), content match, hand overlay
 
-- run at: `2026-11-10T11:42:09Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
+- run at: `2026-11-10T11:51:39Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
 
 ```bash
 python3 -I /private/tmp/claude-504/-Users-autopilot-development-simple-dispatcher-workspaces-032b00de-2bf9-4190-8702-18d08c168be4/032b00de-2bf9-4190-8702-18d08c168be4/scratchpad/scripts/cites.py /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher /private/tmp/claude-504/-Users-autopilot-development-simple-dispatcher-workspaces-032b00de-2bf9-4190-8702-18d08c168be4/032b00de-2bf9-4190-8702-18d08c168be4/scratchpad/out/citation-repoints.csv && python3 -I /private/tmp/claude-504/-Users-autopilot-development-simple-dispatcher-workspaces-032b00de-2bf9-4190-8702-18d08c168be4/032b00de-2bf9-4190-8702-18d08c168be4/scratchpad/scripts/cites_resolve.py /private/tmp/claude-504/-Users-autopilot-development-simple-dispatcher-workspaces-032b00de-2bf9-4190-8702-18d08c168be4/032b00de-2bf9-4190-8702-18d08c168be4/scratchpad/out/citation-repoints.csv; echo exit=$?
@@ -491,7 +491,7 @@ exit=0
 
 ### Q13. Run-4 parse (52 rows, R1-R17; incomplete parse exits 1)
 
-- run at: `2026-11-10T11:42:27Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
+- run at: `2026-11-10T11:51:52Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
 
 ```bash
 python3 -I /private/tmp/claude-504/-Users-autopilot-development-simple-dispatcher-workspaces-032b00de-2bf9-4190-8702-18d08c168be4/032b00de-2bf9-4190-8702-18d08c168be4/scratchpad/scripts/run4.py /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer /private/tmp/claude-504/-Users-autopilot-development-simple-dispatcher-workspaces-032b00de-2bf9-4190-8702-18d08c168be4/032b00de-2bf9-4190-8702-18d08c168be4/scratchpad/out/run4-ledger.json; echo exit=$?
@@ -504,7 +504,7 @@ exit=0
 
 ### Q14. Carried-recommendation probes (R2, R8, R9, R11, R13, R14, R15, R17, R5, R10)
 
-- run at: `2026-11-10T11:42:27Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
+- run at: `2026-11-10T11:51:52Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
 
 ```bash
 echo '--- R2'; grep -n silentSince lib/dispatch-store.js | head -3; git grep -n silentSince origin/main -- lib routes server.js ':!lib/dispatch-store.js' | cut -c1-120; echo '--- R9'; grep -n 'function formatDispatchWatch' routes/proxy-dispatch.js; grep -n periodicalId routes/proxy-dispatch.js | cut -c1-120; echo '--- R8'; git grep -l observer-efficacy-signal origin/main -- lib routes server.js; grep -n '^export' lib/workspace-registry.js; git grep -l 'workspace-registry.js' origin/main -- lib routes server.js | wc -l; echo '--- R11'; git grep -n -A1 'scheduler.register(' origin/main -- server.js | grep name: ; git grep -n 'setInterval(' origin/main -- server.js | cut -c1-130; echo '--- R13'; grep -n OwnerCredentialStore server.js; echo '--- R14'; grep -n CONTRACT_SHA256 tests/unit/runner-kit-contract.test.js | head -2 | cut -c1-120; grep -n -E 'FIXTURE_SHA256 =|LV_COMMIT =' /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher/test/runner-contract.test.js; cmp lib/runner-kit/contract.json /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher/test/fixtures/runner-contract.json && echo byte-identical; ls .github/workflows /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher/.github/workflows; echo '--- R15'; git grep -n authStoppedWorkspaces origin/main -- lib routes public server.js | cut -c1-100; echo '--- R17'; grep -n -i alarm lib/hourly-cleanup.js | wc -l; sed -n '276p;285p' lib/liveness-alarm-store.js; echo '--- R5'; grep -n 'export function resolvePrecompute' lib/run-paragraph-hook.js; echo '--- R10 (run 3 query, non-review production hits)'; git grep -n -E 'LIN-2995|yet honor' origin/main -- 'lib/*.js' 'routes/*.js' 'public/*.js' server.js | cut -c1-120; echo '--- usage wiring (SD)'; grep -n 'request-records\|request-usage' /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher/opencode-runner.js /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher/hook.js /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher/dispatcher.js /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher/reapers.js | cut -c1-110; grep -n 'WORKER_USAGE_RELAY = ' /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher/config.js; grep -n "router.post('/api/dispatch/usage" routes/dispatch.js | cut -c1-90
@@ -574,6 +574,28 @@ origin/main:public/dispatch.js:772:// stored halt (LIN-2995, `lib/runner-kit/run
 <LinearViewer>/..
 1345:const WORKER_USAGE_RELAY = envFlag('SD_WORKER_USAGE_RELAY', true);
 1671:  router.post('/api/dispatch/usage/:itemId', feedbackLimiter, authenticateDispatchTok
+```
+
+### Q17. Configuration surface (added after the second read): feature switches at both pins, dispatch-switch references, consumer default flips
+
+- run at: `2026-11-10T11:51:53Z` · LinearViewer `9cf51ef72` · simple-dispatcher `5d8489e`
+
+```bash
+for r in c5694b68 origin/main; do git show $r:lib/feature-defaults.js > /tmp/fd-$$.mjs; node -e "import('file:///tmp/fd-$$.mjs').then(m=>console.log('$r FEATURES keys:',Object.keys(m.FEATURES).length,Object.values(m.FEATURES).join(',')))"; done; rm -f /tmp/fd-$$.mjs; for c in d738a7678 00c3e081d 2c8366760 e336733ee; do git log -1 --format='%h %ad %s' --date=short $c | cut -c1-120; done; echo "FEATURES.DISPATCH refs: $(git grep -c FEATURES.DISPATCH c5694b68 -- lib routes server.js | wc -l | tr -d ' ') -> $(git grep -c FEATURES.DISPATCH origin/main -- lib routes server.js | wc -l | tr -d ' ') files"; git grep -l -E 'featureFlags|getFeatureFlags' origin/main -- 'lib/render*.js' 'lib/components/*.js' lib/run-controls.js | wc -l; grep -n -E "envFlag\('SD_(ASSISTANT_TEXT|WORKER_USAGE)_RELAY'" /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher/config.js; git -C /Users/autopilot/development/simple-dispatcher-workspaces/032b00de-2bf9-4190-8702-18d08c168be4/LinearViewer/../simple-dispatcher log -1 --format='%h %ad %s' --date=short a7e5173
+```
+
+```text
+c5694b68 FEATURES keys: 21 linearMcp,dispatch,aiRecommendations,promptButtons,codeReview,codeReviewSelf,codeReviewCicd,codeReviewPr,proxy,roadmap,collective,taskChat,ship,nextRun,flightCompanion,passagePlanner,shipBiscuit,liveConsole,shipJourney,feedbackWidget,feedbackTriage
+origin/main FEATURES keys: 10 roadmap,collective,taskChat,ship,flightCompanion,passagePlanner,shipBiscuit,liveConsole,shipJourney,feedbackWidget
+d738a7678 2026-10-24 LIN-3848: remove the nine settings switches that do nothing or are superseded (#2082)
+00c3e081d 2026-10-24 LIN-3849: read derived runControls/runSetup in renderers and client; remove proxy/dispatch flags
+2c8366760 2026-10-25 LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+e336733ee 2026-10-24 LIN-3849: e2e — member sees no halt buttons; the server still refuses a direct halt
+FEATURES.DISPATCH refs: 1 -> 0 files
+      34
+1316:const ASSISTANT_TEXT_RELAY = envFlag('SD_ASSISTANT_TEXT_RELAY', true);
+1345:const WORKER_USAGE_RELAY = envFlag('SD_WORKER_USAGE_RELAY', true);
+a7e5173 2026-11-03 LIN-4165: send every assistant text reply to Harbour (relay on by default) (#302)
 ```
 
 ### Q15. Tracker states (workspace API, read 2026-11-10T11:17Z)
@@ -1233,7 +1255,7 @@ def add(id_, typ, status, what, areas, profile, chp, cfg, conf, delta_class, del
         if sc[d]==N:
             if d in (na_extra or {}): na[d]=na_extra[d]
             elif d=='cfg':
-                na[d]='carried N/A* from run 4 (re-verified in place: no environment or flag surface)' if status=='carried' else 'no environment variable or flag; behaviour is fixed in code'
+                na[d]='carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`)' if status=='carried' else 'no environment variable or flag; behaviour is fixed in code'
             elif d=='chp': na[d]='a review methodology has no runtime happy path'
             else: na[d]=NA_TXT[d]
     r4 = run4.get(id_)
@@ -1249,13 +1271,13 @@ add('mod-periodicals','MOD','carried','Registry of recurring review templates (1
     'unchanged scores — registry still 16 (`lib/periodicals.js:1015-1135`); corrective templates now feed area notes and mint nothing (LIN-4380, header `:110-118`); advisory templates still render minting wording (R18); 14 window commits, not filed unchanged blindly',
     over={'doc':2,'test':3}, cites={'doc':'`lib/periodicals.js:843` "not a fourteenth sibling" against 16 registry entries; `:303`, `:382` render minting wording in every advisory prompt (R18)'}, recs=['R18'], severity='M')
 add('mod-prompt-template-system','MOD','carried','Deterministic recommendation system: stage router + one path for every recommendation (no model writes a prompt)',['llm-and-prompts','other-features'],'compute','4',N,'Medium',U,
-    'unchanged — `8cca0193b` (LIN-3906) fixed two stage-selector misroutes (shipped defect, fixed: coverage caveat, R16); `lib/size-of-move.js`, `lib/stage-writes.js`, `lib/recommendation-look-first.js`, `lib/prompts/autopilot-precedence.js` fold; `lib/prompt-template-defs.js` #10 by churn (24 commits)',
+    'unchanged — `8cca0193b` (LIN-3906) fixed two stage-selector misroutes (shipped defect, fixed: coverage caveat, R16); `lib/size-of-move.js`, `lib/stage-writes.js`, `lib/recommendation-look-first.js`, `lib/prompts/autopilot-precedence.js` fold; `lib/prompt-template-defs.js` #10 by churn (24 commits); the Survey became two read-only stage templates (LIN-4248) and code now runs the look-first sequence, Surveys before scoping, at both recommendation seams (LIN-4370, `recommendation-look-first.js`) — a routing behaviour change inside this id, not a new FLOW (one owner: the stage path)',
     cites={'chp':'`lib/stage-router.js` + `generatePrompt()` one-path invariant (CLAUDE.md Invariants); routing snapshots regenerated in `8cca0193b`'})
 add('mod-roadmap-trajectory','MOD','carried','Velocity/execution-order/milestone layer',['llm-and-prompts','task-model'],'compute','3','3','Medium/Low',U,
     'unchanged — `lib/task-order.js` (task-model area) folds; no cited gain')
-add('mod-render-layer','MOD','carried','Server-side page renderers, tiered; Home, Settings and dashboard route families',['front-end-pages','front-end-browser','web-routes','other-features'],'render','4 / 2-3',N,'Medium/Low',U,
-    'unchanged score; **confidence Medium→Medium/Low** — the largest fold this run (31 files: Settings one-page-per-area LIN-3846, Home pipeline LIN-4118, dashboard split LIN-3742 Done, `run-controls` LIN-3849, `vendor-assets` LIN-3787) was dispositioned by header and importers, not read in depth; `lib/render.js` #6 and `public/app.js` #18 by churn; Home lane fails the new-FLOW test (owned by `lib/home-pipeline.js`)',
-    cites={'chp':'split score carried (run-2 convention): first-class pages 4, experimental tier 2-3'})
+add('mod-render-layer','MOD','carried','Server-side page renderers, tiered; Home, Settings and dashboard route families',['front-end-pages','front-end-browser','web-routes','other-features'],'render','4 / 2-3','3','Medium/Low','changed-cfg',
+    'unchanged score; **confidence Medium→Medium/Low** — the largest fold this run (31 files: Settings one-page-per-area LIN-3846, Home pipeline LIN-4118, dashboard split LIN-3742 Done, `run-controls` LIN-3849, `vendor-assets` LIN-3787) was dispositioned by header and importers, not read in depth; `lib/render.js` #6 and `public/app.js` #18 by churn; Home lane fails the new-FLOW test (owned by `lib/home-pipeline.js`). **CFG N/A → 3**: run 4\'s N/A* missed the feature-switch surface this layer reads, and this window cut it from 21 switches to 10 (LIN-3848/3849/3912); see cited cells',
+    cites={'chp':'split score carried (run-2 convention): first-class pages 4, experimental tier 2-3','cfg':'**N/A → 3 (a reportable flip, caught by the second read)**: the user feature switches in `lib/feature-defaults.js` went from 21 to 10 in the window — LIN-3848 (`d738a7678`) removed nine that did nothing or were superseded, LIN-3849 (`00c3e081d`) replaced the `dispatch` and `proxy` switches with run controls derived from facts (`lib/run-controls.js`, `getFeatureFlags` at `:27,127`), LIN-3912 (`2c8366760`) retired `nextRun` with its page and job; 34 renderer, component and run-control files read the remaining flags (`rerun-outputs.md` Q17). Held at 3, not 4: the experimental tier still rides on per-user switches'})
 add('mod-dispatch-queue','MOD','carried','Queue storage + wake propagation, TTL, loop guards',['runs-and-dispatch'],'store','4','4','High',U,
     'unchanged — three High sibling findings landed here and **all three were fixed in the window** (coverage caveats, R16): API Quality 2026-10-23 H1 (a store fault answered 404/401/empty 200) by `ec9eed17e` (LIN-3805: a retryable 503, `DispatchStoreFault`, `lib/dispatch-store.js:49,72-73`); Data & Fetch 2026-10-23 H1 (30-day window unindexed) by `f4289aa64` (LIN-3811: deferred window indexes built off the boot path, `lib/db-indexes.js:12-26`); Data & Fetch H2 / Performance H2 (full rows by default) by `fcab9f712` (LIN-3812: lean/digest default read). `lib/dispatch-store.js` #4 by churn (+1,906 lines; Code Quality 11-04 F-dispatch-store HIGH structural, LIN-2398)',
     over={'err':3,'rl':2}, cites={'chp':'run-4 evidence carried (`takeItem({targets})`, loop guards); no core defect this window','cfg':'run-4 CFG 4 carried (TTL/queue config, `lib/queue-config.js`)'},
@@ -1292,7 +1314,7 @@ add('mod-library','MOD','carried','Public `/library` catalogue; `/getting-starte
 add('mod-response-hardening','MOD','carried','Pinned public-origin resolver, HSTS, default `no-store`, hash-based CSP',['front-end-pages','auth-accounts-and-workspaces','wiring'],'render','4','3','High',U,
     'unchanged', over={'sec':4}, cites={'chp':'run-4 chain carried','sec':'`APP_CSP` script-src is self + hashes, no `unsafe-inline` (`lib/security-headers.js:63-65`)'})
 add('mod-model-routing','MOD','new','Per-workspace model-routing table: job registry, harness/model/effort resolution, store, history, presets, Settings › Models and the proxy routes',['llm-and-prompts','agent-api','web-routes','front-end-pages','front-end-browser'],'store','3','3','Medium','new',
-    'new — 17 files (LIN-3852/3853/3962, steps of LIN-3820 Todo): registry `lib/llm-jobs.js`, pure table `lib/model-routing.js` with a witness test proving it answers as the old resolvers did (`:20-22`), store, proxy routes with write scope (`routes/proxy-model-routing.js:40`), change log and undo (`:102`, `:213`); held at 3: the parent design LIN-3820 is still Todo and a blank row deliberately falls through to simple-dispatcher\'s `workspaces.json` (`lib/model-routing.js:14-15`), so model choice still has two sources; consumer evidence `harnesses.js` (LIN-3830 resumes keep model/effort). CFG 3: per-workspace defaults, no env flag',
+    'new — 17 files (LIN-3852/3853/3962, steps of LIN-3820 Todo): registry `lib/llm-jobs.js`, pure table `lib/model-routing.js` with a witness test proving it answers as the old resolvers did (`:20-22`), store, proxy routes with write scope (`routes/proxy-model-routing.js:189`), change log and undo (`:102`, `:213`); held at 3: the parent design LIN-3820 is still Todo and a blank row deliberately falls through to simple-dispatcher\'s `workspaces.json` (`lib/model-routing.js:14-15`), so model choice still has two sources; consumer evidence `harnesses.js` (LIN-3830 resumes keep model/effort). CFG 3: per-workspace defaults, no env flag',
     over={'res':N,'obs':3,'idem':3,'err':3}, recs=[])
 # ---------------- API (10 carried)
 add('api-linear-graphql','API','carried','Linear GraphQL client + retry/timeout',['providers'],'extapi','4','3','Medium',U,
@@ -1312,7 +1334,7 @@ add('api-workspace-proxy','API','carried',"Harbour's exposed source-neutral cons
     'unchanged — `lib/proxy-instructions.js` #3, `routes/proxy-compute.js` #8, `routes/proxy.js` #13 by churn, none behaviour-declared as a defect fix; `routes/proxy-model-routing.js` filed under `mod-model-routing`; mint by registry id (LIN-4313/4317)',
     cites={'chp':'run-4 evidence carried','cfg':'run-4 CFG 4 carried'})
 add('api-dispatch','API','carried',"Harbour's exposed Dispatch API (incl. the per-request usage intake)",['runs-and-dispatch'],'exposed','4','4','Medium',U,
-    '**confidence High→Medium**, score unchanged — API Quality 2026-10-23 H1 was fixed in the window (LIN-3805, `ec9eed17e`); Test Coverage 2026-10-23 C1 is open by evidence: LIN-690 reads Done (2026-10-30) but a bounded search finds no test asserting the dispatch-token store\'s cross-workspace revoke or `tokenHash` exclusion (`tests/unit/dispatch-tokens.test.js` changed only by LIN-3795; the wrong-workspace revoke test is the proxy store\'s, `tests/unit/proxy-tokens.test.js:674`) (R16); new route `POST /api/dispatch/usage/:itemId` (`routes/dispatch.js:1671`)',
+    '**confidence High→Medium**, score unchanged — API Quality 2026-10-23 H1 was fixed in the window (LIN-3805, `ec9eed17e`); Test Coverage 2026-10-23 C1 is open by evidence: LIN-690 reads Done (2026-10-30) but a bounded search finds no test asserting the dispatch-token store\'s cross-workspace revoke or `tokenHash` exclusion (`tests/unit/dispatch-tokens.test.js` changed only by LIN-3795; the wrong-workspace revoke test is the proxy store\'s, `tests/unit/proxy-tokens.test.js:674`) (R16); new route `POST /api/dispatch/usage/:itemId` (`routes/dispatch.js:1671`); who may dispatch from the UI is no longer a per-user `dispatch` switch but derived from facts (owner + live runner key or queue token, `lib/run-controls.js`, LIN-3849) — CFG 4 held (the server-side gates did not change)',
     over={'test':2}, cites={'chp':'run-4 evidence carried; usage intake `routes/dispatch.js:1671`','cfg':'run-4 CFG 4 carried'})
 add('api-jira-rest','API','carried','Jira Cloud provider — read-only MVP',['providers'],'extapi','4','4','High',U,'unchanged', cites={'chp':'run-4 evidence carried','cfg':'run-4 CFG 4 carried'})
 add('api-runner-kit','API','carried','Runner kit served to user machines: kit JS, setup page, kickoff prompt, contract fixture shared with simple-dispatcher',['runs-and-dispatch'],'exposed','3','3','High','improved',
@@ -1351,12 +1373,12 @@ add('flow-operator-decisions','FLOW','carried','scan → task-decisions → unan
 add('flow-account-merge','FLOW','carried','identity-conflict resolution lane',['auth-accounts-and-workspaces'],'flowauth','4',N,'High',U,'unchanged', cites={'chp':'run-4 evidence carried (`routes/account-merge.js`)'})
 add('flow-flight-companion-turn','FLOW','carried','agent turn core → gate → transcripts → SSE stream',['llm-and-prompts'],'flow','4',N,'Medium',U,'unchanged', cites={'chp':'run-4 evidence carried'})
 add('flow-dispatch-halt','FLOW','carried','operator halt request → store → consumer honouring',['runs-and-dispatch','front-end-pages'],'flow','3',N,'Medium',U,
-    'unchanged — R10 still resolved in code (run 3\'s query: 0 stale production hits; `public/dispatch.js:772` accurate); LIN-3074 still Backlog; `lib/components/halt-controls.js` folds')
+    'unchanged — R10 still resolved in code (run 3\'s query: 0 stale production hits; `public/dispatch.js:772` accurate); LIN-3074 still Backlog; `lib/components/halt-controls.js` folds; LIN-3849 (`e336733ee`) shows halt buttons only to those the server lets halt (members see none; a direct halt is still refused)')
 add('flow-run-evidence-closeout','FLOW','carried','PR evidence, review ledger and the close-out box for a run; merged close-out events for every Done write',['runs-and-dispatch','web-routes'],'flow','3',N,'High',U,
     'unchanged — routes moved to `routes/workspace-api-run-evidence.js` (R7 writer #3 `:260`→`:224`→`:47`/`:60`); `lib/close-out-merges.js` (LIN-3756/3863) records merged events for proxy and person Done writes; `f6e6a0233` (LIN-3903) fixed a post-deploy check that held the close (coverage caveat, R16); consumer LIN-4375 (the `[done]` url is the session\'s own PR)',
     over={'idem':3}, recs=['R7'], severity='H')
 add('flow-email-identity','FLOW','carried','Email magic-link sign-in, account home, session options',['auth-accounts-and-workspaces'],'flowauth','4','4','Medium','improved',
-    '**CHP 3→4** — run 4 held it at 3 for the in-memory per-IP limiter and the live spam bot; LIN-3771 (`c6c5585a8`, Done) and LIN-3789 added a per-address 24 h cap, a site-wide hourly alarm, a honeypot and a minimum form time (`lib/email-auth.js:41-58`, `routes/email-auth.js:97,141`). Per-IP stays per-process (`routes/email-auth.js:88-92`)',
+    '**CHP 3→4** — run 4 held it at 3 for the in-memory per-IP limiter and the live spam bot; LIN-3771 (`c6c5585a8`, Done) and LIN-3789 added a per-address 24 h cap, a site-wide hourly alarm, a honeypot and a minimum form time (`lib/email-auth.js:41-58`, `routes/email-auth.js:97,141`). Per-IP stays per-process (`routes/email-auth.js:90-95`)',
     over={'rl':3}, cites={'chp':'`lib/email-auth.js:44-58` layered send defences (LIN-3771/3789); refusals logged without the address (`routes/email-auth.js:97`)','cfg':'run-4 CFG 4 carried (`lib/email-availability.js`)'})
 add('flow-workspace-lifecycle','FLOW','carried','Workspace create/bind/remove, registry, settings change log, owner backfill, erasure',['auth-accounts-and-workspaces'],'flowauth','3',N,'Medium',U,
     'unchanged — registry still write-only (`lib/workspace-registry.js` exports only `recordWorkspace`, now 10 importing writers; R8); `lib/workspace-change-log.js` folds (LIN-3846)', recs=['R8'])
@@ -1376,7 +1398,7 @@ add('flow-as-asked-seal','FLOW','new','The `## As asked` block: sealed on create
     over={'err':3,'idem':3}, recs=['R20'], severity='M')
 # ---------------- META
 add('meta-integration-surface-maturity-review','META','carried',"This review's own methodology",['llm-and-prompts'],'compute','3',N,'Medium',U,
-    'unchanged at 3 — gains: scripted, balanced reconciliation (189 sweep rows, 291 citation rows), first full twelve-dimension reading, a JSON ledger. Losses: its own template still describes minting (R18), its top recommendation is at a fifth cycle with no route to owned work (R21), and 12 of 34 done/High ids were hit (R16). See Self-Audit',
+    'unchanged at 3 — gains: scripted, balanced reconciliation (189 sweep rows, 291 citation rows), first full twelve-dimension reading, a JSON ledger. Losses: its own template still describes minting (R18), its top recommendation is at a fifth cycle with no route to owned work (R21), and 12 of 34 done/High ids were hit (R16). The Tier-2 second read found the window\'s largest configuration change (feature switches 21 → 10) missing and one carried N/A* note claiming a re-verification that was not done; both fixed in place. See Self-Audit',
     over={'err':N,'res':N,'rl':N,'auth':N,'idem':N,'val':N,'obs':N,'sec':N,'test':2,'doc':2},
     cites={'test':'`tests/unit/periodicals.test.js:371-372` census regexes miss both advisory minting phrases','doc':'method steps (five-pass sweep, area cross-check, scripted ledger) live only in ticket text, not in `generateIntegrationSurfaceMaturityPrompt` (`lib/periodicals.js:835`)'},
     na_extra={d:'a review methodology has no runtime surface for this dimension' for d in ['err','res','rl','auth','idem','val','obs','sec']}, recs=['R16','R18','R21'], severity='M')
@@ -1487,6 +1509,7 @@ q "Q11. C14 Arm 1 (run 4 Q34 regexes, verbatim) over c5694b68..origin/main" "pyt
 q "Q12. Citation re-points (strict + paragraph-local bare), content match, hand overlay" "python3 -I $SPS/scripts/cites.py $LV $SD $SPS/out/citation-repoints.csv && python3 -I $SPS/scripts/cites_resolve.py $SPS/out/citation-repoints.csv; echo exit=\$?"
 q "Q13. Run-4 parse (52 rows, R1-R17; incomplete parse exits 1)" "python3 -I $SPS/scripts/run4.py $LV $SPS/out/run4-ledger.json; echo exit=\$?"
 q "Q14. Carried-recommendation probes (R2, R8, R9, R11, R13, R14, R15, R17, R5, R10)" "echo '--- R2'; grep -n silentSince lib/dispatch-store.js | head -3; git grep -n silentSince origin/main -- lib routes server.js ':!lib/dispatch-store.js' | cut -c1-120; echo '--- R9'; grep -n 'function formatDispatchWatch' routes/proxy-dispatch.js; grep -n periodicalId routes/proxy-dispatch.js | cut -c1-120; echo '--- R8'; git grep -l observer-efficacy-signal origin/main -- lib routes server.js; grep -n '^export' lib/workspace-registry.js; git grep -l 'workspace-registry.js' origin/main -- lib routes server.js | wc -l; echo '--- R11'; git grep -n -A1 'scheduler.register(' origin/main -- server.js | grep name: ; git grep -n 'setInterval(' origin/main -- server.js | cut -c1-130; echo '--- R13'; grep -n OwnerCredentialStore server.js; echo '--- R14'; grep -n CONTRACT_SHA256 tests/unit/runner-kit-contract.test.js | head -2 | cut -c1-120; grep -n -E 'FIXTURE_SHA256 =|LV_COMMIT =' $SD/test/runner-contract.test.js; cmp lib/runner-kit/contract.json $SD/test/fixtures/runner-contract.json && echo byte-identical; ls .github/workflows $SD/.github/workflows; echo '--- R15'; git grep -n authStoppedWorkspaces origin/main -- lib routes public server.js | cut -c1-100; echo '--- R17'; grep -n -i alarm lib/hourly-cleanup.js | wc -l; sed -n '276p;285p' lib/liveness-alarm-store.js; echo '--- R5'; grep -n 'export function resolvePrecompute' lib/run-paragraph-hook.js; echo '--- R10 (run 3 query, non-review production hits)'; git grep -n -E 'LIN-2995|yet honor' origin/main -- 'lib/*.js' 'routes/*.js' 'public/*.js' server.js | cut -c1-120; echo '--- usage wiring (SD)'; grep -n 'request-records\|request-usage' $SD/opencode-runner.js $SD/hook.js $SD/dispatcher.js $SD/reapers.js | cut -c1-110; grep -n 'WORKER_USAGE_RELAY = ' $SD/config.js; grep -n \"router.post('/api/dispatch/usage\" routes/dispatch.js | cut -c1-90"
+q "Q17. Configuration surface (added after the second read): feature switches at both pins, dispatch-switch references, consumer default flips" "for r in c5694b68 origin/main; do git show \$r:lib/feature-defaults.js > /tmp/fd-\$\$.mjs; node -e \"import('file:///tmp/fd-\$\$.mjs').then(m=>console.log('\$r FEATURES keys:',Object.keys(m.FEATURES).length,Object.values(m.FEATURES).join(',')))\"; done; rm -f /tmp/fd-\$\$.mjs; for c in d738a7678 00c3e081d 2c8366760 e336733ee; do git log -1 --format='%h %ad %s' --date=short \$c | cut -c1-120; done; echo \"FEATURES.DISPATCH refs: \$(git grep -c FEATURES.DISPATCH c5694b68 -- lib routes server.js | wc -l | tr -d ' ') -> \$(git grep -c FEATURES.DISPATCH origin/main -- lib routes server.js | wc -l | tr -d ' ') files\"; git grep -l -E 'featureFlags|getFeatureFlags' origin/main -- 'lib/render*.js' 'lib/components/*.js' lib/run-controls.js | wc -l; grep -n -E \"envFlag\\('SD_(ASSISTANT_TEXT|WORKER_USAGE)_RELAY'\" $SD/config.js; git -C $SD log -1 --format='%h %ad %s' --date=short a7e5173"
 echo; echo '### Q15. Tracker states (workspace API, read 2026-11-10T11:17Z)'; echo; echo '```text'; cat "$SPS/out/tracker-states.txt"; echo '```'
 echo; echo '### Q16. Generator: validate the ledger, render the report tables, confirm a second run changes nothing'; echo; echo '```bash'; echo 'python3 -I <scratch>/scripts/gen.py docs/reviews/_evidence-2026-11-10-ism/trend-ledger.json docs/reviews/_evidence-2026-11-10-ism/run4-ledger.json docs/reviews/integration-surface-maturity-review-2026-11-10.md --check'; echo '```'; echo; echo '```text'; python3 -I "$SPS/scripts/gen.py" docs/reviews/_evidence-2026-11-10-ism/trend-ledger.json docs/reviews/_evidence-2026-11-10-ism/run4-ledger.json docs/reviews/integration-surface-maturity-review-2026-11-10.md --check 2>&1; echo '```'
 echo; echo '## Script sources (full text; not committed)'

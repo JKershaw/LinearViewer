@@ -78,7 +78,8 @@ importers: `lib/pipeline-churn.js` only; every `public/` addition is referenced 
 `opencode-runner.js`, `reapers.js`), `opencode-request-records.js` (`opencode-runner.js`). None is dead.
 
 **Pass 2 — deleted files (10).** No run-4 line citation points into any of them, and no run-4 id depended on one. The
-next-run lane (`lib/next-run.js`, `lib/render-next-run.js`, `routes/next-run.js`, `public/next-run.{js,css}`) is
+next-run lane (`lib/next-run.js`, `lib/render-next-run.js`, `routes/next-run.js`, `public/next-run.{js,css}`), retired
+with its `nextRun` switch, its scheduled LLM job and the `prototypes/` folder by LIN-3912 (`2c8366760`), is
 **retired evidence, not a retired surface**. `lib/task-cost.js` and `lib/plan-fee-config.js` were named in
 `flow-cost-telemetry`'s *definition* ("task-cost/model-pricing/weekly-budget/plan-fee lane"); that cell is re-pointed to
 the per-request usage ledger that replaced them (LIN-4195). The three vendored minified libraries **moved**: they are
@@ -111,6 +112,17 @@ unscored). The 67 commits name 55 LIN ids in their subjects (76 counting bodies)
 | `flow-autopilot-wake` | LIN-3759 (relay a parked child's PENDING-EXTERNAL to its parent), LIN-4027 (leaf `[pending]` wake) | unchanged |
 | `mod-model-routing` (new) | `harnesses.js`, `executors.js`: resumes keep the session's model/effort (LIN-3830); opencode resolves effort to null and says so (LIN-3857); blank Harbour rows fall through to `workspaces.json` | held at 3 (two sources of model choice) |
 | `flow-area-notes-leftover` (new) | `docs/areas/` registry, README, four notes and a guard test (LIN-4372); README points at Harbour's `LEFTOVER_RULE` (LIN-4385) | new cross-repo FLOW |
+| `flow-dispatch-lifecycle` (feedback volume) | `config.js:1316` `SD_ASSISTANT_TEXT_RELAY` default **on** (LIN-4165, `a7e5173`): every assistant text reply is now posted to Harbour as dispatch feedback *(added after the second read)* | a cross-repo default flip; more feedback rows per run, no score change |
+
+**Configuration surface, both repos (added after the second read).** The window's largest configuration change was in
+Harbour's own switches: user feature switches in `lib/feature-defaults.js` went from **21 to 10** (+31/−70). LIN-3848
+(`d738a7678`) removed nine switches that did nothing or were superseded (and the `observerAuthority` workspace switch);
+LIN-3849 (`00c3e081d`, 22 files) replaced the `dispatch` and `proxy` switches with run controls derived from facts —
+the viewer owns the workspace and it has a live runner key or queue token (`lib/run-controls.js`); `FEATURES.DISPATCH`
+references in `lib`/`routes`/`server.js` went from 3 lines (one file) to 0; LIN-3912 retired `nextRun`. The consumer flipped two defaults
+on (`SD_WORKER_USAGE_RELAY`, LIN-4127; `SD_ASSISTANT_TEXT_RELAY`, LIN-4165) behind one flag parser (`env-flag.js`,
+LIN-4182). This is filed as `mod-render-layer` CFG **N/A → 3** (the switches are read by 34 renderer, component and run-control
+files) and noted on `api-dispatch` and `flow-dispatch-halt`; the server-side gates did not change.
 
 Consumer-only changes with no Harbour crossing (unscored by the decision below): the heavy-tier test harness
 (LIN-4219–4224, 123 test files), `resource-metrics.js` bounded sink (LIN-1819), `terminal-driver.js` launch diagnosis
@@ -132,6 +144,12 @@ files match no area.
 **Unbounded classes, recorded as such.** Provider-side Done automations; live periodical `stopAt` values; production
 `request-usage` rows (no production read was made); whether stored dispatch rows carry `periodicalId` when read back.
 No decision depends on any of them.
+
+**Incident record carried from run 4.** `docs/incidents/2026-10-22-railway-security-disclosure.md` landed one commit
+after run 4's pin and run 4 recorded it as a dated post-pin note (credential rotation, region move, email sign-in off).
+Its follow-ups now read: LIN-3772 (least-privileged MongoDB user instead of root) **Done**, LIN-3771 (email spam)
+**Done** (it moves `flow-email-identity`), LIN-3770 (maintenance mode) **Todo**. No other incident file was added in
+the window.
 
 ---
 
@@ -164,7 +182,9 @@ R14 (both repos now pin one contract hash in CI), R1 (the Stage-2 end is defined
 registered sibling has now run), R16 (12 of 34 done/High ids hit, down from 14 of 35). **New:** the per-request usage
 ledger replaced the deleted cost lane end to end across both repos — the window's largest cross-repo FLOW change, filed
 as `flow-cost-telemetry`'s new definition, not a new id; model routing (`mod-model-routing`), area notes and the leftover
-step (`flow-area-notes-leftover`) and the As-asked seal (`flow-as-asked-seal`). **Unchanged:** R7 (fifth cycle), R3 (fifth
+step (`flow-area-notes-leftover`) and the As-asked seal (`flow-as-asked-seal`). **Simplified:** the configuration
+surface — user feature switches 21 → 10, and who may dispatch is now derived from facts, not a switch (LIN-3848/3849/3912;
+found by the second read, filed as `mod-render-layer` CFG N/A → 3). **Unchanged:** R7 (fifth cycle), R3 (fifth
 run), R2, R9 (read side), R13, R15, R17, R8, R11. **Worsened:** none by score. Four rows lose High confidence to open
 High sibling findings (`api-dispatch`, `api-linear-graphql`, `mod-provider-abstraction`, `flow-agent-grants`). The three
 Highs filed against the dispatch store on 2026-10-23 were all fixed within a day (LIN-3805, LIN-3811, LIN-3812).
@@ -287,7 +307,7 @@ CHP-based so it compares with run 4; the per-dimension means below are the basel
 | SEC | 54 | 0 | 3.00 | 75.0% | Security Review |
 | TEST | 54 | 0 | 2.94 | 73.6% | Test Coverage Gap Review |
 | DOC | 54 | 0 | 2.91 | 72.7% | Documentation Review |
-| CFG | 22 | 32 | 3.59 | 89.8% | this review + siblings |
+| CFG | 23 | 31 | 3.57 | 89.1% | this review + siblings |
 <!-- /gen:dim-means -->
 
 | # | Dimension | Owning review | Freshness at 2026-11-10T11:19Z | Confidence of the per-surface cells | Delta vs run 4 (portfolio) |
@@ -303,7 +323,7 @@ CHP-based so it compares with run 4; the per-dimension means below are the basel
 | 9 | Security | **Security Review** | 2026-10-23 | Medium | first reading; `mod-response-hardening` 4 (CSP); R4 stays closed |
 | 10 | Testing | **Test Coverage Gap Review** | 2026-10-23 (18 days) | Medium | first reading; TCG C1 (`api-dispatch`, `flow-agent-grants` 2); R14 improved |
 | 11 | Documentation | **Documentation Review** | 2026-10-21 (20 days; a run was dispatched 2026-11-10 and had not landed at the listing) | Medium | first reading; R12 improved 19 → 5; R18 template drift |
-| 12 | Configuration | **this review + siblings** | — | Medium | `flow-cost-telemetry` CFG 3→4 (cited); no N/A flipped |
+| 12 | Configuration | **this review + siblings** | — | Medium | `flow-cost-telemetry` CFG 3→4 (cited); `mod-render-layer` CFG N/A → 3 (feature switches 21 → 10, LIN-3848/3849/3912; caught by the second read) |
 
 ---
 
@@ -355,8 +375,10 @@ testing 2 · documentation 2 · confidence Medium (unchanged).*
   (four rows), and fixed ones are recorded as coverage caveats. What the model still cannot do: a fixed defect on a
   CHP-4 surface changes nothing, a sibling High moves confidence, never a score, and a ticket marked Done is not proof
   of its fix — LIN-690 reads Done with no asserting test found, which this run caught only by reading the tests.
-- **Is any dimension consistently N/A or consistently 0?** Configuration is N/A on 32 of 54 scored ids (run 4: 30 of
-  51; the new FLOWs add two, each justified). Under the first full reading, resilience, rate limits, auth and
+- **Is any dimension consistently N/A or consistently 0?** Configuration is N/A on 31 of 54 scored ids (run 4: 30 of
+  51; the new FLOWs add two, each justified; `mod-render-layer` flips N/A → 3, a reportable delta, not a denominator
+  accident). The carried CFG N/A*s were not re-verified row by row, and the one the second read tested was wrong; the
+  next run should treat every carried N/A* as unverified until read. Under the first full reading, resilience, rate limits, auth and
   idempotency are N/A on 18–37 ids, nearly all pure renderers and compute modules, where the dimension genuinely does not
   apply. No dimension is 0 anywhere. **Observability is the lowest mean (2.04)** and has no owner: that is the
   measurement, not dead weight.
@@ -370,7 +392,10 @@ testing 2 · documentation 2 · confidence Medium (unchanged).*
   files, all referenced). The deleted-file pass found five more deletions than the mint. The area pass found the
   catch-all pattern (R19). Scripted reconciliation found two errors of this run's own making before prose: a basename
   importer matcher that missed same-directory imports (discarded, Q4) and a citation rule that resolved a sibling
-  report's `:99` to a code file (marked a rule false positive).
+  report's `:99` to a code file (marked a rule false positive). **What the sweep still missed:** the window's largest
+  configuration change (21 → 10 feature switches, LIN-3848/3849/3912), in this review's own first-party dimension. The
+  file-based passes saw `lib/run-controls.js` as one added file and `lib/feature-defaults.js` was not in the top-25
+  churn; a behaviour pass over configuration (flag and env-default diffs in both repos) is the missing sixth pass.
 - **Does this template still describe behaviour that changed?** **Yes (R18).** The rendered ISM prompt says "whatever
   follow-up work this review mints" and "(and any follow-up tasks)" although the engine says no periodical mints
   (`lib/periodicals.js:117-118`); it says "fourteenth sibling" against 16; and the method this run used lives only in
@@ -508,9 +533,9 @@ row, and every 0, 1 or 4 cell is cited in the table after the ledger. *All table
 |---|---|---|---|---|---|---|---|---|
 | `mod-provider-abstraction` | `4·3·N·N·N·N·3·2·3·3·3·N` | = | = | — | 100% | High → Medium | providers | **confidence High→Medium**, score unchanged — Data & Fetch 2026-10-23 H3 `tracker-reads-no-read-through` (HIGH, LIN-446) sits on the provider read path, an open High finding on a CHP-4 surface (R16); `lib/workspace-issues-memo.js` (30 s issue-set memo) folds |
 | `mod-periodicals` | `3·3·N·N·N·N·3·2·3·3·2·3` | = | = | M | 75% | High | llm-and-prompts | unchanged scores — registry still 16 (`lib/periodicals.js:1015-1135`); corrective templates now feed area notes and mint nothing (LIN-4380, header `:110-118`); advisory templates still render minting wording (R18); 14 window commits, not filed unchanged blindly |
-| `mod-prompt-template-system` | `4·3·N·N·N·N·3·2·3·3·3·N` | = | = | — | 100% | Medium | llm-and-prompts, other-features | unchanged — `8cca0193b` (LIN-3906) fixed two stage-selector misroutes (shipped defect, fixed: coverage caveat, R16); `lib/size-of-move.js`, `lib/stage-writes.js`, `lib/recommendation-look-first.js`, `lib/prompts/autopilot-precedence.js` fold; `lib/prompt-template-defs.js` #10 by churn (24 commits) |
+| `mod-prompt-template-system` | `4·3·N·N·N·N·3·2·3·3·3·N` | = | = | — | 100% | Medium | llm-and-prompts, other-features | unchanged — `8cca0193b` (LIN-3906) fixed two stage-selector misroutes (shipped defect, fixed: coverage caveat, R16); `lib/size-of-move.js`, `lib/stage-writes.js`, `lib/recommendation-look-first.js`, `lib/prompts/autopilot-precedence.js` fold; `lib/prompt-template-defs.js` #10 by churn (24 commits); the Survey became two read-only stage templates (LIN-4248) and code now runs the look-first sequence, Surveys before scoping, at both recommendation seams (LIN-4370, `recommendation-look-first.js`) — a routing behaviour change inside this id, not a new FLOW (one owner: the stage path) |
 | `mod-roadmap-trajectory` | `3·3·N·N·N·N·3·2·3·3·3·3` | = | = | — | 75% | Medium/Low | llm-and-prompts, task-model | unchanged — `lib/task-order.js` (task-model area) folds; no cited gain |
-| `mod-render-layer` | `4/2-3·3·N·N·N·N·3·2·3·3·3·N` | = | = | — | 81% | Medium → Medium/Low | front-end-pages, front-end-browser, web-routes, other-features | unchanged score; **confidence Medium→Medium/Low** — the largest fold this run (31 files: Settings one-page-per-area LIN-3846, Home pipeline LIN-4118, dashboard split LIN-3742 Done, `run-controls` LIN-3849, `vendor-assets` LIN-3787) was dispositioned by header and importers, not read in depth; `lib/render.js` #6 and `public/app.js` #18 by churn; Home lane fails the new-FLOW test (owned by `lib/home-pipeline.js`) |
+| `mod-render-layer` | `4/2-3·3·N·N·N·N·3·2·3·3·3·3` | = | N/A→3 | — | 81% | Medium → Medium/Low | front-end-pages, front-end-browser, web-routes, other-features | unchanged score; **confidence Medium→Medium/Low** — the largest fold this run (31 files: Settings one-page-per-area LIN-3846, Home pipeline LIN-4118, dashboard split LIN-3742 Done, `run-controls` LIN-3849, `vendor-assets` LIN-3787) was dispositioned by header and importers, not read in depth; `lib/render.js` #6 and `public/app.js` #18 by churn; Home lane fails the new-FLOW test (owned by `lib/home-pipeline.js`). **CFG N/A → 3**: run 4's N/A* missed the feature-switch surface this layer reads, and this window cut it from 21 switches to 10 (LIN-3848/3849/3912); see cited cells |
 | `mod-dispatch-queue` | `4·3·2·2·N·3·3·2·3·3·3·4` | = | = | M | 100% | High | runs-and-dispatch | unchanged — three High sibling findings landed here and **all three were fixed in the window** (coverage caveats, R16): API Quality 2026-10-23 H1 (a store fault answered 404/401/empty 200) by `ec9eed17e` (LIN-3805: a retryable 503, `DispatchStoreFault`, `lib/dispatch-store.js:49,72-73`); Data & Fetch 2026-10-23 H1 (30-day window unindexed) by `f4289aa64` (LIN-3811: deferred window indexes built off the boot path, `lib/db-indexes.js:12-26`); Data & Fetch H2 / Performance H2 (full rows by default) by `fcab9f712` (LIN-3812: lean/digest default read). `lib/dispatch-store.js` #4 by churn (+1,906 lines; Code Quality 11-04 F-dispatch-store HIGH structural, LIN-2398) |
 | `mod-observation-materializer` | `3·2·2·2·N·3·3·2·3·3·3·N` | = | = | — | 75% | Medium/Low | runs-and-dispatch | unchanged — not read in depth this run either (Code Quality 11-04 F-observation MED-HIGH, LIN-4013, structural) |
 | `mod-kpi-audit` | `4/3·3·N·N·N·N·3·2·3·3·3·N` | = | = | — | 88% | Medium | reports-and-operator-tools, web-routes | unchanged — `lib/workspace-kpis-cache.js`, `routes/dashboard-kpis.js`, `routes/workspace-api-audit.js` fold (split/extract, no behaviour declared) |
@@ -527,7 +552,7 @@ row, and every 0, 1 or 4 cell is cited in the table after the ledger. *All table
 | `mod-dispatch-entrance` | `3·3·N·N·N·N·3·2·3·3·3·N` | = | = | — | 75% | Medium | runs-and-dispatch | unchanged — #11 by churn (24 commits); `lib/dispatch-factory.js` (13 commits) placed here; `lib/recommendation-look-first.js` imported at the seam |
 | `mod-library` | `4·3·N·N·N·N·3·2·3·3·3·N` | = | = | — | 100% | High | llm-and-prompts, web-routes | unchanged — `routes/getting-started.js` and `lib/prompts/agent-onboarding.js` fold (LIN-4085) |
 | `mod-response-hardening` | `4·3·N·N·N·N·3·2·4·3·3·3` | = | = | — | 100% | High | front-end-pages, auth-accounts-and-workspaces, wiring | unchanged |
-| `mod-model-routing` | `3·3·N·2·N·3·3·3·3·3·3·3` | new | new | — | 75% | Medium | llm-and-prompts, agent-api, web-routes, front-end-pages, front-end-browser | new — 17 files (LIN-3852/3853/3962, steps of LIN-3820 Todo): registry `lib/llm-jobs.js`, pure table `lib/model-routing.js` with a witness test proving it answers as the old resolvers did (`:20-22`), store, proxy routes with write scope (`routes/proxy-model-routing.js:40`), change log and undo (`:102`, `:213`); held at 3: the parent design LIN-3820 is still Todo and a blank row deliberately falls through to simple-dispatcher's `workspaces.json` (`lib/model-routing.js:14-15`), so model choice still has two sources; consumer evidence `harnesses.js` (LIN-3830 resumes keep model/effort). CFG 3: per-workspace defaults, no env flag |
+| `mod-model-routing` | `3·3·N·2·N·3·3·3·3·3·3·3` | new | new | — | 75% | Medium | llm-and-prompts, agent-api, web-routes, front-end-pages, front-end-browser | new — 17 files (LIN-3852/3853/3962, steps of LIN-3820 Todo): registry `lib/llm-jobs.js`, pure table `lib/model-routing.js` with a witness test proving it answers as the old resolvers did (`:20-22`), store, proxy routes with write scope (`routes/proxy-model-routing.js:189`), change log and undo (`:102`, `:213`); held at 3: the parent design LIN-3820 is still Todo and a blank row deliberately falls through to simple-dispatcher's `workspaces.json` (`lib/model-routing.js:14-15`), so model choice still has two sources; consumer evidence `harnesses.js` (LIN-3830 resumes keep model/effort). CFG 3: per-workspace defaults, no env flag |
 <!-- /gen:ledger-mod -->
 
 ### API surfaces
@@ -544,7 +569,7 @@ row, and every 0, 1 or 4 cell is cited in the table after the ledger. *All table
 | `api-yap-chat-client` | `3·3·3·3·3·3·3·2·3·3·3·4` | = | = | — | 75% | Medium/High | llm-and-prompts | unchanged — 0 window commits |
 | `api-egress-proxy-fetch` | `3·3·3·3·3·3·3·2·3·3·3·4` | = | = | — | 75% | Medium/High | platform-and-plumbing | unchanged — 0 window commits |
 | `api-workspace-proxy` | `4·3·2·3·3·2·3·2·3·3·3·4` | = | = | — | 100% | High | agent-api | unchanged — `lib/proxy-instructions.js` #3, `routes/proxy-compute.js` #8, `routes/proxy.js` #13 by churn, none behaviour-declared as a defect fix; `routes/proxy-model-routing.js` filed under `mod-model-routing`; mint by registry id (LIN-4313/4317) |
-| `api-dispatch` | `4·3·2·3·3·2·3·2·3·2·3·4` | = | = | — | 100% | High → Medium | runs-and-dispatch | **confidence High→Medium**, score unchanged — API Quality 2026-10-23 H1 was fixed in the window (LIN-3805, `ec9eed17e`); Test Coverage 2026-10-23 C1 is open by evidence: LIN-690 reads Done (2026-10-30) but a bounded search finds no test asserting the dispatch-token store's cross-workspace revoke or `tokenHash` exclusion (`tests/unit/dispatch-tokens.test.js` changed only by LIN-3795; the wrong-workspace revoke test is the proxy store's, `tests/unit/proxy-tokens.test.js:674`) (R16); new route `POST /api/dispatch/usage/:itemId` (`routes/dispatch.js:1671`) |
+| `api-dispatch` | `4·3·2·3·3·2·3·2·3·2·3·4` | = | = | — | 100% | High → Medium | runs-and-dispatch | **confidence High→Medium**, score unchanged — API Quality 2026-10-23 H1 was fixed in the window (LIN-3805, `ec9eed17e`); Test Coverage 2026-10-23 C1 is open by evidence: LIN-690 reads Done (2026-10-30) but a bounded search finds no test asserting the dispatch-token store's cross-workspace revoke or `tokenHash` exclusion (`tests/unit/dispatch-tokens.test.js` changed only by LIN-3795; the wrong-workspace revoke test is the proxy store's, `tests/unit/proxy-tokens.test.js:674`) (R16); new route `POST /api/dispatch/usage/:itemId` (`routes/dispatch.js:1671`); who may dispatch from the UI is no longer a per-user `dispatch` switch but derived from facts (owner + live runner key or queue token, `lib/run-controls.js`, LIN-3849) — CFG 4 held (the server-side gates did not change) |
 | `api-jira-rest` | `4·3·3·3·3·3·3·2·3·3·3·4` | = | = | — | 100% | High | providers | unchanged |
 | `api-runner-kit` | `3·3·2·3·3·2·3·2·3·3·3·3` | = | = | M | 75% | High | runs-and-dispatch | score unchanged, **R14 improved**: both repos now pin the same contract sha256 in CI-run suites (`tests/unit/runner-kit-contract.test.js:48,330`; SD `test/runner-contract.test.js:50`, LIN-4384/4385/4378); the copies are byte-identical (`cmp`); residual one-directional re-pin (SD `:42-44`). `0e6cd32e1` (LIN-3857) fixed a dropped subagent model/effort (coverage caveat, R16); `runCommand` cyc 136 (Code Quality 11-04, LIN-3741) |
 <!-- /gen:ledger-api -->
@@ -569,9 +594,9 @@ row, and every 0, 1 or 4 cell is cited in the table after the ledger. *All table
 | `flow-operator-decisions` | `4·2·2·N·N·2·3·2·3·3·3·N` | = | = | — | 100% | Medium | runs-and-dispatch, other-features, web-routes | unchanged — 5 files fold (`ruling-settled`, `ruling-standing`, `live-anchor`, `routes/dashboard-rulings.js`, `routes/workspace-api-scan.js`) |
 | `flow-account-merge` | `4·2·2·N·3·2·3·2·3·3·3·N` | = | = | — | 100% | High | auth-accounts-and-workspaces | unchanged |
 | `flow-flight-companion-turn` | `4·2·2·N·N·2·3·2·3·3·3·N` | = | = | — | 100% | Medium | llm-and-prompts | unchanged |
-| `flow-dispatch-halt` | `3·2·2·N·N·2·3·2·3·3·3·N` | = | = | — | 75% | Medium | runs-and-dispatch, front-end-pages | unchanged — R10 still resolved in code (run 3's query: 0 stale production hits; `public/dispatch.js:772` accurate); LIN-3074 still Backlog; `lib/components/halt-controls.js` folds |
+| `flow-dispatch-halt` | `3·2·2·N·N·2·3·2·3·3·3·N` | = | = | — | 75% | Medium | runs-and-dispatch, front-end-pages | unchanged — R10 still resolved in code (run 3's query: 0 stale production hits; `public/dispatch.js:772` accurate); LIN-3074 still Backlog; `lib/components/halt-controls.js` folds; LIN-3849 (`e336733ee`) shows halt buttons only to those the server lets halt (members see none; a direct halt is still refused) |
 | `flow-run-evidence-closeout` | `3·2·2·N·N·3·3·2·3·3·3·N` | = | = | H | 75% | High | runs-and-dispatch, web-routes | unchanged — routes moved to `routes/workspace-api-run-evidence.js` (R7 writer #3 `:260`→`:224`→`:47`/`:60`); `lib/close-out-merges.js` (LIN-3756/3863) records merged events for proxy and person Done writes; `f6e6a0233` (LIN-3903) fixed a post-deploy check that held the close (coverage caveat, R16); consumer LIN-4375 (the `[done]` url is the session's own PR) |
-| `flow-email-identity` | `4·2·2·3·3·2·3·2·3·3·3·4` | 3→4 | = | — | 100% | Medium | auth-accounts-and-workspaces | **CHP 3→4** — run 4 held it at 3 for the in-memory per-IP limiter and the live spam bot; LIN-3771 (`c6c5585a8`, Done) and LIN-3789 added a per-address 24 h cap, a site-wide hourly alarm, a honeypot and a minimum form time (`lib/email-auth.js:41-58`, `routes/email-auth.js:97,141`). Per-IP stays per-process (`routes/email-auth.js:88-92`) |
+| `flow-email-identity` | `4·2·2·3·3·2·3·2·3·3·3·4` | 3→4 | = | — | 100% | Medium | auth-accounts-and-workspaces | **CHP 3→4** — run 4 held it at 3 for the in-memory per-IP limiter and the live spam bot; LIN-3771 (`c6c5585a8`, Done) and LIN-3789 added a per-address 24 h cap, a site-wide hourly alarm, a honeypot and a minimum form time (`lib/email-auth.js:41-58`, `routes/email-auth.js:97,141`). Per-IP stays per-process (`routes/email-auth.js:90-95`) |
 | `flow-workspace-lifecycle` | `3·2·2·N·3·2·3·2·3·3·3·N` | = | = | — | 75% | Medium | auth-accounts-and-workspaces | unchanged — registry still write-only (`lib/workspace-registry.js` exports only `recordWorkspace`, now 10 importing writers; R8); `lib/workspace-change-log.js` folds (LIN-3846) |
 | `flow-consumer-liveness` | `3·2·2·N·N·2·3·2·3·2·2·N` | = | = | M | 75% | Medium | runs-and-dispatch | unchanged — `authStoppedWorkspaces` still only validated and stored (`lib/consumer-heartbeat.js:34,87`, R15); alarm store `cleanup()` still uncalled (R17); consumer: one dispatcher per host (SD `instance-guard.js`, LIN-796) |
 | `flow-agent-grants` | `4·2·2·N·3·2·3·2·3·2·3·N` | = | = | — | 100% | Medium/High → Medium | agent-api | **confidence Medium/High→Medium**, score unchanged — Test Coverage 2026-10-23 C1 (High): the dispatch-token store's cross-workspace revoke and `tokenHash` exclusion are unasserted; LIN-690 reads Done (2026-10-30) with no such test found (R16) |
@@ -587,7 +612,7 @@ row, and every 0, 1 or 4 cell is cited in the table after the ledger. *All table
 
 | id | scores | CHP Δ | CFG Δ | Sev | Complete | Confidence (run 4 → now) | Area(s) | Delta vs run 4 (citation) |
 |---|---|---|---|---|---|---|---|---|
-| `meta-integration-surface-maturity-review` | `3·N·N·N·N·N·N·N·N·2·2·N` | = | = | M | 75% | Medium | llm-and-prompts | unchanged at 3 — gains: scripted, balanced reconciliation (189 sweep rows, 291 citation rows), first full twelve-dimension reading, a JSON ledger. Losses: its own template still describes minting (R18), its top recommendation is at a fifth cycle with no route to owned work (R21), and 12 of 34 done/High ids were hit (R16). See Self-Audit |
+| `meta-integration-surface-maturity-review` | `3·N·N·N·N·N·N·N·N·2·2·N` | = | = | M | 75% | Medium | llm-and-prompts | unchanged at 3 — gains: scripted, balanced reconciliation (189 sweep rows, 291 citation rows), first full twelve-dimension reading, a JSON ledger. Losses: its own template still describes minting (R18), its top recommendation is at a fifth cycle with no route to owned work (R21), and 12 of 34 done/High ids were hit (R16). The Tier-2 second read found the window's largest configuration change (feature switches 21 → 10) missing and one carried N/A* note claiming a re-verification that was not done; both fixed in place. See Self-Audit |
 <!-- /gen:ledger-meta -->
 
 ### Cited cells (every 0, 1 or 4, and every changed CHP/CFG)
@@ -601,6 +626,7 @@ Unchanged CHP/CFG 4s carry run 4's citation; where a fresh one exists it is list
 | `mod-periodicals` | DOC | 2 | `lib/periodicals.js:843` "not a fourteenth sibling" against 16 registry entries; `:303`, `:382` render minting wording in every advisory prompt (R18) |
 | `mod-prompt-template-system` | CHP | 4 | `lib/stage-router.js` + `generatePrompt()` one-path invariant (CLAUDE.md Invariants); routing snapshots regenerated in `8cca0193b` |
 | `mod-render-layer` | CHP | 4/2-3 | split score carried (run-2 convention): first-class pages 4, experimental tier 2-3 |
+| `mod-render-layer` | CFG | 3 | **N/A → 3 (a reportable flip, caught by the second read)**: the user feature switches in `lib/feature-defaults.js` went from 21 to 10 in the window — LIN-3848 (`d738a7678`) removed nine that did nothing or were superseded, LIN-3849 (`00c3e081d`) replaced the `dispatch` and `proxy` switches with run controls derived from facts (`lib/run-controls.js`, `getFeatureFlags` at `:27,127`), LIN-3912 (`2c8366760`) retired `nextRun` with its page and job; 34 renderer, component and run-control files read the remaining flags (`rerun-outputs.md` Q17). Held at 3, not 4: the experimental tier still rides on per-user switches |
 | `mod-dispatch-queue` | CHP | 4 | run-4 evidence carried (`takeItem({targets})`, loop guards); no core defect this window |
 | `mod-dispatch-queue` | CFG | 4 | run-4 CFG 4 carried (TTL/queue config, `lib/queue-config.js`) |
 | `mod-kpi-audit` | CHP | 4/3 | run-4 evidence carried (`lib/kpi-stats.js` privacy boundary, CLAUDE.md Key Behaviors) |
@@ -659,7 +685,7 @@ Unchanged CHP/CFG 4s carry run 4's citation; where a fresh one exists it is list
 ### N/A justifications
 
 <!-- gen:na-flips -->
-**N/A flips vs run 4: none.** CFG is N/A for 32 of 54 scored ids (run 4: 30 of 51; the three new ids add 2).
+**N/A flips vs run 4: `mod-render-layer` CFG N/A* → 3.** CFG is N/A for 31 of 54 scored ids (run 4: 30 of 51; the three new ids add 2).
 <!-- /gen:na-flips -->
 
 <!-- gen:na -->
@@ -669,7 +695,7 @@ Unchanged CHP/CFG 4s carry run 4's citation; where a fresh one exists it is list
 | `mod-provider-abstraction` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-provider-abstraction` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `mod-provider-abstraction` | IDEM | pure and writes nothing, so a retry has no effect to double |
-| `mod-provider-abstraction` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `mod-provider-abstraction` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `mod-periodicals` | RES | no outbound I/O of its own: a pure function of what its caller hands it |
 | `mod-periodicals` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-periodicals` | AUTH | holds and checks no credential; the route or lane that calls it does |
@@ -678,7 +704,7 @@ Unchanged CHP/CFG 4s carry run 4's citation; where a fresh one exists it is list
 | `mod-prompt-template-system` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-prompt-template-system` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `mod-prompt-template-system` | IDEM | pure and writes nothing, so a retry has no effect to double |
-| `mod-prompt-template-system` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `mod-prompt-template-system` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `mod-roadmap-trajectory` | RES | no outbound I/O of its own: a pure function of what its caller hands it |
 | `mod-roadmap-trajectory` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-roadmap-trajectory` | AUTH | holds and checks no credential; the route or lane that calls it does |
@@ -687,73 +713,72 @@ Unchanged CHP/CFG 4s carry run 4's citation; where a fresh one exists it is list
 | `mod-render-layer` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-render-layer` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `mod-render-layer` | IDEM | pure and writes nothing, so a retry has no effect to double |
-| `mod-render-layer` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
 | `mod-dispatch-queue` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `mod-observation-materializer` | AUTH | holds and checks no credential; the route or lane that calls it does |
-| `mod-observation-materializer` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `mod-observation-materializer` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `mod-kpi-audit` | RES | no outbound I/O of its own: a pure function of what its caller hands it |
 | `mod-kpi-audit` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-kpi-audit` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `mod-kpi-audit` | IDEM | pure and writes nothing, so a retry has no effect to double |
-| `mod-kpi-audit` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `mod-kpi-audit` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `mod-live-console` | RES | no outbound I/O of its own: a pure function of what its caller hands it |
 | `mod-live-console` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-live-console` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `mod-live-console` | IDEM | pure and writes nothing, so a retry has no effect to double |
-| `mod-live-console` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `mod-live-console` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `mod-scheduler` | RL | schedules in-process jobs; no list or rate-limited call of its own |
 | `mod-scheduler` | AUTH | holds and checks no credential; the route or lane that calls it does |
-| `mod-scheduler` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `mod-scheduler` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `mod-observer-lane` | RES | no outbound I/O of its own: a pure function of what its caller hands it |
 | `mod-observer-lane` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-observer-lane` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `mod-observer-lane` | IDEM | pure and writes nothing, so a retry has no effect to double |
-| `mod-observer-lane` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `mod-observer-lane` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `mod-ship-journey` | RES | no outbound I/O of its own: a pure function of what its caller hands it |
 | `mod-ship-journey` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-ship-journey` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `mod-ship-journey` | IDEM | pure and writes nothing, so a retry has no effect to double |
-| `mod-ship-journey` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `mod-ship-journey` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `mod-passage-planner` | RES | no outbound I/O of its own: a pure function of what its caller hands it |
 | `mod-passage-planner` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-passage-planner` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `mod-passage-planner` | IDEM | pure and writes nothing, so a retry has no effect to double |
-| `mod-passage-planner` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `mod-passage-planner` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `mod-task-edit` | RES | no outbound I/O of its own: a pure function of what its caller hands it |
 | `mod-task-edit` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-task-edit` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `mod-task-edit` | IDEM | pure and writes nothing, so a retry has no effect to double |
-| `mod-task-edit` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `mod-task-edit` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `mod-task-create` | RES | no outbound I/O of its own: a pure function of what its caller hands it |
 | `mod-task-create` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-task-create` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `mod-task-create` | IDEM | pure and writes nothing, so a retry has no effect to double |
-| `mod-task-create` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `mod-task-create` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `mod-effort-readout` | RES | no outbound I/O of its own: a pure function of what its caller hands it |
 | `mod-effort-readout` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-effort-readout` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `mod-effort-readout` | IDEM | pure and writes nothing, so a retry has no effect to double |
-| `mod-effort-readout` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `mod-effort-readout` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `mod-secret-scan` | RES | no outbound I/O of its own: a pure function of what its caller hands it |
 | `mod-secret-scan` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-secret-scan` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `mod-secret-scan` | IDEM | pure and writes nothing, so a retry has no effect to double |
-| `mod-secret-scan` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `mod-secret-scan` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `mod-task-page` | RES | no outbound I/O of its own: a pure function of what its caller hands it |
 | `mod-task-page` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-task-page` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `mod-task-page` | IDEM | pure and writes nothing, so a retry has no effect to double |
-| `mod-task-page` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `mod-task-page` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `mod-dispatch-entrance` | RES | no outbound I/O of its own: a pure function of what its caller hands it |
 | `mod-dispatch-entrance` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-dispatch-entrance` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `mod-dispatch-entrance` | IDEM | pure and writes nothing, so a retry has no effect to double |
-| `mod-dispatch-entrance` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `mod-dispatch-entrance` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `mod-library` | RES | no outbound I/O of its own: a pure function of what its caller hands it |
 | `mod-library` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-library` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `mod-library` | IDEM | pure and writes nothing, so a retry has no effect to double |
-| `mod-library` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `mod-library` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `mod-response-hardening` | RES | no outbound I/O of its own: a pure function of what its caller hands it |
 | `mod-response-hardening` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `mod-response-hardening` | AUTH | holds and checks no credential; the route or lane that calls it does |
@@ -762,44 +787,44 @@ Unchanged CHP/CFG 4s carry run 4's citation; where a fresh one exists it is list
 | `mod-model-routing` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `api-mongodb-storage` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `flow-dispatch-lifecycle` | AUTH | holds and checks no credential; the route or lane that calls it does |
-| `flow-dispatch-lifecycle` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `flow-dispatch-lifecycle` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `flow-followup-resume` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `flow-followup-resume` | AUTH | holds and checks no credential; the route or lane that calls it does |
-| `flow-followup-resume` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `flow-followup-resume` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `flow-autopilot-wake` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `flow-autopilot-wake` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `flow-oauth` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `flow-bootstrap-token-exchange` | RL | returns no paged list and calls no rate-limited dependency of its own |
-| `flow-bootstrap-token-exchange` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `flow-bootstrap-token-exchange` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `flow-recap-brief-cache` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `flow-recap-brief-cache` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `flow-periodicals-two-stage` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `flow-periodicals-two-stage` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `flow-account-connection-workspace-credential` | RL | returns no paged list and calls no rate-limited dependency of its own |
-| `flow-account-connection-workspace-credential` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `flow-account-connection-workspace-credential` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `flow-cost-telemetry` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `flow-operator-decisions` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `flow-operator-decisions` | AUTH | holds and checks no credential; the route or lane that calls it does |
-| `flow-operator-decisions` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `flow-operator-decisions` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `flow-account-merge` | RL | returns no paged list and calls no rate-limited dependency of its own |
-| `flow-account-merge` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `flow-account-merge` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `flow-flight-companion-turn` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `flow-flight-companion-turn` | AUTH | holds and checks no credential; the route or lane that calls it does |
-| `flow-flight-companion-turn` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `flow-flight-companion-turn` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `flow-dispatch-halt` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `flow-dispatch-halt` | AUTH | holds and checks no credential; the route or lane that calls it does |
-| `flow-dispatch-halt` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `flow-dispatch-halt` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `flow-run-evidence-closeout` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `flow-run-evidence-closeout` | AUTH | holds and checks no credential; the route or lane that calls it does |
-| `flow-run-evidence-closeout` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `flow-run-evidence-closeout` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `flow-workspace-lifecycle` | RL | returns no paged list and calls no rate-limited dependency of its own |
-| `flow-workspace-lifecycle` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `flow-workspace-lifecycle` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `flow-consumer-liveness` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `flow-consumer-liveness` | AUTH | holds and checks no credential; the route or lane that calls it does |
-| `flow-consumer-liveness` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `flow-consumer-liveness` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `flow-agent-grants` | RL | returns no paged list and calls no rate-limited dependency of its own |
-| `flow-agent-grants` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
-| `flow-task-share` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `flow-agent-grants` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
+| `flow-task-share` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 | `flow-area-notes-leftover` | RL | returns no paged list and calls no rate-limited dependency of its own |
 | `flow-area-notes-leftover` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `flow-area-notes-leftover` | CFG | no environment variable or flag; behaviour is fixed in code |
@@ -807,7 +832,7 @@ Unchanged CHP/CFG 4s carry run 4's citation; where a fresh one exists it is list
 | `flow-as-asked-seal` | AUTH | holds and checks no credential; the route or lane that calls it does |
 | `flow-as-asked-seal` | CFG | no environment variable or flag; behaviour is fixed in code |
 | `meta-integration-surface-maturity-review` | ERR, RES, RL, AUTH, IDEM, VAL, OBS, SEC | a review methodology has no runtime surface for this dimension |
-| `meta-integration-surface-maturity-review` | CFG | carried N/A* from run 4 (re-verified in place: no environment or flag surface) |
+| `meta-integration-surface-maturity-review` | CFG | carried N/A* from run 4; not re-verified row by row this run (the second read showed one such carry was wrong, see `mod-render-layer`) |
 <!-- /gen:na -->
 
 ### Area cross-check (pass 5)
@@ -834,4 +859,59 @@ Unchanged CHP/CFG 4s carry run 4's citation; where a fresh one exists it is list
 
 ## Adversarial Second-Read
 
-*(Filled in after the second read; see below.)*
+**Tier used:** **Tier 2 — a fresh-context sub-agent**, dispatched from this session after the report was written, with
+no memory of the report-writing turn. It was given only the report path, both repo roots, the two windows
+(`c5694b68..origin/main`, `bb1da78..origin/main`), the one-paragraph remit and the question below; no findings and no
+summary. It inspected the repositories itself, read-only.
+
+**Question posed, verbatim:** *"What is the largest item in this window that this report missed or misfiled?"*
+
+**Reader's full answer, verbatim:**
+
+> **1. Largest item missed or misfiled: the feature-flag configuration surface lost more than half its switches in the window, and the report never mentions it.** Configuration is one of the report's own first-party dimensions.
+>
+> What the window shows, in `lib/feature-defaults.js` (+31/−70):
+> - **`d738a7678` (LIN-3848, 2026-10-24)** removed the switches `linearMcp`, `aiRecommendations`, `promptButtons`, the four `codeReview*` switches and `feedbackTriage`, plus the workspace switch `observerAuthority`.
+> - **`00c3e081d` (LIN-3849)** removed the `dispatch` switch (off by default) and the `proxy` switch. It touched 22 files and replaced them with `lib/run-controls.js`, which works out run controls from facts: the viewer owns the workspace and it has a live runner key or queue token. Before this, `lib/render.js` built the queue and rulings badges and `dispatchEnabled` from `featureFlags.dispatch === true`. So who can dispatch changed from a switch each user turned on to a derived rule. That is a core-path and configuration change on the dispatch flows.
+> - **`2c8366760` (LIN-3912)** retired the Next run page together with its `nextRun` switch, its scheduled LLM job and the 39-file `prototypes/` folder.
+>
+> Net effect: user switches went from **21 to 10** (counted at `c5694b68` and at `origin/main`). References to `FEATURES.DISPATCH` in `lib`, `routes` and `server.js` went from 4 to 0.
+>
+> What the report says:
+> - It has **zero mentions** of LIN-3848, LIN-3912, `feature-defaults`, or the removed switches. Neither this run nor run 4 has a ledger surface for switches or settings.
+> - `lib/run-controls.js` is filed only as one of 31 files "dispositioned by header and importers" into `mod-render-layer` (line 66, line 513; `sweep-dispositions.csv` row 64).
+> - Line 306 (Configuration, first-party): "`flow-cost-telemetry` CFG 3→4 … **no N/A flipped**."
+> - Line 690: `mod-render-layer` CFG is "carried N/A* from run 4 (**re-verified in place: no environment or flag surface**)". That is false. At HEAD about 20 render and component files read `featureFlags` or `getFeatureFlags` (for example `lib/components/view-nav.js`, `lib/render-dispatch.js`, `lib/render-runner-setup.js`), and `lib/run-controls.js:27,127` calls `getFeatureFlags(req.session)`.
+> - The same boilerplate N/A sits on `flow-dispatch-lifecycle` (line 765) and `flow-dispatch-halt` (line 791). LIN-3849 changed both: the run-control decision moved, and `e336733ee` makes members see no halt buttons. Meanwhile `api-dispatch` CFG 4 is "carried" from run 4 (line 630) with no mention of the gate change.
+>
+> **2. Classification:** Mainly a **coverage gap**: the largest configuration change of the window, in the report's own remit, is absent. It also includes a **factual error**, the "re-verified: no flag surface" N/A on `mod-render-layer`.
+>
+> **3. Confidence:** About **60%** that this is the largest miss. Weakest point: the change simplifies things, so scores might not move much and the miss changes the trend story more than the numbers. Someone could also argue the 31-file `mod-render-layer` fold is the bigger single misfiling. That fold includes a Settings rebuild (LIN-3846 and LIN-3890's four-part untangle, the latter never named) and a new Home page. The report already admits it did not read that fold in depth and cut its confidence for it.
+>
+> **4. Secondary items:**
+> - **Railway credential incident absent.** `docs/incidents/2026-10-22-railway-security-disclosure.md` was added in the window: every production secret rotated, the database moved region and its public endpoints removed, the app still connecting to MongoDB as root (LIN-3772 cutover pending), maintenance mode wanted (LIN-3770). The report has zero hits for "railway", "incident" or "mongo" outside `api-mongodb-storage`.
+> - **Consumer default flipped with no mention.** In simple-dispatcher, `a7e5173` (LIN-4165) turned `SD_ASSISTANT_TEXT_RELAY` on by default, so every assistant reply is now posted to Harbour. That is a cross-repo configuration change; the report has zero mentions of LIN-4165, and it is missing from the Pass 4 table.
+> - **New autopilot flow filed as a module fold.** LIN-4370 (5 commits) makes the code run Surveys before scoping at both recommendation seams, across `lib/recent-runs.js`, `lib/proxy-instructions.js` and `routes/proxy-compute.js`. It sits on top of LIN-4248, which made the Survey two new read-only stage templates. The report folds `recommendation-look-first.js` into `mod-prompt-template-system` and never mentions LIN-4248, LIN-4253 or LIN-4251.
+> - **Next run retirement unnamed.** The report counts `public/next-run.{js,css}` among the deleted files but never names LIN-3912 or the retired page, flag and job.
+>
+> **5. On R7:** R7 is a fair top recommendation. Only one of three routes that write Done is guarded, it has been open for five cycles, and a wrong Done is a real correctness risk. As an open risk, R7 matters more than my item. But R7 is a known item the report carried forward correctly, so it is not a miss. My item is the larger *miss*: the largest configuration change of the window, in the report's own remit, absent and covered by a false "re-verified" note.
+
+**Verification by this report's author (content-checked).** Reproduced: `lib/feature-defaults.js` `FEATURES` has 21
+keys at `c5694b68` and 10 at the pin (imported and counted, `rerun-outputs.md` Q17); the three commits exist with the
+stated subjects and dates; `FEATURES.DISPATCH` 3 lines in one file → 0 (the reader said 4; Q17); `SD config.js:1316` `envFlag('SD_ASSISTANT_TEXT_RELAY', true)`.
+One part did not hold: LIN-3772 (MongoDB least-privileged user) now reads **Done**, so "still root" is out of date by the
+tracker. The Railway incident was recorded by run 4 as a post-pin note; this report now carries it forward.
+
+Adversarial second-read verdict: AGREE
+Differed from top finding: YES
+Disposition: fixed in place
+
+The reader's answer differs from this report's #1 (R7), which the reader endorsed as the larger open risk. **Fixed in
+place; no recommendation minted** (a coverage gap and a false N/A note, not a code defect): (1) `mod-render-layer` CFG
+**N/A → 3** with the citation, reported as an N/A flip, and the carried-N/A justification text now says it was **not**
+re-verified row by row; (2) a *Configuration surface, both repos* paragraph and a LIN-4165 row in *Scope & sweep
+accounting* Pass 4; (3) LIN-3849 noted on `api-dispatch` and `flow-dispatch-halt`, LIN-4248/4370 on
+`mod-prompt-template-system` (a routing change inside one owner's stage path, so not a new FLOW); (4) LIN-3912 named
+in Pass 2; (5) the incident record carried forward with its follow-up states; (6) the Self-Audit records the miss and
+names a configuration behaviour pass as the missing sixth sweep. Completeness is unchanged (CHP-based); the CFG mean
+moves 3.59 → 3.57 and the CFG N/A count 32 → 31.
