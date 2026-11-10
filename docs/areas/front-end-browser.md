@@ -25,3 +25,8 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   in `public/recap.js`, and the check for a `statusCode` inside a keepalive 200 body is now
   written four times (also `public/scan.js` and `public/observation.js`). One shared reader
   in `public/common.js`. (Area reads CG/CH, 8 Nov, on LIN-4358.)
+- `public/llms.txt`: its H11 names the unscoped `/api/recommend/status`, which is now only a
+  legacy redirect (`routes/legacy-redirects.js`), and its view list omits `projects` and the
+  flag-gated `live-console` (`lib/components/view-nav.js`). The browser guide is otherwise sound:
+  its endpoints and selectors resolve. (Documentation Review, 10 Nov.;
+  `docs/reviews/documentation-review-2026-11-10.md`.)

@@ -11,9 +11,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   stages, `GROUNDING_NOTES` unknown kinds): give one stage its own list (LIN-4371).
 - Keep scoping and both Survey renders byte-identical unless the ticket is about them:
   replays compare them (LIN-4369).
-- The Surveys get no area notes pointer (survey-place reads no shape reports, which feed the
-  notes). Scoping's pointer cites in its final message (its record takes no fifth line); both
-  share `AREA_NOTES_WHERE`, so say where notes are there (LIN-4346).
+- The Surveys get no area notes pointer: survey-place reads no shape reports, which feed the
+  notes. Scoping cites its pointer in its final message; both share `AREA_NOTES_WHERE` (LIN-4346).
 - `lib/prompt-template-defs.js` and the budget test change in almost every merge: rebase,
   then re-measure. Its fixture passes no context, so it measures a prompt's empty-context
   branch: dropping one can raise a ceiling while real renders shrink (LIN-4393).
@@ -33,7 +32,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   check real rows reach it: scoped runs carry `maxTasks: null`, so P4's detour round
   `guardBudget` cost a session (LIN-4349).
 - `lib/periodicals.js`: close-out merges a Periodical's PR and sets Done, as for any task.
-  Give no Periodical its own merge rule: notes are prompt input (LIN-4390).
+  Give no Periodical its own merge rule: notes are prompt input (LIN-4390). The rule is retyped
+  in five files; only a test links them.
 - Model facts come from the OpenRouter catalog: add no model list or rate (LIN-4358).
   Tests seed `tests/unit/helpers/pinned-catalog.js`.
 
@@ -43,40 +43,39 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   `routes/proxy-compute.js` twice, `routes/workspace-api-prompts.js`) build prompt context by
   hand: a new field must reach five places (LIN-4368 missed one). (LIN-4393 leftovers.)
 - `lib/size-of-move.js`: the built-in policy (`DECIDED_BY.policy`, err larger) may stand in
-  for John's "per task breakdown of options"; the size words and cut ruling ask questions
-  they never explain. Revisit both with per-task options. (John, LIN-4393.)
+  for John's "per task breakdown of options"; its size words are unexplained. (John, LIN-4393.)
 - `lib/should-mock-ai.js`: `isHermeticTestToken` is a third spelling of the test-token
   check, beside `isTestToken` in `routes/workspace-api-steps.js` and the inline
   `isTestMode` checks in `routes/proxy-compute.js` and `routes/task-chat.js`. (LIN-4347.)
 - `lib/as-asked.js`: "When it could go" is repeated in three functions. (John, 7 Nov.)
-- `lib/prompt-template-defs.js`: who may agree to a reduced ask has two names, "cut" in
-  `CUT` (`lib/prompts/stage-intent.js`) and "narrowing" in the plan-review and review
-  verdicts here and in `lib/completion-signals.js`. No test links them. (John, 8 Nov.)
-- `lib/prompts/stage-intent.js`: `CUT` writes the closing contract's token order
-  (`DECISION:` before `BLOCKED:`) into a scope line beside `ASK`, which asks another
-  shape. (John, 8 Nov.)
+- `lib/prompts/stage-intent.js`: `CUT` writes the closing contract's token order (`DECISION:`
+  before `BLOCKED:`) into a scope line beside `ASK`. Its "cut" and the plan-review and review
+  "narrowing" (`lib/completion-signals.js`) name one thing; no test links them. (John, 8 Nov.)
 - `lib/prompt-template-defs.js`: a new stage kind is a row in about nine parallel tables
   (`GROUNDING_BY_KIND`, rendered ceilings, completion signals, labels…), some unguarded;
   fold them into one stage definition. (Survey tally, LIN-4248.)
 - `lib/call-budget.js`: the budget rule has never run live on anthropic/claude-haiku-5.5. Before a
-  call moves to it, replay the snapshot of LIN-4352 (`GET /api/proxy/issues/LIN-4352/snapshots?limit=1`,
-  82b963e0) through `scripts/replay-brief.mjs`. Pass: block [2] WHOLE, four sections, finishReason=stop,
-  any retry's reasoning bound accepted. REFUSED: change the rule first. (John, LIN-4358.)
+  call moves to it, replay LIN-4352's snapshot through `scripts/replay-brief.mjs`: block [2] WHOLE,
+  four sections, finishReason=stop, any retry's reasoning bound accepted. REFUSED: change the rule
+  first. (John, LIN-4358.)
 - `lib/call-budget.js`: split rule: `resolveReasoningBudget`/`isReasoningModel` stay in
   `lib/openrouter.js`; tool hops and the routing pair get the budget, not the retry;
   `canReason` has test callers only. (Area reads CG/CH.)
 - `lib/openrouter.js`: `SUGGESTED_MODEL_IDS` and `DISPATCH_MODEL_SUGGESTIONS`
   (`lib/model-routing-harnesses.js`) repeat ids by hand, unchecked; the first doubles as
   the cold-catalog tool fallback. (Area reads CG/CH.)
-- `lib/periodicals.js`: `areaNotes()` says to follow the notes' own rules, then restates them
-  (one home, Waiting vs Lesson, file first). "Waiting entries are context, not scope" is also
-  in `lib/prompt-formatters.js` and both READMEs; `docs/areas/` is spelled in four code places.
-  (Drift & Coherence Review, 10 Nov; `docs/reviews/drift-coherence-review-2026-11-10.md`.)
-- `lib/prompt-formatters.js`: the area-notes guard is copied to SD and has diverged (200 lines to
-  147, an extra `sh` extension, no Periodical-entry rules in SD's README); only comments link
-  them. (Drift & Coherence Review, 10 Nov; the other side is SD's.)
-- `lib/periodicals.js`: who merges and sets Done is retyped in three bullets here and in
-  `lib/prompt-template-defs.js` (twice), `lib/prompts/autopilot-kickoff.js` and
-  `lib/proxy-preamble.js`; only a test links them. (LIN-4390 leftovers.)
+- `lib/periodicals.js`: `areaNotes()` restates the notes' own rules, and `docs/areas/` is spelled
+  in 17 lines across 10 code files. (Drift & Coherence Review, 10 Nov;
+  `docs/reviews/drift-coherence-review-2026-11-10.md`; count, Documentation Review, 10 Nov;
+  `docs/reviews/documentation-review-2026-11-10.md`.)
+- `lib/periodicals.js`: SD's area-notes guard has diverged (SD 200 lines, LV 147; SD adds `sh`), and SD's
+  README has no Periodical-entry rules. A Periodical's SD note must cite the report second, but the
+  report lives in LinearViewer, so SD's existence check rejects it. (Drift & Coherence Review,
+  10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)
 - `lib/recommendation-live-wait.js`: a read, not a claim: two different-kind calls racing on one
   ticket both pass. The store should claim it, compare-and-set like `claimHeldWake`. (LIN-4392.)
+- `lib/periodicals.js`: Periodical prompts have no size ceiling: +18.8% in the window (185,952 to
+  220,882 B), and only a sha256 tripwire covers them. Size of the move: a ceiling. (Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)
+- `lib/periodicals.js`: `docs/reviews/` has 109 top-level reports (88 MB) and no index. Size of the
+  move: an index or series archive. (Documentation Review, 10 Nov.;
+  `docs/reviews/documentation-review-2026-11-10.md`.)

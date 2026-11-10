@@ -28,4 +28,4 @@ Area notes for `other-features` in the registry. Format and rules: README.md.
   so it sits in this catch-all. It opens the Agent API ↔ Other features pair (2/1, through
   `routes/proxy-writes.js` and `lib/proxy-graphql-errors.js`). Moving it to LLM & prompts
   closes the pair, but reverses the pin and moves this entry, so it is a size of move for the
-  guide's owner, not a tidy. (Seams & Tangles, 8 Nov.) `docs/reviews/seams-tangles-review-2026-11-08-run10.md`
+  guide's owner, not a tidy. (Seams & Tangles, 8 Nov.; `docs/reviews/seams-tangles-review-2026-11-08-run10.md`.)
