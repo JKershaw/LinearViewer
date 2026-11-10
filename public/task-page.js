@@ -16,7 +16,8 @@
  * (LIN-4405): the "Sessions on one clock" fragment (`data-timeline-url` on its
  * section), re-read by `createTimelineRefresher` when a poll's `trackHtml`
  * changes or every 60 s while a lane runs, never more than once per 60 s
- * window, and never once the poll stops (done, hidden tab, 401, revoked link).
+ * window, and never once the poll stops (hidden tab, 401, revoked link). Done is
+ * the one exception: it reads once more, past the window, then stops (`finish`).
  * Owner-only behaviour starts from owner-only DOM hooks: the brief/recap widgets mount from the
  * `task-page-owner-widgets` marker, and the close-out box (public/close-out.js)
  * is its own owner fragment. A guest loads the same scripts and they no-op.
@@ -160,7 +161,9 @@
    * (`noteTrack`; the first value only seeds it, since the page load drew the same history) and, while the painted
    * timeline has a running lane (`isRunning`), once per window. Every reason is coalesced: at most one fetch per
    * `TIMELINE_WINDOW_MS`, a reason inside the window becomes one trailing fetch at its end, and nothing overlaps.
-   * `pause` (hidden tab) and `stop` (done, 401, revoked) clear the timer; `resume` asks once if a lane runs.
+   * `pause` (hidden tab) and `stop` (401, revoked) clear the timer; `resume` asks once if a lane runs. `finish` (the
+   * first done) is the one exception to the window: the poll that says done usually carries the track change of the
+   * last session ending, so it reads once now, paints it, then stops, and no lane is left painted running.
    *
    * @param {Object} o
    * @param {string} o.url
@@ -182,6 +185,8 @@
     var wanted = false;
     var stopped = false;
     var paused = false;
+    var finishing = false;
+    var finalPending = false;
     var timer = null;
 
     function arm(delay) {
@@ -212,6 +217,12 @@
         })
         .then(function () {
           inFlight = false;
+          if (finishing) {
+            // A read already in flight when done arrived may predate it: read once more, then stop for good.
+            if (finalPending && !stopped) { finalPending = false; return fetchNow(); }
+            stopped = true;
+            return;
+          }
           if (stopped || paused) return;
           if (wanted || o.isRunning()) arm(TIMELINE_WINDOW_MS);
         });
@@ -231,6 +242,15 @@
       pause: function () { paused = true; clearTimer(timer); timer = null; },
       resume: function () { if (stopped) return; paused = false; if (o.isRunning()) request(); },
       stop: function () { stopped = true; clearTimer(timer); timer = null; },
+      finish: function () {
+        if (stopped || finishing) return Promise.resolve();
+        finishing = true;
+        paused = false;
+        clearTimer(timer);
+        timer = null;
+        if (inFlight) { finalPending = true; return Promise.resolve(); }
+        return fetchNow();
+      },
       state: function () { return { timer: timer, inFlight: inFlight, stopped: stopped, paused: paused, lastFetchAt: lastFetchAt }; }
     };
   }
@@ -824,7 +844,8 @@
     function apply(state) {
       // LIN-4405: a changed track (a session started, ended or moved on) asks for the timeline; the refresher coalesces.
       if (timeline) {
-        if (state.status === 'done') timeline.stop();
+        // The first done reads the last change once, past the window, then stops (`finish`).
+        if (state.status === 'done') timeline.finish();
         else timeline.noteTrack(state.trackHtml);
       }
       // LIN-4070: an incomplete read carries no state (the server is still gathering it). The page keeps what it painted,

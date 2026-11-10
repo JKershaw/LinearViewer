@@ -4,7 +4,8 @@
  * The real shipped source runs in the vm (tests/unit/helpers/client-world.js), with fake timers. Pins:
  *  - a changed `trackHtml` asks for the fragment, and a running lane asks every window, but every reason is coalesced
  *    into at most one fetch per 60 s window (survey item 5: a running chip changes the track about once a minute);
- *  - the timer stops with the poll: paused while hidden, stopped on done, 401 or a revoked link;
+ *  - the timer stops with the poll: paused while hidden, stopped on 401 or a revoked link, and on done only after one
+ *    final read past the window (`finish`), so the last session's end is painted, not left running;
  *  - through `init()`: the section's `data-timeline-url` is fetched on a changed track and its mount repainted, keeping
  *    an opened lane open.
  *
@@ -137,6 +138,44 @@ describe('createTimelineRefresher', () => {
     }
   });
 
+  test('finish (the first done) after a changed track reads exactly once, past the window, paints it and leaves no timer', async () => {
+    const h = harness({ running: true });
+    h.refresher.noteTrack('a');
+    h.refresher.noteTrack('b');
+    await flush();
+    assert.equal(h.fetched.length, 1, 'the changed track read');
+    assert.deepEqual(h.delays(), [h.WINDOW], 'a lane runs: the next window is armed');
+    // The last session ends: the done poll carries the changed track. Inside the window, finish still reads now.
+    h.refresher.finish();
+    await flush();
+    assert.equal(h.fetched.length, 2, 'one final read, not held to the window');
+    assert.deepEqual(h.applied, ['<p>1</p>', '<p>2</p>'], 'the final read is painted');
+    assert.deepEqual(h.delays(), [], 'no timer after finish');
+    assert.equal(h.refresher.state().stopped, true);
+    h.refresher.finish();
+    h.refresher.noteTrack('c');
+    h.refresher.resume();
+    await h.advance(h.WINDOW * 3);
+    assert.equal(h.fetched.length, 2, 'finished means stopped');
+  });
+
+  test('finish while a read is in flight reads once more after it, then stops; finish after stop does nothing', async () => {
+    const h = harness();
+    h.refresher.noteTrack('a');
+    h.refresher.noteTrack('b');
+    h.refresher.finish();
+    await flush();
+    assert.equal(h.fetched.length, 2, 'the in-flight read may predate done: one more');
+    assert.deepEqual(h.delays(), []);
+    assert.equal(h.refresher.state().stopped, true);
+
+    const g = harness();
+    g.refresher.stop();
+    g.refresher.finish();
+    await flush();
+    assert.equal(g.fetched.length, 0, 'a stopped refresher (401, revoked) stays stopped');
+  });
+
   test('any other failure keeps the paint and tries again next window while a lane runs', async () => {
     const h = harness({ running: true, fail: Object.assign(new Error('x'), { status: 500 }) });
     h.refresher.noteTrack('a');
@@ -206,10 +245,12 @@ describe('init(): the section is re-read and repainted from its fragment', () =>
     assert.equal(mount.querySelector('[data-testid="task-timeline-lane"] details').open, true, 'the opened lane stays open');
     assert.ok(windowTimer(), 'still running: the next window is armed');
 
-    // A done reply stops the refresher: its timer is cleared and no further read happens.
+    // A done reply reads the fragment once more (the last change, past the window), then stops: its timer is cleared
+    // and no further read happens.
     states.push({ status: 'done', live: false, trackHtml: '<ol>three</ol>', headerHtml: '' });
     await firePoll();
+    assert.equal(fetched.filter(u => u === TIMELINE_URL).length, 2, 'done: exactly one final read');
     assert.equal(windowTimer(), undefined, 'done: the window timer is cleared');
-    assert.equal(fetched.filter(u => u === TIMELINE_URL).length, 1);
+    assert.equal(timers.filter(live).length, 0, 'done: no timer of any kind is left');
   });
 });
