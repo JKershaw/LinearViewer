@@ -3275,3 +3275,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **Resolved:** run 5's cross-repo contract mismatch (66 rows each, byte-identical).
   - **It minted nothing:** the report, Waiting entries in three area notes, and about 100k lines of evidence.
   - **The baseline for the work ahead:** Seams says structurally unchanged, Drift says better in one area and neutral elsewhere. Both readings are taken now; Drift and Seams run again at the switch.
+- **John on growth (10 Nov):** "If we're adding, healthy growth is fine too." This fits D1, where settled is a balance, not smallness. So when we read the curve, the question is what kind of growth: lines that add what the product does are healthy; copies, comment-only lines and scaffolding around it are not. The comment share and deletions per addition, read beside net lines, are what tell the two apart.
