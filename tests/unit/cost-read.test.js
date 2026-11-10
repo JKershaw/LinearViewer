@@ -79,9 +79,13 @@ describe('W3: incomplete figures (narrow rule, plan N1)', () => {
   });
 
   test('an opencode lineage with a dropped true member is incomplete, not a silent partial', () => {
-    // LIN-8: the founder (an opencode delta, 38 days old) is dropped; the in-window delta alone
-    // would read as the whole. It must not be priced as complete.
-    assert.equal(current.S1['LIN-8'].body.totalUsd, null);
+    // LIN-8: on a 30-day reporting surface the founder (an opencode delta, 38 days old) is dropped; the in-window delta
+    // alone would read as the whole. It must not be priced as complete (S11, the /kpis cost per ticket, leaves it out).
+    // LIN-4404: S1 reads the task's whole life, so it fetches that founder and the lineage is complete there (1.10, the
+    // S1 task-life pins below). The narrow rule itself is witnessed on readCost in "W3 (record)".
+    assert.equal(current.S11.pricedTicketCount, 10);
+    assert.equal(current.S1['LIN-8'].body.workerSessions[0].incomplete, undefined, 'the wire carries no incomplete flag');
+    assert.equal(current.S1['LIN-8'].body.totalUsd, 1.1);
   });
 
   test('a no-usage lineage with a dropped member is incomplete, not "no telemetry" alone', () => {
@@ -144,8 +148,10 @@ describe('W4 (plan N2): S1 = ΣS5 for an issue, on a selection S5 does not trunc
     return { ...corpus, history: corpus.history.filter(keep), queue: corpus.queue.filter(keep) };
   }
   // The issues with no filler lineage: their selection stays under S5's 2000-row cap. LIN-42 and LIN-99 are
-  // over the cap by design (the test above pins that truncation).
-  const ISSUES = ['LIN-1', 'LIN-2', 'LIN-3', 'LIN-6', 'LIN-7', 'LIN-8', 'LIN-9', 'LIN-10', 'LIN-11', 'LIN-12', 'LIN-14', 'LIN-17', 'LIN-18'];
+  // over the cap by design (the test above pins that truncation). LIN-8 is out since LIN-4404: S1 reads the task's
+  // whole life and S5 is a 30-day reporting window, so they cannot agree on a lineage whose founder is older than the
+  // window (the test after this one pins how they differ).
+  const ISSUES = ['LIN-1', 'LIN-2', 'LIN-3', 'LIN-6', 'LIN-7', 'LIN-9', 'LIN-10', 'LIN-11', 'LIN-12', 'LIN-14', 'LIN-17', 'LIN-18'];
 
   test('for each issue, S1 pricedUsd equals the sum of S5 spend over the issue\'s lineages', async () => {
     let withSpend = 0;
@@ -158,6 +164,13 @@ describe('W4 (plan N2): S1 = ΣS5 for an issue, on a selection S5 does not trunc
       if (s1 > 0) withSpend += 1;
     }
     assert.ok(withSpend > 0, 'some issue carries priced spend, so the agreement is not 0 = 0');
+  });
+
+  test('LIN-4404: on LIN-8 (founder older than 30 days) S1 reads the whole life and S5 withholds the 30-day partial', async () => {
+    const run = await runReplay(issueSelection(buildCorpus(), 'LIN-8'));
+    const s5 = run.S5.jobs.reduce((sum, job) => sum + job.spendUsd, 0);
+    assert.ok(Math.abs(run.S1['LIN-8'].body.pricedUsd - 1.1) < 1e-9, 'S1: the founder delta 0.70 + the in-window 0.40');
+    assert.equal(s5, 0, 'S5: the in-window delta alone is incomplete, so it is not priced');
   });
 });
 
@@ -249,6 +262,39 @@ describe('the S11, S12 and S13 movements, pinned to their after-values (LIN-4178
     const hk = current.S13.steps.find(s => s.lineageId === 'hk');
     assert.equal(hk.cost.status, 'not-reported');
     assert.equal(hk.cost.usd, null);
+  });
+});
+
+// LIN-4404: the task-life read moves values on paths the change list already named (a, b, d), which W9 cannot see
+// (it checks paths, not values). These pin the after-values, so a regression to the 30-day read fails here.
+describe('the S1 task-life movements, pinned to their after-values (LIN-4404)', () => {
+  const session = (issue, anchor) => sessions(issue).find(s => s.rootItemId === anchor);
+  const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} vs ${b}`);
+
+  test('every S1 window names the task-life rule', () => {
+    for (const issue of Object.keys(current.S1)) {
+      assert.deepEqual(current.S1[issue].body.window, { days: null, appCallsSince: null, scope: 'task-life' }, issue);
+    }
+  });
+
+  test('LIN-8: the opencode straddler reads its 38-day-old founder, so it is complete at its whole-life 1.10', () => {
+    close(session('LIN-8', 'so').costUsd, 1.1);
+    close(current.S1['LIN-8'].body.pricedUsd, 1.1);
+    close(current.S1['LIN-8'].body.totalUsd, 1.1);
+  });
+
+  test('the straddlers date from their founders (fetched earliest member, plan decision (ii))', () => {
+    assert.equal(session('LIN-42', 'st').dispatchedAt, '2026-09-24T12:00:00.000Z');
+    assert.equal(session('LIN-8', 'so').dispatchedAt, '2026-09-26T12:00:00.000Z');
+    assert.equal(session('LIN-17', 'nss').dispatchedAt, '2026-09-19T12:00:00.000Z');
+    assert.equal(session('LIN-18', 'cg').dispatchedAt, '2026-09-14T12:00:00.000Z');
+  });
+
+  test('LIN-42: its 60-day-old call joins appCalls and totalUsd; LIN-99 does not move', () => {
+    assert.equal(current.S1['LIN-42'].body.appCalls.calls, 1);
+    close(current.S1['LIN-42'].body.appCalls.costUsd, 0.9);
+    close(current.S1['LIN-42'].body.totalUsd, current.S1['LIN-42'].body.pricedUsd + 0.9);
+    close(current.S1['LIN-99'].body.pricedUsd, 20.01);
   });
 });
 

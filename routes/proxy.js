@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { createDedupeCache, createGenerationTracker } from '../lib/proxy-dedupe.js';
 import { createCredentialTrail } from '../lib/proxy-credential-trail.js';
+import { LINEAGE_QUERY_LIMIT } from '../lib/task-cost-read.js';
 import { buildInstructions } from '../lib/proxy-instructions.js';
 import { createAgentStatusRoutes } from './proxy-agent-status.js';
 import { createProxyHaltRoutes } from './proxy-halt.js';
@@ -316,30 +317,9 @@ const PROXY_ATTACH_FAILED_MESSAGE = 'Proxy context was requested but a proxy tok
 // routes/proxy-tokens-admin.js (LIN-679 Stage 2 / LIN-2534).
 // MAX_COMMENT_LENGTH now imported from lib/issue-write-validation.js (LIN-1552).
 
-// LIN-1470: defensive cap on the list endpoint's lineage batch query
-// (`rootItemId: {$in: anchors}`). Unlike the 200-row PAGE bound, nothing
-// structurally limits how many rows one $in query can match: it spans the
-// full 30-day read window, not just the current page, and — unlike the
-// existing single-anchor equivalent at `_collectGroupFeedback` (the `:id`
-// watch endpoint, one anchor per request) — this one fans the same query
-// shape out across every anchor on the CURRENT PAGE (up to 200) in one call.
-// A hard row-count cap is nonetheless the wrong lever here: the query already
-// carries `projection: {prompt: 0}`, so it never touches the multi-KB-to-10MB
-// field the H12/503 incidents (f5a94a53/15ca7b47) were actually about — the
-// per-row cost is bounded (metadata + a typically-small feedback[]) the same
-// way the existing shipped single-anchor query already is. 2000 is a
-// generous backstop (10x the page bound) against a pathological outlier
-// lineage, not a tuned realistic ceiling — no shipped lineage has come close.
-// L3 (review): if a lineage DOES exceed this cap, `listHistory`'s `limit`
-// path sorts `{resolvedAt: -1}` and keeps only the newest N, so the oldest
-// members of an over-cap lineage are dropped from the merge (and so from
-// feedbackCount/status/completedAt derivation). The list handler consumes
-// the store's pre-slice `total` to warn — with the exact overshoot — when
-// that happens (LIN-1485 → LIN-1494). Accepted as a backstop-of-last-resort,
-// not a correctness guarantee at that scale.
-// Exported (LIN-1494 F2 tidy) so the tests that exercise this exact cap
-// import it instead of hand-mirroring the constant.
-export const LINEAGE_QUERY_LIMIT = 2000;
+// The cap on the task cost read's lineage-sibling query lives with that read (LIN-4404: lib/task-cost-read.js, its only
+// consumer). Re-exported here so the tests that exercise the cap keep importing it from the route module.
+export { LINEAGE_QUERY_LIMIT };
 
 // Timeout for individual GraphQL requests to Linear.
 // Prevents the proxy from hanging silently when Linear is slow or payloads are large,

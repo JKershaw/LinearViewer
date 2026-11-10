@@ -3,7 +3,7 @@
     "what": "LIN-4197 beat 4: the read path's recorded baseline over the transcript corpus (each stage run on its own through runReplay), and over the mixed-harness control.",
     "recordedAt": "Harbour 72305215 (main), recorded on feat/lin-4197-cost-corpus with the beat 3 corpus and the beat 4 fixture changes; no production code differs from 72305215. Corpus data copied from simple-dispatcher 7a2d83c00485add17e0e15e00be8d3e609a537e6.",
     "baseline": "Recorded BEFORE any read change. Piece 4 (the records-first cutover) must be diffed against these values; each case note says where the read path differs from its oracle, and those differences are the baseline, not defects to fix here.",
-    "mustNotBeRegenerated": "Do not regenerate or edit this file to make a later production change pass. A change to any value here is a reviewed change to this baseline, with the reason stated.",
+    "mustNotBeRegenerated": "Do not regenerate or edit this file to make a later production change pass. A change to any value here is a reviewed change to this baseline, with the reason stated. LIN-4404 (reviewed amendment, re-recorded with record-lin4197.mjs and diffed against the previous file): /cost/:identifier (S1) reads a task's whole life, not the 30-day reporting window (the task-life rule, lib/read-horizon.js, ruled on LIN-4395). Exactly these values moved, and nothing else: (1) every S1 body's window, in every section, from { days: 30, appCallsSince: <30 days before the replay clock> } to { days: null, appCallsSince: null, scope: 'task-life' }; (2) existingCorpusAtHead S1 only: the straddlers now read their founders older than 30 days. LIN-8 so (corpus case 7) is complete and priced at 1.1 (0.7 founder delta + 0.4), so its costUsd, pricedUsd and totalUsd move from null/0/null to 1.1; so (case 7), nss (case 16), cg (case 17) and LIN-42 st (case 4) take their founder's dispatchedAt as the session's; LIN-42's appCalls gain call c5 (proxy-x, $0.90, 60 days old) and its totalUsd gains 0.90. S2 to S13 (the reporting windows) and the over-cap filler cases 20-21 do not move.",
     "recordsOnlyAddition": "LIN-4201 added one section, recordsOnly (change list item (e)): a lineage killed before its first Stop, so it has request records and NO [usage] snapshot. It was recorded at Harbour eb44eff9 (main, the read path before LIN-4201), so its values are the before. Every other section is byte-identical to the LIN-4197 recording.",
     "fields": "recordsOnly: runReplay output over that lineage, its summary and oracle (as a case). existingCorpusAtHead: runReplay over the existing corpus at this commit (the same output goldens.json holds, re-run here; goldens.json itself is the LIN-4177 baseline and is not re-recorded). replay: runReplay output over the stage (S1 to S13, mixedHarness). summary.readRunPageUsd: S13 cost for the stage's lineage (null when withheld). summary.readModelsSpendUsd / readModelsUnpriced: S5 for the implementation job (priced spend, and the count of unpriced runs). oracleUsd: the LIN-4197 beat 1 oracle (each record priced alone with computeUsageCostUsd, shared ids once). differenceUsd: readRunPageUsd minus oracleUsd (null when the read withholds the figure)."
   },
@@ -53,8 +53,9 @@
             ]
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -102,8 +103,9 @@
             ]
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -145,8 +147,9 @@
             "byFeature": []
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -168,8 +171,9 @@
             "byFeature": []
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -211,8 +215,9 @@
             "byFeature": []
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -254,8 +259,9 @@
             "byFeature": []
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -263,8 +269,8 @@
         "status": 200,
         "body": {
           "identifier": "LIN-8",
-          "pricedUsd": 0,
-          "totalUsd": null,
+          "pricedUsd": 1.1,
+          "totalUsd": 1.1,
           "unpriced": [],
           "noTelemetryCount": 0,
           "unreadableCount": 0,
@@ -273,11 +279,11 @@
             {
               "rootItemId": "so",
               "kind": "implementation",
-              "dispatchedAt": "2026-10-31T12:00:00.000Z",
+              "dispatchedAt": "2026-09-26T12:00:00.000Z",
               "harness": "opencode",
               "model": "openrouter/qwen-3",
               "effort": null,
-              "costUsd": null,
+              "costUsd": 1.1,
               "durationMs": 0,
               "tokens": {
                 "inputTokens": 0,
@@ -297,8 +303,9 @@
             "byFeature": []
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -334,8 +341,9 @@
             "byFeature": []
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -379,8 +387,9 @@
             "byFeature": []
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -428,8 +437,9 @@
             ]
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -479,8 +489,9 @@
             ]
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -516,8 +527,9 @@
             "byFeature": []
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -559,8 +571,9 @@
             "byFeature": []
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -582,8 +595,9 @@
             "byFeature": []
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -627,8 +641,9 @@
             "byFeature": []
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -646,7 +661,7 @@
             {
               "rootItemId": "nss",
               "kind": "implementation",
-              "dispatchedAt": "2026-11-02T12:00:00.000Z",
+              "dispatchedAt": "2026-09-19T12:00:00.000Z",
               "harness": null,
               "model": null,
               "effort": null,
@@ -664,8 +679,9 @@
             "byFeature": []
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -683,7 +699,7 @@
             {
               "rootItemId": "cg",
               "kind": "implementation",
-              "dispatchedAt": "2026-10-31T12:00:00.000Z",
+              "dispatchedAt": "2026-09-14T12:00:00.000Z",
               "harness": null,
               "model": "anthropic/claude-sonnet-5",
               "effort": null,
@@ -707,8 +723,9 @@
             "byFeature": []
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -717,7 +734,7 @@
         "body": {
           "identifier": "LIN-42",
           "pricedUsd": 51.020000000002526,
-          "totalUsd": 51.020000000002526,
+          "totalUsd": 51.920000000002524,
           "unpriced": [],
           "noTelemetryCount": 0,
           "unreadableCount": 0,
@@ -745,7 +762,7 @@
             {
               "rootItemId": "st",
               "kind": "implementation",
-              "dispatchedAt": "2026-11-01T12:00:00.000Z",
+              "dispatchedAt": "2026-09-24T12:00:00.000Z",
               "harness": null,
               "model": "anthropic/claude-sonnet-5",
               "effort": null,
@@ -38782,14 +38799,21 @@
             }
           ],
           "appCalls": {
-            "calls": 0,
-            "costUsd": 0,
+            "calls": 1,
+            "costUsd": 0.9,
             "unpricedCalls": 0,
-            "byFeature": []
+            "byFeature": [
+              {
+                "feature": "proxy-x",
+                "calls": 1,
+                "costUsd": 0.9
+              }
+            ]
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       },
@@ -76831,8 +76855,9 @@
             "byFeature": []
           },
           "window": {
-            "days": 30,
-            "appCallsSince": "2026-10-04T12:00:00.000Z"
+            "days": null,
+            "appCallsSince": null,
+            "scope": "task-life"
           }
         }
       }
@@ -78889,8 +78914,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -78912,8 +78938,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -78935,8 +78962,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -78958,8 +78986,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -78981,8 +79010,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -79004,8 +79034,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -79027,8 +79058,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -79050,8 +79082,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -79073,8 +79106,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -79096,8 +79130,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -79119,8 +79154,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -79142,8 +79178,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -79165,8 +79202,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -79188,8 +79226,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -79211,8 +79250,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -79234,8 +79274,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -79257,8 +79298,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -79280,8 +79322,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -79303,8 +79346,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           }
@@ -79957,8 +80001,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -79980,8 +80025,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -80003,8 +80049,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -80026,8 +80073,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -80049,8 +80097,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -80072,8 +80121,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -80095,8 +80145,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -80118,8 +80169,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -80141,8 +80193,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -80164,8 +80217,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -80187,8 +80241,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -80210,8 +80265,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -80233,8 +80289,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -80256,8 +80313,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -80279,8 +80337,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -80302,8 +80361,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -80325,8 +80385,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -80348,8 +80409,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -80371,8 +80433,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           }
@@ -81030,8 +81093,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81053,8 +81117,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81076,8 +81141,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81099,8 +81165,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81122,8 +81189,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81145,8 +81213,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81168,8 +81237,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81191,8 +81261,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81214,8 +81285,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81237,8 +81309,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81260,8 +81333,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81283,8 +81357,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81306,8 +81381,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81329,8 +81405,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81352,8 +81429,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81375,8 +81453,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81398,8 +81477,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81421,8 +81501,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -81444,8 +81525,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           }
@@ -82098,8 +82180,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82121,8 +82204,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82144,8 +82228,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82167,8 +82252,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82190,8 +82276,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82213,8 +82300,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82236,8 +82324,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82259,8 +82348,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82282,8 +82372,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82305,8 +82396,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82328,8 +82420,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82351,8 +82444,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82374,8 +82468,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82397,8 +82492,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82420,8 +82516,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82443,8 +82540,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82466,8 +82564,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82489,8 +82588,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -82512,8 +82612,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           }
@@ -83171,8 +83272,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83194,8 +83296,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83217,8 +83320,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83240,8 +83344,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83263,8 +83368,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83286,8 +83392,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83309,8 +83416,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83332,8 +83440,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83355,8 +83464,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83378,8 +83488,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83401,8 +83512,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83424,8 +83536,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83447,8 +83560,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83470,8 +83584,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83493,8 +83608,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83516,8 +83632,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83539,8 +83656,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83562,8 +83680,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -83585,8 +83704,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           }
@@ -84244,8 +84364,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84267,8 +84388,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84290,8 +84412,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84313,8 +84436,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84336,8 +84460,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84359,8 +84484,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84382,8 +84508,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84405,8 +84532,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84428,8 +84556,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84451,8 +84580,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84474,8 +84604,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84497,8 +84628,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84520,8 +84652,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84543,8 +84676,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84566,8 +84700,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84589,8 +84724,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84612,8 +84748,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84635,8 +84772,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -84658,8 +84796,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           }
@@ -85317,8 +85456,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85340,8 +85480,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85363,8 +85504,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85386,8 +85528,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85409,8 +85552,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85432,8 +85576,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85455,8 +85600,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85478,8 +85624,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85501,8 +85648,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85524,8 +85672,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85547,8 +85696,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85570,8 +85720,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85593,8 +85744,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85616,8 +85768,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85639,8 +85792,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85662,8 +85816,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85685,8 +85840,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85708,8 +85864,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -85731,8 +85888,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           }
@@ -86390,8 +86548,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86413,8 +86572,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86436,8 +86596,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86459,8 +86620,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86482,8 +86644,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86505,8 +86668,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86528,8 +86692,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86551,8 +86716,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86574,8 +86740,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86597,8 +86764,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86620,8 +86788,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86643,8 +86812,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86666,8 +86836,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86689,8 +86860,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86712,8 +86884,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86735,8 +86908,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86758,8 +86932,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86781,8 +86956,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -86804,8 +86980,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           }
@@ -87463,8 +87640,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87486,8 +87664,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87509,8 +87688,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87532,8 +87712,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87555,8 +87736,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87578,8 +87760,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87601,8 +87784,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87624,8 +87808,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87647,8 +87832,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87670,8 +87856,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87693,8 +87880,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87716,8 +87904,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87739,8 +87928,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87762,8 +87952,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87785,8 +87976,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87808,8 +88000,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87831,8 +88024,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87854,8 +88048,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           },
@@ -87877,8 +88072,9 @@
                 "byFeature": []
               },
               "window": {
-                "days": 30,
-                "appCallsSince": "2026-10-04T12:00:00.000Z"
+                "days": null,
+                "appCallsSince": null,
+                "scope": "task-life"
               }
             }
           }
@@ -88532,8 +88728,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88555,8 +88752,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88578,8 +88776,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88601,8 +88800,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88624,8 +88824,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88647,8 +88848,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88670,8 +88872,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88693,8 +88896,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88716,8 +88920,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88739,8 +88944,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88762,8 +88968,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88785,8 +88992,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88808,8 +89016,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88831,8 +89040,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88854,8 +89064,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88877,8 +89088,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88900,8 +89112,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88937,8 +89150,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -88960,8 +89174,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         }
@@ -89585,8 +89800,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -89608,8 +89824,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -89631,8 +89848,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -89654,8 +89872,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -89699,8 +89918,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -89742,8 +89962,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -89765,8 +89986,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -89788,8 +90010,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -89811,8 +90034,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -89834,8 +90058,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -89857,8 +90082,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -89880,8 +90106,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -89903,8 +90130,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -89926,8 +90154,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -89949,8 +90178,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -89972,8 +90202,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -89995,8 +90226,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -90018,8 +90250,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         },
@@ -90041,8 +90274,9 @@
               "byFeature": []
             },
             "window": {
-              "days": 30,
-              "appCallsSince": "2026-10-04T12:00:00.000Z"
+              "days": null,
+              "appCallsSince": null,
+              "scope": "task-life"
             }
           }
         }

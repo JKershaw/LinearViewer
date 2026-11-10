@@ -1232,7 +1232,8 @@ matching zero rows and returning an authoritative-looking `$0.00`.
       "dispatches": [
         { "itemId": "…", "kind": "implementation", "dispatchedAt": "2026-08-01T10:00:00Z",
           "followUpTo": null, "byModel": [{ "model": "claude-sonnet-5", "requests": 40, "tokens": "…", "costUsd": 4.90 }],
-          "requests": 40, "tokens": "…", "costUsd": 4.90 }
+          "requests": 40, "tokens": "…", "costUsd": 4.90,
+          "firstRequestAt": "2026-08-01T10:00:20Z", "lastRequestAt": "2026-08-01T10:02:30Z" }
       ] }
   ],
   "appCalls": {
@@ -1242,7 +1243,7 @@ matching zero rows and returning an authoritative-looking `$0.00`.
   "unpriced": [],
   "noTelemetryCount": 0,
   "unreadableCount": 0,
-  "window": { "days": 30, "appCallsSince": "2026-07-02T12:00:00Z" }
+  "window": { "days": null, "appCallsSince": null, "scope": "task-life" }
 }
 ```
 
@@ -1264,7 +1265,8 @@ matching zero rows and returning an authoritative-looking `$0.00`.
 - **Per-dispatch detail (LIN-4263)**: each lineage row also carries `tokens` (the
   lineage's token sum) and `byModel` (requests, tokens and USD per model; records
   lineages only), and `dispatches`, one entry per dispatch in the lineage, in dispatch
-  order: `{itemId, kind, dispatchedAt, followUpTo, byModel, requests, tokens, costUsd}`.
+  order: `{itemId, kind, dispatchedAt, followUpTo, byModel, requests, tokens, costUsd,
+  firstRequestAt, lastRequestAt}`.
   The entries sum to the lineage's `requests`, `tokens` and `costUsd`. A record belongs to
   the dispatch whose row posted it, unless it was made before that row was dispatched (a
   build that ran before the records deploy is posted under its follow-up's `itemId`); then
@@ -1273,15 +1275,26 @@ matching zero rows and returning an authoritative-looking `$0.00`.
   whose cumulative total carries one model and cannot be split, and for any lineage read
   without the `/cost` route's per-dispatch flag. A dispatch with no records reads
   `requests: 0` and `null` tokens, `byModel` and cost, never `0`.
+- **Working span (LIN-4404)**: `firstRequestAt` / `lastRequestAt` on a `dispatches` entry are
+  the earliest and latest `at` (ISO) of the request records that entry owns under the rule
+  above, so a late-posted record's time counts toward the dispatch that made it. Both are
+  `null` when the dispatch owns no record with a time. They exist only where `dispatches`
+  does: request records began on 4 Nov 2026 and are not backfilled, so an older lineage reads
+  `dispatches: null` and its working times are unknown, not reconstructed.
 - **Labels are the lineage's, not a session's**: `model` on a `workerSessions` row is the
   lineage's cost-dominant model, so a cheap follow-up does not rename an expensive build, and
   an expensive follow-up does rename it. `dispatches` says which model each dispatch ran.
   `effort` and `harness` are the latest record's (a follow-up's, when it posted last).
-- **Retention vs read window**: `window.days` (fixed 30) is how far back app-call
-  figures reach — a **read window**, not retention. The app-call log and dispatch
-  history are **retained for the life of the project**, so older rows still exist;
-  this field reports the fixed window the figures are drawn from, not a pruning
-  boundary. `appCalls`/`workerSessions` are scoped to that window.
+- **Whole life, not a reporting window (LIN-4404)**: `window` is
+  `{ "days": null, "appCallsSince": null, "scope": "task-life" }`. A task's own read covers
+  its whole life (the task-life rule, `lib/read-horizon.js`): every dispatch and app call of
+  the task, whatever its age, so `totalUsd` for a task older than 30 days is now its
+  whole-life figure where it used to stop at 30 days. `days` and `appCallsSince` are `null`
+  because there is no day bound to report. The app-call log and dispatch history are
+  retained for the life of the project; workspace reporting windows (spend, periodicals,
+  `/kpis`, pipeline loops) stay at 30 days. If a task's lineages hold more than 2,000 rows,
+  the oldest are not read; a lineage whose unread rows could change its figure reads
+  `costUsd: null` (so `totalUsd` is `null`), never a partial sum.
 - **One issue per lineage**: a lineage counts under ONE issue, the issue of its
   earliest non-wake member that carries one. A follow-up filed under another issue
   counts under its parent's issue; a wake's work counts under its lineage's issue,

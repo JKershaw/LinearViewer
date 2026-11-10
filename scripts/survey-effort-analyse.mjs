@@ -63,6 +63,9 @@ const union = (iv) => { const s = [...iv].sort((a, b) => a[0] - b[0]); let tot =
 
 const runnerBy = Object.fromEntries(runner.rows.map((r) => [r.id, r]));
 const tickets = []; const skipped = []; let droppedLineages = 0;
+
+// LIN-4404: /cost reads a task's whole life (`window.scope: 'task-life'`), so every app call is covered.
+const appWindowOf = (window) => (window?.scope === 'task-life' ? 'task-life' : null);
 for (const id of sample) {
   const cost = read(`/issues/${id}/cost`);
   if (!cost || !(cost.workerSessions || []).length) { skipped.push({ id, why: cost?.noLineage ? 'no fleet lineage' : 'no cost data' }); continue; }
@@ -103,7 +106,7 @@ for (const id of sample) {
   const g = git[id] || {};
   tickets.push({
     id, month: g.month, repos: g.repos, risk: g.risk, prodLines: g.prodLines, testLines: g.testLines, docLines: g.docLines, prodFiles: g.prodFiles,
-    units, tierUnits, reorient, app, appWindow: cost.window?.appCallsSince,
+    units, tierUnits, reorient, app, appWindow: appWindowOf(cost.window),
     spanMs: t1 - t0, workMs: union(work), blockedMs: union(blocked), phaseMs,
     dispatches: runnerBy[id]?.dispatches ?? null,
     reviewRounds: own.filter((l) => l.layer === 'review').length, planReviewRounds: own.filter((l) => l.layer === 'plan-review').length,
@@ -128,11 +131,11 @@ console.log('\n## Pooled weighted-token share by layer/phase, per month (repo: b
 console.log(['month', 'n', ...layers, 'reorient*', 'app(recommend+brief)*'].join('\t'));
 for (const m of [...months, 'ALL']) {
   const ts = tickets.filter((t) => m === 'ALL' || t.month === m); const tot = ts.reduce((a, t) => a + t.total, 0);
-  const appTs = ts.filter((t) => t.appWindow && t.month >= t.appWindow.slice(0, 7));
+  const appTs = ts.filter((t) => t.appWindow === 'task-life');
   const appTot = appTs.reduce((a, t) => a + Object.values(t.app).reduce((x, y) => x + y, 0), 0); const appBase = appTs.reduce((a, t) => a + t.total, 0);
   console.log([m, ts.length, ...layers.map((k) => pct(ts.reduce((a, t) => a + (t.units[k] || 0), 0) / tot)), pct(ts.reduce((a, t) => a + t.reorient, 0) / tot), appTs.length ? pct(appTot / (appBase + appTot)) : 'n/a'].join('\t'));
 }
-console.log('* reorient is a subset of the layers; app share is of worker+app units, for tickets inside the 30-day app-call window');
+console.log('* reorient is a subset of the layers; app share is of worker+app units, for tickets whose app calls /cost covers (all of them under the task-life read, LIN-4404)');
 const tierTot = {}; for (const t of tickets) for (const [k, v] of Object.entries(t.tierUnits)) tierTot[k] = (tierTot[k] || 0) + v;
 const allU = tickets.reduce((a, t) => a + t.total, 0);
 console.log(`median ticket ${(med(tickets.map((t) => t.total)) / 1e3).toFixed(0)}k units; tier share of sample units:`, Object.entries(tierTot).map(([k, v]) => `${k} ${pct(v / allU)}`).join(', '));

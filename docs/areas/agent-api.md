@@ -15,6 +15,11 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   and the task page reach too; a check in the descent arm (`lib/dispatch-entrance.js`) covers
   one surface and has no run facts. A caller's bypass rides the call options (`skipLiveWait`),
   never the recommendation context (LIN-4392).
+- `/cost/:identifier` (`routes/proxy-compute.js`) is pinned by frozen baselines. A change to its window or shape
+  moves `tests/fixtures/cost-replay/expected-changes.json` (W9 checks paths, not values, so pin moved values in
+  `tests/unit/cost-read.test.js`), `tests/fixtures/cost-replay/goldens-lin4197.json` (amend its header with the
+  reason; record with `tests/fixtures/cost-replay/record-lin4197.mjs`) and the `docs/passage-runner-prompt.md` drift
+  guard. `tests/fixtures/cost-replay/goldens.json` stays the baseline: re-recording it erases the change list (LIN-4404).
 
 ## Waiting
 
