@@ -25,8 +25,8 @@
  * Revoked is deliberately indistinguishable from never-issued. There is no
  * stored-only fallback and no rate limit (John's rulings).
  *
- * Render-time masking (LIN-3389): the page and the three HTML fields of
- * `/state` pass through `maskSecretsInHtml` (existing secret-scan rules, over
+ * Render-time masking (LIN-3389): the page, the HTML fields of `/state` and the
+ * timeline fragment (LIN-4405) pass through `maskSecretsInHtml` (existing secret-scan rules, over
  * entity-decoded text) at the response boundary. A hit is MASKED and served,
  * never refused; the log carries rule ids and an 8-hex token-hash prefix only.
  * A masker throw fails closed with the usual 503. LIN-3261 still owns the
@@ -36,6 +36,8 @@
  * `(urlKey, issueIdentifier, source)`, with single-flight so concurrent guests
  * share one tracker read. Failures are never cached, and it sits after every
  * auth check, so a revoke or an owner change takes effect on the next request.
+ * The timeline fragment does not use it: it reads through the shared timeline cache (`timelineFragment`,
+ * lib/task-timeline.js), which holds stored facts only and is also behind every auth check.
  */
 
 import { Router } from 'express';

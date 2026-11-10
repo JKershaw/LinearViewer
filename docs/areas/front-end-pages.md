@@ -5,6 +5,12 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
 ## Lessons
 
 - A control a page renders per row (a select or input in each Settings row) needs its own accessible name: a `<label>`, `aria-label` or `aria-labelledby`. A placeholder or a visible word beside it is not enough. Settings › Models renders 86 unnamed controls, one set per job row (Design & Interface Review, 8 Nov 2026; `lib/render-settings.js`, `docs/reviews/design-interface-review-2026-11-08.md`).
+- The task page carries money (LIN-4405). A guest sees none: the guest route strips the timeline with `withoutSpend`
+  (`lib/task-timeline.js`, a copy, since the page result is cached), and `lib/render-task-timeline.js` never puts a cost
+  in an attribute. Any new figure on the page goes through the same strip, and the three-response guest test
+  (`tests/unit/task-timeline-page.test.js`) is the gate.
+- The task page's desktop grid (`public/task-page.css`, ≥1024px) places every child by `grid-area`. A new section needs
+  its own area in both templates, or it renders at the top of the page (LIN-4405).
 
 ## Waiting
 

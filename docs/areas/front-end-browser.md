@@ -2,6 +2,14 @@
 
 Area notes for `front-end-browser` in the registry. Format and rules: README.md.
 
+## Lessons
+
+- A page script's second request keeps the poll's discipline: coalesce every reason into one fetch per window, and stop
+  when the poll stops (done, hidden tab, 401, revoked link). `createTimelineRefresher` (`public/task-page.js`, LIN-4405)
+  is the pattern; a running chip changes the poll's track about once a minute, so "fetch when it changes" alone repeats.
+- Task-page CSS is phone-first at `min-width: 600px` (only the listed breakpoints pass `tests/unit/ui-authorities.test.js`),
+  with `--font-size-*` tokens and no new mono selector (`tests/unit/lin-4107-type-sizes.test.js`).
+
 ## Waiting
 
 - `public/app.js`: Home's Running and Up next are refreshed by parsing a whole page with
