@@ -5,35 +5,35 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 ## Lessons
 
 - Prompt size is frozen (`tests/unit/prompt-size-budget.test.js`): text grows only with its
-  ticket and reason beside the ceiling it raises, and `FROZEN_TOTAL_BYTES` with it; the
-  replaced reason moves to "Ceiling history" in `scripts/prompt-template-change-log.md`.
+  ticket and reason beside the ceiling (and `FROZEN_TOTAL_BYTES`); the old reason goes to
+  "Ceiling history" in `scripts/prompt-template-change-log.md`.
 - Grounding note lists in `lib/prompt-formatters.js` are shared (`WORK` serves several
-  stages; `GROUNDING_NOTES` is the unknown-kind fallback): give one stage its own list
-  rather than edit a shared one (LIN-4371).
+  stages, `GROUNDING_NOTES` unknown kinds): give one stage its own list (LIN-4371).
 - Keep scoping and both Survey renders byte-identical unless the ticket is about them:
-  replays compare them byte for byte (LIN-4369).
-- The Surveys get no area notes pointer: survey-place reads no reports on the codebase's
-  shape, which feed the notes. Scoping's own pointer cites in its final message (its record
-  takes no fifth line); both share `AREA_NOTES_WHERE`, so say where notes are there (LIN-4346).
+  replays compare them (LIN-4369).
+- The Surveys get no area notes pointer (survey-place reads no shape reports, which feed the
+  notes). Scoping's pointer cites in its final message (its record takes no fifth line); both
+  share `AREA_NOTES_WHERE`, so say where notes are there (LIN-4346).
 - `lib/prompt-template-defs.js` and the budget test change in almost every merge: rebase,
   then re-measure. Its fixture passes no context, so it measures a prompt's empty-context
-  branch: dropping one can raise a ceiling while real renders shrink (LIN-4393). Measure.
+  branch: dropping one can raise a ceiling while real renders shrink (LIN-4393).
 - The `## As asked` block's words have one owner, `lib/as-asked.js`. Import its spellings;
-  never retype the heading or the end line (LIN-4362).
+  never retype the heading or end line (LIN-4362).
 - `lib/prompt-template-defs.js` cannot import a module that imports `lib/prompt-templates.js`
-  (a cycle). Shared words live in an import-free leaf under `lib/prompts/` both import, as
+  (a cycle). Shared words live in an import-free leaf under `lib/prompts/`, as
   `lib/prompts/leftover-words.js` holds `LEFTOVER_RULE` (LIN-4376) and
   `lib/prompts/autopilot-precedence.js` autopilot's order: never restate a rank (LIN-4382).
 - Prompt words that ban a kind of how do not hold it: in LIN-4369's replay, closing one channel
-  moved the banned how into the next (done-means, comments, the `[done]` report). Hold a shape in
-  code or a test, as `SIZE_RECORD_SHAPE` in `lib/size-of-move.js` does (arm 3), or hold the reader's
-  side (arm 4).
-- A stage lead's first sentence is the selector's purpose line. Changing it changes the
-  routing prompt: regenerate the router snapshots and `scripts/eval/meta-prompt.baseline.txt`,
-  and move the routing ceiling (LIN-4369).
+  moved the banned how to the next. Hold a shape in code or a test, as `SIZE_RECORD_SHAPE` in
+  `lib/size-of-move.js` does (arm 3), or hold the reader's side (arm 4).
+- A stage lead's first sentence is the selector's purpose line: to change it, regenerate the
+  router snapshots and `scripts/eval/meta-prompt.baseline.txt` and move the routing ceiling
+  (LIN-4369).
 - `lib/prompts/autopilot-precedence.js`: before prompt text routes round a server guard,
   check real rows reach it: scoped runs carry `maxTasks: null`, so P4's detour round
   `guardBudget` cost a session (LIN-4349).
+- `lib/periodicals.js`: close-out merges a Periodical's PR and sets Done, as for any task.
+  Give no Periodical its own merge rule: notes are prompt input (LIN-4390).
 - Model facts come from the OpenRouter catalog: add no model list or rate (LIN-4358).
   Tests seed `tests/unit/helpers/pinned-catalog.js`.
 
@@ -41,8 +41,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 
 - `lib/recommendation-input.js`: the pinned-kind and in-app renders (`lib/dispatch-entrance.js`,
   `routes/proxy-compute.js` twice, `routes/workspace-api-prompts.js`) build prompt context by
-  hand, not through this projection: a new field must reach five places, and LIN-4368's
-  missed one until review. (LIN-4393 leftovers.)
+  hand, not via this projection: a new field must reach five places (LIN-4368
+  missed one). (LIN-4393 leftovers.)
 - `lib/size-of-move.js`: the built-in policy (`DECIDED_BY.policy`, err larger) may stand in
   for John's "per task breakdown of options"; the size words and cut ruling ask questions
   they never explain. Revisit both when per-task options land. (John, 8 Nov, LIN-4393.)
@@ -50,7 +50,7 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   check, beside `isTestToken` in `routes/workspace-api-steps.js` and the inline
   `isTestMode` checks in `routes/proxy-compute.js` and `routes/task-chat.js`; now the
   dispatch entrance and factory use it too. (John, 7 Nov, LIN-4347.)
-- `lib/as-asked.js`: "When it could go" is repeated in each of three functions. (John, 7 Nov.)
+- `lib/as-asked.js`: "When it could go" is repeated in three functions. (John, 7 Nov.)
 - `lib/prompt-template-defs.js`: who may agree to a reduced ask has two names, "cut" in
   `CUT` (`lib/prompts/stage-intent.js`) and "narrowing" in the plan-review and review
   verdict text here and in `lib/completion-signals.js`. No test links them. (John, 8 Nov.)
@@ -59,8 +59,7 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   different shape. (John, 8 Nov.)
 - `lib/prompt-template-defs.js`: a new stage kind is still a row in about nine parallel
   tables (`GROUNDING_BY_KIND`, rendered ceilings, completion signals, stage labels…), some
-  unguarded. `route: null` says "never offered" (LIN-4253); folding the per-kind tables
-  into the stage's one definition is open. (Survey tally, LIN-4248.)
+  unguarded; folding the per-kind tables into the stage's one definition is open. (Survey tally, LIN-4248.)
 - `lib/call-budget.js`: the budget rule has never run live on anthropic/claude-haiku-5.5. Before a
   call moves to it, replay the snapshot of LIN-4352 (`GET /api/proxy/issues/LIN-4352/snapshots?limit=1`,
   82b963e0) through `scripts/replay-brief.mjs`. Pass: block [2] WHOLE, four sections, finishReason=stop,
@@ -72,10 +71,12 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   (`lib/model-routing-harnesses.js`) repeat ids by hand, unchecked; the first doubles as
   the cold-catalog tool fallback. (Area reads CG/CH, 8 Nov.)
 - `lib/periodicals.js`: `areaNotes()` says to follow the notes' own rules, then restates them
-  (one home, Waiting vs Lesson, file before report). "Waiting entries are context, not scope"
-  also sits in `lib/prompt-formatters.js` and both READMEs, and `docs/areas/` is spelled in four
-  code places. One home each. (Drift & Coherence Review, 10 Nov;
-  `docs/reviews/drift-coherence-review-2026-11-10.md`.)
+  (one home, Waiting vs Lesson, file first). "Waiting entries are context, not scope" is also
+  in `lib/prompt-formatters.js` and both READMEs; `docs/areas/` is spelled in four code places.
+  (Drift & Coherence Review, 10 Nov; `docs/reviews/drift-coherence-review-2026-11-10.md`.)
 - `lib/prompt-formatters.js`: the area-notes guard is copied to SD and has diverged (200 lines to
   147, an extra `sh` extension, no Periodical-entry rules in SD's README). Only comments hold the
   copies together. (Drift & Coherence Review, 10 Nov; the other side is SD's.)
+- `lib/periodicals.js`: who merges and sets Done is retyped in three bullets here and in
+  `lib/prompt-template-defs.js` (twice), `lib/prompts/autopilot-kickoff.js` and
+  `lib/proxy-preamble.js`; only a test links them. (LIN-4390 leftovers.)

@@ -88,9 +88,11 @@ describe('periodicals registry', () => {
 // the repo and mint ONE project-specific review task, then stop. The minted
 // task's description, which the prompt dictates, carries the Stage-2 review
 // contract: read prior runs, produce an uncapped severity-ranked report, then
-// SELF-CONCLUDE — summarise the report in a Linear comment and close the task.
-// Leaving the task In Progress (the original LIN-354 contract) made it loop on
-// `review` forever (LIN-386), so the task now ends itself.
+// HAND OFF — post the PR link and the second read, then a closing comment that
+// summarises the report and names who finishes. A run that stopped silently
+// left the task looping on `review` (LIN-386); a run that set Done itself went
+// past the dispatch gate, so review approves and close-out merges and sets Done
+// (LIN-4390). The run never merges or sets Done.
 //
 // One half of the Stage-2 contract — *minting a bounded set of follow-up tasks*
 // — is shared only by the 13 CORRECTIVE reviews, which turn findings into
@@ -98,7 +100,7 @@ describe('periodicals registry', () => {
 // Surface Maturity) deliberately mint NO follow-ups: each is a governor that
 // hands its read to a human. So the follow-up-creation assertion is scoped to
 // mode === 'corrective' below, while everything else (mint-one-task,
-// read-prior-runs + uncapped report, self-conclude, review-only,
+// read-prior-runs + uncapped report, hand-off, review-only,
 // stays-general) stays universal across the registry and locks the contract
 // for new periodicals of either mode.
 describe('shared two-stage contract (all periodicals)', () => {
@@ -128,12 +130,13 @@ describe('shared two-stage contract (all periodicals)', () => {
         assert.match(prompt, /make-work/i);
       });
 
-      test('minted task contract: self-conclude, review-only', () => {
-        // The task ends itself: Linear summary + close. It must NOT be left open
-        // (LIN-386 — leaving it In Progress looped on `review` forever).
-        assert.match(prompt, /conclude this task|move the task to its done|done\/completed state/i);
+      test('minted task contract: hand-off to close-out, review-only', () => {
+        // The run ends at a named hand-off (LIN-4390), never silently (LIN-386) and never at Done:
+        // close-out merges and sets Done. lin-4390-periodical-hand-off.test.js holds the full shape.
+        assert.match(prompt, /Then hand off — do not stop silently, and do not merge or set Done yourself/);
         assert.match(prompt, /summary of the report/i);
-        assert.match(prompt, /do not leave it open/i);
+        assert.match(prompt, /close-out [^.]*sets this task to Done and posts the final summary/i);
+        assert.doesNotMatch(prompt, /move the task to its done|done\/completed state/i);
         // Producing the report still changes no code.
         assert.match(prompt, /review-only/i);
       });
@@ -226,16 +229,18 @@ describe('shared two-stage contract (all periodicals)', () => {
         assert.match(prompt, /a human-readable duplicate the engine never reads/i);
       });
 
-      test('LIN-2323: AGREE and DISAGREE both conclude normally — disagreement is the escalation, never a reason to park the task', () => {
-        assert.match(prompt, /AGREE and DISAGREE both conclude this task normally/i);
+      test('LIN-2323: AGREE and DISAGREE both end in the hand-off — disagreement is the escalation, never a reason to park the task', () => {
+        assert.match(prompt, /AGREE and DISAGREE both end in the normal hand-off/i);
         assert.match(prompt, /a DISAGREE verdict is itself the escalation/i);
-        assert.match(prompt, /never a reason to leave this task open pending a human/i);
-        assert.match(prompt, /owns merging its own report PR/i);
-        assert.match(prompt, /required CI checks are green, merge it before the Done transition/i);
-        assert.match(prompt, /genuinely impossible.*may this task conclude with that PR left open/i);
-        assert.match(prompt, /explicit handoff naming what blocks the merge/i);
-        assert.match(prompt, /never as ordinary completion/i);
+        assert.match(prompt, /never a reason to hold back the hand-off pending a human/i);
+        // LIN-4390 (replacing LIN-2396's self-merge): close-out owns the report PR's merge; the run
+        // leaves it green, and the task stays open until close-out merges, never Done with it open.
+        assert.match(prompt, /This run neither merges its report pull request, if it opened one, nor sets Done/);
+        assert.match(prompt, /rebased and green for close-out, which merges it and then sets Done/);
         assert.match(prompt, /is not a normal terminal state/i);
+        assert.match(prompt, /never Done with the pull request open/i);
+        assert.match(prompt, /genuinely cannot be made green.*name that blocker/i);
+        assert.match(prompt, /close-out's Done transition is refused until this comment exists/);
       });
     });
   }
@@ -770,7 +775,7 @@ describe('Stability Review specifics (LIN-453)', () => {
   test('governor divergence: reports for a human decision, mints NO follow-up tasks', () => {
     assert.match(prompt, /human decision|leave the decision|a human/i);
     assert.match(prompt, /no follow-up|not create follow-up/i);
-    // Still self-concludes (the universal contract) — covered in the shared loop.
+    // Still hands off to close-out (the universal contract) — covered in the shared loop.
   });
 
   test('names the altitude difference from Code Quality and Drift & Coherence', () => {
@@ -892,7 +897,7 @@ describe('Recent Headwinds specifics (LIN-542)', () => {
   test('advisory divergence: reports for a human decision, mints NO follow-up tasks', () => {
     assert.match(prompt, /human decision|leave the decision|a human/i);
     assert.match(prompt, /no follow-up|not create follow-up/i);
-    // Still self-concludes (the universal contract) — covered in the shared loop.
+    // Still hands off to close-out (the universal contract) — covered in the shared loop.
   });
 
   test('names the altitude difference from the Stability Review (no double-flagging churn)', () => {
@@ -1384,7 +1389,7 @@ describe('Seams & Tangles feeds the area notes, mints nothing (LIN-4379)', () =>
       /already filed as a ticket stays in the report only/i,
       /one docs-only pull request/i,
       /rebase it onto main/i,
-      /merge it under the merge authority/i
+      /review approves it and close-out merges it, never this run/i
     ]) assert.match(notesBullet, re);
   });
 
