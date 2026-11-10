@@ -165,7 +165,7 @@ Sizes are on `origin/main` before this change (`008d38bb0`, which includes LIN-4
 |---|---|---|---|---|---|
 | runs-and-dispatch | 6,144 | 5,916 | 11 | 16 | pipeline-churn entry removed (LIN-4405 filed it as LIN-4409, so it is ticket-owned); HALT_MODES home fixed; wake-shadow ticket corrected; 'aside' entry pruned; settled limiter entry pruned; contract.json report moved inside its parenthesis |
 | llm-and-prompts | 6,139 | 6,106 | 12 | 14 | close-out Waiting folded into the Lesson; guard entry rewritten as the seam; two new entries; CUT pair merged; distilled |
-| agent-api | 4,543 | 5,889 | 3 | 11 | three new entries; broker and rate-limit entries corrected; Seams citation moved; distilled |
+| agent-api | 4,543 | 6,040 | 3 | 12 | three new entries; broker and rate-limit entries corrected; Seams citation moved; distilled |
 | front-end-browser | 1,140 | 1,549 | — | 4 | one new entry (llms.txt) |
 | other-features | 1,803 | 1,805 | 1 | 5 | Seams citation moved |
 
