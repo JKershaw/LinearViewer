@@ -10,6 +10,11 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   reach the token store (LIN-4378). The limiters skip under `NODE_ENV=test`, so a limiter
   test drives the real route chain with it flipped off, as
   `tests/unit/lin-4378-proxy-limiter-per-credential.test.js` does.
+- A recommend surface must not offer what the verb refuses. A rule for recommend-and-dispatch
+  goes in `lib/openrouter.js` `codeRouteOf`, which GET /recommend (`routes/proxy-compute.js`)
+  and the task page reach too; a check in the descent arm (`lib/dispatch-entrance.js`) covers
+  one surface and has no run facts. A caller's bypass rides the call options (`skipLiveWait`),
+  never the recommendation context (LIN-4392).
 
 ## Waiting
 
