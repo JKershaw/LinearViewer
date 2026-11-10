@@ -3277,3 +3277,14 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **The baseline for the work ahead:** Seams says structurally unchanged, Drift says better in one area and neutral elsewhere. Both readings are taken now; Drift and Seams run again at the switch.
 - **John on growth (10 Nov):** "If we're adding, healthy growth is fine too." This fits D1, where settled is a balance, not smallness. So when we read the curve, the question is what kind of growth: lines that add what the product does are healthy; copies, comment-only lines and scaffolding around it are not. The comment share and deletions per addition, read beside net lines, are what tell the two apart.
 - **09:35 UTC: LIN-4390 merged** (`f5b1f5efa`, PR #2383; 6 files, +248/−98, mostly tests): Periodical runs hand off to close-out, per John's ruling, and the leftover step tidied the hand-off wording. The ticket is still In Progress while its run closes out. Blind reads wait until it's Done, so they read the whole move. **Lane 2 next: LIN-4392 kicked off.**
+- **09:36 UTC: LIN-4400 (A5, the backlog pass) is Done.** It changed nothing: the inventory and the results are comments on the ticket only, and the review audited the session for writes.
+  - **Inventory:** 1,366 open tickets, every one read (exact coverage, checked by the review).
+  - **The tally:** 888 carry a claim, in 1,281 rows (1,019 broken, 83 blocking, 179 safety). Verdicts: 864 confirmed at base, 255 gone, 162 can't tell from code. 478 carry no claim.
+  - **The first pass missed 18% of claims.** A blind widened pass re-read all 586 first-pass "none" tickets. It counted stale docs and vacuous tests as broken; those rows are tagged.
+  - **The cut that matters for "open the door":** 115 confirmed safety rows and 41 confirmed blocking, over 134 tickets. They recur in a few themes:
+    - merge and read-only rules held only by prompts (LIN-1242, LIN-1273, LIN-3417);
+    - tokens in prompt text (LIN-1372, LIN-1395, LIN-1408);
+    - tracker text that can forge rulings, verdicts or PR links (LIN-3386, LIN-3387, LIN-3402);
+    - member-minted tokens (LIN-4215).
+  - **Three calls offered to John, not raised as rulings:** whether stale docs and vacuous tests count as broken; reading the 51 Duplicate-state tickets (LIN-1808 is Urgent); and the fact that nothing resurfaces this list.
+  - **I'm not acting on it.** It goes to the gate discussion and to the chunked sort alongside each lane (D11).
