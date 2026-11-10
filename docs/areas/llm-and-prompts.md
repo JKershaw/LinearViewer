@@ -5,35 +5,37 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 ## Lessons
 
 - Prompt size is frozen (`tests/unit/prompt-size-budget.test.js`): text grows only with its
-  ticket and reason beside the ceiling it raises, and `FROZEN_TOTAL_BYTES` with it; the
-  replaced reason moves to "Ceiling history" in `scripts/prompt-template-change-log.md`.
+  ticket and reason beside the ceiling (and `FROZEN_TOTAL_BYTES`); the old reason moves to
+  "Ceiling history" in `scripts/prompt-template-change-log.md`.
 - Grounding note lists in `lib/prompt-formatters.js` are shared (`WORK` serves several
   stages; `GROUNDING_NOTES` is the unknown-kind fallback): give one stage its own list
   rather than edit a shared one (LIN-4371).
 - Keep scoping and both Survey renders byte-identical unless the ticket is about them:
   replays compare them byte for byte (LIN-4369).
-- The Surveys get no area notes pointer: survey-place reads no reports on the codebase's
-  shape, which feed the notes. Scoping's own pointer cites in its final message (its record
-  takes no fifth line); both share `AREA_NOTES_WHERE`, so say where notes are there (LIN-4346).
+- The Surveys get no area notes pointer (survey-place reads no shape reports, which feed the
+  notes). Scoping's pointer cites in its final message (its record takes no fifth line); both
+  share `AREA_NOTES_WHERE`, so say where notes are there (LIN-4346).
 - `lib/prompt-template-defs.js` and the budget test change in almost every merge: rebase,
   then re-measure. Its fixture passes no context, so it measures a prompt's empty-context
-  branch: dropping one can raise a ceiling while real renders shrink (LIN-4393). Measure.
+  branch: dropping one can raise a ceiling while real renders shrink (LIN-4393).
 - The `## As asked` block's words have one owner, `lib/as-asked.js`. Import its spellings;
   never retype the heading or the end line (LIN-4362).
 - `lib/prompt-template-defs.js` cannot import a module that imports `lib/prompt-templates.js`
-  (a cycle). Shared words live in an import-free leaf under `lib/prompts/` both import, as
+  (a cycle). Shared words live in an import-free leaf under `lib/prompts/`, as
   `lib/prompts/leftover-words.js` holds `LEFTOVER_RULE` (LIN-4376) and
   `lib/prompts/autopilot-precedence.js` autopilot's order: never restate a rank (LIN-4382).
-- Prompt words that ban a kind of how do not hold it: in LIN-4369's replay, runs wrote the
-  banned how anyway, and closing one channel moved it into the next (done-means, comments,
-  the `[done]` report). Hold a shape in code or a test, as `SIZE_RECORD_SHAPE` in
-  `lib/size-of-move.js` does (arm 3), or hold the reader's side (arm 4).
+- Prompt words that ban a kind of how do not hold it: LIN-4369's replayed runs wrote it
+  anyway, and closing one channel moved it to the next. Hold a shape in code or a test, as
+  `SIZE_RECORD_SHAPE` in `lib/size-of-move.js` does (arm 3), or hold the reader's side (arm 4).
 - A stage lead's first sentence is the selector's purpose line. Changing it changes the
   routing prompt: regenerate the router snapshots and `scripts/eval/meta-prompt.baseline.txt`,
   and move the routing ceiling (LIN-4369).
 - `lib/prompts/autopilot-precedence.js`: before prompt text routes round a server guard,
   check real rows reach it: scoped runs carry `maxTasks: null`, so P4's detour round
   `guardBudget` cost a session (LIN-4349).
+- `lib/periodicals.js`: a Periodical run hands off a green PR after its link and
+  second-read comments; close-out merges and sets Done. No Periodical gets its own merge
+  rule: notes are prompt input, so docs-only still needs review (LIN-4390).
 - Model facts come from the OpenRouter catalog: add no model list or rate (LIN-4358).
   Tests seed `tests/unit/helpers/pinned-catalog.js`.
 
@@ -41,8 +43,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 
 - `lib/recommendation-input.js`: the pinned-kind and in-app renders (`lib/dispatch-entrance.js`,
   `routes/proxy-compute.js` twice, `routes/workspace-api-prompts.js`) build prompt context by
-  hand, not through this projection: a new field must reach five places, and LIN-4368's
-  missed one until review. (LIN-4393 leftovers.)
+  hand, not through this projection: a new field must reach five places (LIN-4368
+  missed one). (LIN-4393 leftovers.)
 - `lib/size-of-move.js`: the built-in policy (`DECIDED_BY.policy`, err larger) may stand in
   for John's "per task breakdown of options"; the size words and cut ruling ask questions
   they never explain. Revisit both when per-task options land. (John, 8 Nov, LIN-4393.)
@@ -51,9 +53,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   them; arm 3 removed the prompt's third copy. (LIN-4369 leftovers.)
 - `lib/should-mock-ai.js`: `isHermeticTestToken` is a third spelling of the test-token
   check, beside `isTestToken` in `routes/workspace-api-steps.js` and the inline
-  `isTestMode` checks in `routes/proxy-compute.js` and `routes/task-chat.js`; nothing uses
-  it yet. (John, 7 Nov, LIN-4347.)
-- `lib/as-asked.js`: "When it could go" is repeated in each of three functions. (John, 7 Nov.)
+  `isTestMode` checks in `routes/proxy-compute.js` and `routes/task-chat.js`. (John, 7 Nov, LIN-4347.)
+- `lib/as-asked.js`: "When it could go" is repeated in three functions. (John, 7 Nov.)
 - `lib/prompts/stage-intent.js`: `docs/architecture/prompt-system.md` names the eight
   deciding stages, an unwatched second copy of `DECIDE`'s membership. (John, 8 Nov.)
 - `lib/prompt-template-defs.js`: who may agree to a reduced ask has two names, "cut" in
