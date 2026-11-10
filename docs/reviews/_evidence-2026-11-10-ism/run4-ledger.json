@@ -1,0 +1,644 @@
+{
+ "rows": [
+  {
+   "id": "mod-provider-abstraction",
+   "type": "MOD",
+   "what": "Name\u2192instance registry decoupling provider specifics",
+   "chp": "4",
+   "cfg": "N/A*",
+   "confidence": "High",
+   "delta": "unchanged \u2014 `lib/providers/interface.js` 2 window commits, `index.js` 0; Seams F3 (Medium, \"providers reach upward\") is below the C14 High bar"
+  },
+  {
+   "id": "mod-periodicals",
+   "type": "MOD",
+   "what": "Registry of recurring review templates",
+   "chp": "3",
+   "cfg": "3",
+   "confidence": "High",
+   "delta": "unchanged \u2014 registry now 16 entries (Seams & Tangles added, owns none of the twelve); `template.scope` still unconsumed; `lib/periodicals.js` 3 window commits"
+  },
+  {
+   "id": "mod-prompt-template-system",
+   "type": "MOD",
+   "what": "Deterministic recommendation system: stage router + one path for every recommendation (no model writes a prompt; meta-prompt deleted)",
+   "chp": "4",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "**confidence High\u2192Medium**, score unchanged \u2014 definition changed under LIN-3300 (`19d7198a` deleted `lib/prompts/meta-prompt-template.js`; selection via `lib/stage-router.js`, `composeRoutedRecommendation` `lib/openrouter.js:1815`); 11 files folded (incl. the 4 `mod-stage-router` files); `dbf3ecb8` fixed four selector misroutes (LIN-3378); Seams F1 (High, structural, 23/23) open"
+  },
+  {
+   "id": "mod-roadmap-trajectory",
+   "type": "MOD",
+   "what": "Velocity/execution-order/milestone layer",
+   "chp": "3",
+   "cfg": "3",
+   "confidence": "Medium/Low",
+   "delta": "unchanged score \u2014 not filed unchanged blindly: `lib/render-roadmap.js` rebuilt, `65969467` (LIN-3566) fixed two class-(a) defects, `9ee09ae9` changed the glyph source (`lib/render-roadmap.js:95`); no cited gain, so no move"
+  },
+  {
+   "id": "mod-render-layer",
+   "type": "MOD",
+   "what": "~20+ server-side page renderers, tiered",
+   "chp": "4 / 2-3",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "unchanged score \u2014 rebuild `1f8010a0` (LIN-3579) was the one behaviour change; run page placed with `mod-task-page`; Seams F2 (High, structural) and Code Quality F-dashboard (HIGH, LIN-3742) open; `public/app.js`, `public/flight-companion.js` (LIN-3385/3401) folded here"
+  },
+  {
+   "id": "mod-dispatch-queue",
+   "type": "MOD",
+   "what": "Queue storage + wake propagation, TTL, loop guards",
+   "chp": "4",
+   "cfg": "4",
+   "confidence": "High",
+   "delta": "unchanged \u2014 `4ee0a2c7` (LIN-3578) fixed a dropped digest-less abort (shipped defect, fixed: coverage caveat); `takeItem({targets})` (LIN-3622, `lib/dispatch-store.js:889-906`); 2 files folded"
+  },
+  {
+   "id": "mod-observation-materializer",
+   "type": "MOD",
+   "what": "Durable read-model store + materializer",
+   "chp": "3",
+   "cfg": "N/A*",
+   "confidence": "Medium/Low",
+   "delta": "unchanged score; **confidence Medium\u2192Medium/Low** \u2014 retention/horizon rework (`f4bfce14` LIN-3161, `8ee0ac68`, `c572a681` LIN-3163) was not read in depth; 4 files folded (run-paragraph lane)"
+  },
+  {
+   "id": "mod-kpi-audit",
+   "type": "MOD",
+   "what": "Public KPI aggregation + workspace audit",
+   "chp": "4 / 3",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "unchanged \u2014 `91fca7dd` (LIN-3591) fixed a public `/kpis` free-tier count leak (fixed: coverage caveat); daily rollup folds in (read back at `lib/kpi-stats.js:649-651`); 8 files folded"
+  },
+  {
+   "id": "mod-live-console",
+   "type": "MOD",
+   "what": "Ambient cross-workspace activity feed",
+   "chp": "4",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "unchanged \u2014 `lib/live-console.js` 5 window commits, none behaviour-declared; LIN-2993 caveat from run 3 stands but its stated cause is now open (post-pin incident correction)"
+  },
+  {
+   "id": "mod-scheduler",
+   "type": "MOD",
+   "what": "Leader-safe CAS-lease job substrate (7 registered jobs + 1 bare hourly interval)",
+   "chp": "4",
+   "cfg": "N/A*",
+   "confidence": "High",
+   "delta": "**confidence Medium\u2192High**, score unchanged \u2014 4 \u2192 7 jobs (`server.js:801/868/898/928/948/980/1009`), roster test passes 5/5 (`tests/unit/claude-md-scheduler-jobs-census.test.js`); `lib/scheduler.js` untouched; hourly cleanup still bare (`server.js:4599`, R11); `lib/hourly-cleanup.js` folds"
+  },
+  {
+   "id": "mod-observer-lane",
+   "type": "MOD",
+   "what": "Observer signal modules",
+   "chp": "3",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "unchanged \u2014 `lib/observer-efficacy-signal.js` still 0 production importers (E1, R8); `observer-pass` 2 window commits"
+  },
+  {
+   "id": "mod-ship-journey",
+   "type": "MOD",
+   "what": "Waypoint-trail derivation + playback view",
+   "chp": "4",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "unchanged \u2014 `lib/ship-journey.js`, `lib/render-ship-journey.js` 0 window commits"
+  },
+  {
+   "id": "mod-passage-planner",
+   "type": "MOD",
+   "what": "Kickoff-prompt copy view",
+   "chp": "4",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "unchanged \u2014 `lib/render-passage-planner.js`, `lib/prompts/passage-planner-kickoff.js` 0 window commits"
+  },
+  {
+   "id": "mod-task-edit",
+   "type": "MOD",
+   "what": "Dedicated task-edit drill-down",
+   "chp": "4",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "unchanged \u2014 `lib/render-task-edit.js`, `public/task-edit.js` 2 window commits each, none behaviour-declared"
+  },
+  {
+   "id": "mod-task-create",
+   "type": "MOD",
+   "what": "Dedicated task-create drill-down",
+   "chp": "4",
+   "cfg": "N/A*",
+   "confidence": "Low/Medium",
+   "delta": "unchanged \u2014 `lib/render-task-create.js`, `public/task-create.js` 0 window commits"
+  },
+  {
+   "id": "mod-effort-readout",
+   "type": "MOD",
+   "what": "Per-kind effort \u00d7 cost \u00d7 duration read-out (route + renderer)",
+   "chp": "4",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "unchanged \u2014 `lib/effort-readout.js:597` stale runtime string is an R12 member (runner now reports effort, LIN-2567 Done)"
+  },
+  {
+   "id": "mod-secret-scan",
+   "type": "MOD",
+   "what": "Repo + served-public-page secret scan (CLI + CI)",
+   "chp": "3",
+   "cfg": "N/A*",
+   "confidence": "Low/Medium",
+   "delta": "unchanged score \u2014 new runtime consumer `lib/mask-secrets-in-html.js` (folded; `dfa8e881` LIN-3389); outside the C14 population (3, Low/Medium) but an open High tracker item sits here: LIN-2850/2852 (served-page scan reports a zero-JS page clean; source scanner fail-open)"
+  },
+  {
+   "id": "mod-task-page",
+   "type": "MOD",
+   "what": "Owner task page and its stored-data state endpoint; loader, view model (`run-view`) and run-steps renderer shared with the run page",
+   "chp": "4",
+   "cfg": "N/A*",
+   "confidence": "High",
+   "delta": "new \u2014 `routes/task-page.js:58` \u2192 loader (`server.js:3081`) \u2192 `lib/render-task-page.js`; client poll `public/prompt-section.js:999`; mount order pinned; 11 loader and 9 renderer unit files plus `task-page.spec.js`. CFG N/A*: no flag by design, `runnerReady` from the dispatch flag"
+  },
+  {
+   "id": "mod-dispatch-entrance",
+   "type": "MOD",
+   "what": "Single decision seam for the four enqueue lanes; refusal mapping, target lists, task-mode event log",
+   "chp": "3",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "new \u2014 `routes/dispatch.js:437`, `routes/proxy-dispatch.js:316,357`, `routes/proxy-kickoff.js:104` call it; held at 3: GET `routes/task-mode.js:83` has no client or lib caller, rate limit marked PROVISIONAL (`routes/task-mode.js:24`); the 1,812-line `lib/dispatch-entrance.js` was not read in full. CFG N/A*: only a test seam"
+  },
+  {
+   "id": "mod-library",
+   "type": "MOD",
+   "what": "Public `/library` catalogue of repo docs with a safe markdown renderer, search, sitemap, robots",
+   "chp": "4",
+   "cfg": "N/A*",
+   "confidence": "High",
+   "delta": "new \u2014 mounted `server.js:2300`, routes `routes/library.js:133-176`, raw HTML escaped and href allow-list (`routes/library.js:33,36`); catalogue depends on `docs/` being deployed. CFG N/A*: no env surface"
+  },
+  {
+   "id": "mod-response-hardening",
+   "type": "MOD",
+   "what": "Pinned public-origin resolver, HSTS, default `no-store`, hash-based CSP with nosniff and frame guard",
+   "chp": "4",
+   "cfg": "3",
+   "confidence": "High",
+   "delta": "new \u2014 `server.js:1070` HSTS, `:1075` cache, `:1078` security headers; `APP_CSP` has no script `unsafe-inline` (`lib/security-headers.js:65`); caveat Security #18 (Low): `nosniff` only on `text/html` (`lib/security-headers.js:79`). CFG 3: `PUBLIC_ORIGIN` unset falls back to the Host header (`lib/public-origin.js:27`); HSTS only under production+https"
+  },
+  {
+   "id": "api-linear-graphql",
+   "type": "API",
+   "what": "Linear GraphQL client + retry/timeout",
+   "chp": "4",
+   "cfg": "3",
+   "confidence": "High",
+   "delta": "unchanged \u2014 `lib/providers/linear/index.js` 3 window commits, none behaviour-declared"
+  },
+  {
+   "id": "api-github-app",
+   "type": "API",
+   "what": "GitHub App install\u2192callback\u2192link flow",
+   "chp": "3",
+   "cfg": "4",
+   "confidence": "Medium/High",
+   "delta": "unchanged \u2014 LIN-3404 (`15c3b42c`, `lib/github-install-flow.js:664`): the install callback trusted `installation_id`; fixed (coverage caveat); LIN-3626 (`ccdf7260`) bounded the installations walk; `installation-pages.js` folds"
+  },
+  {
+   "id": "api-openrouter",
+   "type": "API",
+   "what": "LLM client + live model catalog",
+   "chp": "4",
+   "cfg": "4",
+   "confidence": "High",
+   "delta": "unchanged \u2014 not filed on churn alone: `3ee41011` (LIN-2854, a pre-aborted signal still bought a recommendation, `lib/openrouter.js:1019,1259`) fixed; `279258c9`, `a89c43b7` additive; `lib/openrouter.js` is #22 by churn (31 commits, mostly LIN-3300)"
+  },
+  {
+   "id": "api-mongodb-storage",
+   "type": "API",
+   "what": "Session/data storage, dual backend",
+   "chp": "4",
+   "cfg": "4",
+   "confidence": "Medium",
+   "delta": "**confidence High\u2192Medium**, score unchanged \u2014 LIN-3394 open (High, Security #1): no `workspaces.urlKey` unique index in `lib/db-indexes.js`; `5bcd09be` (LIN-3163, post-deploy) fixed index keys vs sort keys (`lib/db-indexes.js:270-282`); `session-row-live` folds"
+  },
+  {
+   "id": "api-yap-chat-client",
+   "type": "API",
+   "what": "HTTP client for the experimental chat server",
+   "chp": "3",
+   "cfg": "4",
+   "confidence": "Medium/High",
+   "delta": "unchanged \u2014 `lib/yap-client.js` 0 window commits"
+  },
+  {
+   "id": "api-egress-proxy-fetch",
+   "type": "API",
+   "what": "Outbound HTTP proxy wrapper",
+   "chp": "3",
+   "cfg": "4",
+   "confidence": "Medium/High",
+   "delta": "unchanged \u2014 `lib/proxy-fetch.js` 0 window commits"
+  },
+  {
+   "id": "api-workspace-proxy",
+   "type": "API",
+   "what": "Harbour's exposed source-neutral consumer API",
+   "chp": "4",
+   "cfg": "4",
+   "confidence": "High",
+   "delta": "unchanged \u2014 `350242d5` (LIN-3576: credential-resolution rejection \u2192 unlogged 500; unlanded description write returned 200, now 502, `routes/proxy-writes.js:259`), `0152606d` (hang-up, `lib/http-keepalive.js:125`), `d1085dcd` (halt owner gate) fixed (coverage caveat); 14 routers mounted (`routes/proxy.js:1277\u20131611`, was 11); `proxy-alarms`, `proxy-runner`, `proxy-runner-prompt` fold; run 3 CFG evidence `dispatch-repo-guard.js` retired (deleted `e1a80856`)"
+  },
+  {
+   "id": "api-dispatch",
+   "type": "API",
+   "what": "Harbour's exposed Dispatch API",
+   "chp": "4",
+   "cfg": "4",
+   "confidence": "High",
+   "delta": "unchanged \u2014 `4563046c` (LIN-3440: GitHub issue ids rejected, `lib/dispatch-validation.js:267`) fixed (coverage caveat); head-moved close-out refused with 409 (`lib/dispatch-entrance.js:1159-1191`); `dispatch-feedback-validation` folds"
+  },
+  {
+   "id": "api-jira-rest",
+   "type": "API",
+   "what": "Jira Cloud provider \u2014 read-only MVP",
+   "chp": "4",
+   "cfg": "4",
+   "confidence": "High",
+   "delta": "unchanged \u2014 `lib/providers/jira/adf.js` #9 by churn: `bf6f7507` (LIN-3561), `c2bc9a65` (LIN-3564) fixed; `e90b94c6` (LIN-3570) additive; `oauth.js` and the client untouched (`adf.js:121,181,713`)"
+  },
+  {
+   "id": "api-runner-kit",
+   "type": "API",
+   "what": "Runner kit served to user machines: kit JS, setup page, kickoff prompt, contract fixture shared with simple-dispatcher",
+   "chp": "3",
+   "cfg": "3",
+   "confidence": "High",
+   "delta": "new \u2014 served `routes/runner-kit.js:27`, sha256-pinned `lib/prompts/runner-kickoff.js:89`, setup `routes/runner-setup.js:57`; held at 3: cross-repo contract pin unguarded (R14), `runCommand` cyc 132 (LIN-3741), doc/contract disagree on the kit heartbeat (`contract.json:289-290` vs `docs/dispatch-integration.md:283`); CFG 3: feature flags gate the setup page, base URL from `publicOrigin`"
+  },
+  {
+   "id": "flow-dispatch-lifecycle",
+   "type": "FLOW",
+   "what": "queue \u2192 take \u2192 feedback \u2192 terminal-marker",
+   "chp": "3",
+   "cfg": "N/A*",
+   "confidence": "High",
+   "delta": "unchanged \u2014 R2 core gap open (`lib/dispatch-store.js:948-967` `cleanup()` keys on `expiresAt`; `silentSince` no production caller); closers LIN-3364/3365/3366 add event-driven closure; 3 files fold"
+  },
+  {
+   "id": "flow-followup-resume",
+   "type": "FLOW",
+   "what": "`followUpTo` resume; consumer owns liveness",
+   "chp": "4",
+   "cfg": "N/A*",
+   "confidence": "High",
+   "delta": "unchanged \u2014 all follow-up branches now provision a resume credential (`lib/follow-up-dispatch.js:247`, `cd85cf69`); `follow-up-dispatch.js` folds; no shipped-defect fix found"
+  },
+  {
+   "id": "flow-autopilot-wake",
+   "type": "FLOW",
+   "what": "subscription + `waitForFollowUps` up-chain wake",
+   "chp": "4",
+   "cfg": "3",
+   "confidence": "Medium",
+   "delta": "unchanged \u2014 `d2d7d818` (LIN-3592) fixed `waitForFollowUps` never stamped on the pinned-verb arm (fixed: coverage caveat); `lib/ci-wake-sweep.js` (LIN-3661) is the new scheduled job (`server.js:980`); 3 files fold"
+  },
+  {
+   "id": "flow-oauth",
+   "type": "FLOW",
+   "what": "Linear, GitHub App, OpenRouter PKCE, Jira",
+   "chp": "3",
+   "cfg": "4",
+   "confidence": "Medium",
+   "delta": "**confidence High\u2192Medium**, score unchanged \u2014 LIN-3642 (High, provisional, Done) landed on a surface rated High: `routes/auth.js:140` now requires a present `state` (`bc875ddc`); Jira leg still self-disclosed unproven (`lib/providers/jira/oauth.js:28-36`, unchanged); `routes/provider-auth-routers.js` folds"
+  },
+  {
+   "id": "flow-bootstrap-token-exchange",
+   "type": "FLOW",
+   "what": "Single-use bootstrap \u2192 working-token exchange",
+   "chp": "4",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "**confidence High\u2192Medium**, score unchanged \u2014 exchange reworked in-window (`061d19ca` LIN-3129, corrective `c943ab11`); LIN-1410 open (High, Security #2): bootstrap token inline in prompt text for non-`claude-code` harnesses (`lib/proxy-preamble.js:200`); `dispatch-session-redaction` folds (`608d8501`, LIN-3384)"
+  },
+  {
+   "id": "flow-recap-brief-cache",
+   "type": "FLOW",
+   "what": "Hash-based staleness invalidation",
+   "chp": "4",
+   "cfg": "3",
+   "confidence": "High",
+   "delta": "unchanged \u2014 `lib/recap-cache.js`, `lib/brief-cache.js` 0 window commits; `lib/recap.js` 1"
+  },
+  {
+   "id": "flow-free-tier-rate-limit",
+   "type": "FLOW",
+   "what": "Quota check \u2192 use \u2192 footer \u2192 429 (runs/day per account; hourly global cap)",
+   "chp": "3",
+   "cfg": "4",
+   "confidence": "Medium",
+   "delta": "**CHP 2\u21923**, **confidence High\u2192Medium** \u2014 R5 resolved: one key builder `lib/free-tier-store.js:97`, read `:149` and write `:225` on the same key, pinned by `tests/unit/free-tier-store.test.js` and `free-tier-allowance-fronts.test.js` (LIN-3238 `ea4b4290`, LIN-3239, LIN-3269, LIN-3706 `0eb4a2d1`); held at 3 not 4: residual precompute spend (`lib/run-paragraph-hook.js:30-37`, Security #13 / LIN-3422) and a model rewrite landed in-window; CFG 4 unchanged (`lib/plan-allowance.js:150`)"
+  },
+  {
+   "id": "flow-periodicals-two-stage",
+   "type": "FLOW",
+   "what": "Stage-1 mint \u2192 Stage-2 self-conclude contract (report gate)",
+   "chp": "3",
+   "cfg": "3",
+   "confidence": "High",
+   "delta": "unchanged scores \u2014 R7 widened to 3 update-path Done writers (1 gated) + 2 ungated create routes; R1 improved (close-out lane) but the new Done path is ungated; R9 `periodicalId` still dropped on read; CFG held at 3"
+  },
+  {
+   "id": "flow-account-connection-workspace-credential",
+   "type": "FLOW",
+   "what": "Account \u2192 Connection \u2192 binding \u2192 workspace credential (legacy owner-credential record still runs alongside)",
+   "chp": "3",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "**confidence High\u2192Medium**, CHP 3 unchanged \u2014 R13: seam improved (`lib/connection-credential.js`), dual representation open (LIN-2150 `Todo`); ~77 window commits; 9 files fold; not filed unchanged; adjacent to the post-pin credential rotation"
+  },
+  {
+   "id": "flow-cost-telemetry",
+   "type": "FLOW",
+   "what": "task-cost/model-pricing/weekly-budget/plan-fee lane",
+   "chp": "3",
+   "cfg": "3",
+   "confidence": "Medium",
+   "delta": "unchanged \u2014 `unpriced-models` folds; `3739a540` (LIN-3094) new pricing rows; no shipped-defect fix found"
+  },
+  {
+   "id": "flow-operator-decisions",
+   "type": "FLOW",
+   "what": "scan \u2192 task-decisions \u2192 unanswered \u2192 shelved \u2192 supersede",
+   "chp": "4",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "**confidence High\u2192Medium**, score unchanged (at ceiling) \u2014 second large window in a row (decision withdrawal on ticket close, LIN-3366 `993c3923`); `4ee0a2c7` (LIN-3578) fixed a dropped abort; Rulings-feed item LIN-3281 open (High, tracker, not re-verified by Security); `question-card` folds"
+  },
+  {
+   "id": "flow-account-merge",
+   "type": "FLOW",
+   "what": "identity-conflict resolution lane",
+   "chp": "4",
+   "cfg": "N/A*",
+   "confidence": "High",
+   "delta": "unchanged \u2014 `5388ce40` (LIN-1892 S3) adds merge paths (`routes/account-merge.js:136`); `account-group` folds"
+  },
+  {
+   "id": "flow-flight-companion-turn",
+   "type": "FLOW",
+   "what": "agent turn core \u2192 gate \u2192 transcripts \u2192 SSE stream",
+   "chp": "4",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "unchanged \u2014 `3cb74ddc`, `089a9081` small fixes; `flight-companion-census-seed`, `run-proposals-store` fold"
+  },
+  {
+   "id": "flow-dispatch-halt",
+   "type": "FLOW",
+   "what": "operator halt request \u2192 store \u2192 consumer honouring",
+   "chp": "3",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "unchanged \u2014 R10 resolved in code (0 stale hits); second consumer (`lib/runner-kit/runner.mjs:221` `haltAction`) diverges on an unknown mode as a **declared** contract row (LIN-3630); `poll-halt` folds; CHP held at 3 (a CI check that new modes are handled by the kit, `2a90f7b4` LIN-3650, was not read here)"
+  },
+  {
+   "id": "flow-run-evidence-closeout",
+   "type": "FLOW",
+   "what": "PR evidence, review ledger and the close-out box for a run, with a durable close-out event log",
+   "chp": "3",
+   "cfg": "N/A*",
+   "confidence": "High",
+   "delta": "new \u2014 wired end to end (`routes/workspace-api.js:3521,3655,3721` \u2192 `lib/close-out-readiness.js`; events `server.js:749`; UI `lib/render-session.js:521`; funnel `lib/milestone-funnel.js:211`); held at 3: its Done path is R7 member #3 (ungated `:3655`\u2192`:815`) and the proxy/recommend/kickoff lanes lack the readiness re-check (LIN-3649); the press event stores all-zero `openItems` (`routes/workspace-api.js:3759`) against the store header (`lib/close-out-events-store.js:7-9`). CFG N/A*: only hard-coded TTLs/budgets (`lib/pr-state-store.js:28-35`)"
+  },
+  {
+   "id": "flow-email-identity",
+   "type": "FLOW",
+   "what": "Email magic-link sign-in (Resend/console/capture transports), account home, session options",
+   "chp": "3",
+   "cfg": "4",
+   "confidence": "Medium",
+   "delta": "new \u2014 wired (`routes/email-auth.js:399` send, `:521` confirm; SHA-256-only tokens, login-CSRF nonce); held at 3, not 4: the send limiter is in-memory and per-process (per-IP 10/15 min `routes/email-auth.js:83-90`, per-address 3/15 min `lib/email-auth.js:41-42`), and a sign-in spam bot sent 47 emails from 2026-10-20 (LIN-3771 In Progress); email sign-in was switched off in production on 2026-10-23 (post-pin note). CFG 4: off by default, console refused in production, `PUBLIC_ORIGIN` required (`lib/email-availability.js:66`)"
+  },
+  {
+   "id": "flow-workspace-lifecycle",
+   "type": "FLOW",
+   "what": "Workspace create/bind/remove: urlKey resolver and holders, registry, removal revocation, owner backfill, starter seed, account erasure",
+   "chp": "3",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "new \u2014 backfill runs at boot (`server.js:294`), resolver feeds the bind arms (`lib/pat-session.js:93`), revoker built `server.js:668`; held at 3: registry is write-only (`lib/workspace-registry.js:2-3`, R8), erasure is scripts-only (`scripts/erase-account.mjs:35`), no unique `urlKey` index (LIN-3394, R-pointer). CFG N/A*: backfill has no flag by design, `CUTOFF` is a constant (`lib/owner-backfill.js:62`)"
+  },
+  {
+   "id": "flow-consumer-liveness",
+   "type": "FLOW",
+   "what": "Consumer heartbeat ingest/store and the scheduled advisory liveness-alarm sweep",
+   "chp": "3",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "new \u2014 heartbeat doors `routes/proxy-runner.js:131` \u2192 store (`server.js:762`) \u2192 read `routes/proxy-reads.js:375`; sweep `server.js:948-949` \u2192 `routes/proxy-alarms.js:38`; held at 3: alarm-only (`lib/liveness-alarm-sweep.js:20-23`, R2), `authStoppedWorkspaces` stored not shown (R15), alarm store `cleanup()` uncalled (R17); no e2e or contract test. CFG N/A*: intervals are constants in `server.js`"
+  },
+  {
+   "id": "flow-agent-grants",
+   "type": "FLOW",
+   "what": "Proxy grant/scope vocabulary, `requireGrant` middleware, owner-only gates for mints and runner actions",
+   "chp": "4",
+   "cfg": "N/A*",
+   "confidence": "Medium/High",
+   "delta": "new \u2014 fail-closed and fully wired: `requireGrant('dispatch')` `routes/proxy-dispatch.js:315,356`, `routes/proxy-kickoff.js:103`; `requireGrant('take')` `routes/proxy-runner.js:83`; `resolveRunnerOwnerRefusal` `routes/dispatch.js:360`, `routes/proxy-halt.js:77`; stale comment `lib/proxy-scopes.js:12-13`; tokens outliving logout is Security #10 (LIN-3617/3618/3619). CFG N/A*: closed constants"
+  },
+  {
+   "id": "flow-task-share",
+   "type": "FLOW",
+   "what": "Owner-minted unguessable `/t/:token` read-only guest task pages; only the SHA-256 is stored",
+   "chp": "3",
+   "cfg": "N/A*",
+   "confidence": "Medium/High",
+   "delta": "new \u2014 owner UI `lib/render-task-page.js:670`, mint/list/revoke `routes/task-share.js:287,316,332`, guest page `:191`; no rate limit on the public endpoints by ruling (`routes/task-share.js:21-22`); stale comment `lib/guest-task-path.js:41-43` (sitemap/robots now exist, `routes/library.js:133,149`). CFG N/A*: no env surface"
+  },
+  {
+   "id": "meta-integration-surface-maturity-review",
+   "type": "META",
+   "what": "This review's own methodology",
+   "chp": "3",
+   "cfg": "N/A*",
+   "confidence": "Medium",
+   "delta": "**CHP 4\u21923**, **confidence High\u2192Medium** \u2014 see Self-Audit and R16: plan-review `9bafe452` found C9 and C14 unbounded and step 6 copying derived verdicts (4 blocking findings); 14 done/High ids hit by real findings vs 2 in run 3; research errata E1\u2013E15"
+  }
+ ],
+ "recs": [
+  {
+   "id": "R7",
+   "surface": "`flow-periodicals-two-stage`",
+   "dimension": "configuration/enforcement",
+   "impact": "H",
+   "effort": "L",
+   "priority": 1,
+   "status": "open, carried (unchanged, 4th cycle; widened to 3 writers / 1 gated + 2 create routes)",
+   "owner": "this review \u2192 LIN-2576"
+  },
+  {
+   "id": "R13",
+   "surface": "`flow-account-connection-workspace-credential`",
+   "dimension": "core/happy-path, auth & credentials",
+   "impact": "H",
+   "effort": "\u2014 (Security's)",
+   "priority": 2,
+   "status": "open, carried (model improved, CHP 3, dual representation)",
+   "owner": "Security Review; LIN-2150"
+  },
+  {
+   "id": "R1",
+   "surface": "`flow-periodicals-two-stage`",
+   "dimension": "core/happy-path, configuration",
+   "impact": "H",
+   "effort": "M",
+   "priority": 3,
+   "status": "open, carried (improved; LIN-3649 is the open lane)",
+   "owner": "this review"
+  },
+  {
+   "id": "R14",
+   "surface": "`api-runner-kit`",
+   "dimension": "testing (contract), configuration",
+   "impact": "M",
+   "effort": "L-M",
+   "priority": 4,
+   "status": "open, **new**",
+   "owner": "this review (boundary); Code Quality LIN-3741 (complexity)"
+  },
+  {
+   "id": "R2",
+   "surface": "`flow-dispatch-lifecycle`",
+   "dimension": "core/happy-path",
+   "impact": "M",
+   "effort": "M",
+   "priority": 5,
+   "status": "open, carried (partly improved)",
+   "owner": "this review \u2192 LIN-2120"
+  },
+  {
+   "id": "R9",
+   "surface": "`flow-periodicals-two-stage`",
+   "dimension": "configuration/data integrity",
+   "impact": "M",
+   "effort": "L",
+   "priority": 6,
+   "status": "open, carried (unchanged)",
+   "owner": "this review \u2192 LIN-2846"
+  },
+  {
+   "id": "R16",
+   "surface": "META",
+   "dimension": "methodology",
+   "impact": "M",
+   "effort": "L",
+   "priority": 7,
+   "status": "open, **new** (scoring-model gap at scale)",
+   "owner": "this review"
+  },
+  {
+   "id": "R15",
+   "surface": "`flow-consumer-liveness`",
+   "dimension": "observability",
+   "impact": "M",
+   "effort": "L",
+   "priority": 8,
+   "status": "open, **new**",
+   "owner": "Observability \u2014 LIN-1041 (not built)"
+  },
+  {
+   "id": "R3",
+   "surface": "portfolio/META",
+   "dimension": "error handling, resilience, rate limits, idempotency, observability",
+   "impact": "H",
+   "effort": "\u2014",
+   "priority": 9,
+   "status": "open, carried (unchanged; owner map corrected)",
+   "owner": "Reliability LIN-1040 / Observability LIN-1041"
+  },
+  {
+   "id": "R12",
+   "surface": "portfolio/META",
+   "dimension": "documentation",
+   "impact": "L-M",
+   "effort": "L",
+   "priority": 10,
+   "status": "open, carried (**worsened** 5 \u2192 19)",
+   "owner": "Documentation Review"
+  },
+  {
+   "id": "R8",
+   "surface": "portfolio/META",
+   "dimension": "cross-surface (landed-but-unconsumed)",
+   "impact": "M",
+   "effort": "\u2014",
+   "priority": 11,
+   "status": "open, carried (mixed; resolved instance retired)",
+   "owner": "this review"
+  },
+  {
+   "id": "R6",
+   "surface": "portfolio/META",
+   "dimension": "sibling review cadence",
+   "impact": "M",
+   "effort": "\u2014",
+   "priority": 12,
+   "status": "open, carried (improved)",
+   "owner": "scheduling call"
+  },
+  {
+   "id": "R11",
+   "surface": "`mod-scheduler`",
+   "dimension": "configuration",
+   "impact": "L",
+   "effort": "L",
+   "priority": 13,
+   "status": "open, carried (improved; bare hourly interval residual)",
+   "owner": "this review"
+  },
+  {
+   "id": "R17",
+   "surface": "`flow-consumer-liveness`",
+   "dimension": "core/happy-path (retention), documentation",
+   "impact": "L",
+   "effort": "L",
+   "priority": 14,
+   "status": "open, **new**",
+   "owner": "this review (pointer)"
+  },
+  {
+   "id": "R5",
+   "surface": "`flow-free-tier-rate-limit`",
+   "dimension": "testing (sibling-owned)",
+   "impact": "\u2014",
+   "effort": "\u2014",
+   "priority": 15,
+   "status": "**resolved**, carried (residual precompute: Security LIN-3422)",
+   "owner": "\u2014"
+  },
+  {
+   "id": "R10",
+   "surface": "`flow-dispatch-halt`",
+   "dimension": "documentation",
+   "impact": "\u2014",
+   "effort": "L (close LIN-3074)",
+   "priority": 16,
+   "status": "**resolved in code**, carried",
+   "owner": "Documentation Review"
+  },
+  {
+   "id": "R4",
+   "surface": "feedback-widget image handling",
+   "dimension": "security",
+   "impact": "\u2014",
+   "effort": "\u2014",
+   "priority": 17,
+   "status": "**closed/resolved**, carried",
+   "owner": "\u2014"
+  }
+ ]
+}

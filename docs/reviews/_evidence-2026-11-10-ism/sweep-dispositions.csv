@@ -1,0 +1,190 @@
+repo,path,git_status,area,production_importers,disposition,target
+LinearViewer,lib/as-asked-seal.js,A,other-features,lib/dispatch-factory.js;routes/proxy-writes.js;routes/workspace-api-feedback.js;routes/workspace-api-issue-write.js,new id,flow-as-asked-seal
+LinearViewer,lib/as-asked.js,A,llm-and-prompts,lib/as-asked-seal.js;lib/brief.js;lib/chat-tools.js;lib/completion-signals.js;lib/dispatch-factory.js;lib/file-pointer.js;lib/follow-on-ratio.js;lib/periodicals.js;lib/plan-review-round-trips.js;lib/prompt-contract.js;lib/prompt-template-defs.js;lib/prompts/autopilot-kickoff.js;lib/prompts/flight-companion-kickoff.js;lib/prompts/stage-intent.js;lib/proxy-instructions.js;lib/proxy-preamble.js;lib/recap-cache.js;lib/recommendation-facts.js;lib/recommendation-look-first.js;lib/size-of-move.js;lib/task-page-loader.js;lib/task-stack.js;lib/workspace-api-mocks.js;routes/proxy-writes.js;routes/workspace-api-feedback.js,new id,flow-as-asked-seal
+LinearViewer,lib/call-budget.js,A,llm-and-prompts,lib/openrouter.js,fold,api-openrouter
+LinearViewer,lib/catalog-rate.js,A,llm-and-prompts,lib/model-pricing.js;lib/openrouter-catalog.js;lib/pricing-conformance-sweep.js,fold,flow-cost-telemetry
+LinearViewer,lib/close-out-merges.js,A,runs-and-dispatch,routes/workspace-api-run-evidence.js;server.js,fold,flow-run-evidence-closeout
+LinearViewer,lib/components/decision-panel.js,A,front-end-pages,lib/components/dispatch-no-job.js;lib/render-settings-models.js;lib/render-styleguide.js;routes/dispatch.js,new id,mod-model-routing
+LinearViewer,lib/components/dispatch-no-job.js,A,front-end-pages,server.js,new id,mod-model-routing
+LinearViewer,lib/components/halt-controls.js,A,front-end-pages,lib/render-dispatch.js;lib/render-settings-workspace.js,fold,flow-dispatch-halt
+LinearViewer,lib/components/head-meta.js,A,front-end-pages,lib/render-landing.js;lib/render-library.js;routes/getting-started.js,fold,mod-render-layer
+LinearViewer,lib/components/model-change-lines.js,A,front-end-pages,lib/render-settings-models.js;lib/render-settings-workspace.js,new id,mod-model-routing
+LinearViewer,lib/components/plain-page.js,A,front-end-pages,lib/render-account-home.js;lib/render-legal.js;lib/render-pages.js;lib/render-styleguide.js,fold,mod-render-layer
+LinearViewer,lib/components/settings-ask.js,A,front-end-pages,lib/components/halt-controls.js;lib/components/settings-key-row.js;lib/render-settings-models.js;lib/render-settings-workspace.js;lib/render-settings-you.js;lib/render-settings.js;lib/render-styleguide.js,fold,mod-render-layer
+LinearViewer,lib/components/settings-frame.js,A,front-end-pages,lib/render-settings.js;lib/render-styleguide.js,fold,mod-render-layer
+LinearViewer,lib/components/settings-group.js,A,front-end-pages,lib/components/plain-page.js;lib/render-settings-models.js;lib/render-settings-workspace.js;lib/render-settings-you.js;lib/render-settings.js;lib/render-styleguide.js,fold,mod-render-layer
+LinearViewer,lib/components/settings-key-row.js,A,front-end-pages,lib/render-settings-workspace.js;lib/render-styleguide.js,fold,mod-render-layer
+LinearViewer,lib/components/settings-row.js,A,front-end-pages,lib/components/settings-ask.js;lib/components/settings-group.js;lib/components/settings-key-row.js;lib/render-account-home.js;lib/render-settings-models.js;lib/render-settings-workspace.js;lib/render-settings-you.js;lib/render-settings.js;lib/render-styleguide.js,fold,mod-render-layer
+LinearViewer,lib/components/settings-spend-bar.js,A,front-end-pages,lib/components/decision-panel.js;lib/render-settings-models.js,fold,mod-render-layer
+LinearViewer,lib/components/tabs.js,A,front-end-pages,lib/render-observation.js;lib/render-styleguide.js,fold,mod-render-layer
+LinearViewer,lib/components/time.js,A,front-end-pages,lib/render-task-page.js,fold,mod-task-page
+LinearViewer,lib/connection-secondary-remint.js,A,auth-accounts-and-workspaces,server.js,fold,flow-account-connection-workspace-credential
+LinearViewer,lib/cost-format.js,A,other-features,lib/components/decision-panel.js;lib/render-effort-readout.js;lib/render-kpis.js;lib/render-run-steps.js;lib/render-settings.js;lib/render-workspace-kpis.js;lib/ship-biscuit.js,fold,flow-cost-telemetry
+LinearViewer,lib/cost-read.js,A,runs-and-dispatch,lib/effort-readout.js;lib/kpi-stats.js;lib/model-routing-history.js;lib/model-routing-spend.js;lib/run-view.js;lib/task-cost-read.js;lib/terminal-marked-task-cost.js;lib/weekly-budget.js;lib/workspace-kpi-stats.js;routes/proxy-compute.js;routes/settings.js;routes/ship-biscuit.js,fold,flow-cost-telemetry
+LinearViewer,lib/dashboard-refresh.js,A,other-features,server.js,fold,mod-render-layer
+LinearViewer,lib/dispatch-leftover-hook.js,A,runs-and-dispatch,server.js,new id,flow-area-notes-leftover
+LinearViewer,lib/dispatch-leftover.js,A,runs-and-dispatch,lib/dispatch-leftover-hook.js,new id,flow-area-notes-leftover
+LinearViewer,lib/dispatch-lineage-status.js,A,runs-and-dispatch,lib/dispatch-store.js;lib/effort-readout.js;routes/proxy-dispatch.js,fold,flow-dispatch-lifecycle
+LinearViewer,lib/dispatch-session-read.js,A,runs-and-dispatch,lib/chat-tools.js;lib/follow-up-dispatch.js;routes/dashboard.js;routes/task-chat.js,fold,flow-dispatch-lifecycle
+LinearViewer,lib/harbour-token-format.js,A,agent-api,lib/dispatch-tokens.js;lib/harbour-feedback-tokens.js;lib/proxy-tokens.js,fold,flow-bootstrap-token-exchange
+LinearViewer,lib/home-pipeline.js,A,other-features,lib/dashboard-refresh.js;server.js,fold,mod-render-layer
+LinearViewer,lib/home-row-states.js,A,other-features,server.js,fold,mod-render-layer
+LinearViewer,lib/home-rows.js,A,other-features,server.js,fold,mod-render-layer
+LinearViewer,lib/home-view.js,A,other-features,lib/home-pipeline.js;lib/home-rows.js,fold,mod-render-layer
+LinearViewer,lib/key-state-holders.js,A,other-features,server.js,exclude,test-state registry (CLAUDE.md E2E pattern; tests/unit/key-state-census.test.js)
+LinearViewer,lib/key-state.js,A,other-features,lib/key-state-holders.js;server.js,exclude,"test-state registry: resets per-key holders on seed seams (header :1-5, LIN-4168); no production behaviour; new-FLOW test: owned by this module, fails"
+LinearViewer,lib/lineage-membership.js,A,runs-and-dispatch,lib/cost-read.js;lib/dispatch-lineage.js;lib/effort-readout.js;lib/model-routing-history.js;lib/request-usage-intake.js;lib/request-usage-loader.js;lib/task-cost-read.js;lib/terminal-marked-task-cost.js;routes/dashboard-effort.js,fold,flow-dispatch-lifecycle
+LinearViewer,lib/live-anchor.js,A,other-features,lib/unanswered-decisions.js;routes/dashboard-session-state.js,fold,flow-operator-decisions
+LinearViewer,lib/llm-jobs.js,A,llm-and-prompts,lib/components/dispatch-no-job.js;lib/components/model-change-lines.js;lib/dispatch-factory.js;lib/model-routing-edit.js;lib/model-routing-store.js;lib/model-routing-validate.js;lib/model-routing.js;lib/render-settings-models.js;routes/dispatch.js;routes/proxy-model-routing.js,new id,mod-model-routing
+LinearViewer,lib/model-routing-edit.js,A,llm-and-prompts,lib/components/dispatch-no-job.js;routes/settings-model.js;routes/settings.js,new id,mod-model-routing
+LinearViewer,lib/model-routing-harnesses.js,A,llm-and-prompts,lib/components/decision-panel.js;lib/components/dispatch-no-job.js;lib/components/model-change-lines.js;lib/components/page.js;lib/model-routing-edit.js;lib/openrouter.js;lib/render-settings-models.js;lib/render-settings.js;server.js,new id,mod-model-routing
+LinearViewer,lib/model-routing-history.js,A,llm-and-prompts,routes/dispatch.js;routes/settings.js,new id,mod-model-routing
+LinearViewer,lib/model-routing-spend.js,A,llm-and-prompts,lib/components/decision-panel.js;lib/render-settings-models.js;routes/dashboard-feed.js;routes/dispatch.js;routes/settings.js,new id,mod-model-routing
+LinearViewer,lib/model-routing-store.js,A,llm-and-prompts,server.js,new id,mod-model-routing
+LinearViewer,lib/model-routing-summary.js,A,llm-and-prompts,routes/settings.js,new id,mod-model-routing
+LinearViewer,lib/model-routing-validate.js,A,llm-and-prompts,routes/proxy-model-routing.js,new id,mod-model-routing
+LinearViewer,lib/model-routing.js,A,llm-and-prompts,lib/components/decision-panel.js;lib/dispatch-factory.js;lib/model-routing-edit.js;lib/model-routing-harnesses.js;lib/model-routing-store.js;lib/model-routing-validate.js;lib/render-settings-models.js;lib/render-settings.js;lib/workspace-change-log.js;lib/workspace-preferences.js;routes/dispatch.js;routes/proxy-model-routing.js;routes/settings-model.js;routes/settings.js;routes/test.js;server.js,new id,mod-model-routing
+LinearViewer,lib/pipeline-churn.js,A,runs-and-dispatch,,exclude,scripts-only analysis by design (scripts/pipeline-churn.mjs; header :3-8)
+LinearViewer,lib/prompts/agent-onboarding.js,A,llm-and-prompts,lib/render-landing.js;routes/getting-started.js,fold,mod-library
+LinearViewer,lib/prompts/area-registry-path.js,A,llm-and-prompts,lib/prompt-formatters.js,new id,flow-area-notes-leftover
+LinearViewer,lib/prompts/autopilot-precedence.js,A,llm-and-prompts,lib/prompts/autopilot-kickoff.js,fold,mod-prompt-template-system
+LinearViewer,lib/prompts/leftover-words.js,A,llm-and-prompts,lib/dispatch-leftover.js;lib/prompt-template-defs.js,new id,flow-area-notes-leftover
+LinearViewer,lib/recommendation-look-first.js,A,llm-and-prompts,lib/dispatch-entrance.js;lib/openrouter.js;routes/workspace-api.js,fold,mod-prompt-template-system
+LinearViewer,lib/render-settings-models.js,A,front-end-pages,lib/render-settings.js;lib/render-styleguide.js,new id,mod-model-routing
+LinearViewer,lib/render-settings-workspace.js,A,front-end-pages,lib/render-settings-models.js;lib/render-settings.js,fold,mod-render-layer
+LinearViewer,lib/render-settings-you.js,A,front-end-pages,lib/render-settings.js,fold,mod-render-layer
+LinearViewer,lib/request-usage-fold.js,A,runs-and-dispatch,lib/cost-read.js,fold,flow-cost-telemetry
+LinearViewer,lib/request-usage-intake.js,A,runs-and-dispatch,routes/dispatch.js;routes/proxy-runner.js;server.js,fold,flow-cost-telemetry
+LinearViewer,lib/request-usage-loader.js,A,runs-and-dispatch,lib/model-routing-history.js;lib/run-paragraph-hook.js;lib/task-cost-read.js;lib/workspace-kpi-stats.js;routes/dashboard-effort.js;routes/dashboard.js;server.js,fold,flow-cost-telemetry
+LinearViewer,lib/request-usage-store.js,A,runs-and-dispatch,lib/request-usage-intake.js,fold,flow-cost-telemetry
+LinearViewer,lib/request-usage-vocabulary.js,A,runs-and-dispatch,lib/request-usage-store.js;lib/row-usage.js;lib/session-telemetry.js,fold,flow-cost-telemetry
+LinearViewer,lib/row-usage.js,A,runs-and-dispatch,lib/cost-read.js;lib/dispatch-lineage.js;lib/model-pricing.js;lib/request-usage-fold.js;lib/session-telemetry.js,fold,flow-cost-telemetry
+LinearViewer,lib/ruling-settled.js,A,other-features,routes/dashboard-rulings.js;routes/workspace-api-issue-write.js;routes/workspace-api-scan.js,fold,flow-operator-decisions
+LinearViewer,lib/ruling-standing.js,A,other-features,lib/home-row-states.js;lib/task-page-loader.js,fold,flow-operator-decisions
+LinearViewer,lib/run-controls.js,A,runs-and-dispatch,lib/dashboard-refresh.js;routes/collective.js;routes/dashboard-effort.js;routes/dashboard-feed.js;routes/dashboard-kpis.js;routes/dashboard.js;routes/flight-companion.js;routes/live-console.js;routes/passage-planner.js;routes/runner-setup.js;routes/settings.js;routes/ship-biscuit.js;routes/ship-journey.js;routes/task-chat.js;routes/task-create.js;routes/task-edit.js;routes/task-page.js;routes/workspace-api-issue-read.js;routes/workspace-api-run-evidence.js;routes/workspace-kpis.js;server.js,fold,mod-render-layer
+LinearViewer,lib/sample-data/fixture-parent.js,A,providers,lib/workspace-api-mocks.js;routes/proxy-compute.js,exclude,"test-mode / sample data (run-4 rule, cf. lib/sample-data/*)"
+LinearViewer,lib/settings-areas.js,A,front-end-pages,lib/components/settings-frame.js;lib/render-settings-models.js;lib/render-settings.js;lib/render-styleguide.js;routes/openrouter-auth.js;routes/settings-model.js;routes/settings.js;server.js,fold,mod-render-layer
+LinearViewer,lib/settings-copy-first-card.js,A,front-end-pages,server.js,fold,mod-render-layer
+LinearViewer,lib/settings-keys.js,A,agent-api,lib/run-controls.js;routes/settings.js,fold,mod-render-layer
+LinearViewer,lib/size-of-move.js,A,llm-and-prompts,lib/completion-signals.js;lib/prompt-template-defs.js;lib/proxy-instructions.js;lib/recommendation-facts.js;lib/recommendation-look-first.js;routes/proxy-writes.js,fold,mod-prompt-template-system
+LinearViewer,lib/stage-writes.js,A,other-features,lib/prompt-template-defs.js;lib/proxy-preamble.js,fold,mod-prompt-template-system
+LinearViewer,lib/subtree-index.js,A,other-features,lib/home-row-states.js;lib/task-facts-holder.js;lib/task-page-loader.js,fold,mod-task-page
+LinearViewer,lib/task-board-view.js,A,front-end-pages,lib/home-pipeline.js;lib/render-ship.js;lib/render-swim.js;lib/render-swipe.js;lib/render.js;routes/task-page.js;server.js,fold,mod-render-layer
+LinearViewer,lib/task-cost-read.js,A,runs-and-dispatch,routes/proxy-compute.js;routes/proxy.js,fold,flow-cost-telemetry
+LinearViewer,lib/task-facts-holder.js,A,other-features,server.js,fold,mod-task-page
+LinearViewer,lib/task-order.js,A,task-model,lib/roadmap.js;lib/task-board-view.js;lib/task-stack.js,fold,mod-roadmap-trajectory
+LinearViewer,lib/task-state.js,A,other-features,lib/render-task-page.js;lib/render.js;lib/task-page-loader.js;routes/task-page.js;routes/task-share.js,fold,mod-task-page
+LinearViewer,lib/usage-snapshot-intake.js,A,other-features,lib/dispatch-store.js;server.js,fold,flow-cost-telemetry
+LinearViewer,lib/vendor-assets.js,A,platform-and-plumbing,server.js,fold,mod-render-layer
+LinearViewer,lib/waiting-section.js,A,other-features,lib/render.js;server.js,fold,mod-render-layer
+LinearViewer,lib/workspace-change-log.js,A,auth-accounts-and-workspaces,lib/render-settings-models.js;lib/render-settings-workspace.js;routes/settings.js;server.js,fold,flow-workspace-lifecycle
+LinearViewer,lib/workspace-issues-memo.js,A,auth-accounts-and-workspaces,server.js,fold,mod-provider-abstraction
+LinearViewer,lib/workspace-kpis-cache.js,A,reports-and-operator-tools,routes/workspace-kpis.js,fold,mod-kpi-audit
+LinearViewer,public/cost-format.js,A,front-end-browser,lib/components/decision-panel.js;lib/cost-format.js;lib/render-effort-readout.js;lib/render-flight-companion.js;lib/render-kpis.js;lib/render-observation.js;lib/render-run-steps.js;lib/render-settings.js;lib/render-swipe.js;lib/render-task-page.js;lib/render-workspace-kpis.js;lib/render.js;lib/ship-biscuit.js,fold,flow-cost-telemetry
+LinearViewer,public/decision-panel.js,A,front-end-browser,lib/components/decision-panel.js;lib/components/dispatch-no-job.js;lib/model-routing-edit.js;lib/render-dispatch.js;lib/render-settings-models.js;lib/render-settings.js;lib/render-styleguide.js;lib/render-task-page.js;lib/render.js;routes/dispatch.js,new id,mod-model-routing
+LinearViewer,public/home-placement.js,A,front-end-browser,lib/render.js,fold,mod-render-layer
+LinearViewer,public/landing-copy.js,A,front-end-browser,lib/render-landing.js,fold,mod-render-layer
+LinearViewer,public/logo/og-image.png,A,front-end-browser,lib/components/head-meta.js,fold,mod-render-layer
+LinearViewer,public/run-control.css,A,front-end-browser,lib/render-swipe.js;lib/render-task-page.js;lib/render.js,fold,mod-render-layer
+LinearViewer,public/settings-models.js,A,front-end-browser,lib/render-settings-models.js;lib/render-settings.js,new id,mod-model-routing
+LinearViewer,public/stage-track.css,A,front-end-browser,lib/render-task-page.js;lib/render.js,fold,mod-task-page
+LinearViewer,routes/dashboard-drilldown.js,A,web-routes,routes/dashboard.js,fold,mod-render-layer
+LinearViewer,routes/dashboard-effort.js,A,web-routes,routes/dashboard.js,fold,mod-effort-readout
+LinearViewer,routes/dashboard-feed.js,A,web-routes,routes/dashboard.js,fold,mod-render-layer
+LinearViewer,routes/dashboard-kpis.js,A,web-routes,routes/dashboard.js,fold,mod-kpi-audit
+LinearViewer,routes/dashboard-rulings.js,A,web-routes,routes/dashboard.js,fold,flow-operator-decisions
+LinearViewer,routes/dashboard-session-state.js,A,web-routes,routes/dashboard-effort.js;routes/dashboard-feed.js;routes/dashboard-rulings.js;routes/dashboard-summaries.js;routes/dashboard.js;routes/workspace-api-run-evidence.js,fold,mod-task-page
+LinearViewer,routes/dashboard-summaries.js,A,web-routes,routes/dashboard.js,fold,mod-render-layer
+LinearViewer,routes/getting-started.js,A,web-routes,server.js,fold,mod-library
+LinearViewer,routes/proxy-model-routing.js,A,agent-api,routes/proxy.js,new id,mod-model-routing
+LinearViewer,routes/settings-model.js,A,web-routes,server.js,new id,mod-model-routing
+LinearViewer,routes/settings.js,A,web-routes,server.js,fold,mod-render-layer
+LinearViewer,routes/workspace-api-audit.js,A,web-routes,routes/workspace-api.js,fold,mod-kpi-audit
+LinearViewer,routes/workspace-api-feedback.js,A,web-routes,routes/workspace-api.js,fold,mod-task-create
+LinearViewer,routes/workspace-api-issue-read.js,A,web-routes,routes/workspace-api.js,fold,mod-task-edit
+LinearViewer,routes/workspace-api-issue-write.js,A,web-routes,routes/workspace-api.js,fold,mod-task-edit
+LinearViewer,routes/workspace-api-run-evidence.js,A,web-routes,routes/workspace-api.js,fold,flow-run-evidence-closeout
+LinearViewer,routes/workspace-api-scan.js,A,web-routes,routes/workspace-api.js,fold,flow-operator-decisions
+LinearViewer,routes/workspace-api-steps.js,A,web-routes,routes/workspace-api-audit.js;routes/workspace-api-feedback.js;routes/workspace-api-issue-read.js;routes/workspace-api-issue-write.js;routes/workspace-api-prompts.js;routes/workspace-api-scan.js;routes/workspace-api.js,exclude,pure shared helpers of the workspace-api routers (header :1-8); behaviour lives in the routers it serves
+LinearViewer,lib/next-run.js,D,other-features,,deleted,retired evidence (next-run lane retired; no run-4 id or cite depended on it)
+LinearViewer,lib/plan-fee-config.js,D,other-features,,deleted,flow-cost-telemetry definition re-pointed: plan-fee lane removed with the costs rebuild
+LinearViewer,lib/render-next-run.js,D,front-end-pages,,deleted,retired evidence (next-run lane)
+LinearViewer,lib/task-cost.js,D,other-features,,deleted,flow-cost-telemetry definition re-pointed: replaced by request-usage-* / cost-read / row-usage (LIN-4195)
+LinearViewer,public/chart.umd.min.js,D,front-end-browser,,deleted,moved: served from node_modules at the same URL by lib/vendor-assets.js (LIN-3787)
+LinearViewer,public/marked.min.js,D,front-end-browser,,deleted,moved: lib/vendor-assets.js (LIN-3787)
+LinearViewer,public/next-run.css,D,front-end-browser,,deleted,retired evidence (next-run lane)
+LinearViewer,public/next-run.js,D,front-end-browser,,deleted,retired evidence (next-run lane)
+LinearViewer,public/purify.min.js,D,front-end-browser,,deleted,moved: lib/vendor-assets.js (LIN-3787)
+LinearViewer,routes/next-run.js,D,web-routes,,deleted,retired evidence (next-run lane)
+LinearViewer,server.js,"M(56 commits,+761/-661)",wiring,,modified (churn top-25),wiring; mod-scheduler (R11 intervals) + every new mount
+LinearViewer,public/llms.txt,"M(49 commits,+150/-93)",front-end-browser,,modified (churn top-25),mod-render-layer (agent-facing DOM doc)
+LinearViewer,lib/proxy-instructions.js,"M(36 commits,+179/-45)",agent-api,,modified (churn top-25),api-workspace-proxy
+LinearViewer,lib/dispatch-store.js,"M(30 commits,+1906/-426)",runs-and-dispatch,,modified (churn top-25),"mod-dispatch-queue (+R2, API Quality H1, D&F H1)"
+LinearViewer,public/prompt-section.js,"M(30 commits,+1578/-90)",front-end-browser,,modified (churn top-25),mod-task-page (Code Quality F-prompt-section HIGH)
+LinearViewer,lib/render.js,"M(29 commits,+434/-95)",front-end-pages,,modified (churn top-25),mod-render-layer
+LinearViewer,public/style.css,"M(28 commits,+1718/-705)",front-end-browser,,modified (churn top-25),mod-render-layer
+LinearViewer,routes/proxy-compute.js,"M(25 commits,+140/-103)",agent-api,,modified (churn top-25),api-workspace-proxy
+LinearViewer,lib/task-page-loader.js,"M(24 commits,+647/-96)",runs-and-dispatch,,modified (churn top-25),mod-task-page
+LinearViewer,lib/prompt-template-defs.js,"M(24 commits,+243/-205)",llm-and-prompts,,modified (churn top-25),mod-prompt-template-system
+LinearViewer,lib/dispatch-entrance.js,"M(24 commits,+352/-107)",runs-and-dispatch,,modified (churn top-25),mod-dispatch-entrance
+LinearViewer,routes/workspace-api.js,"M(22 commits,+111/-2977)",web-routes,,modified (churn top-25),"split 3,782 -> 916 lines + 7 new siblings; R7 #2/#3, R1, R4, R5 cites re-pointed"
+LinearViewer,routes/proxy.js,"M(21 commits,+142/-100)",agent-api,,modified (churn top-25),api-workspace-proxy
+LinearViewer,public/common.js,"M(19 commits,+273/-176)",front-end-browser,,modified (churn top-25),mod-render-layer
+LinearViewer,lib/render-styleguide.js,"M(19 commits,+408/-18)",front-end-pages,,modified (churn top-25),mod-render-layer
+LinearViewer,routes/dispatch.js,"M(18 commits,+257/-27)",runs-and-dispatch,,modified (churn top-25),api-dispatch (+usage intake route)
+LinearViewer,lib/render-task-page.js,"M(17 commits,+360/-126)",front-end-pages,,modified (churn top-25),mod-task-page
+LinearViewer,public/app.js,"M(15 commits,+681/-198)",front-end-browser,,modified (churn top-25),mod-render-layer
+LinearViewer,lib/periodicals.js,"M(14 commits,+366/-125)",llm-and-prompts,,modified (churn top-25),mod-periodicals + META (R18 template drift)
+LinearViewer,lib/db-indexes.js,"M(14 commits,+325/-17)",platform-and-plumbing,,modified (churn top-25),api-mongodb-storage
+LinearViewer,lib/run-view.js,"M(14 commits,+226/-37)",runs-and-dispatch,,modified (churn top-25),mod-task-page
+LinearViewer,lib/dispatch-factory.js,"M(13 commits,+428/-53)",runs-and-dispatch,,modified (churn top-25),mod-dispatch-entrance (+mod-model-routing resolution)
+LinearViewer,routes/task-page.js,"M(13 commits,+168/-31)",web-routes,,modified (churn top-25),mod-task-page
+LinearViewer,lib/completion-signals.js,"M(12 commits,+51/-23)",runs-and-dispatch,,modified (churn top-25),flow-dispatch-lifecycle
+LinearViewer,routes/test.js,"M(12 commits,+202/-19)",web-routes,,modified (churn top-25),excluded: test-only routes
+simple-dispatcher,CLAUDE.md,M(+3/-0),(none),,consumer,consumer docs (area-notes pointer); unscored
+simple-dispatcher,README.md,M(+32/-5),(none),,consumer,consumer docs; unscored
+simple-dispatcher,config.js,M(+165/-78),state-and-config,,consumer,"consumer evidence: flow-cost-telemetry (WORKER_USAGE_RELAY default on :1345, LIN-4127)"
+simple-dispatcher,dispatcher.js,M(+145/-26),loop-and-routing,,consumer,"consumer evidence: flow-cost-telemetry (cancel flush :15) + flow-consumer-liveness (instance guard, LIN-796)"
+simple-dispatcher,docs/areas/README.md,A(+71/-0),(none),,consumer,"consumer evidence: flow-area-notes-leftover (LIN-4372; points at Harbour LEFTOVER_RULE, LIN-4385)"
+simple-dispatcher,docs/areas/areas.json,A(+51/-0),(none),,consumer,consumer evidence: flow-area-notes-leftover (LIN-4372)
+simple-dispatcher,docs/areas/launch-and-harnesses.md,A(+20/-0),(none),,consumer,consumer evidence: flow-area-notes-leftover
+simple-dispatcher,docs/areas/state-and-config.md,A(+23/-0),(none),,consumer,consumer evidence: flow-area-notes-leftover
+simple-dispatcher,docs/areas/stop-hook-and-relay.md,A(+44/-0),(none),,consumer,consumer evidence: flow-area-notes-leftover
+simple-dispatcher,docs/areas/test-harnesses.md,A(+19/-0),(none),,consumer,consumer evidence: flow-area-notes-leftover
+simple-dispatcher,docs/deployment.md,M(+14/-2),(none),,consumer,consumer docs; unscored
+simple-dispatcher,docs/full-system-test-plan.md,M(+3/-2),(none),,consumer,consumer docs; unscored
+simple-dispatcher,docs/module-map.md,M(+111/-4),(none),,consumer,"consumer docs (names the runner contract, LIN-4378); unscored"
+simple-dispatcher,docs/session-lifecycle.md,M(+80/-13),(none),,consumer,consumer docs (CANCELLED resume rules); evidence for flow-followup-resume
+simple-dispatcher,docs/substrate.md,M(+1/-1),(none),,consumer,consumer docs; unscored
+simple-dispatcher,docs/testing-and-ci.md,M(+209/-5),(none),,consumer,consumer docs (heavy-tier harness); unscored
+simple-dispatcher,e2e-smoke.js,M(+26/-18),test-harnesses,,consumer,consumer test harness; unscored
+simple-dispatcher,env-flag.js,A(+41/-0),state-and-config,config.js;instance-guard.js;oplog.js;resource-metrics.js,consumer,"consumer-internal (SD_* flag parser, LIN-4182); configuration evidence for flow-cost-telemetry"
+simple-dispatcher,executors.js,M(+60/-7),launch-and-harnesses,,consumer,"consumer evidence: mod-model-routing (LIN-3857) + consumer-internal (LIN-2469, LIN-4171)"
+simple-dispatcher,experiments/lin-4171-resume-timing.js,A(+63/-0),test-harnesses,,consumer,experiment (LIN-4171 resume re-clone witness); excluded
+simple-dispatcher,experiments/lin-4171-resume-witness.js,A(+151/-0),test-harnesses,,consumer,experiment (LIN-4171); excluded
+simple-dispatcher,feedback.js,M(+4/-3),stop-hook-and-relay,,consumer,consumer evidence: flow-dispatch-lifecycle (LIN-4199 feedback post)
+simple-dispatcher,followup.js,M(+50/-6),loop-and-routing,,consumer,consumer evidence: flow-followup-resume (LIN-4079/4082 CANCELLED resume rules)
+simple-dispatcher,format.js,M(+7/-1),state-and-config,,consumer,consumer-internal (LIN-2478 log line); unscored
+simple-dispatcher,harbour-token-mcp-server.js,M(+79/-15),launch-and-harnesses,,consumer,"consumer evidence: flow-bootstrap-token-exchange (broker 429 back-off, LIN-4378) + api-runner-kit contract"
+simple-dispatcher,harnesses.js,M(+69/-4),launch-and-harnesses,,consumer,consumer evidence: mod-model-routing (LIN-3830 resume keeps model/effort; LIN-3857 opencode effort null)
+simple-dispatcher,heartbeat.js,M(+20/-2),reapers-and-liveness,,consumer,consumer evidence: flow-consumer-liveness (LIN-4030)
+simple-dispatcher,hook.js,M(+465/-382),stop-hook-and-relay,,consumer,consumer evidence: flow-cost-telemetry (Stop flush :19-20) + flow-dispatch-lifecycle (LIN-4218 Stop relay table)
+simple-dispatcher,instance-guard.js,A(+242/-0),state-and-config,dispatcher.js,consumer,"consumer evidence: flow-consumer-liveness (one dispatcher per host, LIN-796)"
+simple-dispatcher,links.js,M(+82/-1),stop-hook-and-relay,,consumer,"consumer evidence: flow-run-evidence-closeout ([done] url is the session own PR, LIN-4375)"
+simple-dispatcher,opencode-request-records.js,A(+56/-0),launch-and-harnesses,opencode-runner.js,consumer,consumer evidence: flow-cost-telemetry (LIN-4202)
+simple-dispatcher,opencode-runner.js,M(+86/-136),launch-and-harnesses,,consumer,"consumer evidence: flow-cost-telemetry (:91-93, relayRequestRecords :590) + flow-dispatch-lifecycle"
+simple-dispatcher,oplog.js,M(+6/-4),state-and-config,,consumer,consumer-internal (env-flag adoption); unscored
+simple-dispatcher,package.json,M(+3/-2),(none),,consumer,consumer test scripts (test:baseline); unscored
+simple-dispatcher,phases.js,M(+11/-6),state-and-config,,consumer,consumer-internal (LIN-4172 reap split); unscored
+simple-dispatcher,queue.js,M(+17/-0),loop-and-routing,,consumer,consumer evidence: flow-dispatch-lifecycle (LIN-3047 malformed poll body)
+simple-dispatcher,reapers.js,M(+364/-116),reapers-and-liveness,,consumer,"consumer evidence: flow-cost-telemetry (detached flush) + flow-dispatch-lifecycle (LIN-3905, LIN-4172)"
+simple-dispatcher,request-usage-flush.js,A(+285/-0),stop-hook-and-relay,dispatcher.js;hook.js;opencode-runner.js;reapers.js,consumer,consumer evidence: flow-cost-telemetry (producer contract :10-16)
+simple-dispatcher,request-usage.js,A(+183/-0),stop-hook-and-relay,hook.js;request-usage-flush.js,consumer,consumer evidence: flow-cost-telemetry (LIN-4199)
+simple-dispatcher,resource-metrics.js,M(+104/-6),reapers-and-liveness,,consumer,consumer-internal (LIN-1819 bounded sink); unscored
+simple-dispatcher,signal-guard.js,M(+2/-1),reapers-and-liveness,,consumer,consumer-internal (LIN-4077 one-line); unscored
+simple-dispatcher,state-dir.js,A(+23/-0),state-and-config,config.js;executors.js;harnesses.js;oplog.js;resource-metrics.js;signal-guard.js;state-store.js;terminal-driver.js,consumer,"consumer-internal (state dir, LIN-4077); unscored"
+simple-dispatcher,state-store.js,M(+2/-1),state-and-config,,consumer,consumer-internal (state dir); unscored
+simple-dispatcher,subscription.js,M(+2/-1),reapers-and-liveness,,consumer,consumer-internal (state dir); unscored
+simple-dispatcher,terminal-driver.js,M(+10/-6),launch-and-harnesses,,consumer,consumer-internal (LIN-1453 launch diagnosis); unscored
+simple-dispatcher,transcript.js,M(+66/-87),stop-hook-and-relay,,consumer,"consumer evidence: flow-cost-telemetry (walkUsage LIN-3229) + api-runner-kit (one DONE: rule, LIN-4385)"
+simple-dispatcher,watch-restart.sh,M(+50/-10),state-and-config,,consumer,consumer-internal (LIN-796 guard wiring); unscored
