@@ -3290,3 +3290,10 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **I'm not acting on it.** It goes to the gate discussion and to the chunked sort alongside each lane (D11).
 - **09:46 UTC: ruling `lin4392-wait-surfaces`.** Should one live-stage rule also make the task page and `GET /recommend` show "wait", as they already do for look-first, or should only recommend-and-dispatch refuse? Suggested **proceed**: one rule for one fact is the simpler code, and post-only would leave the page offering a stage the server refuses. **For the "your seat" count:** this is close to an engineering call. It was raised because it changes what a person sees beyond the ask's literal words.
 - **09:48 UTC: LIN-4390 is Done.** Blind reads CO (`9ea6b2f3`) and CP (`09293e1b`) sent for `f5b1f5efa` (same template as round 1, no ticket id on the dispatch).
+- **09:52 UTC: LIN-4390 blind reads: better (CO), mixed (CP).**
+  - **Both credit:** one owner for finishing a Periodical (close-out); two near-copies of the closing bullets folded into one `handOffBullet()`; and the first test that checks the Periodical prompts against the gate wording.
+  - **CP's worse side:**
+    - "close-out merges and sets Done" is still written in three bullets, and three layers of tests pin the wording;
+    - to fit two new entries, `llm-and-prompts.md` shortened about ten unrelated entries and lost detail. It's now at 6,142 of 6,144 bytes.
+  - **A pattern to watch, for the gate discussion:** the busiest area notes are at their cap. The Seams and Drift baselines also distilled to fit. Each new entry now squeezes old ones, so notes lose detail. That's the drain question (D8, D12) showing up as a cap rather than a count.
+  - **Cost:** two blind reads, about two minutes each. LIN-4390's own cost is to read later from `/cost`.
