@@ -32,18 +32,11 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   an error code, would hold "whole or loud". (Review, 8 Nov, on LIN-4358; area reads CG/CH.)
 - `routes/proxy.js`: `hashCredential` (proxyLimiter's key) is a second sha256-of-a-token helper
   beside `ProxyTokenStore._hashToken`. One exported token hash. (Area reads CE/CF, LIN-4378.)
-- `lib/proxy-instructions.js`: the rate-limit rule (60/min per token; on a 429 wait
-  `Retry-After`) is restated in about eight places: here three times, both kickoff prompts,
-  and three docs. One sentence, quoted from one place. The key is the proven credential, else
-  the client IP (`routes/proxy.js`), so "per token" is wrong before auth, and the guide's
-  per-IP token-mint line omits the session-account bucket. (Area reads CE/CF, LIN-4378;
-  Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)
-- `routes/proxy.js`: the `proxyLimiter` window (60 seconds) and the runner broker's wait cap
-  (`EXCHANGE_MAX_WAIT_SECONDS` in `lib/runner-kit/broker.mjs`) are matched by a comment only.
-  The contract records a 60s wait on each side (`lib/runner-kit/contract.json`), but no test
-  reads the limiter's `windowMs` against it, so a change to either can silently break the
-  broker's retry budget. A test that reads `windowMs` beside that row would move the match out
-  of comments. (Seams & Tangles, 8 Nov.; `docs/reviews/seams-tangles-review-2026-11-08-run10.md`.)
+- `lib/proxy-instructions.js`: the rate-limit rule (60/min per token; on a 429 wait `Retry-After`)
+  is restated in about eight places; one sentence, quoted from one place. It keys on the proven
+  credential, else the IP (`routes/proxy.js`), so "per token" is wrong before auth. (Area reads
+  CE/CF, LIN-4378; Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)
+- `routes/proxy.js`: the `proxyLimiter` window (60 seconds) and the broker's wait cap (`EXCHANGE_MAX_WAIT_SECONDS`, `lib/runner-kit/broker.mjs`) are matched by a comment only. The contract records a 60s wait on both sides, but no test reads `windowMs` against it, so either can silently break the retry budget. (Seams & Tangles, 8 Nov.; `docs/reviews/seams-tangles-review-2026-11-08-run10.md`.)
 - `lib/proxy-preamble.js`: `applyDefaultDispatchHarness` (the default harness policy) is imported by LLM's
   `lib/model-routing.js` and `lib/model-routing-harnesses.js`, so routing policy sits in an Agent API file and LLM
   depends on it. Its home is the routing side, or a shared leaf both can import. (Seams & Tangles, 10 Nov.;
@@ -71,3 +64,4 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   item (`routes/proxy-runner.js` filters on runner targets, `lib/dispatch-targets.js`). Neither
   doc says so. (LIN-3622, Done; Documentation Review, 10 Nov.;
   `docs/reviews/documentation-review-2026-11-10.md`.)
+- `lib/proxy-instructions.js`: a fresh, unsized ticket gets survey-task, survey-place, then scoping from `recommend` and `recommend-and-dispatch` (`lib/recommendation-look-first.js`); a live step answers `prompt: null` with `liveWait`. The catalog says so; the guide's GET /recommend section does not, so an agent following it takes a Survey step as its task. (LIN-4370, Done; Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)
