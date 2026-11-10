@@ -1,0 +1,221 @@
+{
+  "commit": "5d8489e7fd8434f0e69af7df11a3746790abbe64",
+  "method": "literal require() reader, root-level *.js, git objects only (LIN-4402 run 11 scratch)",
+  "registry": "sd-areas-5d8489e.json",
+  "scope": {
+    "files": 52,
+    "unmappedFiles": [],
+    "unresolvedRelative": [],
+    "nonLiteralRequires": []
+  },
+  "fileEdges": 157,
+  "areaLinks": {
+    "Loop, poll & routing -> Launch & harnesses": 6,
+    "Launch & harnesses -> Reapers & liveness": 2,
+    "Launch & harnesses -> State, config & host process": 13,
+    "Loop, poll & routing -> Stop hook & relay": 4,
+    "Loop, poll & routing -> State, config & host process": 13,
+    "Loop, poll & routing -> Reapers & liveness": 7,
+    "Test harnesses -> Launch & harnesses": 5,
+    "Test harnesses -> Stop hook & relay": 7,
+    "Test harnesses -> State, config & host process": 1,
+    "Test harnesses -> Reapers & liveness": 1,
+    "Launch & harnesses -> Loop, poll & routing": 1,
+    "Stop hook & relay -> State, config & host process": 10,
+    "Reapers & liveness -> State, config & host process": 14,
+    "Reapers & liveness -> Stop hook & relay": 6,
+    "Stop hook & relay -> Reapers & liveness": 2,
+    "Reapers & liveness -> Launch & harnesses": 5,
+    "Launch & harnesses -> Stop hook & relay": 5,
+    "Reapers & liveness -> Loop, poll & routing": 3,
+    "State, config & host process -> Stop hook & relay": 1,
+    "State, config & host process -> Reapers & liveness": 1
+  },
+  "reciprocalPairs": [
+    {
+      "a": "Loop, poll & routing",
+      "b": "Launch & harnesses",
+      "aToB": 6,
+      "bToA": 1
+    },
+    {
+      "a": "Launch & harnesses",
+      "b": "Reapers & liveness",
+      "aToB": 2,
+      "bToA": 5
+    },
+    {
+      "a": "Loop, poll & routing",
+      "b": "Reapers & liveness",
+      "aToB": 7,
+      "bToA": 3
+    },
+    {
+      "a": "Stop hook & relay",
+      "b": "State, config & host process",
+      "aToB": 10,
+      "bToA": 1
+    },
+    {
+      "a": "Reapers & liveness",
+      "b": "State, config & host process",
+      "aToB": 14,
+      "bToA": 1
+    },
+    {
+      "a": "Reapers & liveness",
+      "b": "Stop hook & relay",
+      "aToB": 6,
+      "bToA": 2
+    }
+  ],
+  "crossings": {
+    "Loop, poll & routing -> Launch & harnesses": [
+      "admission.js -> harnesses.js",
+      "admission.js -> terminal-driver.js",
+      "dispatcher.js -> executors.js",
+      "dispatcher.js -> harnesses.js",
+      "dispatcher.js -> net-util.js",
+      "dispatcher.js -> terminal-driver.js"
+    ],
+    "Launch & harnesses -> Reapers & liveness": [
+      "clones.js -> reapers.js",
+      "terminal-driver.js -> signal-guard.js"
+    ],
+    "Launch & harnesses -> State, config & host process": [
+      "clones.js -> state-store.js",
+      "clones.js -> config.js",
+      "executors.js -> state-dir.js",
+      "executors.js -> config.js",
+      "harnesses.js -> state-dir.js",
+      "harnesses.js -> config.js",
+      "opencode-runner.js -> config.js",
+      "opencode-runner.js -> format.js",
+      "opencode-runner.js -> oplog.js",
+      "opencode-runner.js -> state-store.js",
+      "opencode-runner.js -> phases.js",
+      "terminal-driver.js -> state-dir.js",
+      "terminal-driver.js -> config.js"
+    ],
+    "Loop, poll & routing -> Stop hook & relay": [
+      "dispatcher.js -> feedback.js",
+      "dispatcher.js -> request-usage-flush.js",
+      "dispatcher.js -> hook.js",
+      "queue.js -> http.js"
+    ],
+    "Loop, poll & routing -> State, config & host process": [
+      "dispatcher.js -> oplog.js",
+      "dispatcher.js -> shutdown.js",
+      "dispatcher.js -> instance-guard.js",
+      "dispatcher.js -> phases.js",
+      "dispatcher.js -> state-store.js",
+      "dispatcher.js -> config.js",
+      "dispatcher.js -> format.js",
+      "duplicate-launch.js -> phases.js",
+      "followup.js -> phases.js",
+      "halt.js -> config.js",
+      "launch-breaker.js -> config.js",
+      "pacing.js -> phases.js",
+      "queue.js -> config.js"
+    ],
+    "Loop, poll & routing -> Reapers & liveness": [
+      "dispatcher.js -> signal-guard.js",
+      "dispatcher.js -> reapers.js",
+      "dispatcher.js -> resources.js",
+      "dispatcher.js -> host-heartbeat.js",
+      "dispatcher.js -> host-heartbeat-sender.js",
+      "dispatcher.js -> resource-metrics.js",
+      "dispatcher.js -> subscription.js"
+    ],
+    "Test harnesses -> Launch & harnesses": [
+      "e2e-broker-witness.js -> net-util.js",
+      "e2e-smoke.js -> terminal-driver.js",
+      "e2e-smoke.js -> executors.js",
+      "e2e-smoke.js -> harnesses.js",
+      "e2e-smoke.js -> opencode-runner.js"
+    ],
+    "Test harnesses -> Stop hook & relay": [
+      "e2e-hold-probe-hook.js -> hook.js",
+      "e2e-probe-hook.js -> transcript.js",
+      "e2e-sentinel-probe-hook.js -> transcript.js",
+      "e2e-sentinel-probe-hook.js -> hook.js",
+      "e2e-smoke.js -> transcript.js",
+      "e2e-smoke.js -> hook.js",
+      "e2e-smoke.js -> links.js"
+    ],
+    "Test harnesses -> State, config & host process": [
+      "e2e-smoke.js -> config.js"
+    ],
+    "Test harnesses -> Reapers & liveness": [
+      "e2e-smoke.js -> reapers.js"
+    ],
+    "Launch & harnesses -> Loop, poll & routing": [
+      "executors.js -> launch-breaker.js"
+    ],
+    "Stop hook & relay -> State, config & host process": [
+      "feedback.js -> config.js",
+      "hook.js -> load-env.js",
+      "hook.js -> state-store.js",
+      "hook.js -> oplog.js",
+      "hook.js -> phases.js",
+      "hook.js -> format.js",
+      "hook.js -> config.js",
+      "request-usage-flush.js -> state-store.js",
+      "request-usage-flush.js -> oplog.js",
+      "request-usage-flush.js -> config.js"
+    ],
+    "Reapers & liveness -> State, config & host process": [
+      "heartbeat.js -> phases.js",
+      "heartbeat.js -> format.js",
+      "host-heartbeat.js -> phases.js",
+      "opencode-liveness.js -> phases.js",
+      "opencode-liveness.js -> config.js",
+      "reapers.js -> oplog.js",
+      "reapers.js -> phases.js",
+      "reapers.js -> format.js",
+      "reapers.js -> state-store.js",
+      "reapers.js -> config.js",
+      "resource-metrics.js -> state-dir.js",
+      "resource-metrics.js -> env-flag.js",
+      "signal-guard.js -> state-dir.js",
+      "signal-guard.js -> oplog.js"
+    ],
+    "Reapers & liveness -> Stop hook & relay": [
+      "heartbeat.js -> transcript.js",
+      "host-heartbeat-sender.js -> http.js",
+      "reapers.js -> feedback.js",
+      "reapers.js -> transcript.js",
+      "reapers.js -> hook.js",
+      "reapers.js -> request-usage-flush.js"
+    ],
+    "Stop hook & relay -> Reapers & liveness": [
+      "hook.js -> heartbeat.js",
+      "request-usage-flush.js -> reapers.js"
+    ],
+    "Reapers & liveness -> Launch & harnesses": [
+      "opencode-liveness.js -> harnesses.js",
+      "reapers.js -> executors.js",
+      "reapers.js -> terminal-driver.js",
+      "reapers.js -> harnesses.js",
+      "reapers.js -> net-util.js"
+    ],
+    "Launch & harnesses -> Stop hook & relay": [
+      "opencode-runner.js -> hook.js",
+      "opencode-runner.js -> feedback.js",
+      "opencode-runner.js -> links.js",
+      "opencode-runner.js -> transcript.js",
+      "opencode-runner.js -> request-usage-flush.js"
+    ],
+    "Reapers & liveness -> Loop, poll & routing": [
+      "reapers.js -> launch-breaker.js",
+      "reapers.js -> targets.js",
+      "reapers.js -> pacing.js"
+    ],
+    "State, config & host process -> Stop hook & relay": [
+      "shutdown.js -> feedback.js"
+    ],
+    "State, config & host process -> Reapers & liveness": [
+      "shutdown.js -> signal-guard.js"
+    ]
+  }
+}
