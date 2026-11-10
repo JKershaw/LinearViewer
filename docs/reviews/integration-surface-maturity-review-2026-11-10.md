@@ -922,5 +922,8 @@ re-verified row by row; (2) a *Configuration surface, both repos* paragraph and 
 accounting* Pass 4; (3) LIN-3849 noted on `api-dispatch` and `flow-dispatch-halt`, LIN-4248/4370 on
 `mod-prompt-template-system` (a routing change inside one owner's stage path, so not a new FLOW); (4) LIN-3912 named
 in Pass 2; (5) the incident record carried forward with its follow-up states; (6) the Self-Audit records the miss and
-names a configuration behaviour pass as the missing sixth sweep. Completeness is unchanged (CHP-based); the CFG mean
+names a configuration behaviour pass as the missing sixth sweep; (7) `flow-dispatch-lifecycle` and
+`flow-dispatch-halt` CFG stay carried N/A*, which the reader questioned (LIN-3849 moved run controls from per-user
+switches to fact-derived `lib/run-controls.js`). They were not re-scored this run and are open for run 6's
+configuration pass. Completeness is unchanged (CHP-based); the CFG mean
 moves 3.59 → 3.57 and the CFG N/A count 32 → 31.
