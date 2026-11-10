@@ -3264,3 +3264,14 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **Headline:** LinearViewer is structurally unchanged since run 10. It has the same 13 reciprocal knots and the one 9-area cycle, and edges moved by ±1 to ±4. LIN-4393 improved Auth ⇄ LLM (6/4 → 5/3), and `workspace-preferences.js` went from 20 importers to 16. The look-first route added one new kind of edge (LLM → Runs, reading run history). Agent API ⇄ LLM (43/4) is now in the ledger.
   - **First simple-dispatcher baseline:** `seams.mjs` reads 0 of 52 CommonJS files there. A literal-require reader kept in the evidence folder reads all 52: 6 reciprocal pairs, two of them a guide-placement issue (`shutdown.js`).
   - **It minted nothing:** one Waiting entry (no contract row pins the leftover step's resume of a finished session), the report, and about 25k lines of evidence. Drift's baseline is still running.
+- **08:44 UTC: the Drift baseline merged** (LIN-4403, run 6, `1e106e4e3`, PR #2385; window `aec9e16be..b315e0e8f` and SD `07c88f7a..5d8489e`). **"Better in one area, neutral in the rest."**
+  - **Better:** LLM & prompts. Three decisions went to one home each: the As asked words, the leftover rule, and model facts from the catalogue.
+  - **Neutral:** runs and dispatch, the Agent API, and the rest.
+  - **New costs, LOW to LOW–MEDIUM:**
+    - the session-PR pick is mirrored across the two repos, joined only by a comment (found by the second read);
+    - `dispatch-leftover.js` restates three decisions that already have homes;
+    - note-routing wording is restated in four places;
+    - the stage-kind roster worsened (`survey-place` went from 13 occurrences to 21).
+  - **Resolved:** run 5's cross-repo contract mismatch (66 rows each, byte-identical).
+  - **It minted nothing:** the report, Waiting entries in three area notes, and about 100k lines of evidence.
+  - **The baseline for the work ahead:** Seams says structurally unchanged, Drift says better in one area and neutral elsewhere. Both readings are taken now; Drift and Seams run again at the switch.
