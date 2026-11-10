@@ -193,6 +193,7 @@ import { createTaskCreateRoutes } from './routes/task-create.js'
 import { createTaskPageRoutes } from './routes/task-page.js'
 import { createTaskPageLoader } from './lib/task-page-loader.js'
 import { createTaskShareRoutes } from './routes/task-share.js'
+import { createTaskTimelineReader, createTimelineFragmentReader } from './lib/task-timeline.js'
 import { createLibraryRouter } from './routes/library.js'
 import { TaskShareStore } from './lib/task-share-store.js'
 import { createWorkspaceRemovalRevoker } from './lib/workspace-removal-revocation.js'
@@ -3335,6 +3336,13 @@ const refreshTaskFacts = createTaskFactsRefresh({ holder: taskFacts, fetchAndPre
 const writeTaskFacts = (urlKey, fetched, opts) => taskFacts.write(urlKey, fetched, opts)
 // LIN-4168: the one per-key reset. Every seed seam calls it once per workspace it puts in the session. The holders it resets
 // (task facts among them, refilled from the new seed for LIN-4110) are registered in lib/key-state-holders.js.
+// LIN-4405: "Sessions on one clock". One reader over the task's own whole-life cost read (lib/task-cost-read.js) and
+// its close-out events; the page load calls it through the loader, and both fragment routes (owner/member and guest)
+// share one single-flight short cache over the stored-facts state read plus the same reader.
+const readTaskTimeline = createTaskTimelineReader({ dispatchQueueStore, requestUsageLoader, closeOutEventsStore })
+// The fragment cache is per workspace key, so it is registered with the per-key reset below; `taskPageLoader` is read
+// when a fragment is first asked for, after it is built.
+const timelineFragment = createTimelineFragmentReader({ loadTaskState: (args) => taskPageLoader.loadTaskState(args), readTaskTimeline })
 const keyState = createKeyState();
 registerKeyStateHolders(keyState, {
   taskFacts: { holder: taskFacts, refresh: refreshTaskFacts },
@@ -3346,8 +3354,9 @@ registerKeyStateHolders(keyState, {
   refreshOnResolveGate,
   installationTokenFor,
   workspaceKpisCache,
+  timelineFragment,
 });
-const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, taskDecisionsStore, shelvedRulingsStore, taskFacts: { read: taskFacts.read }, gatherTaskStates })
+const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, taskDecisionsStore, shelvedRulingsStore, taskFacts: { read: taskFacts.read }, gatherTaskStates, readTaskTimeline })
 // LIN-3833 / LIN-4016: Home's row states, assembled once for all three Home routes (lib/home-row-states.js): one lean
 // loop read for the workspace, grouped by task. A viewer who sees no sessions (copy-first, no `runControls`) reads
 // nothing and gets the tracker words alone. The states cover the Recent and project rows too, so a subtask that needs
@@ -3379,6 +3388,8 @@ app.use(createTaskPageRoutes({
   // LIN-4104 D2: the owner's filled run button, read once per task page load (never on the /state poll).
   taskModeStore,
   accountStore,
+  // LIN-4405: the "Sessions on one clock" fragment, shared with the guest route.
+  timelineFragment,
 }))
 
 // Mount the task share routes (LIN-3330) — the owner mint/list/revoke controls
@@ -3395,6 +3406,7 @@ app.use(createTaskShareRoutes({
   workspaceOwnerCheck,
   guestAccess: createGuestTaskAccess({ resolveWorkspaceAccess, getProviderForWorkspace }),
   getDeployInfo,
+  timelineFragment,
 }))
 
 // Mount flight-companion routes (experimental prototype for LIN-751 realtime chat — LIN-922).

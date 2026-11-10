@@ -16,6 +16,7 @@ import { createRejectedCredentialRegistry } from '../../lib/rejected-credentials
 import { createRefreshOnResolveGate } from '../../lib/refresh-on-resolve-gate.js';
 import { createInstallationTokenResolver } from '../../lib/connection-credential.js';
 import { createWorkspaceKpisCache } from '../../lib/workspace-kpis-cache.js';
+import { createTimelineFragmentReader } from '../../lib/task-timeline.js';
 import { fakeGitHub, connection, OWNER as LOOKUP_OWNER, NOW as LOOKUP_NOW } from './lin-3285-seam.js';
 import { createKeyState } from '../../lib/key-state.js';
 import { registerKeyStateHolders } from '../../lib/key-state-holders.js';
@@ -49,6 +50,12 @@ export function buildKeyStateInstances({ fetchAndPrepareProjects = async () => (
     installationTokenFor,
     // LIN-4201: the workspace KPIs page's cache, over a stub read (the real one is collectWorkspaceKpis).
     workspaceKpisCache: createWorkspaceKpisCache({ collect: async (urlKey) => ({ urlKey }), now }),
+    // LIN-4405: the timeline fragment cache, over stub reads (the real ones are the loader's state read and the timeline reader).
+    timelineFragment: createTimelineFragmentReader({
+      loadTaskState: async () => ({ model: { sessions: [] } }),
+      readTaskTimeline: async ({ identifier }) => ({ identifier, lanes: [] }),
+      now: () => new Date(now()),
+    }),
   };
 }
 

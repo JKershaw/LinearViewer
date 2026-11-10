@@ -168,6 +168,7 @@
       "question question"
       "run run"
       "stages context"
+      "timeline context"
       "pr context"
       "quiet quiet"
       "docs docs"
@@ -184,6 +185,8 @@
   .sess-page.task-page > .task-next { grid-area: run; }
   .sess-page.task-page > .task-question { grid-area: question; }
   .sess-page.task-page > .task-stages { grid-area: stages; }
+  /* LIN-4405: "Sessions on one clock" sits beneath the Stages, in both templates. */
+  .sess-page.task-page > .task-timeline { grid-area: timeline; }
   .sess-page.task-page > .task-pr-section { grid-area: pr; }
   .sess-page.task-page > .task-context-section { grid-area: context; }
   /* Neither brief nor recap yet: the quiet line is a named row after the PR, and the page gives the stages the full width
@@ -197,6 +200,7 @@
       "question question"
       "run run"
       "stages stages"
+      "timeline timeline"
       "pr pr"
       "quiet quiet"
       "docs docs"
@@ -236,3 +240,63 @@ h1 .task-ident { font-size: inherit; }
 .sess-v code { font-family: var(--font-structural); font-size: inherit; }
 .task-description .section-header { font-size: var(--font-size-lg); }
 .task-md h2, .task-md h3 { font-size: var(--font-size-lg); }
+
+/* ── Sessions on one clock (LIN-4405) ──────────────────────────────────────
+   Every position is a percentage the server computed (lib/task-timeline.js);
+   nothing here measures. Phone first: the label sits above a full-width
+   track, on the same clock as every other lane. From 600px a label column
+   sits beside each track. Working time is a solid bar; held or waiting time
+   is a thin line; unknown working times are an outline, never a bar. */
+.tl { font-family: var(--font-content); }
+.tl-summary-line { margin: 0 0 var(--space-2); font-size: var(--font-size-sm); color: var(--muted); }
+.tl-note { margin: 0 0 var(--space-1); font-size: var(--font-size-sm); color: var(--muted); }
+.tl-empty { margin: 0; }
+.tl-lanes { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.tl-lane { border-bottom: 1px solid var(--line-soft); }
+.tl-summary,
+.tl-axis { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; align-items: center; }
+.tl-summary { cursor: pointer; list-style: none; padding: var(--space-1) 0; }
+.tl-summary::-webkit-details-marker { display: none; }
+.tl-summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.tl-label { display: flex; flex-direction: column; min-width: 0; }
+.tl-name { font-size: var(--font-size-sm); font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.tl-name::before { content: '▸ '; color: var(--muted); font-weight: 400; }
+.tl-details[open] .tl-name::before { content: '▾ '; }
+.tl-meta { font-size: var(--font-size-sm); line-height: 1.4; color: var(--muted); overflow-wrap: anywhere; }
+.tl-track { position: relative; display: block; height: 1.25rem; min-width: 0; }
+.tl-track > span { position: absolute; display: block; }
+.tl-break { top: 0; bottom: 0; background: repeating-linear-gradient(135deg, transparent 0 3px, var(--line-soft) 3px 5px); }
+.tl-line { top: 50%; height: 2px; margin-top: -1px; background: var(--slate); opacity: 0.7; }
+.tl-line--unknown { top: 20%; height: 60%; margin-top: 0; background: transparent; border: 1px dashed var(--slate); opacity: 1; }
+.tl-seg { top: 20%; height: 60%; background: var(--brand); border-radius: 2px; }
+.tl-tick { top: 0; height: 100%; width: 2px; margin-left: -1px; background: var(--amber); }
+.tl-tick--bare { background: var(--slate); }
+.tl-merge { top: -2px; bottom: -2px; width: 0; border-left: 2px solid var(--green); }
+.tl-clip { top: 50%; width: 0; height: 0; margin-top: -4px; border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+.tl-clip--start { border-right: 6px solid var(--slate); margin-left: -6px; }
+.tl-clip--end { border-left: 6px solid var(--slate); }
+.tl-open-end { top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--brand); }
+.tl-body { padding: 0 0 var(--space-2) var(--space-3); }
+.tl-dispatches { margin: 0; padding: 0 0 0 var(--space-2); font-size: var(--font-size-sm); line-height: 1.5; color: var(--muted); }
+.tl-dispatch { overflow-wrap: anywhere; }
+.tl-axis { margin: 0 0 var(--space-1); }
+.tl-axis-pad { display: none; }
+.tl-axis-track { position: relative; display: block; height: 2.6rem; font-size: var(--font-size-sm); color: var(--muted); }
+.tl-axis-start { position: absolute; left: 0; top: 0; white-space: nowrap; }
+.tl-axis-end { position: absolute; right: 0; top: 1.3rem; white-space: nowrap; }
+.tl-axis-break { position: absolute; top: 0; white-space: nowrap; display: flex; justify-content: center; }
+.tl-axis-merge { position: absolute; bottom: 0; height: 0.4rem; width: 0; border-left: 2px solid var(--green); }
+.tl-legend { margin: var(--space-2) 0 0; font-size: var(--font-size-sm); color: var(--muted); display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; align-items: center; }
+.tl-legend-item { white-space: nowrap; }
+.tl-key { display: inline-block; vertical-align: middle; margin-right: 0.3rem; }
+.tl-key--seg { width: 14px; height: 8px; background: var(--brand); border-radius: 2px; }
+.tl-key--line { width: 14px; height: 2px; background: var(--slate); }
+.tl-key--tick { width: 2px; height: 10px; background: var(--amber); }
+.tl-key--merge { width: 0; height: 10px; border-left: 2px solid var(--green); }
+@media (min-width: 600px) {
+  .tl-summary,
+  .tl-axis { grid-template-columns: minmax(11rem, 17rem) minmax(0, 1fr); gap: var(--space-2); }
+  .tl-axis-pad { display: block; }
+  .tl-axis-track { height: 1.3rem; }
+  .tl-axis-end { top: 0; }
+}

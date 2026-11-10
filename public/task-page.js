@@ -12,8 +12,13 @@
  * polling — the state endpoint can't see the tracker, so it could never repaint
  * a done header truthfully (LIN-3324 Decisions: poll rule).
  *
- * The poll only ever requests the state URL. Owner-only behaviour starts from
- * owner-only DOM hooks: the brief/recap widgets mount from the
+ * The poll only ever requests the state URL. A second kind of request exists
+ * (LIN-4405): the "Sessions on one clock" fragment (`data-timeline-url` on its
+ * section), re-read by `createTimelineRefresher` when a poll's `trackHtml`
+ * changes or every 60 s while a lane runs, never more than once per 60 s
+ * window, and never once the poll stops (hidden tab, 401, revoked link). Done is
+ * the one exception: it reads once more, past the window, then stops (`finish`).
+ * Owner-only behaviour starts from owner-only DOM hooks: the brief/recap widgets mount from the
  * `task-page-owner-widgets` marker, and the close-out box (public/close-out.js)
  * is its own owner fragment. A guest loads the same scripts and they no-op.
  *
@@ -44,6 +49,8 @@
   // held set that never fills costs a bounded burst, then the normal cadence.
   var INCOMPLETE_LIMIT = 15;
   var OPEN_CLASS = 'sess-run--expanded';
+  // LIN-4405: the timeline fragment is read at most once per window, and every window while a lane runs.
+  var TIMELINE_WINDOW_MS = 60000;
 
   /**
    * The next poll delay, or null for "don't schedule one". Pure.
@@ -68,7 +75,8 @@
   }
 
   /**
-   * The poll loop. Every request it makes is `fetchJson(stateUrl)`.
+   * The poll loop. Every request it makes is `fetchJson(stateUrl)`; the timeline fragment is the page's one other
+   * request, and `createTimelineRefresher` makes it, not this loop (LIN-4405).
    *
    * @param {Object} o
    * @param {string} o.stateUrl
@@ -143,7 +151,107 @@
       poll: poll,
       onVisibilityChange: onVisibilityChange,
       stop: function () { stopped = true; clearTimer(timer); timer = null; },
+      isStopped: function () { return stopped; },
       state: function () { return { current: current, failures: failures, timer: timer, inFlight: inFlight }; }
+    };
+  }
+
+  /**
+   * The "Sessions on one clock" refresher (LIN-4405). It asks for the fragment when the poll's `trackHtml` changes
+   * (`noteTrack`; the first value only seeds it, since the page load drew the same history) and, while the painted
+   * timeline has a running lane (`isRunning`), once per window. Every reason is coalesced: at most one fetch per
+   * `TIMELINE_WINDOW_MS`, a reason inside the window becomes one trailing fetch at its end, and nothing overlaps.
+   * `pause` (hidden tab) and `stop` (401, revoked) clear the timer; `resume` asks once if a lane runs. `finish` (the
+   * first done) is the one exception to the window: the poll that says done usually carries the track change of the
+   * last session ending, so it reads once now, paints it, then stops, and no lane is left painted running.
+   *
+   * @param {Object} o
+   * @param {string} o.url
+   * @param {Function} o.fetchJson - (url) → Promise<{timelineHtml: string}>
+   * @param {Function} o.apply - (html) → void
+   * @param {Function} o.isRunning - () → boolean, read from the painted timeline
+   * @param {Function} [o.now] - () → ms
+   * @param {Function} [o.setTimer]
+   * @param {Function} [o.clearTimer]
+   */
+  function createTimelineRefresher(o) {
+    var setTimer = o.setTimer || function (fn, ms) { return setTimeout(fn, ms); };
+    var clearTimer = o.clearTimer || function (id) { clearTimeout(id); };
+    var now = o.now || function () { return Date.now(); };
+    var lastFetchAt = null;
+    var lastTrack = null;
+    var seeded = false;
+    var inFlight = false;
+    var wanted = false;
+    var stopped = false;
+    var paused = false;
+    var finishing = false;
+    var finalPending = false;
+    var timer = null;
+
+    function arm(delay) {
+      clearTimer(timer);
+      timer = setTimer(function () { timer = null; fetchNow(); }, Math.max(0, delay));
+    }
+
+    function request() {
+      if (stopped || paused) return;
+      wanted = true;
+      if (inFlight || timer !== null) return;
+      var wait = lastFetchAt === null ? 0 : lastFetchAt + TIMELINE_WINDOW_MS - now();
+      if (wait <= 0) fetchNow(); else arm(wait);
+    }
+
+    function fetchNow() {
+      if (stopped || paused || inFlight) return Promise.resolve();
+      inFlight = true;
+      wanted = false;
+      lastFetchAt = now();
+      return Promise.resolve()
+        .then(function () { return o.fetchJson(o.url); })
+        .then(function (body) {
+          if (!stopped && body && typeof body.timelineHtml === 'string') o.apply(body.timelineHtml);
+        }, function (err) {
+          // Signed out, or a revoked guest link: stop for good, as the poll does.
+          if (err && (err.status === 401 || err.status === 404)) stopped = true;
+        })
+        .then(function () {
+          inFlight = false;
+          if (finishing) {
+            // A read already in flight when done arrived may predate it: read once more, then stop for good.
+            if (finalPending && !stopped) { finalPending = false; return fetchNow(); }
+            stopped = true;
+            return;
+          }
+          if (stopped || paused) return;
+          if (wanted || o.isRunning()) arm(TIMELINE_WINDOW_MS);
+        });
+    }
+
+    return {
+      noteTrack: function (trackHtml) {
+        if (typeof trackHtml !== 'string') return;
+        if (!seeded) { seeded = true; lastTrack = trackHtml; return; }
+        if (trackHtml === lastTrack) return;
+        lastTrack = trackHtml;
+        request();
+      },
+      // The page loaded with a running lane: re-read one window after the load.
+      start: function () { if (!stopped && o.isRunning()) { lastFetchAt = now(); arm(TIMELINE_WINDOW_MS); } },
+      request: request,
+      pause: function () { paused = true; clearTimer(timer); timer = null; },
+      resume: function () { if (stopped) return; paused = false; if (o.isRunning()) request(); },
+      stop: function () { stopped = true; clearTimer(timer); timer = null; },
+      finish: function () {
+        if (stopped || finishing) return Promise.resolve();
+        finishing = true;
+        paused = false;
+        clearTimer(timer);
+        timer = null;
+        if (inFlight) { finalPending = true; return Promise.resolve(); }
+        return fetchNow();
+      },
+      state: function () { return { timer: timer, inFlight: inFlight, stopped: stopped, paused: paused, lastFetchAt: lastFetchAt }; }
     };
   }
 
@@ -598,6 +706,10 @@
     var contextMount = doc.querySelector('[data-testid="task-page-context-mount"]');
     var rows = function () { return trackMount ? trackMount.querySelectorAll('.task-step') : []; };
     var memory = createOpenMemory(rows());
+    // LIN-4405: "Sessions on one clock", a direct child of the page (so a copy in ticket text is never it), captured here
+    // before any Markdown renders.
+    var timelineSection = doc.querySelector('[data-testid="task-page"] > [data-testid="task-timeline"][data-timeline-url]');
+    var timelineMount = timelineSection ? timelineSection.querySelector(':scope > [data-testid="task-timeline-mount"]') : null;
 
     // LIN-3385: wire every Harbour control BEFORE the first markdown render
     // (`enhanceContextMarkdown` below is the first). Ticket-derived markdown
@@ -701,7 +813,41 @@
       }
     }
 
+    // LIN-4405: the timeline section repaints from its own fragment (built by the server, positions included). An
+    // opened lane stays open across a repaint, keyed by its `data-lane-id`. The section was captured before any
+    // Markdown rendered (LIN-3385).
+    var timeline = null;
+    if (timelineSection && timelineMount) {
+      timeline = createTimelineRefresher({
+        url: timelineSection.getAttribute('data-timeline-url'),
+        fetchJson: function (url) { return window.api(url, { on401: false }); },
+        isRunning: function () { return !!timelineMount.querySelector('[data-testid="task-timeline-lane"][data-state="running"]'); },
+        apply: function (html) {
+          var opened = [];
+          var lanes = timelineMount.querySelectorAll('[data-testid="task-timeline-lane"]');
+          for (var i = 0; i < lanes.length; i++) {
+            var details = lanes[i].querySelector('details');
+            if (details && details.open) opened.push(lanes[i].getAttribute('data-lane-id'));
+          }
+          timelineMount.innerHTML = html;
+          if (typeof window.initLocalTimes === 'function') window.initLocalTimes(timelineMount);
+          var fresh = timelineMount.querySelectorAll('[data-testid="task-timeline-lane"]');
+          for (var j = 0; j < fresh.length; j++) {
+            if (opened.indexOf(fresh[j].getAttribute('data-lane-id')) === -1) continue;
+            var open = fresh[j].querySelector('details');
+            if (open) open.open = true;
+          }
+        }
+      });
+    }
+
     function apply(state) {
+      // LIN-4405: a changed track (a session started, ended or moved on) asks for the timeline; the refresher coalesces.
+      if (timeline) {
+        // The first done reads the last change once, past the window, then stops (`finish`).
+        if (state.status === 'done') timeline.finish();
+        else timeline.noteTrack(state.trackHtml);
+      }
       // LIN-4070: an incomplete read carries no state (the server is still gathering it). The page keeps what it painted,
       // the poll goes on, and the next complete reply replaces it.
       if (state.incomplete) {
@@ -756,12 +902,24 @@
         onGone: goneHandlerFor(main.getAttribute('data-state-url'), main)
       });
       poller.start();
-      doc.addEventListener('visibilitychange', function () { poller.onVisibilityChange(doc.hidden); });
+      if (timeline) timeline.start();
+      doc.addEventListener('visibilitychange', function () {
+        poller.onVisibilityChange(doc.hidden);
+        // LIN-4405: the timeline timer stops with the poll: paused while the tab is hidden, and for good once the poll
+        // has stopped (a 401 or a revoked link).
+        if (!timeline) return;
+        if (poller.isStopped()) timeline.stop();
+        else if (doc.hidden) timeline.pause();
+        else timeline.resume();
+      });
+    } else if (timeline) {
+      // A page that loaded done never polls, so its timeline is never re-read.
+      timeline.stop();
     }
 
     tickClocks(main);
     setInterval(function () { tickClocks(main); }, TICK_MS);
-    return { poller: poller, memory: memory, apply: apply };
+    return { poller: poller, memory: memory, apply: apply, timeline: timeline };
   }
 
   if (typeof document !== 'undefined' && document.addEventListener) {
@@ -775,6 +933,8 @@
       pollDelay: pollDelay,
       cadenceStatus: cadenceStatus,
       createPoller: createPoller,
+      createTimelineRefresher: createTimelineRefresher,
+      TIMELINE_WINDOW_MS: TIMELINE_WINDOW_MS,
       createOpenMemory: createOpenMemory,
       rememberToggle: rememberToggle,
       applyOpenMemory: applyOpenMemory,

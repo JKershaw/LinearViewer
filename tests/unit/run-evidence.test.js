@@ -85,6 +85,19 @@ describe('run-evidence: state derivation', () => {
     assert.equal(m.evidence.checked.now.state, 'passing');
   });
 
+  test('LIN-4405: the PR carries GitHub\'s merged_at as mergedAt (additive; null when unset or unread)', () => {
+    const merged = buildRunEvidence({
+      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')],
+      prStatus: { ...oneOpen, state: 'closed', merged: true, merged_at: '2026-07-02T10:00:00Z' },
+    });
+    assert.equal(merged.state.status, 'merged');
+    assert.equal(merged.state.pr.mergedAt, '2026-07-02T10:00:00Z');
+    const open = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: oneOpen });
+    assert.equal(open.state.pr.mergedAt, null);
+    const unread = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: { readable: false } });
+    assert.equal(unread.state.pr.mergedAt, null);
+  });
+
   test('more than one PR URL → multiple-prs, with the plan wording', () => {
     const m = buildRunEvidence({
       issueIdentifier: 'LIN-1',

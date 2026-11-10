@@ -11,6 +11,12 @@
  *   GET /t/:token        — the guest task page (owner page, controls hidden)
  *   GET /t/:token/state  — held-facts repaint, the owner endpoint's JSON without the owner fields (LIN-4070 B2:
  *                          it reads the holder only; it is built with no refresh function and starts no fetch)
+ *   GET /t/:token/timeline — the "Sessions on one clock" fragment without dollars (LIN-4405)
+ *
+ * Spend (LIN-4405, John's ruling on LIN-4395: "Owner and members see spend; guests see the picture without
+ * dollars"). This is the one place a guest response takes something OUT of the model rather than leaving a fragment
+ * out: the page and the timeline fragment both pass the timeline through `withoutSpend` (lib/task-timeline.js), which
+ * returns a copy, so the cached page result is never changed. `/t/:token/state` carries no timeline at all.
  *
  * Refusal contract (the plan's request matrix): a malformed token 404s BEFORE
  * any store read; unknown, revoked, owner-changed and (for the page) a
@@ -19,8 +25,8 @@
  * Revoked is deliberately indistinguishable from never-issued. There is no
  * stored-only fallback and no rate limit (John's rulings).
  *
- * Render-time masking (LIN-3389): the page and the three HTML fields of
- * `/state` pass through `maskSecretsInHtml` (existing secret-scan rules, over
+ * Render-time masking (LIN-3389): the page, the HTML fields of `/state` and the
+ * timeline fragment (LIN-4405) pass through `maskSecretsInHtml` (existing secret-scan rules, over
  * entity-decoded text) at the response boundary. A hit is MASKED and served,
  * never refused; the log carries rule ids and an 8-hex token-hash prefix only.
  * A masker throw fails closed with the usual 503. LIN-3261 still owns the
@@ -30,6 +36,8 @@
  * `(urlKey, issueIdentifier, source)`, with single-flight so concurrent guests
  * share one tracker read. Failures are never cached, and it sits after every
  * auth check, so a revoke or an owner change takes effect on the next request.
+ * The timeline fragment does not use it: it reads through the shared timeline cache (`timelineFragment`,
+ * lib/task-timeline.js), which holds stored facts only and is also behind every auth check.
  */
 
 import { Router } from 'express';
@@ -41,6 +49,8 @@ import { maskSecretsInHtml } from '../lib/mask-secrets-in-html.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
 import { readOwnerSeamStatus } from '../lib/workspace-owner.js';
 import { pageStatusOf } from '../lib/task-state.js';
+import { withoutSpend } from '../lib/task-timeline.js';
+import { renderTaskTimeline } from '../lib/render-task-timeline.js';
 import {
   renderTaskPage,
   renderTaskStatus,
@@ -97,6 +107,8 @@ function unavailablePage(res) {
  * @param {Function} [deps.getDeployInfo]
  * @param {Function} [deps.now]
  * @param {(html: string) => {html: string, hits: string[]}} [deps.maskHtml]
+ * @param {{read: Function}|null} [deps.timelineFragment] - lib/task-timeline.js `createTimelineFragmentReader`, shared
+ *   with the owner route (LIN-4405); without it the guest page's section has no fragment URL and the endpoint 404s
  * @returns {import('express').Router}
  */
 export function createTaskShareRoutes({
@@ -108,6 +120,7 @@ export function createTaskShareRoutes({
   getDeployInfo = () => ({}),
   now = () => new Date(),
   maskHtml = maskSecretsInHtml,
+  timelineFragment = null,
 } = {}) {
   if (!taskShareStore) throw new Error('task-share routes: taskShareStore is required');
   if (!loader) throw new Error('task-share routes: loader is required');
@@ -219,7 +232,8 @@ export function createTaskShareRoutes({
     if (result.notFound) return notFound(res);
     if (result.unavailable) return unavailablePage(res);
 
-    const { model } = result;
+    // LIN-4405: the guest sees the timeline without dollars. `withoutSpend` copies; the cached result is never changed.
+    const model = result.model.timeline === undefined ? result.model : { ...result.model, timeline: withoutSpend(result.model.timeline) };
     let body;
     try {
       body = maskFragment(record, 'page', renderTaskPage(model, {
@@ -229,6 +243,7 @@ export function createTaskShareRoutes({
         urlKey: record.urlKey,
         binding: { source: record.source },
         stateUrl: `/t/${encodeURIComponent(token)}/state`,
+        timelineUrl: timelineFragment ? `/t/${encodeURIComponent(token)}/timeline` : '',
         now: now(),
         pageOptions: { deployInfo: getDeployInfo(), workspaces: [], featureFlags: {}, openRouterSource: null },
       }));
@@ -273,6 +288,25 @@ export function createTaskShareRoutes({
       return res.json(body);
     } catch (error) {
       console.error('Task share state error:', error.message);
+      return jsonError(res, 503, UNAVAILABLE_MESSAGE);
+    }
+  });
+
+  // LIN-4405: the timeline fragment for a guest. The same token checks as the page, then the shared single-flight
+  // timeline cache (stored facts only: the open sessions from `loadTaskState` and the task's own cost read; no tracker
+  // and no GitHub call, so the page's 5-second tracker cache is not used here), then `withoutSpend`, then the mask.
+  router.get('/t/:token/timeline', async (req, res) => {
+    const { token } = req.params;
+    const scoped = await resolveScopedRecord(token);
+    if (scoped.kind === 'malformed' || scoped.kind === 'notfound' || !timelineFragment) return jsonError(res, 404, 'Not found');
+    if (scoped.kind === 'unavailable') return jsonError(res, 503, UNAVAILABLE_MESSAGE);
+    const { record } = scoped;
+    try {
+      const timeline = await timelineFragment.read({ urlKey: record.urlKey, identifier: record.issueIdentifier, issueId: record.issueId });
+      res.set('Cache-Control', 'no-store');
+      return res.json({ timelineHtml: maskFragment(record, 'timeline', renderTaskTimeline(withoutSpend(timeline))) });
+    } catch (error) {
+      console.error('Task share timeline error:', error.message);
       return jsonError(res, 503, UNAVAILABLE_MESSAGE);
     }
   });
