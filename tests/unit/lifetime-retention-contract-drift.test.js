@@ -160,10 +160,12 @@ describe('lifetime-retention stale-language reconciliation (LIN-3163 Finding 1)'
     assert.match(READ_HORIZON, /retained for the life of the project/);
   });
 
-  test('the passage-runner prompt calls the /cost gap a 30-day read window, not retention', () => {
-    assert.doesNotMatch(PASSAGE_PROMPT, /30-day app-call retention window/,
-      '/cost reads a fixed 30-day horizon; app-call evidence is lifetime-retained');
-    assert.match(PASSAGE_PROMPT, /30-day app-call read window/);
+  test('the passage-runner prompt names no 30-day /cost window: the read covers the task\'s whole life (LIN-4404)', () => {
+    // Was (LIN-3161): "a 30-day read window, not retention". Since LIN-4404 /cost reads a task's whole life (the
+    // task-life rule, lib/read-horizon.js), so neither a retention window nor a read window is a coverage gap to report.
+    assert.doesNotMatch(PASSAGE_PROMPT, /30-day app-call (retention|read) window/,
+      '/cost reads the task\'s whole life; app-call evidence is lifetime-retained');
+    assert.match(PASSAGE_PROMPT, /each read covers the task's whole\s+life/);
   });
 
   test('the published /kpis workspace basis names the 30-day read window, not retention', () => {

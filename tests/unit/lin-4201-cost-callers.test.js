@@ -192,6 +192,8 @@ export const REQUIRED_ARG = {
   computeEffortReadout: 'requestSource', collectKpiStats: 'requestSource',
   computeTerminalMarkedTaskCost: 'costLineages', terminalMarkedTaskCostDetail: 'costLineages',
   collectWorkspaceKpis: 'requestUsageLoader', readModelsHistory: 'requestUsageLoader',
+  // LIN-4404: the task's own read (lib/task-cost-read.js), lifted out of the /cost route; its callers hand it the loader.
+  readTaskCost: 'requestUsageLoader',
 };
 // `lineageFigureOf` is the synchronous per-lineage figure over records its caller passes (LIN-4226, plan-review note 1):
 // it loads nothing, so it is not a required-source entry and is not in this table.
@@ -299,7 +301,7 @@ describe('census: every production call passes the records (LIN-4201)', () => {
       }
     }
     for (const site of [
-      'routes/proxy-compute.js#readCost', 'lib/model-routing-history.js#readCost', 'lib/effort-readout.js#readCost',
+      'lib/task-cost-read.js#readCost', 'routes/proxy-compute.js#readTaskCost', 'lib/model-routing-history.js#readCost', 'lib/effort-readout.js#readCost',
       'lib/kpi-stats.js#lineageRecords', 'lib/workspace-kpi-stats.js#lineageRecords',
       'routes/dashboard.js#buildRunView', 'lib/run-paragraph-hook.js#buildView',
       'routes/settings.js#readModelsHistory', 'routes/dispatch.js#readModelsHistory', 'routes/dashboard-effort.js#computeEffortReadout',

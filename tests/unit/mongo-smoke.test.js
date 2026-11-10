@@ -36,7 +36,7 @@ import { AccountStore } from '../../lib/account-store.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
 import { ObserverStateStore } from '../../lib/observer-state-store.js';
-import { LINEAGE_QUERY_LIMIT } from '../../routes/proxy.js';
+import { LINEAGE_QUERY_LIMIT } from '../../lib/task-cost-read.js';
 import { establishAccount } from '../../lib/account-session.js';
 import { MagicLinkStore } from '../../lib/email-auth.js';
 import { __internal as pipelineInternal } from '../../lib/pipeline-loops.js';
@@ -973,7 +973,8 @@ describe(
 
     // --- LIN-1470 (review ledger L2): the lineage `$in` query's real plan ---
     //
-    // The list endpoint's lineage join issues, via listHistory:
+    // The task cost read's sibling query (lib/task-cost-read.js since LIN-4404; first the list endpoint's lineage
+    // join) issues, via listHistory:
     //   find({urlKey, rootItemId: {$in: anchors}}, {projection: {prompt: 0}})
     //     .sort({resolvedAt: -1}).skip(0).limit(LINEAGE_QUERY_LIMIT)
     // The review flagged that {urlKey, rootItemId} covers the PREDICATE but not
@@ -981,8 +982,8 @@ describe(
     // 32MB sort-memory limit erroring". Only real Mongo can answer that —
     // MangoDB has no query planner and no explain() — so it is answered here.
 
-    // The exact query routes/proxy.js issues, with the cap imported from the
-    // route module itself (LIN-1494 F2 tidy — no hand-mirrored constant).
+    // The exact query the read issues, with the cap imported from its owner
+    // (LIN-1494 F2 tidy — no hand-mirrored constant; LIN-4404 moved it).
     const lineageCursor = (collection, anchors) =>
       collection
         .find({ urlKey: 'acme', rootItemId: { $in: anchors } }, { projection: { prompt: 0 } })

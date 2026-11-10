@@ -1,5 +1,5 @@
 {
-  "note": "LIN-4177: the change list. Each entry names one intended difference from the baseline goldens: a=cap (LIN-4148), b=horizon straddler credited to its true issue, c=true base kind, d=incomplete lineages show no figure. LIN-4178 adds the KPI path and run page: d also reaches S11, S12 and S13 (the same narrow incomplete rule, and the S12/S13 display fixes). Anything else that differs is a defect (W9). The workerSessions[].dispatchedAt decision is option (ii): the fetched earliest member's time is kept (no entry: no replay line moves). The S11 baseline was re-recorded at 9e397e6b over the horizon-filtered rows /kpis actually reads (LIN-4178): the first golden was recorded on unfiltered rows. LIN-4179 adds the calls population: S2 and S3 stop counting a null call cost as $0 (d): the priced sum keeps its value ($0.33), and the unpriced count (2) and the withheld total (totalUsd null) say so. S4 is value-identical (no entry: the scan estimate is S7's scan typicalUsd, shaped as before). S1's appCalls wire, S7, and every other surface are unchanged by LIN-4179.",
+  "note": "LIN-4177: the change list. Each entry names one intended difference from the baseline goldens: a=cap (LIN-4148), b=horizon straddler credited to its true issue, c=true base kind, d=incomplete lineages show no figure. LIN-4178 adds the KPI path and run page: d also reaches S11, S12 and S13 (the same narrow incomplete rule, and the S12/S13 display fixes). Anything else that differs is a defect (W9). The workerSessions[].dispatchedAt decision is option (ii): the fetched earliest member's time is kept (no entry: no replay line moves). The S11 baseline was re-recorded at 9e397e6b over the horizon-filtered rows /kpis actually reads (LIN-4178): the first golden was recorded on unfiltered rows. LIN-4179 adds the calls population: S2 and S3 stop counting a null call cost as $0 (d): the priced sum keeps its value ($0.33), and the unpriced count (2) and the withheld total (totalUsd null) say so. S4 is value-identical (no entry: the scan estimate is S7's scan typicalUsd, shaped as before). S1's appCalls wire, S7, and every other surface are unchanged by LIN-4179. LIN-4404 adds g=task-life (/cost/:identifier reads a task's whole life, not the 30-day window; lib/read-horizon.js): S1's window reads { days: null, appCallsSince: null, scope: 'task-life' }; the horizon straddlers (corpus cases 4, 7, 16, 17) read their founders, older than 30 days, so each session's dispatchedAt is its founder's and LIN-8's opencode lineage is complete and priced (1.1, not withheld); LIN-42's 60-day-old call (c5, $0.90) joins its appCalls and totalUsd. Entries a, b and d below whose value moved say so. The over-cap fillers (cases 20-21) sit inside 30 days and do not move. S2 to S13 (the reporting windows) do not move. goldens.json stays the 9e397e6b baseline: re-recording it would erase this ledger.",
   "changes": [
     {
       "path": "S1.LIN-99.body.workerSessions.P",
@@ -9,7 +9,7 @@
     {
       "path": "S1.LIN-42.body.workerSessions.st",
       "change": "b",
-      "reason": "Horizon straddler (LIN-4148): st's founder is on LIN-42 and is older than the window; the in-window follow-up is on LIN-99. st is credited to LIN-42."
+      "reason": "Horizon straddler (LIN-4148): st's founder is on LIN-42 and is older than the window; the in-window follow-up is on LIN-99. st is credited to LIN-42. LIN-4404 (g): its founder (40 days old) is now fetched, so the session's dispatchedAt is the founder's, not the in-window follow-up's."
     },
     {
       "path": "S1.LIN-99.body.workerSessions.st",
@@ -19,12 +19,12 @@
     {
       "path": "S1.LIN-42.body.pricedUsd",
       "change": "a/b",
-      "reason": "LIN-42 gains st's 4.00 (b)."
+      "reason": "LIN-42 gains st's 4.00 (b). LIN-4404 (g): unchanged by the task-life read (51.02); st's founder is now fetched, but the lineage's last running total (4.00) is still the one counted."
     },
     {
       "path": "S1.LIN-42.body.totalUsd",
       "change": "a/b",
-      "reason": "As pricedUsd: LIN-42's total gains st's 4.00 (b)."
+      "reason": "As pricedUsd: LIN-42's total gains st's 4.00 (b). LIN-4404 (g): also gains call c5 ($0.90, 60 days old), now inside the task-life read: 51.92."
     },
     {
       "path": "S1.LIN-99.body.pricedUsd",
@@ -39,17 +39,17 @@
     {
       "path": "S1.LIN-8.body.pricedUsd",
       "change": "d",
-      "reason": "LIN-8's opencode founder is older than the window and dropped; the in-window opencode delta alone was a silent partial. It is now incomplete, so it is not priced."
+      "reason": "LIN-8's opencode founder is older than the window and dropped; the in-window opencode delta alone was a silent partial. It is now incomplete, so it is not priced. LIN-4404 (g): the founder is now fetched (the task-life read), so the lineage is complete and is priced at its whole-life 1.10 (the 0.70 founder delta + the 0.40 in-window delta). Neither the old partial 0.40 nor withheld."
     },
     {
       "path": "S1.LIN-8.body.totalUsd",
       "change": "d",
-      "reason": "Incomplete: null, not the partial 0.40."
+      "reason": "Incomplete: null, not the partial 0.40. LIN-4404 (g): complete, so 1.10 (see pricedUsd)."
     },
     {
       "path": "S1.LIN-8.body.workerSessions.so.costUsd",
       "change": "d",
-      "reason": "The incomplete lineage shows no figure."
+      "reason": "The incomplete lineage shows no figure. LIN-4404 (g): complete, so it shows its whole-life 1.10."
     },
     {
       "path": "S5.jobs.implementation",
@@ -200,6 +200,31 @@
       "pattern": "^S1\\.[^.]+\\.body\\.workerSessions\\.[^.]+\\.(tokens|byModel|dispatches)(\\.|$)",
       "change": "f",
       "reason": "LIN-4263 (additive only): every workerSessions row gains tokens, byModel (records lineages) and dispatches (records lineages, /cost only), placed after durationMs. The pattern names exactly those keys; no figure path is covered by it, and the figure pins (costUsd, pricedUsd, totalUsd, labels) are unchanged."
+    },
+    {
+      "pattern": "^S1\\.[^.]+\\.body\\.window\\.(days|appCallsSince|scope)$",
+      "change": "g",
+      "reason": "LIN-4404 (task-life): every S1 body's window moves from { days: 30, appCallsSince: <30 days before the clock> } to { days: null, appCallsSince: null, scope: 'task-life' }. scope is the added key, placed last. The pattern names exactly those three keys."
+    },
+    {
+      "path": "S1.LIN-8.body.workerSessions.so.dispatchedAt",
+      "change": "g",
+      "reason": "LIN-4404 (task-life): so's founder (38 days old, corpus case 7) is now fetched, so the session's dispatchedAt is the founder's (plan decision (ii): the fetched earliest member's)."
+    },
+    {
+      "path": "S1.LIN-17.body.workerSessions.nss.dispatchedAt",
+      "change": "g",
+      "reason": "LIN-4404 (task-life): nss's founder (45 days old, corpus case 16) is now fetched; the session's dispatchedAt is the founder's. Still no usage, so no figure."
+    },
+    {
+      "path": "S1.LIN-18.body.workerSessions.cg.dispatchedAt",
+      "change": "g",
+      "reason": "LIN-4404 (task-life): cg's founder (50 days old, corpus case 17) is now fetched; the session's dispatchedAt is the founder's. Its figure (the counted running total, 1.20) is unchanged."
+    },
+    {
+      "path": "S1.LIN-42.body.appCalls",
+      "change": "g",
+      "reason": "LIN-4404 (task-life): the call-log read takes the task-life bound, so LIN-42's call c5 (proxy-x, $0.90, 60 days old) is counted: calls 0 to 1, costUsd 0 to 0.90, one proxy-x feature row."
     }
   ]
 }

@@ -8,9 +8,8 @@
  */
 import { Router } from 'express';
 import { graphqlErrorExtra, graphqlErrorDetail } from '../lib/proxy-graphql-errors.js';
-import { readCost, appCallsOf } from '../lib/cost-read.js';
-import { requireRequestUsageLoader } from '../lib/request-usage-loader.js';
-import { anchorOf, isMember } from '../lib/lineage-membership.js';
+import { appCallsOf } from '../lib/cost-read.js';
+import { readTaskCost } from '../lib/task-cost-read.js';
 import { resolveChatCredential, isAiUnavailable } from '../lib/chat-request.js';
 import { resolveRecommendation } from '../lib/recommend-recurse.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
@@ -27,7 +26,7 @@ import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, deriveDispatchKind } from '../lib/prompt-templates.js';
 import { getPeriodicals } from '../lib/periodicals.js';
 import { foldPeriodicalRuns, DEFAULT_HORIZON_MS } from '../lib/periodical-runs.js';
-import { READ_HORIZON_MS, READ_HORIZON_DAYS, readHorizonStart } from '../lib/read-horizon.js';
+import { READ_HORIZON_MS, TASK_LIFE_SCOPE, taskLifeStart } from '../lib/read-horizon.js';
 import { PERIODICAL_PROJECTION, PERIODICAL_HISTORY_PROJECTION } from '../lib/dispatch-store.js';
 import { buildPromptFilename } from '../lib/prompt-formatters.js';
 import { armKeepalive, clientGoneSignal } from '../lib/http-keepalive.js';
@@ -67,7 +66,7 @@ import { badRequest, jsonError, keepaliveError, notFound } from '../lib/errors.j
  * @param {Function} deps.recommendErrorResponse - Maps a recommendation error to {status, body} (closure-local; relocated in routes/proxy.js by G1, shared with group I)
  * @param {Function} deps.resolvePromptIssueContext - Resolves the issue + prompt context for deterministic, server-side prompt generation (module-scope, shared with groups H/I)
  * @param {Function} deps.withTimeout - Races a promise against a timeout (module-scope, shared with group I)
- * @param {number} deps.LINEAGE_QUERY_LIMIT - Cap on lineage-history rows read for the north-star endpoint (module-scope)
+ * @param {number} deps.LINEAGE_QUERY_LIMIT - Cap on the task cost read's lineage-sibling rows (`/cost`, lib/task-cost-read.js; tests inject a smaller one)
  * @param {number} deps.RECOMMEND_DESCENT_BUDGET_MS - Shared cross-hop budget for the recommend recursion (module-scope)
  * @param {number} deps.LLM_TIMEOUT_MS - Budget for the OpenRouter LLM generation leg (module-scope)
  * @param {Function} deps.getTestMockData - Lazy-loads test fixtures in test mode (module-scope, shared with groups H/I)
@@ -650,14 +649,21 @@ export function createComputeRoutes({
    * into the anchor's single cumulative total, or that lineage would be
    * undercounted here. `readCost` (lib/cost-read.js) does the actual
    * lineage-group/merge/sum join, and reports only the lineages that count
-   * under `:identifier` (lib/lineage-membership.js, LIN-4147); this route only
-   * fetches its inputs.
+   * under `:identifier` (lib/lineage-membership.js, LIN-4147). The fetch of its
+   * inputs is lib/task-cost-read.js `readTaskCost` (LIN-4404); this route
+   * validates, reads the issue's Harbour calls, and shapes the wire.
+   *
+   * LIN-4404 (task-life rule, lib/read-horizon.js): the read covers the task's
+   * whole life, not the 30-day reporting window, so `totalUsd` for a task older
+   * than a month is its whole-life figure. `window` says so:
+   * `{ days: null, appCallsSince: null, scope: 'task-life' }`.
    *
    * LIN-4263: each `workerSessions` row stays one row per lineage, and gains
    * `tokens`, `byModel` (records lineages only) and `dispatches`: one entry per
    * true dispatch in the lineage, with its own model(s), tokens and USD, which
-   * sum to the lineage's own. `dispatches` is null for a snapshot-only lineage,
-   * where the split is not knowable. Only this route builds it (`perDispatch`).
+   * sum to the lineage's own, and (LIN-4404) its `firstRequestAt` /
+   * `lastRequestAt`. `dispatches` is null for a snapshot-only lineage, where the
+   * split is not knowable. Only the task read builds it (`perDispatch`).
    */
   router.get(['/api/proxy/issues/:identifier/cost', '/api/proxy/cost/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
@@ -681,78 +687,24 @@ export function createComputeRoutes({
         return badRequest.json(res, 'This endpoint requires the issue identifier (e.g. LIN-123), not a UUID — dispatch and call-log rows are keyed by identifier, so a UUID would silently match zero rows');
       }
 
-      // LIN-3161 (LIN-3157 A1): both the dispatch-history reads and the
-      // call-log summary are bounded on the shared 30-day read horizon, so a
-      // future lifetime retention cannot silently widen this window. The bound
-      // is on `dispatchedAt` (listHistory's own `since`) / `timestamp`.
-      const since = readHorizonStart();
+      // LIN-4404: a task's own read covers its whole life (the task-life rule, lib/read-horizon.js). The call-log read
+      // stays here (the census allows `listInHorizon` only in this file) and is passed the explicit task-life bound,
+      // because a missing `since` there means the 30-day window. It runs beside the dispatch reads.
+      const appSummary = llmCallLogStore
+        ? llmCallLogStore.listInHorizon(req.proxyUrlKey, { issueIdentifier: identifier, since: taskLifeStart() }).then(appCallsOf)
+        : appCallsOf([]);
+      // The fetch (own rows, founder identity, lineage siblings) and the one read live in lib/task-cost-read.js, which
+      // the task page's timeline also calls. It reports only the lineages that count under this issue (LIN-4147).
+      const { lineagesTruncated: _lineagesTruncated, ...result } = await readTaskCost(
+        { dispatchQueueStore, requestUsageLoader, lineageLimit: LINEAGE_QUERY_LIMIT },
+        { urlKey: req.proxyUrlKey, identifier, appSummary, caller: 'GET /api/proxy/cost' }
+      );
 
-      // LIN-4177: the lineage's identity (issue, base kind, true members) comes from the founder
-      // lookup: scalar, uncapped and not windowed, so a straddler whose founder is older than the
-      // window still counts under its true issue (LIN-4148). The usage read below keeps its bounds.
-      const [queued, history, ownIdentity] = await Promise.all([
-        dispatchQueueStore.listItems(req.proxyUrlKey, { issueIdentifier: identifier, projection: { prompt: 0 } }),
-        dispatchQueueStore.listHistory(req.proxyUrlKey, { issueIdentifier: identifier, since, projection: { prompt: 0 } }),
-        dispatchQueueStore.lineageIdentityRows(req.proxyUrlKey, { issueIdentifier: identifier })
-      ]);
-      const ownRows = [
-        ...queued.map(i => ({ ...i, status: 'queued', feedback: [] })),
-        ...history.items
-      ];
-
-      // Every lineage this issue is the founder of, by identity: its own member rows, any age.
-      const anchors = [...new Set(ownIdentity.filter(isMember).map(anchorOf).filter(Boolean))];
-      const identityRows = anchors.length
-        ? [...ownIdentity, ...await dispatchQueueStore.lineageIdentityRows(req.proxyUrlKey, { anchors })]
-        : ownIdentity;
-
-      const siblingRowsByAnchor = new Map();
-      if (anchors.length) {
-        const { items: lineageSiblings, total: lineageTotal } = await dispatchQueueStore.listHistory(req.proxyUrlKey, {
-          rootItemId: { $in: anchors },
-          limit: LINEAGE_QUERY_LIMIT,
-          since,
-          projection: { prompt: 0 }
-        });
-        if (lineageTotal > LINEAGE_QUERY_LIMIT) {
-          console.warn(`Lineage query exceeded LINEAGE_QUERY_LIMIT (${LINEAGE_QUERY_LIMIT}) for urlKey=${req.proxyUrlKey}, identifier=${identifier}, anchors=${anchors.length}, total=${lineageTotal} — result truncated to the newest ${LINEAGE_QUERY_LIMIT}`);
-        }
-        for (const sib of lineageSiblings) {
-          const bucket = siblingRowsByAnchor.get(sib.rootItemId);
-          if (bucket) bucket.push(sib);
-          else siblingRowsByAnchor.set(sib.rootItemId, [sib]);
-        }
-      }
-
-      // The issue's calls in the window (LIN-4179): the store returns docs, the one read sums them.
-      const appSummary = appCallsOf(llmCallLogStore
-        ? await llmCallLogStore.listInHorizon(req.proxyUrlKey, { issueIdentifier: identifier, since })
-        : []);
-
-      // LIN-4147 / LIN-4177: report only the lineages whose true issue is this one, and only those
-      // with a member in the window. Fetched usage rows: the siblings, then the own rows (the pool
-      // order the fold has always read).
-      const fetchedRows = [...[...siblingRowsByAnchor.values()].flat(), ...ownRows];
-      // LIN-4201 / LIN-4226: the read loads the request records of every lineage it sees, through the one loader
-      // (lib/cost-read.js `lineageRecords`). A lineage with records reads them; one without reads its snapshots.
-      const requestSource = requireRequestUsageLoader(requestUsageLoader, 'GET /api/proxy/cost');
-      // LIN-4263: `perDispatch` is this route's alone. It builds each lineage's `dispatches` (one entry per dispatch,
-      // each folded from its own records); the Models page, routing preview and effort readout read the same
-      // lineage rows without it and pay nothing for the split.
-      const result = await readCost({
-        fetchedRows,
-        identityRows,
-        requestSource,
-        urlKey: req.proxyUrlKey,
-        appSummary,
-        issueIdentifier: identifier,
-        windowStart: since,
-        perDispatch: true
-      });
-
+      // No day bound to report: `days` and `appCallsSince` are null, and `scope` (added last) names the rule.
       const window = {
-        days: READ_HORIZON_DAYS,
-        appCallsSince: since.toISOString()
+        days: null,
+        appCallsSince: null,
+        scope: TASK_LIFE_SCOPE
       };
 
       logEvent(req, '/api/proxy/cost', 200);

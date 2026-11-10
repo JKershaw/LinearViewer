@@ -151,7 +151,10 @@ const TABLE = {
   'routes/proxy-dispatch.js :: /api/proxy/dispatch': [PRJ, 3],
   'routes/proxy-dispatch.js :: /api/proxy/dispatch/:id': [PRJ, 1],
   'routes/proxy-dispatch.js :: liveSeen': [PRJ, 1], // the :id watch long-poll re-read, keyed lexically after LIN-3367's const liveSeen arrow
-  'routes/proxy-compute.js :: /api/proxy/issues/:identifier/snapshots/diff': [PRJ, 3],
+  // LIN-4404: these three reads were the /cost route's, keyed under the snapshots/diff route registered above it (the
+  // scanner reads no array registration). They moved with the fetch into the task's own read; each still projects the
+  // prompt out (`projection: { prompt: 0 }`), and its result is the cost read's input, never a response row.
+  'lib/task-cost-read.js :: readTaskCost': [PRJ, 3],
   'routes/proxy-compute.js :: /api/proxy/periodicals': [PRJ, 2],
   // routes — test only
   // LIN-3833: the same route also reads the row (`listItems`) so the run-source twin can compare the stamp with the control.
