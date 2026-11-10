@@ -18,7 +18,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readCostOverRecords } from '../../lib/cost-read.js';
-import { readTaskCost } from '../../lib/task-cost-read.js';
+import { readTaskCost, LINEAGE_QUERY_LIMIT } from '../../lib/task-cost-read.js';
+import { LINEAGE_QUERY_LIMIT as ROUTE_LINEAGE_QUERY_LIMIT } from '../../routes/proxy.js';
 import { taskLifeStart, TASK_LIFE_SCOPE, TASK_LIFE_HORIZON, READ_HORIZON_MS } from '../../lib/read-horizon.js';
 import { LlmCallLogStore } from '../../lib/llm-call-log.js';
 import { NO_REQUEST_RECORDS, loaderOver } from '../fixtures/request-usage-loader.js';
@@ -225,10 +226,17 @@ describe('LIN-4404: readTaskCost', () => {
     assert.deepEqual(result.foundedElsewhere.map(l => [l.rootItemId, l.countedUnder, l.taggedItemIds]), [['P', 'LIN-9', ['W1']]]);
   });
 
-  test('refuses a missing store, cap or loader rather than reading something else', async () => {
+  test('the cap defaults to LINEAGE_QUERY_LIMIT, the cap this read owns', async () => {
+    const s = store({ history: [dispatch('b1', 'b1', 60)] });
+    await readTaskCost({ dispatchQueueStore: s, requestUsageLoader: NO_REQUEST_RECORDS }, { urlKey: 'acme', identifier: 'LIN-1' });
+    assert.equal(s.calls.find(c => c.rootItemId).limit, LINEAGE_QUERY_LIMIT);
+    assert.equal(LINEAGE_QUERY_LIMIT, ROUTE_LINEAGE_QUERY_LIMIT, 'routes/proxy.js re-exports the same cap');
+  });
+
+  test('refuses a missing store, a bad cap or a missing loader rather than reading something else', async () => {
     const s = store({ history: [] });
     await assert.rejects(readTaskCost({ requestUsageLoader: NO_REQUEST_RECORDS, lineageLimit: 3 }, { urlKey: 'acme', identifier: 'LIN-1' }), /dispatchQueueStore/);
-    await assert.rejects(readTaskCost({ dispatchQueueStore: s, requestUsageLoader: NO_REQUEST_RECORDS }, { urlKey: 'acme', identifier: 'LIN-1' }), /lineageLimit/);
+    await assert.rejects(readTaskCost({ dispatchQueueStore: s, requestUsageLoader: NO_REQUEST_RECORDS, lineageLimit: 0 }, { urlKey: 'acme', identifier: 'LIN-1' }), /lineageLimit/);
     await assert.rejects(readTaskCost({ dispatchQueueStore: s, lineageLimit: 3 }, { urlKey: 'acme', identifier: 'LIN-1' }));
   });
 });

@@ -66,7 +66,7 @@ import { badRequest, jsonError, keepaliveError, notFound } from '../lib/errors.j
  * @param {Function} deps.recommendErrorResponse - Maps a recommendation error to {status, body} (closure-local; relocated in routes/proxy.js by G1, shared with group I)
  * @param {Function} deps.resolvePromptIssueContext - Resolves the issue + prompt context for deterministic, server-side prompt generation (module-scope, shared with groups H/I)
  * @param {Function} deps.withTimeout - Races a promise against a timeout (module-scope, shared with group I)
- * @param {number} deps.LINEAGE_QUERY_LIMIT - Cap on lineage-history rows read for the north-star endpoint (module-scope)
+ * @param {number} deps.LINEAGE_QUERY_LIMIT - Cap on the task cost read's lineage-sibling rows (`/cost`, lib/task-cost-read.js; tests inject a smaller one)
  * @param {number} deps.RECOMMEND_DESCENT_BUDGET_MS - Shared cross-hop budget for the recommend recursion (module-scope)
  * @param {number} deps.LLM_TIMEOUT_MS - Budget for the OpenRouter LLM generation leg (module-scope)
  * @param {Function} deps.getTestMockData - Lazy-loads test fixtures in test mode (module-scope, shared with groups H/I)

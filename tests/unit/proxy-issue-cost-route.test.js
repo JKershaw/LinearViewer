@@ -279,8 +279,8 @@ describe('GET /api/proxy/issues/:identifier/cost — response shape', () => {
   });
 
   test('LIN-2615: effort and durationMs reach the wire through the route spread', async () => {
-    // `buildTaskCost` is well covered directly, but the route re-emits its
-    // result with a bare spread (`res.json({ identifier, ...result, window })`)
+    // The read is well covered directly, but the route re-emits its result
+    // with a spread (`res.json({ identifier, ...result, workerSessions, window })`)
     // — no projection, so the two fields LIN-2615 added SHOULD survive. That
     // was inspection-only until now; this asserts it off a live request.
     const { app } = buildApp({
@@ -421,9 +421,9 @@ describe('GET /api/proxy/issues/:identifier/cost — task-life read (LIN-4404, w
   });
 });
 
-// LIN-4147: the route must hand the requested issue to buildTaskCost, or /cost applies no issue
-// filter and prices another issue's lineage as well. buildTaskCost's own tests call it directly,
-// so these two drive the route (removing `issueIdentifier: identifier` from the call turns both red).
+// LIN-4147: the read must be handed the requested issue, or /cost applies no issue filter and prices
+// another issue's lineage as well. These drive the route, so removing `issueIdentifier: identifier`
+// from readTaskCost's readCost call (lib/task-cost-read.js, LIN-4404) turns them red.
 describe('GET /api/proxy/issues/:identifier/cost — only lineages that count under the requested issue (LIN-4147)', () => {
   test('a wake row for LIN-X, re-pointed into an issue-less root, is not priced under LIN-X', async () => {
     const root = row({ id: 'P', rootItemId: 'P', issueIdentifier: null, kind: 'autopilot', dispatchedAt: ts('10:00'), feedback: [usageEntry({ costUsd: 7, rootItemId: 'P' })] });
