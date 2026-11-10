@@ -68,7 +68,7 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   in 17 lines across 10 code files. (Drift & Coherence Review, 10 Nov;
   `docs/reviews/drift-coherence-review-2026-11-10.md`; count, Documentation Review, 10 Nov;
   `docs/reviews/documentation-review-2026-11-10.md`.)
-- `lib/periodicals.js`: SD's area-notes guard has diverged (200 lines to 147, adds `sh`), and SD's
+- `lib/periodicals.js`: SD's area-notes guard has diverged (SD 200 lines, LV 147; SD adds `sh`), and SD's
   README has no Periodical-entry rules. A Periodical's SD note must cite the report second, but the
   report lives in LinearViewer, so SD's existence check rejects it. (Drift & Coherence Review,
   10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)
@@ -76,6 +76,6 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   ticket both pass. The store should claim it, compare-and-set like `claimHeldWake`. (LIN-4392.)
 - `lib/periodicals.js`: Periodical prompts have no size ceiling: +18.8% in the window (185,952 to
   220,882 B), and only a sha256 tripwire covers them. Size of the move: a ceiling. (Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)
-- `lib/periodicals.js`: `docs/reviews/` has 109 top-level reports (92 MB) and no index. Size of the
+- `lib/periodicals.js`: `docs/reviews/` has 109 top-level reports (88 MB) and no index. Size of the
   move: an index or series archive. (Documentation Review, 10 Nov.;
   `docs/reviews/documentation-review-2026-11-10.md`.)
