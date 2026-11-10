@@ -35,12 +35,12 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   (`lin-4377-store-knows-no-leftover` counts the word).
 - Price a pulled extra like any piece: a cost read that rode along with LIN-4201 landed alone as
   LIN-4226.
+- A task timeline lane is running from the page's open session ids (`isOpenState`), never the
+  cost row; a lineage's own `incomplete`, not the shared `lineagesTruncated`, decides "not
+  complete" (LIN-4405, `lib/task-timeline.js`).
 
 ## Waiting
 
-- `lib/pipeline-churn.js`: its own `ORCHESTRATION_KINDS` omits `periodical`, unlike `lib/run-view.js`'s,
-  and spells `'leftover'` beside `LEFTOVER_KIND`; one set would move churn figures. (LIN-4376;
-  Drift & Coherence Review, 10 Nov.)
 - `lib/dispatch-wake.js`: `reportedPrUrlOf` and SD's `sessionPrs` pick a PR by one order, joined
   by a comment only; a change to one moves a PR link. (Drift & Coherence Review, 10 Nov;
   `docs/reviews/drift-coherence-review-2026-11-10.md`.)
