@@ -4,6 +4,7 @@
  *   GET /workspace/:urlKey/task/:identifier            — the owner's task page
  *   GET /workspace/:urlKey/api/task/:identifier/state  — stored-data repaint
  *   GET /workspace/:urlKey/api/task/:identifier/proposals — the owner's staged chat proposals (LIN-3975)
+ *   GET /workspace/:urlKey/api/task/:identifier/timeline — the "Sessions on one clock" fragment (LIN-4405)
  *
  * A DRILL-DOWN page, like `/task/:issueId/edit` and the run page: no feature
  * flag, no view-tier entry, a back link, and a 404 body for an unknown id.
@@ -50,6 +51,7 @@ import {
   renderTaskTrack,
   renderStageStrip,
 } from '../lib/render-task-page.js';
+import { renderTaskTimeline } from '../lib/render-task-timeline.js';
 
 /** A non-empty query string value, else undefined. */
 function queryValue(value) {
@@ -74,10 +76,12 @@ function sessionsOfState(model, taskState, runWords = null) {
  * @param {Function} deps.getDeployInfo - Footer deploy info.
  * @param {{loadTaskPage: Function, loadTaskState: Function}} deps.loader - `createTaskPageLoader(...)`
  * @param {Function|null} [deps.workspaceOwnerCheck] - the ONE hoisted owner seam (server.js)
+ * @param {{read: Function}|null} [deps.timelineFragment] - lib/task-timeline.js `createTimelineFragmentReader`, shared
+ *   with the guest route (LIN-4405); without it the page's section has no fragment URL and the endpoint 404s
  * @param {Function} [deps.now] - () → Date
  * @returns {Router}
  */
-export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, taskFacts = null, refreshTaskFacts = null, taskModeStore = null, accountStore = null, now = () => new Date() }) {
+export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, taskFacts = null, refreshTaskFacts = null, taskModeStore = null, accountStore = null, timelineFragment = null, now = () => new Date() }) {
   if (!loader) throw new Error('task-page routes: loader is required');
   const router = Router();
 
@@ -167,6 +171,10 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       const model = owner ? { ...result.model, proposals: await pendingProposalsOf(workspace.urlKey, result.model) } : result.model;
       const stateQuery = model.issueId ? [`issueId=${encodeURIComponent(model.issueId)}`] : [];
       const stateUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/api/task/${encodeURIComponent(model.identifier)}/state${stateQuery.length ? `?${stateQuery.join('&')}` : ''}`;
+      // LIN-4405: the timeline fragment, re-read by the page script while a session runs.
+      const timelineUrl = timelineFragment
+        ? `/workspace/${encodeURIComponent(workspace.urlKey)}/api/task/${encodeURIComponent(model.identifier)}/timeline${stateQuery.length ? `?${stateQuery.join('&')}` : ''}`
+        : '';
       // The page's pill and run control read the gathered state (LIN-4070 B). When the held set is incomplete the pill is
       // the display-only provisional one, and the row record carries no action, so no run is offered.
       const taskState = result.taskState || null;
@@ -188,6 +196,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         urlKey: workspace.urlKey,
         binding: { source: binding.source || null },
         stateUrl,
+        timelineUrl,
         now: now(),
         pageOptions,
         promptOpts,
@@ -291,6 +300,29 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     } catch (error) {
       console.error('Task page proposals error:', error.message);
       return jsonError(res, 500, 'Could not read staged proposals');
+    }
+  });
+
+  // LIN-4405: "Sessions on one clock" as a fragment, for the owner and members (both see spend, John's ruling on
+  // LIN-4395). Stored facts only: the open sessions come from the state read (`loadTaskState`, no tracker, no GitHub)
+  // and the timeline from the task's own cost read, through the single-flight short cache the guest route shares
+  // (`timelineFragment`), so open tabs share one read. The `/state` reply is untouched: its keys stay as pinned.
+  router.get('/workspace/:urlKey/api/task/:identifier/timeline', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const { identifier } = req.params;
+    if (!isValidIssueId(identifier) || !timelineFragment) return jsonError(res, 404, 'Task not found');
+    const issueId = queryValue(req.query.issueId);
+    try {
+      const timeline = await timelineFragment.read({
+        urlKey: workspace.urlKey,
+        identifier,
+        issueId: issueId && isValidIssueId(issueId) ? issueId : null,
+      });
+      res.set('Cache-Control', 'no-store');
+      return res.json({ timelineHtml: renderTaskTimeline(timeline) });
+    } catch (error) {
+      console.error('Task page timeline error:', error.message);
+      return jsonError(res, 500, 'Could not read the sessions');
     }
   });
 

@@ -227,6 +227,18 @@
     "disposition": "registered",
     "holder": "workspace-issues-memo"
   },
+  "lib/task-timeline.js::cache": {
+    "disposition": "registered",
+    "holder": "task-timeline-fragment"
+  },
+  "lib/task-timeline.js::epochs": {
+    "disposition": "registered",
+    "holder": "task-timeline-fragment"
+  },
+  "lib/task-timeline.js::inflight": {
+    "disposition": "registered",
+    "holder": "task-timeline-fragment"
+  },
   "lib/workspace-kpis-cache.js::entries": {
     "disposition": "registered",
     "holder": "workspace-kpis-cache"
@@ -335,6 +347,10 @@
     "disposition": "delegated",
     "to": "lib/connection-credential.js::tokens"
   },
+  "server.js::readTaskTimeline": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
   "server.js::keyState": {
     "disposition": "not-state",
     "why": "The registry itself (lib/key-state.js)."
@@ -414,6 +430,10 @@
   "server.js::taskPageLoader": {
     "disposition": "not-state",
     "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "server.js::timelineFragment": {
+    "disposition": "delegated",
+    "to": "lib/task-timeline.js::cache"
   },
   "server.js::urlKeyHolderFinder": {
     "disposition": "not-state",
