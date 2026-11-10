@@ -7,7 +7,7 @@ This is the first run to review the area notes as a documentation surface. It is
 
 | Repo | HEAD reviewed | Window | Commits | Files in window |
 |---|---|---|---|---|
-| LinearViewer | `9cf51ef72` (origin/main when reviewed); the branch was rebased onto `730df21c2` (origin/main at push, which includes LIN-4392 and the sibling LIN-4407 review, both outside this window's measured HEAD) | `821cf841..9cf51ef72` | 467 | 5,509 |
+| LinearViewer | `9cf51ef72` (origin/main when reviewed); the branch was rebased onto `008d38bb0` (origin/main at push, which includes LIN-4392, LIN-4398, LIN-4405 and the sibling LIN-4407 review, all outside this window's measured HEAD) | `821cf841..9cf51ef72` | 467 | 5,509 |
 | simple-dispatcher | `5d8489e` (origin/main) | `bb1da78e..5d8489e` | 67 | 255 |
 
 LV production files touched per area, executed through `docs/areas/areas.json` (first match wins), 13 areas. Unmapped: 5,076 (docs 4,006, tests 951, the rest scripts/experiments/root).
@@ -159,11 +159,11 @@ Guards: LV `tests/unit/area-notes.test.js`, `tests/unit/lin-4377-area-notes-poin
 
 Per-note bytes (cap 6,144), before → after this change:
 
-Sizes are on `origin/main` before this change (`730df21c2`, which includes LIN-4392 and LIN-4407) and after it.
+Sizes are on `origin/main` before this change (`008d38bb0`, which includes LIN-4392, LIN-4398, LIN-4405 and LIN-4407) and after it.
 
 | Note | Main before | After | Lessons | Waiting | Notes |
 |---|---|---|---|---|---|
-| runs-and-dispatch | 6,144 | 5,974 | 10 | 17 | pipeline-churn report path added; HALT_MODES home fixed; wake-shadow ticket corrected; 'aside' entry pruned; settled limiter entry pruned; contract.json report moved inside its parenthesis |
+| runs-and-dispatch | 6,144 | 5,916 | 11 | 16 | pipeline-churn entry removed (LIN-4405 filed it as LIN-4409, so it is ticket-owned); HALT_MODES home fixed; wake-shadow ticket corrected; 'aside' entry pruned; settled limiter entry pruned; contract.json report moved inside its parenthesis |
 | llm-and-prompts | 6,139 | 6,106 | 12 | 14 | close-out Waiting folded into the Lesson; guard entry rewritten as the seam; two new entries; CUT pair merged; distilled |
 | agent-api | 4,543 | 5,889 | 3 | 11 | three new entries; broker and rate-limit entries corrected; Seams citation moved; distilled |
 | front-end-browser | 1,140 | 1,549 | — | 4 | one new entry (llms.txt) |
@@ -174,7 +174,7 @@ Other notes (front-end-pages 2,728; platform-and-plumbing 831; wiring 606; auth-
 Format defects found (all corrected in the three notes; the rest are listed for the owning area):
 
 - Seams citations outside the parenthesis: `runs-and-dispatch.md` (contract.json), `agent-api.md` (two), `other-features.md` (as-asked-seal). All four fixed.
-- Periodical readings without a report path: `runs-and-dispatch.md` (pipeline-churn) fixed; `llm-and-prompts.md` (prompt-formatters guard) rewritten.
+- Periodical readings without a report path: `runs-and-dispatch.md` (pipeline-churn) is no longer a note entry: LIN-4405 on main filed it as LIN-4409; `llm-and-prompts.md` (prompt-formatters guard) rewritten.
 - Wrong home: `runs-and-dispatch.md` cited `HALT_MODES` in `lib/dispatch-targets.js`; it is in `lib/workspace-halt.js:34`. Fixed.
 - Mis-sourced: `runs-and-dispatch.md` wake-shadow was tagged LIN-4166; the classifier is LIN-3257 (Done). Fixed.
 - Stale trigger: `runs-and-dispatch.md` "on a second 'aside' case" — no code, ticket or test names an "aside" case. The mechanism is `subscription: 'none'` (`lib/dispatch-store.js:755`, LIN-4166). Pruned.
@@ -229,7 +229,7 @@ Not owned by this repo's notes; all SD-side. Full detail in the closing comment.
 
 Correction to the rebase account: the `routes/proxy-writes.js` entry's sentence on the look-first sequence (`lib/proxy-instructions.js` spells it by hand beside `LOOK_FIRST_STEPS`) was removed on `origin/main` by LIN-4407, before this branch was rebased. This change did not remove it, and it is not restored here: the duplication it describes is a decision-duplication item for the Drift & Coherence owner.
 - `docs/areas/llm-and-prompts.md`: the close-out Waiting entry ("who merges is retyped") is folded into the close-out Lesson, keeping its rule; the Lesson names the five files. The guard entry is rewritten as the cross-repo seam (D9). New Waiting entries: Periodical prompt budget (D8) and the `docs/reviews/` index (D36). Distilled, with content kept: the `stage-intent` CUT and "narrowing" pair (merged), `call-budget` replay, the `areaNotes()` restatement (its duplicate "Waiting entries are context" mention dropped), and the Surveys Lesson (dropped "its record takes no fifth line"). LIN-4407 had distilled several of the same entries on main; the note was rebased onto its wording.
-- `docs/areas/runs-and-dispatch.md`: `lib/pipeline-churn.js` cited to its report; `lib/dispatch-leftover.js` HALT_MODES home fixed; `lib/runner-kit/contract.json` Seams report moved inside its parenthesis; wake-shadow ticket corrected to LIN-3257; the "aside" entry pruned (no referent); the settled limiter entry pruned. The runner-usage gap is recorded in agent-api, where its route lives (`routes/proxy-runner.js`). 6,144 → 5,974.
+- `docs/areas/runs-and-dispatch.md`: the `lib/pipeline-churn.js` entry was removed on main (LIN-4405, filed as LIN-4409); `lib/dispatch-leftover.js` HALT_MODES home fixed; `lib/runner-kit/contract.json` Seams report moved inside its parenthesis; wake-shadow ticket corrected to LIN-3257; the "aside" entry pruned (no referent); the settled limiter entry pruned. The runner-usage gap is recorded in agent-api, where its route lives (`routes/proxy-runner.js`). 6,144 → 5,974.
 - `docs/areas/front-end-browser.md`: one new Waiting entry (`public/llms.txt` H11 and view list, D29).
 - `docs/areas/other-features.md`: Seams citation moved inside its parenthesis (as-asked-seal).
 - Guard run after edits: see §10.
