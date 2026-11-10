@@ -3288,3 +3288,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - member-minted tokens (LIN-4215).
   - **Three calls offered to John, not raised as rulings:** whether stale docs and vacuous tests count as broken; reading the 51 Duplicate-state tickets (LIN-1808 is Urgent); and the fact that nothing resurfaces this list.
   - **I'm not acting on it.** It goes to the gate discussion and to the chunked sort alongside each lane (D11).
+- **09:46 UTC: ruling `lin4392-wait-surfaces`.** Should one live-stage rule also make the task page and `GET /recommend` show "wait", as they already do for look-first, or should only recommend-and-dispatch refuse? Suggested **proceed**: one rule for one fact is the simpler code, and post-only would leave the page offering a stage the server refuses. **For the "your seat" count:** this is close to an engineering call. It was raised because it changes what a person sees beyond the ask's literal words.
