@@ -195,11 +195,7 @@ describe('GET /api/proxy/issues/:identifier/cost — route aliases', () => {
     const b = await get(app, '/api/proxy/cost/LIN-42');
     assert.equal(a.status, 200);
     assert.equal(b.status, 200);
-    // `window.appCallsSince` is computed from Date.now() per request, so it can
-    // legitimately differ by a millisecond between the two calls; everything
-    // else must be byte-identical.
-    const strip = body => ({ ...body, window: { ...body.window, appCallsSince: undefined } });
-    assert.deepEqual(strip(a.body), strip(b.body));
+    assert.deepEqual(a.body, b.body);
   });
 });
 
