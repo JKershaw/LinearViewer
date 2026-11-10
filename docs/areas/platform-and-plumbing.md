@@ -23,3 +23,4 @@ Area notes for `platform-and-plumbing` in the registry. Format and rules: README
 - `lib/deploy-info.js`: merged to live is not owned in code (no deploy job or Railway
   config in the repository); John holds Railway today. A no-secret "did it go live" check, reading
   the deployed commit, is a candidate on its own. (Survey tally: LIN-4167.)
+- `lib/secret-scan.js`: shapes still unmatched beyond the ticketed four: quoted or YAML/JSON secret assignments, env values holding `/` or `.`, credentialed postgres/redis/mysql URIs, a cut PEM inside a blockquote or JSON string, PuTTY keys; Slack tokens are only partly masked. No census pins mint sites, so a new raw random credential would mint unprefixed and unscanned: mint through `lib/harbour-token-format.js`. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)
