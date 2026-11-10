@@ -1,0 +1,2 @@
+602ab014062857bfba3e9aa543088472c3ba5dbc7cb0673da909e67ed727eb40  lib/runner-kit/contract.json
+602ab014062857bfba3e9aa543088472c3ba5dbc7cb0673da909e67ed727eb40  ../simple-dispatcher/test/fixtures/runner-contract.json

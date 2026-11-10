@@ -1,0 +1,17 @@
+{
+  "commit": "5d8489e7fd8434f0e69af7df11a3746790abbe64",
+  "areaMapSource": "/Users/autopilot/development/simple-dispatcher-workspaces/26406c1f-b105-46dc-a895-817ff5c2f7c6/LinearViewer/docs/reviews/_evidence-2026-11-10-run11/sd-areas-5d8489e.json",
+  "scope": {
+    "files": 0,
+    "parseFailures": [],
+    "unresolvedRelativeImports": 0,
+    "nonLiteralDynamicImports": 0,
+    "unmappedFiles": []
+  },
+  "areas": [],
+  "links": [],
+  "knots": {
+    "pairs": [],
+    "groups": []
+  }
+}
