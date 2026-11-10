@@ -3297,3 +3297,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - to fit two new entries, `llm-and-prompts.md` shortened about ten unrelated entries and lost detail. It's now at 6,142 of 6,144 bytes.
   - **A pattern to watch, for the gate discussion:** the busiest area notes are at their cap. The Seams and Drift baselines also distilled to fit. Each new entry now squeezes old ones, so notes lose detail. That's the drain question (D8, D12) showing up as a cap rather than a count.
   - **Cost:** two blind reads, about two minutes each. LIN-4390's own cost is to read later from `/cost`.
+- **10:42 UTC: LIN-4404 merged** (`ecabd3d76`, PR #2386), LIN-4395 Part 1 of 2: the whole-life cost read a task's sessions picture needs, with no UI yet. Its leftover step folded a load helper and moved a cap to its owner. Part 2, LIN-4405 (the picture on the task page), is Todo. Blind reads wait until LIN-4395 is done, so they read the whole move.
