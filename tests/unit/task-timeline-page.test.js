@@ -19,7 +19,8 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createTaskPageLoader } from '../../lib/task-page-loader.js';
 import { renderTaskPage } from '../../lib/render-task-page.js';
-import { createTaskTimelineReader, createTimelineFragmentReader, taskTimeline, mergeMarksOf } from '../../lib/task-timeline.js';
+import { createTaskTimelineReader, createTimelineFragmentReader, taskTimeline, mergeMarksOf, withoutSpend } from '../../lib/task-timeline.js';
+import { renderTaskTimeline } from '../../lib/render-task-timeline.js';
 import { createTaskShareRoutes } from '../../routes/task-share.js';
 import { createTaskPageRoutes } from '../../routes/task-page.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
@@ -263,6 +264,46 @@ describe('the guest: no dollars in any of the three responses', () => {
     } finally {
       await close();
     }
+  });
+
+  test('the renderer\'s own gate: a stripped timeline writes no pricing word for priced, incomplete, no-usage, unpriced or foreign lanes', () => {
+    // withoutSpend removes the figures; the renderer must also drop the words that would stand in for them. This pins
+    // `laneCost`'s and `totalWords`' `if (!spend) return null;` (review fix 2), which the route tests cannot see.
+    const MIN = 60 * 1000;
+    const T0 = Date.parse('2026-11-08T12:00:00.000Z');
+    const at = m => new Date(T0 + m * MIN).toISOString();
+    const d = (itemId, kind, start, first, last, { costUsd = 0.1, followUpTo = null } = {}) => ({
+      itemId, kind, dispatchedAt: at(start), followUpTo, byModel: [{ model: 'claude-opus-5-5', requests: 3, costUsd }],
+      requests: 3, costUsd, firstRequestAt: at(first), lastRequestAt: at(last),
+    });
+    const s = (rootItemId, kind, start, dur, dispatches, extra = {}) => ({
+      rootItemId, kind, dispatchedAt: at(start), harness: 'claude-code', model: 'claude-opus-5-5', effort: 'high',
+      costUsd: 1, durationMs: dur * MIN, dispatches, telemetry: true, incomplete: false, ...extra,
+    });
+    const tl = taskTimeline({
+      sessions: [
+        s('priced', 'plan', 0, 5, [d('priced', 'plan', 0, 1, 4)], { costUsd: 2 }),
+        s('partial', 'implementation', 6, 5, [d('partial', 'implementation', 6, 7, 10)], { costUsd: null, incomplete: true }),
+        s('silent', 'review', 12, 5, [d('silent', 'review', 12, 13, 15, { costUsd: null })], { costUsd: null, telemetry: false }),
+        s('unpriced', 'close-out', 18, 5, [d('unpriced', 'close-out', 18, 19, 21, { costUsd: null })], { costUsd: null }),
+      ],
+      foundedElsewhere: [{
+        ...s('P', 'autopilot', -60, 120, [d('P', 'autopilot', -60, -59, -58), d('W1', 'wake', 8, 8.5, 9, { followUpTo: 'P' })], { costUsd: 9 }),
+        countedUnder: 'LIN-9', taggedItemIds: ['W1'],
+      }],
+      now: at(30), totalUsd: null, pricedUsd: 2, lineagesTruncated: true,
+    });
+    const WORDS = /not priced|cost not complete|no usage posted|lineage cost|total/;
+    // What a reader sees: text between tags plus title attributes (a `data-testid` naming "total" is not a word shown).
+    const shown = html => [...html.replace(/<[^>]*>/g, m => (m.match(/\stitle="([^"]*)"/) || ['', ' '])[1] + ' ').split(/\s+/)].join(' ');
+    const owner = shown(renderTaskTimeline(tl));
+    for (const word of ['not priced', 'cost not complete', 'no usage posted', 'lineage cost', 'total']) {
+      assert.ok(owner.includes(word), `the owner's picture writes "${word}", so its absence below is meaningful`);
+    }
+    const guestHtml = renderTaskTimeline(withoutSpend(tl));
+    assert.match(guestHtml, /data-testid="task-timeline-lane"/, 'the guest still sees the lanes');
+    assert.doesNotMatch(shown(guestHtml), WORDS);
+    assert.doesNotMatch(guestHtml, /\$/);
   });
 
   test('a malformed token never reaches the timeline read', async () => {
