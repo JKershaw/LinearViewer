@@ -41,6 +41,15 @@ move. Every mint number was re-measured; where it differs, the measured one is u
 | Areas feeding Waiting entries | (research: Seams & Tangles and Drift & Coherence) | **three** periodicals: Seams & Tangles (4 entries), Drift & Coherence (3) and **Design & Interface 2026-11-08 (8)**; plus 16 builder "Survey tally" entries |
 | `request-usage-flush.js:10-16` producer contract | cites `routes/dispatch.js:1668` | the route is now at `routes/dispatch.js:1671` (a three-line consumer-comment drift, not a behaviour change) |
 
+**Post-pin note (dated, not a rescore).** While this PR was in CI, `origin/main` moved to `a36ad6195` (#2387,
+LIN-4392: one live-stage wait before the stage selector on every recommendation surface; new
+`lib/recommendation-live-wait.js`, plus `lib/stage-router.js`, `lib/recommendation-look-first.js`,
+`routes/proxy-compute.js`, `routes/workspace-api.js`). It lands inside `mod-prompt-template-system` (the look-first
+routing noted on that row) and touches none of the files R7, R18 or R20 cite (`git diff 2e2fe3653...a36ad6195` over
+`routes/proxy-writes.js`, `routes/workspace-api-issue-write.js`, `routes/workspace-api-run-evidence.js`,
+`lib/periodicals.js` and `lib/periodical-report-gate.js` is empty). Every code citation resolves at the scoring pin
+`9cf51ef72`; the branch is rebased onto `a36ad6195` for close-out.
+
 **Research and survey errata** (each "research said X; the primary source shows Y"):
 
 | # | Said | Primary source shows |
