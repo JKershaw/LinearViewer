@@ -1,0 +1,34 @@
+# Lockfile, install and signature checks at 008d38bb0
+
+## npm ci --dry-run
+17 packages are looking for funding
+  run `npm fund` for details
+
+## npm ls --all (UNMET lines; all optional)
+│ │   ├── UNMET OPTIONAL DEPENDENCY encoding@^0.1.0
+│ ├── UNMET OPTIONAL DEPENDENCY @aws-sdk/credential-providers@^3.806.0
+│ ├── UNMET OPTIONAL DEPENDENCY @mongodb-js/zstd@^7.0.0
+│ ├── UNMET OPTIONAL DEPENDENCY gcp-metadata@^7.0.1
+│ ├── UNMET OPTIONAL DEPENDENCY kerberos@^7.0.0
+│ ├── UNMET OPTIONAL DEPENDENCY mongodb-client-encryption@>=7.0.0 <7.1.0
+│ ├── UNMET OPTIONAL DEPENDENCY snappy@^7.3.2
+│ └── UNMET OPTIONAL DEPENDENCY socks@^2.8.6
+
+## npm audit signatures
+9 packages have verified attestations
+(use --json --include-attestations to view attestation details)
+
+
+## lockfile (python over package-lock.json)
+entries incl root 113 | resolved excl root 112
+non-registry resolved 0
+missing integrity 0
+nested duplicates ['node_modules/https-proxy-agent/node_modules/debug', 'node_modules/https-proxy-agent/node_modules/ms', 'node_modules/mongodb-connection-string-url/node_modules/tr46', 'node_modules/mongodb-connection-string-url/node_modules/webidl-conversions', 'node_modules/mongodb-connection-string-url/node_modules/whatwg-url', 'node_modules/mongodb/node_modules/bson', 'node_modules/send/node_modules/ms']
+root engines None
+
+## served browser libraries (sha256, first 16 hex)
+cd37898f9782adf5  node_modules/dompurify/dist/purify.min.js
+e131975cfd9e6fd1  node_modules/marked/lib/marked.umd.js
+48444a82d4edcb5b  node_modules/chart.js/dist/chart.umd.min.js
+@kurkle/color v0.3.2
+installed @kurkle/color: 0.3.4
