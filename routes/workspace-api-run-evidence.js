@@ -17,7 +17,7 @@ import { readCloseOutChain, closeOutNotReady, closeOutNotReadyRefusal } from '..
 import { getLoopsForIssue, sessionIdByLoop } from '../lib/pipeline-loops.js';
 import { sessionIdOf } from '../lib/live-console.js';
 import { toSessionView } from '../lib/sessions-view.js';
-import { inReadWindow } from '../lib/read-horizon.js';
+import { inReadWindow, TASK_LIFE_HORIZON } from '../lib/read-horizon.js';
 import { runSessionsOf } from '../lib/task-page-loader.js';
 import { enrichLoop } from '../lib/run-loop-state.js';
 import { deriveSessionWaiting } from './dashboard-session-state.js';
@@ -105,7 +105,7 @@ export function registerSessionsRoutes(router, { workspaceFromUrl, dispatchQueue
       const loops = await getLoopsForIssue(workspace.urlKey, identifier, {
         dispatchStore: dispatchQueueStore,
         agentStatusStore,
-        horizon: 'all',
+        horizon: TASK_LIFE_HORIZON,
         noPrompt: true // toSessionView never reads promptText (LIN-3812)
       });
       // The run's page is keyed by the session id the Live Console uses, so each session carries it for its run link

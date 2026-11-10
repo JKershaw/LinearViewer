@@ -21,9 +21,8 @@ import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-load
 const createProxyRoutes = withDefaults(createProxyRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
 
 
-// LIN-4177: the route reads only the 30-day window, and its activity rule counts a lineage only with a
-// member in it. Fixture times sit two days back (the UTC day), so they are in the window the store would
-// have served. `ts('HH:MM')` is that day at that time.
+// Fixture times sit two days back (the UTC day). Since LIN-4404 the route reads the task's whole life, so the day
+// matters only to the task-life suite below, which also places rows 40 days back. `ts('HH:MM')` is that day at that time.
 const FIXTURE_DAY_MS = (() => {
   const d = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
@@ -67,18 +66,21 @@ function buildApp({ queued = [], history = [], dispatchQueueStore: dispatchQueue
   const historyCalls = [];
   const itemsCalls = [];
 
+  // A `since` filters as the real store does (dispatch-store.js: `dispatchedAt: {$gte: since}`, which also skips a row
+  // with no `dispatchedAt`), so a read the route bounds in time loses the rows the store would not serve (LIN-4404).
+  const inSince = (r, since) => !since || (r.dispatchedAt != null && new Date(r.dispatchedAt).getTime() >= since.getTime());
   const listHistory = async (urlKey, opts = {}) => {
     historyCalls.push(opts);
     if (opts.rootItemId && opts.rootItemId.$in) {
       const anchors = opts.rootItemId.$in;
-      let items = history.filter(r => anchors.includes(r.rootItemId));
+      let items = history.filter(r => anchors.includes(r.rootItemId) && inSince(r, opts.since));
       const total = items.length;
       if (opts.limit) items = items.slice(0, opts.limit);
       return { items, total };
     }
-    let items = opts.issueIdentifier
+    let items = (opts.issueIdentifier
       ? history.filter(r => r.issueIdentifier === opts.issueIdentifier)
-      : history;
+      : history).filter(r => inSince(r, opts.since));
     const total = items.length;
     return { items, total };
   };
@@ -249,8 +251,8 @@ describe('GET /api/proxy/issues/:identifier/cost — store wiring', () => {
 describe('GET /api/proxy/issues/:identifier/cost — response shape', () => {
   test('end-to-end: worker + app costs joined, fully priced', async () => {
     // LIN-3163 (LIN-3157 B): the call log is lifetime-retained and no longer
-    // exposes a `ttl`. The published /cost window is derived from the shared
-    // 30-day READ_HORIZON_DAYS (LIN-3161), never from a store retention value.
+    // exposes a `ttl`. Since LIN-4404 the published /cost window is the task's
+    // whole life (see the task-life suite below), never a store retention value.
     // listInHorizon is stubbed because a bare construction leaves this.collection undefined. The two priced
     // calls below are the app-call figure the route publishes (LIN-4179: the docs, summed by the one read).
     const llmCallLogStore = new LlmCallLogStore();
@@ -273,11 +275,7 @@ describe('GET /api/proxy/issues/:identifier/cost — response shape', () => {
     assert.equal(body.workerSessions[0].kind, 'implementation');
     assert.equal(body.appCalls.calls, 2);
     assert.equal(body.appCalls.costUsd, 0.05);
-    assert.equal(body.window.days, 30);
-    assert.ok(body.window.appCallsSince);
-
-    // The `window.days` wiring is now the shared read horizon, not store.ttl —
-    // see the dedicated '30-day read horizon' suite below (LIN-3161).
+    assert.deepEqual(body.window, { days: null, appCallsSince: null, scope: 'task-life' });
   });
 
   test('LIN-2615: effort and durationMs reach the wire through the route spread', async () => {
@@ -325,25 +323,61 @@ describe('GET /api/proxy/issues/:identifier/cost — response shape', () => {
   });
 });
 
-describe('GET /api/proxy/issues/:identifier/cost — 30-day read horizon (LIN-3161 / LIN-3157 A1)', () => {
-  const HORIZON_MS = 30 * 24 * 60 * 60 * 1000;
+// LIN-4404 (replaces the LIN-3161 30-day suite): a task's own read covers its whole life (the task-life rule,
+// lib/read-horizon.js). Published reporting windows stay at 30 days; their own suites are unchanged.
+describe('GET /api/proxy/issues/:identifier/cost — task-life read (LIN-4404, was LIN-3161)', () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const daysAgo = (n) => new Date(Date.now() - n * DAY_MS).toISOString();
 
-  test('window.days is the shared 30-day horizon, not the store ttl', async () => {
-    // A store configured with lifetime-ish retention (365 d) must not widen the
-    // published window — the route derives it from READ_HORIZON_DAYS. Before
-    // A1 this read `window.days === 365`.
+  test('a lineage dispatched 40 days ago is read and priced', async () => {
+    const old = row({ id: 'O', rootItemId: 'O', dispatchedAt: daysAgo(40), resolvedAt: daysAgo(40), feedback: [usageEntry({ costUsd: 6, rootItemId: 'O', timestamp: daysAgo(40) })] });
+    const { app } = buildApp({ history: [old] });
+    const { status, body } = await get(app, '/api/proxy/issues/LIN-42/cost');
+
+    assert.equal(status, 200);
+    assert.equal(body.noLineage, false);
+    assert.equal(body.workerSessions.length, 1);
+    assert.equal(body.workerSessions[0].rootItemId, 'O');
+    assert.equal(body.pricedUsd, 6);
+    assert.equal(body.totalUsd, 6);
+  });
+
+  test('an old lineage and a recent one both count: totalUsd is the whole-life figure', async () => {
+    const old = row({ id: 'O', rootItemId: 'O', dispatchedAt: daysAgo(40), resolvedAt: daysAgo(40), feedback: [usageEntry({ costUsd: 6, rootItemId: 'O', timestamp: daysAgo(40) })] });
+    const recent = row({ id: 'N', rootItemId: 'N', feedback: [usageEntry({ costUsd: 1.5, rootItemId: 'N' })] });
+    const { app } = buildApp({ history: [old, recent] });
+    const { body } = await get(app, '/api/proxy/issues/LIN-42/cost');
+
+    assert.deepEqual(body.workerSessions.map(s => s.rootItemId).sort(), ['N', 'O']);
+    assert.equal(body.totalUsd, 7.5);
+  });
+
+  test('an old snapshot-only lineage stays `dispatches: null`: no request spans are reconstructed', async () => {
+    const old = row({ id: 'O', rootItemId: 'O', dispatchedAt: daysAgo(40), resolvedAt: daysAgo(40), feedback: [usageEntry({ costUsd: 6, rootItemId: 'O', timestamp: daysAgo(40) })] });
+    const { app } = buildApp({ history: [old] });
+    const { body } = await get(app, '/api/proxy/issues/LIN-42/cost');
+    assert.equal(body.workerSessions[0].dispatches, null);
+  });
+
+  test('window is { days: null, appCallsSince: null, scope: "task-life" }, scope last', async () => {
     const lifetimeStore = new LlmCallLogStore({ ttl: 365 * 24 * 60 * 60 });
     lifetimeStore.listInHorizon = async () => [];
     const { app } = buildApp({ history: [row()], llmCallLogStore: lifetimeStore });
     const { status, body } = await get(app, '/api/proxy/issues/LIN-42/cost');
 
     assert.equal(status, 200);
-    assert.equal(body.window.days, 30);
-    const ageMs = Date.now() - new Date(body.window.appCallsSince).getTime();
-    assert.ok(Math.abs(ageMs - HORIZON_MS) < 5000, `expected appCallsSince ~30d ago, got ${Math.round(ageMs / 86400000)} days`);
+    assert.deepEqual(Object.keys(body.window), ['days', 'appCallsSince', 'scope']);
+    assert.deepEqual(body.window, { days: null, appCallsSince: null, scope: 'task-life' });
   });
 
-  test('the horizon `since` reaches both listHistory calls and listInHorizon (LIN-4179)', async () => {
+  test('the wire keys and their order are unchanged; the internal flags stay off the wire', async () => {
+    const { app } = buildApp({ history: [row()] });
+    const { body } = await get(app, '/api/proxy/issues/LIN-42/cost');
+    assert.deepEqual(Object.keys(body), ['identifier', 'pricedUsd', 'totalUsd', 'unpriced', 'noTelemetryCount', 'unreadableCount', 'noLineage', 'workerSessions', 'appCalls', 'window']);
+    assert.deepEqual(Object.keys(body.workerSessions[0]), ['rootItemId', 'kind', 'dispatchedAt', 'harness', 'model', 'effort', 'costUsd', 'durationMs', 'tokens', 'byModel', 'dispatches']);
+  });
+
+  test('both listHistory calls carry no `since` (identity-bounded), and listInHorizon gets the explicit task-life Date', async () => {
     let summarizeOpts = null;
     const store = new LlmCallLogStore();
     store.listInHorizon = async (urlKey, filters = {}) => {
@@ -357,16 +391,33 @@ describe('GET /api/proxy/issues/:identifier/cost — 30-day read horizon (LIN-31
     const lineageCall = lineageCallOf(historyCalls);
     assert.ok(pageCall, 'expected the issue-scoped page call');
     assert.ok(lineageCall, 'expected the lineage batch call');
+    assert.equal(pageCall.since, undefined, 'the own-row read is bounded by its issue, not by time');
+    assert.equal(lineageCall.since, undefined, 'the sibling read is bounded by its anchors and limit, not by time');
+    assert.equal(pageCall.issueIdentifier, 'LIN-42');
+    assert.deepEqual(lineageCall.rootItemId, { $in: ['root-1'] });
 
-    const lo = Date.now() - HORIZON_MS - 5000;
-    const hi = Date.now() - HORIZON_MS + 5000;
-    for (const [label, call] of [['page', pageCall], ['lineage', lineageCall]]) {
-      assert.ok(call.since instanceof Date, `${label} call must carry a Date since`);
-      assert.ok(call.since.getTime() >= lo && call.since.getTime() <= hi, `${label} since must be ~30d ago`);
-    }
     assert.ok(summarizeOpts, 'listInHorizon must be called');
+    // A missing `since` there means 30 days (lib/llm-call-log.js), so the bound is explicit, and a Date (read-horizon.js).
     assert.ok(summarizeOpts.since instanceof Date, 'listInHorizon must receive a Date since');
-    assert.ok(summarizeOpts.since.getTime() >= lo && summarizeOpts.since.getTime() <= hi, 'listInHorizon since must be ~30d ago');
+    assert.equal(summarizeOpts.since.getTime(), 0, 'listInHorizon since is the task-life bound, the epoch');
+  });
+
+  test('a call older than 30 days is in the app-call figure (the real store, the task-life bound)', async () => {
+    const docs = [
+      { urlKey: 'acme', issueIdentifier: 'LIN-42', feature: 'recommend', model: 'm', cost: 0.04, timestamp: new Date(Date.now() - 40 * DAY_MS) },
+      { urlKey: 'acme', issueIdentifier: 'LIN-42', feature: 'recommend', model: 'm', cost: 0.01, timestamp: new Date(Date.now() - 1 * DAY_MS) },
+    ];
+    const collection = {
+      find(query) {
+        const since = query.timestamp?.$gte;
+        const hits = docs.filter(d => d.urlKey === query.urlKey && d.issueIdentifier === query.issueIdentifier && (!since || d.timestamp >= since));
+        return { toArray: async () => hits };
+      }
+    };
+    const { app } = buildApp({ history: [row()], llmCallLogStore: new LlmCallLogStore({ collection }) });
+    const { body } = await get(app, '/api/proxy/issues/LIN-42/cost');
+    assert.equal(body.appCalls.calls, 2);
+    assert.equal(body.appCalls.costUsd, 0.05);
   });
 });
 

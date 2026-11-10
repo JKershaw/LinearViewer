@@ -4,8 +4,10 @@
  *
  * What is pinned, and on which selection (the replay corpus is the same for every surface):
  *  - S2 = Σ S7 across features, priced and unpriced counts both (the workspace calls total is the sum of its features);
- *  - S1's own calls are a subset of S2's (every issue's calls sit inside the workspace total);
- *  - S1 = S13 per lineage (the run page's lineage figure is the issue's lineage figure);
+ *  - S1's own calls inside 30 days are a subset of S2's (every issue's calls sit inside the workspace total); since
+ *    LIN-4404 S1 reads the task's whole life, so it also counts exactly its own calls older than 30 days;
+ *  - S1 = S13 per lineage (the run page's lineage figure is the issue's lineage figure), for every lineage since
+ *    LIN-4404: both read the lineage's whole life;
  *  - S5 = S12 over the lineages both count (30-day agent spend, on a selection with no straddler and no row-cap truncation).
  *
  * Run with: node --test tests/unit/cost-read-agreement.test.js
@@ -42,28 +44,46 @@ describe('S2 = Σ S7 across features (priced and unpriced counts both)', () => {
 });
 
 describe("S1's calls are a subset of S2's", () => {
+  // LIN-4404: S1 reads the task's whole life and S2 (the workspace calls) the 30-day window, so the subset is taken over
+  // the window: each issue's calls older than 30 days (from the corpus) are taken out of its S1 figures first, and the
+  // second test pins that S1 counts exactly those old calls on top.
+  const oldCallsOf = (issue) => buildCorpus().calls.filter(c => c.issueIdentifier === issue && NOW_MS - new Date(c.timestamp).getTime() >= 30 * DAY_MS);
+
   test('every issue\'s own calls sit inside the workspace calls, and so do its per-feature calls', () => {
     let issueCalls = 0;
     let issueSpend = 0;
     for (const issue of REPLAY_ISSUES) {
       const app = current.S1[issue].body.appCalls;
-      issueCalls += app.calls;
-      issueSpend += app.costUsd;
+      const old = oldCallsOf(issue);
+      issueCalls += app.calls - old.length;
+      issueSpend += app.costUsd - old.reduce((sum, c) => sum + (c.cost ?? 0), 0);
       for (const row of app.byFeature) {
         const whole = current.S2.byFeature.find(f => f.feature === row.feature);
+        const inWindow = row.calls - old.filter(c => c.feature === row.feature).length;
+        if (inWindow === 0) continue;
         assert.ok(whole, `${issue}: feature ${row.feature} is in the workspace calls`);
-        assert.ok(row.calls <= whole.calls, `${issue}: ${row.feature} calls ${row.calls} are within the workspace ${whole.calls}`);
+        assert.ok(inWindow <= whole.calls, `${issue}: ${row.feature} calls ${inWindow} are within the workspace ${whole.calls}`);
       }
     }
     assert.ok(issueCalls <= current.S2.totalCalls, `Σ issue calls ${issueCalls} <= workspace ${current.S2.totalCalls}`);
     assert.ok(issueSpend <= current.S2.pricedUsd + 1e-9, `Σ issue spend ${issueSpend} <= workspace ${current.S2.pricedUsd}`);
   });
+
+  test('LIN-4404: S1 counts its own calls older than 30 days, which S2 does not', () => {
+    const old = oldCallsOf('LIN-42');
+    assert.ok(old.length > 0, 'the corpus has an issue call older than 30 days, so this is not vacuous');
+    const app = current.S1['LIN-42'].body.appCalls;
+    assert.equal(app.calls, buildCorpus().calls.filter(c => c.issueIdentifier === 'LIN-42').length, 'every LIN-42 call, of any age');
+    for (const call of old) {
+      assert.ok(app.byFeature.some(f => f.feature === call.feature), `${call._id} (${call.feature}) is in LIN-42's calls`);
+    }
+  });
 });
 
 describe('S1 = S13 per lineage', () => {
-  // The run page is unbounded (plan: S13 reads the session's loops whatever their age), so a straddler, whose founder is
-  // older than the 30-day window, shows its whole total there, while /cost is windowed and withholds it (incomplete).
-  // That is the named window difference, not a drift; the agreement is pinned on lineages whose founder is in the window.
+  // The run page is unbounded (plan: S13 reads the session's loops whatever their age). Until LIN-4404 /cost was windowed,
+  // so a straddler (founder older than 30 days) agreed only on lineages founded in the window. Since LIN-4404 /cost reads
+  // the task's whole life too, so the agreement holds on every lineage, and the test asserts a straddler is compared.
   const founderInWindow = new Map();
   for (const row of [...buildCorpus().history, ...buildCorpus().queue]) {
     if (row._id === row.rootItemId) founderInWindow.set(row._id, NOW_MS - new Date(row.dispatchedAt).getTime() < 30 * DAY_MS);
@@ -75,13 +95,14 @@ describe('S1 = S13 per lineage', () => {
       for (const session of current.S1[issue].body.workerSessions) s1.set(session.rootItemId, session);
     }
     let compared = 0;
+    let straddlers = 0;
     for (const step of current.S13.steps) {
       const lineage = step.lineageId;
       const figure = step.cost;
-      if (founderInWindow.get(lineage) !== true) continue;
       const session = s1.get(lineage);
       if (!session) continue;
       compared += 1;
+      if (founderInWindow.get(lineage) === false) straddlers += 1;
       if (figure.usd === null || figure.usd === undefined) {
         assert.equal(session.costUsd, null, `${lineage}: the run page withholds its figure, so S1 must too`);
       } else {
@@ -89,6 +110,7 @@ describe('S1 = S13 per lineage', () => {
       }
     }
     assert.ok(compared > 0, 'at least one run-page lineage is also an issue lineage, so the agreement is not vacuous');
+    assert.ok(straddlers > 0, 'a lineage founded more than 30 days ago is compared (LIN-4404: both reads are whole-life)');
   });
 });
 

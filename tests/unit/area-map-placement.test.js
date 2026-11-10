@@ -18,6 +18,9 @@ describe('code-shape area map placement (LIN-3729)', () => {
     }
     assert.strictEqual(areaOf('lib/workspace-kpis-cache.js'), 'Reports & operator tools');
     assert.strictEqual(areaOf('lib/workspace-kpi-stats.js'), 'Reports & operator tools');
+    // LIN-4404: the task's own cost read, lifted out of the /cost route, sits beside the read it calls. Its pattern
+    // replaced a dead `task-cost` entry (no lib/task-cost.js since buildTaskCost was retired), which it would not match.
+    assert.strictEqual(areaOf('lib/task-cost-read.js'), 'Runs & dispatch');
   });
 
   test('the three relabelled files land in their owning areas', () => {
