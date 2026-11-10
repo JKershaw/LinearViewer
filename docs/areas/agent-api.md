@@ -10,6 +10,11 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   reach the token store (LIN-4378). The limiters skip under `NODE_ENV=test`, so a limiter
   test drives the real route chain with it flipped off, as
   `tests/unit/lin-4378-proxy-limiter-per-credential.test.js` does.
+- A recommend surface must not offer what the verb refuses. A rule for recommend-and-dispatch
+  goes in `lib/openrouter.js` `codeRouteOf`, which GET /recommend (`routes/proxy-compute.js`)
+  and the task page reach too; a check in the descent arm (`lib/dispatch-entrance.js`) covers
+  one surface and has no run facts. A caller's bypass rides the call options (`skipLiveWait`),
+  never the recommendation context (LIN-4392).
 - `/cost/:identifier` (`routes/proxy-compute.js`) is pinned by frozen baselines. A change to its window or shape
   moves `tests/fixtures/cost-replay/expected-changes.json` (W9 checks paths, not values, so pin moved values in
   `tests/unit/cost-read.test.js`), `tests/fixtures/cost-replay/goldens-lin4197.json` (amend its header with the
@@ -44,7 +49,11 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   `docs/reviews/seams-tangles-review-2026-11-10-run11.md`
 - `routes/proxy-writes.js`: "no step may change them" (the `## As asked` words) is written twice,
   in `AS_ASKED_LEAD` and in `BRIEF_HINT` (`lib/as-asked.js`); the census pins the markers, not this
-  rule. `lib/proxy-instructions.js` also spells the look-first sequence by hand, though
-  `lib/recommendation-look-first.js` holds `LOOK_FIRST_STEPS`, and "a day" beside
-  `LANDED_MIN_GAP_MS`. Borderline, LOW. (Drift & Coherence Review, 10 Nov;
+  rule. `lib/proxy-instructions.js` also spells "a day" beside `LANDED_MIN_GAP_MS`.
+  Borderline, LOW. (Drift & Coherence Review, 10 Nov;
   `docs/reviews/drift-coherence-review-2026-11-10.md`.)
+- `routes/proxy.js`: recommend-and-dispatch's `skipLiveWait` exempts any `followUpTo`, so a
+  follow-up into an *ended* session of a different stage proceeds while another stage is live.
+  Tightening to "followUpTo is in the live row's lineage" needs a lineage read per hop
+  (`lib/dispatch-entrance.js` sets it; the wait and its race entry are in
+  `lib/recommendation-live-wait.js`). (LIN-4392 review.)

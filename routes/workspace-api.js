@@ -55,7 +55,7 @@ import { armKeepalive, armSseKeepalive, clientGoneSignal } from '../lib/http-kee
 import { testMockData } from '../lib/sample-data/mock-data.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { sendSSE } from '../lib/sse.js';
-import { lookFirstWaitRefusal } from '../lib/recommendation-look-first.js';
+import { liveWaitRefusal } from '../lib/recommendation-live-wait.js';
 import {
   MOCK_STAGE_KIND,
   generateMockRecommendation,
@@ -120,8 +120,8 @@ function toHopRecord(ctx, r) {
     // descent guard (LIN-353) — already in ctx, no extra round-trip.
     state: ctx.issue.state,
     children: ctx.children,
-    // LIN-4370: a look-first run is live; no step, and the stream says why.
-    ...(r.lookFirstWait ? { lookFirstWait: r.lookFirstWait } : {})
+    // LIN-4392: a stage run is live; no step, and the stream says why.
+    ...(r.liveWait ? { liveWait: r.liveWait } : {})
   };
 }
 
@@ -297,8 +297,8 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           ...await modelCallArgs(context, { ...call, signal: abort.signal }),
           (type, data) => { if (type === 'done') leafDone = data; else emit(type, data); }
         );
-        // LIN-4370: a look-first run is live, so there is no step to offer; say so, never a `custom` done.
-        if (structured?.lookFirstWait) return emit('error', lookFirstWaitRefusal(structured.lookFirstWait, contextIssue.identifier));
+        // LIN-4392: a stage run is live, so there is no step to offer; say so, never a `custom` done.
+        if (structured?.liveWait) return emit('error', liveWaitRefusal(structured.liveWait, contextIssue.identifier));
         emit('done', {
           ...leafDone, issueUrl: contextIssue.url,
           identifier: contextIssue.identifier, title: contextIssue.title || null,
@@ -374,9 +374,9 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     });
     if (isClosed()) return;
 
-    if (rec.lookFirstWait) {
-      // LIN-4370: a look-first run is live. Nothing to send; the reasoning already streamed.
-      emit('error', lookFirstWaitRefusal(rec.lookFirstWait, rec.identifier));
+    if (rec.liveWait) {
+      // LIN-4392: a stage run is live on this hop. Nothing to send; the reasoning already streamed.
+      emit('error', liveWaitRefusal(rec.liveWait, rec.identifier));
     } else if (rec.recommendedAction === 'defer' || !rec.prompt) {
       // An abnormal stop (depth / cycle / unresolved / timeout) is surfaced, never
       // shipped as a defer. The terminal hop's reasoning already streamed live.
@@ -527,8 +527,8 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         deferredVia,
         deferTruncated,
         deferStopReason,
-        // LIN-4370: present only when a look-first run is live (no step, prompt null).
-        ...(rec.lookFirstWait ? { lookFirstWait: rec.lookFirstWait } : {})
+        // LIN-4392: present only when a stage run is live (no step, prompt null).
+        ...(rec.liveWait ? { liveWait: rec.liveWait } : {})
       });
     } catch (error) {
       // A hang-up aborts the model call, which surfaces as a timeout: the client

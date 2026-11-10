@@ -41,42 +41,42 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 
 - `lib/recommendation-input.js`: the pinned-kind and in-app renders (`lib/dispatch-entrance.js`,
   `routes/proxy-compute.js` twice, `routes/workspace-api-prompts.js`) build prompt context by
-  hand, not via this projection: a new field must reach five places (LIN-4368
-  missed one). (LIN-4393 leftovers.)
+  hand: a new field must reach five places (LIN-4368 missed one). (LIN-4393 leftovers.)
 - `lib/size-of-move.js`: the built-in policy (`DECIDED_BY.policy`, err larger) may stand in
   for John's "per task breakdown of options"; the size words and cut ruling ask questions
-  they never explain. Revisit both when per-task options land. (John, 8 Nov, LIN-4393.)
+  they never explain. Revisit both with per-task options. (John, LIN-4393.)
 - `lib/should-mock-ai.js`: `isHermeticTestToken` is a third spelling of the test-token
   check, beside `isTestToken` in `routes/workspace-api-steps.js` and the inline
-  `isTestMode` checks in `routes/proxy-compute.js` and `routes/task-chat.js`; now the
-  dispatch entrance and factory use it too. (John, 7 Nov, LIN-4347.)
+  `isTestMode` checks in `routes/proxy-compute.js` and `routes/task-chat.js`. (LIN-4347.)
 - `lib/as-asked.js`: "When it could go" is repeated in three functions. (John, 7 Nov.)
 - `lib/prompt-template-defs.js`: who may agree to a reduced ask has two names, "cut" in
   `CUT` (`lib/prompts/stage-intent.js`) and "narrowing" in the plan-review and review
-  verdict text here and in `lib/completion-signals.js`. No test links them. (John, 8 Nov.)
+  verdicts here and in `lib/completion-signals.js`. No test links them. (John, 8 Nov.)
 - `lib/prompts/stage-intent.js`: `CUT` writes the closing contract's token order
-  (`DECISION:` before `BLOCKED:`) into a scope line, beside `ASK`, which asks for a
-  different shape. (John, 8 Nov.)
-- `lib/prompt-template-defs.js`: a new stage kind is still a row in about nine parallel
-  tables (`GROUNDING_BY_KIND`, rendered ceilings, completion signals, stage labels…), some
-  unguarded; folding the per-kind tables into the stage's one definition is open. (Survey tally, LIN-4248.)
+  (`DECISION:` before `BLOCKED:`) into a scope line beside `ASK`, which asks another
+  shape. (John, 8 Nov.)
+- `lib/prompt-template-defs.js`: a new stage kind is a row in about nine parallel tables
+  (`GROUNDING_BY_KIND`, rendered ceilings, completion signals, labels…), some unguarded;
+  fold them into one stage definition. (Survey tally, LIN-4248.)
 - `lib/call-budget.js`: the budget rule has never run live on anthropic/claude-haiku-5.5. Before a
   call moves to it, replay the snapshot of LIN-4352 (`GET /api/proxy/issues/LIN-4352/snapshots?limit=1`,
   82b963e0) through `scripts/replay-brief.mjs`. Pass: block [2] WHOLE, four sections, finishReason=stop,
-  any retry's reasoning bound accepted. REFUSED: change the rule first. (John, 8 Nov, LIN-4358.)
+  any retry's reasoning bound accepted. REFUSED: change the rule first. (John, LIN-4358.)
 - `lib/call-budget.js`: split rule: `resolveReasoningBudget`/`isReasoningModel` stay in
   `lib/openrouter.js`; tool hops and the routing pair get the budget, not the retry;
-  `canReason` has test callers only. (Area reads CG/CH, 8 Nov.)
+  `canReason` has test callers only. (Area reads CG/CH.)
 - `lib/openrouter.js`: `SUGGESTED_MODEL_IDS` and `DISPATCH_MODEL_SUGGESTIONS`
   (`lib/model-routing-harnesses.js`) repeat ids by hand, unchecked; the first doubles as
-  the cold-catalog tool fallback. (Area reads CG/CH, 8 Nov.)
+  the cold-catalog tool fallback. (Area reads CG/CH.)
 - `lib/periodicals.js`: `areaNotes()` says to follow the notes' own rules, then restates them
   (one home, Waiting vs Lesson, file first). "Waiting entries are context, not scope" is also
   in `lib/prompt-formatters.js` and both READMEs; `docs/areas/` is spelled in four code places.
   (Drift & Coherence Review, 10 Nov; `docs/reviews/drift-coherence-review-2026-11-10.md`.)
 - `lib/prompt-formatters.js`: the area-notes guard is copied to SD and has diverged (200 lines to
-  147, an extra `sh` extension, no Periodical-entry rules in SD's README). Only comments hold the
-  copies together. (Drift & Coherence Review, 10 Nov; the other side is SD's.)
+  147, an extra `sh` extension, no Periodical-entry rules in SD's README); only comments link
+  them. (Drift & Coherence Review, 10 Nov; the other side is SD's.)
 - `lib/periodicals.js`: who merges and sets Done is retyped in three bullets here and in
   `lib/prompt-template-defs.js` (twice), `lib/prompts/autopilot-kickoff.js` and
   `lib/proxy-preamble.js`; only a test links them. (LIN-4390 leftovers.)
+- `lib/recommendation-live-wait.js`: a read, not a claim: two different-kind calls racing on one
+  ticket both pass. The store should claim it, compare-and-set like `claimHeldWake`. (LIN-4392.)
