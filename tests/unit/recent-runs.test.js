@@ -62,7 +62,7 @@ describe('recentRuns (LIN-3300)', () => {
       listHistory: async () => ({ items: [done('plan', '2026-10-04T00:00:00.000Z')] })
     };
     // LIN-4370: one read, two lists. `runs` is the selector's slice; `allRuns` adds each run's dispatch time and
-    // dispatch id (a live run the look-first route waits on is named by it; a row with no id reads null).
+    // dispatch id (a live run the live-stage wait holds on is named by it; a row with no id reads null).
     assert.deepEqual(await loadRecentRuns(store, 'acme', 'LIN-1'), {
       runs: [
         { stage: 'plan', at: '2026-10-04T00:00:00.000Z', outcome: 'done' },

@@ -108,7 +108,7 @@ export const TEMPLATES_RENDERED_CEILINGS = {
  * rules, its prompt and the reply parse. The stage options it lists are each stage's
  * `route`, counted in the template defs.
  */
-export const STAGE_ROUTER_SOURCE_CEILING = 8244; // LIN-4370: +175, the rules' comment restates the invariant (code settles the review loop bound and the look-first sequence); a comment, not prompt text
+export const STAGE_ROUTER_SOURCE_CEILING = 8269; // LIN-4392: +25, the rules' comment names the live-stage wait as the first route code settles; a comment, not prompt text
 /**
  * The routing prompt, rendered bytes for the eval baseline's leaf (a leaf with no
  * comments and no plan, its view a placeholder). It also catches growth in the stage
@@ -139,7 +139,7 @@ export const LEFTOVER_PROMPT_RENDERED_CEILING = 1352; // LIN-4376: +157, where e
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 357949; // LIN-4346: +1145 (356804 -> 357949): formatters +710, scoping +435
+export const FROZEN_TOTAL_BYTES = 357974; // LIN-4392: +25 (357949 -> 357974): stage-router source +25, a comment naming the live-stage wait; no rendered prompt changed
 
 const BASE_URL = 'https://harbour.example';
 

@@ -41,46 +41,45 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 
 ## Waiting
 
-- `lib/dispatch-wake.js`: `reportedPrUrlOf` and SD's `sessionPrs` pick a PR by one order, joined
-  by a comment only; a change to one moves a PR link. (Drift & Coherence Review, 10 Nov;
+- `lib/dispatch-wake.js`: `reportedPrUrlOf` and SD's `sessionPrs` pick a PR by one order, linked
+  only by a comment; changing one moves a PR link. (Drift & Coherence Review, 10 Nov;
   `docs/reviews/drift-coherence-review-2026-11-10.md`.)
 - `lib/dispatch-leftover.js`: restates the follow-up target, halt modes and `NEVER_RAN` (also in
   `_releaseIfHeld`) beside their homes (`lib/dispatch-targets.js`, `HALT_MODES`); a new halt mode
   would not stop a leftover. (Drift & Coherence Review, 10 Nov; `docs/reviews/drift-coherence-review-2026-11-10.md`.)
-- `lib/dispatch-leftover-hook.js`: a claim with no row. A death between `claimHeldWake` and the
-  enqueue, or a failed release write, leaves the wake held. No sweep: a lease never sees a
-  re-report, a sweep needs a history scan, and clearing stamps reopens LIN-4375's double queue.
-  (LIN-4375, LIN-4377.)
-- `lib/dispatch-store.js`: `releaseHeldWake` still prepends `formatHeldWakeNote({status})`, so the
-  release path picks leftover wording; the `lin-4377` test counts the spelling, not the dependency.
-  (Operator, LIN-4377, 8 Nov.)
+- `lib/dispatch-leftover-hook.js`: a death between `claimHeldWake` and the enqueue, or a failed
+  release write, leaves the wake held. No sweep: a lease sees no re-report, a sweep scans
+  history, and clearing stamps reopens LIN-4375's double queue. (LIN-4377.)
+- `lib/dispatch-store.js`: `releaseHeldWake` prepends `formatHeldWakeNote({status})`, so release
+  picks leftover wording; `lin-4377` counts the spelling, not the dependency. (Operator, LIN-4377.)
 - `lib/dispatch-store.js`: `addFeedback` takes one `wakeHook`; a second held-wake feature
-  first needs composable hooks. (Operator, LIN-4377, 8 Nov.)
+  first needs composable hooks. (Operator, LIN-4377.)
 - `lib/runner-kit/contract.json`: the row-shape rule is written twice (`checkRowShape`;
-  simple-dispatcher's `columnProblems`); `CONTRACT_SHA256` pins the bytes, not the rule.
-  (Operator, LIN-4377, 8 Nov.)
-- `lib/runner-kit/contract.json`: no row pins a follow-up to a finished session with no halt
-  (rows cover pause and stop only), though the leftover step resumes its build that way
-  (`lib/dispatch-leftover.js`). Add the row or name the gap. (Seams & Tangles, 10 Nov.)
+  SD's `columnProblems`); `CONTRACT_SHA256` pins the bytes, not the rule. (Operator, LIN-4377.)
+- `lib/runner-kit/contract.json`: no row pins a follow-up to a finished, unhalted session
+  (rows cover pause and stop), though the leftover step resumes its build that way
+  (`lib/dispatch-leftover.js`). (Seams & Tangles, 10 Nov.)
   `docs/reviews/seams-tangles-review-2026-11-10-run11.md`
 - `lib/dispatch-factory.js`: tests `provider.name === 'linear'` beside
-  `isHermeticTestToken` for a test-only transport. (John, 7 Nov, LIN-4347.)
-- `lib/effort-readout.js`: still outputs the deleted name `GATE_DUE_MARKER` (now
+  `isHermeticTestToken` for a test-only transport. (LIN-4347.)
+- `lib/effort-readout.js`: outputs the deleted name `GATE_DUE_MARKER` (now
   `planReviewDueOf`), pinned by cost-replay goldens. (John, 7 Nov.)
-- `lib/cost-read.js`: split `readCalls` and `callsSurfaceOf` out, and settle whether
+- `lib/cost-read.js`: split out `readCalls` and `callsSurfaceOf`; settle whether
   instance-wide reads sit beside workspace-keyed stores. (Survey tally: LIN-4201.)
-- `lib/session-summary.js`: do stored run paragraphs keep pre-cutover (records-first)
-  figures? (Survey tally: LIN-4201.)
+- `lib/session-summary.js`: do stored run paragraphs keep pre-cutover figures? (Survey
+  tally: LIN-4201.)
 - `lib/dispatch-feedback-validation.js`: feedback kinds lack one declaration with their
   role: `PARKED_WAIT_SKIPPED_KINDS` (`lib/session-telemetry.js`), `FEEDBACK_ENTRY_KINDS`,
   `findWakeEvent`'s skip rule. (Survey tally: LIN-4240, 4239, 4233.)
-- `lib/wake-shadow.js`: one wake policy, by promoting the LIN-3257 classifier this
-  shadow records. (Survey tally: LIN-4166.)
-- `lib/follow-up-dispatch.js`: on a second "aside" case, name the aside follow-up for
-  every lineage reader. (Survey tally: LIN-4166.)
-- `lib/runner-kit/runner.mjs`: the per-message transcript fold is here and in
-  simple-dispatcher; one shared fold would turn a transcript into requests.
-  (Survey tally: LIN-4203, LIN-4195.)
+- `lib/wake-shadow.js`: one wake policy, from the LIN-3257 classifier this shadow records.
+  (Survey tally: LIN-4166.)
+- `lib/follow-up-dispatch.js`: on a second "aside" case, name the aside follow-up for all
+  lineage readers. (Survey tally: LIN-4166.)
+- `lib/runner-kit/runner.mjs`: the per-message transcript fold is here and in SD; one shared
+  fold would turn a transcript into requests. (Survey tally: LIN-4203, LIN-4195.)
 - `routes/dispatch.js`: feedback and heartbeat limiters stay 100/min per IP. (LIN-4378.)
 - `lib/dispatch-entrance.js`: only `POST /autopilot/kickoff` passes `periodicalReview` (no
   tail on a Periodical's review); the rest rely on the marker rule. (LIN-4382.)
+- `lib/recent-runs.js`: `runFact` reads only the row's feedback: a stage parked `[pending]` whose
+  lineage ends `[blocked]` or `[skipped]` reads `running` and holds the live-stage wait until
+  aborted. (LIN-4392.)
