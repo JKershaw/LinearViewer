@@ -25,6 +25,9 @@
  *     nothing else is sent, scoping included, and the ticket is not handed to the selector;
  *     recommend-and-dispatch refuses 409 STAGE_IN_FLIGHT naming the live dispatch, the UI
  *     stream says the same, and aborting a wedged step moves the sequence on.
+ *   - LIN-4398: a gate-marked Periodical review's sequence is scoping alone (the Surveys are
+ *     skipped, never described as attempted); its unmarked twin and the manual `kind` override
+ *     are unchanged.
  *
  * Run with: node --test tests/unit/lin-4370-look-first-route.test.js
  */
@@ -33,7 +36,8 @@ process.env.NODE_ENV = 'test';
 import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { lookFirstStep, lookFirstOff, holdingComment, isSurveyComment, LOOK_FIRST_STEPS } from '../../lib/recommendation-look-first.js';
+import { lookFirstStep, lookFirstOff, lookFirstSteps, holdingComment, isSurveyComment, LOOK_FIRST_STEPS } from '../../lib/recommendation-look-first.js';
+import { buildPeriodicalGateMarker, isPeriodicalReview } from '../../lib/periodicals.js';
 import { liveWaitOf, STAGE_IN_FLIGHT_CODE } from '../../lib/recommendation-live-wait.js';
 import { getRecommendation, getRecommendationStream, setFetchImpl, setPromptTraceRecorder, buildSelectorArgs } from '../../lib/openrouter.js';
 import { generatePrompt, PROMPT_TEMPLATES, deriveDispatchKind } from '../../lib/prompt-templates.js';
@@ -648,5 +652,95 @@ describe('LIN-4369 handoff: scoping\'s final message never reaches the stage aft
     assert.equal(seen.length, 1, 'no second scoping: the selector is asked');
     assert.equal(items[0].kind, 'research');
     assert.ok(!seen[0].includes('NOTES FOR THE BUILDER') && !items[0].prompt.includes('NOTES FOR THE BUILDER'));
+  });
+});
+
+// ── LIN-4398: a Periodical's review ticket starts at scoping; every other ticket keeps both Surveys ──
+
+describe('LIN-4398: a gate-marked Periodical review skips the two Surveys and starts at scoping', () => {
+  const MARKED = sealAsAsked(`${buildPeriodicalGateMarker('Documentation Review')}\n\nRun the documentation review.`);
+  const marked = (over = {}) => leaf({ description: MARKED, ...over });
+  const twin = (over = {}) => leaf(over);
+  const mentions = leaf({ description: `${ASKED}\n\nThis ticket is not a Periodical review; it only mentions Periodicals in passing.` });
+
+  test('isPeriodicalReview: true for the marker, false for plain, empty, null and a mere mention', () => {
+    assert.equal(isPeriodicalReview(MARKED), true);
+    assert.equal(isPeriodicalReview(ASKED), false);
+    assert.equal(isPeriodicalReview(''), false);
+    assert.equal(isPeriodicalReview(null), false);
+    assert.equal(isPeriodicalReview(undefined), false);
+    assert.equal(isPeriodicalReview(mentions.description), false);
+  });
+
+  test('lookFirstSteps: the marked review gets [scoping]; every other ticket gets the default three', () => {
+    assert.deepEqual(lookFirstSteps(MARKED), ['scoping']);
+    assert.deepEqual(lookFirstSteps(ASKED), ['survey-task', 'survey-place', 'scoping']);
+    assert.deepEqual(lookFirstSteps(mentions.description), ['survey-task', 'survey-place', 'scoping']);
+    assert.deepEqual(lookFirstSteps(''), ['survey-task', 'survey-place', 'scoping']);
+    assert.deepEqual(lookFirstSteps(null), ['survey-task', 'survey-place', 'scoping']);
+    assert.deepEqual(LOOK_FIRST_STEPS, ['survey-task', 'survey-place', 'scoping'], 'the exported default is unchanged');
+  });
+
+  test('empty trail: the marked review is sent scoping, and its reason claims no Survey was attempted', () => {
+    const step = lookFirstStep(marked(), ctx());
+    assert.equal(step.step, 'scoping');
+    assert.doesNotMatch(step.why, /attempted/, 'skipped Surveys are not described as attempted');
+    assert.match(step.why, /survey-task and survey-place are skipped/);
+    assert.match(step.why, /Periodical review lands no code/);
+  });
+
+  test('its unmarked twin keeps both Surveys: survey-task first, scoping only after both comments', () => {
+    assert.equal(stepOf(twin(), ctx()), 'survey-task');
+    assert.equal(stepOf(twin(), ctx([surveyTask('10:00'), surveyPlace('10:30')])), 'scoping');
+    assert.equal(lookFirstStep(twin(), ctx()).why, 'the look-first sequence: no size of the move is recorded, so survey-task is next; code sends each step once, whatever an earlier step said.', 'the ordinary reason text is unchanged');
+  });
+
+  test('a hand-sent Survey or an earlier Survey run on the marked review does not stop, repeat, or re-route scoping', () => {
+    assert.equal(stepOf(marked(), ctx([surveyTask('10:00')], [run('survey-task', '09:50', 'done', '10:00')])), 'scoping');
+    assert.equal(stepOf(marked(), ctx([surveyTask('10:00'), surveyPlace('10:30')], [run('survey-task', '09:50'), run('survey-place', '10:20')])), 'scoping');
+    // Once scoping has a run on record the route stands aside: the sequence sends scoping once, never again.
+    assert.equal(stepOf(marked(), ctx([], [run('scoping', '11:00', 'failed', '11:20')])), null);
+    assert.equal(stepOf(marked(), ctx([], [run('scoping', '11:00', 'queued', '11:00')])), null);
+  });
+
+  test('the other off-switches still hold on a marked review (a size record, a person\'s hold, a plan)', () => {
+    assert.equal(lookFirstOff(marked({ description: MARKED + RECORD() }), ctx()), 'size recorded');
+    assert.equal(lookFirstOff(marked(), ctx([surveyTask('10:00'), person('10:30')], [run('survey-task', '09:40', 'done', '10:00')])), "a person's comment holds it");
+    assert.equal(lookFirstOff(marked(), ctx([comment('10:00', '## Plan\n\nThe plan in a comment.')])), 'has a plan');
+  });
+
+  test('wired: recommend-and-dispatch sends the marked review scoping with no model call, and the route is look-first', async () => {
+    setFetchImpl(async () => { throw new Error('the model must not be called for a marked Periodical review'); });
+    setIssue(marked({ identifier: 'LF-P1' }));
+    const items = [];
+    const { status, body } = await request(proxyApp({ items }), '/api/proxy/recommend-and-dispatch', { method: 'POST', body: { issueIdentifier: 'LF-P1' } });
+    assert.equal(status, 201, JSON.stringify(body));
+    assert.equal(body.kind, 'scoping');
+    assert.equal(items.length, 1);
+    assert.equal(items[0].kind, 'scoping');
+    assert.equal(items.some(i => i.kind === 'survey-task' || i.kind === 'survey-place'), false);
+    // The buffered seam on the same ticket: the same route, step and prompt, and no model call.
+    const rec = await getRecommendation(marked({ identifier: 'LF-P1' }), ctx(), { apiKey: 'stub', model: 'x' });
+    assert.equal(rec.codeRoute, 'look-first');
+    assert.equal(rec.recommendedAction, 'scoping');
+    assert.equal(rec.prompt, generatePrompt('scoping', marked({ identifier: 'LF-P1' }), ctx()).prompt);
+  });
+
+  test('wired: the twin on the same harness still dispatches survey-task first', async () => {
+    setFetchImpl(async () => { throw new Error('the model must not be called on the look-first route'); });
+    setIssue(twin({ identifier: 'LF-P3' }));
+    const items = [];
+    const { status, body } = await request(proxyApp({ items }), '/api/proxy/recommend-and-dispatch', { method: 'POST', body: { issueIdentifier: 'LF-P3' } });
+    assert.equal(status, 201, JSON.stringify(body));
+    assert.equal(body.kind, 'survey-task');
+  });
+
+  test('wired: the manual kind override still pins survey-task on a marked review (the override never reads the route)', async () => {
+    setFetchImpl(async () => { throw new Error('the override skips the model entirely'); });
+    setIssue(marked({ identifier: 'LF-P2' }));
+    const items = [];
+    const { status, body } = await request(proxyApp({ items }), '/api/proxy/recommend-and-dispatch', { method: 'POST', body: { issueIdentifier: 'LF-P2', kind: 'survey-task' } });
+    assert.equal(status, 201, JSON.stringify(body));
+    assert.equal(items[0].kind, 'survey-task');
   });
 });
