@@ -1,0 +1,1846 @@
+{
+ "commit": "5d8489e7fd8434f0e69af7df11a3746790abbe64",
+ "commitDate": "2026-11-08T12:43:31Z",
+ "previousCommit": "07c88f7a338b3e19a01070775e1f4d4cfc91f040",
+ "baseline": false,
+ "areaGuide": "/Users/autopilot/development/simple-dispatcher-workspaces/1a77bbff-9bbd-4839-a165-8773dcd369c4/simple-dispatcher/docs/areas/areas.json",
+ "churnWindowDays": 90,
+ "top": 25,
+ "counts": {
+  "groups": 61,
+  "mustRule": 27,
+  "table": 25,
+  "unranked": 0,
+  "gone": 0
+ },
+ "groups": [
+  {
+   "rank": 1,
+   "id": "G0001",
+   "detector": "contract",
+   "decision": "text contract marker: [failed]",
+   "score": 1430,
+   "fileCount": 10,
+   "areaCount": 6,
+   "areas": [
+    "Launch & harnesses",
+    "Loop, poll & routing",
+    "Reapers & liveness",
+    "State, config & host process",
+    "Stop hook & relay",
+    "Test harnesses"
+   ],
+   "files": [
+    "abort.js",
+    "admission.js",
+    "dispatcher.js",
+    "e2e-smoke.js",
+    "executors.js",
+    "followup.js",
+    "hook.js",
+    "opencode-runner.js",
+    "reapers.js",
+    "scripts/floor-report.mjs"
+   ],
+   "siteCount": 39,
+   "churn": 143,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 22,
+    "pattern": "\\[failed\\]"
+   },
+   "sites": [
+    "abort.js:45",
+    "abort.js:86",
+    "admission.js:37",
+    "admission.js:49",
+    "admission.js:63",
+    "admission.js:76",
+    "dispatcher.js:972",
+    "dispatcher.js:989",
+    "dispatcher.js:1022",
+    "dispatcher.js:1166",
+    "dispatcher.js:1200",
+    "dispatcher.js:1288",
+    "dispatcher.js:1448",
+    "e2e-smoke.js:607",
+    "executors.js:782",
+    "followup.js:56",
+    "followup.js:82",
+    "followup.js:109",
+    "hook.js:1623",
+    "hook.js:1663",
+    "opencode-runner.js:901",
+    "opencode-runner.js:939",
+    "opencode-runner.js:940",
+    "opencode-runner.js:1492",
+    "opencode-runner.js:1643",
+    "opencode-runner.js:1644",
+    "opencode-runner.js:1752",
+    "reapers.js:489",
+    "reapers.js:505",
+    "reapers.js:525",
+    "reapers.js:529",
+    "reapers.js:530",
+    "reapers.js:667",
+    "reapers.js:2571",
+    "reapers.js:2659",
+    "reapers.js:2845",
+    "reapers.js:2871",
+    "reapers.js:3306",
+    "scripts/floor-report.mjs:55"
+   ]
+  },
+  {
+   "rank": 2,
+   "id": "G0002",
+   "detector": "set",
+   "decision": "string set {'ignore', 'pipe'} as array [stdio]",
+   "score": 1110,
+   "fileCount": 10,
+   "areaCount": 5,
+   "areas": [
+    "Launch & harnesses",
+    "Reapers & liveness",
+    "State, config & host process",
+    "Stop hook & relay",
+    "Test harnesses"
+   ],
+   "files": [
+    "e2e-broker-witness.js",
+    "e2e-smoke.js",
+    "experiments/lin-3270-going-down-witness.js",
+    "hook.js",
+    "instance-guard.js",
+    "opencode-runner.js",
+    "reapers.js",
+    "scripts/floor-report.mjs",
+    "signal-guard.js",
+    "terminal-driver.js"
+   ],
+   "siteCount": 15,
+   "churn": 111,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 6,
+    "pattern": "['\"`](ignore|pipe)['\"`]"
+   },
+   "sites": [
+    "e2e-broker-witness.js:77",
+    "e2e-smoke.js:1141",
+    "e2e-smoke.js:1762",
+    "experiments/lin-3270-going-down-witness.js:82",
+    "hook.js:574",
+    "instance-guard.js:156",
+    "opencode-runner.js:371",
+    "opencode-runner.js:1211",
+    "reapers.js:4035",
+    "scripts/floor-report.mjs:49",
+    "signal-guard.js:41",
+    "terminal-driver.js:511",
+    "terminal-driver.js:525",
+    "terminal-driver.js:1035",
+    "terminal-driver.js:1342"
+   ]
+  },
+  {
+   "rank": 3,
+   "id": "G0003",
+   "detector": "contract",
+   "decision": "text contract marker: [working]",
+   "score": 846,
+   "fileCount": 6,
+   "areaCount": 4,
+   "areas": [
+    "Launch & harnesses",
+    "Loop, poll & routing",
+    "Reapers & liveness",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "dispatcher.js",
+    "executors.js",
+    "heartbeat.js",
+    "hook.js",
+    "opencode-runner.js",
+    "reapers.js"
+   ],
+   "siteCount": 12,
+   "churn": 141,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 8,
+    "pattern": "\\[working\\]"
+   },
+   "sites": [
+    "dispatcher.js:1210",
+    "executors.js:769",
+    "heartbeat.js:367",
+    "heartbeat.js:367",
+    "heartbeat.js:376",
+    "hook.js:1338",
+    "hook.js:1461",
+    "hook.js:1473",
+    "hook.js:1474",
+    "opencode-runner.js:1286",
+    "reapers.js:2943",
+    "reapers.js:2945"
+   ]
+  },
+  {
+   "rank": 4,
+   "id": "G0004",
+   "detector": "clone",
+   "decision": "tiny rule copied as a helper onAttemptFailed(), 4 copies of 1-4 statements",
+   "score": 536,
+   "fileCount": 4,
+   "areaCount": 4,
+   "areas": [
+    "Launch & harnesses",
+    "Loop, poll & routing",
+    "Reapers & liveness",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "dispatcher.js",
+    "hook.js",
+    "opencode-runner.js",
+    "reapers.js"
+   ],
+   "siteCount": 4,
+   "churn": 134,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": null,
+   "sites": [
+    "dispatcher.js:718",
+    "hook.js:151",
+    "opencode-runner.js:527",
+    "reapers.js:102"
+   ]
+  },
+  {
+   "rank": 5,
+   "id": "G0005",
+   "detector": "contract",
+   "decision": "text contract marker: [done]",
+   "score": 525,
+   "fileCount": 5,
+   "areaCount": 5,
+   "areas": [
+    "Launch & harnesses",
+    "Reapers & liveness",
+    "State, config & host process",
+    "Stop hook & relay",
+    "Test harnesses"
+   ],
+   "files": [
+    "e2e-smoke.js",
+    "hook.js",
+    "opencode-runner.js",
+    "reapers.js",
+    "scripts/floor-report.mjs"
+   ],
+   "siteCount": 8,
+   "churn": 105,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 16,
+    "pattern": "\\[done\\]"
+   },
+   "sites": [
+    "e2e-smoke.js:606",
+    "hook.js:2172",
+    "hook.js:2172",
+    "opencode-runner.js:1585",
+    "reapers.js:2572",
+    "reapers.js:3279",
+    "reapers.js:3294",
+    "scripts/floor-report.mjs:54"
+   ]
+  },
+  {
+   "rank": 6,
+   "id": "G0006",
+   "detector": "cmp",
+   "decision": "repeated comparison phase == 'AWAITING_FOLLOWUP'",
+   "score": 455,
+   "fileCount": 5,
+   "areaCount": 3,
+   "areas": [
+    "Reapers & liveness",
+    "Stop hook & relay",
+    "Test harnesses"
+   ],
+   "files": [
+    "e2e-smoke.js",
+    "hook.js",
+    "host-heartbeat.js",
+    "opencode-liveness.js",
+    "reapers.js"
+   ],
+   "siteCount": 8,
+   "churn": 91,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 0,
+    "pattern": "['\"`](AWAITING_FOLLOWUP)['\"`]"
+   },
+   "sites": [
+    "e2e-smoke.js:1528",
+    "e2e-smoke.js:1560",
+    "hook.js:1297",
+    "hook.js:2125",
+    "host-heartbeat.js:60",
+    "opencode-liveness.js:250",
+    "reapers.js:919",
+    "reapers.js:921"
+   ]
+  },
+  {
+   "rank": 7,
+   "id": "G0007",
+   "detector": "contract",
+   "decision": "text contract marker: [blocked]",
+   "score": 280,
+   "fileCount": 4,
+   "areaCount": 4,
+   "areas": [
+    "Launch & harnesses",
+    "State, config & host process",
+    "Stop hook & relay",
+    "Test harnesses"
+   ],
+   "files": [
+    "e2e-smoke.js",
+    "hook.js",
+    "opencode-runner.js",
+    "scripts/floor-report.mjs"
+   ],
+   "siteCount": 4,
+   "churn": 70,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 5,
+    "pattern": "\\[blocked\\]"
+   },
+   "sites": [
+    "e2e-smoke.js:608",
+    "hook.js:1684",
+    "opencode-runner.js:1518",
+    "scripts/floor-report.mjs:56"
+   ]
+  },
+  {
+   "rank": 8,
+   "id": "G0008",
+   "detector": "contract",
+   "decision": "text contract marker: [pending]",
+   "score": 280,
+   "fileCount": 4,
+   "areaCount": 4,
+   "areas": [
+    "Launch & harnesses",
+    "State, config & host process",
+    "Stop hook & relay",
+    "Test harnesses"
+   ],
+   "files": [
+    "e2e-smoke.js",
+    "hook.js",
+    "opencode-runner.js",
+    "scripts/floor-report.mjs"
+   ],
+   "siteCount": 5,
+   "churn": 70,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 2,
+    "pattern": "\\[pending\\]"
+   },
+   "sites": [
+    "e2e-smoke.js:609",
+    "e2e-smoke.js:609",
+    "hook.js:1726",
+    "opencode-runner.js:1571",
+    "scripts/floor-report.mjs:58"
+   ]
+  },
+  {
+   "rank": 9,
+   "id": "G0009",
+   "detector": "cmp",
+   "decision": "repeated comparison phase == 'CANCELLED'",
+   "score": 196,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Loop, poll & routing",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "dispatcher.js",
+    "hook.js"
+   ],
+   "siteCount": 5,
+   "churn": 98,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 0,
+    "pattern": "['\"`](CANCELLED)['\"`]"
+   },
+   "sites": [
+    "dispatcher.js:307",
+    "hook.js:1006",
+    "hook.js:1183",
+    "hook.js:1204",
+    "hook.js:1216"
+   ]
+  },
+  {
+   "rank": 10,
+   "id": "G0010",
+   "detector": "contract",
+   "decision": "text contract marker: [evidence]",
+   "score": 195,
+   "fileCount": 3,
+   "areaCount": 2,
+   "areas": [
+    "Launch & harnesses",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "hook.js",
+    "links.js",
+    "opencode-runner.js"
+   ],
+   "siteCount": 4,
+   "churn": 65,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 1,
+    "pattern": "\\[evidence\\]"
+   },
+   "sites": [
+    "hook.js:601",
+    "links.js:331",
+    "opencode-runner.js:981",
+    "opencode-runner.js:1458"
+   ]
+  },
+  {
+   "rank": 11,
+   "id": "G0011",
+   "detector": "cmp",
+   "decision": "repeated comparison code == 'ENOENT'",
+   "score": 192,
+   "fileCount": 3,
+   "areaCount": 3,
+   "areas": [
+    "Loop, poll & routing",
+    "Reapers & liveness",
+    "State, config & host process"
+   ],
+   "files": [
+    "dispatcher.js",
+    "instance-guard.js",
+    "resource-metrics.js"
+   ],
+   "siteCount": 3,
+   "churn": 64,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 3,
+    "pattern": "['\"`](ENOENT)['\"`]"
+   },
+   "sites": [
+    "dispatcher.js:554",
+    "instance-guard.js:146",
+    "resource-metrics.js:90"
+   ]
+  },
+  {
+   "rank": 12,
+   "id": "G0012",
+   "detector": "cmp",
+   "decision": "repeated comparison harness == 'opencode'",
+   "score": 189,
+   "fileCount": 3,
+   "areaCount": 2,
+   "areas": [
+    "Launch & harnesses",
+    "Reapers & liveness"
+   ],
+   "files": [
+    "executors.js",
+    "opencode-liveness.js",
+    "reapers.js"
+   ],
+   "siteCount": 16,
+   "churn": 63,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 7,
+    "pattern": "['\"`](opencode)['\"`]"
+   },
+   "sites": [
+    "executors.js:408",
+    "opencode-liveness.js:234",
+    "reapers.js:914",
+    "reapers.js:970",
+    "reapers.js:2221",
+    "reapers.js:2445",
+    "reapers.js:2916",
+    "reapers.js:2972",
+    "reapers.js:3081",
+    "reapers.js:3100",
+    "reapers.js:3122",
+    "reapers.js:3146",
+    "reapers.js:3209",
+    "reapers.js:3234",
+    "reapers.js:3432",
+    "reapers.js:3470"
+   ]
+  },
+  {
+   "rank": 13,
+   "id": "G0013",
+   "detector": "cmp",
+   "decision": "repeated comparison livenessSignal == 'transcript-hook'",
+   "score": 180,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Loop, poll & routing",
+    "Reapers & liveness"
+   ],
+   "files": [
+    "dispatcher.js",
+    "reapers.js"
+   ],
+   "siteCount": 7,
+   "churn": 90,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 2,
+    "pattern": "['\"`](transcript-hook)['\"`]"
+   },
+   "sites": [
+    "dispatcher.js:947",
+    "dispatcher.js:1428",
+    "dispatcher.js:1596",
+    "reapers.js:235",
+    "reapers.js:410",
+    "reapers.js:589",
+    "reapers.js:644"
+   ]
+  },
+  {
+   "rank": 14,
+   "id": "G0014",
+   "detector": "cmp",
+   "decision": "repeated comparison type == 'text'",
+   "score": 164,
+   "fileCount": 4,
+   "areaCount": 3,
+   "areas": [
+    "Launch & harnesses",
+    "Stop hook & relay",
+    "Test harnesses"
+   ],
+   "files": [
+    "e2e-smoke.js",
+    "links.js",
+    "opencode-runner.js",
+    "transcript.js"
+   ],
+   "siteCount": 10,
+   "churn": 41,
+   "mustRule": true,
+   "table": false,
+   "status": "grown",
+   "ownChurn": {
+    "commits": 4,
+    "pattern": "['\"`](text)['\"`]"
+   },
+   "sites": [
+    "e2e-smoke.js:1271",
+    "links.js:154",
+    "links.js:158",
+    "links.js:275",
+    "opencode-runner.js:288",
+    "opencode-runner.js:351",
+    "transcript.js:53",
+    "transcript.js:77",
+    "transcript.js:107",
+    "transcript.js:425"
+   ]
+  },
+  {
+   "rank": 15,
+   "id": "G0015",
+   "detector": "cmp",
+   "decision": "repeated comparison kind == 'pending'",
+   "score": 164,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Reapers & liveness",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "hook.js",
+    "reapers.js"
+   ],
+   "siteCount": 2,
+   "churn": 82,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 7,
+    "pattern": "['\"`](pending)['\"`]"
+   },
+   "sites": [
+    "hook.js:1712",
+    "reapers.js:948"
+   ]
+  },
+  {
+   "rank": 16,
+   "id": "G0016",
+   "detector": "cmp",
+   "decision": "repeated comparison role == 'assistant'",
+   "score": 152,
+   "fileCount": 4,
+   "areaCount": 3,
+   "areas": [
+    "Launch & harnesses",
+    "Reapers & liveness",
+    "Test harnesses"
+   ],
+   "files": [
+    "e2e-smoke.js",
+    "heartbeat.js",
+    "opencode-request-records.js",
+    "opencode-runner.js"
+   ],
+   "siteCount": 6,
+   "churn": 38,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 1,
+    "pattern": "['\"`](assistant)['\"`]"
+   },
+   "sites": [
+    "e2e-smoke.js:1310",
+    "e2e-smoke.js:1331",
+    "heartbeat.js:253",
+    "opencode-request-records.js:30",
+    "opencode-runner.js:312",
+    "opencode-runner.js:348"
+   ]
+  },
+  {
+   "rank": 17,
+   "id": "G0017",
+   "detector": "const",
+   "decision": "named constant LINK_CAP=8",
+   "score": 130,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Launch & harnesses",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "hook.js",
+    "opencode-runner.js"
+   ],
+   "siteCount": 2,
+   "churn": 65,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 0,
+    "pattern": "LINK_CAP"
+   },
+   "sites": [
+    "hook.js:46",
+    "opencode-runner.js:77"
+   ]
+  },
+  {
+   "rank": 18,
+   "id": "G0018",
+   "detector": "clone",
+   "decision": "near-duplicate function deriveEvidenceScope() (also: resolveScope), ~7 statements, same vocabulary (dialect copy or close variant)",
+   "score": 130,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Launch & harnesses",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "hook.js",
+    "opencode-runner.js"
+   ],
+   "siteCount": 2,
+   "churn": 65,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": null,
+   "sites": [
+    "hook.js:569",
+    "opencode-runner.js:367"
+   ]
+  },
+  {
+   "rank": 19,
+   "id": "G0019",
+   "detector": "cmp",
+   "decision": "repeated comparison kind == 'blocked'",
+   "score": 130,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Launch & harnesses",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "hook.js",
+    "opencode-runner.js"
+   ],
+   "siteCount": 3,
+   "churn": 65,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 5,
+    "pattern": "['\"`](blocked)['\"`]"
+   },
+   "sites": [
+    "hook.js:1524",
+    "hook.js:1668",
+    "opencode-runner.js:1509"
+   ]
+  },
+  {
+   "rank": 20,
+   "id": "G0020",
+   "detector": "cmp",
+   "decision": "repeated comparison kind == 'failed'",
+   "score": 130,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Launch & harnesses",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "hook.js",
+    "opencode-runner.js"
+   ],
+   "siteCount": 2,
+   "churn": 65,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 1,
+    "pattern": "['\"`](failed)['\"`]"
+   },
+   "sites": [
+    "hook.js:1651",
+    "opencode-runner.js:1483"
+   ]
+  },
+  {
+   "rank": 21,
+   "id": "G0021",
+   "detector": "cmp",
+   "decision": "repeated comparison kind == 'pending-external'",
+   "score": 130,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Launch & harnesses",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "hook.js",
+    "opencode-runner.js"
+   ],
+   "siteCount": 3,
+   "churn": 65,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 0,
+    "pattern": "['\"`](pending-external)['\"`]"
+   },
+   "sites": [
+    "hook.js:1524",
+    "hook.js:1712",
+    "opencode-runner.js:1535"
+   ]
+  },
+  {
+   "rank": 22,
+   "id": "G0022",
+   "detector": "cmp",
+   "decision": "repeated comparison kind == 'pending-internal'",
+   "score": 130,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Launch & harnesses",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "hook.js",
+    "opencode-runner.js"
+   ],
+   "siteCount": 2,
+   "churn": 65,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 0,
+    "pattern": "['\"`](pending-internal)['\"`]"
+   },
+   "sites": [
+    "hook.js:1689",
+    "opencode-runner.js:1535"
+   ]
+  },
+  {
+   "rank": 23,
+   "id": "G0023",
+   "detector": "cmp",
+   "decision": "repeated comparison mode == 'stop'",
+   "score": 128,
+   "fileCount": 2,
+   "areaCount": 1,
+   "areas": [
+    "Loop, poll & routing"
+   ],
+   "files": [
+    "dispatcher.js",
+    "halt.js"
+   ],
+   "siteCount": 6,
+   "churn": 64,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 9,
+    "pattern": "['\"`](stop)['\"`]"
+   },
+   "sites": [
+    "dispatcher.js:1895",
+    "dispatcher.js:2112",
+    "halt.js:235",
+    "halt.js:266",
+    "halt.js:285",
+    "halt.js:289"
+   ]
+  },
+  {
+   "rank": 24,
+   "id": "G0024",
+   "detector": "cmp",
+   "decision": "repeated comparison action == 'reject'",
+   "score": 126,
+   "fileCount": 2,
+   "areaCount": 1,
+   "areas": [
+    "Loop, poll & routing"
+   ],
+   "files": [
+    "dispatcher.js",
+    "followup.js"
+   ],
+   "siteCount": 4,
+   "churn": 63,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 6,
+    "pattern": "['\"`](reject)['\"`]"
+   },
+   "sites": [
+    "dispatcher.js:838",
+    "dispatcher.js:901",
+    "dispatcher.js:1259",
+    "followup.js:154"
+   ]
+  },
+  {
+   "rank": 25,
+   "id": "G0025",
+   "detector": "contract",
+   "decision": "text contract marker: [aborted]",
+   "score": 124,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Loop, poll & routing",
+    "State, config & host process"
+   ],
+   "files": [
+    "dispatcher.js",
+    "scripts/floor-report.mjs"
+   ],
+   "siteCount": 3,
+   "churn": 62,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 5,
+    "pattern": "\\[aborted\\]"
+   },
+   "sites": [
+    "dispatcher.js:659",
+    "dispatcher.js:660",
+    "scripts/floor-report.mjs:55"
+   ]
+  },
+  {
+   "rank": 26,
+   "id": "G0026",
+   "detector": "contract",
+   "decision": "text contract marker: [skipped]",
+   "score": 124,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Loop, poll & routing",
+    "State, config & host process"
+   ],
+   "files": [
+    "dispatcher.js",
+    "scripts/floor-report.mjs"
+   ],
+   "siteCount": 2,
+   "churn": 62,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 2,
+    "pattern": "\\[skipped\\]"
+   }
+  },
+  {
+   "rank": 27,
+   "id": "G0027",
+   "detector": "cmp",
+   "decision": "repeated comparison type == 'user'",
+   "score": 116,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Reapers & liveness",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "reapers.js",
+    "transcript.js"
+   ],
+   "siteCount": 5,
+   "churn": 58,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 3,
+    "pattern": "['\"`](user)['\"`]"
+   }
+  },
+  {
+   "rank": 28,
+   "id": "G0028",
+   "detector": "cmp",
+   "decision": "repeated comparison postedPhase == 'EXECUTING'",
+   "score": 112,
+   "fileCount": 2,
+   "areaCount": 1,
+   "areas": [
+    "Reapers & liveness"
+   ],
+   "files": [
+    "heartbeat.js",
+    "reapers.js"
+   ],
+   "siteCount": 2,
+   "churn": 56,
+   "mustRule": false,
+   "table": false,
+   "status": "unchanged"
+  },
+  {
+   "rank": 29,
+   "id": "G0029",
+   "detector": "cmp",
+   "decision": "repeated comparison holdKind == 'opencode'",
+   "score": 110,
+   "fileCount": 2,
+   "areaCount": 1,
+   "areas": [
+    "Reapers & liveness"
+   ],
+   "files": [
+    "opencode-liveness.js",
+    "reapers.js"
+   ],
+   "siteCount": 3,
+   "churn": 55,
+   "mustRule": false,
+   "table": false,
+   "status": "unchanged"
+  },
+  {
+   "rank": 30,
+   "id": "G0030",
+   "detector": "discrim",
+   "decision": "string set {'ALIVE', 'STALLED'} as or-chain [ID.runner]",
+   "score": 110,
+   "fileCount": 2,
+   "areaCount": 1,
+   "areas": [
+    "Reapers & liveness"
+   ],
+   "files": [
+    "opencode-liveness.js",
+    "reapers.js"
+   ],
+   "siteCount": 2,
+   "churn": 55,
+   "mustRule": false,
+   "table": false,
+   "status": "unchanged"
+  },
+  {
+   "rank": 31,
+   "id": "G0031",
+   "detector": "cmp",
+   "decision": "repeated comparison substrate == 'hook'",
+   "score": 108,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Loop, poll & routing",
+    "Reapers & liveness"
+   ],
+   "files": [
+    "pacing.js",
+    "reapers.js"
+   ],
+   "siteCount": 3,
+   "churn": 54,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 1,
+    "pattern": "['\"`](hook)['\"`]"
+   }
+  },
+  {
+   "rank": 32,
+   "id": "G0032",
+   "detector": "cmp",
+   "decision": "repeated comparison type == 'blocked'",
+   "score": 98,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Stop hook & relay",
+    "Test harnesses"
+   ],
+   "files": [
+    "e2e-smoke.js",
+    "hook.js"
+   ],
+   "siteCount": 3,
+   "churn": 49,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 5,
+    "pattern": "['\"`](blocked)['\"`]"
+   }
+  },
+  {
+   "rank": 33,
+   "id": "G0033",
+   "detector": "cmp",
+   "decision": "repeated comparison type == 'complete'",
+   "score": 98,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Stop hook & relay",
+    "Test harnesses"
+   ],
+   "files": [
+    "e2e-smoke.js",
+    "hook.js"
+   ],
+   "siteCount": 3,
+   "churn": 49,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 5,
+    "pattern": "['\"`](complete)['\"`]"
+   }
+  },
+  {
+   "rank": 34,
+   "id": "G0034",
+   "detector": "cmp",
+   "decision": "repeated comparison type == 'defer'",
+   "score": 98,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Stop hook & relay",
+    "Test harnesses"
+   ],
+   "files": [
+    "e2e-smoke.js",
+    "hook.js"
+   ],
+   "siteCount": 4,
+   "churn": 49,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 5,
+    "pattern": "['\"`](defer)['\"`]"
+   }
+  },
+  {
+   "rank": 35,
+   "id": "G0035",
+   "detector": "cmp",
+   "decision": "repeated comparison type == 'failed'",
+   "score": 98,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Stop hook & relay",
+    "Test harnesses"
+   ],
+   "files": [
+    "e2e-smoke.js",
+    "hook.js"
+   ],
+   "siteCount": 2,
+   "churn": 49,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 1,
+    "pattern": "['\"`](failed)['\"`]"
+   }
+  },
+  {
+   "rank": 36,
+   "id": "G0036",
+   "detector": "cmp",
+   "decision": "repeated comparison status == 'running'",
+   "score": 68,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Launch & harnesses",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "opencode-runner.js",
+    "transcript.js"
+   ],
+   "siteCount": 2,
+   "churn": 34,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 1,
+    "pattern": "['\"`](running)['\"`]"
+   }
+  },
+  {
+   "rank": 37,
+   "id": "G0037",
+   "detector": "clone",
+   "decision": "near-duplicate function extractToolActivity() (also: sabotagedExtractToolActivity), ~16 statements, fuzzy",
+   "score": 66,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Launch & harnesses",
+    "Test harnesses"
+   ],
+   "files": [
+    "e2e-smoke.js",
+    "opencode-runner.js"
+   ],
+   "siteCount": 2,
+   "churn": 33,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": null
+  },
+  {
+   "rank": 38,
+   "id": "G0038",
+   "detector": "record",
+   "decision": "record assembled from the same sources {callID=ID.callID, name=ID.tool, status=ID.status, input=ID.input}",
+   "score": 66,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Launch & harnesses",
+    "Test harnesses"
+   ],
+   "files": [
+    "e2e-smoke.js",
+    "opencode-runner.js"
+   ],
+   "siteCount": 2,
+   "churn": 33,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": null
+  },
+  {
+   "rank": 39,
+   "id": "G0039",
+   "detector": "set+discrim",
+   "decision": "string set {'CANCELLED', 'COMPLETED', 'FAILED'} as or-chain/array [ID.phase, TERMINAL_PHASES]",
+   "score": 66,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Launch & harnesses",
+    "State, config & host process"
+   ],
+   "files": [
+    "opencode-runner.js",
+    "phases.js"
+   ],
+   "siteCount": 8,
+   "churn": 33,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 0,
+    "pattern": "['\"`](CANCELLED|COMPLETED|FAILED)['\"`]"
+   }
+  },
+  {
+   "rank": 40,
+   "id": "G0040",
+   "detector": "cmp",
+   "decision": "repeated comparison type == 'assistant'",
+   "score": 64,
+   "fileCount": 4,
+   "areaCount": 2,
+   "areas": [
+    "Reapers & liveness",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "heartbeat.js",
+    "links.js",
+    "request-usage.js",
+    "transcript.js"
+   ],
+   "siteCount": 8,
+   "churn": 16,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 7,
+    "pattern": "['\"`](assistant)['\"`]"
+   }
+  },
+  {
+   "rank": 41,
+   "id": "G0041",
+   "detector": "clone",
+   "decision": "tiny rule copied as a helper executorFor() (also: harnessFor, getTerminalDriver), 3 copies of 1-4 statements",
+   "score": 63,
+   "fileCount": 3,
+   "areaCount": 1,
+   "areas": [
+    "Launch & harnesses"
+   ],
+   "files": [
+    "executors.js",
+    "harnesses.js",
+    "terminal-driver.js"
+   ],
+   "siteCount": 3,
+   "churn": 21,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": null
+  },
+  {
+   "rank": 42,
+   "id": "G0042",
+   "detector": "cmp",
+   "decision": "repeated comparison type == 'tool_use'",
+   "score": 60,
+   "fileCount": 3,
+   "areaCount": 3,
+   "areas": [
+    "Reapers & liveness",
+    "Stop hook & relay",
+    "Test harnesses"
+   ],
+   "files": [
+    "e2e-smoke.js",
+    "heartbeat.js",
+    "transcript.js"
+   ],
+   "siteCount": 6,
+   "churn": 20,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 3,
+    "pattern": "['\"`](tool_use)['\"`]"
+   },
+   "sites": [
+    "e2e-smoke.js:1334",
+    "heartbeat.js:64",
+    "heartbeat.js:120",
+    "heartbeat.js:256",
+    "heartbeat.js:340",
+    "transcript.js:347"
+   ]
+  },
+  {
+   "rank": 43,
+   "id": "G0043",
+   "detector": "clone",
+   "decision": "tiny rule copied as a helper readJson() (also: readMarkerFile, (anonymous), readRecordedIdentity, readStateUncached), 5 copies of 1-4 statements",
+   "score": 52,
+   "fileCount": 4,
+   "areaCount": 3,
+   "areas": [
+    "Reapers & liveness",
+    "State, config & host process",
+    "Test harnesses"
+   ],
+   "files": [
+    "e2e-hold-probe-hook.js",
+    "e2e-smoke.js",
+    "signal-guard.js",
+    "state-store.js"
+   ],
+   "siteCount": 5,
+   "churn": 13,
+   "mustRule": true,
+   "table": false,
+   "status": "unchanged",
+   "ownChurn": null,
+   "sites": [
+    "e2e-hold-probe-hook.js:34",
+    "e2e-smoke.js:198",
+    "e2e-smoke.js:330",
+    "signal-guard.js:138",
+    "state-store.js:126"
+   ]
+  },
+  {
+   "rank": 44,
+   "id": "G0044",
+   "detector": "cmp",
+   "decision": "repeated comparison type == 'tool_result'",
+   "score": 45,
+   "fileCount": 3,
+   "areaCount": 2,
+   "areas": [
+    "Reapers & liveness",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "heartbeat.js",
+    "links.js",
+    "transcript.js"
+   ],
+   "siteCount": 5,
+   "churn": 15,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 4,
+    "pattern": "['\"`](tool_result)['\"`]"
+   }
+  },
+  {
+   "rank": 45,
+   "id": "G0045",
+   "detector": "record",
+   "decision": "record assembled from the same sources {templateDir=ID.templateDir, remoteControl=ID.remoteControl, resumeSessionId=ID.resumeSessionId, model=ID.model, effort=ID.effort, +5}",
+   "score": 28,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Launch & harnesses",
+    "Test harnesses"
+   ],
+   "files": [
+    "executors.js",
+    "experiments/lin-4171-resume-witness.js"
+   ],
+   "siteCount": 2,
+   "churn": 14,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": null
+  },
+  {
+   "rank": 46,
+   "id": "G0046",
+   "detector": "cmp",
+   "decision": "repeated comparison name == 'Bash'",
+   "score": 28,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Reapers & liveness",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "heartbeat.js",
+    "transcript.js"
+   ],
+   "siteCount": 4,
+   "churn": 14,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 1,
+    "pattern": "['\"`](Bash)['\"`]"
+   }
+  },
+  {
+   "rank": 47,
+   "id": "G0047",
+   "detector": "cmp",
+   "decision": "repeated comparison type == 'attachment'",
+   "score": 28,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Reapers & liveness",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "heartbeat.js",
+    "transcript.js"
+   ],
+   "siteCount": 3,
+   "churn": 14,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 2,
+    "pattern": "['\"`](attachment)['\"`]"
+   }
+  },
+  {
+   "rank": 48,
+   "id": "G0048",
+   "detector": "cmp",
+   "decision": "repeated comparison type == 'system'",
+   "score": 28,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Reapers & liveness",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "heartbeat.js",
+    "transcript.js"
+   ],
+   "siteCount": 5,
+   "churn": 14,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 2,
+    "pattern": "['\"`](system)['\"`]"
+   }
+  },
+  {
+   "rank": 49,
+   "id": "G0049",
+   "detector": "set+discrim",
+   "decision": "string set {'EXECUTING', 'RESUMING'} as or-chain/array [ACTIVE_PHASES]",
+   "score": 22,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Reapers & liveness",
+    "State, config & host process"
+   ],
+   "files": [
+    "opencode-liveness.js",
+    "phases.js"
+   ],
+   "siteCount": 2,
+   "churn": 11,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 0,
+    "pattern": "['\"`](EXECUTING|RESUMING)['\"`]"
+   }
+  },
+  {
+   "rank": 50,
+   "id": "G0050",
+   "detector": "clone",
+   "decision": "near-duplicate function toolResultText() (also: userEntryText), ~8 statements, same vocabulary (dialect copy or close variant)",
+   "score": 20,
+   "fileCount": 2,
+   "areaCount": 1,
+   "areas": [
+    "Stop hook & relay"
+   ],
+   "files": [
+    "links.js",
+    "transcript.js"
+   ],
+   "siteCount": 2,
+   "churn": 10,
+   "mustRule": false,
+   "table": false,
+   "status": "new"
+  },
+  {
+   "rank": 51,
+   "id": "G0051",
+   "detector": "set+discrim",
+   "decision": "string set {'BLOCKED', 'CANCELLED', 'COMPLETED', 'EXECUTING', 'FAILED', 'RESUMING'} as array/switch [undefined, ID.phase]",
+   "score": 14,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Reapers & liveness",
+    "State, config & host process"
+   ],
+   "files": [
+    "phases.js",
+    "resources.js"
+   ],
+   "siteCount": 4,
+   "churn": 7,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 1,
+    "pattern": "['\"`](BLOCKED|CANCELLED|COMPLETED|EXECUTING|FAILED|RESUMING)['\"`]"
+   }
+  },
+  {
+   "rank": 52,
+   "id": "G0052",
+   "detector": "cmp",
+   "decision": "repeated comparison code == 'ESRCH'",
+   "score": 12,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Reapers & liveness",
+    "State, config & host process"
+   ],
+   "files": [
+    "instance-guard.js",
+    "signal-guard.js"
+   ],
+   "siteCount": 2,
+   "churn": 6,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 2,
+    "pattern": "['\"`](ESRCH)['\"`]"
+   }
+  },
+  {
+   "rank": 53,
+   "id": "G0053",
+   "detector": "cmp",
+   "decision": "repeated comparison method == 'GET'",
+   "score": 10,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Launch & harnesses",
+    "Test harnesses"
+   ],
+   "files": [
+    "experiments/02-dispatch-server.js",
+    "harbour-token-mcp-server.js"
+   ],
+   "siteCount": 3,
+   "churn": 5,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 1,
+    "pattern": "['\"`](GET)['\"`]"
+   }
+  },
+  {
+   "rank": 54,
+   "id": "G0054",
+   "detector": "cmp",
+   "decision": "repeated comparison kind == 'wake'",
+   "score": 8,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Loop, poll & routing",
+    "State, config & host process"
+   ],
+   "files": [
+    "followup.js",
+    "scripts/floor-report.mjs"
+   ],
+   "siteCount": 3,
+   "churn": 4,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 1,
+    "pattern": "['\"`](wake)['\"`]"
+   }
+  },
+  {
+   "rank": 55,
+   "id": "G0055",
+   "detector": "set",
+   "decision": "string set {'cacheCreation1hInputTokens', 'cacheCreationInputTokens', 'cacheReadInputTokens', 'inputTokens', 'outputTokens'} as array",
+   "score": 6,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "Launch & harnesses",
+    "Stop hook & relay"
+   ],
+   "files": [
+    "opencode-request-records.js",
+    "request-usage.js"
+   ],
+   "siteCount": 2,
+   "churn": 3,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 2,
+    "pattern": "['\"`](cacheCreation1hInputTokens|cacheCreationInputTokens|cacheReadInputTokens|inputTokens|outputTokens)['\"`]"
+   }
+  },
+  {
+   "rank": 56,
+   "id": "G0056",
+   "detector": "set",
+   "decision": "string set {'HEAD', 'rev-parse'} as array",
+   "score": 2,
+   "fileCount": 2,
+   "areaCount": 1,
+   "areas": [
+    "Test harnesses"
+   ],
+   "files": [
+    "experiments/lin-4171-resume-timing.js",
+    "experiments/lin-4171-resume-witness.js"
+   ],
+   "siteCount": 2,
+   "churn": 1,
+   "mustRule": false,
+   "table": false,
+   "status": "unchanged"
+  },
+  {
+   "rank": 57,
+   "id": "G0057",
+   "detector": "set",
+   "decision": "string set {'origin/main', 'rev-parse'} as array",
+   "score": 2,
+   "fileCount": 2,
+   "areaCount": 1,
+   "areas": [
+    "Test harnesses"
+   ],
+   "files": [
+    "experiments/lin-4171-resume-timing.js",
+    "experiments/lin-4171-resume-witness.js"
+   ],
+   "siteCount": 2,
+   "churn": 1,
+   "mustRule": false,
+   "table": false,
+   "status": "unchanged"
+  },
+  {
+   "rank": 58,
+   "id": "G0058",
+   "detector": "contract",
+   "decision": "text contract marker: [dispatcher]",
+   "score": 2,
+   "fileCount": 2,
+   "areaCount": 2,
+   "areas": [
+    "State, config & host process",
+    "Test harnesses"
+   ],
+   "files": [
+    "experiments/lin-3270-going-down-witness.js",
+    "shutdown.js"
+   ],
+   "siteCount": 2,
+   "churn": 1,
+   "mustRule": false,
+   "table": true,
+   "status": "unchanged",
+   "ownChurn": {
+    "commits": 1,
+    "pattern": "\\[dispatcher\\]"
+   }
+  },
+  {
+   "rank": 59,
+   "id": "G0059",
+   "detector": "contract",
+   "decision": "text contract marker: [witness]",
+   "score": 2,
+   "fileCount": 2,
+   "areaCount": 1,
+   "areas": [
+    "Test harnesses"
+   ],
+   "files": [
+    "e2e-broker-witness.js",
+    "experiments/lin-3270-going-down-witness.js"
+   ],
+   "siteCount": 10,
+   "churn": 1,
+   "mustRule": false,
+   "table": false,
+   "status": "unchanged"
+  },
+  {
+   "rank": 60,
+   "id": "G0060",
+   "detector": "cmp",
+   "decision": "repeated comparison method == 'POST'",
+   "score": 0,
+   "fileCount": 2,
+   "areaCount": 1,
+   "areas": [
+    "Test harnesses"
+   ],
+   "files": [
+    "e2e-broker-witness.js",
+    "experiments/02-dispatch-server.js"
+   ],
+   "siteCount": 2,
+   "churn": 0,
+   "mustRule": false,
+   "table": false,
+   "status": "unchanged"
+  },
+  {
+   "rank": 61,
+   "id": "G0061",
+   "detector": "set",
+   "decision": "string set {'activeWorkspace', 'apiUrl', 'workspaces'} as array",
+   "score": 0,
+   "fileCount": 2,
+   "areaCount": 1,
+   "areas": [
+    "Test harnesses"
+   ],
+   "files": [
+    "experiments/chrome-extension/popup.js",
+    "experiments/chrome-extension/service-worker.js"
+   ],
+   "siteCount": 2,
+   "churn": 0,
+   "mustRule": false,
+   "table": false,
+   "status": "unchanged"
+  }
+ ],
+ "gone": []
+}

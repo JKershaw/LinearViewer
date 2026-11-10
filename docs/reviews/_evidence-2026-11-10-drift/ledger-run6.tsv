@@ -1,0 +1,150 @@
+row	finding	severity	run6_delta	noted_in
+1	lib-import-cycles	low-medium	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+2	provider-auth-router-upward-imports	resolved	unchanged (touched: server.js; cited decision not in a window hunk)	—
+3	routes-error-envelope-fragmentation	low-medium	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+4	production-to-test-fixture-imports	resolved	resolved (held; no cited file touched in the window)	—
+5	periodical-report-filename-convention-split	medium-low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+6	dispatch-kind-vocabulary-cross-repo	low	changed: new row-only kind list ROW_ONLY_KINDS (lib/dispatch-fields.js:188) adds 'leftover' beside 'wake'	—
+7	provider-resolution-incantation	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+8	ui-divergences-registry-staleness	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+9	simple-dispatcher-api-base-duplication	low	unchanged (false hit: server.js matched by basename only)	—
+10	cross-repo-halt-vocabulary	low-medium (sub-row)	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+11	cross-repo-sentinel-decision-marker-vocabulary	medium	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+12	target-vocabulary	low	unchanged (touched: lib/dispatch-store.js, routes/dispatch.js, server.js; cited decision not in a window hunk)	—
+13	sse-frame-writer-duplication	resolved	resolved (held; no cited file touched in the window)	—
+14	routes-proxy-decomposition	—	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+15	cross-repo-repo-list	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+16	ci-convention-split-across-repos	informational	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+17	semicolon-style-split	low	unchanged (touched: server.js, public/flight-companion.js; cited decision not in a window hunk)	—
+18	client-escape-html-duplication	—	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+19	client-shared-helper-duplication	—	unchanged (false hit: server.js matched by basename only)	—
+20	client-section-fetch-idiom-duplication	—	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+21	linear-cli-parallel-graphql-surface	—	unchanged (touched: server.js; cited decision not in a window hunk)	—
+22	store-module-uniformity	—	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+23	server-side-escaping	—	unchanged (touched: server.js; cited decision not in a window hunk)	—
+24	dispatch-payload-centralization	—	unchanged (touched: routes/dispatch.js; cited decision not in a window hunk)	—
+25	renderer-provider-abstraction	—	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+26	cache-module-family	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+27	lib-components-primitive-adoption	—	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+28	state-store-write-seam	—	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+29	phase-vocabulary-centralization	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+30	target-harness-axis-orthogonality	—	unchanged (touched: routes/dispatch.js; cited decision not in a window hunk)	—
+31	test-seam-separation	—	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+32	css-token-layer	—	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+33	runner-contract-semantics-cross-repo	medium	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+34	connection-binding-predicate-drift	low-medium	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+35	run-page-identity-scrape	medium	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+36	dispatch-entrance-field-duplication	low	unchanged (touched: routes/dispatch.js, routes/proxy-compute.js, server.js; cited decision not in a window hunk)	—
+37	owner-word-collision	low	unchanged (touched: lib/run-view.js; cited decision not in a window hunk)	—
+38	run-family-render-primitives	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+39	persist-binding-sibling-seams	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+40	server-formatter-duplication	low	unchanged (touched: lib/effort-readout.js, server.js; cited decision not in a window hunk)	—
+41	wake-marker-regex-copies	resolved	resolved (held; no cited file touched in the window)	—
+42	runner-liveness-assumption	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+43	workspace-urlkey-consolidation	—	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+44	credential-decision-multiplicity	medium-high	unchanged (touched: routes/settings.js; cited decision not in a window hunk)	—
+45	keepalive-error-envelope-writer	resolved	resolved (held; no cited file touched in the window)	—
+46	html-error-page-two-writers	resolved	resolved (held; no cited file touched in the window)	—
+47	ai-availability-gate-duplication	medium-low	improved: one fewer inline test-token literal (plain count in lib, routes, public: 27 at aec9e16be, 26 at b315e0e8f); one site now calls isHermeticTestToken (lib/should-mock-ai.js:28). The agent census-pattern count was 34 to 33.	—
+48	dispatch-refusal-relay-duplication	resolved	resolved (held; no cited file touched in the window)	—
+49	tolerant-date-parse-date-twins	resolved	resolved (held; no cited file touched in the window)	—
+50	timestamp-parse-consolidation	—	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+51	loose-json-consolidation	—	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+52	ai-mock-predicate-consolidation	—	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+53	batch-guard-residue	informational	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+54	decision-dialect-split	medium (sub-row)	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+55	human-wait-derivation-split	low-medium	unchanged (touched: lib/run-view.js, lib/task-page-loader.js, routes/dispatch.js; cited decision not in a window hunk)	—
+56	decision-stamp-classifier-copies	low-medium	unchanged (touched: lib/session-telemetry.js; cited decision not in a window hunk)	—
+57	provider-write-field-contract	low-medium	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+58	close-out-merged-refusal-split	low-medium	unchanged (touched: routes/dispatch.js; cited decision not in a window hunk)	—
+59	periodic-loop-two-mechanisms	informational	unchanged (touched: server.js; cited decision not in a window hunk)	—
+60	consumer-liveness-signal-conflation	resolved	resolved (held; no cited file touched in the window)	—
+61	consumer-heartbeat-wire-restated	low-medium (sub-row of 60)	unchanged (touched: routes/dispatch.js; cited decision not in a window hunk)	—
+62	owner-answer-reader-copies	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+63	mock-ai-builder-copies	low-medium	improved: buildMockBriefFromContext removed (its 36-line copy gone); both route calls use shared buildMockBrief (routes/proxy-compute.js:1488, :1616; lib/workspace-api-mocks.js)	—
+64	fresh-run-definition-copies	low-medium	worsened: one more run-existence predicate hasDispatchForIssue (lib/dispatch-store.js:2315), beside findRecentFreshDispatch and isFreshDispatch; no shared home	—
+65	terminal-loop-rule-copies	low-medium	unchanged (touched: server.js; cited decision not in a window hunk)	—
+66	state-type-label-rank-maps	low-medium	unchanged (touched: server.js; cited decision not in a window hunk)	—
+67	csp-decision-split	resolved	resolved (held; no cited file touched in the window)	—
+68	priority-label-maps	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+69	localhost-predicate-split	low	unchanged (touched: routes/dispatch.js, server.js; cited decision not in a window hunk)	—
+70	observer-instance-key-copies	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+71	pilot-eligibility-copies	low	unchanged (touched: lib/effort-readout.js, routes/dispatch.js; cited decision not in a window hunk)	—
+72	linear-image-host-allowlist	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+73	page-chrome-options	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+74	ship-biscuit-desk-list	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+75	free-tier-rule-copies	resolved	resolved (held; no cited file touched in the window)	—
+76	sd-blocked-child-last-activity-split	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+77	census-gone-overstates-resolution	informational	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+78	follow-up-target-rule-copies	resolved	resolved (held; no cited file touched in the window)	—
+79	lineage-row-read-copies	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+80	pr-url-regex-copies	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+81	pause-marker-predicate-gap	low	worsened: inline marker-keyed pending predicates 7 to 11 in lib, routes, server.js; new sites lib/dispatch-leftover-hook.js:125,130,160 and lib/dispatch-store.js:3504	—
+82	review-on-record-readers	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+83	credential-block-grammar-split	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+84	review-loop-ceiling-restated	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+85	sweep-as-library-imports	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+86	github-envelope-walker-split	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+87	binding-active-answer-copies	low-medium (sub-row of 44)	unchanged (touched: server.js; cited decision not in a window hunk)	—
+88	auth-failure-answer-copies	low-medium	unchanged (touched: routes/dispatch.js; cited decision not in a window hunk)	—
+89	account-group-reader-copies	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+90	stable-stringify-copies	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+91	kpi-page-twin-copies	low-medium	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+92	kit-terminal-status-copy	low	unchanged (touched: routes/dispatch.js; cited decision not in a window hunk)	—
+93	sd-parked-predicate-inline	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+94	https-predicate-restated	low	unchanged (touched: server.js; cited decision not in a window hunk)	—
+95	harbour-token-format-restated	—	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+96	registry-providers-restated	low (sub-row of 44)	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+97	sd-401-layers-three	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+98	expire-ownerless-has-owner-copy	low	unchanged (touched: routes/dispatch.js; cited decision not in a window hunk)	—
+99	vendor-script-list-restated	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+100	prune-to-capacity-clones	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+101	resume-model-effort-cross-repo	medium-high	unchanged (touched: routes/dispatch.js, lib/dispatch-factory.js, lib/follow-up-dispatch.js; cited decision not in a window hunk)	—
+102	halt-word-map-copies	medium	unchanged (touched: lib/workspace-change-log.js; cited decision not in a window hunk)	—
+103	home-next-answer-split	medium	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+104	coherence-loop-stalled	medium (process)	unchanged: process row; LIN-3449 still Todo (22 comments); this run mints no child	—
+105	settings-run-setup-rebuilt	low-medium	unchanged (touched: routes/settings.js; cited decision not in a window hunk)	—
+106	settings-preset-systems	low-medium	unchanged (touched: routes/dispatch.js, routes/settings.js; cited decision not in a window hunk)	—
+107	routes-as-library	low-medium	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+108	model-vocabulary-rule-copies	low-medium	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+109	task-page-state-outside-owner	low-medium	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+110	live-anchor-old-home-alive	low-medium	unchanged (touched: routes/proxy-rulings.js; cited decision not in a window hunk)	agent-api
+111	lineage-anchor-rules-three	low-medium	unchanged (touched: lib/dispatch-store.js, routes/dispatch.js; cited decision not in a window hunk)	—
+112	model-constants-server-client-twins	resolved	resolved (held; no cited file touched in the window)	—
+113	low-rows-unpromoted	low	unchanged (touched: lib/task-page-loader.js; cited decision not in a window hunk)	—
+114	halt-poll-cold-cache-fail-open	medium (conditional)	unchanged: John's ruling, not chosen here	—
+115	usage-relay-flag-partial	resolved	resolved (held; no cited file touched in the window)	—
+116	usage-record-vocabulary-two-readers	low-medium	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+117	lineage-identity-read-twins	resolved	unchanged (touched: lib/dispatch-store.js; cited decision not in a window hunk)	—
+118	reap-window-constant-cross-repo	low-medium	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+119	cost-fold-partition-restated	resolved	resolved (held; no cited file touched in the window)	—
+120	key-state-residue	informational	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+121	unit-census-convention-split	informational	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+122	usage-snapshot-prose-residue	low	unchanged (touched: docs/architecture/source-map.md, lib/proxy-instructions.js, docs/proxy-integration.md, lib/effort-readout.js; prose sites outside hunks)	—
+123	completeness-precedence-restated	borderline (not graded)	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+124	erasure-inventory-lockstep-gap	resolved	unchanged (touched: server.js; cited decision not in a window hunk)	—
+125	parked-wait-text-cross-repo	low-medium	unchanged (touched: lib/session-telemetry.js; cited decision not in a window hunk)	—
+126	error-code-case-split	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+127	ruling-settled-row-predicate-inline	low	unchanged (touched: routes/workspace-api-issue-write.js; cited decision not in a window hunk)	—
+128	waiting-standing-comment-residue	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+129	request-source-guard-copies	low	unchanged (touched: lib/run-view.js; cited decision not in a window hunk)	—
+130	reply-effect-default-split	borderline (not graded)	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+131	override-kind-list-stale	low	unchanged (touched: lib/proxy-instructions.js, routes/proxy-compute.js; VERB OVERRIDE sentence is in a hunk, same 15 keys)	—
+132	path-class-predicate-copies	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+133	world-helper-convention-half-guarded	low	unchanged (touched: CLAUDE.md; cited decision not in a window hunk)	—
+134	stage-writes-threading-per-entrance	low	unchanged (touched: lib/dispatch-entrance.js, routes/workspace-api-feedback.js, lib/proxy-preamble.js, tests/unit/lin-3134-declared-mint-census.test.js; cited decision not in a window hunk)	—
+135	in-progress-predicate-server-client-split	low	unchanged (no cited file touched in aec9e16be..b315e0e8f)	—
+136	stage-kind-roster-tables	low	worsened: `survey-place` occurrences 13 in 9 files → 21 in 10 files inside the window; still joined by string keys	—
+137	enqueue-route-list-restated	low	unchanged: four stale copies remain (CLAUDE.md enqueue line, lib/proxy-scopes.js:23-25, docs/proxy-integration.md dispatch row); lib/proxy-scopes.js:8 now says four	—
+138	element-method-guard-idiom-beyond-scan	low	unchanged: presence/typeof guards remain at public/prompt-section.js:1055, 1223, 1856 and public/question-cards.js:241 (line drift only)	—
+139	client-dual-export-split	low (borderline)	unchanged: public/live-console.js:1361-1367 still exports two surfaces	—
+141	session-lane-grant-from-client-text	low-medium	unchanged in code: the prompt sniff remains at lib/dispatch-entrance.js:1226 (isAutopilotVariant) inside the window-edited declaresDispatchGrant; LIN-4318 Backlog	—
+140	working-beat-grammar-cross-repo	low-medium	unchanged: no `[working]` line in any window hunk under lib, routes, public or server.js, nor in SD's window; the four added lines are test-only (tests/unit/lin-4370-look-first-route.test.js)	—
+142	leftover-gate-restates-three-decisions (R1)	LOW–MEDIUM	new (window): lib/dispatch-leftover.js restates the follow-up target set, the halt modes and NEVER_RAN; homes exist (census groups 21, 47)	runs-and-dispatch
+143	periodical-notes-bullet-restates-leftover-rule (P1)	LOW	new (window): lib/periodicals.js:313 areaNotes() says follow the notes' rules, then restates them	llm-and-prompts
+144	context-not-scope-three-homes (P2)	LOW	"new: ""Waiting entries are context, not scope"" in prompt-formatters.js:604 and both READMEs"	llm-and-prompts
+145	area-notes-dir-outside-registry-path (P3)	LOW	new: docs/areas/ spelled in four code places beside the registry-path constant	llm-and-prompts
+146	area-notes-guard-copied-and-diverged (P4)	LOW	new, cross-repo: the notes guard copied to SD and diverged (200 vs 147 lines, sh extension, README rules)	llm-and-prompts
+147	as-asked-rule-sentence-two-homes (A1)	LOW (borderline)	"new (window): ""no step may change them"" in AS_ASKED_LEAD and BRIEF_HINT"	agent-api
+148	agent-api-literals-restate-homes (A2)	LOW (borderline)	"new: look-first sequence, ""a day"", DECIDED_BY values and ""four lines"" restated beside their constants"	agent-api
+149	session-pr-pick-mirror-cross-repo	LOW–MEDIUM	new (window, LIN-4375; found by the second read): the PR pick is one rule in two repos, joined by a comment only	runs-and-dispatch
