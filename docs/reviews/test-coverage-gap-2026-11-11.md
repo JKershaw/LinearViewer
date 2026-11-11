@@ -399,7 +399,7 @@ remove the entry":
   stops importing Agent API") holds exactly this.
 
 Every other agent-api entry was re-read against the code at `b5950f704` and still holds, so none
-was cut or shortened. Note sizes after the change: agent-api 5,870, front-end-pages 5,950, runs-and-dispatch 5,980, platform-and-plumbing 2,291, reports-and-operator-tools 1,379, web-routes 2,085, llm-and-prompts 6,143.
+was cut or shortened. Note sizes after the change: agent-api 5,870, front-end-pages 5,937, runs-and-dispatch 5,980, platform-and-plumbing 2,291, reports-and-operator-tools 1,379, web-routes 2,085, llm-and-prompts 6,143.
 
 **Seams have no full home in the notes yet.** R3 is a cross-area seam: the guard would sit with
 the e2e test routes (web-routes), and the egress site is in Other features. It is filed under the
