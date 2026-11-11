@@ -78,3 +78,5 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - `lib/recent-runs.js`: `runFact` reads only the row's feedback: a stage parked `[pending]` whose
   lineage ends `[blocked]` or `[skipped]` reads `running` and holds the live-stage wait until
   aborted. (LIN-4392.)
+- `lib/agent-status-store.js`: `listSessions` and `listTaskThreads` have no production caller
+  and LIN-691 is canceled; delete them and their tests. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)

@@ -1,0 +1,660 @@
+file	line%	branch%	funcs%	uncovered lines
+all files	95.00	88.70	91.08	
+docs/papers/harbour/unwedge-or-breakdown-scripts/classify.mjs	100.00	88.24	100.00	
+experiments/consolidate-1-census/census.mjs	76.05	61.17	52.82	35-37 113-115 144 181-187 200 208 211-218 305-310 352-357 376-388 407-417 421-424 429-439 470-479 483-487 494 497 537-542 550 562 564-569 572-574 593-597 608-610 624-628 632-653 661-663 669-677 683-696 706-712 716-728 742 744 769-773 779-782 787-790
+experiments/rebuild-rung7/replay/lib/fakes.mjs	49.17	86.11	15.46	33-53 58-65 71-79 98-136 145-149 152-154 174-177 265-276 284-394 414-437 439-454 459-467 481-486 489-498
+experiments/replay-kit/lib/router/ai-coverage.mjs	100.00	95.83	100.00	
+experiments/replay-kit/lib/router/common.mjs	44.00	46.30	26.47	12-20 31-35 48-51 53-57 61-73 77-79 85-154 166-169 172-181 209-231 262-270 281-289 291 296-298
+experiments/replay-kit/lib/router/vclock.mjs	92.26	65.91	43.33	46-50 67-70 120-122
+lib/account-conflict.js	100.00	100.00	100.00	
+lib/account-erasure.js	99.53	93.78	98.69	286 326-328 652
+lib/account-group.js	100.00	100.00	100.00	
+lib/account-merge-log.js	96.67	75.00	100.00	56-57
+lib/account-session.js	100.00	100.00	100.00	
+lib/account-store.js	98.95	90.54	100.00	132-135
+lib/account-workspace-store.js	100.00	96.97	100.00	
+lib/action-kind.js	100.00	100.00	100.00	
+lib/agent-status-store.js	90.27	60.87	73.33	98-99 101-102 215-217 257-265 284-286 329-334 350-352 362-369
+lib/agent-turn.js	95.92	92.91	100.00	620-624 630-638 640-644 694-696 726-729 731-734
+lib/as-asked-seal.js	98.64	75.86	100.00	63-64
+lib/as-asked.js	100.00	95.83	100.00	
+lib/async-errors.js	96.00	88.89	100.00	35-36
+lib/attachment-upload.js	98.18	92.59	100.00	93-94
+lib/audit.js	98.71	82.47	100.00	375-383
+lib/bash-tool.js	96.32	88.89	76.47	30-32 78 85-86
+lib/brief-cache.js	68.81	100.00	66.67	43-58 61-75 78-80
+lib/brief.js	100.00	94.74	100.00	
+lib/call-budget.js	100.00	78.95	100.00	
+lib/catalog-rate.js	97.41	94.59	80.00	105-109
+lib/chat-request.js	99.22	100.00	90.91	77-78
+lib/chat-tools.js	99.61	89.63	100.00	1420-1421 1478-1479 1819-1820 1936-1937
+lib/chat-transcript.js	100.00	100.00	100.00	
+lib/ci-wake-sweep.js	97.85	80.00	82.86	125-126 146-148 201-202 220-221
+lib/close-out-events-store.js	97.99	84.18	100.00	251-253 273-275 444-446
+lib/close-out-merges.js	100.00	86.79	93.33	
+lib/close-out-readiness.js	100.00	97.22	100.00	
+lib/collective-characters-store.js	93.93	73.13	100.00	110-112 127-129 150-151 235-237 250-252 265-267
+lib/collective-preset-defs.js	99.48	95.65	100.00	62-63
+lib/collective-presets-store.js	92.47	73.68	100.00	84-86 106-108 127-128 166-168 182-184
+lib/completion-signals.js	100.00	100.00	100.00	
+lib/components/accent-bar.js	100.00	84.62	100.00	
+lib/components/button.js	100.00	96.43	100.00	
+lib/components/card.js	100.00	100.00	100.00	
+lib/components/decision-panel.js	100.00	94.29	100.00	
+lib/components/disclosure.js	100.00	100.00	100.00	
+lib/components/dispatch-no-job.js	100.00	85.71	100.00	
+lib/components/empty-state.js	100.00	100.00	100.00	
+lib/components/field.js	100.00	63.64	100.00	
+lib/components/footer.js	100.00	100.00	100.00	
+lib/components/halt-controls.js	100.00	100.00	100.00	
+lib/components/head-meta.js	100.00	100.00	100.00	
+lib/components/icon-button.js	100.00	80.00	100.00	
+lib/components/icon.js	100.00	85.71	100.00	
+lib/components/landing-hero.js	100.00	100.00	100.00	
+lib/components/model-change-lines.js	100.00	88.00	100.00	
+lib/components/navbar.js	100.00	98.37	100.00	
+lib/components/page-header.js	100.00	100.00	100.00	
+lib/components/page.js	100.00	100.00	100.00	
+lib/components/plain-page.js	100.00	97.06	100.00	
+lib/components/runner-link.js	100.00	75.00	100.00	
+lib/components/section.js	100.00	100.00	100.00	
+lib/components/segment-bar.js	100.00	100.00	100.00	
+lib/components/settings-ask.js	100.00	95.45	100.00	
+lib/components/settings-frame.js	100.00	85.71	100.00	
+lib/components/settings-group.js	100.00	100.00	100.00	
+lib/components/settings-key-row.js	100.00	92.31	100.00	
+lib/components/settings-row.js	100.00	97.50	100.00	
+lib/components/settings-spend-bar.js	100.00	100.00	100.00	
+lib/components/status-pill.js	100.00	100.00	100.00	
+lib/components/surface.js	100.00	100.00	100.00	
+lib/components/tabs.js	100.00	94.44	100.00	
+lib/components/tag.js	100.00	82.61	100.00	
+lib/components/time.js	100.00	100.00	100.00	
+lib/components/view-nav.js	100.00	95.65	100.00	
+lib/components/wordmark.js	100.00	100.00	100.00	
+lib/connection-access.js	100.00	86.21	100.00	
+lib/connection-binding.js	100.00	95.74	100.00	
+lib/connection-credential.js	96.00	83.66	96.74	96-97 117-118 161-162 209 254-256 273-274 283-286 394-396 504-506 553-554 563-564 631-633 679-681 699-700 782-783 826-828 836-837 883-885 909-911 919-920 958-965 1388-1390 1551-1553
+lib/connection-lifecycle.js	97.06	90.00	100.00	62-64 116-117
+lib/connection-secondary-remint.js	100.00	95.83	100.00	
+lib/connection-store.js	90.65	68.47	100.00	234-236 266-268 294-296 309-311 315-317 334-336 352-354 375-377 391-393 438-440 457-459 477-479 509-511 529-531 566-568 581-583 591-593 606-608 617-619 632-634 640-642 656-658 667-669
+lib/consumer-heartbeat-ingest.js	97.75	75.00	100.00	64-65
+lib/consumer-heartbeat-store.js	100.00	83.33	100.00	
+lib/consumer-heartbeat.js	100.00	100.00	100.00	
+lib/consumer-poll-warning.js	98.57	95.24	100.00	63-64
+lib/context-graph.js	100.00	87.22	100.00	
+lib/cost-format.js	100.00	100.00	100.00	
+lib/cost-read.js	99.77	93.75	100.00	540-541
+lib/credential-diagnostics.js	99.55	96.72	100.00	134
+lib/credential-invariant-sweep.js	96.25	88.06	90.00	217-219 284-291
+lib/credential-lifecycle-events.js	100.00	100.00	100.00	
+lib/credential-state.js	100.00	96.97	100.00	
+lib/custom-prompts-store.js	51.25	100.00	14.29	41-49 58-68 78-101 111-126 135-143 151-159
+lib/dashboard-refresh.js	100.00	84.62	66.67	
+lib/db-indexes.js	99.89	96.36	95.45	908
+lib/deploy-info.js	100.00	100.00	100.00	
+lib/description-edit.js	100.00	89.29	100.00	
+lib/digest-feedback.js	99.69	95.45	100.00	124-125
+lib/dismissal-suggestions-store.js	96.69	87.18	100.00	212-214 258-260 279-281 296-298
+lib/dispatch-entrance.js	99.32	94.53	98.33	687-690 1590-1592 1657-1660 1736-1738
+lib/dispatch-factory.js	99.22	95.64	98.36	781-782 873-877 945-946 1080-1081
+lib/dispatch-feedback-format.js	100.00	92.86	100.00	
+lib/dispatch-feedback-validation.js	100.00	100.00	100.00	
+lib/dispatch-fields.js	100.00	100.00	100.00	
+lib/dispatch-leftover-hook.js	98.33	81.43	84.62	98-99 106-107
+lib/dispatch-leftover.js	100.00	92.00	100.00	
+lib/dispatch-lineage-status.js	100.00	97.18	100.00	
+lib/dispatch-lineage.js	100.00	95.65	100.00	
+lib/dispatch-presets-store.js	94.19	85.25	100.00	82-83 125-127 142-144 222-224 237-239
+lib/dispatch-referent-guard.js	100.00	97.73	100.00	
+lib/dispatch-refusal.js	91.18	95.00	100.00	46-54
+lib/dispatch-session-read.js	100.00	86.67	44.44	
+lib/dispatch-session-redaction.js	100.00	83.33	100.00	
+lib/dispatch-store.js	97.75	92.10	98.48	610-611 628-629 718-719 960-961 1086-1087 1203-1205 1255-1257 1277-1280 1298-1301 1541-1542 1572-1573 1603-1604 1647-1648 1728-1729 1737-1740 1743-1746 1756-1764 2103-2105 2111-2112 2586-2589 2714-2715 2741-2742 2969-2979 3343-3345 3459 3564-3565 3588-3589 3617-3618 4021-4022 4264-4265 4310-4314 4368-4370 4408-4409 4456-4458
+lib/dispatch-targets.js	100.00	100.00	100.00	
+lib/dispatch-terminal.js	100.00	97.01	100.00	
+lib/dispatch-tokens.js	89.57	80.39	83.33	75-76 125-126 207-208 228-230 242-243 252-254 287-298 307-314
+lib/dispatch-validation.js	100.00	100.00	100.00	
+lib/dispatch-wake.js	100.00	88.98	100.00	
+lib/drop-shares-collection.js	86.84	36.84	100.00	44-46 52-53 62-64 73-74
+lib/effort-readout.js	100.00	97.87	100.00	
+lib/email-auth.js	100.00	96.43	100.00	
+lib/email-availability.js	100.00	100.00	100.00	
+lib/email-transport.js	100.00	91.67	100.00	
+lib/errors.js	100.00	95.48	100.00	
+lib/escalation-kpis.js	100.00	92.50	100.00	
+lib/expire-ownerless-dispatch-tokens.js	100.00	97.83	100.00	
+lib/feature-defaults.js	100.00	100.00	100.00	
+lib/feedback-title.js	100.00	85.71	100.00	
+lib/file-pointer.js	100.00	91.94	100.00	
+lib/flight-companion-census-seed.js	100.00	100.00	100.00	
+lib/flight-companion-gate.js	100.00	100.00	100.00	
+lib/follow-on-ratio.js	100.00	90.54	100.00	
+lib/follow-up-dispatch.js	100.00	93.62	100.00	
+lib/free-tier-store.js	82.37	97.30	78.57	220-262 334-343 352-362
+lib/github-install-flow.js	99.30	97.45	100.00	354-357 1120-1123
+lib/github-pr-files.js	95.44	75.32	94.44	118-122 140-141 199-200 237-238
+lib/github-pr-status.js	100.00	94.96	100.00	
+lib/graph-features.js	100.00	92.86	100.00	
+lib/guest-task-path.js	100.00	100.00	100.00	
+lib/harbour-comments-store.js	95.42	84.62	100.00	97-99 127-129
+lib/harbour-feedback-tokens.js	90.23	70.00	80.00	47-48 109-111 121-128
+lib/harbour-spawn.js	83.77	33.33	80.00	43-52 113-116 157-158 171-176 179-180 202-212 225-226
+lib/harbour-token-format.js	100.00	100.00	100.00	
+lib/held-connection-entry.js	98.61	85.71	75.00	123-124
+lib/home-pipeline.js	100.00	100.00	100.00	
+lib/home-row-states.js	100.00	91.67	75.00	
+lib/home-rows.js	100.00	78.69	94.44	
+lib/home-view.js	100.00	94.47	100.00	
+lib/hourly-cleanup.js	100.00	100.00	100.00	
+lib/http-keepalive.js	100.00	98.11	100.00	
+lib/issue-write-validation.js	100.00	100.00	100.00	
+lib/key-state-holders.js	100.00	93.75	96.15	
+lib/key-state.js	100.00	97.37	90.91	
+lib/kpi-daily-rollup.js	99.27	90.91	100.00	352-354
+lib/kpi-page.js	100.00	95.65	100.00	
+lib/kpi-stats.js	100.00	98.81	100.00	
+lib/library-metadata.js	100.00	100.00	100.00	
+lib/library.js	98.13	82.55	98.11	77-85 225 413
+lib/lineage-closure.js	100.00	92.92	100.00	
+lib/lineage-membership.js	100.00	100.00	100.00	
+lib/linear-fetch.js	96.00	85.37	80.00	42-44 93 150-153 155-157
+lib/linear.js	100.00	100.00	100.00	
+lib/live-anchor.js	100.00	100.00	100.00	
+lib/live-console.js	100.00	94.25	100.00	
+lib/liveness-alarm-store.js	98.66	68.52	91.67	267 270-272
+lib/liveness-alarm-sweep.js	97.15	73.42	76.19	67-68 70-71 96-97 266-267
+lib/liveness-detectors.js	98.94	92.17	98.18	479 556-563
+lib/llm-call-log.js	95.16	91.23	90.00	177-185
+lib/llm-jobs.js	97.94	100.00	83.33	96-97
+lib/local-store.js	99.72	75.89	100.00	195
+lib/loop-supersede.js	100.00	100.00	100.00	
+lib/loose-json.js	100.00	95.65	100.00	
+lib/mask-secrets-in-html.js	96.74	87.83	83.33	135-139 160-163
+lib/milestone-funnel.js	100.00	96.95	100.00	
+lib/model-pricing.js	100.00	97.67	100.00	
+lib/model-routing-edit.js	91.30	80.65	100.00	37-41 63-65
+lib/model-routing-harnesses.js	100.00	97.06	100.00	
+lib/model-routing-history.js	100.00	100.00	100.00	
+lib/model-routing-spend.js	100.00	93.22	95.65	
+lib/model-routing-store.js	97.58	90.84	92.11	137-138 196-197 214-216 314
+lib/model-routing-summary.js	100.00	81.25	100.00	
+lib/model-routing-validate.js	100.00	96.97	100.00	
+lib/model-routing.js	98.38	94.79	97.44	312-313 378 453-457
+lib/north-star-resolver.js	100.00	94.94	100.00	
+lib/observation-sessions-materializer.js	98.38	78.57	91.30	60-61 188-190 380-381
+lib/observation-sessions-store.js	94.93	66.04	100.00	269-271 288-290 318-320 346-348 374-376 393-395 410-412
+lib/observer-efficacy-signal.js	100.00	86.15	100.00	
+lib/observer-pass.js	97.94	84.40	93.33	200-202 233-234 311-313 432-433
+lib/observer-shadow-log.js	96.03	74.47	100.00	214-216 235-237 254-256 274-275
+lib/observer-state-store.js	97.97	94.74	100.00	327-329 348-350 440-442
+lib/observer-sweep.js	99.09	92.63	100.00	469-472 513-514
+lib/openrouter-catalog.js	100.00	95.29	94.74	
+lib/openrouter-key-resolver.js	100.00	98.15	100.00	
+lib/openrouter.js	96.18	90.42	89.66	546-597 1022-1023 1062-1066 1108-1109 1195-1197 1267-1268 1540-1541 1612-1613 1751-1753 1774-1775 1867-1868 1961-1962 2138-2139 2195-2197 2215-2216
+lib/owner-backfill.js	98.75	92.41	100.00	118 253-254 360 476-477
+lib/owner-credential-store.js	92.59	79.59	100.00	186-187 245-247 326-328 366-368 376-378 394-396 404-406 459-461 488-490 496-498 523-525 551-553 582-584 586-588 614-616 638-640 661-663 687-689 703-705 725-727
+lib/owner-mint-refusals.js	99.36	97.14	100.00	147
+lib/ownerless-token-policy.js	100.00	100.00	100.00	
+lib/parse-landing.js	89.64	73.91	60.00	13-26 80-82 124-126 136 175-176
+lib/partial-write-error.js	100.00	100.00	100.00	
+lib/pat-session.js	100.00	96.15	100.00	
+lib/periodical-report-gate.js	100.00	100.00	100.00	
+lib/periodical-runs.js	100.00	94.85	100.00	
+lib/periodicals.js	100.00	98.86	100.00	
+lib/persist-binding.js	100.00	100.00	100.00	
+lib/pipeline-churn.js	98.23	70.52	93.88	236 259-260 298-301
+lib/pipeline-loops.js	98.70	92.64	100.00	323-325 578-580 1063-1071
+lib/plan-allowance.js	100.00	100.00	100.00	
+lib/plan-review-round-trips.js	100.00	98.40	100.00	
+lib/poll-halt.js	100.00	100.00	100.00	
+lib/pr-state-copy.js	97.44	92.31	100.00	33
+lib/pr-state-store.js	98.32	88.57	100.00	164-167
+lib/pricing-conformance-sweep.js	100.00	97.78	100.00	
+lib/prompt-contract.js	100.00	100.00	100.00	
+lib/prompt-formatters.js	94.95	93.58	96.15	130-146 295-310 387-402
+lib/prompt-template-defs.js	100.00	89.80	100.00	
+lib/prompt-templates.js	95.81	80.70	90.00	311-313 376-391
+lib/prompt-trace-store.js	98.16	82.46	100.00	260-262 322-324
+lib/prompts/agent-onboarding.js	100.00	84.00	100.00	
+lib/prompts/area-registry-path.js	100.00	100.00	100.00	
+lib/prompts/autopilot-kickoff.js	100.00	100.00	100.00	
+lib/prompts/autopilot-manual.js	97.27	53.85	100.00	51-53
+lib/prompts/autopilot-precedence.js	100.00	100.00	100.00	
+lib/prompts/collective-participant.js	100.00	97.87	100.00	
+lib/prompts/flight-companion-brief.js	99.30	94.12	100.00	308-310
+lib/prompts/flight-companion-kickoff.js	100.00	100.00	100.00	
+lib/prompts/leftover-words.js	100.00	100.00	100.00	
+lib/prompts/passage-planner-kickoff.js	94.55	75.00	100.00	52-54
+lib/prompts/passage-runner-kickoff.js	94.34	71.43	100.00	50-52
+lib/prompts/revision-brief.js	100.00	96.15	100.00	
+lib/prompts/roadmap-chat-template.js	100.00	80.00	100.00	
+lib/prompts/roadmap-digest-template.js	99.58	93.88	100.00	115
+lib/prompts/roadmap-gap-template.js	100.00	100.00	100.00	
+lib/prompts/roadmap-narrative-template.js	95.26	75.00	92.31	171-172 176-180 184-189
+lib/prompts/roadmap-north-star-template.js	100.00	90.00	100.00	
+lib/prompts/roadmap-orientation-template.js	100.00	94.59	100.00	
+lib/prompts/roadmap-product-template.js	100.00	100.00	100.00	
+lib/prompts/roadmap-trajectory-template.js	100.00	100.00	100.00	
+lib/prompts/runner-kickoff.js	100.00	95.65	100.00	
+lib/prompts/ship-biscuit-editor.js	100.00	86.59	100.00	
+lib/prompts/stage-intent.js	100.00	44.44	100.00	
+lib/prompts/task-chat-template.js	100.00	90.00	100.00	
+lib/prompts/worker-lane-kickoff.js	94.92	75.00	100.00	56-58
+lib/providers/github-projects/client.js	91.18	43.18	77.78	94-103 152-156 199-201
+lib/providers/github-projects/fake-client.js	100.00	50.00	100.00	
+lib/providers/github-projects/index.js	98.41	76.19	90.00	151-152 388-389 415-416 426-427 562-563
+lib/providers/github/app-auth.js	99.28	83.49	96.67	135 191-192 439-440
+lib/providers/github/client.js	96.15	85.71	82.61	106 163-164 177 183 186-188
+lib/providers/github/fake-client.js	98.77	80.00	97.62	60-61
+lib/providers/github/index.js	99.60	80.33	98.61	337-340
+lib/providers/github/installation-pages.js	100.00	90.32	100.00	
+lib/providers/index.js	100.00	100.00	100.00	
+lib/providers/interface.js	99.29	100.00	94.23	301-302 454-455
+lib/providers/jira/adf.js	100.00	97.32	100.00	
+lib/providers/jira/client.js	90.87	86.42	54.17	78-80 148-150 223 361 366-374 390 404 409 414-416 421 426 431-446
+lib/providers/jira/fake-client.js	87.79	74.79	86.54	91-94 107-114 132-139 160-162 170 186-189 208-211 219-222 226-229 262-263 340-343 352 391
+lib/providers/jira/index.js	99.32	84.31	98.73	340-341 524-531
+lib/providers/jira/oauth.js	96.28	80.95	85.71	176-177 215-216 265-266 283-284 314-315 318-319
+lib/providers/linear/index.js	95.91	78.38	62.50	681-683 701-704 715-718 729-732 742-745 808-809 841-842 851-852 871-873 903-906 984-986 1018-1019 1174-1175 1222-1251 1270-1271 1273-1294 1917-1920 1931-1934
+lib/providers/local/index.js	99.71	80.46	98.53	65-66
+lib/providers/models.js	100.00	100.00	100.00	
+lib/providers/registry.js	100.00	100.00	100.00	
+lib/providers/state-map.js	100.00	100.00	100.00	
+lib/proxy-credential-trail.js	98.36	95.45	100.00	53-54
+lib/proxy-dedupe.js	100.00	95.65	100.00	
+lib/proxy-events.js	96.30	83.33	94.74	514-516 530-531 564-566 663-667 712-717 790-792 802-809
+lib/proxy-fetch.js	43.22	80.95	50.00	16-18 58-69 98-99 103-198
+lib/proxy-graphql-errors.js	100.00	98.36	100.00	
+lib/proxy-instructions.js	100.00	100.00	100.00	
+lib/proxy-preamble.js	100.00	99.47	100.00	
+lib/proxy-ref-resolver.js	100.00	87.76	100.00	
+lib/proxy-scopes.js	100.00	100.00	100.00	
+lib/proxy-tokens.js	97.14	87.10	89.29	139-140 146 478-479 507-508 722 803-805 817-818 912-913 998-1009 1022-1024 1060
+lib/proxy-wire.js	100.00	95.96	100.00	
+lib/public-origin.js	100.00	100.00	100.00	
+lib/question-card.js	100.00	83.00	100.00	
+lib/queue-config.js	98.21	91.43	95.24	94 126-127
+lib/read-horizon.js	100.00	100.00	100.00	
+lib/recap-cache.js	77.32	91.67	77.78	84-93 128-143 146-160 163-165
+lib/recap.js	85.09	100.00	80.00	98-114
+lib/recent-runs.js	100.00	95.00	100.00	
+lib/recommend-recurse.js	100.00	94.23	100.00	
+lib/recommendation-facts.js	99.58	92.33	100.00	179-180 372
+lib/recommendation-input.js	100.00	100.00	100.00	
+lib/recommendation-live-wait.js	100.00	66.67	100.00	
+lib/recommendation-look-first.js	100.00	89.29	96.00	
+lib/refresh-on-resolve-gate.js	100.00	100.00	100.00	
+lib/refresh-strategy.js	100.00	100.00	100.00	
+lib/rejected-credentials.js	100.00	97.53	100.00	
+lib/render-account-home.js	100.00	81.82	100.00	
+lib/render-audit.js	43.42	100.00	0.00	34-76
+lib/render-collective.js	100.00	68.42	100.00	
+lib/render-custom-prompts.js	30.83	100.00	0.00	22-42 48-78 94-133
+lib/render-dispatch.js	100.00	100.00	100.00	
+lib/render-effort-readout.js	96.97	88.24	100.00	27 50-51 99-100 122-123
+lib/render-email-auth.js	100.00	93.55	100.00	
+lib/render-escalation-kpis.js	99.24	86.21	100.00	27
+lib/render-flight-companion.js	100.00	92.13	100.00	
+lib/render-kpis.js	100.00	96.77	100.00	
+lib/render-landing.js	100.00	89.47	100.00	
+lib/render-legal.js	100.00	83.33	100.00	
+lib/render-library.js	100.00	88.00	100.00	
+lib/render-live-console.js	100.00	50.00	100.00	
+lib/render-observation.js	99.23	66.67	100.00	162-164
+lib/render-pages.js	99.89	94.26	100.00	447
+lib/render-passage-planner.js	100.00	66.67	100.00	
+lib/render-prompt-opts.js	100.00	100.00	100.00	
+lib/render-prompts.js	100.00	84.21	100.00	
+lib/render-proxy.js	100.00	100.00	100.00	
+lib/render-roadmap.js	99.02	84.07	94.87	254-258
+lib/render-run-evidence.js	100.00	92.96	100.00	
+lib/render-run-steps.js	99.73	89.55	100.00	215
+lib/render-runner-setup.js	99.26	90.91	100.00	50
+lib/render-session.js	100.00	88.41	100.00	
+lib/render-settings-models.js	97.63	89.50	96.97	138 312-321
+lib/render-settings-workspace.js	99.16	88.89	93.33	216-217
+lib/render-settings-you.js	98.65	82.22	88.24	125-127
+lib/render-settings.js	99.47	88.40	96.15	581-584
+lib/render-ship-biscuit.js	100.00	71.43	100.00	
+lib/render-ship-journey.js	98.80	64.71	100.00	75-76
+lib/render-ship.js	97.53	57.14	100.00	70-73
+lib/render-styleguide.js	100.00	100.00	100.00	
+lib/render-swim.js	97.30	81.82	100.00	53-56
+lib/render-swipe.js	100.00	93.94	100.00	
+lib/render-task-chat.js	100.00	61.11	100.00	
+lib/render-task-create.js	100.00	87.50	100.00	
+lib/render-task-edit.js	100.00	80.95	100.00	
+lib/render-task-page.js	99.80	90.23	100.00	532-533
+lib/render-task-timeline.js	100.00	90.91	100.00	
+lib/render-templates.js	53.23	100.00	0.00	34-62
+lib/render-workspace-kpis.js	100.00	100.00	100.00	
+lib/render.js	97.51	91.07	98.28	89-91 351-354 605-623 652-653
+lib/report-history-store.js	93.49	59.68	100.00	184-186 199-201 220-222 245-247 272-274 284-286 304-305
+lib/request-usage-fold.js	100.00	97.50	100.00	
+lib/request-usage-intake.js	100.00	100.00	100.00	
+lib/request-usage-loader.js	100.00	94.12	100.00	
+lib/request-usage-store.js	100.00	90.91	100.00	
+lib/request-usage-vocabulary.js	100.00	100.00	100.00	
+lib/require-grant.js	100.00	100.00	100.00	
+lib/response-headers.js	100.00	100.00	100.00	
+lib/roadmap.js	98.37	90.91	100.00	733-743 746-747
+lib/row-usage.js	100.00	100.00	100.00	
+lib/ruling-settled.js	100.00	100.00	100.00	
+lib/ruling-standing.js	100.00	100.00	50.00	
+lib/run-closeout-state.js	97.67	95.97	100.00	300-308
+lib/run-controls.js	98.68	92.11	100.00	113-114
+lib/run-evidence.js	100.00	87.25	100.00	
+lib/run-ledger.js	98.38	83.77	92.68	242-247 305
+lib/run-loop-state.js	100.00	100.00	100.00	
+lib/run-paragraph-hook.js	100.00	94.59	100.00	
+lib/run-paragraph-store.js	100.00	75.00	100.00	
+lib/run-paragraph.js	99.53	83.87	100.00	74
+lib/run-proposals-store.js	94.85	68.63	100.00	129-131 143-145 200-202 219-221
+lib/run-summary-cache.js	100.00	92.50	100.00	
+lib/run-summary.js	100.00	86.36	100.00	
+lib/run-view.js	100.00	93.92	100.00	
+lib/runner-kit/broker.mjs	96.97	87.14	92.75	112-113 186-187 230-232 264-265 336-337 585-586 632-633 662-665 685-686
+lib/runner-kit/runner.mjs	98.99	91.55	91.38	802-804 912 1459-1467 1473-1474
+lib/runner-owner-gate.js	100.00	100.00	100.00	
+lib/sample-data/fixture-parent.js	100.00	80.00	100.00	
+lib/sample-data/mock-data.js	100.00	100.00	100.00	
+lib/sample-data/ship-dense-sample-data.js	100.00	78.95	100.00	
+lib/sample-data/swim-sample-data.js	100.00	80.00	100.00	
+lib/saved-chat-store.js	94.62	73.77	100.00	179-181 208-210 225-227 237-239 257-258
+lib/scan-fingerprint.js	99.68	90.77	100.00	108
+lib/scan-public-pages.js	96.14	87.80	100.00	58-59 215-222
+lib/scan.js	99.14	87.50	100.00	163-164
+lib/scheduler.js	93.23	73.08	87.50	93-94 96-97 99-100 102-103 115-116 131-133
+lib/secret-scan.js	99.26	89.51	100.00	543-544 577-579
+lib/security-headers.js	100.00	85.71	100.00	
+lib/session-materializer-precompute.js	96.15	87.50	80.00	70-74
+lib/session-options.js	100.00	100.00	100.00	
+lib/session-roles.js	100.00	95.45	100.00	
+lib/session-row-live.js	100.00	88.89	100.00	
+lib/session-store.js	100.00	93.75	71.43	
+lib/session-summary-cache.js	100.00	84.62	100.00	
+lib/session-summary.js	100.00	78.72	100.00	
+lib/session-telemetry.js	100.00	96.19	100.00	
+lib/sessions-feed-cache.js	100.00	100.00	100.00	
+lib/sessions-view.js	100.00	100.00	100.00	
+lib/settings-areas.js	100.00	95.35	100.00	
+lib/settings-copy-first-card.js	95.35	88.89	100.00	36-37
+lib/settings-keys.js	100.00	93.33	100.00	
+lib/settings-proxy-default.js	88.14	66.67	100.00	37-39 47-48 54-55
+lib/shelved-rulings-store.js	94.83	82.98	100.00	137-139 158-160 170-172
+lib/ship-biscuit-history-store.js	92.86	53.85	100.00	56-57 59-60 187-189 202-204 217-219 229-231 249-250
+lib/ship-biscuit.js	99.44	64.83	100.00	128-130
+lib/ship-journey.js	99.77	94.94	100.00	61
+lib/ship-layout.js	97.01	89.92	98.36	189-192 250-251 274 762-789
+lib/should-mock-ai.js	100.00	100.00	100.00	
+lib/size-of-move.js	100.00	96.39	100.00	
+lib/sse.js	100.00	100.00	100.00	
+lib/stage-router.js	100.00	91.67	100.00	
+lib/stage-writes.js	100.00	100.00	100.00	
+lib/starter-seed.js	100.00	100.00	100.00	
+lib/subtree-index.js	98.81	85.00	100.00	68
+lib/superseded-selection.js	100.00	78.13	100.00	
+lib/suspect-credential-refresh.js	98.97	90.74	75.00	288-290
+lib/swim-graph.js	100.00	97.06	100.00	
+lib/swim-lanes.js	98.41	87.17	98.25	175-176 350 568-571 731-734 758-759
+lib/task-attachments.js	100.00	96.88	100.00	
+lib/task-board-view.js	93.41	87.50	96.77	276-277 279-280 282-283 288-297 324-325 327-328 330-331
+lib/task-cost-read.js	100.00	94.44	100.00	
+lib/task-decisions-store.js	96.26	92.51	100.00	271-273 308-310 400-402 438-439 519-521 538-540 576-578 627-629 660-662 743-745 826-827
+lib/task-done-cache.js	100.00	100.00	100.00	
+lib/task-facts-holder.js	100.00	100.00	88.89	
+lib/task-mode-store.js	99.34	95.18	100.00	454-456
+lib/task-order.js	99.41	91.67	97.22	112-113
+lib/task-page-href.js	100.00	100.00	100.00	
+lib/task-page-loader.js	99.37	91.35	96.38	1258-1259 1265-1266 1344-1346 1366-1367 1554
+lib/task-run-facts.js	97.87	98.31	90.91	113-115
+lib/task-share-access.js	100.00	100.00	100.00	
+lib/task-share-store.js	100.00	71.43	100.00	
+lib/task-snapshot-store.js	95.14	82.69	100.00	213-215 236-238 247-249 304-306 316-318 347-348
+lib/task-stack.js	96.02	72.73	100.00	91-98 124-125
+lib/task-state.js	100.00	96.97	100.00	
+lib/task-timeline.js	99.41	87.83	92.65	201 462-463
+lib/terminal-marked-task-cost.js	100.00	100.00	100.00	
+lib/ticket-close-closer.js	97.35	91.91	86.96	277-279 312-314 322-324
+lib/timeline-zoom.js	100.00	96.30	100.00	
+lib/token-refresh.js	96.68	92.11	75.00	174-180
+lib/transcript-spend.js	99.43	77.97	100.00	95 141
+lib/trashed-signal.js	100.00	100.00	100.00	
+lib/tree.js	99.27	95.09	100.00	399-400 632-634
+lib/unanswered-decisions.js	99.29	97.27	100.00	173-179
+lib/unpriced-models.js	100.00	100.00	100.00	
+lib/urlkey-holders.js	100.00	92.93	100.00	
+lib/usage-snapshot-intake.js	100.00	100.00	100.00	
+lib/user-preferences.js	93.29	89.29	95.65	106-108 122-124 143-145 174-176 193-195 386-388 412-414 427-439
+lib/utils/html.js	100.00	100.00	100.00	
+lib/utils/time.js	100.00	100.00	100.00	
+lib/vendor-assets.js	100.00	90.00	100.00	
+lib/waiting-section.js	100.00	82.61	100.00	
+lib/wake-credential.js	100.00	94.44	100.00	
+lib/wake-shadow.js	100.00	68.18	100.00	
+lib/wall-clock-summary.js	100.00	80.56	100.00	
+lib/weekly-budget.js	100.00	100.00	100.00	
+lib/workflow-config.js	100.00	100.00	100.00	
+lib/workspace-api-mocks.js	86.63	68.12	81.48	168-192 214-218 232-245
+lib/workspace-change-log.js	97.55	84.34	90.48	140-141 156-157 165
+lib/workspace-halt.js	100.00	97.50	100.00	
+lib/workspace-issues-memo.js	92.11	63.64	62.50	31-36
+lib/workspace-kpi-stats.js	100.00	100.00	100.00	
+lib/workspace-kpis-cache.js	100.00	95.00	100.00	
+lib/workspace-lookup.js	100.00	100.00	100.00	
+lib/workspace-owner.js	100.00	96.55	100.00	
+lib/workspace-preferences.js	95.50	87.69	100.00	92-94 106-108 114-116 130-132 151-153 164-166 172-174 360-361
+lib/workspace-registry.js	100.00	100.00	100.00	
+lib/workspace-removal-revocation.js	100.00	88.00	100.00	
+lib/workspace-store.js	100.00	92.59	100.00	
+lib/workspace-title-resolver.js	100.00	96.00	100.00	
+lib/workspace-token-cache.js	100.00	97.14	100.00	
+lib/workspace-token-refresh.js	100.00	100.00	100.00	
+lib/workspace-token-resolver.js	99.68	95.92	94.12	546-547
+lib/workspace-urlkey.js	98.74	92.31	100.00	178-179 205-206
+lib/workspace.js	99.92	97.92	98.33	944
+lib/yap-client.js	94.67	85.71	73.33	57-62 74-75 146-148 170-171
+playwright.config.js	100.00	33.33	100.00	
+playwright.perf.config.js	100.00	100.00	100.00	
+playwright.visual.config.js	100.00	100.00	100.00	
+routes/account-merge.js	93.83	87.50	100.00	103-109 187-188 226-229 231-232
+routes/auth.js	89.83	73.24	100.00	85-86 94-95 117-129 165-174 184-190 392-398 480-483 499-505 524-525
+routes/collective.js	80.09	78.00	82.35	107-108 143-149 157-158 172-173 177-178 181-182 418-422 519-521 531-574 580-612 618-644
+routes/dashboard-drilldown.js	95.91	76.47	88.89	88-94
+routes/dashboard-effort.js	98.07	92.16	93.33	135-139
+routes/dashboard-feed.js	99.26	90.66	98.08	768-770 796-798
+routes/dashboard-kpis.js	97.17	85.11	100.00	179-181 196-198
+routes/dashboard-rulings.js	99.34	97.27	100.00	126-128
+routes/dashboard-session-state.js	99.07	88.06	100.00	286-288
+routes/dashboard-summaries.js	94.70	83.62	86.96	95-100 106-107 123-125 286-291 297-298 309-311
+routes/dashboard.js	96.12	80.37	93.18	349-350 459-460 483-484 491-492 536-537 539-540 589-592 594-596 607-608 610-611 624-626 654-655 658-660 758-760
+routes/dispatch.js	96.39	88.21	95.08	205-206 317-318 361-362 429-432 443-453 456-458 653-654 678-679 733-734 774-775 796-797 846-847 868-869 893-894 1128-1129 1141-1142 1156-1157 1170-1171 1179-1180 1213-1214 1269-1271 1285-1286 1563-1564 1596-1597
+routes/email-auth.js	95.71	90.42	100.00	239-241 292-293 386-389 649-652 660-674 689-690
+routes/flight-companion.js	95.21	91.24	96.30	469-475 487-501 732-733 809-820 844-845 847-848 850-851
+routes/getting-started.js	93.75	100.00	80.00	33-39 52
+routes/github-auth.js	100.00	100.00	100.00	
+routes/github-projects-auth.js	100.00	100.00	100.00	
+routes/held-connection.js	97.68	80.82	92.59	252-255 359-361 443-445 466
+routes/jira-auth.js	95.03	88.36	100.00	267-272 394-396 430-433 446-449 455-459 465-469 601-604 792-795 910-914 930-933 982-987
+routes/legacy-redirects.js	63.38	100.00	28.57	23-28 39-43 47-51 55-59 63-67
+routes/library.js	100.00	94.44	100.00	
+routes/live-console.js	84.78	70.00	72.22	66-67 78 101-102 124-137 142-161 270-272
+routes/milestone-funnel.js	96.00	83.33	100.00	69-71
+routes/openrouter-auth.js	86.55	77.14	100.00	129-130 137-142 145-150 167-173 176-182 208-214 226-227 278-279
+routes/passage-planner.js	57.35	100.00	50.00	36-64
+routes/provider-auth-routers.js	100.00	100.00	100.00	
+routes/proxy-agent-status.js	76.71	65.71	100.00	37-39 41-43 45-47 49-51 53-55 62-64 66-68 70-72 77-79 98-101 128-130
+routes/proxy-alarms.js	98.90	66.67	100.00	89
+routes/proxy-compute.js	90.14	71.28	93.94	157-160 199-203 290-291 298-300 324-326 337-339 362-363 401-403 561-564 578-580 593-594 598-600 611-613 616-618 623-625 850-852 1039-1041 1059-1060 1063-1065 1069-1071 1097-1105 1129-1130 1134-1139 1148-1154 1195-1198 1212-1213 1216-1218 1245-1250 1277-1283 1324-1336 1354-1355 1358-1360 1364-1366 1428-1433 1489-1492 1506-1507 1510-1512 1538-1543 1617-1629
+routes/proxy-dispatch.js	98.61	89.57	100.00	146 433-436 640-643
+routes/proxy-flight-companion.js	94.87	89.47	90.48	184-185 231-232 330-345
+routes/proxy-halt.js	100.00	97.14	100.00	
+routes/proxy-kickoff.js	100.00	91.67	100.00	
+routes/proxy-model-routing.js	96.30	91.78	100.00	87-89 115-117 142-143
+routes/proxy-reads.js	98.09	92.41	100.00	223-224 247-248 300-301 319-320 430-431 608-609
+routes/proxy-rulings.js	98.46	91.57	100.00	355-357 368-371
+routes/proxy-runner-prompt.js	100.00	100.00	100.00	
+routes/proxy-runner.js	96.22	86.84	100.00	196-198 248-251 284-287
+routes/proxy-token-exchange.js	97.75	93.75	66.67	45-46
+routes/proxy-tokens-admin.js	99.11	89.86	100.00	248-249 252-253
+routes/proxy-writes.js	99.78	87.73	98.36	466-467
+routes/proxy.js	99.10	91.89	92.73	375-376 395-396 532-533 1245-1249 1417-1418 1575-1576
+routes/runner-kit.js	95.65	85.71	100.00	37-38
+routes/runner-setup.js	93.81	88.89	100.00	88-93
+routes/settings-model.js	93.81	78.57	92.31	40-41 54-55 96-97 109
+routes/settings.js	92.82	66.19	84.62	60-61 63-64 66-67 69-74 76-77 79-80 117-119 184-185 237-241 427-428 441-446 451-453 483-485
+routes/ship-biscuit.js	75.55	43.33	45.45	95-96 115-121 131-132 138-139 199-233 252-270
+routes/ship-journey.js	60.81	100.00	50.00	42-70
+routes/task-chat.js	87.07	56.62	79.31	70-73 76-80 111-117 156-178 202-203 205-206 254-255 284-290 312-314 331-333 353-358 370-372 384-386 408-409 412-413 418-421 425-426 428-429 451-452 476-481 720-723
+routes/task-create.js	100.00	87.50	100.00	
+routes/task-edit.js	100.00	96.15	100.00	
+routes/task-mode.js	97.35	85.19	100.00	107-109
+routes/task-page.js	96.06	87.64	94.12	206-212 278-280 301-303
+routes/task-share.js	96.10	86.84	95.65	229-231 309-311 346-348 362-364 379-381
+routes/workspace-api-audit.js	100.00	100.00	100.00	
+routes/workspace-api-feedback.js	98.98	82.55	95.00	153-155 585-587
+routes/workspace-api-issue-read.js	91.98	87.80	57.14	40-54 94-97 212-213
+routes/workspace-api-issue-write.js	99.33	92.22	95.45	560-565
+routes/workspace-api-prompts.js	80.86	75.00	71.43	116-122 130-139 147-167 175-186 207-208 215-216 228-232 249-257 263-264 303-304 327-328 358-360 412-414
+routes/workspace-api-roadmap.js	75.06	48.89	67.86	85-91 103-104 108-109 111-112 185-216 224-244 254-271 285-287 291-293 362-365 374-380 437-455 529-534 547 549 561-562 568-573 575-581 645-646 673-675 682-685 779-788 790 805-806 810-811 818-819 821-835 842-868 871-875 877-881
+routes/workspace-api-run-evidence.js	96.28	80.00	92.31	54-55 149-151 187-189 313-315 372-374
+routes/workspace-api-scan.js	91.05	78.99	100.00	136-138 142-144 210-212 252-253 256-260 293-300 302-308 347-348 352-353 399-401 454-455 457-461 480-485 491-492 517-518 560-562 601-602 684-685
+routes/workspace-api-steps.js	91.07	80.00	87.50	71-73 83-85 96-99
+routes/workspace-api.js	86.35	64.15	90.63	282-290 352-363 381-383 409-421 453-454 473-474 481-490 576-577 588-592 606-618 667-668 670-675 683-685 701-702 729-730 771-772 795-823 857-861 898-900
+routes/workspace-kpis.js	100.00	80.00	66.67	
+routes/workspace.js	98.83	93.10	66.67	166-167
+scripts/apply-deferred-indexes.mjs	94.51	80.00	77.78	87-91
+scripts/backfill-kpi-daily-rollup.mjs	88.57	84.62	60.00	54-55 65-70
+scripts/code-shape/census-core.mjs	94.40	81.66	90.14	132-133 135-138 273-278 302-307 350-360 408 489 501 503-508 640-642 721 723 758-761
+scripts/code-shape/census-diff.mjs	79.17	90.91	90.00	20-24
+scripts/code-shape/census-review-core.mjs	100.00	97.78	100.00	
+scripts/code-shape/census-review.mjs	100.00	80.00	100.00	
+scripts/code-shape/census.mjs	100.00	100.00	100.00	
+scripts/code-shape/cochange-core.mjs	100.00	100.00	100.00	
+scripts/code-shape/cochange.mjs	100.00	66.67	100.00	
+scripts/code-shape/code-shape-lib.mjs	95.74	91.01	100.00	81-86 95-96
+scripts/code-shape/perturb-core.mjs	95.89	92.31	100.00	13 63-64
+scripts/code-shape/probe.mjs	96.47	64.71	100.00	25-27
+scripts/code-shape/retention-core.mjs	100.00	100.00	100.00	
+scripts/code-shape/retention.mjs	100.00	100.00	100.00	
+scripts/code-shape/seams.mjs	100.00	94.29	94.12	
+scripts/code-shape/shape-core.mjs	92.55	82.17	96.43	66-68 163-164 175-178 246-255
+scripts/code-shape/shape-report.mjs	100.00	87.50	100.00	
+scripts/code-shape/shape.mjs	100.00	100.00	100.00	
+scripts/code-shape/tap.mjs	100.00	100.00	100.00	
+scripts/code-shape/verbatim-core.mjs	100.00	93.55	100.00	
+scripts/code-shape/verbatim.mjs	91.18	57.14	100.00	14-16
+scripts/drop-funnel-events-collection.mjs	97.67	84.62	87.50	125-127
+scripts/dry-run-owner-backfill.mjs	94.92	50.00	50.00	55-57
+scripts/dry-run-urlkey-duplicates.mjs	99.60	92.81	97.56	495-496
+scripts/dry-run-workspace-ownership.mjs	98.26	81.97	93.75	92 232-233 284-285
+scripts/erase-account.mjs	98.89	89.87	75.00	177-178
+scripts/eval/eval-dense.mjs	99.58	63.59	88.89	158-159
+scripts/expire-ownerless-dispatch-tokens.mjs	93.75	50.00	50.00	44-46
+scripts/explain-paged-lists-lin3163.js	63.87	93.94	69.23	57-58 194-196 198-201 203-300 306-310
+scripts/false-live-rows.js	89.46	87.44	82.19	205-208 260-267 434-436 510-515 518-520 523-525 527-553 556-560
+scripts/figure-theme.mjs	59.46	87.50	100.00	23-37
+scripts/file-pointer-read.mjs	71.01	69.57	57.14	44 117-129 132-161 165-169
+scripts/follow-on-ratio.mjs	45.89	83.33	18.75	106-128 146-157 205-238 245-279 283-288 290-346 350-397 400-401
+scripts/fossil-pass-lin2633.js	93.59	89.71	76.47	293 623-628 630-660 667-671
+scripts/lib/figure-theme.mjs	100.00	94.25	94.59	
+scripts/lin-4200-d13-volume-timing.mjs	43.37	87.69	60.71	187-197 204-225 231-237 244-263 265-308 310-321 323-356 358-362 369-413 415-491 494-498
+scripts/lin-4200-measure-records-vs-snapshots.mjs	79.78	82.05	95.08	279-280 482-499 536-641 644-648
+scripts/lin3014/build-measure.mjs	74.36	90.00	66.67	57-74 77-78
+scripts/lin3014/capture-kpis.mjs	81.30	88.89	87.50	68-71 103-119 122-123
+scripts/lin3014/lib/classify.mjs	100.00	100.00	100.00	
+scripts/lin3014/lib/equivalence-core.mjs	100.00	86.00	100.00	
+scripts/lin3014/lib/exemptions.mjs	100.00	100.00	100.00	
+scripts/lin3014/lib/guard.mjs	100.00	95.45	100.00	
+scripts/lin3014/lib/replay-core.mjs	100.00	100.00	100.00	
+scripts/lin3014/replay.mjs	40.44	66.67	16.67	51-60 62-91 93-120 122-129 132-136
+scripts/lineage-close-backfill-lin3365.js	85.02	92.21	90.32	158-160 217-219 230-235 237-259 263-267
+scripts/plan-review-round-trips.mjs	53.52	66.04	37.50	76-99 111-122 148-151 171-201 244-245 251-253 258-259 276-277 292-293 297-299 302-303 311-366 370-422 425-426
+scripts/repair-account-merge-lin2233.js	83.22	75.00	50.00	103 122-140 145-149
+scripts/retention-lifetime-pass-lin3157.js	94.35	80.53	86.96	122-123 153-154 331-332 337-338 489-494 513-515 525-538
+scripts/revert-connection-backed.js	89.06	80.95	66.67	169-184 188-192
+scripts/run-unit-tests.mjs	97.65	94.74	83.33	79-80
+scripts/scan-mis-mirrored-workspaces-lin1981.js	85.23	88.46	71.43	146-166 172-176
+scripts/scan-same-kind-sources-lin3332.mjs	88.39	76.47	75.00	136-148 151-155
+scripts/scan-secondary-binding-shapes-lin3790.mjs	88.00	86.11	77.78	131-143 146-150
+scripts/survey-hides-d5x-lib.mjs	100.00	100.00	100.00	
+scripts/survey-hides-d7-lib.mjs	100.00	94.44	100.00	
+scripts/survey-hides-runner.mjs	68.60	64.29	53.13	43-45 84-87 90-92 98-100 106-146
+scripts/ticket-closed-clear-lin3399.js	83.55	88.33	82.14	147-149 195-224 227-231
+scripts/transcript-spend.mjs	29.69	70.00	26.32	101-121 125-241 248-257 259-318 331-385 387-417 420-421
+server.js	49.02	45.83	6.61	252-274 278-279 377-379 404-406 411-414 538 540 926 959-967 986 1017 1034-1035 1051-1055 1061 1088 1124 1147-1150 1167 1183 1186 1209-1210 1215-1218 1282-1284 1338-1340 1349-1356 1363-1643 1649-1652 1666-1674 1729-1961 1968-2027 2040-2061 2067-2073 2078-2371 2380-2398 2411-2425 2438-2449 2459-2470 2478 2482 2493-2497 2503 2510 2533-2567 2583-2623 2747-2749 2803-2807 2814-2816 2866-3113 3127-3147 3151-3168 3182-3193 3201-3203 3221-3223 3231-3237 3243-3249 3253-3259 3467-3488 3513-3538 3549-3641 3655-3729 3742-3787 3795-3811 3821-3881 3890-3931 3940-4007 4015-4093 4101-4112 4122-4133 4141-4161 4169-4213 4221-4234 4259-4309 4321-4357 4391-4458 4469-4489 4498-4526 4535-4609 4626-4661 4687 4756-4757 4762-4763
+tests/fixtures/browser-cost-format.js	100.00	100.00	100.00	
+tests/fixtures/client-common.js	100.00	100.00	100.00	
+tests/fixtures/clock-shift.js	100.00	90.91	87.50	
+tests/fixtures/connection-access-guards.js	99.68	92.19	96.97	292
+tests/fixtures/cost-read-cores.js	100.00	87.50	100.00	
+tests/fixtures/cost-replay/corpus.js	100.00	86.96	100.00	
+tests/fixtures/cost-replay/diff.js	100.00	97.78	100.00	
+tests/fixtures/cost-replay/harness.js	99.50	89.72	83.56	103-104
+tests/fixtures/cost-replay/lin4197-replay.js	100.00	64.71	100.00	
+tests/fixtures/dashboard-router.js	100.00	97.37	82.61	
+tests/fixtures/dispatch-list-store.js	100.00	100.00	100.00	
+tests/fixtures/email-auth-harness.js	100.00	91.30	97.14	
+tests/fixtures/erasure-seed.js	100.00	97.75	100.00	
+tests/fixtures/flight-companion-sse-frames.js	100.00	100.00	100.00	
+tests/fixtures/github-harness.js	86.59	100.00	0.00	26-27 74-82
+tests/fixtures/github-install-flow-branches.js	100.00	100.00	100.00	
+tests/fixtures/github-projects-harness.js	88.17	100.00	0.00	25-26 85-93
+tests/fixtures/harness-models.js	100.00	100.00	100.00	
+tests/fixtures/held-task-facts.js	100.00	80.00	100.00	
+tests/fixtures/hermetic-linear.js	100.00	75.00	66.67	
+tests/fixtures/jira-harness.js	93.19	100.00	0.00	25-26 222-235
+tests/fixtures/key-state-instances.js	100.00	100.00	87.50	
+tests/fixtures/key-state-scan.js	100.00	96.67	100.00	
+tests/fixtures/lin-3285-seam.js	99.02	92.73	100.00	52
+tests/fixtures/lineage-identity.js	100.00	100.00	100.00	
+tests/fixtures/local-harness.js	83.26	60.98	71.43	130-139 184-198 216-236 295-308 332-345 348-352 480-481
+tests/fixtures/mango-tmpdir.js	97.50	86.67	92.31	96-97 116
+tests/fixtures/mock-collection.js	100.00	99.26	100.00	
+tests/fixtures/network-guard.js	97.75	81.03	91.67	58 154-155 160 199-200
+tests/fixtures/periodicals-tree.js	100.00	100.00	100.00	
+tests/fixtures/proxy-prompt-box.js	100.00	100.00	100.00	
+tests/fixtures/question-card-rows.js	100.00	100.00	100.00	
+tests/fixtures/request-usage-loader.js	100.00	77.78	100.00	
+tests/fixtures/run-ledger-comments.js	100.00	100.00	100.00	
+tests/fixtures/run-ledger-trails.js	100.00	100.00	100.00	
+tests/fixtures/scheduler-race-worker.mjs	100.00	100.00	66.67	
+tests/fixtures/secret-scan-fixtures.js	100.00	100.00	100.00	
+tests/fixtures/stage-router-prompts/cases.mjs	100.00	100.00	100.00	
+tests/fixtures/state-route.js	100.00	100.00	63.16	
+tests/fixtures/stub-provider.js	100.00	100.00	100.00	
+tests/fixtures/task-cost-adapter.js	100.00	100.00	100.00	
+tests/fixtures/task-decision.js	100.00	71.43	100.00	
+tests/fixtures/task-timeline/lin-4393.js	100.00	100.00	100.00	
+tests/fixtures/with-fresh-digests.js	100.00	60.00	100.00	
+tests/helpers/collection-names.js	100.00	100.00	100.00	
+tests/helpers/css-rules.js	97.40	96.25	100.00	75 92-94
+tests/helpers/embedded-data.js	100.00	60.00	100.00	
+tests/helpers/public-kpis-fixture.js	100.00	100.00	100.00	
+tests/helpers/render-settings-areas.js	100.00	100.00	100.00	
+tests/measures/css-cascade.mjs	55.41	97.37	56.76	69-75 78-89 93-121 124-127 131-155 167-174 253-272 277-290 293-313
+tests/probes/move-probe.mjs	68.65	93.75	86.67	126-183
+tests/unit/helpers/area-registry.js	100.00	88.89	100.00	
+tests/unit/helpers/client-world.js	100.00	96.55	90.48	
+tests/unit/helpers/fake-dom.js	98.36	90.91	94.35	117 482-484 622 640 713 753-755 774-780
+tests/unit/helpers/frozen-resolvers-6ea1371e.js	97.61	95.24	100.00	43-44 74-75 178-179
+tests/unit/helpers/live-console-world.js	100.00	94.74	77.78	
+tests/unit/helpers/pinned-catalog.js	100.00	100.00	100.00	
+tests/unit/helpers/real-dispatch-disclosure.js	100.00	100.00	100.00	
+tests/unit/helpers/routing-fakes.js	100.00	97.67	100.00	
+tests/unit/helpers/swipe-page.js	100.00	100.00	100.00	
+tests/unit/helpers/task-page-body.js	100.00	66.67	100.00	
+tests/unit/helpers/task-page-loop.js	100.00	100.00	100.00	
+tests/unit/lib/dashboard-unit.js	100.00	100.00	100.00	
+tests/unit/lib/dispatch-writer.js	100.00	50.00	100.00	
+tests/unit/lib/entrance-route-sweep.js	100.00	86.67	100.00	
+tests/unit/lib/import-graph.js	100.00	94.27	100.00	
+tests/unit/lib/proxy-di-witness.js	96.86	89.66	100.00	51 100-101 137-138 164-165
+tests/unit/lib/proxy-fake-deps.js	100.00	100.00	72.86	
+tests/unit/lib/raw-http.js	100.00	93.33	100.00	
+tests/unit/lib/route-layer.js	100.00	100.00	100.00	
+tests/unit/lib/workspace-api-unit.js	100.00	100.00	100.00	
+tests/unit/lin-3126-harness.js	79.72	87.50	51.35	45-48 51-52 61-62 132-150 172-180 183-190
+tests/unit/lin-3126-proxy-harness.js	71.54	85.71	46.81	45-53 57-71 74-75 140-152 156-164 222-231 235-246
+tests/unit/lin-3382-resolver-harness.js	100.00	87.23	93.55	

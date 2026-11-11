@@ -1,0 +1,13 @@
+diff --git a/lib/account-erasure.js b/lib/account-erasure.js
+index 1ebb6fee9..8bf15e4b8 100644
+--- a/lib/account-erasure.js
++++ b/lib/account-erasure.js
+@@ -929,7 +929,7 @@ export async function applyErasure({ db, plan, onStep, settleMs = IN_FLIGHT_SETT
+           const tail = rest.join('.');
+           const filter = { [f.path]: { $in: plan.groupIds } };
+           if (f.kind === 'array') {
+-            await guard(row.collection, () => db.collection(row.collection).updateMany(filter, { $set: { [`${head}.$[e].${tail}`]: ERASED_ACCOUNT_ID } }, { arrayFilters: [{ [`e.${tail}`]: { $in: plan.groupIds } }] }));
++            await guard(row.collection, () => db.collection(row.collection).updateMany(filter, { $set: { [`${head}.$[e].${tail}`]: ERASED_ACCOUNT_ID } }, { arrayFilters: [{ [`e.${tail}`]: { $exists: true } }] }));
+           } else {
+             await guard(row.collection, () => db.collection(row.collection).updateMany(filter, { $set: { [f.path]: ERASED_ACCOUNT_ID } }));
+           }
