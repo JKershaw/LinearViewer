@@ -30,6 +30,8 @@ node --experimental-test-coverage --test --test-concurrency=5 \
 | Line / branch / funcs | 95.97 / 87.60 / 92.35 | **95.00 / 88.70 / 91.08** |
 
 The one failure is environmental, not a product signal (L9): `scripts/code-shape/wrappers.test.mjs:258`.
+This run used Node v25.9.0 locally. CI pins Node 24 (`.nvmrc`, `package.json` engines), and the
+native coverage numbers may differ slightly between the two.
 Line coverage fell a point while the suite grew by 5,600 tests, and as last time the percentage
 says little. The verdicts below rest on mutation spikes.
 
@@ -116,38 +118,45 @@ new sites replaced the old ones.
 
 ### High
 
-**C1 — `dispatch-token-store-untested-auth-boundary` — not resolved, though LIN-690 is Done.**
+**C2 — `model-routing-store-urlkey-filters-unasserted` — new name; grades an existing Security Review entry. Top finding (raised from Medium-High by the second read).**
+The Security Review (10 Nov) counted these filters as untested (row 21,
+`docs/reviews/security-review-2026-11-10.md:64`) and left the entry "`urlKey` filters untested" in
+`docs/areas/agent-api.md` (`routes/proxy-model-routing.js`). This run grades that entry and does not
+duplicate it. **M20 (preset apply), M21 (undo), M22 (`listPresets`) and M23 (`getLog`) all survive
+the whole unit suite.** M22 and M23 carry the weight, and they have no precondition.
+`GET …/model-routing/presets` and `…/log` (`routes/proxy-model-routing.js:97-105`) accept any proxy
+token, and `publicEntry` (`:56-59`) strips only `urlKey` and the actor's account id. Settings
+(`routes/settings.js:190-191`, `:297-298`) reads the same two methods. A dropped filter would serve
+every workspace's presets and change log to any token from any workspace and to any member: actor
+names, reasons, token ids and entry ids. No test would fail. M20 and M21 need another workspace's
+UUID, which bounds them. The store is new in the window, fake-only (see Fakes above), and its one
+direct test file has no real engine. No ticket holds this; the existing note entry is its home.
+
+### Medium-High
+
+**C1 — `dispatch-token-store-untested-auth-boundary` — not resolved, though LIN-690 is Done (lowered from High by the second read).**
 LIN-690 was closed on 30 Oct by backlog triage: "Already fixed on main … I did not check every case
 the ticket lists." Neither case the ticket named is asserted:
 - **Cross-workspace revoke.** The only workspace guard is `urlKey` in `deleteOne({ _id: tokenId,
   urlKey })` (`lib/dispatch-tokens.js:246-249`), behind `DELETE /workspace/:urlKey/api/dispatch/tokens/:tokenId`
   (`routes/dispatch.js:1164`). The route's owner gate (`:1173`, M25 killed) checks the caller's
   workspace, not the token's. **M3 survives the whole unit suite**: a regression that let an owner
-  of workspace A revoke workspace B's runner token by id would ship green.
+  of workspace A revoke workspace B's runner token by id would ship green. It is bounded like M20
+  and M21: the id is a UUID (`routes/dispatch.js:1170`) that is never listed outside its own
+  workspace, and the harm is a revoke (a runner stops), not an exposure.
 - **Hash never listed.** `listTokens` (`lib/dispatch-tokens.js:205-231`) goes straight to
   `res.json({ tokens })` (`routes/dispatch.js:1153-1154`). **M5 survives the whole unit suite**,
-  even though the function is 100% line-covered (Trap 3).
+  even though the function is 100% line-covered (Trap 3). A leaked hash would reach only the token's
+  own workspace, and it cannot be presented as a credential, because validation hashes whatever the
+  caller sends (`lib/dispatch-tokens.js:129-136`). It is a contract the store's own comment states
+  ("never the token hash") that no test holds.
 
-`lib/dispatch-tokens.js` has not changed since `9aa68bb82` (23 Oct). The sibling
-`lib/proxy-tokens.js` kills both mutants (M3p, M5p), so the gap is specific to the dispatch store,
-and the proxy tests are the pattern to copy. With LIN-690 closed, nothing open holds this. It is
-written as a Waiting entry in `docs/areas/agent-api.md`; whether to reopen LIN-690 instead is a
-question for the person (see the end).
-
-### Medium-High
-
-**C2 — `model-routing-store-urlkey-filters-unasserted` — new name; grades an existing Security Review entry.**
-The Security Review (10 Nov) counted these filters as untested (row 21,
-`docs/reviews/security-review-2026-11-10.md:64`) and left the entry "`urlKey` filters untested" in
-`docs/areas/agent-api.md` (`routes/proxy-model-routing.js`). This run grades that entry and does not
-duplicate it. **M20 (preset apply), M21 (undo), M22 (`listPresets`) and M23 (`getLog`) all survive
-the whole unit suite.** M22 and M23 matter most. `GET …/model-routing/presets` and `…/log`
-(`routes/proxy-model-routing.js:97-105`) accept any proxy token, and Settings
-(`routes/settings.js:190-191`, `:297-298`) reads the same two methods. A dropped filter would serve
-every workspace's presets and change log, including actor names and reasons, to any token and any
-member, and no test would fail. M20 and M21 need another workspace's UUID, which bounds them. The
-store is fake-only (see Fakes above), and its one direct test file has no real engine. No ticket
-holds this; the existing note entry is its home.
+What keeps this near the top is the closure, not the impact: a ticket minted for exactly these two
+cases was closed as fixed without either being checked. `lib/dispatch-tokens.js` has not changed
+since `9aa68bb82` (23 Oct). The sibling `lib/proxy-tokens.js` kills both mutants (M3p, M5p), so the
+gap is specific to the dispatch store, and the proxy tests are the pattern to copy. With LIN-690
+closed, nothing open holds this. It is written as a Waiting entry in `docs/areas/agent-api.md`;
+whether to reopen LIN-690 instead is a question for the person (see the end).
 
 **C3 — `harbour-feedback-tokens-zero-coverage` — changed shape: covered through a fake, two invariants still unasserted.**
 The module is no longer absent. It reads 90.23 / 70 / 80 through an inline fake added by LIN-3795 in
@@ -193,7 +202,7 @@ The last report said a unit flake "would show as red" because the unit suite has
 In fact, manual whole-run re-runs are a retry layer. In the 16 re-run runs, attempt 1 failed a
 **unit** job in five that then went green. Three were `tests/unit/db-indexes.test.js` (10-25
 and 10-26, one on a `main` push), fixed in the window by LIN-3985 (`96efd1fe6`). One is open:
-`tests/unit/scheduler.test.js:264` "(e) error containment" failed once (run 40251525217, 10-26) with
+`tests/unit/scheduler.test.js:265` "(e) error containment" failed once (run 40251525217, 10-26) with
 `expected the interval to keep ticking past the first throw (at least 2 calls), got 1`. The test
 sleeps 300 ms of wall clock for 30 ms ticks (`:285`). Under load its failure message is the
 defect it guards (an interval cleared after a throw), so a person reading the red cannot tell them
@@ -257,6 +266,14 @@ Waiting entry in `docs/areas/front-end-pages.md`.
   and a dispatched session's `TMPDIR` sits under the simple-dispatcher checkout, whose `node_modules`
   holds acorn. CI is unaffected. It has no area file (the test is under `scripts/`), so it is raised
   for the person in the closing comment. Reported, not fixed.
+- **L11 — `task-share-timeline-mask-unasserted`: graded, already homed.** Security Review row 16
+  (`docs/reviews/security-review-2026-11-10.md:59`) said no test pins `maskFragment` on the public
+  `GET /t/:token/timeline` (`routes/task-share.js:307`, new in the window). Its entry already sits in
+  `docs/areas/web-routes.md` (`routes/task-share.js`), so this run adds no note. Removing the mask
+  (M33) survives the 13 task-share unit files (283 tests), and the second reader found it survives the
+  whole suite. The sibling masks are pinned: dropping the `/state` mask fails 2 tests, as does dropping
+  the timeline's `withoutSpend` (second reader). The fragment is mostly structural text, so this is Low.
+  The first draft missed it; the second read found it.
 - **L10 — `free-tier-store-helper-lines`, recorded only.** `lib/free-tier-store.js` reads 82.37
   because `recordUsage` (a test helper), `cleanup` and `clear` (`:219-362`) are uncovered. None is on
   the money path, and M1, M2 and M13 were killed last run.
@@ -417,8 +434,8 @@ area a change would start from, naming the other side.
 
 | Stable name | Module | Severity | State vs 2026-10-23 |
 |---|---|---|---|
-| `dispatch-token-store-untested-auth-boundary` | `lib/dispatch-tokens.js` | High | unchanged; LIN-690 closed unresolved (M3, M5 survive the whole suite) |
-| `model-routing-store-urlkey-filters-unasserted` | `lib/model-routing-store.js` | Medium-High | new (grades Security Review row 21) |
+| `model-routing-store-urlkey-filters-unasserted` | `lib/model-routing-store.js` | High | new (grades Security Review row 21); top finding |
+| `dispatch-token-store-untested-auth-boundary` | `lib/dispatch-tokens.js` | Medium-High | lowered from High (bounded impact); LIN-690 closed unresolved (M3, M5 survive the whole suite) |
 | `harbour-feedback-tokens-zero-coverage` | `lib/harbour-feedback-tokens.js` | Medium-High | changed shape: fake-covered, M17b/M18 survive (LIN-2061) |
 | `e2e-retry-hidden-task-page-phone-layout` | `tests/e2e/task-page.spec.js` | Medium | new |
 | `account-erasure-array-anonymise-overreach` | `lib/account-erasure.js` | Medium | new |
@@ -437,6 +454,7 @@ area a change would start from, naming the other side.
 | `unit-rerun-rescues-token-tail-collision` | `tests/unit/task-share-route.test.js` | Low | new |
 | `wrappers-tmpdir-false-red` | `scripts/code-shape/wrappers.test.mjs` | Low | new (environmental) |
 | `free-tier-store-helper-lines` | `lib/free-tier-store.js` | Low | recorded only |
+| `task-share-timeline-mask-unasserted` | `routes/task-share.js` | Low | new here (Security Review row 16; M33 survives) |
 | `e2e-retry-hidden-dispatch-api-stray-queue-item` | `tests/e2e/dispatch.spec.js` | (was High) | resolved (LIN-3798) |
 | `e2e-retry-hidden-collective-fanout-seat-failure` | `tests/e2e/collective.spec.js` | (was Medium) | resolved (LIN-3798) |
 | `free-tier-global-hourly-cap-unenforced` | `lib/free-tier-store.js` | (was Critical) | still resolved |
@@ -447,4 +465,74 @@ area a change would start from, naming the other side.
 
 ## Adversarial Second-Read
 
-@@SECONDREAD@@
+**Tier 2:** a fresh-context sub-agent with no memory of the research or the report-writing turns.
+It was given only the report path, the window SHAs (`0b5afa6f` to `b5950f704`) and the question.
+**Question:** "What is the largest item in this window that this report missed or misfiled?"
+
+**Reader's answer** (every point it made, with its formatting condensed; a preamble noting that the
+report was committed while it read, with no finding or citation moving, is omitted):
+
+> No miss large enough to change the report's conclusions; the largest issue is a **severity misfile
+> between the top two findings**: by the report's own bounding logic, C2 is at least as severe as C1,
+> and arguably more.
+>
+> I re-ran the mutants jointly on the whole unit suite: M3, M5, M22 and M23 all survive (24,923 tests,
+> only the known environmental failure), so the survival claims hold. But the report discounts
+> M20/M21 because they "need another workspace's UUID, which bounds them", and gives M3 no such
+> discount, though M3 has exactly that precondition: the route checks `UUID_REGEX`
+> (`routes/dispatch.js:1170`) and deletes by `_id: tokenId`, and token ids are never listed outside
+> their own workspace. Its harm is also only a revoke, a runner taken down, with nothing exposed. M5
+> is weaker still: it would add a SHA-256 of a 256-bit random token to a listing shown only to the
+> token's own workspace, and tokens are validated by hashing what the caller presents
+> (`lib/dispatch-tokens.js:129-136`), so a leaked hash is not a usable credential. By contrast, C2's
+> M22/M23 has no precondition: any proxy token from any workspace would read every workspace's change
+> log (actor names, reasons, token ids, entry ids; `publicEntry` at `routes/proxy-model-routing.js`
+> strips only `urlKey`). It is new code in the window (`lib/model-routing-store.js`, +330 lines) with
+> no ticket, while `lib/dispatch-tokens.js` is unchanged since `9aa68bb82`. C1's real weight is a
+> process failure: LIN-690 was closed as fixed without the fix being checked. That is worth
+> reporting, but it does not raise the regression impact.
+>
+> One real miss, small: Security Review row 16 (`docs/reviews/security-review-2026-11-10.md:59`)
+> records a test gap on a new public surface that the report never mentions. I confirmed it: removing
+> `maskFragment` from `GET /t/:token/timeline` (`routes/task-share.js:307`, added on 11-10 by
+> LIN-4405) survives the whole suite (24,923 tests, 1 environmental failure). The sibling masks are
+> pinned: removing the `/state` mask fails 2 tests, and removing the timeline's `withoutSpend` fails 2.
+> The report graded row 21 of that review (C2) but skipped row 16. It is Low, because the timeline
+> renders mostly structural text.
+>
+> Checked and sound: the model-routing write paths (forcing the proxy-write setting gate open fails
+> 1 test; removing the version check fails 2); the free-tier billing clamp (`lib/agent-turn.js:460`
+> killed behaviourally; `routes/dashboard-summaries.js:90` killed only by census and witness tests);
+> tests deleted in the window, each removed with its feature (LIN-3912, LIN-3855, LIN-4129); the
+> test-runner and CI changes (keyed hermetic arm, clock-shift arm, LIN-3798's e2e write-drain), all of
+> which strengthen the suite; the test files outside the CI globs (`tests/judge`, `tests/measures`,
+> `tests/visual`, `tests/perf`), all off CI on purpose. One stale failure predates the window
+> (`scripts/eval/jev-routing-state.test.mjs`, 1 of 15). The coverage ran on Node v25.9.0 while CI
+> pins Node 24; minor, and the report does not disclose it.
+>
+> Citations I checked are accurate, except one: `tests/unit/scheduler.test.js:264` is a blank line;
+> the test starts at `:265`, with the failure message at `:290`.
+>
+> Is the High the right top finding? Only partially. C1's facts hold, but its severity rests on the
+> LIN-690 closure, not on impact. C2 (M22/M23) is an unconditioned cross-workspace read in new,
+> unticketed code and should be the top finding. Demote C1 to Medium-High, and keep the
+> closed-unresolved LIN-690 as a process note.
+>
+> Adversarial second-read verdict: AGREE
+> Differed from top finding: YES
+
+**Disposition (fixed in place).**
+- The re-rank is accepted, and it agrees with the bounding this report already applied to M20 and
+  M21. C2 is now the High and the top finding; C1 is Medium-High, and the LIN-690 closure is stated as
+  what keeps it near the top.
+- The row-16 miss is added as L11. M33 was re-run here: it survives 283 tests in the 13 task-share
+  files. Row 16 already has its home in `docs/areas/web-routes.md`, so no note is added.
+- The scheduler citation is corrected to `:265`, and the Node-version difference is disclosed under
+  Method. The other "checked and sound" items are not findings.
+- The reader's verdict stands as AGREE: no change to the report's conclusions beyond the ordering.
+  The `docs/areas/agent-api.md` entry for C1 is unchanged; it records an unasserted contract whatever
+  the severity.
+
+Adversarial second-read verdict: AGREE
+Differed from top finding: YES
+Disposition: fixed in place

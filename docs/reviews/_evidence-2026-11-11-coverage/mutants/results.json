@@ -568,6 +568,17 @@
     "tests/unit/model-routing-store.test.js",
     "tests/unit/render-legal.test.js"
    ]
+  },
+  {
+   "mutant": "M33",
+   "file": "routes/task-share.js",
+   "files": 13,
+   "tests": 283,
+   "passed": 283,
+   "failed": 0,
+   "result": "SURVIVED",
+   "failing": [],
+   "note": "added after the second read; test files = unit files naming task-share or maskFragment; the second reader also ran it against the whole suite (survived)"
   }
  ],
  "joint_full_suite": {

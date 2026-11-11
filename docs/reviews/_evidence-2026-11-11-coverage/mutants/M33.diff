@@ -1,0 +1,13 @@
+diff --git a/routes/task-share.js b/routes/task-share.js
+index 497884699..99371f01c 100644
+--- a/routes/task-share.js
++++ b/routes/task-share.js
+@@ -304,7 +304,7 @@ export function createTaskShareRoutes({
+     try {
+       const timeline = await timelineFragment.read({ urlKey: record.urlKey, identifier: record.issueIdentifier, issueId: record.issueId });
+       res.set('Cache-Control', 'no-store');
+-      return res.json({ timelineHtml: maskFragment(record, 'timeline', renderTaskTimeline(withoutSpend(timeline))) });
++      return res.json({ timelineHtml: renderTaskTimeline(withoutSpend(timeline)) });
+     } catch (error) {
+       console.error('Task share timeline error:', error.message);
+       return jsonError(res, 503, UNAVAILABLE_MESSAGE);
