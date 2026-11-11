@@ -26,9 +26,9 @@ The step-by-step transcript is `docs/reviews/_evidence-2026-11-11/onboarding-col
 - **For the persona, three seams decide the cold start.** None of them is broken outright, and each one makes a Jira team guess:
   - **Jira by API token**, the door that needs no server config, is offered only from inside an existing workspace's Settings. The landing door and the workspace switcher's `+ Jira` both go to OAuth (J13).
   - **The product's runner and Simple Dispatcher are never introduced as a choice.** The runner page defines itself as working "with no Simple Dispatcher" to a reader who has never heard the name (J14).
-  - **A second person has no way in.** The UI speaks of "members" and "everyone in <workspace>", but nothing says how a teammate joins. `docs/v1.md` rules colleagues beyond the share link a later step (J15).
+  - **A Jira team cannot share a workspace, and the obvious move splits it** (*source-confirmed, corrected after the second-read, §9*). Each person who presses "Continue with Jira" gets their own workspace, `jira:<accountId>` (`routes/jira-auth.js:745-771`), with its own owner and runner key. Nothing joins them, and nothing says so. The UI's "member" language ("everyone in <workspace>") can only hold for Linear workspaces, which are keyed on the organisation (`routes/auth.js:210`). For this persona that is the most decisive gap in the walk (J15, R4-11).
 - **One new objective breakage.** On a self-host without AI, the run control's default **Next step** gets a 503 and spins forever (R4-2).
-- **The top objective defect is unchanged.** It is still `scripts/env-check.sh` (LIN-2386), now in its fourth consecutive run.
+- **The top objective defect is unchanged.** It is still `scripts/env-check.sh` (LIN-2386), now in its fourth consecutive run. It is the top *objective* defect, but it does not touch a Jira team on the hosted product. **For this persona the largest finding is R4-11.**
 
 ---
 
@@ -80,7 +80,7 @@ These are the same four loop steps run #3 used as "used as intended": read → g
 | **J12** | **Agent-led onboarding (new)** | ✅ live and self-host |
 | **J13** | **Jira team (new)** | ✅ live doors and self-host; downstream via the fake-Jira harness (a reach) |
 | **J14** | **The team's own runner (new)** | ✅ fresh clone; live up to the runner page |
-| **J15** | **More than one person (new)** | ✅ live surfaces; second identity capability-gated |
+| **J15** | **More than one person (new)** | ✅ live surfaces; Jira workspace keying source-confirmed (§9) |
 | R1 | `simple-dispatcher` seam | ✅ fresh clone `5d8489e` |
 | D1 | Destination divergence | cross-cutting |
 | v1 | v1-promise check | ✅ live and self-host |
@@ -221,12 +221,14 @@ The persona's likely first move: copy the landing prompt (*"…fetch the onboard
 
 **Downstream: what a Jira workspace meets.** Without a Jira site this was walked on the self-host's fake-Jira test harness (§D2; logged as a reach, §5):
 - **`+ Add task`** on the Backlog opens Jira's own create dialog (`https://<site>/secure/CreateIssue!default.jspa`), which leaves Harbour. That is honest, and consistent with `README.md:60`'s "creating new issues isn't supported yet".
+- **An agent reading tasks** through the proxy, the first thing guide path (b) leads to, gets 422 on Jira. The Jira provider implements none of the four declared proxy reads (`viewer`, `projects`, `issues`, `issueDetail`: `lib/providers/interface.js:107`, none of them in `lib/providers/jira/index.js`). Dispatched prompts fall back to a brief-only path (`lib/proxy-preamble.js:383-397`), but an agent following the guide and `/instructions`, which advertise those reads regardless of provider, meets the 422 on its first read. *Source-confirmed after the second-read (§9). The harness walk probed only `POST /issues`.* That is **LIN-2816** (Backlog).
 - **An agent creating a task** through the proxy gets **422 `CAPABILITY_NOT_SUPPORTED` `createIssue`**. That is honest at the endpoint, but `/api/proxy/instructions`' `POST /issues` text names only GitHub's and Local's limits (§A2). An agent learns about Jira by failing. That is **LIN-3807** (Backlog, "add Jira to the c[reate …]").
-- **A periodical mint** on the Jira workspace was accepted (201, queued), with no caveat that the review's follow-on step needs to create an issue. *Inferred, not walked:* that step would hit the same 422. The run would need a runner subagent, which is out of scope here.
+- **A periodical mint** on the Jira workspace was accepted (201, queued), with no caveat that the minted run's first step creates the review task in the tracker (`lib/periodicals.js:1236-1247`). *Inferred, not walked:* that step would hit the same 422. The run would need a runner subagent, which is out of scope here.
 - The **Proxy page** says "interact with Linear" (R4-7).
+- **Jira tasks take a different first step from Local ones.** LIN-4370 (`7a4446eed`) routes a fresh task carrying an "As asked" block to the Survey and scoping sequence. LIN-4352 (`d81e13e7d`) skips sealing that block on Jira, because Jira's formatting round trip changes the end line. So the Local runner walk in J14 does not stand in for a Jira task's Next step or Run to PR (source, not walked).
 - Known open, cited and not re-filed: **LIN-4355** (As asked block in Jira), **LIN-2008** (boards/sprints), **LIN-2014** (scope on a large site), **LIN-2391** (docs misstate Jira).
 
-**Verdict:** OAuth door proceeded, then gated; API-token door had to guess; downstream create honest at each surface, with the instructions silent. **Destination:** NO cold (no Jira site); a simulated Jira workspace reads, writes, mints and could dispatch. **Delta: new journey.**
+**Verdict:** OAuth door proceeded, then gated; API-token door had to guess; downstream create honest at each surface, with the instructions silent; proxy reads 422 (source). **Destination:** NO cold (no Jira site). A simulated Jira workspace reads in the UI, writes, mints and could dispatch; an agent's proxy reads do not work. **Delta: new journey.**
 
 ### J14: The team's own runner (new)
 1. **How a newcomer learns a runner is needed.** From a fresh workspace (live and self-host):
@@ -239,7 +241,7 @@ The persona's likely first move: copy the landing prompt (*"…fetch the onboard
 3. **Are the two runners told apart?**
    - The only place a newcomer meets the other one's name is the runner page's own definition, *"…on your machine, **with no Simple Dispatcher**"*, plus a rule that a recently-polling Simple Dispatcher makes the runner `abort` (§D).
    - `README.md`, `/llms.txt` and `/getting-started.md` never name Simple Dispatcher.
-   - From the other side, `simple-dispatcher`'s README never names the runner kit or the Runner setup page. It says only *"Tokens are created in LinearViewer's workspace settings"* (§F).
+   - From the other side, `simple-dispatcher`'s README never names the runner kit or the Runner setup page. It says only *"Tokens are created in LinearViewer's workspace settings"* (`README.md:240`, §F). Inside this window, LIN-796 (`7d1d34c`) made a second Simple Dispatcher refuse to start beside a live one on the same host. That is a team-runner fact no Harbour page mentions.
    - In fact a queue token is minted on the **Dispatch** page (Settings › Running › Queue and history › Dispatch › "new token: generate"). Settings › Agent access says keys that can start runs are minted "from the agent prompt" (§D).
 
    **Had to guess**, for any team that wants an always-on host rather than a session.
@@ -260,10 +262,17 @@ The persona's likely first move: copy the landing prompt (*"…fetch the onboard
   - A Local workspace belongs to one browser's cookie (a second, cookie-less client is bounced: LIN-3065).
   - The **share link** is the one multi-person surface. It gives a read-only guest view, walked live (J11).
   - Run controls are owner-only, and the runner kit runs only the owner's dispatches, as the runner page says plainly. So a teammate who is a member could not start runs on the owner's runner.
-  - Whether a second Jira identity signing into the same site joins the same workspace is **capability-gated** (it needs two Jira accounts).
-- **Recorded scope.** `docs/v1.md:89` puts *"organisations and colleagues beyond the share link"* out of v1, "as later steps rather than never".
+  - **Jira (corrected after the second-read, §9; source-confirmed, not walked).** The first draft marked this capability-gated, but the source answers it.
+    - A Jira sign-in's workspace is keyed on the person: `const workspaceId = \`jira:${myself.accountId}\`` (`routes/jira-auth.js:771`), "identity is the human, never the site" (`:745-749`, LIN-1329).
+    - `?mode=new` rejoins that same person's container (`lib/providers/jira/index.js:1394-1398`; LIN-2819 is about the signed-in `+ Jira` case).
+    - GitHub is keyed the same way (`github:${userId}`, `lib/github-install-flow.js:949`). Only Linear is keyed on the organisation (`routes/auth.js:210`).
+    - So **each teammate who presses "Continue with Jira" (the door the guide sends them through) gets a separate workspace over the same Jira site**, with its own owner, run controls and runner key.
+    - Dispatch, run state and the runner's "another consumer polled this workspace" rule are all per workspace. So two teammates' runners could each take the same Jira issue without either seeing the other.
+    - The Settings membership copy quoted above cannot become true on a Jira or GitHub workspace.
+    - In this window LIN-3849 sharpened the member model (member viewer, owner-only run controls). It applies to Linear workspaces.
+- **Recorded scope.** `docs/v1.md:89` puts *"organisations and colleagues beyond the share link"* out of v1, "as later steps rather than never". That deferral covers the missing invite. It does not cover the obvious join path silently forking a Jira team into one workspace each, with UI language that reads as shared.
 
-**Verdict:** had to guess, and capability-gated for tracker-backed membership. **Destination:** n/a (a team property). **Delta: new journey.** The gap is a recorded v1 scope decision, not a defect. For this persona it is the first question the product cannot answer.
+**Verdict:** had to guess (Local); for a Jira team the natural path silently splits the team (source-confirmed). **Destination:** n/a (a team property). It bears directly on "a Jira-backed workspace … run on the team's own runner". **Delta: new journey.** For this persona it is the largest finding in the review.
 
 ### R1: `simple-dispatcher` seam (fresh clone `5d8489e`)
 `npm install` → `node dispatcher.js` in a clean environment → `Failed to load workspaces.json: ENOENT` → exit 1. There is still no example file. The explanation has moved to `README.md:223` of 415 (it was `:196`). The README names no runner-kit alternative, and its token sentence doesn't name the Dispatch page (J14). **Verdict:** unchanged friction. **Delta:** unchanged.
@@ -301,9 +310,9 @@ The persona's likely first move: copy the landing prompt (*"…fetch the onboard
 | R4-5 | GitHub Projects: now addable from Settings › Sources, but still no cold entry from the landing's provider list. | J2 | Objective (narrowed) | Low-Med | Cite **LIN-2387** |
 | R4-6 | **Jira team, door seam.** Hosted Jira doors (hero, guide, switcher `+ Jira`) are all OAuth `mode=new`. The no-server-config **API-token** path exists only under Settings › Sources › Jira inside an existing workspace. On a self-host with no Jira env the switcher shows no `+ Jira`, though the API-token path works there. A Jira team without OAuth consent has to discover "make a workspace first, then Settings". | J13 | Friction | Med | **Area note** (`lib/components/navbar.js`); the guide's half is **LIN-4090** |
 | R4-9 | **Runner choice is never presented.** The product points only to the own-session kit. The runner page defines itself as working "with no Simple Dispatcher" and makes the two mutually exclusive per workspace, but no surface a newcomer reads introduces Simple Dispatcher, and `simple-dispatcher`'s README never names the kit. Its "Tokens are created in LinearViewer's workspace settings" doesn't lead to the Dispatch page where queue tokens are minted. A cross-repo seam. | J14/R1 | Friction | Med | **Area note** (`lib/render-runner-setup.js`, naming the other side); the `simple-dispatcher` side in its own notes (companion PR) |
-| R4-11 | **A second person has no way in, and nothing says so.** The UI speaks of members; there is no invite or join, and no doc says how a teammate joins. Run controls and the runner are owner-only. This is a recorded v1 scope decision (`docs/v1.md:89`). | J15 | Capability gate / divergence | Med (for this persona) | Report-only; for the person (a product decision, not a tidy) |
+| **R4-11** | **A Jira team cannot share a workspace, and the obvious move splits it.** Each "Continue with Jira" makes a per-person workspace (`jira:<accountId>`, `routes/jira-auth.js`); GitHub is the same; only Linear is keyed on the organisation. Teammates end up with separate owners, run controls and runner keys over one Jira site, and their runners could take the same issue unseen. Settings' "member" copy cannot hold there, and nothing tells them. There is no invite or join on any provider; the missing invite is a recorded v1 deferral (`docs/v1.md:89`), the silent split is not. *Corrected after the second-read (§9): source-confirmed, not walked.* | J15/J13 | Divergence (source-confirmed) | **Med-High (largest for this persona)** | **Area note** (`routes/jira-auth.js`, auth-accounts-and-workspaces); also for the person (a product decision about team workspaces) |
 | R4-7 | The Proxy page, where the guide sends every agent, says "interact with **Linear**" (header and hint), with a `LIN-123` example, on Local and Jira workspaces. The copied prompt is correct (LIN-2370). | J12/J13 | Friction / divergence | Low-Med | **Area note** (`lib/render-proxy.js`) |
-| R4-8 | Jira create: `+ Add task` leaves for Jira's own dialog; proxy `POST /issues` → 422 `CAPABILITY_NOT_SUPPORTED` (honest). But `/api/proxy/instructions` names only GitHub's and Local's create limits, and a periodical mint is accepted with no caveat. | J13 | Friction | Low-Med | Cite **LIN-3807** |
+| R4-8 | Jira through the proxy. Reads (`/issues`, `/issues/:id`, `/me`, `/projects`) 422, because the provider implements none of the declared reads, while `/instructions` advertises them for every provider (source-confirmed, §9). Create → 422 `CAPABILITY_NOT_SUPPORTED` (walked, honest), but `/instructions` names only GitHub's and Local's create limits. A periodical mint is accepted with no caveat although its first step creates a task. `+ Add task` leaves for Jira's own dialog. | J13/J12 | Friction | Med | Cite **LIN-2816** (reads), **LIN-3807** (create) |
 | R4-12 | Agent-led guide: thin past "copy the Agent Prompt" (no Jira API token, Sources, runner choice or first checked result); its door is missing on `/swipe`, where path (a) sends the person. | J12 | Friction | Low-Med | Cite **LIN-4090**, **LIN-4088** |
 | R4-13 | Guest share page: every Harbour link 302s the guest to `/` with no message; nothing says "this is Harbour, get your own". Now confirmed live. | J11 | Friction | Med | Report-only (recorded design decision; siblings LIN-3369, LIN-3348) |
 | R4-14 | Seed copy: LOCAL-2's description says "the **Linear** API proxy" on a Local workspace; "Welcome…" is still In Progress. | J8 | Friction | Low | Cite **LIN-3069** |
@@ -333,14 +342,15 @@ The persona's likely first move: copy the landing prompt (*"…fetch the onboard
 1. **The Proxy page's "generate & copy"** was reproduced with curl using the body in `public/proxy.js`, and the copied text was rendered with that file's `buildAgentPrompt`. A browser user presses the button.
 2. **The runner credential block** was built in `public/runner-setup.js`'s format (repeat of R3-13).
 3. **J13 downstream used the test-only fake-Jira harness** (`NODE_ENV=test`, `/test/set-jira-session`, `tests/fixtures/jira-harness.js`). It drives the real provider code against an in-memory Jira, but no real Jira site, credential or Atlassian consent was involved. Its results stand for "what a Jira workspace's surfaces show", not for real-site behaviour.
-4. **Probe paths** (`/auth/jira` bare, `/invite`, `/join`, `/runner-kit/contract.json`, `…/dispatch` without a runner) came from source and the brief, not from the live surface. The 163-URL sweep is the surface-only cross-check.
-5. **Settings form bodies and the `Origin` header** (add-source, feature toggles) were read from the rendered forms. That is what a browser submits, so it is not a deep reach.
-6. **Where Next step fails** (`public/prompt-section.js`) was located by grep after the walk found the 503. Only the owning file is cited; no cause analysis was done (Comprehension-Debt altitude).
+4. **Where the J13/J15 Jira facts came from.** After the second-read, the per-person workspace keying and the missing proxy reads were confirmed by reading source (§9), not by a walk. They are tagged *source-confirmed* where they appear.
+5. **Probe paths** (`/auth/jira` bare, `/invite`, `/join`, `/runner-kit/contract.json`, `…/dispatch` without a runner) came from source and the brief, not from the live surface. The 163-URL sweep is the surface-only cross-check.
+6. **Settings form bodies and the `Origin` header** (add-source, feature toggles) were read from the rendered forms. That is what a browser submits, so it is not a deep reach.
+7. **Where Next step fails** (`public/prompt-section.js`) was located by grep after the walk found the 503. Only the owning file is cited; no cause analysis was done (Comprehension-Debt altitude).
 
 **Capability-gated** (marked, not guessed):
 - all OAuth consent screens (Linear, GitHub, Jira 3LO, GitHub Projects);
 - the hosted email inbox (no live send);
-- a real Jira site and a second Jira identity (J13, J15);
+- a real Jira site and a second Jira identity (J13, J15). The second identity's outcome is answered from source; the live walk stays gated;
 - a runner subagent with a repo, CI and PR (verify on evidence);
 - AI on the self-host (no OpenRouter key).
 
@@ -350,7 +360,7 @@ The persona's likely first move: copy the landing prompt (*"…fetch the onboard
 
 ## 6 · Where findings went (no tasks minted)
 
-This review mints no tasks. **Ticketed findings stay in this report only:** R4-1, R4-3, R4-4, R4-5, R4-8, R4-12 and R4-14, citing LIN-2386, LIN-3065/3141, LIN-3108, LIN-2387, LIN-3807, LIN-4090/4088 and LIN-3069.
+This review mints no tasks. **Ticketed findings stay in this report only:** R4-1, R4-3, R4-4, R4-5, R4-8, R4-12 and R4-14, citing LIN-2386, LIN-3065/3141, LIN-3108, LIN-2387, LIN-2816/3807, LIN-4090/4088 and LIN-3069.
 
 **Area notes written in this PR.** Each is a Waiting entry, citing the area's file first and this report second, sourced "Onboarding & Cold-Start Review, 11 Nov.":
 - `docs/areas/front-end-browser.md`: R4-2 (`public/prompt-section.js`).
@@ -358,12 +368,13 @@ This review mints no tasks. **Ticketed findings stay in this report only:** R4-1
   - R4-6 (`lib/components/navbar.js`);
   - R4-7 (`lib/render-proxy.js`);
   - R4-9 (`lib/render-runner-setup.js`). R4-9 is a **cross-repo seam**, filed under the area a change would start from and naming `simple-dispatcher` as the other side. **Seams have no full home in the notes yet.**
+- `docs/areas/auth-accounts-and-workspaces.md`: R4-11 (`routes/jira-auth.js`), added after the second-read.
 - `simple-dispatcher/docs/areas/loop-and-routing.md` (new note, companion docs-only PR): R4-19 and the README half of R4-9 (`dispatcher.js`).
 
-Neither LinearViewer note was near its cap, and no existing entry was found settled by this walk. The notes near their cap (`agent-api.md`, `llm-and-prompts.md`, `runs-and-dispatch.md`) are untouched, because no un-ticketed finding binds them.
+None of the three LinearViewer notes touched was near its cap. One existing entry was corrected: the Security Review's `lib/email-auth.js` entry in `auth-accounts-and-workspaces.md` said the hazard was "Latent while `EMAIL_TRANSPORT=off`", but the hosted email door is on (J9). Its finding stands, and only that clause changed. The notes near their cap (`agent-api.md`, `llm-and-prompts.md`, `runs-and-dispatch.md`) are untouched, because no un-ticketed finding binds them.
 
 **For the person (no area home):**
-- **R4-11** (team membership): a product decision recorded in `docs/v1.md`, not a tidy.
+- **R4-11** (Jira and GitHub workspaces are per person, so a team splits silently): a product decision about team workspaces, bigger than a tidy. It is also a Waiting entry in `docs/areas/auth-accounts-and-workspaces.md`.
 - **R4-16** (the Node pin in `package.json`, a manifest).
 - A fresh `npm install` reports **7 vulnerabilities (2 moderate, 4 high, 1 critical)**. That belongs to the Dependency & Supply-Chain Review's altitude (`docs/reviews/dependency-supply-chain-review-2026-11-10.md`) and is only routed here.
 
@@ -383,7 +394,7 @@ Neither LinearViewer note was near its cap, and no existing entry was found sett
 
 **C4, Jira surfaces a newcomer meets** (bounded by the walk): hero door, guide door, cold `/auth/jira`, switcher `+ Jira`, Settings › Sources (API token / OAuth), the link form and its error, Backlog `+ Add task`, Proxy page, proxy create, periodical mint. **Unbounded:** real-site behaviour (sync, OAuth site picker, a large site), because that is production data behind consent.
 
-**C5, multi-person surfaces:** share link (walked), membership copy in Settings (walked), owner-only runner and run controls (walked). **Unbounded:** whether a second tracker identity joins a workspace (capability-gated).
+**C5, multi-person surfaces:** share link (walked), membership copy in Settings (walked), owner-only runner and run controls (walked). **Workspace keying per sign-in path** (source-bounded after §9; members: Linear → organisation, Jira → person, GitHub → person, Local → cookie, email → account with no workspace). **Unbounded:** live behaviour with two real Jira identities (capability-gated).
 
 `Surface Assessment: [lands cleanly]`. This is a review-only report. It proposes no code change, and the area-note entries fit their notes' caps without restructuring.
 
@@ -406,9 +417,9 @@ Neither LinearViewer note was near its cap, and no existing entry was found sett
 | J10: own-session runner | `kit ok` → login → poll → take → broker → feedback | dispatch + runner holding item | Low (R4-21) | **improved** (+take, +broker) |
 | J11: guest share | live mint and guest view; onward bounce | n/a (viewer) | Med (R4-13) | unchanged; **now live** |
 | **J12: agent-led onboarding** | guide → Local → token (live); self-host guide's only door 503s | read + ground (live) | Low-Med (R4-12, R4-7) | **new** |
-| **J13: Jira team** | OAuth gated; API token via Settings only; downstream honest (harness) | NO (no site) | Med (R4-6), Low-Med (R4-8) | **new** |
+| **J13: Jira team** | OAuth gated; API token via Settings only; create honest (harness); proxy reads 422 (source) | NO (no site) | Med (R4-6, R4-8) | **new** |
 | **J14: team's own runner** | kit to take + broker; runner choice unexplained; Next step 503 spinner (no AI) | dispatch + take (self-host) | Med (R4-2, R4-9) | **new** |
-| **J15: more than one person** | membership copy, no join path; share link only | n/a | Med (R4-11) | **new** |
+| **J15: more than one person** | no join path; Jira/GitHub workspaces per person, so a team splits silently (source) | n/a | **Med-High** (R4-11) | **new** |
 | R1: simple-dispatcher seam | zero-config exit 1; no runner-kit pointer | n/a | Low (R4-19) | unchanged |
 | D1: destination divergence | README and `llms.txt` "collapsible tree"; incident doc stale; v1.md fixed | n/a | Low-Med (R4-17) | partly **resolved** |
 | v1: v1-promise check | steps 1, 3, 4, 5, 8 reachable; 6–7 gated | partial | — | **improved** (step 4 via UI, step 8 live) |
@@ -418,7 +429,70 @@ Neither LinearViewer note was near its cap, and no existing entry was found sett
 
 ## 9 · Adversarial Second-Read
 
-*(Filled in after the fresh-context read; see below.)*
+**Tier used:** Tier 2, a fresh-context sub-agent with no memory of the report-writing turn. It received only:
+- the report and evidence paths;
+- run #3's report path;
+- both repo paths and their windows (`661124c1..da5df707d`, `bb1da78..5d8489e`);
+- the persona and the review's altitude;
+- the question.
+
+It was not told the ranking or this session's notes. It was limited to read-only work: source and git reads, and GETs against `harbour.cat`. It wrote no files.
+
+**Question posed (verbatim):** *"What is the largest item in this window that this report missed or misfiled?"*
+
+**Reader's answer (in full, lightly reformatted):**
+
+> **1. The largest missed or misfiled item: the report says it could not test whether a second Jira teammate joins the same workspace, but the source answers it. They don't. Each Jira sign-in makes a separate, personal workspace.**
+>
+> **What the report says.** J15 and §5 file the question as untestable: "Whether a second Jira identity signing into the same site joins the same workspace is capability-gated (it needs two Jira accounts)." §7 C5 lists it as "Unbounded". R4-11 then closes as "a recorded v1 scope decision, not a defect", at Med.
+>
+> **What the source says.** No second account is needed:
+> - `routes/jira-auth.js:745-749`: "The container is keyed on the human's Atlassian `accountId` … (LIN-1329 Q1: identity is the human, never the site, which is a resource address)". Line 771 sets `const workspaceId = `jira:${myself.accountId}``.
+> - `lib/providers/jira/index.js:1394-1398`: `/auth/jira/oauth?mode=new` "REJOINS the existing `jira:<accountId>` container", meaning that same person's own container.
+> - GitHub works the same way: `lib/github-install-flow.js:949` keys on `github:${creds.userId}`.
+> - Linear keys on the organisation: `routes/auth.js:210` has `workspaceId: org.id`. So the "member" model exists only for Linear workspaces.
+> - The member model got sharper inside this window: LIN-3849 added the member viewer, owner-only run controls and a read-only Dispatch page for members (commits `dcf0473ad`, `12381d466`, `e336733ee`).
+>
+> **Why it is the largest.**
+> - The persona's target is one shared Jira-backed workspace that the team runs on its runner.
+> - The way a Jira team would naturally try to join is for each person to press "Continue with Jira", the hero door the guide sends them through. That gives each person their own workspace over the same Jira site, each with its own owner and its own runner key.
+> - Nothing joins them, and nothing tells them this happened.
+> - The Settings copy the report quotes ("every workspace you're a member of — even work triggered by another member", "For everyone in …") can never be true on a Jira or GitHub workspace.
+> - Dispatch, run state, and the runner's "another consumer polled this workspace, abort" rule are all per workspace. So two teammates' runners could each take the same Jira issue without seeing each other.
+> - That changes R4-11's conclusion. It is not just "no join path, a v1 decision". It is "the obvious join path quietly splits the team, and the UI's membership language is false for this persona's tracker". That is a Jira-team-specific divergence, not the generic v1 colleagues deferral at `docs/v1.md:89`.
+> - It is the one persona question the report marked unanswerable when it could have been answered from source. The report already uses source probes elsewhere (§5 reach 4).
+> - On this persona's terms it is at least as decisive as R4-6 or R4-9, which are door friction and naming confusion. R4-1 (env-check) still tops the objective list, but it does not touch a Jira team that uses the hosted product.
+>
+> **2. Verdict: DISAGREE.** Most of the findings and citations hold up. But J15 and R4-11 are misfiled (marked untestable when the code answers it, and judged too mild), and that changes the persona-level headline.
+>
+> **3. Does my answer differ from the report's top-ranked finding? YES.** The report's top-ranked finding is R4-1: `scripts/env-check.sh` reports a false Playwright blocker on macOS and has no `exit`, so it never fails (LIN-2386, High, fourth run). Its persona headline is the three seams: Jira API-token door, runner choice, and no way in for a second person. My item is a misfiling inside that third seam.
+>
+> **4. Lesser issues.**
+> - **J13 says a simulated Jira workspace "reads", but that is only true in the UI.** The Jira provider implements none of the proxy reads (`viewer`, `projects`, `issues`, `issueDetail`, declared at `lib/providers/interface.js:107`; none is a method in `lib/providers/jira/index.js`). So an agent's `GET /api/proxy/issues`, `/issues/:id`, `/me` and `/projects` all get 422 on Jira. Dispatched prompts work around this with a brief-only fallback (`lib/proxy-preamble.js:383-397`), but the D2 harness walk only probed `POST /issues`. The Jira half of the agent-led path (J12 path b) was never walked at the agent's first read.
+> - **The report's Local runner walk does not stand in for Jira.** In this window, LIN-4370 (`7a4446eed`) added code that sends a fresh task with an "As asked" block to Survey, Survey, then scoping. LIN-4352 (`d81e13e7d`) skips sealing that block on Jira, because the Jira formatting round trip changes the end line. So Jira tasks take a different first step from Local ones under Next step and Run to PR. The report doesn't mention this; it cites only LIN-4355.
+> - **R4-8 is slightly mis-worded.** The issue creation belongs to the minted run's *first* step ("minting the review task", `lib/periodicals.js:1236-1247`), not a "follow-on step". Since LIN-4380 the periodicals themselves file no follow-up tasks. The conclusion (it would hit 422 on Jira) stands.
+> - **Spot-checked citations are all accurate:** `render-landing.js:407`, `landing-hero.js:58/81/98`, `agent-onboarding.js:102`, `linear/index.js:2458`, `README.md:3/60/89`, `docs/v1.md:89/107`, `north-star.md:5`, and the simple-dispatcher README `:223` (the token sentence is at `:240`). Live harbour.cat is at `da5df707d`, as the report says.
+> - **simple-dispatcher window, a minor gap:** LIN-796 (`7d1d34c`, "a second dispatcher refuses to start beside a live one") is a team-runner fact that R1 and R4-9 don't mention.
+
+**Disposition reasoning.** Each point was checked at source before acting:
+- `routes/jira-auth.js:745-771` keys the container `jira:${myself.accountId}`, and `lib/providers/jira/index.js:1394-1398` says `mode=new` rejoins it.
+- `routes/auth.js:210` keys Linear on `org.id`.
+- `lib/providers/interface.js:107` declares the four reads, and `lib/providers/jira/index.js` defines none of them (Local does).
+- LIN-2816 (Backlog) already covers `/instructions` advertising reads regardless of provider.
+- No ticket covers the per-person split for a team. LIN-2819 is the narrower signed-in `+ Jira` case.
+- `7d1d34c` is LIN-796, and `README.md:240` holds the token sentence.
+
+All points were **fixed in place**:
+- **R4-11** is rewritten as a source-confirmed divergence: Jira/GitHub workspaces are per person, so the obvious join path splits a team. It is raised to **Med-High, the largest finding for this persona**, given a Waiting entry in `docs/areas/auth-accounts-and-workspaces.md`, and listed for the person.
+- The **headline**, **J15**, **C5**, **§5** and the **ledger** are corrected.
+- **J13 and R4-8** now carry the proxy-read 422s (LIN-2816), the corrected periodical wording, and the LIN-4352/LIN-4370 Jira first-step difference.
+- **J14** names LIN-796, and the SD citation is corrected.
+
+**Why R4-1 stays top-ranked as the objective defect.** R4-11 is a source-confirmed divergence and a product decision, not breakage a walk hit. The most severe *objective* defect is still R4-1. The report now says plainly that for this persona the largest finding is R4-11. **No task is minted.**
+
+`Adversarial second-read verdict: DISAGREE`
+`Differed from top finding: YES`
+`Disposition: fixed in place`
 
 ---
 
