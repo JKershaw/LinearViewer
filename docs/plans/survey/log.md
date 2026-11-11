@@ -3348,3 +3348,12 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - **21:53 UTC: a second ruling on the same question, `lin4415-weekly-floor`** (loop `2098d5c3`, a different stage from the first). Options: accept (name the retirement in the PR) or file a ticket for a scheduler. Suggested **accept**, the same answer as the first. **For the gate:** one question raised twice by two stages of one task is a small false-escalation tax.
 - **~22:00 UTC: John chose accept-and-done for `lin4392-close-dead-row`** ("Mark accept and run as recommended, it's safe, right?"). I changed the suggestion from operator-close to **accept-and-done**. It's safe: the live-stage wait is per ticket, so the dead row only holds LIN-2537, which has been Done since September. LIN-4392 goes to Done and one follow-up records the row. John is applying all four rulings as suggested.
 - **~22:05 UTC: John applied all four rulings as suggested.** LIN-4415 carries on; LIN-4392's close-out should now finish with one follow-up for the dead row. John is off until morning. The 07:15 reminder will start lane 1 (LIN-4414) and lane 2 (LIN-4399) if all is clear.
+- **22:26 UTC: LIN-4413 merged** (`fe2f1f0cb`, PR #2395; docs only: report, walk evidence, three area notes, plus simple-dispatcher #336, a loop-and-routing note). This is the Onboarding & Cold-Start Review, run 4, read for the first outside team. **The headline for the door:**
+  - Agent-led onboarding is the clearest gain since run 3: a coding agent gets a guide, and a person reaches a free grounded prompt with no credential.
+  - Cold self-host now gets as far as dispatch → runner take → feedback. Verify-on-evidence is still unreached.
+  - **R4-11 (most decisive for the persona): a Jira team cannot share a workspace.** Each person's "Continue with Jira" makes their own `jira:<accountId>` workspace, with its own owner and runner key, and nothing joins them or says so. Linear workspaces are keyed on the organisation, so they share.
+  - Jira by API token (no server config) is offered only from inside an existing workspace's Settings.
+  - The product's runner and Simple Dispatcher are never introduced as a choice.
+  - New breakage R4-2: on a self-host without AI, Next step gets a 503 and spins forever.
+  - `scripts/env-check.sh` (LIN-2386) is the top objective defect for the fourth run running.
+  - **For the gate:** R4-11 is a product call on the door (A7's scope or a new ask). It's John's.
