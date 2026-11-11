@@ -26,8 +26,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   `lib/size-of-move.js`, arm 3) or hold the reader's side (arm 4).
 - A stage lead's first sentence is the selector's purpose line: changing it means new router
   snapshots, `scripts/eval/meta-prompt.baseline.txt` and routing ceiling (LIN-4369).
-- `lib/prompts/autopilot-precedence.js`: before prompt text routes round a server guard, check
-  real rows reach it (scoped runs carry `maxTasks: null`; P4's detour cost a session, LIN-4349).
+- `lib/prompts/autopilot-precedence.js`: check real rows reach a server guard before prompt
+  text bypasses it (LIN-4349). A scoped run's Periodical is opt-in by goal: no tail, no flag
+  (LIN-4415).
 - `lib/periodicals.js`: close-out merges a Periodical's PR and sets Done as for any task;
   give no Periodical its own merge rule: notes are prompt input (LIN-4390). The rule is retyped
   in five files; only a test links them.
