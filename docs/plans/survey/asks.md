@@ -111,6 +111,38 @@ The Stability Review already runs as a Periodical. John: "weekly is sort of the 
 
 **Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.
 
+### Added 11 Nov: A10 and A11
+
+**Approved word for word by John on 11 Nov** ("And this all looks great to me."). **Filed 11 Nov, about 21:40 UTC,** sealed by Harbour: A10 LIN-4414, A11 LIN-4415. LIN-4415 kicked off at 21:42 with the usual goal. A10 runs first in lane 1 on Thursday, before A6.
+
+### A10. Waiting work in an area gets done, and its lessons stay short (D3, D8, D12)
+
+**Title:** An area's waiting work gets done over time instead of being cut to make room, and its lessons stay short
+
+**Repository:** JKershaw/LinearViewer (Harbour), and JKershaw/simple-dispatcher where its notes say the same.
+
+**What this is for.** Each area of the code has a note in two parts: Lessons, read before every change in the area, and Waiting, work known there but not scheduled. A note has a size cap so it stays short enough to read before every change. The three busiest notes are at or near the cap, and most of each is Waiting. A Waiting entry leaves when a change happens to settle it, when a ticket is filed for it, or when it is cut down to make room, so detail is being squeezed out of entries that are still true. A6 will send more finds into these notes. John: "Harbour should converge work, even if slowly, and resist spiralling out and generating more work (unless it's tidying up)." On the notes: "I'd be happy to address the notes issue potentially next."
+
+**What we want.** Lessons stay short enough to read before every change. Waiting work is not squeezed or cut to make room. And waiting work gets done: over time an area's waiting list shrinks, as tidying.
+
+**Done when** no note loses a still-true entry, or its detail, to fit; each note's Lessons stay within today's size limit; and the next changes in a busy area do some of its waiting work, so its list shrinks without entries being dropped or turned into tickets.
+
+**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.
+
+### A11. A finished task doesn't start a Periodical by default (D7)
+
+**Title:** A finished task no longer starts a Periodical by default; Periodicals run when chosen
+
+**Repository:** JKershaw/LinearViewer (Harbour).
+
+**What this is for.** When a run scoped to one task merges it, the run then starts one Periodical, if any is due or has had work merged in its repo since it last ran. There are 15 Periodicals that read a repo, so that is nearly always, and each task brought one. On 10 Nov these came to about $101, a quarter of the day's spend, and none changed code. John: "we probably don't need a periodical every time by default?" and "I very much agree."
+
+**What we want.** A finished task doesn't start a Periodical unless it was asked to. Periodicals still run when chosen: by a person, or by a goal that asks for one. A general run's own order of work is unchanged.
+
+**Done when** a task that merges without being asked for a Periodical starts none, and a Periodical can still be started on purpose.
+
+**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.
+
 ### Go-aheads (no new ticket)
 
 - **G1.** Kick off LIN-4390 (Periodical prompts grant merge authority the review gate withholds) and LIN-4392 (a second stage can start beside a live one), as defects, on Opus.
@@ -181,5 +213,21 @@ John expects agents to reach for big moves here: "very likely to get agents tryi
 - on "ask me", a task with a real size choice puts the question, with options and rough costs, where rulings show, and the answer becomes the task's size;
 - on the default, the agent running the task decides and the task says so;
 - the setting reads plainly to a newcomer.
+
+**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.
+
+### A12. The confirmed safety problems are closed in code (D11)
+
+**Approved word for word by John on 11 Nov and filed as LIN-4416.** It starts after the switch.
+
+**Title:** The safety problems the backlog pass confirmed are closed in code, through the loop
+
+**Repository:** JKershaw/LinearViewer (Harbour), and JKershaw/simple-dispatcher where a theme reaches it.
+
+**What this is for.** The backlog pass (A5, LIN-4400) found 134 open tickets with confirmed safety or blocking problems. Most recur in a few themes: merge and read-only limits that exist only in prompt text; tokens inside prompt text; tracker text that can be forged (LIN-3386, LIN-3387, LIN-3402); and tokens that members can mint (LIN-4215). LIN-2576 (the report gate runs on only one route) has topped a Periodical's findings five times. A small outside team will soon hand Harbour real work, and the north star says secure defaults assume hostile input. John: "Agreed on the safety - a code collection of tasks to run through the improved loop. Alongside the other work we identified as best to work on."
+
+**What we want.** The confirmed problems are closed in code, as a collection of tasks run through the loop alongside the other work after the switch.
+
+**Done when** each confirmed problem is fixed in code and its ticket closed for that reason, or John has ruled it can wait.
 
 **Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.
