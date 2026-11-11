@@ -1,14 +1,16 @@
 /**
  * LIN-4382 (piece 4 of LIN-4349): Autopilot's order is written once, with `landed` ranked
- * under real work, and a scoped run takes one Periodical as it finishes.
+ * under real work.
  *
  * - `AUTOPILOT_PRECEDENCE` (lib/prompts/autopilot-precedence.js) is the one spelling of the
- *   ranks and the tail. No other file in lib/ or routes/ spells them out, and the docs that
- *   used to restate the order name the constant instead.
- * - The kickoff renders it exactly once, in both modes, with no second order beside it.
- * - The tail names the gate marker a Periodical's review task carries, spelled as
- *   lib/periodicals.js spells it, and `POST /autopilot/kickoff` tells a run on such a task
- *   that it takes no tail (so Mint + Autopilot cannot chain readings).
+ *   ranks. No other file in lib/ or routes/ spells them out, and the docs that used to
+ *   restate the order name the constant instead.
+ * - The kickoff renders it exactly once, in every mode, with no second order beside it.
+ * - LIN-4415: a scoped run stops once its task is complete. The completion Periodical
+ *   LIN-4382 gave it (the tail), the tail's LIN-4349 budget branch and its chain guard are
+ *   retired; a census below fails if their wording comes back in lib/, routes/ or the live
+ *   docs. A Periodical is still started on purpose: by a person (the mint routes) or by a
+ *   goal that asks (rank 1, carried on the scoped goal block).
  *
  * Run with: node --test tests/unit/lin-4382-precedence-written-once.test.js
  */
@@ -47,8 +49,7 @@ const RANK_PATTERNS = [
   /supersedes the Orient/i,
   // The new order's own distinctive clauses.
   /no stack work can move now/i,
-  /a Periodical lane reading `due`, the weekly floor/i,
-  /a scoped run ends with one Periodical/i
+  /a Periodical lane reading `due`, the weekly floor/i
 ];
 
 const squash = (text) => text.replace(/\s+/g, ' ');
@@ -155,26 +156,21 @@ describe('the kickoff renders the policy once, in both modes (LIN-4382)', () => 
   });
 });
 
-describe('the tail skips a Periodical\'s own review task (LIN-4382)', () => {
-  test('the marker the policy names is the one lib/periodicals.js writes', () => {
+// LIN-4415 retired the completion tail. With no default tail there is nothing for a Periodical's
+// review run to chain, so its guard (the policy's gate-marker sentence and the kickoff's
+// review-task line) went with it: the review's run is a scoped run with no goal, and it stops.
+describe('a scoped run stops once its task is complete (LIN-4415)', () => {
+  test('the policy names no gate marker and no tail', () => {
     const marker = buildPeriodicalGateMarker('Seams & Tangles');
     const attr = marker.match(/^<!-- (\S+) /)[1];
-    assert.ok(AUTOPILOT_PRECEDENCE.includes('`' + attr + '`'), `the policy names \`${attr}\``);
-  });
-
-  test('a kickoff told the task is a Periodical review says it takes no tail; omitted is byte-identical', () => {
-    const issue = { identifier: 'LIN-42', title: 'Seams & Tangles review' };
-    const bare = buildAutopilotKickoff({ baseUrl: BASE_URL, issue });
-    assert.equal(buildAutopilotKickoff({ baseUrl: BASE_URL, issue, periodicalReview: null }), bare);
-    assert.equal(buildAutopilotKickoff({ baseUrl: BASE_URL, issue, periodicalReview: '  ' }), bare);
-    const marked = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, periodicalReview: 'seams-tangles' });
-    assert.ok(marked.includes('**LIN-42** is the review task of the `seams-tangles` Periodical, so this run takes no tail: stop when it is done.'));
-    const general = buildAutopilotKickoff({ baseUrl: BASE_URL });
-    assert.equal(buildAutopilotKickoff({ baseUrl: BASE_URL, periodicalReview: 'seams-tangles' }), general, 'ignored on a general run');
+    assert.ok(!AUTOPILOT_PRECEDENCE.includes(attr), `the policy no longer names \`${attr}\``);
+    assert.ok(!/\btail\b/i.test(AUTOPILOT_PRECEDENCE), 'the policy carries no tail');
+    assert.ok(AUTOPILOT_PRECEDENCE.includes('mint the lane with `POST /periodicals/{id}/mint`'),
+      'the mint-and-drive instruction stays, for a goal that asks for a Periodical');
   });
 
   // The route-level witness: POST /api/proxy/autopilot/kickoff is the path a Mint + Autopilot
-  // handoff takes. It reads the issue's description and resolves the marker itself.
+  // handoff takes (PERIODICAL_AUTOPILOT_TAIL, lib/periodicals.js, passes no goal).
   describe('POST /api/proxy/autopilot/kickoff', () => {
     const TOKEN = 'lin-4382-token';
     const URL_KEY = 'acme';
@@ -221,14 +217,14 @@ describe('the tail skips a Periodical\'s own review task (LIN-4382)', () => {
       return a;
     }
 
-    async function kickoff(issueIdentifier) {
+    async function kickoff(issueIdentifier, extra = {}) {
       const server = app().listen(0, '127.0.0.1');
       await new Promise((resolve) => server.once('listening', resolve));
       try {
         const res = await fetch(`http://127.0.0.1:${server.address().port}/api/proxy/autopilot/kickoff`, {
           method: 'POST',
           headers: { Authorization: 'Bearer anything', 'Content-Type': 'application/json' },
-          body: JSON.stringify({ issueIdentifier, appendProxyContext: false })
+          body: JSON.stringify({ issueIdentifier, appendProxyContext: false, ...extra })
         });
         const body = await res.json();
         assert.equal(res.status, 201, JSON.stringify(body));
@@ -240,58 +236,93 @@ describe('the tail skips a Periodical\'s own review task (LIN-4382)', () => {
       }
     }
 
-    test('a gate-marked review task: the kickoff says this run takes no tail', async () => {
+    const STOPS = "start no Periodical unless the human's goal asks for\none. Once it is complete, stop;";
+
+    // What the retired guard was there to stop: a review's run chaining the next reading. It is
+    // now told to stop like any scoped run, with no review-specific line and no tail to take.
+    test('a gate-marked review task: no review-specific line and no tail; the run stops', async () => {
       const prompt = await kickoff('TEST-2');
-      assert.ok(prompt.includes('**TEST-2** is the review task of the `seams-tangles` Periodical, so this run takes no tail'), 'the no-tail line');
+      assert.ok(!prompt.includes('is the review task of the'), 'no review-specific line');
+      assert.ok(!/policy's tail|takes no tail|ends with one Periodical/i.test(prompt), 'no retired tail wording anywhere');
+      assert.ok(prompt.includes(STOPS), 'told to stop once its task is complete');
     });
 
-    test('an ordinary task: no such line, the tail stands', async () => {
+    test('an ordinary task: no tail; the run stops', async () => {
       const prompt = await kickoff('TEST-1');
-      assert.ok(!prompt.includes('so this run takes no tail'));
-      assert.ok(prompt.includes("take the policy's tail"));
+      assert.ok(!/policy's tail|takes no tail|ends with one Periodical/i.test(prompt));
+      assert.ok(prompt.includes(STOPS));
+    });
+
+    test('a goal that asks for a Periodical rides on the scoped run, with rank 1 and the mint instruction', async () => {
+      const goal = 'then run the Seams & Tangles Periodical';
+      const prompt = await kickoff('TEST-1', { goal });
+      assert.ok(prompt.includes(`**Additional context from the human:** ${goal}`));
+      assert.ok(prompt.includes('1. an explicit goal from the human;'));
+      assert.ok(prompt.includes('mint the lane with `POST /periodicals/{id}/mint`'));
     });
   });
 });
 
-// LIN-4349 correction (parent review b6641b4d, coordinator's call after it): every real
-// scoped run declares no `maxTasks`, so `guardBudget` would admit the review task the tail's
-// mint opens. The tail drives that review in place (the ruled "one Periodical run, two
-// sessions") and keeps Mint + Autopilot only for a run that declares a task budget, where
-// the review would be a task past it. The chain guard stays as the backstop.
-describe('the tail drives its review in place unless a task budget is declared (LIN-4349)', () => {
-  const tailOf = (text) => squash(text.slice(text.indexOf('**The tail: a scoped run ends with one Periodical.**')));
-  const issue = { identifier: 'LIN-42', title: 'Some task' };
+// LIN-4415 retired-phrase census: the completion tail, its pointers, its LIN-4349 budget branch and
+// its chain guard. Any of these in lib/ or routes/ JavaScript, or in the live docs, is stale text
+// that tells a scoped run to take a Periodical it was not asked for. Dated records (docs/papers,
+// docs/reviews, docs/plans) stay as written. `isPeriodicalReview` (LIN-4398) is a different symbol
+// and is not matched: the `periodicalReview` pattern is case-sensitive and word-bounded.
+describe('the retired completion tail is gone from code and live docs (LIN-4415)', () => {
+  const RETIRED = [
+    /policy's tail/i,
+    /scoped-run tail/i,
+    /scoped run's tail/i,
+    /ends with one Periodical/i,
+    /takes no tail/i,
+    /tail of its own/i,
+    /\bperiodicalReview\b/,
+    /one Periodical, then stop/i,
+    /then the tail/i
+  ];
 
-  test('no budget declared: plain mint, then the run drives the review itself with periodicalId', () => {
-    const tail = tailOf(AUTOPILOT_PRECEDENCE);
-    assert.ok(tail.includes('Mint it with `POST /periodicals/{id}/mint` (`repo` set for a named lane).'),
-      'the mint itself carries no autopilot flag');
-    assert.ok(tail.includes('With no task budget declared in your snapshot, drive the review task the mint opens yourself'),
-      'the unbudgeted branch drives in place');
-    assert.ok(tail.includes('`periodicalId` on the `POST /recommend-and-dispatch` that opens its chain'),
-      'the in-place drive stamps periodicalId, so self-exclusion keeps working');
-    assert.ok(tail.includes('until it is merged and verified, then stop: that review is the tail and takes no tail of its own'),
-      'the in-place review cannot chain another reading');
+  function liveDocs() {
+    const out = [];
+    for (const name of readdirSync(join(ROOT, 'docs'))) {
+      if (/^autopilot.*\.md$/.test(name) || name === 'proxy-integration.md') out.push(`docs/${name}`);
+    }
+    const walk = (rel) => {
+      for (const ent of readdirSync(join(ROOT, rel), { withFileTypes: true })) {
+        const path = `${rel}/${ent.name}`;
+        if (ent.isDirectory()) walk(path);
+        else if (ent.name.endsWith('.md')) out.push(path);
+      }
+    };
+    walk('docs/architecture');
+    walk('docs/areas');
+    return out;
+  }
+
+  const hitsIn = (text) => RETIRED.filter((re) => re.test(squash(text)));
+
+  test('no JavaScript in lib/ or routes/, and no live doc, carries the retired wording', () => {
+    const offenders = [];
+    for (const path of [...jsFiles('lib'), ...jsFiles('routes'), ...liveDocs()]) {
+      const hits = hitsIn(readFileSync(join(ROOT, path), 'utf8'));
+      if (hits.length) offenders.push(`${path} (${hits.join(', ')})`);
+    }
+    assert.deepEqual(offenders, []);
   });
 
-  test('budget declared: Mint + Autopilot, then stop; never the unconditional handoff', () => {
-    const tail = tailOf(AUTOPILOT_PRECEDENCE);
-    assert.ok(tail.includes('With a task budget declared, that review would be a task past it (`BUDGET_EXHAUSTED`), so mint with `"autopilot": true` instead, so a run of its own drives the review, then stop.'));
-    assert.ok(!tail.includes('Mint it with `POST /periodicals/{id}/mint` and `"autopilot": true`'),
-      'the P4 mint-and-stop is no longer the only path');
-    const inPlace = tail.indexOf('With no task budget declared');
-    const handoff = tail.indexOf('"autopilot": true');
-    assert.ok(inPlace >= 0 && handoff > inPlace, 'Mint + Autopilot appears only in the budgeted branch, after the default');
-    assert.ok(tail.includes('Nor does a run whose own task is a Periodical\'s review'), 'the chain guard stays');
+  test('the census sees the retired wording, and spares isPeriodicalReview (mutation witness)', () => {
+    assert.ok(hitsIn("Once it is complete, take the policy's tail (one Periodical,\nthen stop)").length >= 2);
+    assert.ok(hitsIn('**The tail: a scoped run ends with one Periodical.**').length === 1);
+    assert.ok(hitsIn('const { periodicalReview } = st;').length === 1);
+    assert.deepEqual(hitsIn('if (isPeriodicalReview(issue)) return;'), []);
+    assert.deepEqual(hitsIn('withAutopilotTail(prompt, PERIODICAL_AUTOPILOT_TAIL)'), []);
   });
 
-  test('the budget signal the tail names is the line the kickoff renders for a declared budget, and only then', () => {
-    // The kickoff renders the policy indented under its Orient step.
-    const rendered = AUTOPILOT_PRECEDENCE.replace(/^(?=.)/gm, '   ');
-    const unbudgeted = buildAutopilotKickoff({ baseUrl: BASE_URL, issue });
-    const budgeted = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, maxTasks: 1 });
-    assert.ok(unbudgeted.includes(rendered) && budgeted.includes(rendered), 'both render the policy, tail included');
-    assert.ok(!/task budget:/i.test(unbudgeted), 'an unbudgeted scoped run states no budget, so the tail drives in place');
-    assert.ok(budgeted.includes('**Task budget: up to 1 distinct task this run.**'), 'a budgeted one states it, so the tail hands off');
+  test('the live-doc set covers the docs the tail was written into', () => {
+    const docs = liveDocs();
+    for (const doc of ['docs/autopilot.md', 'docs/autopilot-kickoff.md', 'docs/autopilot-operating-manual.md',
+      'docs/autopilot-orchestrator-prompt.md', 'docs/proxy-integration.md', 'docs/architecture/source-map.md',
+      'docs/areas/runs-and-dispatch.md']) {
+      assert.ok(docs.includes(doc), `${doc} is scanned`);
+    }
   });
 });

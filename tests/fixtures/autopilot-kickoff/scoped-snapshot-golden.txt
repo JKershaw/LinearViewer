@@ -10,8 +10,8 @@ lands.
 is done. This run is scoped to that one task. Orient by reading the task, then trigger
 `POST /recommend-and-dispatch` with `{ issueIdentifier: "LIN-42", sessionId }`; loop until
 it's complete (verified) or you hit a point that wants the human.
-Do not pull other tasks off the stack. Once it is complete, take the policy's tail (one Periodical,
-then stop); at a point that wants the human, just stop.
+Do not pull other tasks off the stack, and start no Periodical unless the human's goal asks for
+one. Once it is complete, stop; at a point that wants the human, just stop.
 
 **Proxy:** base https://example.com/api/proxy · Bearer token supplied alongside this prompt (the +proxy block) · full
 verb catalog at `GET https://example.com/api/proxy/instructions`.

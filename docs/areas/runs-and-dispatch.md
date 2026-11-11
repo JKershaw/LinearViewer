@@ -75,8 +75,6 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   (Survey tally: LIN-3257.)
 - `lib/runner-kit/runner.mjs`: the per-message transcript fold is here and in SD; one shared
   fold would turn a transcript into requests. (Survey tally: LIN-4203, LIN-4195.)
-- `lib/dispatch-entrance.js`: only `POST /autopilot/kickoff` passes `periodicalReview` (no
-  tail on a Periodical's review); the rest rely on the marker rule. (LIN-4382.)
 - `lib/recent-runs.js`: `runFact` reads only the row's feedback: a stage parked `[pending]` whose
   lineage ends `[blocked]` or `[skipped]` reads `running` and holds the live-stage wait until
   aborted. (LIN-4392.)

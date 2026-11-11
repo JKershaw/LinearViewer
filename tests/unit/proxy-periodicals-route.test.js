@@ -175,9 +175,9 @@ describe('GET /api/proxy/periodicals', () => {
     assert.equal('runs' in item, false);
   });
 
-  // LIN-4382: `scope` is published so the precedence policy's repo-only rules
-  // (a `never` lane counts as overdue; the scoped-run tail) can be applied from
-  // this response alone. Every template carries the registry's own value.
+  // LIN-4382: `scope` is published so the precedence policy's repo-only rule
+  // (a `never` lane counts as overdue) can be applied from this response alone.
+  // Every template carries the registry's own value.
   test('each template publishes the registry\'s `scope` (repo | workspace)', async () => {
     const { app } = buildApp({});
     const { body } = await get(app);

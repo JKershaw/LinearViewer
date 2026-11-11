@@ -1011,8 +1011,7 @@ export function createComputeRoutes({
           mode: r.mode,
           // LIN-4382: what the run reads, a codebase or the tracker. The
           // precedence policy (lib/prompts/autopilot-precedence.js) takes a
-          // `never` lane as overdue, and the scoped-run tail takes a lane at
-          // all, only when it is `repo`.
+          // `never` lane as overdue only when it is `repo`.
           scope: r.scope,
           cadence: r.cadence,
           state: r.state,

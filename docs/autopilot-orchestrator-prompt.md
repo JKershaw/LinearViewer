@@ -68,7 +68,7 @@ into the one you pick with `GET /brief/{id}`). Apply the **precedence policy** â
 
 > *Historical (LIN-4382): the order below is this Stage B draft's and is kept as written. The
 > live order is `AUTOPILOT_PRECEDENCE` in `lib/prompts/autopilot-precedence.js`, which the
-> kickoff renders; it adds the rank under the stack and the scoped-run tail.*
+> kickoff renders; it adds the rank under the stack.*
 
 1. an explicit human instruction/goal, else
 2. a periodical past its cadence threshold (maintenance debt), else

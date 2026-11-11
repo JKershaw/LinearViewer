@@ -385,14 +385,17 @@ describe('buildAutopilotKickoff (general / stack-walk)', () => {
 describe('buildAutopilotKickoff (scoped to an issue)', () => {
   const issue = { identifier: 'LIN-42', title: 'Fix login bug' };
 
-  // LIN-4382: inverted on purpose. A scoped run is no longer told the policy is moot: once its
-  // task is complete it takes the policy's tail (one Periodical, then stop).
-  test('goal is pinned to the task, then the policy\'s tail — the policy is not moot', () => {
+  // LIN-4415: a scoped run stops once its task is complete. LIN-4382 had it take the policy's
+  // tail (one Periodical) first; that default is retired, and a Periodical is taken only when the
+  // human's goal asks for one. The policy still renders (rank 1 and the mint instruction serve a
+  // goal that asks), so it is still not "moot".
+  test('goal is pinned to the task, then the run stops: no Periodical unless the goal asks', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue });
     assert.ok(text.includes('run on autopilot until **LIN-42** (Fix login bug)'));
     assert.ok(!text.includes('precedence policy is moot'));
-    assert.ok(text.includes("Do not pull other tasks off the stack. Once it is complete, take the policy's tail (one Periodical,\nthen stop); at a point that wants the human, just stop."));
-    assert.ok(text.includes("that's your natural stopping point: take the policy's tail (step 1), report and\n     stop."), 'step 5\'s complete branch says the same');
+    assert.ok(text.includes("Do not pull other tasks off the stack, and start no Periodical unless the human's goal asks for\none. Once it is complete, stop; at a point that wants the human, just stop."));
+    assert.ok(text.includes("that's your natural stopping point: report and stop. If you're walking the stack"), 'step 5\'s complete branch says the same');
+    assert.ok(!/policy's tail/i.test(text), 'no pointer to a retired tail');
   });
 
   test('first act reads the issue and triggers recommend-and-dispatch for it', () => {
@@ -510,11 +513,12 @@ describe('buildAutopilotKickoff (providerUi capability gate, LIN-2804)', () => {
 });
 
 // LIN-1829 pinned the scoped snapshot byte for byte so the general-only periodicals pointer could
-// never leak into it. LIN-4382 changes it ON PURPOSE: a scoped run now takes the precedence
-// policy's tail, so the scoped goal block no longer says "the precedence policy is moot" and
-// names the tail instead. The golden (tests/fixtures/autopilot-kickoff/scoped-snapshot-golden.txt)
-// was re-captured for that one change, and the assertions below say what may and may not differ.
-describe('buildAutopilotKickoff (scoped snapshot, LIN-1829 golden updated for LIN-4382)', () => {
+// never leak into it. LIN-4382 changed it on purpose to name the precedence policy's tail; LIN-4415
+// changes it again on purpose: the tail is retired, so the goal block's last two lines now say the
+// run starts no Periodical unless the human's goal asks, and stops once its task is complete. The
+// golden (tests/fixtures/autopilot-kickoff/scoped-snapshot-golden.txt) was re-captured for that one
+// change, and the assertions below say what may and may not differ.
+describe('buildAutopilotKickoff (scoped snapshot, LIN-1829 golden updated for LIN-4415)', () => {
   const SEP = '\n\n---\n\n';
   // Must match the exact params the golden was generated with.
   const GOLDEN_ISSUE = { identifier: 'LIN-42', title: 'Fix the thing' };
@@ -530,42 +534,47 @@ describe('buildAutopilotKickoff (scoped snapshot, LIN-1829 golden updated for LI
     assert.strictEqual(scopedSnapshotSection(), golden);
   });
 
-  test('the scoped snapshot names the tail but carries no periodicals read of its own', () => {
+  // LIN-4415 witness 1: a scoped run with no goal is told to stop, and nothing in its prompt tells
+  // it to take a Periodical once its task is done. The `/periodicals` check already held at
+  // LIN-4382 (the read lived only in the policy); it stays as a regression pin.
+  test('a no-goal scoped snapshot stops on completion and carries no periodicals read', () => {
     const snapshot = scopedSnapshotSection();
-    assert.ok(snapshot.includes("take the policy's tail (one Periodical,\nthen stop)"));
+    assert.ok(snapshot.includes("start no Periodical unless the human's goal asks for\none. Once it is complete, stop;"));
     assert.ok(!snapshot.includes('/periodicals'), 'the read lives in the policy, once, not in the snapshot');
+    assert.ok(!/\btail\b/i.test(snapshot), 'the snapshot names no tail');
   });
 
-  // Inverted from "the periodicals pointer never appears in scoped output": scoped output now
-  // carries the periodicals read, but only in the tail, gated on the task being finished.
-  test('the scoped periodicals read happens only after the task is merged and verified, and after that check', () => {
+  test('a no-goal scoped kickoff carries none of the retired completion-tail wording', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue: GOLDEN_ISSUE });
-    const tail = text.slice(text.indexOf('**The tail: a scoped run ends with one Periodical.**'));
-    const finished = tail.indexOf('Once its task is merged and verified');
-    const read = tail.indexOf('read `GET /periodicals`');
-    assert.ok(finished >= 0 && read > finished, 'the read is conditioned on completion');
-    assert.ok(tail.includes('(after that check, not in the same beat as the Done write: a merge is recorded asynchronously)'));
-    assert.ok(tail.includes('A run stopped for the human, or before the merge, takes no tail.'));
+    for (const retired of [
+      /The tail: a scoped run ends with one Periodical/i,
+      /policy's tail/i,
+      /takes no tail/i,
+      /tail of its own/i,
+      /one Periodical, then stop/i,
+      /harbour-periodical-gate/,
+      /drive the review task the mint opens yourself/i,
+    ]) {
+      assert.ok(!retired.test(text), `retired wording ${retired} is gone`);
+    }
     // The scoped first act still starts on the task, never on the periodicals.
     const firstAct = text.slice(text.indexOf('**Your first act:**'));
     assert.ok(!firstAct.includes('periodicals'));
   });
 
-  test('the tail handles `never` beside `due`, ahead of `landed`, and takes repo-scoped lanes only', () => {
-    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue: GOLDEN_ISSUE });
-    const tail = text.slice(text.indexOf('**The tail: a scoped run ends with one Periodical.**'));
-    assert.ok(tail.includes('take at most one lane of a `scope: "repo"` template: `due` (including `never`) before `landed`, then the oldest last run'));
-    // LIN-4349 correction: the mint carries no autopilot flag by default; the run drives the
-    // review itself unless a task budget is declared (pinned in lin-4382-precedence-written-once).
-    assert.ok(tail.includes('Mint it with `POST /periodicals/{id}/mint` (`repo` set for a named lane).'));
-    assert.ok(tail.includes('drive the review task the mint opens yourself'));
-    assert.ok(tail.includes('then stop'));
+  // LIN-4415 witness 2 (kept behaviour): the opt-in is the human's own goal text. It rides on the
+  // scoped goal block (LIN-2818), and the policy still carries rank 1 and the mint instruction.
+  test('a scoped goal that asks for a Periodical reaches the run, with rank 1 and the mint instruction', () => {
+    const goal = 'then run the Seams & Tangles Periodical';
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue: GOLDEN_ISSUE, goal });
+    assert.ok(text.includes(`**Additional context from the human:** ${goal}`));
+    assert.ok(text.includes('1. an explicit goal from the human;'));
+    assert.ok(text.includes('mint the lane with `POST /periodicals/{id}/mint` (`repo` set for a named lane)'));
   });
 
   test('the scoped run still never pulls other tasks off the stack', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue: GOLDEN_ISSUE });
-    assert.ok(text.includes('Do not pull other tasks off the stack.'));
-    assert.ok(text.includes('A run scoped to one task takes nothing else from the stack.'));
+    assert.ok(text.includes('Do not pull other tasks off the stack,'));
   });
 
   // NOTE: this reconstitutes `text` from its own sections plus the golden, so it can only fail
