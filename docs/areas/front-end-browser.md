@@ -30,3 +30,8 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   flag-gated `live-console` (`lib/components/view-nav.js`). The browser guide is otherwise sound:
   its endpoints and selectors resolve. (Documentation Review, 10 Nov.;
   `docs/reviews/documentation-review-2026-11-10.md`.)
+- `public/prompt-section.js`: on a server with no AI (`aiState: "unconfigured"`, a self-host with no
+  OpenRouter key) the run control still offers Next step. Pressing it gets a 503 from the recommend
+  stream, and "AI Recommend · generating…" / "Loading…" spin with no message, while Run to PR works
+  beside it. Offer only what the server can do, or say why it can't. (Onboarding & Cold-Start
+  Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)

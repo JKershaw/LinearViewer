@@ -22,3 +22,17 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
 - `lib/render-library.js`: every Library document renders two `<h1>` (the shell "Harbour" and the document title), 117 of 117. The index renders one. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)
 - `lib/render-styleguide.js`: in dark theme the swatch captions under `.sg-value` show light-theme values (`#ffffff` for `--bg`, `#1a1a1a` for `--fg`) beside dark swatches. LIN-3957 and LIN-3960 are open on this page and do not cover it. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)
 - `lib/mask-secrets-in-html.js`: on a Jira workspace `/t/` masks text after `lib/providers/jira/adf.js` has escaped every `_` to `\_`, so underscore-bearing shapes (Resend, Harbour, Linear, GitHub, env-style) reach a guest unmasked; OpenRouter, Mongo, Atlassian and PEM still match. Strip CommonMark backslash escapes, with a position map, before matching. A seam: providers has no note. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)
+- `lib/components/navbar.js`: the workspace switcher's `+ Jira` goes to Jira OAuth `mode=new` (a new
+  sign-in), and on a server with no Jira OAuth env it is not shown at all, although the Jira API-token
+  path (no server config) works there. That path is only reachable from Settings › Sources inside a
+  workspace, so a Jira team without OAuth consent has to find "make a workspace, then Settings" alone.
+  (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)
+- `lib/render-proxy.js`: the Proxy page header and hint say agents "interact with Linear" and its
+  examples use `LIN-123`, on Local and Jira workspaces too. The onboarding guide sends every agent here.
+  The copied prompt is already provider-correct (LIN-2370); the page copy around it is not.
+  (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)
+- `lib/render-runner-setup.js`: the runner page defines itself as working "with no Simple Dispatcher"
+  and makes the two exclusive per workspace, but no page a newcomer reads says what Simple Dispatcher
+  is or when a team would want it (an always-on host), and its queue token lives on the Dispatch page.
+  A seam with the simple-dispatcher repo, whose README never names this page. (Onboarding &
+  Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)
