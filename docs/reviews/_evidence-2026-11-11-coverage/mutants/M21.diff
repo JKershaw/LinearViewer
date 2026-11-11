@@ -1,0 +1,13 @@
+diff --git a/lib/model-routing-store.js b/lib/model-routing-store.js
+index 1f2a0e59f..3a4b0757f 100644
+--- a/lib/model-routing-store.js
++++ b/lib/model-routing-store.js
+@@ -230,7 +230,7 @@ export class ModelRoutingStore {
+    */
+   async undo(entryId, ctx, guard) {
+     this._checkContext(ctx);
+-    const entry = await this.logCollection.findOne({ _id: entryId, urlKey: ctx.urlKey });
++    const entry = await this.logCollection.findOne({ _id: entryId });
+     if (!entry) throw new RoutingError('NOT_FOUND', 'no such log entry');
+     if (entry.kind === 'preset-save' || !entry.changes?.length) throw new RoutingError('NOT_UNDOABLE', 'this entry changed nothing to restore');
+     return this._commit(ctx, 'undo', (table) => {

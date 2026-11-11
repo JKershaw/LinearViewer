@@ -1,0 +1,13 @@
+diff --git a/lib/harbour-feedback-tokens.js b/lib/harbour-feedback-tokens.js
+index e308b73b7..b191267bb 100644
+--- a/lib/harbour-feedback-tokens.js
++++ b/lib/harbour-feedback-tokens.js
+@@ -92,7 +92,7 @@ export class HarbourFeedbackTokenStore {
+       const query = {
+         tokenHash,
+         used: false,
+-        expiresAt: { $gt: now }
++        expiresAt: { $gt: new Date(0) }
+       };
+       if (expectedItemId) {
+         query.itemId = expectedItemId;

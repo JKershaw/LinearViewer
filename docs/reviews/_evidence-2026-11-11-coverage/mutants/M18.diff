@@ -1,0 +1,13 @@
+diff --git a/lib/harbour-feedback-tokens.js b/lib/harbour-feedback-tokens.js
+index e308b73b7..837db2598 100644
+--- a/lib/harbour-feedback-tokens.js
++++ b/lib/harbour-feedback-tokens.js
+@@ -95,7 +95,7 @@ export class HarbourFeedbackTokenStore {
+         expiresAt: { $gt: now }
+       };
+       if (expectedItemId) {
+-        query.itemId = expectedItemId;
++        /* M18: item binding dropped */
+       }
+ 
+       // Atomic claim: only one caller can flip `used` from false to true.

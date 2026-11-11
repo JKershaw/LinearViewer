@@ -36,3 +36,10 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   is or when a team would want it (an always-on host), and its queue token lives on the Dispatch page.
   A seam with the simple-dispatcher repo, whose README never names this page. (Onboarding &
   Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)
+- `lib/render-task-page.js`: the layout test's desktop check that both quiet offers (write a
+  brief, write a recap) sit on one line is a one-shot `boundingBox` read after a reload; it fails
+  first (10.25 px against 4) and passes on retry in 33 sampled green runs, so a real wrap
+  would read as a flake. Wait for layout to settle or poll. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)
+- `lib/render-session.js`: the run page's `session-run-chat` link is missing on the first attempt
+  and present on retry in 10 sampled green runs (no ticket); whether the link renders late or
+  the seed lands late is unknown. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)

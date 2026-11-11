@@ -23,9 +23,6 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
 
 ## Waiting
 
-- `routes/proxy-rulings.js`: its own live-run predicate (`liveDispatchOnAnchor` over
-  `isTerminalLoop`) instead of `liveOnAnchor` (`lib/live-anchor.js`); its comment names an
-  incident from that class. One predicate. (Survey tally: LIN-4143.)
 - `routes/proxy-compute.js`: the recap/brief GET and POST handlers repeat one error-mapping chain
   and match provider errors by an "OpenRouter" substring; one helper beside `failureOf`, keyed on
   an error code, would hold "whole or loud". (Review, 8 Nov, on LIN-4358; area reads CG/CH.)
@@ -36,10 +33,6 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   (`routes/proxy.js`), so "per token" is wrong before auth. (Area reads
   CE/CF, LIN-4378; Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)
 - `routes/proxy.js`: the `proxyLimiter` window (60 seconds) and the broker's wait cap (`EXCHANGE_MAX_WAIT_SECONDS`, `lib/runner-kit/broker.mjs`) match by comment only: the contract records 60s on both sides, but no test reads `windowMs` against it, so either can break the retry budget. (Seams & Tangles, 8 Nov.; `docs/reviews/seams-tangles-review-2026-11-08-run10.md`.)
-- `lib/proxy-preamble.js`: `applyDefaultDispatchHarness` (harness policy) is imported by LLM's
-  `lib/model-routing.js` and `lib/model-routing-harnesses.js`: routing policy in an Agent API file.
-  Move it to the routing side or a shared leaf. (Seams & Tangles, 10 Nov.;
-  `docs/reviews/seams-tangles-review-2026-11-10-run11.md`.)
 - `routes/proxy-writes.js`: "no step may change them" (the `## As asked` words) is written twice,
   in `AS_ASKED_LEAD` and in `BRIEF_HINT` (`lib/as-asked.js`); the census pins the markers, not this
   rule; `lib/proxy-instructions.js` spells "a day" beside `LANDED_MIN_GAP_MS`. Borderline, LOW.
@@ -66,3 +59,7 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
 - `routes/proxy-model-routing.js`: with `modelRoutingProxyWrites` on (any member), every readWrite
   key, leaf workers' included, can set any harness or model workspace-wide; a non-`claude-code`
   harness puts later bootstraps inline. No runnable check; `urlKey` filters untested. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)
+- `lib/dispatch-tokens.js`: a `revokeToken` without `urlKey` (revokes any workspace's token by id)
+  and a `listTokens` that returns `tokenHash` pass every unit test; `lib/proxy-tokens.js` asserts
+  both. LIN-690 closed without them. (Test Coverage Gap Review, 11 Nov.;
+  `docs/reviews/test-coverage-gap-2026-11-11.md`.)

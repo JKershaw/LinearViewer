@@ -1,0 +1,12 @@
+diff --git a/lib/dispatch-tokens.js b/lib/dispatch-tokens.js
+index fbe565d5a..7732dfc27 100644
+--- a/lib/dispatch-tokens.js
++++ b/lib/dispatch-tokens.js
+@@ -212,6 +212,7 @@ export class DispatchTokenStore {
+ 
+       return docs.map(doc => ({
+         tokenId: doc._id,
++        tokenHash: doc.tokenHash,
+         label: doc.label,
+         createdAt: doc.createdAt?.toISOString?.() || doc.createdAt,
+         // LIN-3421: null for a token with no expiry (every legacy row; new tokens carry 90 days, LIN-3618).

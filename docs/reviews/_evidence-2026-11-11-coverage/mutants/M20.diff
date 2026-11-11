@@ -1,0 +1,13 @@
+diff --git a/lib/model-routing-store.js b/lib/model-routing-store.js
+index 1f2a0e59f..6d371571b 100644
+--- a/lib/model-routing-store.js
++++ b/lib/model-routing-store.js
+@@ -219,7 +219,7 @@ export class ModelRoutingStore {
+   /** Make the table equal a preset's snapshot, as one logged change (also when nothing differs). */
+   async applyPreset(presetId, ctx, guard) {
+     this._checkContext(ctx);
+-    const preset = await this.presetsCollection.findOne({ _id: presetId, urlKey: ctx.urlKey });
++    const preset = await this.presetsCollection.findOne({ _id: presetId });
+     if (!preset) throw new RoutingError('NOT_FOUND', 'no such preset');
+     return this._commit(ctx, 'preset-apply', (table) => tableFromSnapshot(table.version, preset.snapshot), { presetId }, guard);
+   }

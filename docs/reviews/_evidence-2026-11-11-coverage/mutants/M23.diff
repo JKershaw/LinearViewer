@@ -1,0 +1,13 @@
+diff --git a/lib/model-routing-store.js b/lib/model-routing-store.js
+index 1f2a0e59f..6026fa7ac 100644
+--- a/lib/model-routing-store.js
++++ b/lib/model-routing-store.js
+@@ -139,7 +139,7 @@ export class ModelRoutingStore {
+ 
+   /** Newest first, with the actor's display name resolved now. A `gap` marks a missing seq. */
+   async getLog(urlKey, { limit = 100 } = {}) {
+-    const rows = await this.logCollection.find({ urlKey }).sort({ seq: -1 }).limit(limit).toArray();
++    const rows = await this.logCollection.find({}).sort({ seq: -1 }).limit(limit).toArray();
+     const out = [];
+     for (let i = 0; i < rows.length; i++) {
+       const row = rows[i];

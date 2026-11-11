@@ -1,0 +1,14 @@
+diff --git a/lib/dispatch-tokens.js b/lib/dispatch-tokens.js
+index fbe565d5a..a67b53dba 100644
+--- a/lib/dispatch-tokens.js
++++ b/lib/dispatch-tokens.js
+@@ -244,8 +244,7 @@ export class DispatchTokenStore {
+ 
+     try {
+       const result = await this.collection.deleteOne({
+-        _id: tokenId,
+-        urlKey
++        _id: tokenId
+       });
+       return result.deletedCount > 0;
+     } catch (err) {
