@@ -3326,3 +3326,17 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - **11 Nov, ~21:20 UTC: spare allowance before the reset.** John: about 3% of the week left, with the reset in about 10 hours; "plenty for a periodical or several". New token `.tok7`, valid to 13 Nov 21:18 UTC, which covers paper v2. Used for:
   - **the six owed blind reads:** LIN-4392 (CQ `54228f7c`, CR `64c3dd9c`), LIN-4395 as one move across `ecabd3d76`, `9cf51ef72` and `d94800931` (CS `9db43b38`, CT `81381f1b`), and LIN-4398 (CU `9c40fbc4`, CV `d8e3f57c`);
   - **one Periodical, Onboarding & Cold-Start** (minted with autopilot), chosen because it reads the door the first outside team will walk through. Its note gives that team's shape as context, not scope. It skips the Surveys (A3), and a Periodical's own run takes no tail.
+- **11 Nov, ~21:25 UTC: the deferred blind reads are in.**
+
+  | Change | Reads | Result |
+  |---|---|---|
+  | LIN-4390 (Periodical hand-off) | CO, CP | better, mixed |
+  | LIN-4392 (one live-stage wait) | CQ, CR | **better, better** |
+  | LIN-4395 (sessions on one clock; three merges) | CS, CT | **better, better** |
+  | LIN-4398 (A3, Periodicals skip the Surveys) | CU, CV | mixed, mixed |
+
+  - **LIN-4392:** the wait has one owner (`lib/recommendation-live-wait.js`), checked first on every recommend surface, and the look-first copy was deleted. Debits: a `skipLiveWait` flag threaded through four layers; the wait reads but doesn't claim, so two racing calls can both pass (written into the notes).
+  - **LIN-4395:** the cost read has one owner (`lib/task-cost-read.js`), shared by `/cost` and the timeline; the read horizons are named; the new modules have homes. Debits: a second main-model rule that disagrees with `foldRequestUsage`; another hand-rolled TTL cache; a second duration formatter; the loader and timeline import each other. **For John's "healthy growth":** both readers judged the 1,150 lines largely well homed, with small copies at the edge.
+  - **LIN-4398:** one owner for which look-first steps a ticket gets, reusing the marker parser. Debits: the "a Periodical lands no code" reason prints whenever any step is dropped; `isPeriodicalReview` sits beside two older spellings of the same check; `llms.txt` is stale; nothing deleted.
+  - **So far:** four tasks, eight reads: 5 better, 3 mixed, 0 worse.
+  - **The notes cap, again, now named in four of six reads.** To fit new entries, unrelated entries lost dates, attributions and facts, and in one case (CT) a still-true entry was deleted: the `pipeline-churn.js` `ORCHESTRATION_KINDS` copy is still in the code, but the repo no longer records it. That's the cap destroying knowledge rather than shedding settled entries. **Top of the gate list.**
