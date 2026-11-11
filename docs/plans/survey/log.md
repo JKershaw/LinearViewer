@@ -3357,3 +3357,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - New breakage R4-2: on a self-host without AI, Next step gets a 503 and spins forever.
   - `scripts/env-check.sh` (LIN-2386) is the top objective defect for the fourth run running.
   - **For the gate:** R4-11 is a product call on the door (A7's scope or a new ask). It's John's.
+- **22:32 UTC: LIN-4415 (A11) merged** (`b5950f704`, PR #2396; production: 6 files, +24/−53, net −29). A finished task no longer starts a Periodical. The tail paragraph has gone from `AUTOPILOT_PRECEDENCE`, along with its budget condition (LIN-4349) and the guard that kept a Periodical's own review from chaining another. Rank 1 (a goal asking for one) still works. **It names what it retires**, and the code got smaller. It took about 50 minutes from kickoff to merge. Its own run was rendered under the old rule, so it may still take one last tail. Blind reads come at Done.
