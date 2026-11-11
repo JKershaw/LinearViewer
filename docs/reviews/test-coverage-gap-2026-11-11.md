@@ -154,9 +154,9 @@ the ticket lists." Neither case the ticket named is asserted:
 What keeps this near the top is the closure, not the impact: a ticket minted for exactly these two
 cases was closed as fixed without either being checked. `lib/dispatch-tokens.js` has not changed
 since `9aa68bb82` (23 Oct). The sibling `lib/proxy-tokens.js` kills both mutants (M3p, M5p), so the
-gap is specific to the dispatch store, and the proxy tests are the pattern to copy. With LIN-690
-closed, nothing open holds this. It is written as a Waiting entry in `docs/areas/agent-api.md`;
-whether to reopen LIN-690 instead is a question for the person (see the end).
+gap is specific to the dispatch store, and the proxy tests are the pattern to copy. LIN-690 was
+reopened by the 11 Nov ruling (`lin4418-reopen-690`), with M3 and M5 as its acceptance tests. It is
+now the only home for this finding, so there is no area-note entry (one-home rule).
 
 **C3 — `harbour-feedback-tokens-zero-coverage` — changed shape: covered through a fake, two invariants still unasserted.**
 The module is no longer absent. It reads 90.23 / 70 / 80 through an inline fake added by LIN-3795 in
@@ -220,7 +220,7 @@ logs are that stub, not egress). LIN-3815 (Backlog) names the OpenRouter catalog
 uploads.linear.app, not GitHub. This is not proven to cause any rescue, and the population cannot be
 bounded from logs, because only calls that log an error are visible. The e2e server has no egress
 guard, while the unit suite has `test:hermetic`. The guard is the larger tidy: a size-of-move entry
-in `docs/areas/web-routes.md`. The site itself is for LIN-3815 (a question for the person).
+in `docs/areas/web-routes.md`. The site itself was added to LIN-3815 (ruled and applied 11 Nov).
 
 **R4 — `e2e-retry-hidden-session-run-chat` — new.**
 `tests/e2e/session-proposals.spec.js:64` was retry-rescued in **10 sampled green runs
@@ -240,7 +240,7 @@ Waiting entry in `docs/areas/front-end-pages.md`.
   `lin-4198-request-usage-mongod`) already throw when `CI` is set and the URI is missing (the guard
   at `tests/unit/mongo-smoke.test.js:53` was there at `0b5afa6f`). Research verified it with `CI=1
   MONGODB_TEST_URI=`. What is left is that the guard is a per-file convention: nothing makes a *new*
-  real-Mongo file carry it. LIN-3799 (Backlog) could narrow to that census.
+  real-Mongo file carry it. LIN-3799 (Backlog) was narrowed to that census (ruled and applied 11 Nov).
 - **L3 — `agent-status-grouping-untested-data-integrity`: dead code still present.** LIN-691 was
   canceled on 30 Oct, but `listSessions` and `listTaskThreads` (`lib/agent-status-store.js:228`,
   `:299`) remain with no production caller. Waiting entry in `docs/areas/runs-and-dispatch.md` to
@@ -371,12 +371,11 @@ recurs; one sighting is not a finding. CI's last 30 runs (11-04 to 11-11) are gr
 ## Area notes written
 
 Each entry cites the area's file first and this report second; the source reads "(Test Coverage
-Gap Review, 11 Nov.)". Findings that already have a ticket stay out of the notes: LIN-2061 (C3),
-LIN-1879 (C5), LIN-3799 (L2), LIN-3815 (R3's site), LIN-4102 (drawer rescues) and LIN-3541 (fakes).
+Gap Review, 11 Nov.)". Findings that already have a ticket stay out of the notes: LIN-690 (C1, reopened),
+LIN-2061 (C3), LIN-1879 (C5), LIN-3799 (L2), LIN-3815 (R3's site), LIN-4102 (drawer rescues) and LIN-3541 (fakes).
 
 | Note | Entry | Finding |
 |---|---|---|
-| `docs/areas/agent-api.md` | `lib/dispatch-tokens.js` | C1 |
 | `docs/areas/front-end-pages.md` | `lib/render-task-page.js`; `lib/render-session.js` | R1; R4 |
 | `docs/areas/reports-and-operator-tools.md` | `lib/account-erasure.js` | C4 |
 | `docs/areas/platform-and-plumbing.md` | `lib/scheduler.js` | R2 |
@@ -399,7 +398,8 @@ remove the entry":
   stops importing Agent API") holds exactly this.
 
 Every other agent-api entry was re-read against the code at `b5950f704` and still holds, so none
-was cut or shortened. Note sizes after the change: agent-api 5,870, front-end-pages 5,937, runs-and-dispatch 5,980, platform-and-plumbing 2,291, reports-and-operator-tools 1,379, web-routes 2,085, llm-and-prompts 6,143.
+was cut or shortened. Note sizes after the change: agent-api 5,549 (after
+close-out removed the C1 entry once LIN-690 was reopened), front-end-pages 5,937, runs-and-dispatch 5,980, platform-and-plumbing 2,291, reports-and-operator-tools 1,379, web-routes 2,085, llm-and-prompts 6,143.
 
 **Seams have no full home in the notes yet.** R3 is a cross-area seam: the guard would sit with
 the e2e test routes (web-routes), and the egress site is in Other features. It is filed under the
@@ -421,10 +421,11 @@ area a change would start from, naming the other side.
 
 ## For the person (none blocks hand-off)
 
-- Reopen **LIN-690** with M3 and M5 as its acceptance tests? If yes, remove the C1 entry from
-  `docs/areas/agent-api.md` (one home).
-- Add the GitHub task-facts egress (R3) to **LIN-3815**?
-- Narrow **LIN-3799** to a census that makes every new real-Mongo suite carry the CI guard (L2)?
+- **Ruled and applied (11 Nov):** **LIN-690** reopened, with M3 and M5 as its acceptance tests. The C1
+  entry was removed from `docs/areas/agent-api.md` (one home).
+- **Ruled and applied (11 Nov):** the GitHub task-facts egress (R3) was added to **LIN-3815**.
+- **Ruled and applied (11 Nov):** **LIN-3799** was narrowed to a census that makes every new
+  real-Mongo suite carry the CI guard (L2).
 - Larger tidy: a standing e2e egress guard (R3; `docs/areas/web-routes.md`).
 - No area file: the `wrappers.test.mjs` `TMPDIR` false red (L9).
 - Sibling: the research-time `state-store` failure did not reproduce in 18 runs. Nothing to act on
@@ -435,7 +436,7 @@ area a change would start from, naming the other side.
 | Stable name | Module | Severity | State vs 2026-10-23 |
 |---|---|---|---|
 | `model-routing-store-urlkey-filters-unasserted` | `lib/model-routing-store.js` | High | new (grades Security Review row 21); top finding |
-| `dispatch-token-store-untested-auth-boundary` | `lib/dispatch-tokens.js` | Medium-High | lowered from High (bounded impact); LIN-690 closed unresolved (M3, M5 survive the whole suite) |
+| `dispatch-token-store-untested-auth-boundary` | `lib/dispatch-tokens.js` | Medium-High | lowered from High (bounded impact); LIN-690 reopened (M3, M5 survive) |
 | `harbour-feedback-tokens-zero-coverage` | `lib/harbour-feedback-tokens.js` | Medium-High | changed shape: fake-covered, M17b/M18 survive (LIN-2061) |
 | `e2e-retry-hidden-task-page-phone-layout` | `tests/e2e/task-page.spec.js` | Medium | new |
 | `account-erasure-array-anonymise-overreach` | `lib/account-erasure.js` | Medium | new |

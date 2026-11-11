@@ -59,7 +59,3 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
 - `routes/proxy-model-routing.js`: with `modelRoutingProxyWrites` on (any member), every readWrite
   key, leaf workers' included, can set any harness or model workspace-wide; a non-`claude-code`
   harness puts later bootstraps inline. No runnable check; `urlKey` filters untested. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)
-- `lib/dispatch-tokens.js`: a `revokeToken` without `urlKey` (revokes any workspace's token by id)
-  and a `listTokens` that returns `tokenHash` pass every unit test; `lib/proxy-tokens.js` asserts
-  both. LIN-690 closed without them. (Test Coverage Gap Review, 11 Nov.;
-  `docs/reviews/test-coverage-gap-2026-11-11.md`.)
