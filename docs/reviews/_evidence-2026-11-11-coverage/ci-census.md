@@ -30,8 +30,8 @@ Drawn separately in the gap slice (before 2026-10-24T19:19Z) and after it: every
 | | sampled | complete log set | green | green with a retry rescue |
 |---|---|---|---|---|
 | gap slice | 56 | 56 | 46 | 4 |
-| after | 299 | 278 | 246 | 80 |
-| total | 355 | 334 | 292 | 84 (28.8%) |
+| after | 299 | 299 | 246 | 81 |
+| total | 355 | 355 | 292 | 85 (29.1%) |
 
 A "retry rescue" is a green run whose E2E log has a first-attempt `✘` line. Granularity is the Playwright `list` reporter only; `test-results/` is uploaded only on failure.
 
@@ -58,6 +58,7 @@ A "retry rescue" is a green run whose E2E log has a first-attempt `✘` line. Gr
 | 2 | `tests/e2e/lin-4010-home-opened-task.spec.js:342` | 2026-11-02..2026-11-04 | the review-shaped Home at 1280px, dark (LIN-4010 review) › one running box with Stop in vi |
 | 2 | `tests/e2e/observation.spec.js:519` | 2026-11-06..2026-11-07 | Autopilot Observation page (first-class) › Running-collapsed livebar shimmer (LIN-933) › a |
 | 1 | `tests/e2e/live-console.spec.js:3215` | 2026-11-02..2026-11-02 | Live Console (experimental) › LIN-4035: activity collapsed, one link rule, the title on th |
+| 1 | `tests/e2e/look-alike-controls.spec.js:209` | 2026-11-03..2026-11-03 | Look-alike controls in ticket text answer nothing (LIN-3385) › task page: a look-alike in  |
 | 1 | `tests/e2e/task-page.spec.js:817` | 2026-11-05..2026-11-05 | Task page, owner view (LIN-3329) › LIN-3634: a head that moves after the page loaded is re |
 | 1 | `tests/e2e/observation.spec.js:543` | 2026-11-06..2026-11-06 | Autopilot Observation page (first-class) › Running-collapsed livebar shimmer (LIN-933) › r |
 | 1 | `tests/e2e/observation-rulings.spec.js:1148` | 2026-11-08..2026-11-08 | Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e › two loops sharing one decision_id  |
@@ -231,20 +232,20 @@ A "retry rescue" is a green run whose E2E log has a first-attempt `✘` line. Gr
 | 40948121557 | 2026-10-29T20:20:20Z | success | 1 | yes |  |
 | 40965968183 | 2026-10-29T22:27:08Z | failure | 1 | yes | lin-3987-decision-panel.spec.js:135, lin-4010-home-opened-task.spec.js:404 |
 | 40971074004 | 2026-10-29T23:08:45Z | success | 1 | yes | task-page.spec.js:374 |
-| 40971146104 | 2026-10-29T23:09:22Z | failure | 1 | no |  |
+| 40971146104 | 2026-10-29T23:09:22Z | failure | 1 | yes | lin-3987-decision-panel.spec.js:135 |
 | 40974411672 | 2026-10-29T23:37:34Z | success | 1 | yes |  |
 | 40979313856 | 2026-10-30T00:22:49Z | success | 1 | yes |  |
 | 41032634679 | 2026-10-30T09:19:53Z | success | 1 | yes |  |
 | 41040303159 | 2026-10-30T10:22:46Z | success | 1 | yes |  |
 | 41045505071 | 2026-10-30T11:05:17Z | success | 1 | yes |  |
 | 41047821837 | 2026-10-30T11:24:08Z | success | 1 | yes |  |
-| 41050632042 | 2026-10-30T11:47:41Z | failure | 1 | no |  |
+| 41050632042 | 2026-10-30T11:47:41Z | failure | 1 | yes |  |
 | 41057969354 | 2026-10-30T12:47:07Z | success | 1 | yes |  |
 | 41071695736 | 2026-10-30T14:27:53Z | success | 1 | yes |  |
 | 41080381668 | 2026-10-30T15:24:11Z | success | 1 | yes | task-page.spec.js:374 |
 | 41095718433 | 2026-10-30T17:05:20Z | success | 1 | yes |  |
 | 41101318422 | 2026-10-30T17:45:36Z | success | 1 | yes | lin-4010-home-opened-task.spec.js:227 |
-| 41138312615 | 2026-10-30T22:28:05Z | failure | 1 | no |  |
+| 41138312615 | 2026-10-30T22:28:05Z | failure | 1 | yes |  |
 | 41139638163 | 2026-10-30T22:40:12Z | success | 1 | yes |  |
 | 41146143147 | 2026-10-30T23:43:30Z | success | 1 | yes |  |
 | 41159872028 | 2026-10-31T02:24:34Z | success | 1 | yes |  |
@@ -254,31 +255,31 @@ A "retry rescue" is a green run whose E2E log has a first-attempt `✘` line. Gr
 | 41175305614 | 2026-10-31T06:07:38Z | success | 1 | yes |  |
 | 41185288654 | 2026-10-31T08:36:18Z | success | 1 | yes |  |
 | 41186141669 | 2026-10-31T08:49:14Z | success | 1 | yes |  |
-| 41186741065 | 2026-10-31T08:58:28Z | failure | 1 | no |  |
-| 41187129284 | 2026-10-31T09:03:58Z | failure | 1 | no |  |
+| 41186741065 | 2026-10-31T08:58:28Z | failure | 1 | yes | lin-4010-home-opened-task.spec.js:227 |
+| 41187129284 | 2026-10-31T09:03:58Z | failure | 1 | yes | task-page.spec.js:374 |
 | 41187700129 | 2026-10-31T09:11:58Z | success | 1 | yes |  |
 | 41188517209 | 2026-10-31T09:23:38Z | success | 1 | yes |  |
 | 41189659953 | 2026-10-31T09:40:39Z | success | 1 | yes |  |
 | 41190137866 | 2026-10-31T09:47:48Z | success | 1 | yes |  |
 | 41190807647 | 2026-10-31T09:58:08Z | success | 1 | yes | lin-4010-home-opened-task.spec.js:227 |
-| 41322406766 | 2026-11-01T15:40:23Z | failure | 1 | no |  |
+| 41322406766 | 2026-11-01T15:40:23Z | failure | 1 | yes | lin-3975-task-run.spec.js:108, lin-3975-task-run.spec.js:302, task-page.spec.js:303 |
 | 41322524665 | 2026-11-01T15:41:49Z | success | 1 | yes | lin-4010-home-opened-task.spec.js:227 |
-| 41323197563 | 2026-11-01T15:49:55Z | failure | 1 | no |  |
+| 41323197563 | 2026-11-01T15:49:55Z | failure | 1 | yes | lin-3975-task-run.spec.js:108, lin-3975-task-run.spec.js:302, look-alike-controls.spec.js:209, task-page.spec.js:303 |
 | 41326065238 | 2026-11-01T16:23:12Z | success | 1 | yes |  |
 | 41334564230 | 2026-11-01T18:03:02Z | success | 1 | yes |  |
 | 41342403005 | 2026-11-01T19:34:20Z | success | 1 | yes |  |
 | 41352552909 | 2026-11-01T21:32:47Z | success | 1 | yes |  |
 | 41359024039 | 2026-11-01T22:49:07Z | success | 1 | yes |  |
 | 41369837425 | 2026-11-02T00:56:32Z | success | 1 | yes | task-page.spec.js:376 |
-| 41382273465 | 2026-11-02T03:17:28Z | failure | 1 | no |  |
+| 41382273465 | 2026-11-02T03:17:28Z | failure | 1 | yes | assignee-filter.spec.js:87, dashboard.spec.js:31, error-handling.spec.js:118, jira-provider.spec.js:27, lin-4010-home-opened-task.spec.js:230, opened-task-first-screen.spec.js:718, prompts.spec.js:41, prompts.spec.js:50, prompts.spec.js:58, prompts.spec.js:65, prompts.spec.js:76, prompts.spec.js:90, prompts.spec.js:99 |
 | 41384955813 | 2026-11-02T03:47:16Z | success | 1 | yes | task-page.spec.js:376 |
 | 41389864166 | 2026-11-02T04:41:28Z | success | 1 | yes |  |
 | 41407597886 | 2026-11-02T07:38:22Z | success | 1 | yes |  |
 | 41418882213 | 2026-11-02T09:13:26Z | success | 1 | yes | lin-4010-home-opened-task.spec.js:230 |
-| 41420314156 | 2026-11-02T09:24:00Z | failure | 1 | no |  |
-| 41423323114 | 2026-11-02T09:46:02Z | failure | 1 | no |  |
-| 41424293833 | 2026-11-02T09:53:19Z | failure | 1 | no |  |
-| 41428036700 | 2026-11-02T10:20:36Z | failure | 1 | no |  |
+| 41420314156 | 2026-11-02T09:24:00Z | failure | 1 | yes | lin-4115-home-halt-banner.spec.js:185, look-alike-controls.spec.js:209 |
+| 41423323114 | 2026-11-02T09:46:02Z | failure | 1 | yes | lin-4119-backlog-page.spec.js:319, look-alike-controls.spec.js:213 |
+| 41424293833 | 2026-11-02T09:53:19Z | failure | 1 | yes | error-handling.spec.js:249, lin-4115-home-halt-banner.spec.js:189, look-alike-controls.spec.js:213 |
+| 41428036700 | 2026-11-02T10:20:36Z | failure | 1 | yes | lin-4115-home-halt-banner.spec.js:189, live-console.spec.js:3215, look-alike-controls.spec.js:213 |
 | 41432220705 | 2026-11-02T10:52:11Z | success | 1 | yes |  |
 | 41439541701 | 2026-11-02T11:47:18Z | success | 1 | yes |  |
 | 41443890623 | 2026-11-02T12:20:29Z | success | 1 | yes |  |
@@ -295,10 +296,10 @@ A "retry rescue" is a green run whose E2E log has a first-attempt `✘` line. Gr
 | 41593231553 | 2026-11-03T06:58:21Z | success | 1 | yes |  |
 | 41597478878 | 2026-11-03T07:36:49Z | success | 1 | yes |  |
 | 41599762955 | 2026-11-03T07:57:25Z | success | 1 | yes |  |
-| 41600882212 | 2026-11-03T08:06:52Z | success | 2 | no |  |
-| 41638750382 | 2026-11-03T12:47:59Z | failure | 1 | no |  |
+| 41600882212 | 2026-11-03T08:06:52Z | success | 2 | yes | look-alike-controls.spec.js:209 |
+| 41638750382 | 2026-11-03T12:47:59Z | failure | 1 | yes | legal.spec.js:210, lin-3987-decision-panel.spec.js:172, observation-rulings.spec.js:1821, observation-rulings.spec.js:1998 |
 | 41645305849 | 2026-11-03T13:32:57Z | success | 1 | yes | task-page.spec.js:376 |
-| 41683760998 | 2026-11-03T17:23:20Z | failure | 1 | no |  |
+| 41683760998 | 2026-11-03T17:23:20Z | failure | 1 | yes | opened-task-first-screen.spec.js:430, opened-task-first-screen.spec.js:638 |
 | 41686160584 | 2026-11-03T17:38:13Z | success | 1 | yes |  |
 | 41693805199 | 2026-11-03T18:26:17Z | success | 1 | yes |  |
 | 41711404990 | 2026-11-03T20:18:49Z | success | 1 | yes |  |
@@ -310,10 +311,10 @@ A "retry rescue" is a green run whose E2E log has a first-attempt `✘` line. Gr
 | 41798922939 | 2026-11-04T08:21:53Z | success | 1 | yes |  |
 | 41800030296 | 2026-11-04T08:30:29Z | success | 1 | yes | lin-4010-home-opened-task.spec.js:342, task-page.spec.js:376 |
 | 41801874515 | 2026-11-04T08:44:52Z | success | 1 | yes |  |
-| 41830363924 | 2026-11-04T12:33:56Z | failure | 1 | no |  |
+| 41830363924 | 2026-11-04T12:33:56Z | failure | 1 | yes | task-page.spec.js:376 |
 | 41831795810 | 2026-11-04T12:43:54Z | success | 1 | yes | task-page.spec.js:376 |
 | 41873338280 | 2026-11-04T17:01:08Z | success | 1 | yes |  |
-| 41888288210 | 2026-11-04T18:33:17Z | failure | 1 | no |  |
+| 41888288210 | 2026-11-04T18:33:17Z | failure | 1 | yes |  |
 | 41891505130 | 2026-11-04T18:53:07Z | success | 1 | yes |  |
 | 41896714676 | 2026-11-04T19:24:59Z | success | 1 | yes |  |
 | 41929130326 | 2026-11-04T22:53:15Z | success | 1 | yes |  |
@@ -323,7 +324,7 @@ A "retry rescue" is a green run whose E2E log has a first-attempt `✘` line. Gr
 | 41960255661 | 2026-11-05T03:13:45Z | success | 1 | yes |  |
 | 41968705511 | 2026-11-05T04:35:04Z | success | 1 | yes | task-page.spec.js:376 |
 | 41977546436 | 2026-11-05T06:00:27Z | success | 1 | yes |  |
-| 41994115026 | 2026-11-05T08:23:42Z | failure | 1 | no |  |
+| 41994115026 | 2026-11-05T08:23:42Z | failure | 1 | yes | lin-3833-home-first-page.spec.js:278, templates.spec.js:17 |
 | 41996153629 | 2026-11-05T08:39:24Z | success | 1 | yes | session-proposals.spec.js:64 |
 | 42009059529 | 2026-11-05T10:14:33Z | success | 1 | yes |  |
 | 42012891607 | 2026-11-05T10:42:08Z | success | 1 | yes |  |
@@ -352,7 +353,7 @@ A "retry rescue" is a green run whose E2E log has a first-attempt `✘` line. Gr
 | 42101516844 | 2026-11-05T20:14:25Z | success | 1 | yes |  |
 | 42108814416 | 2026-11-05T21:01:43Z | success | 1 | yes |  |
 | 42116356257 | 2026-11-05T21:51:12Z | success | 1 | yes | task-page.spec.js:376 |
-| 42185714190 | 2026-11-06T08:09:52Z | failure | 1 | no |  |
+| 42185714190 | 2026-11-06T08:09:52Z | failure | 1 | yes | task-page.spec.js:376 |
 | 42187662151 | 2026-11-06T08:26:14Z | success | 1 | yes |  |
 | 42190887139 | 2026-11-06T08:53:09Z | success | 1 | yes |  |
 | 42193963431 | 2026-11-06T09:17:49Z | success | 1 | yes |  |
@@ -370,9 +371,9 @@ A "retry rescue" is a green run whose E2E log has a first-attempt `✘` line. Gr
 | 42280281836 | 2026-11-06T19:30:54Z | success | 1 | yes |  |
 | 42301821057 | 2026-11-06T22:04:24Z | success | 1 | yes |  |
 | 42357329216 | 2026-11-07T08:52:48Z | success | 1 | yes |  |
-| 42367308675 | 2026-11-07T11:14:03Z | failure | 1 | no |  |
+| 42367308675 | 2026-11-07T11:14:03Z | failure | 1 | yes | task-page.spec.js:376 |
 | 42369684928 | 2026-11-07T11:47:54Z | success | 1 | yes | session-proposals.spec.js:64 |
-| 42374342068 | 2026-11-07T12:51:49Z | failure | 1 | no |  |
+| 42374342068 | 2026-11-07T12:51:49Z | failure | 1 | yes | task-page.spec.js:376, task-page.spec.js:662 |
 | 42383113503 | 2026-11-07T14:45:50Z | success | 1 | yes | session-proposals.spec.js:64 |
 | 42391774796 | 2026-11-07T16:32:08Z | success | 1 | yes |  |
 | 42395118529 | 2026-11-07T17:12:00Z | success | 1 | yes | observation.spec.js:519 |
@@ -423,3 +424,21 @@ A "retry rescue" is a green run whose E2E log has a first-attempt `✘` line. Gr
 | 42834462229 | 2026-11-10T14:28:39Z | success | 1 | yes |  |
 | 43106596584 | 2026-11-11T21:50:36Z | success | 1 | yes | task-page.spec.js:379 |
 | 43110363169 | 2026-11-11T22:16:28Z | success | 1 | yes | session-proposals.spec.js:64, task-page.spec.js:379 |
+
+## Unit failures on attempt 1 of re-runs that ended green
+
+From the full attempt-1 unit job logs of the 16 `run_attempt > 1` runs (5 had a failing unit job on attempt 1 and a green final attempt):
+
+| run id | created | event / branch | failing test (as reported at that sha) |
+|---|---|---|---|
+| 40051600931 | 2026-10-24T01:50Z | push / main | `tests/unit/task-share-route.test.js:513` "a minted Harbour token planted bare … is masked" (assertion "dispatch token tail reached the body") |
+| 40221330398 | 2026-10-25T18:27Z | push / main | `tests/unit/db-indexes.test.js` "deferred index tier (LIN-3811)" › "a spec whose key already exists under another name is not rebuilt" |
+| 40231800146 | 2026-10-25T20:39Z | pull_request / feat/lin-3962-decision-panel | same db-indexes test |
+| 40251525217 | 2026-10-26T00:53Z | pull_request / feat/lin-3980-landing-plain-sign-in | `tests/unit/scheduler.test.js:265` "(e) error containment" ("expected the interval to keep ticking past the first throw (at least 2 calls), got 1") |
+| 40265633784 | 2026-10-26T03:45Z | pull_request / feat/lin-3975-task-page-move | same db-indexes test |
+
+The db-indexes test was fixed by LIN-3985 (`96efd1fe6`, 2026-10-31, "tests await the deferred index build instead of a budget of turns"); no later re-run rescue.
+
+## Live GitHub egress
+
+`Bad credentials` lines (REST `repos/octo/repo/issues`, `repos/octo/repo/milestones`, and GraphQL) appear in the E2E logs of 127 of the 355 sampled runs. Only calls that log an error are visible, so this does not bound the egress population.

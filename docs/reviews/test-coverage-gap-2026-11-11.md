@@ -101,15 +101,16 @@ listing began, and 154 of those came after LIN-3798's merge (`cada192e0`, 2026-1
 
 Sample: every fourth first-attempt green run, plus every failed and every re-run run, drawn
 separately in the gap and after it. That is 355 runs, with the E2E shard and unit job logs of
-every attempt (334 with a complete log set). Per-test granularity is the same as last time
+every attempt (all 355 with a complete log set). Per-test granularity is the same as last time
 and no finer: the Playwright `list` reporter's first-attempt `✘` line, its `N flaky` block and the
 first-attempt error. `retries: process.env.CI ? 2 : 0` is at `playwright.config.js:22`, and
 `test-results/` is uploaded only on failure (`.github/workflows/test.yml:133`). The 1-in-4 green
 sample is a bound, not the population. `ci-census.md` in the evidence folder has the commands, the
 counts and every sampled run's first-attempt failure sites.
 
-**84 of 292 sampled green runs (29%) carried at least one retry rescue**,
-against 33% last run. The rate did not move; new sites replaced the old ones.
+**85 of 292 sampled green runs (29%) carried at least one retry rescue**: 81 of 246 (33%) after
+10-24T19:19Z, the same as last run's 33%, and 4 of 46 in the earlier gap slice. The rate did not move;
+new sites replaced the old ones.
 
 ## Findings, severity-ranked
 
@@ -165,8 +166,10 @@ desktop") failed its first attempt and passed on retry in **33 of 292 sampled gr
 file moved. The first-attempt error is always the desktop half: `both offers on one line`, expected
 < 4, received 10.25 (11.20 three times), at `tests/e2e/task-page.spec.js:321`. That is a one-shot
 `boundingBox` read of the two quiet offers (`lib/render-task-page.js:884-885`) straight after a
-reload, with no wait for layout to settle. A real wrap regression would fail the same way and
-would look like this flake until all three attempts failed. The onset follows LIN-3975
+reload, with no wait for layout to settle. Only a regression that fails every attempt goes red. The
+offset is the same 10.25 px almost every time, which points to one repeatable first-load layout state
+(the offers apart until something settles), not noise. That state may be what a person sees on a cold
+load, and the retry hides it. The onset follows LIN-3975
 (`74ad4f4c9`, 26 Oct), which added the quiet offers. No ticket. Waiting entry in
 `docs/areas/front-end-pages.md`.
 
@@ -201,7 +204,7 @@ L8.
 **R3 — `e2e-live-github-egress` — new member of the LIN-3815 class.**
 `tests/e2e/settings-providers.spec.js` seeds a GitHub binding (`octo/repo`) with a fake installation
 token. The background task-facts refresh (`lib/task-facts-holder.js:150`) then calls `api.github.com`
-live. `Bad credentials` appears in the E2E logs of **119 of the 355 sampled runs**, on REST
+live. `Bad credentials` appears in the E2E logs of **127 of the 355 sampled runs**, on REST
 `/repos/octo/repo/issues` and `/milestones` and on GraphQL. LIN-3798 stubbed only Linear's
 `test-token`, in-process (`routes/test.js:53`; the "Authentication required" lines in the run-page
 logs are that stub, not egress). LIN-3815 (Backlog) names the OpenRouter catalog and
@@ -305,13 +308,15 @@ them at each run's sha.
 | 2 | `tests/e2e/ship.spec.js:332` | 10-25..10-25 | Ship Page › layout is deterministic across reloads |
 | 1 | `tests/e2e/lin-3968-home-next-step.spec.js:332` | 11-10..11-10 | Home: the stage strip is one row and styled (LIN-3968) › every chip sits on one  |
 | 1 | `tests/e2e/live-console.spec.js:3215` | 11-02..11-02 | Live Console (experimental) › LIN-4035: activity collapsed, one link rule, the t |
+| 1 | `tests/e2e/look-alike-controls.spec.js:209` | 11-03..11-03 | Look-alike controls in ticket text answer nothing (LIN-3385) › task page: a look |
 | 1 | `tests/e2e/observation-rulings.spec.js:1148` | 11-08..11-08 | Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e › two loops sharing one de |
 | 1 | `tests/e2e/observation-rulings.spec.js:1275` | 11-08..11-08 | Bulk-agree progress / Stop / completion summary (LIN-2758) — e2e › a full 3-row  |
 | 1 | `tests/e2e/observation.spec.js:543` | 11-06..11-06 | Autopilot Observation page (first-class) › Running-collapsed livebar shimmer (LI |
 | 1 | `tests/e2e/task-page.spec.js:817` | 11-05..11-05 | Task page, owner view (LIN-3329) › LIN-3634: a head that moves after the page lo |
 
 Only sites that recur and name a concrete defect a pass-on-retry would hide are graded (R1, R4).
-The lin-4010 drawer rescues belong to LIN-4102 (Backlog). The 10-24 to 10-26 cluster
+The lin-4010 drawer rescues (`:227`, `:230`) belong to LIN-4102 (Backlog). The same spec's `:342`
+(the 1280px dark Home, two runs) is recorded, not graded. The 10-24 to 10-26 cluster
 (detail-nonactive-binding, lin-3833 home sheet, local-provider, proxy page, dispatch-page "can
 revoke token") has not recurred since 10-26. The dispatch-page revoke error (`settings-key-dispatch`
 count expected 0, received 1) is exactly what a revoke no-op looks like, but with no recurrence it
