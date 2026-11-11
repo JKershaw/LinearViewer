@@ -1487,7 +1487,7 @@ decide for itself whether a periodical is due.
   the wire boundary).
 - **`scope`** (LIN-4382) is what a run reads: a codebase (`repo`) or this workspace's own
   tracker (`workspace`). The precedence policy (`AUTOPILOT_PRECEDENCE`) counts a `never` lane
-  as overdue, and lets the scoped-run tail take a lane, only when it is `repo`.
+  as overdue only when it is `repo`.
 - **`mode`**/**`scope`**/**`cadence`** are **carried through from the matched template** by the fold
   itself, never re-joined against the registry here — so this endpoint can never publish a
   `cadence` that disagrees with the one its own `due`/`recent` boundary actually used.

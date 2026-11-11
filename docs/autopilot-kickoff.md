@@ -96,15 +96,17 @@ and a fresh session is dispatched into the same wall.
 <!-- MAINTAINER NOTE — the precedence policy is not mirrored in this doc.
      It is written once, as `AUTOPILOT_PRECEDENCE` in lib/prompts/autopilot-precedence.js
      (LIN-4382), an import-free leaf the kickoff renders verbatim in this Orient step, in
-     scoped, general and stepper runs alike. That includes the scoped-run tail. Read the
+     scoped, general and stepper runs alike. Read the
      ranks there; do not copy them into this doc, the generator or any other file in lib/
      or routes/: tests/unit/lin-4382-precedence-written-once.test.js fails on a copy.
 
      History: LIN-1829 shipped the Periodicals' rank as a general-only first-act clause that
      superseded this list, to keep scoped output unchanged by construction; LIN-1932 split
      lane state per repo; LIN-4381 added `landed`. LIN-4382 removed the second order and the
-     supersedes clause: a scoped run now carries the policy too, because it takes the tail
-     once its own task is merged and verified. -->
+     supersedes clause, so a scoped run carries the policy too. LIN-4415 retired the
+     Periodical a scoped run took once its task was merged: it now stops then, and still
+     carries the policy because its goal can ask for a Periodical, and rank 1 and the mint
+     instruction are what tell it how. -->
 
 
 2. **Trigger the next step.** `POST /recommend-and-dispatch` with `{ issueIdentifier, target, sessionId }`
@@ -167,8 +169,7 @@ and a fresh session is dispatched into the same wall.
    - **continue** — the arc isn't finished (plan's done, implementation's next; review
      found a blocker, resolve it and go on). This is the common case — keep the work moving.
    - **complete** — evidence confirms this task/feature is genuinely done. If you're working
-     a scoped goal, that's your natural stopping point: take the policy's tail (step 1), report
-     and stop. If you're walking
+     a scoped goal, that's your natural stopping point: report and stop. If you're walking
      the stack open-ended, move to the next item.
    - **pause for the human** — anything that's theirs: a review that raises a direction or
      judgment question, a change big or risky enough to want eyes before it lands, a blocker

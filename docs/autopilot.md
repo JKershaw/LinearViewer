@@ -171,9 +171,10 @@ The autopilot's **first act is to orient**: apply a fixed precedence to the snap
 announce what it will work on. The order itself is written once, as `AUTOPILOT_PRECEDENCE`
 in `lib/prompts/autopilot-precedence.js` (LIN-4382), and the kickoff renders it in its
 Orient step for every run; read it there rather than here. It ranks a human's goal first,
-keeps the Periodicals' weekly floor ahead of the stack, puts a Periodical made due by landed
-work *under* the stack (taken only when nothing on it can move), and gives a run scoped to
-one task a tail: once that task is merged and verified, at most one Periodical, then stop.
+keeps the Periodicals' weekly floor ahead of the stack, and puts a Periodical made due by landed
+work *under* the stack (taken only when nothing on it can move). A run scoped to one task
+stops once that task is merged and verified; it starts a Periodical only when the human's
+goal asks for one (LIN-4415).
 
 **Shipped note (LIN-1827/LIN-1829, §8.C; LIN-1932; LIN-4381; LIN-4382):** periodical cadence
 state ships as a **live pointer**, not text baked into the snapshot at generation time — the
