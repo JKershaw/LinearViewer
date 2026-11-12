@@ -37,6 +37,13 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   read the proxy pace by fixed sleeps (`scripts/pipeline-churn.mjs` sleeps 1.1 s, and 5 s × attempt
   on a 429; the `steady-base-*` and `survey-*` scripts likewise), so the rate rule is spelled two
   ways. One shared client under `scripts/lib/` would retire the copies. (LIN-4421 leftovers; Survey global.)
+- `scripts/stability-measures-core.mjs`: `ownTicket` is the one landing-owns-its-ticket rule,
+  but `scripts/delivery-composition.mjs` (line 105) still credits every `LIN-n` in a commit
+  subject, so its ticket counts and first/last dates include precedents ("after LIN-1",
+  "LIN-690 reopened"). On the 8 Nov window, matching whole messages gives 163 IDs against 106
+  own tickets. Importing `ownTicket` would give the reports one attribution. The `\bLIN-\d+\b`
+  matches in `scripts/steady-base-growth.mjs` and `scripts/steady-base-code.mjs` count ticket
+  citations in file text and comment lines, not landings, so they are not this rule. (LIN-4421 review.)
 - `lib/account-erasure.js`: each collection should be declared once with all its facts
   (name, store module, erasure row, urlKey class, dry-run shape), and opening an
   undeclared name should fail. LIN-4234 gave both guards one source of collection names;

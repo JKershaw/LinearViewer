@@ -366,6 +366,15 @@ describe('finished tasks: counted once, in the window where they finished', () =
     assert.deepStrictEqual([...a, ...b].map((t) => t.id).sort(), ['LIN-10', 'LIN-20']);
   });
 
+  test('completed exactly at A\'s head counts in A only: the window is (base, head], even with A\'s landings as B\'s prior', () => {
+    const atHead = new Map([['LIN-50', { state: { type: 'completed', name: 'Done' }, completedAt: A.headDate }]]);
+    const ownA = landingOwners([landing('a3', '2026-11-08T16:00:00Z', 'LIN-50: lands in A')]);
+    const inA = selectFinished({ window: ownA, issues: atHead, ...A });
+    assert.deepStrictEqual(inA.finished.map((t) => t.id), ['LIN-50']);
+    const inB = selectFinished({ window: landingOwners([]), prior: ownA, issues: atHead, ...B });
+    assert.deepStrictEqual([inB.finished, inB.doneOutside, inB.notDone], [[], [], []]);
+  });
+
   test('a prior-only ticket finished elsewhere is not reported; a canceled one is not finished', () => {
     const more = new Map([...issues, ['LIN-30', { state: { type: 'completed' }, completedAt: '2026-11-08T08:00:00Z' }], ['LIN-40', { state: { type: 'canceled', name: 'Canceled' }, completedAt: null }]]);
     const sel = selectFinished({
@@ -522,6 +531,15 @@ describe('the tracker read end to end, through a fake proxy', () => {
     assert.deepStrictEqual([rows.speed.status, rows.speed.value.medianSessions, rows.speed.unreadable], [STATUS.PARTIAL, 8, 1]);
     assert.deepStrictEqual([rows.minted.status, rows.minted.value.base, rows.minted.value.head, rows.minted.value.span], [STATUS.MEASURED, 'LIN-24', 'LIN-48', 24]);
     assert.strictEqual(rows.minted.value.bracket, 'LIN-60');
+  });
+
+  test('a window ticket whose issue read is a 404 is unreadable with its reason, and the tasks row is partial', async () => {
+    const { client } = proxy({ '/issues/LIN-33': { status: 404 } });
+    const withMissing = [...windowLandings, landing('d', '2026-11-08T18:00:00Z', 'LIN-33: four')];
+    const { rows } = await readTracker({ client, windowLandings: withMissing, window: { ...window, landings: 4 }, lookback: { days: 3 } });
+    assert.deepStrictEqual([rows.tasks.status, rows.tasks.unreadable, rows.tasks.value.finished], [STATUS.PARTIAL, 1, 2]);
+    assert.deepStrictEqual(rows.tasks.value.ids.unreadable, [{ id: 'LIN-33', reason: 'issue not found' }]);
+    assert.deepStrictEqual(rows.tasks.value.ids.landedUnfinished, [{ id: 'LIN-32', state: 'In Progress' }]);
   });
 
   test('an unreadable issue list ends the read: every tracker row is not measured, none is zero', async () => {
