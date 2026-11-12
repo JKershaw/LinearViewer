@@ -1,9 +1,12 @@
 // The area notes guard (LIN-4371): the notes in docs/areas/ stay keyed on the registry and true to the tree.
-// docs/areas/README.md owns the format; this test holds the four checks it names:
+// docs/areas/README.md owns the format; this test holds the five checks it names:
 //   1. every notes file is named by a registry area's slug;
 //   2. every path a note cites exists;
 //   3. every waiting entry cites a path, and its first cited path maps to the note's own area;
-//   4. every note stays under NOTE_BYTE_CAP.
+//   4. every note's `## Lessons` section stays under NOTE_BYTE_CAP (LIN-4414: Waiting has no cap, so a still-true
+//      entry is never squeezed or cut to make room; it leaves only when settled, untrue or filed);
+//   5. the README states NOTE_BYTE_CAP, so its number cannot drift from this constant (LIN-4414).
+// Each note's Waiting count is printed as a test diagnostic, so whether the lists are falling can be read in CI.
 // The checks are one pure function over (registry, files, exists), run once on the real tree and once per mutation,
 // so each check is shown to fail on the defect it exists to catch. simple-dispatcher keeps its own copy (LIN-4372);
 // the two repositories share no test code.
@@ -14,12 +17,12 @@ import { join } from 'node:path';
 import { ROOT, loadAreas, areaOf } from './helpers/area-registry.js';
 
 const NOTES_DIR = 'docs/areas';
-// About 6 KB (LIN-4347's plan leaves the builder to pick it): a note is read before every change in its area, so it
-// must stay short enough to read in full. The largest seeded note is about half of this.
+// About 6 KB (LIN-4347's plan leaves the builder to pick it): a note's Lessons are read before every change in its
+// area, so they must stay short enough to read in full. Since LIN-4414 it caps the `## Lessons` section only.
 export const NOTE_BYTE_CAP = 6144;
 const NOT_NOTES = new Set(['README.md', 'areas.json']);
 const SECTIONS = new Set(['Lessons', 'Waiting']);
-const EXTENSIONS = 'js|mjs|cjs|json|md|css|html|txt|yml|yaml|toml';
+const EXTENSIONS = 'js|mjs|cjs|json|md|css|html|txt|yml|yaml|toml|sh';
 // A repo-relative path in backticks: path characters only (a `:12` suffix stays in, so a line number fails check 2),
 // and either a `/` in it or a file extension. `/dispatch`, `^lib/` and `provider.name` are not paths.
 const PATH_SPAN = new RegExp(`^[\\w.:-]+(?:/[\\w.:-]+)*/?$`);
@@ -46,8 +49,18 @@ export function parseNote(text) {
   return { headings, waiting };
 }
 
+/** The bytes of a note's `## Lessons` section: from its heading to the next level-two heading or the end; 0 if none. */
+export function lessonsBytes(text) {
+  const lines = text.split('\n');
+  const start = lines.findIndex((line) => /^## Lessons\s*$/.test(line));
+  if (start < 0) return 0;
+  let end = lines.findIndex((line, i) => i > start && /^## /.test(line));
+  if (end < 0) end = lines.length;
+  return Buffer.byteLength(lines.slice(start, end).join('\n'), 'utf8');
+}
+
 /**
- * The four checks over one directory listing. `files` maps a file name in docs/areas/ to its text; `exists` answers
+ * The five checks over one directory listing. `files` maps a file name in docs/areas/ to its text; `exists` answers
  * for a repo-relative path. Returns one problem per defect, `{ check, file, detail }`; an empty list is a pass.
  */
 export function checkAreaNotes({ areas, files, exists, cap = NOTE_BYTE_CAP }) {
@@ -74,8 +87,11 @@ export function checkAreaNotes({ areas, files, exists, cap = NOTE_BYTE_CAP }) {
       const owner = areaOf(first.replace(/\/$/, '/x'), areas)?.slug;
       if (owner !== slug) problems.push({ check: 3, file, detail: `waiting entry's first path \`${first}\` maps to ${owner ?? 'no area'}, not ${slug}` });
     }
-    const bytes = Buffer.byteLength(text, 'utf8');
-    if (bytes > cap) problems.push({ check: 4, file, detail: `${bytes} bytes, over the ${cap}-byte cap` });
+    const bytes = lessonsBytes(text);
+    if (bytes > cap) problems.push({ check: 4, file, detail: `its Lessons are ${bytes} bytes, over the ${cap}-byte cap (Waiting has no cap)` });
+  }
+  if (!String(files['README.md'] ?? '').includes(String(cap))) {
+    problems.push({ check: 5, file: 'README.md', detail: `does not state the ${cap}-byte Lessons cap the guard holds` });
   }
   return problems;
 }
@@ -97,8 +113,18 @@ describe('area notes (LIN-4371)', () => {
     assert.ok(Object.keys(tree.files).some((f) => !NOT_NOTES.has(f)), 'the seeded notes are present');
   });
 
-  test('every note in docs/areas/ passes the four checks', () => {
+  test('every note in docs/areas/ passes the five checks', () => {
     assert.deepStrictEqual(checkAreaNotes(tree), []);
+  });
+
+  // LIN-4414: an area's waiting list should shrink over time through the leftover step's retirements. The counts are
+  // printed so a reader of CI can see it (baselines on 12 Nov: runs-and-dispatch 16, llm-and-prompts 15,
+  // front-end-pages 13, agent-api 11).
+  test('each note\'s Waiting count (printed)', (t) => {
+    for (const file of Object.keys(tree.files).filter((f) => !NOT_NOTES.has(f)).sort()) {
+      const { waiting } = parseNote(tree.files[file]);
+      t.diagnostic(`area-notes waiting ${file.slice(0, -3)}: ${waiting.length} entries; Lessons ${lessonsBytes(tree.files[file])} of ${NOTE_BYTE_CAP} bytes`);
+    }
   });
 
   // Each mutation is applied to a copy of the real tree, so a check that stopped looking would pass it.
@@ -133,15 +159,36 @@ describe('area notes (LIN-4371)', () => {
       assert.ok(renamed.some((p) => p.check === 3 && p.detail.includes('Waiting work')), 'a renamed section cannot hide its entries');
     });
 
-    test('4: a note over its byte cap', () => {
-      const big = mutate((f) => ({ [note]: `${f[note]}\n${'x'.repeat(NOTE_BYTE_CAP)}\n` }));
+    test('4: a note whose Lessons are over the byte cap', () => {
+      // Grown inside Lessons (LIN-4414): before it, this appended at the end of the file, which is Waiting.
+      const big = mutate((f) => ({ [note]: f[note].replace('## Lessons\n', `## Lessons\n\n- ${'x'.repeat(NOTE_BYTE_CAP)}\n`) }));
+      assert.ok(big.length, 'the mutation landed in Lessons');
       assert.deepStrictEqual(checksOf(big), [4]);
+    });
+
+    test('4: Waiting has no cap: 7 KB of valid waiting entries pass every check (LIN-4414)', () => {
+      const [owned] = citedPaths(parseNote(tree.files[note]).waiting[0]);
+      const entry = `- \`${owned}\`: a valid waiting entry, citing a file in this area first, grown to test the cap. (LIN-4414.)\n`;
+      const grown = `${tree.files[note].replace(/\n*$/, '\n')}${entry.repeat(Math.ceil(7168 / entry.length))}`;
+      assert.ok(Buffer.byteLength(grown) - Buffer.byteLength(tree.files[note]) >= 7168, 'grew by 7 KB');
+      assert.ok(Buffer.byteLength(grown) > NOTE_BYTE_CAP, 'the whole file is over the cap');
+      assert.deepStrictEqual(checksOf(mutate(() => ({ [note]: grown }))), []);
+    });
+
+    test('4: a note with no Lessons section passes check 4', () => {
+      const noLessons = mutate((f) => ({ [note]: f[note].replace(/## Lessons\n[\s\S]*?(?=\n## )/, '') }));
+      assert.ok(!noLessons.some((p) => p.check === 4), JSON.stringify(noLessons));
+    });
+
+    test('5: a README that does not state the cap', () => {
+      const silent = mutate((f) => ({ 'README.md': f['README.md'].split(String(NOTE_BYTE_CAP)).join('some number of') }));
+      assert.deepStrictEqual(checksOf(silent), [5]);
     });
   });
 
   test('citedPaths reads repo-relative paths only', () => {
     assert.deepStrictEqual(
-      citedPaths('`lib/a.js` `server.js` `tests/fixtures/` `x.js:3` `/dispatch` `^lib/` `provider.name === 1` `GATE_DUE_MARKER` `doc.kind`'),
-      ['lib/a.js', 'server.js', 'tests/fixtures/', 'x.js:3']);
+      citedPaths('`lib/a.js` `server.js` `tests/fixtures/` `x.js:3` `run.sh` `/dispatch` `^lib/` `provider.name === 1` `GATE_DUE_MARKER` `doc.kind`'),
+      ['lib/a.js', 'server.js', 'tests/fixtures/', 'x.js:3', 'run.sh']);
   });
 });

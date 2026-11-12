@@ -2299,6 +2299,15 @@ Posting the same `(issue + body)` again within a short window does not create a 
 
 That invalidation has the same scope as the dedupe window it invalidates: **in-process**, on the server instance that handled the delete or edit. Behind more than one instance, a delete on instance A does not invalidate instance B, so a re-post routed to B can still return the pre-delete deduped response until the window expires. Like the dedupe cache itself, treat it as best-effort rather than a guarantee — if you need certainty that a comment is gone or changed, re-read the issue's comments.
 
+**The builder's leftover answer (LIN-4414).** A comment whose first non-blank line, trimmed, is exactly `### Leftovers` is the builder's leftover answer, and it names the waiting entry the build settled on exactly one line starting `Retires:`, in one of three forms: the entry's file as a repo-relative path in backticks, then its opening words; `none, no waiting entry`; or `none, nothing fix-sized`, then the smallest entry in the busiest touched area (its file in backticks) and why it is larger than a fix. Any other comment, including a review verdict with a `### Leftovers` subsection further down, is not checked. The check runs before the dedupe lookup and before any provider call, on create, edit and a comment-target attachment caption, and a refused body posts nothing:
+
+| Status | `code` | Meaning |
+|--------|--------|---------|
+| `422` | `LEFTOVER_RETIRES_MISSING` | the answer has no `Retires:` line. The message gives one literal example of each form. |
+| `422` | `LEFTOVER_RETIRES_SHAPE` | the answer has more than one `Retires:` line, or its line is in none of the three forms (`kind`: `"repeated"`, `"no-path"`, `"no-words"`, `"unknown-reason"`, `"fix-sized-no-entry"`, `"fix-sized-no-reason"`; `line: { number, text }`, 1-based within the comment). |
+
+Like the description guards, only this proxy is checked: an answer posted to the provider another way is not.
+
 #### Delete Comment
 
 ```
@@ -2331,6 +2340,8 @@ Content-Type: application/json
 | `issueId` | UUID/identifier | Yes | Issue the comment belongs to (URL consistency; not used to resolve the comment) |
 | `commentId` | UUID | Yes | The comment's own id |
 | `body` | string | Yes | New comment body in Markdown (max 50K chars) |
+
+An edited body that opens with `### Leftovers` is held to the leftover answer's `Retires:` line, with the same `422` codes as Add Comment.
 
 Returns `200`:
 ```json

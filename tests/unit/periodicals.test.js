@@ -308,14 +308,29 @@ describe('Mint + Autopilot variant (LIN-1279)', () => {
 // loop replaces the LIN-386 "bounded follow-up creation" loop, keeping what each of its
 // assertions protected under the new output:
 //   - "every finding is recorded in the report" -> the report stays uncapped (everything found);
-//   - "bounded / cap it"                         -> what the reading writes stays within its bound,
-//                                                   each note under its cap;
+//   - "bounded / cap it"                         -> what the reading writes stays within its bound
+//                                                   (LIN-4414 dropped "each note under its cap": the
+//                                                   notes' README owns their size, and no reading is
+//                                                   told to shorten a note);
 //   - "search for an existing ticket before minting" (LIN-2991/LIN-3022 §5a, no re-raise)
 //                                                -> a finding already filed as a ticket stays in
 //                                                   the report only, never also in a note.
 // It selects by mode, so a corrective template that stops feeding the notes fails here. The
 // advisory reviews (Stability, Recent Headwinds, Integration & Surface Maturity) report to a
 // person instead; see their specifics blocks and the census below.
+// LIN-4414: what the notes bullet no longer says. The size limit, Waiting versus Lesson and the citation
+// format are the notes' own rules (their README); "distil" and "under its cap" told readings to squeeze
+// still-true entries to fit.
+const SQUEEZE_AND_RESTATEMENT = [/distil/i, /under its cap/i, /the byte cap/i, /add a Lesson instead/i, /cites the file it is about first/i, /second cited path/i];
+
+test('LIN-4414: no Periodical render tells a reading to squeeze a note to fit its cap', () => {
+  assert.strictEqual(PERIODICALS.length, 16);
+  for (const template of PERIODICALS) {
+    const prompt = template.generatePrompt();
+    for (const re of [/distil/i, /under its cap/i, /the byte cap/i]) assert.doesNotMatch(prompt, re, `${template.id}: ${re}`);
+  }
+});
+
 describe('corrective reviews: feed the notes, mint nothing (LIN-4380)', () => {
   const corrective = PERIODICALS.filter(t => t.mode === 'corrective');
 
@@ -329,7 +344,7 @@ describe('corrective reviews: feed the notes, mint nothing (LIN-4380)', () => {
     const notesBullet = lines.find(l => l.startsWith('- **Feed the area notes'));
     const routesBullet = lines.find(l => l.startsWith('- **Route each finding that has no area note'));
 
-    test(`${template.title} feeds the area notes through one docs-only PR, citing file then reading`, () => {
+    test(`${template.title} feeds the area notes through one docs-only PR, naming the reading as source`, () => {
       assert.ok(notesBullet, `${template.id}: the notes bullet is present`);
       for (const re of [
         /mint no follow-up tasks/i,
@@ -338,12 +353,11 @@ describe('corrective reviews: feed the notes, mint nothing (LIN-4380)', () => {
         /since the commit the previous report measured/i,
         /map each changed file to its area through the registry/i,
         /prune entries you find settled or no longer true/i,
-        /Waiting entry/, /Lesson/,
-        /cites the file it is about first/i,
-        /this report as the second cited path/i,
         /one docs-only pull request/i,
         /rebase it onto main/i
       ]) assert.match(notesBullet, re, `${template.id}: ${re}`);
+      // LIN-4414: the notes' own rules are not restated here, and nothing tells a reading to shorten a note.
+      for (const re of SQUEEZE_AND_RESTATEMENT) assert.doesNotMatch(notesBullet, re, `${template.id}: ${re}`);
       // The source tag names this template's own title (P1's citation contract).
       assert.ok(notesBullet.includes(`"${template.title}, <the date of this run>"`), `${template.id}: source tag names its title`);
     });
@@ -360,7 +374,7 @@ describe('corrective reviews: feed the notes, mint nothing (LIN-4380)', () => {
       assert.match(prompt, /beyond the report artifact itself and the area-note edits described above/);
       assert.match(prompt, /After the report and its area-note edits above are written/);
       assert.match(prompt, /what this reading writes — the report and its area-note entries — stays within its existing bound/);
-      assert.match(prompt, /each note under its cap/);
+      assert.doesNotMatch(prompt, /each note under its cap/);
     });
 
     test(`${template.title} still records every finding in the report and never re-raises a filed one`, () => {
@@ -1377,15 +1391,11 @@ describe('Seams & Tangles feeds the area notes, mints nothing (LIN-4379)', () =>
       /mint no follow-up tasks/i,
       /searching the repo/i,
       /follow their own rules/i,
-      /registry/i, /guard/i, /byte cap/i, /one home/i,
+      /registry/i, /guard/i, /one home/i,
       /since the commit the previous report measured/i,
       /map each changed file to its area through the registry/i,
       /prune entries you find settled or no longer true/i,
-      /distil/i,
-      /Waiting entry/, /Lesson/,
-      /cites the file it is about first/i,
       /Seams & Tangles, <the date of this run>/,
-      /this report as the second cited path/i,
       /already filed as a ticket stays in the report only/i,
       /one docs-only pull request/i,
       /rebase it onto main/i,

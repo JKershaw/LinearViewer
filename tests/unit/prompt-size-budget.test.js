@@ -132,14 +132,14 @@ export const AGENT_ONBOARDING_RENDERED_CEILING = 3691; // LIN-4085: new at 3207,
 /** Landing agent prompt, rendered bytes at BASE_URL (renderLandingAgentPrompt). LIN-4085: new. Copied by a person into their own agent, so it is wording the agent reads, not code. */
 export const LANDING_AGENT_PROMPT_CEILING = 584; // LIN-4085: new at 584 (the copied prompt under the sign-in buttons)
 /** The leftover step's prompt, rendered bytes at the fixture ticket and PR below (leftoverPrompt, lib/dispatch-leftover.js). */
-export const LEFTOVER_PROMPT_RENDERED_CEILING = 1352; // LIN-4376: +157, where each answer goes is the shared LEFTOVER_RULE, rendered verbatim with its one-home line. What counts as a leftover, and whether it is fix-sized, is the builder's judgement no code sees
+export const LEFTOVER_PROMPT_RENDERED_CEILING = 1787; // LIN-4414: +435 (1352 -> 1787), the step settles one waiting entry before the push and its answer starts with the heading and names it on one Retires line in one of three forms (leaf words). The shape is held in code (lib/dispatch-leftover-answer.js, the proxy's 422); the words left are what the builder must do, which no code can do for it.
 
 /**
  * The total: the sum of every ceiling above. A PR that raises a ceiling raises
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 357974; // LIN-4392: +25 (357949 -> 357974): stage-router source +25, a comment naming the live-stage wait; no rendered prompt changed
+export const FROZEN_TOTAL_BYTES = 358409; // LIN-4414: +435 (357974 -> 358409): the leftover prompt's ceiling, for the one checked retirement
 
 const BASE_URL = 'https://harbour.example';
 
