@@ -18,6 +18,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const ANALYSE = path.join(here, 'analyse.mjs');
 const V1_INPUTS = path.join(here, 'inputs-v1.json');
 const V1_EVIDENCE = path.join(here, '..', 'task-size-and-cost-evidence', '2026-11-05');
+const V2_EVIDENCE = path.join(here, '..', 'task-size-and-cost-evidence', '2026-11-12');
 const WINDOW = '2026-11-04T05:00:00Z';
 
 function run(args) {
@@ -57,6 +58,24 @@ test('v1 with the inputs named explicitly also reproduces it, and every self-che
     assert.equal(r.code, 0, r.stderr);
     assert.equal(readFileSync(path.join(ev, 'analysis.json'), 'utf8'), readFileSync(path.join(V1_EVIDENCE, 'analysis.json'), 'utf8'));
     assert.ok(!/^FAIL/m.test(r.stdout), r.stdout);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---- v2: the committed 12 Nov folder, re-analysed with its own inputs, must reproduce its analysis.json byte for byte ----
+// One witness for every v2 rule (token sum, custom sensitivity, cohort, rounds regressor, golden size, exact rule): a rule
+// changed in analyse.mjs changes the committed numbers, and this fails (LIN-4427 review, mutation check).
+
+test('v2 with its inputs reproduces the committed 2026-11-12 analysis.json byte for byte, and every self-check passes', async () => {
+  const dir = scratch();
+  try {
+    const ev = path.join(dir, 'ev');
+    cpSync(V2_EVIDENCE, ev, { recursive: true });
+    const r = await run([ev, '--inputs', path.join(ev, 'inputs.json')]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.ok(!/^FAIL/m.test(r.stdout), r.stdout);
+    assert.equal(readFileSync(path.join(ev, 'analysis.json'), 'utf8'), readFileSync(path.join(V2_EVIDENCE, 'analysis.json'), 'utf8'));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

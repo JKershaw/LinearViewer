@@ -7,7 +7,7 @@
 // Usage: REPO=<path to repo> node size-golden-glob.mjs <sha> <repo-label>
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
-import { mergedPrs } from '../coherence-as-it-grows-scripts/coherence-census.mjs';
+import { mergedPrs, isTest as censusIsTest } from '../coherence-as-it-grows-scripts/coherence-census.mjs';
 import { isTest } from '../../../../scripts/delivery-paths.mjs';
 
 const repo = process.env.REPO;
@@ -16,6 +16,9 @@ const rev = process.argv[2];
 const label = process.argv[3];
 if (!rev || !label) { console.error('usage: REPO=<path> size-golden-glob.mjs <sha> <repo-label>'); process.exit(2); }
 const git = (args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', maxBuffer: 1 << 30 });
+// Each repo's own test-line predicate, as its size file counted it: LinearViewer's is the census's (tests/**/*.js|mjs, no
+// tests/fixtures/); simple-dispatcher's is scripts/delivery-paths.mjs. Subtracting by the wrong one would remove lines never added.
+const isTestFor = label === 'LinearViewer' ? censusIsTest : isTest;
 // The glob `*.golden.*` on the basename: the basename contains ".golden." (a leading `*` may be empty).
 const isStarGolden = (p) => /\.golden\./.test(path.posix.basename(p));
 
@@ -25,7 +28,7 @@ for (const r of mergedPrs(rev)) {
   const row = { repo: label, pr: r.pr, ticket: r.ticket, goldenGlobAdded: 0, goldenGlobDeleted: 0 };
   for (const l of numstat ? numstat.split('\n') : []) {
     const [a, d, p] = l.split('\t');
-    if (!p || !isTest(p) || !isStarGolden(p)) continue;
+    if (!p || !isTestFor(p) || !isStarGolden(p)) continue;
     row.goldenGlobAdded += a === '-' ? 0 : Number(a);
     row.goldenGlobDeleted += d === '-' ? 0 : Number(d);
   }

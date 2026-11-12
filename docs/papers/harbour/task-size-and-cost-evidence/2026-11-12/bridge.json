@@ -30,18 +30,21 @@
   "byModel": {
     "claude-haiku-5-5": {
       "lineages": 10,
+      "usdChange": 0,
       "medianRatio": 1,
       "minRatio": 1,
       "maxRatio": 1
     },
     "claude-opus-5-5": {
       "lineages": 57,
+      "usdChange": 3.9601,
       "medianRatio": 1,
       "minRatio": 0.973,
       "maxRatio": 3.3496
     },
     "claude-sonnet-5-5": {
       "lineages": 51,
+      "usdChange": -16.0375,
       "medianRatio": 0.7489,
       "minRatio": 0.6694,
       "maxRatio": 0.8537

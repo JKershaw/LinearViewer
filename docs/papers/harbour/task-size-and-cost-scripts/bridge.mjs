@@ -55,8 +55,9 @@ const rows = v1Tickets.map((t) => {
 
 const allRatios = rows.flatMap((r) => r.ratios);
 const byModel = Object.fromEntries([...new Set(allRatios.map((x) => x.model))].sort().map((m) => {
-  const xs = allRatios.filter((x) => x.model === m).map((x) => x.ratio);
-  return [m, { lineages: xs.length, medianRatio: r4(median(xs)), minRatio: r4(Math.min(...xs)), maxRatio: r4(Math.max(...xs)) }];
+  const group = allRatios.filter((x) => x.model === m);
+  const xs = group.map((x) => x.ratio);
+  return [m, { lineages: xs.length, usdChange: r4(group.reduce((s, x) => s + (x.v2 - x.v1), 0)), medianRatio: r4(median(xs)), minRatio: r4(Math.min(...xs)), maxRatio: r4(Math.max(...xs)) }];
 }));
 const totals = {
   tickets: rows.length,
