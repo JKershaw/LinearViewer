@@ -37,6 +37,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - `lib/library.js` takes a shelf doc's summary by position (`firstParagraphAfterTitle`): a paper
   that opens with a figure keeps its alt text under 12 words, or the alt text becomes the
   summary; a rewritten first paragraph re-pins `tests/fixtures/library-doc-summaries.json` (LIN-4428).
+- A blind reader's limits are instructions, not access: with the repository checked out it can still
+  see commit subjects (`git worktree add` prints the head's) and area notes. Both slipped, harmlessly,
+  in the LIN-4436 pilot. Code hands a blind stage SHAs and PR URLs, never a PR body or commit log.
 
 ## Waiting
 
@@ -98,3 +101,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   (`areaNotesRoutes`) each state the docs-only notes-PR rule in their own words; one shared
   constant in `lib/prompts/leftover-words.js` would make it one, at the cost of re-pinning the 13
   Periodical prompt hashes. (LIN-4432.)
+- `lib/prompts/leftover-words.js`: the first-match area lookup is spelled three ways: `CONSEQUENCE_TEST`'s
+  "first match wins" parenthetical, `docs/areas/README.md` ("take the first area with a pattern that
+  matches its path") and the blind-read prompt's own sentence (`docs/plans/survey/blind-read-prompt.md`),
+  which shipped as piloted, so it was not retyped after the pilot. One constant in the leaf would make it
+  one, at the cost of re-piloting that sentence. (LIN-4436 leftovers.)
