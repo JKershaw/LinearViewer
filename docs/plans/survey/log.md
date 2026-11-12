@@ -3491,3 +3491,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **For LIN-4419's kickoff,** the goal adds: John: "we should support a normal/expected range." The range we state is the one CI runs.
   - It starts after LIN-2386, one at a time.
 - **~16:55 UTC: John adds a limit for LIN-4419:** "this does risk as ending up with a cicd pipeline which tries to test every version, which whilst nice to have is likely overkill for our needs. Plus it might start costing us a lot more money on github." The goal now carries both of John's quotes and a limit: the claimed range is checked without testing every version, and the CI cost stays close to today's.
+- **~17:00 UTC: John:** "Yeah, or even a quick subset of tests for other versions etc. we'll see how it lands." That's an example of the cheap route, not a rule, so the goal stays as drafted and Harbour picks the route.
