@@ -10,7 +10,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { mergedPrs } from '../coherence-as-it-grows-scripts/coherence-census.mjs';
-import { isTest, isDoc } from '../../../../scripts/delivery-paths.mjs';
+import { isTest, isDoc, isGolden } from '../../../../scripts/delivery-paths.mjs';
 
 const repo = process.env.REPO;
 if (!repo) { console.error('REPO must be set'); process.exit(2); }
@@ -21,12 +21,17 @@ const out = [];
 for (const r of mergedPrs(rev)) {
   const numstat = git(['diff', '--numstat', r.parents[0], r.sha]).trim();
   const row = { pr: r.pr, sha: r.sha.slice(0, 8), day: r.day, ticket: r.ticket,
-    codeFiles: 0, codeAdded: 0, codeDeleted: 0, testFiles: 0, testAdded: 0, testDeleted: 0, docFiles: 0 };
+    codeFiles: 0, codeAdded: 0, codeDeleted: 0, testFiles: 0, testAdded: 0, testDeleted: 0, docFiles: 0,
+    // LIN-4426: golden lines, a subset of the test lines above (scripts/delivery-paths.mjs isGolden).
+    testGoldenAdded: 0, testGoldenDeleted: 0 };
   for (const l of numstat ? numstat.split('\n') : []) {
     const [a, d, p] = l.split('\t');
     if (!p) continue;
     const add = a === '-' ? 0 : Number(a), del = d === '-' ? 0 : Number(d);
-    if (isTest(p)) { row.testFiles++; row.testAdded += add; row.testDeleted += del; }
+    if (isTest(p)) {
+      row.testFiles++; row.testAdded += add; row.testDeleted += del;
+      if (isGolden(p)) { row.testGoldenAdded += add; row.testGoldenDeleted += del; }
+    }
     else if (isDoc(p)) { row.docFiles++; }
     else { row.codeFiles++; row.codeAdded += add; row.codeDeleted += del; }
   }

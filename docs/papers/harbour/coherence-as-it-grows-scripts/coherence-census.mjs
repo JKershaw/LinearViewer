@@ -13,6 +13,8 @@ import { execFileSync } from 'child_process';
 import { mkdtempSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname, resolve as presolve } from 'path';
+// LIN-4426: golden test lines for `prs`, from the repo-neutral rule (not a rule of this file).
+import { isGolden } from '../../../../scripts/delivery-paths.mjs';
 
 const repo = process.env.REPO || '.';
 const git = (a, input) => execFileSync('git', ['-C', repo, ...a], { encoding: 'utf8', maxBuffer: 1 << 30, input, stdio: ['pipe', 'pipe', 'ignore'] });
@@ -185,7 +187,7 @@ if (cmd === 'prs') {
       const days = log ? log.split('\n') : [];
       commits = days.length; firstDay = days[days.length - 1] || r.day;
     }
-    out.push({ pr: r.pr, sha: r.sha.slice(0, 8), day: r.day, ticket: r.ticket, commits, firstDay, prodFiles: prod.map((f) => f.path), prodAdded: prod.reduce((s, f) => s + f.added, 0), prodDeleted: prod.reduce((s, f) => s + f.deleted, 0), testFiles: tests.length, testAdded: tests.reduce((s, f) => s + f.added, 0), testDeleted: tests.reduce((s, f) => s + f.deleted, 0), otherFiles: files.length - prod.length - tests.length, areas: [...new Set(prod.map((f) => areaOf(f.path)))] });
+    out.push({ pr: r.pr, sha: r.sha.slice(0, 8), day: r.day, ticket: r.ticket, commits, firstDay, prodFiles: prod.map((f) => f.path), prodAdded: prod.reduce((s, f) => s + f.added, 0), prodDeleted: prod.reduce((s, f) => s + f.deleted, 0), testFiles: tests.length, testAdded: tests.reduce((s, f) => s + f.added, 0), testDeleted: tests.reduce((s, f) => s + f.deleted, 0), testGoldenAdded: files.filter((f) => isGolden(f.path)).reduce((s, f) => s + f.added, 0), testGoldenDeleted: files.filter((f) => isGolden(f.path)).reduce((s, f) => s + f.deleted, 0),otherFiles: files.length - prod.length - tests.length, areas: [...new Set(prod.map((f) => areaOf(f.path)))] });
   }
   console.log(JSON.stringify(out));
 }
