@@ -76,7 +76,7 @@ describe('close-out: writes review\'s note entries and states the one-home rule 
 
   test('the note entries are written on the PR branch before the merge, alongside the fixes', () => {
     const fixes = section(prompt, 'Make the Fixes Review Asked For');
-    assert.match(fixes, /Write each note entry review named, in its own area or another, into that area's `docs\/areas\/<slug>\.md` on the PR branch the same way, before the merge\./);
+    assert.match(fixes, /Write each note entry review named, and any note-bound outside find you notice yourself, in its own area or another, into that area's `docs\/areas\/<slug>\.md` on the PR branch the same way, before the merge\./);
     assert.match(prompt, /Make the fixes and write every note entry review named/, 'Workflow step 2 names them');
   });
 

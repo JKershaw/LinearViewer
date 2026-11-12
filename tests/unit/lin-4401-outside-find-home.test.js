@@ -7,7 +7,8 @@
  *   four kinds of safety it names (authentication, secrets, data loss, irreversible writes).
  * Part (v): the wording around the gate that no other part reads: the gate's fallbacks and "Never
  *   both", the leftover prompt's note-bound rule and answer form, review's "name its home" and the
- *   condition on the "file" option in review and Triage.
+ *   condition on the "file" option in review and Triage, and close-out's Make the Fixes clause for a
+ *   note-bound outside find close-out notices itself (review fix 9).
  *
  * Both assertions compare the rendered text against the constant's own text, so a route that
  * retypes the gate in its own words fails here rather than passing on a near-match.
@@ -163,6 +164,12 @@ describe('(v) the wording around the gate, held where no other part reads it', (
   test('review names each outside find\'s home under the gate', () => {
     const scope = section(render('review'), "Inside or Outside the Ticket's Scope");
     assert.match(scope, /Name its home under the gate below \(an area slug with the entry worded ready to write, or "ticket" and why\)/);
+  });
+
+  test('close-out\'s Make the Fixes writes a note-bound outside find it notices itself before the merge, once', () => {
+    const fixes = section(render('close-out'), 'Make the Fixes Review Asked For');
+    assert.equal(occurrences(fixes, 'and any note-bound outside find you notice yourself'), 1);
+    assert.match(fixes, /any note-bound outside find you notice yourself, in its own area or another, into that area's `docs\/areas\/<slug>\.md` on the PR branch the same way, before the merge\./);
   });
 
   for (const [label, text] of [
