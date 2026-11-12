@@ -1,0 +1,94 @@
+{
+  "version": "v2",
+  "note": "Pre-registered inputs for the 12 Nov evidence folder (LIN-4427). Committed before the freeze and before any fit. Each value is read through need() in analyse.mjs; a missing rule throws. The reasons for each rule are in the README beside this file. as_of is not written here: it is manifest.freeze_finished_at, and this file is not amended after the freeze (the manifest stores its sha256).",
+  "ticket": "LIN-4427",
+  "attribution": "dispatch",
+  "window_start": "2026-11-04T05:00:00Z",
+  "lin_range_floor": 4170,
+  "excluded": ["LIN-4257", "LIN-4275"],
+  "exact": {
+    "state": "Done",
+    "totalUsd": "non-null",
+    "lineages": "every lineage has non-null dispatches, and no lineage is incomplete",
+    "landed": "production or test lines in either repository (shape code)",
+    "dispatch_cost_with_zero_requests": "a dispatch that made no request (requests 0, costUsd null) costs 0 USD; the lineage sum already counts it as 0 (LIN-4200: the dispatch 3e49cc95 is 0 and the lineage's 4.876455 equals the sum of its other dispatches)"
+  },
+  "custom_founded_legs": {
+    "1e599b49-49cb-4522-9021-67b5b5f4531f": "work",
+    "31638298-ff8d-4328-bbdd-50f75d1fe923": "work",
+    "d8fc1806-0208-4655-b9cc-686b58912b27": "work",
+    "666b718a-e253-4ac9-b4f4-ecec86bae800": "floor",
+    "2eb724ca-f4a7-4295-aa6f-91d38a8f5b58": "work",
+    "e5e9725c-b9d1-4632-bdd5-928f223e9f8c": "work",
+    "2bbf7360-2e10-477b-9c9c-473f7bb2b82d": "floor",
+    "14a57475-7aa4-464a-8e9f-c5ac602063d4": "floor",
+    "cf993036-3de0-4881-80f1-1f88af6c2fdd": "floor",
+    "ffc0a432-8772-41df-92c6-81fae8efbfdd": "floor"
+  },
+  "custom_founded_coding_quotes": {
+    "1e599b49-49cb-4522-9021-67b5b5f4531f": "LIN-4201: '# Implement LIN-4201: Costs rebuild 2 · piece 4' → work (build)",
+    "31638298-ff8d-4328-bbdd-50f75d1fe923": "LIN-4202: 'You are executing LIN-4202 as a stepped, warm session of 5 beats (… tests/witnesses/commit/PR …)' → work (build)",
+    "d8fc1806-0208-4655-b9cc-686b58912b27": "LIN-4224: 'You are implementing LIN-4224 … in 4 ordered beats' → work (build)",
+    "666b718a-e253-4ac9-b4f4-ecec86bae800": "LIN-4226: 'You are planning LIN-4226 … This is a PLAN task: make no code changes.' → floor (plan is before the build)",
+    "2eb724ca-f4a7-4295-aa6f-91d38a8f5b58": "LIN-4265: '# LIN-4265 — beat 1/4: ground + rename' → work (build beats)",
+    "e5e9725c-b9d1-4632-bdd5-928f223e9f8c": "LIN-4282: 'You are implementing LIN-4282 … in four ordered beats' → work (build)",
+    "2bbf7360-2e10-477b-9c9c-473f7bb2b82d": "LIN-4340 essay: 'Write an essay answering one question' → floor (no build; the ticket has no code lines, so it is outside the exact set and shown only)",
+    "14a57475-7aa4-464a-8e9f-c5ac602063d4": "LIN-4340 essay (second lineage): 'Write an essay answering one question' → floor (as above)",
+    "cf993036-3de0-4881-80f1-1f88af6c2fdd": "LIN-4358 (uncoded before this file): 'A read-only investigation. … Your only output is one comment' → floor (investigation is research-like, bucket before)",
+    "ffc0a432-8772-41df-92c6-81fae8efbfdd": "LIN-4377 (uncoded before this file): 'A read-only investigation. … Your only output is one comment' → floor (as above)"
+  },
+  "pair_sets": [
+    { "name": "tidy-first 1", "tidy": "LIN-4253", "follow": "LIN-4251" },
+    { "name": "tidy-first 2", "tidy": "LIN-4252", "follow": "LIN-4246" },
+    { "name": "tidy-after of 2", "tidy": "LIN-4255", "follow": null },
+    { "name": "second tidy-after", "tidy": "LIN-4254", "follow": null },
+    { "name": "control (tidy folded in)", "tidy": "LIN-4247", "follow": null },
+    { "name": "larger extra, split off", "tidy": "LIN-4201", "follow": "LIN-4226" }
+  ],
+  "size": {
+    "primary": "production lines (added + deleted) over the ticket's merged PRs in both repositories: LinearViewer census production rule (coherence-census.mjs prodAdded + prodDeleted) and simple-dispatcher code rule (size-prs-repo-neutral.mjs codeAdded + codeDeleted). Test and doc files are not in the primary.",
+    "sensitivity": "production plus test lines in both repositories, minus the lines of test files whose basename matches the glob *.golden.* (size-golden-glob.mjs). The census's isGolden rule (any test path containing 'golden') is NOT used: the ask names *.golden.*, and the two rules differ on this window's files (e.g. tests/unit/render-session-golden.test.js is isGolden and not *.golden.*).",
+    "zero_size": "a ticket with zero primary size is counted in the dropped count and not plotted"
+  },
+  "marker": {
+    "rule": "a ticket's repository marker is the repository with more primary production lines; a tie goes to LinearViewer"
+  },
+  "tokens": {
+    "formula": "inputTokens + outputTokens + cacheCreationInputTokens + cacheReadInputTokens, summed over a leg's dispatch rows (null if any row's tokens are null)",
+    "reason": "price-free: /cost dollars are priced at read time, and LIN-4358's time-of-day tiers put a calendar term in them. cacheCreation1hInputTokens is already inside cacheCreationInputTokens (lib/model-pricing.js:48-51) and is not added again. Cache reads dominate some builds, so the token fit is reported beside the dollar fit, not instead of it."
+  },
+  "fit": {
+    "model": "OLS of log10(USD or tokens) on log10(size), per leg (floor, work, keep-alive, Survey)",
+    "min_n": 8,
+    "min_n_reason": "the existing coefficient rule (analyse.mjs: no coefficient below n = 8), set before any slope is seen",
+    "interval": "95% percentile bootstrap over tickets, with replacement",
+    "bootstrap": {
+      "algorithm": "mulberry32",
+      "provenance": "Tommy Ettinger's mulberry32 (public domain); the same algorithm as scripts/survey-landing-accretion.mjs:65 and test-surplus-scripts/sites.mjs, restated in fit.mjs",
+      "seed": 20261112,
+      "resamples": 2000,
+      "level": 0.95
+    },
+    "reading": "interval includes 1: straight line; interval entirely below 1: flattens; entirely above 1: bends up"
+  },
+  "strata": {
+    "work_haiku_only": "claude-haiku-5-5",
+    "work_opus_only": "claude-opus-5-5",
+    "cohort_from": "2026-11-08T00:00:00Z",
+    "cohort_rule": "first dispatch row of the ticket at or after cohort_from (UTC)",
+    "repositories": ["LinearViewer", "simple-dispatcher"]
+  },
+  "sensitivity": {
+    "custom_to_keepalive": "every custom dispatch that is not an after-answer is put in keep-alive (orchestration) instead of its lineage's leg; the tickets whose legs move are listed"
+  },
+  "rounds": {
+    "helper": "lib/plan-review-round-trips.js computeIssueRoundTrips, unchanged (lib/plan-review-round-trips.js:481)",
+    "pairs": [
+      { "gate": "review", "rePass": "implementation" },
+      { "gate": "plan-review", "rePass": "plan" }
+    ],
+    "as_of": "manifest.freeze_finished_at",
+    "regressor": "round trips summed over both pairs; floor on log10(size) with and without it",
+    "power_note": "100 of 127 tickets have one review pass and 16 have plan-review (research); a null does not show no effect"
+  }
+}
