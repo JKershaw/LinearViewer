@@ -3366,3 +3366,7 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - **00:01 UTC 12 Nov: LIN-4418 Done ($25.0).** That was the last tail. `lin4418-reopen-690` no longer shows as open, and I can't tell from the list who closed it. It's for John to check in the morning along with the early-apply pattern above. **Nothing is running now.** Thursday's lanes start at the 07:15 reminder.
   - **Overnight spend:** LIN-4415 $13.3, LIN-4418 $25.0, plus LIN-4413 Onboarding.
   - **Blind reads still owed:** LIN-4392 and LIN-4415, after the reset.
+
+## 12 Nov
+
+- **07:13 UTC: past the reset; both lanes started.** John: "all looks good, and we're past the reset… let's proceed!" On rulings closing: John: "I think rulings close themselves when tasks close, these days?", which fits `lin4418-reopen-690` leaving the list at LIN-4418's Done. Kicked off with the usual goal: lane 1 **LIN-4414 (A10, notes)**, dispatch `2593c977`; lane 2 **LIN-4399 (A4, Stability Review)**, dispatch `ae9cef89`. Blind reads for LIN-4415 dispatched: **CW** `231298a8`, **CX** `a348b0b3`. (Correction: LIN-4392's reads were done on 11 Nov, CQ/CR, better/better, so only LIN-4415's were owed.) The 07:15 reminder was deleted, as it was no longer needed. Next: lane 1 LIN-4401 (A6) → LIN-4396 (A1); lane 2 LIN-4397 (A2).
