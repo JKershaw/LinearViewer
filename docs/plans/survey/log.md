@@ -3470,3 +3470,14 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **What it settles:** this discharges the "not run" item on LIN-4401 in fact: the next close-out with an outside find wrote a note, not a ticket. The 13:51 waiver now has its observation. The ticket text isn't changed; it's recorded here.
   - **The first live reading from the new tracker measure** (review's run, 8 Nov window): 106/106 finished tasks; LIN-4393 took 53.9 min, 8 sessions and $14.94; **1.67 tickets minted per landing**. The plan's earlier "about 1.4" was a hand count, and this is the measured figure before A6. A6 should push it down from here.
   - **The live checks were real:** review ran an independent live read, and close-out added two mutation-killing tests (the (base, head] boundary and the 404 mapping), both of which stayed green before.
+- **16:12 UTC: paper v2's rewrite merged** (LIN-4428; `2022841a1`, PR #2403). It was written by Haiku and checked by two fresh Sonnet readers inside the session (a figure check and a fresh-reader test), answered under Method, Checks. The chart leads.
+  - **The answer:** "Cost rises with size, but slowly."
+    - Floor about +16% per doubling (0.21); work about +30% (0.38).
+    - Survey and keep-alive don't follow size.
+    - No interval reaches 1.
+  - **The key correction to my 13:04 summary:** a slope below 1 doesn't show the cost *bending*. A large fixed part plus a smaller part that grows with size gives the same slopes. The paper words "flattens" as a statement about the slope, and the reading it allows is "a large fixed cost per task plus a smaller part that rises with size".
+  - **Other points it makes:**
+    - The work slope is the least settled figure: it runs from 0.20 to 0.53 across cuts. Within one model it's Haiku 0.31, Opus 0.20.
+    - On v1's 22 tickets, v2 moves $40.71 out of keep-alive (v1 had put the after-answers and build beats in the wrong legs). So v2 is a re-measurement, not just a larger sample.
+    - The tidy-first pairs are still anecdotes.
+  - **Tidying on the way (A10 working again):** the leftovers folded `lib/as-asked.js`'s three copies of "When it could go" into one header paragraph. That retires John's own Waiting entry from 7 Nov. One new Waiting entry was added (`lib/library.js` takes summaries by position).
