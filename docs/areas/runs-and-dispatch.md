@@ -38,6 +38,10 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - A task timeline lane is running from the page's open session ids (`isOpenState`), never the
   cost row; a lineage's own `incomplete`, not the shared `lineagesTruncated`, decides "not
   complete" (LIN-4405, `lib/task-timeline.js`).
+- A reader that classifies by kind routes `custom` before `bucketOf`: `BUCKET_OF_KIND` maps
+  `custom` to orchestration, and `bucketOf` falls back to orchestration silently, so check membership
+  (`lib/wall-clock-summary.js`). `dispatchesOf` turns a missing kind into `custom` (`lib/cost-read.js`):
+  confirm a custom kind from its own row before trusting it (LIN-4426).
 
 ## Waiting
 
@@ -78,5 +82,3 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - `lib/recent-runs.js`: `runFact` reads only the row's feedback: a stage parked `[pending]` whose
   lineage ends `[blocked]` or `[skipped]` reads `running` and holds the live-stage wait until
   aborted. (LIN-4392.)
-- `lib/agent-status-store.js`: `listSessions` and `listTaskThreads` have no production caller
-  and LIN-691 is canceled; delete them and their tests. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)

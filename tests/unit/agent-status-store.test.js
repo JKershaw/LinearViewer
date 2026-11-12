@@ -388,63 +388,6 @@ describe('AgentStatusStore.listStatus (real MangoDB tmpdir, LIN-3162 A2)', () =>
 });
 
 // ---------------------------------------------------------------------------
-// C4 #7 (treatment H, permanent): summaries over the reporting window.
-// No external callers today — pinned so they cannot become lifetime scans.
-// ---------------------------------------------------------------------------
-
-describe('AgentStatusStore listSessions/listTaskThreads read the reporting window (LIN-3162 A2)', () => {
-  let harness;
-  let raw;
-  let store;
-
-  before(async () => {
-    harness = createMangoTmpdir('lin-3162-agent-sessions-');
-    await harness.connect();
-  });
-
-  after(async () => {
-    await harness.close();
-  });
-
-  beforeEach(() => {
-    raw = harness.freshDb().collection('foreman-status');
-    store = new AgentStatusStore({ collection: raw });
-  });
-
-  const DAY_MS = 24 * 60 * 60 * 1000;
-
-  test('listSessions counts rows with no expiresAt that are inside the horizon', async () => {
-    const now = Date.now();
-    await raw.insertOne({ _id: 'a', urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'a', status: 'completed', summary: 's', timestamp: new Date(now - DAY_MS) });
-    const { sessions } = await store.listSessions('ws-1');
-    assert.strictEqual(sessions.length, 1);
-    assert.strictEqual(sessions[0].itemCount, 1);
-  });
-
-  test('listSessions excludes a row older than the horizon even with a live stamped expiry', async () => {
-    const now = Date.now();
-    await raw.insertOne({ _id: 'old', urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'a', status: 'completed', summary: 's', timestamp: new Date(now - 40 * DAY_MS), expiresAt: new Date(now + 365 * DAY_MS) });
-    const { sessions } = await store.listSessions('ws-1');
-    assert.deepStrictEqual(sessions, []);
-  });
-
-  test('listTaskThreads counts rows with no expiresAt that are inside the horizon', async () => {
-    const now = Date.now();
-    await raw.insertOne({ _id: 'a', urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'a', status: 'completed', summary: 's', timestamp: new Date(now - DAY_MS) });
-    const { tasks } = await store.listTaskThreads('ws-1');
-    assert.strictEqual(tasks.length, 1);
-    assert.strictEqual(tasks[0].itemCount, 1);
-  });
-
-  test('listTaskThreads excludes a row older than the horizon even with a live stamped expiry', async () => {
-    const now = Date.now();
-    await raw.insertOne({ _id: 'old', urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'a', status: 'completed', summary: 's', timestamp: new Date(now - 40 * DAY_MS), expiresAt: new Date(now + 365 * DAY_MS) });
-    const { tasks } = await store.listTaskThreads('ws-1');
-    assert.deepStrictEqual(tasks, []);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // LIN-3163 (B): lifetime retention — no expiry stamp, no evictor.
 // ---------------------------------------------------------------------------
 

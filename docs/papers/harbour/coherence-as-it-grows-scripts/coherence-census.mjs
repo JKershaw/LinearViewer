@@ -13,7 +13,8 @@ import { execFileSync } from 'child_process';
 import { mkdtempSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname, resolve as presolve } from 'path';
-// LIN-4426: golden test lines for `prs`, from the repo-neutral rule (not a rule of this file).
+// LIN-4426: golden test lines for `prs`, from the repo-neutral rule (not a rule of this file). That rule counts
+// tests/fixtures/, which this file's isTest excludes, so a golden fixture's lines sit in otherFiles here, not testAdded.
 import { isGolden } from '../../../../scripts/delivery-paths.mjs';
 
 const repo = process.env.REPO || '.';

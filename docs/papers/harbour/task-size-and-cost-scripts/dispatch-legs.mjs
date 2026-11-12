@@ -27,6 +27,8 @@ export const DRIFT_RE = /read-only follow-up/i;
 // A custom-founded lineage's coding (inputs.custom_founded_legs, keyed by rootItemId) names a leg; each leg fills a bucket.
 export const CODED_LEGS = ['floor', 'work', 'keepAlive', 'survey'];
 const CODED_BUCKET = { floor: 'before', work: 'diff', keepAlive: 'orchestration', survey: 'survey' };
+// The other way: the leg each bucket fills (before and after are both the floor).
+export const LEG_OF_BUCKET = { before: 'floor', after: 'floor', diff: 'work', orchestration: 'keepAlive', survey: 'survey' };
 
 export const isSurveyKind = (kind) => kind.startsWith('survey-');
 export const firstLineOf = (prompt) => String(prompt ?? '').split('\n').find((l) => l.trim()) ?? '';

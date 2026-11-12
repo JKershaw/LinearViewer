@@ -1,6 +1,6 @@
 {
   "version": "v1",
-  "note": "Inputs for the v1 evidence folder task-size-and-cost-evidence/2026-11-05/. Each value is what freeze.mjs and analyse.mjs hard-coded before LIN-4426 (freeze.mjs:22,23,30,134; analyse.mjs:25,29,45-55,140,161,194-201). They live beside the scripts, not in that folder, which is a frozen record. The default-inputs policy and the cross-paper import are in the headers of dispatch-legs.mjs, freeze.mjs and analyse.mjs.",
+  "note": "Inputs for the v1 evidence folder task-size-and-cost-evidence/2026-11-05/. Each value is what freeze.mjs and analyse.mjs hard-coded before LIN-4426 (as at commit b349c219b): the ticket, window start, LIN range floor, pair sets, exclusions, and lineage attribution. They live beside the scripts, not in that folder, which is a frozen record. The default-inputs policy and the cross-paper import are in the headers of dispatch-legs.mjs, freeze.mjs and analyse.mjs.",
   "ticket": "LIN-4257",
   "attribution": "lineage",
   "window_start": "2026-11-04T05:00:00Z",

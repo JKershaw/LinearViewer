@@ -26,7 +26,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { bucketOf } from '../../../../lib/wall-clock-summary.js';
 import { need } from '../cleaner-than-it-started-scripts/inputs.mjs';
-import { takeTaskSizeInputs, firstLineOf, isAfterAnswer, lineageBucketOf, classifyDispatch } from './dispatch-legs.mjs';
+import { takeTaskSizeInputs, firstLineOf, isAfterAnswer, lineageBucketOf, classifyDispatch, LEG_OF_BUCKET } from './dispatch-legs.mjs';
 
 const EV = process.argv[2];
 if (!EV) { console.error('usage: analyse.mjs <evidence-dir> [--inputs <file.json>]'); process.exit(2); }
@@ -53,7 +53,6 @@ const pop = manifest.population.filter((t) => !EXCLUDED.has(t));
 
 const sumNullable = (xs) => (xs.some((x) => x === null) ? null : xs.reduce((s, x) => s + x, 0));
 const round = (x, d = 4) => (x === null || x === undefined ? null : Math.round(x * 10 ** d) / 10 ** d);
-const LEG_OF_BUCKET = { before: 'floor', after: 'floor', diff: 'work', orchestration: 'keepAlive', survey: 'survey' };
 
 // ---- size inputs (frozen) ----
 const lvPrs = read('size/lv-prs.json');

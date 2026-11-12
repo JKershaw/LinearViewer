@@ -158,7 +158,7 @@ async function main() {
       for (const row of dispatchRowsByTicket.get(id)) {
         if (row.kind !== 'custom' || !row.dispatchedAt || row.dispatchedAt < WINDOW_START) continue;
         const p = await getJson(`/dispatch/${row.id}/prompt`);
-        const firstLine = String(p.body?.prompt ?? '').split('\n').find((l) => l.trim()) ?? '';
+        const firstLine = firstLineOf(p.body?.prompt);
         save(`prompts/${row.id}.json`, p.text, p.readAt, p.status);
         process.stderr.write(`  custom ${row.id} (${id}): ${firstLine.slice(0, 60)}\n`);
       }
