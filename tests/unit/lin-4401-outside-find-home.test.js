@@ -45,7 +45,8 @@ describe('(i) the consequence test renders exactly once in each route that files
     assert.ok(CONSEQUENCE_TEST.length > 0, 'lib/prompts/leftover-words.js exports CONSEQUENCE_TEST as a string');
   });
 
-  for (const kind of ['review', 'close-out']) {
+  // LIN-4432 (piece B): the after-merge audit renders the gate too, once.
+  for (const kind of ['review', 'close-out', 'retrospective-audit']) {
     test(`${kind} contains the gate exactly once`, () => {
       assert.ok(CONSEQUENCE_TEST.length > 0, 'CONSEQUENCE_TEST is exported');
       const n = occurrences(render(kind), CONSEQUENCE_TEST);
@@ -103,11 +104,9 @@ const RETIRED = [
   'an outside item filed on its own terms',
   'a follow-up only close-out files',
   'and followed-up?',
+  // LIN-4432: the audit's filing sentence and signal 5 (no PIECE_B exemption any more).
+  'that still matters',
 ];
-
-// retrospective-audit is piece B (LIN-4432): its own filing sentence changes with its notes PR,
-// so it is exempt from this part and nothing else.
-const PIECE_B = new Set(['retrospective-audit']);
 
 function assertNoRetired(text, label) {
   for (const phrase of RETIRED) {
@@ -117,7 +116,6 @@ function assertNoRetired(text, label) {
 
 describe('(iii) no rendered stage prompt, kickoff prompt or close-out completion signal carries the retired phrases', () => {
   for (const key of Object.keys(PROMPT_TEMPLATES)) {
-    if (PIECE_B.has(key)) continue;
     test(`${key} carries no retired phrase`, () => {
       assertNoRetired(render(key), `${key} prompt`);
     });
@@ -137,6 +135,12 @@ describe('(iii) no rendered stage prompt, kickoff prompt or close-out completion
     const sig = COMPLETION_SIGNALS['close-out'];
     assert.ok(t.description && sig.coreOutcome && sig.readinessCheck && sig.signals.length > 0, 'the fields exist');
     assertNoRetired([t.description, sig.coreOutcome, sig.readinessCheck, ...sig.signals].join('\n'), 'close-out description or completion signal');
+  });
+
+  test("the audit's completion signals, read directly, carry no retired phrase (LIN-4432 signal 5)", () => {
+    const sig = COMPLETION_SIGNALS['retrospective-audit'];
+    assert.ok(sig.coreOutcome && sig.readinessCheck && sig.signals.length > 0, 'the fields exist');
+    assertNoRetired([sig.coreOutcome, sig.readinessCheck, ...sig.signals].join('\n'), 'retrospective-audit completion signal');
   });
 });
 

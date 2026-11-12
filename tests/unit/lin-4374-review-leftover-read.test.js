@@ -150,11 +150,17 @@ describe('the leftover heading and rule have one spelling each (LIN-4374, LIN-43
 });
 
 describe('the post-merge readers are left as they were (LIN-4374)', () => {
-  for (const kind of ['retrospective-audit', 'retro']) {
-    test(`${kind} carries neither the leftover read nor the one-home sentence`, () => {
-      const prompt = render(kind);
-      assert.ok(!prompt.includes(LEFTOVERS_HEADING));
-      assert.ok(!prompt.includes('One home for each leftover'));
-    });
-  }
+  test('retro carries neither the leftover read nor the one-home sentence', () => {
+    const prompt = render('retro');
+    assert.ok(!prompt.includes(LEFTOVERS_HEADING));
+    assert.ok(!prompt.includes('One home for each leftover'));
+  });
+
+  // LIN-4432 (piece B, verdict note / D5): the audit gains the gate, and only the gate.
+  test('retrospective-audit renders the consequence test once, and still neither the leftover read nor the one-home sentence', () => {
+    const prompt = render('retrospective-audit');
+    assert.equal(prompt.split(CONSEQUENCE_TEST).length - 1, 1, 'the audit renders CONSEQUENCE_TEST exactly once');
+    assert.ok(!prompt.includes(LEFTOVERS_HEADING));
+    assert.ok(!prompt.includes('One home for each leftover'));
+  });
 });
