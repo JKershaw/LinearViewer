@@ -5,6 +5,9 @@
  * Part (i): review, close-out and the leftover prompt each contain the gate exactly once.
  * Part (ii): the gate names what makes a find a ticket (breaks, blocks, touches safety) and the
  *   four kinds of safety it names (authentication, secrets, data loss, irreversible writes).
+ * Part (v): the wording around the gate that no other part reads: the gate's fallbacks and "Never
+ *   both", the leftover prompt's note-bound rule and answer form, review's "name its home" and the
+ *   condition on the "file" option in review and Triage.
  *
  * Both assertions compare the rendered text against the constant's own text, so a route that
  * retypes the gate in its own words fails here rather than passing on a near-match.
@@ -142,4 +145,32 @@ describe('(iv) Follow-up Triage still tells close-out to file a gate ticket (the
     assert.ok(triage.includes(CONSEQUENCE_TEST), 'Triage renders the consequence test exactly as the leaf states it');
     assert.match(triage, /Only the gate's tickets are filed here/, 'Triage files only the gate\'s tickets');
   });
+});
+
+describe('(v) the wording around the gate, held where no other part reads it', () => {
+  test('the gate states the provider fallback, the unmapped fallback and "Never both"', () => {
+    assert.match(CONSEQUENCE_TEST, /where the provider cannot create tickets, the summary comment/);
+    assert.match(CONSEQUENCE_TEST, /An unmapped path .* citing a file there first/);
+    assert.match(CONSEQUENCE_TEST, /Never both\./);
+  });
+
+  test('the leftover prompt tells the builder to write each note-bound outside find into its area\'s note, and its answer form says any area\'s note', () => {
+    const prompt = leftoverPrompt({ issueIdentifier: 'LIN-9401', prUrl: 'https://github.com/example/repo/pull/1' });
+    assert.ok(prompt.includes("Write each note-bound outside find into its area's note; for close-out, list only ticket-bound ones."), 'the note-bound rule');
+    assert.ok(prompt.includes("(tidied / noted, any area's note / for close-out, a ticket only)"), 'the answer form');
+  });
+
+  test('review names each outside find\'s home under the gate', () => {
+    const scope = section(render('review'), "Inside or Outside the Ticket's Scope");
+    assert.match(scope, /Name its home under the gate below \(an area slug with the entry worded ready to write, or "ticket" and why\)/);
+  });
+
+  for (const [label, text] of [
+    ['review\'s "Inside or Outside the Ticket\'s Scope"', () => section(render('review'), "Inside or Outside the Ticket's Scope")],
+    ['close-out\'s "Follow-up Triage"', () => section(render('close-out'), 'Follow-up Triage')],
+  ]) {
+    test(`${label} offers "file" only for an outside item the gate sends to a ticket`, () => {
+      assert.ok(text().includes('"file" is offered only for an outside item the gate sends to a ticket'));
+    });
+  }
 });
