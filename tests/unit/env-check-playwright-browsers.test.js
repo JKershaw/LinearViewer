@@ -35,6 +35,7 @@ const negative = absoluteCachePresent
 const under = (root, entries) => [root, ...entries.map((e) => `${root}/${e}`)];
 const LOCATIONS = [
   ['HOME/.cache/ms-playwright', (e) => ({ home: under('.cache/ms-playwright', e) })],
+  ['XDG_CACHE_HOME/ms-playwright', (e) => ({ xdgCache: e })],
   ['HOME/Library/Caches/ms-playwright', (e) => ({ home: under('Library/Caches/ms-playwright', e) })],
   ['cwd node_modules/playwright-core/.local-browsers', (e) => ({ cwd: under('node_modules/playwright-core/.local-browsers', e) })],
   ['PLAYWRIGHT_BROWSERS_PATH', (e) => ({ playwrightBrowsers: e })],

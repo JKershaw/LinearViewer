@@ -101,10 +101,10 @@ fi
 # Check Playwright browsers. Every candidate cache follows one standard (LIN-2386):
 # it counts only when it holds a chromium* entry (chromium_headless_shell-* too),
 # so an empty or firefox-only directory is still a blocker. Hand-kept list: keep it
-# in step with where Playwright installs on each OS.
+# in step with where Playwright installs on each OS (Linux honours $XDG_CACHE_HOME).
 playwright_caches=(
   "node_modules/playwright-core/.local-browsers"
-  "$HOME/.cache/ms-playwright"
+  "${XDG_CACHE_HOME:-$HOME/.cache}/ms-playwright"
   "$HOME/Library/Caches/ms-playwright"
   "/ms-playwright"
 )

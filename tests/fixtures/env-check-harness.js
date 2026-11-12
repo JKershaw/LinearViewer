@@ -12,6 +12,9 @@
  *   - `PLAYWRIGHT_BROWSERS_PATH`: removed from the inherited environment. Set it
  *     only when `playwrightBrowsers` is given, which creates that directory with
  *     the listed entries.
+ *   - `XDG_CACHE_HOME`: removed from the inherited environment. Set it only when
+ *     `xdgCache` is given, which creates `<tmp>/xdg-cache/ms-playwright` with the
+ *     listed entries and points the variable at `<tmp>/xdg-cache`.
  *   - `env`: extra overrides, applied last.
  *
  * Without these, a positive case passes on any machine that already has
@@ -33,6 +36,7 @@ export function runEnvCheck({
   home = [],
   cwd = [],
   playwrightBrowsers,
+  xdgCache,
   env = {},
 } = {}) {
   const tmp = mkdtempSync(join(tmpdir(), 'env-check-'));
@@ -62,6 +66,13 @@ export function runEnvCheck({
       mkdirSync(browsers);
       for (const p of playwrightBrowsers) mkdirSync(join(browsers, p), { recursive: true });
       childEnv.PLAYWRIGHT_BROWSERS_PATH = browsers;
+    }
+    delete childEnv.XDG_CACHE_HOME;
+    if (xdgCache !== undefined) {
+      const xdg = join(tmp, 'xdg-cache');
+      mkdirSync(join(xdg, 'ms-playwright'), { recursive: true });
+      for (const p of xdgCache) mkdirSync(join(xdg, 'ms-playwright', p), { recursive: true });
+      childEnv.XDG_CACHE_HOME = xdg;
     }
     Object.assign(childEnv, env);
 
