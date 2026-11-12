@@ -188,7 +188,7 @@ if (cmd === 'prs') {
       const days = log ? log.split('\n') : [];
       commits = days.length; firstDay = days[days.length - 1] || r.day;
     }
-    out.push({ pr: r.pr, sha: r.sha.slice(0, 8), day: r.day, ticket: r.ticket, commits, firstDay, prodFiles: prod.map((f) => f.path), prodAdded: prod.reduce((s, f) => s + f.added, 0), prodDeleted: prod.reduce((s, f) => s + f.deleted, 0), testFiles: tests.length, testAdded: tests.reduce((s, f) => s + f.added, 0), testDeleted: tests.reduce((s, f) => s + f.deleted, 0), testGoldenAdded: files.filter((f) => isGolden(f.path)).reduce((s, f) => s + f.added, 0), testGoldenDeleted: files.filter((f) => isGolden(f.path)).reduce((s, f) => s + f.deleted, 0),otherFiles: files.length - prod.length - tests.length, areas: [...new Set(prod.map((f) => areaOf(f.path)))] });
+    out.push({ pr: r.pr, sha: r.sha.slice(0, 8), day: r.day, ticket: r.ticket, commits, firstDay, prodFiles: prod.map((f) => f.path), prodAdded: prod.reduce((s, f) => s + f.added, 0), prodDeleted: prod.reduce((s, f) => s + f.deleted, 0), testFiles: tests.length, testAdded: tests.reduce((s, f) => s + f.added, 0), testDeleted: tests.reduce((s, f) => s + f.deleted, 0), testGoldenAdded: files.filter((f) => isGolden(f.path)).reduce((s, f) => s + f.added, 0), testGoldenDeleted: files.filter((f) => isGolden(f.path)).reduce((s, f) => s + f.deleted, 0), otherFiles: files.length - prod.length - tests.length, areas: [...new Set(prod.map((f) => areaOf(f.path)))] });
   }
   console.log(JSON.stringify(out));
 }
