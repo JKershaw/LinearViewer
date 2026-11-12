@@ -34,6 +34,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   in five files; only a test links them.
 - Model facts come from the OpenRouter catalog: add no model list or rate (LIN-4358);
   tests seed `tests/unit/helpers/pinned-catalog.js`.
+- `lib/library.js` takes a shelf doc's summary by position (`firstParagraphAfterTitle`): a paper
+  that opens with a figure keeps its alt text under 12 words, or the alt text becomes the
+  summary; a rewritten first paragraph re-pins `tests/fixtures/library-doc-summaries.json` (LIN-4428).
 
 ## Waiting
 
@@ -45,7 +48,6 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - `lib/should-mock-ai.js`: `isHermeticTestToken` is a third test-token check beside
   `isTestToken` (`routes/workspace-api-steps.js`) and inline `isTestMode` in
   `routes/proxy-compute.js` and `routes/task-chat.js`. (LIN-4347.)
-- `lib/as-asked.js`: "When it could go" is in three functions. (John, 7 Nov.)
 - `lib/prompts/stage-intent.js`: `CUT` writes the closing contract's token order (`DECISION:`
   before `BLOCKED:`) into a scope line beside `ASK`. Its "cut" and the plan-review and review
   "narrowing" (`lib/completion-signals.js`) name one thing; no test links them. (John, 8 Nov.)
@@ -79,6 +81,10 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   human" (ranked first), a periodical mint `note` "the operator" (`lib/periodicals.js`):
   attribute both to the minting token. (Security Review, 10 Nov.;
   `docs/reviews/security-review-2026-11-10.md`.)
+- `lib/library.js`: summaries come from first-paragraph position, so an opening image's alt text
+  can become the summary and every shelf rewrite churns `tests/fixtures/library-doc-summaries.json`;
+  a `summary:` front-matter field would end both, but changes every doc's summary source.
+  (Survey global, LIN-4428.)
 - `lib/periodicals.js`: a reading's finding with no file in an area to cite goes to the closing
   comment, "never in a ticket", a live secret included, while `CONSEQUENCE_TEST`
   (`lib/prompts/leftover-words.js`) sends a find that touches safety to a ticket. The two rules in
