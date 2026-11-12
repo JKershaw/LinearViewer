@@ -3,6 +3,8 @@
 *Working document, started 2 November 2026 by John Kershaw and Claude. It records what we know, what we think, and the spikes we plan. It is updated as the spikes run, and it is a reference, not a spec.*
 
 > **Where it stands.** The balances for this loop are in the paper [Can a task finish with the codebase cleaner than it started?](../papers/harbour/cleaner-than-it-started.md): the blind reads, the Periodicals and the limits. The place ledger keeps its rows, and this notebook does not restate their tally.
+>
+> **12 Nov 2026 (LIN-4439):** From this merge, the balance is the pre-merge `## Blind read`, counted by measure 1 (`scripts/stability-measures.mjs`; its declaration is `docs/reviews/stability-measures/README.md`), and the hand-run pass stops.
 
 ## Why this exists
 

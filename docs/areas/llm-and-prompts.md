@@ -65,9 +65,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   before `BLOCKED:`) into a scope line beside `ASK`. Its "cut" and the plan-review and review
   "narrowing" (`lib/completion-signals.js`) name one thing; no test links them. (John, 8 Nov.)
 - `lib/prompt-template-defs.js`: a stage kind is a row in ~fourteen parallel tables
-  (`GROUNDING_BY_KIND`, ceilings, completion signals, labels…): fold into one definition.
-  The guard half is settled: `tests/unit/stage-kind-tables.test.js` fails on a missing row
-  (LIN-4437). (Survey tally, LIN-4248.)
+  (`GROUNDING_BY_KIND`, ceilings, completion signals, labels…): fold them into one
+  definition. (Survey tally, LIN-4248.)
 - `lib/call-budget.js`: the budget rule is untested live on anthropic/claude-haiku-5.5; before
   moving a call there, replay LIN-4352's snapshot through `scripts/replay-brief.mjs`: block [2] WHOLE,
   four sections, finishReason=stop, any retry's reasoning bound accepted. REFUSED: change the rule

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // The Stability Review's measures over one window of landings (LIN-4399; the repository reads, LIN-4420; the tracker
-// reads, LIN-4421; the blind-read sample and the person's seat, LIN-4422).
+// reads, LIN-4421; the person's seat, LIN-4422; measure 1 from the blind-read ledger, LIN-4439).
 // Usage: node scripts/stability-measures.mjs <repo> <base> <head> [--runner <dir>] [--api <base>] [--lookback-days <n>]
-//          [--blind <signs.json>] [--reference <file> | --as-reference <label>]
+//          [--reference <file> | --as-reference <label>]
 //   → JSON on stdout; the ordered opening table on stderr.
 // Reads: git objects of <repo> (lines through the code-shape kit's counter, first-parent churn, Waiting entries), `gh`
 // for CI runs (run from <repo>, so its GitHub remote decides the repository), and the runner checkout's git objects
@@ -12,9 +12,10 @@
 // before base, so the landings of the --lookback-days (default 3) before base are read for their tickets too. The same
 // proxy reads the person's seat over those finished tasks (scripts/stability-measures-seat.mjs: loop rulings only;
 // person origin not measured; the operator-free share an upper bound).
-// Measure 1 needs no proxy: the sample of ordinary landings comes from git (scripts/stability-measures-blind.mjs).
-// Without --blind the tally reads `pending blind reads`; --blind <signs.json> (full sha → that reader's Balance cell,
-// verbatim) gives the neutral-or-better share, the number read worse and the mean sign.
+// Measure 1 (scripts/stability-measures-blind.mjs) counts the window's landings that have a `## Blind read` naming their
+// PR posted before their merge, with its verdict, and the unread by named reason. It reads the tickets' comments
+// through the same proxy client (the tracker's own issue reads first, so a ticket costs one call); without --api it is
+// `not measured`. It replaced LIN-4422's sample and its hand-scored signs file (LIN-4439): one source.
 // LIN-4423, the reference: --as-reference <label> writes a reference reading of an earlier window. Its blind-read and
 // seat rows read `no <label> reading; the first reading sets it` (the seat is not read, saving its ~1,700 calls), and
 // the session-local diagnostics that would differ on a re-run are left out (the runner tip and freshness check's
@@ -34,13 +35,14 @@ import {
   NO_REFERENCE_KEYS, NO_REFERENCE_ROWS, SCOPE_INCLUDE, buildReading, churnRow, ciRow, formatTable, linesRow, noReferenceReading,
   notMeasured, parseLandingLog, parseNumstat, referencesFrom, waitingRows,
 } from './stability-measures-core.mjs';
-import { createProxyClient, firstLine, readSeat, readTracker, trackerNotMeasured } from './stability-measures-tracker.mjs';
-import { blindRow, sampleRow } from './stability-measures-blind.mjs';
+import { createProxyClient, firstLine, readSeat, readTracker, readTrails, trackerNotMeasured } from './stability-measures-tracker.mjs';
+import { blindRow, repoSlugOf, ticketsToRead } from './stability-measures-blind.mjs';
 
-const USAGE = 'usage: node scripts/stability-measures.mjs <repo> <base> <head> [--runner <dir>] [--api <base>] [--lookback-days <n>] [--blind <signs.json>] [--reference <file> | --as-reference <label>]';
+const USAGE = 'usage: node scripts/stability-measures.mjs <repo> <base> <head> [--runner <dir>] [--api <base>] [--lookback-days <n>] [--reference <file> | --as-reference <label>]';
 const DEFAULT_LOOKBACK_DAYS = 3;
 const LANDING_FORMAT = '--format=%H%x1f%cI%x1f%s%x1f%b%x1e';
 const GH_LIMIT = 1000;
+const NO_API = 'no --api given and HARBOUR_LOCAL_BASE unset';
 
 // Waiting entries at one commit, from git objects: the notes directly inside docs/areas/. A readable commit with no
 // such directory has none (0); a git failure is the caller's `not measured`.
@@ -116,10 +118,11 @@ function readCiRuns(repo, window) {
 // and marked Done after it (close-out runs after the merge), which finish in this window (LIN-4421 ruling). Older
 // landings are not read: a ticket whose only landings predate the lookback and that finished here is not counted.
 // The seat is read over the same finished tasks with the same client, so its calls share the one pacing budget.
-// With readSeatRows false (a reference reading) the seat is not read and `rows.seat` is left to the caller.
-async function readTrackerRows(repo, api, window, lookbackDays, windowLog, { references = {}, readSeatRows = true } = {}) {
+// With readSeatRows false (a reference reading) the seat is not read and `rows.seat` is left to the caller. `trails` are
+// the issue reads' comment trails, handed to measure 1 so a ticket is read once.
+async function readTrackerRows(repo, client, window, lookbackDays, windowLog, { references = {}, readSeatRows = true } = {}) {
   const lookback = { days: lookbackDays, since: new Date(new Date(window.baseDate).getTime() - lookbackDays * 86400e3).toISOString() };
-  if (!api) return { lookback, rows: trackerNotMeasured('no --api given and HARBOUR_LOCAL_BASE unset', references) };
+  if (!client) return { lookback, rows: trackerNotMeasured(NO_API, references) };
   if (windowLog.reason) return { lookback, rows: trackerNotMeasured(`landing log unreadable: ${windowLog.reason}`, references) };
   let priorLandings;
   try {
@@ -127,25 +130,25 @@ async function readTrackerRows(repo, api, window, lookbackDays, windowLog, { ref
   } catch (e) {
     return { lookback, rows: trackerNotMeasured(`landing log unreadable: ${firstLine(e)}`, references) };
   }
-  const client = createProxyClient({ base: api });
   const tracker = await readTracker({ client, windowLandings: windowLog.landings, priorLandings, window, lookback, references });
   if (!tracker.selection) return { lookback, rows: tracker.rows, stats: tracker.stats, priorLandings: priorLandings.length };
-  if (!readSeatRows) return { lookback, rows: tracker.rows, stats: client.stats, priorLandings: priorLandings.length };
+  const done = { lookback, stats: client.stats, priorLandings: priorLandings.length, trails: tracker.trails };
+  if (!readSeatRows) return { ...done, rows: tracker.rows };
   const seat = await readSeat({ client, finished: tracker.selection.finished, tasks: tracker.tasks, references });
-  return { lookback, rows: { ...tracker.rows, seat: seat.rows }, stats: client.stats, priorLandings: priorLandings.length };
+  return { ...done, rows: { ...tracker.rows, seat: seat.rows } };
 }
 
-// signs.json for the blind tally: null without --blind (pending), else the parsed object or { reason }.
-function readSigns(file) {
-  if (file == null) return null;
-  try {
-    const signs = JSON.parse(readFileSync(resolve(file), 'utf8'));
-    if (!signs || typeof signs !== 'object' || Array.isArray(signs)) return { reason: `${file} is not an object keyed by commit sha` };
-    if ('reason' in signs) return { reason: `${file} has a "reason" key, not a commit sha` };
-    return signs;
-  } catch (e) {
-    return { reason: `${file}: ${firstLine(e)}` };
-  }
+// Measure 1: the comments of the tickets its landings need (ticketsToRead: ordinary landings after the gate), reusing
+// the tracker's trails, then the row. `repo` narrows a PR number to this repository's URLs; null when origin is not a
+// GitHub remote (the number alone is matched).
+async function readBlindRow(repo, client, windowLog, numstat, known, reference) {
+  if (!client) return notMeasured('blind', NO_API, { reference });
+  if (windowLog.reason) return notMeasured('blind', `landing log unreadable: ${windowLog.reason}`, { reference });
+  let slug = null;
+  try { slug = repoSlugOf(git(repo, ['remote', 'get-url', 'origin'])); } catch { slug = null; }
+  const tickets = ticketsToRead({ landings: windowLog.landings, numstat });
+  const { trails } = await readTrails({ client, tickets, known: known ?? new Map() });
+  return blindRow({ landings: windowLog.landings, numstat, trails, repo: slug, reference });
 }
 
 // The reference slots for --reference: a file that cannot be read or is not a matching reference reading stops the run,
@@ -159,7 +162,7 @@ function readReferences(file) {
 
 await runCli(async () => {
   const { positional, flags } = parseArgs(process.argv.slice(2), {
-    '--runner': 'value', '--api': 'value', '--lookback-days': 'value', '--blind': 'value', '--reference': 'value', '--as-reference': 'value',
+    '--runner': 'value', '--api': 'value', '--lookback-days': 'value', '--reference': 'value', '--as-reference': 'value',
   });
   const [repoArg, baseArg, headArg] = positional;
   if (!repoArg || !baseArg || !headArg || positional.length > 3) throw new UsageError(USAGE);
@@ -171,7 +174,6 @@ await runCli(async () => {
   const asReference = flags['--as-reference'] ?? null;
   if (asReference != null && !asReference.trim()) throw new UsageError(`--as-reference needs a label, such as '8 Nov'\n${USAGE}`);
   if (asReference != null && flags['--reference'] != null) throw new UsageError(`a reference reading is not read against another reference: give --reference or --as-reference, not both\n${USAGE}`);
-  if (asReference != null && flags['--blind'] != null) throw new UsageError(`a reference reading has no blind read (its blind rows read "${noReferenceReading(asReference)}"): drop --blind\n${USAGE}`);
   const refs = readReferences(flags['--reference']);
   const noReading = (key) => notMeasured(key, noReferenceReading(asReference), { reference: refs[key] });
 
@@ -196,19 +198,16 @@ await runCli(async () => {
   const ci = readCiRuns(repo, window);
   const runner = readRunner(runnerDir, window);
   const harbour = { base: tryCount(() => waitingAt(repo, base)), head: tryCount(() => waitingAt(repo, head)) };
-  // The window's landing log (subjects and bodies), read once: the sample's ticket owners and the tracker's.
+  // The window's landing log (subjects and bodies), read once: measure 1's landings and the tracker's ticket owners.
   let windowLog;
   try { windowLog = { landings: parseLandingLog(git(repo, ['log', '--first-parent', LANDING_FORMAT, `${base}..${head}`])) }; } catch (e) { windowLog = { reason: firstLine(e) }; }
-  let sample;
-  let blind;
-  if (asReference != null) {
-    [sample, blind] = NO_REFERENCE_ROWS['no-new-mess'].map(noReading);
-  } else {
-    sample = windowLog.reason ? notMeasured('sample', `landing log unreadable: ${windowLog.reason}`, { reference: refs.sample }) : sampleRow({ landings: windowLog.landings, numstat: landings, reference: refs.sample });
-    blind = blindRow({ sample, signs: readSigns(flags['--blind']), reference: refs.blind });
-  }
-  const tracker = await readTrackerRows(repo, api, window, lookbackDays, windowLog, { references: refs, readSeatRows: asReference == null });
+  // One paced client for the tracker, the seat and measure 1, so all three share the token's budget.
+  const client = api ? createProxyClient({ base: api }) : null;
+  const tracker = await readTrackerRows(repo, client, window, lookbackDays, windowLog, { references: refs, readSeatRows: asReference == null });
   const seat = asReference != null ? NO_REFERENCE_ROWS.seat.map(noReading) : tracker.rows.seat;
+  const noNewMess = asReference != null
+    ? NO_REFERENCE_ROWS['no-new-mess'].map(noReading)
+    : [await readBlindRow(repo, client, windowLog, landings, tracker.trails, refs.blind)];
 
   const reading = buildReading({
     window,
@@ -221,7 +220,7 @@ await runCli(async () => {
         ...waitingRows({ harbour, runner: runner.reading, landings: landings.length, references: refs }),
         tracker.rows.minted,
       ],
-      'no-new-mess': [sample, blind],
+      'no-new-mess': noNewMess,
       speed: [tracker.rows.tasks, tracker.rows.speed],
       seat,
       cost: [tracker.rows.cost],
@@ -242,7 +241,6 @@ await runCli(async () => {
       runner: flags['--runner'] ?? null,
       api: flags['--api'] ?? (api ? '$HARBOUR_LOCAL_BASE/api/proxy' : null),
       lookbackDays,
-      blind: flags['--blind'] ?? null,
       reference: flags['--reference'] ?? null,
     },
     sources: {
@@ -253,7 +251,7 @@ await runCli(async () => {
         readOn: api ? new Date().toISOString().slice(0, 10) : null,
         lookback: tracker.lookback,
         priorLandings: tracker.priorLandings ?? null,
-        ...(asReference != null ? {} : { calls: tracker.stats ?? null }),
+        ...(asReference != null ? {} : { calls: client?.stats ?? null }),
       },
     },
     ...reading,

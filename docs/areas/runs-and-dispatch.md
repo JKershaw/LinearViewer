@@ -49,6 +49,8 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   `custom` to orchestration, and `bucketOf` falls back to orchestration silently, so check membership
   (`lib/wall-clock-summary.js`). `dispatchesOf` turns a missing kind into `custom` (`lib/cost-read.js`):
   confirm a custom kind from its own row before trusting it (LIN-4426).
+- A full PR URL's repository and number come from `prOf` beside `prUrlsIn` (`lib/run-ledger.js`),
+  for the task page and measure 1 alike; compare repositories case-blind, as GitHub does (LIN-4439).
 
 ## Waiting
 
@@ -73,8 +75,6 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   `docs/reviews/seams-tangles-review-2026-11-10-run11.md`.)
 - `lib/dispatch-factory.js`: tests `provider.name === 'linear'` beside
   `isHermeticTestToken` for a test-only transport. (LIN-4347.)
-- `lib/effort-readout.js`: outputs the deleted name `GATE_DUE_MARKER` (now
-  `planReviewDueOf`), pinned by cost-replay goldens. (John, 7 Nov.)
 - `lib/cost-read.js`: split out `readCalls` and `callsSurfaceOf`; settle whether
   instance-wide reads sit beside workspace-keyed stores. (Survey tally: LIN-4201.)
 - `lib/session-summary.js`: do stored run paragraphs keep pre-cutover figures? (Survey
@@ -96,3 +96,12 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   `lib/recommendation-facts.js` treats only the new PR as the notes PR), and a foreign PR cited
   before the first review joins a first landing. Each costs a read that must name an extra PR. One
   comment classifier and one landing reader would make both follow from one rule. (LIN-4438; Survey global on LIN-4438.)
+- `lib/run-closeout-state.js`: `deriveCloseOutState` works from two PR lists: `prs` (`extractPrUrls`,
+  every PR ever cited) drives the PR-shape reasons (multiple-prs, partial, merged) and `landingPrs`
+  (`landingPrUrls`) drives the blind-read gate, so the box can count PRs the gate ignores and the
+  other way round (pinned in `tests/unit/lin-4438-blind-read-gate.test.js` rows 14 and 15). Which
+  reader answers "this task's PRs" spans the box, the guard and the route. (Blind read on LIN-4439.)
+- `lib/close-out-readiness.js`: in the stop-at lane `deriveCloseOutState` lets merged and partial
+  outrank the gate, then `closeOutNotReady` asks `closeOutWaitsOn` again to override it, so the box
+  state is not the guard's whole answer and the precedence lives in two files. Carrying the gate's
+  answer in the state changes the box model the renderers read. (Blind read on LIN-4439.)

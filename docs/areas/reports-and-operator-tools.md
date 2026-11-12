@@ -31,10 +31,15 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   `/cost` lists, not roots: on LIN-4393 each member's own resume lines were missing from
   its root's merged read. `dispatchedBy` is never origin (one account for autopilot and
   person), and `/rulings` returns loop rulings only (LIN-4422).
-- A blind read's Balance becomes a sign only through `codeBalance` in
-  `scripts/stability-measures-blind.mjs`; the paper's coder
-  (`docs/papers/harbour/cleaner-than-it-started-scripts/code-blind.mjs`) imports it, and
-  re-running that must reproduce both frozen blind codes files (LIN-4422).
+- Measure 1 has one source, the pre-merge `## Blind read`: a landing counts as read only when a
+  read naming its PR was posted before its merge, matched through `landingPrUrls` and
+  `parseBlindRead` from `lib/run-ledger.js`, never a parser of its own; anything else is
+  unread under a named reason. A hand-run Balance cell becomes a sign only in
+  `docs/papers/harbour/cleaner-than-it-started-scripts/balance-sign.mjs`, beside the paper's
+  coder, which must reproduce both frozen codes files (LIN-4439).
+- A landing's subject is read through the core's regexes only: `MERGE_PR` gives a merge landing
+  both its branch (`ownTicket`) and its PR number (`landingPr`), so the two never parse it apart
+  (LIN-4439 leftovers).
 - Rounding, the mean and percentages come from the core (`round`, `mean`, `percent`); a new
   stability module imports them, never re-spells `Math.round(x * 1000) / 10`. A landing or a
   commit is credited to one ticket only through `ownTicket`; `scripts/delivery-composition.mjs`
@@ -80,12 +85,6 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   in use are priced and that the choice lists name listed models. Renaming moves the
   scheduler job name (its `scheduler-locks` doc), the server.js registration, the
   scheduler census and `docs/architecture/source-map.md`. (LIN-4358 leftovers.)
-- `scripts/code-shape/retention.mjs`: its no-acorn check in `scripts/code-shape/wrappers.test.mjs`
-  ("without acorn each CLI … exits 2") copies the kit under `tmpdir()` and assumes no
-  `node_modules` above it, but its guard test only checks `tmpdir()/node_modules`. A dispatched
-  session's `TMPDIR` sits under the simple-dispatcher checkout, which has `node_modules/acorn`,
-  so the test fails there on clean main while CI's `/tmp` passes. Walking every ancestor in the
-  guard, or copying to a directory known to have none, would make it say why. (LIN-4423 leftovers.)
 - `scripts/stability-measures.mjs`: its declaration's contract
   (`docs/reviews/stability-measures/README.md`) is checked from two files. The `DECLARATION`
   block in `tests/unit/stability-measures.test.js` checks that it names every row the tool emits;
@@ -95,3 +94,8 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   file. Moving that check into `tests/unit/stability-measures.test.js`, beside the rest of the
   contract, with the prompt's element list exported for it, would give the contract one home.
   (LIN-4424 blind read.)
+- `scripts/stability-measures-core.mjs`: `landingPr` reads which PR a landing merged, but the
+  survey scripts tell a squash landing by their own trailing-`(#N)` test
+  (`scripts/survey-growth-git.mjs`, `scripts/survey-halving-git.mjs`,
+  `scripts/survey-tests-friction-git.mjs`), so the rule is spelled four ways. Importing
+  `landingPr` would make it one, at the cost of re-checking their frozen survey counts. (LIN-4439 leftovers.)

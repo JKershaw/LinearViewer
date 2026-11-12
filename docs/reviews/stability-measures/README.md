@@ -18,17 +18,20 @@ window where it finished.
 
 ### 1. No new mess
 
-Ordinary tickets read neutral or better in a blind read.
+Landings read the same or better in a blind read before they merge.
 
-- `sample`: the landings to read. An *ordinary* landing names its own ticket and touches a path outside `docs/`.
-  Each ticket keeps one landing, its first ordinary one in the window, and up to 8 of those are taken evenly spaced
-  in landing order, so a re-run picks the same commits. Unit: tickets landed in the window. Source: git.
-  Defined in `scripts/stability-measures-blind.mjs`.
-- `blind`: the share of sampled tickets read neutral or better (better, neutral or mixed), the number read worse, and
-  the mean sign (better +1, neutral or mixed 0, worse −1). A sampled commit with no readable sign is counted as
-  unreadable, never as neutral. Without `--blind` the row reads `pending blind reads`. Unit: sampled ticket. Source:
-  the blind reads below. Defined in `scripts/stability-measures-blind.mjs` (`codeBalance` is the one
-  Balance-to-sign rule; the paper's coder imports it).
+- `blind`: the window's landings, how many have a `## Blind read` naming their PR posted on their ticket before their
+  merge, and that read's verdict counted as better, same or worse (the newest such read when there are several).
+  Every other landing is counted unread under one named reason, the first that holds: **no ticket** (it names no
+  ticket of its own, `ownTicket`); **not an ordinary landing** (an *ordinary* landing names its own ticket and
+  touches a path outside `docs/`); **landed before the gate** (merged at or before PR #2413, `eb14b7fff`, the merge
+  from which close-out waits on a recorded read); **no read on record**. A landing's PR is its `Merge pull request
+  #N` or trailing `(#N)`, matched against the ticket's landing as it stood at the merge (`landingPrUrls` in
+  `lib/run-ledger.js`, the gate's own reader) and narrowed to this repository when its origin is a GitHub remote.
+  A ticket whose comments could not be read whole (a failed read, or comments the proxy flagged truncated) makes
+  the row partial, never "no read". Without `--api` the row reads `not measured`. Unit: landing. Source: git and
+  the tracker (`GET /issues/{id}`, the same read as `tasks`, so a ticket costs one call). Defined in
+  `scripts/stability-measures-blind.mjs` (`blindRow`, `GATE_LANDING`, `isOrdinaryLanding`).
 
 ### 2. The curve
 
@@ -114,7 +117,7 @@ From the LinearViewer checkout's root, with the simple-dispatcher checkout besid
 
 ```
 node scripts/stability-measures.mjs . <base> HEAD --runner ../simple-dispatcher \
-  --reference docs/reviews/stability-measures/reference-2026-11-08.json [--blind signs.json] \
+  --reference docs/reviews/stability-measures/reference-2026-11-08.json \
   > reading.json 2> table.txt
 ```
 
@@ -134,7 +137,7 @@ folder and runs the committed script; it does not copy or write measuring script
 ### What it reads outside this repository
 
 - **The tracker**, through the workspace API proxy (`--api`, default `$HARBOUR_LOCAL_BASE/api/proxy`), for
-  `minted`, `tasks`, `speed`, `cost`, `rulings` and `operator-free`. Reads are paced at 50 a minute and honour
+  `blind`, `minted`, `tasks`, `speed`, `cost`, `rulings` and `operator-free`. Reads are paced at 50 a minute and honour
   429 `Retry-After` (`createProxyClient` in `scripts/stability-measures-tracker.mjs`). On the 8 Nov window the
   tracker rows took about 280 calls and the seat about 1,700 more (one detail read per lineage member), roughly
   40 minutes in all.
@@ -146,15 +149,16 @@ A source that is absent prints its rows as `not measured` with the reason.
 
 ### The blind read
 
-1. Run the tool without `--blind`. The `sample` row lists the sampled commits.
-2. For each sampled commit, start a fresh reader: a new session or subagent that has read nothing else in this
-   review. Give it only that commit's diff and the frozen prompt,
-   `docs/papers/harbour/cleaner-than-it-started-evidence/2026-11-06/prompts/blind-read-prompt.md`, unchanged.
-3. Save each reader's Balance cell verbatim in `signs.json`: one object keyed by the full commit sha.
-4. Re-run with `--blind signs.json`, and save `signs.json` in the evidence folder beside the reading.
+**From 12 November 2026 (LIN-4439), the balance is the pre-merge `## Blind read`, counted by measure 1, and the
+hand-run pass stops.** The `blind-read` stage reads each change cold after its approving review and before close-out
+merges it, and close-out waits on that comment (LIN-4437, LIN-4438). The review reads those comments through the
+tool. It no longer samples landings or starts readers of its own, and there is no signs file to keep.
 
-When LIN-4396 (a blind read before merge) lands, its recorded reads may replace this sample; this page will say so
-then.
+**A diff-scoped read does not replace the Periodicals.** The blind read sees one change's diff and its area, not the
+code's shape across a window. LIN-4253 read better in both hand-run blind passes, while Seams & Tangles run 8 rated
+the area it touched worse: its one new leaf file grew the catch-all area from 16 files to 17
+(`docs/reviews/seams-tangles-review-2026-11-05-run8.md`; the paper's Finding 3). The Periodicals stay the window
+reading beside measure 1.
 
 ## The 8 November starting point
 
@@ -201,7 +205,6 @@ Its opening table (the tool's stderr):
 ```
 stability measures 5334c81a7..9574d5371 (2026-11-04T05:23:59Z → 2026-11-08T17:10:36Z), 114 landings
 1. No new mess
-   sample           not measured: no 8 Nov reading; the first reading sets it
    blind            not measured: no 8 Nov reading; the first reading sets it
 2. The curve
    lines            net +6,558 (code +3,034, comment-only +3,185, blank +339); +57.5 per landing; totals 200,226 → 206,784; comment-only share 39.44% → 39.73%
@@ -224,12 +227,12 @@ stability measures 5334c81a7..9574d5371 (2026-11-04T05:23:59Z → 2026-11-08T17:
 
 How to read it:
 
-- **No blind read and no seat reading.** The 8 Nov starting point had neither, so `sample`, `blind`, `rulings`,
+- **No blind read and no seat reading.** The 8 Nov starting point had neither, so `blind`, `rulings`,
   `origin` and `operator-free` read `not measured: no 8 Nov reading; the first reading sets it`. The tool writes
   them that way (`--as-reference`), rather than reading the seat today and passing it off as 8 November's. The
   blind-read paper's baseline (`docs/papers/harbour/cleaner-than-it-started.md`, Finding 1: +0.38 and +0.50 over
-  eight changes in `015aa4c6..5334c81a`) is a different method, with batches of commits and two passes, not this
-  sample. It is cited here as context, not as a comparison.
+  eight changes in `015aa4c6..5334c81a`) is a different method, with batches of commits and two passes read after
+  merge, not the pre-merge read this row counts. It is cited here as context, not as a comparison.
 - **Waiting 0 → 56 is not a rate.** Harbour's `docs/areas/` was created inside this window (base has no notes
   directory), so +0.49 per landing mostly records the notes being started, not entries accumulating at a normal
   pace. The runner's 0 → 10 is the same. The next reading's change per landing should not be judged against it as if

@@ -11,9 +11,9 @@
 // LIN-4421 adds the tracker half: landing ownership, finished-task selection, sessions, speed, cost and the ID-span
 // search for tickets minted. Its reads come in as records too (issue reads, /cost bodies, probe results); the search
 // takes an injected probe, so the core still does no I/O of its own.
-// LIN-4422 adds measures 1 and 4 in their own pure modules, beside this one: the blind-read sample and tally
-// (scripts/stability-measures-blind.mjs, which owns the one Balance-to-sign rule) and the person's seat
-// (scripts/stability-measures-seat.mjs). Their rows use row/notMeasured from here; formatTable prints them.
+// Measures 1 and 4 have their own pure modules, beside this one: the blind read counted from the ledger
+// (scripts/stability-measures-blind.mjs; LIN-4439 replaced LIN-4422's sample with it) and the person's seat
+// (scripts/stability-measures-seat.mjs, LIN-4422). Their rows use row/notMeasured from here; formatTable prints them.
 
 export const SCOPE_INCLUDE = '^(server\\.js$|(lib|routes|public)/.*\\.[cm]?js$)';
 export const NOT_BUILT = 'not built yet';
@@ -170,8 +170,10 @@ export function waitingRows({ harbour, runner, landings, references = {} }) {
 // own ticket. This is the one ownership rule for the measure; the CLI keeps no ticket regex of its own.
 export const TICKET_KEY = 'LIN';
 
-const MERGE_PR = /^Merge pull request #\d+ from (\S+)/;
-const MERGE_BRANCH = /^Merge (?:remote-tracking )?branch '([^']+)'/;
+// A merge landing's subject, read once for both its ticket (the branch, ownTicket) and its PR (the number, landingPr).
+const MERGE_PR = /^Merge pull request #(?<pr>\d+) from (?<branch>\S+)/;
+const MERGE_BRANCH = /^Merge (?:remote-tracking )?branch '(?<branch>[^']+)'/;
+const SQUASH_PR = /\(#(?<pr>\d+)\)\s*$/;
 
 /**
  * The ticket a landing delivers, or null. A squash landing: the first id in its subject. A merge landing: the id in
@@ -187,7 +189,17 @@ export function ownTicket(subject, body = '', { key = TICKET_KEY } = {}) {
   const merge = MERGE_PR.exec(subject) ?? MERGE_BRANCH.exec(subject);
   if (!merge) return first(subject);
   const title = String(body ?? '').trim().split('\n')[0];
-  return first(merge[1], 'i') ?? first(title);
+  return first(merge.groups.branch, 'i') ?? first(title);
+}
+
+/**
+ * The pull request a landing merged, as its number, or null (LIN-4439, measure 1): a merge landing's
+ * `Merge pull request #N from …`, else a squash subject's trailing `(#N)`. A landing pushed straight to the branch
+ * names none. Beside ownTicket because both read one landing's subject, one way for every stability reader.
+ */
+export function landingPr(subject) {
+  const m = MERGE_PR.exec(subject ?? '') ?? SQUASH_PR.exec(subject ?? '');
+  return m ? Number(m.groups.pr) : null;
 }
 
 /**
@@ -458,8 +470,7 @@ const signed = (n) => (n == null ? '—' : `${n > 0 ? '+' : ''}${n.toLocaleStrin
 const summarise = (r) => {
   const v = r.value;
   switch (r.key) {
-    case 'sample': return `${v.sampled} of ${v.ordinary} ordinary landings (of ${v.landings}; ${v.repeatLandings} repeat ticket landing(s) skipped): ${v.commits.map((c) => `${c.commit.slice(0, 9)} ${c.ticket}`).join(', ')}`;
-    case 'blind': return `${v.neutralOrBetterShare}% neutral or better (${v.neutralOrBetter} of ${v.read} read), ${v.worse} worse, mean sign ${signed(v.meanSign)} (better ${v.counts.better}, neutral ${v.counts.neutral}, mixed ${v.counts.mixed}, worse ${v.counts.worse})`;
+    case 'blind': return `${v.read} of ${v.landings} landings read blind before merge (better ${v.verdicts.better}, same ${v.verdicts.same}, worse ${v.verdicts.worse}); unread: ${Object.entries(v.unread).map(([why, n]) => `${why} ${n}`).join(', ')}`;
     case 'rulings': return `${v.label}: ${v.raised} raised over ${v.finished} finished tasks, ${v.perFinishedTask} per task (distinct decisions); answered ${v.answeredShare == null ? '—' : `${v.answeredShare}%`} of answered + dismissed (answered ${v.outcomes.answered}, dismissed ${v.outcomes.dismissed}, withdrawn ${v.outcomes.withdrawn}, open ${v.outcomes.open}); not read: ${v.notRead.join('; ')}`;
     case 'operator-free': return `${v.label}: ${v.share}% (${v.operatorFree} of ${v.read} tasks) with ${v.conditions.join(', ')}; failing: ruling ${v.failing.ruling}, blocked ${v.failing.blocked}, operator-closed ${v.failing.operatorClosed}; missing condition: ${v.missingCondition}; closedReason 'operator' is a catch-all and may push the share down`;
     case 'lines': return `net ${signed(v.net.total)} (code ${signed(v.net.code)}, comment-only ${signed(v.net.comment)}, blank ${signed(v.net.blank)}); ${signed(v.perLanding.total)} per landing; totals ${num(v.base.total)} → ${num(v.head.total)}; comment-only share ${v.base.commentShare}% → ${v.head.commentShare}%`;
@@ -510,11 +521,11 @@ export function formatTable(reading) {
 
 /**
  * The rows a reference reading never has, by measure: measure 1 (the blind read) and measure 4 (the person's seat), in
- * the order their modules emit them (sampleRow and blindRow; seatRows). A test pins both lists against those modules,
+ * the order their modules emit them (blindRow; seatRows). A test pins both lists against those modules,
  * so a row added there cannot silently drop out of a reference reading.
  */
 export const NO_REFERENCE_ROWS = Object.freeze({
-  'no-new-mess': Object.freeze(['sample', 'blind']),
+  'no-new-mess': Object.freeze(['blind']),
   seat: Object.freeze(['rulings', 'origin', 'operator-free']),
 });
 export const NO_REFERENCE_KEYS = Object.freeze(Object.values(NO_REFERENCE_ROWS).flat());

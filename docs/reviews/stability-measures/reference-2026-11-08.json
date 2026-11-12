@@ -8,7 +8,6 @@
  "reference": {
   "label": "8 Nov",
   "noReading": [
-   "sample",
    "blind",
    "rulings",
    "origin",
@@ -19,7 +18,6 @@
   "runner": "../simple-dispatcher",
   "api": "$HARBOUR_LOCAL_BASE/api/proxy",
   "lookbackDays": 3,
-  "blind": null,
   "reference": null
  },
  "sources": {
@@ -56,14 +54,6 @@
    "key": "no-new-mess",
    "title": "No new mess",
    "rows": [
-    {
-     "key": "sample",
-     "value": null,
-     "reference": null,
-     "status": "not measured",
-     "reason": "no 8 Nov reading; the first reading sets it",
-     "unreadable": null
-    },
     {
      "key": "blind",
      "value": null,
