@@ -17,7 +17,8 @@ ready=()
 
 # --- Collect check results ---
 
-# Check Node.js (required major comes from .nvmrc, the single pin — LIN-3788)
+# Check Node.js. The floor is the .nvmrc major, which CI tests and devEngines.runtime pins for
+# production; engines.node accepts it and newer (LIN-3788, LIN-4419; tied by node-version-pin.test.js).
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 required_major=$(tr -d '[:space:]v' < "$repo_root/.nvmrc" 2>/dev/null | cut -d. -f1)
 if command -v node &> /dev/null; then
@@ -26,7 +27,7 @@ if command -v node &> /dev/null; then
   if ! [[ "$required_major" =~ ^[0-9]+$ ]]; then
     ready+=("Node.js $node_version (no .nvmrc pin found; floor not checked)")
   elif [ "$node_major" -ge "$required_major" ]; then
-    ready+=("Node.js $node_version (≥$required_major required)")
+    ready+=("Node.js $node_version (≥$required_major required; CI tests $required_major — .nvmrc)")
   else
     blockers+=("Upgrade Node.js (current: $node_version, need ≥$required_major)")
     blocker_commands+=("Install Node.js $required_major+ (nvm install; see .nvmrc) or from https://nodejs.org")
