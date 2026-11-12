@@ -1,0 +1,1 @@
+{"id":"114962c6-d771-4f93-896c-ab17632883da","promptName":"Prompt","kind":"custom","prompt":"Generate an ed25519 key and register it via railway ssh keys add","issueIdentifier":"LIN-4200","issueUrl":null,"target":"cli","followUpTo":"3ccfa072-12bd-46e5-ba82-dc7112f914e2","sessionId":null,"dispatchedAt":"2026-11-04T07:41:41.711Z"}
