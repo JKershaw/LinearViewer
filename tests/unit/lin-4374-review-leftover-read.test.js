@@ -21,7 +21,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { generatePrompt } from '../../lib/prompt-templates.js';
-import { LEFTOVERS_HEADING, LEFTOVER_RULE, RETIRES_LABEL, RETIRES_NONE } from '../../lib/prompts/leftover-words.js';
+import { LEFTOVERS_HEADING, LEFTOVER_RULE, CONSEQUENCE_TEST, RETIRES_LABEL, RETIRES_NONE } from '../../lib/prompts/leftover-words.js';
 import * as dispatchFields from '../../lib/dispatch-fields.js';
 import * as dispatchLeftover from '../../lib/dispatch-leftover.js';
 import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
@@ -120,7 +120,15 @@ describe('the leftover heading and rule have one spelling each (LIN-4374, LIN-43
   });
 
   // Distinctive pieces of the rule, and the retirement words (LIN-4414): a file that retypes any of them restates it.
-  const RULE_PIECES = [LEFTOVER_RULE, 'a note is known but not scheduled', 'or a ticket the consequence test sends', 'Consequence test for an outside find:', RETIRES_LABEL, RETIRES_NONE.noWaiting, RETIRES_NONE.nothingFixSized];
+  // The gate's body without its header: retyping it under another header is still a restatement (LIN-4401).
+  const CONSEQUENCE_HEADER = 'Consequence test for an outside find: ';
+  const CONSEQUENCE_BODY = CONSEQUENCE_TEST.slice(CONSEQUENCE_HEADER.length);
+  const RULE_PIECES = [LEFTOVER_RULE, 'a note is known but not scheduled', 'or a ticket the consequence test sends', CONSEQUENCE_TEST, CONSEQUENCE_BODY, 'Consequence test for an outside find:', RETIRES_LABEL, RETIRES_NONE.noWaiting, RETIRES_NONE.nothingFixSized];
+
+  test('the gate\'s body is the constant less its header', () => {
+    assert.ok(CONSEQUENCE_TEST.startsWith(CONSEQUENCE_HEADER), 'the header is the constant\'s opening');
+    assert.ok(!CONSEQUENCE_BODY.includes(CONSEQUENCE_HEADER) && CONSEQUENCE_BODY.length > 300, 'the body is the rest');
+  });
 
   test('no other file in lib/ or routes/ spells the heading, the rule or the retirement words', () => {
     const offenders = [];
@@ -137,7 +145,7 @@ describe('the leftover heading and rule have one spelling each (LIN-4374, LIN-43
       };
       walk(dir);
     }
-    assert.deepEqual(offenders, [], `import LEFTOVERS_HEADING, LEFTOVER_RULE, RETIRES_LABEL and RETIRES_NONE from ${OWNER} instead of retyping them`);
+    assert.deepEqual(offenders, [], `import LEFTOVERS_HEADING, LEFTOVER_RULE, CONSEQUENCE_TEST, RETIRES_LABEL and RETIRES_NONE from ${OWNER} instead of retyping them`);
   });
 });
 
