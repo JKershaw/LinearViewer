@@ -105,6 +105,9 @@ async function pressRow(body, table) {
     proxyTokenStore: { createToken: async () => ({ token: BOOTSTRAP }) },
     dispatchPresetsStore: { get: async () => null },
     workspacePreferencesStore: storeWith(table),
+    // LIN-4438: the readiness guard reads the comments for every close-out (the blind-read gate); a seam
+    // keeps that read off the network. No review on the trail, so the press is admitted as before.
+    closeOut: { resolveProvider: () => ({ provider: { async fetchIssueComments() { return []; } }, callScope: 'scope' }) },
     afterEnqueue: async () => undefined
   });
   assert.equal(responses[0]?.status, 201, `the press answered ${responses[0]?.status}: ${JSON.stringify(responses[0]?.body)}`);
