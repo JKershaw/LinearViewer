@@ -189,6 +189,7 @@ describe('the route\'s own edges', () => {
       assert.equal(blindReadStep({ state: { type } }, { comments: approved, allRuns: [] }), null, type);
     }
     assert.equal(blindReadStep({ state: DONE }, { comments: approved, allRuns: [] }).step, 'blind-read');
+    assert.equal(blindReadStep({ state: DONE }, { comments: [summary(1), review(2), closeOut(3, `Merged ${PR1}; set Done.`)], allRuns: [] }), null, 'Done, closed out after the review, no read: stands aside');
   });
 
   test('a live blind read is not an ended attempt; runs before the review do not count', () => {
