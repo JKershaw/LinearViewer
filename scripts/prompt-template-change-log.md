@@ -258,6 +258,10 @@ Two reasons recur, so they are written once here:
 - `close-out`, replaced by LIN-4438: LIN-4401 (LIN-4432 review fix): +27 (13162 -> 13189): Land It's notes close-out cites the notes PR's URL. LIN-4401 (LIN-4432 beat 4): +224 (12938 -> 13162): Land It's sentence for a Done ticket's approved, unmerged audit notes PR (merge and summary only), Workflow step 5's pointer to it, and close-out's route clause for that PR; shape held by tests/unit/lin-4432-audit-notes-pr.test.js
 - `blind-read`, replaced by LIN-4438: LIN-4437: new at 4791, rendered with one landing PR (FIXTURE_CONTEXT_BY_KIND); the piloted reader prompt (LIN-4436) verbatim but for its fill-ins, the Where-to-stand sentence and the Goal/Process frame; its comment shape is held by the proxy
 - `FROZEN_TOTAL_BYTES`, replaced by LIN-4438: LIN-4437: +13182 (363834 -> 377016): the blind-read stage: prompt-template-defs.js source +7691, its new rendered ceiling 4791, stage-intent.js +296, prompt-templates.js +241, prompt-formatters.js +163
+- `lib/prompt-template-defs.js` source, replaced by LIN-4441: LIN-4438: +751 (119867 -> 120618): close-out's blind-read, PR-link and leftover-hand-off clauses and the blind read's merged-PR base rule, less review's retired edges paragraph; the imports (FOR_CLOSE_OUT, RETIRES_LABEL) and three reason comments; the gate itself is code (closeOutWaitsOn) and the route is lib/recommendation-blind-read.js
+- `lib/prompt-formatters.js` source, replaced by LIN-4441: LIN-4437: +163, the blind read's own empty grounding list and its reason (a comment; it renders nothing)
+- `implementation`, replaced by LIN-4441: LIN-4379: +102, the pointer asks the work to name a note entry it used (file and source) where it records its decisions, so the next look-first step citing a finding is checkable; which entry bears on the work is the agent's judgement no code sees
+- `FROZEN_TOTAL_BYTES`, replaced by LIN-4441: LIN-4438: +897 (377016 -> 377913): prompt-template-defs.js source +751, review -619, close-out +611, blind-read +154
 - LIN-4438: +897 (377016 -> 377913): defs +751, review -619, close-out +611 (counted against review's loss, net -8), blind-read +154.
 
 ## Rows

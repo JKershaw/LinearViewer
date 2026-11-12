@@ -72,9 +72,9 @@ import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
 /** Templates, source bytes. Same files `steady-base-growth.mjs` GROUPS as
  * "worker templates". */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 120618, // LIN-4438: +751 (119867 -> 120618): close-out's blind-read, PR-link and leftover-hand-off clauses and the blind read's merged-PR base rule, less review's retired edges paragraph; the imports (FOR_CLOSE_OUT, RETIRES_LABEL) and three reason comments; the gate itself is code (closeOutWaitsOn) and the route is lib/recommendation-blind-read.js
+  'lib/prompt-template-defs.js': 120682, // LIN-4441: +64 (120618 -> 120682): step 5 and guideline 5 point at the one local-testing rule ("Test Before Pushing") instead of two full-suite instructions; the rule itself renders from lib/prompt-formatters.js
   'lib/prompt-templates.js': 19903, // LIN-4437: +241, finishStagePrompt skips the attachments section for the blind read (code and its comment; the skip is witnessed in tests/unit/lin-4437-blind-read.test.js)
-  'lib/prompt-formatters.js': 47968, // LIN-4437: +163, the blind read's own empty grounding list and its reason (a comment; it renders nothing)
+  'lib/prompt-formatters.js': 48509, // LIN-4441: +541 (47968 -> 48509): formatLocalTestRule, the one local-testing rule for implementation work (targeted run with CI, the no-CI substitute deferred to Establish CI)
   'lib/prompt-contract.js': 3875, // LIN-4362: the `## As asked` spellings interpolate AS_ASKED_HEADING (code, not prompt text)
 };
 
@@ -94,7 +94,7 @@ export const TEMPLATES_RENDERED_CEILINGS = {
   spike: 3276, // LIN-4379: +102, the pointer asks the work to name a note entry it used (file and source) where it records its decisions, so the next look-first step citing a finding is checkable; which entry bears on the work is the agent's judgement no code sees
   context: 2021, // LIN-3300: at 2021 since the stage rules only the meta-prompt carried moved into their templates
   'plan-review': 7601, // LIN-4353: the verdict quotes the ask and says how the plan meets it; only the person agrees to a narrowing (the reviewer's judgement)
-  implementation: 8493, // LIN-4379: +102, the pointer asks the work to name a note entry it used (file and source) where it records its decisions, so the next look-first step citing a finding is checkable; which entry bears on the work is the agent's judgement no code sees
+  implementation: 8890, // LIN-4441: +397 (8493 -> 8890): the rule's own section (targeted local run, CI as the full proof, no-CI substitute deferred), rendered once beside Establish CI; it replaces the two competing full-suite instructions, which now point to it. A worker's choice of tests is judgement no code or test can enforce
   review: 16406, // LIN-4438: -619 (17025 -> 16406): the edges read retired to the blind read; review keeps one sentence, the builder's Retires: line names an entry this diff removes (tests/unit/lin-4374-review-leftover-read.test.js)
   'close-out': 13800, // LIN-4438: +611 (13189 -> 13800), counted against review's -619 (net -8): the blind read in Workflow step 1 and Make the Fixes, the leftover lines marked for close-out in Follow-up Triage, and the not-ready sentence's PR-link and blind-read clauses for the lanes no guard sees (the gate is held in code: lib/close-out-readiness.js)
   'retrospective-audit': 5609, // LIN-4401 (LIN-4432 review fix): +46 (5563 -> 5609): the findings comment's required heading `## Retrospective audit — <identifier>`. LIN-4401 (LIN-4432 beat 4): +944 (4619 -> 5563): the consequence test (579 bytes, LIN-4401 D1) renders once in Reporting; the notes-PR sentences and the audit's own workflow (the shared read-only one stays for its other users) add the rest; FOLLOW_UP_SHAPE stays. Shape held by tests/unit/lin-4401-outside-find-home.test.js and tests/unit/lin-4432-audit-notes-pr.test.js
@@ -140,7 +140,7 @@ export const LEFTOVER_PROMPT_RENDERED_CEILING = 2498; // LIN-4401 (LIN-4431 beat
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 377913; // LIN-4438: +897 (377016 -> 377913): prompt-template-defs.js source +751, review -619, close-out +611, blind-read +154
+export const FROZEN_TOTAL_BYTES = 378915; // LIN-4441: +1002 (377913 -> 378915): prompt-template-defs.js source +64, prompt-formatters.js source +541, implementation rendered +397
 
 const BASE_URL = 'https://harbour.example';
 

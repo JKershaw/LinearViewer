@@ -114,10 +114,7 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   matches its path") and the blind-read prompt's own sentence (`lib/prompt-template-defs.js`, the
   `blind-read` template), which shipped as piloted (LIN-4437), so it was not retyped after the pilot. One constant in the leaf would make it
   one, at the cost of re-piloting that sentence. (LIN-4436 leftovers.)
-<<<<<<< HEAD
-=======
 - `lib/prompt-formatters.js`: `formatLocalTestRule` names this repo's runner command
   (`node scripts/run-unit-tests.mjs tests/unit/<files>`) in a template that also drives other
   repos, and `CLAUDE.md` spells the same rule; a repo-supplied test command would make the line
   right elsewhere and give it one spelling. (LIN-4441 leftovers.)
->>>>>>> 5a7c24365 (LIN-4441 leftovers: one unit-job spelling, one median, one landing rule)
