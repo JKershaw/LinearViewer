@@ -508,8 +508,16 @@ export function formatTable(reading) {
 // The rows a starting point never had are written as not measured with NO_REFERENCE_READING's reason, never read today
 // and passed off as then. docs/reviews/stability-measures/README.md is the declaration that names all of this.
 
-/** The rows a reference reading never has: measure 1 (the blind read) and measure 4 (the person's seat). */
-export const NO_REFERENCE_KEYS = Object.freeze(['sample', 'blind', 'rulings', 'origin', 'operator-free']);
+/**
+ * The rows a reference reading never has, by measure: measure 1 (the blind read) and measure 4 (the person's seat), in
+ * the order their modules emit them (sampleRow and blindRow; seatRows). A test pins both lists against those modules,
+ * so a row added there cannot silently drop out of a reference reading.
+ */
+export const NO_REFERENCE_ROWS = Object.freeze({
+  'no-new-mess': Object.freeze(['sample', 'blind']),
+  seat: Object.freeze(['rulings', 'origin', 'operator-free']),
+});
+export const NO_REFERENCE_KEYS = Object.freeze(Object.values(NO_REFERENCE_ROWS).flat());
 
 /** The reason those rows carry in a reference reading. */
 export const noReferenceReading = (label) => `no ${label} reading; the first reading sets it`;

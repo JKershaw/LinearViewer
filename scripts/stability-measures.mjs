@@ -2,7 +2,7 @@
 // The Stability Review's measures over one window of landings (LIN-4399; the repository reads, LIN-4420; the tracker
 // reads, LIN-4421; the blind-read sample and the person's seat, LIN-4422).
 // Usage: node scripts/stability-measures.mjs <repo> <base> <head> [--runner <dir>] [--api <base>] [--lookback-days <n>]
-//          [--blind <signs.json>]
+//          [--blind <signs.json>] [--reference <file> | --as-reference <label>]
 //   → JSON on stdout; the ordered opening table on stderr.
 // Reads: git objects of <repo> (lines through the code-shape kit's counter, first-parent churn, Waiting entries), `gh`
 // for CI runs (run from <repo>, so its GitHub remote decides the repository), and the runner checkout's git objects
@@ -31,8 +31,8 @@ import {
 } from './code-shape/code-shape-lib.mjs';
 import { NOTES_DIR, countWaiting } from '../lib/prompts/area-note-format.js';
 import {
-  NO_REFERENCE_KEYS, SCOPE_INCLUDE, buildReading, churnRow, ciRow, formatTable, linesRow, noReferenceReading, notMeasured, parseLandingLog, parseNumstat,
-  referencesFrom, waitingRows,
+  NO_REFERENCE_KEYS, NO_REFERENCE_ROWS, SCOPE_INCLUDE, buildReading, churnRow, ciRow, formatTable, linesRow, noReferenceReading,
+  notMeasured, parseLandingLog, parseNumstat, referencesFrom, waitingRows,
 } from './stability-measures-core.mjs';
 import { createProxyClient, firstLine, readSeat, readTracker, trackerNotMeasured } from './stability-measures-tracker.mjs';
 import { blindRow, sampleRow } from './stability-measures-blind.mjs';
@@ -202,13 +202,13 @@ await runCli(async () => {
   let sample;
   let blind;
   if (asReference != null) {
-    [sample, blind] = [noReading('sample'), noReading('blind')];
+    [sample, blind] = NO_REFERENCE_ROWS['no-new-mess'].map(noReading);
   } else {
     sample = windowLog.reason ? notMeasured('sample', `landing log unreadable: ${windowLog.reason}`, { reference: refs.sample }) : sampleRow({ landings: windowLog.landings, numstat: landings, reference: refs.sample });
     blind = blindRow({ sample, signs: readSigns(flags['--blind']), reference: refs.blind });
   }
   const tracker = await readTrackerRows(repo, api, window, lookbackDays, windowLog, { references: refs, readSeatRows: asReference == null });
-  const seat = asReference != null ? ['rulings', 'origin', 'operator-free'].map(noReading) : tracker.rows.seat;
+  const seat = asReference != null ? NO_REFERENCE_ROWS.seat.map(noReading) : tracker.rows.seat;
 
   const reading = buildReading({
     window,
