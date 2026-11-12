@@ -5,6 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
 import { PERIODICALS, getPeriodicals, buildPeriodicalNodes, withAutopilotTail, PERIODICAL_AUTOPILOT_TAIL, resolvePeriodicalIdFromGateMarker, buildPeriodicalGateMarker } from '../../lib/periodicals.js';
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
@@ -864,6 +865,26 @@ describe('Stability Review specifics (LIN-453)', () => {
     assert.doesNotMatch(prompt, /introducing no new tooling/);
     assert.doesNotMatch(prompt, /not a metrics product\)/);
     assert.match(prompt, /write no measuring tool of your own/i);
+  });
+
+  // LIN-4424 leftovers: the two sides of the deferral, linked. The prompt lists what a declaration
+  // holds; this repository's declaration must carry each element in words a run can find, and the
+  // supersession its bullet honours. A new element in the bullet fails here until it is mapped.
+  test('LIN-4424: this repo\'s declaration carries every element the prompt asks a declaration for', () => {
+    const declaration = readFileSync(new URL('../../docs/reviews/stability-measures/README.md', import.meta.url), 'utf8');
+    const listed = declarationBullet.match(/\): their ([^.]+)\. If there is one/);
+    assert.ok(listed, 'the bullet lists what a declaration holds');
+    const evidence = {
+      'definitions': /Defined in `/,
+      'order': /in this order/,
+      'unit of work': /unit of work/i,
+      'reference reading': /reference reading/,
+      'measuring tool': /node scripts\/stability-measures\.mjs/
+    };
+    const elements = listed[1].split(/, | and /);
+    assert.deepStrictEqual(elements.sort(), Object.keys(evidence).sort(), 'map each element the bullet names to the declaration');
+    for (const element of elements) assert.match(declaration, evidence[element], `the declaration carries its ${element}`);
+    assert.match(declaration, /as\s+superseded/, 'the declaration names the ledger rows its measures supersede');
   });
 });
 
