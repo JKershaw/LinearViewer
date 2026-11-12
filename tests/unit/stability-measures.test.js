@@ -1,25 +1,33 @@
 // LIN-4420: the stability measures' core (scripts/stability-measures-core.mjs). Pure inputs in, rows out: the row
 // contract's three states, the counting rule against the code-shape kit's own counter, churn's scope and denominator,
-// CI matching, Waiting's zero-versus-unreadable line, and the measures' order. The live reproduction on the 8 Nov
-// window needs `gh` and two checkouts, so it is run by hand and recorded in the PR, never here.
+// CI matching, Waiting's zero-versus-unreadable line, and the measures' order. The live run on the 8 Nov window needs
+// the proxy, `gh` and two checkouts, so it is not run here: its committed output (LIN-4423) is checked below, and the
+// CLI's own reads are run against fixture repositories and a stand-in `gh`.
 // LIN-4421: the tracker half. Landing ownership, finished-task selection across window edges, sessions as /cost
 // lineages (the recorded LIN-4393 fixture), speed and cost with their unreadable counts, the ID-span search, and the
 // paced proxy client (scripts/stability-measures-tracker.mjs) with injected fetch, sleep and clock.
 // LIN-4422: measure 1 (the shared Balance-to-sign rule against the paper's frozen codes, the fixed sample, the tally)
 // and measure 4 (loop rulings, origin not measured, the operator-free upper bound read from every lineage member's
 // feedback), and the seat read end to end through the same fake proxy.
+// LIN-4423: the reference reading (referencesFrom, the table's reference line, the CLI's refusals), the committed 8 Nov
+// reference against piece 1's verified figures, and the declaration naming every measure and row the tool emits.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { execFile, spawnSync } from 'node:child_process';
+import { createServer } from 'node:http';
+import { delimiter, join } from 'node:path';
+import { makeRepo } from '../../scripts/code-shape/test-helpers.mjs';
 import { ROOT } from './helpers/area-registry.js';
 import { analyse } from '../../scripts/code-shape/shape-core.mjs';
 import { measureShape } from '../../scripts/code-shape/shape-report.mjs';
 import { compileScope } from '../../scripts/code-shape/code-shape-lib.mjs';
 import { NOT_NOTES, countWaiting, parseNote } from '../../lib/prompts/area-note-format.js';
 import {
-  MINTED_NOT_SUPPLIED, NOT_BUILT, SCOPE_INCLUDE, STATUS, buildReading, churnRow, ciRow, costRow, firstDispatchOf, formatTable,
-  idSpanSearch, landingOwners, linesRow, mintedRow, notMeasured, ownTicket, parseLandingLog, parseNumstat, row, selectFinished,
+  MEASURES, MINTED_NOT_SUPPLIED, NOT_BUILT, NO_REFERENCE_KEYS, NO_REFERENCE_ROWS, SCOPE_INCLUDE, STATUS, buildReading, churnRow, ciRow, costRow, firstDispatchOf, formatTable,
+  idSpanSearch, landingOwners, linesRow, mintedRow, noReferenceReading, notMeasured, ownTicket, parseLandingLog, parseNumstat,
+  referencesFrom, row, selectFinished,
   sessionsOf, speedRow, tasksRow, waitingRow, waitingRows,
 } from '../../scripts/stability-measures-core.mjs';
 import { DISPATCH_LIST_LIMIT, createProxyClient, readSeat, readTracker, retryAfterMs, trackerNotMeasured } from '../../scripts/stability-measures-tracker.mjs';
@@ -28,7 +36,7 @@ import {
 } from '../../scripts/stability-measures-blind.mjs';
 import {
   MISSING_CONDITION, ORIGIN_UNREADABLE, UPPER_BOUND, LOOP_ONLY, hasBlockedMarker, membersOf, operatorFreeRow, rulingsRow,
-  seatRows, taskConditions,
+  seatNotMeasured, seatRows, taskConditions,
 } from '../../scripts/stability-measures-seat.mjs';
 import { deriveBlockedStatus } from '../../lib/dispatch-terminal.js';
 
@@ -853,4 +861,249 @@ describe('the seat read end to end, through a fake proxy', () => {
     const reading = buildReading({ window: {}, rows: { seat: rows.seat } });
     assert.deepStrictEqual(reading.measures[3].rows.map((r) => r.reason), ['no --api given and HARBOUR_LOCAL_BASE unset', ORIGIN_UNREADABLE, 'no --api given and HARBOUR_LOCAL_BASE unset']);
   });
+});
+
+// ── LIN-4423: the reference reading and the declaration ──────────────────────
+// The reference is written by the tool itself (--as-reference) and read back by it (--reference), so every value beside
+// a live row has that row's definition. The committed 8 Nov reading must reproduce piece 1's verified figures, and the
+// declaration must name every row the tool emits, so a renamed row or measure cannot drift past it unnoticed.
+const DECLARATION_DIR = join(ROOT, 'docs/reviews/stability-measures');
+const REFERENCE = JSON.parse(readFileSync(join(DECLARATION_DIR, 'reference-2026-11-08.json'), 'utf8'));
+const DECLARATION = readFileSync(join(DECLARATION_DIR, 'README.md'), 'utf8');
+const rowsOf = (reading) => Object.fromEntries(reading.measures.flatMap((m) => m.rows.map((r) => [r.key, r])));
+
+describe('the reference: written and read by the tool, never another definition', () => {
+  const window = { base: 'b'.repeat(40), head: 'h'.repeat(40), baseDate: '2026-11-08T17:10:36Z', headDate: '2026-11-12T17:00:00Z', landings: 10 };
+  const reference = (rows, extra = {}) => ({
+    tool: 'stability-measures', reference: { label: '8 Nov' }, scope: { include: SCOPE_INCLUDE }, measures: [{ key: 'curve', rows }], ...extra,
+  });
+
+  test('referencesFrom keys each reference row by its row key, carrying the label, status, value and reason', () => {
+    const churn = churnRow(parseNumstat('@a\n\n3\t1\tlib/x.js'), inScope);
+    const refs = referencesFrom(reference([churn, notMeasured('blind', noReferenceReading('8 Nov'))]));
+    assert.deepStrictEqual(refs.churn, { label: '8 Nov', status: STATUS.MEASURED, value: churn.value, reason: null, unreadable: 0 });
+    assert.deepStrictEqual(refs.blind, { label: '8 Nov', status: STATUS.NOT_MEASURED, value: null, reason: 'no 8 Nov reading; the first reading sets it', unreadable: null });
+  });
+
+  test('the rows a reference never has are the rows measures 1 and 4 emit, in their modules\' order', () => {
+    const sample = sampleRow({ landings: [], numstat: [] });
+    assert.deepStrictEqual(NO_REFERENCE_ROWS['no-new-mess'], [sample.key, blindRow({ sample, signs: null }).key]);
+    assert.deepStrictEqual(NO_REFERENCE_ROWS.seat, seatNotMeasured('x').map((r) => r.key));
+    assert.deepStrictEqual(NO_REFERENCE_KEYS, [...NO_REFERENCE_ROWS['no-new-mess'], ...NO_REFERENCE_ROWS.seat]);
+  });
+
+  test('a file that is not this tool\'s reference reading, or counts lines on another scope, is refused', () => {
+    assert.throws(() => referencesFrom({ tool: 'shape' }), /not a stability-measures reading/);
+    assert.throws(() => referencesFrom({ ...reference([]), reference: undefined }), /not a reference reading/);
+    assert.throws(() => referencesFrom(reference([], { scope: { include: '^lib/' } })), /another scope/);
+  });
+
+  test('the opening table prints each reference under its live row, summarised by the row\'s own rule', () => {
+    const live = churnRow(parseNumstat('@a\n\n9\t3\tlib/x.js'), inScope);
+    const refs = referencesFrom(reference([churnRow(parseNumstat('@a\n\n3\t1\tlib/x.js'), inScope), notMeasured('blind', noReferenceReading('8 Nov'))]));
+    const table = formatTable(buildReading({
+      window,
+      rows: { curve: [churnRow(parseNumstat('@a\n\n9\t3\tlib/x.js'), inScope, { reference: refs.churn })], 'no-new-mess': [blindRow({ sample: notMeasured('sample', 'x'), signs: null, reference: refs.blind })] },
+    }));
+    assert.match(table, new RegExp(`churn +${live.value.added} added.*\\n {20}8 Nov: 3 added, 1 deleted over 1 landings`));
+    assert.match(table, /blind +not measured: no sample: x\n {20}8 Nov: not measured: no 8 Nov reading; the first reading sets it/);
+  });
+
+  test('the CLI refuses a reference reading read against a reference, and a --reference that is not one, before any read', () => {
+    const cli = (...args) => spawnSync(process.execPath, ['scripts/stability-measures.mjs', '.', 'HEAD', 'HEAD', ...args], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, HARBOUR_LOCAL_BASE: '' } });
+    const both = cli('--as-reference', '8 Nov', '--reference', 'docs/reviews/stability-measures/reference-2026-11-08.json');
+    assert.strictEqual(both.status, 2);
+    assert.match(both.stderr, /give --reference or --as-reference, not both/);
+    const wrong = cli('--reference', 'package.json');
+    assert.strictEqual(wrong.status, 2);
+    assert.match(wrong.stderr, /--reference package\.json is not a stability-measures reading/);
+  });
+});
+
+describe('the committed 8 Nov reference reproduces the verified figures', () => {
+  const rows = rowsOf(REFERENCE);
+
+  test('window 5334c81a..9574d537 (run 4\'s pin to run 5\'s), 114 landings, written as the 8 Nov reference', () => {
+    assert.strictEqual(REFERENCE.window.base.slice(0, 8), '5334c81a');
+    assert.strictEqual(REFERENCE.window.head.slice(0, 8), '9574d537');
+    assert.strictEqual(REFERENCE.window.landings, 114);
+    assert.strictEqual(REFERENCE.reference.label, '8 Nov');
+    assert.deepStrictEqual(REFERENCE.measures.map((m) => m.title), MEASURES.map((m) => m.title));
+  });
+
+  test('lines: net 6,558 = code +3,034, comment-only +3,185, blank +339; share 39.44% → 39.73%', () => {
+    const { net, base, head } = rows.lines.value;
+    assert.deepStrictEqual([net.total, net.code, net.comment, net.blank], [6558, 3034, 3185, 339]);
+    assert.deepStrictEqual([base.commentShare, head.commentShare], [39.44, 39.73]);
+  });
+
+  test('churn 0.36 deleted per added; Waiting 0 → 56 in Harbour and 10 in the runner at 5d8489e', () => {
+    assert.strictEqual(rows.churn.value.deletedPerAdded, 0.36);
+    assert.deepStrictEqual([rows['waiting.harbour'].value.base, rows['waiting.harbour'].value.head], [0, 56]);
+    assert.strictEqual(rows['waiting.runner'].value.head, 10);
+    assert.strictEqual(rows['waiting.runner'].value.headSha.slice(0, 7), '5d8489e');
+  });
+
+  test('the blind-read and seat rows say the starting point had none; every other row was measured', () => {
+    for (const key of NO_REFERENCE_KEYS) {
+      assert.deepStrictEqual([rows[key].status, rows[key].reason], [STATUS.NOT_MEASURED, noReferenceReading('8 Nov')], key);
+    }
+    for (const [key, r] of Object.entries(rows).filter(([k]) => !NO_REFERENCE_KEYS.includes(k))) assert.strictEqual(r.status, STATUS.MEASURED, key);
+  });
+
+  test('no session-local diagnostic is committed: no proxy URL, no call counts, no runner tip', () => {
+    assert.strictEqual(REFERENCE.inputs.api, '$HARBOUR_LOCAL_BASE/api/proxy');
+    assert.ok(!('calls' in REFERENCE.sources.tracker));
+    for (const k of ['tip', 'tipDate', 'upstreamSha']) assert.ok(!(k in REFERENCE.sources.runner), k);
+    assert.match(REFERENCE.sources.tracker.readOn, /^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe('the declaration names what the tool emits', () => {
+  test('every measure title, in order, and every row key the reference carries', () => {
+    let at = 0;
+    for (const m of MEASURES) {
+      const i = DECLARATION.indexOf(`${m.rank}. ${m.title}`, at);
+      assert.ok(i >= at, `README names "${m.rank}. ${m.title}" after the measure before it`);
+      at = i;
+    }
+    for (const key of Object.keys(rowsOf(REFERENCE))) assert.ok(DECLARATION.includes(`\`${key}\``), `README names row \`${key}\``);
+  });
+
+  test('every scripts/ or lib/ module it cites exists', () => {
+    const cited = [...DECLARATION.matchAll(/`((?:scripts|lib)\/[\w./-]+\.m?js)`/g)].map((m) => m[1]);
+    assert.ok(cited.length >= 5, 'the declaration points at the defining modules');
+    for (const p of new Set(cited)) assert.ok(existsSync(join(ROOT, p)), p);
+  });
+});
+
+// The CLI's own reads (LIN-4423 leftovers): git numstat with merge landings, the landing log's ownership, Waiting in both
+// repositories, the runner's endpoints by date, the `gh` listing and the --blind file, run end to end on fixture
+// repositories. `gh` is a stand-in script first on PATH that records its arguments and prints fixed runs, so nothing
+// leaves the machine. The lookback's prior-landing log is read only with a proxy, so its test gives a loopback stand-in
+// whose issue list is empty: the tracker rows stop there, after the log was read. The proxy reads themselves are the
+// tracker tests' above.
+describe('the CLI\'s reads, end to end on fixture repositories', () => {
+  const note = (n) => `# x\n\n## Lessons\n\n## Waiting\n\n${Array.from({ length: n }, (_, i) => `- \`lib/a.js\`: entry ${i}.\n`).join('')}`;
+  const at = (d) => `2026-01-0${d}T12:00:00Z`;
+
+  test('churn counts a merge landing against its first parent; tickets, Waiting, runner endpoints, CI and --blind are read', () => {
+    const repo = makeRepo();
+    const runner = makeRepo();
+    const fake = mkdtempSync(join(tmpdir(), 'stability-gh-'));
+    try {
+      const base = repo.commit({ 'lib/a.js': 'const a = 1;\nconst b = 2;\n', 'docs/areas/x.md': note(1) }, at(1), 'base');
+      const squash = repo.commit({ 'lib/b.js': 'export const b = 1;\nexport const c = 2;\n' }, at(2), 'LIN-1: add b (#1)');
+      repo.git('checkout', '-q', '-b', 'feat/lin-2-c');
+      repo.commit({ 'lib/c.js': '// c\nexport const c = 1;\n\n', 'lib/a.js': 'const a = 1;\n', 'docs/areas/x.md': note(3) }, at(3), 'work');
+      repo.git('checkout', '-q', 'main');
+      const env = { ...process.env, GIT_AUTHOR_DATE: at(4), GIT_COMMITTER_DATE: at(4) };
+      spawnSync('git', ['-C', repo.dir, '-c', 'user.name=t', '-c', 'user.email=t@example.com', 'merge', '-q', '--no-ff', 'feat/lin-2-c',
+        '-m', 'Merge pull request #2 from x/feat/lin-2-c', '-m', 'Add c'], { env });
+      const merge = repo.git('rev-parse', 'HEAD').trim();
+
+      runner.commit({ 'docs/areas/r.md': note(1) }, '2025-12-31T00:00:00Z', 'r1');
+      const runnerHead = runner.commit({ 'docs/areas/r.md': note(2) }, at(3), 'r2');
+      runner.commit({ 'docs/areas/r.md': note(5) }, at(6), 'r3 (after head: the tip, not an endpoint)');
+
+      const minutesLater = (sha, m) => ({ databaseId: m, headSha: sha, startedAt: at(4), updatedAt: new Date(Date.parse(at(4)) + m * 60e3).toISOString(), conclusion: 'success' });
+      writeFileSync(join(fake, 'runs.json'), JSON.stringify([minutesLater(squash, 4), minutesLater(merge, 8), minutesLater(base, 60)]));
+      writeFileSync(join(fake, 'gh'), `#!/bin/sh\nprintf '%s\\n' "$@" > "${join(fake, 'args')}"\ncat "${join(fake, 'runs.json')}"\n`);
+      chmodSync(join(fake, 'gh'), 0o755);
+      const cli = (...args) => {
+        const r = spawnSync(process.execPath, [join(ROOT, 'scripts/stability-measures.mjs'), repo.dir, base, merge, '--runner', runner.dir, ...args],
+          { encoding: 'utf8', env: { ...process.env, HARBOUR_LOCAL_BASE: '', PATH: `${fake}${delimiter}${process.env.PATH}` } });
+        assert.strictEqual(r.status, 0, r.stderr);
+        return rowsOf(JSON.parse(r.stdout));
+      };
+
+      const rows = cli();
+      // Without --diff-merges=first-parent the merge landing has no numstat and churn reads 2 added, 0 deleted.
+      assert.deepStrictEqual([rows.churn.value.landings, rows.churn.value.added, rows.churn.value.deleted], [2, 5, 1]);
+      assert.deepStrictEqual(rows.lines.value.net, { total: 4, code: 2, comment: 1, blank: 1 });
+      assert.deepStrictEqual(rows.sample.value.commits.map((c) => [c.commit, c.ticket]), [[squash, 'LIN-1'], [merge, 'LIN-2']]);
+      assert.deepStrictEqual([rows['waiting.harbour'].value.base, rows['waiting.harbour'].value.head], [1, 3]);
+      assert.deepStrictEqual([rows['waiting.runner'].value.base, rows['waiting.runner'].value.head, rows['waiting.runner'].value.headSha], [1, 2, runnerHead]);
+      assert.deepStrictEqual([rows.ci.value.runs, rows.ci.value.medianMinutes], [2, 6], 'the base\'s run is not a landing\'s');
+      const ghArgs = readFileSync(join(fake, 'args'), 'utf8').split('\n');
+      for (const [flag, value] of [['--workflow', 'test.yml'], ['--branch', 'main'], ['--status', 'success'], ['--created', '2026-01-01..2026-01-05']]) {
+        assert.strictEqual(ghArgs[ghArgs.indexOf(flag) + 1], value, flag);
+      }
+      assert.strictEqual(rows.blind.reason, PENDING_BLIND);
+
+      const signs = join(fake, 'signs.json');
+      writeFileSync(signs, JSON.stringify({ [squash]: '**better** (small)', [merge]: '**worse**' }));
+      const blind = cli('--blind', signs).blind;
+      assert.deepStrictEqual([blind.status, blind.value.neutralOrBetter, blind.value.worse, blind.value.meanSign], [STATUS.MEASURED, 1, 1, 0]);
+      writeFileSync(signs, '[]');
+      assert.match(cli('--blind', signs).blind.reason, /^signs unreadable: .* is not an object keyed by commit sha$/);
+    } finally {
+      repo.cleanup(); runner.cleanup(); rmSync(fake, { recursive: true, force: true });
+    }
+  });
+
+  // LIN-4423 review, ledger item 1: the committed reference tests assert a static file, so this drives the code path that
+  // writes a reference (--as-reference) and reads it back beside the live rows (--reference). Seen red under each of: the
+  // CLI's refs forced to {}, the runner tip kept in a reference's output, sample and blind read live in reference mode.
+  test('--as-reference writes a reference reading that --reference reads back beside each live row', () => {
+    const repo = makeRepo();
+    const runner = makeRepo();
+    const fake = mkdtempSync(join(tmpdir(), 'stability-gh-'));
+    try {
+      const base = repo.commit({ 'lib/a.js': 'const a = 1;\nconst b = 2;\n', 'docs/areas/x.md': note(1) }, at(1), 'base');
+      const head = repo.commit({ 'lib/b.js': 'export const b = 1;\n', 'lib/a.js': 'const a = 1;\n', 'docs/areas/x.md': note(2) }, at(2), 'LIN-1: add b (#1)');
+      runner.commit({ 'docs/areas/r.md': note(1) }, at(1), 'r1');
+      runner.commit({ 'docs/areas/r.md': note(3) }, at(5), 'r2 (after head: the tip a live reading records)');
+      writeFileSync(join(fake, 'gh'), '#!/bin/sh\necho "[]"\n');
+      chmodSync(join(fake, 'gh'), 0o755);
+      const cli = (...args) => {
+        const r = spawnSync(process.execPath, [join(ROOT, 'scripts/stability-measures.mjs'), repo.dir, base, head, '--runner', runner.dir, ...args],
+          { encoding: 'utf8', env: { ...process.env, HARBOUR_LOCAL_BASE: '', PATH: `${fake}${delimiter}${process.env.PATH}` } });
+        assert.strictEqual(r.status, 0, r.stderr);
+        return { out: JSON.parse(r.stdout), stdout: r.stdout, stderr: r.stderr };
+      };
+
+      const first = cli('--as-reference', 'fix');
+      const refRows = rowsOf(first.out);
+      for (const key of NO_REFERENCE_KEYS) {
+        assert.deepStrictEqual([refRows[key].status, refRows[key].reason], [STATUS.NOT_MEASURED, noReferenceReading('fix')], key);
+      }
+      for (const k of ['tip', 'tipDate', 'upstreamSha']) assert.ok(!(k in first.out.sources.runner), k);
+      assert.ok(!('calls' in first.out.sources.tracker));
+
+      const file = join(fake, 'reference.json');
+      writeFileSync(file, first.stdout);
+      const second = cli('--reference', file);
+      const rows = rowsOf(second.out);
+      assert.deepStrictEqual(rows.churn.reference, { label: 'fix', status: STATUS.MEASURED, value: refRows.churn.value, reason: null, unreadable: 0 });
+      assert.strictEqual(rows.sample.reference.reason, noReferenceReading('fix'));
+      assert.match(second.stderr, /\n {20}fix: \d/);
+    } finally {
+      repo.cleanup(); runner.cleanup(); rmSync(fake, { recursive: true, force: true });
+    }
+  });
+});
+
+test('the lookback reads the first-parent landings of the days before base, base included, and no older', async () => {
+  const repo = makeRepo();
+  const fake = mkdtempSync(join(tmpdir(), 'stability-gh-'));
+  const server = createServer((req, res) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ issues: [] })); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try {
+    repo.commit({ 'lib/a.js': 'const a = 0;\n' }, '2025-12-20T12:00:00Z', 'LIN-7: older than the lookback');
+    repo.commit({ 'lib/a.js': 'const a = 1;\n' }, '2025-12-30T12:00:00Z', 'LIN-8: inside the lookback');
+    const base = repo.commit({ 'lib/a.js': 'const a = 2;\n' }, '2026-01-01T12:00:00Z', 'LIN-9: base');
+    const head = repo.commit({ 'lib/b.js': 'const b = 1;\n' }, '2026-01-02T12:00:00Z', 'LIN-10: the window');
+    writeFileSync(join(fake, 'gh'), '#!/bin/sh\necho "[]"\n');
+    chmodSync(join(fake, 'gh'), 0o755);
+    const out = await new Promise((resolve, reject) => execFile(process.execPath,
+      [join(ROOT, 'scripts/stability-measures.mjs'), repo.dir, base, head, '--api', `http://127.0.0.1:${server.address().port}`, '--lookback-days', '3'],
+      { env: { ...process.env, HARBOUR_LOCAL_BASE: '', PATH: `${fake}${delimiter}${process.env.PATH}` } },
+      (e, stdout, stderr) => (e ? reject(new Error(stderr || e.message)) : resolve(JSON.parse(stdout)))));
+    assert.deepStrictEqual(out.sources.tracker.lookback, { days: 3, since: '2025-12-29T12:00:00.000Z' });
+    assert.strictEqual(out.sources.tracker.priorLandings, 2, 'LIN-8 and base; not LIN-7');
+    assert.match(rowsOf(out).tasks.reason, /issue list has no LIN- issue/);
+  } finally {
+    server.close(); repo.cleanup(); rmSync(fake, { recursive: true, force: true });
+  }
 });

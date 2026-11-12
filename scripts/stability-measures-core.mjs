@@ -475,18 +475,67 @@ const summarise = (r) => {
   }
 };
 
-/** One line per row, measures in order: the review's opening table. */
+const describeRow = (r) => {
+  const body = r.status === STATUS.NOT_MEASURED ? `not measured: ${r.reason}` : summarise(r);
+  return `${body}${r.status === STATUS.PARTIAL ? ` [partial: ${r.unreadable} unreadable — ${r.reason}]` : ''}`;
+};
+
+// A reference from a committed reading (referencesFrom) prints on its own line under the live row, summarised by the
+// same rule as the row; any other reference value prints as it is.
+const describeReference = (r) => {
+  const ref = r.reference;
+  if (ref && typeof ref === 'object' && 'status' in ref) return `${ref.label}: ${describeRow({ ...ref, key: r.key })}`;
+  return `reference: ${typeof ref === 'object' ? JSON.stringify(ref) : ref}`;
+};
+
+/** One line per row, measures in order: the review's opening table. A row with a reference gets a second line. */
 export function formatTable(reading) {
   const { window: w } = reading;
   const lines = [`stability measures ${w.base.slice(0, 9)}..${w.head.slice(0, 9)} (${w.baseDate} → ${w.headDate}), ${w.landings} landings`];
   for (const m of reading.measures) {
     lines.push(`${m.rank}. ${m.title}`);
     for (const r of m.rows) {
-      const body = r.status === STATUS.NOT_MEASURED ? `not measured: ${r.reason}` : summarise(r);
-      const tail = r.status === STATUS.PARTIAL ? ` [partial: ${r.unreadable} unreadable — ${r.reason}]` : '';
-      const ref = r.reference != null ? ` (8 Nov: ${typeof r.reference === 'object' ? JSON.stringify(r.reference) : r.reference})` : '';
-      lines.push(`   ${r.key.padEnd(16)} ${body}${tail}${ref}`);
+      lines.push(`   ${r.key.padEnd(16)} ${describeRow(r)}`);
+      if (r.reference != null) lines.push(`   ${''.padEnd(16)} ${describeReference(r)}`);
     }
   }
   return lines.join('\n');
+}
+
+// ── the reference reading (LIN-4423) ─────────────────────────────────────────
+// A reference is a reading of an earlier window written by this tool with --as-reference <label>, committed, and read
+// back with --reference <file>: so every reference value beside a live row has the live row's own definition and unit.
+// The rows a starting point never had are written as not measured with NO_REFERENCE_READING's reason, never read today
+// and passed off as then. docs/reviews/stability-measures/README.md is the declaration that names all of this.
+
+/**
+ * The rows a reference reading never has, by measure: measure 1 (the blind read) and measure 4 (the person's seat), in
+ * the order their modules emit them (sampleRow and blindRow; seatRows). A test pins both lists against those modules,
+ * so a row added there cannot silently drop out of a reference reading.
+ */
+export const NO_REFERENCE_ROWS = Object.freeze({
+  'no-new-mess': Object.freeze(['sample', 'blind']),
+  seat: Object.freeze(['rulings', 'origin', 'operator-free']),
+});
+export const NO_REFERENCE_KEYS = Object.freeze(Object.values(NO_REFERENCE_ROWS).flat());
+
+/** The reason those rows carry in a reference reading. */
+export const noReferenceReading = (label) => `no ${label} reading; the first reading sets it`;
+
+/**
+ * The reference slots from a committed reading, keyed by row key: { label, status, value, reason, unreadable }.
+ * Throws when the file is not this tool's reference reading or counts lines on another scope, because a reference
+ * with another definition would sit beside the live row as if it were comparable.
+ */
+export function referencesFrom(json, { file = 'reference' } = {}) {
+  if (json?.tool !== 'stability-measures') throw new Error(`${file} is not a stability-measures reading`);
+  const label = json.reference?.label;
+  if (typeof label !== 'string' || !label) throw new Error(`${file} is not a reference reading (no reference.label; write one with --as-reference <label>)`);
+  if (json.scope?.include !== SCOPE_INCLUDE) throw new Error(`${file} counts lines on another scope (${json.scope?.include}), not ${SCOPE_INCLUDE}`);
+  if (!Array.isArray(json.measures)) throw new Error(`${file} has no measures`);
+  const byKey = {};
+  for (const m of json.measures) {
+    for (const r of m.rows ?? []) byKey[r.key] = { label, status: r.status, value: r.value, reason: r.reason, unreadable: r.unreadable };
+  }
+  return byKey;
 }

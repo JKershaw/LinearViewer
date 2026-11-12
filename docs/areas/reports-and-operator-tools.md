@@ -40,14 +40,20 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   commit is credited to one ticket only through `ownTicket`; `scripts/delivery-composition.mjs`
   uses it too since LIN-4422 (its weekly ticket counts since 1 Oct moved by 1 to 5: down in
   five weeks, up 1 in one) (LIN-4422 leftovers).
+- A reference beside a live stability row comes only from a reading the tool wrote itself
+  (`--as-reference <label>`) and reads back (`--reference`; `referencesFrom` refuses another
+  scope), so both share one definition. The ask's per-day 8 Nov figures stay quoted in
+  `docs/reviews/stability-measures/README.md`, never in a reference slot. Rows a starting point
+  never had are written `no <label> reading`, not read today and passed off as then, and the
+  README names every field a re-run may change; a new live field joins that list (LIN-4423).
+- The CLI's own reads are tested end to end in `tests/unit/stability-measures.test.js` on
+  fixture repositories (`makeRepo`), with a stand-in `gh` first on PATH and a loopback
+  stand-in proxy; a new read gets a case there, not only a hand run. On git 2.46
+  `--first-parent` already gives first-parent merge diffs, so dropping the explicit
+  `--diff-merges=first-parent` passes the test there; keep the flag for older git (LIN-4423 leftovers).
 
 ## Waiting
 
-- `scripts/stability-measures.mjs`: its reads (numstat flags, runner endpoint resolution, `gh`
-  listing, and since LIN-4421 the landing log's `%x1f` format and the lookback's `--since`) are
-  witnessed only by the hand-run reproduction, and since LIN-4422 so is the `--blind` file read
-  (`readSigns`); a fixture-repo test would pin `--diff-merges=first-parent` against silent
-  undercount. (LIN-4420 review; LIN-4421 and LIN-4422 leftovers.)
 - `scripts/stability-measures-tracker.mjs`: `createProxyClient` is the one proxy client in
   `scripts/` that paces from the start and honours 429 `Retry-After`. The other 47 scripts that
   read the proxy pace by fixed sleeps (`scripts/pipeline-churn.mjs` sleeps 1.1 s, and 5 s × attempt
@@ -74,3 +80,9 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   in use are priced and that the choice lists name listed models. Renaming moves the
   scheduler job name (its `scheduler-locks` doc), the server.js registration, the
   scheduler census and `docs/architecture/source-map.md`. (LIN-4358 leftovers.)
+- `scripts/code-shape/retention.mjs`: its no-acorn check in `scripts/code-shape/wrappers.test.mjs`
+  ("without acorn each CLI … exits 2") copies the kit under `tmpdir()` and assumes no
+  `node_modules` above it, but its guard test only checks `tmpdir()/node_modules`. A dispatched
+  session's `TMPDIR` sits under the simple-dispatcher checkout, which has `node_modules/acorn`,
+  so the test fails there on clean main while CI's `/tmp` passes. Walking every ancestor in the
+  guard, or copying to a directory known to have none, would make it say why. (LIN-4423 leftovers.)
