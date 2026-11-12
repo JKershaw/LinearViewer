@@ -13,12 +13,13 @@ in `lib/prompt-formatters.js`).
 and regex patterns over repo-relative code paths. **First match wins.** To find a
 file's area, take the first area with a pattern that matches its path.
 
-The registry covers code only: `lib/`, `routes/`, `public/`, `server.js` and a few
-named scripts. It has no `docs/` or `scripts/` patterns, because one would change the
-code-shape census and co-change counts (the LIN-3829 caution in
-`tests/unit/area-map-placement.test.js`). So a note entry about a doc, a script or a
-test cites the code that owns it first. For prompt text, that is usually
-`lib/prompt-template-defs.js` or `lib/prompts/stage-intent.js`.
+The registry covers code only: `lib/`, `routes/`, `public/`, `server.js` and only a
+few named scripts, each by exact pattern. It has no `docs/` patterns and no
+directory-wide `scripts/` one, because that would re-file the scripts already there and
+move the code-shape census and co-change counts (the LIN-3829 caution in
+`tests/unit/area-map-placement.test.js`, which pins each named script). So a note entry
+about a doc, a test or an unnamed script cites the code that owns it first. For prompt
+text, that is usually `lib/prompt-template-defs.js` or `lib/prompts/stage-intent.js`.
 
 A new production file with no pattern falls through to the `^lib/` catch-all in
 Other features. Give it a home in the same change. A placement that was once wrong is

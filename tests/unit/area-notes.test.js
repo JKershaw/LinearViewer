@@ -15,12 +15,13 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, loadAreas, areaOf } from './helpers/area-registry.js';
+// What a waiting entry is, and which files are not notes, is defined once in the product's leaf (LIN-4420): the
+// stability measure (scripts/stability-measures.mjs) counts the entries this guard checks, from the same definition.
+import { NOTES_DIR, NOT_NOTES, parseNote } from '../../lib/prompts/area-note-format.js';
 
-const NOTES_DIR = 'docs/areas';
 // About 6 KB (LIN-4347's plan leaves the builder to pick it): a note's Lessons are read before every change in its
 // area, so they must stay short enough to read in full. Since LIN-4414 it caps the `## Lessons` section only.
 export const NOTE_BYTE_CAP = 6144;
-const NOT_NOTES = new Set(['README.md', 'areas.json']);
 const SECTIONS = new Set(['Lessons', 'Waiting']);
 const EXTENSIONS = 'js|mjs|cjs|json|md|css|html|txt|yml|yaml|toml|sh';
 // A repo-relative path in backticks: path characters only (a `:12` suffix stays in, so a line number fails check 2),
@@ -32,21 +33,6 @@ const HAS_EXTENSION = new RegExp(`\\.(?:${EXTENSIONS})$`);
 export function citedPaths(text) {
   return [...text.matchAll(/`([^`\s]+)`/g)].map((m) => m[1])
     .filter((s) => PATH_SPAN.test(s) && (s.includes('/') || HAS_EXTENSION.test(s.replace(/(:\d+)+$/, ''))));
-}
-
-/** A note's `##` sections and its waiting entries (one per top-level bullet, continuation lines joined). */
-export function parseNote(text) {
-  const headings = [];
-  const waiting = [];
-  let section = null;
-  for (const line of text.split('\n')) {
-    const h = /^## (.*)$/.exec(line);
-    if (h) { section = h[1].trim(); headings.push(section); continue; }
-    if (section !== 'Waiting') continue;
-    if (line.startsWith('- ')) waiting.push(line.slice(2));
-    else if (/^\s+\S/.test(line) && waiting.length) waiting[waiting.length - 1] += ` ${line.trim()}`;
-  }
-  return { headings, waiting };
 }
 
 /** The bytes of a note's `## Lessons` section: from its heading to the next level-two heading or the end; 0 if none. */
