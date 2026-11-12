@@ -82,3 +82,6 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - `lib/recent-runs.js`: `runFact` reads only the row's feedback: a stage parked `[pending]` whose
   lineage ends `[blocked]` or `[skipped]` reads `running` and holds the live-stage wait until
   aborted. (LIN-4392.)
+- `lib/run-evidence.js`: `buildRunEvidence`, given a precomputed `ledger` without a `blindRead`
+  key, falls back to the latest read on the whole trail rather than after its review (no caller
+  does this yet; piece 3's gate should pass the chain's ledger whole). (Review of LIN-4437.)
