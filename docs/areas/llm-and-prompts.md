@@ -130,3 +130,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   tooling", Code Quality says "introduce no new tooling", and Seams & Tangles allows committed tools in its own bullets. No
   `periodicalBullet` helper owns it; deciding it is one rule re-pins every template that states
   it. (LIN-4424 blind read.)
+- `lib/model-routing-harnesses.js`: a dispatch record's `model` names the routed id
+  (`anthropic/claude-opus-4.8` for the `opus` route), but the claude-code harness runs a Claude id
+  by its family token (`isModelRunnableOn`, `CLAUDE_MAPPABLE_MODEL_FAMILIES`), and on blind-read
+  dispatches d9bdf6d8, cced07ee and 0399b2e2 it ran `claude-opus-5-5`, so a record can misname
+  the model that ran. Cost is already priced from the model the worker reports. Waiting: make the
+  record carry the model the worker reports, or update the routed id. (LIN-4396 review.)

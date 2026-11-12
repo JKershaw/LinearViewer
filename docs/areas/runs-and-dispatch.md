@@ -104,4 +104,12 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - `lib/close-out-readiness.js`: in the stop-at lane `deriveCloseOutState` lets merged and partial
   outrank the gate, then `closeOutNotReady` asks `closeOutWaitsOn` again to override it, so the box
   state is not the guard's whole answer and the precedence lives in two files. Carrying the gate's
-  answer in the state changes the box model the renderers read. (Blind read on LIN-4439.)
+  answer in the state changes the box model the renderers read. (Blind read on LIN-4439.) `ladderNotReady`
+  asks the gate a third time, so the box and the guard order the same reasons two ways and the next
+  close-out reason must be placed in both; one order is a decision about what the box shows versus
+  what the guard refuses. (Blind read on LIN-4396.)
+- `lib/run-closeout-state.js`: the close-out reasons are bare string literals: `'blind-read-missing'`
+  is spelled here and again in `REFUSED_REASONS` (`lib/close-out-readiness.js`, beside `'head-moved'`),
+  and `closeOutNotReadyRefusal` builds its error by capitalising `state.message`. A reasons constant
+  (like `CLOSE_OUT_STATUS`) covering every reason, used by the box, the guard and the render, would
+  give them one vocabulary. (Blind read on LIN-4396.)
