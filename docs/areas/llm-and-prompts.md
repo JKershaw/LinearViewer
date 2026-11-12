@@ -40,6 +40,10 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - A blind reader's limits are instructions, not access: with the repository checked out it can still
   see commit subjects (`git worktree add` prints the head's) and area notes. Both slipped, harmlessly,
   in the LIN-4436 pilot. Code hands a blind stage SHAs and PR URLs, never a PR body or commit log.
+- A new stage kind is a row in every table `tests/unit/stage-kind-tables.test.js` reads: add it, or list it
+  there as out with the reason. A kind in `SPINE` (`lib/run-view.js`) also moves the run page's "n of N", the
+  session and task-page goldens (`UPDATE_RENDER_SESSION_GOLDEN=1`, `UPDATE_RENDER_TASK_PAGE_GOLDEN=1`) and the
+  E2E count pins; read the golden diff before accepting it (LIN-4437).
 
 ## Waiting
 
@@ -54,9 +58,10 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - `lib/prompts/stage-intent.js`: `CUT` writes the closing contract's token order (`DECISION:`
   before `BLOCKED:`) into a scope line beside `ASK`. Its "cut" and the plan-review and review
   "narrowing" (`lib/completion-signals.js`) name one thing; no test links them. (John, 8 Nov.)
-- `lib/prompt-template-defs.js`: a stage kind is a row in ~nine parallel tables
-  (`GROUNDING_BY_KIND`, ceilings, completion signals, labels…), some unguarded: fold
-  into one definition. (Survey tally, LIN-4248.)
+- `lib/prompt-template-defs.js`: a stage kind is a row in ~fourteen parallel tables
+  (`GROUNDING_BY_KIND`, ceilings, completion signals, labels…): fold into one definition.
+  The guard half is settled: `tests/unit/stage-kind-tables.test.js` fails on a missing row
+  (LIN-4437). (Survey tally, LIN-4248.)
 - `lib/call-budget.js`: the budget rule is untested live on anthropic/claude-haiku-5.5; before
   moving a call there, replay LIN-4352's snapshot through `scripts/replay-brief.mjs`: block [2] WHOLE,
   four sections, finishReason=stop, any retry's reasoning bound accepted. REFUSED: change the rule
@@ -103,6 +108,10 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   Periodical prompt hashes. (LIN-4432.)
 - `lib/prompts/leftover-words.js`: the first-match area lookup is spelled three ways: `CONSEQUENCE_TEST`'s
   "first match wins" parenthetical, `docs/areas/README.md` ("take the first area with a pattern that
-  matches its path") and the blind-read prompt's own sentence (`docs/plans/survey/blind-read-prompt.md`),
-  which shipped as piloted, so it was not retyped after the pilot. One constant in the leaf would make it
+  matches its path") and the blind-read prompt's own sentence (`lib/prompt-template-defs.js`, the
+  `blind-read` template), which shipped as piloted (LIN-4437), so it was not retyped after the pilot. One constant in the leaf would make it
   one, at the cost of re-piloting that sentence. (LIN-4436 leftovers.)
+- `lib/recommendation-facts.js`: `isLandingEvidence` excludes blind reads but not Survey reports,
+  which `lib/run-ledger.js` `landingPrUrls` skips; a Survey citing a full PR URL still reads as
+  landed work for the plan-review `landed` fact. One comment classifier keyed on headings would
+  give both one rule. (Review of LIN-4437.)

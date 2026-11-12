@@ -16,6 +16,9 @@
  * body (create, edit, and the comment-target attachment caption) carries the leftover answer
  * guard (LIN-4414, `refusedByLeftoverAnswer`): a comment opening with the leftover heading names
  * the waiting entry the build settled (lib/dispatch-leftover-answer.js checkLeftoverAnswer).
+ * The same writes carry the blind-read guard (LIN-4437, `refusedByBlindRead`): a comment opening
+ * with `## Blind read` has one verdict line and names exactly the landing's PRs
+ * (lib/run-ledger.js checkBlindRead); it is the one comment guard that reads the trail first.
  *
  * Shape. Every route is one literal registration whose handler runs through
  * `guarded(spec, handler)`, which owns the part they all share, in this order:
@@ -63,6 +66,7 @@ import { checkAsAsked, splitAsAsked, hasMarkerLine, askedText, AS_ASKED_HEADING 
 import { sealForFiling } from '../lib/as-asked-seal.js';
 import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK } from '../lib/size-of-move.js';
 import { checkLeftoverAnswer, leftoverAnswerRefusal } from '../lib/dispatch-leftover-answer.js';
+import { checkBlindRead, blindReadRefusal, isBlindRead, landingPrUrls } from '../lib/run-ledger.js';
 import { jsonError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
 
@@ -697,6 +701,42 @@ export function createProxyWriteRoutes({
 
   // ---------------------------------------------------------------------------
   // Comments
+  /**
+   * The blind-read guard (LIN-4437), at every write that creates or edits a comment body, after the
+   * leftover guard. It acts only on a comment whose first non-blank line is the `## Blind read`
+   * heading (exactly, or with a `:` tail), so a review verdict that mentions the heading further down,
+   * and a `## Blind read pilot` tally, pass untouched. The body's shape (one verdict line, one of the
+   * three words, a reason, at least one full PR URL) is checked first and needs no read. The PR set
+   * then needs the ticket's whole, timestamped trail (`fetchIssueComments`, which throws rather than
+   * return a prefix): not the write guard's capped `comments(last: 20)`, which carries no times. When
+   * that read fails or the provider has none, the set check is skipped and logged, and the shape
+   * check still holds: fail open, as the close-out gate does on a failed read. 422 with the code.
+   * Resolves true once it has refused.
+   */
+  async function refusedByBlindRead(ctx, body) {
+    if (!isBlindRead(body)) return false;
+    const shape = checkBlindRead(body);
+    if (!shape.ok) return refuseBlindRead(ctx, shape);
+    let landing = null;
+    try {
+      if (typeof ctx.provider.fetchIssueComments !== 'function') throw new Error('the provider reads no comment trail');
+      landing = landingPrUrls(await ctx.provider.fetchIssueComments(ctx.token, ctx.req.params.issueId));
+    } catch (err) {
+      console.warn(`[blind-read] ${ctx.req.params.issueId}: PR-set check skipped, the trail could not be read whole (${err?.message || err}); the shape check held`);
+    }
+    if (landing === null) return false;
+    const check = checkBlindRead(body, { landing });
+    return check.ok ? false : refuseBlindRead(ctx, check);
+  }
+
+  function refuseBlindRead(ctx, check) {
+    return refuse(ctx, 422, blindReadRefusal(check), {
+      code: check.code,
+      ...(check.line ? { line: check.line } : {}),
+      ...(check.expected ? { expected: check.expected, got: check.got } : {})
+    });
+  }
+
   // ---------------------------------------------------------------------------
 
   // POST /api/proxy/issues/:issueId/comments (canonical, nested issue-scoped form)
@@ -711,6 +751,7 @@ export function createProxyWriteRoutes({
     if (refuseBadCommentBody(ctx, body)) return;
     // LIN-4414: before the dedupe lookup, so a body refused once can never pass on a cache hit.
     if (refusedByLeftoverAnswer(ctx, body)) return;
+    if (await refusedByBlindRead(ctx, body)) return;
     if (!await guardTarget(ctx, 'issueWriteGuard', { onNull: 'proceed' })) return;
 
     // Deterministic dedupe (LIN-399): an identical comment just created for this
@@ -761,6 +802,7 @@ export function createProxyWriteRoutes({
     const { body } = req.body;
     if (refuseBadCommentBody(ctx, body)) return;
     if (refusedByLeftoverAnswer(ctx, body)) return;
+    if (await refusedByBlindRead(ctx, body)) return;
     const updated = normalizeWritePayload(await provider.updateComment(token, commentId, body), 'comment');
     if (writeRejected(req, res, endpoint, updated, 'Comment was not updated')) return;
     commentDedupeGenerations.bump(req.proxyUrlKey);
@@ -801,6 +843,7 @@ export function createProxyWriteRoutes({
     if (!bodyValidation.valid) return refuse(ctx, 400, bodyValidation.error);
     // LIN-4414: a comment-target caption becomes the comment's opening text, so it is checked as one.
     if (!toDescription && body && refusedByLeftoverAnswer(ctx, body)) return;
+    if (!toDescription && body && await refusedByBlindRead(ctx, body)) return;
 
     if (!image) return refuse(ctx, 400, 'image is required');
     const parsed = parseFeedbackImage(image);

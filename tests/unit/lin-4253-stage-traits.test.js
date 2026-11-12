@@ -44,6 +44,7 @@ const PINNED = {
   'retro': { route: 'hand-only', writes: 'none', reason: 'Hand-triggered look-back, never routed (LIN-3309); a reading pass that writes nothing unless asked (LIN-4251).' },
   'survey-task': { route: 'hand-only', writes: 'one-comment', reason: 'LIN-4248 forecast: reads, posts one comment on the surveyed ticket, changes nothing else.' },
   'survey-place': { route: 'hand-only', writes: 'one-comment', reason: 'LIN-4248 forecast of the codebase as a place: the same one-comment write as survey-task.' },
+  'blind-read': { route: 'hand-only', writes: 'blind-comment', reason: 'LIN-4437 blind read: sent by hand (LIN-4396 piece 3 adds a code route, never the selector); one comment, and its preamble names no ticket read.' },
 };
 const KINDS = Object.keys(PINNED);
 const HAND_ONLY = KINDS.filter(kind => PINNED[kind].route === 'hand-only');
@@ -75,8 +76,8 @@ describe('LIN-4253 — the pin table names every template, with its reason (non-
     for (const kind of KINDS) assert.equal(PROMPT_TEMPLATES[kind].writes, PINNED[kind].writes, kind);
   });
 
-  test('the pinned hand-only kinds are the three that were hand-only before LIN-4253, in the same order', () => {
-    assert.deepEqual(HAND_ONLY, ['retro', 'survey-task', 'survey-place']);
+  test('the pinned hand-only kinds are the three that were hand-only before LIN-4253, in the same order, then the blind read (LIN-4437)', () => {
+    assert.deepEqual(HAND_ONLY, ['retro', 'survey-task', 'survey-place', 'blind-read']);
   });
 });
 
@@ -111,15 +112,19 @@ describe('LIN-4253 — every template declares both traits (a missing one fails 
 });
 
 describe('LIN-4253 / LIN-4251 — writes and the reading pass (STAGE_INTENT), related, not folded', () => {
-  // The two-way statement (LIN-4251): a stage is a reading pass exactly when its writes is `none`
-  // or `one-comment`. Each direction is checked, so a stage that reads and writes as work, or that
-  // writes and does not read, fails here.
-  test('a stage is READING exactly when its writes is none or one-comment', () => {
-    const READS_ONLY = [WRITES.NONE, WRITES.ONE_COMMENT];
+  // The two-way statement (LIN-4251, LIN-4437): a stage is a reading pass exactly when its writes is
+  // `none`, `one-comment` or `blind-comment`. Each direction is checked, so a stage that reads and
+  // writes as work, or that writes and does not read, fails here.
+  test('a stage is a reading pass exactly when its writes is none, one-comment or blind-comment', () => {
+    const READS_ONLY = [WRITES.NONE, WRITES.ONE_COMMENT, WRITES.BLIND_COMMENT];
     for (const kind of KINDS) {
       const reading = READING.test(STAGE_INTENT[kind][0]);
-      assert.equal(reading, READS_ONLY.includes(PROMPT_TEMPLATES[kind].writes), `${kind}: READING iff writes is none or one-comment`);
+      assert.equal(reading, READS_ONLY.includes(PROMPT_TEMPLATES[kind].writes), `${kind}: a reading pass iff writes is none, one-comment or blind-comment`);
     }
+  });
+
+  test('the blind read\'s reading-pass line names no ticket (LIN-4437), unlike READING', () => {
+    assert.doesNotMatch(STAGE_INTENT['blind-read'].join(' '), /ticket/i);
   });
 
   test('ticket-fields is not READING: triage is filing, its STAGE_INTENT says so', () => {

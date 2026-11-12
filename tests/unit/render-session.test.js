@@ -1703,7 +1703,7 @@ describe('render-session: plain-word step summaries (LIN-3250 nit)', () => {
 });
 
 describe('render-session: a real-shaped stepped single-lineage session (LIN-3250 ledger item 5)', () => {
-  test('with close-out still running, one lineage renders 3 of 4 with Next: close-out and intact rows', () => {
+  test('with close-out still running, one lineage renders 3 of 5 (LIN-4437: the blind read in SPINE) with Next: close-out and intact rows', () => {
     const session = fixtureSession({
       sessionId: 'stepped-1',
       completedAt: null,
@@ -1716,7 +1716,7 @@ describe('render-session: a real-shaped stepped single-lineage session (LIN-3250
       ],
     });
     const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
-    assert.match(html, /data-testid="session-progress"[^>]*>3 of 4 stages</);
+    assert.match(html, /data-testid="session-progress"[^>]*>3 of 5 stages</);
     assert.match(html, /data-testid="session-next"[^>]*>Next: close-out</);
     assert.match(stepSummaryText(html), /^Close-out · in progress/, 'the active loop decides the step kind/status');
     assert.equal((html.match(/data-testid="session-step"/g) || []).length, 1, 'one lineage → one step');

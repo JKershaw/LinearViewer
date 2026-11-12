@@ -13,12 +13,12 @@ import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
 import { ROW_ONLY_KINDS } from '../../lib/dispatch-fields.js';
 
 describe('run-view: stage vocabulary (LIN-3328)', () => {
-  test('SPINE is unchanged — the run page "n of 4" depends on it', () => {
-    assert.deepEqual(SPINE, ['plan', 'implementation', 'review', 'close-out']);
+  test('SPINE is pinned — the run page "n of 5" depends on it (LIN-4437: + blind-read between review and close-out)', () => {
+    assert.deepEqual(SPINE, ['plan', 'implementation', 'review', 'blind-read', 'close-out']);
   });
 
-  test('USUAL_STAGES is research ahead of the unchanged SPINE', () => {
-    assert.deepEqual(USUAL_STAGES, ['research', 'plan', 'plan-review', 'implementation', 'review', 'close-out']);
+  test('USUAL_STAGES is research ahead of SPINE, plan-review after plan', () => {
+    assert.deepEqual(USUAL_STAGES, ['research', 'plan', 'plan-review', 'implementation', 'review', 'blind-read', 'close-out']);
     assert.deepEqual(USUAL_STAGES.filter(kind => kind !== 'research' && kind !== 'plan-review'), SPINE);
   });
 

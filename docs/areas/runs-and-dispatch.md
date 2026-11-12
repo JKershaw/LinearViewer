@@ -45,11 +45,6 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 
 ## Waiting
 
-- `lib/dispatch-terminal.js`: the `WAKE_FEEDBACK_REGEX` comment says the predicate "is consumed
-  ONLY by the up-chain wake auto-enqueue", but five lib modules import it (run view, liveness
-  detectors, the task page loader, pipeline churn, the observer efficacy signal) and, since LIN-4422,
-  `scripts/stability-measures-seat.mjs` reads `[blocked]` with it. The "blast radius at zero"
-  claim needs restating as who reads it and why each wants the superset. (LIN-4422 leftovers.)
 - `lib/dispatch-wake.js`: `reportedPrUrlOf` and SD's `sessionPrs` pick a PR by one order, linked
   only by a comment; changing one moves a PR link. (Drift & Coherence Review, 10 Nov;
   `docs/reviews/drift-coherence-review-2026-11-10.md`.)
@@ -87,3 +82,6 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - `lib/recent-runs.js`: `runFact` reads only the row's feedback: a stage parked `[pending]` whose
   lineage ends `[blocked]` or `[skipped]` reads `running` and holds the live-stage wait until
   aborted. (LIN-4392.)
+- `lib/run-evidence.js`: `buildRunEvidence`, given a precomputed `ledger` without a `blindRead`
+  key, falls back to the latest read on the whole trail rather than after its review (no caller
+  does this yet; piece 3's gate should pass the chain's ledger whole). (Review of LIN-4437.)

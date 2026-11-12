@@ -90,9 +90,10 @@ describe('LIN-4010 — Plan review is a usual stage, after Plan', () => {
     message: null, links: [], loop: { takenAt: '2026-10-29T13:00:00.000Z', dispatchedAt: '2026-10-29T13:00:00.000Z' }, ...over,
   });
 
-  test('the usual order is research, plan, plan-review, then SPINE from Build on; SPINE itself is unchanged', () => {
-    assert.deepEqual(USUAL_STAGES, ['research', 'plan', 'plan-review', 'implementation', 'review', 'close-out']);
-    assert.deepEqual(SPINE, ['plan', 'implementation', 'review', 'close-out']);
+  test('the usual order is research, plan, plan-review, then SPINE from Build on; SPINE itself is unchanged by it', () => {
+    // LIN-4437: SPINE gains the blind read between review and close-out, so the usual stages do too.
+    assert.deepEqual(USUAL_STAGES, ['research', 'plan', 'plan-review', 'implementation', 'review', 'blind-read', 'close-out']);
+    assert.deepEqual(SPINE, ['plan', 'implementation', 'review', 'blind-read', 'close-out']);
   });
 
   // LIN-4103 beat 2: after Plan nothing has failed and nothing was undone, so no step is offered (no guessed Plan review).

@@ -72,9 +72,9 @@ import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
 /** Templates, source bytes. Same files `steady-base-growth.mjs` GROUPS as
  * "worker templates". */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 112176, // LIN-4401 (LIN-4432 review fix): +90 (112086 -> 112176): the audit's findings-comment heading and the notes-PR URL citation in close-out's Land It. LIN-4401 (LIN-4432 beat 4): +1170 (110916 -> 112086): the audit's Reporting and workflow, review's and close-out's notes-PR sentences, and the audit and close-out route clauses for a notes PR; the consequence test itself is rendered from the leaf
-  'lib/prompt-templates.js': 19662, // LIN-4370: +69, the never-offered comment says the look-first route sends the Surveys (a comment, not prompt text)
-  'lib/prompt-formatters.js': 47805, // LIN-4346: +710 (47095 -> 47805), scoping's own area notes pointer: its record takes no fifth line and it posts no comment, so it cites a note in its final message
+  'lib/prompt-template-defs.js': 119867, // LIN-4437: +7691 (112176 -> 119867): the blind-read stage, its piloted text shipped as piloted (LIN-4436 Go) with the Where-to-stand sentence and the empty-landing branch; the class lines and unmapped-path sentence render from the leaf; the comment's shape is held by the proxy (lib/run-ledger.js checkBlindRead), not the words
+  'lib/prompt-templates.js': 19903, // LIN-4437: +241, finishStagePrompt skips the attachments section for the blind read (code and its comment; the skip is witnessed in tests/unit/lin-4437-blind-read.test.js)
+  'lib/prompt-formatters.js': 47968, // LIN-4437: +163, the blind read's own empty grounding list and its reason (a comment; it renders nothing)
   'lib/prompt-contract.js': 3875, // LIN-4362: the `## As asked` spellings interpolate AS_ASKED_HEADING (code, not prompt text)
 };
 
@@ -101,6 +101,7 @@ export const TEMPLATES_RENDERED_CEILINGS = {
   retro: 4265, // LIN-3299: at 4265 since Scope and Authority on every path
   'survey-task': 1204, // LIN-4248: new at 1204; the hand-tuned task-view Survey wording, verbatim but for the {BASE} sentence and the Goal/Process frame
   'survey-place': 2119, // LIN-4248: new at 2119; the hand-tuned place-view Survey wording, verbatim but for the {BASE} sentence and the Goal/Process frame
+  'blind-read': 4791, // LIN-4437: new at 4791, rendered with one landing PR (FIXTURE_CONTEXT_BY_KIND); the piloted reader prompt (LIN-4436) verbatim but for its fill-ins, the Where-to-stand sentence and the Goal/Process frame; its comment shape is held by the proxy
 };
 
 /**
@@ -118,7 +119,7 @@ export const STAGE_ROUTER_SOURCE_CEILING = 8269; // LIN-4392: +25, the rules' co
 export const ROUTER_PROMPT_RENDERED_CEILING = 10110; // LIN-4401 (LIN-4432 beat 4): +223 (9887 -> 10110): the audit's whenNot clause for a landing an audit already ran on (TRAIL FACTS), with the notes PR's route, and close-out's when for an approved notes PR on a Done ticket; LIN-4370 before it: +96, scoping's `when` covers a size ruling answered after the look-first route's one scoping run; whether a comment answers the ruling is the selector's reading, so code cannot settle it
 
 /** Every stage's Scope and Authority lines, source bytes (lib/prompts/stage-intent.js). */
-export const STAGE_INTENT_SOURCE_CEILING = 3423; // LIN-4367: +14, CUT and DECIDE are exported so the cut test reads the rule and finds deciding stages by identity (code, not prompt text)
+export const STAGE_INTENT_SOURCE_CEILING = 3719; // LIN-4437: +296, the blind read's own reading-pass line, which names no ticket (READING and JUDGE both point at it); whether the reader stays blind is held by the preamble and the attachments skip, tested
 
 /** Served runner prompt, source bytes (docs/runner-prompt.md). */
 export const RUNNER_PROMPT_SOURCE_CEILING = 17638; // LIN-3669: §5 names the watchdog's three outcomes; the parent's response to a finished-but-unposted subagent is prose (the parent is a model)
@@ -139,7 +140,7 @@ export const LEFTOVER_PROMPT_RENDERED_CEILING = 2498; // LIN-4401 (LIN-4431 beat
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 363834; // LIN-4401 (LIN-4432 review fix): +163 (363671 -> 363834): prompt-template-defs.js source +90, close-out +27, audit +46; LIN-4401 (LIN-4432 beat 4): +2674 (360997 -> 363671): the five ceilings raised above (prompt-template-defs.js source +1170, audit +944, close-out +224, routing prompt +223, review +113); LIN-4401 (LIN-4431 close-out) before it: +2588, review +758, close-out +756, leftover prompt +711, defs +363; review fix 9 added +87
+export const FROZEN_TOTAL_BYTES = 377016; // LIN-4437: +13182 (363834 -> 377016): the blind-read stage: prompt-template-defs.js source +7691, its new rendered ceiling 4791, stage-intent.js +296, prompt-templates.js +241, prompt-formatters.js +163
 
 const BASE_URL = 'https://harbour.example';
 
@@ -170,6 +171,12 @@ const FIXTURE_CONTEXT = {
   comments: []
 };
 
+// LIN-4437: the blind read renders its prompt only for a landing; with no comments it renders the short
+// "nothing to read" branch, which would let its real text grow unseen. One landing PR, its kind alone.
+const FIXTURE_CONTEXT_BY_KIND = {
+  'blind-read': { ...FIXTURE_CONTEXT, comments: [{ body: 'Implementation: https://github.com/example/repo/pull/1', createdAt: '2026-01-02T00:00:00.000Z' }] }
+};
+
 // The leaf the baseline snapshot (scripts/eval/regen-baseline.mjs) uses: no comments,
 // no plan, its view left as the {{ISSUE_CONTEXT}} placeholder. Rendered this is
 // byte-identical to scripts/eval/meta-prompt.baseline.txt.
@@ -185,7 +192,7 @@ const OVER_CEILING_FIX =
   'with the reason in the comment beside the ceiling (the ticket, the bytes, why not code or a test).';
 
 const sourceBytes = (path) => Buffer.byteLength(readFileSync(fileURLToPath(new URL(`../../${path}`, import.meta.url))));
-const renderBytes = (key) => Buffer.byteLength(generatePrompt(key, FIXTURE_ISSUE, FIXTURE_CONTEXT).prompt);
+const renderBytes = (key) => Buffer.byteLength(generatePrompt(key, FIXTURE_ISSUE, FIXTURE_CONTEXT_BY_KIND[key] || FIXTURE_CONTEXT).prompt);
 
 describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () => {
   test('templates source bytes', () => {

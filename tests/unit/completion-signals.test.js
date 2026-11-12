@@ -25,7 +25,7 @@ const ALL_SIGNAL_TYPES = [
   'blocked', 'bug',
   'plan', 'look-into', 'triage', 'breakdown',
   'research', 'scoping', 'design', 'spike', 'context', 'plan-review', 'implementation',
-  'review', 'close-out', 'retrospective-audit', 'retro', 'survey-task', 'survey-place'
+  'review', 'close-out', 'retrospective-audit', 'retro', 'survey-task', 'survey-place', 'blind-read'
 ];
 
 // =============================================================================
@@ -44,12 +44,12 @@ describe('COMPLETION_SIGNALS', () => {
     'plan',
     'look-into', 'triage', 'breakdown', 'research', 'scoping',
     'design', 'spike', 'context', 'plan-review', 'implementation', 'review', 'close-out',
-    'retrospective-audit', 'retro', 'survey-task', 'survey-place'
+    'retrospective-audit', 'retro', 'survey-task', 'survey-place', 'blind-read'
   ];
 
-  test('has all 19 expected prompt types', () => {
+  test('has all 20 expected prompt types', () => {
     const keys = Object.keys(COMPLETION_SIGNALS);
-    assert.strictEqual(keys.length, 19, 'Should have exactly 19 prompt types');
+    assert.strictEqual(keys.length, 20, 'Should have exactly 20 prompt types');
     for (const type of expectedPromptTypes) {
       assert.ok(type in COMPLETION_SIGNALS, `Should have ${type} signal`);
     }
@@ -127,10 +127,10 @@ describe('Signal Content', () => {
 // =============================================================================
 
 describe('getDefinedSignalTypes', () => {
-  test('returns all 19 signal types', () => {
+  test('returns all 20 signal types', () => {
     const defined = getDefinedSignalTypes();
     assert.ok(Array.isArray(defined));
-    assert.strictEqual(defined.length, 19);
+    assert.strictEqual(defined.length, 20);
   });
 
   test('returns all expected types', () => {

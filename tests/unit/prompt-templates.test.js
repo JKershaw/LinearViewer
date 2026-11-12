@@ -113,9 +113,9 @@ describe('getPromptLabels', () => {
     assert.ok(labels.includes('retro'));
   });
 
-  test('has exactly 19 templates (LIN-4248: + survey-task, survey-place)', () => {
+  test('has exactly 20 templates (LIN-4248: + survey-task, survey-place; LIN-4437: + blind-read)', () => {
     const labels = getPromptLabels();
-    assert.strictEqual(labels.length, 19);
+    assert.strictEqual(labels.length, 20);
   });
 });
 
@@ -128,7 +128,7 @@ describe('defer recommend-meta action', () => {
     // The no-body cost contract is structural: defer has no PROMPT_TEMPLATES entry,
     // so it cannot produce a prompt and cannot inflate the template count.
     assert.ok(!('defer' in PROMPT_TEMPLATES), 'defer must not be a prompt template');
-    assert.strictEqual(getPromptLabels().length, 19, 'defer must not change the template count');
+    assert.strictEqual(getPromptLabels().length, 20, 'defer must not change the template count');
   });
 
   test('defer is registered in RECOMMEND_META_ACTIONS and the dispatch vocabulary', () => {
@@ -3508,7 +3508,7 @@ describe('grounding notes chosen per stage (LIN-3296)', () => {
     review: 'STCA', 'close-out': 'STC',
     'look-into': 'S', context: 'S',
     'retrospective-audit': 'S', retro: 'S',
-    'survey-task': '', 'survey-place': '',
+    'survey-task': '', 'survey-place': '', 'blind-read': '',
     triage: ''
   };
   const HEADINGS = {

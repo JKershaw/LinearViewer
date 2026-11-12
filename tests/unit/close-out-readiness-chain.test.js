@@ -54,6 +54,31 @@ describe('readCloseOutChain review on record (LIN-3497)', () => {
   });
 });
 
+describe('readCloseOutChain carries the blind read (LIN-4437)', () => {
+  const PR = 'https://github.com/acme/repo/pull/7';
+  const readBody = `## Blind read\n\nVerdict: worse — lib/foo.js grew a second copy of the parser.\n\nRead: ${PR}`;
+
+  test('an approving review then a valid read after it: ledger.blindRead names the read', async () => {
+    const { ledger } = await chainFor([
+      { ...comment(reviewBody, '2026-07-02T00:00:00.000Z'), id: 'review-1' },
+      { ...comment(readBody, '2026-07-03T00:00:00.000Z'), id: 'read-1' },
+    ]);
+    assert.equal(ledger.verdict, 'approve');
+    assert.notEqual(ledger.blindRead, null);
+    assert.equal(ledger.blindRead.verdict, 'worse');
+    assert.equal(ledger.blindRead.commentId, 'read-1');
+    assert.deepEqual(ledger.blindRead.prs, [PR]);
+  });
+
+  test('a read before the review is not this review\'s read: ledger.blindRead is null', async () => {
+    const { ledger } = await chainFor([
+      { ...comment(readBody, '2026-07-01T00:00:00.000Z'), id: 'read-0' },
+      { ...comment(reviewBody, '2026-07-02T00:00:00.000Z'), id: 'review-1' },
+    ]);
+    assert.equal(ledger.blindRead, null);
+  });
+});
+
 describe('readCloseOutChain when the comment read hits the cap (LIN-4322)', () => {
   test('rejects over the real Linear read: no merge or Done is judged on a prefix of the trail', async () => {
     const all = Array.from({ length: CONNECTION_CAP + 1 }, (_, i) => ({

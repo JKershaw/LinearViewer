@@ -1,0 +1,45 @@
+Repository: JKershaw/LinearViewer (Harbour). Clone or fetch it as you need.
+
+You are reading one change blind, before it merges. Not whether it does its job: whether the code it leaves behind in its area is in better, the same or worse shape for the next change. You didn't write it, you are not told why it was made, and you shouldn't try to find out.
+
+**This is read-only.** Don't change code, branches, pull requests, tickets or tracker state. {DESTINATION}
+
+**The change:** {PRS}, read at `{HEAD}` against its merge-base `{BASE}`.
+
+**What you read, and nothing else:**
+- the diff: `git diff {BASE} {HEAD} -- . ':(exclude)docs/areas/*.md' ':(exclude)docs/plans' ':(exclude)docs/reviews' ':(exclude)docs/papers'`;
+- the code, tests and how-to docs at `{BASE}` and at `{HEAD}` (`git show <sha>:<path>`, or a worktree at each). You may run tests at either;
+- `docs/areas/areas.json`, the area registry.
+
+**Don't read** the pull request itself (its page, description, comments, reviews or commit messages: the URL is only the change's name, so don't run `gh` on it, `git log` with messages, or `git show <commit>`), any ticket, the area notes (`docs/areas/*.md`; only `areas.json`), or anything under `docs/plans/`, `docs/reviews/` or `docs/papers/`, at either commit. Form your view from the code.
+
+**Areas.** A file's area is the first area in `docs/areas/areas.json` with a pattern that matches its repo-relative path. An unmapped path (`tests/`, `scripts/`) takes the area whose code it concerns, citing a file there first; no such file or no area notes, the summary comment. For you, "the summary comment" means: list that find under Outside, citing its path as it is. The change's area is every area a file in the diff maps to; a change can have several.
+
+**What to look for.** Did the change give a decision one owner, or add a second copy of something the codebase already has? Did it leave anything new without an obvious home? Did it tangle parts of the code that were apart, or untangle them? Did something that should have learned about it (a list, a registry, a guard, a test, a doc) not? Did it leave dead code, a stale comment, or a test that doesn't witness what it says? What did it delete or make simpler? A find is something concrete in the code at `{HEAD}` that the next change would want different, with the file that shows it. Taste, style and whether the change was worth making are not finds.
+
+**Sort each find into exactly one class:**
+- Inside the change's area and fix-sized: fixed on the PR branch.
+- Inside the area but larger: a `## Waiting` entry in that area's `docs/areas/<slug>.md`.
+- Outside the area: a `## Waiting` entry in its note, or a ticket the consequence test sends.
+
+You only sort; someone else acts on each class. Fix-sized means one sitting on this branch could fix it without changing the change's design: a few lines in one or two files, and no new decision. Anything that needs a decision, a new design or several areas is larger.
+
+**The verdict** is exactly one of three words: `better`, `same` or `worse`. There is no fourth. `same` means what the change made better and what it made worse balance, or there is little of either. The reason weighs both sides: name the specific thing it made better and the specific thing it made worse (or say there is none), with their files, in one or two sentences.
+
+**The comment**, in exactly this shape:
+
+## Blind read
+Verdict: <better|same|worse>. <the reason>
+
+Read: {PRS} at `{HEAD}` against `{BASE}`.
+
+### Inside the area, fix-sized
+- `<file>` (<area slug>): what is wrong, and the fix.
+
+### Inside the area, larger
+- `<file>` (<area slug>): what is wrong, and why it is larger than a fix.
+
+### Outside the area
+- `<file>` (<area slug>, or unmapped): what is wrong.
+
+Rules for the comment: its first line is exactly `## Blind read`. Exactly one line starts `Verdict:`, and the word right after it is the verdict. Write "None." under a class with no finds. Full PR URLs appear only on the `Read:` line, for the change read; cite any other pull request as `#N`. Be willing to say same or worse.
