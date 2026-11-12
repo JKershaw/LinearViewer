@@ -16,6 +16,9 @@
 // Attribution (inputs.attribution):
 //   "lineage"  — v1's path, unchanged: each lineage's cost is one row, at its own kind's leg (bucketOf).
 //   "dispatch" — each /cost dispatch is its own row (lineage.dispatches); classified by dispatch-legs.mjs.
+//   Dispatch mode also carries the LIN-4427 rules (version 2, read from its inputs.json): the Done filter, the
+//   zero-request cost, primary and sensitivity size, the markers, the token sums, the fits (fit.mjs), the custom
+//   sensitivity and the round trips. Lineage mode computes none of them.
 //
 // Cost legs use lib/wall-clock-summary.js bucketOf (no kind map of our own):
 //   before → split into survey-* (own row) and the floor; after → floor;
@@ -27,6 +30,8 @@ import path from 'node:path';
 import { bucketOf } from '../../../../lib/wall-clock-summary.js';
 import { need } from '../cleaner-than-it-started-scripts/inputs.mjs';
 import { takeTaskSizeInputs, firstLineOf, isAfterAnswer, lineageBucketOf, classifyDispatch, LEG_OF_BUCKET } from './dispatch-legs.mjs';
+import { fitSeries, olsMulti, bootstrapCoefs } from './fit.mjs';
+import { computeIssueRoundTrips } from '../../../../lib/plan-review-round-trips.js';
 
 const EV = process.argv[2];
 if (!EV) { console.error('usage: analyse.mjs <evidence-dir> [--inputs <file.json>]'); process.exit(2); }
@@ -87,13 +92,20 @@ function legsOf(cost, dispatch) {
   return { legs, pre, sumOf, floor, surveyUsd, impl, workerTotal, appCallsUsd, reconciles, dispatch };
 }
 
+// LIN-4427: the price-free token sum of one dispatch (inputs.tokens.formula). cacheCreation1hInputTokens is inside
+// cacheCreationInputTokens (lib/model-pricing.js:48-51), so it is not added again. Null when the tokens are unknown.
+const tokenTotalOf = (t) => (t ? t.inputTokens + t.outputTokens + t.cacheCreationInputTokens + t.cacheReadInputTokens : null);
+
 // The model of one dispatch: its one model, or 'multiple'; null when it made no request (its cost is then unknown).
 const modelOf = (d) => (!d.byModel || d.byModel.length === 0 ? null : d.byModel.length === 1 ? d.byModel[0].model : 'multiple');
 
 // Dispatch attribution (LIN-4426). Each /cost dispatch is one row in the same legs as legsOf, so the two read alike.
+// (The lineage-mode path above is what version 1's byte-identical witness runs; nothing in it changed for LIN-4427.)
 // A null dispatch cost stays null. A lineage with dispatches: null is approximate: its whole cost sits at lineage level.
 // Survey after-answers are read from their prompts (freeze saved one for every custom dispatch).
-function legsOfDispatch(cost, readPrompt) {
+// LIN-4427: `customToKeepAlive` is the disclosed sensitivity (inputs.sensitivity): every custom dispatch that is not an
+// after-answer goes to keep-alive instead of its lineage's leg. A dispatch with zero requests costs 0 (inputs.exact).
+function legsOfDispatch(cost, readPrompt, { customToKeepAlive = false } = {}) {
   const legs = { before: [], diff: [], after: [], orchestration: [], survey: [] };
   const rows = [];
   const splits = [];
@@ -105,22 +117,35 @@ function legsOfDispatch(cost, readPrompt) {
     if (w.dispatches === null) {
       approximate = true;
       if (w.dispatchedAt < WINDOW) pre = true;
-      put({ kind: w.kind, model: w.model, costUsd: w.costUsd, dispatchedAt: w.dispatchedAt, bucket: founder, itemId: null });
+      put({ kind: w.kind, model: w.model, costUsd: w.costUsd, dispatchedAt: w.dispatchedAt, bucket: founder, itemId: null, tokenTotal: null, custom: false, afterAnswer: false });
       continue;
     }
     splits.push({ rootItemId: w.rootItemId, kind: w.kind, lineageCostUsd: w.costUsd, dispatchCostsUsd: w.dispatches.map((d) => d.costUsd) });
     for (const d of w.dispatches) {
       const firstLine = d.kind === 'custom' ? firstLineOf(readPrompt(d.itemId).prompt) : undefined;
-      const bucket = classifyDispatch({ kind: d.kind, firstLine, lineageBucket: founder });
+      const afterAnswer = d.kind === 'custom' && isAfterAnswer(firstLine);
+      let bucket = classifyDispatch({ kind: d.kind, firstLine, lineageBucket: founder });
+      if (customToKeepAlive && d.kind === 'custom' && !afterAnswer) bucket = 'orchestration';
       if (d.dispatchedAt && d.dispatchedAt < WINDOW) pre = true;
       if (d.kind === 'custom' && d.dispatchedAt && d.dispatchedAt >= WINDOW) {
         customs.push(d.itemId);
-        if (isAfterAnswer(firstLine)) afterAnswers++;
+        if (afterAnswer) afterAnswers++;
       }
-      put({ kind: d.kind, model: modelOf(d), costUsd: d.costUsd, dispatchedAt: d.dispatchedAt, bucket, itemId: d.itemId });
+      const noRequests = d.requests === 0;
+      put({ kind: d.kind, model: modelOf(d), costUsd: noRequests && d.costUsd === null ? 0 : d.costUsd, dispatchedAt: d.dispatchedAt, bucket, itemId: d.itemId,
+        tokenTotal: noRequests ? 0 : tokenTotalOf(d.tokens), custom: d.kind === 'custom', afterAnswer });
     }
   }
   const sumOf = (rs) => sumNullable(rs.map((r) => r.costUsd));
+  // LIN-4427: per-leg token totals (null if any row's tokens are unknown) and the after-answer and custom follow-up dollars.
+  const tokensOfLeg = (rs) => sumNullable(rs.map((r) => r.tokenTotal));
+  const legTokens = {
+    floor: tokensOfLeg([...legs.before, ...legs.after]), work: tokensOfLeg(legs.diff),
+    keepAlive: tokensOfLeg(legs.orchestration), survey: tokensOfLeg(legs.survey),
+  };
+  const firstDispatchedAt = rows.map((r) => r.dispatchedAt).filter(Boolean).sort()[0] ?? null;
+  const afterAnswerUsd = sumNullable(rows.filter((r) => r.afterAnswer).map((r) => r.costUsd));
+  const customFollowUpUsd = sumNullable(rows.filter((r) => r.custom && !r.afterAnswer).map((r) => r.costUsd));
   const surveyUsd = sumOf(legs.survey);
   const floor = (() => {
     const a = sumOf(legs.before), c = sumOf(legs.after);
@@ -133,13 +158,67 @@ function legsOfDispatch(cost, readPrompt) {
     : Math.abs((workerTotal + (appCallsUsd ?? 0)) - cost.totalUsd) < 1e-6;
   const nullLegs = [...new Set(rows.filter((r) => r.costUsd === null).map((r) => LEG_OF_BUCKET[r.bucket]))];
   return { legs, pre, sumOf, floor, surveyUsd, impl, workerTotal, appCallsUsd, reconciles, dispatch: null,
-    rows, splits, customs, afterAnswers, approximate, nullLegs };
+    rows, splits, customs, afterAnswers, approximate, nullLegs, legTokens, firstDispatchedAt, afterAnswerUsd, customFollowUpUsd };
 }
 
 // The implementation model when work comes from several dispatch rows: their one shared model, else 'multiple'.
 function implModelOfDispatch(impl) {
   const models = [...new Set(impl.map((r) => r.model))];
   return models.length === 0 ? null : models.length === 1 ? models[0] : 'multiple';
+}
+
+// ---- LIN-4427 (dispatch mode only): inputs read through need(), so a missing rule throws ----
+const V2 = DISPATCH ? {
+  exactState: need(inputs, 'exact.state'),
+  // The prose rules below are implemented in code (zero-request cost, primary and sensitivity size, marker, tokens, the
+  // custom sensitivity). They are read here only so that a missing one stops the analysis rather than going unrecorded.
+  proseRules: [need(inputs, 'exact.dispatch_cost_with_zero_requests'), need(inputs, 'size.primary'), need(inputs, 'size.sensitivity'), need(inputs, 'marker.rule'), need(inputs, 'tokens.formula'), need(inputs, 'sensitivity.custom_to_keepalive')],
+  asOfRule: need(inputs, 'rounds.as_of'),
+  roundPairs: need(inputs, 'rounds.pairs'),
+  minN: need(inputs, 'fit.min_n'),
+  boot: { seed: need(inputs, 'fit.bootstrap.seed'), resamples: need(inputs, 'fit.bootstrap.resamples'), level: need(inputs, 'fit.bootstrap.level') },
+  haiku: need(inputs, 'strata.work_haiku_only'),
+  opus: need(inputs, 'strata.work_opus_only'),
+  cohortMs: Date.parse(need(inputs, 'strata.cohort_from')),
+} : null;
+if (DISPATCH) {
+  if (V2.asOfRule !== 'manifest.freeze_finished_at') throw new Error(`inputs rounds.as_of is "${V2.asOfRule}"; the rule is manifest.freeze_finished_at`);
+  if (!Number.isFinite(V2.cohortMs)) throw new Error('inputs strata.cohort_from is not a time');
+}
+const AS_OF = DISPATCH ? manifest.freeze_finished_at : null;
+const GOLDEN_GLOB = DISPATCH ? [...read('size/lv-golden-glob.json'), ...read('size/sd-golden-glob.json')] : [];
+const goldenLinesOf = (t) => GOLDEN_GLOB.filter((r) => r.ticket === t).reduce((s, r) => s + r.goldenGlobAdded + r.goldenGlobDeleted, 0);
+// The round trips of each pair (lib/plan-review-round-trips.js, unchanged), from the frozen dispatch rows and issue.
+const roundsOf = (t, items, issue) => Object.fromEntries(V2.roundPairs.map((pair) => {
+  const r = computeIssueRoundTrips({ id: issue.id, identifier: t, rows: items, comments: issue.comments ?? [], description: issue.description ?? '' },
+    { asOf: AS_OF, gateKind: pair.gate, rePassKind: pair.rePass });
+  return [pair.gate, { roundTrips: r.roundTrips, gateRows: items.filter((i) => i.kind === pair.gate).length, gateDue: r.gateDue, gateHonoured: r.gateHonoured }];
+}));
+
+// LIN-4427: the per-ticket fields only dispatch mode carries (the lineage-mode output is unchanged).
+function v2Fields(t, cost, items, L, lv, sd) {
+  const g = cost.totalUsd === null ? () => null : (x) => x;
+  const primary = lv.reduce((s, r) => s + r.prodAdded + r.prodDeleted, 0) + sd.reduce((s, r) => s + r.codeAdded + r.codeDeleted, 0);
+  const testLines = lv.reduce((s, r) => s + r.testAdded + r.testDeleted, 0) + sd.reduce((s, r) => s + r.testAdded + r.testDeleted, 0);
+  const sensitivity = primary + testLines - goldenLinesOf(t);
+  const lvProd = lv.reduce((s, r) => s + r.prodAdded + r.prodDeleted, 0), sdCode = sd.reduce((s, r) => s + r.codeAdded + r.codeDeleted, 0);
+  // A tie goes to LinearViewer (inputs.marker.rule). A ticket with no production lines in either repository has no marker.
+  const marker = lvProd === 0 && sdCode === 0 ? null : lvProd >= sdCode ? 'LinearViewer' : 'simple-dispatcher';
+  // The same ticket with every custom follow-up in keep-alive (the disclosed sensitivity, inputs.sensitivity).
+  const Ls = legsOfDispatch(cost, (id) => read(`prompts/${id}.json`), { customToKeepAlive: true });
+  const rounds = roundsOf(t, items, read(`issue/${t}.json`));
+  return {
+    size: { primary, sensitivity, lvProd, sdCode },
+    marker,
+    incomplete: cost.workerSessions.some((w) => w.incomplete === true),
+    firstDispatchedAt: L.firstDispatchedAt,
+    legTokens: L.legTokens,
+    afterAnswerUsd: round(g(L.afterAnswerUsd)),
+    customFollowUpUsd: round(g(L.customFollowUpUsd)),
+    legsCustomToKeepAlive: { floor: round(g(Ls.floor)), work: round(g(Ls.sumOf(Ls.impl))), keepAlive: round(g(Ls.sumOf(Ls.legs.orchestration))), survey: round(g(Ls.surveyUsd)) },
+    rounds,
+    roundTrips: Object.values(rounds).reduce((s, r) => s + r.roundTrips, 0),
+  };
 }
 
 const perTicket = {};
@@ -198,6 +277,7 @@ for (const t of pop) {
     surveyBalanceLine: sv.length ? sv[0].line : null,
     weightedUnits: { all: tokens.byChild?.[t] ?? null, implementation: tk.implementation ?? null },
     ...(DISPATCH ? { approximate: L.approximate, nullLegs: L.nullLegs } : {}),
+    ...(DISPATCH ? v2Fields(t, cost, dispatch, L, lv, sd) : {}),
   };
 }
 
@@ -228,7 +308,8 @@ const test = (label, pairs) => {
 // Approximate (pre-window) legs are never pooled with exact ones.
 // Dispatch attribution drops the lineage-only implRows === 1 rule: a ticket may hold several work dispatches (each
 // is summed into work). Its replacement is the approximate flag (a dispatches: null lineage) and self-check d2.
-const finished = pop.map((t) => perTicket[t]).filter((r) => r.totalUsd !== null && r.shape === 'code');
+const finished = pop.map((t) => perTicket[t]).filter((r) => r.totalUsd !== null && r.shape === 'code'
+  && (!DISPATCH || (r.state === V2.exactState && !r.incomplete)));
 const exact = finished.filter((r) => !r.preWindowLegs && (DISPATCH ? !r.approximate : r.implRows === 1));
 const clean = exact.filter((r) => r.implModel === 'claude-haiku-5-5' && r.customInWindow === 0 && r.customLegs === 0 && r.legs.work !== null && r.lv.prodLines > 0);
 const workObserver = exact.filter((r) => r.implModel === 'claude-opus-5-5' && r.afterAnswers > 0 && r.legs.work !== null);
@@ -303,6 +384,60 @@ analysis.pairs = PAIR_SETS.map((ps) => ({ name: ps.name, tidy: pairRow(ps.tidy),
 // ---- self-checks: the analysis fails loudly rather than reporting a broken table ----
 const checks = [];
 const check = (name, ok, detail = '') => checks.push({ name, ok: Boolean(ok), detail });
+// ---- LIN-4427 fits (dispatch mode only): every rule is the inputs file's, read above; nothing is tuned after a slope ----
+if (DISPATCH) {
+  const LEGS = ['floor', 'work', 'keepAlive', 'survey'];
+  const fitOpts = { seed: V2.boot.seed, resamples: V2.boot.resamples, level: V2.boot.level, minN: V2.minN };
+  const pointsOf = (rows, usdOf, sizeOf = (r) => r.size.primary) => rows.map((r) => ({ ticket: r.ticket, marker: r.marker, size: sizeOf(r), usd: usdOf(r) }));
+  const legFits = (rows, { tokens = false, sizeOf, legsOf = (r) => r.legs } = {}) =>
+    Object.fromEntries(LEGS.map((leg) => [leg, fitSeries(pointsOf(rows, (r) => (tokens ? r.legTokens[leg] : legsOf(r)[leg]), sizeOf), fitOpts)]));
+  const EXACT = exact;
+  const byRepo = (m) => EXACT.filter((r) => r.marker === m);
+  const fits = {
+    primary: legFits(EXACT),
+    tokens: legFits(EXACT, { tokens: true }),
+    sensitivitySize: legFits(EXACT, { sizeOf: (r) => r.size.sensitivity }),
+    customToKeepAlive: legFits(EXACT, { legsOf: (r) => r.legsCustomToKeepAlive }),
+    workHaikuOnly: { work: fitSeries(pointsOf(EXACT.filter((r) => r.implModel === V2.haiku), (r) => r.legs.work), fitOpts) },
+    workOpusOnly: { work: fitSeries(pointsOf(EXACT.filter((r) => r.implModel === V2.opus), (r) => r.legs.work), fitOpts) },
+    cohortFirstDispatchedFrom: legFits(EXACT.filter((r) => r.firstDispatchedAt && Date.parse(r.firstDispatchedAt) >= V2.cohortMs)),
+    byMarker: { LinearViewer: legFits(byRepo('LinearViewer')), 'simple-dispatcher': legFits(byRepo('simple-dispatcher')) },
+  };
+  // The disclosed sensitivity: which tickets' legs move when custom follow-ups go to keep-alive (population, not only exact).
+  const moved = pop.filter((t) => LEGS.some((leg) => perTicket[t].legs[leg] !== undefined && perTicket[t].legsCustomToKeepAlive[leg] !== perTicket[t].legs[leg]))
+    .map((t) => ({ ticket: t, exact: EXACT.some((r) => r.ticket === t), legs: Object.fromEntries(LEGS.filter((leg) => perTicket[t].legsCustomToKeepAlive[leg] !== perTicket[t].legs[leg]).map((leg) => [leg, { now: perTicket[t].legs[leg], sensitivity: perTicket[t].legsCustomToKeepAlive[leg] }])) }));
+  // Rounds (inputs.rounds): floor on log10 size, with and without the round trips as a regressor. Exact tickets only.
+  const usable = EXACT.filter((r) => r.size.primary > 0 && r.legs.floor > 0);
+  const X0 = usable.map((r) => [1, Math.log10(r.size.primary)]);
+  const X1 = usable.map((r) => [1, Math.log10(r.size.primary), r.roundTrips]);
+  const yF = usable.map((r) => Math.log10(r.legs.floor));
+  const roundsFit = usable.length < V2.minN ? { n: usable.length, reading: `n=${usable.length} < ${V2.minN}: no regression` } : (() => {
+    const b0 = olsMulti(X0, yF), b1 = olsMulti(X1, yF);
+    const c0 = bootstrapCoefs(X0, yF, fitOpts), c1 = bootstrapCoefs(X1, yF, fitOpts);
+    return { n: usable.length,
+      withoutRounds: { sizeSlope: b0 && b0[1], sizeSlopeCi: c0.ci[1] },
+      withRounds: { sizeSlope: b1 && b1[1], sizeSlopeCi: c1.ci[1], roundsCoef: b1 && b1[2], roundsCoefCi: c1.ci[2] },
+      bootstrap: { resamples: V2.boot.resamples, singularWithout: c0.singular, singularWith: c1.singular } };
+  })();
+  const roundsSummary = Object.fromEntries(V2.roundPairs.map((pair) => {
+    const rs = EXACT.map((r) => r.rounds[pair.gate]);
+    return [pair.gate, { tickets: EXACT.length, withGateRow: rs.filter((x) => x.gateRows > 0).length, gateDue: rs.filter((x) => x.gateDue).length,
+      gateHonoured: rs.filter((x) => x.gateHonoured).length, roundTrips: rs.reduce((s, x) => s + x.roundTrips, 0), ticketsWithRoundTrip: rs.filter((x) => x.roundTrips > 0).length }];
+  }));
+  analysis.v2 = { asOf: AS_OF, freezeFinishedAt: manifest.freeze_finished_at, bootstrap: { ...V2.boot, minN: V2.minN }, cohortFrom: V2.cohortMs ? new Date(V2.cohortMs).toISOString() : null,
+    exactCount: EXACT.length, exact: EXACT.map((r) => r.ticket), fits, sensitivityMoved: moved, rounds: { fit: roundsFit, summary: roundsSummary },
+    zeroSizeInExact: EXACT.filter((r) => r.size.primary === 0).map((r) => r.ticket), landedNoTokens: EXACT.filter((r) => r.legTokens.floor === null || r.legTokens.work === null).map((r) => r.ticket) };
+  // self-checks for the fits: a reported slope has n >= min_n; the interval brackets the slope; exact tickets are Done and complete
+  const allFits = [];
+  const walk = (o, name) => { if (o && typeof o === 'object' && 'n' in o && 'dropped' in o) allFits.push([name, o]); else if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) walk(v, `${name}.${k}`); };
+  walk(fits, 'fits');
+  analysis.v2.fitCount = allFits.length;
+  check('every reported slope has n >= min_n', allFits.every(([, f]) => f.slope === null || f.n >= V2.minN), '');
+  check('every slope interval brackets its point estimate', allFits.every(([, f]) => f.slope === null || (f.ci[0] <= f.slope && f.slope <= f.ci[1])), '');
+  check('exact tickets are Done, priced and complete', EXACT.every((r) => r.state === V2.exactState && r.totalUsd !== null && !r.incomplete), '');
+  check('exact tickets carry no null leg', EXACT.every((r) => LEGS.every((leg) => r.legs[leg] !== null)), '');
+}
+
 // (a) no frozen JSON carries a top-level error (the freeze also refuses these; this re-checks the folder)
 const frozenJson = [...manifest.files.map((f) => f.path), 'manifest.json'];
 const badFrozen = frozenJson.filter((rel) => { const j = read(rel); return j && typeof j === 'object' && !Array.isArray(j) && 'error' in j; });
@@ -388,6 +523,19 @@ for (const [name, block] of Object.entries(analysis.tests)) {
 lines.push('## pairs (re-read last)');
 for (const p of analysis.pairs) {
   for (const r of [p.tidy, p.follow].filter(Boolean)) lines.push(`${p.name}: ${r.ticket} ${r.state} total=${f(r.totalUsd)} floor=${f(r.floor)} work=${f(r.work)} keep-alive=${f(r.keepAlive)} survey=${f(r.survey)} models=${r.implModels.join('/') || '-'} noLineage=${r.noLineage} noTelemetry=${r.noTelemetryCount}`);
+}
+if (DISPATCH) {
+  lines.push('## LIN-4427 fits (USD unless stated): slope [95% bootstrap interval], n, dropped (size, cost)');
+  const printFits = (o, name) => {
+    if (o && 'n' in o && 'dropped' in o) {
+      const f = o;
+      lines.push(`${name}: n=${f.n} dropped=${f.dropped.zeroOrNullSize},${f.dropped.zeroOrNullCost} slope=${f.slope === null ? 'none' : f.slope.toFixed(3)} ci=${f.ci ? `[${f.ci[0].toFixed(3)}, ${f.ci[1].toFixed(3)}]` : 'none'} ${f.reading}`);
+    } else for (const [k, v] of Object.entries(o)) printFits(v, `${name}/${k}`);
+  };
+  printFits(analysis.v2.fits, 'fits');
+  lines.push(`moved by custom->keep-alive: ${analysis.v2.sensitivityMoved.map((m) => `${m.ticket}${m.exact ? '' : '(not exact)'}`).join(', ') || 'none'}`);
+  lines.push(`rounds summary: ${JSON.stringify(analysis.v2.rounds.summary)}`);
+  lines.push(`rounds regression: ${JSON.stringify(analysis.v2.rounds.fit)}`);
 }
 lines.push('## self-checks');
 for (const c of checks) lines.push(`${c.ok ? 'pass' : 'FAIL'}  ${c.name}`);
