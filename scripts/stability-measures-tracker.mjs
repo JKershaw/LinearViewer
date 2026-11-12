@@ -30,7 +30,8 @@ export function retryAfterMs(header, nowMs) {
   return Number.isNaN(at) ? null : Math.max(0, at - nowMs);
 }
 
-const firstLine = (e) => String(e?.message ?? e).trim().split('\n')[0];
+/** An error's first line: the reason a row or a failed read carries. */
+export const firstLine = (e) => String(e?.message ?? e).trim().split('\n')[0];
 
 export function createProxyClient({
   base,
@@ -87,6 +88,9 @@ export function createProxyClient({
 // ── the tracker read ─────────────────────────────────────────────────────────
 const enc = encodeURIComponent;
 
+/** Every tracker row not measured, for one reason: no proxy, no landing log, or an unreadable issue list. */
+export const trackerNotMeasured = (why, references = {}) => Object.fromEntries(['tasks', 'speed', 'cost', 'minted'].map((k) => [k, notMeasured(k, why, { reference: references[k] })]));
+
 /** The highest issue number on the newest page of the issue list: a known existing number to bracket the search. */
 async function readBracket(client, key) {
   const r = await client.get('/issues?limit=50');
@@ -112,13 +116,7 @@ export async function readTracker({ client, windowLandings, priorLandings = [], 
   const own = landingOwners(windowLandings);
   const prior = landingOwners(priorLandings);
   const bracket = await readBracket(client, key);
-  if (bracket.reason) {
-    const why = `proxy: ${bracket.reason}`;
-    return {
-      rows: { tasks: notMeasured('tasks', why), speed: notMeasured('speed', why), cost: notMeasured('cost', why), minted: notMeasured('minted', why, { reference: references.minted }) },
-      stats: client.stats,
-    };
-  }
+  if (bracket.reason) return { rows: trackerNotMeasured(`proxy: ${bracket.reason}`, references), stats: client.stats };
 
   const issues = new Map();
   const ids = [...new Set([...own.owners.keys(), ...prior.owners.keys()])];

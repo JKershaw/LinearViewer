@@ -22,13 +22,12 @@ import { NOTES_DIR, countWaiting } from '../lib/prompts/area-note-format.js';
 import {
   SCOPE_INCLUDE, buildReading, churnRow, ciRow, formatTable, linesRow, notMeasured, parseLandingLog, parseNumstat, waitingRows,
 } from './stability-measures-core.mjs';
-import { createProxyClient, readTracker } from './stability-measures-tracker.mjs';
+import { createProxyClient, firstLine, readTracker, trackerNotMeasured } from './stability-measures-tracker.mjs';
 
 const USAGE = 'usage: node scripts/stability-measures.mjs <repo> <base> <head> [--runner <dir>] [--api <base>] [--lookback-days <n>] [--blind <signs.json>]';
 const DEFAULT_LOOKBACK_DAYS = 3;
 const LANDING_FORMAT = '--format=%H%x1f%cI%x1f%s%x1f%b%x1e';
 const GH_LIMIT = 1000;
-const firstLine = (e) => String(e?.message ?? e).trim().split('\n')[0];
 
 // Waiting entries at one commit, from git objects: the notes directly inside docs/areas/. A readable commit with no
 // such directory has none (0); a git failure is the caller's `not measured`.
@@ -105,18 +104,14 @@ function readCiRuns(repo, window) {
 // landings are not read: a ticket whose only landings predate the lookback and that finished here is not counted.
 async function readTrackerRows(repo, api, window, lookbackDays) {
   const lookback = { days: lookbackDays, since: new Date(new Date(window.baseDate).getTime() - lookbackDays * 86400e3).toISOString() };
-  if (!api) {
-    const why = 'no --api given and HARBOUR_LOCAL_BASE unset';
-    return { lookback, rows: { tasks: notMeasured('tasks', why), speed: notMeasured('speed', why), cost: notMeasured('cost', why), minted: notMeasured('minted', why) } };
-  }
+  if (!api) return { lookback, rows: trackerNotMeasured('no --api given and HARBOUR_LOCAL_BASE unset') };
   let windowLandings;
   let priorLandings;
   try {
     windowLandings = parseLandingLog(git(repo, ['log', '--first-parent', LANDING_FORMAT, `${window.base}..${window.head}`]));
     priorLandings = parseLandingLog(git(repo, ['log', '--first-parent', LANDING_FORMAT, `--since=${lookback.since}`, window.base]));
   } catch (e) {
-    const why = `landing log unreadable: ${firstLine(e)}`;
-    return { lookback, rows: { tasks: notMeasured('tasks', why), speed: notMeasured('speed', why), cost: notMeasured('cost', why), minted: notMeasured('minted', why) } };
+    return { lookback, rows: trackerNotMeasured(`landing log unreadable: ${firstLine(e)}`) };
   }
   const { rows, stats } = await readTracker({ client: createProxyClient({ base: api }), windowLandings, priorLandings, window, lookback });
   return { lookback, rows, stats, priorLandings: priorLandings.length };
