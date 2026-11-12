@@ -5,8 +5,8 @@
 // Each row's sign is the reviewer's own Balance cell, copied verbatim (bold markers removed) and
 // mapped to a score: better = +1, neutral / mixed / worse = 0 / 0 / -1. "mixed (leans worse)" stays
 // mixed and is flagged `leans`. A row with no sign of its own ("(with #3)") keeps sign null.
-// That rule is codeBalance in scripts/stability-measures-blind.mjs (LIN-4422), shared with the Stability Review's
-// blind tally so the two cannot drift; re-running this on either frozen folder reproduces its blind-codes.json.
+// That rule is codeBalance in ./balance-sign.mjs (LIN-4422; shared with the Stability Review's blind tally until
+// LIN-4439 retired that tally); re-running this on either frozen folder reproduces its blind-codes.json.
 // Commit labels are resolved to frozen merges by hash prefix (>= 7 chars, unique), and each row
 // is attributed to tickets through the merge subject; the pass title names the ticket(s) of a
 // single or combined read.
@@ -26,7 +26,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { takeInputs, need, blindCutoff, postsAfter } from './inputs.mjs';
-import { codeBalance } from '../../../../scripts/stability-measures-blind.mjs';
+import { codeBalance } from './balance-sign.mjs';
 
 // Returns { kind, id, subject_tickets, batch?, subject? } for a title, or throws naming the title.
 // `id` is 'batch <X>' for a batch and the pass letter otherwise (the same ids the coder always used).

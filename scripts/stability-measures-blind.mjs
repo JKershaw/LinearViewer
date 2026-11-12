@@ -1,128 +1,137 @@
-// Measure 1, no new mess (LIN-4422): the blind-read sample and its tally. Pure, like the core: landings, numstat
-// records and the recorded Balance cells come in as data, rows come out.
+// Measure 1, no new mess: the pre-merge blind read, counted from the ledger (LIN-4439, piece 4 of LIN-4396). Pure, like
+// the core: landings, their file lists and each ticket's comment trail come in as data, the row comes out. The reads are
+// scripts/stability-measures-tracker.mjs readTrails (comments through createProxyClient on --api).
 //
-// The one Balance-to-sign rule. A blind reader's Balance cell becomes a sign here and nowhere else: the paper's
-// coding (docs/papers/harbour/cleaner-than-it-started-scripts/code-blind.mjs) imports codeBalance, so the measure's
-// tally and the paper's codes cannot drift on the edge cells: `**mixed (leans worse)**` is mixed (0, flagged leans),
-// `**better** (small)` is better (+1), and a cell with no leading sign word (`(with #3)`, a row linked to an earlier
-// one) has no sign. Scores as in docs/papers/harbour/cleaner-than-it-started.md: better +1, neutral or mixed 0, worse -1.
+// It replaces LIN-4422's sample of up to 8 ordinary landings, hand-scored from a file of Balance cells, in place:
+// measure 1 has one source, the `## Blind read` comments the blind-read stage posts before close-out merges (LIN-4437,
+// LIN-4438).
 //
-// The sample (the plan's P1.4). An ordinary landing names its own ticket (the core's ownTicket) and touches a path
-// outside docs/. One landing per ticket, its first ordinary landing in the window: the ruling on lin4399-m1m4-placeholder
-// says "a sample of the window's tickets", so a ticket landed in pieces is read once, not once per piece. From those, up
-// to SAMPLE_SIZE landings evenly spaced in landing order (oldest first), so a re-run of the same window picks the same
-// commits. The reader prompt is frozen at
-// docs/papers/harbour/cleaner-than-it-started-evidence/2026-11-06/prompts/blind-read-prompt.md.
+// Every first-parent landing of the window is counted once, by the first of these that holds:
+//   no ticket                 the landing names no ticket of its own (ownTicket, the core's one rule);
+//   not an ordinary landing   LIN-4422's definition, kept here as isOrdinaryLanding: it names its own ticket and touches
+//                             a path outside docs/;
+//   landed before the gate    merged at or before piece 3's landing (GATE_LANDING, PR #2413). "At": the gate's own
+//                             merge was not held by the gate it delivered;
+//   no read on record         no well-formed blind read (parseBlindRead) posted on the ticket before the merge names the
+//                             landing's PR;
+//   read                      the newest such read, with its verdict (better, same or worse).
+// The landing's PR is its number (landingPr) matched against landingPrUrls of the trail as it stood at the merge: the
+// landing then was the one the gate read. A ticket whose trail could not be read whole (a failed read, or comments the
+// proxy flagged truncated) and a landing with no file list are unreadable: the row is partial, never "no read".
 //
-// signs.json is one object keyed by full commit sha, each value that reader's Balance cell copied verbatim. A sampled
-// commit with no entry, or with a cell that has no sign, is unreadable (the read is partial); it is never neutral.
+// The hand-run passes' Balance-to-sign rule (codeBalance) left with the sample: the paper's coder is its one user, and
+// it lives beside that coder (docs/papers/harbour/cleaner-than-it-started-scripts/balance-sign.mjs).
 
-import { mean, notMeasured, ownTicket, percent, round, row } from './stability-measures-core.mjs';
+import { BLIND_READ_VERDICTS } from '../lib/prompts/blind-read-words.js';
+import { landingPrUrls, parseBlindRead } from '../lib/run-ledger.js';
+import { landingPr, notMeasured, ownTicket, row } from './stability-measures-core.mjs';
 
-export const SAMPLE_SIZE = 8;
-export const PENDING_BLIND = 'pending blind reads';
-export const SIGN_SCORE = Object.freeze({ better: 1, neutral: 0, mixed: 0, worse: -1 });
+/** Piece 3's landing (LIN-4438): from this merge, close-out waits on a recorded `## Blind read` naming the PR. */
+export const GATE_LANDING = Object.freeze({
+  commit: 'eb14b7fff9f1b0e0de623add1b1fc61fd924021a', pr: 2413, ticket: 'LIN-4438', mergedAt: '2026-11-12T21:06:21Z',
+});
 
-/**
- * A Balance cell → { balance, sign, score, leans }. `balance` is the cell with bold markers removed and trimmed;
- * `sign` its leading word (better, neutral, mixed or worse, lower-cased) or null; `score` from SIGN_SCORE or null;
- * `leans` is 'worse' when the cell says "leans worse", else null.
- */
-export function codeBalance(raw) {
-  const balance = String(raw ?? '').replace(/\*\*/g, '').trim();
-  const sign = (balance.match(/^(better|neutral|mixed|worse)\b/i) || [])[1]?.toLowerCase() ?? null;
-  return { balance, sign, score: sign === null ? null : SIGN_SCORE[sign], leans: /leans worse/i.test(balance) ? 'worse' : null };
+/** The named reasons a landing is unread, in the order they are tried. */
+export const UNREAD = Object.freeze({
+  noTicket: 'no ticket',
+  notOrdinary: 'not an ordinary landing',
+  beforeGate: 'landed before the gate',
+  noRead: 'no read on record',
+});
+
+/** LIN-4422's ordinary landing: it names its own ticket and touches a path outside docs/. */
+export function isOrdinaryLanding(landing, files) {
+  return ownTicket(landing.subject, landing.body) != null && files.some((f) => !f.path.startsWith('docs/'));
 }
 
-const outsideDocs = (files) => files.some((f) => !f.path.startsWith('docs/'));
+/** A GitHub remote URL (https or ssh) → `owner/name`, or null. */
+export function repoSlugOf(remoteUrl) {
+  const m = /github\.com[:/]([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?\/?$/.exec(String(remoteUrl ?? '').trim());
+  return m ? m[1] : null;
+}
+
+/** Whether a full PR URL is PR `n` (of `repo`, when the repository is known). */
+const isPr = (url, n, repo) => url.endsWith(`/pull/${n}`) && (!repo || url.includes(`github.com/${repo}/pull/`));
+
+const atOrBefore = (a, b) => Date.parse(a) <= Date.parse(b);
 
 /**
- * The window's ordinary landings, oldest first, one per ticket. `landings` are parseLandingLog() records (subject and
- * body, newest first as git logs them); `numstat` are parseNumstat() records of the same window (files per commit).
- * A landing whose files were not read is not ordinary: `unread` counts them, so a short numstat is not a short sample.
+ * The first reason a landing is unread that needs no trail, or null when only its ticket's comments can tell.
+ * → { reason } | { unreadable } | { ticket } (read the trail).
  */
-export function ordinaryLandings(landings, numstat) {
+function triage(landing, files, gate) {
+  const ticket = ownTicket(landing.subject, landing.body);
+  if (!ticket) return { reason: UNREAD.noTicket };
+  if (!files) return { ticket, unreadable: 'no file list' };
+  if (!isOrdinaryLanding(landing, files)) return { ticket, reason: UNREAD.notOrdinary };
+  if (atOrBefore(landing.date, gate.mergedAt)) return { ticket, reason: UNREAD.beforeGate };
+  return { ticket };
+}
+
+/**
+ * The tickets whose comments measure 1 needs: those of the window's ordinary landings after the gate. The CLI reads
+ * only these, so a window before the gate spends no proxy call on measure 1.
+ */
+export function ticketsToRead({ landings, numstat, gate = GATE_LANDING }) {
   const filesOf = new Map(numstat.map((c) => [c.commit, c.files]));
-  const seen = new Map();
-  let unread = 0;
-  let repeat = 0;
+  const tickets = new Set();
+  for (const l of landings) {
+    const t = triage(l, filesOf.get(l.commit), gate);
+    if (t.ticket && !t.reason && !t.unreadable) tickets.add(t.ticket);
+  }
+  return [...tickets];
+}
+
+/**
+ * One landing against its ticket's trail. `trail` is { comments, truncated } or { reason } (a failed read).
+ * → { status: 'read', verdict, readAt, commentId, prUrl } | { status: <an UNREAD reason>, why? } | { status: 'unreadable', why }.
+ */
+export function readLanding({ landing, files, trail, gate = GATE_LANDING, repo = null }) {
+  const t = triage(landing, files, gate);
+  if (t.unreadable) return { status: 'unreadable', why: t.unreadable };
+  if (t.reason) return { status: t.reason };
+  if (!trail || trail.reason) return { status: 'unreadable', why: `ticket read failed: ${trail?.reason ?? 'not read'}` };
+  if (trail.truncated) return { status: 'unreadable', why: 'the ticket\'s comments came back truncated' };
+  const pr = landingPr(landing.subject);
+  if (pr == null) return { status: UNREAD.noRead, why: 'the landing names no PR' };
+  const before = (trail.comments ?? []).filter((c) => c && Date.parse(c.createdAt ?? '') < Date.parse(landing.date));
+  const prUrl = landingPrUrls(before).find((u) => isPr(u, pr, repo)) ?? null;
+  if (!prUrl) return { status: UNREAD.noRead, why: `#${pr} is not on the ticket's landing before the merge` };
+  const reads = before.map(parseBlindRead).filter((r) => r && r.prs.includes(prUrl));
+  if (!reads.length) return { status: UNREAD.noRead, why: `no blind read naming #${pr} before the merge` };
+  const latest = reads.reduce((a, b) => (Date.parse(b.at ?? '') >= Date.parse(a.at ?? '') ? b : a));
+  return { status: 'read', verdict: latest.verdict, readAt: latest.at, commentId: latest.commentId, prUrl };
+}
+
+/**
+ * Measure 1's row. `landings` are parseLandingLog() records of the window, `numstat` parseNumstat() records of the
+ * same window (files per commit), `trails` a Map ticket → { comments, truncated } | { reason } holding at least
+ * ticketsToRead()'s tickets. `repo` (owner/name) narrows a PR number to this repository's URL when it is known.
+ */
+export function blindRow({ landings, numstat, trails, gate = GATE_LANDING, repo = null, reference = null }) {
+  if (!landings.length) return notMeasured('blind', 'no landings in the window', { reference });
+  const filesOf = new Map(numstat.map((c) => [c.commit, c.files]));
+  const verdicts = Object.fromEntries(BLIND_READ_VERDICTS.map((v) => [v, 0]));
+  const unread = Object.fromEntries(Object.values(UNREAD).map((r) => [r, 0]));
+  const unreadableWhy = [];
+  const perLanding = [];
+  let read = 0;
   for (const l of [...landings].reverse()) {
     const ticket = ownTicket(l.subject, l.body);
-    if (!ticket) continue;
-    const files = filesOf.get(l.commit);
-    if (!files) { unread++; continue; }
-    if (!outsideDocs(files)) continue;
-    if (seen.has(ticket)) { seen.get(ticket).laterLandings.push(l.commit); repeat++; continue; }
-    seen.set(ticket, { commit: l.commit, ticket, date: l.date, subject: l.subject, laterLandings: [] });
+    const r = readLanding({ landing: l, files: filesOf.get(l.commit), trail: ticket ? trails.get(ticket) : null, gate, repo });
+    perLanding.push({ commit: l.commit, ticket, pr: landingPr(l.subject), mergedAt: l.date, ...r });
+    if (r.status === 'read') { read++; verdicts[r.verdict]++; } else if (r.status === 'unreadable') unreadableWhy.push(`${l.commit.slice(0, 9)} ${r.why}`);
+    else unread[r.status]++;
   }
-  return { ordinary: [...seen.values()], unread, repeatLandings: repeat };
-}
-
-/**
- * Up to `size` items evenly spaced through `items` (kept in their order): item floor((2i + 1) * n / 2size) for
- * i = 0..size-1, the middle of each of `size` equal stretches. Fewer items than `size`: all of them.
- */
-export function evenSample(items, size = SAMPLE_SIZE) {
-  if (items.length <= size) return [...items];
-  return Array.from({ length: size }, (_, i) => items[Math.floor(((2 * i + 1) * items.length) / (2 * size))]);
-}
-
-/** The sample row: which commits a blind reader reads, and the rule that picked them. */
-export function sampleRow({ landings, numstat, size = SAMPLE_SIZE, reference = null }) {
-  if (!landings.length) return notMeasured('sample', 'no landings in the window', { reference });
-  const { ordinary, unread, repeatLandings } = ordinaryLandings(landings, numstat);
-  if (!ordinary.length) {
-    return unread
-      ? notMeasured('sample', `no ordinary landing could be read (${unread} landing(s) had no file list)`, { reference })
-      : notMeasured('sample', 'no ordinary landings in the window (none names a ticket and touches code outside docs/)', { reference });
-  }
-  const sample = evenSample(ordinary, size);
+  if (unreadableWhy.length === landings.length) return notMeasured('blind', `no landing could be read (${unreadableWhy[0]})`, { reference });
   const value = {
-    rule: `up to ${size} ordinary landings (own ticket, a path outside docs/; one per ticket, its first), evenly spaced in landing order`,
-    landings: landings.length, ordinary: ordinary.length, repeatLandings, size, sampled: sample.length,
-    commits: sample,
+    landings: landings.length, read, verdicts, unread,
+    gate: { commit: gate.commit, pr: gate.pr, mergedAt: gate.mergedAt }, repo,
+    perLanding,
   };
-  return row('sample', value, { unreadable: unread, reason: unread ? `${unread} ticket landing(s) had no file list` : null, reference });
-}
-
-/**
- * The blind tally over the sample. `signs` is the parsed signs.json (sha → Balance cell), null when no --blind was
- * given (the row reads `pending blind reads`), or { reason } when the file could not be read.
- */
-export function blindRow({ sample, signs, reference = null }) {
-  if (sample.status === 'not measured') return notMeasured('blind', `no sample: ${sample.reason}`, { reference });
-  if (signs == null) return notMeasured('blind', PENDING_BLIND, { reference });
-  if (signs.reason) return notMeasured('blind', `signs unreadable: ${signs.reason}`, { reference });
-  const counts = { better: 0, neutral: 0, mixed: 0, worse: 0 };
-  const scores = [];
-  const perCommit = [];
-  const missing = [];
-  const unsigned = [];
-  for (const s of sample.value.commits) {
-    const cell = signs[s.commit];
-    if (typeof cell !== 'string') { missing.push(s.commit); perCommit.push({ commit: s.commit, ticket: s.ticket, sign: null }); continue; }
-    const coded = codeBalance(cell);
-    if (coded.sign === null) { unsigned.push(s.commit); perCommit.push({ commit: s.commit, ticket: s.ticket, sign: null, balance: coded.balance }); continue; }
-    counts[coded.sign]++;
-    scores.push(coded.score);
-    perCommit.push({ commit: s.commit, ticket: s.ticket, sign: coded.sign, score: coded.score, leans: coded.leans, balance: coded.balance });
-  }
-  const sampled = new Set(sample.value.commits.map((s) => s.commit));
-  const notSampled = Object.keys(signs).filter((k) => !sampled.has(k));
-  const why = [
-    missing.length ? `${missing.length} sampled commit(s) have no sign in signs.json` : null,
-    unsigned.length ? `${unsigned.length} Balance cell(s) have no leading sign word` : null,
-    notSampled.length ? `${notSampled.length} key(s) name no sampled commit (keys are full shas)` : null,
-  ].filter(Boolean).join('; ');
-  if (!scores.length) return notMeasured('blind', `no sampled commit has a readable sign (${why})`, { reference });
-  const neutralOrBetter = counts.better + counts.neutral + counts.mixed;
-  const value = {
-    read: scores.length, sampled: sample.value.sampled,
-    neutralOrBetter, neutralOrBetterShare: percent(neutralOrBetter, scores.length),
-    worse: counts.worse,
-    meanSign: round(mean(scores), 2),
-    counts, perCommit, missing, unsigned, notSampled,
-  };
-  const unreadable = missing.length + unsigned.length;
-  return row('blind', value, { unreadable, reason: unreadable ? why : null, reference });
+  return row('blind', value, {
+    unreadable: unreadableWhy.length,
+    reason: unreadableWhy.length ? `${unreadableWhy.length} landing(s) unreadable: ${unreadableWhy.join('; ')}` : null,
+    reference,
+  });
 }

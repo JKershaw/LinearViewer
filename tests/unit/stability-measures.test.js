@@ -6,11 +6,13 @@
 // LIN-4421: the tracker half. Landing ownership, finished-task selection across window edges, sessions as /cost
 // lineages (the recorded LIN-4393 fixture), speed and cost with their unreadable counts, the ID-span search, and the
 // paced proxy client (scripts/stability-measures-tracker.mjs) with injected fetch, sleep and clock.
-// LIN-4422: measure 1 (the shared Balance-to-sign rule against the paper's frozen codes, the fixed sample, the tally)
-// and measure 4 (loop rulings, origin not measured, the operator-free upper bound read from every lineage member's
+// LIN-4422: the Balance-to-sign rule against the paper's frozen codes (the rule now beside the paper's coder) and
+// measure 4 (loop rulings, origin not measured, the operator-free upper bound read from every lineage member's
 // feedback), and the seat read end to end through the same fake proxy.
 // LIN-4423: the reference reading (referencesFrom, the table's reference line, the CLI's refusals), the committed 8 Nov
 // reference against piece 1's verified figures, and the declaration naming every measure and row the tool emits.
+// LIN-4439: measure 1 reads the ledger (a pre-merge `## Blind read` naming each landing's PR, unread by named reason),
+// its trails through the paced client, the CLI end to end on a loopback proxy, and one source (no sample, no --blind).
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -26,14 +28,15 @@ import { compileScope } from '../../scripts/code-shape/code-shape-lib.mjs';
 import { NOT_NOTES, countWaiting, parseNote } from '../../lib/prompts/area-note-format.js';
 import {
   MEASURES, MINTED_NOT_SUPPLIED, NOT_BUILT, NO_REFERENCE_KEYS, NO_REFERENCE_ROWS, SCOPE_INCLUDE, STATUS, buildReading, churnRow, ciRow, costRow, firstDispatchOf, formatTable,
-  idSpanSearch, landingOwners, linesRow, mintedRow, noReferenceReading, notMeasured, ownTicket, parseLandingLog, parseNumstat,
+  idSpanSearch, landingOwners, landingPr, linesRow, mintedRow, noReferenceReading, notMeasured, ownTicket, parseLandingLog, parseNumstat,
   referencesFrom, row, selectFinished,
   sessionsOf, speedRow, tasksRow, waitingRow, waitingRows,
 } from '../../scripts/stability-measures-core.mjs';
-import { DISPATCH_LIST_LIMIT, createProxyClient, readSeat, readTracker, retryAfterMs, trackerNotMeasured } from '../../scripts/stability-measures-tracker.mjs';
+import { DISPATCH_LIST_LIMIT, createProxyClient, readSeat, readTracker, readTrails, retryAfterMs, trackerNotMeasured } from '../../scripts/stability-measures-tracker.mjs';
 import {
-  PENDING_BLIND, SAMPLE_SIZE, blindRow, codeBalance, evenSample, ordinaryLandings, sampleRow,
+  GATE_LANDING, UNREAD, blindRow, isOrdinaryLanding, repoSlugOf, ticketsToRead,
 } from '../../scripts/stability-measures-blind.mjs';
+import { codeBalance } from '../../docs/papers/harbour/cleaner-than-it-started-scripts/balance-sign.mjs';
 import {
   MISSING_CONDITION, ORIGIN_UNREADABLE, UPPER_BOUND, LOOP_ONLY, hasBlockedMarker, membersOf, operatorFreeRow, rulingsRow,
   seatNotMeasured, seatRows, taskConditions,
@@ -588,7 +591,8 @@ describe('the tracker read end to end, through a fake proxy', () => {
 });
 
 // ── LIN-4422: measure 1, no new mess ────────────────────────────────────────
-describe('the Balance-to-sign rule: one rule for the measure and the paper', () => {
+// The hand-run passes' rule left the measure with the sample (LIN-4439) and lives beside the paper's coder, its one user.
+describe('the Balance-to-sign rule: one rule for the paper\'s coder', () => {
   const frozen = ['2026-11-06', '2026-11-06-v2'].flatMap((d) => JSON.parse(readFileSync(join(ROOT, `docs/papers/harbour/cleaner-than-it-started-evidence/${d}/blind-codes.json`), 'utf8'))
     .passes.flatMap((p) => p.rows.map((r) => ({ ...r, where: `${d} ${p.id} #${r.row}` }))));
 
@@ -609,97 +613,169 @@ describe('the Balance-to-sign rule: one rule for the measure and the paper', () 
 
   test('the paper\'s coder imports the rule and keeps no sign map of its own', () => {
     const src = readFileSync(join(ROOT, 'docs/papers/harbour/cleaner-than-it-started-scripts/code-blind.mjs'), 'utf8');
-    assert.match(src, /import \{ codeBalance \} from '\.\.\/\.\.\/\.\.\/\.\.\/scripts\/stability-measures-blind\.mjs'/);
+    assert.match(src, /import \{ codeBalance \} from '\.\/balance-sign\.mjs'/);
     assert.doesNotMatch(src, /better\|neutral\|mixed\|worse|better: 1/);
   });
 });
 
-// Landings as git logs them, newest first: parseLandingLog records plus parseNumstat file lists.
-const window1 = (specs) => {
+// ── LIN-4439: measure 1 reads the ledger ────────────────────────────────────
+// Landings after the gate (PR #2413, merged 12 Nov 21:06:21Z) unless a test says otherwise, oldest first in `specs`,
+// handed over newest first as git logs them. A trail is a ticket's comments as GET /issues/{id} returns them.
+const PR = (n, repo = 'JKershaw/LinearViewer') => `https://github.com/${repo}/pull/${n}`;
+const AFTER = (h, m = 0) => new Date(Date.parse('2026-11-13T00:00:00Z') + (h * 60 + m) * 60e3).toISOString().replace('.000Z', 'Z');
+const read = (verdict, prs, createdAt, id = `r-${createdAt}`) => ({ id, createdAt, body: `## Blind read\n\nVerdict: ${verdict} because the area reads plainer now\n\n${prs.join('\n')}` });
+const said = (body, createdAt) => ({ id: `c-${createdAt}`, createdAt, body });
+const ledgerWindow = (specs) => {
   const landings = [];
   const numstat = [];
-  specs.forEach(([subject, paths], i) => {
-    const commit = `${String(i).padStart(2, '0')}`.padEnd(40, 'a');
-    landings.unshift(landing(commit, new Date(Date.parse('2026-11-05T00:00:00Z') + i * 3600e3).toISOString(), subject));
-    if (paths) numstat.unshift({ commit, files: paths.map((p) => ({ path: p, added: 1, deleted: 0 })) });
+  specs.forEach(({ subject, date, files = ['lib/x.js'] }, i) => {
+    const commit = `${String(i).padStart(2, '0')}`.padEnd(40, 'c');
+    landings.unshift(landing(commit, date, subject));
+    if (files) numstat.unshift({ commit, files: files.map((p) => ({ path: p, added: 1, deleted: 0 })) });
   });
   return { landings, numstat };
 };
+const trailsOf = (byTicket) => new Map(Object.entries(byTicket).map(([t, comments]) => [t, Array.isArray(comments) ? { comments, truncated: false } : comments]));
 
-describe('the blind-read sample: ordinary landings, fixed by rule', () => {
-  test('ordinary: names its own ticket and touches a path outside docs/; one landing per ticket, its first', () => {
-    const { landings, numstat } = window1([
-      ['LIN-1: code', ['lib/a.js']],
-      ['LIN-2: notes only', ['docs/areas/x.md']],
-      ['Tidy the README', ['README.md']],
-      ['LIN-1: a second piece', ['lib/b.js']],
-      ['LIN-3: code and docs', ['docs/x.md', 'routes/y.js']],
-    ]);
-    const { ordinary, unread, repeatLandings } = ordinaryLandings(landings, numstat);
-    assert.deepStrictEqual(ordinary.map((o) => o.ticket), ['LIN-1', 'LIN-3'], 'oldest first; LIN-2 docs-only and the unowned landing are not ordinary');
-    assert.deepStrictEqual(ordinary[0].laterLandings, [landings[1].commit], 'LIN-1\'s second piece is recorded, not sampled again');
-    assert.deepStrictEqual([unread, repeatLandings], [0, 1]);
+describe('measure 1: a landing counts as read only with a blind read naming its PR before its merge', () => {
+  const merged = AFTER(2);
+  const one = (comments, subject = 'LIN-1: change (#20)') => {
+    const { landings, numstat } = ledgerWindow([{ subject, date: merged }]);
+    return blindRow({ landings, numstat, trails: trailsOf({ 'LIN-1': comments }) });
+  };
+
+  test('a timely read naming the landing\'s PR counts as read, with its verdict', () => {
+    const r = one([said(`Implemented: ${PR(20)}`, AFTER(1)), read('worse', [PR(20)], AFTER(1, 30))]);
+    assert.deepStrictEqual([r.key, r.status, r.value.landings, r.value.read], ['blind', STATUS.MEASURED, 1, 1]);
+    assert.deepStrictEqual(r.value.verdicts, { better: 0, same: 0, worse: 1 });
+    assert.deepStrictEqual(r.value.unread, { [UNREAD.noTicket]: 0, [UNREAD.notOrdinary]: 0, [UNREAD.beforeGate]: 0, [UNREAD.noRead]: 0 });
+    assert.deepStrictEqual([r.value.perLanding[0].status, r.value.perLanding[0].verdict, r.value.perLanding[0].prUrl], ['read', 'worse', PR(20)]);
   });
 
-  test('more than 8: the middle of each of 8 equal stretches, the same commits on every run', () => {
-    const { landings, numstat } = window1(Array.from({ length: 20 }, (_, i) => [`LIN-${100 + i}: change`, ['lib/x.js']]));
-    const a = sampleRow({ landings, numstat });
-    const b = sampleRow({ landings: [...landings], numstat: [...numstat] });
-    assert.strictEqual(SAMPLE_SIZE, 8);
-    assert.deepStrictEqual(a.value.commits.map((c) => c.ticket), [1, 3, 6, 8, 11, 13, 16, 18].map((i) => `LIN-${100 + i}`));
-    assert.deepStrictEqual(a, b, 'a re-run picks the same sample');
-    assert.deepStrictEqual([a.status, a.value.ordinary, a.value.sampled], [STATUS.MEASURED, 20, 8]);
+  test('a read posted after the merge is no read on record', () => {
+    const r = one([said(`Implemented: ${PR(20)}`, AFTER(1)), read('better', [PR(20)], AFTER(2, 5))]);
+    assert.deepStrictEqual([r.value.read, r.value.unread[UNREAD.noRead]], [0, 1]);
+    assert.match(r.value.perLanding[0].why, /no blind read naming #20 before the merge/);
   });
 
-  test('fewer than 8: every ordinary landing, in landing order', () => {
-    const { landings, numstat } = window1([['LIN-7: a', ['lib/a.js']], ['LIN-8: b', ['public/b.js']], ['LIN-9: c', ['docs/c.md']]]);
-    const r = sampleRow({ landings, numstat });
-    assert.deepStrictEqual(r.value.commits.map((c) => c.ticket), ['LIN-7', 'LIN-8']);
-    assert.deepStrictEqual(evenSample([1, 2, 3]), [1, 2, 3]);
-    assert.deepStrictEqual(evenSample([]), []);
+  test('a read naming a different PR is no read on record', () => {
+    const r = one([said(`Implemented: ${PR(19)} then ${PR(20)}`, AFTER(1)), read('better', [PR(19)], AFTER(1, 30))]);
+    assert.deepStrictEqual([r.value.read, r.value.unread[UNREAD.noRead]], [0, 1]);
   });
 
-  test('a ticket landing with no file list is unreadable, counted; no ordinary landing at all is not measured', () => {
-    const { landings, numstat } = window1([['LIN-1: a', ['lib/a.js']], ['LIN-2: b', null]]);
-    const r = sampleRow({ landings, numstat });
-    assert.deepStrictEqual([r.status, r.unreadable, r.value.sampled], [STATUS.PARTIAL, 1, 1]);
-    const none = window1([['docs: notes', ['docs/a.md']]]);
-    assert.strictEqual(sampleRow(none).status, STATUS.NOT_MEASURED);
-    assert.strictEqual(sampleRow({ landings: [], numstat: [] }).reason, 'no landings in the window');
+  test('the newest timely read gives the verdict; a malformed read (no reason) is not a read', () => {
+    const r = one([said(PR(20), AFTER(1)), read('worse', [PR(20)], AFTER(1, 10)), read('same', [PR(20)], AFTER(1, 40)),
+      said(`## Blind read\n\nVerdict: better\n\n${PR(20)}`, AFTER(1, 50))]);
+    assert.deepStrictEqual(r.value.verdicts, { better: 0, same: 1, worse: 0 });
+  });
+
+  test('a PR that is not on the ticket\'s landing before the merge is no read on record, whatever a read names', () => {
+    const r = one([read('better', [PR(20)], AFTER(1))]);
+    assert.match(r.value.perLanding[0].why, /#20 is not on the ticket's landing before the merge/);
+    assert.match(one([said(PR(20), AFTER(1)), read('better', [PR(20)], AFTER(1, 5))], 'LIN-1: pushed straight to main').value.perLanding[0].why, /names no PR/);
+  });
+
+  test('a merge landing\'s PR is its "Merge pull request #N"; a squash landing\'s its trailing (#N)', () => {
+    assert.deepStrictEqual([landingPr('Merge pull request #2413 from JKershaw/feat/lin-4438-x'), landingPr('LIN-4419: pin Node (#2412)'), landingPr('LIN-1: see #12 for why')], [2413, 2412, null]);
+    const { landings, numstat } = ledgerWindow([{ subject: 'Merge pull request #21 from JKershaw/feat/lin-1-x', date: merged }]);
+    const r = blindRow({ landings, numstat, trails: trailsOf({ 'LIN-1': [said(PR(21), AFTER(1)), read('better', [PR(21)], AFTER(1, 5))] }) });
+    assert.deepStrictEqual(r.value.verdicts.better, 1);
+  });
+
+  test('with the repository known, a PR number names only that repository\'s PR', () => {
+    const foreign = PR(20, 'JKershaw/simple-dispatcher');
+    const { landings, numstat } = ledgerWindow([{ subject: 'LIN-1: change (#20)', date: merged }]);
+    const trails = trailsOf({ 'LIN-1': [said(foreign, AFTER(1)), read('better', [foreign], AFTER(1, 5))] });
+    assert.strictEqual(blindRow({ landings, numstat, trails }).value.read, 1, 'the number alone matches when the repository is unknown');
+    assert.strictEqual(blindRow({ landings, numstat, trails, repo: 'JKershaw/LinearViewer' }).value.unread[UNREAD.noRead], 1);
+    assert.deepStrictEqual([repoSlugOf('https://github.com/JKershaw/LinearViewer.git\n'), repoSlugOf('git@github.com:JKershaw/LinearViewer.git'), repoSlugOf('/tmp/x')],
+      ['JKershaw/LinearViewer', 'JKershaw/LinearViewer', null]);
   });
 });
 
-describe('the blind tally: neutral or better, worse, mean sign', () => {
-  const { landings, numstat } = window1(['LIN-1', 'LIN-2', 'LIN-3', 'LIN-4', 'LIN-5'].map((t) => [`${t}: x`, ['lib/x.js']]));
-  const sample = sampleRow({ landings, numstat });
-  const sha = (i) => sample.value.commits[i].commit;
+describe('measure 1: each unread landing is counted by its own named reason', () => {
+  const window = ledgerWindow([
+    { subject: 'LIN-1: before the gate (#10)', date: '2026-11-12T20:00:00Z' },
+    { subject: 'Merge pull request #2413 from JKershaw/feat/lin-4438-blind-read-gate', date: GATE_LANDING.mergedAt },
+    { subject: 'Tidy the README (#11)', date: AFTER(1) },
+    { subject: 'LIN-2: notes only (#12)', date: AFTER(2), files: ['docs/areas/x.md'] },
+    { subject: 'LIN-3: no read (#13)', date: AFTER(3) },
+    { subject: 'LIN-4: read (#14)', date: AFTER(4), files: ['docs/x.md', 'routes/y.js'] },
+  ]);
+  const trails = trailsOf({ 'LIN-3': [said(PR(13), AFTER(2, 30))], 'LIN-4': [said(PR(14), AFTER(3, 30)), read('better', [PR(14)], AFTER(3, 45))] });
+  const r = blindRow({ ...window, trails });
 
-  test('no signs given: the sample prints and the tally reads pending blind reads', () => {
-    const blind = blindRow({ sample, signs: null });
-    assert.deepStrictEqual([blind.status, blind.reason], [STATUS.NOT_MEASURED, PENDING_BLIND]);
-    const w = { base: 'b'.repeat(40), head: 'h'.repeat(40), baseDate: 'x', headDate: 'y', landings: 5 };
-    const table = formatTable(buildReading({ window: w, rows: { 'no-new-mess': [sample, blind] } }));
-    assert.match(table, /^1\. No new mess\n {3}sample +5 of 5 ordinary landings .*LIN-1, .*LIN-5\n {3}blind +not measured: pending blind reads$/m);
+  test('no ticket, not an ordinary landing, landed before the gate and no read on record each have a fixture', () => {
+    assert.deepStrictEqual(Object.keys(r.value.unread), ['no ticket', 'not an ordinary landing', 'landed before the gate', 'no read on record']);
+    assert.deepStrictEqual(r.value.unread, { 'no ticket': 1, 'not an ordinary landing': 1, 'landed before the gate': 2, 'no read on record': 1 });
+    assert.deepStrictEqual(r.value.perLanding.map((l) => l.status), ['landed before the gate', 'landed before the gate', 'no ticket', 'not an ordinary landing', 'no read on record', 'read'], 'oldest first');
+    assert.deepStrictEqual([r.status, r.value.landings, r.value.read, r.value.verdicts.better], [STATUS.MEASURED, 6, 1, 1]);
   });
 
-  test('a mixed balance counts 0: better, mixed, mixed (leans worse), neutral, worse', () => {
-    const signs = { [sha(0)]: '**better**', [sha(1)]: '**mixed**', [sha(2)]: '**mixed (leans worse)**', [sha(3)]: '**neutral**', [sha(4)]: '**worse**' };
-    const r = blindRow({ sample, signs });
-    assert.deepStrictEqual([r.status, r.value.read, r.value.neutralOrBetter, r.value.neutralOrBetterShare, r.value.worse, r.value.meanSign], [STATUS.MEASURED, 5, 4, 80, 1, 0]);
-    assert.deepStrictEqual(r.value.counts, { better: 1, neutral: 1, mixed: 2, worse: 1 });
-    assert.strictEqual(r.value.perCommit[2].leans, 'worse');
+  test('the gate is piece 3\'s landing; its own merge was not held by it, so it counts as before the gate', () => {
+    assert.deepStrictEqual([GATE_LANDING.pr, GATE_LANDING.ticket, GATE_LANDING.commit.slice(0, 9)], [2413, 'LIN-4438', 'eb14b7fff']);
+    assert.strictEqual(r.value.perLanding[1].ticket, 'LIN-4438');
+    assert.deepStrictEqual(r.value.gate, { commit: GATE_LANDING.commit, pr: 2413, mergedAt: GATE_LANDING.mergedAt });
   });
 
-  test('a sampled commit with no sign, or a cell with no sign word, is unreadable, never neutral', () => {
-    const r = blindRow({ sample, signs: { [sha(0)]: '**better**', [sha(1)]: '(with #3)', [sha(2).slice(0, 9)]: '**worse**' } });
-    assert.deepStrictEqual([r.status, r.value.read, r.unreadable, r.value.meanSign, r.value.worse], [STATUS.PARTIAL, 1, 4, 1, 0]);
-    assert.match(r.reason, /3 sampled commit\(s\) have no sign in signs\.json; 1 Balance cell\(s\) have no leading sign word; 1 key\(s\) name no sampled commit \(keys are full shas\)/);
+  test('only ordinary landings after the gate need their ticket\'s comments', () => {
+    assert.deepStrictEqual(ticketsToRead(window), ['LIN-4', 'LIN-3']);
   });
 
-  test('no readable sign, or an unreadable signs file, is not measured with its reason', () => {
-    assert.match(blindRow({ sample, signs: {} }).reason, /^no sampled commit has a readable sign/);
-    assert.strictEqual(blindRow({ sample, signs: { reason: 'x.json: Unexpected token' } }).reason, 'signs unreadable: x.json: Unexpected token');
-    assert.match(blindRow({ sample: notMeasured('sample', 'no landings in the window'), signs: null }).reason, /^no sample: no landings/);
+  test('ordinary is LIN-4422\'s definition: its own ticket and a path outside docs/', () => {
+    assert.strictEqual(isOrdinaryLanding(landing('a', 'x', 'LIN-5: x'), [{ path: 'docs/a.md' }, { path: 'lib/a.js' }]), true);
+    assert.strictEqual(isOrdinaryLanding(landing('a', 'x', 'LIN-5: x'), [{ path: 'docs/a.md' }]), false);
+    assert.strictEqual(isOrdinaryLanding(landing('a', 'x', 'Tidy'), [{ path: 'lib/a.js' }]), false);
+  });
+
+  test('the opening table prints the read count, the verdicts and every unread reason', () => {
+    const w = { base: 'b'.repeat(40), head: 'h'.repeat(40), baseDate: 'x', headDate: 'y', landings: 6 };
+    assert.match(formatTable(buildReading({ window: w, rows: { 'no-new-mess': [r] } })),
+      /^1\. No new mess\n {3}blind +1 of 6 landings read blind before merge \(better 1, same 0, worse 0\); unread: no ticket 1, not an ordinary landing 1, landed before the gate 2, no read on record 1$/m);
+  });
+});
+
+describe('measure 1: what could not be read is counted, never "no read"', () => {
+  const window = ledgerWindow([{ subject: 'LIN-1: a (#1)', date: AFTER(1) }, { subject: 'LIN-2: b (#2)', date: AFTER(2) }, { subject: 'LIN-3: c (#3)', date: AFTER(3), files: null },
+    { subject: 'LIN-4: d (#4)', date: AFTER(4) }]);
+
+  test('a failed ticket read, a truncated trail and a landing with no file list make the row partial', () => {
+    const r = blindRow({ ...window, trails: trailsOf({ 'LIN-1': { reason: 'HTTP 500' }, 'LIN-2': { comments: [], truncated: true }, 'LIN-4': [] }) });
+    assert.deepStrictEqual([r.status, r.unreadable, r.value.read, r.value.unread[UNREAD.noRead]], [STATUS.PARTIAL, 3, 0, 1], 'the truncated trail is not "no read"');
+    assert.match(r.reason, /ticket read failed: HTTP 500; .* comments came back truncated; .* no file list/);
+  });
+
+  test('no landing readable, or no landing at all, is not measured with its reason', () => {
+    const { landings, numstat } = ledgerWindow([{ subject: 'LIN-1: a (#1)', date: AFTER(1) }]);
+    const none = blindRow({ landings, numstat, trails: new Map() });
+    assert.deepStrictEqual([none.status, none.value], [STATUS.NOT_MEASURED, null]);
+    assert.match(none.reason, /^no landing could be read \(.* ticket read failed: not read\)$/);
+    assert.deepStrictEqual(blindRow({ landings: [], numstat: [], trails: new Map() }), notMeasured('blind', 'no landings in the window'));
+  });
+});
+
+describe('measure 1: the trails come through the paced proxy client, one issue read per ticket', () => {
+  const client = (routes) => {
+    const paths = [];
+    const fetch = async (url) => {
+      const path = url.replace('http://p/api/proxy', '');
+      paths.push(path);
+      const r = routes[path] ?? { status: 500 };
+      return { status: r.status, headers: { get: () => null }, json: async () => r.body ?? {} };
+    };
+    return { paths, client: createProxyClient({ base: 'http://p/api/proxy', fetch, now: () => 0, sleep: async () => {} }) };
+  };
+
+  test('a known trail costs no call; the rest are read, a truncated one flagged and a failed one carrying its reason', async () => {
+    const { client: c, paths } = client({
+      '/issues/LIN-2': { status: 200, body: { comments: [said('x', AFTER(1))], truncated: { comments: true } } },
+      '/issues/LIN-3': { status: 404 },
+      '/issues/LIN-4': { status: 200, body: { comments: [said('y', AFTER(1))] } },
+    });
+    const known = new Map([['LIN-1', { comments: [], truncated: false }]]);
+    const { trails } = await readTrails({ client: c, tickets: ['LIN-1', 'LIN-2', 'LIN-3', 'LIN-4'], known });
+    assert.deepStrictEqual(paths, ['/issues/LIN-2', '/issues/LIN-3', '/issues/LIN-4']);
+    assert.deepStrictEqual([trails.get('LIN-1'), trails.get('LIN-2').truncated, trails.get('LIN-3'), trails.get('LIN-4').truncated], [known.get('LIN-1'), true, { reason: 'issue not found' }, false]);
   });
 });
 
@@ -886,8 +962,7 @@ describe('the reference: written and read by the tool, never another definition'
   });
 
   test('the rows a reference never has are the rows measures 1 and 4 emit, in their modules\' order', () => {
-    const sample = sampleRow({ landings: [], numstat: [] });
-    assert.deepStrictEqual(NO_REFERENCE_ROWS['no-new-mess'], [sample.key, blindRow({ sample, signs: null }).key]);
+    assert.deepStrictEqual(NO_REFERENCE_ROWS['no-new-mess'], [blindRow({ landings: [], numstat: [], trails: new Map() }).key]);
     assert.deepStrictEqual(NO_REFERENCE_ROWS.seat, seatNotMeasured('x').map((r) => r.key));
     assert.deepStrictEqual(NO_REFERENCE_KEYS, [...NO_REFERENCE_ROWS['no-new-mess'], ...NO_REFERENCE_ROWS.seat]);
   });
@@ -903,10 +978,10 @@ describe('the reference: written and read by the tool, never another definition'
     const refs = referencesFrom(reference([churnRow(parseNumstat('@a\n\n3\t1\tlib/x.js'), inScope), notMeasured('blind', noReferenceReading('8 Nov'))]));
     const table = formatTable(buildReading({
       window,
-      rows: { curve: [churnRow(parseNumstat('@a\n\n9\t3\tlib/x.js'), inScope, { reference: refs.churn })], 'no-new-mess': [blindRow({ sample: notMeasured('sample', 'x'), signs: null, reference: refs.blind })] },
+      rows: { curve: [churnRow(parseNumstat('@a\n\n9\t3\tlib/x.js'), inScope, { reference: refs.churn })], 'no-new-mess': [blindRow({ landings: [], numstat: [], trails: new Map(), reference: refs.blind })] },
     }));
     assert.match(table, new RegExp(`churn +${live.value.added} added.*\\n {20}8 Nov: 3 added, 1 deleted over 1 landings`));
-    assert.match(table, /blind +not measured: no sample: x\n {20}8 Nov: not measured: no 8 Nov reading; the first reading sets it/);
+    assert.match(table, /blind +not measured: no landings in the window\n {20}8 Nov: not measured: no 8 Nov reading; the first reading sets it/);
   });
 
   test('the CLI refuses a reference reading read against a reference, and a --reference that is not one, before any read', () => {
@@ -978,7 +1053,7 @@ describe('the declaration names what the tool emits', () => {
 });
 
 // The CLI's own reads (LIN-4423 leftovers): git numstat with merge landings, the landing log's ownership, Waiting in both
-// repositories, the runner's endpoints by date, the `gh` listing and the --blind file, run end to end on fixture
+// repositories, the runner's endpoints by date, the `gh` listing and measure 1 without a proxy, run end to end on fixture
 // repositories. `gh` is a stand-in script first on PATH that records its arguments and prints fixed runs, so nothing
 // leaves the machine. The lookback's prior-landing log is read only with a proxy, so its test gives a loopback stand-in
 // whose issue list is empty: the tracker rows stop there, after the log was read. The proxy reads themselves are the
@@ -987,7 +1062,7 @@ describe('the CLI\'s reads, end to end on fixture repositories', () => {
   const note = (n) => `# x\n\n## Lessons\n\n## Waiting\n\n${Array.from({ length: n }, (_, i) => `- \`lib/a.js\`: entry ${i}.\n`).join('')}`;
   const at = (d) => `2026-01-0${d}T12:00:00Z`;
 
-  test('churn counts a merge landing against its first parent; tickets, Waiting, runner endpoints, CI and --blind are read', () => {
+  test('churn counts a merge landing against its first parent; tickets, Waiting, runner endpoints and CI are read; measure 1 needs --api', () => {
     const repo = makeRepo();
     const runner = makeRepo();
     const fake = mkdtempSync(join(tmpdir(), 'stability-gh-'));
@@ -1021,7 +1096,6 @@ describe('the CLI\'s reads, end to end on fixture repositories', () => {
       // Without --diff-merges=first-parent the merge landing has no numstat and churn reads 2 added, 0 deleted.
       assert.deepStrictEqual([rows.churn.value.landings, rows.churn.value.added, rows.churn.value.deleted], [2, 5, 1]);
       assert.deepStrictEqual(rows.lines.value.net, { total: 4, code: 2, comment: 1, blank: 1 });
-      assert.deepStrictEqual(rows.sample.value.commits.map((c) => [c.commit, c.ticket]), [[squash, 'LIN-1'], [merge, 'LIN-2']]);
       assert.deepStrictEqual([rows['waiting.harbour'].value.base, rows['waiting.harbour'].value.head], [1, 3]);
       assert.deepStrictEqual([rows['waiting.runner'].value.base, rows['waiting.runner'].value.head, rows['waiting.runner'].value.headSha], [1, 2, runnerHead]);
       assert.deepStrictEqual([rows.ci.value.runs, rows.ci.value.medianMinutes], [2, 6], 'the base\'s run is not a landing\'s');
@@ -1029,14 +1103,9 @@ describe('the CLI\'s reads, end to end on fixture repositories', () => {
       for (const [flag, value] of [['--workflow', 'test.yml'], ['--branch', 'main'], ['--status', 'success'], ['--created', '2026-01-01..2026-01-05']]) {
         assert.strictEqual(ghArgs[ghArgs.indexOf(flag) + 1], value, flag);
       }
-      assert.strictEqual(rows.blind.reason, PENDING_BLIND);
-
-      const signs = join(fake, 'signs.json');
-      writeFileSync(signs, JSON.stringify({ [squash]: '**better** (small)', [merge]: '**worse**' }));
-      const blind = cli('--blind', signs).blind;
-      assert.deepStrictEqual([blind.status, blind.value.neutralOrBetter, blind.value.worse, blind.value.meanSign], [STATUS.MEASURED, 1, 1, 0]);
-      writeFileSync(signs, '[]');
-      assert.match(cli('--blind', signs).blind.reason, /^signs unreadable: .* is not an object keyed by commit sha$/);
+      // No proxy: measure 1 is a not-measured row in the core's shape, never a zero count (lesson LIN-4420).
+      assert.deepStrictEqual(rows.blind, notMeasured('blind', 'no --api given and HARBOUR_LOCAL_BASE unset'));
+      assert.ok(!('sample' in rows), 'the sample row is gone: measure 1 has one row');
     } finally {
       repo.cleanup(); runner.cleanup(); rmSync(fake, { recursive: true, force: true });
     }
@@ -1044,7 +1113,7 @@ describe('the CLI\'s reads, end to end on fixture repositories', () => {
 
   // LIN-4423 review, ledger item 1: the committed reference tests assert a static file, so this drives the code path that
   // writes a reference (--as-reference) and reads it back beside the live rows (--reference). Seen red under each of: the
-  // CLI's refs forced to {}, the runner tip kept in a reference's output, sample and blind read live in reference mode.
+  // CLI's refs forced to {}, the runner tip kept in a reference's output, the blind row read live in reference mode.
   test('--as-reference writes a reference reading that --reference reads back beside each live row', () => {
     const repo = makeRepo();
     const runner = makeRepo();
@@ -1076,7 +1145,7 @@ describe('the CLI\'s reads, end to end on fixture repositories', () => {
       const second = cli('--reference', file);
       const rows = rowsOf(second.out);
       assert.deepStrictEqual(rows.churn.reference, { label: 'fix', status: STATUS.MEASURED, value: refRows.churn.value, reason: null, unreadable: 0 });
-      assert.strictEqual(rows.sample.reference.reason, noReferenceReading('fix'));
+      assert.strictEqual(rows.blind.reference.reason, noReferenceReading('fix'));
       assert.match(second.stderr, /\n {20}fix: \d/);
     } finally {
       repo.cleanup(); runner.cleanup(); rmSync(fake, { recursive: true, force: true });
@@ -1106,4 +1175,85 @@ test('the lookback reads the first-parent landings of the days before base, base
   } finally {
     server.close(); repo.cleanup(); rmSync(fake, { recursive: true, force: true });
   }
+});
+
+// LIN-4439: measure 1 end to end. A fixture repository whose window holds one landing for each outcome, its origin a
+// GitHub remote, and a loopback stand-in proxy serving each ticket's comments. Its issue list fails, so the tracker
+// stops after one call (the client paces at 1.2 s a call) and measure 1 reads its own trails: only the tickets of
+// ordinary landings after the gate. Reusing the tracker's trails is readTrails' `known` (the client test above).
+test('measure 1 reads each ticket\'s comments through --api and counts the window\'s landings by outcome', async () => {
+  const repo = makeRepo();
+  const fake = mkdtempSync(join(tmpdir(), 'stability-gh-'));
+  const lv = (n) => `https://github.com/JKershaw/LinearViewer/pull/${n}`;
+  const foreign = 'https://github.com/JKershaw/simple-dispatcher/pull/8';
+  const blindRead = (verdict, url, createdAt) => ({ id: createdAt, createdAt, body: `## Blind read\n\nVerdict: ${verdict}, the new module has one obvious home\n\n${url}` });
+  const comments = {
+    'LIN-1': [{ id: 'a', createdAt: '2026-11-13T10:30:00Z', body: `Implemented: ${lv(5)}` }, blindRead('better', lv(5), '2026-11-13T10:50:00Z')],
+    'LIN-3': [{ id: 'b', createdAt: '2026-11-13T12:30:00Z', body: `See ${foreign}` }, blindRead('same', foreign, '2026-11-13T12:40:00Z')],
+  };
+  const paths = [];
+  const server = createServer((req, res) => {
+    paths.push(req.url);
+    res.setHeader('content-type', 'application/json');
+    const m = /^\/issues\/(LIN-\d+)$/.exec(req.url);
+    if (m) return res.end(JSON.stringify({ identifier: m[1], state: { type: 'started' }, comments: comments[m[1]] ?? [] }));
+    res.statusCode = 404;
+    return res.end('{}');
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try {
+    repo.git('remote', 'add', 'origin', 'https://github.com/JKershaw/LinearViewer.git');
+    const base = repo.commit({ 'lib/a.js': 'const a = 0;\n' }, '2026-11-12T20:00:00Z', 'base');
+    repo.commit({ 'lib/a.js': 'const a = 1;\n' }, '2026-11-12T21:00:00Z', 'LIN-4: before the gate (#4)');
+    repo.commit({ 'lib/b.js': 'const b = 1;\n' }, '2026-11-13T11:00:00Z', 'LIN-1: add b (#5)');
+    repo.commit({ 'docs/n.md': 'n\n' }, '2026-11-13T11:30:00Z', 'LIN-2: notes only (#6)');
+    repo.commit({ 'lib/c.js': 'const c = 1;\n' }, '2026-11-13T12:00:00Z', 'Tidy c (#7)');
+    repo.git('checkout', '-q', '-b', 'feat/lin-3-d');
+    repo.commit({ 'lib/d.js': 'const d = 1;\n' }, '2026-11-13T12:50:00Z', 'work');
+    repo.git('checkout', '-q', 'main');
+    spawnSync('git', ['-C', repo.dir, '-c', 'user.name=t', '-c', 'user.email=t@example.com', 'merge', '-q', '--no-ff', 'feat/lin-3-d',
+      '-m', 'Merge pull request #8 from x/feat/lin-3-d', '-m', 'Add d'], { env: { ...process.env, GIT_AUTHOR_DATE: '2026-11-13T13:00:00Z', GIT_COMMITTER_DATE: '2026-11-13T13:00:00Z' } });
+    const head = repo.git('rev-parse', 'HEAD').trim();
+    writeFileSync(join(fake, 'gh'), '#!/bin/sh\necho "[]"\n');
+    chmodSync(join(fake, 'gh'), 0o755);
+    const out = await new Promise((resolve, reject) => execFile(process.execPath,
+      [join(ROOT, 'scripts/stability-measures.mjs'), repo.dir, base, head, '--api', `http://127.0.0.1:${server.address().port}`, '--lookback-days', '0'],
+      { env: { ...process.env, HARBOUR_LOCAL_BASE: '', PATH: `${fake}${delimiter}${process.env.PATH}` } },
+      (e, stdout, stderr) => (e ? reject(new Error(stderr || e.message)) : resolve({ json: JSON.parse(stdout), table: stderr }))));
+    const blind = rowsOf(out.json).blind;
+    assert.deepStrictEqual([blind.status, blind.value.landings, blind.value.read, blind.value.repo], [STATUS.MEASURED, 5, 1, 'JKershaw/LinearViewer']);
+    assert.deepStrictEqual(blind.value.verdicts, { better: 1, same: 0, worse: 0 });
+    // LIN-3 is a merge landing (its ticket from the branch, its PR from "Merge pull request #8"); its read names
+    // simple-dispatcher's #8, not this repository's: no read on record.
+    assert.deepStrictEqual(blind.value.unread, { 'no ticket': 1, 'not an ordinary landing': 1, 'landed before the gate': 1, 'no read on record': 1 });
+    assert.deepStrictEqual(paths, ['/issues?limit=50', '/issues/LIN-3', '/issues/LIN-1'], 'LIN-4 (before the gate) and LIN-2 (not ordinary) cost no call');
+    assert.match(rowsOf(out.json).tasks.reason, /^proxy: issue list: not found$/);
+    assert.match(out.table, /blind +1 of 5 landings read blind before merge \(better 1, same 0, worse 0\)/);
+  } finally {
+    server.close(); repo.cleanup(); rmSync(fake, { recursive: true, force: true });
+  }
+});
+
+// LIN-4439 acceptance: one source for measure 1. The hand-scored input and the sample are gone from the tool and its
+// declaration, and nothing else in the measuring scripts scores a blind read.
+test('measure 1 has one source: no --blind input and no sample anywhere in the tool or its declaration', () => {
+  const files = ['scripts/stability-measures.mjs', 'scripts/stability-measures-core.mjs', 'scripts/stability-measures-blind.mjs',
+    'scripts/stability-measures-tracker.mjs', 'scripts/stability-measures-seat.mjs', 'docs/reviews/stability-measures/README.md'];
+  for (const f of files) {
+    const src = readFileSync(join(ROOT, f), 'utf8');
+    assert.doesNotMatch(src, /--blind\b|signs\.json|sampleRow|evenSample|SAMPLE_SIZE|pending blind reads/, f);
+  }
+  assert.ok(!rowsOf(REFERENCE).sample, 'the committed reference has no sample row');
+  assert.ok(!('blind' in REFERENCE.inputs), 'the committed reference records no --blind input');
+});
+
+// LIN-4439 acceptance: the hand-run pass is retired in writing, dated, in every place the plan names, and the
+// declaration says a diff-scoped read does not replace the Periodicals.
+test('the retirement line is dated in the place ledger, the notebook, the paper\'s evidence folder and the declaration', () => {
+  for (const f of ['docs/plans/survey/place-ledger.md', 'docs/plans/survey.md', 'docs/papers/harbour/cleaner-than-it-started-evidence/README.md', 'docs/reviews/stability-measures/README.md']) {
+    const text = readFileSync(join(ROOT, f), 'utf8');
+    assert.match(text, /12 Nov(?:ember)? 2026 \(LIN-4439\)/, `${f} dates the retirement`);
+    assert.match(text, /the balance is the pre-merge `## Blind read`, counted by measure 1[\s\S]{0,200}?and the\shand-run pass stops/, `${f} says what replaces the pass`);
+  }
+  assert.match(DECLARATION, /does not replace the Periodicals[\s\S]*LIN-4253 read better in both hand-run blind passes, while Seams & Tangles run 8 rated/);
 });

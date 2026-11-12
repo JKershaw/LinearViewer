@@ -125,6 +125,7 @@ A second independent blind pass (batches C and D, reshuffled with seed 1105) is 
 - **Rows both passes rate better:** LIN-4168, LIN-4173, LIN-4179 (baseline), and LIN-4203, LIN-4218, LIN-4234, LIN-4151, LIN-4143 (forward). **Worse in both:** LIN-4241. **Neutral in both:** LIN-4048. LIN-4212 (unsurveyed) is worse, then "mixed, leans worse".
 - **What the forward rows rated better have in common:** a deletion (LIN-4203), a priced tally row done as its own task (LIN-4218), a tidy-after as its own ticket (LIN-4234), and two features whose change *was* removing a second path or a flag (LIN-4151, LIN-4143). The ordinary features that added a capability (LIN-4241, LIN-4242, LIN-4243, LIN-4048) are mixed, neutral or worse.
 - **From here, the balance column is the blind read.** My column stays as history.
+- **12 Nov 2026 (LIN-4439): From this merge, the balance is the pre-merge `## Blind read`, counted by measure 1 (`scripts/stability-measures.mjs`; its declaration is `docs/reviews/stability-measures/README.md`), and the hand-run pass stops.** The balance column and its rows below stay as history; no new row gets a hand-run balance.
 
 ## Forward rows from 5 Nov (balance = the blind read)
 

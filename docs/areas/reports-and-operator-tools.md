@@ -31,10 +31,12 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   `/cost` lists, not roots: on LIN-4393 each member's own resume lines were missing from
   its root's merged read. `dispatchedBy` is never origin (one account for autopilot and
   person), and `/rulings` returns loop rulings only (LIN-4422).
-- A blind read's Balance becomes a sign only through `codeBalance` in
-  `scripts/stability-measures-blind.mjs`; the paper's coder
-  (`docs/papers/harbour/cleaner-than-it-started-scripts/code-blind.mjs`) imports it, and
-  re-running that must reproduce both frozen blind codes files (LIN-4422).
+- Measure 1 has one source, the pre-merge `## Blind read`: a landing counts as read only when a
+  read naming its PR was posted before its merge, matched through `landingPrUrls` and
+  `parseBlindRead` from `lib/run-ledger.js`, never a parser of its own; anything else is
+  unread under a named reason. A hand-run Balance cell becomes a sign only in
+  `docs/papers/harbour/cleaner-than-it-started-scripts/balance-sign.mjs`, beside the paper's
+  coder, which must reproduce both frozen codes files (LIN-4439).
 - Rounding, the mean and percentages come from the core (`round`, `mean`, `percent`); a new
   stability module imports them, never re-spells `Math.round(x * 1000) / 10`. A landing or a
   commit is credited to one ticket only through `ownTicket`; `scripts/delivery-composition.mjs`
