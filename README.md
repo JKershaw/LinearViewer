@@ -160,6 +160,8 @@ OPENROUTER_FREE_TIER_KEY=server-key-for-free-tier  # Optional: enables free-tier
 
 ### 3. Install and Run
 
+Node.js 24 or newer is required. `.nvmrc` names the version CI tests (`nvm use` selects it), and `npm run env:check` reports anything missing.
+
 ```bash
 npm install
 npx playwright install   # first-time setup, for E2E tests

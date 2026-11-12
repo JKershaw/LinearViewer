@@ -1,0 +1,55 @@
+name: Node LTS (scheduled)
+
+# LIN-4419. The supported Node range is `>=24` (package.json engines), and CI
+# tests only the `.nvmrc` major on every PR. This job covers the rest of the
+# range: the newest LTS, weekly, unit suite only. It checks two things: the
+# suite passes there, and `npm ci` prints no EBADENGINE/EBADDEVENGINES warning.
+#
+# The `pull_request` trigger is permanent and filtered to this file's path, so
+# ordinary PRs never start it. A workflow only dispatches from the default
+# branch, so this trigger is how an edit to this file gets its own run before
+# it lands. Costs nothing on other PRs.
+
+on:
+  schedule:
+    # Mondays at 07:00 UTC (about 4 runs a month).
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/node-lts-scheduled.yml'
+
+jobs:
+  newest-lts:
+    name: Unit suite on newest Node LTS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js (newest LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      # Warnings are fatal here. npm writes engine warnings to stderr, so the
+      # output is captured as well as shown. `shell: bash` gives pipefail, so
+      # a failing `npm ci` fails the step even through `tee`.
+      - name: Install dependencies (no engine warnings allowed)
+        shell: bash
+        run: |
+          npm ci 2>&1 | tee npm-ci.log
+          node -v && npm -v
+          if grep -E 'EBADENGINE|EBADDEVENGINES' npm-ci.log; then
+            echo "::error::npm ci printed an engine warning on the newest LTS; see the lines above."
+            exit 1
+          fi
+
+      # GitHub sets CI=true on every job. The Mongo-gated tests (for example
+      # mongo-smoke) then hard-fail without MONGODB_TEST_URI. This job adds no
+      # Mongo service: the risk being checked is Node against our code and
+      # dependencies. `env -u CI` removes the variable, which is different
+      # from leaving it out of `env:`.
+      - name: Run unit suite (hermetic, CI unset)
+        run: env -u CI npm run test:hermetic
