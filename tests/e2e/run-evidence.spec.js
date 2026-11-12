@@ -57,6 +57,9 @@ async function seedLocalWorkspaceWithEvidence(page, { extraPrUrl = null } = {}) 
   const comments = [
     { id: 'c-pr', body: `Opened the pull request: ${PR}${extraPrUrl ? ` and ${extraPrUrl}` : ''}`, createdAt: '2026-07-01T10:00:00Z', user: 'Runner' },
     { id: 'c-review', body: REVIEW_BODY, createdAt: '2026-07-02T10:00:00Z', user: 'Reviewer' },
+    // LIN-4438: a blind read naming every PR after the review, so the box meets the PR's own state
+    // (head moved, several PRs) rather than the blind-read gate in front of it.
+    { id: 'c-read', body: `## Blind read\nVerdict: same. It left the seeded area neither better nor worse.\n\nRead: ${[PR, extraPrUrl].filter(Boolean).join(', ')}.`, createdAt: '2026-07-02T11:00:00Z', user: 'Reader' },
   ];
   const resp = await page.request.post('/test/set-local-session', {
     data: {

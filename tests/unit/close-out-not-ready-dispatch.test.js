@@ -27,7 +27,11 @@ const MOVED = 'bbbbbbb2222222';
 
 const reviewBody = `## Review\n\nReviewed head \`${REVIEWED}\`.\n\n### What CI Did Not Prove\n| # | Claim | In/Out | Discharge |\n| --- | --- | --- | --- |\n| 1 | one claim | In | none |\n\n**Verdict: Approve**`;
 const comment = (body, createdAt) => ({ body, createdAt, user: 'reviewer' });
-const COMMENTS = [comment(PR, '2026-07-01T00:00:00.000Z'), comment(reviewBody, '2026-07-02T00:00:00.000Z')];
+// LIN-4438: a blind read naming the PR, after the review, so the head-moved cases below meet the head
+// check rather than the blind-read gate in front of it.
+const readBody = (url = PR) => `## Blind read\nVerdict: same. It gave the readiness rule one owner and left nothing worse.\n\nRead: ${url} at \`${REVIEWED}\` against \`0000000\`.`;
+const NO_READ = [comment(PR, '2026-07-01T00:00:00.000Z'), comment(reviewBody, '2026-07-02T00:00:00.000Z')];
+const COMMENTS = [...NO_READ, comment(readBody(), '2026-07-03T00:00:00.000Z')];
 const openStatus = (number, sha, over = {}) => ({ readable: true, repo: 'acme/widget', number, state: 'open', merged: false, head: { ref: 'f', sha }, ref: sha, checks: [], ...over });
 
 function makeStore() {
@@ -135,17 +139,19 @@ describe('LIN-3634: session close-out readiness stage', () => {
     assert.equal(second.status, 409, JSON.stringify(second.body));
   });
 
-  test('ordinary ladder close-out (not stop-at): admitted with ZERO provider / comment / PR reads', async () => {
+  // LIN-4438 reverses LIN-3634's "zero reads" pin on purpose: the ladder lane now spends ONE comment
+  // read (and still no PR or GitHub read) so the session lane cannot close out past the blind-read gate.
+  test('ordinary ladder close-out (not stop-at) with a read on record: admitted with one comment read and NO PR read', async () => {
     const { store } = makeStore();
     const seam = makeSeam({ stopAt: null });
     const res = await post(buildApp(store, seam), CLOSE_OUT);
     assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.deepEqual(seam.calls, { resolveProvider: 0, fetchIssueComments: 0, readPrStatus: 0 });
+    assert.deepEqual(seam.calls, { resolveProvider: 1, fetchIssueComments: 1, readPrStatus: 0 });
   });
 
   test('two open PRs, a review that is not Approve, and a merged PR are not head-moved: admitted', async () => {
     const cases = {
-      'two open PRs': makeSeam({ comments: [comment(`${PR} https://github.com/acme/widget/pull/42`, '2026-07-01T00:00:00.000Z'), COMMENTS[1]], statuses: { 41: openStatus(41, MOVED), 42: openStatus(42, MOVED) } }),
+      'two open PRs': makeSeam({ comments: [comment(`${PR} https://github.com/acme/widget/pull/42`, '2026-07-01T00:00:00.000Z'), COMMENTS[1], comment(readBody(`${PR}, https://github.com/acme/widget/pull/42`), '2026-07-03T00:00:00.000Z')], statuses: { 41: openStatus(41, MOVED), 42: openStatus(42, MOVED) } }),
       'not approved': makeSeam({ comments: [COMMENTS[0], comment(reviewBody.replace('Approve', 'Request Changes'), '2026-07-02T00:00:00.000Z')] }),
       merged: makeSeam({ statuses: { 41: openStatus(41, MOVED, { state: 'closed', merged: true }) } })
     };
@@ -241,8 +247,58 @@ describe('LIN-3634: session close-out readiness stage', () => {
       const followUpTo = await warmItem(store, app);
       const res = await post(app, { ...CLOSE_OUT, followUpTo });
       assert.equal(res.status, 201, JSON.stringify(res.body));
-      assert.equal(seam.calls.fetchIssueComments, 0);
+      assert.equal(seam.calls.fetchIssueComments, 1, 'the ladder lane reads the comments once (LIN-4438)');
+      assert.equal(seam.calls.readPrStatus, 0);
     });
+  });
+});
+
+describe('LIN-4438: the session lane holds the blind-read gate', () => {
+  test('ladder lane, approve and no read: 409 CLOSE_OUT_NOT_READY / blind-read-missing, no row, no PR read', async () => {
+    const { store, getInsertCount } = makeStore();
+    const seam = makeSeam({ stopAt: null, comments: NO_READ });
+    const res = await post(buildApp(store, seam), CLOSE_OUT);
+    assert.equal(res.status, 409, JSON.stringify(res.body));
+    assert.equal(res.body.code, CLOSE_OUT_NOT_READY_CODE);
+    assert.equal(res.body.reason, 'blind-read-missing');
+    assert.equal(res.body.error, 'No blind read on record since the review');
+    assert.equal(getInsertCount(), 0);
+    assert.deepEqual(seam.calls, { resolveProvider: 1, fetchIssueComments: 1, readPrStatus: 0 });
+  });
+
+  test('stop-at lane, approve and no read: 409 blind-read-missing, even with the head unmoved', async () => {
+    const { store } = makeStore();
+    const res = await post(buildApp(store, makeSeam({ comments: NO_READ, statuses: { 41: openStatus(41, REVIEWED) } })), CLOSE_OUT);
+    assert.equal(res.status, 409, JSON.stringify(res.body));
+    assert.equal(res.body.reason, 'blind-read-missing');
+  });
+
+  test('ladder lane: with a read admitted; with no review admitted; a read of another PR only refused', async () => {
+    const cases = {
+      'read on record': [COMMENTS, 201],
+      'no review': [[comment(PR, '2026-07-01T00:00:00.000Z')], 201],
+      'read names another PR': [[...NO_READ, comment(readBody('https://github.com/acme/widget/pull/40'), '2026-07-03T00:00:00.000Z')], 409],
+      'request changes': [[NO_READ[0], comment(reviewBody.replace('Approve', 'Request Changes'), '2026-07-02T00:00:00.000Z')], 201],
+    };
+    for (const [name, [comments, status]] of Object.entries(cases)) {
+      const { store } = makeStore();
+      const res = await post(buildApp(store, makeSeam({ stopAt: null, comments })), CLOSE_OUT);
+      assert.equal(res.status, status, `${name}: ${JSON.stringify(res.body)}`);
+    }
+  });
+
+  test('ladder lane: an unreadable comment read admits and logs', async () => {
+    const { store } = makeStore();
+    const errors = [];
+    const original = console.error;
+    console.error = (...args) => { errors.push(args); };
+    try {
+      const res = await post(buildApp(store, makeSeam({ stopAt: null, throwComments: true })), CLOSE_OUT);
+      assert.equal(res.status, 201, JSON.stringify(res.body));
+    } finally {
+      console.error = original;
+    }
+    assert.ok(errors.some(a => a[0] === '[close-out-readiness] guard read failed, admitting:'), JSON.stringify(errors));
   });
 });
 

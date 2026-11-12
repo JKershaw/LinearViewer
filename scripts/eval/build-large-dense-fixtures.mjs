@@ -75,10 +75,13 @@ const TARGETS = [
       + 'so `blocked` is defensible alongside the remaining S3 implement round: accept-set = implement|implementation|blocked.'
   },
   {
-    id: 'LIN-2944', role: 'dense leaf', expect: ['implement', 'implementation'],
+    id: 'LIN-2944', role: 'dense leaf', expect: ['blind-read'],
     labelSource: 'live', changed: true,
     note: 'Beat 2 said breakdown. Live: P0 merged; the trail records "next action implementation for P1" and a '
       + 'ruling "Dispatch implement for N4+T1". Beat-3 re-score: accept-set widened to the existing fixture convention.'
+      + ' LIN-4438: the slice merged by a close-out before the blind-read gate, with no read on record and the ticket '
+      + 'still In Progress, so code sends one blind read first (a close-out after the review never resets the landing; '
+      + 'only Done stands aside); the selector picks implementation after it.'
   },
   {
     id: 'LIN-3059', role: 'dense leaf', expect: ['blocked'],
@@ -87,10 +90,13 @@ const TARGETS = [
       + '`lin3059-hosted-witness` = after-3098.'
   },
   {
-    id: 'LIN-3098', role: 'dense leaf', expect: ['implement', 'implementation'],
+    id: 'LIN-3098', role: 'dense leaf', expect: ['blind-read'],
     labelSource: 'hand', changed: false,
     note: 'S4 merged; S5 (hosted-witness runbook) is the next implementation slice; S6 waits on LIN-3136. '
       + 'Beat-3 re-score: accept-set widened to the existing fixture convention.'
+      + ' LIN-4438: the slice merged by a close-out before the blind-read gate, with no read on record and the ticket '
+      + 'still In Progress, so code sends one blind read first (a close-out after the review never resets the landing; '
+      + 'only Done stands aside); the selector picks implementation after it.'
   },
   {
     id: 'LIN-3107', role: 'dense leaf', expect: ['retrospective-audit'],

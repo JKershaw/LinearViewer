@@ -38,6 +38,10 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - A task timeline lane is running from the page's open session ids (`isOpenState`), never the
   cost row; a lineage's own `incomplete`, not the shared `lineagesTruncated`, decides "not
   complete" (LIN-4405, `lib/task-timeline.js`).
+- Close-out readiness has five lanes: the route (`codeRouteOf`), the stop-at state, the task page's
+  box (`buildRunEvidence`) and both guard lanes (`closeOutNotReady`). A readiness rule goes in
+  `closeOutWaitsOn` (`lib/run-closeout-state.js`) and gets a row in the shared-trail table
+  (`lin-4438-blind-read-gate`); gating one lane let the page offer a press the guard refused (LIN-4438).
 - A reader that classifies by kind routes `custom` before `bucketOf`: `BUCKET_OF_KIND` maps
   `custom` to orchestration, and `bucketOf` falls back to orchestration silently, so check membership
   (`lib/wall-clock-summary.js`). `dispatchesOf` turns a missing kind into `custom` (`lib/cost-read.js`):
@@ -82,6 +86,11 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - `lib/recent-runs.js`: `runFact` reads only the row's feedback: a stage parked `[pending]` whose
   lineage ends `[blocked]` or `[skipped]` reads `running` and holds the live-stage wait until
   aborted. (LIN-4392.)
-- `lib/run-evidence.js`: `buildRunEvidence`, given a precomputed `ledger` without a `blindRead`
-  key, falls back to the latest read on the whole trail rather than after its review (no caller
-  does this yet; piece 3's gate should pass the chain's ledger whole). (Review of LIN-4437.)
+- `lib/run-ledger.js`: `landingPrUrls` counts every full PR URL after its anchor, so it disagrees with
+  the other landing readers in two cases the shared-trail table pins as chosen, not designed
+  (`tests/unit/lin-4438-blind-read-gate.test.js` rows 14 and 15): an audit report that re-cites a
+  merged landing PR puts it in the notes PR's landing (`auditAfterLandingCloseOut` in
+  `lib/recommendation-facts.js` treats only the new PR as the notes PR), and a foreign PR cited
+  before the first review joins a first landing (`isLandingEvidence` skew, the Survey-report entry
+  in llm-and-prompts). Each costs a read that must name an extra PR. One comment classifier and one
+  landing reader would make both follow from one rule. (LIN-4438; Survey global on LIN-4438.)

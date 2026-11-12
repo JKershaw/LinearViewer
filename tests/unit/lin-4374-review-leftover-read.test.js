@@ -1,15 +1,17 @@
 /**
- * LIN-4374 (piece 3 of LIN-4347): review reads the leftovers, close-out writes the notes.
+ * LIN-4374 (piece 3 of LIN-4347): review reads the leftovers, close-out writes the notes; reshaped by
+ * LIN-4438 (piece 3 of LIN-4396), which retired review's edges read to the blind read.
  *
- * - Review's "Isolated, or One of a Class?" section carries the one read of what the change
- *   left at its edges: the builder's `### Leftovers` comment against the diff, each untouched
- *   edge routed to a fix, a note entry or an outside follow-up, and never by itself Request
- *   Changes (the review loop bound is untouched).
+ * - Review no longer reads what the change left at its edges (the blind read does, before close-out).
+ *   It keeps one sentence: the builder's `Retires:` line names a waiting entry this diff removes, a
+ *   check the blind reader cannot make, since it never sees the leftovers.
+ * - Close-out takes over the builder's hand-off: Follow-up Triage takes the `### Leftovers` lines
+ *   marked for close-out through the gate, in the leaf's one spelling of that mark (`FOR_CLOSE_OUT`),
+ *   which the leftover prompt asks for in the same words.
  * - Close-out writes review's note entries into `docs/areas/<slug>.md` on the PR branch before
  *   the merge, stays the only filer, and states the one-home rule in Follow-up Triage.
  * - The heading and where a leftover goes have one spelling each, in the leaf
- *   `lib/prompts/leftover-words.js` (LIN-4376), rendered verbatim by the leftover prompt,
- *   review and close-out.
+ *   `lib/prompts/leftover-words.js` (LIN-4376), rendered verbatim by the leftover prompt and close-out.
  * - The two post-merge readers (`retrospective-audit`, `retro`) are left as they were.
  *
  * Run with: node --test tests/unit/lin-4374-review-leftover-read.test.js
@@ -21,7 +23,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { generatePrompt } from '../../lib/prompt-templates.js';
-import { LEFTOVERS_HEADING, LEFTOVER_RULE, CONSEQUENCE_TEST, RETIRES_LABEL, RETIRES_NONE } from '../../lib/prompts/leftover-words.js';
+import { LEFTOVERS_HEADING, LEFTOVER_RULE, CONSEQUENCE_TEST, RETIRES_LABEL, RETIRES_NONE, FOR_CLOSE_OUT } from '../../lib/prompts/leftover-words.js';
 import * as dispatchFields from '../../lib/dispatch-fields.js';
 import * as dispatchLeftover from '../../lib/dispatch-leftover.js';
 import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
@@ -50,24 +52,35 @@ function section(prompt, heading) {
   return end < 0 ? rest : rest.slice(0, end);
 }
 
-describe('review: the one read of what the change left at its edges (LIN-4374)', () => {
-  const classCheck = section(render('review'), 'Isolated, or One of a Class?');
+describe('review keeps its retirement check and no longer reads the edges (LIN-4438)', () => {
+  const review = render('review');
 
-  test('the read sits in the class check and reads the builder\'s answer under the shared heading', () => {
-    assert.ok(classCheck.includes('**What the change left at its edges.**'), classCheck);
-    assert.ok(classCheck.includes('`' + LEFTOVERS_HEADING + '`'), 'names the heading the leftover step posts under');
-    assert.match(classCheck, /Read the diff against the builder's/);
-    assert.match(classCheck, /if there is one/, 'with no answer on the ticket, review still reads the diff');
-    assert.match(classCheck, /neither tidied nor in its area's notes/);
+  test('review keeps its Retires: sentence, in the leaf\'s words', () => {
+    assert.ok(review.includes('Check that the `' + RETIRES_LABEL + '` line of the builder\'s `' + LEFTOVERS_HEADING + '` comment names a waiting entry this diff removes.'), 'the one sentence');
   });
 
-  test('each untouched edge has one of three routes, in the shared words, named for close-out', () => {
-    assert.ok(classCheck.includes(LEFTOVER_RULE), 'renders LEFTOVER_RULE verbatim');
-    assert.match(classCheck, /Name each for close-out with its home; word a note entry as it should land\./);
+  test('review no longer reads the edges', () => {
+    assert.ok(!review.includes('What the change left at its edges'), 'the edges paragraph is gone');
+    assert.ok(!review.includes(LEFTOVER_RULE), 'review renders no leftover rule');
+    assert.doesNotMatch(review, /Read the diff against the builder's/);
+    assert.doesNotMatch(review, /A leftover alone is never Request Changes/);
+  });
+});
+
+describe('close-out takes the builder\'s hand-off (LIN-4438)', () => {
+  test('Follow-up Triage takes the lines marked for close-out through the gate, in the shared label', () => {
+    const triage = section(render('close-out'), 'Follow-up Triage');
+    assert.ok(triage.includes('Take the builder\'s `' + LEFTOVERS_HEADING + '` lines marked ' + FOR_CLOSE_OUT + ' through it too.'), triage);
+    assert.ok(triage.indexOf(CONSEQUENCE_TEST) < triage.indexOf(FOR_CLOSE_OUT + ' through it'), 'beside the gate it goes through');
   });
 
-  test('a leftover alone never makes Request Changes, and defects keep their route', () => {
-    assert.match(classCheck, /A leftover alone is never Request Changes; a defect keeps its route\./);
+  test('the leftover prompt renders the same label, from the leaf, in both places', () => {
+    const PROMPT = leftoverPrompt({ issueIdentifier: 'LIN-9001', prUrl: 'https://github.com/o/r/pull/1' });
+    assert.equal(FOR_CLOSE_OUT, 'for close-out');
+    assert.ok(PROMPT.includes(`note; ${FOR_CLOSE_OUT}, list only ticket-bound ones`));
+    assert.ok(PROMPT.includes(`any area's note / ${FOR_CLOSE_OUT}, a ticket only`));
+    const src = readFileSync(join(ROOT, 'lib/dispatch-leftover.js'), 'utf8');
+    assert.ok(!src.includes(FOR_CLOSE_OUT), 'lib/dispatch-leftover.js renders the label, never retypes it');
   });
 });
 
@@ -95,10 +108,10 @@ describe('the leftover heading and rule have one spelling each (LIN-4374, LIN-43
   const OWNER = 'lib/prompts/leftover-words.js';
   const PROMPT = leftoverPrompt({ issueIdentifier: 'LIN-9001', prUrl: 'https://github.com/o/r/pull/1' });
 
-  test('the leftover prompt, review and close-out each render the heading or rule from the leaf', () => {
+  test('the leftover prompt and close-out each render the heading and rule from the leaf', () => {
     assert.ok(PROMPT.includes('`' + LEFTOVERS_HEADING + '`'), 'leftover prompt: the heading');
     assert.ok(PROMPT.includes(LEFTOVER_RULE), 'leftover prompt: the rule');
-    assert.ok(render('review').includes(LEFTOVER_RULE), 'review: the rule');
+    assert.ok(render('close-out').includes('`' + LEFTOVERS_HEADING + '`'), 'close-out: the heading');
     assert.ok(render('close-out').includes(LEFTOVER_RULE), 'close-out: the rule');
   });
 

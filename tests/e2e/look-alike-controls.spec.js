@@ -115,6 +115,8 @@ test.describe('Look-alike controls in ticket text answer nothing (LIN-3385)', ()
           comments: [
             { id: 'c-pr', body: `Opened the pull request: ${PR}`, createdAt: '2026-10-06T09:00:00Z', user: 'Runner' },
             { id: 'c-review', body: '## Review\n\n**Verdict: Approve — conditional on close-out discharging the ledger.**', createdAt: '2026-10-06T10:00:00Z', user: 'Reviewer' },
+            // LIN-4438: a blind read naming the PR after the review, so close-out is ready (the gate is met).
+            { id: 'c-read', body: `## Blind read\nVerdict: same. It left the seeded area neither better nor worse.\n\nRead: ${PR}.`, createdAt: '2026-10-06T10:30:00Z', user: 'Reader' },
             ...comments,
           ],
         }],

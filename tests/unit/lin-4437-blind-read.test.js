@@ -260,10 +260,10 @@ describe('the prompt is the piloted text', () => {
 
 describe('the ledger carries the read', () => {
   const trail = [summary(1), review(2), read1(3, [PR], 'same')];
-  test('readRunLedger and assembleTrailFacts attach blindRead', () => {
-    assert.equal(readRunLedger(trail).blindRead.verdict, 'same');
+  test('assembleTrailFacts attaches blindRead (the route reads it); readRunLedger no longer does (LIN-4438: nothing read it)', () => {
     assert.equal(assembleTrailFacts(trail, '').review.blindRead.verdict, 'same');
-    assert.equal(readRunLedger([summary(1), review(2)]).blindRead, null);
+    assert.equal(assembleTrailFacts([summary(1), review(2)], '').review.blindRead, null);
+    assert.equal(Object.hasOwn(readRunLedger(trail), 'blindRead'), false);
   });
   test('buildRunEvidence carries it, and the fragment shows the verdict and reason, or none on record', () => {
     const model = buildRunEvidence({ comments: trail, issueIdentifier: 'LIN-1' });
@@ -275,8 +275,15 @@ describe('the ledger carries the read', () => {
     assert.match(renderRunEvidence(buildRunEvidence({ comments: [summary(1), review(2)], issueIdentifier: 'LIN-1' })), /no blind read on record/);
   });
   test('a precomputed ledger brings its own read', () => {
-    const ledger = { ...readRunLedger(trail) };
+    const ledger = { ...readRunLedger(trail), blindRead: assembleTrailFacts(trail, '').review.blindRead };
     assert.equal(buildRunEvidence({ comments: [], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead.verdict, 'same');
+  });
+  test('a precomputed ledger with no blindRead key reads the read after ITS review, not the whole trail (LIN-4438)', () => {
+    const older = [read1(1, [PR], 'worse'), summary(2), review(3)];
+    const ledger = readRunLedger(older);
+    assert.equal(buildRunEvidence({ comments: older, ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead, null, 'review in the comments');
+    assert.equal(buildRunEvidence({ comments: [older[0]], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead, null, 'placed by the ledger time');
+    assert.equal(buildRunEvidence({ comments: [...older, read1(4, [PR], 'same')], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead.verdict, 'same');
   });
 });
 

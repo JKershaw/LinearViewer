@@ -375,7 +375,9 @@ describe('readers: a Linear workspace reads with the minted token', () => {
     assert.match(anon.reason, /\b403\b|rate limit/i);
   });
 
-  test('C1: a close-out that does not stop at the PR makes zero installation calls and zero provider reads', async () => {
+  // LIN-4438 changed this pin on purpose: the ladder lane now reads the comments once (the blind-read
+  // gate), and still asks for no installation token, since it reads no PR.
+  test('C1: a close-out that does not stop at the PR makes zero installation calls and one provider (comment) read', async () => {
     let asked = 0;
     let providerReads = 0;
     const state = await closeOutNotReady({
@@ -388,7 +390,7 @@ describe('readers: a Linear workspace reads with the minted token', () => {
     });
     assert.equal(state, null);
     assert.equal(asked, 0);
-    assert.equal(providerReads, 0);
+    assert.equal(providerReads, 1);
   });
 
   test('C2: a guard read after a cached read still fetches the live head', async () => {
