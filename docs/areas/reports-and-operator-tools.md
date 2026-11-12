@@ -82,12 +82,6 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   in use are priced and that the choice lists name listed models. Renaming moves the
   scheduler job name (its `scheduler-locks` doc), the server.js registration, the
   scheduler census and `docs/architecture/source-map.md`. (LIN-4358 leftovers.)
-- `scripts/code-shape/retention.mjs`: its no-acorn check in `scripts/code-shape/wrappers.test.mjs`
-  ("without acorn each CLI … exits 2") copies the kit under `tmpdir()` and assumes no
-  `node_modules` above it, but its guard test only checks `tmpdir()/node_modules`. A dispatched
-  session's `TMPDIR` sits under the simple-dispatcher checkout, which has `node_modules/acorn`,
-  so the test fails there on clean main while CI's `/tmp` passes. Walking every ancestor in the
-  guard, or copying to a directory known to have none, would make it say why. (LIN-4423 leftovers.)
 - `scripts/stability-measures.mjs`: its declaration's contract
   (`docs/reviews/stability-measures/README.md`) is checked from two files. The `DECLARATION`
   block in `tests/unit/stability-measures.test.js` checks that it names every row the tool emits;
