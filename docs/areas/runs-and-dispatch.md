@@ -96,3 +96,12 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   `lib/recommendation-facts.js` treats only the new PR as the notes PR), and a foreign PR cited
   before the first review joins a first landing. Each costs a read that must name an extra PR. One
   comment classifier and one landing reader would make both follow from one rule. (LIN-4438; Survey global on LIN-4438.)
+- `lib/run-closeout-state.js`: `deriveCloseOutState` works from two PR lists: `prs` (`extractPrUrls`,
+  every PR ever cited) drives the PR-shape reasons (multiple-prs, partial, merged) and `landingPrs`
+  (`landingPrUrls`) drives the blind-read gate, so the box can count PRs the gate ignores and the
+  other way round (pinned in `tests/unit/lin-4438-blind-read-gate.test.js` rows 14 and 15). Which
+  reader answers "this task's PRs" spans the box, the guard and the route. (Blind read on LIN-4439.)
+- `lib/close-out-readiness.js`: in the stop-at lane `deriveCloseOutState` lets merged and partial
+  outrank the gate, then `closeOutNotReady` asks `closeOutWaitsOn` again to override it, so the box
+  state is not the guard's whole answer and the precedence lives in two files. Carrying the gate's
+  answer in the state changes the box model the renderers read. (Blind read on LIN-4439.)
