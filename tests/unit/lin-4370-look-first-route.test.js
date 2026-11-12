@@ -41,7 +41,7 @@ import { buildPeriodicalGateMarker, isPeriodicalReview } from '../../lib/periodi
 import { liveWaitOf, STAGE_IN_FLIGHT_CODE } from '../../lib/recommendation-live-wait.js';
 import { getRecommendation, getRecommendationStream, setFetchImpl, setPromptTraceRecorder, buildSelectorArgs } from '../../lib/openrouter.js';
 import { generatePrompt, PROMPT_TEMPLATES, deriveDispatchKind } from '../../lib/prompt-templates.js';
-import { SURVEY_HEADINGS } from '../../lib/prompt-template-defs.js';
+import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
 import { sealAsAsked } from '../../lib/as-asked.js';
 import { stageRuns } from '../../lib/recent-runs.js';
 import { buildRouterPrompt } from '../../lib/stage-router.js';
