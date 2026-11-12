@@ -9,10 +9,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, mkdtempSync, mkdirSync, writeFileSync, copyFileSync, chmodSync, rmSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { runEnvCheck } from '../fixtures/env-check-harness.js';
 
 const root = new URL('../../', import.meta.url);
 const read = (p) => readFileSync(new URL(p, root), 'utf8');
@@ -52,29 +50,6 @@ test('every setup-node step reads .nvmrc, none hard-codes a version', () => {
   }
   assert.ok(steps >= 4);
 });
-
-// Run a copy of env-check.sh in a temp tree whose .nvmrc we control, with a stub `node`
-// first on PATH, so the script's own reading of .nvmrc is what decides the output.
-function runEnvCheck({ nvmrc, nodeVersion }) {
-  const tmp = mkdtempSync(join(tmpdir(), 'env-check-'));
-  try {
-    mkdirSync(join(tmp, 'scripts'));
-    mkdirSync(join(tmp, 'bin'));
-    copyFileSync(new URL('scripts/env-check.sh', root), join(tmp, 'scripts', 'env-check.sh'));
-    if (nvmrc !== null) writeFileSync(join(tmp, '.nvmrc'), `${nvmrc}\n`);
-    const stub = join(tmp, 'bin', 'node');
-    writeFileSync(stub, `#!/bin/sh\necho v${nodeVersion}\n`);
-    chmodSync(stub, 0o755);
-    const r = spawnSync('bash', [join(tmp, 'scripts', 'env-check.sh')], {
-      cwd: tmpdir(),
-      encoding: 'utf8',
-      env: { ...process.env, PATH: `${join(tmp, 'bin')}:${process.env.PATH}` },
-    });
-    return { out: r.stdout, err: r.stderr };
-  } finally {
-    rmSync(tmp, { recursive: true, force: true });
-  }
-}
 
 test('env-check derives its Node requirement from .nvmrc, from any cwd', () => {
   const old = runEnvCheck({ nvmrc: '99', nodeVersion: '18.0.0' });

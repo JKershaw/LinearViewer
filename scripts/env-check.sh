@@ -98,17 +98,26 @@ if [ -n "$LINEAR_API_KEY" ]; then
   ready+=("LINEAR_API_KEY")
 fi
 
-# Check Playwright browsers
-playwright_ok=0
-if [ -d "node_modules/playwright-core/.local-browsers" ]; then
-  playwright_ok=1
-elif [ -d "$HOME/.cache/ms-playwright" ]; then
-  playwright_ok=1
-elif [ -d "/ms-playwright" ]; then
-  playwright_ok=1
-elif [ -n "$PLAYWRIGHT_BROWSERS_PATH" ] && compgen -G "$PLAYWRIGHT_BROWSERS_PATH/chromium*" > /dev/null; then
-  playwright_ok=1
+# Check Playwright browsers. Every candidate cache follows one standard (LIN-2386):
+# it counts only when it holds a chromium* entry (chromium_headless_shell-* too),
+# so an empty or firefox-only directory is still a blocker. Hand-kept list: keep it
+# in step with where Playwright installs on each OS (Linux honours $XDG_CACHE_HOME).
+playwright_caches=(
+  "node_modules/playwright-core/.local-browsers"
+  "${XDG_CACHE_HOME:-$HOME/.cache}/ms-playwright"
+  "$HOME/Library/Caches/ms-playwright"
+  "/ms-playwright"
+)
+if [ -n "$PLAYWRIGHT_BROWSERS_PATH" ]; then
+  playwright_caches+=("$PLAYWRIGHT_BROWSERS_PATH")
 fi
+playwright_ok=0
+for d in "${playwright_caches[@]}"; do
+  if compgen -G "$d/chromium*" > /dev/null; then
+    playwright_ok=1
+    break
+  fi
+done
 
 if [ "$playwright_ok" -eq 1 ]; then
   ready+=("Playwright browsers installed")
