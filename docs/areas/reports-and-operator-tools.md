@@ -38,7 +38,8 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
 - Rounding, the mean and percentages come from the core (`round`, `mean`, `percent`); a new
   stability module imports them, never re-spells `Math.round(x * 1000) / 10`. A landing or a
   commit is credited to one ticket only through `ownTicket`; `scripts/delivery-composition.mjs`
-  uses it too since LIN-4422 (its ticket counts fell by 1 to 5 a week) (LIN-4422 leftovers).
+  uses it too since LIN-4422 (its weekly ticket counts since 1 Oct moved by 1 to 5: down in
+  five weeks, up 1 in one) (LIN-4422 leftovers).
 
 ## Waiting
 
