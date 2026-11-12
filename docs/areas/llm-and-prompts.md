@@ -84,3 +84,7 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   (`lib/prompts/leftover-words.js`) sends a find that touches safety to a ticket. The two rules in
   this area answer the live-secret case oppositely; having Periodicals render the gate needs
   John's ruling on that case first. (LIN-4401, LIN-4431.)
+- `lib/prompts/leftover-words.js`: since `CONSEQUENCE_TEST` (LIN-4401), outside finds gather as
+  Waiting entries in other areas' notes where tickets used to be filed. LIN-4414's one retirement
+  per build drains only the areas a build touches, so rarely touched notes (other-features) will
+  grow; their Waiting counts are the honest measure. (LIN-4431.)
