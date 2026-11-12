@@ -7,10 +7,13 @@
 //   partial       value set from what could be read, `unreadable` counts what could not, `reason` names it;
 //   not measured  value null, reason says why, unreadable null.
 // A source that is missing or unreadable is `not measured`, never 0. Zero is a reading: a commit that can be read and
-// has no notes directory has 0 Waiting entries. Later pieces (LIN-4421..LIN-4423) add rows of the same shape.
+// has no notes directory has 0 Waiting entries. Later pieces add rows of the same shape.
 // LIN-4421 adds the tracker half: landing ownership, finished-task selection, sessions, speed, cost and the ID-span
 // search for tickets minted. Its reads come in as records too (issue reads, /cost bodies, probe results); the search
 // takes an injected probe, so the core still does no I/O of its own.
+// LIN-4422 adds measures 1 and 4 in their own pure modules, beside this one: the blind-read sample and tally
+// (scripts/stability-measures-blind.mjs, which owns the one Balance-to-sign rule) and the person's seat
+// (scripts/stability-measures-seat.mjs). Their rows use row/notMeasured from here; formatTable prints them.
 
 export const SCOPE_INCLUDE = '^(server\\.js$|(lib|routes|public)/.*\\.[cm]?js$)';
 export const NOT_BUILT = 'not built yet';
@@ -220,7 +223,8 @@ const inWindow = (at, baseDate, headDate) => at != null && new Date(at) > new Da
  * before base and marked Done after it (close-out runs after the merge) counts here, not nowhere.
  *
  * `window` and `prior` are landingOwners() of the window's landings and of the landings read before base.
- * `issues` maps id → { state: { type }, completedAt } or { reason } (an issue read that failed).
+ * `issues` maps id → { state: { type }, completedAt, parent? } or { reason } (an issue read that failed). A finished
+ * task carries its parent's id (or null), so the seat row can name rulings anchored on a parent (LIN-4422).
  * Window tickets not finished here are counted by why, never dropped. A prior-only ticket not finished here belongs
  * to another window and is not reported. Any failed read is unreadable: it might have been finished here.
  */
@@ -238,7 +242,7 @@ export function selectFinished({ window, prior = { owners: new Map() }, issues, 
     if (done && inWindow(issue.completedAt, baseDate, headDate)) {
       const own = [window.owners.get(id), prior.owners.get(id)].filter(Boolean);
       const lastLandingAt = own.map((o) => o.lastLandingAt).sort((a, b) => new Date(b) - new Date(a))[0];
-      finished.push({ id, completedAt: issue.completedAt, lastLandingAt, landedInWindow: inThis });
+      finished.push({ id, completedAt: issue.completedAt, lastLandingAt, landedInWindow: inThis, parent: issue.parent ?? null });
     } else if (inThis) {
       (done ? doneOutside : notDone).push(done ? { id, completedAt: issue.completedAt } : { id, state: issue.state?.name ?? issue.state?.type ?? null });
     }
@@ -451,6 +455,10 @@ const signed = (n) => (n == null ? '—' : `${n > 0 ? '+' : ''}${n.toLocaleStrin
 const summarise = (r) => {
   const v = r.value;
   switch (r.key) {
+    case 'sample': return `${v.sampled} of ${v.ordinary} ordinary landings (of ${v.landings}; ${v.repeatLandings} repeat ticket landing(s) skipped): ${v.commits.map((c) => `${c.commit.slice(0, 9)} ${c.ticket}`).join(', ')}`;
+    case 'blind': return `${v.neutralOrBetterShare}% neutral or better (${v.neutralOrBetter} of ${v.read} read), ${v.worse} worse, mean sign ${signed(v.meanSign)} (better ${v.counts.better}, neutral ${v.counts.neutral}, mixed ${v.counts.mixed}, worse ${v.counts.worse})`;
+    case 'rulings': return `${v.label}: ${v.raised} raised over ${v.finished} finished tasks, ${v.perFinishedTask} per task (distinct decisions); answered ${v.answeredShare == null ? '—' : `${v.answeredShare}%`} of answered + dismissed (answered ${v.outcomes.answered}, dismissed ${v.outcomes.dismissed}, withdrawn ${v.outcomes.withdrawn}, open ${v.outcomes.open}); not read: ${v.notRead.join('; ')}`;
+    case 'operator-free': return `${v.label}: ${v.share}% (${v.operatorFree} of ${v.read} tasks) with ${v.conditions.join(', ')}; failing: ruling ${v.failing.ruling}, blocked ${v.failing.blocked}, operator-closed ${v.failing.operatorClosed}; missing condition: ${v.missingCondition}; closedReason 'operator' is a catch-all and may push the share down`;
     case 'lines': return `net ${signed(v.net.total)} (code ${signed(v.net.code)}, comment-only ${signed(v.net.comment)}, blank ${signed(v.net.blank)}); ${signed(v.perLanding.total)} per landing; totals ${num(v.base.total)} → ${num(v.head.total)}; comment-only share ${v.base.commentShare}% → ${v.head.commentShare}%`;
     case 'churn': return `${num(v.added)} added, ${num(v.deleted)} deleted over ${v.landings} landings; ${v.perLanding.added} added and ${v.perLanding.deleted} deleted per landing; ${v.deletedPerAdded} deleted per added`;
     case 'ci': return `median ${v.medianMinutes} min over ${v.runs} runs (${v.landingsWithRun} of ${v.landings} landings)`;

@@ -25,6 +25,16 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   base, not all of history: a task whose only landings predate the lookback and that finished
   in the window is missed. The bound is printed on the `tasks` row; widen it there, never by
   matching more of each message (LIN-4421).
+- "Went blocked" is any `[blocked]` feedback entry (`WAKE_FEEDBACK_REGEX` with
+  `isWaitingWakeMarker`), never `status` or `deriveBlockedStatus`: both read only the last
+  marker, so a lineage that blocked and then finished reads unblocked. Read every member
+  `/cost` lists, not roots: on LIN-4393 each member's own resume lines were missing from
+  its root's merged read. `dispatchedBy` is never origin (one account for autopilot and
+  person), and `/rulings` returns loop rulings only (LIN-4422).
+- A blind read's Balance becomes a sign only through `codeBalance` in
+  `scripts/stability-measures-blind.mjs`; the paper's coder
+  (`docs/papers/harbour/cleaner-than-it-started-scripts/code-blind.mjs`) imports it, and
+  re-running that must reproduce both frozen blind codes files (LIN-4422).
 
 ## Waiting
 
@@ -37,6 +47,17 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   read the proxy pace by fixed sleeps (`scripts/pipeline-churn.mjs` sleeps 1.1 s, and 5 s × attempt
   on a 429; the `steady-base-*` and `survey-*` scripts likewise), so the rate rule is spelled two
   ways. One shared client under `scripts/lib/` would retire the copies. (LIN-4421 leftovers; Survey global.)
+- `scripts/stability-measures-seat.mjs`: the person's seat reads loop rulings only and cannot
+  read person origin, so its operator-free share is an upper bound. Two proxy reads would
+  make it whole: an origin field on the dispatch read (the server records it as press
+  events in `lib/task-mode-store.js` and `personOriginated` in `lib/dispatch-wake.js`), and
+  a read of resolved task-bound rulings (or of `computeEscalationKpis` itself, which already
+  reads both halves). Whether a parent's rulings count against its pieces is LIN-4399's
+  call. (LIN-4422; LIN-4399 plan review note 1; Survey open-0.)
+- `scripts/stability-measures-tracker.mjs`: `readSeat` reads every lineage member's detail,
+  one call each: 1,576 members for the 106 finished tasks of the 8 Nov window, about half
+  an hour at 50 a minute. A dispatch-detail read by issue or by lineage that returns each
+  member's own feedback would cut that to one call per task. (LIN-4422; Survey global.)
 - `scripts/stability-measures-core.mjs`: `ownTicket` is the one landing-owns-its-ticket rule,
   but `scripts/delivery-composition.mjs` (line 105) still credits every `LIN-n` in a commit
   subject, so its ticket counts and first/last dates include precedents ("after LIN-1",

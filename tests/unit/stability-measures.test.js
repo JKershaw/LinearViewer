@@ -5,6 +5,9 @@
 // LIN-4421: the tracker half. Landing ownership, finished-task selection across window edges, sessions as /cost
 // lineages (the recorded LIN-4393 fixture), speed and cost with their unreadable counts, the ID-span search, and the
 // paced proxy client (scripts/stability-measures-tracker.mjs) with injected fetch, sleep and clock.
+// LIN-4422: measure 1 (the shared Balance-to-sign rule against the paper's frozen codes, the fixed sample, the tally)
+// and measure 4 (loop rulings, origin not measured, the operator-free upper bound read from every lineage member's
+// feedback), and the seat read end to end through the same fake proxy.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -19,7 +22,15 @@ import {
   idSpanSearch, landingOwners, linesRow, mintedRow, notMeasured, ownTicket, parseLandingLog, parseNumstat, row, selectFinished,
   sessionsOf, speedRow, tasksRow, waitingRow, waitingRows,
 } from '../../scripts/stability-measures-core.mjs';
-import { createProxyClient, readTracker, retryAfterMs } from '../../scripts/stability-measures-tracker.mjs';
+import { DISPATCH_LIST_LIMIT, createProxyClient, readSeat, readTracker, retryAfterMs, trackerNotMeasured } from '../../scripts/stability-measures-tracker.mjs';
+import {
+  PENDING_BLIND, SAMPLE_SIZE, blindRow, codeBalance, evenSample, ordinaryLandings, sampleRow,
+} from '../../scripts/stability-measures-blind.mjs';
+import {
+  MISSING_CONDITION, ORIGIN_UNREADABLE, UPPER_BOUND, LOOP_ONLY, hasBlockedMarker, membersOf, operatorFreeRow, rulingsRow,
+  seatRows, taskConditions,
+} from '../../scripts/stability-measures-seat.mjs';
+import { deriveBlockedStatus } from '../../lib/dispatch-terminal.js';
 
 const inScope = compileScope({ include: SCOPE_INCLUDE });
 
@@ -250,7 +261,7 @@ describe('landing ownership: each landing names only its own ticket', () => {
   });
 
   test('the CLI keeps no ticket regex of its own: ownership is the core\'s', () => {
-    for (const f of ['scripts/stability-measures.mjs', 'scripts/stability-measures-tracker.mjs']) {
+    for (const f of ['scripts/stability-measures.mjs', 'scripts/stability-measures-tracker.mjs', 'scripts/stability-measures-blind.mjs', 'scripts/stability-measures-seat.mjs']) {
       assert.doesNotMatch(readFileSync(join(ROOT, f), 'utf8'), /LIN-\\d|LIN-\\\\d|\\bLIN-\\b/, f);
     }
   });
@@ -544,8 +555,13 @@ describe('the tracker read end to end, through a fake proxy', () => {
 
   test('an unreadable issue list ends the read: every tracker row is not measured, none is zero', async () => {
     const { client, paths } = proxy({ '/issues?limit=50': { status: 503 } });
-    const { rows } = await readTracker({ client, windowLandings, window });
-    for (const r of Object.values(rows)) assert.deepStrictEqual([r.status, r.value, r.reason], [STATUS.NOT_MEASURED, null, 'proxy: issue list: HTTP 503'], r.key);
+    const { rows, selection, tasks } = await readTracker({ client, windowLandings, window });
+    const { seat, ...tracker } = rows;
+    for (const r of [...Object.values(tracker), seat[0], seat[2]]) assert.deepStrictEqual([r.status, r.value, r.reason], [STATUS.NOT_MEASURED, null, 'proxy: issue list: HTTP 503'], r.key);
+    // LIN-4422: the seat reads the same finished set, so it fails with it, under the same reason, never `not built yet`.
+    assert.deepStrictEqual(seat.map((r) => r.key), ['rulings', 'origin', 'operator-free']);
+    assert.deepStrictEqual([seat[1].status, seat[1].reason], [STATUS.NOT_MEASURED, ORIGIN_UNREADABLE], 'origin keeps its own reason');
+    assert.deepStrictEqual([selection, tasks], [null, null], 'no finished set to hand on');
     assert.deepStrictEqual(paths, ['/issues?limit=50']);
   });
 
@@ -559,5 +575,281 @@ describe('the tracker read end to end, through a fake proxy', () => {
     assert.match(table, /speed +median [\d.]+ min .* median 8 sessions/);
     assert.match(table, /cost +median \$14\.94 .* unpriced 0, noTelemetryCount 0, unreadableCount 0, noLineage 0 \[partial: 1 unreadable/);
     assert.doesNotMatch(table, /\{"/);
+  });
+});
+
+// ── LIN-4422: measure 1, no new mess ────────────────────────────────────────
+describe('the Balance-to-sign rule: one rule for the measure and the paper', () => {
+  const frozen = ['2026-11-06', '2026-11-06-v2'].flatMap((d) => JSON.parse(readFileSync(join(ROOT, `docs/papers/harbour/cleaner-than-it-started-evidence/${d}/blind-codes.json`), 'utf8'))
+    .passes.flatMap((p) => p.rows.map((r) => ({ ...r, where: `${d} ${p.id} #${r.row}` }))));
+
+  test('every frozen Balance cell codes to the sign, score and leans the paper recorded', () => {
+    assert.ok(frozen.length >= 200, `both frozen folders read (${frozen.length} rows)`);
+    for (const r of frozen) {
+      const c = codeBalance(r.balance_raw);
+      assert.deepStrictEqual([c.sign, c.score, c.leans], [r.sign, r.score, r.leans], r.where);
+    }
+  });
+
+  test('the edge cells: mixed (leans worse) is mixed, better (small) is better, (with #3) has no sign', () => {
+    assert.deepStrictEqual(codeBalance('**mixed (leans worse)**'), { balance: 'mixed (leans worse)', sign: 'mixed', score: 0, leans: 'worse' });
+    assert.deepStrictEqual(codeBalance('**better** (small)'), { balance: 'better (small)', sign: 'better', score: 1, leans: null });
+    assert.deepStrictEqual(codeBalance('(with #3)'), { balance: '(with #3)', sign: null, score: null, leans: null });
+    assert.deepStrictEqual([codeBalance('**Worse**').score, codeBalance('neutral').score, codeBalance('').sign], [-1, 0, null]);
+  });
+
+  test('the paper\'s coder imports the rule and keeps no sign map of its own', () => {
+    const src = readFileSync(join(ROOT, 'docs/papers/harbour/cleaner-than-it-started-scripts/code-blind.mjs'), 'utf8');
+    assert.match(src, /import \{ codeBalance \} from '\.\.\/\.\.\/\.\.\/\.\.\/scripts\/stability-measures-blind\.mjs'/);
+    assert.doesNotMatch(src, /better\|neutral\|mixed\|worse|better: 1/);
+  });
+});
+
+// Landings as git logs them, newest first: parseLandingLog records plus parseNumstat file lists.
+const window1 = (specs) => {
+  const landings = [];
+  const numstat = [];
+  specs.forEach(([subject, paths], i) => {
+    const commit = `${String(i).padStart(2, '0')}`.padEnd(40, 'a');
+    landings.unshift(landing(commit, new Date(Date.parse('2026-11-05T00:00:00Z') + i * 3600e3).toISOString(), subject));
+    if (paths) numstat.unshift({ commit, files: paths.map((p) => ({ path: p, added: 1, deleted: 0 })) });
+  });
+  return { landings, numstat };
+};
+
+describe('the blind-read sample: ordinary landings, fixed by rule', () => {
+  test('ordinary: names its own ticket and touches a path outside docs/; one landing per ticket, its first', () => {
+    const { landings, numstat } = window1([
+      ['LIN-1: code', ['lib/a.js']],
+      ['LIN-2: notes only', ['docs/areas/x.md']],
+      ['Tidy the README', ['README.md']],
+      ['LIN-1: a second piece', ['lib/b.js']],
+      ['LIN-3: code and docs', ['docs/x.md', 'routes/y.js']],
+    ]);
+    const { ordinary, unread, repeatLandings } = ordinaryLandings(landings, numstat);
+    assert.deepStrictEqual(ordinary.map((o) => o.ticket), ['LIN-1', 'LIN-3'], 'oldest first; LIN-2 docs-only and the unowned landing are not ordinary');
+    assert.deepStrictEqual(ordinary[0].laterLandings, [landings[1].commit], 'LIN-1\'s second piece is recorded, not sampled again');
+    assert.deepStrictEqual([unread, repeatLandings], [0, 1]);
+  });
+
+  test('more than 8: the middle of each of 8 equal stretches, the same commits on every run', () => {
+    const { landings, numstat } = window1(Array.from({ length: 20 }, (_, i) => [`LIN-${100 + i}: change`, ['lib/x.js']]));
+    const a = sampleRow({ landings, numstat });
+    const b = sampleRow({ landings: [...landings], numstat: [...numstat] });
+    assert.strictEqual(SAMPLE_SIZE, 8);
+    assert.deepStrictEqual(a.value.commits.map((c) => c.ticket), [1, 3, 6, 8, 11, 13, 16, 18].map((i) => `LIN-${100 + i}`));
+    assert.deepStrictEqual(a, b, 'a re-run picks the same sample');
+    assert.deepStrictEqual([a.status, a.value.ordinary, a.value.sampled], [STATUS.MEASURED, 20, 8]);
+  });
+
+  test('fewer than 8: every ordinary landing, in landing order', () => {
+    const { landings, numstat } = window1([['LIN-7: a', ['lib/a.js']], ['LIN-8: b', ['public/b.js']], ['LIN-9: c', ['docs/c.md']]]);
+    const r = sampleRow({ landings, numstat });
+    assert.deepStrictEqual(r.value.commits.map((c) => c.ticket), ['LIN-7', 'LIN-8']);
+    assert.deepStrictEqual(evenSample([1, 2, 3]), [1, 2, 3]);
+    assert.deepStrictEqual(evenSample([]), []);
+  });
+
+  test('a ticket landing with no file list is unreadable, counted; no ordinary landing at all is not measured', () => {
+    const { landings, numstat } = window1([['LIN-1: a', ['lib/a.js']], ['LIN-2: b', null]]);
+    const r = sampleRow({ landings, numstat });
+    assert.deepStrictEqual([r.status, r.unreadable, r.value.sampled], [STATUS.PARTIAL, 1, 1]);
+    const none = window1([['docs: notes', ['docs/a.md']]]);
+    assert.strictEqual(sampleRow(none).status, STATUS.NOT_MEASURED);
+    assert.strictEqual(sampleRow({ landings: [], numstat: [] }).reason, 'no landings in the window');
+  });
+});
+
+describe('the blind tally: neutral or better, worse, mean sign', () => {
+  const { landings, numstat } = window1(['LIN-1', 'LIN-2', 'LIN-3', 'LIN-4', 'LIN-5'].map((t) => [`${t}: x`, ['lib/x.js']]));
+  const sample = sampleRow({ landings, numstat });
+  const sha = (i) => sample.value.commits[i].commit;
+
+  test('no signs given: the sample prints and the tally reads pending blind reads', () => {
+    const blind = blindRow({ sample, signs: null });
+    assert.deepStrictEqual([blind.status, blind.reason], [STATUS.NOT_MEASURED, PENDING_BLIND]);
+    const w = { base: 'b'.repeat(40), head: 'h'.repeat(40), baseDate: 'x', headDate: 'y', landings: 5 };
+    const table = formatTable(buildReading({ window: w, rows: { 'no-new-mess': [sample, blind] } }));
+    assert.match(table, /^1\. No new mess\n {3}sample +5 of 5 ordinary landings .*LIN-1, .*LIN-5\n {3}blind +not measured: pending blind reads$/m);
+  });
+
+  test('a mixed balance counts 0: better, mixed, mixed (leans worse), neutral, worse', () => {
+    const signs = { [sha(0)]: '**better**', [sha(1)]: '**mixed**', [sha(2)]: '**mixed (leans worse)**', [sha(3)]: '**neutral**', [sha(4)]: '**worse**' };
+    const r = blindRow({ sample, signs });
+    assert.deepStrictEqual([r.status, r.value.read, r.value.neutralOrBetter, r.value.neutralOrBetterShare, r.value.worse, r.value.meanSign], [STATUS.MEASURED, 5, 4, 80, 1, 0]);
+    assert.deepStrictEqual(r.value.counts, { better: 1, neutral: 1, mixed: 2, worse: 1 });
+    assert.strictEqual(r.value.perCommit[2].leans, 'worse');
+  });
+
+  test('a sampled commit with no sign, or a cell with no sign word, is unreadable, never neutral', () => {
+    const r = blindRow({ sample, signs: { [sha(0)]: '**better**', [sha(1)]: '(with #3)', [sha(2).slice(0, 9)]: '**worse**' } });
+    assert.deepStrictEqual([r.status, r.value.read, r.unreadable, r.value.meanSign, r.value.worse], [STATUS.PARTIAL, 1, 4, 1, 0]);
+    assert.match(r.reason, /3 sampled commit\(s\) have no sign in signs\.json; 1 Balance cell\(s\) have no leading sign word; 1 key\(s\) name no sampled commit \(keys are full shas\)/);
+  });
+
+  test('no readable sign, or an unreadable signs file, is not measured with its reason', () => {
+    assert.match(blindRow({ sample, signs: {} }).reason, /^no sampled commit has a readable sign/);
+    assert.strictEqual(blindRow({ sample, signs: { reason: 'x.json: Unexpected token' } }).reason, 'signs unreadable: x.json: Unexpected token');
+    assert.match(blindRow({ sample: notMeasured('sample', 'no landings in the window'), signs: null }).reason, /^no sample: no landings/);
+  });
+});
+
+// ── LIN-4422: measure 4, the person's seat ──────────────────────────────────
+const ruling = (issue, outcome, extra = {}) => ({
+  decision: { decision_id: `${issue}-${outcome}` }, anchor: { issueIdentifier: issue, ...extra.anchor },
+  ...(outcome === 'open' ? {} : { resolution: { decisionId: `${issue}-${outcome}`, outcome } }),
+});
+const fb = (...messages) => messages.map((message, i) => ({ message, timestamp: `2026-11-08T10:0${i}:00Z` }));
+const quiet = (over = {}) => ({ membership: { memberIds: ['r1'], rootOnly: 0 }, list: { items: [{ id: 'r1', closedReason: null }], total: 1 }, details: [{ itemId: 'r1', body: { feedback: fb('[working] x', '[done] ok'), closedReason: null } }], ...over });
+
+describe('seat: loop rulings per finished task and the answered share', () => {
+  const finished = [{ id: 'LIN-1', parent: 'LIN-9' }, { id: 'LIN-2', parent: 'LIN-9' }, { id: 'LIN-3', parent: null }];
+
+  test('an unreadable rulings read is never 0: both the rulings row and the operator-free share are not measured', () => {
+    const [rulings, origin, free] = seatRows({ finished, rulings: { reason: 'HTTP 503' }, dispatch: new Map() });
+    assert.deepStrictEqual([rulings.status, rulings.value, rulings.reason], [STATUS.NOT_MEASURED, null, 'rulings read failed: HTTP 503']);
+    assert.deepStrictEqual([free.status, free.value], [STATUS.NOT_MEASURED, null]);
+    assert.match(free.reason, /no-ruling condition is unreadable/);
+    assert.deepStrictEqual([origin.status, origin.reason], [STATUS.NOT_MEASURED, ORIGIN_UNREADABLE]);
+  });
+
+  test('outcome buckets as escalation-kpis: answered / (answered + dismissed); withdrawn and self-resolved are neither; null is unreadable', () => {
+    const rulings = { rulings: [
+      ruling('LIN-1', 'answered'), ruling('LIN-1', 'answered'), ruling('LIN-2', 'dismissed'), ruling('LIN-2', 'withdrawn'),
+      ruling('LIN-3', 'self-resolved'), ruling('LIN-3', null), ruling('LIN-3', 'open'),
+      ruling('LIN-9', 'answered'), ruling('LIN-500', 'dismissed'),
+    ] };
+    const r = rulingsRow({ finished, rulings });
+    assert.deepStrictEqual([r.status, r.unreadable, r.value.raised, r.value.perFinishedTask, r.value.answeredShare], [STATUS.PARTIAL, 1, 7, 2.33, 66.7]);
+    assert.deepStrictEqual(r.value.outcomes, { answered: 2, dismissed: 1, withdrawn: 1, 'self-resolved': 1, unknown: 1, open: 1 });
+    assert.match(r.reason, /1 resolved ruling\(s\) have outcome null/);
+    assert.strictEqual(r.value.onParents, 1, 'the parent\'s ruling is named, not counted against its pieces');
+    assert.strictEqual(r.value.label, LOOP_ONLY);
+    assert.match(r.value.notRead.join(' '), /answered task-bound rulings \(anchor\.taskDecisionId\)/);
+    assert.match(r.value.notRead.join(' '), /parent or another unfinished ticket .*1 on a finished task's parent/);
+    assert.match(r.value.rules.raised, /distinct decisions/);
+  });
+
+  test('read rulings with none on the finished tasks is a measured zero, with no share', () => {
+    const r = rulingsRow({ finished, rulings: { rulings: [ruling('LIN-500', 'answered')] } });
+    assert.deepStrictEqual([r.status, r.value.raised, r.value.perFinishedTask, r.value.answeredShare], [STATUS.MEASURED, 0, 0, null]);
+  });
+});
+
+describe('seat: blocking read from every lineage member\'s feedback', () => {
+  test('a lineage that blocked and then finished counts as blocked (the last-marker helper would say no)', () => {
+    const feedback = fb('[working] start', '[blocked] DECISION: which way?', '[working] Session resumed.', '[done] finished');
+    assert.strictEqual(hasBlockedMarker(feedback), true);
+    assert.strictEqual(deriveBlockedStatus(feedback), null, 'why the measure does not use deriveBlockedStatus');
+    const t = taskConditions('LIN-1', { rulingCount: 0, d: quiet({ details: [{ itemId: 'r1', body: { feedback, closedReason: null } }] }) });
+    assert.deepStrictEqual([t.blocked, t.free], [true, false]);
+  });
+
+  test('[pending] is a handoff, not a wait on a person; a marker must open the entry', () => {
+    assert.strictEqual(hasBlockedMarker(fb('[pending] waiting on CI', 'mentions [blocked] mid-line', '[done] ok')), false);
+  });
+
+  test('every member /cost lists is read: a marker on a member that is not the root still counts', () => {
+    const m = membersOf({ body: LIN4393.cost });
+    assert.deepStrictEqual([m.memberIds.length, m.rootOnly], [14, 0]);
+    const d = {
+      membership: { memberIds: ['root', 'member'], rootOnly: 0 }, list: { items: [], total: 0 },
+      details: [{ itemId: 'root', body: { feedback: fb('[done] ok') } }, { itemId: 'member', body: { feedback: fb('[started] Resuming session', '[blocked] DECISION: x', '[done] ok') } }],
+    };
+    assert.strictEqual(taskConditions('LIN-1', { rulingCount: 0, d }).blocked, true);
+  });
+
+  test('membership: roots stand in only where /cost cannot split a lineage, and are counted; no lineage is unreadable', () => {
+    const body = { workerSessions: [{ rootItemId: 'a', dispatches: [{ itemId: 'a' }, { itemId: 'b' }] }, { rootItemId: 'c', dispatches: null }] };
+    assert.deepStrictEqual(membersOf({ body }), { memberIds: ['a', 'b', 'c'], rootOnly: 1 });
+    assert.match(membersOf({ body: { noLineage: true, workerSessions: [] } }).reason, /no lineage/);
+    assert.match(membersOf({ reason: 'HTTP 500' }).reason, /cost read failed: HTTP 500/);
+  });
+});
+
+describe('seat: the operator-free share, an upper bound with its missing condition named', () => {
+  const finished = ['LIN-1', 'LIN-2', 'LIN-3', 'LIN-4', 'LIN-5', 'LIN-6'].map((id) => ({ id, parent: null }));
+  const dispatch = new Map([
+    ['LIN-1', quiet()],
+    ['LIN-2', quiet()],
+    ['LIN-3', quiet({ list: { items: [{ id: 'q', closedReason: 'operator' }], total: 1 } })], // closed by an operator, a row that never ran
+    ['LIN-4', quiet({ details: [{ itemId: 'r1', reason: 'HTTP 500' }] })], // unreadable
+    ['LIN-5', quiet({ details: [{ itemId: 'r1', reason: 'HTTP 500' }] })], // unreadable reads, but a ruling already shows the operator
+    ['LIN-6', quiet({ membership: { reason: 'no lineage: no dispatch ran for this issue' }, details: [] })],
+  ]);
+  const rulings = { rulings: [ruling('LIN-2', 'answered'), ruling('LIN-5', 'dismissed')] };
+
+  test('three readable conditions; a task whose reads failed is unreadable unless a read already shows the operator', () => {
+    const r = operatorFreeRow({ finished, rulings, dispatch });
+    assert.deepStrictEqual([r.status, r.value.read, r.value.operatorFree, r.value.share, r.unreadable], [STATUS.PARTIAL, 4, 1, 25, 2]);
+    assert.deepStrictEqual(r.value.failing, { ruling: 2, blocked: 0, operatorClosed: 1 });
+    assert.deepStrictEqual(r.value.perTask.find((t) => t.id === 'LIN-5'), { id: 'LIN-5', ruling: true, blocked: null, operatorClosed: null, free: false });
+    assert.match(r.reason, /2 task\(s\) unreadable: .*1 dispatch detail read\(s\) failed \(HTTP 500\).*no lineage/);
+  });
+
+  test('the row says upper bound, names the missing condition, and discloses the catch-all closes', () => {
+    const r = operatorFreeRow({ finished, rulings, dispatch });
+    assert.strictEqual(r.value.label, UPPER_BOUND);
+    assert.strictEqual(r.value.missingCondition, MISSING_CONDITION);
+    assert.match(MISSING_CONDITION, /no person-started dispatch \(not measured: dispatchedBy is the workspace account for autopilot and person alike\)/);
+    assert.match(r.value.caveats.join(' '), /catch-all .*bulk fossil passes/);
+    const w = { base: 'b'.repeat(40), head: 'h'.repeat(40), baseDate: 'x', headDate: 'y', landings: 6 };
+    const table = formatTable(buildReading({ window: w, rows: { seat: seatRows({ finished, rulings, dispatch }) } }));
+    assert.match(table, /^4\. The person's seat\n {3}rulings +loop rulings only: 2 raised over 6 finished tasks.*\n {3}origin +not measured: dispatchedBy is the workspace account for autopilot and person alike\n {3}operator-free +upper bound: 25% \(1 of 4 tasks\).*missing condition: no person-started dispatch/m);
+    assert.doesNotMatch(table, /\{"/);
+  });
+
+  test('a truncated dispatch list leaves closedReason unknown, never "not closed"', () => {
+    const t = taskConditions('LIN-1', { rulingCount: 0, d: quiet({ list: { items: [{ id: 'r1', closedReason: null }], total: DISPATCH_LIST_LIMIT + 1 } }) });
+    assert.deepStrictEqual([t.operatorClosed, t.free], [null, null]);
+    assert.match(t.reason, /dispatch list truncated \(1 of 101\)/);
+  });
+});
+
+describe('the seat read end to end, through a fake proxy', () => {
+  const cost = { workerSessions: [{ rootItemId: 'root-1', dispatches: [{ itemId: 'root-1' }, { itemId: 'member-1' }] }] };
+  const fetchFrom = (routes) => {
+    const paths = [];
+    const fetch = async (url) => {
+      const path = url.replace('http://p/api/proxy', '');
+      paths.push(path);
+      const r = routes[path] ?? { status: 404 };
+      return { status: r.status, headers: { get: () => null }, json: async () => r.body ?? {} };
+    };
+    let t = 0;
+    return { paths, client: createProxyClient({ base: 'http://p/api/proxy', fetch, now: () => t, sleep: async (ms) => { t += ms; } }) };
+  };
+  const routes = {
+    '/rulings?includeResolved=true': { status: 200, body: { rulings: [ruling('LIN-31', 'answered')] } },
+    [`/dispatch?issueIdentifier=LIN-30&limit=${DISPATCH_LIST_LIMIT}`]: { status: 200, body: { items: [{ id: 'root-1', closedReason: null }], total: 1 } },
+    [`/dispatch?issueIdentifier=LIN-31&limit=${DISPATCH_LIST_LIMIT}`]: { status: 200, body: { items: [], total: 0 } },
+    '/dispatch/root-1': { status: 200, body: { feedback: fb('[done] ok'), closedReason: null } },
+    '/dispatch/member-1': { status: 200, body: { feedback: fb('[blocked] DECISION: x', '[done] ok'), closedReason: null } },
+    '/dispatch/root-2': { status: 200, body: { feedback: fb('[done] ok'), closedReason: null } },
+  };
+  const finished = [{ id: 'LIN-30', parent: null }, { id: 'LIN-31', parent: null }];
+  const tasks = [{ id: 'LIN-30', cost: { body: cost } }, { id: 'LIN-31', cost: { body: { workerSessions: [{ rootItemId: 'root-2', dispatches: null }] } } }];
+
+  test('rulings once, then each task\'s list and every member\'s detail; the member\'s marker blocks LIN-30', async () => {
+    const { client, paths } = fetchFrom(routes);
+    const { rows } = await readSeat({ client, finished, tasks });
+    assert.strictEqual(paths.filter((p) => p.startsWith('/rulings')).length, 1, 'one rulings read for every task');
+    assert.ok(paths.includes('/dispatch/member-1'), 'a lineage member, not only its root');
+    const [rulingsR, , free] = rows;
+    assert.deepStrictEqual([rulingsR.value.raised, rulingsR.value.answeredShare], [1, 100]);
+    assert.deepStrictEqual([free.status, free.value.read, free.value.operatorFree, free.value.failing.blocked, free.value.rootOnlyLineages], [STATUS.MEASURED, 2, 0, 1, 1]);
+  });
+
+  test('a failed rulings read skips every dispatch read: no share can be read without the no-ruling condition', async () => {
+    const { client, paths } = fetchFrom({ ...routes, '/rulings?includeResolved=true': { status: 503 } });
+    const { rows } = await readSeat({ client, finished, tasks });
+    assert.deepStrictEqual(paths, ['/rulings?includeResolved=true']);
+    assert.deepStrictEqual(rows.map((r) => r.status), [STATUS.NOT_MEASURED, STATUS.NOT_MEASURED, STATUS.NOT_MEASURED]);
+  });
+
+  test('no proxy: the seat is not measured with the tracker\'s reason, never `not built yet`', () => {
+    const rows = trackerNotMeasured('no --api given and HARBOUR_LOCAL_BASE unset');
+    const reading = buildReading({ window: {}, rows: { seat: rows.seat } });
+    assert.deepStrictEqual(reading.measures[3].rows.map((r) => r.reason), ['no --api given and HARBOUR_LOCAL_BASE unset', ORIGIN_UNREADABLE, 'no --api given and HARBOUR_LOCAL_BASE unset']);
   });
 });

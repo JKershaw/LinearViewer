@@ -20,6 +20,10 @@ import { checkInstructions, assertNotTruncated, INSTRUCTIONS_CONTRACT } from './
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPTS_UNDER_TEST = ['freeze.mjs', 'code-blind.mjs', 'inputs.mjs'];
 const REL_SCRIPTS = path.join('docs', 'papers', 'harbour', 'cleaner-than-it-started-scripts');
+// code-blind.mjs takes its Balance-to-sign rule from the Stability Review's blind module (LIN-4422), which imports the
+// stability core; both go into the fixture at their real paths, or code-blind cannot load there.
+const SHARED_FROM_REPO = ['scripts/stability-measures-blind.mjs', 'scripts/stability-measures-core.mjs'];
+const REPO_ROOT_HERE = path.resolve(here, '..', '..', '..', '..');
 const GOOD_INSTRUCTIONS = ['# Workspace API Proxy', ...INSTRUCTIONS_CONTRACT, 'more prose'].join('\n');
 
 // ---- pure checks ----
@@ -76,6 +80,8 @@ function makeFixture() {
   const scriptDir = path.join(lv, REL_SCRIPTS);
   mkdirSync(scriptDir, { recursive: true });
   for (const f of SCRIPTS_UNDER_TEST) copyFileSync(path.join(here, f), path.join(scriptDir, f));
+  mkdirSync(path.join(lv, 'scripts'), { recursive: true });
+  for (const f of SHARED_FROM_REPO) copyFileSync(path.join(REPO_ROOT_HERE, f), path.join(lv, f));
   // the place ledger at the pin: no LIN ids, so the ledger check has nothing to explain
   mkdirSync(path.join(lv, 'docs', 'plans', 'survey'), { recursive: true });
   writeFileSync(path.join(lv, 'docs', 'plans', 'survey', 'place-ledger.md'), '# ledger\n\nno tickets here\n');
