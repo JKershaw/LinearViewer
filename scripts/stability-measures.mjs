@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The Stability Review's measures over one window of landings (LIN-4399; the repository reads, LIN-4420; the tracker
-// reads, LIN-4421).
+// reads, LIN-4421; the blind-read sample and the person's seat, LIN-4422).
 // Usage: node scripts/stability-measures.mjs <repo> <base> <head> [--runner <dir>] [--api <base>] [--lookback-days <n>]
 //          [--blind <signs.json>]
 //   → JSON on stdout; the ordered opening table on stderr.
@@ -9,9 +9,13 @@
 // for its Waiting entries. Every read that fails becomes `not measured: <reason>` in its row; nothing is zero-filled.
 // --api (default $HARBOUR_LOCAL_BASE/api/proxy) is the workspace proxy for finished tasks, speed, cost and tickets
 // minted (scripts/stability-measures-tracker.mjs: paced, honours 429 Retry-After). Finished tasks may have landed
-// before base, so the landings of the --lookback-days (default 3) before base are read for their tickets too.
-// --blind feeds the blind-read tally, a later piece's row (LIN-4422); here it is recorded only.
-import { existsSync } from 'node:fs';
+// before base, so the landings of the --lookback-days (default 3) before base are read for their tickets too. The same
+// proxy reads the person's seat over those finished tasks (scripts/stability-measures-seat.mjs: loop rulings only;
+// person origin not measured; the operator-free share an upper bound).
+// Measure 1 needs no proxy: the sample of ordinary landings comes from git (scripts/stability-measures-blind.mjs).
+// Without --blind the tally reads `pending blind reads`; --blind <signs.json> (full sha → that reader's Balance cell,
+// verbatim) gives the neutral-or-better share, the number read worse and the mean sign.
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {
@@ -22,7 +26,8 @@ import { NOTES_DIR, countWaiting } from '../lib/prompts/area-note-format.js';
 import {
   SCOPE_INCLUDE, buildReading, churnRow, ciRow, formatTable, linesRow, notMeasured, parseLandingLog, parseNumstat, waitingRows,
 } from './stability-measures-core.mjs';
-import { createProxyClient, firstLine, readTracker, trackerNotMeasured } from './stability-measures-tracker.mjs';
+import { createProxyClient, firstLine, readSeat, readTracker, trackerNotMeasured } from './stability-measures-tracker.mjs';
+import { blindRow, sampleRow } from './stability-measures-blind.mjs';
 
 const USAGE = 'usage: node scripts/stability-measures.mjs <repo> <base> <head> [--runner <dir>] [--api <base>] [--lookback-days <n>] [--blind <signs.json>]';
 const DEFAULT_LOOKBACK_DAYS = 3;
@@ -102,19 +107,35 @@ function readCiRuns(repo, window) {
 // The tracker rows. The window's landings own its tickets; the lookback's landings own tickets merged just before base
 // and marked Done after it (close-out runs after the merge), which finish in this window (LIN-4421 ruling). Older
 // landings are not read: a ticket whose only landings predate the lookback and that finished here is not counted.
-async function readTrackerRows(repo, api, window, lookbackDays) {
+// The seat is read over the same finished tasks with the same client, so its calls share the one pacing budget.
+async function readTrackerRows(repo, api, window, lookbackDays, windowLog) {
   const lookback = { days: lookbackDays, since: new Date(new Date(window.baseDate).getTime() - lookbackDays * 86400e3).toISOString() };
   if (!api) return { lookback, rows: trackerNotMeasured('no --api given and HARBOUR_LOCAL_BASE unset') };
-  let windowLandings;
+  if (windowLog.reason) return { lookback, rows: trackerNotMeasured(`landing log unreadable: ${windowLog.reason}`) };
   let priorLandings;
   try {
-    windowLandings = parseLandingLog(git(repo, ['log', '--first-parent', LANDING_FORMAT, `${window.base}..${window.head}`]));
     priorLandings = parseLandingLog(git(repo, ['log', '--first-parent', LANDING_FORMAT, `--since=${lookback.since}`, window.base]));
   } catch (e) {
     return { lookback, rows: trackerNotMeasured(`landing log unreadable: ${firstLine(e)}`) };
   }
-  const { rows, stats } = await readTracker({ client: createProxyClient({ base: api }), windowLandings, priorLandings, window, lookback });
-  return { lookback, rows, stats, priorLandings: priorLandings.length };
+  const client = createProxyClient({ base: api });
+  const tracker = await readTracker({ client, windowLandings: windowLog.landings, priorLandings, window, lookback });
+  if (!tracker.selection) return { lookback, rows: tracker.rows, stats: tracker.stats, priorLandings: priorLandings.length };
+  const seat = await readSeat({ client, finished: tracker.selection.finished, tasks: tracker.tasks });
+  return { lookback, rows: { ...tracker.rows, seat: seat.rows }, stats: client.stats, priorLandings: priorLandings.length };
+}
+
+// signs.json for the blind tally: null without --blind (pending), else the parsed object or { reason }.
+function readSigns(file) {
+  if (file == null) return null;
+  try {
+    const signs = JSON.parse(readFileSync(resolve(file), 'utf8'));
+    if (!signs || typeof signs !== 'object' || Array.isArray(signs)) return { reason: `${file} is not an object keyed by commit sha` };
+    if ('reason' in signs) return { reason: `${file} has a "reason" key, not a commit sha` };
+    return signs;
+  } catch (e) {
+    return { reason: `${file}: ${firstLine(e)}` };
+  }
 }
 
 await runCli(async () => {
@@ -148,7 +169,12 @@ await runCli(async () => {
   const ci = readCiRuns(repo, window);
   const runner = readRunner(runnerDir, window);
   const harbour = { base: tryCount(() => waitingAt(repo, base)), head: tryCount(() => waitingAt(repo, head)) };
-  const tracker = await readTrackerRows(repo, api, window, lookbackDays);
+  // The window's landing log (subjects and bodies), read once: the sample's ticket owners and the tracker's.
+  let windowLog;
+  try { windowLog = { landings: parseLandingLog(git(repo, ['log', '--first-parent', LANDING_FORMAT, `${base}..${head}`])) }; } catch (e) { windowLog = { reason: firstLine(e) }; }
+  const sample = windowLog.reason ? notMeasured('sample', `landing log unreadable: ${windowLog.reason}`) : sampleRow({ landings: windowLog.landings, numstat: landings });
+  const blind = blindRow({ sample, signs: readSigns(flags['--blind']) });
+  const tracker = await readTrackerRows(repo, api, window, lookbackDays, windowLog);
 
   const reading = buildReading({
     window,
@@ -160,7 +186,9 @@ await runCli(async () => {
         ...waitingRows({ harbour, runner: runner.reading, landings: landings.length }),
         tracker.rows.minted,
       ],
+      'no-new-mess': [sample, blind],
       speed: [tracker.rows.tasks, tracker.rows.speed],
+      seat: tracker.rows.seat,
       cost: [tracker.rows.cost],
     },
   });

@@ -45,6 +45,11 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 
 ## Waiting
 
+- `lib/dispatch-terminal.js`: the `WAKE_FEEDBACK_REGEX` comment says the predicate "is consumed
+  ONLY by the up-chain wake auto-enqueue", but five lib modules import it (run view, liveness
+  detectors, the task page loader, pipeline churn, the observer efficacy signal) and, since LIN-4422,
+  `scripts/stability-measures-seat.mjs` reads `[blocked]` with it. The "blast radius at zero"
+  claim needs restating as who reads it and why each wants the superset. (LIN-4422 leftovers.)
 - `lib/dispatch-wake.js`: `reportedPrUrlOf` and SD's `sessionPrs` pick a PR by one order, linked
   only by a comment; changing one moves a PR link. (Drift & Coherence Review, 10 Nov;
   `docs/reviews/drift-coherence-review-2026-11-10.md`.)

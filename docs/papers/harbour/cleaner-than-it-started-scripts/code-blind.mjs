@@ -5,6 +5,8 @@
 // Each row's sign is the reviewer's own Balance cell, copied verbatim (bold markers removed) and
 // mapped to a score: better = +1, neutral / mixed / worse = 0 / 0 / -1. "mixed (leans worse)" stays
 // mixed and is flagged `leans`. A row with no sign of its own ("(with #3)") keeps sign null.
+// That rule is codeBalance in scripts/stability-measures-blind.mjs (LIN-4422), shared with the Stability Review's
+// blind tally so the two cannot drift; re-running this on either frozen folder reproduces its blind-codes.json.
 // Commit labels are resolved to frozen merges by hash prefix (>= 7 chars, unique), and each row
 // is attributed to tickets through the merge subject; the pass title names the ticket(s) of a
 // single or combined read.
@@ -24,6 +26,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { takeInputs, need, blindCutoff, postsAfter } from './inputs.mjs';
+import { codeBalance } from '../../../../scripts/stability-measures-blind.mjs';
 
 // Returns { kind, id, subject_tickets, batch?, subject? } for a title, or throws naming the title.
 // `id` is 'batch <X>' for a batch and the pass letter otherwise (the same ids the coder always used).
@@ -87,8 +90,6 @@ function main() {
   const blind = comments.filter((c) => /^## Blind place scoring, /.test(c.body || '') && !postsAfter(c.createdAt, cutoffMs))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-  const SCORE = { better: 1, neutral: 0, mixed: 0, worse: -1 };
-  const cleanCell = (s) => (s || '').replace(/\*\*/g, '').trim();
   const passes = [];
   const unresolved = [];
 
@@ -108,8 +109,7 @@ function main() {
       const commitCell = cells[1];
       const balanceRaw = cells[2] ?? '';
       const reason = cells.slice(3).join(' | ');
-      const balance = cleanCell(balanceRaw);
-      const word = (balance.match(/^(better|neutral|mixed|worse)\b/i) || [])[1]?.toLowerCase() ?? null;
+      const { balance, sign, score, leans } = codeBalance(balanceRaw);
       const labels = [...commitCell.matchAll(/\b[0-9a-f]{7,9}\b/g)].map((m) => m[0]);
       const resolved = labels.map(resolve);
       labels.forEach((l, i) => { if (!resolved[i]) unresolved.push({ pass: id, row: n, label: l }); });
@@ -122,9 +122,9 @@ function main() {
         shas: resolved.filter(Boolean).map((m) => ({ repo: m.repo, short: m.short, full: m.full, subject: m.subject })),
         tickets,
         balance_raw: balanceRaw.trim(),
-        sign: word,
-        score: word === null ? null : SCORE[word],
-        leans: /leans worse/i.test(balance) ? 'worse' : null,
+        sign,
+        score,
+        leans,
         ...(/with #\d+/.test(commitCell) ? { note: 'row linked to an earlier row (not scored on its own)' } : {}),
         quote: { balance: balance, reason: reason.replace(/\*\*/g, '') },
       });

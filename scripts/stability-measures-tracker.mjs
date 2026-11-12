@@ -1,5 +1,5 @@
 // The stability measures' tracker reads (LIN-4421): a paced workspace-proxy client and the reads behind the finished
-// tasks, speed, cost and minted rows. Its own file because the CLI runs when imported and the core does no I/O: here
+// tasks, speed, cost and minted rows, and (LIN-4422) the seat's rulings and dispatch reads over the same finished set. Its own file because the CLI runs when imported and the core does no I/O: here
 // `fetch`, `sleep` and the clock are injected, so pacing, the 429 path and the whole read are tested without a network
 // (tests/unit/stability-measures.test.js). The decisions (ownership, selection, sessions, the search) stay in the core.
 //
@@ -16,6 +16,7 @@
 import {
   TICKET_KEY, costRow, idSpanSearch, landingOwners, mintedRow, notMeasured, selectFinished, speedRow, tasksRow,
 } from './stability-measures-core.mjs';
+import { membersOf, seatNotMeasured, seatRows } from './stability-measures-seat.mjs';
 
 export const DEFAULT_PER_MINUTE = 50;
 export const DEFAULT_RETRIES = 3;
@@ -88,8 +89,15 @@ export function createProxyClient({
 // ── the tracker read ─────────────────────────────────────────────────────────
 const enc = encodeURIComponent;
 
-/** Every tracker row not measured, for one reason: no proxy, no landing log, or an unreadable issue list. */
-export const trackerNotMeasured = (why, references = {}) => Object.fromEntries(['tasks', 'speed', 'cost', 'minted'].map((k) => [k, notMeasured(k, why, { reference: references[k] })]));
+/**
+ * Every tracker row not measured, for one reason: no proxy, no landing log, or an unreadable issue list. The seat's
+ * rows (LIN-4422) read the same finished set, so they fail with it, under the same reason: `seat` is their list in
+ * order, origin keeping its own reason. A row missing here would print `not built yet`, the wrong reason.
+ */
+export const trackerNotMeasured = (why, references = {}) => ({
+  ...Object.fromEntries(['tasks', 'speed', 'cost', 'minted'].map((k) => [k, notMeasured(k, why, { reference: references[k] })])),
+  seat: seatNotMeasured(why, references),
+});
 
 /** The highest issue number on the newest page of the issue list: a known existing number to bracket the search. */
 async function readBracket(client, key) {
@@ -116,13 +124,13 @@ export async function readTracker({ client, windowLandings, priorLandings = [], 
   const own = landingOwners(windowLandings);
   const prior = landingOwners(priorLandings);
   const bracket = await readBracket(client, key);
-  if (bracket.reason) return { rows: trackerNotMeasured(`proxy: ${bracket.reason}`, references), stats: client.stats };
+  if (bracket.reason) return { rows: trackerNotMeasured(`proxy: ${bracket.reason}`, references), selection: null, tasks: null, stats: client.stats };
 
   const issues = new Map();
   const ids = [...new Set([...own.owners.keys(), ...prior.owners.keys()])];
   for (const id of ids) {
     const r = await client.get(`/issues/${enc(id)}`);
-    issues.set(id, r.ok ? { state: r.body?.state ?? null, completedAt: r.body?.completedAt ?? null } : { reason: r.status === 404 ? 'issue not found' : r.reason });
+    issues.set(id, r.ok ? { state: r.body?.state ?? null, completedAt: r.body?.completedAt ?? null, parent: r.body?.parent?.identifier ?? null } : { reason: r.status === 404 ? 'issue not found' : r.reason });
   }
   const selection = selectFinished({ window: own, prior, issues, baseDate: window.baseDate, headDate: window.headDate });
 
@@ -144,6 +152,41 @@ export async function readTracker({ client, windowLandings, priorLandings = [], 
       cost: costRow(tasks, { reference: references.cost }),
       minted: mintedRow({ base, head, landings: window.landings, bracket: `${key}-${bracket.value}`, key, reference: references.minted }),
     },
+    // The finished selection and each finished task's /cost body, for readers that measure the same tasks (the seat
+    // row, LIN-4422): one finished set, two readers, never a second issue or /cost pass.
+    selection,
+    tasks,
     stats: client.stats,
   };
+}
+
+// ── the seat read (LIN-4422) ────────────────────────────────────────────────
+export const DISPATCH_LIST_LIMIT = 100;
+
+/**
+ * The person's seat for the tracker read's finished tasks. Calls, in order: the rulings once (`includeResolved=true`,
+ * filtered by anchor issue here, not one call per task); then per finished task its dispatch list (closedReason on
+ * every row of the issue, including rows that never ran) and the detail of every lineage member /cost lists
+ * (feedback, merged forward over its lineage, and closedReason for members filed under another issue).
+ * A failed rulings read skips the dispatch reads: without the no-ruling condition no share can be read.
+ * `finished` is readTracker's selection.finished, `tasks` its [{ id, cost }].
+ */
+export async function readSeat({ client, finished, tasks, references = {} }) {
+  const r = await client.get('/rulings?includeResolved=true');
+  const rulings = !r.ok ? { reason: r.reason } : Array.isArray(r.body?.rulings) ? { rulings: r.body.rulings } : { reason: 'rulings body has no list' };
+  const dispatch = new Map();
+  if (!rulings.reason) {
+    for (const t of tasks) {
+      const membership = membersOf(t.cost);
+      const l = await client.get(`/dispatch?issueIdentifier=${enc(t.id)}&limit=${DISPATCH_LIST_LIMIT}`);
+      const list = !l.ok ? { reason: l.reason } : Array.isArray(l.body?.items) ? { items: l.body.items, total: l.body.total ?? null } : { reason: 'list body has no items' };
+      const details = [];
+      for (const itemId of membership.memberIds ?? []) {
+        const d = await client.get(`/dispatch/${enc(itemId)}`);
+        details.push(d.ok ? { itemId, body: d.body } : { itemId, reason: d.status === 404 ? 'dispatch not found' : d.reason });
+      }
+      dispatch.set(t.id, { membership, list, details });
+    }
+  }
+  return { rows: seatRows({ finished, rulings, dispatch, references }), stats: client.stats };
 }

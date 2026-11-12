@@ -12,8 +12,12 @@
  * cannot say whether output fell. This script reports four substrates side by
  * side so the reader can see where they disagree:
  *
- *   1. TICKETS LANDED  — distinct LIN-#### ids whose FIRST citing commit falls in
+ *   1. TICKETS LANDED  — distinct LIN-#### ids whose FIRST own commit falls in
  *      the week. The closest available proxy for "a unit of work reached code".
+ *      A commit owns one ticket: `ownTicket` in scripts/stability-measures-core.mjs
+ *      (the first id in a subject, or a merge's branch). Ids cited further along a
+ *      subject ("after LIN-1", "LIN-690 reopened") are precedents, not tickets
+ *      landed, so they no longer move a ticket's first or last date (LIN-4422).
  *   2. RAW COMMITS     — every commit. Inflated or deflated by merge policy.
  *   3. MAINLINE UNITS  — `git log --first-parent`: one unit per merged PR,
  *      INVARIANT to squash-vs-merge. This is the honest delivery substrate.
@@ -44,6 +48,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { isTest, isDoc } from './delivery-paths.mjs';
+import { ownTicket } from './stability-measures-core.mjs';
 
 const args = process.argv.slice(2);
 const repos = [];
@@ -102,7 +107,8 @@ for (const repo of repos) {
     const date = line.slice(0, i), subject = line.slice(i + 1);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
     raw.set(weekOf(date), (raw.get(weekOf(date)) || 0) + 1);
-    for (const id of new Set(subject.match(/\bLIN-\d+\b/g) || [])) {
+    const id = ownTicket(subject);
+    if (id) {
       const cur = tickets.get(id);
       if (!cur) tickets.set(id, { first: date, last: date });
       else {

@@ -25,25 +25,45 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   base, not all of history: a task whose only landings predate the lookback and that finished
   in the window is missed. The bound is printed on the `tasks` row; widen it there, never by
   matching more of each message (LIN-4421).
+- "Went blocked" is any `[blocked]` feedback entry (`WAKE_FEEDBACK_REGEX` with
+  `isWaitingWakeMarker`), never `status` or `deriveBlockedStatus`: both read only the last
+  marker, so a lineage that blocked and then finished reads unblocked. Read every member
+  `/cost` lists, not roots: on LIN-4393 each member's own resume lines were missing from
+  its root's merged read. `dispatchedBy` is never origin (one account for autopilot and
+  person), and `/rulings` returns loop rulings only (LIN-4422).
+- A blind read's Balance becomes a sign only through `codeBalance` in
+  `scripts/stability-measures-blind.mjs`; the paper's coder
+  (`docs/papers/harbour/cleaner-than-it-started-scripts/code-blind.mjs`) imports it, and
+  re-running that must reproduce both frozen blind codes files (LIN-4422).
+- Rounding, the mean and percentages come from the core (`round`, `mean`, `percent`); a new
+  stability module imports them, never re-spells `Math.round(x * 1000) / 10`. A landing or a
+  commit is credited to one ticket only through `ownTicket`; `scripts/delivery-composition.mjs`
+  uses it too since LIN-4422 (its weekly ticket counts since 1 Oct moved by 1 to 5: down in
+  five weeks, up 1 in one) (LIN-4422 leftovers).
 
 ## Waiting
 
 - `scripts/stability-measures.mjs`: its reads (numstat flags, runner endpoint resolution, `gh`
   listing, and since LIN-4421 the landing log's `%x1f` format and the lookback's `--since`) are
-  witnessed only by the hand-run reproduction; a fixture-repo test would pin
-  `--diff-merges=first-parent` against silent undercount. (LIN-4420 review; LIN-4421 leftovers.)
+  witnessed only by the hand-run reproduction, and since LIN-4422 so is the `--blind` file read
+  (`readSigns`); a fixture-repo test would pin `--diff-merges=first-parent` against silent
+  undercount. (LIN-4420 review; LIN-4421 and LIN-4422 leftovers.)
 - `scripts/stability-measures-tracker.mjs`: `createProxyClient` is the one proxy client in
   `scripts/` that paces from the start and honours 429 `Retry-After`. The other 47 scripts that
   read the proxy pace by fixed sleeps (`scripts/pipeline-churn.mjs` sleeps 1.1 s, and 5 s × attempt
   on a 429; the `steady-base-*` and `survey-*` scripts likewise), so the rate rule is spelled two
   ways. One shared client under `scripts/lib/` would retire the copies. (LIN-4421 leftovers; Survey global.)
-- `scripts/stability-measures-core.mjs`: `ownTicket` is the one landing-owns-its-ticket rule,
-  but `scripts/delivery-composition.mjs` (line 105) still credits every `LIN-n` in a commit
-  subject, so its ticket counts and first/last dates include precedents ("after LIN-1",
-  "LIN-690 reopened"). On the 8 Nov window, matching whole messages gives 163 IDs against 106
-  own tickets. Importing `ownTicket` would give the reports one attribution. The `\bLIN-\d+\b`
-  matches in `scripts/steady-base-growth.mjs` and `scripts/steady-base-code.mjs` count ticket
-  citations in file text and comment lines, not landings, so they are not this rule. (LIN-4421 review.)
+- `scripts/stability-measures-seat.mjs`: the person's seat reads loop rulings only and cannot
+  read person origin, so its operator-free share is an upper bound. Two proxy reads would
+  make it whole: an origin field on the dispatch read (the server records it as press
+  events in `lib/task-mode-store.js` and `personOriginated` in `lib/dispatch-wake.js`), and
+  a read of resolved task-bound rulings (or of `computeEscalationKpis` itself, which already
+  reads both halves). Whether a parent's rulings count against its pieces is LIN-4399's
+  call. (LIN-4422; LIN-4399 plan review note 1; Survey open-0.)
+- `scripts/stability-measures-tracker.mjs`: `readSeat` reads every lineage member's detail,
+  one call each: 1,576 members for the 106 finished tasks of the 8 Nov window, about half
+  an hour at 50 a minute. A dispatch-detail read by issue or by lineage that returns each
+  member's own feedback would cut that to one call per task. (LIN-4422; Survey global.)
 - `lib/account-erasure.js`: each collection should be declared once with all its facts
   (name, store module, erasure row, urlKey class, dry-run shape), and opening an
   undeclared name should fail. LIN-4234 gave both guards one source of collection names;
