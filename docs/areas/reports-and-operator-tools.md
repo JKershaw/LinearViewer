@@ -13,6 +13,14 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   14 merge landings vanish and churn reads a plausible 8,590 / 3,055 instead of 10,235 / 3,677.
   Filter its paths with the kit's `compileScope`, not a git pathspec, so churn and line totals
   share one scope (LIN-4420).
+- A landing names only its own ticket (`ownTicket` in the core: first id in a squash subject,
+  else the merge's branch, else its PR title). Whole-message matching read 163 tickets in the
+  8 Nov window against 106 and gave precedents fake last landings. A session is a `/cost`
+  lineage, not a non-wake row (LIN-4393: 14 rows, 5 wakes, 8 sessions). Proxy reads go
+  through `createProxyClient` in `scripts/stability-measures-tracker.mjs` (paced, honours
+  429 `Retry-After`), and a null `totalUsd` keeps its cause apart from a failed read (LIN-4421).
+- An issue-number search needs a known existing upper bracket: past the maximum is a 404 too,
+  and a trashed issue is a 200 with `trashed: true`. Both count as gaps (LIN-4421).
 
 ## Waiting
 

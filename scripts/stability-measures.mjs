@@ -1,11 +1,16 @@
 #!/usr/bin/env node
-// The Stability Review's measures over one window of landings (LIN-4399; the repository reads, LIN-4420).
-// Usage: node scripts/stability-measures.mjs <repo> <base> <head> [--runner <dir>] [--api <base>] [--blind <signs.json>]
+// The Stability Review's measures over one window of landings (LIN-4399; the repository reads, LIN-4420; the tracker
+// reads, LIN-4421).
+// Usage: node scripts/stability-measures.mjs <repo> <base> <head> [--runner <dir>] [--api <base>] [--lookback-days <n>]
+//          [--blind <signs.json>]
 //   → JSON on stdout; the ordered opening table on stderr.
 // Reads: git objects of <repo> (lines through the code-shape kit's counter, first-parent churn, Waiting entries), `gh`
 // for CI runs (run from <repo>, so its GitHub remote decides the repository), and the runner checkout's git objects
 // for its Waiting entries. Every read that fails becomes `not measured: <reason>` in its row; nothing is zero-filled.
-// --api and --blind feed rows built by later pieces (tracker reads, blind-read tally); here they are recorded only.
+// --api (default $HARBOUR_LOCAL_BASE/api/proxy) is the workspace proxy for finished tasks, speed, cost and tickets
+// minted (scripts/stability-measures-tracker.mjs: paced, honours 429 Retry-After). Finished tasks may have landed
+// before base, so the landings of the --lookback-days (default 3) before base are read for their tickets too.
+// --blind feeds the blind-read tally, a later piece's row (LIN-4422); here it is recorded only.
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -14,9 +19,14 @@ import {
   resolveCommit, runCli,
 } from './code-shape/code-shape-lib.mjs';
 import { NOTES_DIR, countWaiting } from '../lib/prompts/area-note-format.js';
-import { SCOPE_INCLUDE, buildReading, churnRow, ciRow, formatTable, linesRow, notMeasured, parseNumstat, waitingRows } from './stability-measures-core.mjs';
+import {
+  SCOPE_INCLUDE, buildReading, churnRow, ciRow, formatTable, linesRow, notMeasured, parseLandingLog, parseNumstat, waitingRows,
+} from './stability-measures-core.mjs';
+import { createProxyClient, readTracker } from './stability-measures-tracker.mjs';
 
-const USAGE = 'usage: node scripts/stability-measures.mjs <repo> <base> <head> [--runner <dir>] [--api <base>] [--blind <signs.json>]';
+const USAGE = 'usage: node scripts/stability-measures.mjs <repo> <base> <head> [--runner <dir>] [--api <base>] [--lookback-days <n>] [--blind <signs.json>]';
+const DEFAULT_LOOKBACK_DAYS = 3;
+const LANDING_FORMAT = '--format=%H%x1f%cI%x1f%s%x1f%b%x1e';
 const GH_LIMIT = 1000;
 const firstLine = (e) => String(e?.message ?? e).trim().split('\n')[0];
 
@@ -90,12 +100,37 @@ function readCiRuns(repo, window) {
   }
 }
 
+// The tracker rows. The window's landings own its tickets; the lookback's landings own tickets merged just before base
+// and marked Done after it (close-out runs after the merge), which finish in this window (LIN-4421 ruling). Older
+// landings are not read: a ticket whose only landings predate the lookback and that finished here is not counted.
+async function readTrackerRows(repo, api, window, lookbackDays) {
+  const lookback = { days: lookbackDays, since: new Date(new Date(window.baseDate).getTime() - lookbackDays * 86400e3).toISOString() };
+  if (!api) {
+    const why = 'no --api given and HARBOUR_LOCAL_BASE unset';
+    return { lookback, rows: { tasks: notMeasured('tasks', why), speed: notMeasured('speed', why), cost: notMeasured('cost', why), minted: notMeasured('minted', why) } };
+  }
+  let windowLandings;
+  let priorLandings;
+  try {
+    windowLandings = parseLandingLog(git(repo, ['log', '--first-parent', LANDING_FORMAT, `${window.base}..${window.head}`]));
+    priorLandings = parseLandingLog(git(repo, ['log', '--first-parent', LANDING_FORMAT, `--since=${lookback.since}`, window.base]));
+  } catch (e) {
+    const why = `landing log unreadable: ${firstLine(e)}`;
+    return { lookback, rows: { tasks: notMeasured('tasks', why), speed: notMeasured('speed', why), cost: notMeasured('cost', why), minted: notMeasured('minted', why) } };
+  }
+  const { rows, stats } = await readTracker({ client: createProxyClient({ base: api }), windowLandings, priorLandings, window, lookback });
+  return { lookback, rows, stats, priorLandings: priorLandings.length };
+}
+
 await runCli(async () => {
-  const { positional, flags } = parseArgs(process.argv.slice(2), { '--runner': 'value', '--api': 'value', '--blind': 'value' });
+  const { positional, flags } = parseArgs(process.argv.slice(2), { '--runner': 'value', '--api': 'value', '--lookback-days': 'value', '--blind': 'value' });
   const [repoArg, baseArg, headArg] = positional;
   if (!repoArg || !baseArg || !headArg || positional.length > 3) throw new UsageError(USAGE);
   const repo = resolve(repoArg);
   const runnerDir = flags['--runner'] ? resolve(flags['--runner']) : null;
+  const api = flags['--api'] ?? (process.env.HARBOUR_LOCAL_BASE ? `${process.env.HARBOUR_LOCAL_BASE}/api/proxy` : null);
+  const lookbackDays = flags['--lookback-days'] == null ? DEFAULT_LOOKBACK_DAYS : Number(flags['--lookback-days']);
+  if (!Number.isFinite(lookbackDays) || lookbackDays < 0) throw new UsageError(`--lookback-days must be a number of days, 0 or more\n${USAGE}`);
 
   const base = resolveCommit(repo, baseArg);
   const head = resolveCommit(repo, headArg);
@@ -118,6 +153,7 @@ await runCli(async () => {
   const ci = readCiRuns(repo, window);
   const runner = readRunner(runnerDir, window);
   const harbour = { base: tryCount(() => waitingAt(repo, base)), head: tryCount(() => waitingAt(repo, head)) };
+  const tracker = await readTrackerRows(repo, api, window, lookbackDays);
 
   const reading = buildReading({
     window,
@@ -127,7 +163,10 @@ await runCli(async () => {
         churnRow(landings, inScope),
         ciRow({ runs: ci.runs, reason: ci.reason, landingShas: landings.map((l) => l.commit), listingCapped: ci.listingCapped }),
         ...waitingRows({ harbour, runner: runner.reading, landings: landings.length }),
+        tracker.rows.minted,
       ],
+      speed: [tracker.rows.tasks, tracker.rows.speed],
+      cost: [tracker.rows.cost],
     },
   });
 
@@ -135,8 +174,12 @@ await runCli(async () => {
     tool: 'stability-measures',
     repo: repoArg,
     scope: { include: SCOPE_INCLUDE, exclude: DEFAULT_EXCLUDE },
-    inputs: { runner: flags['--runner'] ?? null, api: flags['--api'] ?? (process.env.HARBOUR_LOCAL_BASE ? `${process.env.HARBOUR_LOCAL_BASE}/api/proxy` : null), blind: flags['--blind'] ?? null },
-    sources: { runner: { ...runner.source, dir: flags['--runner'] ?? null }, ci: { workflow: 'test.yml', branch: 'main', created: ci.created ?? null } },
+    inputs: { runner: flags['--runner'] ?? null, api, lookbackDays, blind: flags['--blind'] ?? null },
+    sources: {
+      runner: { ...runner.source, dir: flags['--runner'] ?? null },
+      ci: { workflow: 'test.yml', branch: 'main', created: ci.created ?? null },
+      tracker: { lookback: tracker.lookback, priorLandings: tracker.priorLandings ?? null, calls: tracker.stats ?? null },
+    },
     ...reading,
   });
   console.error(formatTable(reading));

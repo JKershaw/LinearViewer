@@ -62,13 +62,16 @@ describe('code-shape area map placement (LIN-3729)', () => {
 
   // LIN-4420: the stability measures (the CLI and its pure core) are production files for the Stability Review, filed
   // the way LIN-3829 filed the retention checker: by exact name, so no existing script is re-filed and no census or
-  // co-change count moves. The measurer it sits beside, and the kit's other tools, stay unmapped.
+  // co-change count moves. The measurer it sits beside, and the kit's other tools, stay unmapped. LIN-4421 adds the
+  // tracker reads (the paced proxy client and the reads behind finished tasks, speed, cost and minted) by exact name too.
   test('the stability measures land in Reports & operator tools; neighbouring scripts stay unmapped', () => {
     assert.strictEqual(areaOf('scripts/stability-measures.mjs'), 'Reports & operator tools');
     assert.strictEqual(areaOf('scripts/stability-measures-core.mjs'), 'Reports & operator tools');
+    assert.strictEqual(areaOf('scripts/stability-measures-tracker.mjs'), 'Reports & operator tools');
     assert.strictEqual(areaOf('scripts/steady-base-code.mjs'), undefined);
     assert.strictEqual(areaOf('scripts/code-shape/verbatim.mjs'), undefined);
-    assert.strictEqual(areaOf('scripts/stability-measures-old.mjs'), undefined, 'the pattern names two files, not a prefix');
+    assert.strictEqual(areaOf('scripts/stability-measures-old.mjs'), undefined, 'the pattern names three files, not a prefix');
+    assert.strictEqual(areaOf('scripts/stability-measures-trackers.mjs'), undefined);
   });
 
   // LIN-3754: the task board view model composes the ordering rules for the
