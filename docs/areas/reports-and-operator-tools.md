@@ -2,8 +2,23 @@
 
 Area notes for `reports-and-operator-tools` in the registry. Format and rules: README.md.
 
+## Lessons
+
+- A measure whose source is missing or unreadable reads `not measured: <reason>`, never 0;
+  zero is a reading only from a source that was read (a commit with no notes directory has 0
+  Waiting entries). New stability rows use the row shape in `scripts/stability-measures-core.mjs`
+  (measured, partial with its unreadable count, not measured) and count Waiting entries with
+  `countWaiting` from `lib/prompts/area-note-format.js`, never a regex of their own (LIN-4420).
+- Churn passes `--diff-merges=first-parent` explicitly: with merge diffs off, the 8 Nov window's
+  14 merge landings vanish and churn reads a plausible 8,590 / 3,055 instead of 10,235 / 3,677.
+  Filter its paths with the kit's `compileScope`, not a git pathspec, so churn and line totals
+  share one scope (LIN-4420).
+
 ## Waiting
 
+- `scripts/stability-measures.mjs`: its reads (numstat flags, runner endpoint resolution, `gh`
+  listing) are witnessed only by the hand-run reproduction; a fixture-repo test would pin
+  `--diff-merges=first-parent` against silent undercount. (LIN-4420 review.)
 - `lib/account-erasure.js`: each collection should be declared once with all its facts
   (name, store module, erasure row, urlKey class, dry-run shape), and opening an
   undeclared name should fail. LIN-4234 gave both guards one source of collection names;
