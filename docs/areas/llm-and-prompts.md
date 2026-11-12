@@ -40,6 +40,10 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - A blind reader's limits are instructions, not access: with the repository checked out it can still
   see commit subjects (`git worktree add` prints the head's) and area notes. Both slipped, harmlessly,
   in the LIN-4436 pilot. Code hands a blind stage SHAs and PR URLs, never a PR body or commit log.
+- A new stage kind is a row in every table `tests/unit/stage-kind-tables.test.js` reads: add it, or list it
+  there as out with the reason. A kind in `SPINE` (`lib/run-view.js`) also moves the run page's "n of N", the
+  session and task-page goldens (`UPDATE_RENDER_SESSION_GOLDEN=1`, `UPDATE_RENDER_TASK_PAGE_GOLDEN=1`) and the
+  E2E count pins; read the golden diff before accepting it (LIN-4437).
 
 ## Waiting
 
@@ -104,6 +108,6 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   Periodical prompt hashes. (LIN-4432.)
 - `lib/prompts/leftover-words.js`: the first-match area lookup is spelled three ways: `CONSEQUENCE_TEST`'s
   "first match wins" parenthetical, `docs/areas/README.md` ("take the first area with a pattern that
-  matches its path") and the blind-read prompt's own sentence (`docs/plans/survey/blind-read-prompt.md`),
-  which shipped as piloted, so it was not retyped after the pilot. One constant in the leaf would make it
+  matches its path") and the blind-read prompt's own sentence (`lib/prompt-template-defs.js`, the
+  `blind-read` template), which shipped as piloted (LIN-4437), so it was not retyped after the pilot. One constant in the leaf would make it
   one, at the cost of re-piloting that sentence. (LIN-4436 leftovers.)

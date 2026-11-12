@@ -2308,6 +2308,17 @@ That invalidation has the same scope as the dedupe window it invalidates: **in-p
 
 Like the description guards, only this proxy is checked: an answer posted to the provider another way is not.
 
+**The blind read (LIN-4437).** A comment whose first non-blank line is `## Blind read` (exactly, or followed by `:`) is a blind read. It needs exactly one line starting `Verdict:`, whose first word is `better`, `same` or `worse`, followed by a reason. Its full PR URLs must equal the ticket's current landing (`landingPrUrls`, `lib/run-ledger.js`), with at least one. The shape is checked before any provider call. The landing check reads the ticket's whole comment trail. If that read fails, the landing check is skipped and logged, and the shape check still holds. Any other comment is not checked: one that mentions the heading further down, or one that opens with a longer heading such as `## Blind read pilot`. The check runs on create, edit and a comment-target attachment caption, and a refused body posts nothing:
+
+| Status | `code` | Meaning |
+|--------|--------|---------|
+| `422` | `BLIND_READ_VERDICT_MISSING` | no `Verdict:` line. |
+| `422` | `BLIND_READ_VERDICT_REPEATED` | more than one `Verdict:` line (`line` names the second). |
+| `422` | `BLIND_READ_VERDICT_WORD` | the verdict word is not `better`, `same` or `worse` ("mixed" included). |
+| `422` | `BLIND_READ_REASON_MISSING` | the verdict has no reason after its word. |
+| `422` | `BLIND_READ_PRS_MISSING` | no full PR URL. |
+| `422` | `BLIND_READ_PRS_MISMATCH` | the full PR URLs differ from the landing (`expected`, `got`). Cite any other PR as `#N`. |
+
 #### Delete Comment
 
 ```
