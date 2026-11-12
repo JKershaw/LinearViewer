@@ -3481,3 +3481,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - On v1's 22 tickets, v2 moves $40.71 out of keep-alive (v1 had put the after-answers and build beats in the wrong legs). So v2 is a re-measurement, not just a larger sample.
     - The tidy-first pairs are still anecdotes.
   - **Tidying on the way (A10 working again):** the leftovers folded `lib/as-asked.js`'s three copies of "When it could go" into one header paragraph. That retires John's own Waiting entry from 7 Nov. One new Waiting entry was added (`lib/library.js` takes summaries by position).
+- **16:22 UTC: paper v2 (LIN-4275) Done.** All three pieces are merged (LIN-4426, LIN-4427, LIN-4428). Cost: parent $16.3, pieces $11.6, $12.6 and $11.2, so **about $51.7 in all**. That covers three merges, one of them production (−139, the dead-code retirement). It ran as a third item beside the two lanes without crossing them.
