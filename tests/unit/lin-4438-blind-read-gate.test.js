@@ -139,6 +139,11 @@ describe('the shared-trail table: every lane agrees (LIN-4438)', () => {
         assert.equal(got.ladderGuard?.reason, 'blind-read-missing', `row ${row.n}: the ladder guard refuses`);
         assert.ok(notReadyForGate(got.state), `row ${row.n}: the stop-at state is not ready: ${got.state.status}/${got.state.reason}`);
         assert.ok(notReadyForGate(got.box), `row ${row.n}: the page box is not ready: ${got.box.status}/${got.box.reason}`);
+        // LIN-4439 blind read: one builder, so both guard lanes refuse with the box model's shape.
+        const keys = (m) => Object.keys(m).sort();
+        assert.deepEqual(keys(got.stopAtGuard), keys(got.state), `row ${row.n}: the stop-at refusal is a box model`);
+        assert.deepEqual(keys(got.ladderGuard), keys(got.stopAtGuard), `row ${row.n}: both lanes refuse with one shape`);
+        assert.equal(got.stopAtGuard.setDone, false, `row ${row.n}: a refusal sets nothing`);
       } else {
         assert.equal(got.stopAtGuard, null, `row ${row.n}: the stop-at guard admits`);
         assert.equal(got.ladderGuard, null, `row ${row.n}: the ladder guard admits`);

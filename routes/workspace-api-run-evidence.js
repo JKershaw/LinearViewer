@@ -335,10 +335,11 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
       if (closeOutEventsStore && await closeOutEventsStore.hasMergedEvent({ urlKey, prUrl })) {
         return jsonError(res, 409, 'This pull request is already merged; the close-out press was not recorded', { code: 'CLOSE_OUT_ALREADY_MERGED' });
       }
-      // LIN-3657: the dispatch lane refuses a head-moved close-out (LIN-3634); the
-      // press asks the same question so it never records one. The guard keeps
-      // `closeOutNotReady`'s scope (the task's sole open PR, not `prUrl`) and fails
-      // open on an unreadable read. Source: the request's, else the named dispatch
+      // LIN-3657: the press asks the dispatch lane's question (LIN-3634), so it never
+      // records a close-out that lane would refuse: a head-moved close-out on a
+      // stop-at-PR task (scoped to the task's sole open PR, not `prUrl`), and, on any
+      // task, a landing PR with no blind read since the review (`blind-read-missing`,
+      // read from the trail, LIN-4438). It fails open on an unreadable read. Source: the request's, else the named dispatch
       // row's (the clients' press body carries none; the row is what their dispatch
       // call stamped), and only when that row is this task's.
       let source = [req.body?.source, req.query.source].find((v) => typeof v === 'string') ?? null;

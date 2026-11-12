@@ -590,7 +590,7 @@ describe('the tracker read end to end, through a fake proxy', () => {
   });
 });
 
-// ── LIN-4422: measure 1, no new mess ────────────────────────────────────────
+// ── The paper's Balance-to-sign rule (LIN-4422's, no longer a measure) ──────
 // The hand-run passes' rule left the measure with the sample (LIN-4439) and lives beside the paper's coder, its one user.
 describe('the Balance-to-sign rule: one rule for the paper\'s coder', () => {
   const frozen = ['2026-11-06', '2026-11-06-v2'].flatMap((d) => JSON.parse(readFileSync(join(ROOT, `docs/papers/harbour/cleaner-than-it-started-evidence/${d}/blind-codes.json`), 'utf8'))
