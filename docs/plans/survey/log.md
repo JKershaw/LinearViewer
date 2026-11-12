@@ -3439,3 +3439,22 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **For the gate:** this is the project's waiver form working as intended, a gap shown rather than a green tick. I'll watch LIN-4421's close-out for the first witness.
 - **~15:32 UTC: A6 blind reads DA (`c4350450`) and DB (`c13de1dd`) queued.** They cover change 1, LV `c6d99f05e` with SD `af9b496`, and change 2, LV `a514506b6`.
 - **~15:32 UTC: lane 1's next task, LIN-4396 (A1: a change is read blind before it merges), kicked off** with the usual goal (dispatch `809e9d80`). This is the last of lane 1's batch 1 asks.
+- **15:33–15:35 UTC: A6 blind reads, DA and DB.** Change 1 (LV `c6d99f05e` + SD `af9b496`): **mixed, mixed.** Change 2 (LV `a514506b6`): **worse, worse.** These are the first "worse" ratings since 10 Nov.
+  - **Change 1, better:** `CONSEQUENCE_TEST` is one constant that three prompts import, and the retype guard covers it.
+  - **Change 1, worse:**
+    - The docs restate the rule in their own words in four places; the notes README calls it "written once" and then restates it.
+    - The retype guard checks only `lib/` and `routes/`.
+    - SD's README still says "filed follow-up" where LV now says "ticket".
+    - The live-secret clash with `lib/periodicals.js` was written down as a Waiting entry rather than fixed.
+  - **Change 2, worse:**
+    - The audit was a standalone read-only stage. It now opens a PR, which needs special cases in review, close-out and the router's facts.
+    - The router spots an audit by matching heading text that the prompt spells separately (unlike the shared `LEFTOVERS_HEADING`).
+    - It guesses the notes PR from the first link in the audit's comment.
+    - The notes-PR rule is now written in two places, and the audit's workflow is a hand copy of `formatReadOnlyWorkflow` with one step added.
+  - **Both readers, across the batch:**
+    - The copy guards stop at `lib/`, so the paraphrases in docs are already drifting.
+    - Known duplicates are logged as Waiting entries rather than removed. A10's `Retires:`/Waiting route is being used to record new mess, not only to retire old mess.
+    - More tests pin exact wording (change 1 edited about 15 assertions for rewording).
+  - **Tally since 10 Nov:** 7 better, 7 mixed, 2 worse.
+  - **For the gate (the sharpest item so far):** the mechanisms of A10 and A6 work, but each adds copies faster than it removes them, in the prompt and docs layer that no guard reads. Piece B also took a cut John ruled on (gate-notes-pr), which I suggested as "the ask already settles it". The ask settled the what; the readers say the how cost more than it was worth. That's a lesson for my own suggestions too.
+- **15:35 UTC: ruling `lin4421-lookback-bound` (lane 2, resumable).** Should tracker reads look back only 3 days before the window (about 280 reads, which caught 1 extra task on 8 Nov), rather than through full history (thousands of rate-limited reads)? I suggested **accept-bound**, since the bound is disclosed and can be widened per run. **For the gate (false-escalation count):** a measurement cost trade-off, the fifth such question today.
