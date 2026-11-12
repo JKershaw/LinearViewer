@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { LEFTOVERS_HEADING, RETIRES_LABEL, RETIRES_NONE } from '../../lib/prompts/leftover-words.js';
+import { buildInstructions } from '../../lib/proxy-instructions.js';
 import {
   checkLeftoverAnswer, isLeftoverAnswer, leftoverAnswerRefusal, retiresExamples, LEFTOVER_ANSWER_CODES
 } from '../../lib/dispatch-leftover-answer.js';
@@ -160,5 +161,12 @@ describe('the refusal message', () => {
     assert.match(missing, /must not open with that heading/);
     const repeated = leftoverAnswerRefusal(checkLeftoverAnswer(answer(ENTRY, NO_WAITING)));
     assert.match(repeated, /its line 7 has more than one such line/);
+  });
+});
+
+describe('one home for the forms (LIN-4414 leftovers)', () => {
+  test('the proxy catalog renders the forms from retiresExamples(), not its own words', () => {
+    const catalog = buildInstructions({ baseUrl: 'https://harbour.example', scope: 'readWrite' });
+    for (const example of retiresExamples()) assert.ok(catalog.includes(example), example);
   });
 });

@@ -20,6 +20,10 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   `tests/unit/cost-read.test.js`), `tests/fixtures/cost-replay/goldens-lin4197.json` (amend its header with the
   reason; record with `tests/fixtures/cost-replay/record-lin4197.mjs`) and the `docs/passage-runner-prompt.md` drift
   guard. `tests/fixtures/cost-replay/goldens.json` stays the baseline: re-recording it erases the change list (LIN-4404).
+- A check on comment bodies keys on the comment's opening line, never on any line: reviewers write
+  the same `### Leftovers` heading mid-comment, so matching any heading line would refuse the verdict
+  that gates merge (`routes/proxy-writes.js` `refusedByLeftoverAnswer`; caught at LIN-4414's plan
+  review). Test it against real comments, review verdicts included (`tests/unit/dispatch-leftover-answer.test.js`).
 
 ## Waiting
 
