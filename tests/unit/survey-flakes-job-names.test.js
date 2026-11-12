@@ -12,14 +12,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const src = readFileSync(new URL('../../scripts/survey-flakes-sessions.mjs', import.meta.url), 'utf8');
-const literal = (re) => {
-  const m = re.exec(src);
-  assert.ok(m, `pattern not found in survey-flakes-sessions.mjs: ${re}`);
-  return new Function(`return ${m[1]};`)();
-};
-const JOB_G = literal(/^const JOB_G = (\/.*\/g);$/m);
-const JOB_EXACT = literal(/^const JOB_EXACT = (\/.*\/);$/m);
-const UNIT_FAIL = literal(/if \((\/\^\[Uu\]nit tests.*?\/)\.test\(i\.job\)/);
+// The four pattern lines, evaluated as written: UNIT_JOB is the one spelling of the unit-job name.
+const block = /^const UNIT_JOB = [\s\S]*?^const UNIT_EXACT = .*$/m.exec(src);
+assert.ok(block, 'the UNIT_JOB..UNIT_EXACT block is in survey-flakes-sessions.mjs');
+const { JOB_G, JOB_EXACT, UNIT_EXACT: UNIT_FAIL } = new Function(`${block[0]}\nreturn { JOB_G, JOB_EXACT, UNIT_EXACT };`)();
+assert.match(src, /if \(UNIT_EXACT\.test\(i\.job\) && i\.status === 'fail'\) g\.unitFail = true;/, 'the unit-failure check reads UNIT_EXACT');
 
 const PROXY = 'Unit tests (proxy, clock +400d)';
 

@@ -6,6 +6,10 @@
  * and a mean, plus the run count. This is the CI side of the ticket's first Done-when bullet ("a PR's CI wall time drops
  * below ~8.5 min median"). It reads GitHub through `gh run list`, and nothing else.
  *
+ * Beside `ciRow` in `scripts/stability-measures-core.mjs`, the landing-window CI row, whose median and rounding it
+ * reuses. The two differ on purpose: that row times updatedAt − startedAt for runs whose head is a window landing; this
+ * one times updatedAt − createdAt (queue included, as the LIN-4441 plan asks) for every successful main run in a window.
+ *
  * WHAT IT CANNOT MEASURE, AND WHY: the ticket's 28% (worker time waiting on CI) and 10–13% (local full-suite runs) shares,
  * and CI waits per task. Those need worker-session timings across dispatches, and the 7–12 Nov baseline (38 tasks,
  * 333 dispatches) was produced from inputs that are NOT in this repository. `scripts/survey-tests-*.mjs` measures per-file
@@ -16,6 +20,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { mean, median, round } from './stability-measures-core.mjs';
 
 export const WORKFLOW = 'test.yml';
 
@@ -25,13 +30,9 @@ export function summariseWall(runs, { since = null } = {}) {
     .filter((r) => r.conclusion === 'success' && r.headBranch === 'main')
     .filter((r) => !since || r.createdAt >= since)
     .map((r) => (Date.parse(r.updatedAt) - Date.parse(r.createdAt)) / 60000)
-    .filter((m) => Number.isFinite(m) && m > 0)
-    .sort((a, b) => a - b);
+    .filter((m) => Number.isFinite(m) && m > 0);
   if (!wall.length) return { runs: 0, medianMin: null, meanMin: null };
-  const mid = Math.floor(wall.length / 2);
-  const median = wall.length % 2 ? wall[mid] : (wall[mid - 1] + wall[mid]) / 2;
-  const mean = wall.reduce((s, m) => s + m, 0) / wall.length;
-  return { runs: wall.length, medianMin: Math.round(median * 100) / 100, meanMin: Math.round(mean * 100) / 100 };
+  return { runs: wall.length, medianMin: round(median(wall), 2), meanMin: round(mean(wall), 2) };
 }
 
 function main(argv) {
