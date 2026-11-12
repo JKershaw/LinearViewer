@@ -3417,3 +3417,16 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - **The other reads agree:** token slopes sit close to the dollar slopes (floor 0.22, work 0.31). Round trips add about 0.19 per round on the floor at low power (17 review round trips in 15 tickets).
   - **Caveats it states:** 30 of the 98 exact tickets are test-only (zero production lines), so they aren't plotted. The population is found through commit mentions, a hole with no bound. Simple-dispatcher has too few tickets for a slope.
   - The chart is `docs/papers/harbour/figures/task-size-and-cost/size-cost.svg`. The paper's prose is still to come.
+- **13:39 UTC: A6's first piece merged** (LIN-4431, child of LIN-4401; `c6d99f05e`, PR #2402, $24.2).
+  - **What it adds:** `CONSEQUENCE_TEST` beside `LEFTOVER_RULE` in the leftover-words leaf. An outside find becomes a ticket only if it breaks something, blocks work or touches safety. Otherwise it's a Waiting entry in the note of the area its first cited file maps to. The rule is rendered in the leftover step, review's scope section and close-out's Triage.
+  - **Size:** production `lib/` +45/−30. Prompt text grows +2,588 bytes (review +758, close-out +756, leftover prompt +711, defs +363), with each reason recorded at its ceiling. The gate is prose that the agent reads, and a shape test holds it (`tests/unit/lin-4401-outside-find-home.test.js`).
+  - **It retires** the old filing sentences in close-out, review and the signals.
+  - **For the gate:** this is a rule held in prompt words. That's the thing the LIN-4369 lesson warns about, and A10 chose code for the same reason.
+- **Found: the usual goal didn't reach the child runs.** LIN-4431's stages ran as:
+  - survey-task, survey-place, scoping and the autopilot: Opus;
+  - implementation: **Haiku** (high);
+  - review: Opus at **medium** effort;
+  - close-out and all nine review fixes: **Sonnet**.
+  - **Why:** the parent (`8e5b97ce`) started a child autopilot for LIN-4431 (`3c3f15e2`, model opus) without the goal's text. Its stored record has no "Use opus". The child then used each stage's default model.
+  - **The same shape elsewhere:** paper v2's children, LIN-4426 (Haiku/Sonnet/Opus commits) and LIN-4427 (3 Haiku, 1 Opus, 1 Sonnet). LIN-4420 (lane 2's child, this morning) was all Opus, so a child run doesn't always lose it.
+  - **Next:** LIN-4432 (A6's piece B) is held behind it and will likely run the same way. I haven't touched the run. Whether this matters, and what to do about it, is John's call (money, and his own instruction).
