@@ -90,7 +90,7 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   a fixed cost with a small growing part, because both give a log–log slope below 1. Fit `cost = a + b·size` on the 98 exact
   tickets, and label it a post-freeze analysis, since the frozen analysis has no such fit. (Claude, 2026-11-12)
 - **Do review rounds make the floor grow with size?** Version 2 found 17 review round trips across 15 tickets and 3
-  plan-review round trips across 3, and a round coefficient of 0.19 per trip with an interval of [0.00, 0.31] (n 67). Too
+  plan-review round trips across 3, and a round coefficient of 0.19 per trip with an interval of [0.003, 0.31] (n 67), and an unchanged size slope. Too
   few to test. Count rounds again after about two more weeks of records. (Claude, 2026-11-12)
 - **Which declared twins have ever been paid for?** Half answered: version 2's M3 found three sibling fixes in 165
   subset edits of the named decisions, while 42 sibling escapes sit on decisions the census never named, so the
