@@ -53,12 +53,15 @@ names, have neither, so they are never read as paths.
 
 ## One home for each leftover
 
-Where a leftover goes, and why an item never lives both here and in a filed follow-up,
-is written once: `LEFTOVER_RULE` in `lib/prompts/leftover-words.js` (LIN-4376). The
-leftover step, review and close-out each render it word for word. For the notes:
+Where a leftover goes, and why an item never lives both here and in a ticket, is written
+once in `lib/prompts/leftover-words.js`: `LEFTOVER_RULE` (LIN-4376) and `CONSEQUENCE_TEST`
+(LIN-4401), which says where an outside find goes. An outside find becomes a ticket only
+if it breaks something, blocks work, or touches safety; otherwise it is a `## Waiting`
+entry in the note of the area its first cited file maps to. Never both. The leftover
+step, review and close-out render both word for word. For the notes:
 
 - A waiting entry leaves in only three ways: a change settles it, a change makes it
-  untrue (either removes it in the same change), or a follow-up is filed for it. It
+  untrue (either removes it in the same change), or the consequence test sends it to a ticket. It
   never leaves, and is never shortened, to make room.
 - Waiting entries are context, not scope. A ticket takes one on only when the size of
   its move does.
@@ -72,15 +75,17 @@ leftover step, review and close-out each render it word for word. For the notes:
   entry or there are no notes; or none, because no touched area has a fix-sized entry,
   naming the smallest entry in the busiest touched area and why it is larger than a
   fix. The proxy refuses an answer without a valid line (`lib/dispatch-leftover-answer.js`).
-  A filed follow-up never counts as the retirement. The build itself still treats
+  A ticket never counts as the retirement. The build itself still treats
   Waiting as context.
 
-Who writes here: the builder's leftover step tidies or notes what its change left
-(`lib/dispatch-leftover.js`), review names any edge it left untouched, close-out
-writes review's note entries on the PR branch before the merge (LIN-4374), and Stage 2
-of a Periodical writes its reading's entries in the same docs-only PR as its report
-(`lib/periodicals.js`, LIN-4379). Close-out is the only one that files a follow-up;
-a Periodical that writes here files none.
+Who writes here: the builder's leftover step tidies or notes what its change left,
+writing an outside find into its own area's note (`lib/dispatch-leftover.js`, LIN-4401),
+review names any edge it left untouched, close-out
+writes review's note entries, in any area, on the PR branch before the merge (LIN-4374,
+LIN-4401), and Stage 2 of a Periodical writes its reading's entries in the same docs-only
+PR as its report (`lib/periodicals.js`, LIN-4379). Close-out is the only one that files
+a ticket, and only one the consequence test sends to a ticket; every other outside find
+is a note entry in its area. A Periodical that writes here files none.
 
 The Survey notebook's tally (`docs/plans/survey/broad-options.md`) moved here; the rest
 of `docs/plans/survey/` stays as frozen research.

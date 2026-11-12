@@ -752,7 +752,7 @@ describe('code-review consolidated into review (LIN-523)', () => {
   test('review does not instruct merge or Done (close-out split at the merge line)', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
     // Said once, in the hand-off, with its reason (LIN-3293 dedup).
-    assert.ok(/You do NOT merge, mark the task Done, or file follow-ups/.test(result.prompt));
+    assert.ok(/You do NOT merge, mark the task Done, or file the gate's tickets/.test(result.prompt));
   });
 });
 
@@ -1716,8 +1716,8 @@ describe('review template', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
     assert.ok(/Review is write-only/i.test(result.prompt), 'states review is write-only');
     assert.ok(/CI is green on the PR/i.test(result.prompt), 'confirms CI green on the PR');
-    assert.ok(/You do NOT merge, mark the task Done, or file follow-ups/i.test(result.prompt),
-      'review does not merge, mark Done, or file follow-ups: close-out files them (LIN-3293)');
+    assert.ok(/You do NOT merge, mark the task Done, or file the gate's tickets/i.test(result.prompt),
+      "review does not merge, mark Done, or file the gate's tickets: close-out files them (LIN-3293, LIN-4401)");
     assert.ok(/Approve — conditional on close-out discharging the ledger/i.test(result.prompt),
       'a non-empty ledger forces a conditional approval');
     assert.ok(/the `close-out` step does, from the ledger you wrote/i.test(result.prompt), 'hands off to the close-out step');
@@ -2376,20 +2376,20 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
     test('close-out lets an outside item be settled by a self-contained filed ticket', () => {
       const { prompt } = generatePrompt('close-out', issue, context);
-      assert.ok(/\*\*Outside\*\*: file it as a follow-up a reader with no access to this task can act on/.test(prompt),
-        'an outside item is filed, and the filing stands alone');
+      assert.ok(/\*\*Outside\*\*: settled by its note commit, or by the gate's ticket, written for a reader with no access to this task/.test(prompt),
+        'an outside item is settled by its note, or by a gate ticket that stands alone');
     });
 
     // LIN-3006: the drop-then-file route is removed on purpose — inside work is
     // done or left undone with its reason, never filed.
     test('close-out files outside items only — inside work is never filed', () => {
       const { prompt } = generatePrompt('close-out', issue, context);
-      assert.ok(/Only outside items are filed here; inside work is done or left undone with its reason, never filed/.test(prompt),
+      assert.ok(/Only the gate's tickets are filed here; inside work is done or left undone with its reason, never filed/.test(prompt),
         'follow-up triage files outside items only');
       assert.ok(!/inside-scope items you have explicitly dropped in the summary above, are eligible to be filed/i.test(prompt),
         'the drop-then-file route stays removed');
       const workflow = prompt.slice(prompt.indexOf('## Workflow'), prompt.indexOf('## Context'));
-      assert.ok(/file the outside follow-ups/.test(workflow), 'the workflow files outside follow-ups only');
+      assert.ok(/file the gate's tickets/.test(workflow), "the workflow files the gate's tickets only");
     });
 
     test('review and close-out limit ruling options to outside-only filing', () => {
@@ -2509,7 +2509,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
         'the Inside bullet carries the not-run exception, pointing to Land It');
       assert.ok(/Leave one undone only when finishing it is a change the team would need to hear about first/.test(inside),
         'the hold for real inside work stays');
-      assert.ok(/file it as a follow-up a reader with no access to this task can act on/.test(settle),
+      assert.ok(/written for a reader with no access to this task/.test(settle),
         'the Outside bullet keeps the outsider standard: the retained bound of review\'s cut Outside wording (LIN-3293)');
     });
 
@@ -2584,7 +2584,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       assert.ok(eligibilityIdx < noReRaiseIdx && noReRaiseIdx < nextSectionIdx, 'the no-re-raise clause sits after the eligibility clause');
       assert.ok(!/on a finding, check it is not already covered/i.test(review), 'LIN-3903: the trigger is any DECISION:, not only one on a finding');
       assert.equal(review.search(existingTicketClause), -1, 'review files nothing, so it has no filing check');
-      assert.match(review, /close-out files it, after checking it does not already exist/);
+      assert.match(review, /Close-out files the gate's tickets/);
     });
 
     test('Follow-up Triage carries both clauses, immediately after the eligibility clause and before the Priority bullet', () => {
@@ -2700,7 +2700,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     const land = prompt.slice(prompt.indexOf('### Land It and Close the Loop'));
     const summaryAt = land.search(/Post the summary comment/);
     const archiveAt = land.search(/archive and prune the description/);
-    const followUpsAt = land.search(/file the outside follow-ups/);
+    const followUpsAt = land.search(/file the gate's tickets/);
     assert.ok(summaryAt > -1 && archiveAt > -1 && followUpsAt > -1, 'all three steps are present');
     assert.ok(summaryAt < archiveAt && archiveAt < followUpsAt,
       'archive+prune sits strictly between the summary post and follow-up filing');
@@ -2710,7 +2710,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     const { prompt } = generatePrompt('close-out', issue, context);
     const workflow = prompt.slice(prompt.indexOf('## Workflow'), prompt.indexOf('## Context'));
     const archiveAt = workflow.search(/archive & prune the description/);
-    const followUpsAt = workflow.search(/file the outside follow-ups/);
+    const followUpsAt = workflow.search(/file the gate's tickets/);
     assert.ok(archiveAt > -1 && followUpsAt > -1 && archiveAt < followUpsAt,
       'the workflow list sequences archive & prune before filing follow-ups');
   });
@@ -2818,7 +2818,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
   test('(h1) sanity: the close-out body states merge→done→summary→archive→prune→follow-up in order', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
     const land = prompt.slice(prompt.indexOf('### Land It and Close the Loop'), prompt.indexOf('### Follow-up Triage'));
-    const steps = [/Merge pinned/, /set the task to Done/, /Post the summary comment/, /archive and prune/, /file the outside follow-ups/];
+    const steps = [/Merge pinned/, /set the task to Done/, /Post the summary comment/, /archive and prune/, /file the gate's tickets/];
     const positions = steps.map(re => land.search(re));
     assert.ok(positions.every(p => p > -1), 'every step is present in the Land It section');
     for (let i = 1; i < positions.length; i++) {
@@ -2828,7 +2828,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
   // LIN-3300: aiHint.goal and aiHint.workflow (two more copies) are gone; the description stays.
   test('(h2) the description names every irreversible-set step in the body\'s order', () => {
-    const keywords = ['merge', 'done', 'summary', 'archive', 'prune', 'follow-up'];
+    const keywords = ['merge', 'done', 'summary', 'archive', 'prune', "gate's tickets"];
     const assertOrdered = (text, label) => {
       const lower = text.toLowerCase();
       const positions = keywords.map(k => lower.indexOf(k));
@@ -2887,7 +2887,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
   test('(i5) the close-out step that files follow-ups points filers at Follow-up Triage', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
     const land = prompt.slice(prompt.indexOf('### Land It and Close the Loop'), prompt.indexOf('### Follow-up Triage'));
-    assert.ok(/file the outside follow-ups \(see Follow-up Triage below\)/.test(land),
+    assert.ok(/file the gate's tickets \(see Follow-up Triage below\)/.test(land),
       'the filing step references Follow-up Triage');
   });
 
