@@ -343,7 +343,7 @@ describe('B4 owner load: a press merge reads as a close-out merge (review F1)', 
 
 describe('deriveCloseOutState: a merged PR reads the same for every viewer (LIN-3426)', () => {
   const merged = { readable: true, state: 'closed', merged: true, head: { sha: 'a' } };
-  const run = (owner) => deriveCloseOutState({ prs: [{ url: PR_URL, repo: 'acme/app', number: 41 }], prStatuses: [merged], review: null, owner, stopAt: 'pr' });
+  const run = (owner) => deriveCloseOutState({ prs: [{ url: PR_URL, repo: 'acme/app', number: 41 }], prStatuses: [merged], landingPrs: [PR_URL], review: null, owner, stopAt: 'pr' });
   test('owner and guest get the same merged message and no merger flag', () => {
     const { owner: _o1, ...asOwner } = run(true);
     const { owner: _o2, ...asGuest } = run(false);

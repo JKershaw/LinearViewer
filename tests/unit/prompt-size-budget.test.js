@@ -72,7 +72,7 @@ import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
 /** Templates, source bytes. Same files `steady-base-growth.mjs` GROUPS as
  * "worker templates". */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 119867, // LIN-4437: +7691 (112176 -> 119867): the blind-read stage, its piloted text shipped as piloted (LIN-4436 Go) with the Where-to-stand sentence and the empty-landing branch; the class lines and unmapped-path sentence render from the leaf; the comment's shape is held by the proxy (lib/run-ledger.js checkBlindRead), not the words
+  'lib/prompt-template-defs.js': 120618, // LIN-4438: +751 (119867 -> 120618): close-out's blind-read, PR-link and leftover-hand-off clauses and the blind read's merged-PR base rule, less review's retired edges paragraph; the imports (FOR_CLOSE_OUT, RETIRES_LABEL) and three reason comments; the gate itself is code (closeOutWaitsOn) and the route is lib/recommendation-blind-read.js
   'lib/prompt-templates.js': 19903, // LIN-4437: +241, finishStagePrompt skips the attachments section for the blind read (code and its comment; the skip is witnessed in tests/unit/lin-4437-blind-read.test.js)
   'lib/prompt-formatters.js': 47968, // LIN-4437: +163, the blind read's own empty grounding list and its reason (a comment; it renders nothing)
   'lib/prompt-contract.js': 3875, // LIN-4362: the `## As asked` spellings interpolate AS_ASKED_HEADING (code, not prompt text)
@@ -95,13 +95,13 @@ export const TEMPLATES_RENDERED_CEILINGS = {
   context: 2021, // LIN-3300: at 2021 since the stage rules only the meta-prompt carried moved into their templates
   'plan-review': 7601, // LIN-4353: the verdict quotes the ask and says how the plan meets it; only the person agrees to a narrowing (the reviewer's judgement)
   implementation: 8493, // LIN-4379: +102, the pointer asks the work to name a note entry it used (file and source) where it records its decisions, so the next look-first step citing a finding is checkable; which entry bears on the work is the agent's judgement no code sees
-  review: 17025, // LIN-4401 (LIN-4432 beat 4): +113 (16912 -> 17025): one sentence, an audit's notes PR on a Done ticket is judged against the audit's findings comment; the gate is held by tests/unit/lin-4401-outside-find-home.test.js, the sentence by tests/unit/lin-4432-audit-notes-pr.test.js
-  'close-out': 13189, // LIN-4401 (LIN-4432 review fix): +27 (13162 -> 13189): Land It's notes close-out cites the notes PR's URL. LIN-4401 (LIN-4432 beat 4): +224 (12938 -> 13162): Land It's sentence for a Done ticket's approved, unmerged audit notes PR (merge and summary only), Workflow step 5's pointer to it, and close-out's route clause for that PR; shape held by tests/unit/lin-4432-audit-notes-pr.test.js
+  review: 16406, // LIN-4438: -619 (17025 -> 16406): the edges read retired to the blind read; review keeps one sentence, the builder's Retires: line names an entry this diff removes (tests/unit/lin-4374-review-leftover-read.test.js)
+  'close-out': 13800, // LIN-4438: +611 (13189 -> 13800), counted against review's -619 (net -8): the blind read in Workflow step 1 and Make the Fixes, the leftover lines marked for close-out in Follow-up Triage, and the not-ready sentence's PR-link and blind-read clauses for the lanes no guard sees (the gate is held in code: lib/close-out-readiness.js)
   'retrospective-audit': 5609, // LIN-4401 (LIN-4432 review fix): +46 (5563 -> 5609): the findings comment's required heading `## Retrospective audit — <identifier>`. LIN-4401 (LIN-4432 beat 4): +944 (4619 -> 5563): the consequence test (579 bytes, LIN-4401 D1) renders once in Reporting; the notes-PR sentences and the audit's own workflow (the shared read-only one stays for its other users) add the rest; FOLLOW_UP_SHAPE stays. Shape held by tests/unit/lin-4401-outside-find-home.test.js and tests/unit/lin-4432-audit-notes-pr.test.js
   retro: 4265, // LIN-3299: at 4265 since Scope and Authority on every path
   'survey-task': 1204, // LIN-4248: new at 1204; the hand-tuned task-view Survey wording, verbatim but for the {BASE} sentence and the Goal/Process frame
   'survey-place': 2119, // LIN-4248: new at 2119; the hand-tuned place-view Survey wording, verbatim but for the {BASE} sentence and the Goal/Process frame
-  'blind-read': 4791, // LIN-4437: new at 4791, rendered with one landing PR (FIXTURE_CONTEXT_BY_KIND); the piloted reader prompt (LIN-4436) verbatim but for its fill-ins, the Where-to-stand sentence and the Goal/Process frame; its comment shape is held by the proxy
+  'blind-read': 4945, // LIN-4438: +154 (4791 -> 4945): the Where-to-stand base rule for a merged PR (its merge commit's first parent), the first live read's find 4: the old rule gave an empty diff once merged; a git rule the reader runs, not a shape code can hold
 };
 
 /**
@@ -140,7 +140,7 @@ export const LEFTOVER_PROMPT_RENDERED_CEILING = 2498; // LIN-4401 (LIN-4431 beat
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 377016; // LIN-4437: +13182 (363834 -> 377016): the blind-read stage: prompt-template-defs.js source +7691, its new rendered ceiling 4791, stage-intent.js +296, prompt-templates.js +241, prompt-formatters.js +163
+export const FROZEN_TOTAL_BYTES = 377913; // LIN-4438: +897 (377016 -> 377913): prompt-template-defs.js source +751, review -619, close-out +611, blind-read +154
 
 const BASE_URL = 'https://harbour.example';
 

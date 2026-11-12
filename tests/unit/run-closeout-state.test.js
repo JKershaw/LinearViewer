@@ -14,6 +14,8 @@ import {
   deriveCloseOutState,
   closeOutSetsDone,
   isApprovedReview,
+  closeOutWaitsOn,
+  BLIND_READ_MISSING_COPY,
   resolveRunVariant,
   sameHead,
   CLOSE_OUT_STATUS,
@@ -33,6 +35,10 @@ const closedStatus = (sha = 'aaaaaaa') => ({
   repo: REPO, readable: true, number: 1, state: 'closed', merged: false, head: { ref: 'x', sha }, ref: sha, checks: []
 });
 const unknownStatus = (reason = 'not checked') => ({ repo: REPO, readable: false, state: 'unknown', reason });
+
+// The PR-shape table below runs with the blind-read gate off (no landing PR, LIN-4438); the gate's
+// own cases are in the describe at the end.
+const NO_LANDING = [];
 
 const approve = (verdict = 'approve') => ({ verdict, verdictText: verdict === 'approve' ? 'Approve' : 'Approve — conditional', sha: 'aaaaaaa' });
 
@@ -67,6 +73,7 @@ describe('resolveRunVariant — the authoritative row variant, fail-closed', () 
 
 describe('deriveCloseOutState — variant is preserved fail-closed', () => {
   const readyInput = (over = {}) => ({
+    landingPrs: NO_LANDING,
     prs: [pr(41)],
     prStatuses: [openStatus()],
     review: approve(),
@@ -101,6 +108,7 @@ describe('isApprovedReview', () => {
 describe('deriveCloseOutState — truth table', () => {
   test('one open PR, Approve on record and a runner set up is ready and pressable', () => {
     const state = deriveCloseOutState({
+      landingPrs: NO_LANDING,
       prs: [pr(41)],
       prStatuses: [openStatus()],
       review: approve(),
@@ -118,6 +126,7 @@ describe('deriveCloseOutState — truth table', () => {
 
   // LIN-3418: a head that moved after the review approved it is never ready.
   const movedArgs = (over = {}) => ({
+    landingPrs: NO_LANDING,
     prs: [pr(41)],
     prStatuses: [openStatus('bbbbbbb')],
     review: approve(),
@@ -167,6 +176,7 @@ describe('deriveCloseOutState — truth table', () => {
 
   test('a non-stop-at-PR run is never ready, however the PR reads', () => {
     const state = deriveCloseOutState({
+      landingPrs: NO_LANDING,
       prs: [pr(41)],
       prStatuses: [openStatus()],
       review: approve(),
@@ -182,6 +192,7 @@ describe('deriveCloseOutState — truth table', () => {
 
   test('many open PRs are never ready (per-PR state, task stays open)', () => {
     const state = deriveCloseOutState({
+      landingPrs: NO_LANDING,
       prs: [pr(41), pr(42)],
       prStatuses: [openStatus(), openStatus()],
       review: approve(),
@@ -195,6 +206,7 @@ describe('deriveCloseOutState — truth table', () => {
 
   test('an unreadable PR state fails open: unknown, never ready, never Done', () => {
     const state = deriveCloseOutState({
+      landingPrs: NO_LANDING,
       prs: [pr(41)],
       prStatuses: [unknownStatus()],
       review: approve(),
@@ -209,6 +221,7 @@ describe('deriveCloseOutState — truth table', () => {
 
   test('multi-PR partial merge names the merged PR and the open remainder', () => {
     const state = deriveCloseOutState({
+      landingPrs: NO_LANDING,
       prs: [pr(41), pr(42)],
       prStatuses: [mergedStatus(), openStatus()],
       review: approve(),
@@ -227,6 +240,7 @@ describe('deriveCloseOutState — truth table', () => {
 
   test('F1: a non-stop-at-PR merged run reads neutrally — main\'s copy', () => {
     const state = deriveCloseOutState({
+      landingPrs: NO_LANDING,
       prs: [pr(41)],
       prStatuses: [mergedStatus()],
       review: approve(),
@@ -242,6 +256,7 @@ describe('deriveCloseOutState — truth table', () => {
 
   test('F1: a non-stop-at-PR partial merge also carries no viewer-specific merger flag', () => {
     const state = deriveCloseOutState({
+      landingPrs: NO_LANDING,
       prs: [pr(41), pr(42)],
       prStatuses: [mergedStatus(), openStatus()],
       review: approve(),
@@ -255,6 +270,7 @@ describe('deriveCloseOutState — truth table', () => {
 
   test('a partial merge with two remaining PRs pluralises the remainder', () => {
     const state = deriveCloseOutState({
+      landingPrs: NO_LANDING,
       prs: [pr(41), pr(42), pr(43)],
       prStatuses: [mergedStatus(), openStatus(), openStatus()],
       review: approve(),
@@ -268,6 +284,7 @@ describe('deriveCloseOutState — truth table', () => {
   test('N-b: a merged PR beside a readable closed-unmerged PR names that, not "could not be read"', () => {
     const closed = { readable: true, repo: REPO, number: 42, state: 'closed', merged: false, head: { ref: 'f', sha: 'bbbbbbb' }, ref: 'bbbbbbb', checks: [] };
     const state = deriveCloseOutState({
+      landingPrs: NO_LANDING,
       prs: [pr(41), pr(42)],
       prStatuses: [mergedStatus(), closed],
       review: approve(),
@@ -283,6 +300,7 @@ describe('deriveCloseOutState — truth table', () => {
 
   test('N-b: a merged PR beside an unreadable remaining PR still fails open', () => {
     const state = deriveCloseOutState({
+      landingPrs: NO_LANDING,
       prs: [pr(41), pr(42)],
       prStatuses: [mergedStatus(), unknownStatus()],
       review: approve(),
@@ -296,6 +314,7 @@ describe('deriveCloseOutState — truth table', () => {
 
   test('a merged PR (own check) is merged and Done is set', () => {
     const state = deriveCloseOutState({
+      landingPrs: NO_LANDING,
       prs: [pr(41)],
       prStatuses: [mergedStatus()],
       review: approve(),
@@ -311,6 +330,7 @@ describe('deriveCloseOutState — truth table', () => {
 
   test('not ready (no Approve) still renders the set-up state, never hidden', () => {
     const state = deriveCloseOutState({
+      landingPrs: NO_LANDING,
       prs: [pr(41)],
       prStatuses: [openStatus()],
       review: approve('request-changes'),
@@ -327,6 +347,7 @@ describe('deriveCloseOutState — truth table', () => {
 
   test('not ready (runner not set up) renders the set-up state', () => {
     const state = deriveCloseOutState({
+      landingPrs: NO_LANDING,
       prs: [pr(41)],
       prStatuses: [openStatus()],
       review: approve(),
@@ -340,13 +361,14 @@ describe('deriveCloseOutState — truth table', () => {
   });
 
   test('no PR found is its own state', () => {
-    const state = deriveCloseOutState({ prs: [], prStatuses: [], review: approve(), runnerReady: true, owner: true });
+    const state = deriveCloseOutState({ landingPrs: NO_LANDING, prs: [], prStatuses: [], review: approve(), runnerReady: true, owner: true });
     assert.strictEqual(state.status, CLOSE_OUT_STATUS.NO_PR);
     assert.strictEqual(state.pressable, false);
   });
 
   test('a closed-but-unmerged PR is not ready and not Done', () => {
     const state = deriveCloseOutState({
+      landingPrs: NO_LANDING,
       prs: [pr(41)],
       prStatuses: [closedStatus()],
       review: approve(),
@@ -361,6 +383,7 @@ describe('deriveCloseOutState — truth table', () => {
 
   test('a non-owner sees no box state', () => {
     const state = deriveCloseOutState({
+      landingPrs: NO_LANDING,
       prs: [pr(41)],
       prStatuses: [openStatus()],
       review: approve(),
@@ -404,5 +427,67 @@ describe('closeOutSetsDone — one test per bound that withholds Done', () => {
   test('the target PR may be selected by index among many', () => {
     assert.strictEqual(closeOutSetsDone({ prStatuses: [mergedStatus(), mergedStatus()], prIndex: 1, review: approve(), byPersonCheck: true }), true);
     assert.strictEqual(closeOutSetsDone({ prStatuses: [openStatus(), mergedStatus()], prIndex: 1, review: approve(), byPersonCheck: true }), false);
+  });
+});
+
+describe('LIN-4438: closeOutWaitsOn and the blind-read gate in the box state', () => {
+  const URL41 = pr(41).url;
+  const URL40 = pr(40).url;
+  const read = (...prs) => ({ verdict: 'same', reason: 'a b c', prs, at: null, commentId: null });
+  const withRead = (verdict, blindRead) => ({ ...approve(verdict), blindRead });
+
+  test('waits only when the review approves, the landing has a PR, and a landing PR is unnamed', () => {
+    assert.strictEqual(closeOutWaitsOn(withRead('approve', null), [URL41]), 'blind-read');
+    assert.strictEqual(closeOutWaitsOn(withRead('approve-conditional', null), [URL41]), 'blind-read');
+    assert.strictEqual(closeOutWaitsOn(withRead('approve', read(URL41)), [URL41]), null);
+    assert.strictEqual(closeOutWaitsOn(withRead('approve', read(URL40)), [URL41]), 'blind-read', 'an older PR only');
+    assert.strictEqual(closeOutWaitsOn(withRead('approve', read(URL41)), [URL40, URL41]), 'blind-read', 'every landing PR, not any');
+    assert.strictEqual(closeOutWaitsOn(withRead('request-changes', null), [URL41]), null);
+    assert.strictEqual(closeOutWaitsOn(withRead('approve', null), []), null, 'no landing PR: nothing to wait on');
+    assert.strictEqual(closeOutWaitsOn(null, [URL41]), null, 'no review');
+  });
+
+  test('a missing landing fails loudly, in the predicate and in deriveCloseOutState', () => {
+    assert.throws(() => closeOutWaitsOn(approve(), undefined), TypeError);
+    assert.throws(() => deriveCloseOutState({ prs: [pr(41)], prStatuses: [openStatus()], review: approve(), runnerReady: true, owner: true, stopAt: 'pr' }), TypeError);
+  });
+
+  const gateArgs = (over = {}) => ({
+    prs: [pr(41)], prStatuses: [openStatus()], landingPrs: [URL41],
+    review: withRead('approve', null), runnerReady: true, owner: true, stopAt: 'pr', ...over
+  });
+
+  test('approve with no read: not ready, blind-read-missing, with its copy; a read naming the PR: ready', () => {
+    const missing = deriveCloseOutState(gateArgs());
+    assert.strictEqual(missing.status, CLOSE_OUT_STATUS.NOT_READY);
+    assert.strictEqual(missing.reason, 'blind-read-missing');
+    assert.strictEqual(missing.message, BLIND_READ_MISSING_COPY);
+    assert.strictEqual(missing.message, 'no blind read on record since the review');
+    assert.strictEqual(missing.pressable, false);
+    const ready = deriveCloseOutState(gateArgs({ review: withRead('approve', read(URL41)) }));
+    assert.strictEqual(ready.status, CLOSE_OUT_STATUS.READY);
+    assert.strictEqual(ready.pressable, true);
+  });
+
+  test('order: after not-stop-at-run and review-not-approve, before runner-not-set-up, multiple-prs, pr-unreadable, pr-not-open and head-moved', () => {
+    assert.strictEqual(deriveCloseOutState(gateArgs({ stopAt: null })).reason, 'not-stop-at-run');
+    assert.strictEqual(deriveCloseOutState(gateArgs({ review: withRead('request-changes', null) })).reason, 'review-not-approve');
+    for (const [name, over] of Object.entries({
+      'runner not set up': { runnerReady: false },
+      'head moved': { prStatuses: [openStatus('bbbbbbb')] },
+      'unreadable': { prStatuses: [unknownStatus()] },
+      'closed': { prStatuses: [closedStatus()] },
+      'two PRs': { prs: [pr(40), pr(41)], prStatuses: [openStatus('aaaaaaa', { number: 40 }), openStatus()] },
+    })) {
+      assert.strictEqual(deriveCloseOutState(gateArgs(over)).reason, 'blind-read-missing', name);
+    }
+  });
+
+  test('a merge already made is still recorded, gate or not', () => {
+    const merged = deriveCloseOutState(gateArgs({ prStatuses: [mergedStatus()], byPersonCheck: true }));
+    assert.strictEqual(merged.status, CLOSE_OUT_STATUS.MERGED);
+    assert.strictEqual(merged.setDone, true);
+    const partial = deriveCloseOutState(gateArgs({ prs: [pr(40), pr(41)], prStatuses: [mergedStatus('aaaaaaa', { number: 40 }), openStatus()] }));
+    assert.strictEqual(partial.status, CLOSE_OUT_STATUS.PARTIAL);
   });
 });

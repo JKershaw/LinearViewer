@@ -496,6 +496,8 @@ test.describe('Task page, owner view (LIN-3329)', () => {
           comments: [
             { id: 'c-pr', body: `Opened the pull request: ${PR_URL}`, createdAt: '2026-10-06T09:00:00Z', user: 'Runner' },
             { id: 'c-review', body: REVIEW_BODY, createdAt: '2026-10-06T10:00:00Z', user: 'Reviewer' },
+            // LIN-4438: a blind read naming the PR after the review, so close-out is ready (the gate is met).
+            { id: 'c-read', body: `## Blind read\nVerdict: same. It left the seeded area neither better nor worse.\n\nRead: ${PR_URL}.`, createdAt: '2026-10-06T10:30:00Z', user: 'Reader' },
           ],
         }],
       },
@@ -535,7 +537,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(page.locator('[data-testid="task-page"]')).toHaveAttribute('data-ready-header', /ready to merge/);
     // The description and comments are visible (and markdown-upgraded).
     await expect(page.locator('[data-testid="task-page-description"]')).toBeVisible();
-    await expect(page.locator('[data-testid="task-page-comments"]')).toContainText('Comments (2)');
+    await expect(page.locator('[data-testid="task-page-comments"]')).toContainText('Comments (3)');
     await noHorizontalScroll(page);
 
     // The 8 Oct witness: the merge click works from the task page, which has NO
@@ -593,6 +595,8 @@ test.describe('Task page, owner view (LIN-3329)', () => {
           comments: [
             { id: 'c-pr', body: `Opened the pull request: ${PR_URL}`, createdAt: '2026-10-06T09:00:00Z', user: 'Runner' },
             { id: 'c-review', body: REVIEW_BODY, createdAt: '2026-10-06T10:00:00Z', user: 'Reviewer' },
+            // LIN-4438: a blind read naming the PR after the review, so close-out is ready (the gate is met).
+            { id: 'c-read', body: `## Blind read\nVerdict: same. It left the seeded area neither better nor worse.\n\nRead: ${PR_URL}.`, createdAt: '2026-10-06T10:30:00Z', user: 'Reader' },
           ],
         }],
       },
@@ -648,6 +652,8 @@ test.describe('Task page, owner view (LIN-3329)', () => {
           comments: [
             { id: 'c-pr', body: `Opened the pull request: ${PR_URL}`, createdAt: '2026-10-06T09:00:00Z', user: 'Runner' },
             { id: 'c-review', body: REVIEW_BODY, createdAt: '2026-10-06T10:00:00Z', user: 'Reviewer' },
+            // LIN-4438: a blind read naming the PR after the review, so close-out is ready (the gate is met).
+            { id: 'c-read', body: `## Blind read\nVerdict: same. It left the seeded area neither better nor worse.\n\nRead: ${PR_URL}.`, createdAt: '2026-10-06T10:30:00Z', user: 'Reader' },
           ],
         }],
       },

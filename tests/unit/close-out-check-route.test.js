@@ -50,6 +50,9 @@ function unknownStatus(number) {
 
 const reviewBody = (verdict = 'Approve') => `## Review\n\n### What CI Did Not Prove\n| # | Claim | In/Out | Discharge |\n| --- | --- | --- | --- |\n| 1 | one claim | In | none |\n\n**Verdict: ${verdict}**`;
 const comment = (body, createdAt) => ({ body, createdAt, user: 'reviewer' });
+// LIN-4438: a blind read naming every PR in `text`, after the review, so these approving trails stay
+// ready; the gate's own refusals are in close-out-not-ready-dispatch and lin-4438-blind-read-gate.
+const readOf = (text) => comment(`## Blind read\nVerdict: same. It left the close-out area neither better nor worse.\n\nRead: ${String(text).match(/https:\/\/github\.com\/\S+?\/pull\/\d+/g).join(', ')}.`, '2026-07-03T00:00:00.000Z');
 
 function makeRouter({
   comments = [],
@@ -86,7 +89,7 @@ function makeDefaultMarkDoneRouter({ throwOnUpdate = false } = {}) {
   const store = new CloseOutEventsStore({ collection });
   const calls = { updateIssue: [] };
   const provider = {
-    async fetchIssueComments() { return [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')]; },
+    async fetchIssueComments() { return [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)]; },
     async fetchIssueContext() { return { issue: { id: 'issue-uuid', identifier: 'LIN-1', team: { id: 'team-1' } } }; },
     async issueWriteGuard() { return { team: { id: 'team-1' } }; },
     async states() { return [{ id: 'st-open', name: 'In Progress', type: 'started' }, { id: 'st-done', name: 'Done', type: 'completed' }]; },
@@ -140,14 +143,14 @@ const rows = async (collection) => collection.find({}).toArray();
 
 describe('POST /api/run-evidence/:issueIdentifier/check', () => {
   test('auth required: no signed-in account → 401, nothing recorded', async () => {
-    const built = makeRouter({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')], statuses: { 41: mergedStatus(41) } });
+    const built = makeRouter({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)], statuses: { 41: mergedStatus(41) } });
     const res = await check(built, baseReq({ session: {} }));
     assert.equal(res.statusCode, 401);
     assert.equal((await rows(built.collection)).length, 0);
   });
 
   test('person-session-only rule: a proxy/worker token is refused and never sets Done', async () => {
-    const built = makeRouter({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')], statuses: { 41: mergedStatus(41) } });
+    const built = makeRouter({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)], statuses: { 41: mergedStatus(41) } });
     const res = await check(built, baseReq({ proxyTokenId: 'pt-1', proxyUrlKey: 'ws' }));
     assert.equal(res.statusCode, 403);
     assert.equal(res.jsonBody.code, 'PERSON_SESSION_REQUIRED');
@@ -157,7 +160,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
 
   test('any repo: a PR URL is accepted now the allowlist is gone (LIN-3333)', async () => {
     const PR_FOREIGN = 'https://github.com/acme/other/pull/12';
-    const built = makeRouter({ comments: [comment(PR_FOREIGN, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')], statuses: { 12: openStatus(12) } });
+    const built = makeRouter({ comments: [comment(PR_FOREIGN, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_FOREIGN)], statuses: { 12: openStatus(12) } });
     const res = await check(built);
     assert.equal(res.statusCode, 200);
     assert.equal(res.jsonBody.state.status, 'ready');
@@ -166,7 +169,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
 
   test('fails open on an unreadable PR state: unknown, no record, no Done', async () => {
     const built = makeRouter({
-      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)],
       readPrStatus: async () => { throw new Error('rate limited'); },
     });
     const res = await check(built);
@@ -178,7 +181,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
 
   test('a non-stop-at-PR run is never ready: no record, no Done', async () => {
     const built = makeRouter({
-      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)],
       statuses: { 41: openStatus(41) },
       isStopAtRun: async () => null,
     });
@@ -191,7 +194,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
 
   test('R1 all hold: merged + Approve + no other PR + person session → records and sets Done', async () => {
     const built = makeRouter({
-      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)],
       statuses: { 41: mergedStatus(41) },
     });
     const res = await check(built);
@@ -209,7 +212,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
 
   test('R1 bound: the PR is not merged → no Done, nothing recorded', async () => {
     const built = makeRouter({
-      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)],
       statuses: { 41: openStatus(41) },
     });
     const res = await check(built);
@@ -231,7 +234,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
 
   test('multi-PR partial merge: records the merged PR, leaves the task open, returns the partial copy', async () => {
     const built = makeRouter({
-      comments: [comment(`${PR_A} and ${PR_B}`, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      comments: [comment(`${PR_A} and ${PR_B}`, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(`${PR_A} and ${PR_B}`)],
       statuses: { 41: mergedStatus(41), 42: openStatus(42) },
     });
     const res = await check(built);
@@ -247,7 +250,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
 
   test('R1 bound: another PR in the run evidence is still unmerged → withholds Done', async () => {
     const built = makeRouter({
-      comments: [comment(`${PR_A} and ${PR_B}`, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      comments: [comment(`${PR_A} and ${PR_B}`, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(`${PR_A} and ${PR_B}`)],
       statuses: { 41: mergedStatus(41), 42: openStatus(42) },
     });
     const res = await check(built);
@@ -259,7 +262,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
     const times = { created_at: '2026-06-01T08:00:00Z', merged_at: '2026-06-01T10:30:00Z' };
     let status = mergedStatus(41, 'aaaaaaa', times);
     const built = makeRouter({
-      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)],
       readPrStatus: async () => status,
     });
     await check(built);
@@ -277,7 +280,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
 
   test('LIN-3713: a merge whose status carries no forge times stores nulls', async () => {
     const built = makeRouter({
-      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)],
       statuses: { 41: mergedStatus(41) },
     });
     await check(built);
@@ -288,7 +291,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
 
   test('idempotency: a repeated check writes no second event', async () => {
     const built = makeRouter({
-      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)],
       statuses: { 41: mergedStatus(41) },
     });
     await check(built);
@@ -299,7 +302,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
   test('a failed Done write never blocks the record and is retried on the next check', async () => {
     let fail = true;
     const built = makeRouter({
-      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)],
       statuses: { 41: mergedStatus(41) },
       markDone: async () => { if (fail) { const e = new Error('provider down'); throw e; } },
     });
@@ -317,7 +320,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
 
   test('M7: a merged PR on a non-stop-at-PR run records nothing and never sets Done', async () => {
     const built = makeRouter({
-      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)],
       statuses: { 41: mergedStatus(41) },
       isStopAtRun: async () => null,
     });
@@ -351,7 +354,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
 
   test('F1: a press recorded for the head makes the merge a close-out merge, not "by you"', async () => {
     const built = makeRouter({
-      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)],
       statuses: { 41: mergedStatus(41) },
     });
     const pressRes = await press(built, baseReq({ body: { prUrl: PR_A, headSha: 'aaaaaaa', dispatchId: 'd-1' } }));
@@ -370,7 +373,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
 
   test('F2: repeated checks after a merge call markDone exactly once (Done written once per merge)', async () => {
     const built = makeRouter({
-      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)],
       statuses: { 41: mergedStatus(41) },
     });
     const first = await check(built);
@@ -387,7 +390,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
   // reopened task (recorded Done, tracker back In Progress) loops reloading.
   test("B1': doneNow is true on the call that writes Done, false on the next call", async () => {
     const built = makeRouter({
-      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)],
       statuses: { 41: mergedStatus(41) },
     });
     const first = await check(built);
@@ -417,7 +420,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
       dispatchQueueStore: queueStore,
       closeOutEventsStore: store,
       closeOut: {
-        resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')] }), callScope: 'scope' }),
+        resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)] }), callScope: 'scope' }),
         readPrStatus: async ({ number }) => mergedStatus(number),
         runnerReady: () => true,
         markDone: async () => { calls.markDone += 1; },
@@ -433,7 +436,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
 
   test('F4: a press at a DIFFERENT head than the merge still marks the merge close-out', async () => {
     const built = makeRouter({
-      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)],
       // the merge is seen at a NEW head (a push happened after the press)
       statuses: { 41: mergedStatus(41, 'bbbbbbb') },
     });
@@ -472,7 +475,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
       dispatchQueueStore: queueStore,
       closeOutEventsStore: store,
       closeOut: {
-        resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')] }), callScope: 'scope' }),
+        resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)] }), callScope: 'scope' }),
         readPrStatus: async ({ number }) => mergedStatus(number),
         runnerReady: () => true,
         markDone: async () => { calls.markDone += 1; },
@@ -519,7 +522,7 @@ describe('POST /api/run-evidence/:issueIdentifier/close-out-press', () => {
 // LIN-3395: a stale-tab press after a self-merge must be refused, so it never
 // becomes a second close-out event or a second Done write.
 describe('LIN-3395: close-out-press after a merged event exists', () => {
-  const mergedComments = () => [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')];
+  const mergedComments = () => [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)];
   const stalePress = () => baseReq({ body: { prUrl: PR_A, headSha: 'aaaaaaa', dispatchId: 'd-stale' } });
 
   test('a press for a prUrl that already has a merged event is refused and writes nothing', async () => {
@@ -594,7 +597,7 @@ describe('LIN-3657: close-out-press on a head-moved close-out', () => {
   const REVIEWED = 'aaaaaaa1111111';
   const MOVED = 'bbbbbbb2222222';
   const headReview = `## Review\n\nReviewed head \`${REVIEWED}\`.\n\n### What CI Did Not Prove\n| # | Claim | In/Out | Discharge |\n| --- | --- | --- | --- |\n| 1 | one claim | In | none |\n\n**Verdict: Approve**`;
-  const comments = [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(headReview, '2026-07-02T00:00:00.000Z')];
+  const comments = [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(headReview, '2026-07-02T00:00:00.000Z'), readOf(PR_A)];
   const movedStatuses = { 41: openStatus(41, MOVED) };
   const pressReq = (body = {}) => baseReq({ body: { prUrl: PR_A, headSha: MOVED, dispatchId: 'd-9', ...body } });
 
@@ -697,7 +700,7 @@ describe('LIN-3657: close-out-press on a head-moved close-out', () => {
 // LIN-3913: the proxyUrlKey arm of isPersonSession, and the 100-char identifier bound,
 // pinned on the check and press routes (the only other callers of validCloseOutIdentifier).
 describe('LIN-3913: person-session and identifier guards on check and press', () => {
-  const mergedComments = () => [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')];
+  const mergedComments = () => [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)];
 
   test('a proxyUrlKey-only caller (no proxyTokenId) is refused 403 on check and never sets Done', async () => {
     const built = makeRouter({ comments: mergedComments(), statuses: { 41: mergedStatus(41) } });

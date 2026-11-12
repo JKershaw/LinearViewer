@@ -80,9 +80,9 @@ step, review and close-out render both word for word. For the notes:
 
 Who writes here: the builder's leftover step tidies or notes what its change left,
 writing an outside find into its own area's note (`lib/dispatch-leftover.js`, LIN-4401),
-review names any edge it left untouched, close-out
-writes review's note entries, in any area, on the PR branch before the merge (LIN-4374,
-LIN-4401), and Stage 2 of a Periodical writes its reading's entries in the same docs-only
+the blind read before close-out names what a change left at its edges (LIN-4438), close-out
+fixes its fix-sized finds and writes review's note entries, in any area, on the PR branch
+before the merge (LIN-4374, LIN-4401), and Stage 2 of a Periodical writes its reading's entries in the same docs-only
 PR as its report (`lib/periodicals.js`, LIN-4379), and the after-merge audit
 (`retrospective-audit`, LIN-4432) writes its entries in one docs-only PR of its own. Close-out
 and the audit are the only ones that file a ticket, and only one the consequence test sends

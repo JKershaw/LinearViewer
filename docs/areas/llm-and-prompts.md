@@ -111,7 +111,3 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   matches its path") and the blind-read prompt's own sentence (`lib/prompt-template-defs.js`, the
   `blind-read` template), which shipped as piloted (LIN-4437), so it was not retyped after the pilot. One constant in the leaf would make it
   one, at the cost of re-piloting that sentence. (LIN-4436 leftovers.)
-- `lib/recommendation-facts.js`: `isLandingEvidence` excludes blind reads but not Survey reports,
-  which `lib/run-ledger.js` `landingPrUrls` skips; a Survey citing a full PR URL still reads as
-  landed work for the plan-review `landed` fact. One comment classifier keyed on headings would
-  give both one rule. (Review of LIN-4437.)
