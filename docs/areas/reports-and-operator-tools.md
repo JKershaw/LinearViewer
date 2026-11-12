@@ -35,13 +35,18 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   `scripts/stability-measures-blind.mjs`; the paper's coder
   (`docs/papers/harbour/cleaner-than-it-started-scripts/code-blind.mjs`) imports it, and
   re-running that must reproduce both frozen blind codes files (LIN-4422).
+- Rounding, the mean and percentages come from the core (`round`, `mean`, `percent`); a new
+  stability module imports them, never re-spells `Math.round(x * 1000) / 10`. A landing or a
+  commit is credited to one ticket only through `ownTicket`; `scripts/delivery-composition.mjs`
+  uses it too since LIN-4422 (its ticket counts fell by 1 to 5 a week) (LIN-4422 leftovers).
 
 ## Waiting
 
 - `scripts/stability-measures.mjs`: its reads (numstat flags, runner endpoint resolution, `gh`
   listing, and since LIN-4421 the landing log's `%x1f` format and the lookback's `--since`) are
-  witnessed only by the hand-run reproduction; a fixture-repo test would pin
-  `--diff-merges=first-parent` against silent undercount. (LIN-4420 review; LIN-4421 leftovers.)
+  witnessed only by the hand-run reproduction, and since LIN-4422 so is the `--blind` file read
+  (`readSigns`); a fixture-repo test would pin `--diff-merges=first-parent` against silent
+  undercount. (LIN-4420 review; LIN-4421 and LIN-4422 leftovers.)
 - `scripts/stability-measures-tracker.mjs`: `createProxyClient` is the one proxy client in
   `scripts/` that paces from the start and honours 429 `Retry-After`. The other 47 scripts that
   read the proxy pace by fixed sleeps (`scripts/pipeline-churn.mjs` sleeps 1.1 s, and 5 s × attempt
@@ -58,13 +63,6 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   one call each: 1,576 members for the 106 finished tasks of the 8 Nov window, about half
   an hour at 50 a minute. A dispatch-detail read by issue or by lineage that returns each
   member's own feedback would cut that to one call per task. (LIN-4422; Survey global.)
-- `scripts/stability-measures-core.mjs`: `ownTicket` is the one landing-owns-its-ticket rule,
-  but `scripts/delivery-composition.mjs` (line 105) still credits every `LIN-n` in a commit
-  subject, so its ticket counts and first/last dates include precedents ("after LIN-1",
-  "LIN-690 reopened"). On the 8 Nov window, matching whole messages gives 163 IDs against 106
-  own tickets. Importing `ownTicket` would give the reports one attribution. The `\bLIN-\d+\b`
-  matches in `scripts/steady-base-growth.mjs` and `scripts/steady-base-code.mjs` count ticket
-  citations in file text and comment lines, not landings, so they are not this rule. (LIN-4421 review.)
 - `lib/account-erasure.js`: each collection should be declared once with all its facts
   (name, store module, erasure row, urlKey class, dry-run shape), and opening an
   undeclared name should fail. LIN-4234 gave both guards one source of collection names;

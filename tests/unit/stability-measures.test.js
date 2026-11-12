@@ -261,7 +261,8 @@ describe('landing ownership: each landing names only its own ticket', () => {
   });
 
   test('the CLI keeps no ticket regex of its own: ownership is the core\'s', () => {
-    for (const f of ['scripts/stability-measures.mjs', 'scripts/stability-measures-tracker.mjs', 'scripts/stability-measures-blind.mjs', 'scripts/stability-measures-seat.mjs']) {
+    // LIN-4422 leftovers: delivery-composition credits each commit's own ticket through ownTicket too.
+    for (const f of ['scripts/stability-measures.mjs', 'scripts/stability-measures-tracker.mjs', 'scripts/stability-measures-blind.mjs', 'scripts/stability-measures-seat.mjs', 'scripts/delivery-composition.mjs']) {
       assert.doesNotMatch(readFileSync(join(ROOT, f), 'utf8'), /LIN-\\d|LIN-\\\\d|\\bLIN-\\b/, f);
     }
   });

@@ -1,5 +1,5 @@
 // The stability measures' tracker reads (LIN-4421): a paced workspace-proxy client and the reads behind the finished
-// tasks, speed, cost and minted rows. Its own file because the CLI runs when imported and the core does no I/O: here
+// tasks, speed, cost and minted rows, and (LIN-4422) the seat's rulings and dispatch reads over the same finished set. Its own file because the CLI runs when imported and the core does no I/O: here
 // `fetch`, `sleep` and the clock are injected, so pacing, the 429 path and the whole read are tested without a network
 // (tests/unit/stability-measures.test.js). The decisions (ownership, selection, sessions, the search) stay in the core.
 //

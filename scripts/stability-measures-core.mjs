@@ -33,7 +33,8 @@ export function notMeasured(key, reason, { reference = null } = {}) {
   return { key, value: null, reference, status: STATUS.NOT_MEASURED, reason, unreadable: null };
 }
 
-const round = (n, places) => (n == null ? null : Math.round(n * 10 ** places) / 10 ** places);
+// Rounding, the mean and a percentage: one spelling for every stability module (blind and seat import them).
+export const round = (n, places) => (n == null ? null : Math.round(n * 10 ** places) / 10 ** places);
 const perLanding = (n, landings) => round(n / landings, 1);
 
 export const median = (xs) => {
@@ -286,7 +287,9 @@ export function firstDispatchOf(cost) {
   return times.reduce((a, b) => (new Date(b) < new Date(a) ? b : a));
 }
 
-const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+export const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+/** n / d as a percentage to one place; null when there is no denominator. */
+export const percent = (n, d) => (d ? round((n / d) * 100, 1) : null);
 const tally = (items) => Object.entries(items.reduce((m, k) => ({ ...m, [k]: (m[k] ?? 0) + 1 }), {})).map(([k, n]) => `${n} ${k}`).join(', ');
 
 /**

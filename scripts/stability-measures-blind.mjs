@@ -17,7 +17,7 @@
 // signs.json is one object keyed by full commit sha, each value that reader's Balance cell copied verbatim. A sampled
 // commit with no entry, or with a cell that has no sign, is unreadable (the read is partial); it is never neutral.
 
-import { notMeasured, ownTicket, row } from './stability-measures-core.mjs';
+import { mean, notMeasured, ownTicket, percent, round, row } from './stability-measures-core.mjs';
 
 export const SAMPLE_SIZE = 8;
 export const PENDING_BLIND = 'pending blind reads';
@@ -118,9 +118,9 @@ export function blindRow({ sample, signs, reference = null }) {
   const neutralOrBetter = counts.better + counts.neutral + counts.mixed;
   const value = {
     read: scores.length, sampled: sample.value.sampled,
-    neutralOrBetter, neutralOrBetterShare: Math.round((neutralOrBetter / scores.length) * 1000) / 10,
+    neutralOrBetter, neutralOrBetterShare: percent(neutralOrBetter, scores.length),
     worse: counts.worse,
-    meanSign: Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 100) / 100,
+    meanSign: round(mean(scores), 2),
     counts, perCommit, missing, unsigned, notSampled,
   };
   const unreadable = missing.length + unsigned.length;

@@ -21,7 +21,7 @@
 //                  read, not only roots.
 
 import { WAKE_FEEDBACK_REGEX, isWaitingWakeMarker } from '../lib/dispatch-terminal.js';
-import { notMeasured, row } from './stability-measures-core.mjs';
+import { notMeasured, percent, round, row } from './stability-measures-core.mjs';
 
 export const LOOP_ONLY = 'loop rulings only';
 export const ORIGIN_UNREADABLE = 'dispatchedBy is the workspace account for autopilot and person alike';
@@ -30,7 +30,6 @@ export const MISSING_CONDITION = `no person-started dispatch (not measured: ${OR
 export const SEAT_KEYS = Object.freeze(['rulings', 'origin', 'operator-free']);
 
 const OUTCOMES = ['answered', 'dismissed', 'withdrawn', 'self-resolved'];
-const pct = (n, d) => (d ? Math.round((n / d) * 1000) / 10 : null);
 
 /**
  * Whether any feedback entry is a `[blocked]` wake marker: the waiting marker of lib/dispatch-terminal.js, matched on
@@ -93,10 +92,10 @@ export function rulingsRow({ finished, rulings, reference = null }) {
     label: LOOP_ONLY,
     finished: finished.length,
     raised: onTasks.length,
-    perFinishedTask: Math.round((onTasks.length / finished.length) * 100) / 100,
+    perFinishedTask: round(onTasks.length / finished.length, 2),
     tasksWithRuling: Object.keys(perTaskCounts).length,
     outcomes,
-    answeredShare: pct(outcomes.answered, judged),
+    answeredShare: percent(outcomes.answered, judged),
     rules: {
       raised: 'distinct decisions: a re-ask in one lineage collapses into one ruling row',
       answeredShare: 'answered / (answered + dismissed), as lib/escalation-kpis.js; withdrawn and self-resolved are neither; a null outcome is unreadable',
@@ -169,7 +168,7 @@ export function operatorFreeRow({ finished, rulings, dispatch, reference = null 
       'rulings not read (answered task-bound, parent-anchored) can only lower the true share',
       "closedReason 'operator' is a catch-all for any close outside handed-on, lineage-terminal and ticket-closed (bulk fossil passes included), so it may count tasks no person touched and push the share down",
     ],
-    tasks: finished.length, read: read.length, operatorFree: free, share: pct(free, read.length),
+    tasks: finished.length, read: read.length, operatorFree: free, share: percent(free, read.length),
     failing: {
       ruling: perTask.filter((t) => t.ruling).length,
       blocked: perTask.filter((t) => t.blocked === true).length,
