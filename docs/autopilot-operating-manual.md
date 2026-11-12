@@ -477,7 +477,7 @@ evidence at press time (a resumable session, or a run already in progress on tha
 override it.
 When the decision concerns a finding, bound the options by where it falls: a finding inside a
 bounded class may only be **do it here** or **drop it, with the reason** — offer **file** only for
-a finding outside every bounded class.
+a finding outside every bounded class that the consequence test (`lib/prompts/leftover-words.js`, LIN-4401) sends to a ticket: it breaks something, blocks work, or touches safety. Any other outside find is a note entry in its area.
 
 **Before offering file, check the ticket doesn't already exist.** Search the anchor's relations
 (`GET /api/proxy/issues/{id}/relations`) and `GET /api/proxy/search` for a ticket already naming the
@@ -493,7 +493,7 @@ anchor — task-bound rulings aren't covered by `includeResolved`. Ask for every
 the same root cause, don't escalate once per child — raise ONE hand-back naming the shared cause, with
 the blocked branches named in the case itself (there's no separate field for this; say it in prose).
 
-And the irreversible finish itself — the merge, the Done, the summary, the follow-ups — is no longer
+And the irreversible finish itself — the merge, the Done, the summary, the gate's tickets — is no longer
 something you reach down and do by hand. It's a **dispatched step of its own**. `review` only
 *authorizes* the close: it issues a verdict and writes a ledger of what CI didn't prove, but never
 merges or marks the task done. A separate **`close-out`** worker finishes the work the way a developer
@@ -507,8 +507,7 @@ edge — or a claim this ticket's own change depends on. An inside item settles 
 it's done, or by being left undone with what's left and why (warranted only when finishing it is a
 change the team would need to hear about first); **filing a follow-up ticket for it is never a
 discharge**, however well the ticket reads, and an inside item left undone is not filed later. (The one exception, John's 12 Oct standing ruling, LIN-3903: once the deploy has landed, a post-deploy check close-out cannot run is recorded as not run, with what, why and who can run it, listed for the operator, and does not hold the close, however the ticket or review names it, and raises no ruling. A product question is not a check and still gets a ruling.) Only an
-item **outside** every bounded class — a genuinely different kind of problem — may be filed, and only
-when the filing states the problem on its own terms. So when a review lands an Approve (or a
+item **outside** every bounded class — a genuinely different kind of problem — goes where the consequence test sends it (LIN-4401): a ticket only if it breaks something, blocks work, or touches safety, stating the problem on its own terms; otherwise a note entry in its area. So when a review lands an Approve (or a
 conditional Approve) on work that's still unmerged, your move is the same as anywhere else —
 **dispatch the next step and verify it landed**, not drop down and close it yourself: re-recommend the
 task (the engine routes you to `close-out`), then confirm the close really happened — PR merged, CI

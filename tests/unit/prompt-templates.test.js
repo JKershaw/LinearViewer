@@ -2376,7 +2376,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
     test('close-out lets an outside item be settled by a self-contained filed ticket', () => {
       const { prompt } = generatePrompt('close-out', issue, context);
-      assert.ok(/\*\*Outside\*\*: settled by its note commit, or by the gate's ticket \(Follow-up Triage\), written for a reader with no access to this task/.test(prompt),
+      assert.ok(/\*\*Outside\*\*: settled by its note commit, or by the gate's ticket, written for a reader with no access to this task/.test(prompt),
         'an outside item is settled by its note, or by a gate ticket that stands alone');
     });
 

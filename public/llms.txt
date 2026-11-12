@@ -263,7 +263,7 @@ relationship between the tasks, not as a label.
 - `context` - context: Synthesize current state when joining mid-task
 - `plan-review` - plan-review: Verify a plan's grounding claims with fresh context before implementation starts
 - `review` - review: Verify implementation before merge
-- `close-out` - close-out: Discharge the review ledger, then merge, set Done, post the summary, and file follow-ups
+- `close-out` - close-out: Discharge the review ledger, then merge, set Done, post the summary, and file the gate's tickets (other outside finds go to area notes)
 - `retro` - retro: Retrospective look-back (or in-flight reorient) — reconstruct what happened, assess downstream effects/risks, surface lessons; presents findings without writing back
 - `retrospective-audit` - retrospective audit: Audit a merged change's claims and test integrity after the fact; presents findings without writing back
 - `survey-task` - survey-task: Sent by the look-first route (first on a fresh, unsized ticket) or by hand, never by the selector. Read-only forecast before work starts: why this task will be difficult and what would be done first; posts one comment on the surveyed ticket and changes nothing else
