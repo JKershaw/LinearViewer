@@ -124,4 +124,10 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - `lib/periodicals.js`: "search the repo for a committed tool (no path is written here) and run it"
   is spelled four times: Drift & Coherence's census bullet, Seams & Tangles' two bullets and
   Stability's declaration bullet. One shared helper would make it one, at the cost of re-pinning
-  those three templates' hashes. (LIN-4424 leftovers; Survey global.)
+  those three templates' hashes. (LIN-4424 leftovers; Survey global.) The rule it answers, whether
+  a review may run a tool the repo commits, is itself worded per template: Stability's run bullet
+  says "introducing no tooling beyond what the repo commits", while Recent Headwinds (which reads
+  the same rework and churn trajectory) and Drift & Coherence still say "introducing no new
+  tooling", Code Quality says "introduce no new tooling", and Seams & Tangles allows committed tools in its own bullets. No
+  `periodicalBullet` helper owns it; deciding it is one rule re-pins every template that states
+  it. (LIN-4424 blind read.)

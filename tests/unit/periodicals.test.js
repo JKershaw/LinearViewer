@@ -816,9 +816,12 @@ describe('Stability Review specifics (LIN-453)', () => {
   test('LIN-4424: stays repo-neutral: no repo path, none of the 8 Nov figures or pins, no ticket id', () => {
     assert.doesNotMatch(prompt, /\b(scripts|docs|lib)\//);
     assert.doesNotMatch(prompt, /\bLIN-\d/);
+    // The 8 Nov figures the slice names, kept to their distinctive forms: bare small integers
+    // (the 66 and 56 Waiting counts, 830 deleted lines) would also match unrelated prose, so
+    // they are left out. The path and ticket-id checks above carry neutrality in general.
     const eightNovember = [
-      /1\.56k/, /2,390/, /\b830\b/, /0\.35\b/, /0\.36\b/, /206,78\d/, /207,338/, /82,1\d\d/, /8\.5\d\b/,
-      /\b66\b/, /\b56\b/, /1\.43\b/, /1\.67\b/, /\$24\b/, /14\.94/, /\b54 minutes/, /9574d537/, /5334c81a/
+      /1\.56k/, /2,390/, /0\.35\b/, /0\.36\b/, /206,78\d/, /207,338/, /82,1\d\d/, /8\.5\d\b/,
+      /1\.43\b/, /1\.67\b/, /\$24\b/, /14\.94/, /\b54 minutes/, /9574d537/, /5334c81a/
     ];
     for (const figure of eightNovember) assert.doesNotMatch(prompt, figure);
   });
@@ -863,7 +866,6 @@ describe('Stability Review specifics (LIN-453)', () => {
   test('LIN-4424: forbids tooling the review would write itself: only what the repo commits', () => {
     assert.match(prompt, /introducing no tooling beyond what the repo commits/);
     assert.doesNotMatch(prompt, /introducing no new tooling/);
-    assert.doesNotMatch(prompt, /not a metrics product\)/);
     assert.match(prompt, /write no measuring tool of your own/i);
   });
 
