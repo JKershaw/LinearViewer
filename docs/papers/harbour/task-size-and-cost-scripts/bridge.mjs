@@ -7,8 +7,10 @@
 //   node docs/papers/harbour/task-size-and-cost-scripts/bridge.mjs <v1-evidence-dir> <v2-evidence-dir>
 //
 // What it separates, per ticket and in total:
-//   - the leg moves that do not change a total: after-answers (v1 work → v2 Survey) and custom follow-ups (v1 counted
-//     inside their lineage's leg, v2 in the coded leg); these are read from v2's dispatch rows;
+//   - the leg moves that do not change a total, read from v2's records: after-answers (v1 inside work, v2 in Survey) and
+//     custom-founded lineages (v1's bucketOf put a `custom` lineage whole in keep-alive; v2 puts it in its coded leg, from
+//     v2's inputs.json custom_founded_legs). A custom follow-up inside another kind's lineage sits in that lineage's leg
+//     in both versions, so it does not move; its dollars are reported (customNonAfterDispatchesUsd) but not as a move;
 //   - the total change, split into lineages newly present in v2 (not in v1's cost read) and the change in each lineage
 //     that was in both (repricing and any records added to it; the two are not separated, see the per-model table).
 // Per-model repricing: for each lineage in both reads whose v2 model is one model, the ratio v2 cost / v1 cost, by model.
@@ -21,6 +23,7 @@ if (!V1 || !V2) { console.error('usage: bridge.mjs <v1-evidence-dir> <v2-evidenc
 const read = (dir, rel) => JSON.parse(readFileSync(path.join(dir, rel), 'utf8'));
 const a1 = read(V1, 'analysis.json');
 const a2 = read(V2, 'analysis.json');
+const CODING = read(V2, 'inputs.json').custom_founded_legs;
 const LEGS = ['floor', 'work', 'keepAlive', 'survey'];
 const r4 = (x) => (x === null || x === undefined ? null : Math.round(x * 1e4) / 1e4);
 const sum = (xs) => (xs.some((x) => x === null) ? null : xs.reduce((s, x) => s + x, 0));
@@ -39,7 +42,9 @@ const rows = v1Tickets.map((t) => {
     inV2Exact: v2Exact.has(t),
     v1: { totalUsd: r4(p1.totalUsd), ...Object.fromEntries(LEGS.map((l) => [l, p1.legs[l === 'keepAlive' ? 'keepAlive' : l]])) },
     v2: { totalUsd: r4(p2.totalUsd), ...Object.fromEntries(LEGS.map((l) => [l, p2.legs[l]])) },
-    moves: { afterAnswersUsd: p2.afterAnswerUsd, customFollowUpsUsd: p2.customFollowUpUsd },
+    moves: { afterAnswersUsd: p2.afterAnswerUsd,
+      customFoundedOutOfKeepAliveUsd: r4(sum(c2.workerSessions.filter((w) => w.kind === 'custom' && CODING[w.rootItemId] !== 'keepAlive').map((w) => w.costUsd))) },
+    customNonAfterDispatchesUsd: p2.customFollowUpUsd,
     totalChange: r4(p2.totalUsd === null || p1.totalUsd === null ? null : p2.totalUsd - p1.totalUsd),
     newlyPresentLineagesUsd: r4(sum(newlyPresent.map((w) => w.costUsd))),
     matchedLineageChange: r4(sum(pairs.map(({ w1, w2 }) => (w1.costUsd === null || w2.costUsd === null ? null : w2.costUsd - w1.costUsd)))),
@@ -61,7 +66,8 @@ const totals = {
   newlyPresentLineagesUsd: r4(sum(rows.map((r) => r.newlyPresentLineagesUsd))),
   matchedLineageChange: r4(sum(rows.map((r) => r.matchedLineageChange))),
   afterAnswersUsd: r4(sum(rows.map((r) => r.moves.afterAnswersUsd))),
-  customFollowUpsUsd: r4(sum(rows.map((r) => r.moves.customFollowUpsUsd))),
+  customFoundedOutOfKeepAliveUsd: r4(sum(rows.map((r) => r.moves.customFoundedOutOfKeepAliveUsd))),
+  customNonAfterDispatchesUsd: r4(sum(rows.map((r) => r.customNonAfterDispatchesUsd))),
   legChange: Object.fromEntries(LEGS.map((l) => [l, r4(sum(rows.map((r) => (r.v2[l] === null || r.v1[l] === null ? null : r.v2[l] - r.v1[l]))))])),
   v2ExactAmongV1: rows.filter((r) => r.inV2Exact).length,
   note: 'The total change is not split by price list: v1 froze no per-model tokens. The per-model ratios are one lineage across two reads (they include any records added to it).',
@@ -72,6 +78,7 @@ writeFileSync(path.join(V2, 'bridge.json'), JSON.stringify(out, null, 2) + '\n')
 
 console.log(`bridge: ${rows.length} v1 exact tickets; v2 exact among them: ${totals.v2ExactAmongV1}`);
 console.log(`total USD v1 ${totals.v1TotalUsd} → v2 ${totals.v2TotalUsd} (change ${totals.totalChange}): newly present lineages ${totals.newlyPresentLineagesUsd}, matched lineages ${totals.matchedLineageChange}`);
-console.log(`moved legs (do not change totals): after-answers ${totals.afterAnswersUsd}, custom follow-ups ${totals.customFollowUpsUsd}`);
+console.log(`moved legs (do not change totals): after-answers ${totals.afterAnswersUsd} (work → Survey), custom-founded lineages ${totals.customFoundedOutOfKeepAliveUsd} (keep-alive → coded leg)`);
+console.log(`custom dispatches that are not after-answers (not a move): ${totals.customNonAfterDispatchesUsd}`);
 console.log(`leg change v2−v1: ${JSON.stringify(totals.legChange)}`);
 console.log(`per-model lineage ratio v2/v1: ${JSON.stringify(byModel)}`);

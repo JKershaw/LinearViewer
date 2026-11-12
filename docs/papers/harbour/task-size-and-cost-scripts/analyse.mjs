@@ -28,6 +28,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { bucketOf } from '../../../../lib/wall-clock-summary.js';
+import { promptTokensOf } from '../../../../lib/model-pricing.js';
 import { need } from '../cleaner-than-it-started-scripts/inputs.mjs';
 import { takeTaskSizeInputs, firstLineOf, isAfterAnswer, lineageBucketOf, classifyDispatch, LEG_OF_BUCKET } from './dispatch-legs.mjs';
 import { fitSeries, olsMulti, bootstrapCoefs } from './fit.mjs';
@@ -92,16 +93,19 @@ function legsOf(cost, dispatch) {
   return { legs, pre, sumOf, floor, surveyUsd, impl, workerTotal, appCallsUsd, reconciles, dispatch };
 }
 
-// LIN-4427: the price-free token sum of one dispatch (inputs.tokens.formula). cacheCreation1hInputTokens is inside
-// cacheCreationInputTokens (lib/model-pricing.js:48-51), so it is not added again. Null when the tokens are unknown.
-const tokenTotalOf = (t) => (t ? t.inputTokens + t.outputTokens + t.cacheCreationInputTokens + t.cacheReadInputTokens : null);
+// LIN-4427: the price-free token sum of one dispatch (inputs.tokens.formula): the prompt (lib/model-pricing.js
+// promptTokensOf, the one definition of input + cache read + cache write) plus output. cacheCreation1hInputTokens is a
+// partition marker inside cacheCreationInputTokens (lib/model-pricing.js:48-51), so it is not added again. Null when
+// the tokens are unknown.
+const tokenTotalOf = (t) => (t ? promptTokensOf(t) + t.outputTokens : null);
 
 // The model of one dispatch: its one model, or 'multiple'; null when it made no request (its cost is then unknown).
 const modelOf = (d) => (!d.byModel || d.byModel.length === 0 ? null : d.byModel.length === 1 ? d.byModel[0].model : 'multiple');
 
 // Dispatch attribution (LIN-4426). Each /cost dispatch is one row in the same legs as legsOf, so the two read alike.
 // (The lineage-mode path above is what version 1's byte-identical witness runs; nothing in it changed for LIN-4427.)
-// A null dispatch cost stays null. A lineage with dispatches: null is approximate: its whole cost sits at lineage level.
+// A null dispatch cost stays null, except a dispatch that made no request, which costs 0 (LIN-4427, below). A lineage
+// with dispatches: null is approximate: its whole cost sits at lineage level.
 // Survey after-answers are read from their prompts (freeze saved one for every custom dispatch).
 // LIN-4427: `customToKeepAlive` is the disclosed sensitivity (inputs.sensitivity): every custom dispatch that is not an
 // after-answer goes to keep-alive instead of its lineage's leg. A dispatch with zero requests costs 0 (inputs.exact).
@@ -282,6 +286,8 @@ for (const t of pop) {
 }
 
 // ---- statistics (descriptive below n = 8; no coefficient reported under that) ----
+// The minimum n for a coefficient: v1's 8 in lineage mode; inputs fit.min_n in dispatch mode (pre-registered as the same rule).
+const COEF_MIN_N = DISPATCH ? V2.minN : 8;
 const ranks = (xs) => {
   const idx = xs.map((x, i) => [x, i]).sort((a, b) => a[0] - b[0]);
   const r = new Array(xs.length);
@@ -301,7 +307,7 @@ const spearman = (xs, ys) => {
 };
 const test = (label, pairs) => {
   const n = pairs.length;
-  return { label, n, rho: n >= 8 ? round(spearman(pairs.map((p) => p.x), pairs.map((p) => p.y)), 2) : null, points: n >= 8 ? undefined : pairs, note: n >= 8 ? 'Spearman rho' : 'n < 8: points shown, no coefficient' };
+  return { label, n, rho: n >= COEF_MIN_N ? round(spearman(pairs.map((p) => p.x), pairs.map((p) => p.y)), 2) : null, points: n >= COEF_MIN_N ? undefined : pairs, note: n >= COEF_MIN_N ? 'Spearman rho' : `n < ${COEF_MIN_N}: points shown, no coefficient` };
 };
 
 // Exact = finished, priced, code shape, and every leg dispatched inside the records era.
@@ -320,7 +326,7 @@ const SENSES = { prodLines: (r) => r.lv.prodLines, testLines: (r) => r.lv.testLi
 const series = (rows, yName, yOf) => Object.entries(SENSES).map(([sn, xOf]) => {
   const pairs = rows.filter((r) => yOf(r) !== null && yOf(r) !== undefined).map((r) => ({ ticket: r.ticket, x: xOf(r), y: yOf(r) }));
   const n = pairs.length;
-  return { label: `${sn} vs ${yName}`, n, rho: n >= 8 ? round(spearman(pairs.map((p) => p.x), pairs.map((p) => p.y)), 2) : null, points: n >= 8 ? undefined : pairs };
+  return { label: `${sn} vs ${yName}`, n, rho: n >= COEF_MIN_N ? round(spearman(pairs.map((p) => p.x), pairs.map((p) => p.y)), 2) : null, points: n >= COEF_MIN_N ? undefined : pairs };
 });
 
 const BAL = { '+': 1, '0': 0, '−': -1, '-': -1 };
@@ -328,7 +334,7 @@ const balOrd = (b) => (b === null ? null : b.startsWith('−/+') ? 0 : (BAL[b[0]
 const balanceSeries = (rows, yName, yOf) => {
   const pairs = rows.filter((r) => balOrd(r.surveyBalance) !== null && yOf(r) !== null && yOf(r) !== undefined).map((r) => ({ ticket: r.ticket, x: balOrd(r.surveyBalance), y: yOf(r) }));
   const n = pairs.length;
-  return [{ label: `survey balance (ordinal) vs ${yName}`, n, rho: n >= 8 ? round(spearman(pairs.map((p) => p.x), pairs.map((p) => p.y)), 2) : null, points: n >= 8 ? undefined : pairs }];
+  return [{ label: `survey balance (ordinal) vs ${yName}`, n, rho: n >= COEF_MIN_N ? round(spearman(pairs.map((p) => p.x), pairs.map((p) => p.y)), 2) : null, points: n >= COEF_MIN_N ? undefined : pairs }];
 };
 const analysis = {
   ticket: TICKET,
@@ -491,7 +497,7 @@ const EXCLUDED_IN_POP = [...EXCLUDED].filter((t) => manifest.population.includes
 check('population count matches manifest', pop.length === manifest.population_count - EXCLUDED_IN_POP.length, `${pop.length} vs ${manifest.population_count - EXCLUDED_IN_POP.length}`);
 // (f) no coefficient below n = 8
 const allSeries = Object.values(analysis.tests).flat();
-check('no coefficient below n = 8', allSeries.every((b) => b.n >= 8 || b.rho === null), '');
+check(`no coefficient below n = ${COEF_MIN_N}`, allSeries.every((b) => b.n >= COEF_MIN_N || b.rho === null), '');
 analysis.checks = checks;
 const failed = checks.filter((c) => !c.ok);
 if (failed.length) { console.error('SELF-CHECK FAILED:\n' + failed.map((c) => `  ${c.name}: ${c.detail}`).join('\n')); process.exitCode = 1; }
@@ -518,7 +524,7 @@ for (const t of pop) {
 lines.push('');
 for (const [name, block] of Object.entries(analysis.tests)) {
   lines.push(`## ${name}`);
-  for (const b of block) lines.push(`${b.label}: n=${b.n}, ${b.rho !== null ? `rho=${b.rho}` : 'no coefficient (n<8)'}`);
+  for (const b of block) lines.push(`${b.label}: n=${b.n}, ${b.rho !== null ? `rho=${b.rho}` : `no coefficient (n<${COEF_MIN_N})`}`);
 }
 lines.push('## pairs (re-read last)');
 for (const p of analysis.pairs) {

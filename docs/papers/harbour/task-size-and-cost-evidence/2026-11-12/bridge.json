@@ -16,7 +16,8 @@
     "newlyPresentLineagesUsd": 0,
     "matchedLineageChange": -12.0775,
     "afterAnswersUsd": 23.967,
-    "customFollowUpsUsd": 38.5082,
+    "customFoundedOutOfKeepAliveUsd": 32.3416,
+    "customNonAfterDispatchesUsd": 38.5082,
     "legChange": {
       "floor": -1.6337,
       "work": 6.2993,
@@ -66,8 +67,9 @@
       },
       "moves": {
         "afterAnswersUsd": 2.3217,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": -0.4901,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -0.4901,
@@ -128,8 +130,9 @@
       },
       "moves": {
         "afterAnswersUsd": 1.7037,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": -0.5988,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -0.5988,
@@ -190,8 +193,9 @@
       },
       "moves": {
         "afterAnswersUsd": 0,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": -0.5105,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -0.5105,
@@ -252,8 +256,9 @@
       },
       "moves": {
         "afterAnswersUsd": 0,
-        "customFollowUpsUsd": 1.5496
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 1.5496,
       "totalChange": -0.3066,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -0.3066,
@@ -314,8 +319,9 @@
       },
       "moves": {
         "afterAnswersUsd": 1.6219,
-        "customFollowUpsUsd": 30.2353
+        "customFoundedOutOfKeepAliveUsd": 26.0776
       },
+      "customNonAfterDispatchesUsd": 30.2353,
       "totalChange": -0.9977,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -0.9977,
@@ -383,8 +389,9 @@
       },
       "moves": {
         "afterAnswersUsd": 0,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": -0.4509,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -0.4509,
@@ -438,8 +445,9 @@
       },
       "moves": {
         "afterAnswersUsd": 0,
-        "customFollowUpsUsd": 0.4593
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0.4593,
       "totalChange": -2.6807,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -2.6807,
@@ -521,8 +529,9 @@
       },
       "moves": {
         "afterAnswersUsd": 0,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": -0.7039,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -0.7039,
@@ -590,8 +599,9 @@
       },
       "moves": {
         "afterAnswersUsd": 0,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": -0.5669,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -0.5669,
@@ -645,8 +655,9 @@
       },
       "moves": {
         "afterAnswersUsd": 0,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": -0.5945,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -0.5945,
@@ -700,8 +711,9 @@
       },
       "moves": {
         "afterAnswersUsd": 0,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": -0.7106,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -0.7106,
@@ -755,8 +767,9 @@
       },
       "moves": {
         "afterAnswersUsd": 0,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": -1.1447,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -1.1447,
@@ -810,8 +823,9 @@
       },
       "moves": {
         "afterAnswersUsd": 0,
-        "customFollowUpsUsd": 6.264
+        "customFoundedOutOfKeepAliveUsd": 6.264
       },
+      "customNonAfterDispatchesUsd": 6.264,
       "totalChange": -1.817,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -1.817,
@@ -886,8 +900,9 @@
       },
       "moves": {
         "afterAnswersUsd": 1.7399,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": -0.5009,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -0.5009,
@@ -948,8 +963,9 @@
       },
       "moves": {
         "afterAnswersUsd": 2.1876,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": 0,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": 0,
@@ -982,8 +998,9 @@
       },
       "moves": {
         "afterAnswersUsd": 1.1737,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": -0.1684,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -0.1684,
@@ -1037,8 +1054,9 @@
       },
       "moves": {
         "afterAnswersUsd": 2.0637,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": -0.2809,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -0.2809,
@@ -1092,8 +1110,9 @@
       },
       "moves": {
         "afterAnswersUsd": 1.6431,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": 1.0711,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": 1.0711,
@@ -1168,8 +1187,9 @@
       },
       "moves": {
         "afterAnswersUsd": 2.3554,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": -1.2696,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -1.2696,
@@ -1237,8 +1257,9 @@
       },
       "moves": {
         "afterAnswersUsd": 2.5455,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": 1.7898,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": 1.7898,
@@ -1320,8 +1341,9 @@
       },
       "moves": {
         "afterAnswersUsd": 2.1368,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": -0.5856,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -0.5856,
@@ -1403,8 +1425,9 @@
       },
       "moves": {
         "afterAnswersUsd": 2.474,
-        "customFollowUpsUsd": 0
+        "customFoundedOutOfKeepAliveUsd": 0
       },
+      "customNonAfterDispatchesUsd": 0,
       "totalChange": -0.5601,
       "newlyPresentLineagesUsd": 0,
       "matchedLineageChange": -0.5601,
