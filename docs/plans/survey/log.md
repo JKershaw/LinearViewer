@@ -3487,3 +3487,6 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **LIN-4419:** the Node engines pin is exactly "24", and the README names no version.
   - **The plan:** run them one at a time. **LIN-2386 kicked off** (dispatch `cd43a7ad`), with the usual goal minus "Use opus on every stage", since John is fine with stage defaults and these are small. LIN-4419 follows.
   - **Safety tickets stay out** of this slot (LIN-690, LIN-2576): they're A12's, after the switch.
+- **~16:50 UTC: John on LIN-4419 (which Node versions we support):** "Agreed, we should support a normal/expected range." This answers option 2: widen the pin to a normal range, with CI checking the claim. Today only Node 24 is pinned and tested. The onboarding review saw Node 25.9 install and start with only the `EBADENGINE` warning. The setup check already says "≥24".
+  - **For LIN-4419's kickoff,** the goal adds: John: "we should support a normal/expected range." The range we state is the one CI runs.
+  - It starts after LIN-2386, one at a time.
