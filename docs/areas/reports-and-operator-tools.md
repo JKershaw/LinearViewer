@@ -13,12 +13,37 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   14 merge landings vanish and churn reads a plausible 8,590 / 3,055 instead of 10,235 / 3,677.
   Filter its paths with the kit's `compileScope`, not a git pathspec, so churn and line totals
   share one scope (LIN-4420).
+- A landing names only its own ticket (`ownTicket` in the core: first id in a squash subject,
+  else the merge's branch, else its PR title). Whole-message matching read 163 tickets in the
+  8 Nov window against 106 and gave precedents fake last landings. A session is a `/cost`
+  lineage, not a non-wake row (LIN-4393: 14 rows, 5 wakes, 8 sessions). Proxy reads go
+  through `createProxyClient` in `scripts/stability-measures-tracker.mjs` (paced, honours
+  429 `Retry-After`), and a null `totalUsd` keeps its cause apart from a failed read (LIN-4421).
+- An issue-number search needs a known existing upper bracket: past the maximum is a 404 too,
+  and a trashed issue is a 200 with `trashed: true`. Both count as gaps (LIN-4421).
+- Finished tasks are read from the window's landings plus `--lookback-days` (default 3) before
+  base, not all of history: a task whose only landings predate the lookback and that finished
+  in the window is missed. The bound is printed on the `tasks` row; widen it there, never by
+  matching more of each message (LIN-4421).
 
 ## Waiting
 
 - `scripts/stability-measures.mjs`: its reads (numstat flags, runner endpoint resolution, `gh`
-  listing) are witnessed only by the hand-run reproduction; a fixture-repo test would pin
-  `--diff-merges=first-parent` against silent undercount. (LIN-4420 review.)
+  listing, and since LIN-4421 the landing log's `%x1f` format and the lookback's `--since`) are
+  witnessed only by the hand-run reproduction; a fixture-repo test would pin
+  `--diff-merges=first-parent` against silent undercount. (LIN-4420 review; LIN-4421 leftovers.)
+- `scripts/stability-measures-tracker.mjs`: `createProxyClient` is the one proxy client in
+  `scripts/` that paces from the start and honours 429 `Retry-After`. The other 47 scripts that
+  read the proxy pace by fixed sleeps (`scripts/pipeline-churn.mjs` sleeps 1.1 s, and 5 s × attempt
+  on a 429; the `steady-base-*` and `survey-*` scripts likewise), so the rate rule is spelled two
+  ways. One shared client under `scripts/lib/` would retire the copies. (LIN-4421 leftovers; Survey global.)
+- `scripts/stability-measures-core.mjs`: `ownTicket` is the one landing-owns-its-ticket rule,
+  but `scripts/delivery-composition.mjs` (line 105) still credits every `LIN-n` in a commit
+  subject, so its ticket counts and first/last dates include precedents ("after LIN-1",
+  "LIN-690 reopened"). On the 8 Nov window, matching whole messages gives 163 IDs against 106
+  own tickets. Importing `ownTicket` would give the reports one attribution. The `\bLIN-\d+\b`
+  matches in `scripts/steady-base-growth.mjs` and `scripts/steady-base-code.mjs` count ticket
+  citations in file text and comment lines, not landings, so they are not this rule. (LIN-4421 review.)
 - `lib/account-erasure.js`: each collection should be declared once with all its facts
   (name, store module, erasure row, urlKey class, dry-run shape), and opening an
   undeclared name should fail. LIN-4234 gave both guards one source of collection names;
@@ -29,7 +54,3 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   in use are priced and that the choice lists name listed models. Renaming moves the
   scheduler job name (its `scheduler-locks` doc), the server.js registration, the
   scheduler census and `docs/architecture/source-map.md`. (LIN-4358 leftovers.)
-- `lib/account-erasure.js`: the shared anonymisation's `arrayFilters` is unasserted for other
-  accounts: a filter matching every element (so every `trimHistory` `by` in a row naming the
-  erased account, a co-member's included, becomes `erased`) passes all 407 tests. Assert that a
-  co-member's entry survives. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)

@@ -51,7 +51,7 @@
         "^lib/(kpi-stats|workspace-kpi-stats|workspace-kpis-cache|kpi-daily-rollup|milestone-funnel|account-erasure|pricing-conformance-sweep|scan-public-pages)\\.js$",
         "^experiments/replay-kit/",
         "^scripts/code-shape/retention(-core)?\\.mjs$",
-        "^scripts/stability-measures(-core)?\\.mjs$"
+        "^scripts/stability-measures(-core|-tracker)?\\.mjs$"
       ]
     },
     {

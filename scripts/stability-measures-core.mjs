@@ -8,6 +8,9 @@
 //   not measured  value null, reason says why, unreadable null.
 // A source that is missing or unreadable is `not measured`, never 0. Zero is a reading: a commit that can be read and
 // has no notes directory has 0 Waiting entries. Later pieces (LIN-4421..LIN-4423) add rows of the same shape.
+// LIN-4421 adds the tracker half: landing ownership, finished-task selection, sessions, speed, cost and the ID-span
+// search for tickets minted. Its reads come in as records too (issue reads, /cost bodies, probe results); the search
+// takes an injected probe, so the core still does no I/O of its own.
 
 export const SCOPE_INCLUDE = '^(server\\.js$|(lib|routes|public)/.*\\.[cm]?js$)';
 export const NOT_BUILT = 'not built yet';
@@ -157,6 +160,260 @@ export function waitingRows({ harbour, runner, landings, references = {} }) {
   return [h, r, total];
 }
 
+// ── tracker: landing ownership ──────────────────────────────────────────────
+// LIN-4421 ruling (comment 8bec1ee6): each landing names only its own ticket. Matching whole messages picks up
+// precedents ("LIN-690 reopened") and gives tickets fake last landings: 163 ids in the 8 Nov window against 106 by
+// own ticket. This is the one ownership rule for the measure; the CLI keeps no ticket regex of its own.
+export const TICKET_KEY = 'LIN';
+
+const MERGE_PR = /^Merge pull request #\d+ from (\S+)/;
+const MERGE_BRANCH = /^Merge (?:remote-tracking )?branch '([^']+)'/;
+
+/**
+ * The ticket a landing delivers, or null. A squash landing: the first id in its subject. A merge landing: the id in
+ * its branch name (`feat/lin-4421-...`, case-insensitive), else the first id in the PR title (the body's first line).
+ * Branch before title: the branch is named when the work is dispatched, the title can be re-worded to cite another
+ * ticket; in the 8 Nov window they never disagree (114 of 114 landings), so the order is pinned, not observed.
+ */
+export function ownTicket(subject, body = '', { key = TICKET_KEY } = {}) {
+  const first = (text, flags = '') => {
+    const m = new RegExp(`\\b${key}-(\\d+)\\b`, flags).exec(text ?? '');
+    return m ? `${key}-${Number(m[1])}` : null;
+  };
+  const merge = MERGE_PR.exec(subject) ?? MERGE_BRANCH.exec(subject);
+  if (!merge) return first(subject);
+  const title = String(body ?? '').trim().split('\n')[0];
+  return first(merge[1], 'i') ?? first(title);
+}
+
+/**
+ * `git log --format=%H%x1f%cI%x1f%s%x1f%b%x1e` text → [{ commit, date, subject, body }], in log order.
+ */
+export function parseLandingLog(text) {
+  return text.split('\x1e').map((r) => r.replace(/^\n+/, '')).filter(Boolean).map((r) => {
+    const [commit, date, subject, body = ''] = r.split('\x1f');
+    return { commit, date, subject, body: body.trim() };
+  });
+}
+
+/** ticket → { landings: [sha…], lastLandingAt } over the given landings; plus the landings that own no ticket. */
+export function landingOwners(landings) {
+  const owners = new Map();
+  const unowned = [];
+  for (const l of landings) {
+    const id = ownTicket(l.subject, l.body);
+    if (!id) { unowned.push(l.commit); continue; }
+    const o = owners.get(id) ?? { landings: [], lastLandingAt: null };
+    o.landings.push(l.commit);
+    if (!o.lastLandingAt || new Date(l.date) > new Date(o.lastLandingAt)) o.lastLandingAt = l.date;
+    owners.set(id, o);
+  }
+  return { owners, unowned };
+}
+
+// ── tracker: finished tasks ──────────────────────────────────────────────────
+const inWindow = (at, baseDate, headDate) => at != null && new Date(at) > new Date(baseDate) && new Date(at) <= new Date(headDate);
+
+/**
+ * Finished tasks (D3 as the LIN-4421 ruling changed it): a ticket owned by a landing up to head, Done, with
+ * `completedAt` in (base, head]. A ticket that lands in two windows counts once, where it finished; one merged just
+ * before base and marked Done after it (close-out runs after the merge) counts here, not nowhere.
+ *
+ * `window` and `prior` are landingOwners() of the window's landings and of the landings read before base.
+ * `issues` maps id → { state: { type }, completedAt } or { reason } (an issue read that failed).
+ * Window tickets not finished here are counted by why, never dropped. A prior-only ticket not finished here belongs
+ * to another window and is not reported. Any failed read is unreadable: it might have been finished here.
+ */
+export function selectFinished({ window, prior = { owners: new Map() }, issues, baseDate, headDate }) {
+  const finished = [];
+  const notDone = [];
+  const doneOutside = [];
+  const unreadable = [];
+  const ids = new Set([...window.owners.keys(), ...prior.owners.keys()]);
+  for (const id of [...ids].sort((a, b) => Number(a.split('-')[1]) - Number(b.split('-')[1]))) {
+    const issue = issues.get(id);
+    const inThis = window.owners.has(id);
+    if (!issue || issue.reason) { unreadable.push({ id, reason: issue?.reason ?? 'not read' }); continue; }
+    const done = issue.state?.type === 'completed';
+    if (done && inWindow(issue.completedAt, baseDate, headDate)) {
+      const own = [window.owners.get(id), prior.owners.get(id)].filter(Boolean);
+      const lastLandingAt = own.map((o) => o.lastLandingAt).sort((a, b) => new Date(b) - new Date(a))[0];
+      finished.push({ id, completedAt: issue.completedAt, lastLandingAt, landedInWindow: inThis });
+    } else if (inThis) {
+      (done ? doneOutside : notDone).push(done ? { id, completedAt: issue.completedAt } : { id, state: issue.state?.name ?? issue.state?.type ?? null });
+    }
+  }
+  return { finished, notDone, doneOutside, unreadable };
+}
+
+/** The finished-task row: the denominator of speed and cost, with what landed and did not finish beside it. */
+export function tasksRow({ selection, windowTickets, unownedLandings, lookback, reference }) {
+  const { finished, notDone, doneOutside, unreadable } = selection;
+  if (unreadable.length && !finished.length && !notDone.length && !doneOutside.length) {
+    return notMeasured('tasks', `every issue read failed (${unreadable[0].reason})`, { reference });
+  }
+  const value = {
+    finished: finished.length,
+    finishedLandedBefore: finished.filter((t) => !t.landedInWindow).length,
+    windowTickets,
+    landedUnfinished: notDone.length,
+    landedDoneOutside: doneOutside.length,
+    unownedLandings: unownedLandings.length,
+    lookback,
+    ids: {
+      finished: finished.map((t) => t.id), landedUnfinished: notDone, landedDoneOutside: doneOutside,
+      unreadable, unownedLandings,
+    },
+  };
+  return row('tasks', value, { unreadable: unreadable.length, reason: unreadable.length ? `${unreadable.length} issue read(s) failed: ${[...new Set(unreadable.map((u) => u.reason))].join('; ')}` : null, reference });
+}
+
+// ── tracker: sessions, speed and cost from /cost ─────────────────────────────
+// LIN-4421 ruling: a session is a dispatch lineage as /cost counts it (`workerSessions`, lib/cost-read.js), not a
+// non-wake dispatch row. LIN-4393 has 14 rows, 5 of them wakes, so the row rule gives 9; its leftover run resumes the
+// implementation's lineage, and /cost reads 8. Speed and cost share this one count.
+export const sessionsOf = (cost) => (cost?.noLineage || !Array.isArray(cost?.workerSessions) ? null : cost.workerSessions.length);
+
+/** The earliest dispatch of the task: the earliest lineage root (a root is its lineage's first member). */
+export function firstDispatchOf(cost) {
+  if (sessionsOf(cost) == null) return null;
+  const times = cost.workerSessions.flatMap((s) => [s.dispatchedAt, ...(s.dispatches ?? []).map((d) => d.dispatchedAt)]).filter(Boolean);
+  if (!times.length) return null;
+  return times.reduce((a, b) => (new Date(b) < new Date(a) ? b : a));
+}
+
+const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+const tally = (items) => Object.entries(items.reduce((m, k) => ({ ...m, [k]: (m[k] ?? 0) + 1 }), {})).map(([k, n]) => `${n} ${k}`).join(', ');
+
+/**
+ * Speed per finished task: minutes from first dispatch to last landing, and sessions. `tasks` is
+ * [{ id, lastLandingAt, cost: { body } | { reason } }]. A failed /cost read, a task with no lineage, or one whose
+ * first dispatch came after its last landing (landed by hand, dispatched later) has no speed: unreadable, counted.
+ */
+export function speedRow(tasks, { reference } = {}) {
+  if (!tasks.length) return notMeasured('speed', 'no finished tasks in the window', { reference });
+  const minutes = [];
+  const sessions = [];
+  const why = [];
+  const perTask = [];
+  for (const t of tasks) {
+    if (t.cost.reason) { why.push('cost read failed'); continue; }
+    const n = sessionsOf(t.cost.body);
+    const first = firstDispatchOf(t.cost.body);
+    if (n == null) { why.push('no lineage'); continue; }
+    if (!first) { why.push('no dispatch time'); continue; }
+    const m = (new Date(t.lastLandingAt) - new Date(first)) / 60000;
+    if (m < 0) { why.push('first dispatch after last landing'); continue; }
+    minutes.push(m);
+    sessions.push(n);
+    perTask.push({ id: t.id, minutes: round(m, 1), sessions: n });
+  }
+  if (!minutes.length) return notMeasured('speed', `no finished task could be timed (${tally(why)})`, { reference });
+  const value = {
+    tasks: tasks.length, read: minutes.length,
+    medianMinutes: round(median(minutes), 1), meanMinutes: round(mean(minutes), 1),
+    medianSessions: median(sessions), meanSessions: round(mean(sessions), 2),
+    perTask,
+  };
+  return row('speed', value, { unreadable: why.length, reason: why.length ? tally(why) : null, reference });
+}
+
+/**
+ * Cost per finished task: median and mean `totalUsd`. A null `totalUsd` is unreadable, never 0, and so is a failed
+ * read; the causes stay apart (a task partly unpriced is not a broken read). /cost's own counters are summed beside.
+ */
+export function costRow(tasks, { reference } = {}) {
+  if (!tasks.length) return notMeasured('cost', 'no finished tasks in the window', { reference });
+  const usd = [];
+  const nullTotal = { unpriced: 0, noTelemetry: 0, unreadable: 0, noLineage: 0, other: 0 };
+  const failures = [];
+  const counters = { unpriced: 0, noTelemetryCount: 0, unreadableCount: 0, noLineage: 0 };
+  const perTask = [];
+  for (const t of tasks) {
+    if (t.cost.reason) { failures.push({ id: t.id, reason: t.cost.reason }); continue; }
+    const c = t.cost.body;
+    counters.unpriced += c.unpriced?.length ?? 0;
+    counters.noTelemetryCount += c.noTelemetryCount ?? 0;
+    counters.unreadableCount += c.unreadableCount ?? 0;
+    counters.noLineage += c.noLineage ? 1 : 0;
+    if (typeof c.totalUsd === 'number') { usd.push(c.totalUsd); perTask.push({ id: t.id, usd: round(c.totalUsd, 2) }); continue; }
+    // One cause per task, first that applies, so the causes sum to the null count.
+    if (c.noLineage) nullTotal.noLineage++;
+    else if (c.unpriced?.length) nullTotal.unpriced++;
+    else if (c.noTelemetryCount) nullTotal.noTelemetry++;
+    else if (c.unreadableCount) nullTotal.unreadable++;
+    else nullTotal.other++;
+    perTask.push({ id: t.id, usd: null });
+  }
+  const nulls = Object.values(nullTotal).reduce((a, b) => a + b, 0);
+  const unreadable = nulls + failures.length;
+  const causes = [
+    nulls ? `${nulls} null totalUsd (${Object.entries(nullTotal).filter(([, n]) => n).map(([k, n]) => `${k} ${n}`).join(', ')})` : null,
+    failures.length ? `${failures.length} cost read(s) failed (${[...new Set(failures.map((f) => f.reason))].join('; ')})` : null,
+  ].filter(Boolean).join('; ');
+  if (!usd.length) return notMeasured('cost', `no finished task has a total: ${causes}`, { reference });
+  const value = {
+    tasks: tasks.length, priced: usd.length,
+    medianUsd: round(median(usd), 2), meanUsd: round(mean(usd), 2),
+    nullTotal, readFailures: failures, counters, perTask,
+  };
+  return row('cost', value, { unreadable, reason: unreadable ? causes : null, reference });
+}
+
+// ── tracker: tickets minted (ID-span estimate) ───────────────────────────────
+/**
+ * The highest issue number created at or before `at`, searched by probing single issues (the issue list carries no
+ * timestamps). `probe(n)` resolves to { status: 'ok', createdAt, trashed } | { status: 'missing' } |
+ * { status: 'unreadable', reason }. `hi` must be a known existing number (a 404 cannot tell a gap from beyond the
+ * maximum, so the search never walks above it); `lo` a number known to be created at or before `at`, or 0.
+ * A 404 or a trashed issue is a gap: the search steps up past it to the next number that exists. Issue numbers rise
+ * with creation, so this is a bisection on (lo, hi). Every probe is recorded; an unreadable probe ends the search
+ * with its reason (an answer around a hole would be a guess).
+ */
+export async function idSpanSearch({ at, lo = 0, hi, probe, cache = new Map() }) {
+  const probes = [];
+  const read = async (n) => {
+    if (!cache.has(n)) cache.set(n, await probe(n));
+    const r = cache.get(n);
+    probes.push({ n, status: r.status === 'ok' && r.trashed ? 'trashed' : r.status, createdAt: r.createdAt ?? null });
+    return r;
+  };
+  const exists = (r) => r.status === 'ok' && !r.trashed;
+  const before = (r) => new Date(r.createdAt) <= new Date(at);
+  const top = await read(hi);
+  if (top.status === 'unreadable') return { reason: `probe of ${hi} unreadable: ${top.reason}`, probes };
+  if (!exists(top)) return { reason: `bracket ${hi} is not an existing issue`, probes };
+  if (before(top)) return { value: hi, atBracket: true, probes };
+  // Invariant: lo exists (or is 0) and was created at or before `at`; every existing number >= hi was created after.
+  while (hi - lo > 1) {
+    const mid = Math.floor((lo + hi) / 2);
+    let n = mid;
+    let r = await read(n);
+    while (!exists(r) && r.status !== 'unreadable' && n + 1 < hi) r = await read(++n);
+    if (r.status === 'unreadable') return { reason: `probe of ${n} unreadable: ${r.reason}`, probes };
+    if (!exists(r)) { hi = mid; continue; } // mid..hi-1 are all gaps
+    if (before(r)) lo = n; else hi = mid;
+  }
+  return { value: lo, atBracket: false, probes };
+}
+
+/**
+ * Tickets minted per landing, labelled an ID-span estimate: the highest issue number created at or before head minus
+ * the same at base, over the window's landings. The span counts trashed and missing numbers (they were minted too).
+ */
+export function mintedRow({ base, head, landings, bracket, key = TICKET_KEY, reference }) {
+  const failed = [base?.reason && `base: ${base.reason}`, head?.reason && `head: ${head.reason}`].filter(Boolean);
+  if (!base || !head) failed.push('endpoint not searched');
+  if (failed.length) return notMeasured('minted', `ID-span search failed (${failed.join('; ')})`, { reference });
+  if (!landings) return notMeasured('minted', 'no landings in the window', { reference });
+  const span = head.value - base.value;
+  return row('minted', {
+    label: 'ID-span estimate', base: `${key}-${base.value}`, head: `${key}-${head.value}`, span, perLanding: round(span / landings, 2),
+    bracket: bracket ?? null, headAtBracket: head.atBracket,
+    probes: { base: base.probes.map((p) => p.n), head: head.probes.map((p) => p.n), detail: [...base.probes, ...head.probes] },
+  }, { reference });
+}
+
 // ── the reading ──────────────────────────────────────────────────────────────
 /** The five measures in the order they win when they clash (LIN-4399's ask). */
 export const MEASURES = Object.freeze([
@@ -167,14 +424,16 @@ export const MEASURES = Object.freeze([
   { rank: 5, key: 'cost', title: 'Cost per finished task' },
 ]);
 
+export const MINTED_NOT_SUPPLIED = 'tracker reads not supplied';
+
 /**
  * The ordered reading. `rows` maps a measure key to its rows; a measure with none yet reads `not measured: not built
- * yet`. The curve opens with net production lines, then churn, CI and Waiting; tickets minted per landing is a later
- * piece's row (LIN-4421).
+ * yet`. The curve opens with net production lines, then churn, CI and Waiting, and always ends with tickets minted
+ * per landing: a caller that supplies no minted row gets `not measured: tracker reads not supplied`, never a gap.
  */
 export function buildReading({ window, rows = {}, references = {} }) {
   const curve = rows.curve ?? [];
-  const withMinted = curve.some((r) => r.key === 'minted') ? curve : [...curve, notMeasured('minted', NOT_BUILT, { reference: references.minted })];
+  const withMinted = curve.some((r) => r.key === 'minted') ? curve : [...curve, notMeasured('minted', MINTED_NOT_SUPPLIED, { reference: references.minted })];
   const filled = { ...rows, curve: withMinted };
   return {
     window,
@@ -195,6 +454,10 @@ const summarise = (r) => {
     case 'lines': return `net ${signed(v.net.total)} (code ${signed(v.net.code)}, comment-only ${signed(v.net.comment)}, blank ${signed(v.net.blank)}); ${signed(v.perLanding.total)} per landing; totals ${num(v.base.total)} → ${num(v.head.total)}; comment-only share ${v.base.commentShare}% → ${v.head.commentShare}%`;
     case 'churn': return `${num(v.added)} added, ${num(v.deleted)} deleted over ${v.landings} landings; ${v.perLanding.added} added and ${v.perLanding.deleted} deleted per landing; ${v.deletedPerAdded} deleted per added`;
     case 'ci': return `median ${v.medianMinutes} min over ${v.runs} runs (${v.landingsWithRun} of ${v.landings} landings)`;
+    case 'minted': return `${v.span} over ${v.base} → ${v.head}, ${v.perLanding} per landing (${v.label}; ${v.probes.detail.length} probes)`;
+    case 'tasks': return `${v.finished} finished (${v.finishedLandedBefore} landed before base); of ${v.windowTickets} tickets landed here, ${v.landedUnfinished} not done and ${v.landedDoneOutside} done outside the window; ${v.unownedLandings} landing(s) own no ticket; lookback ${v.lookback?.days ?? '—'} days`;
+    case 'speed': return `median ${v.medianMinutes} min (mean ${v.meanMinutes}) first dispatch → last landing; median ${v.medianSessions} sessions (mean ${v.meanSessions}); ${v.read} of ${v.tasks} tasks`;
+    case 'cost': return `median $${v.medianUsd} (mean $${v.meanUsd}) over ${v.priced} of ${v.tasks} tasks; unpriced ${v.counters.unpriced}, noTelemetryCount ${v.counters.noTelemetryCount}, unreadableCount ${v.counters.unreadableCount}, noLineage ${v.counters.noLineage}`;
     default:
       if (r.key.startsWith('waiting.')) return `${num(v.base)} → ${num(v.head)} (${signed(v.change)}, ${signed(v.perLanding)} per landing)${v.branch ? `; ${v.branch} ${v.baseSha?.slice(0, 9)}..${v.headSha?.slice(0, 9)}` : ''}`;
       return JSON.stringify(v);

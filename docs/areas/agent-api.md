@@ -36,6 +36,11 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   is restated in ~eight places (quote one); it keys on the proven credential, else the IP
   (`routes/proxy.js`), so "per token" is wrong before auth. (Area reads
   CE/CF, LIN-4378; Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)
+- `routes/proxy-reads.js`: GET /issues returns no `createdAt`, so the stability measure's
+  tickets-minted row bisects single-issue reads for it (`scripts/stability-measures-tracker.mjs`
+  `idSpanSearch`: 22 probes on the 8 Nov window, with 404, trashed and bracket edge cases). A
+  `createdAt` on the list, or a created-before filter, would replace them with one read.
+  (LIN-4421 leftovers; Survey global.)
 - `routes/proxy.js`: the `proxyLimiter` window (60 seconds) and the broker's wait cap (`EXCHANGE_MAX_WAIT_SECONDS`, `lib/runner-kit/broker.mjs`) match by comment only: the contract records 60s on both sides, but no test reads `windowMs` against it, so either can break the retry budget. (Seams & Tangles, 8 Nov.; `docs/reviews/seams-tangles-review-2026-11-08-run10.md`.)
 - `routes/proxy-writes.js`: "no step may change them" (the `## As asked` words) is written twice,
   in `AS_ASKED_LEAD` and in `BRIEF_HINT` (`lib/as-asked.js`); the census pins the markers, not this

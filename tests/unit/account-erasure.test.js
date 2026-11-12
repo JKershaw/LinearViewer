@@ -331,6 +331,28 @@ describe('workspace-change-log rows at a Full wipe (LIN-3846)', () => {
   });
 });
 
+// The shared anonymisation rewrites array elements through `arrayFilters`. The table loop's oracle (anonymisedCopy)
+// rewrites every element, so it cannot tell a filter that matches the group from one that matches everything: this
+// pins the filter on a row whose trimHistory names the person, their alias and a co-member (Test Coverage Gap Review,
+// 11 Nov.; settled as LIN-4421's leftover).
+describe('array fields at a Full wipe: only the erased group\'s elements change', () => {
+  test('a co-member\'s trimHistory entry in a shared workspace survives; the person\'s and the alias\'s become the erased id', async () => {
+    const { db, seed } = await fresh();
+    const id = seed.index.find((e) => e.collection === 'dispatch-history' && e.workspace === 'shared' && e.tenant === 'person')?._id;
+    assert.ok(id, 'the seed has a person-named history row in the shared workspace');
+    const trimHistory = [
+      { by: PERSON.accountId, at: PAST, removed: 1 },
+      { by: BYSTANDER.accountId, at: PAST, removed: 2 },
+      { by: PERSON.aliasId, at: PAST, removed: 3 },
+    ];
+    await db.collection('dispatch-history').updateOne({ _id: id }, { $set: { trimHistory } });
+    const plan = await planOf(db, 'full');
+    await applyOf(db, plan);
+    const row = await db.collection('dispatch-history').findOne({ _id: id });
+    assert.deepStrictEqual(row.trimHistory.map((t) => [t.by, t.removed]), [[ERASED_ACCOUNT_ID, 1], [BYSTANDER.accountId, 2], [ERASED_ACCOUNT_ID, 3]]);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Dry run, output, errors
 // ---------------------------------------------------------------------------

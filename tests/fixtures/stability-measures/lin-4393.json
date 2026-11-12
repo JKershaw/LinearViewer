@@ -1,0 +1,273 @@
+{
+ "_recorded": "LIN-4421, 12 Nov 2026, through the workspace proxy: GET /dispatch?issueIdentifier=LIN-4393 (rows trimmed to id, kind, dispatchedAt, sessionId), GET /issues/LIN-4393/cost (trimmed: token and per-model detail dropped), GET /issues/LIN-4393 (state, completedAt), and its landing from git. Not edited to fit any arithmetic.",
+ "issue": {
+  "identifier": "LIN-4393",
+  "state": {
+   "name": "Done",
+   "type": "completed"
+  },
+  "createdAt": "2026-11-08T14:40:52.825Z",
+  "completedAt": "2026-11-08T15:46:46.415Z"
+ },
+ "landing": {
+  "commit": "393c7686b860149c3f790d188544650ca901cd82",
+  "date": "2026-11-08T15:34:51Z",
+  "subject": "LIN-4393: remove the size-of-the-move setting cleanly (#2377)",
+  "body": ""
+ },
+ "dispatchRows": [
+  {
+   "id": "2ae6d4d8-06f3-4c9b-9d45-026bc5cbad1e",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-08T15:47:58.722Z",
+   "sessionId": "aac50384-a59a-4497-8e6d-fde2bb158b41"
+  },
+  {
+   "id": "0af0901c-705d-404e-ba31-f391a8a8b4ce",
+   "kind": "close-out",
+   "dispatchedAt": "2026-11-08T15:33:19.785Z",
+   "sessionId": "aac50384-a59a-4497-8e6d-fde2bb158b41"
+  },
+  {
+   "id": "06a2334a-d215-4dd8-a392-db840459bde3",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-08T15:33:04.339Z",
+   "sessionId": "aac50384-a59a-4497-8e6d-fde2bb158b41"
+  },
+  {
+   "id": "ed2ccbe7-bf13-432a-a52e-59572d778a19",
+   "kind": "review",
+   "dispatchedAt": "2026-11-08T15:30:40.944Z",
+   "sessionId": "aac50384-a59a-4497-8e6d-fde2bb158b41"
+  },
+  {
+   "id": "c63c6855-aec8-42a5-a2a7-176ffe6e3be5",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-08T15:30:03.958Z",
+   "sessionId": "aac50384-a59a-4497-8e6d-fde2bb158b41"
+  },
+  {
+   "id": "b3cc4c7d-cf3e-4065-9799-460b2d2346f4",
+   "kind": "leftover",
+   "dispatchedAt": "2026-11-08T15:15:38.933Z",
+   "sessionId": null
+  },
+  {
+   "id": "3878654a-a0d9-4a4d-a12d-06a30a3bb027",
+   "kind": "implementation",
+   "dispatchedAt": "2026-11-08T14:52:21.848Z",
+   "sessionId": "aac50384-a59a-4497-8e6d-fde2bb158b41"
+  },
+  {
+   "id": "3d4aaf93-c1cc-4d7a-b745-ea6ca76c4647",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-08T14:52:02.156Z",
+   "sessionId": "aac50384-a59a-4497-8e6d-fde2bb158b41"
+  },
+  {
+   "id": "68f67079-d12b-4554-92f9-1d3abc83a0ea",
+   "kind": "plan",
+   "dispatchedAt": "2026-11-08T14:47:43.984Z",
+   "sessionId": "aac50384-a59a-4497-8e6d-fde2bb158b41"
+  },
+  {
+   "id": "43dcde42-4aa7-41cc-a089-f11754ea387b",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-08T14:47:18.210Z",
+   "sessionId": "aac50384-a59a-4497-8e6d-fde2bb158b41"
+  },
+  {
+   "id": "8887e5bc-4460-4b5a-94a7-bd57a320ff8a",
+   "kind": "scoping",
+   "dispatchedAt": "2026-11-08T14:45:51.091Z",
+   "sessionId": "aac50384-a59a-4497-8e6d-fde2bb158b41"
+  },
+  {
+   "id": "aac50384-a59a-4497-8e6d-fde2bb158b41",
+   "kind": "autopilot",
+   "dispatchedAt": "2026-11-08T14:45:06.721Z",
+   "sessionId": null
+  },
+  {
+   "id": "2430d226-73cd-4430-b127-37fc5b90167b",
+   "kind": "survey-place",
+   "dispatchedAt": "2026-11-08T14:41:00.074Z",
+   "sessionId": null
+  },
+  {
+   "id": "26ea49ac-7386-4378-a925-da99cbf1f75d",
+   "kind": "survey-task",
+   "dispatchedAt": "2026-11-08T14:40:59.557Z",
+   "sessionId": null
+  }
+ ],
+ "dispatchListTotal": 14,
+ "dispatchListTruncated": false,
+ "cost": {
+  "identifier": "LIN-4393",
+  "pricedUsd": 14.750145899999998,
+  "totalUsd": 14.943630899999999,
+  "unpriced": [],
+  "noTelemetryCount": 0,
+  "unreadableCount": 0,
+  "noLineage": false,
+  "workerSessions": [
+   {
+    "rootItemId": "aac50384-a59a-4497-8e6d-fde2bb158b41",
+    "kind": "autopilot",
+    "dispatchedAt": "2026-11-08T14:45:06.721Z",
+    "costUsd": 0.8398737000000001,
+    "durationMs": 3795220,
+    "dispatches": [
+     {
+      "itemId": "aac50384-a59a-4497-8e6d-fde2bb158b41",
+      "kind": "autopilot",
+      "dispatchedAt": "2026-11-08T14:45:06.721Z",
+      "followUpTo": null
+     },
+     {
+      "itemId": "43dcde42-4aa7-41cc-a089-f11754ea387b",
+      "kind": "wake",
+      "dispatchedAt": "2026-11-08T14:47:18.210Z",
+      "followUpTo": "aac50384-a59a-4497-8e6d-fde2bb158b41"
+     },
+     {
+      "itemId": "3d4aaf93-c1cc-4d7a-b745-ea6ca76c4647",
+      "kind": "wake",
+      "dispatchedAt": "2026-11-08T14:52:02.156Z",
+      "followUpTo": "aac50384-a59a-4497-8e6d-fde2bb158b41"
+     },
+     {
+      "itemId": "c63c6855-aec8-42a5-a2a7-176ffe6e3be5",
+      "kind": "wake",
+      "dispatchedAt": "2026-11-08T15:30:03.958Z",
+      "followUpTo": "aac50384-a59a-4497-8e6d-fde2bb158b41"
+     },
+     {
+      "itemId": "06a2334a-d215-4dd8-a392-db840459bde3",
+      "kind": "wake",
+      "dispatchedAt": "2026-11-08T15:33:04.339Z",
+      "followUpTo": "aac50384-a59a-4497-8e6d-fde2bb158b41"
+     },
+     {
+      "itemId": "2ae6d4d8-06f3-4c9b-9d45-026bc5cbad1e",
+      "kind": "wake",
+      "dispatchedAt": "2026-11-08T15:47:58.722Z",
+      "followUpTo": "aac50384-a59a-4497-8e6d-fde2bb158b41"
+     }
+    ]
+   },
+   {
+    "rootItemId": "0af0901c-705d-404e-ba31-f391a8a8b4ce",
+    "kind": "close-out",
+    "dispatchedAt": "2026-11-08T15:33:19.785Z",
+    "costUsd": 1.6063451999999998,
+    "durationMs": 878808,
+    "dispatches": [
+     {
+      "itemId": "0af0901c-705d-404e-ba31-f391a8a8b4ce",
+      "kind": "close-out",
+      "dispatchedAt": "2026-11-08T15:33:19.785Z",
+      "followUpTo": null
+     }
+    ]
+   },
+   {
+    "rootItemId": "ed2ccbe7-bf13-432a-a52e-59572d778a19",
+    "kind": "review",
+    "dispatchedAt": "2026-11-08T15:30:40.944Z",
+    "costUsd": 0.9839708000000001,
+    "durationMs": 143243,
+    "dispatches": [
+     {
+      "itemId": "ed2ccbe7-bf13-432a-a52e-59572d778a19",
+      "kind": "review",
+      "dispatchedAt": "2026-11-08T15:30:40.944Z",
+      "followUpTo": null
+     }
+    ]
+   },
+   {
+    "rootItemId": "3878654a-a0d9-4a4d-a12d-06a30a3bb027",
+    "kind": "implementation",
+    "dispatchedAt": "2026-11-08T14:52:21.848Z",
+    "costUsd": 6.952966999999999,
+    "durationMs": 2262002,
+    "dispatches": [
+     {
+      "itemId": "3878654a-a0d9-4a4d-a12d-06a30a3bb027",
+      "kind": "implementation",
+      "dispatchedAt": "2026-11-08T14:52:21.848Z",
+      "followUpTo": null
+     },
+     {
+      "itemId": "b3cc4c7d-cf3e-4065-9799-460b2d2346f4",
+      "kind": "leftover",
+      "dispatchedAt": "2026-11-08T15:15:38.933Z",
+      "followUpTo": "3878654a-a0d9-4a4d-a12d-06a30a3bb027"
+     }
+    ]
+   },
+   {
+    "rootItemId": "68f67079-d12b-4554-92f9-1d3abc83a0ea",
+    "kind": "plan",
+    "dispatchedAt": "2026-11-08T14:47:43.984Z",
+    "costUsd": 1.9293415999999997,
+    "durationMs": 258049,
+    "dispatches": [
+     {
+      "itemId": "68f67079-d12b-4554-92f9-1d3abc83a0ea",
+      "kind": "plan",
+      "dispatchedAt": "2026-11-08T14:47:43.984Z",
+      "followUpTo": null
+     }
+    ]
+   },
+   {
+    "rootItemId": "8887e5bc-4460-4b5a-94a7-bd57a320ff8a",
+    "kind": "scoping",
+    "dispatchedAt": "2026-11-08T14:45:51.091Z",
+    "costUsd": 0.6435784000000001,
+    "durationMs": 87016,
+    "dispatches": [
+     {
+      "itemId": "8887e5bc-4460-4b5a-94a7-bd57a320ff8a",
+      "kind": "scoping",
+      "dispatchedAt": "2026-11-08T14:45:51.091Z",
+      "followUpTo": null
+     }
+    ]
+   },
+   {
+    "rootItemId": "2430d226-73cd-4430-b127-37fc5b90167b",
+    "kind": "survey-place",
+    "dispatchedAt": "2026-11-08T14:41:00.074Z",
+    "costUsd": 0.9241177999999999,
+    "durationMs": 155612,
+    "dispatches": [
+     {
+      "itemId": "2430d226-73cd-4430-b127-37fc5b90167b",
+      "kind": "survey-place",
+      "dispatchedAt": "2026-11-08T14:41:00.074Z",
+      "followUpTo": null
+     }
+    ]
+   },
+   {
+    "rootItemId": "26ea49ac-7386-4378-a925-da99cbf1f75d",
+    "kind": "survey-task",
+    "dispatchedAt": "2026-11-08T14:40:59.557Z",
+    "costUsd": 0.8699514,
+    "durationMs": 140735,
+    "dispatches": [
+     {
+      "itemId": "26ea49ac-7386-4378-a925-da99cbf1f75d",
+      "kind": "survey-task",
+      "dispatchedAt": "2026-11-08T14:40:59.557Z",
+      "followUpTo": null
+     }
+    ]
+   }
+  ]
+ }
+}
