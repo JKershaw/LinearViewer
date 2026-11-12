@@ -7,6 +7,11 @@ on:
     branches: [main]
 
 jobs:
+  # The two unit arms run side by side (LIN-4441): one job each, so a PR's run
+  # waits for the slower arm, not for the two passes one after the other. Each
+  # arm keeps its own environment (below), and each has its own Mongo service.
+  # Both services share one image and tunable; the workflow test in
+  # tests/unit/ci-workflow.test.js checks that they match.
   unit:
     name: Unit tests
     runs-on: ubuntu-latest
@@ -23,7 +28,8 @@ jobs:
         # Measured on 7.0.0: with glibc.pthread.rseq=1 the refused 8.x images
         # start and take load; rseq=0 doesn't help (probe run 39302841645,
         # PR #1991). Pinned to production's 8.0.32, so the pin must move with
-        # production. Don't drop the env.
+        # production. Don't drop the env. The unit-proxy job below carries the
+        # same pin: move both together.
         image: mongo:8.0.32
         env:
           GLIBC_TUNABLES: glibc.pthread.rseq=1
@@ -49,38 +55,70 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # LIN-1880: runs the SAME unit suite, once, under a socket-level watcher,
-      # and additionally fails if any test opens a non-loopback socket. Costs no
-      # extra CI time than `npm run test:unit` did — it wraps that command
-      # rather than adding a second run. The property is worthless unenforced:
-      # the unit suite reached api.linear.app on every run for months while two
-      # other instruments reported clean.
+      # LIN-1880: runs the unit suite under a socket-level watcher, and fails if
+      # any test opens a non-loopback socket. The property is worthless
+      # unenforced: the unit suite reached api.linear.app on every run for
+      # months while two other instruments reported clean.
       # LIN-2369: this arm runs WITH dummy OpenRouter credentials present, so
-      # the suite must give the same result as the keyless proxy arm below. The
-      # runner blanks both keys (scripts/run-unit-tests.mjs unitTestEnv), so
-      # this proves the blanking holds: remove it and the offending files reach
-      # openrouter.ai here and the arm goes red. It does not prove each file
-      # tolerates a key reaching it. The value is deliberately not shaped like
-      # an OpenRouter key, so the secret scan does not flag this file.
+      # the suite must give the same result as the keyless proxy arm in the
+      # unit-proxy job. The runner blanks both keys (scripts/run-unit-tests.mjs
+      # unitTestEnv), so this proves the blanking holds: remove it and the
+      # offending files reach openrouter.ai here and the arm goes red. It does
+      # not prove each file tolerates a key reaching it. The value is
+      # deliberately not shaped like an OpenRouter key, so the secret scan does
+      # not flag this file.
       - name: Run unit tests (hermetic — no live network, dummy OpenRouter keys set)
         run: npm run test:hermetic:keyed
         env:
           CI: true
           MONGODB_TEST_URI: mongodb://localhost:27017
 
-      # The acceptance criteria name BOTH arms: the escape count must be zero
-      # with proxy env set as well as unset. Since LIN-2992 the watcher also
-      # counts a connect to the configured HTTPS_PROXY/HTTP_PROXY endpoint as
-      # an escape, even on loopback, so a proxy-aware client reaching for the
-      # network shows up here rather than reading as a local server. Cheap
-      # (~35s) and it is the arm that would otherwise never be run.
-      #
-      # LIN-3949: this arm alone runs with the clock shifted +400 days, so a
-      # unit test that pins a fixture date and reads the wall clock goes red in
-      # the PR that introduces it, not on main after the date passes (LIN-1535,
-      # LIN-2732, settings-keys). `test:hermetic` above stays on the real clock,
-      # so a failure in one arm and not the other names the cause: clock rot or
-      # a real bug. Costs no extra CI time. Local run: npm run test:clock-shift.
+  # The proxy arm (LIN-4441: split out of `unit` so it runs beside it). It alone
+  # has the OpenRouter keys absent and the proxy env set, and the clock shifted
+  # +400 days, so a unit test that pins a fixture date and reads the wall clock
+  # goes red in the PR that introduces it, not on main after the date passes
+  # (LIN-3949: LIN-1535, LIN-2732, settings-keys). The keyed arm above stays on
+  # the real clock, so a failure in one arm and not the other names the cause:
+  # clock rot or a real bug. Local run: npm run test:clock-shift.
+  #
+  # The acceptance criteria name BOTH arms: the escape count must be zero with
+  # proxy env set as well as unset. Since LIN-2992 the watcher also counts a
+  # connect to the configured HTTPS_PROXY/HTTP_PROXY endpoint as an escape, even
+  # on loopback, so a proxy-aware client reaching for the network shows up here
+  # rather than reading as a local server.
+  unit-proxy:
+    name: Unit tests (proxy, clock +400d)
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        # Same image and tunable as the `unit` job's service (LIN-3693): the pin
+        # moves with production for both services, and tests/unit/ci-workflow.test.js
+        # fails if the two drift apart.
+        image: mongo:8.0.32
+        env:
+          GLIBC_TUNABLES: glibc.pthread.rseq=1
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand({ping:1})'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Runner kernel
+        run: uname -r
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Run unit tests (hermetic, proxy env set)
         run: npm run test:hermetic:proxy
         env:
@@ -162,13 +200,16 @@ jobs:
   ci-success:
     name: CI success
     if: always()
-    needs: [unit, e2e, secret-scan]
+    # Every job above except this one is listed here, in `needs`, in the shell
+    # condition and in the failure message. tests/unit/ci-workflow.test.js fails
+    # when one is missing, so a new job cannot silently stop blocking merges.
+    needs: [unit, unit-proxy, e2e, secret-scan]
     runs-on: ubuntu-latest
     steps:
       - name: Verify all test jobs passed
         run: |
-          if [ "${{ needs.unit.result }}" != "success" ] || [ "${{ needs.e2e.result }}" != "success" ] || [ "${{ needs.secret-scan.result }}" != "success" ]; then
-            echo "::error::One or more test jobs failed (unit=${{ needs.unit.result }}, e2e=${{ needs.e2e.result }}, secret-scan=${{ needs.secret-scan.result }})."
+          if [ "${{ needs.unit.result }}" != "success" ] || [ "${{ needs.unit-proxy.result }}" != "success" ] || [ "${{ needs.e2e.result }}" != "success" ] || [ "${{ needs.secret-scan.result }}" != "success" ]; then
+            echo "::error::One or more test jobs failed (unit=${{ needs.unit.result }}, unit-proxy=${{ needs.unit-proxy.result }}, e2e=${{ needs.e2e.result }}, secret-scan=${{ needs.secret-scan.result }})."
             exit 1
           fi
           echo "All test jobs passed."
