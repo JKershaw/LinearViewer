@@ -21,7 +21,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { generatePrompt } from '../../lib/prompt-templates.js';
-import { LEFTOVERS_HEADING, LEFTOVER_RULE, RETIRES_LABEL, RETIRES_NONE } from '../../lib/prompts/leftover-words.js';
+import { LEFTOVERS_HEADING, LEFTOVER_RULE, CONSEQUENCE_TEST, RETIRES_LABEL, RETIRES_NONE } from '../../lib/prompts/leftover-words.js';
 import * as dispatchFields from '../../lib/dispatch-fields.js';
 import * as dispatchLeftover from '../../lib/dispatch-leftover.js';
 import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
@@ -76,14 +76,14 @@ describe('close-out: writes review\'s note entries and states the one-home rule 
 
   test('the note entries are written on the PR branch before the merge, alongside the fixes', () => {
     const fixes = section(prompt, 'Make the Fixes Review Asked For');
-    assert.match(fixes, /Write each note entry review named into its area's `docs\/areas\/<slug>\.md` on the PR branch the same way, before the merge\./);
-    assert.match(prompt, /Make the fixes and write the note entries review asked for/, 'Workflow step 2 names them');
+    assert.match(fixes, /Write each note entry review named, and any note-bound outside find you notice yourself, in its own area or another, into that area's `docs\/areas\/<slug>\.md` on the PR branch the same way, before the merge\./);
+    assert.match(prompt, /Make the fixes and write every note entry review named/, 'Workflow step 2 names them');
   });
 
   test('Follow-up Triage states the one-home rule in the shared words, and close-out stays the only filer', () => {
     const triage = section(prompt, 'Follow-up Triage');
     assert.ok(triage.includes(LEFTOVER_RULE), 'renders LEFTOVER_RULE verbatim');
-    assert.match(triage, /Only outside items are filed here/);
+    assert.match(triage, /Only the gate's tickets are filed here/);
   });
 
   test('the prune still keeps the size record word for word (LIN-4368)', () => {
@@ -120,7 +120,15 @@ describe('the leftover heading and rule have one spelling each (LIN-4374, LIN-43
   });
 
   // Distinctive pieces of the rule, and the retirement words (LIN-4414): a file that retypes any of them restates it.
-  const RULE_PIECES = [LEFTOVER_RULE, 'a note is known but not scheduled', 'a follow-up only close-out files', RETIRES_LABEL, RETIRES_NONE.noWaiting, RETIRES_NONE.nothingFixSized];
+  // The gate's body without its header: retyping it under another header is still a restatement (LIN-4401).
+  const CONSEQUENCE_HEADER = 'Consequence test for an outside find: ';
+  const CONSEQUENCE_BODY = CONSEQUENCE_TEST.slice(CONSEQUENCE_HEADER.length);
+  const RULE_PIECES = [LEFTOVER_RULE, 'a note is known but not scheduled', 'or a ticket the consequence test sends', CONSEQUENCE_TEST, CONSEQUENCE_BODY, 'Consequence test for an outside find:', RETIRES_LABEL, RETIRES_NONE.noWaiting, RETIRES_NONE.nothingFixSized];
+
+  test('the gate\'s body is the constant less its header', () => {
+    assert.ok(CONSEQUENCE_TEST.startsWith(CONSEQUENCE_HEADER), 'the header is the constant\'s opening');
+    assert.ok(!CONSEQUENCE_BODY.includes(CONSEQUENCE_HEADER) && CONSEQUENCE_BODY.length > 300, 'the body is the rest');
+  });
 
   test('no other file in lib/ or routes/ spells the heading, the rule or the retirement words', () => {
     const offenders = [];
@@ -137,16 +145,22 @@ describe('the leftover heading and rule have one spelling each (LIN-4374, LIN-43
       };
       walk(dir);
     }
-    assert.deepEqual(offenders, [], `import LEFTOVERS_HEADING, LEFTOVER_RULE, RETIRES_LABEL and RETIRES_NONE from ${OWNER} instead of retyping them`);
+    assert.deepEqual(offenders, [], `import LEFTOVERS_HEADING, LEFTOVER_RULE, CONSEQUENCE_TEST, RETIRES_LABEL and RETIRES_NONE from ${OWNER} instead of retyping them`);
   });
 });
 
 describe('the post-merge readers are left as they were (LIN-4374)', () => {
-  for (const kind of ['retrospective-audit', 'retro']) {
-    test(`${kind} carries neither the leftover read nor the one-home sentence`, () => {
-      const prompt = render(kind);
-      assert.ok(!prompt.includes(LEFTOVERS_HEADING));
-      assert.ok(!prompt.includes('One home for each leftover'));
-    });
-  }
+  test('retro carries neither the leftover read nor the one-home sentence', () => {
+    const prompt = render('retro');
+    assert.ok(!prompt.includes(LEFTOVERS_HEADING));
+    assert.ok(!prompt.includes('One home for each leftover'));
+  });
+
+  // LIN-4432 (piece B, verdict note / D5): the audit gains the gate, and only the gate.
+  test('retrospective-audit renders the consequence test once, and still neither the leftover read nor the one-home sentence', () => {
+    const prompt = render('retrospective-audit');
+    assert.equal(prompt.split(CONSEQUENCE_TEST).length - 1, 1, 'the audit renders CONSEQUENCE_TEST exactly once');
+    assert.ok(!prompt.includes(LEFTOVERS_HEADING));
+    assert.ok(!prompt.includes('One home for each leftover'));
+  });
 });

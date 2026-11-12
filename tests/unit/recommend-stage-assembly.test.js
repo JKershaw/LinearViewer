@@ -133,7 +133,7 @@ describe('one routing call, then code assembles the stage prompt', () => {
     const floors = [/green CI never settles a ledger item/i, /never a bare Approve/i,
       /\*\*A named monitor\*\*/, /one line on why no check short of production could prove it/i,
       /An unnamed monitor or rollback settles nothing/, /name each precisely enough to make without guessing/i,
-      /You do NOT merge, mark the task Done, or file follow-ups/];
+      /You do NOT merge, mark the task Done, or file the gate's tickets/];
     transport(routing('review'));
     const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k' });
     const rest = rec.prompt.slice(rec.prompt.indexOf('## Scope and Authority'));

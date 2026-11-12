@@ -85,3 +85,16 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   can become the summary and every shelf rewrite churns `tests/fixtures/library-doc-summaries.json`;
   a `summary:` front-matter field would end both, but changes every doc's summary source.
   (Survey global, LIN-4428.)
+- `lib/periodicals.js`: a reading's finding with no file in an area to cite goes to the closing
+  comment, "never in a ticket", a live secret included, while `CONSEQUENCE_TEST`
+  (`lib/prompts/leftover-words.js`) sends a find that touches safety to a ticket. The two rules in
+  this area answer the live-secret case oppositely; having Periodicals render the gate needs
+  John's ruling on that case first. (LIN-4401, LIN-4431.)
+- `lib/prompts/leftover-words.js`: since `CONSEQUENCE_TEST` (LIN-4401), outside finds gather as
+  Waiting entries in other areas' notes where tickets used to be filed. LIN-4414's one retirement
+  per build drains only the areas a build touches, so rarely touched notes (other-features) will
+  grow; their Waiting counts are the honest measure. (LIN-4431.)
+- `lib/prompt-template-defs.js` (retrospective-audit Reporting) and `lib/periodicals.js`
+  (`areaNotesRoutes`) each state the docs-only notes-PR rule in their own words; one shared
+  constant in `lib/prompts/leftover-words.js` would make it one, at the cost of re-pinning the 13
+  Periodical prompt hashes. (LIN-4432.)
