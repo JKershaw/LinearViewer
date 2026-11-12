@@ -21,7 +21,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { generatePrompt } from '../../lib/prompt-templates.js';
-import { LEFTOVERS_HEADING, LEFTOVER_RULE } from '../../lib/prompts/leftover-words.js';
+import { LEFTOVERS_HEADING, LEFTOVER_RULE, RETIRES_LABEL, RETIRES_NONE } from '../../lib/prompts/leftover-words.js';
 import * as dispatchFields from '../../lib/dispatch-fields.js';
 import * as dispatchLeftover from '../../lib/dispatch-leftover.js';
 import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
@@ -107,10 +107,22 @@ describe('the leftover heading and rule have one spelling each (LIN-4374, LIN-43
     assert.equal(dispatchLeftover.LEFTOVERS_HEADING, undefined);
   });
 
-  // Distinctive pieces of the rule: a file that retypes any of them restates it.
-  const RULE_PIECES = [LEFTOVER_RULE, 'a note is known but not scheduled', 'a follow-up only close-out files'];
+  // LIN-4414: the leftover answer's retirement line, asked by the prompt and checked at the proxy.
+  test('the leftover prompt asks for an answer that starts with the heading and names one retirement in the leaf\'s words', () => {
+    assert.ok(PROMPT.includes('that starts with the line `' + LEFTOVERS_HEADING + '`'), 'the answer opens with the heading');
+    for (const words of [RETIRES_LABEL, RETIRES_NONE.noWaiting, RETIRES_NONE.nothingFixSized]) {
+      assert.ok(PROMPT.includes('`' + words + '`'), `renders ${words} from the leaf`);
+    }
+    const settle = PROMPT.indexOf('settle one waiting entry');
+    assert.ok(settle > 0, 'asks the builder to settle one waiting entry');
+    assert.ok(settle < PROMPT.indexOf('Push, let CI settle'), 'before the push, so the restated head SHA carries the retirement');
+    assert.match(PROMPT, /else try your other touched areas/, 'nothing fix-sized means no touched area has one');
+  });
 
-  test('no other file in lib/ or routes/ spells the heading or the rule', () => {
+  // Distinctive pieces of the rule, and the retirement words (LIN-4414): a file that retypes any of them restates it.
+  const RULE_PIECES = [LEFTOVER_RULE, 'a note is known but not scheduled', 'a follow-up only close-out files', RETIRES_LABEL, RETIRES_NONE.noWaiting, RETIRES_NONE.nothingFixSized];
+
+  test('no other file in lib/ or routes/ spells the heading, the rule or the retirement words', () => {
     const offenders = [];
     for (const dir of ['lib', 'routes']) {
       const walk = (rel) => {
@@ -125,7 +137,7 @@ describe('the leftover heading and rule have one spelling each (LIN-4374, LIN-43
       };
       walk(dir);
     }
-    assert.deepEqual(offenders, [], `import LEFTOVERS_HEADING and LEFTOVER_RULE from ${OWNER} instead of retyping them`);
+    assert.deepEqual(offenders, [], `import LEFTOVERS_HEADING, LEFTOVER_RULE, RETIRES_LABEL and RETIRES_NONE from ${OWNER} instead of retyping them`);
   });
 });
 

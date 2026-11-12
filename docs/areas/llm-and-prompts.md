@@ -62,13 +62,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - `lib/openrouter.js`: `SUGGESTED_MODEL_IDS` and `DISPATCH_MODEL_SUGGESTIONS`
   (`lib/model-routing-harnesses.js`) repeat ids by hand, unchecked; the first is also the
   cold-catalog fallback. (Area reads CG/CH.)
-- `lib/periodicals.js`: `areaNotes()` restates the notes' own rules; `docs/areas/` is spelled in
-  17 lines across 10 code files. (Drift & Coherence Review, 10 Nov;
-  `docs/reviews/drift-coherence-review-2026-11-10.md`; count, Documentation Review.)
-- `lib/periodicals.js`: SD's notes guard has diverged (SD 200 lines, LV 147; SD adds `sh`) and its
-  README lacks Periodical-entry rules; SD's existence check rejects a Periodical's SD note citing
-  the LinearViewer report. (Drift & Coherence Review,
-  10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)
+- `lib/periodicals.js`: `docs/areas/` is spelled in 17 lines across 10 code files. (Drift &
+  Coherence Review, 10 Nov; `docs/reviews/drift-coherence-review-2026-11-10.md`; count,
+  Documentation Review.)
 - `lib/recommendation-live-wait.js`: a read, not a claim: two different-kind calls racing on
   one ticket both pass; claim compare-and-set, like `claimHeldWake` (LIN-4392).
 - `lib/periodicals.js`: two sizes of move: a ceiling for Periodical prompts (+18.8% in the window,

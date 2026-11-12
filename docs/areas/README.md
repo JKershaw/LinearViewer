@@ -33,11 +33,13 @@ parts, under these two headings:
 
 - `## Lessons`: what binds how you work in the area. A lesson is a rule a builder
   follows, learned from a change that went wrong or nearly did, or from a Periodical
-  reading. Say why.
+  reading. Say why. Lessons are read before every change, so they stay within 6144
+  bytes (the guard's check 4).
 - `## Waiting`: work known in the area but not scheduled. One bullet per entry. Each
   entry **starts by citing the file it is about**, as a repo-relative path in
   backticks, and says what is waiting and where it came from (a ticket, a comment or
-  a reading).
+  a reading). Waiting has no size limit: an entry keeps its detail, and is never cut
+  or shortened to make room.
 
 An entry from a Periodical reading names its source as the Periodical's title and the
 reading's date, for example "(Seams & Tangles, 8 Nov.)". It cites the area's file first
@@ -55,11 +57,23 @@ Where a leftover goes, and why an item never lives both here and in a filed foll
 is written once: `LEFTOVER_RULE` in `lib/prompts/leftover-words.js` (LIN-4376). The
 leftover step, review and close-out each render it word for word. For the notes:
 
-- When a follow-up is filed for a note entry, remove the entry.
-- A change that settles a waiting entry, or makes it untrue, removes it in the same
-  change.
+- A waiting entry leaves in only three ways: a change settles it, a change makes it
+  untrue (either removes it in the same change), or a follow-up is filed for it. It
+  never leaves, and is never shortened, to make room.
 - Waiting entries are context, not scope. A ticket takes one on only when the size of
   its move does.
+- The one exception is the builder's leftover step (LIN-4414). Every stage build that
+  reaches it settles one fix-sized waiting entry on its PR branch, before it pushes:
+  in the area its change touched with the most waiting entries, or, if none there is
+  fix-sized, in another area it touched. It removes the entry and names it on the one
+  retirement line of its leftover answer. That line has three forms, spelled in
+  `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`): the settled
+  entry's cited file and opening words; none, because no touched area has a waiting
+  entry or there are no notes; or none, because no touched area has a fix-sized entry,
+  naming the smallest entry in the busiest touched area and why it is larger than a
+  fix. The proxy refuses an answer without a valid line (`lib/dispatch-leftover-answer.js`).
+  A filed follow-up never counts as the retirement. The build itself still treats
+  Waiting as context.
 
 Who writes here: the builder's leftover step tidies or notes what its change left
 (`lib/dispatch-leftover.js`), review names any edge it left untouched, close-out
@@ -78,5 +92,11 @@ of `docs/plans/survey/` stays as frozen research.
 1. a note's file name is not an area's slug;
 2. a path a note cites does not exist;
 3. a waiting entry cites no path, or its first cited path maps to another area;
-4. a note is over 6144 bytes. Keep a note short enough to read before every change:
-   prune lessons that no longer bind, and settle or drop stale entries.
+4. a note's `## Lessons` section is over 6144 bytes. Waiting is not counted. Keep
+   Lessons short enough to read before every change: prune lessons that no longer
+   bind, and remove waiting entries that are settled or no longer true;
+5. this README does not state that 6144-byte Lessons cap (the guard reads its own
+   constant, so the two cannot drift).
+
+The guard also prints each note's Waiting count, so whether the lists are shrinking
+can be read in CI.

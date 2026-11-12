@@ -12,7 +12,10 @@
  * changed, dropped or forged through this lane. The same two description call sites carry
  * the size record guard (LIN-4368, `refusedBySizeRecord`): a `## Size of the move` section
  * says what and why, never how, a policy never decides "wrong work", and a write may not drop
- * the section (lib/size-of-move.js checkSizeRecord).
+ * the section (lib/size-of-move.js checkSizeRecord). Every write that creates or edits a comment
+ * body (create, edit, and the comment-target attachment caption) carries the leftover answer
+ * guard (LIN-4414, `refusedByLeftoverAnswer`): a comment opening with the leftover heading names
+ * the waiting entry the build settled (lib/dispatch-leftover-answer.js checkLeftoverAnswer).
  *
  * Shape. Every route is one literal registration whose handler runs through
  * `guarded(spec, handler)`, which owns the part they all share, in this order:
@@ -59,6 +62,7 @@ import { appendBlock, replace as replaceInDescription, DescriptionEditError } fr
 import { checkAsAsked, splitAsAsked, hasMarkerLine, askedText, AS_ASKED_HEADING } from '../lib/as-asked.js';
 import { sealForFiling } from '../lib/as-asked-seal.js';
 import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK } from '../lib/size-of-move.js';
+import { checkLeftoverAnswer, leftoverAnswerRefusal } from '../lib/dispatch-leftover-answer.js';
 import { jsonError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
 
@@ -356,6 +360,22 @@ export function createProxyWriteRoutes({
       [SIZE_RECORD_CODES.dropped]: `${lead} is kept once written: the new description drops it. Keep it, or replace it in place.`,
     }[check.code];
     return refuse(ctx, 422, message, { code: check.code, ...(check.kind ? { kind: check.kind } : {}), ...(check.line ? { line: check.line } : {}) });
+  }
+
+  /**
+   * The leftover answer guard (LIN-4414), at every write that creates or edits a comment body:
+   * lib/dispatch-leftover-answer.js checkLeftoverAnswer acts only on a comment whose first
+   * non-blank line is the leftover heading (the builder's answer), so a review verdict with that
+   * heading further down, and every other comment, passes untouched. Answers 422 with the code
+   * (and the line for a shape refusal) before any provider call or dedupe lookup, posts nothing,
+   * and returns true once it has refused. Like the description guards, only this proxy lane is
+   * checked: an answer posted another way, and the copy in the builder's terminal message, are
+   * not (docs/architecture/dispatch-and-proxy.md); review reads the comment.
+   */
+  function refusedByLeftoverAnswer(ctx, body) {
+    const check = checkLeftoverAnswer(body);
+    if (check.ok) return false;
+    return refuse(ctx, 422, leftoverAnswerRefusal(check), { code: check.code, ...(check.kind ? { kind: check.kind } : {}), ...(check.line ? { line: check.line } : {}) });
   }
 
   // ---------------------------------------------------------------------------
@@ -689,6 +709,8 @@ export function createProxyWriteRoutes({
     // cosmetic exception for a doubly-invalid body, which reports the
     // dangerous-chars message instead of the length one.
     if (refuseBadCommentBody(ctx, body)) return;
+    // LIN-4414: before the dedupe lookup, so a body refused once can never pass on a cache hit.
+    if (refusedByLeftoverAnswer(ctx, body)) return;
     if (!await guardTarget(ctx, 'issueWriteGuard', { onNull: 'proceed' })) return;
 
     // Deterministic dedupe (LIN-399): an identical comment just created for this
@@ -738,6 +760,7 @@ export function createProxyWriteRoutes({
     if (refuseBadUuid(ctx, commentId, 'comment')) return;
     const { body } = req.body;
     if (refuseBadCommentBody(ctx, body)) return;
+    if (refusedByLeftoverAnswer(ctx, body)) return;
     const updated = normalizeWritePayload(await provider.updateComment(token, commentId, body), 'comment');
     if (writeRejected(req, res, endpoint, updated, 'Comment was not updated')) return;
     commentDedupeGenerations.bump(req.proxyUrlKey);
@@ -776,6 +799,8 @@ export function createProxyWriteRoutes({
     // type-check then dangerous-chars, comes before the length/budget math.
     const bodyValidation = validateCommentBody(body, { required: false });
     if (!bodyValidation.valid) return refuse(ctx, 400, bodyValidation.error);
+    // LIN-4414: a comment-target caption becomes the comment's opening text, so it is checked as one.
+    if (!toDescription && body && refusedByLeftoverAnswer(ctx, body)) return;
 
     if (!image) return refuse(ctx, 400, 'image is required');
     const parsed = parseFeedbackImage(image);
