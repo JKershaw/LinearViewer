@@ -108,8 +108,13 @@ function bashEdits(cmd) {
 }
 
 // ---- CI status parsing -------------------------------------------------------------------------------------------------
-const JOB_G = /E2E shard \d\/\d|[Uu]nit tests|Secret scan \(source\)|CI success/g;
-const JOB_EXACT = /^(?:E2E shard \d\/\d|[Uu]nit tests|Secret scan \(source\)|CI success)$/;
+// LIN-4441: the proxy arm is its own job ("Unit tests (proxy, clock +400d)") and counts as a unit job. The unit-job name is
+// spelled once, in UNIT_JOB; the longer name comes first so the "Unit tests" prefix never takes the match.
+// tests/unit/survey-flakes-job-names.test.js evaluates these four lines from this file (the script runs on import).
+const UNIT_JOB = String.raw`[Uu]nit tests(?: \(proxy, clock \+400d\))?`;
+const JOB_G = new RegExp(String.raw`E2E shard \d\/\d|${UNIT_JOB}|Secret scan \(source\)|CI success`, 'g');
+const JOB_EXACT = new RegExp(String.raw`^(?:E2E shard \d\/\d|${UNIT_JOB}|Secret scan \(source\)|CI success)$`);
+const UNIT_EXACT = new RegExp(`^${UNIT_JOB}$`);
 const normStatus = (w) => {
   if (!w) return null; const s = w.toLowerCase();
   if (/^(?:fail|failed|failure|failing|timed_out|startup_failure|action_required)$/.test(s)) return 'fail';
@@ -265,7 +270,7 @@ for (const f of files) {
       const pr = i.pr && cmdPrs.includes(i.pr) ? i.pr : cmdPrs.length === 1 ? cmdPrs[0] : i.pr || null;
       const g = group(runId, pr); if (!g.pr && pr) g.pr = pr;
       if (/^E2E shard/.test(i.job)) { const shard = i.job.slice(10); if (i.status === 'fail') g.e2e.fail.add(shard); else if (i.status === 'pass') g.e2e.pass.add(shard); else if (i.status === 'pending') g.e2e.pending.add(shard); }
-      if (/^[Uu]nit tests$/.test(i.job) && i.status === 'fail') g.unitFail = true;
+      if (UNIT_EXACT.test(i.job) && i.status === 'fail') g.unitFail = true;
     }
     // A run-level success with no job lines for that run stands for four green shards.
     for (const r of runs) if (!groups.has(`r${r.runId}`)) { const g = group(r.runId, cmdPrs.length === 1 ? cmdPrs[0] : null); g.runLevel = r.status; if (r.status === 'pass') for (const s of ['1/4', '2/4', '3/4', '4/4']) g.e2e.pass.add(s); }

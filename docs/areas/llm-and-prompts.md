@@ -44,6 +44,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   there as out with the reason. A kind in `SPINE` (`lib/run-view.js`) also moves the run page's "n of N", the
   session and task-page goldens (`UPDATE_RENDER_SESSION_GOLDEN=1`, `UPDATE_RENDER_TASK_PAGE_GOLDEN=1`) and the
   E2E count pins; read the golden diff before accepting it (LIN-4437).
+- `formatCiGateCheck` (`lib/prompt-formatters.js`) renders in implementation, review and close-out:
+  a rule for one stage gets its own formatter beside it. Prove the others unchanged by rendering every
+  kind, fresh and fix round, at HEAD and on the branch, not by the budget test, whose ceilings are caps (LIN-4441).
 
 ## Waiting
 
@@ -111,3 +114,7 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   matches its path") and the blind-read prompt's own sentence (`lib/prompt-template-defs.js`, the
   `blind-read` template), which shipped as piloted (LIN-4437), so it was not retyped after the pilot. One constant in the leaf would make it
   one, at the cost of re-piloting that sentence. (LIN-4436 leftovers.)
+- `lib/prompt-formatters.js`: `formatLocalTestRule` names this repo's runner command
+  (`node scripts/run-unit-tests.mjs tests/unit/<files>`) in a template that also drives other
+  repos, and `CLAUDE.md` spells the same rule; a repo-supplied test command would make the line
+  right elsewhere and give it one spelling. (LIN-4441 leftovers.)

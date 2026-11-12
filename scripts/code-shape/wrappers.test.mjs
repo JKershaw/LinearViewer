@@ -2,7 +2,8 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -255,22 +256,62 @@ test('probe: --rename-map and --perturb-module add rewrites; a bad --target or -
   } finally { probeRepo.cleanup(); rmSync(scratch, { recursive: true, force: true }); }
 });
 
-test('without acorn each CLI that parses code prints "run npm install" and exits 2', () => {
-  // A copy of the kit in a directory with no node_modules above it. (verbatim.mjs parses nothing, so its core never needs acorn.)
-  // Laid out as in the repo: the kit reads the registry path from the product's leaf, lib/prompts/area-registry-path.js (LIN-4383).
-  const dir = mkdtempSync(join(tmpdir(), 'code-shape-noacorn-'));
+// LIN-4441. A kit copy under a temp dir inherits whatever node_modules sits above it: on the runner TMPDIR is
+// simple-dispatcher/state/session-tmp/<session>, so Node walks up to simple-dispatcher/node_modules/acorn and the
+// CLIs load acorn. The copy therefore carries its own node_modules/acorn whose exports point at a missing file. The
+// lookup stops at that package, and loadCore's ERR_MODULE_NOT_FOUND + /acorn/ path fires wherever the copy sits.
+const ACORN_STUB = { name: 'acorn', version: '0.0.0-stub', exports: './missing.mjs' };
+const REGISTRY_PATH = fileURLToPath(new URL('../../lib/prompts/area-registry-path.js', import.meta.url));
+const REAL_ACORN = fileURLToPath(new URL('../../node_modules/acorn', import.meta.url));
+
+// A copy of the kit under `parent`; `stub` decides whether the copy root gets the stub acorn.
+const kitCopy = (parent, { stub }) => {
+  mkdirSync(parent, { recursive: true });
+  const dir = mkdtempSync(join(parent, 'code-shape-noacorn-'));
   const kit = join(dir, 'scripts', 'code-shape');
-  try {
-    cpSync(KIT, kit, { recursive: true, filter: (p) => !p.endsWith('.test.mjs') });
-    cpSync(fileURLToPath(new URL('../../lib/prompts/area-registry-path.js', import.meta.url)), join(dir, 'lib', 'prompts', 'area-registry-path.js'));
-    for (const [script, args] of [['census.mjs', [repo.dir, third]], ['shape.mjs', [repo.dir, third]], ['probe.mjs', [repo.dir, third, '--target', 'lib/a.js', '--test-cmd', 'true']], ['retention.mjs', [repo.dir, first, second]]]) {
-      const r = cli(script, args, { kit });
-      assert.equal(r.status, 2, `${script}: ${r.stderr}`);
-      assert.match(r.stderr, /run npm install/, script);
-    }
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  cpSync(KIT, kit, { recursive: true, filter: (p) => !p.endsWith('.test.mjs') });
+  // Laid out as in the repo: the kit reads the registry path from the product's leaf, lib/prompts/area-registry-path.js (LIN-4383).
+  cpSync(REGISTRY_PATH, join(dir, 'lib', 'prompts', 'area-registry-path.js'));
+  if (stub) {
+    mkdirSync(join(dir, 'node_modules', 'acorn'), { recursive: true });
+    writeFileSync(join(dir, 'node_modules', 'acorn', 'package.json'), JSON.stringify(ACORN_STUB));
+  }
+  return { dir, kit };
+};
+
+// Does `acorn` resolve from inside the copy? CommonJS resolution, which throws where the stub is.
+// (import.meta.resolve would not do: it returns the stub's missing target without checking it exists.)
+const acornResolves = (kit) => {
+  try { createRequire(join(kit, 'x.js')).resolve('acorn'); return true; } catch { return false; }
+};
+
+const CLI_CASES = [['census.mjs', (r) => [r, third]], ['shape.mjs', (r) => [r, third]], ['probe.mjs', (r) => [r, third, '--target', 'lib/a.js', '--test-cmd', 'true']], ['retention.mjs', (r) => [r, first, second]]];
+
+// Each CLI that parses code must print "run npm install" and exit 2 from this kit.
+const expectNoAcornCli = (kit) => {
+  for (const [script, args] of CLI_CASES) {
+    const r = cli(script, args(repo.dir), { kit });
+    assert.equal(r.status, 2, `${script}: ${r.stderr}`);
+    assert.match(r.stderr, /run npm install/, script);
+  }
+};
+
+test('without acorn each CLI that parses code prints "run npm install" and exits 2', () => {
+  const { dir, kit } = kitCopy(tmpdir(), { stub: true });
+  try { expectNoAcornCli(kit); } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('the copy used above really has no acorn on its path', () => {
-  assert.ok(!existsSync(join(tmpdir(), 'node_modules', 'acorn')));
+test('placement: under a parent that has a working acorn, the stubbed copy still exits 2', () => {
+  // The control first: the same copy without the stub really does load acorn from the parent, so the placement is live.
+  const parent = mkdtempSync(join(tmpdir(), 'code-shape-acorn-parent-'));
+  mkdirSync(join(parent, 'node_modules'));
+  cpSync(REAL_ACORN, join(parent, 'node_modules', 'acorn'), { recursive: true });
+  const bare = kitCopy(join(parent, 'nested'), { stub: false });
+  const stubbed = kitCopy(join(parent, 'nested'), { stub: true });
+  try {
+    assert.equal(acornResolves(bare.kit), true, 'control: with no stub, acorn resolves from the parent');
+    assert.equal(cli('census.mjs', [repo.dir, third], { kit: bare.kit }).status, 0, 'control: the unstubbed copy runs');
+    assert.equal(acornResolves(stubbed.kit), false, 'the stub stops the lookup');
+    expectNoAcornCli(stubbed.kit);
+  } finally { rmSync(parent, { recursive: true, force: true }); }
 });
