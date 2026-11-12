@@ -16,10 +16,9 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
 
 ## Waiting
 
-- `scripts/stability-measures.mjs`: the runner's Waiting reads `not measured: runner checkout
-  older than head` whenever the runner has had no commit since the head landing, even when the
-  checkout is current, since only the tip's time is compared. A review run at HEAD will often hit
-  it; settling it needs the runner fetched first or its upstream compared. (LIN-4420 leftovers.)
+- `scripts/stability-measures.mjs`: its reads (numstat flags, runner endpoint resolution, `gh`
+  listing) are witnessed only by the hand-run reproduction; a fixture-repo test would pin
+  `--diff-merges=first-parent` against silent undercount. (LIN-4420 review.)
 - `lib/account-erasure.js`: each collection should be declared once with all its facts
   (name, store module, erasure row, urlKey class, dry-run shape), and opening an
   undeclared name should fail. LIN-4234 gave both guards one source of collection names;

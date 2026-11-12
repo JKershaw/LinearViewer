@@ -31,7 +31,9 @@ const waitingAt = (repo, sha) => {
 const tryCount = (fn) => { try { return { count: fn() }; } catch (e) { return { reason: firstLine(e) }; } };
 
 // The runner's endpoints: the last first-parent commits on its checked-out branch at or before each repository
-// endpoint's commit time. A checkout whose tip predates the head endpoint cannot show what the runner had then.
+// endpoint's commit time. A tip older than the head endpoint is either a stale checkout or a current branch that has
+// had no commit since; origin tells them apart. The checkout is current when origin's branch tip is its own tip or
+// already contained in it; otherwise it cannot show what the runner had at head.
 function readRunner(dir, window) {
   const source = { dir };
   if (!dir) return { source, reading: { reason: 'no --runner given' } };
@@ -41,7 +43,20 @@ function readRunner(dir, window) {
     source.tip = resolveCommit(dir, 'HEAD');
     source.tipDate = commitDateOf(dir, source.tip);
     if (new Date(source.tipDate) < new Date(window.headDate)) {
-      return { source, reading: { reason: `runner checkout older than head (${source.branch} tip ${source.tipDate} < ${window.headDate})` } };
+      let remoteSha;
+      try {
+        remoteSha = git(dir, ['ls-remote', 'origin', `refs/heads/${source.branch}`]).trim().split(/\s+/)[0];
+        if (!remoteSha) throw new Error(`origin has no refs/heads/${source.branch}`);
+      } catch (e) {
+        return { source, reading: { reason: `runner freshness unreadable: ${firstLine(e)}` } };
+      }
+      // Exit 0: origin's tip is in the checkout. Any other exit (not an ancestor, or an object never fetched): stale.
+      const contained = remoteSha === source.tip
+        || spawnSync('git', ['-C', dir, 'merge-base', '--is-ancestor', remoteSha, 'HEAD'], { stdio: 'ignore' }).status === 0;
+      if (!contained) {
+        return { source, reading: { reason: `runner checkout older than head (${source.branch} tip ${source.tipDate} < ${window.headDate})` } };
+      }
+      source.upstreamSha = remoteSha;
     }
     const at = (date) => git(dir, ['rev-list', '-1', '--first-parent', `--before=${date}`, 'HEAD']).trim();
     source.baseSha = at(window.baseDate) || null;
