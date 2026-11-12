@@ -38,6 +38,9 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - A task timeline lane is running from the page's open session ids (`isOpenState`), never the
   cost row; a lineage's own `incomplete`, not the shared `lineagesTruncated`, decides "not
   complete" (LIN-4405, `lib/task-timeline.js`).
+- A test that dispatches a close-out passes a `closeOut` seam (`resolveProvider`): the readiness
+  guard reads comments for every close-out since LIN-4438, and without the seam it reaches the real
+  provider and fails open, a pass the hermetic watcher catches only in CI.
 - Close-out readiness has five lanes: the route (`codeRouteOf`), the stop-at state, the task page's
   box (`buildRunEvidence`) and both guard lanes (`closeOutNotReady`). A readiness rule goes in
   `closeOutWaitsOn` (`lib/run-closeout-state.js`) and gets a row in the shared-trail table
@@ -91,6 +94,5 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   (`tests/unit/lin-4438-blind-read-gate.test.js` rows 14 and 15): an audit report that re-cites a
   merged landing PR puts it in the notes PR's landing (`auditAfterLandingCloseOut` in
   `lib/recommendation-facts.js` treats only the new PR as the notes PR), and a foreign PR cited
-  before the first review joins a first landing (`isLandingEvidence` skew, the Survey-report entry
-  in llm-and-prompts). Each costs a read that must name an extra PR. One comment classifier and one
-  landing reader would make both follow from one rule. (LIN-4438; Survey global on LIN-4438.)
+  before the first review joins a first landing. Each costs a read that must name an extra PR. One
+  comment classifier and one landing reader would make both follow from one rule. (LIN-4438; Survey global on LIN-4438.)

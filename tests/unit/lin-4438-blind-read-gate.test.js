@@ -30,6 +30,7 @@ import { landingPrUrls } from '../../lib/run-ledger.js';
 import { assembleTrailFacts, isAgentNote, isPersonComment } from '../../lib/recommendation-facts.js';
 import { blindReadStep, BLIND_READ_ATTEMPT_BOUND } from '../../lib/recommendation-blind-read.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
+import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
 
 afterEach(() => { setFetchImpl(null); setPromptTraceRecorder(null); });
 
@@ -203,5 +204,20 @@ describe('the route\'s own edges', () => {
 
   test('the route reads the ledger whole: a read written before the review is not its read', () => {
     assert.equal(blindReadStep({ state: STARTED }, { comments: [summary(1), read(2, PR1), review(3)], allRuns: [] }).step, 'blind-read');
+  });
+});
+
+describe('a Survey report is not landing work, for the trail facts as for landingPrUrls (LIN-4438 leftovers)', () => {
+  const survey = (n) => c(n, `${SURVEY_HEADINGS['survey-task']}: LIN-1 @ abc123def\n\nAn earlier attempt is ${PR_OLD}; start from it.`);
+
+  test('a Survey after the review is not work after review, and the landing skips it', () => {
+    const comments = [summary(1), review(2), survey(3)];
+    assert.equal(assembleTrailFacts(comments, '', { leaf: false }).workAfterReview, false);
+    assert.deepEqual(landingPrUrls(comments), [PR1]);
+  });
+
+  test('a Survey after a plan-review verdict is not landed work', () => {
+    const verdict = c(1, '### Plan Review Verdict\n\n**Verdict:** Request Changes. 2 blocking findings.');
+    assert.equal(assembleTrailFacts([verdict, survey(2)], '').planReview.landed, null);
   });
 });
