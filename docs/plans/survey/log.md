@@ -3399,3 +3399,14 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **Why it counts:** that's A10's third Done-when ("the next changes in a busy area do some of its waiting work, so its list shrinks without entries being dropped or turned into tickets"), seen on the first build after A10 merged. One Lesson was added.
 - **~11:40 UTC: LIN-4414 (A10) Done, $25.7.** Blind reads CY (`2589ffd9`) and CZ (`3f7befeb`) are queued. They read both repos' merges together (`b349c219b` and SD `a42456c`).
 - **~11:41 UTC: lane 1's next task, LIN-4401 (A6), kicked off** with the usual goal (dispatch `8e5b97ce`). An outside-area find goes into that area's note rather than becoming a ticket, unless it breaks, blocks or touches safety. Lane 2 is still held on `lin4421-definition-cuts`.
+- **11:37–11:45 UTC: blind reads of A10 (LIN-4414): CY mixed, CZ mixed.** Both read LV `b349c219b` and SD `a42456c` together.
+  - **Better:** the notes README is now the one owner of the notes' rules, so Periodicals no longer repeat them. The `Retires:` wording sits in the shared leftover-words file under the retype guard. Every registry and doc that should know about the change does. Waiting entries were settled.
+  - **Worse:**
+    - `lessonsBytes` is a new section parser in both repos' tests, although `parseNote` in `lib/prompts/area-note-format.js` already reads sections.
+    - The file-path rule was copied from the area-notes test into `lib/dispatch-leftover-answer.js`, and the two copies already accept different extensions.
+    - The refusal function repeats the size-record one line for line.
+    - The new rule is written out in prose in 6 to 8 places, one just below SD's README line saying the leftover rule "is not restated here, where it would drift".
+    - CZ: "one owner for each piece of wording in code, but the prose is copied into every doc that mentions the subsystem, and nothing checks those copies."
+  - Neither reader could run the new route test (`express` wasn't installed in their clones).
+  - **For the gate:** this partly bears out John's over-complexity prediction. The mechanism works (the first witness this morning: −139), but it brought copies. The tally since 10 Nov is now 7 better, 5 mixed, 0 worse.
+- **11:43 UTC: ruling `lin4401-audit-cut` (A6, not blocking: resumable).** The after-merge audit files a ticket for every finding and has no branch to write a note on. What should it do with outside finds? I suggested **gate-notes-pr** (Harbour's own recommendation): the ask already settles it ("everywhere Harbour states it"; note unless it breaks, blocks or touches safety). A comment gives a find no home, and keep-filing contradicts the ask. **For the gate (false-escalation count):** a scope question that John's ask already answers.
