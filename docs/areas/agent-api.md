@@ -68,3 +68,7 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
 - `routes/proxy-model-routing.js`: with `modelRoutingProxyWrites` on (any member), every readWrite
   key, leaf workers' included, can set any harness or model workspace-wide; a non-`claude-code`
   harness puts later bootstraps inline. No runnable check; `urlKey` filters untested. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)
+- `routes/proxy.js`: a dispatch token can still GET ticket context (`/brief/`, `/issues/`, relations), because the proxy
+  does not know which stage a token was minted for. The blind read (LIN-4437) is blind by its prompt and preamble only: a
+  reader that ignores them can read the ask and the plan. Holding it needs the stage on the token and a read guard per
+  stage. By the consequence test it breaks nothing today, blocks no work and touches no safety. (LIN-4396 plan, witness 2.)

@@ -135,7 +135,7 @@ describe('run-view: progress over the fixed spine', () => {
     assert.equal(view.progress.mode, 'stages');
     assert.equal(view.progress.reached, 2);
     assert.equal(view.progress.total, SPINE.length);
-    assert.equal(view.progress.label, '2 of 4 stages');
+    assert.equal(view.progress.label, '2 of 5 stages');
     assert.equal(view.next, 'review');
   });
 
@@ -171,17 +171,17 @@ describe('run-view: progress over the fixed spine', () => {
     assert.ok(afterReview >= last);
   });
 
-  test('F1: a rework follow-up of implementation still running reads 2 of 4, not 1 of 4', () => {
+  test('F1: a rework follow-up of implementation still running reads 2 of 5, not 1 of 5', () => {
     const view = buildRunView(session([
       stage('plan'),
       stage('implementation'),
       loop({ loopId: 'impl-2', lineageId: 'loop-implementation', kind: 'implementation', followUpTo: 'loop-implementation', terminalStatus: null }),
     ]));
     assert.equal(view.progress.reached, 2);
-    assert.equal(view.progress.label, '2 of 4 stages');
+    assert.equal(view.progress.label, '2 of 5 stages');
   });
 
-  test('F1: a single-lineage stepped run with a running close-out reads 3 of 4, not 0 of 4', () => {
+  test('F1: a single-lineage stepped run with a running close-out reads 3 of 5, not 0 of 5, next close-out (not the blind read it passed, LIN-4437)', () => {
     const view = buildRunView(session([
       loop({ loopId: 'l1', lineageId: 'L', kind: 'plan' }),
       loop({ loopId: 'l2', lineageId: 'L', kind: 'implementation', followUpTo: 'l1' }),
@@ -189,23 +189,29 @@ describe('run-view: progress over the fixed spine', () => {
       loop({ loopId: 'l4', lineageId: 'L', kind: 'close-out', followUpTo: 'l3', terminalStatus: null }),
     ]));
     assert.equal(view.progress.reached, 3);
-    assert.equal(view.progress.label, '3 of 4 stages');
+    assert.equal(view.progress.label, '3 of 5 stages');
     assert.equal(view.next, 'close-out');
   });
 
-  test('C3: a terminal run whose last spine step is a finished review reads 3 of 4, next close-out', () => {
+  test('C3: a terminal run whose last spine step is a finished review reads 3 of 5, next the blind read (LIN-4437)', () => {
     const view = buildRunView(
       session([stage('plan'), stage('implementation'), stage('review')], { completedAt: '2026-07-20T11:00:00.000Z' }),
       { now: new Date('2026-07-20T12:00:00.000Z') }
     );
-    assert.equal(view.progress.label, '3 of 4 stages');
+    assert.equal(view.progress.label, '3 of 5 stages');
+    assert.equal(view.next, 'blind-read');
+  });
+
+  test('LIN-4437: a finished blind read reads 4 of 5, next close-out', () => {
+    const view = buildRunView(session([stage('plan'), stage('implementation'), stage('review'), stage('blind-read')]));
+    assert.equal(view.progress.label, '4 of 5 stages');
     assert.equal(view.next, 'close-out');
   });
 
-  test('a run finished through close-out reads 4 of 4 and no next', () => {
+  test('a run finished through close-out reads 5 of 5 and no next, the blind read passed by (LIN-4437)', () => {
     const view = buildRunView(session([stage('plan'), stage('implementation'), stage('review'), stage('close-out')]));
-    assert.equal(view.progress.reached, 4);
-    assert.equal(view.progress.label, '4 of 4 stages');
+    assert.equal(view.progress.reached, 5);
+    assert.equal(view.progress.label, '5 of 5 stages');
     assert.equal(view.next, null);
   });
 
@@ -225,7 +231,7 @@ describe('run-view: progress over the fixed spine', () => {
     ]));
     assert.equal(view.steps.length, 2);
     assert.equal(view.progress.reached, 0);
-    assert.equal(view.progress.label, '0 of 4 stages');
+    assert.equal(view.progress.label, '0 of 5 stages');
     assert.equal(view.next, 'plan');
   });
 });
@@ -239,7 +245,7 @@ describe('run-view: the number is withheld, never guessed, for non-task runs', (
     assert.equal(view.progress.reached, null);
     assert.equal(view.progress.label, "the step's own state");
     assert.equal(view.next, null);
-    assert.ok(!/\d of 4/.test(view.progress.label));
+    assert.ok(!/\d of 5/.test(view.progress.label));
   });
 
   test('a general goal-only session shows "N steps so far" and no next', () => {

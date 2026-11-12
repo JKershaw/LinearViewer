@@ -31,6 +31,7 @@ const MANDATE = {
   [WRITES.WORK]: 'Being dispatched here is your mandate for the reversible work — investigate, edit, open PRs, comment: do not hold your first call, or any call, waiting for a live reply before you start.',
   [WRITES.NONE]: 'Being dispatched here is a reading pass: investigate and read freely, but do not change code, branches, pull requests, tickets or Linear state, and post nothing to Linear unless the person asks; report your findings in this session, and do not hold your first call, or any call, waiting for a live reply before you start.',
   [WRITES.ONE_COMMENT]: 'Being dispatched here is a read-only stage: investigate and read freely, but do not change code, branches, pull requests, tickets or Linear state; your only write is one comment on the ticket named in your task, and do not hold your first call, or any call, waiting for a live reply before you start.',
+  [WRITES.BLIND_COMMENT]: 'Being dispatched here is a blind read: read the repository as your task says, and nothing on the tracker; do not change code, branches, pull requests, tickets or tracker state; your only write is one comment on the ticket named in your task, and do not hold your first call, or any call, waiting for a live reply before you start.',
   [WRITES.TICKET_FIELDS]: 'Being dispatched here is to triage the ticket named in your task: investigate freely, and you may change its labels, priority, state and project and comment on it. Do not change code, branches or pull requests, do not rewrite its description, do not create tickets or subtasks, and do not hold your first call, or any call, waiting for a live reply before you start.',
 };
 // LIN-4277: one literal lead-in (the two lines every closing opens with), then a tail per value. Written
@@ -40,6 +41,7 @@ const CLOSING_TAIL = {
   [WRITES.WORK]: 'a concise summary that\nnames concrete evidence: PR link, commit SHA, and CI/test result, so the\nreport carries proof rather than a bare "done".',
   [WRITES.NONE]: 'your findings and the sources they\ncame from, so the report carries proof rather than a bare "done".',
   [WRITES.ONE_COMMENT]: 'the link to the one comment you\nposted on the ticket named in your task, so the report carries proof rather than a bare "done".',
+  [WRITES.BLIND_COMMENT]: 'the link to the one comment you\nposted on the ticket named in your task, so the report carries proof rather than a bare "done".',
   [WRITES.TICKET_FIELDS]: 'each field change you made (field,\nbefore and after, and the reason), each change you intended but could not apply through the\nworkspace API, and the link to the comment you posted, if any, so the report carries proof\nrather than a bare "done".',
 };
 const CLOSING = Object.fromEntries(Object.entries(CLOSING_TAIL).map(([value, tail]) => [value, `${CLOSING_LEAD_IN}${tail}\n`]));
@@ -47,6 +49,7 @@ const CLOSING = Object.fromEntries(Object.entries(CLOSING_TAIL).map(([value, tai
 const PHRASES = {
   [WRITES.NONE]: { says: [/report your findings in this session/], closingSays: [/findings/] },
   [WRITES.ONE_COMMENT]: { says: [/your only write is one comment on the ticket named in your task/], closingSays: [/the one comment you/] },
+  [WRITES.BLIND_COMMENT]: { says: [/a blind read/, /nothing on the tracker/, /your only write is one comment on the ticket named in your task/], closingSays: [/the one comment you/] },
   [WRITES.TICKET_FIELDS]: {
     says: [/labels, priority, state and project/, /[Dd]o not change code, branches or pull requests/, /do not create tickets or subtasks/],
     closingSays: [/could not apply/],
@@ -148,7 +151,11 @@ describe('LIN-4251 — each non-work value gets its own mandate and closing, in 
         assert.ok(!block.includes('commit SHA'), 'no commit-SHA closing');
         assert.ok(!CLAUSE.test(block), 'the update-the-workspace clause is work\'s alone');
         const apiBase = tokenDelivery === 'mcp' ? '$HARBOUR_LOCAL_BASE' : BASE_URL;
-        assert.ok(block.includes(`Start from the distilled brief: GET ${apiBase}/api/proxy/brief/${ISSUE}`), 'brief line');
+        if (value === WRITES.BLIND_COMMENT) {
+          // LIN-4437: the blind read gets no brief, issue-detail or relations hint, only where its comment goes.
+          assert.ok(!block.includes('/brief/') && !block.includes('/issues/') && !block.includes('/relations/'), 'no ticket-read hint');
+          assert.ok(block.includes(`POST ${apiBase}/api/proxy/comments/${ISSUE}`), 'the comment destination');
+        } else assert.ok(block.includes(`Start from the distilled brief: GET ${apiBase}/api/proxy/brief/${ISSUE}`), 'brief line');
         assert.ok(block.includes(`Full endpoint catalog: GET ${apiBase}/api/proxy/instructions`), 'endpoint catalog line');
       });
     }
@@ -279,7 +286,9 @@ describe('LIN-4277 — a non-work block differs from the work block only in its 
     }
   });
 
-  for (const value of NON_WORK) {
+  // LIN-4437: blind-comment is not the work block less three things: its hints are replaced whole, so it
+  // names no ticket read. Its own describe below holds that, in every variant.
+  for (const value of NON_WORK.filter(v => v !== WRITES.BLIND_COMMENT)) {
     for (const tokenDelivery of ['prose', 'mcp']) {
       for (const variant of ENDPOINT_VARIANTS) {
         const label = `${variant.issueIdentifier ?? 'no issue'} ${JSON.stringify(variant.providerUi)} (${tokenDelivery})`;
@@ -293,6 +302,25 @@ describe('LIN-4277 — a non-work block differs from the work block only in its 
           assert.doesNotMatch(block, /update the workspace/, 'no update clause in any form');
         });
       }
+    }
+  }
+});
+
+describe('LIN-4437 — the blind read\'s block names no ticket read, in every endpoint-hint variant', () => {
+  for (const tokenDelivery of ['prose', 'mcp']) {
+    for (const variant of ENDPOINT_VARIANTS) {
+      const label = `${variant.issueIdentifier ?? 'no issue'} ${JSON.stringify(variant.providerUi)} (${tokenDelivery})`;
+      test(`blind-comment, ${label}: the work block with its hints replaced by the comment destination`, () => {
+        const block = build({ ...variant, tokenDelivery, writes: WRITES.BLIND_COMMENT });
+        const apiBase = tokenDelivery === 'mcp' ? '$HARBOUR_LOCAL_BASE' : BASE_URL;
+        for (const read of ['/brief/', '/issues/', '/relations', '/search', '/stack']) assert.ok(!block.includes(read), `no ${read} hint`);
+        assert.ok(block.includes(MANDATE[WRITES.BLIND_COMMENT]));
+        assert.ok(block.endsWith(CLOSING[WRITES.BLIND_COMMENT]));
+        assert.ok(block.includes(`Full endpoint catalog: GET ${apiBase}/api/proxy/instructions`), 'the catalog line stays');
+        if (variant.issueIdentifier) assert.ok(block.includes(`POST ${apiBase}/api/proxy/comments/${ISSUE}`) && block.includes(`${ISSUE} is where it goes, not something to read.`));
+        else assert.match(block, /Post your one comment where your task says; nothing on the tracker is yours to read\./);
+        assert.doesNotMatch(block, /update the workspace/);
+      });
     }
   }
 });
