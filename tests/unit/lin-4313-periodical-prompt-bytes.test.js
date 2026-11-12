@@ -45,6 +45,17 @@
  * no longer restates Waiting versus Lesson or the citation format (the notes' README owns them);
  * the gap-audit `notes` bound drops ", each note under its cap". The three advisory hashes are
  * unchanged, which is the witness that only the notes wording moved.
+ *
+ * LIN-4399 (LIN-4424) re-pinned stability-review only: it opens with a repository's committed
+ * declaration of its measures when one exists. One bullet joins its bullets (open the report with the
+ * declared rows, in their order and unit, beside the reference reading, read with the committed tool;
+ * endpoint totals allowed, "relative" governing the trajectory assessment; not measured, never
+ * estimated; a replaced ledger row closed as superseded; no declaration, discover as before), its
+ * orient sentence starts discovery with that declaration, and its run bullet's "introducing no new
+ * tooling" became "introducing no tooling beyond what the repo commits". The plain prompt grew 1,246
+ * bytes (12,468 to 13,714, +10.0%); the Mint + Autopilot one the same (13,799 to 15,045). The other 15
+ * hashes are unchanged, Drift & Coherence and Recent Headwinds keeping their own tooling phrase, which
+ * is the witness that only Stability moved.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -61,7 +72,7 @@ const PINNED = {
   "code-quality": { plain: "abd5a8e20c58eb6a80adddf2a05cfb3ebd6316ff40b77f6e1c1b8f89ebce6d71", autopilot: "cb9201327a36feac91dafa46447997ee5524da573d9894fc4324790a48900d4c" },
   "drift-coherence": { plain: "b6c5bd60af7cfdce8446f83639584f20687dca5f6d601a161e672f1758092918", autopilot: "6a47915883f0e77d5378b65a44efb1e8763a3b706720786d0eaa4d4c0d806250" },
   "comprehension-debt": { plain: "f22cb3bf0e1bf03d54d63f27435a6d913235198e583d2a42b308d57038bb8332", autopilot: "681c366ec8cef4d7545dade9eb81efd7613c097359a5ce5a78eee7c202b9dc14" },
-  "stability-review": { plain: "9a608db3da3b3a3928f3f6eeef85cdffd250dd3b6391ab2531e5994e9da9b3b8", autopilot: "ef27bd9cce7f1a0785d49687a729fd103042aeb620fe2ecf1a610ef5633d34ba" },
+  "stability-review": { plain: "8ab4e80235311f63c2839edbaad5f689d2aa8b53d33e1bc39986818ba39863e5", autopilot: "1914d2da61c3503b48be367557fe19c570a11324a3b332ca8303aa804b3b2529" },
   "dependency-supply-chain": { plain: "15599302b823251d60c119ea78f489ce21486959648d593a7884b563567a7f35", autopilot: "3290ee915f46c40febfdc5b9742570ff669cf6f583bd6ed59af11f55b46aba52" },
   "recent-headwinds": { plain: "30beb3d5b555c07e06f097b05f5313f46df6256a44022e9b0d31034cb0bbeb6d", autopilot: "f0f36cd876ba6b854a5b2518c593c91abe962dff4625e505271f0c4c4047ffe9" },
   "design-review": { plain: "cb655c359ea9874437d01843314a5dcb2213a5df39453d24543da18482a4dcdf", autopilot: "6191abd84f5c9fe4307dc483e75c191a081891a62027cef7c92c7b9a58af20bf" },

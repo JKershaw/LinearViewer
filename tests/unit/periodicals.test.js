@@ -803,6 +803,68 @@ describe('Stability Review specifics (LIN-453)', () => {
     assert.match(prompt, /threshold/i);
     assert.match(prompt, /shape/i);
   });
+
+  // LIN-4399 / LIN-4424: a repository may commit its own declaration of this review's measures
+  // (LinearViewer's is under docs/reviews/stability-measures/). The shared prompt defers to one
+  // without naming it: every workspace renders this text, so Harbour's paths, figures and ticket
+  // ids must never appear in it. Run against generatePrompt(), not withAutopilotTail(), whose
+  // tail carries an example ticket id on purpose.
+  const bulletLines = prompt.split('\n').filter(line => line.startsWith('- **'));
+  const declarationBullet = bulletLines.find(line => /declaration of this review's measures/.test(line)) || '';
+
+  test('LIN-4424: stays repo-neutral: no repo path, none of the 8 Nov figures or pins, no ticket id', () => {
+    assert.doesNotMatch(prompt, /\b(scripts|docs|lib)\//);
+    assert.doesNotMatch(prompt, /\bLIN-\d/);
+    const eightNovember = [
+      /1\.56k/, /2,390/, /\b830\b/, /0\.35\b/, /0\.36\b/, /206,78\d/, /207,338/, /82,1\d\d/, /8\.5\d\b/,
+      /\b66\b/, /\b56\b/, /1\.43\b/, /1\.67\b/, /\$24\b/, /14\.94/, /\b54 minutes/, /9574d537/, /5334c81a/
+    ];
+    for (const figure of eightNovember) assert.doesNotMatch(prompt, figure);
+  });
+
+  test('LIN-4424: opens with a committed declaration\'s rows, in its order and unit, beside its reference, read with its tool', () => {
+    assert.ok(declarationBullet, 'a bullet names a committed declaration of this review\'s measures');
+    assert.match(declarationBullet, /open the report/i);
+    assert.match(declarationBullet, /in its order and unit/i);
+    assert.match(declarationBullet, /reference reading/i);
+    assert.match(declarationBullet, /committed tool/i);
+    // The rows come before the severity-ranked findings, and the bullet before the report bullet.
+    assert.match(declarationBullet, /before the severity-ranked findings/i);
+    const reportIndex = bulletLines.findIndex(line => line.startsWith('- **Write an uncapped, trend-framed report.**'));
+    const runIndex = bulletLines.findIndex(line => line.startsWith('- **Run the review.**'));
+    const declarationIndex = bulletLines.indexOf(declarationBullet);
+    assert.ok(declarationIndex >= 0 && declarationIndex < runIndex && runIndex < reportIndex, 'declaration, then the trajectory assessment, then the report');
+    // A discovery hint that names no path.
+    assert.match(declarationBullet, /no path is written here/i);
+    assert.match(declarationBullet, /prior reports/i);
+  });
+
+  test('LIN-4424: declared endpoint totals are allowed; "relative" governs the trajectory assessment', () => {
+    assert.match(declarationBullet, /endpoint totals/i);
+    assert.match(declarationBullet, /relative[^.]*governs the trajectory assessment/i);
+  });
+
+  test('LIN-4424: an unreadable row is not measured with its reason; the run never estimates, but keeps a declared estimate', () => {
+    assert.match(declarationBullet, /not measured, with its reason/i);
+    assert.match(declarationBullet, /never estimate a value yourself/i);
+    assert.match(declarationBullet, /declaration itself defines as an estimate/i);
+  });
+
+  test('LIN-4424: a prior ledger row the declaration replaces closes as superseded', () => {
+    assert.match(declarationBullet, /superseded/i);
+  });
+
+  test('LIN-4424: a repo with no declaration is still told to discover its own sources', () => {
+    assert.match(declarationBullet, /with no declaration[^.]*discover/i);
+    assert.match(prompt, /Discover what trajectory data is available rather than assuming a source/);
+  });
+
+  test('LIN-4424: forbids tooling the review would write itself: only what the repo commits', () => {
+    assert.match(prompt, /introducing no tooling beyond what the repo commits/);
+    assert.doesNotMatch(prompt, /introducing no new tooling/);
+    assert.doesNotMatch(prompt, /not a metrics product\)/);
+    assert.match(prompt, /write no measuring tool of your own/i);
+  });
 });
 
 describe('Dependency & Supply-Chain Review specifics (LIN-371)', () => {
