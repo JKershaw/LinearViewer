@@ -1041,6 +1041,47 @@ describe('the CLI\'s reads, end to end on fixture repositories', () => {
       repo.cleanup(); runner.cleanup(); rmSync(fake, { recursive: true, force: true });
     }
   });
+
+  // LIN-4423 review, ledger item 1: the committed reference tests assert a static file, so this drives the code path that
+  // writes a reference (--as-reference) and reads it back beside the live rows (--reference). Seen red under each of: the
+  // CLI's refs forced to {}, the runner tip kept in a reference's output, sample and blind read live in reference mode.
+  test('--as-reference writes a reference reading that --reference reads back beside each live row', () => {
+    const repo = makeRepo();
+    const runner = makeRepo();
+    const fake = mkdtempSync(join(tmpdir(), 'stability-gh-'));
+    try {
+      const base = repo.commit({ 'lib/a.js': 'const a = 1;\nconst b = 2;\n', 'docs/areas/x.md': note(1) }, at(1), 'base');
+      const head = repo.commit({ 'lib/b.js': 'export const b = 1;\n', 'lib/a.js': 'const a = 1;\n', 'docs/areas/x.md': note(2) }, at(2), 'LIN-1: add b (#1)');
+      runner.commit({ 'docs/areas/r.md': note(1) }, at(1), 'r1');
+      runner.commit({ 'docs/areas/r.md': note(3) }, at(5), 'r2 (after head: the tip a live reading records)');
+      writeFileSync(join(fake, 'gh'), '#!/bin/sh\necho "[]"\n');
+      chmodSync(join(fake, 'gh'), 0o755);
+      const cli = (...args) => {
+        const r = spawnSync(process.execPath, [join(ROOT, 'scripts/stability-measures.mjs'), repo.dir, base, head, '--runner', runner.dir, ...args],
+          { encoding: 'utf8', env: { ...process.env, HARBOUR_LOCAL_BASE: '', PATH: `${fake}${delimiter}${process.env.PATH}` } });
+        assert.strictEqual(r.status, 0, r.stderr);
+        return { out: JSON.parse(r.stdout), stdout: r.stdout, stderr: r.stderr };
+      };
+
+      const first = cli('--as-reference', 'fix');
+      const refRows = rowsOf(first.out);
+      for (const key of NO_REFERENCE_KEYS) {
+        assert.deepStrictEqual([refRows[key].status, refRows[key].reason], [STATUS.NOT_MEASURED, noReferenceReading('fix')], key);
+      }
+      for (const k of ['tip', 'tipDate', 'upstreamSha']) assert.ok(!(k in first.out.sources.runner), k);
+      assert.ok(!('calls' in first.out.sources.tracker));
+
+      const file = join(fake, 'reference.json');
+      writeFileSync(file, first.stdout);
+      const second = cli('--reference', file);
+      const rows = rowsOf(second.out);
+      assert.deepStrictEqual(rows.churn.reference, { label: 'fix', status: STATUS.MEASURED, value: refRows.churn.value, reason: null, unreadable: 0 });
+      assert.strictEqual(rows.sample.reference.reason, noReferenceReading('fix'));
+      assert.match(second.stderr, /\n {20}fix: \d/);
+    } finally {
+      repo.cleanup(); runner.cleanup(); rmSync(fake, { recursive: true, force: true });
+    }
+  });
 });
 
 test('the lookback reads the first-parent landings of the days before base, base included, and no older', async () => {
