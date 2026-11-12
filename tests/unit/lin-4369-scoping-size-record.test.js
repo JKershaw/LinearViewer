@@ -12,7 +12,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { generatePrompt } from '../../lib/prompt-templates.js';
-import { SURVEY_HEADINGS } from '../../lib/prompt-template-defs.js';
+import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
 import { CUT } from '../../lib/prompts/stage-intent.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 import { AS_ASKED_HEADING } from '../../lib/as-asked.js';

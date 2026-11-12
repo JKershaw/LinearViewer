@@ -99,3 +99,7 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   (`scripts/survey-growth-git.mjs`, `scripts/survey-halving-git.mjs`,
   `scripts/survey-tests-friction-git.mjs`), so the rule is spelled four ways. Importing
   `landingPr` would make it one, at the cost of re-checking their frozen survey counts. (LIN-4439 leftovers.)
+- `scripts/stability-measures-blind.mjs`: `GATE_LANDING` hard-codes the gate's merge commit, PR
+  and time as measure 1's cut-off, and `repoSlugOf` is another GitHub-URL parser beside `prOf`
+  (`lib/run-ledger.js`). Taking the cut-off from data needs a decision about where the gate's start
+  is recorded; the parser could fold in with it. (Blind read on LIN-4396.)
