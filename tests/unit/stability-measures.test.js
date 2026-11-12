@@ -8,9 +8,12 @@
 // LIN-4422: measure 1 (the shared Balance-to-sign rule against the paper's frozen codes, the fixed sample, the tally)
 // and measure 4 (loop rulings, origin not measured, the operator-free upper bound read from every lineage member's
 // feedback), and the seat read end to end through the same fake proxy.
+// LIN-4423: the reference reading (referencesFrom, the table's reference line, the CLI's refusals), the committed 8 Nov
+// reference against piece 1's verified figures, and the declaration naming every measure and row the tool emits.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { ROOT } from './helpers/area-registry.js';
 import { analyse } from '../../scripts/code-shape/shape-core.mjs';
@@ -18,8 +21,9 @@ import { measureShape } from '../../scripts/code-shape/shape-report.mjs';
 import { compileScope } from '../../scripts/code-shape/code-shape-lib.mjs';
 import { NOT_NOTES, countWaiting, parseNote } from '../../lib/prompts/area-note-format.js';
 import {
-  MINTED_NOT_SUPPLIED, NOT_BUILT, SCOPE_INCLUDE, STATUS, buildReading, churnRow, ciRow, costRow, firstDispatchOf, formatTable,
-  idSpanSearch, landingOwners, linesRow, mintedRow, notMeasured, ownTicket, parseLandingLog, parseNumstat, row, selectFinished,
+  MEASURES, MINTED_NOT_SUPPLIED, NOT_BUILT, NO_REFERENCE_KEYS, SCOPE_INCLUDE, STATUS, buildReading, churnRow, ciRow, costRow, firstDispatchOf, formatTable,
+  idSpanSearch, landingOwners, linesRow, mintedRow, noReferenceReading, notMeasured, ownTicket, parseLandingLog, parseNumstat,
+  referencesFrom, row, selectFinished,
   sessionsOf, speedRow, tasksRow, waitingRow, waitingRows,
 } from '../../scripts/stability-measures-core.mjs';
 import { DISPATCH_LIST_LIMIT, createProxyClient, readSeat, readTracker, retryAfterMs, trackerNotMeasured } from '../../scripts/stability-measures-tracker.mjs';
@@ -852,5 +856,112 @@ describe('the seat read end to end, through a fake proxy', () => {
     const rows = trackerNotMeasured('no --api given and HARBOUR_LOCAL_BASE unset');
     const reading = buildReading({ window: {}, rows: { seat: rows.seat } });
     assert.deepStrictEqual(reading.measures[3].rows.map((r) => r.reason), ['no --api given and HARBOUR_LOCAL_BASE unset', ORIGIN_UNREADABLE, 'no --api given and HARBOUR_LOCAL_BASE unset']);
+  });
+});
+
+// ── LIN-4423: the reference reading and the declaration ──────────────────────
+// The reference is written by the tool itself (--as-reference) and read back by it (--reference), so every value beside
+// a live row has that row's definition. The committed 8 Nov reading must reproduce piece 1's verified figures, and the
+// declaration must name every row the tool emits, so a renamed row or measure cannot drift past it unnoticed.
+const DECLARATION_DIR = join(ROOT, 'docs/reviews/stability-measures');
+const REFERENCE = JSON.parse(readFileSync(join(DECLARATION_DIR, 'reference-2026-11-08.json'), 'utf8'));
+const DECLARATION = readFileSync(join(DECLARATION_DIR, 'README.md'), 'utf8');
+const rowsOf = (reading) => Object.fromEntries(reading.measures.flatMap((m) => m.rows.map((r) => [r.key, r])));
+
+describe('the reference: written and read by the tool, never another definition', () => {
+  const window = { base: 'b'.repeat(40), head: 'h'.repeat(40), baseDate: '2026-11-08T17:10:36Z', headDate: '2026-11-12T17:00:00Z', landings: 10 };
+  const reference = (rows, extra = {}) => ({
+    tool: 'stability-measures', reference: { label: '8 Nov' }, scope: { include: SCOPE_INCLUDE }, measures: [{ key: 'curve', rows }], ...extra,
+  });
+
+  test('referencesFrom keys each reference row by its row key, carrying the label, status, value and reason', () => {
+    const churn = churnRow(parseNumstat('@a\n\n3\t1\tlib/x.js'), inScope);
+    const refs = referencesFrom(reference([churn, notMeasured('blind', noReferenceReading('8 Nov'))]));
+    assert.deepStrictEqual(refs.churn, { label: '8 Nov', status: STATUS.MEASURED, value: churn.value, reason: null, unreadable: 0 });
+    assert.deepStrictEqual(refs.blind, { label: '8 Nov', status: STATUS.NOT_MEASURED, value: null, reason: 'no 8 Nov reading; the first reading sets it', unreadable: null });
+  });
+
+  test('a file that is not this tool\'s reference reading, or counts lines on another scope, is refused', () => {
+    assert.throws(() => referencesFrom({ tool: 'shape' }), /not a stability-measures reading/);
+    assert.throws(() => referencesFrom({ ...reference([]), reference: undefined }), /not a reference reading/);
+    assert.throws(() => referencesFrom(reference([], { scope: { include: '^lib/' } })), /another scope/);
+  });
+
+  test('the opening table prints each reference under its live row, summarised by the row\'s own rule', () => {
+    const live = churnRow(parseNumstat('@a\n\n9\t3\tlib/x.js'), inScope);
+    const refs = referencesFrom(reference([churnRow(parseNumstat('@a\n\n3\t1\tlib/x.js'), inScope), notMeasured('blind', noReferenceReading('8 Nov'))]));
+    const table = formatTable(buildReading({
+      window,
+      rows: { curve: [churnRow(parseNumstat('@a\n\n9\t3\tlib/x.js'), inScope, { reference: refs.churn })], 'no-new-mess': [blindRow({ sample: notMeasured('sample', 'x'), signs: null, reference: refs.blind })] },
+    }));
+    assert.match(table, new RegExp(`churn +${live.value.added} added.*\\n {20}8 Nov: 3 added, 1 deleted over 1 landings`));
+    assert.match(table, /blind +not measured: no sample: x\n {20}8 Nov: not measured: no 8 Nov reading; the first reading sets it/);
+  });
+
+  test('the CLI refuses a reference reading read against a reference, and a --reference that is not one, before any read', () => {
+    const cli = (...args) => spawnSync(process.execPath, ['scripts/stability-measures.mjs', '.', 'HEAD', 'HEAD', ...args], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, HARBOUR_LOCAL_BASE: '' } });
+    const both = cli('--as-reference', '8 Nov', '--reference', 'docs/reviews/stability-measures/reference-2026-11-08.json');
+    assert.strictEqual(both.status, 2);
+    assert.match(both.stderr, /give --reference or --as-reference, not both/);
+    const wrong = cli('--reference', 'package.json');
+    assert.strictEqual(wrong.status, 2);
+    assert.match(wrong.stderr, /--reference package\.json is not a stability-measures reading/);
+  });
+});
+
+describe('the committed 8 Nov reference reproduces the verified figures', () => {
+  const rows = rowsOf(REFERENCE);
+
+  test('window 5334c81a..9574d537 (run 4\'s pin to run 5\'s), 114 landings, written as the 8 Nov reference', () => {
+    assert.strictEqual(REFERENCE.window.base.slice(0, 8), '5334c81a');
+    assert.strictEqual(REFERENCE.window.head.slice(0, 8), '9574d537');
+    assert.strictEqual(REFERENCE.window.landings, 114);
+    assert.strictEqual(REFERENCE.reference.label, '8 Nov');
+    assert.deepStrictEqual(REFERENCE.measures.map((m) => m.title), MEASURES.map((m) => m.title));
+  });
+
+  test('lines: net 6,558 = code +3,034, comment-only +3,185, blank +339; share 39.44% → 39.73%', () => {
+    const { net, base, head } = rows.lines.value;
+    assert.deepStrictEqual([net.total, net.code, net.comment, net.blank], [6558, 3034, 3185, 339]);
+    assert.deepStrictEqual([base.commentShare, head.commentShare], [39.44, 39.73]);
+  });
+
+  test('churn 0.36 deleted per added; Waiting 0 → 56 in Harbour and 10 in the runner at 5d8489e', () => {
+    assert.strictEqual(rows.churn.value.deletedPerAdded, 0.36);
+    assert.deepStrictEqual([rows['waiting.harbour'].value.base, rows['waiting.harbour'].value.head], [0, 56]);
+    assert.strictEqual(rows['waiting.runner'].value.head, 10);
+    assert.strictEqual(rows['waiting.runner'].value.headSha.slice(0, 7), '5d8489e');
+  });
+
+  test('the blind-read and seat rows say the starting point had none; every other row was measured', () => {
+    for (const key of NO_REFERENCE_KEYS) {
+      assert.deepStrictEqual([rows[key].status, rows[key].reason], [STATUS.NOT_MEASURED, noReferenceReading('8 Nov')], key);
+    }
+    for (const [key, r] of Object.entries(rows).filter(([k]) => !NO_REFERENCE_KEYS.includes(k))) assert.strictEqual(r.status, STATUS.MEASURED, key);
+  });
+
+  test('no session-local diagnostic is committed: no proxy URL, no call counts, no runner tip', () => {
+    assert.strictEqual(REFERENCE.inputs.api, '$HARBOUR_LOCAL_BASE/api/proxy');
+    assert.ok(!('calls' in REFERENCE.sources.tracker));
+    for (const k of ['tip', 'tipDate', 'upstreamSha']) assert.ok(!(k in REFERENCE.sources.runner), k);
+    assert.match(REFERENCE.sources.tracker.readOn, /^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe('the declaration names what the tool emits', () => {
+  test('every measure title, in order, and every row key the reference carries', () => {
+    let at = 0;
+    for (const m of MEASURES) {
+      const i = DECLARATION.indexOf(`${m.rank}. ${m.title}`, at);
+      assert.ok(i >= at, `README names "${m.rank}. ${m.title}" after the measure before it`);
+      at = i;
+    }
+    for (const key of Object.keys(rowsOf(REFERENCE))) assert.ok(DECLARATION.includes(`\`${key}\``), `README names row \`${key}\``);
+  });
+
+  test('every scripts/ or lib/ module it cites exists', () => {
+    const cited = [...DECLARATION.matchAll(/`((?:scripts|lib)\/[\w./-]+\.m?js)`/g)].map((m) => m[1]);
+    assert.ok(cited.length >= 5, 'the declaration points at the defining modules');
+    for (const p of new Set(cited)) assert.ok(existsSync(join(ROOT, p)), p);
   });
 });

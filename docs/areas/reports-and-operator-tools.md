@@ -40,6 +40,12 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   commit is credited to one ticket only through `ownTicket`; `scripts/delivery-composition.mjs`
   uses it too since LIN-4422 (its weekly ticket counts since 1 Oct moved by 1 to 5: down in
   five weeks, up 1 in one) (LIN-4422 leftovers).
+- A reference beside a live stability row comes only from a reading the tool wrote itself
+  (`--as-reference <label>`) and reads back (`--reference`; `referencesFrom` refuses another
+  scope), so both share one definition. The ask's per-day 8 Nov figures stay quoted in
+  `docs/reviews/stability-measures/README.md`, never in a reference slot. Rows a starting point
+  never had are written `no <label> reading`, not read today and passed off as then, and the
+  README names every field a re-run may change; a new live field joins that list (LIN-4423).
 
 ## Waiting
 

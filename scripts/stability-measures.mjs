@@ -15,6 +15,13 @@
 // Measure 1 needs no proxy: the sample of ordinary landings comes from git (scripts/stability-measures-blind.mjs).
 // Without --blind the tally reads `pending blind reads`; --blind <signs.json> (full sha → that reader's Balance cell,
 // verbatim) gives the neutral-or-better share, the number read worse and the mean sign.
+// LIN-4423, the reference: --as-reference <label> writes a reference reading of an earlier window. Its blind-read and
+// seat rows read `no <label> reading; the first reading sets it` (the seat is not read, saving its ~1,700 calls), and
+// the session-local diagnostics that would differ on a re-run are left out (the runner tip and freshness check's
+// upstream sha, and the proxy call counts), so re-running it gives the same bytes apart from the live rows the
+// declaration names. --reference <file> reads a committed reference reading back and prints each of its rows under the
+// live row with the same key; the file must count lines on this tool's scope. The declaration that says which
+// reference a review uses, and how a review picks its window, is docs/reviews/stability-measures/README.md.
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -24,12 +31,13 @@ import {
 } from './code-shape/code-shape-lib.mjs';
 import { NOTES_DIR, countWaiting } from '../lib/prompts/area-note-format.js';
 import {
-  SCOPE_INCLUDE, buildReading, churnRow, ciRow, formatTable, linesRow, notMeasured, parseLandingLog, parseNumstat, waitingRows,
+  NO_REFERENCE_KEYS, SCOPE_INCLUDE, buildReading, churnRow, ciRow, formatTable, linesRow, noReferenceReading, notMeasured, parseLandingLog, parseNumstat,
+  referencesFrom, waitingRows,
 } from './stability-measures-core.mjs';
 import { createProxyClient, firstLine, readSeat, readTracker, trackerNotMeasured } from './stability-measures-tracker.mjs';
 import { blindRow, sampleRow } from './stability-measures-blind.mjs';
 
-const USAGE = 'usage: node scripts/stability-measures.mjs <repo> <base> <head> [--runner <dir>] [--api <base>] [--lookback-days <n>] [--blind <signs.json>]';
+const USAGE = 'usage: node scripts/stability-measures.mjs <repo> <base> <head> [--runner <dir>] [--api <base>] [--lookback-days <n>] [--blind <signs.json>] [--reference <file> | --as-reference <label>]';
 const DEFAULT_LOOKBACK_DAYS = 3;
 const LANDING_FORMAT = '--format=%H%x1f%cI%x1f%s%x1f%b%x1e';
 const GH_LIMIT = 1000;
@@ -108,20 +116,22 @@ function readCiRuns(repo, window) {
 // and marked Done after it (close-out runs after the merge), which finish in this window (LIN-4421 ruling). Older
 // landings are not read: a ticket whose only landings predate the lookback and that finished here is not counted.
 // The seat is read over the same finished tasks with the same client, so its calls share the one pacing budget.
-async function readTrackerRows(repo, api, window, lookbackDays, windowLog) {
+// With readSeatRows false (a reference reading) the seat is not read and `rows.seat` is left to the caller.
+async function readTrackerRows(repo, api, window, lookbackDays, windowLog, { references = {}, readSeatRows = true } = {}) {
   const lookback = { days: lookbackDays, since: new Date(new Date(window.baseDate).getTime() - lookbackDays * 86400e3).toISOString() };
-  if (!api) return { lookback, rows: trackerNotMeasured('no --api given and HARBOUR_LOCAL_BASE unset') };
-  if (windowLog.reason) return { lookback, rows: trackerNotMeasured(`landing log unreadable: ${windowLog.reason}`) };
+  if (!api) return { lookback, rows: trackerNotMeasured('no --api given and HARBOUR_LOCAL_BASE unset', references) };
+  if (windowLog.reason) return { lookback, rows: trackerNotMeasured(`landing log unreadable: ${windowLog.reason}`, references) };
   let priorLandings;
   try {
     priorLandings = parseLandingLog(git(repo, ['log', '--first-parent', LANDING_FORMAT, `--since=${lookback.since}`, window.base]));
   } catch (e) {
-    return { lookback, rows: trackerNotMeasured(`landing log unreadable: ${firstLine(e)}`) };
+    return { lookback, rows: trackerNotMeasured(`landing log unreadable: ${firstLine(e)}`, references) };
   }
   const client = createProxyClient({ base: api });
-  const tracker = await readTracker({ client, windowLandings: windowLog.landings, priorLandings, window, lookback });
+  const tracker = await readTracker({ client, windowLandings: windowLog.landings, priorLandings, window, lookback, references });
   if (!tracker.selection) return { lookback, rows: tracker.rows, stats: tracker.stats, priorLandings: priorLandings.length };
-  const seat = await readSeat({ client, finished: tracker.selection.finished, tasks: tracker.tasks });
+  if (!readSeatRows) return { lookback, rows: tracker.rows, stats: client.stats, priorLandings: priorLandings.length };
+  const seat = await readSeat({ client, finished: tracker.selection.finished, tasks: tracker.tasks, references });
   return { lookback, rows: { ...tracker.rows, seat: seat.rows }, stats: client.stats, priorLandings: priorLandings.length };
 }
 
@@ -138,8 +148,19 @@ function readSigns(file) {
   }
 }
 
+// The reference slots for --reference: a file that cannot be read or is not a matching reference reading stops the run,
+// because printing nothing beside the rows would look like a reading with no reference asked for.
+function readReferences(file) {
+  if (file == null) return {};
+  let json;
+  try { json = JSON.parse(readFileSync(resolve(file), 'utf8')); } catch (e) { throw new UsageError(`--reference ${file}: ${firstLine(e)}`); }
+  try { return referencesFrom(json, { file }); } catch (e) { throw new UsageError(`--reference ${firstLine(e)}`); }
+}
+
 await runCli(async () => {
-  const { positional, flags } = parseArgs(process.argv.slice(2), { '--runner': 'value', '--api': 'value', '--lookback-days': 'value', '--blind': 'value' });
+  const { positional, flags } = parseArgs(process.argv.slice(2), {
+    '--runner': 'value', '--api': 'value', '--lookback-days': 'value', '--blind': 'value', '--reference': 'value', '--as-reference': 'value',
+  });
   const [repoArg, baseArg, headArg] = positional;
   if (!repoArg || !baseArg || !headArg || positional.length > 3) throw new UsageError(USAGE);
   const repo = resolve(repoArg);
@@ -147,6 +168,12 @@ await runCli(async () => {
   const api = flags['--api'] ?? (process.env.HARBOUR_LOCAL_BASE ? `${process.env.HARBOUR_LOCAL_BASE}/api/proxy` : null);
   const lookbackDays = flags['--lookback-days'] == null ? DEFAULT_LOOKBACK_DAYS : Number(flags['--lookback-days']);
   if (!Number.isFinite(lookbackDays) || lookbackDays < 0) throw new UsageError(`--lookback-days must be a number of days, 0 or more\n${USAGE}`);
+  const asReference = flags['--as-reference'] ?? null;
+  if (asReference != null && !asReference.trim()) throw new UsageError(`--as-reference needs a label, such as '8 Nov'\n${USAGE}`);
+  if (asReference != null && flags['--reference'] != null) throw new UsageError(`a reference reading is not read against another reference: give --reference or --as-reference, not both\n${USAGE}`);
+  if (asReference != null && flags['--blind'] != null) throw new UsageError(`a reference reading has no blind read (its blind rows read "${noReferenceReading(asReference)}"): drop --blind\n${USAGE}`);
+  const refs = readReferences(flags['--reference']);
+  const noReading = (key) => notMeasured(key, noReferenceReading(asReference), { reference: refs[key] });
 
   const base = resolveCommit(repo, baseArg);
   const head = resolveCommit(repo, headArg);
@@ -164,7 +191,7 @@ await runCli(async () => {
     return { totals: report.totals, parseFailures: report.scope.parseFailures.length };
   };
   let lines;
-  try { lines = linesRow({ base: shapeAt(base), head: shapeAt(head), landings: landings.length }); } catch (e) { lines = notMeasured('lines', `shape read failed: ${firstLine(e)}`); }
+  try { lines = linesRow({ base: shapeAt(base), head: shapeAt(head), landings: landings.length, reference: refs.lines }); } catch (e) { lines = notMeasured('lines', `shape read failed: ${firstLine(e)}`, { reference: refs.lines }); }
 
   const ci = readCiRuns(repo, window);
   const runner = readRunner(runnerDir, window);
@@ -172,36 +199,62 @@ await runCli(async () => {
   // The window's landing log (subjects and bodies), read once: the sample's ticket owners and the tracker's.
   let windowLog;
   try { windowLog = { landings: parseLandingLog(git(repo, ['log', '--first-parent', LANDING_FORMAT, `${base}..${head}`])) }; } catch (e) { windowLog = { reason: firstLine(e) }; }
-  const sample = windowLog.reason ? notMeasured('sample', `landing log unreadable: ${windowLog.reason}`) : sampleRow({ landings: windowLog.landings, numstat: landings });
-  const blind = blindRow({ sample, signs: readSigns(flags['--blind']) });
-  const tracker = await readTrackerRows(repo, api, window, lookbackDays, windowLog);
+  let sample;
+  let blind;
+  if (asReference != null) {
+    [sample, blind] = [noReading('sample'), noReading('blind')];
+  } else {
+    sample = windowLog.reason ? notMeasured('sample', `landing log unreadable: ${windowLog.reason}`, { reference: refs.sample }) : sampleRow({ landings: windowLog.landings, numstat: landings, reference: refs.sample });
+    blind = blindRow({ sample, signs: readSigns(flags['--blind']), reference: refs.blind });
+  }
+  const tracker = await readTrackerRows(repo, api, window, lookbackDays, windowLog, { references: refs, readSeatRows: asReference == null });
+  const seat = asReference != null ? ['rulings', 'origin', 'operator-free'].map(noReading) : tracker.rows.seat;
 
   const reading = buildReading({
     window,
+    references: refs,
     rows: {
       curve: [
         lines,
-        churnRow(landings, inScope),
-        ciRow({ runs: ci.runs, reason: ci.reason, landingShas: landings.map((l) => l.commit), listingCapped: ci.listingCapped }),
-        ...waitingRows({ harbour, runner: runner.reading, landings: landings.length }),
+        churnRow(landings, inScope, { reference: refs.churn }),
+        ciRow({ runs: ci.runs, reason: ci.reason, landingShas: landings.map((l) => l.commit), listingCapped: ci.listingCapped, reference: refs.ci }),
+        ...waitingRows({ harbour, runner: runner.reading, landings: landings.length, references: refs }),
         tracker.rows.minted,
       ],
       'no-new-mess': [sample, blind],
       speed: [tracker.rows.tasks, tracker.rows.speed],
-      seat: tracker.rows.seat,
+      seat,
       cost: [tracker.rows.cost],
     },
   });
+
+  // The runner's tip, its date and the freshness check's upstream sha move with every runner commit, and the proxy's
+  // call counts and waits with wall-clock pacing: a live reading keeps them, a reference reading leaves them out.
+  const { tip, tipDate, upstreamSha, ...runnerEndpoints } = runner.source;
 
   emitJson({
     tool: 'stability-measures',
     repo: repoArg,
     scope: { include: SCOPE_INCLUDE, exclude: DEFAULT_EXCLUDE },
-    inputs: { runner: flags['--runner'] ?? null, api, lookbackDays, blind: flags['--blind'] ?? null },
+    ...(asReference != null ? { reference: { label: asReference, noReading: NO_REFERENCE_KEYS } } : {}),
+    // Inputs as given: --api's default is recorded as the variable it came from, not the session's local URL.
+    inputs: {
+      runner: flags['--runner'] ?? null,
+      api: flags['--api'] ?? (api ? '$HARBOUR_LOCAL_BASE/api/proxy' : null),
+      lookbackDays,
+      blind: flags['--blind'] ?? null,
+      reference: flags['--reference'] ?? null,
+    },
     sources: {
-      runner: { ...runner.source, dir: flags['--runner'] ?? null },
+      runner: { ...(asReference != null ? runnerEndpoints : runner.source), dir: flags['--runner'] ?? null },
       ci: { workflow: 'test.yml', branch: 'main', created: ci.created ?? null },
-      tracker: { lookback: tracker.lookback, priorLandings: tracker.priorLandings ?? null, calls: tracker.stats ?? null },
+      tracker: {
+        // The UTC day the tracker was read: its rows are that day's tracker, whatever the window.
+        readOn: api ? new Date().toISOString().slice(0, 10) : null,
+        lookback: tracker.lookback,
+        priorLandings: tracker.priorLandings ?? null,
+        ...(asReference != null ? {} : { calls: tracker.stats ?? null }),
+      },
     },
     ...reading,
   });
