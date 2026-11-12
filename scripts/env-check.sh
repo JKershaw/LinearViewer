@@ -17,7 +17,8 @@ ready=()
 
 # --- Collect check results ---
 
-# Check Node.js (required major comes from .nvmrc, the single pin — LIN-3788)
+# Check Node.js. The floor is the .nvmrc major, which CI tests and devEngines.runtime pins for
+# production; engines.node accepts it and newer (LIN-3788, LIN-4419; tied by node-version-pin.test.js).
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 required_major=$(tr -d '[:space:]v' < "$repo_root/.nvmrc" 2>/dev/null | cut -d. -f1)
 if command -v node &> /dev/null; then
