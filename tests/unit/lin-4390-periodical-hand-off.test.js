@@ -93,7 +93,7 @@ test('close-out merges, then sets the task Done and posts the final summary', ()
 
 test('review approves but does not merge or mark Done', () => {
   const { prompt } = generatePrompt('review', ISSUE, {});
-  assert.match(prompt, /You do NOT merge, mark the task Done, or file follow-ups — the `close-out` step does/);
+  assert.match(prompt, /You do NOT merge, mark the task Done, or file the gate's tickets — the `close-out` step does/);
 });
 
 test('every dispatched session, a Periodical run included, reads that merge and Done are gated on review', () => {

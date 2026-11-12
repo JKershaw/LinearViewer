@@ -76,14 +76,14 @@ describe('close-out: writes review\'s note entries and states the one-home rule 
 
   test('the note entries are written on the PR branch before the merge, alongside the fixes', () => {
     const fixes = section(prompt, 'Make the Fixes Review Asked For');
-    assert.match(fixes, /Write each note entry review named into its area's `docs\/areas\/<slug>\.md` on the PR branch the same way, before the merge\./);
-    assert.match(prompt, /Make the fixes and write the note entries review asked for/, 'Workflow step 2 names them');
+    assert.match(fixes, /Write each note entry review named, in its own area or another, into that area's `docs\/areas\/<slug>\.md` on the PR branch the same way, before the merge\./);
+    assert.match(prompt, /Make the fixes and write every note entry review named/, 'Workflow step 2 names them');
   });
 
   test('Follow-up Triage states the one-home rule in the shared words, and close-out stays the only filer', () => {
     const triage = section(prompt, 'Follow-up Triage');
     assert.ok(triage.includes(LEFTOVER_RULE), 'renders LEFTOVER_RULE verbatim');
-    assert.match(triage, /Only outside items are filed here/);
+    assert.match(triage, /Only the gate's tickets are filed here/);
   });
 
   test('the prune still keeps the size record word for word (LIN-4368)', () => {
@@ -120,7 +120,7 @@ describe('the leftover heading and rule have one spelling each (LIN-4374, LIN-43
   });
 
   // Distinctive pieces of the rule, and the retirement words (LIN-4414): a file that retypes any of them restates it.
-  const RULE_PIECES = [LEFTOVER_RULE, 'a note is known but not scheduled', 'a follow-up only close-out files', RETIRES_LABEL, RETIRES_NONE.noWaiting, RETIRES_NONE.nothingFixSized];
+  const RULE_PIECES = [LEFTOVER_RULE, 'a note is known but not scheduled', 'or a ticket the consequence test sends', 'Consequence test for an outside find:', RETIRES_LABEL, RETIRES_NONE.noWaiting, RETIRES_NONE.nothingFixSized];
 
   test('no other file in lib/ or routes/ spells the heading, the rule or the retirement words', () => {
     const offenders = [];

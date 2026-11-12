@@ -15,8 +15,10 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 import * as words from '../../lib/prompts/leftover-words.js';
-import { generatePrompt } from '../../lib/prompt-templates.js';
+import { generatePrompt, PROMPT_TEMPLATES } from '../../lib/prompt-templates.js';
 import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
+import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
+import { buildAutopilotKickoff } from '../../lib/prompts/autopilot-kickoff.js';
 
 const CONSEQUENCE_TEST = typeof words.CONSEQUENCE_TEST === 'string' ? words.CONSEQUENCE_TEST : '';
 
@@ -70,4 +72,74 @@ describe('(ii) the gate names what makes a find a ticket, and the four kinds of 
       assert.match(CONSEQUENCE_TEST, re, `CONSEQUENCE_TEST should name: ${label}`);
     });
   }
+});
+
+/** The text from a `### ` heading to the next `### ` or `## ` heading. */
+function section(prompt, heading) {
+  const start = prompt.indexOf(`### ${heading}`);
+  assert.ok(start >= 0, `the prompt has a "### ${heading}" section`);
+  const rest = prompt.slice(start + 4 + heading.length);
+  const end = rest.search(/\n#{2,3} /);
+  return end < 0 ? rest : rest.slice(0, end);
+}
+
+// The filing wording the consequence test replaces (LIN-4401 D3). Each phrase must be gone from
+// every rendered stage prompt, the kickoff prompt, and close-out's completion signals.
+const RETIRED = [
+  'file the outside follow-ups',
+  'file remaining follow-ups',
+  'files the outside follow-ups',
+  'file it as a follow-up a reader',
+  'close-out files it, after checking',
+  'routed follow-up ticket',
+  'outside-scope follow-up',
+  'file follow-ups',
+  'Only outside items are filed here',
+  'remaining outside follow-ups',
+  'an outside item filed on its own terms',
+  'a follow-up only close-out files',
+  'and followed-up?',
+];
+
+// retrospective-audit is piece B (LIN-4432): its own filing sentence changes with its notes PR,
+// so it is exempt from this part and nothing else.
+const PIECE_B = new Set(['retrospective-audit']);
+
+function assertNoRetired(text, label) {
+  for (const phrase of RETIRED) {
+    assert.ok(!text.includes(phrase), `${label} still says "${phrase}"`);
+  }
+}
+
+describe('(iii) no rendered stage prompt, kickoff prompt or close-out completion signal carries the retired phrases', () => {
+  for (const key of Object.keys(PROMPT_TEMPLATES)) {
+    if (PIECE_B.has(key)) continue;
+    test(`${key} carries no retired phrase`, () => {
+      assertNoRetired(render(key), `${key} prompt`);
+    });
+  }
+
+  test('the leftover prompt carries no retired phrase', () => {
+    assertNoRetired(leftoverPrompt({ issueIdentifier: 'LIN-9401', prUrl: 'https://github.com/example/repo/pull/1' }), 'leftover prompt');
+  });
+
+  test('the kickoff prompt carries no retired phrase', () => {
+    const kickoff = buildAutopilotKickoff({ baseUrl: 'https://harbour.example', issue: ISSUE });
+    assertNoRetired(typeof kickoff === 'string' ? kickoff : kickoff.prompt, 'kickoff prompt');
+  });
+
+  test("close-out's description and completion signals, read directly, carry no retired phrase", () => {
+    const t = PROMPT_TEMPLATES['close-out'];
+    const sig = COMPLETION_SIGNALS['close-out'];
+    assert.ok(t.description && sig.coreOutcome && sig.readinessCheck && sig.signals.length > 0, 'the fields exist');
+    assertNoRetired([t.description, sig.coreOutcome, sig.readinessCheck, ...sig.signals].join('\n'), 'close-out description or completion signal');
+  });
+});
+
+describe('(iv) Follow-up Triage still tells close-out to file a gate ticket (the guard the old filing was for)', () => {
+  test('the Triage section renders the gate and states that close-out files the gate\'s tickets there', () => {
+    const triage = section(render('close-out'), 'Follow-up Triage');
+    assert.ok(triage.includes(CONSEQUENCE_TEST), 'Triage renders the consequence test exactly as the leaf states it');
+    assert.match(triage, /Only the gate's tickets are filed here/, 'Triage files only the gate\'s tickets');
+  });
 });
