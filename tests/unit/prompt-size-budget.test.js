@@ -72,7 +72,7 @@ import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
 /** Templates, source bytes. Same files `steady-base-growth.mjs` GROUPS as
  * "worker templates". */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 110916, // LIN-4401 (LIN-4431 beat 3): +363 (110553 -> 110916): the wiring (one import, the gate rendered in review's scope section and close-out's Follow-up Triage) and the replacement sentences that name the gate; the consequence test itself is rendered from the leaf, not from this file; review fix 9 (LIN-4431 close-out): +43 for the clause in close-out's Make the Fixes that has a note-bound outside find close-out notices itself written before the merge, since the gate no longer files it (Triage runs after the merge and Done, with no branch to write on)
+  'lib/prompt-template-defs.js': 112176, // LIN-4401 (LIN-4432 review fix): +90 (112086 -> 112176): the audit's findings-comment heading and the notes-PR URL citation in close-out's Land It. LIN-4401 (LIN-4432 beat 4): +1170 (110916 -> 112086): the audit's Reporting and workflow, review's and close-out's notes-PR sentences, and the audit and close-out route clauses for a notes PR; the consequence test itself is rendered from the leaf
   'lib/prompt-templates.js': 19662, // LIN-4370: +69, the never-offered comment says the look-first route sends the Surveys (a comment, not prompt text)
   'lib/prompt-formatters.js': 47805, // LIN-4346: +710 (47095 -> 47805), scoping's own area notes pointer: its record takes no fifth line and it posts no comment, so it cites a note in its final message
   'lib/prompt-contract.js': 3875, // LIN-4362: the `## As asked` spellings interpolate AS_ASKED_HEADING (code, not prompt text)
@@ -95,9 +95,9 @@ export const TEMPLATES_RENDERED_CEILINGS = {
   context: 2021, // LIN-3300: at 2021 since the stage rules only the meta-prompt carried moved into their templates
   'plan-review': 7601, // LIN-4353: the verdict quotes the ask and says how the plan meets it; only the person agrees to a narrowing (the reviewer's judgement)
   implementation: 8493, // LIN-4379: +102, the pointer asks the work to name a note entry it used (file and source) where it records its decisions, so the next look-first step citing a finding is checkable; which entry bears on the work is the agent's judgement no code sees
-  review: 16912, // LIN-4401 (LIN-4431 beat 3): +758 (16154 -> 16912): the consequence test (579 bytes, LIN-4401 D1) renders once in the scope section, which names each outside find's home; LEFTOVER_RULE's outside clause renders here too (+31); the shape of the gate is held by tests/unit/lin-4401-outside-find-home.test.js, since the gate is prose the agent reads
-  'close-out': 12938, // LIN-4401 (LIN-4431 beat 3): +756 (12182 -> 12938): the consequence test renders once in Follow-up Triage, the one place close-out files; LEFTOVER_RULE's +31 renders here too; Workflow, Make the Fixes, Settle the Ledger, Land It and the description now say the gate's tickets in place of the old filing sentences; shape held by tests/unit/lin-4401-outside-find-home.test.js; review fix 9 (LIN-4431 close-out): +44, a note-bound outside find close-out notices itself is written before the merge, since the gate no longer files it (the gate's only other place in close-out is Triage, after the merge and Done); shape held by tests/unit/lin-4401-outside-find-home.test.js part (v) and tests/unit/lin-4374-review-leftover-read.test.js
-  'retrospective-audit': 4619, // LIN-3279: FOLLOW_UP_SHAPE rendered
+  review: 17025, // LIN-4401 (LIN-4432 beat 4): +113 (16912 -> 17025): one sentence, an audit's notes PR on a Done ticket is judged against the audit's findings comment; the gate is held by tests/unit/lin-4401-outside-find-home.test.js, the sentence by tests/unit/lin-4432-audit-notes-pr.test.js
+  'close-out': 13189, // LIN-4401 (LIN-4432 review fix): +27 (13162 -> 13189): Land It's notes close-out cites the notes PR's URL. LIN-4401 (LIN-4432 beat 4): +224 (12938 -> 13162): Land It's sentence for a Done ticket's approved, unmerged audit notes PR (merge and summary only), Workflow step 5's pointer to it, and close-out's route clause for that PR; shape held by tests/unit/lin-4432-audit-notes-pr.test.js
+  'retrospective-audit': 5609, // LIN-4401 (LIN-4432 review fix): +46 (5563 -> 5609): the findings comment's required heading `## Retrospective audit — <identifier>`. LIN-4401 (LIN-4432 beat 4): +944 (4619 -> 5563): the consequence test (579 bytes, LIN-4401 D1) renders once in Reporting; the notes-PR sentences and the audit's own workflow (the shared read-only one stays for its other users) add the rest; FOLLOW_UP_SHAPE stays. Shape held by tests/unit/lin-4401-outside-find-home.test.js and tests/unit/lin-4432-audit-notes-pr.test.js
   retro: 4265, // LIN-3299: at 4265 since Scope and Authority on every path
   'survey-task': 1204, // LIN-4248: new at 1204; the hand-tuned task-view Survey wording, verbatim but for the {BASE} sentence and the Goal/Process frame
   'survey-place': 2119, // LIN-4248: new at 2119; the hand-tuned place-view Survey wording, verbatim but for the {BASE} sentence and the Goal/Process frame
@@ -115,7 +115,7 @@ export const STAGE_ROUTER_SOURCE_CEILING = 8269; // LIN-4392: +25, the rules' co
  * options and the facts code renders (lib/recommendation-facts.js), which no source
  * ceiling covers.
  */
-export const ROUTER_PROMPT_RENDERED_CEILING = 9887; // LIN-4370: +96, scoping's `when` covers a size ruling answered after the look-first route's one scoping run; whether a comment answers the ruling is the selector's reading, so code cannot settle it
+export const ROUTER_PROMPT_RENDERED_CEILING = 10110; // LIN-4401 (LIN-4432 beat 4): +223 (9887 -> 10110): the audit's whenNot clause for a landing an audit already ran on (TRAIL FACTS), with the notes PR's route, and close-out's when for an approved notes PR on a Done ticket; LIN-4370 before it: +96, scoping's `when` covers a size ruling answered after the look-first route's one scoping run; whether a comment answers the ruling is the selector's reading, so code cannot settle it
 
 /** Every stage's Scope and Authority lines, source bytes (lib/prompts/stage-intent.js). */
 export const STAGE_INTENT_SOURCE_CEILING = 3423; // LIN-4367: +14, CUT and DECIDE are exported so the cut test reads the rule and finds deciding stages by identity (code, not prompt text)
@@ -139,7 +139,7 @@ export const LEFTOVER_PROMPT_RENDERED_CEILING = 2498; // LIN-4401 (LIN-4431 beat
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 360997; // LIN-4401 (LIN-4431 close-out): +2588 (358409 -> 360997): the four ceilings raised above (review +758, close-out +756, leftover prompt +711, prompt-template-defs.js source +363); review fix 9 added +87 (close-out +44, defs +43)
+export const FROZEN_TOTAL_BYTES = 363834; // LIN-4401 (LIN-4432 review fix): +163 (363671 -> 363834): prompt-template-defs.js source +90, close-out +27, audit +46; LIN-4401 (LIN-4432 beat 4): +2674 (360997 -> 363671): the five ceilings raised above (prompt-template-defs.js source +1170, audit +944, close-out +224, routing prompt +223, review +113); LIN-4401 (LIN-4431 close-out) before it: +2588, review +758, close-out +756, leftover prompt +711, defs +363; review fix 9 added +87
 
 const BASE_URL = 'https://harbour.example';
 

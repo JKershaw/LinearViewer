@@ -88,3 +88,7 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   Waiting entries in other areas' notes where tickets used to be filed. LIN-4414's one retirement
   per build drains only the areas a build touches, so rarely touched notes (other-features) will
   grow; their Waiting counts are the honest measure. (LIN-4431.)
+- `lib/prompt-template-defs.js` (retrospective-audit Reporting) and `lib/periodicals.js`
+  (`areaNotesRoutes`) each state the docs-only notes-PR rule in their own words; one shared
+  constant in `lib/prompts/leftover-words.js` would make it one, at the cost of re-pinning the 13
+  Periodical prompt hashes. (LIN-4432.)

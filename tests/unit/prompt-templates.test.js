@@ -2303,7 +2303,9 @@ describe('retrospective-audit template', () => {
     const result = generatePrompt('retrospective-audit', mockIssue, mockContext);
     assert.ok(/do not change status, labels/i.test(result.prompt), 'must forbid status/label changes');
     assert.ok(/do not merge or mark anything Done/i.test(result.prompt), 'must forbid merge/Done');
-    assert.ok(/file a follow-up ticket, readable on its own, for each finding that still matters/i.test(result.prompt), 'must file follow-ups for findings that matter (LIN-3291)');
+    // LIN-4432: the filing sentence is the consequence test's now (LIN-3291's "that matter" became the gate's terms).
+    assert.ok(/Each gate ticket is filed readable on its own and linked from your comment/.test(result.prompt), 'must file only the gate\'s findings as tickets (LIN-3291, LIN-4432)');
+    assert.ok(/The rest go in one docs-only pull request off main/.test(result.prompt), 'must write the rest as one notes PR (LIN-4432)');
   });
 
   test('reports findings as a comment (read-only workflow), not a Linear write beyond the comment', () => {

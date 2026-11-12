@@ -83,9 +83,11 @@ writing an outside find into its own area's note (`lib/dispatch-leftover.js`, LI
 review names any edge it left untouched, close-out
 writes review's note entries, in any area, on the PR branch before the merge (LIN-4374,
 LIN-4401), and Stage 2 of a Periodical writes its reading's entries in the same docs-only
-PR as its report (`lib/periodicals.js`, LIN-4379). Close-out is the only one that files
-a ticket, and only one the consequence test sends to a ticket; every other outside find
-is a note entry in its area. A Periodical that writes here files none.
+PR as its report (`lib/periodicals.js`, LIN-4379), and the after-merge audit
+(`retrospective-audit`, LIN-4432) writes its entries in one docs-only PR of its own. Close-out
+and the audit are the only ones that file a ticket, and only one the consequence test sends
+to a ticket; every other outside find is a note entry in its area. A Periodical that writes
+here files none.
 
 The Survey notebook's tally (`docs/plans/survey/broad-options.md`) moved here; the rest
 of `docs/plans/survey/` stays as frozen research.
