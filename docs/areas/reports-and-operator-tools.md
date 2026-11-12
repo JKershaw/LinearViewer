@@ -37,6 +37,9 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   unread under a named reason. A hand-run Balance cell becomes a sign only in
   `docs/papers/harbour/cleaner-than-it-started-scripts/balance-sign.mjs`, beside the paper's
   coder, which must reproduce both frozen codes files (LIN-4439).
+- A landing's subject is read through the core's regexes only: `MERGE_PR` gives a merge landing
+  both its branch (`ownTicket`) and its PR number (`landingPr`), so the two never parse it apart
+  (LIN-4439 leftovers).
 - Rounding, the mean and percentages come from the core (`round`, `mean`, `percent`); a new
   stability module imports them, never re-spells `Math.round(x * 1000) / 10`. A landing or a
   commit is credited to one ticket only through `ownTicket`; `scripts/delivery-composition.mjs`
@@ -91,3 +94,8 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   file. Moving that check into `tests/unit/stability-measures.test.js`, beside the rest of the
   contract, with the prompt's element list exported for it, would give the contract one home.
   (LIN-4424 blind read.)
+- `scripts/stability-measures-core.mjs`: `landingPr` reads which PR a landing merged, but the
+  survey scripts tell a squash landing by their own trailing-`(#N)` test
+  (`scripts/survey-growth-git.mjs`, `scripts/survey-halving-git.mjs`,
+  `scripts/survey-tests-friction-git.mjs`), so the rule is spelled four ways. Importing
+  `landingPr` would make it one, at the cost of re-checking their frozen survey counts. (LIN-4439 leftovers.)

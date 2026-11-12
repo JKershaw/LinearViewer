@@ -23,7 +23,7 @@
 // it lives beside that coder (docs/papers/harbour/cleaner-than-it-started-scripts/balance-sign.mjs).
 
 import { BLIND_READ_VERDICTS } from '../lib/prompts/blind-read-words.js';
-import { landingPrUrls, parseBlindRead } from '../lib/run-ledger.js';
+import { landingPrUrls, parseBlindRead, prOf } from '../lib/run-ledger.js';
 import { landingPr, notMeasured, ownTicket, row } from './stability-measures-core.mjs';
 
 /** Piece 3's landing (LIN-4438): from this merge, close-out waits on a recorded `## Blind read` naming the PR. */
@@ -50,8 +50,11 @@ export function repoSlugOf(remoteUrl) {
   return m ? m[1] : null;
 }
 
-/** Whether a full PR URL is PR `n` (of `repo`, when the repository is known). */
-const isPr = (url, n, repo) => url.endsWith(`/pull/${n}`) && (!repo || url.includes(`github.com/${repo}/pull/`));
+/** Whether a full PR URL is PR `n` (of `repo`, when the repository is known; GitHub's owner and name ignore case). */
+const isPr = (url, n, repo) => {
+  const pr = prOf(url);
+  return pr.number === n && (!repo || pr.repo.toLowerCase() === repo.toLowerCase());
+};
 
 const atOrBefore = (a, b) => Date.parse(a) <= Date.parse(b);
 

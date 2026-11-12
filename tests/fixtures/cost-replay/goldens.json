@@ -41180,7 +41180,7 @@
       "complete": true
     },
     "notes": {
-      "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (GATE_DUE_MARKER is a plan-phase description-text marker); they are not rendered for the review pair, which has no `review due:` analogue.",
+      "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (planReviewDueOf reads a plan-phase description line); they are not rendered for the review pair, which has no `review due:` analogue.",
       "orchestrationKinds": "Orchestration-step kinds (autopilot, wake, custom, periodical) are excluded from survival by construction, not because they were never measured.",
       "noGatePairKinds": "A kind with no defined next-gate pair (e.g. plan-review, review, close-out) still reports cost/duration/effort; it has no survival concept, which is distinct from \"not yet instrumented\".",
       "denominatorsNotComparable": "The plan card's survival rate pools verdict tiers a/b/c; the implementation card's pools tiers a/b only (tier-c count shown beside it) — the two rates are not directly comparable.",

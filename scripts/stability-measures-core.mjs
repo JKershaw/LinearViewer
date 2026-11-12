@@ -170,8 +170,10 @@ export function waitingRows({ harbour, runner, landings, references = {} }) {
 // own ticket. This is the one ownership rule for the measure; the CLI keeps no ticket regex of its own.
 export const TICKET_KEY = 'LIN';
 
-const MERGE_PR = /^Merge pull request #\d+ from (\S+)/;
-const MERGE_BRANCH = /^Merge (?:remote-tracking )?branch '([^']+)'/;
+// A merge landing's subject, read once for both its ticket (the branch, ownTicket) and its PR (the number, landingPr).
+const MERGE_PR = /^Merge pull request #(?<pr>\d+) from (?<branch>\S+)/;
+const MERGE_BRANCH = /^Merge (?:remote-tracking )?branch '(?<branch>[^']+)'/;
+const SQUASH_PR = /\(#(?<pr>\d+)\)\s*$/;
 
 /**
  * The ticket a landing delivers, or null. A squash landing: the first id in its subject. A merge landing: the id in
@@ -187,11 +189,8 @@ export function ownTicket(subject, body = '', { key = TICKET_KEY } = {}) {
   const merge = MERGE_PR.exec(subject) ?? MERGE_BRANCH.exec(subject);
   if (!merge) return first(subject);
   const title = String(body ?? '').trim().split('\n')[0];
-  return first(merge[1], 'i') ?? first(title);
+  return first(merge.groups.branch, 'i') ?? first(title);
 }
-
-const MERGE_PR_NUMBER = /^Merge pull request #(\d+) from /;
-const SQUASH_PR_NUMBER = /\(#(\d+)\)\s*$/;
 
 /**
  * The pull request a landing merged, as its number, or null (LIN-4439, measure 1): a merge landing's
@@ -199,8 +198,8 @@ const SQUASH_PR_NUMBER = /\(#(\d+)\)\s*$/;
  * names none. Beside ownTicket because both read one landing's subject, one way for every stability reader.
  */
 export function landingPr(subject) {
-  const m = MERGE_PR_NUMBER.exec(subject ?? '') ?? SQUASH_PR_NUMBER.exec(subject ?? '');
-  return m ? Number(m[1]) : null;
+  const m = MERGE_PR.exec(subject ?? '') ?? SQUASH_PR.exec(subject ?? '');
+  return m ? Number(m.groups.pr) : null;
 }
 
 /**

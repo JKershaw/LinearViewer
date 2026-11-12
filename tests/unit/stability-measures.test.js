@@ -688,6 +688,8 @@ describe('measure 1: a landing counts as read only with a blind read naming its 
     const trails = trailsOf({ 'LIN-1': [said(foreign, AFTER(1)), read('better', [foreign], AFTER(1, 5))] });
     assert.strictEqual(blindRow({ landings, numstat, trails }).value.read, 1, 'the number alone matches when the repository is unknown');
     assert.strictEqual(blindRow({ landings, numstat, trails, repo: 'JKershaw/LinearViewer' }).value.unread[UNREAD.noRead], 1);
+    const own = trailsOf({ 'LIN-1': [said(PR(20), AFTER(1)), read('better', [PR(20)], AFTER(1, 5))] });
+    assert.strictEqual(blindRow({ landings, numstat, trails: own, repo: 'jkershaw/linearviewer' }).value.read, 1, 'GitHub owner and name ignore case (prOf, lib/run-ledger.js)');
     assert.deepStrictEqual([repoSlugOf('https://github.com/JKershaw/LinearViewer.git\n'), repoSlugOf('git@github.com:JKershaw/LinearViewer.git'), repoSlugOf('/tmp/x')],
       ['JKershaw/LinearViewer', 'JKershaw/LinearViewer', null]);
   });

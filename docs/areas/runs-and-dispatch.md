@@ -49,6 +49,8 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   `custom` to orchestration, and `bucketOf` falls back to orchestration silently, so check membership
   (`lib/wall-clock-summary.js`). `dispatchesOf` turns a missing kind into `custom` (`lib/cost-read.js`):
   confirm a custom kind from its own row before trusting it (LIN-4426).
+- A full PR URL's repository and number come from `prOf` beside `prUrlsIn` (`lib/run-ledger.js`),
+  for the task page and measure 1 alike; compare repositories case-blind, as GitHub does (LIN-4439).
 
 ## Waiting
 
@@ -73,8 +75,6 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   `docs/reviews/seams-tangles-review-2026-11-10-run11.md`.)
 - `lib/dispatch-factory.js`: tests `provider.name === 'linear'` beside
   `isHermeticTestToken` for a test-only transport. (LIN-4347.)
-- `lib/effort-readout.js`: outputs the deleted name `GATE_DUE_MARKER` (now
-  `planReviewDueOf`), pinned by cost-replay goldens. (John, 7 Nov.)
 - `lib/cost-read.js`: split out `readCalls` and `callsSurfaceOf`; settle whether
   instance-wide reads sit beside workspace-keyed stores. (Survey tally: LIN-4201.)
 - `lib/session-summary.js`: do stored run paragraphs keep pre-cutover figures? (Survey
