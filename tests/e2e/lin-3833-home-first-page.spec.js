@@ -226,6 +226,7 @@ test.describe('Home first page — "Another step" fits the task (LIN-3833)', () 
     const labels = await items.allInnerTexts();
     // LIN-4024 (item 17): each step carries its stage word (Build, not the step id "implement").
     expect(labels.slice(0, 4)).toEqual(['Look into', 'Research', 'Plan', 'Build']);
-    await expect(component.locator('[data-testid="run-another-left-out"]')).toHaveText("3 steps left out: they do not fit this task's state.");
+    // The hand-only stages (route: null) are left out: retro, the two Surveys and, since LIN-4437, the blind read.
+    await expect(component.locator('[data-testid="run-another-left-out"]')).toHaveText("4 steps left out: they do not fit this task's state.");
   });
 });

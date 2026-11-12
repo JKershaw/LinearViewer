@@ -134,7 +134,7 @@ async function seedWarmSession(page) {
 // own "one warm session, in-session follow-ups" shape. An autopilot anchor plus
 // one implementation lineage built from follow-ups (implementation, rework,
 // review, rework) whose close-out is still running. Progress must read
-// "3 of 4" with "Next: close-out".
+// "3 of 5" (LIN-4437: the blind read in SPINE) with "Next: close-out".
 async function seedSteppedLineageSession(page) {
   const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
     data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LIN-3250', issueTitle: 'Stepped run', target: 'cli' }
@@ -1129,7 +1129,7 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     }
   });
 
-  test('a real stepped single-lineage run reads 3 of 4 with Next: close-out while close-out runs (LIN-3250)', async ({ page }) => {
+  test('a real stepped single-lineage run reads 3 of 5 with Next: close-out while close-out runs (LIN-3250)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
     const { anchorId } = await seedSteppedLineageSession(page);
@@ -1140,7 +1140,7 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     // The headline number is monotone through the whole rework chain: the
     // finished plan/implementation/review stages count even though the running
     // close-out is the active loop.
-    await expect(page.locator('[data-testid="session-progress"]')).toHaveText('3 of 4 stages');
+    await expect(page.locator('[data-testid="session-progress"]')).toHaveText('3 of 5 stages');
     await expect(page.locator('[data-testid="session-next"]')).toHaveText('Next: close-out');
 
     // The implementation lineage is one step with all five loops' rows intact.
