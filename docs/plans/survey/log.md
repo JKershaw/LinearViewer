@@ -3482,3 +3482,8 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - The tidy-first pairs are still anecdotes.
   - **Tidying on the way (A10 working again):** the leftovers folded `lib/as-asked.js`'s three copies of "When it could go" into one header paragraph. That retires John's own Waiting entry from 7 Nov. One new Waiting entry was added (`lib/library.js` takes summaries by position).
 - **16:22 UTC: paper v2 (LIN-4275) Done.** All three pieces are merged (LIN-4426, LIN-4427, LIN-4428). Cost: parent $16.3, pieces $11.6, $12.6 and $11.2, so **about $51.7 in all**. That covers three merges, one of them production (−139, the dead-code retirement). It ran as a third item beside the two lanes without crossing them.
+- **~16:35 UTC: John on the third slot:** "Happy to leave it empty to keep things simple. Or for small tasks that improve quality of life, or are just useful to get ticked off." I picked two existing cold-start tickets, both small, outside both lanes' areas and useful before the door:
+  - **LIN-2386:** env-check doesn't find Playwright's macOS browser cache. It's the top onboarding defect for the fourth run.
+  - **LIN-4419:** the Node engines pin is exactly "24", and the README names no version.
+  - **The plan:** run them one at a time. **LIN-2386 kicked off** (dispatch `cd43a7ad`), with the usual goal minus "Use opus on every stage", since John is fine with stage defaults and these are small. LIN-4419 follows.
+  - **Safety tickets stay out** of this slot (LIN-690, LIN-2576): they're A12's, after the switch.
