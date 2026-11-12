@@ -5,6 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
 import { PERIODICALS, getPeriodicals, buildPeriodicalNodes, withAutopilotTail, PERIODICAL_AUTOPILOT_TAIL, resolvePeriodicalIdFromGateMarker, buildPeriodicalGateMarker } from '../../lib/periodicals.js';
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 
@@ -802,6 +803,90 @@ describe('Stability Review specifics (LIN-453)', () => {
     assert.match(prompt, /human-team/i);
     assert.match(prompt, /threshold/i);
     assert.match(prompt, /shape/i);
+  });
+
+  // LIN-4399 / LIN-4424: a repository may commit its own declaration of this review's measures
+  // (LinearViewer's is under docs/reviews/stability-measures/). The shared prompt defers to one
+  // without naming it: every workspace renders this text, so Harbour's paths, figures and ticket
+  // ids must never appear in it. Run against generatePrompt(), not withAutopilotTail(), whose
+  // tail carries an example ticket id on purpose.
+  const bulletLines = prompt.split('\n').filter(line => line.startsWith('- **'));
+  const declarationBullet = bulletLines.find(line => /declaration of this review's measures/.test(line)) || '';
+
+  test('LIN-4424: stays repo-neutral: no repo path, none of the 8 Nov figures or pins, no ticket id', () => {
+    assert.doesNotMatch(prompt, /\b(scripts|docs|lib)\//);
+    assert.doesNotMatch(prompt, /\bLIN-\d/);
+    // The 8 Nov figures the slice names, kept to their distinctive forms: bare small integers
+    // (the 66 and 56 Waiting counts, 830 deleted lines) would also match unrelated prose, so
+    // they are left out. The path and ticket-id checks above carry neutrality in general.
+    const eightNovember = [
+      /1\.56k/, /2,390/, /0\.35\b/, /0\.36\b/, /206,78\d/, /207,338/, /82,1\d\d/, /8\.5\d\b/,
+      /1\.43\b/, /1\.67\b/, /\$24\b/, /14\.94/, /\b54 minutes/, /9574d537/, /5334c81a/
+    ];
+    for (const figure of eightNovember) assert.doesNotMatch(prompt, figure);
+  });
+
+  test('LIN-4424: opens with a committed declaration\'s rows, in its order and unit, beside its reference, read with its tool', () => {
+    assert.ok(declarationBullet, 'a bullet names a committed declaration of this review\'s measures');
+    assert.match(declarationBullet, /open the report/i);
+    assert.match(declarationBullet, /in its order and unit/i);
+    assert.match(declarationBullet, /reference reading/i);
+    assert.match(declarationBullet, /committed tool/i);
+    // The rows come before the severity-ranked findings, and the bullet before the report bullet.
+    assert.match(declarationBullet, /before the severity-ranked findings/i);
+    const reportIndex = bulletLines.findIndex(line => line.startsWith('- **Write an uncapped, trend-framed report.**'));
+    const runIndex = bulletLines.findIndex(line => line.startsWith('- **Run the review.**'));
+    const declarationIndex = bulletLines.indexOf(declarationBullet);
+    assert.ok(declarationIndex >= 0 && declarationIndex < runIndex && runIndex < reportIndex, 'declaration, then the trajectory assessment, then the report');
+    // A discovery hint that names no path.
+    assert.match(declarationBullet, /no path is written here/i);
+    assert.match(declarationBullet, /prior reports/i);
+  });
+
+  test('LIN-4424: declared endpoint totals are allowed; "relative" governs the trajectory assessment', () => {
+    assert.match(declarationBullet, /endpoint totals/i);
+    assert.match(declarationBullet, /relative[^.]*governs the trajectory assessment/i);
+  });
+
+  test('LIN-4424: an unreadable row is not measured with its reason; the run never estimates, but keeps a declared estimate', () => {
+    assert.match(declarationBullet, /not measured, with its reason/i);
+    assert.match(declarationBullet, /never estimate a value yourself/i);
+    assert.match(declarationBullet, /declaration itself defines as an estimate/i);
+  });
+
+  test('LIN-4424: a prior ledger row the declaration replaces closes as superseded', () => {
+    assert.match(declarationBullet, /superseded/i);
+  });
+
+  test('LIN-4424: a repo with no declaration is still told to discover its own sources', () => {
+    assert.match(declarationBullet, /with no declaration[^.]*discover/i);
+    assert.match(prompt, /Discover what trajectory data is available rather than assuming a source/);
+  });
+
+  test('LIN-4424: forbids tooling the review would write itself: only what the repo commits', () => {
+    assert.match(prompt, /introducing no tooling beyond what the repo commits/);
+    assert.doesNotMatch(prompt, /introducing no new tooling/);
+    assert.match(prompt, /write no measuring tool of your own/i);
+  });
+
+  // LIN-4424 leftovers: the two sides of the deferral, linked. The prompt lists what a declaration
+  // holds; this repository's declaration must carry each element in words a run can find, and the
+  // supersession its bullet honours. A new element in the bullet fails here until it is mapped.
+  test('LIN-4424: this repo\'s declaration carries every element the prompt asks a declaration for', () => {
+    const declaration = readFileSync(new URL('../../docs/reviews/stability-measures/README.md', import.meta.url), 'utf8');
+    const listed = declarationBullet.match(/\): their ([^.]+)\. If there is one/);
+    assert.ok(listed, 'the bullet lists what a declaration holds');
+    const evidence = {
+      'definitions': /Defined in `/,
+      'order': /in this order/,
+      'unit of work': /unit of work/i,
+      'reference reading': /reference reading/,
+      'measuring tool': /node scripts\/stability-measures\.mjs/
+    };
+    const elements = listed[1].split(/, | and /);
+    assert.deepStrictEqual(elements.sort(), Object.keys(evidence).sort(), 'map each element the bullet names to the declaration');
+    for (const element of elements) assert.match(declaration, evidence[element], `the declaration carries its ${element}`);
+    assert.match(declaration, /as\s+superseded/, 'the declaration names the ledger rows its measures supersede');
   });
 });
 

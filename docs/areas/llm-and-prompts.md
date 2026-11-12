@@ -40,6 +40,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - A blind reader's limits are instructions, not access: with the repository checked out it can still
   see commit subjects (`git worktree add` prints the head's) and area notes. Both slipped, harmlessly,
   in the LIN-4436 pilot. Code hands a blind stage SHAs and PR URLs, never a PR body or commit log.
+- `lib/periodicals.js`: Stability defers to a repo's committed declaration of its measures and names
+  none (LIN-4424): change Harbour's measures in `docs/reviews/stability-measures/README.md` and its
+  script, never in the shared template; a test links the bullet's list to that README.
 - A new stage kind is a row in every table `tests/unit/stage-kind-tables.test.js` reads: add it, or list it
   there as out with the reason. A kind in `SPINE` (`lib/run-view.js`) also moves the run page's "n of N", the
   session and task-page goldens (`UPDATE_RENDER_SESSION_GOLDEN=1`, `UPDATE_RENDER_TASK_PAGE_GOLDEN=1`) and the
@@ -118,3 +121,13 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   (`node scripts/run-unit-tests.mjs tests/unit/<files>`) in a template that also drives other
   repos, and `CLAUDE.md` spells the same rule; a repo-supplied test command would make the line
   right elsewhere and give it one spelling. (LIN-4441 leftovers.)
+- `lib/periodicals.js`: "search the repo for a committed tool (no path is written here) and run it"
+  is spelled four times: Drift & Coherence's census bullet, Seams & Tangles' two bullets and
+  Stability's declaration bullet. One shared helper would make it one, at the cost of re-pinning
+  those three templates' hashes. (LIN-4424 leftovers; Survey global.) The rule it answers, whether
+  a review may run a tool the repo commits, is itself worded per template: Stability's run bullet
+  says "introducing no tooling beyond what the repo commits", while Recent Headwinds (which reads
+  the same rework and churn trajectory) and Drift & Coherence still say "introducing no new
+  tooling", Code Quality says "introduce no new tooling", and Seams & Tangles allows committed tools in its own bullets. No
+  `periodicalBullet` helper owns it; deciding it is one rule re-pins every template that states
+  it. (LIN-4424 blind read.)

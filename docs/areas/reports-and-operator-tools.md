@@ -86,3 +86,12 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   session's `TMPDIR` sits under the simple-dispatcher checkout, which has `node_modules/acorn`,
   so the test fails there on clean main while CI's `/tmp` passes. Walking every ancestor in the
   guard, or copying to a directory known to have none, would make it say why. (LIN-4423 leftovers.)
+- `scripts/stability-measures.mjs`: its declaration's contract
+  (`docs/reviews/stability-measures/README.md`) is checked from two files. The `DECLARATION`
+  block in `tests/unit/stability-measures.test.js` checks that it names every row the tool emits;
+  a LIN-4424 test in `tests/unit/periodicals.test.js` reads the same README again to check it
+  carries each element the shared Stability prompt asks a declaration for (including the literal
+  `node scripts/stability-measures.mjs`), so a prompt-template test depends on one repo's docs
+  file. Moving that check into `tests/unit/stability-measures.test.js`, beside the rest of the
+  contract, with the prompt's element list exported for it, would give the contract one home.
+  (LIN-4424 blind read.)
