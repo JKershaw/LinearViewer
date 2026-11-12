@@ -78,8 +78,9 @@ step, review and close-out render both word for word. For the notes:
   A ticket never counts as the retirement. The build itself still treats
   Waiting as context.
 
-Who writes here: the builder's leftover step tidies or notes what its change left
-(`lib/dispatch-leftover.js`), review names any edge it left untouched, close-out
+Who writes here: the builder's leftover step tidies or notes what its change left,
+writing an outside find into its own area's note (`lib/dispatch-leftover.js`, LIN-4401),
+review names any edge it left untouched, close-out
 writes review's note entries, in any area, on the PR branch before the merge (LIN-4374,
 LIN-4401), and Stage 2 of a Periodical writes its reading's entries in the same docs-only
 PR as its report (`lib/periodicals.js`, LIN-4379). Close-out is the only one that files
