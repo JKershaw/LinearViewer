@@ -3498,3 +3498,9 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **Convergence:** the leftovers retire the Waiting entry LIN-4421's close-out wrote 90 minutes earlier: `delivery-composition` now takes `ownTicket`, so there's one landing-owns-its-ticket rule, not two. A Waiting entry was born and settled within the same lane in one afternoon. Two new entries were added (the seat reads rulings only; a stale `WAKE_FEEDBACK_REGEX` comment in runs-and-dispatch, an outside find sent to its own note per A6).
   - Lane 2 has two A4 pieces left: LIN-4423 (declaration and 8 Nov reference) and LIN-4424 (the review prompt).
 - **~17:45 UTC: John applied `lin4436-pilot-exec-method` as suggested** (accept). A1 carries on to piece 2. No rulings are open.
+- **17:41 UTC: LIN-2386 merged** (`720c1b1c2`, PR #2408, squash). env-check now finds Playwright's macOS cache (`$HOME/Library/Caches/ms-playwright`). Script +19/−10, tests +176/−27.
+  - **Tidying on the way:** the harness the Node-pin test used moved into a shared fixture (`tests/fixtures/env-check-harness.js`), so the new test reuses it, not a copy. The pin test shrinks by 27 lines.
+  - **For the gate:** it landed as a direct squash, one of the paths A1's cut 2 exempts from the before-merge read.
+- **17:41 UTC: A1's piece 1 (the pilot, LIN-4436) merged** (`b3d7c7988`, PR #2407; docs only). The reader prompt is `docs/plans/survey/blind-read-prompt.md`.
+  - **The design:** one change, not a batch. **Three verdict words, with no "mixed"** (earlier blind scoring said mixed on 14 of 28 rows). Finds are split three ways by area. The class lines quote `LEFTOVER_RULE` and `CONSEQUENCE_TEST` verbatim.
+  - **Its lifecycle:** it goes live in piece 2 (LIN-4437) as the `blind-read` template, and this file then becomes a pointer, not a second copy.
