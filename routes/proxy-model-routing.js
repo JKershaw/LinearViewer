@@ -186,7 +186,7 @@ export function createProxyModelRoutingRoutes({ modelRoutingStore, workspacePref
       }
     };
   }
-  const writeChain = [proxyLimiter, authenticateProxyToken, requireWriteScope];
+  const writeChain = [proxyLimiter, authenticateProxyToken, requireWriteScope('modelRouting')];
 
   router.post(`${BASE}/jobs/:jobId`, ...writeChain, writeHandler('/jobs/:jobId', (req, body) => {
     const job = getJob(req.params.jobId);

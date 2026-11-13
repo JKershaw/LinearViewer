@@ -39,11 +39,11 @@ const REPO = join(__dirname, '../..');
 // `route` is the registered pattern (the source pin and the router.use check read it); `path` is the URL the
 // tests call. They differ for the mint, whose id is a parameter (LIN-4317).
 const MOUNTS = [
-  { name: 'POST /api/proxy/dispatch', route: '/api/proxy/dispatch', path: '/api/proxy/dispatch', file: 'routes/proxy-dispatch.js', body: { prompt: 'run me', kind: 'implementation' }, enqueues201: true },
-  { name: 'POST /api/proxy/recommend-and-dispatch', route: '/api/proxy/recommend-and-dispatch', path: '/api/proxy/recommend-and-dispatch', file: 'routes/proxy-dispatch.js', body: { issueIdentifier: 'TEST-1', kind: 'implementation' }, enqueues201: true },
-  { name: 'POST /api/proxy/autopilot/kickoff', route: '/api/proxy/autopilot/kickoff', path: '/api/proxy/autopilot/kickoff', file: 'routes/proxy-kickoff.js', body: { goal: 'walk the stack', target: 'cli' }, enqueues201: true },
+  { name: 'POST /api/proxy/dispatch', op: 'dispatch', route: '/api/proxy/dispatch', path: '/api/proxy/dispatch', file: 'routes/proxy-dispatch.js', body: { prompt: 'run me', kind: 'implementation' }, enqueues201: true },
+  { name: 'POST /api/proxy/recommend-and-dispatch', op: 'dispatch', route: '/api/proxy/recommend-and-dispatch', path: '/api/proxy/recommend-and-dispatch', file: 'routes/proxy-dispatch.js', body: { issueIdentifier: 'TEST-1', kind: 'implementation' }, enqueues201: true },
+  { name: 'POST /api/proxy/autopilot/kickoff', op: 'kickoff', route: '/api/proxy/autopilot/kickoff', path: '/api/proxy/autopilot/kickoff', file: 'routes/proxy-kickoff.js', body: { goal: 'walk the stack', target: 'cli' }, enqueues201: true },
   // A plain mint (body {}, 201 as a leaf): `autopilot: true` would pull in the owner and mintGrantBootstrap fakes.
-  { name: 'POST /api/proxy/periodicals/:id/mint', route: '/api/proxy/periodicals/:id/mint', path: '/api/proxy/periodicals/seams-tangles/mint', file: 'routes/proxy-dispatch.js', body: {}, enqueues201: true }
+  { name: 'POST /api/proxy/periodicals/:id/mint', op: 'periodicalMint', route: '/api/proxy/periodicals/:id/mint', path: '/api/proxy/periodicals/seams-tangles/mint', file: 'routes/proxy-dispatch.js', body: {}, enqueues201: true }
 ];
 
 const SCOPE_403 = { error: 'This endpoint requires a read-write token' };
@@ -170,14 +170,14 @@ describe('LIN-3136 criterion 5 — the reads stay ungated', () => {
 // ── criterion 12 ────────────────────────────────────────────────────────────
 
 describe('LIN-3136 criterion 12(a) — one registration per path, gate in place', () => {
-  const EXPECTED = "proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant('dispatch'), async (req, res) =>";
   for (const mount of MOUNTS) {
     test(`${mount.name}: exactly one router.post, with the grant after the scope`, () => {
       const src = readFileSync(join(REPO, mount.file), 'utf8');
       const quoted = mount.route.replace(/[/.*+?^${}()|[\]\\]/g, '\\$&');
       const regs = [...src.matchAll(new RegExp(`router\\.post\\('${quoted}',\\s*([^\\n]*)`, 'g'))];
       assert.equal(regs.length, 1, `exactly one POST registration for ${mount.path}`);
-      assert.equal(regs[0][1].trim().replace(/\s*\{$/, ''), EXPECTED);
+      // LIN-4468: the scope gate is named by its operation; the grant still follows it.
+      assert.equal(regs[0][1].trim().replace(/\s*\{$/, ''), `proxyLimiter, authenticateProxyToken, requireWriteScope('${mount.op}'), requireGrant('dispatch'), async (req, res) =>`);
       for (const m of src.matchAll(/router\.use\(\s*['"]([^'"]+)['"]/g)) {
         assert.ok(!mount.route.startsWith(m[1]) && !m[1].startsWith('/api/proxy/dispatch'), `no path-scoped router.use over ${m[1]}`);
       }
@@ -207,7 +207,7 @@ describe('LIN-3136 criterion 12(b)/(c) — one limiter pass and one token valida
       req.proxyWorkspaceId = 'ws-acme';
       next();
     };
-    const requireWriteScope = (req, res, next) => next();
+    const requireWriteScope = () => (req, res, next) => next();
     const shared = {
       proxyLimiter: limiter, authenticateProxyToken, requireWriteScope, requireGrant,
       logEvent: () => {}, dispatchQueueStore: {}, proxyTokenStore: {}, workspacePreferencesStore: {},

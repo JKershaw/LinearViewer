@@ -249,7 +249,7 @@ export function createDispatchRoutes({
    * drive). This is the write half the autopilot orchestrator uses to dispatch a
    * chosen task.
    */
-  router.post('/api/proxy/dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant('dispatch'), async (req, res) => {
+  router.post('/api/proxy/dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope('dispatch'), requireGrant('dispatch'), async (req, res) => {
     await enterProxyDispatch({ ...lane, req, res, endpoint: '/api/proxy/dispatch' });
   });
 
@@ -290,7 +290,7 @@ export function createDispatchRoutes({
    * documented operator escape hatch (`dispatch-factory.js`) is now reachable
    * on both dispatch verbs.
    */
-  router.post('/api/proxy/recommend-and-dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant('dispatch'), async (req, res) => {
+  router.post('/api/proxy/recommend-and-dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope('dispatch'), requireGrant('dispatch'), async (req, res) => {
     await enterRecommendDispatch({ ...lane, req, res, endpoint: '/api/proxy/recommend-and-dispatch' });
   });
 
@@ -307,7 +307,7 @@ export function createDispatchRoutes({
    * `note` is at most 500 single-line characters; the server places it before the template text and
    * the template text is never changed. An unknown id is a 404 naming GET /api/proxy/periodicals.
    */
-  router.post('/api/proxy/periodicals/:id/mint', proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant('dispatch'), async (req, res) => {
+  router.post('/api/proxy/periodicals/:id/mint', proxyLimiter, authenticateProxyToken, requireWriteScope('periodicalMint'), requireGrant('dispatch'), async (req, res) => {
     await enterPeriodicalMint({ ...lane, req, res, endpoint: '/api/proxy/periodicals/:id/mint', periodicalId: req.params.id });
   });
 

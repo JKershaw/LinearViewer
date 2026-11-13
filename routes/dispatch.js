@@ -29,6 +29,8 @@ import path from 'path';
 import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 import { DISPATCH_DEFAULT_KINDS, deriveDispatchKind, getPromptDescriptionsForAI } from '../lib/prompt-templates.js';
+import { stampFromRow, stampForItem } from '../lib/item-stage-stamp.js';
+import { stampMintOptions } from '../lib/stage-writes.js';
 import { resolveRoutingWithSources } from '../lib/dispatch-factory.js';
 import { getJob } from '../lib/llm-jobs.js';
 import { stageLabel } from '../lib/task-page-loader.js';
@@ -1484,6 +1486,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         const baseUrl = publicOrigin(req);
         let resumed;
         try {
+          // LIN-4468: the refired row's own stage stamps the re-minted token (its kind, its ticket).
+          const stamp = stampFromRow(row);
           resumed = await provisionResumeCredential({
             proxyTokenStore,
             dispatchStore: dispatchQueueStore,
@@ -1493,7 +1497,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
             harness: 'claude-code',
             followUpTo: itemId,
             createdBy: req.dispatchTokenOwner,
-            prompt: null
+            prompt: null,
+            writes: stamp.writes,
+            writesTarget: stamp.writesTarget
           });
         } catch (err) {
           if (isStructuralGrantRefusal(err)) {
@@ -1517,14 +1523,19 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       }
     }
 
+    // LIN-4468: a refire that names an existing row (the runner always does) mints a plain token stamped
+    // with that row's stage, not an unrestricted one. No itemId, or an itemId that names no row, is
+    // stage-less and mints as before. A read fault is a 503: nothing is minted unstamped.
     let minted;
     try {
+      const stamp = itemId !== undefined ? await stampForItem(dispatchQueueStore, req.dispatchUrlKey, itemId) : { writes: null, writesTarget: null };
       minted = await proxyTokenStore.createToken(req.dispatchUrlKey, {
         kind: 'bootstrap',
         scope: READ_WRITE,
         label: 'refire-broker',
         ttl: BOOTSTRAP_TOKEN_TTL_SECONDS,
-        createdBy: req.dispatchTokenOwner
+        createdBy: req.dispatchTokenOwner,
+        ...stampMintOptions(stamp.writes, stamp.writesTarget)
       });
     } catch (err) {
       console.error('Broker-token mint failed:', err.message);
@@ -1606,7 +1617,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       proxyTokenStore,
       urlKey: req.dispatchUrlKey,
       baseUrl,
-      createdBy
+      createdBy,
+      // LIN-4468: the woken row's stage stamps the wake token.
+      itemStamp: { store: dispatchQueueStore, itemId }
     });
 
     // Shared, extracted validator (lib/dispatch-feedback-validation.js) — the

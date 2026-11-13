@@ -33,7 +33,8 @@ const PROXY_ROUTE_FILES = readdirSync(join(REPO, 'routes'))
 const ENTRANCE_LIB = { file: 'lib/dispatch-entrance.js', src: readFileSync(join(REPO, 'lib/dispatch-entrance.js'), 'utf8') };
 const SCANNED_FILES = [...PROXY_ROUTE_FILES, ENTRANCE_LIB];
 
-const GATED = "proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant('dispatch'),";
+// LIN-4468: the scope gate is named by its operation (requireWriteScope('dispatch'), ...).
+const GATED = /proxyLimiter, authenticateProxyToken, requireWriteScope\('\w+'\), requireGrant\('dispatch'\),/;
 // LIN-3601: was { 'routes/proxy-dispatch.js': 3, 'routes/proxy-kickoff.js': 1 }, an exact count per
 // file, each sink tied to the registration above it. Those two files and
 // lib/dispatch-entrance.js are the proxy entrances (E); inside E a sink may sit in
@@ -57,7 +58,7 @@ function scanC1(files) {
       for (let j = i; j >= 0; j--) {
         if (/^\s{2}router\.(get|post|put|patch|delete|use)\(/.test(lines[j])) { reg = lines[j]; break; }
       }
-      if (!reg || !reg.includes("router.post(") || !reg.includes(GATED)) {
+      if (!reg || !reg.includes("router.post(") || !GATED.test(reg)) {
         v.push(`${file}:${i + 1} createDispatchItem( is not under a dispatch-gated POST (${reg ? reg.trim().slice(0, 80) : 'no registration'})`);
       }
     });

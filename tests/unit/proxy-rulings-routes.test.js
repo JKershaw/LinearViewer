@@ -135,7 +135,7 @@ before(async () => {
       req.proxyTokenLabel = 'a-label';
       next();
     },
-    requireWriteScope: (req, res, next) => {
+    requireWriteScope: () => (req, res, next) => {
       if (req.proxyTokenScope !== 'readWrite') {
         return res.status(403).json({ error: 'This endpoint requires a read-write token' });
       }
@@ -671,7 +671,7 @@ describe('POST /api/proxy/rulings/:decisionId/suggest-answer (LIN-2790)', () => 
     app.use(createRulingsRoutes({
       proxyLimiter: (req, res, next) => next(),
       authenticateProxyToken: (req, res, next) => { req.proxyUrlKey = URL_KEY; req.proxyTokenScope = 'readWrite'; next(); },
-      requireWriteScope: (req, res, next) => next(),
+      requireWriteScope: () => (req, res, next) => next(),
       logEvent: () => {},
       dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: [] }; } },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
@@ -752,7 +752,7 @@ describe('degrade paths', () => {
     app.use(createRulingsRoutes({
       proxyLimiter: (req, res, next) => next(),
       authenticateProxyToken: (req, res, next) => { req.proxyUrlKey = URL_KEY; req.proxyTokenScope = 'readWrite'; next(); },
-      requireWriteScope: (req, res, next) => next(),
+      requireWriteScope: () => (req, res, next) => next(),
       logEvent: () => {},
       dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: [] }; } },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
@@ -917,7 +917,7 @@ describe('GET /api/proxy/rulings — task-bound rows via a real TaskDecisionsSto
         req.proxyTokenLabel = 'a-label';
         next();
       },
-      requireWriteScope: (req, res, next) => next(),
+      requireWriteScope: () => (req, res, next) => next(),
       logEvent: () => {},
       dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: [] }; } },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
@@ -1012,7 +1012,7 @@ describe('GET /api/proxy/rulings — LIN-2729 fix: newest-then-filter for task-b
         req.proxyTokenLabel = 'a-label';
         next();
       },
-      requireWriteScope: (req, res, next) => next(),
+      requireWriteScope: () => (req, res, next) => next(),
       logEvent: () => {},
       dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: [] }; } },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
@@ -1162,7 +1162,7 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
         req.proxyCreatedBy = 'account-123';
         next();
       },
-      requireWriteScope: (req, res, next) => next(),
+      requireWriteScope: () => (req, res, next) => next(),
       logEvent: () => {},
       dispatchQueueStore: {
         async listItems() { return []; },

@@ -123,7 +123,7 @@ export function createProxyHaltRoutes({ workspaceHaltStore, workspaceOwnerCheck,
    * write. `setBy` is attributed from the token creator, which the gate has
    * just proven is the workspace owner (an ownerless token is refused).
    */
-  router.post(HALT_ROUTE, proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+  router.post(HALT_ROUTE, proxyLimiter, authenticateProxyToken, requireWriteScope('haltSet'), async (req, res) => {
     const { mode } = req.body || {};
     if (!HALT_MODES.includes(mode)) {
       logEvent(req, HALT_ROUTE, 400);
@@ -157,7 +157,7 @@ export function createProxyHaltRoutes({ workspaceHaltStore, workspaceOwnerCheck,
    * (the runner then resumes). Harmless when nothing is set (the store's own
    * `deleteOne` semantics).
    */
-  router.delete(HALT_ROUTE, proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+  router.delete(HALT_ROUTE, proxyLimiter, authenticateProxyToken, requireWriteScope('haltClear'), async (req, res) => {
     if (await refuseUnlessOwner(req, res)) return;
 
     if (!workspaceHaltStore) {

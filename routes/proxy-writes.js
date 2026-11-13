@@ -68,6 +68,7 @@ import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, 
 import { checkLeftoverAnswer, leftoverAnswerRefusal } from '../lib/dispatch-leftover-answer.js';
 import { blindReadRefusal } from '../lib/run-ledger.js';
 import { checkBlindRead, landingPrUrls } from '../lib/run-trail.js';
+import { isRestrictedStamp, sameTicketKey } from '../lib/stage-writes.js';
 import { jsonError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
 
@@ -194,7 +195,8 @@ export function createProxyWriteRoutes({
   recordPipelineMerge = null,
 }) {
   const router = Router();
-  const writeAuth = [proxyLimiter, authenticateProxyToken, requireWriteScope];
+  // LIN-4468: each mount names its operation (the SPEC key) so the gate checks the stage's allowance for it.
+  const writeAuth = (op) => [proxyLimiter, authenticateProxyToken, requireWriteScope(op)];
 
   // ---------------------------------------------------------------------------
   // Shared steps
@@ -261,6 +263,12 @@ export function createProxyWriteRoutes({
     const { req, res, endpoint, token, provider } = ctx;
     if (denyIfMissingRead(provider, read, req, res, endpoint)) return null;
     const issue = await provider[read](token, req.params.issueId);
+    // LIN-4468: the second enforcement point, before any answer about the issue (a 404 or a 409 must not
+    // tell an outside stage about a ticket it may not write to).
+    if (await outsideStageTarget(ctx, issue)) {
+      refuse(ctx, 403, stageTargetRefusal(req));
+      return null;
+    }
     if (!issue && onNull === 'notFound') {
       refuse(ctx, 404, 'Issue not found');
       return null;
@@ -270,6 +278,31 @@ export function createProxyWriteRoutes({
       return null;
     }
     return { issue };
+  }
+
+  /**
+   * LIN-4468: a restricted stamp (lib/stage-writes.js) may write to its one ticket only. The request's
+   * key is compared first: a literal match is the same ticket. Otherwise the stamped target is resolved
+   * through the same provider and the two issues' ids compared, so any form of that ticket (identifier,
+   * UUID, provider key) passes and nothing else does. Returns true when the write is outside the stamp.
+   */
+  async function outsideStageTarget(ctx, issue) {
+    const { req, token, provider } = ctx;
+    if (!isRestrictedStamp(req.proxyWrites)) return false;
+    const target = req.proxyWritesTarget;
+    if (!target) return true;
+    if (sameTicketKey(req.params.issueId, target)) return false;
+    if (!issue?.id || typeof provider.issueWriteGuard !== 'function') return true;
+    const resolved = await provider.issueWriteGuard(token, target);
+    return !(resolved?.id && String(resolved.id).toLowerCase() === String(issue.id).toLowerCase());
+  }
+
+  /** The 403 for a write outside a restricted stamp's ticket. It names the ticket the stage may write to, so the agent can retry. */
+  function stageTargetRefusal(req) {
+    const target = req.proxyWritesTarget;
+    return target
+      ? `This stage may write only to ${target}; ${req.params.issueId} is outside its allowance.`
+      : `This stage's write allowance names no ticket, so it may not write to ${req.params.issueId}.`;
   }
 
   /** Fire-and-forget ticket-closer seam (LIN-3366) once the response is out. */
@@ -394,7 +427,7 @@ export function createProxyWriteRoutes({
   // ---------------------------------------------------------------------------
 
   // POST /api/proxy/issues: create an issue.
-  router.post('/api/proxy/issues', ...writeAuth, guarded(SPEC.createIssue, async (ctx) => {
+  router.post('/api/proxy/issues', ...writeAuth('createIssue'), guarded(SPEC.createIssue, async (ctx) => {
     const { req, res, endpoint, token, provider } = ctx;
     const { teamId, title, description, projectId, stateId, assigneeId, priority, priorityLevel, parentId, cycleId } = req.body;
 
@@ -509,7 +542,7 @@ export function createProxyWriteRoutes({
   }
 
   // PATCH /api/proxy/issues/:issueId: update an issue.
-  router.patch('/api/proxy/issues/:issueId', ...writeAuth, guarded(SPEC.updateIssue, async (ctx) => {
+  router.patch('/api/proxy/issues/:issueId', ...writeAuth('updateIssue'), guarded(SPEC.updateIssue, async (ctx) => {
     const { req, res, endpoint, token, provider } = ctx;
     const { issueId } = req.params;
     const { title, description, stateId, assigneeId, priority, priorityLevel, projectId, parentId, cycleId } = req.body;
@@ -676,13 +709,13 @@ export function createProxyWriteRoutes({
 
   // POST /api/proxy/issues/:issueId/description/append: append a block to the end
   // of the description; the existing body is preserved byte-for-byte.
-  router.post('/api/proxy/issues/:issueId/description/append', ...writeAuth,
+  router.post('/api/proxy/issues/:issueId/description/append', ...writeAuth('appendDescription'),
     guarded({ ...SPEC.appendDescription, pre: refuseBadAppend }, (ctx) => editDescription(ctx, (current) => appendBlock(current, ctx.req.body.block))));
 
   // POST /api/proxy/issues/:issueId/description/replace: replace one uniquely
   // matched span (normalised, backslash-unescaped, on both sides); a missing or
   // ambiguous span is a loud 422. Full rewrites stay on the issue PATCH.
-  router.post('/api/proxy/issues/:issueId/description/replace', ...writeAuth,
+  router.post('/api/proxy/issues/:issueId/description/replace', ...writeAuth('replaceDescription'),
     guarded({ ...SPEC.replaceDescription, pre: refuseBadReplace }, (ctx) => {
       const { oldString, newString } = ctx.req.body;
       return editDescription(ctx, (current) => replaceInDescription(current, oldString, newString));
@@ -716,7 +749,7 @@ export function createProxyWriteRoutes({
   // everything after the As asked block's end line, keeping the block exactly as
   // read, so a prune never re-sends the person's words. Shares editDescription's
   // read, length and character checks (and the As asked guard, which it passes).
-  router.post('/api/proxy/issues/:issueId/description/below', ...writeAuth,
+  router.post('/api/proxy/issues/:issueId/description/below', ...writeAuth('belowDescription'),
     guarded({ ...SPEC.belowDescription, pre: refuseBadBelow }, (ctx) => editDescription(ctx, (current) => keepBlockThen(current, ctx.req.body.body))));
 
   // ---------------------------------------------------------------------------
@@ -762,7 +795,7 @@ export function createProxyWriteRoutes({
 
   // POST /api/proxy/issues/:issueId/comments (canonical, nested issue-scoped form)
   // and /api/proxy/comments/:issueId (forgiving flat alias, LIN-528): add a comment.
-  router.post(['/api/proxy/issues/:issueId/comments', '/api/proxy/comments/:issueId'], ...writeAuth, guarded(SPEC.createComment, async (ctx) => {
+  router.post(['/api/proxy/issues/:issueId/comments', '/api/proxy/comments/:issueId'], ...writeAuth('createComment'), guarded(SPEC.createComment, async (ctx) => {
     const { req, res, endpoint } = ctx;
     const { issueId } = req.params;
     const { body } = req.body;
@@ -802,7 +835,7 @@ export function createProxyWriteRoutes({
   // returns. :issueId keeps the URL shape consistent with the other issue-scoped
   // endpoints but the delete is keyed solely on commentId. No trashed guard:
   // removing a stray comment from a trashed issue is exactly its use case.
-  router.delete('/api/proxy/issues/:issueId/comments/:commentId', ...writeAuth, guarded(SPEC.deleteComment, async (ctx) => {
+  router.delete('/api/proxy/issues/:issueId/comments/:commentId', ...writeAuth('deleteComment'), guarded(SPEC.deleteComment, async (ctx) => {
     const { req, res, endpoint, token, provider } = ctx;
     const { commentId } = req.params;
     if (refuseBadUuid(ctx, commentId, 'comment')) return;
@@ -816,7 +849,7 @@ export function createProxyWriteRoutes({
   // PATCH /api/proxy/issues/:issueId/comments/:commentId: edit a comment's body.
   // Same URL-shape and no-trashed-guard rationale as DELETE — an edit corrects
   // existing content, it does not add new content to a dead issue.
-  router.patch('/api/proxy/issues/:issueId/comments/:commentId', ...writeAuth, guarded(SPEC.updateComment, async (ctx) => {
+  router.patch('/api/proxy/issues/:issueId/comments/:commentId', ...writeAuth('updateComment'), guarded(SPEC.updateComment, async (ctx) => {
     const { req, res, endpoint, token, provider } = ctx;
     const { commentId } = req.params;
     if (refuseBadUuid(ctx, commentId, 'comment')) return;
@@ -846,7 +879,7 @@ export function createProxyWriteRoutes({
   // primitives end-to-end — provider.uploadFile() (LIN-636) and the raster
   // magic-byte sniffing guard (LIN-682, parseFeedbackImage, shared via
   // lib/attachment-upload.js).
-  router.post('/api/proxy/issues/:issueId/attachments', ...writeAuth, json({ type: () => true, limit: ATTACHMENT_UPLOAD_BODY_LIMIT }), guarded(SPEC.attachment, async (ctx) => {
+  router.post('/api/proxy/issues/:issueId/attachments', ...writeAuth('attachment'), json({ type: () => true, limit: ATTACHMENT_UPLOAD_BODY_LIMIT }), guarded(SPEC.attachment, async (ctx) => {
     const { req, endpoint, token, provider } = ctx;
     const { image, target, body } = req.body || {};
     if (target !== undefined && target !== 'comment' && target !== 'description') {
@@ -910,7 +943,7 @@ export function createProxyWriteRoutes({
   // ---------------------------------------------------------------------------
 
   // POST /api/proxy/issues/:issueId/relations: create a relation between issues.
-  router.post('/api/proxy/issues/:issueId/relations', ...writeAuth, guarded(SPEC.createRelation, async (ctx) => {
+  router.post('/api/proxy/issues/:issueId/relations', ...writeAuth('createRelation'), guarded(SPEC.createRelation, async (ctx) => {
     const { req, res, endpoint, token, provider } = ctx;
     const { issueId } = req.params;
     const { type, relatedIssueId } = req.body;
@@ -934,7 +967,7 @@ export function createProxyWriteRoutes({
   // The relationId is the IssueRelation's own id (exposed on GET /relations/:issueId
   // and GET /issue/:id); the delete is keyed solely on it (Linear deletes by
   // relation id, not by the issue pair), so :issueId is format-checked only.
-  router.delete('/api/proxy/issues/:issueId/relations/:relationId', ...writeAuth, guarded(SPEC.deleteRelation, async (ctx) => {
+  router.delete('/api/proxy/issues/:issueId/relations/:relationId', ...writeAuth('deleteRelation'), guarded(SPEC.deleteRelation, async (ctx) => {
     const { req, res, endpoint, token, provider } = ctx;
     const { relationId } = req.params;
     if (refuseBadUuid(ctx, relationId, 'relation')) return;
@@ -976,7 +1009,7 @@ export function createProxyWriteRoutes({
   }
 
   // POST /api/proxy/issues/:issueId/labels: add a label to an issue.
-  router.post('/api/proxy/issues/:issueId/labels', ...writeAuth, guarded(SPEC.addLabel, (ctx) => {
+  router.post('/api/proxy/issues/:issueId/labels', ...writeAuth('addLabel'), guarded(SPEC.addLabel, (ctx) => {
     const { labelId } = ctx.req.body;
     if (!labelId || typeof labelId !== 'string') return refuse(ctx, 400, 'Valid labelId is required');
     return changeLabels(ctx, labelId, {
@@ -987,7 +1020,7 @@ export function createProxyWriteRoutes({
   }));
 
   // DELETE /api/proxy/issues/:issueId/labels/:labelId: remove a label from an issue.
-  router.delete('/api/proxy/issues/:issueId/labels/:labelId', ...writeAuth, guarded(SPEC.removeLabel, (ctx) => changeLabels(ctx, ctx.req.params.labelId, {
+  router.delete('/api/proxy/issues/:issueId/labels/:labelId', ...writeAuth('removeLabel'), guarded(SPEC.removeLabel, (ctx) => changeLabels(ctx, ctx.req.params.labelId, {
     plan: (current, id) => (current.includes(id) ? current.filter(x => x !== id) : null),
     noop: 'Label not present',
     rejected: 'Label was not removed',

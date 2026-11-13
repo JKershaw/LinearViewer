@@ -78,7 +78,7 @@ before(async () => {
       req.proxyCreatedBy = 'account-123';
       next();
     },
-    requireWriteScope: (req, res, next) => next(),
+    requireWriteScope: () => (req, res, next) => next(),
     logEvent: (req, endpoint, status) => { events.push({ endpoint, status }); },
     dispatchQueueStore: {
       async listItems() { return withFreshDigests([]); },

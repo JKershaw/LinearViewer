@@ -32,6 +32,13 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   maps it: `refs`/`partial` in the proxy write `SPEC`, and each session or feedback catch by hand.
   Provider tests passed while all three create lanes answered a bare 500 for a landed create. Pin
   it at the route boundary (`routes/proxy-writes.js`; `tests/unit/lin-4452-create-lane-envelope.test.js`).
+- Every proxy write mount names its operation: `requireWriteScope('<op>')` for a readWrite route,
+  `requireStageWrite('<op>')` for a grant-gated one, with `<op>` in `STAGE_WRITE_OPS`
+  (`lib/stage-writes.js`; the gate is `lib/stage-write-gate.js`). A stamped token is refused any
+  operation its allowance does not list, so a route nobody named would be refused to a reading
+  stage without a word, and an unnamed name throws at mount. A new write route adds its operation
+  to that list and a row to `CENSUS` in `tests/unit/lin-4468-stage-write-allowance.test.js`, or the
+  census fails (LIN-4468).
 
 ## Waiting
 
@@ -70,10 +77,12 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
 - `routes/proxy-model-routing.js`: with `modelRoutingProxyWrites` on (any member), every readWrite
   key, leaf workers' included, can set any harness or model workspace-wide; a non-`claude-code`
   harness puts later bootstraps inline. No runnable check; `urlKey` filters untested. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)
-- `routes/proxy.js`: a dispatch token can still GET ticket context (`/brief/`, `/issues/`, relations), because the proxy
-  does not know which stage a token was minted for. The blind read (LIN-4437) is blind by its prompt and preamble only: a
-  reader that ignores them can read the ask and the plan. Holding it needs the stage on the token and a read guard per
-  stage. By the consequence test it breaks nothing today, blocks no work and touches no safety. (LIN-4396 plan, witness 2.)
+- `routes/proxy.js`: a stage's token now carries its stage's write allowance and its one ticket (LIN-4468), so the proxy
+  holds a reading stage to its writes. It does not yet hold its reads: a dispatch token can still GET ticket context
+  (`/brief/`, `/issues/`, relations), and the blind read (LIN-4437) is blind by its prompt and preamble only, so a reader that
+  ignores them can read the ask and the plan. Holding that needs a read guard per stage on the stamped token; the table in
+  `lib/stage-writes.js` has no read column yet. By the consequence test it breaks nothing today, blocks no work and touches
+  no safety. (LIN-4396 plan, witness 2; LIN-4468.)
 - `routes/proxy-compute.js`: about 16 production sites (this file x7, `server.js` x3, `routes/test.js`, and
   others) compare a credential to `'test-token'` inline, beside the one helper (`isHermeticTestToken`,
   `lib/should-mock-ai.js`) that only two production modules import. Each is gated on `NODE_ENV=test`, so

@@ -34,6 +34,7 @@
  * (lib/dispatch-feedback-validation.js, lib/wake-credential.js,
  * lib/poll-halt.js) rather than forking the dispatch route's logic.
  */
+import { requireStageWrite } from '../lib/stage-write-gate.js';
 import { Router } from 'express';
 import { badRequest, jsonError, notFound, replyStoreFault } from '../lib/errors.js';
 import { validateFeedbackBody } from '../lib/dispatch-feedback-validation.js';
@@ -138,7 +139,7 @@ export function createProxyRunnerRoutes({
    * The runner kit's consumer heartbeat. Same handler as POST
    * /api/dispatch/heartbeat; the `take` gate above is its only auth.
    */
-  router.post(HEARTBEAT_ROUTE, createHeartbeatIngest({
+  router.post(HEARTBEAT_ROUTE, requireStageWrite('runnerHeartbeat'), createHeartbeatIngest({
     store: consumerHeartbeatStore,
     logEvent,
     endpoint: HEARTBEAT_ROUTE,
@@ -150,7 +151,7 @@ export function createProxyRunnerRoutes({
    * Atomically claim and remove an item from the authenticated runner's own
    * workspace queue. Mirrors the consumer take contract: `{ item, dispatchId }`.
    */
-  router.post(TAKE_ROUTE, async (req, res) => {
+  router.post(TAKE_ROUTE, requireStageWrite('runnerTake'), async (req, res) => {
     const { id } = req.params;
 
     if (!UUID_REGEX.test(id)) {
@@ -189,7 +190,7 @@ export function createProxyRunnerRoutes({
    * Mirrors /api/dispatch/feedback, including clearing `sessionsFeedCache` only
    * on kind:'decision-withdrawn'.
    */
-  router.post(FEEDBACK_ROUTE, async (req, res) => {
+  router.post(FEEDBACK_ROUTE, requireStageWrite('runnerFeedback'), async (req, res) => {
     const { id } = req.params;
 
     if (!UUID_REGEX.test(id)) {
@@ -205,7 +206,9 @@ export function createProxyRunnerRoutes({
       proxyTokenStore,
       urlKey: req.proxyUrlKey,
       baseUrl,
-      createdBy
+      createdBy,
+      // LIN-4468: the woken row's stage stamps the wake token.
+      itemStamp: { store: dispatchQueueStore, itemId: id }
     });
     // LIN-4373: the same leftover step as the dispatch feedback route, bound to this
     // request's origin (never resolveEmailLinkOrigin, which may be unset) and the token's
@@ -258,7 +261,7 @@ export function createProxyRunnerRoutes({
    * the taking runner token's id, so a bearer that did not take the item gets a 404.
    * The path-scoped gate above already requires the `take` grant.
    */
-  router.post(USAGE_ROUTE, async (req, res) => {
+  router.post(USAGE_ROUTE, requireStageWrite('runnerUsage'), async (req, res) => {
     const { id } = req.params;
 
     if (!UUID_REGEX.test(id)) {

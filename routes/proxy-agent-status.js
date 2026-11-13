@@ -26,7 +26,7 @@ export function createAgentStatusRoutes({ agentStatusStore, proxyLimiter, authen
    * POST /api/proxy/foreman/status  (forgiving alias, deprecated — pre-LIN-533 name)
    * Record an agent status update. Shared handler across both forms (LIN-528 pattern).
    */
-  router.post(['/api/proxy/agent/status', '/api/proxy/foreman/status'], proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+  router.post(['/api/proxy/agent/status', '/api/proxy/foreman/status'], proxyLimiter, authenticateProxyToken, requireWriteScope('agentStatus'), async (req, res) => {
     const { taskIdentifier, action, status, summary, dispatchId } = req.body;
 
     if (!taskIdentifier || typeof taskIdentifier !== 'string') {

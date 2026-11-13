@@ -440,14 +440,14 @@ export function createRulingsRoutes({
   /** @route POST /api/proxy/rulings/:decisionId/suggest-dismissal */
   router.post(
     '/api/proxy/rulings/:decisionId/suggest-dismissal',
-    proxyLimiter, authenticateProxyToken, requireWriteScope,
+    proxyLimiter, authenticateProxyToken, requireWriteScope('rulingSuggestDismissal'),
     propose(DISMISSAL)
   );
 
   /** @route POST /api/proxy/rulings/:decisionId/suggest-answer */
   router.post(
     '/api/proxy/rulings/:decisionId/suggest-answer',
-    proxyLimiter, authenticateProxyToken, requireWriteScope,
+    proxyLimiter, authenticateProxyToken, requireWriteScope('rulingSuggestAnswer'),
     propose(ANSWER)
   );
 

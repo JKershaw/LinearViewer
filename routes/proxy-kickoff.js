@@ -107,7 +107,7 @@ export function createKickoffRoutes({
    * appendProxyContext?, sessionId?, subscription?, model?, harness?, effort?, presetId?, maxTasks? }
    * (the authority documents each: lib/dispatch-entrance.js, enterKickoff).
    */
-  router.post('/api/proxy/autopilot/kickoff', proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant('dispatch'), async (req, res) => {
+  router.post('/api/proxy/autopilot/kickoff', proxyLimiter, authenticateProxyToken, requireWriteScope('kickoff'), requireGrant('dispatch'), async (req, res) => {
     await enterKickoff({
       req,
       res,

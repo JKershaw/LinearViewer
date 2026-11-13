@@ -23,8 +23,9 @@ const source = (rel) => readFileSync(join(__dirname, '../../', rel), 'utf8');
 
 const SITES = [
   {
-    path: 'routes/proxy.js',
-    specifier: '../lib/proxy-scopes.js',
+    // LIN-4468: the readWrite scope check moved to the write gate every mount names (lib/stage-write-gate.js).
+    path: 'lib/stage-write-gate.js',
+    specifier: './proxy-scopes.js',
     imports: ['READ_WRITE'],
     usage: 'req.proxyTokenScope !== READ_WRITE',
   },

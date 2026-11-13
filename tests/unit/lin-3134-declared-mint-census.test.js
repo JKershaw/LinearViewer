@@ -1087,7 +1087,7 @@ describe('LIN-3135 (R2) + LIN-3601 — the entrances: no direct grant mint, the 
   // mint sweep's World N broker row. Shape (added, location-free): no inline
   // createToken in E carries a grants key.
   test('mutation: grants planted on an inline proxyTokenStore.createToken( fails', () => {
-    const mutated = plantInE(PRODUCTION, '        createdBy: req.dispatchTokenOwner\n      });\n    } catch (err) {\n      console.error(\'Broker-token mint failed:\'', "        createdBy: req.dispatchTokenOwner,\n        grants: ['dispatch']\n      });\n    } catch (err) {\n      console.error('Broker-token mint failed:'");
+    const mutated = plantInE(PRODUCTION, "        ...stampMintOptions(stamp.writes, stamp.writesTarget)\n      });\n    } catch (err) {\n      console.error('Broker-token mint failed:'", "        ...stampMintOptions(stamp.writes, stamp.writesTarget),\n        grants: ['dispatch']\n      });\n    } catch (err) {\n      console.error('Broker-token mint failed:'");
     assert.ok(entranceShape(mutated).some(m => m.endsWith('an inline proxyTokenStore.createToken( call carries grants')), entranceShape(mutated).join('\n'));
   });
 

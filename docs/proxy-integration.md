@@ -87,7 +87,9 @@ Response:
 | Scope | Access |
 |-------|--------|
 | `read` | Query all read endpoints (issues, teams, projects, cycles, labels, etc.) |
-| `readWrite` | All read access plus create/update/delete issues, comments, relations, labels |
+| `readWrite` | All read access plus create/update/delete issues, comments, relations, labels, subject to any stage write allowance (below) |
+
+**Stage write allowance (LIN-4468).** A token minted for a dispatched stage carries that stage's `writes` (`lib/stage-writes.js`) and the one ticket the stage works on. The proxy refuses any write the allowance does not list, with `403` and a message naming the allowance (`This stage's write allowance (none) does not permit createComment.`). A `one-comment` token may comment on its own ticket only, and a `ticket-fields` token may set only a ticket's state, project and priority, and its labels and comments, on its own ticket. A token with no stamp, or a `work` stamp, is unrestricted, as before.
 
 ### Scopes vs grants (LIN-3059)
 
