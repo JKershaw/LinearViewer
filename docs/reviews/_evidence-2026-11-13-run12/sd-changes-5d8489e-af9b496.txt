@@ -1,0 +1,3 @@
+M	docs/areas/README.md
+A	docs/areas/loop-and-routing.md
+M	test/area-notes.test.js

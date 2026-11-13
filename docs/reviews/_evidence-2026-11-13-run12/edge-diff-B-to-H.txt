@@ -1,0 +1,57 @@
++ lib/dispatch-entrance.js -> lib/recommendation-live-wait.js | Runs & dispatch -> LLM & prompts
++ lib/dispatch-leftover-answer.js -> lib/prompts/leftover-words.js | Runs & dispatch -> LLM & prompts
++ lib/openrouter.js -> lib/recommendation-blind-read.js | LLM & prompts -> LLM & prompts
++ lib/openrouter.js -> lib/recommendation-live-wait.js | LLM & prompts -> LLM & prompts
++ lib/plan-review-round-trips.js -> lib/prompts/blind-read-words.js | Runs & dispatch -> LLM & prompts
++ lib/prompt-template-defs.js -> lib/prompts/blind-read-words.js | LLM & prompts -> LLM & prompts
++ lib/prompt-template-defs.js -> lib/prompts/survey-words.js | LLM & prompts -> LLM & prompts
++ lib/prompt-template-defs.js -> lib/run-ledger.js | LLM & prompts -> Runs & dispatch
++ lib/prompt-templates.js -> lib/prompts/blind-read-words.js | LLM & prompts -> LLM & prompts
++ lib/proxy-instructions.js -> lib/dispatch-leftover-answer.js | Agent API (proxy) -> Runs & dispatch
++ lib/proxy-instructions.js -> lib/prompts/blind-read-words.js | Agent API (proxy) -> LLM & prompts
++ lib/proxy-instructions.js -> lib/prompts/leftover-words.js | Agent API (proxy) -> LLM & prompts
++ lib/proxy-instructions.js -> lib/recommendation-live-wait.js | Agent API (proxy) -> LLM & prompts
++ lib/proxy-instructions.js -> lib/run-ledger.js | Agent API (proxy) -> Runs & dispatch
++ lib/recent-runs.js -> lib/prompts/blind-read-words.js | Runs & dispatch -> LLM & prompts
++ lib/recommendation-blind-read.js -> lib/providers/state-map.js | LLM & prompts -> Providers (Linear, GitHub, Jira, local)
++ lib/recommendation-blind-read.js -> lib/recent-runs.js | LLM & prompts -> Runs & dispatch
++ lib/recommendation-blind-read.js -> lib/recommendation-facts.js | LLM & prompts -> LLM & prompts
++ lib/recommendation-blind-read.js -> lib/run-closeout-state.js | LLM & prompts -> Runs & dispatch
++ lib/recommendation-blind-read.js -> lib/run-ledger.js | LLM & prompts -> Runs & dispatch
++ lib/recommendation-blind-read.js -> lib/utils/time.js | LLM & prompts -> Platform & plumbing
++ lib/recommendation-live-wait.js -> lib/recent-runs.js | LLM & prompts -> Runs & dispatch
++ lib/recommendation-look-first.js -> lib/periodicals.js | LLM & prompts -> LLM & prompts
++ lib/recommendation-look-first.js -> lib/run-ledger.js | LLM & prompts -> Runs & dispatch
++ lib/render-task-page.js -> lib/render-task-timeline.js | Front end: server-rendered pages -> Front end: server-rendered pages
++ lib/render-task-timeline.js -> lib/components/section.js | Front end: server-rendered pages -> Front end: server-rendered pages
++ lib/render-task-timeline.js -> lib/cost-format.js | Front end: server-rendered pages -> Other features
++ lib/render-task-timeline.js -> lib/render-run-steps.js | Front end: server-rendered pages -> Front end: server-rendered pages
++ lib/render-task-timeline.js -> lib/run-view.js | Front end: server-rendered pages -> Runs & dispatch
++ lib/render-task-timeline.js -> lib/task-page-loader.js | Front end: server-rendered pages -> Runs & dispatch
++ lib/render-task-timeline.js -> lib/utils/html.js | Front end: server-rendered pages -> Platform & plumbing
++ lib/run-ledger.js -> lib/prompts/blind-read-words.js | Runs & dispatch -> LLM & prompts
++ lib/run-ledger.js -> lib/prompts/survey-words.js | Runs & dispatch -> LLM & prompts
++ lib/session-roles.js -> lib/dispatch-fields.js | Runs & dispatch -> Runs & dispatch
++ lib/session-roles.js -> lib/run-view.js | Runs & dispatch -> Runs & dispatch
++ lib/task-cost-read.js -> lib/cost-read.js | Runs & dispatch -> Runs & dispatch
++ lib/task-cost-read.js -> lib/lineage-membership.js | Runs & dispatch -> Runs & dispatch
++ lib/task-cost-read.js -> lib/request-usage-loader.js | Runs & dispatch -> Runs & dispatch
++ lib/task-page-loader.js -> lib/task-timeline.js | Runs & dispatch -> Runs & dispatch
++ lib/task-timeline.js -> lib/session-roles.js | Runs & dispatch -> Runs & dispatch
++ lib/task-timeline.js -> lib/task-cost-read.js | Runs & dispatch -> Runs & dispatch
++ lib/task-timeline.js -> lib/utils/time.js | Runs & dispatch -> Platform & plumbing
++ routes/proxy-compute.js -> lib/task-cost-read.js | Agent API (proxy) -> Runs & dispatch
++ routes/proxy-writes.js -> lib/dispatch-leftover-answer.js | Agent API (proxy) -> Runs & dispatch
++ routes/proxy-writes.js -> lib/run-ledger.js | Agent API (proxy) -> Runs & dispatch
++ routes/proxy.js -> lib/task-cost-read.js | Agent API (proxy) -> Runs & dispatch
++ routes/task-page.js -> lib/render-task-timeline.js | Web routes (pages & workspace API) -> Front end: server-rendered pages
++ routes/task-share.js -> lib/render-task-timeline.js | Web routes (pages & workspace API) -> Front end: server-rendered pages
++ routes/task-share.js -> lib/task-timeline.js | Web routes (pages & workspace API) -> Runs & dispatch
++ routes/workspace-api.js -> lib/recommendation-live-wait.js | Web routes (pages & workspace API) -> LLM & prompts
++ server.js -> lib/task-timeline.js | Wiring (server.js) -> Runs & dispatch
+- lib/agent-status-store.js -> lib/read-horizon.js | Runs & dispatch -> Platform & plumbing
+- lib/dispatch-entrance.js -> lib/recommendation-look-first.js | Runs & dispatch -> LLM & prompts
+- lib/recommendation-look-first.js -> lib/prompt-template-defs.js | LLM & prompts -> LLM & prompts
+- routes/proxy-compute.js -> lib/lineage-membership.js | Agent API (proxy) -> Runs & dispatch
+- routes/proxy-compute.js -> lib/request-usage-loader.js | Agent API (proxy) -> Runs & dispatch
+- routes/workspace-api.js -> lib/recommendation-look-first.js | Web routes (pages & workspace API) -> LLM & prompts

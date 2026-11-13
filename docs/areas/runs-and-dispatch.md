@@ -98,7 +98,13 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   merged landing PR puts it in the notes PR's landing (`auditAfterLandingCloseOut` in
   `lib/recommendation-facts.js` treats only the new PR as the notes PR), and a foreign PR cited
   before the first review joins a first landing. Each costs a read that must name an extra PR. One
-  comment classifier and one landing reader would make both follow from one rule. (LIN-4438; Survey global on LIN-4438.)
+  comment classifier and one landing reader would make both follow from one rule. A third case is not pinned: an agent's own note (first line
+  `autopilot`, `plan posted`, `plan revised`, or `revision N`) that cites a new PR after review joins
+  `landingPrUrls` but not `isLandingEvidence` (`lib/recommendation-facts.js`), so `blindReadStep`
+  offers a blind read naming a PR the approved review never covered, where a plain note sends it
+  back to review (reproduced at
+  e2d4659c4; Seams & Tangles, 13 Nov.; `docs/reviews/seams-tangles-review-2026-11-13-run12.md`, §3.0a).
+  (LIN-4438; Survey global on LIN-4438.)
 - `lib/run-closeout-state.js`: `deriveCloseOutState` works from two PR lists: `prs` (`extractPrUrls`,
   every PR ever cited) drives the PR-shape reasons (multiple-prs, partial, merged) and `landingPrs`
   (`landingPrUrls`) drives the blind-read gate, so the box can count PRs the gate ignores and the
