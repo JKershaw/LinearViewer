@@ -3660,3 +3660,15 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - **Settled itself:** the passenger ruling covers merges made outside Harbour too, and which PR reading wins is an engineering call.
     - **The ruling:** are the simple-dispatcher halves of the copied rules in scope (`sessionPrs`, `columnProblems`, the transcript fold)? If unanswered, they're kept in. **Suggested `in-scope`.** The ask says the copies are gone, and John asked for sizes erring larger. Where a rule has to exist on both sides of the wire, one owner plus a check that fails when the other side drifts counts as one home.
   - **Area read 0:** five of six reads done; one Runs & dispatch pass still running.
+- **13:35 UTC: LIN-4447's design is posted** (comment `6efb91fa`). The plan is one close-out decision and one reading of the comment trail, called by every surface. It found a sixth place deciding close-out, `deriveState` in `run-evidence.js`. The pieces:
+  - **0:** blind reads of the area plus a control (`front-end-pages`), before and after;
+  - **1 (larger):** `closeOutDecision` and `CLOSE_OUT_REASONS`, with the passenger rule written once;
+  - **2 (larger):** `lib/run-trail.js`, one classifier and one PR rule; an agent note citing a new PR sends the task back to review;
+  - **3:** `dispatchModelOf` retired;
+  - **4:** the live-stage wait moves to a Runs-owned file;
+  - **5–7:** halt modes, feedback kinds, the factory check, and the call reads split out.
+
+  12 of the 20 Waiting entries are settled; the other 8 say why not.
+  - **New ruling `lin4447-r1-passenger-scope`:** a person's Done and an outside merge, or only Done? **Suggested `both`**, from John's own words. Scoping had already settled this itself, so design asking it again is the "one question raised by two stages" pattern.
+  - **Coming, `lin4447-r2-sd-scope`:** the same question as scoping's `lin4447-sd-scope`, but the opposite recommendation (no, plus a cross-repo contract ticket). One answer should settle both. A follow-up ticket would also go against the leftover rule: unless something breaks or blocks, it would be a Waiting entry.
+  - **Raised with John: piece 0 repeats area read 0,** with a control the front-end lane will touch. It also says "no area-level read tool exists", which risks building new loop machinery. I'm asking John before I put the fact on the ticket.
