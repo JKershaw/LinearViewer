@@ -1,8 +1,12 @@
 /**
  * LIN-4471: the classic-loader census, a ratchet on the suites that run browser scripts as classic scripts. A suite counts
- * when it calls `loadWorld` (tests/unit/helpers/client-world.js, a vm over the fake DOM) or runs a `public/` source
- * through a vm itself. A converted page is tested by a plain import instead (tests/unit/helpers/import-world.js), and it
- * does not count. The list below is the baseline, written out by name as fake-dom-census.test.js does, so that "the
+ * when it calls `loadWorld` (tests/unit/helpers/client-world.js, a vm over the fake DOM), runs a `public/` source
+ * through a vm itself, or runs a classic script through the import helper's `runClassic`
+ * (tests/unit/helpers/import-world.js) with any file other than the two named IIFE siblings, RUN_CLASSIC_SIBLINGS below.
+ * Those two (`chart-helpers.js`, `close-out.js`) are what a converted page reads beside its imports, so a module suite
+ * that runs one of them is not a classic suite. Any other file loaded through `runClassic`, `observation.js` say, or a
+ * `runClassic` call whose argument is not a literal sibling name, counts: the helper must not be a way round the ratchet.
+ * A converted page is tested by a plain import instead (tests/unit/helpers/import-world.js), and it does not count. The list below is the baseline, written out by name as fake-dom-census.test.js does, so that "the
  * tests get simpler" is a number that moves: a new suite that loads browser scripts as classic fails, and so does a
  * listed suite that no longer does, until the list is lowered in the same change. Runs over tests/unit/*.js.
  *
@@ -122,13 +126,28 @@ export const CLASSIC_LOADER_SUITES = [
   'vendor-assets.test.js',
 ];
 
+/**
+ * The classic scripts `importWorld().runClassic` may run without the suite counting: the IIFE siblings the plan blesses
+ * (they declare nothing that could collide), which a converted page reads beside its imports.
+ */
+export const RUN_CLASSIC_SIBLINGS = ['chart-helpers.js', 'close-out.js'];
+
+/** True when the source of a suite runs a browser script as a classic script, by the census rule. */
+export function loadsClassic(src) {
+  if (/\bloadWorld\(/.test(src)) return true;
+  if (/public\//.test(src) && /node:vm|vm\.(runIn|Script|createContext)/.test(src)) return true;
+  const calls = [...src.matchAll(/\brunClassic\(\s*([^)]*?)\s*\)/g)];
+  return calls.some(([, arg]) => {
+    const literal = /^(['"])([^'"]+)\1$/.exec(arg);
+    return !(literal && RUN_CLASSIC_SIBLINGS.includes(literal[2]));
+  });
+}
+
 /** The suites that load browser scripts as classic scripts, by the census rule. */
 export function classicLoaderSuites(files) {
   return files.filter((f) => {
     if (f === 'classic-loader-census.test.js') return false; // this file names the rule's words, and is not a suite
-    const src = readFileSync(join(UNIT, f), 'utf8');
-    if (/\bloadWorld\(/.test(src)) return true;
-    return /public\//.test(src) && /node:vm|vm\.(runIn|Script|createContext)/.test(src);
+    return loadsClassic(readFileSync(join(UNIT, f), 'utf8'));
   });
 }
 
@@ -142,4 +161,21 @@ test('the classic-loader census matches its baseline: no new classic suite, and 
 
 test('the baseline is recorded at 102 suites (the count that must not rise)', () => {
   assert.equal(CLASSIC_LOADER_SUITES.length, 102);
+});
+
+test('runClassic is counted unless it runs a named sibling: observation.js counts, chart-helpers.js does not', () => {
+  assert.equal(loadsClassic("const w = importWorld(); w.runClassic('observation.js');"), true);
+  assert.equal(loadsClassic('importWorld().runClassic("observation.js")'), true);
+  assert.equal(loadsClassic("world.runClassic('chart-helpers.js');"), false);
+  assert.equal(loadsClassic("world.runClassic('close-out.js');"), false);
+  assert.equal(loadsClassic("world.runClassic('chart-helpers.js'); world.runClassic('prompt-section.js');"), true, 'one non-sibling call is enough');
+  assert.equal(loadsClassic('world.runClassic(name);'), true, 'a non-literal argument cannot be shown to be a sibling');
+  assert.equal(loadsClassic("world.runClassic('./chart-helpers.js');"), true, 'only the bare sibling name is exempt');
+  assert.equal(loadsClassic("await world.importPage('workspace-kpis.js');"), false, 'importing a module is not a classic load');
+});
+
+test('the real suites that run a sibling through runClassic are not counted, and the siblings list is the two IIFEs', () => {
+  assert.deepEqual(RUN_CLASSIC_SIBLINGS, ['chart-helpers.js', 'close-out.js']);
+  const found = classicLoaderSuites(['workspace-kpis-module.test.js', 'import-world.test.js']);
+  assert.deepEqual(found, []);
 });

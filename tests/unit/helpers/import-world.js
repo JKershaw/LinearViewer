@@ -23,7 +23,9 @@
  *    keep their cache, and they are pure, so that is safe.
  *  - `runClassic` runs a `public/` classic script in the main realm with `vm.runInThisContext`. It is the one supported
  *    way to put a classic sibling into the same realm as a module. Use it for `chart-helpers.js` and `close-out.js`,
- *    which are IIFEs and so declare nothing that could collide.
+ *    which are IIFEs and so declare nothing that could collide. Any other file loaded this way counts as a classic suite
+ *    in tests/unit/classic-loader-census.test.js (RUN_CLASSIC_SIBLINGS names the two exempt ones), so this helper is not
+ *    a way round that ratchet.
  *  - `restore()` puts back every global it changed, by descriptor: a replaced property gets its old descriptor back, a
  *    new property is deleted. It works from a snapshot taken when the world was made, so a global a test adds by hand
  *    is removed too. Accessor globals are never assigned, because Node 25 exposes some of them getter-only.

@@ -1,6 +1,6 @@
 /**
- * The import graph of `public/` (LIN-4471): the parse, the specifier rule and the flat-layout rule, shared by
- * tests/unit/front-end-import-layout.test.js and tests/unit/bridge-inventory.test.js. The allow-list is read from
+ * The import graph of `public/` (LIN-4471): the parse, the specifier rule and the flat-layout rule, used by
+ * tests/unit/front-end-import-layout.test.js. The allow-list is read from
  * SHARED_MODULES (lib/vendor-assets.js), never copied here: a second hand-kept list of leaves is the twin this check
  * exists to prevent.
  *
@@ -12,26 +12,20 @@
  * Anything else (a bare specifier, an absolute one, a nested or unlisted path) is a violation.
  */
 import * as acorn from 'acorn';
+import * as walk from 'acorn-walk';
 
 /** Each module-level import, re-export and literal dynamic import of `src`: `{ specifier, start }`. */
 export function importSpecifiers(src, { sourceType = 'module' } = {}) {
   const ast = acorn.parse(src, { ecmaVersion: 'latest', sourceType, allowHashBang: true });
   const found = [];
-  const visit = (node) => {
-    if (!node || typeof node.type !== 'string') return;
+  walk.full(ast, (node) => {
     if ((node.type === 'ImportDeclaration' || node.type === 'ExportAllDeclaration' || node.type === 'ExportNamedDeclaration') && node.source) {
       found.push({ specifier: node.source.value, start: node.start });
     }
     if (node.type === 'ImportExpression' && node.source && node.source.type === 'Literal' && typeof node.source.value === 'string') {
       found.push({ specifier: node.source.value, start: node.start });
     }
-    for (const key of Object.keys(node)) {
-      const v = node[key];
-      if (Array.isArray(v)) v.forEach(visit);
-      else if (v && typeof v.type === 'string') visit(v);
-    }
-  };
-  visit(ast);
+  });
   return found;
 }
 

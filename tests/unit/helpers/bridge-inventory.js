@@ -8,26 +8,24 @@
  *
  * The timing rule the registered consumers share (LIN-4446): a module runs after every classic script, so a classic
  * consumer may read the bridged name only from a handler or callback that runs after DOMContentLoaded, never during its
- * own execution. Each consumer's witness test loads the consumer first and calls `loadCostFormat` only after that.
+ * own execution. Each consumer's witness test loads the consumer first and calls `loadCostFormat` only after that, and
+ * the inventory checks the order: the witness's first `loadCostFormat(` call must come after the point where it loads
+ * the consumer, either a `loadWorld(` call whose `scripts` list names the consumer, or the first `world.run(` that
+ * follows a `readFileSync` of the consumer (see `witnessProblem`).
+ *
+ * Scope: this helper checks the CostFormat bridge only. The witness check is written for `loadCostFormat`
+ * (tests/fixtures/browser-cost-format.js), the one loader there is. A second bridged name would need its own witness
+ * loader passed in with the consumer table, which is growth and so needs its own change.
  */
 import * as acorn from 'acorn';
+import * as walk from 'acorn-walk';
 
 const GLOBAL_OBJECTS = new Set(['window', 'globalThis', 'self']);
-
-function walk(node, visit, parent = null, key = null) {
-  if (!node || typeof node.type !== 'string') return;
-  visit(node, parent, key);
-  for (const k of Object.keys(node)) {
-    const v = node[k];
-    if (Array.isArray(v)) v.forEach((c) => walk(c, visit, node, k));
-    else if (v && typeof v.type === 'string') walk(v, visit, node, k);
-  }
-}
 
 /** The names a module writes to the global object: `window.X = …` at any depth. */
 export function bridgeWrites(src, { sourceType = 'module' } = {}) {
   const names = new Set();
-  walk(acorn.parse(src, { ecmaVersion: 'latest', sourceType, allowHashBang: true }), (node) => {
+  walk.full(acorn.parse(src, { ecmaVersion: 'latest', sourceType, allowHashBang: true }), (node) => {
     if (node.type !== 'AssignmentExpression' || node.operator !== '=') return;
     const left = node.left;
     if (left.type === 'MemberExpression' && !left.computed && left.object.type === 'Identifier'
@@ -45,19 +43,57 @@ export function bridgeWrites(src, { sourceType = 'module' } = {}) {
 export function bridgeReads(src, names, { sourceType = 'script' } = {}) {
   const wanted = new Set(names);
   const found = new Set();
-  walk(acorn.parse(src, { ecmaVersion: 'latest', sourceType, allowHashBang: true }), (node, parent, key) => {
+  walk.fullAncestor(acorn.parse(src, { ecmaVersion: 'latest', sourceType, allowHashBang: true }), (node, _state, ancestors) => {
     if (node.type === 'MemberExpression' && !node.computed && node.property.type === 'Identifier' && wanted.has(node.property.name)
       && node.object.type === 'Identifier' && GLOBAL_OBJECTS.has(node.object.name)) {
       found.add(node.property.name);
       return;
     }
     if (node.type === 'Identifier' && wanted.has(node.name)) {
-      const isMemberProp = parent && parent.type === 'MemberExpression' && key === 'property' && !parent.computed;
-      const isPropKey = parent && (parent.type === 'Property' || parent.type === 'MethodDefinition' || parent.type === 'PropertyDefinition') && key === 'key' && !parent.computed;
+      const parent = ancestors[ancestors.length - 2];
+      const isMemberProp = parent && parent.type === 'MemberExpression' && parent.property === node && !parent.computed;
+      const isPropKey = parent && (parent.type === 'Property' || parent.type === 'MethodDefinition' || parent.type === 'PropertyDefinition') && parent.key === node && !parent.computed;
       if (!isMemberProp && !isPropKey) found.add(node.name);
     }
   });
   return found;
+}
+
+/**
+ * The problem with a consumer's witness test text, or null. The witness must show the timing rule: the consumer is
+ * loaded first and `loadCostFormat` is called only after. Read from the witness's AST (comments and imports are not
+ * calls): the first `loadCostFormat(` call, against the point the consumer is loaded, which is the end of either a
+ * `loadWorld({ scripts: [..'consumer.js'..] })` call, or the first `world.run(` call that follows a `readFileSync` whose
+ * arguments name `consumer.js`. The earlier of the two points counts.
+ */
+export function witnessProblem(consumer, witness, text) {
+  const file = consumer.replace(/^\//, '');
+  const calls = [];
+  try {
+    walk.full(acorn.parse(text, { ecmaVersion: 'latest', sourceType: 'module', allowHashBang: true }), (node) => {
+      if (node.type === 'CallExpression') calls.push(node);
+    });
+  } catch (err) {
+    return `${consumer}: its witness ${witness} does not parse (${err.message}), so the load order cannot be checked.`;
+  }
+  const calleeName = (c) => (c.callee.type === 'Identifier' ? c.callee.name : c.callee.type === 'MemberExpression' && !c.callee.computed ? c.callee.property.name : null);
+  const named = (c) => text.slice(c.start, c.end).includes(file);
+  const loaderStarts = calls.filter((c) => c.callee.type === 'Identifier' && c.callee.name === 'loadCostFormat').map((c) => c.start);
+  if (!loaderStarts.length) return `${consumer}: its witness ${witness} never calls loadCostFormat, so it does not show the global installed after the consumer loads.`;
+  const loadedAt = [];
+  for (const c of calls.filter((x) => calleeName(x) === 'loadWorld')) {
+    const scripts = c.arguments[0] && c.arguments[0].type === 'ObjectExpression'
+      ? c.arguments[0].properties.find((p) => p.key && (p.key.name === 'scripts' || p.key.value === 'scripts')) : null;
+    const names = scripts && scripts.value.type === 'ArrayExpression' ? scripts.value.elements.filter((e) => e && e.type === 'Literal').map((e) => String(e.value).replace(/^\//, '')) : [];
+    if (names.includes(file)) loadedAt.push(c.end);
+  }
+  for (const read of calls.filter((x) => calleeName(x) === 'readFileSync' && named(x))) {
+    const run = calls.filter((x) => calleeName(x) === 'run' && x.start > read.start).sort((a, b) => a.start - b.start)[0];
+    if (run) loadedAt.push(run.end);
+  }
+  if (!loadedAt.length) return `${consumer}: its witness ${witness} never loads the consumer (a loadWorld call with ${file} in its scripts, or a readFileSync of it followed by world.run), so the load order cannot be checked.`;
+  if (Math.min(...loaderStarts) < Math.min(...loadedAt)) return `${consumer}: its witness ${witness} calls loadCostFormat before it loads the consumer. The timing rule (LIN-4446) is the reverse: the consumer loads first and the global is installed after, as the module shim does in a browser, so a read during the consumer's own execution fails here.`;
+  return null;
 }
 
 /**
@@ -94,7 +130,10 @@ export function bridgeProblems({ bridged, shim, emitted, pages, renderers, consu
     if (!readers.has(file)) problems.push(`${file} is a registered consumer but no longer reads a bridged name: remove it from the consumer table.`);
     const witness = consumers[file];
     if (!fileExists(witness)) problems.push(`${file}: its witness ${witness} does not exist.`);
-    else if (!/loadCostFormat\s*\(/.test(readText(witness))) problems.push(`${file}: its witness ${witness} never calls loadCostFormat, so it does not show the global installed after the consumer loads.`);
+    else {
+      const problem = witnessProblem(file, witness, readText(witness));
+      if (problem) problems.push(problem);
+    }
   }
 
   for (const { rel, entries } of renderers) {

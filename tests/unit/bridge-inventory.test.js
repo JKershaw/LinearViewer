@@ -12,8 +12,9 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bridgeProblems, bridgeReads, bridgeWrites } from './helpers/bridge-inventory.js';
+import { bridgeProblems, bridgeReads, bridgeWrites, witnessProblem } from './helpers/bridge-inventory.js';
 import { scriptLists } from './helpers/renderer-scripts.js';
+import { byScriptsList, otherScriptOnly, rightOrderByRun, swappedByRun } from './helpers/bridge-witness-fixtures.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
@@ -71,6 +72,21 @@ describe('the bridge over the real repo', () => {
     assert.deepEqual(Object.keys(inputs.emitted).sort(), ['cost-format-global.js', 'workspace-kpis.js']);
   });
 
+  test('the renderer lists the check read are the five that name a consumer, so a list the reader cannot match fails here', () => {
+    // A rewrite of a list the reader does not model (`Object.freeze([...])`, say) would drop that renderer from the
+    // coverage half of the check without a failure, so the lists it did read are pinned by name and number.
+    const named = inputs.renderers.filter((r) => r.entries.some((e) => CONSUMERS[e.src])).map((r) => r.rel);
+    assert.ok(named.includes('lib/render-task-page.js'), `lib/render-task-page.js (the const SCRIPTS shape) is not among the lists read: ${named.join(', ')}`);
+    assert.ok(new Set(named).size >= 5, `expected at least 5 renderers that name a consumer, read ${new Set(named).size}: ${named.join(', ')}`);
+    for (const rel of ['lib/render.js', 'lib/render-swipe.js', 'lib/render-task-page.js', 'lib/render-observation.js', 'lib/render-flight-companion.js']) {
+      assert.ok(named.includes(rel), `${rel} is missing from the consumer-naming lists read: ${named.join(', ')}`);
+    }
+  });
+
+  test('a list written as Object.freeze([...]) is not read: the pin above is what catches it', () => {
+    assert.deepEqual(scriptLists("const SCRIPTS = Object.freeze(['/common.js', '/prompt-section.js']);"), []);
+  });
+
   test('the bridge keeps exactly three classic readers, and the workspace KPIs page is not one', () => {
     assert.deepEqual([...result.readers.keys()].sort(), Object.keys(CONSUMERS).sort());
     assert.equal(result.readers.has('/workspace-kpis.js'), false);
@@ -88,7 +104,7 @@ describe('the checks fail on each synthetic breach (witnesses for the inventory)
       renderers: inputs.renderers,
       consumers: { ...CONSUMERS },
       fileExists: () => true,
-      readText: () => 'loadCostFormat(world.sandbox);',
+      readText: (witness) => rightOrderByRun(Object.keys(CONSUMERS).find((c) => CONSUMERS[c] === witness)),
     };
   };
   const run = (overrides) => bridgeProblems({ ...base(), ...overrides }).problems;
@@ -133,5 +149,23 @@ describe('the checks fail on each synthetic breach (witnesses for the inventory)
   test('a witness that is missing, or never calls loadCostFormat, fails', () => {
     assert.ok(run({ fileExists: () => false }).some((p) => /its witness .* does not exist/.test(p)));
     assert.ok(run({ readText: () => '// no loader here' }).some((p) => /never calls loadCostFormat/.test(p)));
+    assert.ok(run({ readText: () => '// loadCostFormat(world.sandbox) is only named in a comment' }).some((p) => /never calls loadCostFormat/.test(p)), 'a comment is not a call');
+  });
+
+  test('timing: a witness that installs the bridge before it loads the consumer fails, naming the timing rule', () => {
+    const problems = run({ readText: (witness) => swappedByRun(Object.keys(CONSUMERS).find((c) => CONSUMERS[c] === witness)) });
+    const hits = problems.filter((p) => /calls loadCostFormat before it loads the consumer/.test(p));
+    assert.equal(hits.length, Object.keys(CONSUMERS).length, problems.join('\n'));
+    assert.match(hits[0], /timing rule/);
+  });
+
+  test('timing, scripts-list form: installing the bridge before a loadWorld that lists the consumer fails; after it passes', () => {
+    assert.match(witnessProblem('/observation.js', 'w.test.js', byScriptsList('/observation.js', { first: true })), /before it loads the consumer/);
+    assert.equal(witnessProblem('/observation.js', 'w.test.js', byScriptsList('/observation.js')), null);
+    assert.match(witnessProblem('/observation.js', 'w.test.js', otherScriptOnly), /never loads the consumer/);
+  });
+
+  test('timing: a witness that never loads its consumer is named, so the order cannot pass by omission', () => {
+    assert.match(witnessProblem('/flight-companion.js', 'w.test.js', 'loadCostFormat(world.sandbox);'), /never loads the consumer/);
   });
 });

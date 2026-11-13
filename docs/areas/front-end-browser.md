@@ -29,13 +29,15 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   module imports the formatter directly and reads no bridge.
 - A bridge reader reads the global only from a handler or callback that runs after DOMContentLoaded, never while its
   script executes: Chart.js calls scale tick callbacks synchronously. Its witness loads the reader first and installs the
-  global after it (`loadCostFormat`, `tests/fixtures/browser-cost-format.js`), which is the order a page has.
+  global after it (`loadCostFormat`, `tests/fixtures/browser-cost-format.js`), which is the order a page has. The inventory
+  reads each witness's calls and fails a witness whose first `loadCostFormat(` comes before it loads the reader.
 - A `{ module }` entry's place in a renderer's script list means nothing: a module runs after every classic script,
   wherever it is listed. A bridge reader is safe because of when it reads the global, not where the shim sits.
 - A converted page is tested by plain `import` over the fake DOM (`tests/unit/helpers/import-world.js`), not by `loadWorld`.
   Each import is a fresh module instance, and the world puts every global back when it is restored. The classic-loader
   census (`tests/unit/classic-loader-census.test.js`) is a ratchet on the suites that still load classic scripts: it may
-  only fall.
+  only fall. A suite that runs a classic file through `runClassic` counts, except `public/chart-helpers.js` and `public/close-out.js`,
+  the two IIFE siblings a module page may read.
 
 ## Waiting
 
