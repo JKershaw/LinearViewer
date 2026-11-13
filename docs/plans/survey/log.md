@@ -3568,3 +3568,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - **F6, build-then-retire in 5.2 hours** (LIN-4422's blind sample retired by LIN-4439), inside the measurement layer. True reverts: 0.
     - **Settling:** test-suite growth down to a quarter of its pace (F7); CI median 9.28 → 5.78 min after LIN-4441, now bound by E2E shard 2 at about 5.8 min (F8); the dispatch, proxy, Home and runner-kit hotspots quiet; less rewriting (0.36 → 0.30 deleted per added); SD code-silent since 8 Nov, within its own range (F9).
   - **For the gate:** this is the read I'd planned for the switch. It puts numbers on three items already on the list: mechanisms add copies faster than they remove them (F5, F3), the loop's cost (F1, a new item, and the biggest), and the process share of the work (F2).
+- **01:05 UTC: LIN-4442 (Stability Review run 6) Done.** LIN-4399 still In Progress; I'm waiting on John (A2 now, or switch now).
