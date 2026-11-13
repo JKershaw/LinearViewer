@@ -1,0 +1,34 @@
+stability measures eb14b7fff..163efc069 (2026-11-12T21:06:21Z → 2026-11-12T23:17:49Z), 4 landings
+1. No new mess
+   blind            not measured: no --api given and HARBOUR_LOCAL_BASE unset
+                    8 Nov: not measured: no 8 Nov reading; the first reading sets it
+2. The curve
+   lines            net +35 (code +3, comment-only +31, blank +1); +8.8 per landing; totals 209,042 → 209,077; comment-only share 39.74% → 39.74%
+                    8 Nov: net +6,558 (code +3,034, comment-only +3,185, blank +339); +57.5 per landing; totals 200,226 → 206,784; comment-only share 39.44% → 39.73%
+   churn            114 added, 79 deleted over 4 landings; 28.5 added and 19.8 deleted per landing; 0.69 deleted per added
+                    8 Nov: 10,235 added, 3,677 deleted over 114 landings; 89.8 added and 32.3 deleted per landing; 0.36 deleted per added
+   ci               median 5.78 min over 4 runs (4 of 4 landings)
+                    8 Nov: median 8.59 min over 114 runs (114 of 114 landings)
+   waiting.harbour  91 → 98 (+7, +1.75 per landing)
+                    8 Nov: 0 → 56 (+56, +0.49 per landing)
+   waiting.runner   12 → 12 (0, 0 per landing); main af9b496d5..af9b496d5
+                    8 Nov: 0 → 10 (+10, +0.09 per landing); main 9478e1c53..5d8489e7f
+   waiting.total    103 → 110 (+7, +1.75 per landing)
+                    8 Nov: 0 → 66 (+66, +0.58 per landing)
+   minted           not measured: no --api given and HARBOUR_LOCAL_BASE unset
+                    8 Nov: 190 over LIN-4204 → LIN-4394, 1.67 per landing (ID-span estimate; 22 probes)
+3. Speed
+   tasks            not measured: no --api given and HARBOUR_LOCAL_BASE unset
+                    8 Nov: 106 finished (1 landed before base); of 106 tickets landed here, 0 not done and 1 done outside the window; 0 landing(s) own no ticket; lookback 3 days
+   speed            not measured: no --api given and HARBOUR_LOCAL_BASE unset
+                    8 Nov: median 56.3 min (mean 124.6) first dispatch → last landing; median 5 sessions (mean 5.61); 106 of 106 tasks
+4. The person's seat
+   rulings          not measured: no --api given and HARBOUR_LOCAL_BASE unset
+                    8 Nov: not measured: no 8 Nov reading; the first reading sets it
+   origin           not measured: dispatchedBy is the workspace account for autopilot and person alike
+                    8 Nov: not measured: no 8 Nov reading; the first reading sets it
+   operator-free    not measured: no --api given and HARBOUR_LOCAL_BASE unset
+                    8 Nov: not measured: no 8 Nov reading; the first reading sets it
+5. Cost per finished task
+   cost             not measured: no --api given and HARBOUR_LOCAL_BASE unset
+                    8 Nov: median $9.53 (mean $14.29) over 106 of 106 tasks; unpriced 0, noTelemetryCount 0, unreadableCount 0, noLineage 0
