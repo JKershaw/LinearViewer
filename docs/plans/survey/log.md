@@ -3645,3 +3645,18 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - Web routes: `b751eeb3`, `26104435`.
 
   The reads stand at the pinned commit, so the lanes can start beside them without spoiling the "before". Kicked off **LIN-4447** (Runs & dispatch tidy, autopilot `66ced645`) and **LIN-4448** (LLM & prompts tidy, `87882502`) with the standard goal. **All four lanes are running, on default models.** The watcher follows the lanes, the reads, LIN-4441, new rulings and both mains.
+- **13:29 UTC: both tidy lanes scoped as "rebuild the area"**, each with one ruling for John. I posted suggestions on both.
+  - **LIN-4448 `lin4448-safety-cuts`.**
+    - **Scoping's diagnosis:** a stage kind has no single definition. It's a row in about 14 parallel tables in `prompt-template-defs.js`, plus bare copies in five other files.
+    - **The fix it proposes:** one record per stage kind, with the old tables made into views of it. The read-only limit gets held in code by having the proxy refuse writes outside a stage's limit; today it's words only, and the broker checks only that an intent header is present.
+    - **It also corrected the ticket:** `prompt-system.md` is already right; only `llms.txt:271` is wrong.
+    - **The ruling:** should the merge limit (LIN-3417, plus the merge half of LIN-1273) and the token tickets (LIN-1372, LIN-1395, LIN-1408) wait for A12 and simple-dispatcher? **Suggested `defer`.** The ask lets a safety ticket wait by John's ruling; A12 owns them; the merge limit sits in the runner's GitHub credential, and the token tickets concern the MCP and harness, not prompt words.
+  - **LIN-4447 `lin4447-sd-scope`.**
+    - **What scoping found** (all of it checked against `4b5001ddf`):
+      - close-out precedence is spelled in at least four places;
+      - **three** readers decide "this task's PRs", not two (`extractPrUrls`, `landingPrUrls`, `isLandingEvidence`);
+      - `dispatchModelOf` keeps its own model rule;
+      - the live-stage wait sits in a file that `areas.json` places in LLM & prompts.
+    - **Settled itself:** the passenger ruling covers merges made outside Harbour too, and which PR reading wins is an engineering call.
+    - **The ruling:** are the simple-dispatcher halves of the copied rules in scope (`sessionPrs`, `columnProblems`, the transcript fold)? If unanswered, they're kept in. **Suggested `in-scope`.** The ask says the copies are gone, and John asked for sizes erring larger. Where a rule has to exist on both sides of the wire, one owner plus a check that fails when the other side drifts counts as one home.
+  - **Area read 0:** five of six reads done; one Runs & dispatch pass still running.
