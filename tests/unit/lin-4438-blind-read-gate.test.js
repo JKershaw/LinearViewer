@@ -9,7 +9,7 @@
  *   - box: readRunEvidence, the task page's close-out box (its one read is the landing's sole PR, LIN-4458);
  *   - guard, stop-at lane: closeOutNotReady on a stop-at-PR task;
  *   - guard, ladder lane: closeOutNotReady on an ordinary task.
- * A future place that decides readiness without closeOutWaitsOn and landingPrUrls disagrees with a row.
+ * A future place that decides readiness without closeOutDecision (LIN-4460) and the landing disagrees with a row.
  *
  * Rows 14 and 15 write their expected landing down, so the behaviour is chosen, not found. Row 14 was
  * flipped on purpose by LIN-4458 (piece 2 of LIN-4447): with one comment classifier, an audit carries

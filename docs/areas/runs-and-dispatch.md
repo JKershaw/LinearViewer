@@ -50,8 +50,8 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   guard reads comments for every close-out since LIN-4438, and without the seam it reaches the real
   provider and fails open, a pass the hermetic watcher catches only in CI.
 - Close-out readiness is one decision, `closeOutDecision` (`lib/run-closeout-state.js`, LIN-4460): every surface
-  renders or enforces its answer. A readiness rule goes in the decision, with a row in `lin-4438-blind-read-gate` and
-  `lin-4460-close-out-decision` (LIN-4438: gating one lane let the page offer a press the guard refused).
+  renders or enforces its answer. A new reason is a row of `CLOSE_OUT_REASONS` plus a row in
+  `lin-4438-blind-read-gate` and `lin-4460-close-out-decision`, whose census reads code, not comments.
 - When a person acts, Harbour follows (LIN-4447, John): a landing whose every PR reads merged stands the gate aside;
   a Done ticket with no close-out on its landing stands only the recommendation's read aside. Harbour never sets Done.
 - What a comment is, and which PRs are the task's, are read once in `lib/run-trail.js`: a comment kind
@@ -141,6 +141,15 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   Why not now: a PR read on the recommend path costs budget (`PR_STATE_READ_COST` against the 36/h anonymous limit in
   `lib/pr-state-store.js`), needs token resolution on a path that has none, and the process-wide PR cache is not
   workspace-scoped. Supplying a landing-merged fact later is one more input to `closeOutDecision`. (LIN-4460.)
+- `lib/close-out-readiness.js` `readCloseOutChain`: every caller gets the derived box, but the merge recorder
+  (`lib/close-out-merges.js`) wants only the reads, so it passes `actor: 'harbour'`, `runnerReady` and `owner` for a
+  state it discards. A reads-only chain (trail, statuses, stop-at) with each surface calling `deriveCloseOutState`
+  would drop those flags, at the cost of the check route, the guard and the tests that read `state` from the chain
+  (`lin-4438-blind-read-gate`, `close-out-readiness-chain`): larger than a fix. (LIN-4460 leftovers; Survey global.)
+- `lib/run-trail.js` `readTrail`: `closeOutOnTrail` (the decision's advice fact) and `closeOutAfterReview` (the
+  selector's TRAIL FACTS line, `lib/recommendation-facts.js`) agree whenever a review is on record and differ only
+  without one. Folding them to one fact changes `followsPerson` for a Done ticket with no review and touches the
+  selector's facts on the LLM & prompts side. (LIN-4460 leftovers.)
 - `lib/ci-wake-sweep.js` `prRefsFromPark` parses a runner's park message with its own `FULL_PR_URL_RE` (scheme
   optional, repo key case-folded) beside `prUrlsIn`/`prOf` (`lib/run-ledger.js`). Its comment-side read already
   goes through `extractPrUrls`. Moving it onto `prUrlsIn` changes which park messages wake (a scheme-less URL

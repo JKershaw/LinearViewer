@@ -248,9 +248,10 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
   /**
    * Close-out check (LIN-3248, P3 of LIN-2949). The page calls this on load and
    * on tab focus, only while the close-out state is `ready`. It re-reads the PR
-   * live, derives the close-out state with `deriveCloseOutState` (never P2's
-   * looser `closeOut.status`), records a `{ by: 'person' }` event when a PR is
-   * merged, and sets Done only within R1's bounds — all on the signed-in
+   * live, derives the close-out state with `deriveCloseOutState` over the one
+   * decision (`closeOutDecision`, `actor: 'person'`, LIN-4460), records a
+   * `{ by: 'person' }` event when a PR is merged, and sets Done when the
+   * decision's `setDone` says so — all on the signed-in
    * person's own provider session, never a worker or proxy token. Returns
    * `done` (a Done is recorded for the merge) and `doneNow` (THIS call wrote
    * the tracker's Done) so the client reloads only on the real transition.
