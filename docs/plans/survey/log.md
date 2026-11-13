@@ -3639,3 +3639,9 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - (b) in the state reads, the tidy area's count of high and medium repeated rules falls by more than the control's, and its ease moves up at least one step in both passes, while the control's ease moves less.
 
     If (a) holds and (b) doesn't, the result is "better, small". If a lane commit touches the control's files, I list it and judge with that known.
+- **13:16 UTC: area read 0 sent, then the tidy lanes kicked off.** Six reads were sent via `POST /dispatch` (custom, cli, Opus high, no `issueIdentifier`), all pinned to `4b5001ddf`:
+  - LLM & prompts: `a945a8d1`, `9c94fb81`;
+  - Runs & dispatch: `4de8d75e`, `8b82ffe5`;
+  - Web routes: `b751eeb3`, `26104435`.
+
+  The reads stand at the pinned commit, so the lanes can start beside them without spoiling the "before". Kicked off **LIN-4447** (Runs & dispatch tidy, autopilot `66ced645`) and **LIN-4448** (LLM & prompts tidy, `87882502`) with the standard goal. **All four lanes are running, on default models.** The watcher follows the lanes, the reads, LIN-4441, new rulings and both mains.
