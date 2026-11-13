@@ -6,15 +6,17 @@
  *   - route: lib/openrouter.js codeRouteOf, through getRecommendation (the selector stubbed to answer
  *     `close-out` when the code routes stand aside);
  *   - state: deriveCloseOutState for a stop-at-PR run, through readCloseOutChain (the check route's chain);
- *   - box: buildRunEvidence, the task page's close-out box;
+ *   - box: readRunEvidence, the task page's close-out box (its one read is the landing's sole PR, LIN-4458);
  *   - guard, stop-at lane: closeOutNotReady on a stop-at-PR task;
  *   - guard, ladder lane: closeOutNotReady on an ordinary task.
  * A future place that decides readiness without closeOutWaitsOn and landingPrUrls disagrees with a row.
  *
- * Rows 14 and 15 write their expected landing down, so the behaviour is chosen, not found. Both pin a
- * known skew between landingPrUrls and the other landing readers (a notes PR beside its merged landing,
- * a foreign PR cited before the first review); docs/areas/runs-and-dispatch.md carries it as a Waiting
- * entry, so the pin is not read as a design.
+ * Rows 14 and 15 write their expected landing down, so the behaviour is chosen, not found. Row 14 was
+ * flipped on purpose by LIN-4458 (piece 2 of LIN-4447): with one comment classifier, an audit carries
+ * only the PRs it is the first on the trail to cite (its notes PRs), so the merged landing PR it re-cites
+ * no longer joins the notes PR's landing, and the read names the notes PR alone. Row 15 (a foreign PR
+ * cited before the first review joins a first landing) stays a stated limit: no caller holds the task's
+ * repository (docs/areas/runs-and-dispatch.md says why).
  *
  * Run with: node --test tests/unit/lin-4438-blind-read-gate.test.js
  */
@@ -24,10 +26,10 @@ import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { getRecommendation, setFetchImpl, setPromptTraceRecorder } from '../../lib/openrouter.js';
 import { readCloseOutChain, closeOutNotReady } from '../../lib/close-out-readiness.js';
-import { buildRunEvidence } from '../../lib/run-evidence.js';
+import { readRunEvidence } from '../../lib/run-evidence.js';
 import { closeOutWaitsOn } from '../../lib/run-closeout-state.js';
-import { landingPrUrls } from '../../lib/run-ledger.js';
-import { assembleTrailFacts, isAgentNote, isPersonComment } from '../../lib/recommendation-facts.js';
+import { landingPrUrls, commentKindOf, isPersonComment } from '../../lib/run-trail.js';
+import { assembleTrailFacts } from '../../lib/recommendation-facts.js';
 import { blindReadStep, BLIND_READ_ATTEMPT_BOUND } from '../../lib/recommendation-blind-read.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
@@ -81,7 +83,7 @@ const ROWS = [
   { n: 11, name: 'approve, then a plain link comment naming a new PR', comments: [summary(1), review(2), link(3)], route: 'aside', gate: 'wait' },
   { n: 12, name: 'approve, a read, then a merging close-out on a Done ticket', state: DONE, comments: [summary(1), review(2), read(3, PR1), closeOut(4, `Merged ${PR1}; set Done.`)], merged: [41], route: 'aside', gate: 'admit' },
   { n: 13, name: 'approve, a not-ready close-out, a fix round re-naming the PR, then a re-review', comments: [summary(1), review(2), closeOut(3, `Not ready: CI red on ${PR1}. Next: implementation.`), summary(4), review(5)], route: 'blind-read', gate: 'wait' },
-  { n: 14, name: 'a Done ticket: landing close-out, then an audit notes PR and its own review', state: DONE, comments: [summary(1), review(2), read(3, PR1), closeOut(4, `Merged ${PR1}; set Done.`), audit(5), review(6, 'Approve', PR2)], merged: [41], route: 'blind-read', gate: 'wait', landing: [PR1, PR2] },
+  { n: 14, name: 'a Done ticket: landing close-out, then an audit notes PR and its own review', state: DONE, comments: [summary(1), review(2), read(3, PR1), closeOut(4, `Merged ${PR1}; set Done.`), audit(5), review(6, 'Approve', PR2)], merged: [41], route: 'blind-read', gate: 'wait', landing: [PR2] },
   { n: 15, name: 'a pre-review comment cites a foreign PR by full URL', comments: [research(1), summary(2), review(3), read(4, PR1)], route: 'blind-read', gate: 'wait', landing: [FOREIGN, PR1] },
 ];
 
@@ -117,8 +119,8 @@ async function routeLane(row) {
 async function lanes(row) {
   const workspace = { urlKey: 'acme' };
   const { state } = await readCloseOutChain({ workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, 'pr'), stopAt: 'pr', runnerReady: true, owner: true, byPersonCheck: false, prStatusCache: new Map() });
-  const urls = [...new Set(row.comments.flatMap(x => x.body.match(/https:\/\/github\.com\/\S+?\/pull\/\d+/g) || []))];
-  const box = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: row.comments, prStatus: urls.length === 1 ? statusFor(row, urls[0]) : null, stopAt: 'pr', runnerReady: true, owner: true }).closeOut;
+  // LIN-4458: the box is read the way the page reads it (readRunEvidence: one read, of the landing's sole PR).
+  const box = (await readRunEvidence({ issueIdentifier: 'LIN-1', comments: row.comments, readPrStatus: async ({ repo, number }) => statusFor(row, `https://github.com/${repo}/pull/${number}`), stopAt: 'pr', runnerReady: true, viewerIsOwner: true })).closeOut;
   const stopAtGuard = await closeOutNotReady({ workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, 'pr') });
   const ladderGuard = await closeOutNotReady({ workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, null) });
   return { route: await routeLane(row), state, box, stopAtGuard, ladderGuard };
@@ -162,7 +164,7 @@ describe('the shared-trail table: every lane agrees (LIN-4438)', () => {
 describe('rows that need more than the lanes', () => {
   test('row 11: the plain link comment is work after review, not an agent note or a person; the predicate waits', () => {
     const row = ROWS.find(r => r.n === 11);
-    assert.equal(isAgentNote(LINK_BODY), false, 'never an AGENT_NOTE_RE opening, so it counts as landing work');
+    assert.notEqual(commentKindOf(LINK_BODY), 'agent-note', 'never an agent-note opening, so it counts as landing work');
     assert.equal(isPersonComment(LINK_BODY), false, 'never read as a person waiting for an answer');
     const facts = assembleTrailFacts(row.comments, '', { leaf: false });
     assert.equal(facts.workAfterReview, true, 'the selector facts show work after review');
@@ -171,16 +173,20 @@ describe('rows that need more than the lanes', () => {
     assert.deepEqual(landingPrUrls(row.comments), [PR1, PR2]);
   });
 
-  test('row 14: the audit re-cites the merged landing PR, so the notes PR\'s read must name both (the skew, pinned)', () => {
+  // Flipped on purpose by LIN-4458: before it, the audit's re-cite of the merged PR1 joined the notes
+  // PR's landing, so the read had to name both. One classifier gives an audit only the PRs it is the
+  // first to cite, so the notes PR's landing is PR2 alone.
+  test('row 14: the audit re-cites the merged landing PR, and the notes PR\'s read names the notes PR alone (flipped by LIN-4458)', () => {
     const row = ROWS.find(r => r.n === 14);
     const facts = assembleTrailFacts(row.comments, '', { leaf: false });
-    assert.equal(closeOutWaitsOn({ ...facts.review, blindRead: { prs: [PR2] } }, landingPrUrls(row.comments)), 'blind-read', 'a read of the notes PR alone does not clear it');
-    assert.equal(closeOutWaitsOn({ ...facts.review, blindRead: { prs: [PR1, PR2] } }, landingPrUrls(row.comments)), null);
+    assert.deepEqual(landingPrUrls(row.comments), [PR2]);
+    assert.equal(closeOutWaitsOn({ ...facts.review, blindRead: { prs: [PR2] } }, landingPrUrls(row.comments)), null, 'a read of the notes PR alone clears it');
+    assert.equal(closeOutWaitsOn({ ...facts.review, blindRead: { prs: [PR1] } }, landingPrUrls(row.comments)), 'blind-read', 'a read of the merged landing alone does not');
     const prompt = generatePrompt('blind-read', issueOf(row), context(row)).prompt;
-    assert.ok(prompt.includes(`**The change:** ${PR1}, ${PR2}`), 'the reader is told to read both');
+    assert.ok(prompt.includes(`**The change:** ${PR2}`) && !prompt.includes(`**The change:** ${PR1}`), 'the reader is told to read the notes PR only');
   });
 
-  test('row 15: piece 2\'s landingPrUrls keeps a foreign PR cited before the first review in a first landing', () => {
+  test('row 15: the landing keeps a foreign PR cited before the first review in a first landing (a stated limit)', () => {
     const row = ROWS.find(r => r.n === 15);
     assert.deepEqual(landingPrUrls(row.comments), [FOREIGN, PR1]);
   });

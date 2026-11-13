@@ -218,6 +218,42 @@ test('PATCH /issues/:id: a trashed issue is refused (409) before resolution', as
   assert.equal(status, 409);
 });
 
+// LIN-4451 disposition (b), applied to PATCH as create already does (LIN-4452 leftover): a
+// present assigneeId / parentId / cycleId that is not a UUID is refused 400 before any read,
+// never dropped on a 200 that leaves the rest of the PATCH applied.
+for (const name of ['assigneeId', 'parentId', 'cycleId']) {
+  test(`PATCH /issues/:id: a non-UUID ${name} is refused 400 before any read, and nothing is written`, async () => {
+    let guardCalled = false;
+    const { provider, calls } = makeProvider({ issueWriteGuard: async () => { guardCalled = true; return { id: ISSUE_UUID, trashed: false, team: { id: TEAM_UUID } }; } });
+    const { status, body } = await request(buildApp(provider), `/api/proxy/issues/${ISSUE_UUID}`, {
+      method: 'PATCH',
+      body: { title: 'Renamed', [name]: 'ENG-1' },
+    });
+    assert.equal(status, 400, JSON.stringify(body));
+    assert.equal(body.error, `${name} must be a UUID`);
+    assert.equal(guardCalled, false, 'refused before the guard read');
+    assert.equal(calls.updateInput, undefined, 'nothing written, not even the title');
+  });
+}
+
+test('PATCH /issues/:id: UUID assigneeId / parentId / cycleId pass through, and parentId: null still clears', async () => {
+  const { provider, calls } = makeProvider();
+  const { status } = await request(buildApp(provider), `/api/proxy/issues/${ISSUE_UUID}`, {
+    method: 'PATCH',
+    body: { assigneeId: TEAM_UUID, cycleId: PROJECT_UUID, parentId: BUG_UUID },
+  });
+  assert.equal(status, 200);
+  assert.deepEqual(calls.updateInput, { assigneeId: TEAM_UUID, parentId: BUG_UUID, cycleId: PROJECT_UUID });
+
+  const cleared = makeProvider();
+  const res = await request(buildApp(cleared.provider), `/api/proxy/issues/${ISSUE_UUID}`, {
+    method: 'PATCH',
+    body: { parentId: null },
+  });
+  assert.equal(res.status, 200);
+  assert.deepEqual(cleared.calls.updateInput, { parentId: null });
+});
+
 // ---------------------------------------------------------------------------
 // Labels
 // ---------------------------------------------------------------------------

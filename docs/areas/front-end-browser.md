@@ -13,17 +13,37 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
 
 - The no-build-step rule (`CLAUDE.md`) allows browser sharing, not only forbids it (LIN-4446). The browser may import
   natively, and the restated copies came from reading the rule as "no sharing" (`docs/papers/harbour/the-second-copy.md`
-  §9–10). Limits: a shared module is a leaf (it imports nothing and names no browser or Node global, as
-  `tests/unit/shared-modules.test.js` checks), served only
-  through the explicit `SHARED_MODULES` allow-list in `lib/vendor-assets.js`, never by directory. Views and the `vm` test
-  loaders stay classic until a module-capable client test loader exists. A consumer reads a shared global only from a
-  handler or a callback that runs after DOMContentLoaded, never during script execution: Chart.js calls scale tick
-  callbacks synchronously, which is why `public/workspace-kpis.js` builds on DOMContentLoaded. A slice retires the
-  restated copy and its parity check in the same change, not later.
+  §9–10). Pages become ES modules that import what they share (LIN-4471), converted top down: a page module before the
+  files it uses. A module runs after every classic script, so it reads any classic global safely; a leaf converted first
+  would have classic consumers and need a bridge. A lib twin retires when its last classic consumer converts.
+- Shared leaves: a shared module is a leaf (it imports nothing and names no browser or Node global,
+  `tests/unit/shared-modules.test.js`), served only through the explicit `SHARED_MODULES` allow-list in
+  `lib/vendor-assets.js`, one route per file under the served /lib/ namespace, never by directory (a lib file not on the
+  list is a 404). A page imports one with a relative specifier that starts with ../lib/ (quoted in the code). The
+  second is `lib/time-words.js` (LIN-4472): the duration and relative-time words, which the server and the task page both
+  import; the page's own copies were removed, not kept under a parity test. That
+  resolves to the same file in the browser and in Node only because `public/` is served at the URL root and stays flat,
+  with no nested .js files (`tests/unit/front-end-import-layout.test.js`). Do not move `public/` under a prefix or add a
+  subdirectory.
+- One bridge, no new names: `public/cost-format-global.js` is the only module that writes a global for classic scripts.
+  Its names, its one emitter and its classic readers are inventoried (`tests/unit/bridge-inventory.test.js`). A new name
+  fails the check, and so does a registered reader that no longer reads, so the bridge only shrinks. A page that is a
+  module imports the formatter directly and reads no bridge.
+- A bridge reader reads the global only from a handler or callback that runs after DOMContentLoaded, never while its
+  script executes: Chart.js calls scale tick callbacks synchronously. Its witness loads the reader first and installs the
+  global after it (`loadCostFormat`, `tests/fixtures/browser-cost-format.js`), which is the order a page has. The inventory
+  reads each witness's calls and fails a witness whose first `loadCostFormat(` comes before it loads the reader.
 - A `{ module }` entry's place in a renderer's script list means nothing: a module runs after every classic script,
-  wherever it is listed. A consumer is safe because of when it reads the global, not where the shim sits. To test that
-  order in a `vm` seam, set `document.readyState = 'loading'` before the script runs and install the global after it; a
-  seam with no `readyState` (`tests/unit/flight-companion-client.test.js`) starts the page at load, unlike the browser.
+  wherever it is listed. A bridge reader is safe because of when it reads the global, not where the shim sits.
+- A converted page is tested by plain `import` over the fake DOM (`tests/unit/helpers/import-world.js`), not by `loadWorld`.
+  Each import is a fresh module instance, and the world puts every global back when it is restored. The classic-loader
+  census (`tests/unit/classic-loader-census.test.js`) is a ratchet on the suites that still load classic scripts: it may
+  only fall. `importWorld` installs only what it is given, unlike `loadWorld`: no stub `fetch`, `setInterval` or
+  clipboard, and real timers unless `timers` is passed, so a page's init would reach the network or leave a poll
+  running. Test pure exports by a static import; drive an init through one shared world with inert defaults
+  (`tests/unit/helpers/task-page-world.js`, LIN-4472), made before the import so the page's DOMContentLoaded listener
+  lands on the fake document. A suite that runs a classic file through `runClassic` counts, except `public/chart-helpers.js` and `public/close-out.js`,
+  the two IIFE siblings a module page may read.
 
 ## Waiting
 
@@ -43,19 +63,17 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
 - `public/common.js`: exported globals, and the "client twins" of `lib/task-page-href.js`, `lib/timeline-zoom.js`,
   `lib/ship-layout.js` and `lib/prompt-formatters.js`. The first two are leaves of the same shape as cost-format, the
   next candidates; the last two import other modules, so serving a single file will not do for them. Its
-  `TERMINAL_TYPES` mirror of `lib/providers/models.js` (no imports) is another leaf candidate; its comment still says
-  `public/` cannot import it. (LIN-4446 plan and leftovers.)
-- `public/cost-format-global.js`: the module-to-global bridge is specific to one module. `tests/unit/shared-modules.test.js`
-  hard-codes the shim, the `'window.CostFormat'` string and the four consumers, and the DOMContentLoaded-only rule is
-  restated in four files and witnessed per consumer, but no check covers a new consumer: a fifth trips only the
-  hard-coded list, with no hint of the timing rule. A second shared module needs a second shim and guard. Needs a design
-  call first: one shim per module, a general shim, or consumers that are modules. (LIN-4446 blind read.)
+  `TERMINAL_STATE_TYPES` mirror of `lib/providers/models.js` (no imports) is another leaf twin, and it retires when its
+  last classic consumer converts (LIN-4471 corrected its comment to say so). (LIN-4446 plan and leftovers.)
 - `public/ship.js` / `public/ship-biscuit.js`: still hand-synced copies ("mirror of lib/ship-layout.js", "kept in
   lockstep with lib/render-ship-biscuit.js"). Each lib side would first have to become an import-free leaf before it
   could join `SHARED_MODULES`. (LIN-4446 blind read.)
-- `public/prompt-section.js`: the browser files reach their suites through `tests/unit/helpers/client-world.js`, which
-  loads them as classic scripts through `vm`. A module-capable client test loader is needed before any view becomes a
-  module, since `lib/components/page.js` emits classic tags. (LIN-4446.)
+- `public/session.js`: its `formatElapsed` is a copy of `fmtDuration` (`lib/time-words.js`, LIN-4472), and
+  `formatRuntime` in `public/observation.js` is the same rule again (it returns `''` where the leaf returns null).
+  `fmtDuration` in `public/live-console.js` words seconds with no hour rung (`66m 40s` where the leaf says `1h 6m`),
+  so the duration rule is spelled two ways. All three are classic scripts, so none can import the leaf until its
+  page is a module (observation.js is next in LIN-4463's order; session.js shares close-out.js with the task page).
+  Each copy goes when its page converts; Live Console's wording is a choice to make then. (LIN-4472 leftovers.)
 - `public/observation.js`: about 5,000 lines. By the counting method of LIN-4446 (lines starting with `*`, `//` or `/*`)
   1,985 of its 4,679 non-blank lines are comments. Find out why it is this large before splitting it. An earlier survey
   used a different method, so its figure is not comparable. (LIN-4446 plan.)
@@ -69,3 +87,9 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   stream, and "AI Recommend · generating…" / "Loading…" spin with no message, while Run to PR works
   beside it. Offer only what the server can do, or say why it can't. (Onboarding & Cold-Start
   Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)
+- `public/feedback-widget.js`: on any non-ok response it keeps the draft and shows `data.error`; it never
+  checks `code: 'PARTIAL_WRITE'` or `retryable: false` (LIN-4452). After a Jira ticket that landed without
+  its seal, the user sees agent wording ("do not retry the create, read the issue instead") with no
+  identifier and Save still active, so pressing Save again files a duplicate. Read the code, show the
+  created key if the envelope carries one, and disable resubmit. Only reachable on a Jira-backed
+  workspace whose property write fails; revisit with John's live evidence on LIN-4445. (LIN-4452 blind read.)

@@ -81,7 +81,7 @@ function consentCopy() {
 }
 
 /** The writes Jira actually implements, asked of the provider rather than assumed. */
-const IMPLEMENTED_WRITES = ['updateIssue', 'createComment', 'addLabel', 'removeLabel']
+const IMPLEMENTED_WRITES = ['createIssue', 'updateIssue', 'createComment', 'addLabel', 'removeLabel']
   .filter((op) => jira.supports(op));
 
 describe('LIN-2302 instance 1 — Jira API-token consent copy', () => {
@@ -194,6 +194,7 @@ describe('LIN-2302 instance 1 — Jira API-token consent copy', () => {
     // ones `supports()` reports, so the copy and the code cannot drift apart.
     const copy = consentCopy();
     const DISCLOSURE = {
+      createIssue: /\bcreat\w*\b/i,
       updateIssue: /\b(?:updat\w*|chang\w*|edit\w*)\b/i,
       createComment: /\bcomment\w*\b/i,
       addLabel: /\blabel\w*\b/i,
@@ -210,7 +211,8 @@ describe('LIN-2302 instance 1 — Jira API-token consent copy', () => {
     // Over-disclosing is a false claim too — telling a user Harbour will create
     // issues or upload files on their Jira, when `supports()` says it cannot.
     const copy = consentCopy();
-    const UNIMPLEMENTED = ['createIssue', 'uploadFile', 'createRelation'];
+    // createIssue is implemented since LIN-4451, so it is disclosed above, not banned here.
+    const UNIMPLEMENTED = ['uploadFile', 'createRelation'];
     for (const op of UNIMPLEMENTED) {
       assert.equal(jira.supports(op), false, `precondition: Jira still does not implement ${op}`);
     }
@@ -241,7 +243,6 @@ describe('LIN-2302 instance 1 — Jira API-token consent copy', () => {
       return null;
     };
     for (const [op, pattern] of [
-      ['createIssue', /\bcreat\w*\s+(?:new\s+)?(?:issues?|tickets?)\b/i],
       ['uploadFile', /\b(?:upload\w*|attach\w*)\b/i],
       ['createRelation', /\blink\w*\s+issues?\b/i],
     ]) {

@@ -24,14 +24,20 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   the same `### Leftovers` heading mid-comment, so matching any heading line would refuse the verdict
   that gates merge (`routes/proxy-writes.js` `refusedByLeftoverAnswer`; caught at LIN-4414's plan
   review). Test it against real comments, review verdicts included (`tests/unit/dispatch-leftover-answer.test.js`).
+- A format check on an optional create or PATCH field refuses (400); it is never the field's
+  `present` gate. As a `present` gate it skipped the value, and the write succeeded without it: a
+  Jira key or a Linear identifier in `parentId` vanished. Check presence first, then the writable
+  contract, then the format (`routes/proxy-writes.js`, LIN-4451 create, LIN-4452 PATCH).
+- A typed error a provider method gains reaches a caller only if every route calling that method
+  maps it: `refs`/`partial` in the proxy write `SPEC`, and each session or feedback catch by hand.
+  Provider tests passed while all three create lanes answered a bare 500 for a landed create. Pin
+  it at the route boundary (`routes/proxy-writes.js`; `tests/unit/lin-4452-create-lane-envelope.test.js`).
 
 ## Waiting
 
 - `routes/proxy-compute.js`: the recap/brief GET and POST handlers repeat one error-mapping chain
   and match provider errors by an "OpenRouter" substring; one helper beside `failureOf`, keyed on
   an error code, would hold "whole or loud". (Review, 8 Nov, on LIN-4358; area reads CG/CH.)
-- `routes/proxy.js`: `hashCredential` (proxyLimiter's key) is a second sha256-of-a-token helper
-  beside `ProxyTokenStore._hashToken`. One exported token hash. (Area reads CE/CF, LIN-4378.)
 - `lib/proxy-instructions.js`: the rate-limit rule (60/min per token; on a 429 wait `Retry-After`)
   is restated in ~eight places (quote one); it keys on the proven credential, else the IP
   (`routes/proxy.js`), so "per token" is wrong before auth. (Area reads
@@ -49,7 +55,7 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
 - `routes/proxy.js`: recommend-and-dispatch's `skipLiveWait` exempts any `followUpTo`, so a
   follow-up into an *ended* session of another stage proceeds while one is live. Requiring
   `followUpTo` in the live row's lineage needs a lineage read per hop (`lib/dispatch-entrance.js`
-  sets it; wait and race: `lib/recommendation-live-wait.js`). (LIN-4392 review.)
+  sets it; wait and race: `lib/run-live-wait.js`). (LIN-4392 review.)
 - `lib/proxy-instructions.js`: the catalog omits the `leftover` row kind and the hold on a
   build's DONE wake until its leftover row ends (`lib/dispatch-leftover.js`; the architecture doc
   has it). Its `kind` contract, "prompt-template keys plus custom", misses 23

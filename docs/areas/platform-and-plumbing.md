@@ -11,11 +11,16 @@ Area notes for `platform-and-plumbing` in the registry. Format and rules: README
   this file serves, check the embedded versions in the served file (its banner and inlined
   dependencies), not only `package-lock.json`. (Dependency & Supply-Chain Review, 10 Nov.;
   `docs/reviews/dependency-supply-chain-review-2026-11-10.md`)
+- A served-path boundary (`lib/vendor-assets.js`) is tested two ways, never by a probe list alone. Its structure: the
+  router holds exact routes only, one per allow-listed URL, with no `use()` mount. And raw requests: `fetch` collapses
+  dot segments before it sends, so a traversal probe over `fetch` really asks for the root server.js and proves nothing.
+  `tests/unit/shared-modules.test.js` sends them with `node:http`. LIN-4471's review found that a static mount of the
+  repo root passed every probe the list did not name; the structure test is what catches it.
 
 ## Waiting
 
 - `lib/vendor-assets.js`: since LIN-4446 it also serves `SHARED_MODULES` (leaf files under `lib/` at
-  `/shared/*`), so the file name and `createVendorAssetsRouter` say less than it does. A rename touches
+  `/lib/*`, LIN-4471), so the file name and `createVendorAssetsRouter` say less than it does. A rename touches
   `server.js`'s mount, which `tests/unit/vendor-assets.test.js` pins as an exact string, and the source
   map; it was left out of the cost-format slice to keep that slice small. (LIN-4446 leftovers.)
 - `lib/db-indexes.js`: one shared in-memory collection fake that knows these semantics
@@ -32,3 +37,15 @@ Area notes for `platform-and-plumbing` in the registry. Format and rules: README
   several 30 ms ticks; under load it fails with the message of the defect it guards (the interval
   stopped after a throw), and a whole-run re-run turned it green. Count ticks or drive a fake clock.
   (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)
+- `lib/partial-write-error.js`: an edit that fails with `failed: 'property'` is `retryable: true` and its
+  provider message says "retrying is safe". A Jira site that always drops entity properties fails every
+  retry the same way, so a caller that follows `retryable` loops forever. Making property failures
+  non-retryable, or giving them a separate signal, changes the documented envelope
+  (`lib/proxy-instructions.js` PARTIAL_WRITE, `docs/proxy-integration.md`), so it is a decision, not a
+  fix; settle it once John's live evidence (LIN-4445, runbook step 2) shows whether his site drops it.
+  (LIN-4452 blind read.)
+- `lib/partial-write-error.js`: a landed create answers "do not retry the create, read the issue
+  instead", but `context` carries only `applied` and `failed`; the created key appears only inside the
+  prose `error` string, so a caller must parse a sentence to know which issue to read. Adding the issue id
+  to `PartialWriteError` and the envelope widens a documented shape on the proxy and session lanes.
+  (LIN-4452 blind read.)

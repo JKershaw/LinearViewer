@@ -25,19 +25,11 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   path (no server config) works there. That path is only reachable from Settings › Sources inside a
   workspace, so a Jira team without OAuth consent has to find "make a workspace, then Settings" alone.
   (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)
-- `lib/render-proxy.js`: the Proxy page header and hint say agents "interact with Linear" and its
-  examples use `LIN-123`, on Local and Jira workspaces too. The onboarding guide sends every agent here.
-  The copied prompt is already provider-correct (LIN-2370); the page copy around it is not.
-  (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)
 - `lib/render-runner-setup.js`: the runner page defines itself as working "with no Simple Dispatcher"
   and makes the two exclusive per workspace, but no page a newcomer reads says what Simple Dispatcher
   is or when a team would want it (an always-on host), and its queue token lives on the Dispatch page.
   A seam with the simple-dispatcher repo, whose README never names this page. (Onboarding &
   Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)
-- `lib/render-task-page.js`: the layout test's desktop check that both quiet offers (write a
-  brief, write a recap) sit on one line is a one-shot `boundingBox` read after a reload; it fails
-  first (10.25 px against 4) and passes on retry in 33 sampled green runs, so a real wrap
-  would read as a flake. Wait for layout to settle or poll. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)
 - `lib/render-session.js`: the run page's `session-run-chat` link is missing on the first attempt
   and present on retry in 10 sampled green runs (no ticket); whether the link renders late or
   the seed lands late is unknown. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)
@@ -45,3 +37,15 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   (`lib/task-timeline.js`: wake, resumed, or no records), and the legend's "woken or resumed" restates
   it again, though its header says it derives nothing. If the model ticks another role, the renderer
   styles it wrongly and the legend goes stale; the tick could carry its style. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+- `lib/render.js`: the external deep-link "+ Add task" branch has no in-tree provider since LIN-4451
+  (Jira was the last; GitHub Projects has no create affordance at all). The `getCreateTaskUrl`
+  overrides on Linear, GitHub, Local and Jira now only gate `ui.write`. Folding that gate into
+  `inlineCreate` would retire four overrides, the branch, its byte pin (`tests/unit/render.test.js`),
+  the `public/llms.txt` sentence and the decoupling guard in `tests/unit/providers.test.js`: larger
+  than a fix. (LIN-4451 leftovers.)
+- `lib/render-task-create.js`: on Jira, "+ Add task" under an epic opens `/task/new?projectId=<epic>`,
+  but Jira's `createFields()` has no `projectId`, so `routes/task-create.js` ignores it and the epic is
+  dropped silently; the task files in the chosen project with no epic. Either declare `projectId` in
+  `createFields()` (the provider already sets the epic from it, but the form then needs an epic or project
+  control scoped by team) or stop passing the parameter: a separate design decision, not a line edit.
+  (LIN-4451 review.)

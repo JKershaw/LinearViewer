@@ -162,16 +162,37 @@ describe('POST /api/proxy/issues — optional-field write contract (LIN-1557)', 
     assert.equal(input.cycleId, OTHER_UUID);
   });
 
-  test('a structurally-invalid value (non-UUID assigneeId) is silently dropped, unrelated to the write-contract gate', async () => {
-    // Pre-existing behaviour, unchanged by this ticket: format validation runs
-    // BEFORE the write-contract check, so a malformed value never reaches the
-    // gate at all — even for a provider that supports the field.
-    const { provider, calls } = makeProvider({ apiWriteFields: GITHUB_SHAPED });
-    const { status } = await post(buildApp(provider), {
-      title: 'x', assigneeId: 'not-a-uuid',
+  // LIN-4451 (review note 5, disposition (b)): a present, non-UUID assigneeId / parentId /
+  // cycleId is refused 400 rather than dropped on a 201. Before, the UUID check was a
+  // `present` gate, so the value was skipped and the issue filed without it.
+  test('a non-UUID assigneeId on a provider that declares it is refused 400, never filed without it (LIN-4451)', async () => {
+    const { provider, calls } = makeProvider({ apiWriteFields: FULL });
+    const { status, body } = await post(buildApp(provider), {
+      teamId: TEAM_UUID, title: 'x', assigneeId: 'not-a-uuid',
     });
-    assert.equal(status, 201);
-    assert.equal(calls.createIssue[0].assigneeId, undefined);
+    assert.equal(status, 400);
+    assert.match(body.error, /assigneeId must be a UUID/);
+    assert.equal(calls.createIssue.length, 0, 'nothing is created');
+  });
+
+  test('a non-UUID parentId (an issue key) on a provider that declares parentId is refused 400 (LIN-4451, review note 5)', async () => {
+    const { provider, calls } = makeProvider({ apiWriteFields: FULL });
+    const { status, body } = await post(buildApp(provider), {
+      teamId: TEAM_UUID, title: 'x', parentId: 'LIN-123',
+    });
+    assert.equal(status, 400);
+    assert.match(body.error, /parentId must be a UUID/);
+    assert.equal(calls.createIssue.length, 0, 'nothing is created');
+  });
+
+  test('a non-UUID parentId on a provider that does not declare parentId is refused as unsupported (LIN-4451)', async () => {
+    const { provider, calls } = makeProvider({ apiWriteFields: GITHUB_SHAPED });
+    const { status, body } = await post(buildApp(provider), {
+      title: 'x', parentId: 'PROJ-7',
+    });
+    assert.equal(status, 400);
+    assert.match(body.error, /parentId is not supported by this provider/);
+    assert.equal(calls.createIssue.length, 0);
   });
 
   // LIN-2352: teamId's requirement is conditional on createFields(), not a

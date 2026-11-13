@@ -316,9 +316,14 @@ test.describe('Task page, owner view (LIN-3329)', () => {
       // holds both offers on one line.
       expect(quiet.y, 'the quiet line is under the stages').toBeGreaterThan(dStages.y + dStages.height - 2);
       await expect(page.locator('.brief-placeholder, .recap-placeholder')).toHaveCount(0);
-      const offerBrief = await box('task-page-write-brief');
-      const offerRecap = await box('task-page-write-recap');
-      expect(Math.abs(offerBrief.y - offerRecap.y), 'both offers on one line').toBeLessThan(4);
+      // Polled, not read once: straight after the reload the offers can sit about 10 px apart until layout settles
+      // (Test Coverage Gap Review, 11 Nov., R1), so a one-shot read failed the first attempt and passed on retry. A real
+      // wrap never settles, so it still fails here.
+      await expect.poll(async () => {
+        const offerBrief = await box('task-page-write-brief');
+        const offerRecap = await box('task-page-write-recap');
+        return Math.abs(offerBrief.y - offerRecap.y);
+      }, { message: 'both offers on one line' }).toBeLessThan(4);
     } else {
       const dContext = await box('task-page-context-mount');
       expect(dContext.x).toBeGreaterThan(dStages.x + dStages.width - 2);

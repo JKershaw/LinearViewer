@@ -25,7 +25,7 @@ import {
   resolveTeamRef,
   RefResolutionError,
 } from '../lib/proxy-ref-resolver.js';
-import { PartialWriteError } from '../lib/partial-write-error.js';
+import { answerPartialWrite } from '../lib/partial-write-error.js';
 import { isTrashed } from '../lib/trashed-signal.js';
 import { validateIssueWriteFields, isValidPriority, validateCommentBody, MAX_COMMENT_LENGTH } from '../lib/issue-write-validation.js';
 import { parseStampLoopIds, STAMP_LOOP_IDS_MESSAGE } from '../lib/unanswered-decisions.js';
@@ -38,6 +38,7 @@ import { commentDedupe, commentDedupeGenerations } from './proxy.js';
 import { isHermeticTestToken } from '../lib/should-mock-ai.js';
 import { refuseCapability } from './workspace-api-steps.js';
 import { sealForFiling } from '../lib/as-asked-seal.js';
+import { RULING_MARK } from '../lib/run-trail.js';
 
 
 // LIN-2208: whether the decision-answer stamp(s) for a given comment-dedupe
@@ -255,7 +256,7 @@ const resolveIssueStateRef = (provider, token, teamId, rawRef) =>
 
 // The first reason a create body is refused, or null. Order is the contract:
 // team, title, the shared field validation, then the LIN-1973 restrictive half.
-function issueCreateRefusal({ title, description, teamId, stateId, priority }, declared) {
+function issueCreateRefusal({ title, description, teamId, projectId, parentId, stateId, priority }, declared) {
   if (declared.includes('teamId') && (!teamId || typeof teamId !== 'string')) return 'Valid teamId is required';
   if (!title || typeof title !== 'string') return 'title is required';
   // Shared seam (length caps, control characters, priority range). Unlike the
@@ -268,6 +269,11 @@ function issueCreateRefusal({ title, description, teamId, stateId, priority }, d
   // explicit `stateId: ''` is still caught.
   if (stateId !== undefined && !declared.includes('stateId')) return 'stateId is not supported by this provider';
   if (priority !== undefined && !declared.includes('priority')) return 'priority is not supported by this provider';
+  // LIN-4451: the same rule for the epic and the parent. Without it a Jira session
+  // create would file the issue with its epic silently dropped (the in-app form never
+  // sends either, so only a direct API caller can reach this).
+  if (projectId !== undefined && !declared.includes('projectId')) return 'projectId is not supported by this provider';
+  if (parentId !== undefined && !declared.includes('parentId')) return 'parentId is not supported by this provider';
   return null;
 }
 
@@ -295,24 +301,6 @@ function answerIssueWrite(res, rawResult, failureMessage) {
 function issueRefResolutionFailed(res, err) {
   if (!(err instanceof RefResolutionError)) return false;
   jsonError(res, err.status || 422, err.message, err.candidates ? { candidates: err.candidates } : undefined);
-  return true;
-}
-
-// Map a PartialWriteError (LIN-2012) the same way the proxy route does —
-// same structured envelope, same non-2xx PARTIAL_WRITE code — so a caller
-// sees identical shapes on both lanes. This route has no logEvent-equivalent
-// audit trail today (unlike the proxy lane), so the provider-level
-// console.warn in lib/providers/jira/index.js is what covers this lane;
-// adding one here is a separate, out-of-scope concern.
-function partialWriteFailed(res, err) {
-  if (!(err instanceof PartialWriteError)) return false;
-  jsonError(res, err.status || 500, err.message, {
-    code: 'PARTIAL_WRITE',
-    category: 'upstream',
-    retryable: true,
-    detail: err.cause?.message || null,
-    context: { applied: err.applied, failed: err.failed },
-  });
   return true;
 }
 
@@ -417,7 +405,7 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
     // retry (LIN-2933): an identical resubmission must still hit the same
     // dedupe entry, and the written body must not diverge between attempts.
     const key = dedupeKey(workspace.urlKey, issueId, body, commentDedupeGenerations.current(workspace.urlKey), 'human-comment');
-    const attributedBody = `${body}\n\n— Ruling recorded via Harbour`;
+    const attributedBody = `${body}\n\n${RULING_MARK}`;
 
     // Attribution (OQ2): a static fallback line, not a `provider.fetchViewer`
     // round-trip — see the plan's Attribution note for why. Reversible,
@@ -802,7 +790,10 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
       const created = answerIssueWrite(res, await provider.createIssue(token, input), 'Issue was not created');
       if (created) res.status(201).json({ success: true, issue: created.issue });
     } catch (err) {
-      if (issueRefResolutionFailed(res, err)) return;
+      // A PartialWriteError (LIN-2012) gets the proxy lane's envelope (a landed create is
+      // retryable:false). This lane has no logEvent audit line (unlike the proxy lane); the
+      // provider's console.warn in lib/providers/jira/index.js covers it.
+      if (issueRefResolutionFailed(res, err) || answerPartialWrite(res, err)) return;
       // NAMED MONITOR (LIN-1579) for the createdBy stamp: a createdBy-related
       // Linear rejection (5xx/502) surfaces here as a caught error under this
       // exact message — grep server logs for "Workspace-api create issue error".
@@ -884,7 +875,10 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
           .catch(e => console.error('[close-out-merges] seam 2 failure:', e?.message || e));
       }
     } catch (err) {
-      if (issueRefResolutionFailed(res, err) || partialWriteFailed(res, err)) return;
+      // A PartialWriteError (LIN-2012) gets the proxy lane's envelope (a landed create is
+      // retryable:false). This lane has no logEvent audit line (unlike the proxy lane); the
+      // provider's console.warn in lib/providers/jira/index.js covers it.
+      if (issueRefResolutionFailed(res, err) || answerPartialWrite(res, err)) return;
       console.error('Workspace-api update issue error:', err.message);
       return jsonError(res, 500, 'Failed to update issue');
     }

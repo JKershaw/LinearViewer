@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import { buildRouterPrompt, routeStage, parseWhyNow } from '../../lib/stage-router.js';
 import { formatStageOptions, getSelectableStages, STAGE_LEADS } from '../../lib/prompt-templates.js';
 import { getRecommendation, setFetchImpl, buildSelectorArgs } from '../../lib/openrouter.js';
-import { RULING_MARK } from '../../lib/recommendation-facts.js';
+import { RULING_MARK } from '../../lib/run-trail.js';
 
 const open = { name: 'In Progress', type: 'started' };
 const leaf = (over = {}) => ({ identifier: 'LIN-1', title: 'A task', description: 'Do it.', state: open, labels: [], ...over });

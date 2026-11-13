@@ -33,7 +33,7 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   person), and `/rulings` returns loop rulings only (LIN-4422).
 - Measure 1 has one source, the pre-merge `## Blind read`: a landing counts as read only when a
   read naming its PR was posted before its merge, matched through `landingPrUrls` and
-  `parseBlindRead` from `lib/run-ledger.js`, never a parser of its own; anything else is
+  `parseBlindRead` from `lib/run-trail.js`, never a parser of its own; anything else is
   unread under a named reason. A hand-run Balance cell becomes a sign only in
   `docs/papers/harbour/cleaner-than-it-started-scripts/balance-sign.mjs`, beside the paper's
   coder, which must reproduce both frozen codes files (LIN-4439).

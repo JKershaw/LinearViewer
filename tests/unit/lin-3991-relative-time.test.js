@@ -11,7 +11,8 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveHeader, relativeAgo } from '../../lib/task-page-loader.js';
+import { deriveHeader } from '../../lib/task-page-loader.js';
+import { relativeAgo } from '../../lib/time-words.js';
 import { renderTaskStatus } from '../../lib/render-task-page.js';
 import { readSheets, appliedDecls } from '../helpers/css-rules.js';
 

@@ -399,7 +399,8 @@ describe('task page structure', () => {
     const REPO = 'acme/app';
     const derive = (over) => deriveCloseOutState({
       prs: [{ url: `https://github.com/${REPO}/pull/41`, repo: REPO, number: 41, corroborated: false }],
-      prStatuses: [{ repo: REPO, readable: true, number: 41, state: 'open', merged: false, head: { ref: 'x', sha: 'aaaaaaa' }, ref: 'aaaaaaa', checks: [] }],
+      // LIN-4458: statuses are keyed by PR URL.
+      prStatuses: new Map([[`https://github.com/${REPO}/pull/41`, { repo: REPO, readable: true, number: 41, state: 'open', merged: false, head: { ref: 'x', sha: 'aaaaaaa' }, ref: 'aaaaaaa', checks: [] }]]),
       // LIN-4438: a blind read naming the PR is on record, so the gate is met and the runner decides.
       landingPrs: [`https://github.com/${REPO}/pull/41`],
       review: { verdict: 'approve', verdictText: 'Approve', sha: 'aaaaaaa', blindRead: { prs: [`https://github.com/${REPO}/pull/41`] } },
@@ -420,7 +421,7 @@ describe('task page structure', () => {
     assert.equal(lead(ownerState, 'owner'), sentence);
     assert.equal(lead(guestState, 'guest'), sentence, 'the guest reads the same sentence as the owner');
     // LIN-3418: a moved head is not ready for the owner, and the guest reads the same.
-    const moved = { prStatuses: [{ repo: REPO, readable: true, number: 41, state: 'open', merged: false, head: { ref: 'x', sha: 'bbbbbbb' }, ref: 'bbbbbbb', checks: [] }] };
+    const moved = { prStatuses: new Map([[`https://github.com/${REPO}/pull/41`, { repo: REPO, readable: true, number: 41, state: 'open', merged: false, head: { ref: 'x', sha: 'bbbbbbb' }, ref: 'bbbbbbb', checks: [] }]]) };
     const movedOwner = derive({ owner: true, runnerReady: true, ...moved });
     assert.equal(movedOwner.reason, 'head-moved');
     const notReady = 'PR #41 is open, but it isn&#039;t ready to merge yet.';

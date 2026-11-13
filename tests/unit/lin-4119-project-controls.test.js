@@ -140,11 +140,14 @@ describe('LIN-4119 — Add task in the project header', () => {
     assert.ok(!html.includes('add-task-link'));
   });
 
-  test('the external deep-link provider (ui.write) also takes its Add task in the header', () => {
+  // LIN-4451: Jira implements createIssue, so its Add task is the in-app link to /task/new, and
+  // it sits in the header like Linear's. No in-tree provider now takes the external deep link.
+  test('a Jira workspace (in-app create, LIN-4451) also takes its Add task in the header', () => {
     const jira = { id: 'w2', name: 'JS', urlKey: 'ws', provider: 'jira' };
     const html = render([projectWithFolds()], { workspaces: [jira], workspace: jira });
     const header = html.match(/<div class="project-header" data-testid="project-header">([\s\S]*?)<\/div>\n/);
-    assert.ok(header && header[1].includes('data-action="create-task"'), 'the external deep-link sits in the header');
+    assert.ok(header && header[1].includes('data-testid="create-task-trigger"'), 'the in-app create link sits in the header');
+    assert.ok(header[1].includes('/task/new?projectId='), 'it links to the in-app create page');
   });
 
 });

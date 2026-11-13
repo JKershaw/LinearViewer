@@ -205,11 +205,33 @@ test.describe('LIN-3689 — workspace KPIs page (e2e)', () => {
   });
 });
 
-// LIN-4446: the page's cost formatter is the shared lib/cost-format.js, reached through the module shim
-// (public/cost-format-global.js). A vm cannot prove module order, MIME or CSP, so this runs in the browser: the global
-// is installed and formats a sub-cent figure as the server does, and the page throws nothing and is refused nothing.
-test.describe('LIN-4446 — the shared cost formatter on the KPI page (e2e)', () => {
-  test('the module shim installs window.CostFormat, with no page error and no CSP refusal', async ({ page }) => {
+// One priced task, reported the way the runner reports it: a dispatch taken with the runner's token, and one usage record
+// posted through the runner's own endpoint (as tests/e2e/task-timeline.spec.js does). The cost chart draws only from a
+// priced task, so this is what lets the page's cost axis be read in a real browser.
+async function seedPricedUsage(page, key) {
+  const res = await page.request.post(`/workspace/${key}/api/dispatch`, {
+    data: { prompt: 'p', promptName: 'plan', kind: 'plan', issueIdentifier: 'LOCAL-3', target: 'cli' }
+  });
+  expect(res.status()).toBe(201);
+  const itemId = (await res.json()).item.id;
+  const { token } = await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${key}`)).json();
+  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const taken = await page.request.post(`/api/dispatch/take/${itemId}`, { headers: auth });
+  expect(taken.status()).toBe(200);
+  const usage = await page.request.post(`/api/dispatch/usage/${itemId}`, {
+    headers: auth,
+    data: { records: [{ requestId: 'kpi-cost-1', at: new Date().toISOString(), harness: 'claude-code', model: 'claude-haiku-4-5', inputTokens: 1000, outputTokens: 200, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 }] }
+  });
+  expect(usage.status()).toBe(200);
+}
+
+// LIN-4446 / LIN-4471: the cost axis formats with the shared lib/cost-format.js, which the page module imports from
+// /lib/cost-format.js (public/workspace-kpis.js). No window.CostFormat is involved. The test waits for the module's own
+// request (200, a JavaScript type), reads the y-axis tick callback Chart.js built for the cost chart, and checks no page
+// error and no CSP refusal happened on the way.
+test.describe('LIN-4446 / LIN-4471 — the shared cost formatter on the KPI page (e2e)', () => {
+  test('the page module loads /lib/cost-format.js, and the cost axis formats a sub-cent figure with it', async ({ page }) => {
+    await seedPricedUsage(page, keyA);
     const pageErrors = [];
     const cspRefusals = [];
     page.on('pageerror', (err) => pageErrors.push(String(err)));
@@ -217,10 +239,20 @@ test.describe('LIN-4446 — the shared cost formatter on the KPI page (e2e)', ()
       if (msg.type() === 'error' && /Content Security Policy/i.test(msg.text())) cspRefusals.push(msg.text());
     });
 
+    const libRequest = page.waitForResponse((res) => new URL(res.url()).pathname === '/lib/cost-format.js');
     await page.goto(`/workspace/${keyA}/kpis`);
-    const words = await page.evaluate(() => window.CostFormat.formatUsd(0.004));
+    const lib = await libRequest;
+    expect(lib.status()).toBe(200);
+    expect(lib.headers()['content-type']).toMatch(/javascript/);
 
-    expect(words).toBe('<$0.01');
+    await expect.poll(() => page.evaluate(() => {
+      const canvas = document.getElementById('chart-cost');
+      return Boolean(canvas && window.Chart && Chart.getChart(canvas));
+    })).toBe(true);
+    const tick = await page.evaluate(() => Chart.getChart(document.getElementById('chart-cost')).options.scales.y.ticks.callback(0.004));
+
+    expect(tick).toBe('<$0.01');
+    expect(await page.evaluate(() => typeof window.CostFormat)).toBe('undefined');
     expect(pageErrors).toEqual([]);
     expect(cspRefusals).toEqual([]);
   });

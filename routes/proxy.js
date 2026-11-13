@@ -13,7 +13,7 @@
  */
 
 import { Router } from 'express';
-import { createHash } from 'node:crypto';
+import { hashHarbourToken } from '../lib/harbour-token-format.js';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { createDedupeCache, createGenerationTracker } from '../lib/proxy-dedupe.js';
 import { createCredentialTrail } from '../lib/proxy-credential-trail.js';
@@ -97,7 +97,7 @@ import {
   resolveTeamRef,
   RefResolutionError,
 } from '../lib/proxy-ref-resolver.js';
-import { PartialWriteError } from '../lib/partial-write-error.js';
+import { PartialWriteError, partialWriteEnvelope } from '../lib/partial-write-error.js';
 import { tokenValidationOptions } from '../lib/consumer-heartbeat-ingest.js';
 import { badRequest, jsonError, keepaliveError, notFound, workspaceUnavailableEnvelope, classifyUpstreamError, isRateLimited, isEntityNotFoundError } from '../lib/errors.js';
 import { publicOrigin } from '../lib/public-origin.js';
@@ -238,7 +238,6 @@ export const commentDedupeGenerations = createGenerationTracker();
 // a token's first request) counts against the client IP exactly as before.
 const PROVEN_CREDENTIALS_CAP = 10000;
 const provenCredentials = new Set(); // hashes only; least recently proven dropped first
-const hashCredential = (token) => createHash('sha256').update(token).digest('hex');
 function noteCredential(hash, proven) {
   provenCredentials.delete(hash);
   if (!proven) return;
@@ -247,7 +246,7 @@ function noteCredential(hash, proven) {
 }
 function proxyLimiterKey(req) {
   const auth = req.headers.authorization;
-  const hash = auth?.startsWith('Bearer ') && auth.length > 7 ? hashCredential(auth.slice(7)) : null;
+  const hash = auth?.startsWith('Bearer ') && auth.length > 7 ? hashHarbourToken(auth.slice(7)) : null;
   return hash && provenCredentials.has(hash) ? `credential:${hash}` : ipKeyGenerator(req.ip);
 }
 const LIMITER_DEFAULTS = { standardHeaders: true, legacyHeaders: false };
@@ -537,7 +536,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // LIN-4378: a proven credential gets its own proxyLimiter budget; a rejected
       // one (401) goes back to the IP's. The 503 below is a store fault, not a
       // rejection, so it leaves the record alone.
-      noteCredential(hashCredential(token), !!result);
+      noteCredential(hashHarbourToken(token), !!result);
       if (!result) {
         // A rejected CALLER token and a rejected WORKSPACE credential are
         // both 401 and were, until LIN-1985, distinguishable ONLY in Harbour's
@@ -1280,24 +1279,16 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   /**
    * Map a PartialWriteError (LIN-2012) to a non-2xx `PARTIAL_WRITE` response
    * using the existing structured error envelope (code/category/retryable/
-   * context — see lib/errors.js's `errorEnvelope`), rather than a bespoke
-   * shape. The upstream status rides through (fallback 500) so a retryable
-   * 429 partial isn't flattened the same as a non-retryable one. `retryable`
-   * is always true here: both Jira writes are idempotent, so re-issuing the
-   * same PATCH is the correct recovery, never a rollback. Returns true when
-   * handled so callers can `if (partialWriteFailed(...)) return;` from a catch.
+   * context), built by lib/partial-write-error.js `partialWriteEnvelope`, the
+   * one place the retry rule lives: a create that landed is `retryable:false`
+   * and answers 500; an edit keeps `retryable:true` and its upstream status.
+   * Returns true when handled so callers can `if (partialWriteFailed(...)) return;` from a catch.
    */
   function partialWriteFailed(req, res, endpoint, err) {
     if (!(err instanceof PartialWriteError)) return false;
-    const status = err.status || 500;
+    const { status, message, extra } = partialWriteEnvelope(err);
     logEvent(req, endpoint, status, `PARTIAL_WRITE applied=${err.applied.join(',') || 'none'} failed=${err.failed}`);
-    jsonError(res, status, err.message, {
-      code: 'PARTIAL_WRITE',
-      category: 'upstream',
-      retryable: true,
-      detail: err.cause?.message || null,
-      context: { applied: err.applied, failed: err.failed },
-    });
+    jsonError(res, status, message, extra);
     return true;
   }
 

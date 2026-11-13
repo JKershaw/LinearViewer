@@ -82,20 +82,19 @@ test.describe('Jira provider (no test-token mock)', () => {
   });
 
   // LIN-2011 re-review finding F4: the "+ Add task" deep link used to pass the
-  // canonical project's id straight through as Jira's `pid=` query param.
-  // Since LIN-2011 that id is the EPIC issue's id (ENG-0 -> '10500'), not a
-  // Jira project id — Jira allocates project/issue ids from the same numeric
-  // space, so the old link opened the create dialog scoped to whatever
-  // unrelated project happened to hold that id (or a dead one). The fix
-  // drops the `pid=` scoping entirely for Jira rather than pointing it
-  // somewhere untrustworthy.
+  // canonical project's id straight through as Jira's `pid=` query param, which
+  // opened the create dialog against an unrelated project (the id was an epic's).
+  // LIN-4451 implements Jira's createIssue, so "+ Add task" is now the in-app
+  // form (/task/new?projectId=<epic id>), never Jira's external dialog. The
+  // guard holds: no link to Jira's create dialog, and no `pid=` anywhere.
   test('the "+ Add task" link never passes the epic id as Jira\'s pid (F4)', async ({ page }) => {
     await page.goto(`${DASHBOARD}backlog`);
-    const addTaskLink = page.locator('.add-task-link a[data-action="create-task"]').first();
+    const addTaskLink = page.locator('.add-task-link [data-testid="create-task-trigger"]').first();
     await expect(addTaskLink).toBeAttached();
     const href = await addTaskLink.getAttribute('href');
-    expect(href).toBe('https://acme.atlassian.net/secure/CreateIssue!default.jspa');
+    expect(href).toMatch(/\/task\/new\?projectId=/);
     expect(href).not.toContain('pid=');
+    expect(href).not.toContain('CreateIssue');
   });
 
   test('an issue description renders the ADF→Markdown conversion, not raw ADF JSON', async ({ page }) => {

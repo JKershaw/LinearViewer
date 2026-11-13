@@ -32,6 +32,7 @@ import { requestOriginOrNull, ORIGIN_UNRESOLVED_REFUSAL } from '../lib/public-or
 import { buildMockFeedbackTitle } from '../lib/workspace-api-mocks.js';
 import { normalizeWritePayload } from '../lib/proxy-graphql-errors.js';
 import { sealForFiling } from '../lib/as-asked-seal.js';
+import { answerPartialWrite } from '../lib/partial-write-error.js';
 import { AS_ASKED_HEADING } from '../lib/as-asked.js';
 
 // ===========================================================================
@@ -136,6 +137,18 @@ function normalizeFeedbackPriority(value) {
 }
 
 /**
+ * Whether a deployment default (FEEDBACK_TEAM_ID / FEEDBACK_PROJECT_ID) applies to this
+ * provider. Those are Linear UUIDs. On Jira a team is a project key and a project is an
+ * epic (LIN-2018, LIN-2011), so a UUID would reach Jira's create as the wrong thing.
+ * Every other provider keeps the default, as before (GitHub and Local take the team
+ * default as their gate, and ignore its value). LIN-4451.
+ */
+function feedbackEnvDefault(provider, name) {
+  if (provider?.name === 'jira') return false;
+  return Boolean(process.env[name]);
+}
+
+/**
  * The team a feedback ticket is filed under, or null when none can be found (the
  * caller answers that with a 422). First hit wins: an explicit body `teamId`,
  * then the `FEEDBACK_TEAM_ID` env, then the provider's first team.
@@ -143,7 +156,7 @@ function normalizeFeedbackPriority(value) {
 async function resolveFeedbackTeamId(provider, token, bodyTeamId) {
   const explicit = typeof bodyTeamId === 'string' ? bodyTeamId.trim() : '';
   if (explicit) return explicit;
-  if (process.env.FEEDBACK_TEAM_ID) return process.env.FEEDBACK_TEAM_ID;
+  if (feedbackEnvDefault(provider, 'FEEDBACK_TEAM_ID')) return process.env.FEEDBACK_TEAM_ID;
   const cannotListTeams = typeof provider.supports === 'function' && !provider.supports('fetchTeams');
   if (cannotListTeams) return null;
   try {
@@ -466,7 +479,8 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
         code: 'TEAM_UNRESOLVED', provider: provider.name,
       });
     }
-    const resolvedProjectId = (typeof projectId === 'string' && projectId.trim()) || process.env.FEEDBACK_PROJECT_ID || null;
+    const envProjectId = feedbackEnvDefault(provider, 'FEEDBACK_PROJECT_ID') ? process.env.FEEDBACK_PROJECT_ID : null;
+    const resolvedProjectId = (typeof projectId === 'string' && projectId.trim()) || envProjectId || null;
 
     try {
       // The message, then the page / browser capture block (LIN-635 S4).
@@ -583,6 +597,10 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
       });
     } catch (error) {
       console.error('Feedback submit error:', error);
+      // A ticket that landed without its seal (LIN-4452): the same PARTIAL_WRITE envelope
+      // as the other create lanes. retryable:false advises callers not to retry; the feedback
+      // widget (public/feedback-widget.js) does not read it yet, so it can still resubmit.
+      if (answerPartialWrite(res, error)) return;
       return jsonError(res, 500, 'Failed to submit feedback');
     }
   });

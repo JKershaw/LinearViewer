@@ -7,7 +7,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, createHash } from 'node:crypto';
-import { HARBOUR_TOKEN_PREFIXES, mintHarbourToken } from '../../lib/harbour-token-format.js';
+import { HARBOUR_TOKEN_PREFIXES, mintHarbourToken, hashHarbourToken } from '../../lib/harbour-token-format.js';
+import { readFileSync } from 'node:fs';
+import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
+import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
+import { HarbourFeedbackTokenStore } from '../../lib/harbour-feedback-tokens.js';
 import { SECRET_RULES, findSecretMatches } from '../../lib/secret-scan.js';
 import { maskSecretsInHtml as maskResult } from '../../lib/mask-secrets-in-html.js';
 import { credentialInProseRefusal } from '../../lib/runner-kit/runner.mjs';
@@ -115,5 +119,28 @@ describe('(e) runner credential-in-prose guard (standalone regex pinned to the r
   });
   test('takes prose with no credential', () => {
     assert.equal(credentialInProseRefusal({ prompt: 'do the thing' }), false);
+  });
+});
+
+// LIN-4451 leftovers (settles the agent-api Waiting entry on `hashCredential`): one token hash.
+// The three token stores keep only this digest, and the proxy limiter keys a proven credential
+// on it, so a second spelling could let the limiter and the stores disagree on a token.
+describe('hashHarbourToken: the one token hash', () => {
+  test('is the SHA-256 hex digest of the whole token (the standard "abc" vector)', () => {
+    assert.equal(hashHarbourToken('abc'), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+  });
+
+  test('every token store hashes through it', () => {
+    const token = mintHarbourToken('proxy');
+    for (const Store of [ProxyTokenStore, DispatchTokenStore, HarbourFeedbackTokenStore]) {
+      assert.equal(Store.prototype._hashToken(token), hashHarbourToken(token), `${Store.name} hashes as the leaf does`);
+    }
+  });
+
+  test('no store or the proxy limiter spells its own sha256 of a token', () => {
+    for (const file of ['lib/proxy-tokens.js', 'lib/dispatch-tokens.js', 'lib/harbour-feedback-tokens.js', 'routes/proxy.js']) {
+      const src = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
+      assert.doesNotMatch(src, /createHash\('sha256'\)\.update\(token\)/, `${file} hashes a token itself`);
+    }
   });
 });

@@ -19,7 +19,7 @@ import { formatIssueContext, getRecommendation, getRecommendationStream, setFetc
 import { routeStage, parseRouteDecision, parseRecommendedAction } from '../../lib/stage-router.js';
 import { formatStageContract } from '../../lib/prompt-contract.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
-import { readRunLedger } from '../../lib/run-ledger.js';
+import { readRunLedger } from '../../lib/run-trail.js';
 import { isRequestChangesRound } from '../../lib/prompts/revision-brief.js';
 import { fetchIssueContext } from '../../lib/providers/linear/index.js';
 import { LocalProvider } from '../../lib/providers/local/index.js';

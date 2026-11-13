@@ -21,7 +21,7 @@
  *   - the LIN-4369 handoff: a scoping run's final message with builder notes never reaches the
  *     prompt of the stage after it, while the size record does;
  *   - waiting on a live run (close-out ledger item 2, since LIN-4392 the general live-stage
- *     wait in lib/recommendation-live-wait.js): while a look-first step is queued or running,
+ *     wait in lib/run-live-wait.js): while a look-first step is queued or running,
  *     nothing else is sent, scoping included, and the ticket is not handed to the selector;
  *     recommend-and-dispatch refuses 409 STAGE_IN_FLIGHT naming the live dispatch, the UI
  *     stream says the same, and aborting a wedged step moves the sequence on.
@@ -36,9 +36,10 @@ process.env.NODE_ENV = 'test';
 import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { lookFirstStep, lookFirstOff, lookFirstSteps, holdingComment, isSurveyComment, LOOK_FIRST_STEPS } from '../../lib/recommendation-look-first.js';
+import { lookFirstStep, lookFirstOff, lookFirstSteps, holdingComment, LOOK_FIRST_STEPS } from '../../lib/recommendation-look-first.js';
+import { commentKindOf } from '../../lib/run-trail.js';
 import { buildPeriodicalGateMarker, isPeriodicalReview } from '../../lib/periodicals.js';
-import { liveWaitOf, STAGE_IN_FLIGHT_CODE } from '../../lib/recommendation-live-wait.js';
+import { liveWaitOf, STAGE_IN_FLIGHT_CODE } from '../../lib/run-live-wait.js';
 import { getRecommendation, getRecommendationStream, setFetchImpl, setPromptTraceRecorder, buildSelectorArgs } from '../../lib/openrouter.js';
 import { generatePrompt, PROMPT_TEMPLATES, deriveDispatchKind } from '../../lib/prompt-templates.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
@@ -111,11 +112,12 @@ describe('step choice: survey-task, then survey-place, then scoping, each once',
     assert.equal(stepOf(leaf(), ctx(drill)), 'scoping');
   });
 
-  test('isSurveyComment reads the heading constant both Surveys post under, and only it', () => {
-    assert.ok(isSurveyComment(surveyTask('10:00').body, 'survey-task'));
-    assert.ok(!isSurveyComment(surveyTask('10:00').body, 'survey-place'));
-    assert.ok(!isSurveyComment(`${SURVEY_HEADINGS['survey-task']}x: T-1`, 'survey-task'), 'a longer heading is another heading');
-    assert.ok(!isSurveyComment('Survey open-0 looks fine', 'survey-task'), 'prose naming it is not the report');
+  // LIN-4458: a Survey's report is a comment of that Survey's kind (lib/run-trail.js, the one classifier).
+  test('a Survey\'s kind reads the heading constant both Surveys post under, and only it', () => {
+    assert.equal(commentKindOf(surveyTask('10:00').body), 'survey-task');
+    assert.notEqual(commentKindOf(surveyTask('10:00').body), 'survey-place');
+    assert.notEqual(commentKindOf(`${SURVEY_HEADINGS['survey-task']}x: T-1`), 'survey-task', 'a longer heading is another heading');
+    assert.notEqual(commentKindOf('Survey open-0 looks fine'), 'survey-task', 'prose naming it is not the report');
   });
 });
 

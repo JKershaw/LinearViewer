@@ -21,3 +21,13 @@ Area notes for `web-routes` in the registry. Format and rules: README.md.
   error; the task-facts refresh (`lib/task-facts-holder.js`, Other features) calls GitHub live with a
   seeded fake token. A size of move: a standing guard like the unit `test:hermetic` that fails the
   e2e job on any non-loopback connect. LIN-3815 fixes named sites, not the guard. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)
+- `routes/workspace-api-feedback.js`: a feedback screenshot on a Jira workspace is refused 422,
+  because Jira has no `uploadFile` and an attachment needs an issue to exist first. Deciding
+  whether to file the words without the picture, or to upload after the create, is open. (LIN-4451
+  Survey global; a live check belongs with LIN-4452.)
+- `routes/workspace-api-issue-write.js`: "a create field the provider does not declare is a 400" is
+  spelled per field here (against `createFields()`), as a loop over `apiWriteFields()` in
+  `routes/proxy-writes.js`, and not at all in feedback (`routes/workspace-api-feedback.js`), which
+  picks its env defaults by provider name (`feedbackEnvDefault`, `jira`) instead of a provider
+  declaration. One create pipeline with one resolver and one refuse-or-drop rule would make it one
+  rule. (LIN-4451 Survey global; leftovers.)

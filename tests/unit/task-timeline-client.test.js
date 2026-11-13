@@ -1,7 +1,7 @@
 /**
  * LIN-4405: public/task-page.js's "Sessions on one clock" refresher, the page's one request besides the state poll.
  *
- * The real shipped source runs in the vm (tests/unit/helpers/client-world.js), with fake timers. Pins:
+ * The real shipped module (public/task-page.js, imported; LIN-4472) runs over the fake DOM with fake timers. Pins:
  *  - a changed `trackHtml` asks for the fragment, and a running lane asks every window, but every reason is coalesced
  *    into at most one fetch per 60 s window (survey item 5: a running chip changes the track about once a minute);
  *  - the timer stops with the poll: paused while hidden, stopped on 401 or a revoked link, and on done only after one
@@ -13,7 +13,9 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWorld, fireDOMContentLoaded } from './helpers/client-world.js';
+import { fireDOMContentLoaded } from './helpers/client-world.js';
+import { pageWorld } from './helpers/task-page-world.js';
+import * as taskPage from '../../public/task-page.js';
 import { bodyOf } from './helpers/task-page-body.js';
 import { loop, NOW, PAGE_OPTIONS } from './helpers/task-page-loop.js';
 import { renderTaskPage } from '../../lib/render-task-page.js';
@@ -22,13 +24,10 @@ import { buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { taskTimeline } from '../../lib/task-timeline.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 
-function load() {
-  return loadWorld({ scripts: ['task-page.js'], window: { module: { exports: {} } } }).window.module.exports;
-}
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
 function harness({ running = false, fail = null } = {}) {
-  const { createTimelineRefresher, TIMELINE_WINDOW_MS } = load();
+  const { createTimelineRefresher, TIMELINE_WINDOW_MS } = taskPage;
   let clock = 1_000_000;
   let nextId = 1;
   const pending = new Map();
@@ -197,19 +196,15 @@ describe('init(): the section is re-read and repainted from its fragment', () =>
     openItemIds: ['r1'], now: NOW, totalUsd: 1, pricedUsd: 1,
   });
 
-  test('a changed track fetches data-timeline-url and repaints the mount; an opened lane stays open; done stops it', async () => {
+  test('a changed track fetches data-timeline-url and repaints the mount; an opened lane stays open; done stops it', async (t) => {
     const STATE_URL = '/workspace/acme/api/task/LIN-50/state';
     const TIMELINE_URL = '/workspace/acme/api/task/LIN-50/timeline';
     const timers = [];
     const fetched = [];
     const states = [];
-    const world = loadWorld({
-      scripts: ['task-page.js'],
+    const { document: doc } = await pageWorld(t, {
       timers,
       window: {
-        addEventListener() {},
-        setInterval: () => 0,
-        clearInterval() {},
         api: async (url) => {
           fetched.push(url);
           if (url === STATE_URL) return states.shift();
@@ -218,7 +213,6 @@ describe('init(): the section is re-read and repainted from its fragment', () =>
         },
       },
     });
-    const { document: doc } = world;
     const model = { ...buildTaskPageModel({ identifier: 'LIN-50', loops: [loop()], ctx: null, enrichLoop, deriveSessionWaiting, now: NOW }), timeline: runningTimeline() };
     doc.body.innerHTML = bodyOf(renderTaskPage(model, { viewer: 'owner', urlKey: 'acme', binding: {}, stateUrl: STATE_URL, timelineUrl: TIMELINE_URL, now: NOW, pageOptions: PAGE_OPTIONS }));
     await fireDOMContentLoaded(doc);

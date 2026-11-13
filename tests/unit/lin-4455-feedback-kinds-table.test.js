@@ -78,9 +78,8 @@ describe('the leaf imports nothing', () => {
 });
 
 describe('every kind set is the table filtered by a role', () => {
-  test('FEEDBACK_ENTRY_KINDS is the runnerPostable rows in row order, with one home (the store no longer re-exports it)', () => {
+  test('FEEDBACK_ENTRY_KINDS is the runnerPostable rows in row order, with one home: the store does not re-export it (LIN-4459)', () => {
     assert.deepEqual([...FEEDBACK_ENTRY_KINDS], kindsWith('runnerPostable'));
-    // LIN-4465 leftovers: the runner prompt imports the leaf, so the store's shim had no importer left.
     assert.equal('FEEDBACK_ENTRY_KINDS' in dispatchStore, false);
   });
 

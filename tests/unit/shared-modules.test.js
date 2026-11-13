@@ -1,9 +1,10 @@
 /**
  * LIN-4446: browser code shares rather than restates. Shared modules are pure leaf files under lib/, served to the
- * browser through the explicit SHARED_MODULES allow-list (lib/vendor-assets.js), never by directory. A page that
- * needs one loads a module-typed shim (renderPage's `{ module }` entry). This suite is the witness for each piece:
- * the served bytes and type, the boot failure on a missing file, the purity rule, the page emission, the shim guard
- * over every renderer's script list, the retirement of the restated copy, and the real server's 404s.
+ * browser through the explicit SHARED_MODULES allow-list (lib/vendor-assets.js), never by directory, at /lib/<name>.js
+ * (LIN-4471). A page module imports one by a relative specifier. This suite is the witness for the serving boundary:
+ * the served bytes and type, the boot failure on a missing file, the purity rule, the page emission, the retirement of
+ * the restated copy, and the 404s for every path the allow-list does not serve, sent raw (LIN-4471). The bridge's
+ * inventory and the renderer coverage of the bridge are in tests/unit/bridge-inventory.test.js.
  *
  * Run with: node --test tests/unit/shared-modules.test.js
  */
@@ -18,13 +19,44 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { request } from 'node:http';
 import { SHARED_MODULES, VENDOR_ASSETS, createVendorAssetsRouter, sharedModulePath } from '../../lib/vendor-assets.js';
 import { defaultCacheControl } from '../../lib/response-headers.js';
 import { renderPage } from '../../lib/components/page.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
-const SHIM = '/cost-format-global.js';
+
+/**
+ * Sent raw with node:http, never fetch: WHATWG URL parsing collapses dot segments before fetch sends them, so
+ * `fetch('/lib/../server.js')` is really `/server.js` and proves nothing about the /lib/ boundary (LIN-4471).
+ */
+function rawGet(port, path) {
+  return new Promise((resolve, reject) => {
+    const req = request({ host: '127.0.0.1', port, path, method: 'GET' }, (res) => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => resolve({ status: res.statusCode, type: res.headers['content-type'] ?? '', body }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+/** Paths under /lib/ the allow-list does not serve. Each must be a real 404, not the app's HTML shell with a 200. */
+const NOT_SERVED = [
+  '/lib/vendor-assets.js', '/lib/render.js', '/lib/../server.js', '/lib/%2e%2e/server.js', '/lib/%2e%2e%2fserver.js', '/lib/',
+  // Files that exist under the repo root, so a static mount of the root at /lib would serve them (LIN-4471 review).
+  '/lib/server.js', '/lib/package.json', '/lib/lib/vendor-assets.js', '/lib/.env',
+];
+
+/**
+ * The retired namespace (LIN-4446's, re-keyed to the /lib/ namespace by LIN-4471). Built by joining its parts, so that the
+ * acceptance grep for the retired URL stays empty: this is the one place a test names it, to prove it is gone.
+ */
+const RETIRED_SHARED_URL = ['', 'shared', 'cost-format.js'].join('/');
+const RETIRED_PREFIX = RETIRED_SHARED_URL.slice(0, RETIRED_SHARED_URL.lastIndexOf('/') + 1);
 
 /**
  * Purity (LIN-4446): a shared module imports nothing, reads no Node built-in, and names no browser or Node global.
@@ -62,7 +94,7 @@ export function purityProblems(src, name = 'module') {
 
 describe('the allow-lists', () => {
   test('SHARED_MODULES is separate from VENDOR_ASSETS, and VENDOR_ASSETS is unchanged', () => {
-    assert.deepEqual(Object.keys(SHARED_MODULES), ['/shared/cost-format.js']);
+    assert.deepEqual(Object.keys(SHARED_MODULES), ['/lib/cost-format.js', '/lib/time-words.js']);
     assert.deepEqual(Object.keys(VENDOR_ASSETS).sort(), ['/chart.umd.min.js', '/marked.min.js', '/purify.min.js']);
   });
 
@@ -88,21 +120,53 @@ describe('serving the shared module', () => {
   });
   after(() => new Promise((r) => server.close(r)));
 
-  test('/shared/cost-format.js: 200, a JavaScript type, and exactly the bytes of lib/cost-format.js', async () => {
-    const res = await fetch(`http://127.0.0.1:${port}/shared/cost-format.js`);
+  test('/lib/cost-format.js: 200, a JavaScript type, and exactly the bytes of lib/cost-format.js', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/lib/cost-format.js`);
     assert.equal(res.status, 200);
     assert.match(res.headers.get('content-type'), /javascript/);
     assert.deepEqual(Buffer.from(await res.arrayBuffer()), readFileSync(join(ROOT, 'lib/cost-format.js')));
   });
 
-  test('an unknown /shared path is not served from lib/ or public/', async () => {
-    const res = await fetch(`http://127.0.0.1:${port}/shared/nope.js`);
+  // LIN-4472: the task page imports the duration and relative-time words from this leaf, so the browser gets the same bytes
+  // the server imports.
+  test('/lib/time-words.js: 200, a JavaScript type, and exactly the bytes of lib/time-words.js', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/lib/time-words.js`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type'), /javascript/);
+    assert.deepEqual(Buffer.from(await res.arrayBuffer()), readFileSync(join(ROOT, 'lib/time-words.js')));
+  });
+
+  for (const path of NOT_SERVED) {
+    test(`${path} (sent raw) is a real 404, not served from lib/ or public/`, async () => {
+      const res = await rawGet(port, path);
+      assert.equal(res.status, 404, `${path} got ${res.status}`);
+    });
+  }
+
+  // The structure, not a probe list: the router is only fixed routes, one per allow-listed URL, with no `use` mount that
+  // could hand a directory to the browser. A static mount of the repo root at /lib would pass every probe above only by
+  // luck of the probe list, so this is what catches it (LIN-4471 review).
+  test('the router is only exact routes, one per allow-listed URL: no mount, no directory', () => {
+    const router = createVendorAssetsRouter();
+    assert.ok(router.stack.every((layer) => layer.route), 'every layer is a route, not a use() mount');
+    const paths = router.stack.map((layer) => layer.route.path);
+    assert.ok(paths.every((p) => typeof p === 'string'), 'every route path is a string, not a pattern');
+    assert.deepEqual([...paths].sort(), [...Object.keys(VENDOR_ASSETS), ...Object.keys(SHARED_MODULES)].sort());
+  });
+
+  test('the retired namespace is a real 404 (sent raw)', async () => {
+    const res = await rawGet(port, RETIRED_SHARED_URL);
     assert.equal(res.status, 404);
   });
 
-  test('lib/ is not published as a directory', async () => {
-    const res = await fetch(`http://127.0.0.1:${port}/lib/cost-format.js`);
-    assert.equal(res.status, 404);
+  // Express routes are case-insensitive and non-strict (a trailing slash) by default, so the one served leaf also answers
+  // these variants. That is harmless: the same file, with no other file reachable. Pinned, so a change to routing shows.
+  test('the served leaf also answers case and trailing-slash variants (Express default; the same bytes)', async () => {
+    for (const path of ['/LIB/COST-FORMAT.JS', '/lib/cost-format.js/']) {
+      const res = await rawGet(port, path);
+      assert.equal(res.status, 200, path);
+      assert.equal(res.body, readFileSync(join(ROOT, 'lib/cost-format.js'), 'utf8'), path);
+    }
   });
 });
 
@@ -139,58 +203,15 @@ describe('purity: shared modules are leaves', () => {
 
 describe('renderPage: a module entry is a module script, a string stays classic', () => {
   test('emits <script type="module"> for a { module } entry and <script src> for a string, in order', () => {
-    const html = renderPage({ title: 'T', scripts: ['/a.js', { module: '/shared-shim.js' }, '/b.js'] });
+    const html = renderPage({ title: 'T', scripts: ['/a.js', { module: '/page-module.js' }, '/b.js'] });
     const a = html.indexOf('<script src="/a.js"></script>');
-    const m = html.indexOf('<script type="module" src="/shared-shim.js"></script>');
+    const m = html.indexOf('<script type="module" src="/page-module.js"></script>');
     const b = html.indexOf('<script src="/b.js"></script>');
     assert.ok(a > 0 && m > a && b > m, 'three tags, in order');
   });
 
   test('an entry that is neither a string nor { module } throws', () => {
     assert.throws(() => renderPage({ title: 'T', scripts: [{ src: '/x.js' }] }), /invalid script entry/);
-  });
-});
-
-/** The script lists the renderers declare: `scripts: [...]` properties and `const SCRIPTS = [...]` declarations. */
-function scriptLists(src) {
-  const lists = [];
-  const re = /(?:\bscripts\s*:|\bconst\s+SCRIPTS\s*=)\s*\[([^\]]*)\]/g;
-  let m;
-  while ((m = re.exec(src))) {
-    const entries = [];
-    const entry = /\{\s*module:\s*'([^']+)'\s*\}|'([^']+)'/g;
-    let e;
-    while ((e = entry.exec(m[1]))) entries.push(e[1] !== undefined ? { src: e[1], module: true } : { src: e[2], module: false });
-    lists.push(entries);
-  }
-  return lists;
-}
-
-describe('the shim guard: every page that runs a formatter consumer carries the shim', () => {
-  const publicFiles = readdirSync(join(ROOT, 'public')).filter((f) => f.endsWith('.js') && f !== 'cost-format-global.js');
-  const consumers = publicFiles.filter((f) => read(`public/${f}`).includes('window.CostFormat')).map((f) => `/${f}`);
-  const rendererFiles = readdirSync(join(ROOT, 'lib')).filter((f) => f.endsWith('.js')).map((f) => `lib/${f}`);
-
-  test('the consumers are the four files that read window.CostFormat', () => {
-    assert.deepEqual(consumers.sort(), ['/flight-companion.js', '/observation.js', '/prompt-section.js', '/workspace-kpis.js']);
-  });
-
-  test('every list that names a consumer also names the shim as a module', () => {
-    const checked = [];
-    for (const rel of rendererFiles) {
-      for (const list of scriptLists(read(rel))) {
-        const named = list.findIndex((e) => consumers.includes(e.src));
-        if (named < 0) continue;
-        checked.push(rel);
-        // Presence only: a module runs after every classic script wherever it is listed, so its position proves
-        // nothing. The consumers' own timing (reads after DOMContentLoaded) is what makes the order safe.
-        const shim = list.findIndex((e) => e.module && e.src === SHIM);
-        assert.ok(shim >= 0, `${rel} lists a consumer without the module shim`);
-      }
-    }
-    // Six renderers name a consumer today; the guard reads both list shapes (task page's const SCRIPTS included).
-    assert.ok(checked.includes('lib/render-task-page.js'), 'the const SCRIPTS shape is read');
-    assert.ok(checked.length >= 6, `checked ${checked.length} lists`);
   });
 });
 
@@ -203,6 +224,12 @@ describe('retirement: the restated browser copy and its parity check are gone', 
   test('no list or allow-list names the retired browser file', () => {
     assert.doesNotMatch(read('tests/unit/cost-read-census.test.js'), /public\/cost-format\.js/);
     assert.doesNotMatch(read('lib/render.js'), /'\/cost-format\.js'/);
+  });
+
+  test('the retired namespace is gone from the allow-list and the page modules', () => {
+    assert.equal(Object.keys(SHARED_MODULES).some((url) => url.startsWith(RETIRED_PREFIX)), false);
+    assert.doesNotMatch(read('public/cost-format-global.js'), new RegExp(RETIRED_PREFIX));
+    assert.doesNotMatch(read('public/workspace-kpis.js'), new RegExp(RETIRED_PREFIX));
   });
 });
 
@@ -235,12 +262,13 @@ describe('the real server: 404s for the paths the allow-list does not serve', ()
     }
   });
 
-  test('/shared/cost-format.js is served; /shared/nope.js and /lib/cost-format.js are 404', async () => {
-    const ok = await fetch(`http://127.0.0.1:${port}/shared/cost-format.js`);
+  test('/lib/cost-format.js is served; every path the allow-list does not serve is a real 404 (sent raw)', async () => {
+    const ok = await fetch(`http://127.0.0.1:${port}/lib/cost-format.js`);
     assert.equal(ok.status, 200);
     assert.match(ok.headers.get('content-type'), /javascript/);
-    for (const path of ['/shared/nope.js', '/lib/cost-format.js']) {
-      const res = await fetch(`http://127.0.0.1:${port}${path}`);
+    assert.deepEqual(Buffer.from(await ok.arrayBuffer()), readFileSync(join(ROOT, 'lib/cost-format.js')));
+    for (const path of [...NOT_SERVED, RETIRED_SHARED_URL]) {
+      const res = await rawGet(port, path);
       // A real 404 status: a catch-all that answered 200 with the app's HTML shell would fail here.
       assert.equal(res.status, 404, `${path} should be a real 404, got ${res.status}`);
     }

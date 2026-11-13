@@ -16,10 +16,13 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { timeHtml } from '../../lib/components/time.js';
-import { briefWithoutCurrent, briefCurrentSection, relativeAgo } from '../../lib/task-page-loader.js';
+import { briefWithoutCurrent, briefCurrentSection } from '../../lib/task-page-loader.js';
+import { relativeAgo } from '../../lib/time-words.js';
 import { renderTaskDocs, renderTaskPage } from '../../lib/render-task-page.js';
 import { buildPromptOpts } from '../../lib/render-prompt-opts.js';
 import { readSheets, declOf } from '../helpers/css-rules.js';
+import { createFakeDom } from './helpers/fake-dom.js';
+import { shareTime } from '../../public/task-page.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(join(__dirname, '../..', rel), 'utf8');
@@ -54,19 +57,13 @@ describe('LIN-3975 — a moment reads as relative words, and taps to its exact t
   });
 });
 
-describe('LIN-3975 — the share list\'s words are the server\'s relativeAgo words', () => {
-  test('the client relativeWords equals relativeAgo at every span the page shows', () => {
-    const src = read('public/task-page.js');
-    const fn = src.slice(src.indexOf('  function relativeWords(value) {'), src.indexOf('  /** A share\'s created time'));
-    assert.ok(fn.length > 100, 'relativeWords is found');
-    class FixedDate extends Date { static now() { return NOW.getTime(); } }
-    const sandbox = { Date: FixedDate };
-    vm.createContext(sandbox);
-    vm.runInContext(`${fn}\nthis.relativeWords = relativeWords;`, sandbox);
+describe('LIN-3975 — the share list is wired to relativeAgo (wiring check; the words themselves are pinned in lin-4472-time-words.test.js)', () => {
+  test('the share list paints relativeAgo\'s words at every span the page shows', () => {
+    const { document } = createFakeDom();
     const spans = [0, 59_000, 60_000, 59 * 60_000, 60 * 60_000, 23 * 3600_000, 24 * 3600_000, 3 * 86_400_000];
     for (const ago of spans) {
       const iso = new Date(NOW.getTime() - ago).toISOString();
-      assert.equal(sandbox.relativeWords(iso), relativeAgo(iso, NOW), `${ago} ms`);
+      assert.equal(shareTime(document, iso, NOW).textContent, relativeAgo(iso, NOW), `${ago} ms`);
     }
   });
 });
@@ -261,7 +258,7 @@ describe('LIN-3975 — the description shows without a fold, and the empty brief
 
   test('the Read-all control is wired in the task page client before its first Markdown render', () => {
     const src = read('public/task-page.js');
-    const init = src.slice(src.indexOf('  function init(doc) {'), src.indexOf('    function toggle(row) {'));
+    const init = src.slice(src.indexOf('function init(doc) {'), src.indexOf('function toggle(row) {'));
     const wire = init.indexOf('[data-testid="task-page-description-more"]');
     const markdown = init.search(/enhanceContextMarkdown\(|enhanceMarkdown\(/);
     assert.ok(wire > 0, 'the control is wired in init');
