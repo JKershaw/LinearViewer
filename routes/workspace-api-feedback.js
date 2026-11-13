@@ -32,7 +32,7 @@ import { requestOriginOrNull, ORIGIN_UNRESOLVED_REFUSAL } from '../lib/public-or
 import { buildMockFeedbackTitle } from '../lib/workspace-api-mocks.js';
 import { normalizeWritePayload } from '../lib/proxy-graphql-errors.js';
 import { sealForFiling } from '../lib/as-asked-seal.js';
-import { PartialWriteError, partialWriteEnvelope } from '../lib/partial-write-error.js';
+import { answerPartialWrite } from '../lib/partial-write-error.js';
 import { AS_ASKED_HEADING } from '../lib/as-asked.js';
 
 // ===========================================================================
@@ -599,10 +599,7 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
       console.error('Feedback submit error:', error);
       // A ticket that landed without its seal (LIN-4452): the same PARTIAL_WRITE envelope
       // as the other create lanes, retryable:false, so the widget does not file a duplicate.
-      if (error instanceof PartialWriteError) {
-        const env = partialWriteEnvelope(error);
-        return jsonError(res, env.status, env.message, env.extra);
-      }
+      if (answerPartialWrite(res, error)) return;
       return jsonError(res, 500, 'Failed to submit feedback');
     }
   });

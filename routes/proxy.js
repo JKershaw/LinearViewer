@@ -97,7 +97,7 @@ import {
   resolveTeamRef,
   RefResolutionError,
 } from '../lib/proxy-ref-resolver.js';
-import { PartialWriteError, partialWriteEnvelope } from '../lib/partial-write-error.js';
+import { PartialWriteError, partialWriteEnvelope, answerPartialWrite } from '../lib/partial-write-error.js';
 import { tokenValidationOptions } from '../lib/consumer-heartbeat-ingest.js';
 import { badRequest, jsonError, keepaliveError, notFound, workspaceUnavailableEnvelope, classifyUpstreamError, isRateLimited, isEntityNotFoundError } from '../lib/errors.js';
 import { publicOrigin } from '../lib/public-origin.js';
@@ -1286,10 +1286,8 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    */
   function partialWriteFailed(req, res, endpoint, err) {
     if (!(err instanceof PartialWriteError)) return false;
-    const env = partialWriteEnvelope(err);
-    logEvent(req, endpoint, env.status, `PARTIAL_WRITE applied=${err.applied.join(',') || 'none'} failed=${err.failed}`);
-    jsonError(res, env.status, env.message, env.extra);
-    return true;
+    logEvent(req, endpoint, partialWriteEnvelope(err).status, `PARTIAL_WRITE applied=${err.applied.join(',') || 'none'} failed=${err.failed}`);
+    return answerPartialWrite(res, err);
   }
 
   // Group A tokens-admin (LIN-679 Stage 2 / LIN-2534): extracted to

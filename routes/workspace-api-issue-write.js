@@ -25,7 +25,7 @@ import {
   resolveTeamRef,
   RefResolutionError,
 } from '../lib/proxy-ref-resolver.js';
-import { PartialWriteError, partialWriteEnvelope } from '../lib/partial-write-error.js';
+import { answerPartialWrite } from '../lib/partial-write-error.js';
 import { isTrashed } from '../lib/trashed-signal.js';
 import { validateIssueWriteFields, isValidPriority, validateCommentBody, MAX_COMMENT_LENGTH } from '../lib/issue-write-validation.js';
 import { parseStampLoopIds, STAMP_LOOP_IDS_MESSAGE } from '../lib/unanswered-decisions.js';
@@ -303,19 +303,12 @@ function issueRefResolutionFailed(res, err) {
   return true;
 }
 
-// Map a PartialWriteError (LIN-2012) the same way the proxy route does —
-// same structured envelope (lib/partial-write-error.js partialWriteEnvelope,
-// which decides retry: a landed create is retryable:false) — so a caller
-// sees identical shapes on both lanes. This route has no logEvent-equivalent
-// audit trail today (unlike the proxy lane), so the provider-level
-// console.warn in lib/providers/jira/index.js is what covers this lane;
-// adding one here is a separate, out-of-scope concern.
-function partialWriteFailed(res, err) {
-  if (!(err instanceof PartialWriteError)) return false;
-  const env = partialWriteEnvelope(err);
-  jsonError(res, env.status, env.message, env.extra);
-  return true;
-}
+// A PartialWriteError (LIN-2012) is answered by lib/partial-write-error.js
+// `answerPartialWrite`, the same envelope the proxy lane sends (a landed create is
+// retryable:false), so a caller sees identical shapes on both lanes. This route has no
+// logEvent-equivalent audit trail today (unlike the proxy lane), so the provider-level
+// console.warn in lib/providers/jira/index.js is what covers this lane; adding one here
+// is a separate, out-of-scope concern.
 
 /**
  * Register the three issue-write routes, in order: comment write, issue create, issue patch.
@@ -803,7 +796,7 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
       const created = answerIssueWrite(res, await provider.createIssue(token, input), 'Issue was not created');
       if (created) res.status(201).json({ success: true, issue: created.issue });
     } catch (err) {
-      if (issueRefResolutionFailed(res, err) || partialWriteFailed(res, err)) return;
+      if (issueRefResolutionFailed(res, err) || answerPartialWrite(res, err)) return;
       // NAMED MONITOR (LIN-1579) for the createdBy stamp: a createdBy-related
       // Linear rejection (5xx/502) surfaces here as a caught error under this
       // exact message — grep server logs for "Workspace-api create issue error".
@@ -885,7 +878,7 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
           .catch(e => console.error('[close-out-merges] seam 2 failure:', e?.message || e));
       }
     } catch (err) {
-      if (issueRefResolutionFailed(res, err) || partialWriteFailed(res, err)) return;
+      if (issueRefResolutionFailed(res, err) || answerPartialWrite(res, err)) return;
       console.error('Workspace-api update issue error:', err.message);
       return jsonError(res, 500, 'Failed to update issue');
     }
