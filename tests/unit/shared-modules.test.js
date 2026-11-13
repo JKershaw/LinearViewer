@@ -45,7 +45,11 @@ function rawGet(port, path) {
 }
 
 /** Paths under /lib/ the allow-list does not serve. Each must be a real 404, not the app's HTML shell with a 200. */
-const NOT_SERVED = ['/lib/vendor-assets.js', '/lib/render.js', '/lib/../server.js', '/lib/%2e%2e/server.js', '/lib/%2e%2e%2fserver.js', '/lib/'];
+const NOT_SERVED = [
+  '/lib/vendor-assets.js', '/lib/render.js', '/lib/../server.js', '/lib/%2e%2e/server.js', '/lib/%2e%2e%2fserver.js', '/lib/',
+  // Files that exist under the repo root, so a static mount of the root at /lib would serve them (LIN-4471 review).
+  '/lib/server.js', '/lib/package.json', '/lib/lib/vendor-assets.js', '/lib/.env',
+];
 
 /**
  * The retired namespace (LIN-4446's, re-keyed to the /lib/ namespace by LIN-4471). Built by joining its parts, so that the
@@ -127,9 +131,19 @@ describe('serving the shared module', () => {
     test(`${path} (sent raw) is a real 404, not served from lib/ or public/`, async () => {
       const res = await rawGet(port, path);
       assert.equal(res.status, 404, `${path} got ${res.status}`);
-      assert.doesNotMatch(res.body, /createVendorAssetsRouter|express\(\)/, 'no server source in the body');
     });
   }
+
+  // The structure, not a probe list: the router is only fixed routes, one per allow-listed URL, with no `use` mount that
+  // could hand a directory to the browser. A static mount of the repo root at /lib would pass every probe above only by
+  // luck of the probe list, so this is what catches it (LIN-4471 review).
+  test('the router is only exact routes, one per allow-listed URL: no mount, no directory', () => {
+    const router = createVendorAssetsRouter();
+    assert.ok(router.stack.every((layer) => layer.route), 'every layer is a route, not a use() mount');
+    const paths = router.stack.map((layer) => layer.route.path);
+    assert.ok(paths.every((p) => typeof p === 'string'), 'every route path is a string, not a pattern');
+    assert.deepEqual([...paths].sort(), [...Object.keys(VENDOR_ASSETS), ...Object.keys(SHARED_MODULES)].sort());
+  });
 
   test('the retired namespace is a real 404 (sent raw)', async () => {
     const res = await rawGet(port, RETIRED_SHARED_URL);
