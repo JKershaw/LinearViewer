@@ -54,6 +54,10 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - A per-dispatch figure (its model, cost or completeness) is the fold's answer, carried through
   `lib/cost-read.js`; a reader never re-ranks `byModel` itself. `dispatchModelOf` in
   `lib/task-timeline.js` did, and a lane can now name two models. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+- The Harbour calls read is `lib/cost-read-calls.js` (LIN-4457): `readCalls`, `appCallsOf` and
+  `callsSurfaceOf` are pure over docs their caller keys to one workspace (`listInHorizon(urlKey)`). The
+  instance-wide boundary is the `urlKey` / `instanceWide` guard on `lineageRecords` and `readCost`
+  (LIN-4226), not these readers. A new calls shape goes beside them, and `appCallsOf([])` is the one empty shape.
 
 ## Waiting
 
@@ -78,8 +82,6 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   `docs/reviews/seams-tangles-review-2026-11-10-run11.md`.)
 - `lib/dispatch-factory.js`: tests `provider.name === 'linear'` beside
   `isHermeticTestToken` for a test-only transport. (LIN-4347.)
-- `lib/cost-read.js`: split out `readCalls` and `callsSurfaceOf`; settle whether
-  instance-wide reads sit beside workspace-keyed stores. (Survey tally: LIN-4201.)
 - `lib/session-summary.js`: do stored run paragraphs keep pre-cutover figures? (Survey
   tally: LIN-4201.)
 - `lib/dispatch-feedback-validation.js`: feedback kinds lack one declaration with their

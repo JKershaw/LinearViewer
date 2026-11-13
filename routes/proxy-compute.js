@@ -8,7 +8,7 @@
  */
 import { Router } from 'express';
 import { graphqlErrorExtra, graphqlErrorDetail } from '../lib/proxy-graphql-errors.js';
-import { appCallsOf } from '../lib/cost-read.js';
+import { appCallsOf } from '../lib/cost-read-calls.js';
 import { readTaskCost } from '../lib/task-cost-read.js';
 import { resolveChatCredential, isAiUnavailable } from '../lib/chat-request.js';
 import { resolveRecommendation } from '../lib/recommend-recurse.js';

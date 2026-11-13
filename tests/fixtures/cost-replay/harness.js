@@ -29,7 +29,8 @@
 import express from 'express';
 import { createProxyRoutes } from '../../../routes/proxy.js';
 import { LlmCallLogStore } from '../../../lib/llm-call-log.js';
-import { callsSurfaceOf, lineageRecords } from '../../../lib/cost-read.js';
+import { lineageRecords } from '../../../lib/cost-read.js';
+import { callsSurfaceOf } from '../../../lib/cost-read-calls.js';
 import { groupDispatchLineages } from '../../../lib/dispatch-lineage.js';
 import { readModelsHistory } from '../../../lib/model-routing-history.js';
 import { agentSpendByJob, typicalByModel, harbourSpendByJob, spendByEffectiveModel, scanEstimateOf } from '../../../lib/model-routing-spend.js';

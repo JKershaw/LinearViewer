@@ -7,12 +7,12 @@
  * captured metadata, non-numeric fields are coerced to null, and recording never
  * throws (fire-and-forget). The reads are covered further down: the store returns
  * docs (`listInHorizon`), the call telemetry that is not cost is pure (`callTelemetryOf`),
- * and every cost figure is the one calls read (`readCalls`, lib/cost-read.js, LIN-4179).
+ * and every cost figure is the one calls read (`readCalls`, lib/cost-read-calls.js, LIN-4179, LIN-4457).
  */
 import { test, describe, beforeEach, before, after } from 'node:test';
 import assert from 'node:assert';
 import { LlmCallLogStore, callTelemetryOf } from '../../lib/llm-call-log.js';
-import { readCalls, appCallsOf, callsSurfaceOf } from '../../lib/cost-read.js';
+import { readCalls, appCallsOf, callsSurfaceOf } from '../../lib/cost-read-calls.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
 // Minimal in-memory mock of the MongoDB/MangoDB collection surface.
