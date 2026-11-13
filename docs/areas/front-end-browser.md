@@ -44,6 +44,10 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   (`tests/unit/helpers/task-page-world.js`, LIN-4472), made before the import so the page's DOMContentLoaded listener
   lands on the fake document. A suite that runs a classic file through `runClassic` counts, except `public/chart-helpers.js` and `public/close-out.js`,
   the two IIFE siblings a module page may read.
+- Converting two views barely moves an area read. LIN-4463's paired read
+  (`docs/plans/survey/area-read-adoption-0cf05ce8f.md`) changed 2 of 14 sampled files and gave +0.25, under the kit's
+  +0.5. The readers' K2 to K4 points were the duration words restated across classic pages and the window globals
+  defined outside the file. A conversion meant to move the read retires those, not only adds modules.
 
 ## Waiting
 
@@ -74,16 +78,12 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   `formatRuntime` in `public/observation.js` is the same rule again (it returns `''` where the leaf returns null).
   `fmtDuration` in `public/live-console.js` words seconds with no hour rung (`66m 40s` where the leaf says `1h 6m`),
   so the duration rule is spelled two ways. All three are classic scripts, so none can import the leaf until its
-  page is a module (observation.js is next in LIN-4463's order; session.js shares close-out.js with the task page).
+  page is a module (the follow-up order after LIN-4463 is flight-companion, then observation; session.js shares
+  close-out.js with the task page).
   Each copy goes when its page converts; Live Console's wording is a choice to make then. (LIN-4472 leftovers.)
 - `public/observation.js`: about 5,000 lines. By the counting method of LIN-4446 (lines starting with `*`, `//` or `/*`)
   1,985 of its 4,679 non-blank lines are comments. Find out why it is this large before splitting it. An earlier survey
   used a different method, so its figure is not comparable. (LIN-4446 plan.)
-- `public/llms.txt`: its H11 names the unscoped `/api/recommend/status`, which is now only a
-  legacy redirect (`routes/legacy-redirects.js`), and its view list omits `projects` and the
-  flag-gated `live-console` (`lib/components/view-nav.js`). The browser guide is otherwise sound:
-  its endpoints and selectors resolve. (Documentation Review, 10 Nov.;
-  `docs/reviews/documentation-review-2026-11-10.md`.)
 - `public/prompt-section.js`: on a server with no AI (`aiState: "unconfigured"`, a self-host with no
   OpenRouter key) the run control still offers Next step. Pressing it gets a 503 from the recommend
   stream, and "AI Recommend · generating…" / "Loading…" spin with no message, while Run to PR works
