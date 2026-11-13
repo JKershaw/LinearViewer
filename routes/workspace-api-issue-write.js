@@ -25,7 +25,7 @@ import {
   resolveTeamRef,
   RefResolutionError,
 } from '../lib/proxy-ref-resolver.js';
-import { PartialWriteError } from '../lib/partial-write-error.js';
+import { PartialWriteError, partialWriteEnvelope } from '../lib/partial-write-error.js';
 import { isTrashed } from '../lib/trashed-signal.js';
 import { validateIssueWriteFields, isValidPriority, validateCommentBody, MAX_COMMENT_LENGTH } from '../lib/issue-write-validation.js';
 import { parseStampLoopIds, STAMP_LOOP_IDS_MESSAGE } from '../lib/unanswered-decisions.js';
@@ -304,20 +304,16 @@ function issueRefResolutionFailed(res, err) {
 }
 
 // Map a PartialWriteError (LIN-2012) the same way the proxy route does —
-// same structured envelope, same non-2xx PARTIAL_WRITE code — so a caller
+// same structured envelope (lib/partial-write-error.js partialWriteEnvelope,
+// which decides retry: a landed create is retryable:false) — so a caller
 // sees identical shapes on both lanes. This route has no logEvent-equivalent
 // audit trail today (unlike the proxy lane), so the provider-level
 // console.warn in lib/providers/jira/index.js is what covers this lane;
 // adding one here is a separate, out-of-scope concern.
 function partialWriteFailed(res, err) {
   if (!(err instanceof PartialWriteError)) return false;
-  jsonError(res, err.status || 500, err.message, {
-    code: 'PARTIAL_WRITE',
-    category: 'upstream',
-    retryable: true,
-    detail: err.cause?.message || null,
-    context: { applied: err.applied, failed: err.failed },
-  });
+  const env = partialWriteEnvelope(err);
+  jsonError(res, env.status, env.message, env.extra);
   return true;
 }
 
@@ -807,7 +803,7 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
       const created = answerIssueWrite(res, await provider.createIssue(token, input), 'Issue was not created');
       if (created) res.status(201).json({ success: true, issue: created.issue });
     } catch (err) {
-      if (issueRefResolutionFailed(res, err)) return;
+      if (issueRefResolutionFailed(res, err) || partialWriteFailed(res, err)) return;
       // NAMED MONITOR (LIN-1579) for the createdBy stamp: a createdBy-related
       // Linear rejection (5xx/502) surfaces here as a caught error under this
       // exact message — grep server logs for "Workspace-api create issue error".

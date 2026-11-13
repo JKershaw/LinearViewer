@@ -109,6 +109,24 @@ describe('the dropped-property guard (LIN-4452)', () => {
     );
   });
 
+  test('a create whose property the site keeps but changes is refused the same way (the create path, not only the edit)', async () => {
+    const fake = fakeWith();
+    const changed = Object.create(fake);
+    const realGetIssue = fake.getIssue.bind(fake);
+    changed.getIssue = async (id, opts) => {
+      const read = await realGetIssue(id, opts);
+      if (read?.properties?.[AS_ASKED_PROPERTY]) {
+        read.properties[AS_ASKED_PROPERTY] = { ...read.properties[AS_ASKED_PROPERTY], words: 'Something else.' };
+      }
+      return read;
+    };
+    const provider = new JiraProvider({ client: changed, clientFactory: () => changed, site: SITE });
+    await assert.rejects(
+      () => provider.createIssue(SCOPE, { teamId: 'ENG', title: 'Changed', description: sealAsAsked(DISCRIMINATING) }),
+      err => err instanceof PartialWriteError && err.applied.includes('created') && err.failed === 'property' && /do not retry/.test(err.message),
+    );
+  });
+
   test('a description with no block writes no property, so a site that drops properties is not an error', async () => {
     const fake = fakeWith({ dropProperties: true });
     const provider = new JiraProvider({ client: fake, clientFactory: () => fake, site: SITE });

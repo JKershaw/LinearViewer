@@ -129,7 +129,7 @@ const ATTACHMENT_EMBED_RESERVE = 200;
  *  - pre: validation that runs before any resolution.
  */
 const SPEC = {
-  createIssue: { endpoint: '/api/proxy/issues', needs: 'createIssue', source: false, failure: 'Failed to create issue', label: 'create issue', refs: true },
+  createIssue: { endpoint: '/api/proxy/issues', needs: 'createIssue', source: false, failure: 'Failed to create issue', label: 'create issue', refs: true, partial: true },
   updateIssue: { endpoint: '/api/proxy/issues/:id', needs: 'updateIssue', source: true, issueId: 'logged', failure: 'Failed to update issue', label: 'update issue', refs: true, partial: true },
   appendDescription: { endpoint: '/api/proxy/issues/:id/description/append', needs: 'updateIssue', source: true, issueId: 'logged', failure: 'Failed to update description', label: 'description edit', refs: true, partial: true },
   replaceDescription: { endpoint: '/api/proxy/issues/:id/description/replace', needs: 'updateIssue', source: true, issueId: 'logged', failure: 'Failed to update description', label: 'description edit', refs: true, partial: true },

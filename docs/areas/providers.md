@@ -29,8 +29,10 @@
   caller's own permissions, and a cache keyed on the site cannot tell two callers apart. Creates
   are infrequent, so the round trips cost little. (LIN-4451, `createIssue` in the same file.)
 - A create that fails after the issue exists is a PartialWriteError telling the caller not to
-  retry. A retry would file a duplicate. Only the re-read can fail after the create, so that is
-  the one place this applies. (LIN-4451.)
+  retry. A retry would file a duplicate. The re-read and the property check (below) are the two
+  places this applies. Every create lane (proxy, session, feedback) maps it through
+  `lib/partial-write-error.js` `partialWriteEnvelope`: `retryable:false`, answered 500. A lane
+  that does not map it answers a bare 500 that hides the landed issue. (LIN-4451, LIN-4452.)
 - A write's success status does not prove Jira kept the `harbour.asAsked` property: a site can
   answer 200 and drop it, and the words would then be served as converted text, marked kept.
   `createIssue` and `updateIssue` therefore compare the property on the confirmation re-read with
