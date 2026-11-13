@@ -79,13 +79,6 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   (rows cover pause and stop), though the leftover step resumes its build that way
   (`lib/dispatch-leftover.js`). (Seams & Tangles, 10 Nov.;
   `docs/reviews/seams-tangles-review-2026-11-10-run11.md`.)
-<<<<<<< HEAD
-- `lib/cost-read.js`: split out `readCalls` and `callsSurfaceOf`; settle whether
-  instance-wide reads sit beside workspace-keyed stores. (Survey tally: LIN-4201.)
-=======
-- `lib/dispatch-factory.js`: tests `provider.name === 'linear'` beside
-  `isHermeticTestToken` for a test-only transport. (LIN-4347.)
->>>>>>> origin/main
 - `lib/session-summary.js`: do stored run paragraphs keep pre-cutover figures? (Survey
   tally: LIN-4201.)
 - `lib/dispatch-feedback-validation.js`: feedback kinds lack one declaration with their
