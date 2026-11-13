@@ -155,6 +155,29 @@ describe('buildInstructions — grants table + take-gated runner section (LIN-31
     assert.match(text, /the `\+proxy` toggle-path copy, grant-less/);
   });
 
+  test('the runner poll entry says what the route returns: runner-target items only, and halt while one is set', async () => {
+    // LIN-4465 leftovers (the agent-api note's Waiting entry): the catalog and the guide say the
+    // route lists runner-target items only (checked against isRunnerTarget's answers) and that the
+    // halt key has the shape lib/poll-halt.js projects (its keys are compared below). That
+    // routes/proxy-runner.js spreads `halt` only while one is set is not exercised here.
+    const { isRunnerTarget } = await import('../../lib/runner-owner-gate.js');
+    assert.equal(isRunnerTarget('dash'), false);
+    assert.equal(isRunnerTarget(undefined), true);
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite', grants: ['take', 'dispatch'] });
+    const entry = text.slice(text.indexOf(`GET ${BASE_URL}/api/proxy/runner/poll`), text.indexOf(`POST ${BASE_URL}/api/proxy/runner/take/:id`));
+    assert.match(entry, /"halt"\?: \{ "mode": "pause"\|"stop"/);
+    // The catalog's halt keys are the ones the poll's halt read produces (readHaltForPoll's
+    // projection), not a hand-written list that can drift from it.
+    const { projectHaltForPoll } = await import('../../lib/poll-halt.js');
+    const produced = Object.keys(projectHaltForPoll({ _id: 'x', mode: 'pause', setAt: 'a', setBy: 'b', extra: 1 }));
+    const documented = [...entry.match(/"halt"\?: \{([^}]*)\}/)[1].matchAll(/"(\w+)":/g)].map(m => m[1]);
+    assert.deepEqual(documented, produced);
+    assert.match(entry, /a "target": "dash" item is never listed/);
+    const guide = (await import('node:fs')).readFileSync(new URL('../../docs/proxy-integration.md', import.meta.url), 'utf8');
+    assert.match(guide, /a `target: "dash"` item is never listed/);
+    assert.match(guide, /carries a `halt` key, the `GET \/api\/proxy\/dispatch\/halt` shape/);
+  });
+
   test('a take-grant bearer sees the runner endpoints and the refusal codes', () => {
     const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite', grants: ['take', 'dispatch'] });
     assert.match(text, /## Runner Endpoints/);

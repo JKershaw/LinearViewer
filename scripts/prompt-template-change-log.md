@@ -186,6 +186,8 @@ Two reasons recur, so they are written once here:
 - LIN-4370: +175 (8069 -> 8244). The rules' comment restates the invariant: code settles only the review loop bound and the look-first sequence, neither reads a model's verdict, and a person's comment posted after work started outranks the sequence until a later dispatched run. A comment, not prompt text.
 - LIN-4370 (the replaced reason, at LIN-4392): +175, the rules' comment restates the invariant (code settles the review loop bound and the look-first sequence).
 - LIN-4392: +25 (8244 -> 8269). The rules' comment names the live-stage wait as the first route code settles, before the review loop bound and the look-first sequence (`lib/recommendation-live-wait.js`). A comment, not prompt text: no rendered prompt, router snapshot or `scripts/eval/meta-prompt.baseline.txt` changes.
+- LIN-4392 (the replaced reason, at LIN-4465): +25, the rules' comment names the live-stage wait as the first route code settles; a comment, not prompt text.
+- LIN-4465: -63 (8269 -> 8206). The header points at `CODE_ROUTES` (`lib/code-routes.js`) instead of naming the four routes in order; the ceiling is lowered to match. A comment, not prompt text: no rendered prompt changed.
 
 **Stage intent source, `lib/prompts/stage-intent.js`**
 - LIN-3300: the file was `lib/prompts/brief-writer.js` (ceiling 4779). The writer's prompt left with the writer, and the ceiling moved with the scope lines that stayed.

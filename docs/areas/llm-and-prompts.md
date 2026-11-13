@@ -18,6 +18,11 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   can raise a ceiling while real renders shrink (LIN-4393).
 - The `## As asked` block's words have one owner, `lib/as-asked.js`: import its spellings,
   never retype the heading or end line (LIN-4362).
+- The code routes' order lives once, in `CODE_ROUTES` (`lib/code-routes.js`). A new route is an
+  entry with its `emits`, plus the one "Code route order" line in
+  `docs/architecture/prompt-system.md` and in `docs/architecture/source-map.md`;
+  `tests/unit/lin-4465-code-routes.test.js` fails until all three agree. Point at the list; never
+  restate the order or count the routes in prose (LIN-4465).
 - `lib/prompt-template-defs.js` cannot import what imports `lib/prompt-templates.js` (a
   cycle): shared words live in an import-free leaf, as `lib/prompts/leftover-words.js`
   (LIN-4376) and `lib/prompts/autopilot-precedence.js` (never restate a rank; LIN-4382).
@@ -142,12 +147,6 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   heading (three times) and the verdict words instead of importing them. The route module does not
   import `BLIND_READ_KIND` at all, and `tests/unit/stage-kind-tables.test.js` checks presence, not
   these literals. LOW: a stored kind is rarely renamed; the leaf's claim is what is untrue. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
-- `lib/openrouter.js`: the four routes code settles (the live-stage wait, the review loop bound, the
-  blind read, the look-first sequence) are listed by hand in about nine places, no test pins any copy,
-  and two are already wrong: `docs/architecture/prompt-system.md` says "four routes" and then
-  restates three, without the blind read, and `public/llms.txt` says the blind read is "Sent by
-  hand", where its description (`lib/prompt-template-defs.js`) says code sends it. The
-  templates sync test checks that the catalogue bullet exists, not its words. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
 - `lib/prompts/leftover-words.js`: the retirement line's words have one home and one checker
   (`lib/dispatch-leftover-answer.js`), but which entry to settle (the busiest touched area, else
   another) and the three forms are restated by hand in `docs/areas/README.md`, simple-dispatcher's
@@ -161,3 +160,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   `lib/dispatch-leftover-answer.js` (any one to six characters, its comment calling it the guard's
   rule) and in simple-dispatcher's guard. A retirement line can name a path the guard would not read
   as one. Borderline. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+- `lib/code-routes.js`: the review loop bound's step lives in its `CODE_ROUTES` entry, because the route has
+  no module of its own (`reviewLoopStop` is a fact in `lib/recommendation-facts.js`); the other three entries
+  only delegate to their modules. A fifth route, or a change to the bound, cannot follow one pattern. Waiting:
+  decide where the bound's step lives (its own module, or a `reviewLoopStep` beside `reviewLoopStop`) and make
+  the entry delegate like the rest. (LIN-4465 blind read.)

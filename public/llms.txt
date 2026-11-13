@@ -268,7 +268,7 @@ relationship between the tasks, not as a label.
 - `retrospective-audit` - retrospective audit: Audit a merged change's claims and test integrity after the fact; file the gate's tickets and open one docs-only notes PR for the other findings
 - `survey-task` - survey-task: Sent by the look-first route (first on a fresh, unsized ticket) or by hand, never by the selector. Read-only forecast before work starts: why this task will be difficult and what would be done first; posts one comment on the surveyed ticket and changes nothing else
 - `survey-place` - survey-place: Sent by the look-first route (after survey-task) or by hand, never by the selector. Read-only forecast of the codebase as a place: where the task lands, what the obvious way would add, move or tangle, and what would leave the place better; posts one comment on the surveyed ticket and changes nothing else
-- `blind-read` - blind-read: Sent by hand, never by the selector. Reads the ticket's current landing PR(s) cold, before merge (only the diff, the code at its merge-base and head, and the area registry): whether the change left its area better, the same or worse, with its finds sorted three ways; posts one `## Blind read` comment, whose shape the proxy checks
+- `blind-read` - blind-read: Code sends it after an approving review, never the selector. Reads the ticket's current landing PR(s) cold, before merge (only the diff, the code at its merge-base and head, and the area registry): whether the change left its area better, the same or worse, with its finds sorted three ways; posts one `## Blind read` comment, whose shape the proxy checks
 
 ### Public Templates Page
 

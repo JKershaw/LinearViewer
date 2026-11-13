@@ -33,6 +33,8 @@ describe('code-shape area map placement (LIN-3729)', () => {
   test('sibling files the lookaheads must not steal stay where they were', () => {
     assert.strictEqual(areaOf('lib/proxy-wire.js'), 'Agent API (proxy)');
     assert.strictEqual(areaOf('lib/openrouter.js'), 'LLM & prompts');
+    // LIN-4465: the code routes list sits with the route modules it orders, not in the catch-all.
+    assert.strictEqual(areaOf('lib/code-routes.js'), 'LLM & prompts');
     assert.strictEqual(areaOf('lib/pat-session.js'), 'Auth, accounts & workspaces');
   });
 

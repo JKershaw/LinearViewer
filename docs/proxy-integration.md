@@ -271,8 +271,10 @@ body itself is the runner-prompt ticket's (LIN-3098); this is only the credentia
   either is owner-only (`403 RUNNER_OWNER_ONLY` for anyone else) and revokes the whole credential
   lineage (`DELETE /workspace/:urlKey/api/proxy/tokens/{tokenId}`). The Proxy page has no revoke.
 - **Runner routes** (require `take`): `GET /api/proxy/runner/poll`, `POST
-  /api/proxy/runner/take/{id}`, `POST /api/proxy/runner/feedback/{id}`. The poll response adds
-  `otherConsumerLastSeenAt` — a separate consumer (Simple Dispatcher) seen polling the same
+  /api/proxy/runner/take/{id}`, `POST /api/proxy/runner/feedback/{id}`. The poll lists
+  runner-target items only (a `target: "dash"` item is never listed; no `target` counts as `cli`),
+  and carries a `halt` key, the `GET /api/proxy/dispatch/halt` shape, only while an operator halt is
+  set. The poll response adds `otherConsumerLastSeenAt` — a separate consumer (Simple Dispatcher) seen polling the same
   workspace; a recent value means warn and stop rather than race it for work.
 - **Mint refusals** (fail closed; no compatibility lane):
 
