@@ -97,7 +97,7 @@ import {
   resolveTeamRef,
   RefResolutionError,
 } from '../lib/proxy-ref-resolver.js';
-import { PartialWriteError } from '../lib/partial-write-error.js';
+import { PartialWriteError, partialWriteEnvelope } from '../lib/partial-write-error.js';
 import { tokenValidationOptions } from '../lib/consumer-heartbeat-ingest.js';
 import { badRequest, jsonError, keepaliveError, notFound, workspaceUnavailableEnvelope, classifyUpstreamError, isRateLimited, isEntityNotFoundError } from '../lib/errors.js';
 import { publicOrigin } from '../lib/public-origin.js';
@@ -1279,24 +1279,16 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   /**
    * Map a PartialWriteError (LIN-2012) to a non-2xx `PARTIAL_WRITE` response
    * using the existing structured error envelope (code/category/retryable/
-   * context — see lib/errors.js's `errorEnvelope`), rather than a bespoke
-   * shape. The upstream status rides through (fallback 500) so a retryable
-   * 429 partial isn't flattened the same as a non-retryable one. `retryable`
-   * is always true here: both Jira writes are idempotent, so re-issuing the
-   * same PATCH is the correct recovery, never a rollback. Returns true when
-   * handled so callers can `if (partialWriteFailed(...)) return;` from a catch.
+   * context), built by lib/partial-write-error.js `partialWriteEnvelope`, the
+   * one place the retry rule lives: a create that landed is `retryable:false`
+   * and answers 500; an edit keeps `retryable:true` and its upstream status.
+   * Returns true when handled so callers can `if (partialWriteFailed(...)) return;` from a catch.
    */
   function partialWriteFailed(req, res, endpoint, err) {
     if (!(err instanceof PartialWriteError)) return false;
-    const status = err.status || 500;
+    const { status, message, extra } = partialWriteEnvelope(err);
     logEvent(req, endpoint, status, `PARTIAL_WRITE applied=${err.applied.join(',') || 'none'} failed=${err.failed}`);
-    jsonError(res, status, err.message, {
-      code: 'PARTIAL_WRITE',
-      category: 'upstream',
-      retryable: true,
-      detail: err.cause?.message || null,
-      context: { applied: err.applied, failed: err.failed },
-    });
+    jsonError(res, status, message, extra);
     return true;
   }
 

@@ -125,12 +125,13 @@ const ATTACHMENT_EMBED_RESERVE = 200;
  *    check itself (attachments).
  *  - failure / label: the mapped catch's envelope message and console label.
  *  - refs / partial: which typed provider errors the catch maps. RefResolutionError
- *    and PartialWriteError are thrown only by the resolve*Input closures and by
- *    updateIssue, so only the routes that call those map them.
+ *    is thrown by the resolve*Input closures and by createIssue / updateIssue;
+ *    PartialWriteError only by createIssue and updateIssue (the write landed, its
+ *    confirmation failed). Only the routes that call those map them.
  *  - pre: validation that runs before any resolution.
  */
 const SPEC = {
-  createIssue: { endpoint: '/api/proxy/issues', needs: 'createIssue', source: false, failure: 'Failed to create issue', label: 'create issue', refs: true },
+  createIssue: { endpoint: '/api/proxy/issues', needs: 'createIssue', source: false, failure: 'Failed to create issue', label: 'create issue', refs: true, partial: true },
   updateIssue: { endpoint: '/api/proxy/issues/:id', needs: 'updateIssue', source: true, issueId: 'logged', failure: 'Failed to update issue', label: 'update issue', refs: true, partial: true },
   appendDescription: { endpoint: '/api/proxy/issues/:id/description/append', needs: 'updateIssue', source: true, issueId: 'logged', failure: 'Failed to update description', label: 'description edit', refs: true, partial: true },
   replaceDescription: { endpoint: '/api/proxy/issues/:id/description/replace', needs: 'updateIssue', source: true, issueId: 'logged', failure: 'Failed to update description', label: 'description edit', refs: true, partial: true },
@@ -163,7 +164,7 @@ const SPEC = {
  * @param {Function} deps.resolveProjectInput - Symbolic-or-UUID project ref resolver (closure-local)
  * @param {Function} deps.resolveLabelInput - Symbolic-or-UUID label ref resolver (closure-local)
  * @param {Function} deps.refResolutionFailed - Maps a RefResolutionError to its own 422 (closure-local)
- * @param {Function} deps.partialWriteFailed - Maps a PartialWriteError (write landed, confirmation re-read failed) to its own envelope (closure-local)
+ * @param {Function} deps.partialWriteFailed - Maps a PartialWriteError (write landed, its confirmation re-read or harbour.asAsked property check failed) to its own envelope (closure-local)
  * @param {Function} deps.logEvent - Audit/witness event logger (closure-local)
  * @param {Object} [deps.harbourCommentsStore] - Durable (urlKey, commentId) ledger (LIN-2648); best-effort record at each createComment seam, never gates the response
  * @param {Function} [deps.onTicketWrite] - Optional ticket-closed closer seam (LIN-3366), fire-and-forget; never changes a response
@@ -318,6 +319,11 @@ export function createProxyWriteRoutes({
 
   const refuseBadUuid = (ctx, value, noun) => !UUID_REGEX.test(value) && refuse(ctx, 400, `Invalid ${noun} ID format`);
 
+  // The UUID-only ref rule (LIN-4451 create, LIN-4452 PATCH), written once so the two
+  // routes cannot drift: a present value that is not a UUID is refused 400. Returns the
+  // refusal, or false when the value is absent or a UUID (so `parentId: null` passes).
+  const refuseNonUuidRef = (ctx, name, value) => Boolean(value) && !UUID_REGEX.test(value) && refuse(ctx, 400, `${name} must be a UUID`);
+
   /**
    * The `## As asked` guard (LIN-4352): the agent lane may not
    * change the block that holds the words as filed, drop it, or forge one onto a
@@ -451,7 +457,6 @@ export function createProxyWriteRoutes({
     // LIN-2239: priorityLevel reuses isValidPriority's range check (both scales are
     // integers over [0,4]) and converts to the native scale; it has no
     // apiWriteFields entry of its own, so it is gated on `priority`.
-    const isUuid = (v) => Boolean(v) && UUID_REGEX.test(v);
     const isPriority = (v) => v !== undefined && isValidPriority(v);
     // LIN-4451 (review note 5, disposition (b)): assigneeId / parentId / cycleId are
     // UUID-only on Linear. A present value that is not a UUID is refused 400 here, not
@@ -469,7 +474,7 @@ export function createProxyWriteRoutes({
     for (const { name, key, gate = name, value, present, convert, uuid = false } of fields) {
       if (!present(value)) continue;
       if (!writable.includes(gate)) return unsupported(name);
-      if (uuid && !isUuid(value)) return refuse(ctx, 400, `${name} must be a UUID`);
+      if (uuid && refuseNonUuidRef(ctx, name, value)) return;
       input[key] = convert ? await convert(value) : value;
     }
 
@@ -523,6 +528,14 @@ export function createProxyWriteRoutes({
     const updatable = [title, description, stateId, assigneeId, projectId, parentId, cycleId, priority, priorityLevel];
     if (updatable.every(v => v === undefined)) return refuse(ctx, 400, 'No valid fields to update');
 
+    // LIN-4451 (review note 5, disposition (b)), as create does: a present assigneeId /
+    // parentId / cycleId that is not a UUID is refused 400 here, before any read, not
+    // dropped on a 200 that applies the rest of the PATCH. A provider id form (a Jira
+    // issue key) reads as a clear refusal. `parentId: null` clears the parent and passes.
+    for (const [name, value] of [['assigneeId', assigneeId], ['parentId', parentId], ['cycleId', cycleId]]) {
+      if (refuseNonUuidRef(ctx, name, value)) return;
+    }
+
     // LIN-556: one guard read serves both the trashed refusal AND the team scope a
     // symbolic stateId needs (e.g. `done` -> the team's completed state).
     const target = await guardTarget(ctx, 'issueWriteGuard', { onNull: 'proceed' });
@@ -553,10 +566,10 @@ export function createProxyWriteRoutes({
       if (await refusedByPeriodicalGate(ctx, guard, teamId, input.stateId)) return;
     }
     if (projectId) input.projectId = await resolveProjectInput(provider, token, projectId);
-    if (assigneeId && UUID_REGEX.test(assigneeId)) input.assigneeId = assigneeId;
+    if (assigneeId) input.assigneeId = assigneeId;
     if (parentId === null) input.parentId = null;
-    else if (parentId && UUID_REGEX.test(parentId)) input.parentId = parentId;
-    if (cycleId && UUID_REGEX.test(cycleId)) input.cycleId = cycleId;
+    else if (parentId) input.parentId = parentId;
+    if (cycleId) input.cycleId = cycleId;
     // LIN-2239: update's convention is to silently drop a field the provider
     // cannot honour rather than 400, so unlike create there is no capability gate.
     if (priority !== undefined && isValidPriority(priority)) input.priority = priority;
@@ -605,8 +618,9 @@ export function createProxyWriteRoutes({
    * "Failed to read issue description" and maps no typed error; the write maps
    * RefResolutionError (a provider that REFUSES the write, e.g. Jira's D1
    * unrenderable-content guard, LIN-1886, is a permanent caller-visible 422, not a
-   * 500 telling an agent to retry) and PartialWriteError (LIN-2012: the field PUT
-   * landed and only the confirmation re-read failed).
+   * 500 telling an agent to retry) and PartialWriteError (LIN-2012, LIN-4452: the field
+   * PUT landed and only the confirmation re-read, or its harbour.asAsked property
+   * check, failed).
    */
   async function editDescription(ctx, merge) {
     const { req, res, endpoint, token, provider } = ctx;
