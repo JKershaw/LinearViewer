@@ -267,9 +267,9 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
 
     try {
       // LIN-3634: the read chain is `lib/close-out-readiness.js`, shared with the
-      // dispatch guard. Same order as before: comments, PR urls, every PR status,
-      // ledger, stop-at, then `deriveCloseOutState`.
-      const { provider, callScope, prUrls, prStatuses, ledger, stopAt, state } = await readCloseOutChain({
+      // dispatch guard: comments, the trail, each landing PR's status (LIN-4458, keyed
+      // by URL), stop-at, then `deriveCloseOutState`.
+      const { provider, callScope, prs, prStatuses, ledger, stopAt, state } = await readCloseOutChain({
         workspace,
         issueIdentifier,
         source,
@@ -292,12 +292,12 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
       // Close-out is a stop-at-PR surface only: a normal run records and sets
       // nothing here.
       if (stopAt === 'pr') {
-        const merges = await recordMergedPrs({ store: closeOutEventsStore, workspace, accountId: req.session.accountId, issueIdentifier, prUrls, prStatuses, ledger });
+        const merges = await recordMergedPrs({ store: closeOutEventsStore, workspace, accountId: req.session.accountId, issueIdentifier, prs, prStatuses, ledger });
         recorded = merges.recorded;
         let { mergedEvent } = merges;
 
-        const prIndex = Math.max(merges.mergedPrIndex, 0);
-        if (state.status === 'merged' && closeOutSetsDone({ prStatuses, prIndex, review: ledger, byPersonCheck: true })) {
+        // LIN-4458: the merged PR is the state's own, found by URL (no index shared across lists).
+        if (state.status === 'merged' && closeOutSetsDone({ prStatuses, prUrl: state.pr?.url ?? null, review: ledger, byPersonCheck: true })) {
           ({ mergedEvent, ...outcome } = await settleDone({ workspace, provider, callScope, issueIdentifier, seam, mergedEvent }));
         }
 

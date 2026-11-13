@@ -21,7 +21,7 @@ import {
   CONNECTION_CAP,
 } from '../../lib/providers/linear/index.js';
 import { flattenIssue } from '../../lib/proxy-wire.js';
-import { latestReviewComment } from '../../lib/run-ledger.js';
+import { latestReviewComment } from '../../lib/run-trail.js';
 
 let restore;
 function stub(impl) {

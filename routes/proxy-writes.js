@@ -18,7 +18,7 @@
  * the waiting entry the build settled (lib/dispatch-leftover-answer.js checkLeftoverAnswer).
  * The same writes carry the blind-read guard (LIN-4437, `refusedByBlindRead`): a comment opening
  * with `## Blind read` has one verdict line and names exactly the landing's PRs
- * (lib/run-ledger.js checkBlindRead); it is the one comment guard that reads the trail first.
+ * (lib/run-trail.js checkBlindRead); it is the one comment guard that reads the trail first.
  *
  * Shape. Every route is one literal registration whose handler runs through
  * `guarded(spec, handler)`, which owns the part they all share, in this order:
@@ -66,7 +66,8 @@ import { checkAsAsked, splitAsAsked, hasMarkerLine, askedText, AS_ASKED_HEADING 
 import { sealForFiling } from '../lib/as-asked-seal.js';
 import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK } from '../lib/size-of-move.js';
 import { checkLeftoverAnswer, leftoverAnswerRefusal } from '../lib/dispatch-leftover-answer.js';
-import { checkBlindRead, blindReadRefusal, isBlindRead, landingPrUrls } from '../lib/run-ledger.js';
+import { blindReadRefusal } from '../lib/run-ledger.js';
+import { checkBlindRead, landingPrUrls } from '../lib/run-trail.js';
 import { jsonError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
 
@@ -719,8 +720,9 @@ export function createProxyWriteRoutes({
    * Resolves true once it has refused.
    */
   async function refusedByBlindRead(ctx, body) {
-    if (!isBlindRead(body)) return false;
+    // Not a blind read (lib/run-trail.js, the one classifier): `applies: false`, untouched.
     const shape = checkBlindRead(body);
+    if (shape.ok && !shape.applies) return false;
     if (!shape.ok) return refuseBlindRead(ctx, shape);
     let landing = null;
     try {
