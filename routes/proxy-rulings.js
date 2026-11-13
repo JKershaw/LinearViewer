@@ -150,7 +150,7 @@ function optionRefusal(row, optionId) {
  * @param {Object} deps
  * @param {Function} deps.proxyLimiter - The proxy rate limiter, injected (see `proxyLimiter` in routes/proxy.js)
  * @param {Function} deps.authenticateProxyToken - Proxy bearer-token auth middleware
- * @param {Function} deps.requireWriteScope - Middleware requiring a readWrite-scoped token
+ * @param {Function} deps.requireWriteScope - Write-gate factory, `requireWriteScope(op)` (lib/stage-write-gate.js, LIN-4468): readWrite scope plus the stage's allowance for `op`
  * @param {Function} deps.logEvent - Proxy event/audit logger
  * @param {Object} deps.dispatchQueueStore - Dispatch storage (loop reconstruction input)
  * @param {Object} deps.agentStatusStore - Agent status storage (loop reconstruction input)
@@ -440,14 +440,14 @@ export function createRulingsRoutes({
   /** @route POST /api/proxy/rulings/:decisionId/suggest-dismissal */
   router.post(
     '/api/proxy/rulings/:decisionId/suggest-dismissal',
-    proxyLimiter, authenticateProxyToken, requireWriteScope,
+    proxyLimiter, authenticateProxyToken, requireWriteScope('rulingSuggestDismissal'),
     propose(DISMISSAL)
   );
 
   /** @route POST /api/proxy/rulings/:decisionId/suggest-answer */
   router.post(
     '/api/proxy/rulings/:decisionId/suggest-answer',
-    proxyLimiter, authenticateProxyToken, requireWriteScope,
+    proxyLimiter, authenticateProxyToken, requireWriteScope('rulingSuggestAnswer'),
     propose(ANSWER)
   );
 

@@ -15,7 +15,7 @@ import { MAX_NAME_LENGTH, DANGEROUS_CHARS_REGEX } from '../lib/issue-write-valid
  * @param {Object} deps.agentStatusStore - Agent status storage instance
  * @param {Function} deps.proxyLimiter - The proxy rate limiter, injected (see `proxyLimiter` in routes/proxy.js)
  * @param {Function} deps.authenticateProxyToken - Proxy bearer-token auth middleware
- * @param {Function} deps.requireWriteScope - Middleware requiring a readWrite-scoped token
+ * @param {Function} deps.requireWriteScope - Write-gate factory, `requireWriteScope(op)` (lib/stage-write-gate.js, LIN-4468): readWrite scope plus the stage's allowance for `op`
  * @param {Function} deps.logEvent - Proxy event/audit logger
  */
 export function createAgentStatusRoutes({ agentStatusStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent }) {
@@ -26,7 +26,7 @@ export function createAgentStatusRoutes({ agentStatusStore, proxyLimiter, authen
    * POST /api/proxy/foreman/status  (forgiving alias, deprecated — pre-LIN-533 name)
    * Record an agent status update. Shared handler across both forms (LIN-528 pattern).
    */
-  router.post(['/api/proxy/agent/status', '/api/proxy/foreman/status'], proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+  router.post(['/api/proxy/agent/status', '/api/proxy/foreman/status'], proxyLimiter, authenticateProxyToken, requireWriteScope('agentStatus'), async (req, res) => {
     const { taskIdentifier, action, status, summary, dispatchId } = req.body;
 
     if (!taskIdentifier || typeof taskIdentifier !== 'string') {

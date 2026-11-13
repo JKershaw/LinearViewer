@@ -250,12 +250,13 @@ describe('LIN-4373 — release when the leftover row never runs', () => {
       calls.push(args);
       return async () => ({ reason: 'grant-mint-transient:OWNER_CHECK_UNAVAILABLE' });
     });
-    const { a } = await heldBuild(world);
+    const { a, b } = await heldBuild(world);
     const { lines } = await captureLogs(() => world.store.removeItem(URL_KEY, queuedLeftover(world)._id));
     const wakes = wakesTo(world, a._id);
     assert.equal(wakes.length, 1);
     assert.strictEqual(wakes[0].bootstrapToken, null);
-    assert.deepEqual(calls, [{ urlKey: URL_KEY, createdBy: OWNER }], "keyed on the root's dispatchedBy");
+    // LIN-4468: the producing build's id rides along, so the wake takes the resumed parent's stage.
+    assert.deepEqual(calls, [{ urlKey: URL_KEY, createdBy: OWNER, itemId: b._id }], "keyed on the root's dispatchedBy");
     assert.ok(lines.some(l => l.includes('[dispatch-wake] no-retry-degraded')), JSON.stringify(lines));
   });
 

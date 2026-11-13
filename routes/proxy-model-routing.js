@@ -64,7 +64,7 @@ function publicEntry(row) {
  * @param {Object} deps.workspacePreferencesStore - read for the workspace setting only
  * @param {Function} deps.proxyLimiter - The proxy rate limiter, injected (see `proxyLimiter` in routes/proxy.js)
  * @param {Function} deps.authenticateProxyToken
- * @param {Function} deps.requireWriteScope
+ * @param {Function} deps.requireWriteScope - Write-gate factory, `requireWriteScope(op)` (lib/stage-write-gate.js, LIN-4468): readWrite scope plus the stage's allowance for `op`
  * @param {Function} deps.logEvent
  */
 export function createProxyModelRoutingRoutes({ modelRoutingStore, workspacePreferencesStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent }) {
@@ -186,7 +186,7 @@ export function createProxyModelRoutingRoutes({ modelRoutingStore, workspacePref
       }
     };
   }
-  const writeChain = [proxyLimiter, authenticateProxyToken, requireWriteScope];
+  const writeChain = [proxyLimiter, authenticateProxyToken, requireWriteScope('modelRouting')];
 
   router.post(`${BASE}/jobs/:jobId`, ...writeChain, writeHandler('/jobs/:jobId', (req, body) => {
     const job = getJob(req.params.jobId);

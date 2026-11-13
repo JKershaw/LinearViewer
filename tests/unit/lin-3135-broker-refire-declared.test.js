@@ -33,6 +33,8 @@ import { DispatchStoreFault } from '../../lib/errors.js';
 import { ProxyTokenStore, BOOTSTRAP_TOKEN_TTL_SECONDS } from '../../lib/proxy-tokens.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
+import { createProxyRoutes } from '../../routes/proxy.js';
+import { BASE_DEPS } from './lib/proxy-fake-deps.js';
 
 const PATH = '/api/dispatch/broker-token';
 const URL_KEY = 'acme';
@@ -804,5 +806,70 @@ describe('16 — an ordinary child stays grant-less: no grant key on any grant-l
       }
       assert.equal(world.spy.grant.length, 0, `${name}: no grant mint`);
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LIN-4468 refire witness: the re-minted token of a restricted row is stamped with its stage, so
+// the proxy refuses the write that the unstamped token used to make (ticket: "the refire escape").
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A proxy app over the SAME real token store the broker minted into, so the exchanged token is checked for real. */
+function proxyAppOver(world) {
+  const app = express();
+  app.use(express.json());
+  app.use(createProxyRoutes({ ...BASE_DEPS(), proxyTokenStore: world.tokenStore }));
+  return app;
+}
+
+async function postComment(app, token, issueId) {
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  const { port } = server.address();
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/proxy/issues/${issueId}/comments`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body: 'a comment from a refired stage' })
+    });
+    const text = await res.text();
+    let parsed; try { parsed = JSON.parse(text); } catch { parsed = text; }
+    return { status: res.status, body: parsed };
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+}
+
+describe('LIN-4468 — refire witness: a restricted row\'s re-minted token cannot write outside its stage', () => {
+  test('a look-into row refired with no grant declaration mints a none-stamped token, and its comment is refused', async () => {
+    const world = makeWorld();
+    const id = await seedTaken(world, { record: null, patch: { kind: 'look-into', issueIdentifier: 'LIN-9' } });
+    resetSpy(world);
+    const { result: res } = await captureLogs(() => call(buildApp(world), 'owner-token', { itemId: id }));
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(world.spy.plain.length, 1, 'the plain refire mint ran');
+    assert.equal(world.spy.plain[0].opts.writes, 'none', 'stamped with the row\'s stage');
+    assert.equal(world.spy.plain[0].opts.writesTarget, 'LIN-9', 'and its one ticket');
+
+    const working = await world.tokenStore.exchangeBootstrapToken(res.body.token);
+    assert.ok(working?.token, 'the bootstrap exchanges');
+    const refused = await postComment(proxyAppOver(world), working.token, 'LIN-9');
+    assert.equal(refused.status, 403, JSON.stringify(refused.body));
+    assert.equal(refused.body.error, "This stage's write allowance (none) does not permit createComment.");
+  });
+
+  test('a restricted row refired through its declared record mints a stamped grant bootstrap', async () => {
+    const world = makeWorld();
+    const id = await seedTaken(world, { patch: { kind: 'look-into', issueIdentifier: 'LIN-9' } });
+    resetSpy(world);
+    const { result: res } = await captureLogs(() => call(buildApp(world), 'owner-token', { itemId: id }));
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(world.spy.grant.length, 1, 'the declared branch minted');
+    assert.equal(world.spy.grant[0].writes, 'none', 'the declared mint carries the row\'s stage');
+    assert.equal(world.spy.grant[0].writesTarget, 'LIN-9');
+
+    const working = await world.tokenStore.exchangeBootstrapToken(res.body.token);
+    const refused = await postComment(proxyAppOver(world), working.token, 'LIN-9');
+    assert.equal(refused.status, 403, JSON.stringify(refused.body));
   });
 });

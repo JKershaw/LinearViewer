@@ -160,6 +160,9 @@ const TABLE = {
   // LIN-3833: the same route also reads the row (`listItems`) so the run-source twin can compare the stamp with the control.
   'routes/test.js :: /test/dispatch-item': [TST, 2],
   // lib readers — results feed in-process derivations
+  // LIN-4468: the write allowance's stamp reads the row's own kind and ticket server-side; never returned.
+  'lib/item-stage-stamp.js :: stampForItem': [SRV, 1],
+  'lib/item-stage-stamp.js :: stampForFollowUp': [SRV, 1],
   'lib/dispatch-factory.js :: anchor': [SRV, 1],
   'lib/dispatch-factory.js :: defaultFetchPilotPrFiles': [SRV, 2],
   'lib/dispatch-factory.js :: run': [SRV, 1],

@@ -88,7 +88,7 @@ import { LivenessAlarmStore } from './lib/liveness-alarm-store.js'
 import { createLivenessAlarmSweepRun } from './lib/liveness-alarm-sweep.js'
 import { createCiWakeSweepRun, createTickWorkspaceResolver } from './lib/ci-wake-sweep.js'
 import { createLeftoverStep, workspaceIdResolverFrom } from './lib/dispatch-leftover-hook.js'
-import { buildWakeCredentialProvisioner } from './lib/wake-credential.js'
+import { buildHeldWakeProvisionerFactory } from './lib/wake-credential.js'
 import { createKpiDailyRollupRun } from './lib/kpi-daily-rollup.js'
 import { SessionSummaryCacheStore } from './lib/session-summary-cache.js'
 import { RunParagraphStore } from './lib/run-paragraph-store.js'
@@ -1144,11 +1144,11 @@ const leftoverStep = createLeftoverStep({
     getProviderByName: (name) => getProviderForWorkspace({ provider: name })
   }))
 })
-dispatchQueueStore.setWakeCredentialProvisionerFactory(({ urlKey, createdBy }) => buildWakeCredentialProvisioner({
+// LIN-4468: a held wake takes the resumed parent's stage, as an immediate wake does (lib/wake-credential.js).
+dispatchQueueStore.setWakeCredentialProvisionerFactory(buildHeldWakeProvisionerFactory({
   proxyTokenStore,
-  urlKey,
   baseUrl: resolveEmailLinkOrigin(process.env),
-  createdBy
+  store: dispatchQueueStore
 }))
 
 // KPI daily rollup (LIN-3724, design LIN-3712): the scheduler is interval-only,

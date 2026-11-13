@@ -37,7 +37,7 @@ import { createProxyRunnerPromptRoutes } from './proxy-runner-prompt.js';
 import { BYTE_IDENTICAL_ESCALATION_THRESHOLD } from '../lib/rejected-credentials.js';
 import { SENTINEL_EXPIRY_FLOOR_MS } from '../lib/credential-diagnostics.js';
 import { STAGE_PROVIDER_LANE, STAGE_PROXY_TOKEN } from '../lib/proxy-events.js';
-import { READ_WRITE } from '../lib/proxy-scopes.js';
+import { requireWriteScope } from '../lib/stage-write-gate.js';
 import { requireGrant } from '../lib/require-grant.js';
 import { graphqlErrorExtra, graphqlErrorDetail, declaredProviderDisplayName, upstreamErrorStatus } from '../lib/proxy-graphql-errors.js';
 import { deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
@@ -251,9 +251,16 @@ function proxyLimiterKey(req) {
 }
 const LIMITER_DEFAULTS = { standardHeaders: true, legacyHeaders: false };
 const TOKEN_CREATION_MESSAGE = { error: 'Too many token creation requests, please try again later' };
+/**
+ * The proxy limiter's window. The runner broker's exchange retry waits at most this long (the
+ * `exchange` rows of lib/runner-kit/contract.json, which pin both the kit and simple-dispatcher), so
+ * a change here moves the retry budget: tests/unit/proxy-limiter-window-contract.test.js reads it
+ * against the contract's cap.
+ */
+export const PROXY_LIMITER_WINDOW_MS = 60 * 1000;
 const proxyLimiter = rateLimit({
   ...LIMITER_DEFAULTS,
-  windowMs: 60 * 1000,
+  windowMs: PROXY_LIMITER_WINDOW_MS,
   max: 60,
   message: { error: 'Too many proxy requests, please try again later' },
   keyGenerator: proxyLimiterKey,
@@ -593,6 +600,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // LIN-3136: the token's own stored workspace id (null when it has none).
       // The kickoff's declared mint (M1) reads it; it is never client-supplied.
       req.proxyWorkspaceId = result.workspaceId || null;
+      // LIN-4468: the stage's write allowance and its one ticket (null when unstamped, unrestricted).
+      req.proxyWrites = result.writes ?? null;
+      req.proxyWritesTarget = result.writesTarget ?? null;
       next();
     } catch (err) {
       // LIN-3699: reachable now that the store rethrows a failure instead of
@@ -602,15 +612,6 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     }
   }
 
-  /**
-   * Middleware to require write scope.
-   */
-  function requireWriteScope(req, res, next) {
-    if (req.proxyTokenScope !== READ_WRITE) {
-      return jsonError(res, 403, 'This endpoint requires a read-write token');
-    }
-    next();
-  }
 
   /**
    * Per-request provider + token resolution for the consumer data API (reads +
@@ -1339,7 +1340,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
     logEvent(req, '/api/proxy/instructions', 200);
 
-    const text = buildInstructions({ baseUrl, scope, declaredDisplayName, isDeclaredLinear, requiresTeam, grants: req.proxyTokenGrants || [] });
+    const text = buildInstructions({ baseUrl, scope, declaredDisplayName, isDeclaredLinear, requiresTeam, grants: req.proxyTokenGrants || [], writes: req.proxyWrites, writesTarget: req.proxyWritesTarget });
 
     res.type('text/plain').send(text);
   });

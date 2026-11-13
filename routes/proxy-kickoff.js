@@ -18,7 +18,7 @@ import { jsonError } from '../lib/errors.js';
  * @param {Object} deps
  * @param {Function} deps.proxyLimiter - The proxy rate limiter, injected (see `proxyLimiter` in routes/proxy.js)
  * @param {Function} deps.authenticateProxyToken - Consumer-token auth middleware (closure-local in createProxyRoutes)
- * @param {Function} deps.requireWriteScope - Requires readWrite scope on the token (closure-local)
+ * @param {Function} deps.requireWriteScope - Write-gate factory, `requireWriteScope(op)` (lib/stage-write-gate.js, LIN-4468): readWrite scope plus the stage's allowance for `op`
  * @param {Function} deps.requireGrant - The grant gate middleware factory (module-scope in routes/proxy.js); gates POST /autopilot/kickoff on the `dispatch` grant, after the scope check (LIN-3136)
  * @param {Function} deps.logEvent - Audit/witness event logger (closure-local)
  * @param {Object} deps.dispatchQueueStore - Dispatch queue storage instance
@@ -107,7 +107,7 @@ export function createKickoffRoutes({
    * appendProxyContext?, sessionId?, subscription?, model?, harness?, effort?, presetId?, maxTasks? }
    * (the authority documents each: lib/dispatch-entrance.js, enterKickoff).
    */
-  router.post('/api/proxy/autopilot/kickoff', proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant('dispatch'), async (req, res) => {
+  router.post('/api/proxy/autopilot/kickoff', proxyLimiter, authenticateProxyToken, requireWriteScope('kickoff'), requireGrant('dispatch'), async (req, res) => {
     await enterKickoff({
       req,
       res,
