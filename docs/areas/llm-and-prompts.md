@@ -144,9 +144,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   bare in `lib/recommendation-blind-read.js` (the run predicate and the dispatched step),
   `lib/pipeline-churn.js`, `lib/run-view.js` and `lib/run-closeout-state.js`, and has a second constant,
   `VIRTUAL_PROMPTS.BLIND_READ` (`lib/workflow-config.js`); `lib/completion-signals.js` types the
-  heading (three times) and the verdict words instead of importing them. Renaming the kind would leave
-  the route dispatching an unknown kind, and `tests/unit/stage-kind-tables.test.js` checks presence,
-  not these literals. `lib/recommendation-blind-read.js` also redeclares `COMPLETED`. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+  heading (three times) and the verdict words instead of importing them. The route module does not
+  import `BLIND_READ_KIND` at all, and `tests/unit/stage-kind-tables.test.js` checks presence, not
+  these literals. LOW: a stored kind is rarely renamed; the leaf's claim is what is untrue. `lib/recommendation-blind-read.js` also redeclares `COMPLETED`. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
 - `lib/openrouter.js`: the four routes code settles (the live-stage wait, the review loop bound, the
   blind read, the look-first sequence) are listed by hand in about nine places, no test pins any copy,
   and two are already wrong: `docs/architecture/prompt-system.md` says "four routes" and then

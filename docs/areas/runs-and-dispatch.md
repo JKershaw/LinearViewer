@@ -123,3 +123,11 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   the rows inside it can name different models whenever any request is unpriced. The fix is for
   `dispatchesOf` to carry the fold's `last.model`; a change to the dominant-model rule otherwise
   leaves the timeline behind. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+- `lib/run-closeout-state.js`: `closeOutSetsDone` never asks `closeOutWaitsOn`, so the owner's check
+  (`routes/workspace-api-run-evidence.js`) sets a stop-at-PR task Done when its landing PR is merged
+  and approved with no blind read, while the close-out guard (`lib/close-out-readiness.js`) refuses
+  the same trail as `blind-read-missing`, and `blindReadStep` (`lib/recommendation-blind-read.js`)
+  then routes a read to the Done ticket (it stands aside on a completed ticket only after a
+  close-out). The entries above name the box/guard precedence split; this is its Done path. Whether
+  a person's own check may pass the gate is a decision; the shared-trail test runs with
+  `byPersonCheck: false`, so it never reaches this path. (Drift & Coherence Review, 13 Nov., second read; `docs/reviews/drift-coherence-review-2026-11-13.md`.)

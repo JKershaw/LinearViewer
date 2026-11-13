@@ -1,5 +1,5 @@
 # Run 7 (LIN-4443): assemble the report from its prose template and the evidence tables (no hand-copied tables).
-# Usage (repo root): python3 -I assemble-report-run7.py <template.md> <evidence-dir> <second-read.md|-> <out.md>
+# Usage (repo root): python3 -I assemble-report-run7.py <prose-draft.md> <evidence-dir> <second-read.md|-> <out.md>. The prose draft was the writer's working copy (the report is its output); the tables come only from this folder.
 import csv, sys
 tpl, E, sr, out = sys.argv[1:5]
 t = open(tpl).read()
