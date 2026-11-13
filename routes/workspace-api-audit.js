@@ -10,6 +10,7 @@ import { jsonError } from '../lib/errors.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
 import { getWorkspaceToken, isActiveProviderLinear } from '../lib/workspace.js';
 import { buildMockAuditData } from '../lib/workspace-api-mocks.js';
+import { isHermeticTestToken } from '../lib/should-mock-ai.js';
 import { failureOf, refuseCapability } from './workspace-api-steps.js';
 
 export function registerAuditRoutes(router, { workspaceFromUrl }) {
@@ -32,8 +33,8 @@ export function registerAuditRoutes(router, { workspaceFromUrl }) {
       // predicate, NOT shouldMockAi): the semantics are "serve the deterministic
       // audit report", not "mock the AI call". The mock data below is unchanged —
       // the local-seed identity only affects session/workspace resolution.
-      if (process.env.NODE_ENV === 'test' &&
-          (workspace.accessToken === 'test-token' || workspace.provider === 'local')) {
+      if (isHermeticTestToken(workspace.accessToken) ||
+          (process.env.NODE_ENV === 'test' && workspace.provider === 'local')) {
         return res.json(computeAuditFromData(buildMockAuditData()));
       }
 

@@ -31,7 +31,7 @@ import { isTerminalState } from '../lib/providers/state-map.js';
 import { UUID_REGEX } from '../lib/dispatch-validation.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
 import { resolveIssueBinding, isValidIssueId, getWorkspaceCallScope } from '../lib/workspace.js';
-import { shouldMockAi } from '../lib/should-mock-ai.js';
+import { isHermeticTestToken, shouldMockAi } from '../lib/should-mock-ai.js';
 import { getProvider, getProviderForWorkspace } from '../lib/providers/registry.js';
 import { testMockData } from '../lib/sample-data/mock-data.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
@@ -443,7 +443,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     // `isTestMode` gates the DATA mock; `mockAi` additionally fires the AI mock
     // for local-provider sessions. The AI-config + free-tier guards key off
     // `mockAi` so a mocked session isn't 503'd for lacking an OpenRouter key.
-    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+    const isTestMode = isHermeticTestToken(workspace.accessToken);
     const mockAi = shouldMockAi(workspace);
     const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
 

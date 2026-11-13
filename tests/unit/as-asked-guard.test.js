@@ -16,9 +16,9 @@
  * after normalizeEscaping, so a PATCH that writes the block back unescaped over an
  * escaped live block is NOT refused — that case is here too.
  *
- * The guard is also run against the Jira provider's fake, whose ADF round trip
- * loses the end line; see
- * the Jira describe block at the end for what that proves and what it does not.
+ * The guard is also run against the Jira provider's fake. Jira holds the block through
+ * the `harbour.asAsked` property (LIN-4450); see the Jira describe block at the end for
+ * what that proves and what it does not.
  */
 process.env.NODE_ENV = 'test';
 
@@ -30,7 +30,8 @@ import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { localProvider } from '../../lib/providers/local/index.js';
 import { jiraProvider } from '../../lib/providers/jira/index.js';
 import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js';
-import { markdownToAdf } from '../../lib/providers/jira/adf.js';
+import { adfToMarkdown, markdownToAdf } from '../../lib/providers/jira/adf.js';
+import { AS_ASKED_PROPERTY, AS_ASKED_READ } from '../../lib/providers/jira/as-asked-region.js';
 import { createLocalStore } from '../fixtures/local-harness.js';
 import { sealAsAsked, splitAsAsked, AS_ASKED_HEADING, AS_ASKED_END } from '../../lib/as-asked.js';
 
@@ -263,18 +264,16 @@ describe('the guard on LocalStore — the PATCH guard read', () => {
 });
 
 // ---------------------------------------------------------------------------
-// The guard against the Jira provider's fake. Jira stores
-// ADF, and the provider converts markdown ↔ ADF on every write and read. What the
-// round trip does to the block decides what the guard can do on Jira:
-//   - The words and the heading survive, but the END line does not: ADF has one
-//     emphasis mark, and adfToMarkdown renders it `_…_`, so the stored end line
-//     reads back as `_End of what was asked. …_`, not the `*…*` marker. A block
-//     written to Jira therefore reads back as NO block.
-//   - So on Jira the guard never refuses a legitimate write (no live block, no
-//     re-escape refusal loop), and it still refuses forging a block. It cannot
-//     protect a block, because Jira cannot hold one through this provider. That
-//     gap is pinned below so a change to it is seen, and it is the review-ledger
-//     item the plan names (the first-dispatch and create seals must skip Jira).
+// The guard against the Jira provider's fake. Jira stores ADF, which renders the
+// block's end line as `_…_`, so the exact words live in the harbour.asAsked property
+// and the description shows the block formatted (LIN-4450). What the guard can do on
+// Jira follows from that:
+//   - A block written through the provider reads back as its exact words, and the
+//     guard refuses a rewrite that would drop or change it.
+//   - A block with no property (a ticket the region reader still recognises) reads
+//     back as the block with its rendered words, and the guard holds it the same way.
+//   - An ordinary ticket with no block takes ordinary writes, and forging a block on
+//     one is refused.
 // ---------------------------------------------------------------------------
 
 describe('the guard against the Jira fake', () => {
@@ -348,14 +347,29 @@ describe('the guard against the Jira fake', () => {
     assert.equal(res.body.code, 'NO_AS_ASKED_BLOCK');
   });
 
-  test('GAP (ledger): a block stored on Jira reads back with no end marker, so it is no block', async () => {
-    // The same read the guard and description/below make.
+  test('a block on Jira with no harbour.asAsked property reads back as the block, behind canonical markers, and the guard holds it', async () => {
+    // ENG-2 is seeded with the block in its ADF and no property (a ticket the region
+    // reader must still recognise). The end line comes back in the canonical form.
     const { description } = await jiraProvider.issueDescription(SCOPE, 'ENG-2');
     assert.ok(description.includes('## As asked'), 'the heading survives');
-    assert.ok(description.includes('_End of what was asked.'), 'the end line comes back as _…_');
-    assert.equal(splitAsAsked(description), null, 'so the description has no block on Jira');
-    // …and the guard therefore treats a full rewrite of that ticket as an ordinary write.
+    assert.ok(description.includes('*End of what was asked.'), 'the end line is served in its canonical form');
+    assert.equal(splitAsAsked(description)?.words, adfToMarkdown(markdownToAdf(WORDS)), 'the words are the rendering, the best a property-less block can give');
+    // …so the guard refuses a rewrite that would drop the block.
     const rewrite = await call(jiraApp(), 'PATCH', '/api/proxy/issues/ENG-2', { description: 'rewritten' });
-    assert.equal(rewrite.status, 200, JSON.stringify(rewrite.body));
+    assert.equal(rewrite.status, 422, JSON.stringify(rewrite.body));
+    assert.equal(rewrite.body.code, 'AS_ASKED_IMMUTABLE');
+  });
+
+  test('a block written through the provider reads back as its exact words, the property holding them (LIN-4450)', async () => {
+    // Markdown the codec does not give back: bullets, emphasis, trailing spaces.
+    const LOSSY = '* a\n*em*  \n***x***';
+    await jiraProvider.updateIssue(SCOPE, 'ENG-1', { description: sealAsAsked(LOSSY) });
+    const { description } = await jiraProvider.issueDescription(SCOPE, 'ENG-1');
+    assert.equal(splitAsAsked(description)?.words, LOSSY, 'byte for byte');
+    const stored = await fake.getIssue('ENG-1', AS_ASKED_READ);
+    assert.equal(stored.properties[AS_ASKED_PROPERTY].words, LOSSY);
+    // The guard now protects the words: an ordinary rewrite of the block is refused.
+    const rewrite = await call(jiraApp(), 'PATCH', '/api/proxy/issues/ENG-1', { description: 'rewritten' });
+    assert.equal(rewrite.status, 422, JSON.stringify(rewrite.body));
   });
 });

@@ -12,8 +12,8 @@
  * inside the block, and the reported-priority line and its triage marker after the
  * end line. A session or feedback body that already holds a marker line is filed
  * unsealed with exactly one log line (the proxy create refuses it outright). A provider
- * that cannot hold the block (Jira's ADF round trip) is filed unsealed with its own
- * log line, never reformatted.
+ * that cannot hold the block (a round trip that rewrites it) is filed unsealed with its
+ * own log line, never reformatted. Jira holds the block (LIN-4450), so it is not one.
  */
 process.env.NODE_ENV = 'test';
 
@@ -204,17 +204,22 @@ describe('create seal on LocalStore — bodies that already hold a marker line a
 });
 
 describe('create seal — a provider that cannot hold the block is skipped, with its own log line', () => {
-  test('the Jira provider cannot hold the block (its ADF round trip turns the end line into _…_); Local and GitHub-style verbatim stores can', () => {
+  // LIN-4450: Jira now holds the block (its exact words live in the harbour.asAsked
+  // property), so it is no longer the provider that skips. The skip is still real for
+  // a provider whose round trip reformats the block, so a synthetic lossy round trip
+  // drives the branch: the seal is skipped and the text is filed as written.
+  const lossy = (md) => md.replace(/^\*End of/m, '_End of');
+
+  test('Jira can hold the block; a round trip that rewrites the end line cannot', () => {
     assert.equal(typeof jiraProvider.descriptionRoundTrip, 'function', 'Jira declares its markdown round trip');
-    assert.equal(providerHoldsAsAsked(jiraProvider, sealAsAsked(TEXT)), false);
+    assert.equal(providerHoldsAsAsked(jiraProvider, sealAsAsked(TEXT)), true);
     assert.equal(providerHoldsAsAsked(localProvider, sealAsAsked(TEXT)), true);
+    assert.equal(providerHoldsAsAsked({ name: 'lossy', descriptionRoundTrip: lossy }, sealAsAsked(TEXT)), false);
   });
 
   for (const [lane, create] of [['proxy', createProxy], ['session', createSession]]) {
-    test(`${lane} create on a provider with Jira's round trip: filed unsealed and verbatim, one "seal skipped" log line`, async () => {
-      // Jira has no createIssue today, so no create lane reaches it. The seam is
-      // driven here with Jira's own round trip on the LocalStore provider.
-      localProvider.descriptionRoundTrip = (md) => jiraProvider.descriptionRoundTrip(md);
+    test(`${lane} create on a provider with a lossy round trip: filed unsealed and verbatim, one "seal skipped" log line`, async () => {
+      localProvider.descriptionRoundTrip = lossy;
       const res = await create(TEXT);
       assert.equal(res.status, 201, JSON.stringify(res.body));
       assert.equal(await storedDescription(res.body.issue.id), TEXT, 'the text is filed as written, never reformatted');
@@ -224,7 +229,7 @@ describe('create seal — a provider that cannot hold the block is skipped, with
   }
 
   test('feedback on such a provider: today\'s layout, one "seal skipped" log line', async () => {
-    localProvider.descriptionRoundTrip = (md) => jiraProvider.descriptionRoundTrip(md);
+    localProvider.descriptionRoundTrip = lossy;
     const res = await submitFeedback({ message: 'It broke' });
     assert.equal(res.status, 201, JSON.stringify(res.body));
     const stored = await storedDescription(res.body.issue.id);
