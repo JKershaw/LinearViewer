@@ -19,15 +19,19 @@
  *     ceiling table is also read here, from source, so this file is the one completeness guard.
  *   - the template count in docs/architecture/source-map.md and public/llms.txt's catalog keep their
  *     own tests in prompt-templates.test.js (a count and a bullet per kind); llms.txt is read here too.
+ *
+ * LIN-4466 adds a source scan below: outside lib/prompts/blind-read-words.js, the blind read's kind is a
+ * literal only as a row key of a table listed in TABLES (or in the template registry), and its heading and
+ * verdict prose are never typed. TABLES is that scan's table inventory, so a table is listed once.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as acorn from 'acorn';
 import * as walk from 'acorn-walk';
+import { REPO, shippedSourceFiles } from './helpers/shipped-sources.js';
 import { BLIND_READ_KIND, BLIND_READ_HEADING, BLIND_READ_VERDICT_PROSE, BLIND_READ_VERDICT_LIST } from '../../lib/prompts/blind-read-words.js';
 import { PROMPT_TEMPLATES, STAGE_LEADS } from '../../lib/prompt-templates.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
@@ -183,8 +187,6 @@ describe('LIN-4437 — every per-kind table names every PROMPT_TEMPLATES key, or
 // ledger. Eval fixtures under scripts/eval name kinds as data and are out of scope.
 const WORDS_LEAF = 'lib/prompts/blind-read-words.js';
 const TEMPLATE_REGISTRY = 'lib/prompt-template-defs.js';
-const SCAN_ROOTS = ['lib', 'routes', 'server.js', 'scripts/stability-measures-blind.mjs'];
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const TABLE_FILES = new Set(Object.keys(TABLES).map(name => /\((lib\/[^)]+)\)/.exec(name)?.[1]).filter(Boolean));
 
 /** The kind, heading and verdict-prose findings in one module's source. */
@@ -207,8 +209,8 @@ function blindReadFindings(file, source) {
   return out;
 }
 
-const scannedFiles = () => [...new Set(execFileSync('git', ['ls-files', ...SCAN_ROOTS], { cwd: REPO, encoding: 'utf8' }).split('\n'))]
-  .filter(f => /\.m?js$/.test(f) && f !== WORDS_LEAF);
+// The scope is shared with LIN-4458's comment-kind census (tests/unit/helpers/shipped-sources.js).
+const scannedFiles = () => shippedSourceFiles().filter(f => f !== WORDS_LEAF);
 
 describe('LIN-4466 — the blind read\'s kind, heading and verdict words have one home', () => {
   test('the scan reaches the files that type them today', () => {

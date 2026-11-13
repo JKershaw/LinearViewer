@@ -18,6 +18,10 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   can raise a ceiling while real renders shrink (LIN-4393).
 - The `## As asked` block's words have one owner, `lib/as-asked.js`: import its spellings,
   never retype the heading or end line (LIN-4362).
+- The blind read's kind, heading and verdict words have one owner, `lib/prompts/blind-read-words.js`;
+  the verdict prose ("better, the same or worse") is built there from the words. Import them; the scan
+  in `tests/unit/stage-kind-tables.test.js` fails on a literal elsewhere, but a row key of a table it
+  lists. Prove a move byte-identical by rendering every kind, fresh and fix round (LIN-4466).
 - The code routes' order lives once, in `CODE_ROUTES` (`lib/code-routes.js`). A new route is an
   entry with its `emits`, plus the one "Code route order" line in
   `docs/architecture/prompt-system.md` and in `docs/architecture/source-map.md`;
