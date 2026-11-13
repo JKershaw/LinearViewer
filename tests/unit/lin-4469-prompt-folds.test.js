@@ -25,6 +25,8 @@ const RETIRED = [
   'do not change code, branches, pull requests, tickets or tracker state',
   'do not rewrite its description, do not create tickets or subtasks',
   'one docs-only notes pull request',
+  'Don\'t change code, branches, pull requests, tickets or Linear state',
+  'Don\'t change code, branches, pull requests, tickets or tracker state',
   'rebase it onto main and get it green under the notes guard',
   'search for the repo\'s committed code-shape census-review tool',
   'naming any narrowing',
