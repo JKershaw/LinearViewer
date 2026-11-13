@@ -68,7 +68,7 @@ import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, 
 import { checkLeftoverAnswer, leftoverAnswerRefusal } from '../lib/dispatch-leftover-answer.js';
 import { blindReadRefusal } from '../lib/run-ledger.js';
 import { checkBlindRead, landingPrUrls } from '../lib/run-trail.js';
-import { isRestrictedStamp, sameTicketKey } from '../lib/stage-writes.js';
+import { isRestrictedStamp, sameTicketKey, ISSUE_PATCH_FIELDS } from '../lib/stage-writes.js';
 import { jsonError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
 
@@ -153,7 +153,7 @@ const SPEC = {
  * @param {Object} deps.commentDedupe - Short-window comment create dedupe cache (module-scope singleton in routes/proxy.js; injected, NOT re-exported here — the dependency stays one-way, proxy.js -> proxy-writes.js)
  * @param {Object} deps.commentDedupeGenerations - Per-workspace generation tracker invalidating commentDedupe entries on delete/edit (module-scope singleton in routes/proxy.js; injected, same one-way rule as commentDedupe)
  * @param {Function} deps.authenticateProxyToken - Consumer-token auth middleware (closure-local in createProxyRoutes)
- * @param {Function} deps.requireWriteScope - readWrite-scope gate middleware (closure-local)
+ * @param {Function} deps.requireWriteScope - Write-gate factory, `requireWriteScope(op)` (lib/stage-write-gate.js, LIN-4468): readWrite scope plus the stage's allowance for `op`; each mount names its SPEC key
  * @param {Function} deps.resolveProviderAccess - Resolves {token, reason, provider} for the active workspace/provider (closure-local)
  * @param {Function} deps.denyIfUnsupported - Capability gate; 422s an unsupported provider method (closure-local)
  * @param {Function} deps.denyIfMissingRead - Capability gate for an internal read a write handler depends on; 422s when absent (closure-local)
@@ -558,8 +558,9 @@ export function createProxyWriteRoutes({
     // A wholly empty body is refused before any read (the no-network 400 for
     // `{}`); the check after conversion still catches a body whose only fields
     // are unsupported or dropped.
-    const updatable = [title, description, stateId, assigneeId, projectId, parentId, cycleId, priority, priorityLevel];
-    if (updatable.every(v => v === undefined)) return refuse(ctx, 400, 'No valid fields to update');
+    // LIN-4468: the field list is ISSUE_PATCH_FIELDS, the one the triage gate reads, so a field added to the
+    // destructuring above must be added there too (tests/unit/lin-4468-stage-write-allowance.test.js pins it).
+    if (ISSUE_PATCH_FIELDS.every(field => req.body[field] === undefined)) return refuse(ctx, 400, 'No valid fields to update');
 
     // LIN-4451 (review note 5, disposition (b)), as create does: a present assigneeId /
     // parentId / cycleId that is not a UUID is refused 400 here, before any read, not

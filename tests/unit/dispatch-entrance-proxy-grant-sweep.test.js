@@ -35,19 +35,14 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { BASE_DEPS, ACME } from './lib/proxy-fake-deps.js';
-import { enumerateRoutes, sampleUrl, appAround, request, makeSpy, spiedProxyTokenStore } from './lib/entrance-route-sweep.js';
+import { enumerateRoutes, sampleUrl, appAround, request, makeSpy, spiedProxyTokenStore, PROXY_ALLOWED_LAYERS } from './lib/entrance-route-sweep.js';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
 // The composer's audited path-scoped layers: routes/proxy-runner.js:76 (the
 // runner group's limiter + token + `take` gate) and routes/proxy-tokens-admin.js:138
 // (the copy-token creation limiter). Any other layer fails the enumeration.
-const RUNNER_MOUNT = String.raw`^\/api\/proxy\/runner\/?(?=\/|$)`;
-const TOKENS_MOUNT = String.raw`^\/workspace(?:\/([^/]+?))\/api\/proxy\/tokens\/?(?=\/|$)`;
-const ALLOWED_LAYERS = [
-  { mount: RUNNER_MOUNT, names: ['<anonymous>', 'authenticateProxyToken', 'requireGrantMiddleware'] },
-  { mount: TOKENS_MOUNT, names: ['<anonymous>'] }
-];
+const ALLOWED_LAYERS = PROXY_ALLOWED_LAYERS;
 
 const SINKS = ['addItem', 'expandCascadeAborts'];
 const ENQUEUE_MOUNTS = [

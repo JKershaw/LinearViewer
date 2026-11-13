@@ -251,9 +251,16 @@ function proxyLimiterKey(req) {
 }
 const LIMITER_DEFAULTS = { standardHeaders: true, legacyHeaders: false };
 const TOKEN_CREATION_MESSAGE = { error: 'Too many token creation requests, please try again later' };
+/**
+ * The proxy limiter's window. The runner broker's exchange retry waits at most this long (the
+ * `exchange` rows of lib/runner-kit/contract.json, which pin both the kit and simple-dispatcher), so
+ * a change here moves the retry budget: tests/unit/proxy-limiter-window-contract.test.js reads it
+ * against the contract's cap.
+ */
+export const PROXY_LIMITER_WINDOW_MS = 60 * 1000;
 const proxyLimiter = rateLimit({
   ...LIMITER_DEFAULTS,
-  windowMs: 60 * 1000,
+  windowMs: PROXY_LIMITER_WINDOW_MS,
   max: 60,
   message: { error: 'Too many proxy requests, please try again later' },
   keyGenerator: proxyLimiterKey,
@@ -1333,7 +1340,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
     logEvent(req, '/api/proxy/instructions', 200);
 
-    const text = buildInstructions({ baseUrl, scope, declaredDisplayName, isDeclaredLinear, requiresTeam, grants: req.proxyTokenGrants || [] });
+    const text = buildInstructions({ baseUrl, scope, declaredDisplayName, isDeclaredLinear, requiresTeam, grants: req.proxyTokenGrants || [], writes: req.proxyWrites, writesTarget: req.proxyWritesTarget });
 
     res.type('text/plain').send(text);
   });

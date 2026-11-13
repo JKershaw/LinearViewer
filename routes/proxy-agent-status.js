@@ -15,7 +15,7 @@ import { MAX_NAME_LENGTH, DANGEROUS_CHARS_REGEX } from '../lib/issue-write-valid
  * @param {Object} deps.agentStatusStore - Agent status storage instance
  * @param {Function} deps.proxyLimiter - The proxy rate limiter, injected (see `proxyLimiter` in routes/proxy.js)
  * @param {Function} deps.authenticateProxyToken - Proxy bearer-token auth middleware
- * @param {Function} deps.requireWriteScope - Middleware requiring a readWrite-scoped token
+ * @param {Function} deps.requireWriteScope - Write-gate factory, `requireWriteScope(op)` (lib/stage-write-gate.js, LIN-4468): readWrite scope plus the stage's allowance for `op`
  * @param {Function} deps.logEvent - Proxy event/audit logger
  */
 export function createAgentStatusRoutes({ agentStatusStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent }) {

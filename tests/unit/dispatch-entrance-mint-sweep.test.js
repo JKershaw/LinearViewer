@@ -36,6 +36,19 @@
  *   World R, a record present (owner and workspace differ from caller and poster):
  *     follow-up arms                    one `mintGrantBootstrap`, the RECORD's grants, owner and workspace; never `createToken`
  *     refire broker                     the same from the record, and only for the recorded owner who took the live row
+ *   World S (LIN-4468), a restricted stage (look-into, `writes: none`):
+ *     launch arms, session POST         the plain mint carries `writes: none` and the task's ticket
+ *     follow-up, attach and pbt         the same, from the follow-up's OWN kind; pbt takes the parent's ticket
+ *     follow-up of a declared parent    the declared mint carries it (both mechanisms stamp)
+ *     refire broker, a restricted row   the plain mint carries the row's stage and ticket
+ *   An unrestricted stage (work) adds no stamp key: the exact-key pins above hold.
+ *
+ * Stage-less mints (LIN-4468: unstamped, so unrestricted, each for its reason). None is reached here:
+ *   routes/collective.js            participants dispatch as `custom`, which has no template (work)
+ *   lib/chat-tools.js               a chat follow-up dispatches as `custom` (work)
+ *   routes/proxy-tokens-admin.js    an operator's Settings token or runner copy: a person, not a stage
+ *   routes/test.js                  test-only mints, NODE_ENV=test
+ *   refire broker, no itemId or a missing row: names no stage (LIN-3135 R2)
  */
 process.env.NODE_ENV = 'test';
 
@@ -50,7 +63,7 @@ import { createMockCollection } from '../fixtures/mock-collection.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { BASE_DEPS } from './lib/proxy-fake-deps.js';
-import { enumerateRoutes, sampleUrl, request, makeSpy } from './lib/entrance-route-sweep.js';
+import { enumerateRoutes, sampleUrl, request, makeSpy, PROXY_ALLOWED_LAYERS } from './lib/entrance-route-sweep.js';
 
 const URL_KEY = 'acme';
 const POSTER = 'poster-B';
@@ -70,12 +83,7 @@ const FOLLOWUP_RECORD = Object.freeze({
 // The refire broker keeps the lin-3135 shape: ['dispatch'], and a caller who IS the recorded owner.
 const BROKER_RECORD = Object.freeze({ ...FOLLOWUP_RECORD, grants: ['dispatch'] });
 
-const RUNNER_MOUNT = String.raw`^\/api\/proxy\/runner\/?(?=\/|$)`;
-const TOKENS_MOUNT = String.raw`^\/workspace(?:\/([^/]+?))\/api\/proxy\/tokens\/?(?=\/|$)`;
-const ALLOWED_LAYERS = [
-  { mount: RUNNER_MOUNT, names: ['<anonymous>', 'authenticateProxyToken', 'requireGrantMiddleware'] },
-  { mount: TOKENS_MOUNT, names: ['<anonymous>'] }
-];
+const ALLOWED_LAYERS = PROXY_ALLOWED_LAYERS;
 
 // ── the world ───────────────────────────────────────────────────────────────
 
@@ -156,10 +164,10 @@ async function makeWorld() {
   const dispatchTokenMints = () => spy.count('dispatchToken.createToken');
   const reset = () => { spy.calls.length = 0; };
 
-  /** A finished parent row (taken, so it lives in history); `record` is its declaration. */
-  async function seedParent({ record = null } = {}) {
+  /** A finished parent row (taken, so it lives in history); `record` is its declaration, `kind` its stage (LIN-4468). */
+  async function seedParent({ record = null, kind = 'implementation' } = {}) {
     const parent = await dispatchStore.addItem(URL_KEY, {
-      prompt: 'parent beat', promptName: 'Parent', kind: 'implementation', issueIdentifier: 'TEST-1', harness: 'claude-code',
+      prompt: 'parent beat', promptName: 'Parent', kind, issueIdentifier: 'TEST-1', harness: 'claude-code',
       target: 'cli', dispatchedBy: RECORDED_OWNER, ...(record ? { grantDeclaration: record } : {})
     });
     await dispatchStore.takeItem(parent._id, URL_KEY, TAKER_LABEL);
@@ -476,3 +484,67 @@ describe('LIN-3601 mint sweep — no route mints a kind its row does not list', 
 
 // Composer routes OUTSIDE the dispatch entrances that legitimately mint, found by running the sweep once.
 const OUTSIDE_E_MINTERS = {};
+
+// ── LIN-4468: World S, a restricted stage stamps every mint it reaches ───────
+
+const RESTRICTED = 'look-into'; // `writes: none` (lib/prompt-template-defs.js)
+const stampOf = (opts) => ({ writes: opts.writes, writesTarget: opts.writesTarget });
+const NONE_ON = (ticket) => ({ writes: 'none', writesTarget: ticket });
+
+describe('LIN-4468 mint sweep — World S (a restricted stage stamps every mint it reaches)', () => {
+  test('proxy POST /dispatch, a launch of a restricted kind: the plain mint carries the stage and its ticket', async () => {
+    const w = await makeWorld();
+    w.reset();
+    const res = await w.viaProxy(DISPATCH, { prompt: 'look', issueIdentifier: 'TEST-1', target: 'cli', appendProxyContext: true, harness: 'claude-code', kind: RESTRICTED });
+    assert.equal(res.status, 201, res.text);
+    assert.deepEqual(w.plains().map(p => stampOf(p.opts)), [NONE_ON('TEST-1')]);
+  });
+
+  test('session POST, a restricted kind with attachProxy: the plain mint carries the stage and its ticket', async () => {
+    const w = await makeWorld();
+    w.reset();
+    const res = await w.viaSession({ prompt: 'look', kind: RESTRICTED, issueIdentifier: 'TEST-7', attachProxy: true, target: 'cli', harness: 'claude-code' });
+    assert.equal(res.status, 201, res.text);
+    assert.deepEqual(w.plains().map(p => stampOf(p.opts)), [NONE_ON('TEST-7')]);
+  });
+
+  for (const attach of [true, false]) {
+    test(`recommend-and-dispatch override arm, a restricted follow-up (${attach ? 'attach' : 'pbt'}): stamped from its own kind, not its parent's`, async () => {
+      const w = await makeWorld();
+      const parent = await w.seedParent(); // an implementation parent: work
+      w.reset();
+      const body = { issueIdentifier: 'TEST-1', kind: RESTRICTED, followUpTo: parent, ...(attach ? { appendProxyContext: true, harness: 'claude-code' } : {}) };
+      const res = await w.viaProxy(RECOMMEND, body);
+      assert.equal(res.status, 201, res.text);
+      assert.deepEqual(w.plains().map(p => stampOf(p.opts)), [NONE_ON('TEST-1')]);
+    });
+  }
+
+  test('a restricted follow-up of a declared parent: the declared mint carries the stage', async () => {
+    const w = await makeWorld();
+    const parent = await w.seedParent({ record: FOLLOWUP_RECORD });
+    w.reset();
+    const res = await w.viaProxy(RECOMMEND, { issueIdentifier: 'TEST-1', kind: RESTRICTED, followUpTo: parent });
+    assert.equal(res.status, 201, res.text);
+    assert.deepEqual(w.plains(), [], 'a declared resume never mints plain');
+    assert.deepEqual(w.grants().map(stampOf), [NONE_ON('TEST-1')]);
+  });
+
+  test('a work follow-up of a restricted parent: unstamped, its own kind wins', async () => {
+    const w = await makeWorld();
+    const parent = await w.seedParent({ kind: RESTRICTED });
+    w.reset();
+    const res = await w.viaProxy(RECOMMEND, { issueIdentifier: 'TEST-1', kind: 'implementation', followUpTo: parent });
+    assert.equal(res.status, 201, res.text);
+    for (const p of w.plains()) assert.equal('writes' in p.opts, false, 'no stamp key on a work mint');
+  });
+
+  test('refire broker, a restricted row with no record: the plain mint carries the row\'s stage and ticket', async () => {
+    const w = await makeWorld();
+    const itemId = await w.seedParent({ kind: RESTRICTED });
+    w.reset();
+    const res = await w.viaBroker('owner-token', { itemId });
+    assert.equal(res.status, 201, res.text);
+    assert.deepEqual(w.plains(), [{ urlKey: URL_KEY, opts: { ...grantlessCreate('refire-broker', RECORDED_OWNER), ...NONE_ON('TEST-1') } }]);
+  });
+});

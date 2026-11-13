@@ -31,18 +31,13 @@ import assert from 'node:assert/strict';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { BASE_DEPS, ACME } from './lib/proxy-fake-deps.js';
-import { enumerateRoutes, sampleUrl, appAround, request, makeCanary, spiedProxyTokenStore, makeSpy, SAMPLE_UUID } from './lib/entrance-route-sweep.js';
+import { enumerateRoutes, sampleUrl, appAround, request, makeCanary, spiedProxyTokenStore, makeSpy, SAMPLE_UUID, PROXY_ALLOWED_LAYERS } from './lib/entrance-route-sweep.js';
 
 const OWNER = 'acct-owner';
 const OTHER = 'acct-other';
 const ownerCheck = async ({ accountId }) => ({ status: accountId === OWNER ? 'owner' : 'not-owner' });
 
-const RUNNER_MOUNT = String.raw`^\/api\/proxy\/runner\/?(?=\/|$)`;
-const TOKENS_MOUNT = String.raw`^\/workspace(?:\/([^/]+?))\/api\/proxy\/tokens\/?(?=\/|$)`;
-const ALLOWED_LAYERS = [
-  { mount: RUNNER_MOUNT, names: ['<anonymous>', 'authenticateProxyToken', 'requireGrantMiddleware'] },
-  { mount: TOKENS_MOUNT, names: ['<anonymous>'] }
-];
+const ALLOWED_LAYERS = PROXY_ALLOWED_LAYERS;
 
 /** A fake queue row that carries the canary in both places a live token can ride. */
 function canaryRow(canary, { target = 'cli', dispatchedBy = OWNER } = {}) {

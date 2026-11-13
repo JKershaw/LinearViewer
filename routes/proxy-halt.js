@@ -2,8 +2,8 @@
  * Proxy operator halt routes (LIN-2994 Surface 3 / LIN-3025) — the
  * degraded-mode operator path (Decision 4): GET/POST/DELETE
  * /api/proxy/dispatch/halt. Mirrors the shape of routes/proxy-agent-status.js
- * (proxyLimiter + authenticateProxyToken for reads, + requireWriteScope for
- * writes, logEvent on every handled branch including a 200 GET).
+ * (proxyLimiter + authenticateProxyToken for reads, + requireWriteScope('haltSet' /
+ * 'haltClear') for writes, logEvent on every handled branch including a 200 GET).
  *
  * The runner honours the stored halt (lib/runner-kit/runner.mjs `haltAction`:
  * pause leaves fresh items, stop sweeps), so setting or clearing one is a
@@ -42,7 +42,7 @@ export const PROXY_TOKEN_UNBOUND_MESSAGE =
  * @param {Object} deps.workspaceHaltStore - Durable per-workspace operator halt store (lib/workspace-halt.js)
  * @param {Function} deps.proxyLimiter - The proxy rate limiter, injected (see `proxyLimiter` in routes/proxy.js)
  * @param {Function} deps.authenticateProxyToken - Proxy bearer-token auth middleware
- * @param {Function} deps.requireWriteScope - Middleware requiring a readWrite-scoped token
+ * @param {Function} deps.requireWriteScope - Write-gate factory, `requireWriteScope(op)` (lib/stage-write-gate.js, LIN-4468): readWrite scope plus the stage's allowance for `op`
  * @param {Function} deps.logEvent - Proxy event/audit logger
  * @param {Function|null} deps.workspaceOwnerCheck - the ONE hoisted owner seam
  *   (server.js); deliberately undefaulted like `workspaceHaltStore`. Absent or

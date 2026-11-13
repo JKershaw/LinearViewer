@@ -34,6 +34,8 @@
  * (lib/dispatch-feedback-validation.js, lib/wake-credential.js,
  * lib/poll-halt.js) rather than forking the dispatch route's logic.
  */
+// LIN-4468: imported, not injected like the other routers' `requireWriteScope`, so a test that builds
+// this factory alone (several do) still gets the real gate.
 import { requireStageWrite } from '../lib/stage-write-gate.js';
 import { Router } from 'express';
 import { badRequest, jsonError, notFound, replyStoreFault } from '../lib/errors.js';

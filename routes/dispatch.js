@@ -1415,7 +1415,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     // today's inline mint below, untouched, with no store read. Present → look
     // the declaration up first, then branch: a record re-mints declared from the
     // RECORDED authority behind the caller bound, never falling back to plain;
-    // `none` / `row-missing` fall through to today's grant-less mint.
+    // `none` / `row-missing` fall through to the grant-less mint below, which since
+    // LIN-4468 carries the row's own stage (an existing row) or none (a missing row).
     const itemId = req.body?.itemId;
     if (itemId !== undefined) {
       // Present but malformed fails closed rather than falling back.

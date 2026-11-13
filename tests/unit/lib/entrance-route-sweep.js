@@ -24,17 +24,28 @@ import { createMockCollection } from '../../fixtures/mock-collection.js';
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 
 /**
+ * The path-scoped middleware layers `createProxyRoutes` mounts, audited once for every sweep that
+ * walks the proxy router: the runner mount's gate (routes/proxy-runner.js) and the Settings token
+ * admin's session gate (routes/proxy-tokens-admin.js).
+ */
+export const PROXY_ALLOWED_LAYERS = Object.freeze([
+  { mount: String.raw`^\/api\/proxy\/runner\/?(?=\/|$)`, names: ['<anonymous>', 'authenticateProxyToken', 'requireGrantMiddleware'] },
+  { mount: String.raw`^\/workspace(?:\/([^/]+?))\/api\/proxy\/tokens\/?(?=\/|$)`, names: ['<anonymous>'] }
+]);
+
+/**
  * Every route registered on `router`, nested routers included.
  *
  * @param {import('express').Router} router
- * @param {{allowedLayers?: {mount: string, names: string[]}[]}} [options] the
+ * @param {{allowedLayers?: {mount: string, names: string[]}[], withChain?: boolean}} [options] the
  *   path-scoped middleware layers the caller has audited, by the source of the
- *   mount's path regexp and the layer's function names (none by default)
- * @returns {{method: string, path: string}[]} one entry per verb and path form
+ *   mount's path regexp and the layer's function names (none by default); `withChain` adds each
+ *   route's own middleware names as `chain` (LIN-4468's write census reads the gate it names)
+ * @returns {{method: string, path: string, chain?: string[]}[]} one entry per verb and path form
  * @throws {Error} on a layer that is neither a route, a nested router mounted
  *   at the root, nor an allowed middleware
  */
-export function enumerateRoutes(router, { allowedLayers = [] } = {}) {
+export function enumerateRoutes(router, { allowedLayers = [], withChain = false } = {}) {
   const out = [];
   const walk = (stack, prefix) => {
     for (const layer of stack) {
@@ -43,7 +54,9 @@ export function enumerateRoutes(router, { allowedLayers = [] } = {}) {
         for (const method of Object.keys(layer.route.methods)) {
           for (const path of paths) {
             if (typeof path !== 'string') throw new Error(`unclassifiable route path ${String(path)}`);
-            out.push({ method: method.toUpperCase(), path: prefix + path });
+            const entry = { method: method.toUpperCase(), path: prefix + path };
+            if (withChain) entry.chain = layer.route.stack.map(l => l.name);
+            out.push(entry);
           }
         }
         continue;

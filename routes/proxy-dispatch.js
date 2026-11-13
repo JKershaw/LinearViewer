@@ -168,7 +168,7 @@ function dispatchWatchChanged(baseline, item) {
  * @param {number} deps.RECOMMEND_DESCENT_BUDGET_MS - Shared cross-hop budget for the recommend recursion (module-scope)
  * @param {Function} deps.relayDispatchRefusal - replies to a tagged factory refusal (closure-local)
  * @param {Function} deps.requireGrant - The grant gate middleware factory (module-scope in routes/proxy.js); gates POST /dispatch and /recommend-and-dispatch on the `dispatch` grant, after the scope check (LIN-3136)
- * @param {Function} deps.requireWriteScope - Requires readWrite scope on the token (closure-local)
+ * @param {Function} deps.requireWriteScope - Write-gate factory, `requireWriteScope(op)` (lib/stage-write-gate.js, LIN-4468): readWrite scope plus the stage's allowance for `op`
  * @param {Function} deps.resolvePromptIssueContext - Resolves the issue + prompt context for deterministic, server-side prompt generation (module-scope, shared with groups F/H)
  * @param {Function} deps.resolveProviderAccess - Resolves {token, reason, provider} for the active workspace/provider (closure-local)
  * @param {Object} deps.workspacePreferencesStore - Workspace-level preference storage

@@ -39,6 +39,12 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   stage without a word, and an unnamed name throws at mount. A new write route adds its operation
   to that list and a row to `CENSUS` in `tests/unit/lin-4468-stage-write-allowance.test.js`, or the
   census fails (LIN-4468).
+- A token minted for a stage carries its `writes` and ticket, or has a reason not to. Pass both into
+  the mint helpers (`lib/proxy-preamble.js`), or read them from the row (`lib/item-stage-stamp.js`).
+  A mint with neither is unrestricted, which is right only for a person's or a `custom` mint, listed
+  with its reason in `tests/unit/dispatch-entrance-mint-sweep.test.js`. The refire broker minted
+  unrestricted tokens for read-only rows because its mint was a bare `createToken`, which no
+  helper-name search finds (LIN-4468).
 
 ## Waiting
 
@@ -54,7 +60,6 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   `idSpanSearch`: 22 probes on the 8 Nov window, with 404, trashed and bracket edge cases). A
   `createdAt` on the list, or a created-before filter, would replace them with one read.
   (LIN-4421 leftovers; Survey global.)
-- `routes/proxy.js`: the `proxyLimiter` window (60 seconds) and the broker's wait cap (`EXCHANGE_MAX_WAIT_SECONDS`, `lib/runner-kit/broker.mjs`) match by comment only: the contract records 60s on both sides, but no test reads `windowMs` against it, so either can break the retry budget. (Seams & Tangles, 8 Nov.; `docs/reviews/seams-tangles-review-2026-11-08-run10.md`.)
 - `routes/proxy-writes.js`: "no step may change them" (the `## As asked` words) is written twice,
   in `AS_ASKED_LEAD` and in `BRIEF_HINT` (`lib/as-asked.js`); the census pins the markers, not this
   rule; `lib/proxy-instructions.js` spells "a day" beside `LANDED_MIN_GAP_MS`. Borderline, LOW.

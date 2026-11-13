@@ -16,20 +16,21 @@
  *     tokens are held to their operation and their ticket, in each identifier form.
  *
  * The broker refire witness (a `none` row's re-minted token refused a comment) lives beside the
- * broker tests, in tests/unit/lin-3135-broker-refire-declared.test.js.
+ * broker tests, in tests/unit/lin-3135-broker-refire-declared.test.js; every mint origin stamping a
+ * restricted stage is World S of tests/unit/dispatch-entrance-mint-sweep.test.js.
  */
 process.env.NODE_ENV = 'test';
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { Router } from 'express';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { provisionBootstrapToken } from '../../lib/proxy-preamble.js';
 import {
   WRITES,
   STAGE_WRITE_OPS,
   TICKET_FIELDS_UPDATE,
+  ISSUE_PATCH_FIELDS,
   stageWriteAllows,
   normalizeWritesStamp,
   isRestrictedStamp,
@@ -39,6 +40,11 @@ import {
 import { requireWriteScope, requireStageWrite } from '../../lib/stage-write-gate.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { BASE_DEPS, buildApp, call, makeFakeProvider, ACME } from './lib/proxy-fake-deps.js';
+import { enumerateRoutes, PROXY_ALLOWED_LAYERS } from './lib/entrance-route-sweep.js';
+import { buildInstructions } from '../../lib/proxy-instructions.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
 const SPEC_OPS = ['createIssue', 'updateIssue', 'appendDescription', 'replaceDescription', 'belowDescription',
   'createComment', 'deleteComment', 'updateComment', 'attachment', 'createRelation', 'deleteRelation', 'addLabel', 'removeLabel'];
@@ -235,30 +241,6 @@ describe('LIN-4468 — the stamp is minted, exchanged and validated (ProxyTokenS
 // 3. The route census: every proxy write route is classified, and carries its claimed gate
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Every route in the router with its middleware chain's names. Nested routers are walked; a
- * path-scoped middleware layer (the session-auth token admin) is not a route and is skipped.
- */
-export function listRoutes(router) {
-  const out = [];
-  const walk = (stack) => {
-    for (const layer of stack) {
-      if (layer.route) {
-        const paths = Array.isArray(layer.route.path) ? layer.route.path : [layer.route.path];
-        for (const method of Object.keys(layer.route.methods)) {
-          for (const path of paths) {
-            out.push({ method: method.toUpperCase(), path: String(path), chain: layer.route.stack.map(l => l.name) });
-          }
-        }
-        continue;
-      }
-      if (layer.name === 'router' && Array.isArray(layer.handle?.stack)) walk(layer.handle.stack);
-    }
-  };
-  walk(router.stack);
-  return out;
-}
-
 const WRITE_VERBS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
 /**
@@ -269,7 +251,7 @@ const WRITE_VERBS = ['POST', 'PUT', 'PATCH', 'DELETE'];
  *   exempt          authenticated by something other than a proxy bearer, with the reason
  *   session         a session-authenticated route, never reached by a proxy bearer
  */
-export const CENSUS = [
+const CENSUS = [
   // Ticket writes (routes/proxy-writes.js; SPEC keys)
   { m: 'POST', p: '/api/proxy/issues', kind: 'scoped', op: 'createIssue' },
   { m: 'PATCH', p: '/api/proxy/issues/:issueId', kind: 'scoped', op: 'updateIssue' },
@@ -319,7 +301,7 @@ export const CENSUS = [
  * The census verdicts for a list of routes. Pure, so a planted route can be judged the same way.
  * @returns {string[]} violations; empty when the census holds
  */
-export function censusViolations(routes, census = CENSUS) {
+function censusViolations(routes, census = CENSUS) {
   const violations = [];
   const writes = routes.filter(r => WRITE_VERBS.includes(r.method));
   const rowOf = (r) => census.find(c => c.m === r.method && c.p === r.path);
@@ -343,8 +325,9 @@ export function censusViolations(routes, census = CENSUS) {
   return violations;
 }
 
+/** Every proxy route with its middleware names, from the shared walker (path-scoped layers audited once there). */
 function proxyRoutes() {
-  return listRoutes(createProxyRoutes(BASE_DEPS()));
+  return enumerateRoutes(createProxyRoutes(BASE_DEPS()), { allowedLayers: PROXY_ALLOWED_LAYERS, withChain: true });
 }
 
 describe('LIN-4468 — route census: every proxy write route is classified and carries its gate', () => {
@@ -582,5 +565,33 @@ describe('LIN-4468 — over HTTP: a stamp that is absent, work, or unknown', () 
     assert.equal(res.status, 403, JSON.stringify(res.body));
     assert.match(res.body.error, /names no ticket/);
     assert.deepEqual(calls.createComment, []);
+  });
+});
+
+describe('LIN-4468 — the edges: the PATCH field list and the instructions page', () => {
+  const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
+
+  test('the PATCH handler reads exactly ISSUE_PATCH_FIELDS, so the triage gate sees every field it can write', () => {
+    const src = readFileSync(join(REPO, 'routes/proxy-writes.js'), 'utf8');
+    const handler = src.slice(src.indexOf("router.patch('/api/proxy/issues/:issueId',"));
+    const destructured = /const \{([^}]+)\} = req\.body;/.exec(handler);
+    assert.ok(destructured, 'the PATCH handler destructures its body');
+    const names = destructured[1].split(',').map(n => n.trim()).filter(Boolean);
+    assert.deepEqual([...names].sort(), [...ISSUE_PATCH_FIELDS].sort());
+  });
+
+  test('a restricted token is told its allowance under its scope; unstamped and work tokens see the catalog unchanged', () => {
+    const plain = buildInstructions({ baseUrl: 'https://h', scope: 'readWrite' });
+    assert.equal(buildInstructions({ baseUrl: 'https://h', scope: 'readWrite', writes: 'work', writesTarget: 'LIN-9' }), plain);
+    assert.doesNotMatch(plain, /stage write allowance/);
+    const stamped = buildInstructions({ baseUrl: 'https://h', scope: 'readWrite', writes: 'one-comment', writesTarget: 'LIN-9' });
+    assert.match(stamped, /Your stage write allowance: one-comment \(ticket LIN-9\)\. The proxy refuses any write the allowance does not list/);
+  });
+
+  test('over HTTP, GET /api/proxy/instructions names a none token\'s allowance', async () => {
+    const { app } = stageApp({ writes: 'none', writesTarget: 'LIN-9' });
+    const res = await call(app, 'GET', '/api/proxy/instructions');
+    assert.equal(res.status, 200);
+    assert.match(res.body, /Your stage write allowance: none \(ticket LIN-9\)/);
   });
 });
