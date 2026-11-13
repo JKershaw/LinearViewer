@@ -67,6 +67,14 @@ Each open PR's file list (from `gh pr view`) was checked against the 28 sampled 
 
 The check reads each PR's file list as `gh` reports it. It does not inspect diffs.
 
+**At merge (2026-11-13).** Re-checked against `origin/main` `0092d8d9e` and the open PR list immediately before merging:
+
+- #2427 (LIN-4455) has merged (`192e1f81f`). The LLM note on main is now blob `eb976276d` (+5 lines, 172 to 177); the baseline stays `b6b4c726d`. The after-read reports that difference as note movement.
+- #2428 (LIN-4456, `0092d8d9e`) touched neither note nor any sampled file.
+- No sampled file changed between `e8e92d50a` and `0092d8d9e`: `git diff --name-only e8e92d50a origin/main` meets none of the 28 sampled paths. The control note is still blob `ae9c007e1`.
+- No LIN-4465 to LIN-4470 commit is on `origin/main`.
+- Open PRs now: #2431 (LIN-4471, opened after the baseline check) touches no sampled file and neither note. #2429 (LIN-4451) touches no sampled file but adds 6 lines to the control note `docs/areas/front-end-pages.md`; if it merges before the after-read, the control note moves and the after-read reports that as note change. The other twelve open PRs touch neither note nor any sampled file.
+
 ## 4. Where the planned work is and is not
 
 Nothing from pieces 1 to 6 has landed. `git log e8e92d50a..origin/main` is empty when checked. The baseline therefore reads the area as it stands before any piece.
