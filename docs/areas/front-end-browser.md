@@ -13,12 +13,17 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
 
 - The no-build-step rule (`CLAUDE.md`) allows browser sharing, not only forbids it (LIN-4446). The browser may import
   natively, and the restated copies came from reading the rule as "no sharing" (`docs/papers/harbour/the-second-copy.md`
-  §9–10). Limits: a shared module is a leaf (no imports, no Node built-ins, no DOM or global read at load), served only
+  §9–10). Limits: a shared module is a leaf (it imports nothing and names no browser or Node global, as
+  `tests/unit/shared-modules.test.js` checks), served only
   through the explicit `SHARED_MODULES` allow-list in `lib/vendor-assets.js`, never by directory. Views and the `vm` test
   loaders stay classic until a module-capable client test loader exists. A consumer reads a shared global only from a
   handler or a callback that runs after DOMContentLoaded, never during script execution: Chart.js calls scale tick
   callbacks synchronously, which is why `public/workspace-kpis.js` builds on DOMContentLoaded. A slice retires the
   restated copy and its parity check in the same change, not later.
+- A `{ module }` entry's place in a renderer's script list means nothing: a module runs after every classic script,
+  wherever it is listed. A consumer is safe because of when it reads the global, not where the shim sits. To test that
+  order in a `vm` seam, set `document.readyState = 'loading'` before the script runs and install the global after it; a
+  seam with no `readyState` (`tests/unit/flight-companion-client.test.js`) starts the page at load, unlike the browser.
 
 ## Waiting
 
@@ -27,7 +32,8 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   function (LIN-4242); doing the same for the other sections would mean the client never
   parses a whole page. (Survey tally: LIN-4243.)
 - `public/common.js`: `buildDispatchModelOptionDescriptors` repeats the merge rule of
-  `buildModelOptions` (`lib/openrouter-catalog.js`), since the browser has no build step.
+  `buildModelOptions` (`lib/openrouter-catalog.js`). That module is not a leaf (it imports
+  `lib/catalog-rate.js`), so it cannot be served as one shared file (LIN-4446).
   The lists are not copied (they come from `window.__HARNESS_MODELS__` and the catalog over
   the wire); only the rule is. The endpoint could send merged options instead. (LIN-4358.)
 - `public/brief.js`: its `postBrief`/`errorText` block is identical to `postRecap`/`errorText`
@@ -36,7 +42,9 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   in `public/common.js`. (Area reads CG/CH, 8 Nov, on LIN-4358.)
 - `public/common.js`: exported globals, and the "client twins" of `lib/task-page-href.js`, `lib/timeline-zoom.js`,
   `lib/ship-layout.js` and `lib/prompt-formatters.js`. The first two are leaves of the same shape as cost-format, the
-  next candidates; the last two import other modules, so serving a single file will not do for them. (LIN-4446 plan.)
+  next candidates; the last two import other modules, so serving a single file will not do for them. Its
+  `TERMINAL_TYPES` mirror of `lib/providers/models.js` (no imports) is another leaf candidate; its comment still says
+  `public/` cannot import it. (LIN-4446 plan and leftovers.)
 - `public/prompt-section.js`: the browser files reach their suites through `tests/unit/helpers/client-world.js`, which
   loads them as classic scripts through `vm`. A module-capable client test loader is needed before any view becomes a
   module, since `lib/components/page.js` emits classic tags. (LIN-4446.)

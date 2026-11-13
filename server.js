@@ -1222,7 +1222,8 @@ app.use((req, res, next) => {
 // redirect, so the 301 and /health (above it) never carry it.
 app.use(hstsHeader())
 
-// Browser libs from node_modules at their old URLs (LIN-3787). Immediately
+// Browser libs from node_modules at their old URLs (LIN-3787), and the shared
+// leaf modules from lib/ at /shared/* (LIN-4446). Immediately
 // before static so they keep its cache headers and skip defaultCacheControl().
 app.use(createVendorAssetsRouter())
 app.use(express.static('public'))

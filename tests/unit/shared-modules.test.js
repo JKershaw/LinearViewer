@@ -175,16 +175,17 @@ describe('the shim guard: every page that runs a formatter consumer carries the 
     assert.deepEqual(consumers.sort(), ['/flight-companion.js', '/observation.js', '/prompt-section.js', '/workspace-kpis.js']);
   });
 
-  test('every list that names a consumer also names the shim as a module, first', () => {
+  test('every list that names a consumer also names the shim as a module', () => {
     const checked = [];
     for (const rel of rendererFiles) {
       for (const list of scriptLists(read(rel))) {
         const named = list.findIndex((e) => consumers.includes(e.src));
         if (named < 0) continue;
         checked.push(rel);
+        // Presence only: a module runs after every classic script wherever it is listed, so its position proves
+        // nothing. The consumers' own timing (reads after DOMContentLoaded) is what makes the order safe.
         const shim = list.findIndex((e) => e.module && e.src === SHIM);
         assert.ok(shim >= 0, `${rel} lists a consumer without the module shim`);
-        assert.ok(shim < named, `${rel}: the shim must load before the consumer`);
       }
     }
     // Six renderers name a consumer today; the guard reads both list shapes (task page's const SCRIPTS included).
