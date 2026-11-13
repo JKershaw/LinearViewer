@@ -3672,3 +3672,15 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **New ruling `lin4447-r1-passenger-scope`:** a person's Done and an outside merge, or only Done? **Suggested `both`**, from John's own words. Scoping had already settled this itself, so design asking it again is the "one question raised by two stages" pattern.
   - **Coming, `lin4447-r2-sd-scope`:** the same question as scoping's `lin4447-sd-scope`, but the opposite recommendation (no, plus a cross-repo contract ticket). One answer should settle both. A follow-up ticket would also go against the leftover rule: unless something breaks or blocks, it would be a Waiting entry.
   - **Raised with John: piece 0 repeats area read 0,** with a control the front-end lane will touch. It also says "no area-level read tool exists", which risks building new loop machinery. I'm asking John before I put the fact on the ticket.
+- **13:56 UTC: new ruling `lin4447-recommend-path-outside-merge`.** The question: should the recommend path and the ladder lane add a GitHub PR read, so they also follow an outside merge on an In Progress ticket? **Suggested `accept`** (no new reads; add the fact if a stuck case shows up). It's an engineering trade-off the run could have settled itself, so it's a false escalation.
+- **Area read 0 (before): all six in** (LIN-4150, 13:19–13:29). The baseline:
+
+  | Area | Ease (p1, p2) | High + medium repeated rules (p1, p2) | What both passes name |
+  |---|---|---|---|
+  | Runs & dispatch | hard, hard | 9, 8 | "ended / waiting / terminal" written 4–7 times; the lineage anchor 3–4 ways; the row field lists; the store's write path imports `live-console` (the cycle); `observer-efficacy-signal` dead, so the shadow log is write-only; about 2,350–2,700 ticket refs |
+  | LLM & prompts | moderate, moderate | 5, 8 | four OpenRouter request builders, already drifted; `openrouter.js` is four modules in one; contract words beside their own parser regexes; three history stores; about 16 tables per stage kind; heavy history comments |
+  | Web routes (control) | moderate, hard | 8, 7 | the mock-AI rule copied (`isTestToken`, inline checks); workspace teardown written twice; feature-flag reads split; `dashboard-session-state.js` a library inside routes/; deps bags; `test.js` |
+
+  - **Noise floor:** the control's two passes differ by one step on ease. So criterion (b)'s "one step up" has to hold in **both** passes, and against the control's own drift.
+  - **The control overlaps:** two Web routes items have their owner in a lane area. The mock-AI rule (`should-mock-ai.js`) is in LLM & prompts, and the loop-terminal copy (`follow-up-dispatch.js`) is in Runs & dispatch. If LIN-4447 or LIN-4448 fixes them, the control improves through the lanes. I'll judge the control on its other items as well as on the whole.
+  - **LIN-4447's piece 0** would repeat this read with `front-end-pages` as its control. Raised with John: I'm asking before I put the fact on the ticket.
