@@ -4467,8 +4467,8 @@ describe('judging verdicts state how the work met what was asked (LIN-4353)', ()
   // block in order, and a sentence met only in part is a narrowing.
   test('review: the verdict accounts for each sentence of the block, none skipped or cut short', () => {
     const { prompt } = generatePrompt('review', issue, context);
-    assert.ok(sentenceWith(prompt, [/what was asked/i, /each sentence of the block/i, /none skipped or cut short/i, /met in part or not at all is a narrowing/i, /Needs Discussion/]),
-      'review\'s verdict must take each sentence of the block in order, and call one met in part a narrowing');
+    assert.ok(sentenceWith(prompt, [/what was asked/i, /each sentence of the block/i, /none skipped or cut short/i, /met in part or not at all is a cut/i, /Needs Discussion/]),
+      'review\'s verdict must take each sentence of the block in order, and call one met in part a cut');
   });
 
   test('close-out: the summary says how the work met what was asked, citing review', () => {
@@ -4505,9 +4505,9 @@ describe('judging verdicts state how the work met what was asked (LIN-4353)', ()
     assert.ok(!/the asker\'s terms/.test(prompt), 'the asker clause now points at the block');
   });
 
-  test('review names any narrowing, and an unagreed narrowing is Needs Discussion', () => {
+  test('review names any cut, and an unagreed cut is Needs Discussion', () => {
     const { prompt } = generatePrompt('review', issue, context);
-    assert.ok(sentenceWith(prompt, [/narrow/i, /Needs Discussion/]),
-      'review: a narrowing nobody agreed to makes the verdict Needs Discussion');
+    assert.ok(sentenceWith(prompt, [/a cut, which only/i, /Needs Discussion/]),
+      'review: a cut nobody agreed to makes the verdict Needs Discussion');
   });
 });

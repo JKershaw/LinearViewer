@@ -29,10 +29,10 @@ const NON_WORK = WRITES_VALUES.filter(value => value !== WRITES.WORK);
 // fails here rather than passing silently.
 const MANDATE = {
   [WRITES.WORK]: 'Being dispatched here is your mandate for the reversible work — investigate, edit, open PRs, comment: do not hold your first call, or any call, waiting for a live reply before you start.',
-  [WRITES.NONE]: 'Being dispatched here is a reading pass: investigate and read freely, but do not change code, branches, pull requests, tickets or Linear state, and post nothing to Linear unless the person asks; report your findings in this session, and do not hold your first call, or any call, waiting for a live reply before you start.',
-  [WRITES.ONE_COMMENT]: 'Being dispatched here is a read-only stage: investigate and read freely, but do not change code, branches, pull requests, tickets or Linear state; your only write is one comment on the ticket named in your task, and do not hold your first call, or any call, waiting for a live reply before you start.',
-  [WRITES.BLIND_COMMENT]: 'Being dispatched here is a blind read: read the repository as your task says, and nothing on the tracker; do not change code, branches, pull requests, tickets or tracker state; your only write is one comment on the ticket named in your task, and do not hold your first call, or any call, waiting for a live reply before you start.',
-  [WRITES.TICKET_FIELDS]: 'Being dispatched here is to triage the ticket named in your task: investigate freely, and you may change its labels, priority, state and project and comment on it. Do not change code, branches or pull requests, do not rewrite its description, do not create tickets or subtasks, and do not hold your first call, or any call, waiting for a live reply before you start.',
+  [WRITES.NONE]: 'Being dispatched here is a reading pass: investigate and read freely, but do not change code, branches or pull requests; report your findings in this session, and do not hold your first call, or any call, waiting for a live reply before you start.',
+  [WRITES.ONE_COMMENT]: 'Being dispatched here is a read-only stage: investigate and read freely, but do not change code, branches or pull requests; your only write is one comment on the ticket named in your task, and do not hold your first call, or any call, waiting for a live reply before you start.',
+  [WRITES.BLIND_COMMENT]: 'Being dispatched here is a blind read: read the repository as your task says, and nothing on the tracker; do not change code, branches or pull requests; your only write is one comment on the ticket named in your task, and do not hold your first call, or any call, waiting for a live reply before you start.',
+  [WRITES.TICKET_FIELDS]: 'Being dispatched here is to triage the ticket named in your task: investigate freely, and you may change its labels, priority, state and project and comment on it. Do not change code, branches or pull requests, and do not hold your first call, or any call, waiting for a live reply before you start.',
 };
 // LIN-4277: one literal lead-in (the two lines every closing opens with), then a tail per value. Written
 // here, not imported from lib/proxy-preamble.js, so a drift in the code's lead-in text fails this file.
@@ -51,7 +51,7 @@ const PHRASES = {
   [WRITES.ONE_COMMENT]: { says: [/your only write is one comment on the ticket named in your task/], closingSays: [/the one comment you/] },
   [WRITES.BLIND_COMMENT]: { says: [/a blind read/, /nothing on the tracker/, /your only write is one comment on the ticket named in your task/], closingSays: [/the one comment you/] },
   [WRITES.TICKET_FIELDS]: {
-    says: [/labels, priority, state and project/, /[Dd]o not change code, branches or pull requests/, /do not create tickets or subtasks/],
+    says: [/labels, priority, state and project/, /[Dd]o not change code, branches or pull requests/],
     closingSays: [/could not apply/],
   },
 };

@@ -72,8 +72,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - `lib/size-of-move.js`: the built-in policy (`DECIDED_BY.policy`, err larger) may stand in
   for John's "per task breakdown of options"; its size words are unexplained. (John, LIN-4393.)
 - `lib/prompts/stage-kinds.js`: `CUT` writes the closing contract's token order (`DECISION:`
-  before `BLOCKED:`) into a scope line beside `ASK`. Its "cut" and the plan-review and review
-  "narrowing" (`lib/completion-signals.js`) name one thing; no test links them. (John, 8 Nov.)
+  before `BLOCKED:`) into a scope line beside `ASK`. The vocabulary is settled (LIN-4469): the cut
+  and the verdicts' "naming any cut" are one word, in `CUT` and the plan-review and review verdicts. The
+  token order still sits in the scope line and no test links the two. (John, 8 Nov.; LIN-4469 settled the word.)
 - `lib/prompts/stage-kinds.js`: one record per stage kind (LIN-4467). The per-kind tables that stay, each with
   its owner and reason: `JOBS` (`lib/llm-jobs.js`), pure data on purpose so its census test is not vacuous (19 of
   its 39 rows are not template kinds); the route and writes pins (`tests/unit/lin-4253-stage-traits.test.js`),
@@ -131,29 +132,19 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   Waiting entries in other areas' notes where tickets used to be filed. LIN-4414's one retirement
   per build drains only the areas a build touches, so rarely touched notes (other-features) will
   grow; their Waiting counts are the honest measure. (LIN-4431.)
-- `lib/prompt-template-defs.js` (retrospective-audit Reporting) and `lib/periodicals.js`
-  (`areaNotesRoutes`) each state the docs-only notes-PR rule in their own words; one shared
-  constant in `lib/prompts/leftover-words.js` would make it one, at the cost of re-pinning the 13
-  Periodical prompt hashes. (LIN-4432.)
-- `lib/prompts/leftover-words.js`: the first-match area lookup is spelled three ways: `CONSEQUENCE_TEST`'s
-  "first match wins" parenthetical, `docs/areas/README.md` ("take the first area with a pattern that
-  matches its path") and the blind-read prompt's own sentence (`lib/prompt-template-defs.js`, the
-  `blind-read` template), which shipped as piloted (LIN-4437), so it was not retyped after the pilot. One constant in the leaf would make it
-  one, at the cost of re-piloting that sentence. (LIN-4436 leftovers.)
+- `lib/prompt-template-defs.js`: the blind read's own area sentence (the `blind-read`
+  template: "A file's area is the first area in ...") keeps its own words, as piloted (LIN-4437): re-piloting is a
+  person's run. Every other spelling of the lookup now renders `areaLookup` (CONSEQUENCE_TEST and the area-notes
+  pointer, LIN-4469). `docs/areas/README.md` still states first match in prose. (LIN-4436 leftovers; LIN-4469.)
 - `lib/prompt-formatters.js`: `formatLocalTestRule` names this repo's runner command
   (`node scripts/run-unit-tests.mjs tests/unit/<files>`) in a template that also drives other
   repos, and `CLAUDE.md` spells the same rule; a repo-supplied test command would make the line
   right elsewhere and give it one spelling. (LIN-4441 leftovers.)
-- `lib/periodicals.js`: "search the repo for a committed tool (no path is written here) and run it"
-  is spelled four times: Drift & Coherence's census bullet, Seams & Tangles' two bullets and
-  Stability's declaration bullet. One shared helper would make it one, at the cost of re-pinning
-  those three templates' hashes. (LIN-4424 leftovers; Survey global.) The rule it answers, whether
-  a review may run a tool the repo commits, is itself worded per template: Stability's run bullet
-  says "introducing no tooling beyond what the repo commits", while Recent Headwinds (which reads
-  the same rework and churn trajectory) and Drift & Coherence still say "introducing no new
-  tooling", Code Quality says "introduce no new tooling", and Seams & Tangles allows committed tools in its own bullets. No
-  `periodicalBullet` helper owns it; deciding it is one rule re-pins every template that states
-  it. (LIN-4424 blind read.)
+- `lib/periodicals.js`: the policy, whether a review may run a tool the repo commits, is worded per template. Drift &
+  Coherence and Recent Headwinds say "introducing no new tooling", Code Quality says "introduce no new tooling", and
+  Stability says "introducing no tooling beyond what the repo commits"; Seams & Tangles allows committed tools in its own
+  bullets. The search clause itself is one spelling now (`committedSearch`, Stability's wording, LIN-4469). Deciding the
+  policy is one rule that re-pins every template that states it. (LIN-4424 blind read.)
 - `lib/model-routing-harnesses.js`: a dispatch record's `model` names the routed id
   ("anthropic/claude-opus-4.8" for the `opus` route), but the claude-code harness runs a Claude id
   by its family token (`isModelRunnableOn`, `CLAUDE_MAPPABLE_MODEL_FAMILIES`), and on blind-read
@@ -161,13 +152,12 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   the model that ran. Cost is already priced from the model the worker reports. Waiting: make the
   record carry the model the worker reports, or update the routed id. (LIN-4396 review.)
 - `lib/prompts/leftover-words.js`: the retirement line's words have one home and one checker
-  (`lib/dispatch-leftover-answer.js`), but which entry to settle (the busiest touched area, else
-  another) and the three forms are restated by hand in `docs/areas/README.md`, simple-dispatcher's
-  docs/areas/README.md, `docs/proxy-integration.md` (with the refusal kinds) and
-  `docs/architecture/dispatch-and-proxy.md`, and the verbatim guard reads only `lib/` and `routes/`.
-  simple-dispatcher's README says a waiting entry also leaves when "a follow-up is filed for it",
-  where this README says only when the consequence test sends it to a ticket. A cross-repo seam;
-  simple-dispatcher's side is named here, not edited. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+  (`lib/dispatch-leftover-answer.js`). This repo's docs now say what the code does: `docs/areas/README.md` points to
+  the leaf for the three forms, and `docs/architecture/dispatch-and-proxy.md` names the words' home (LIN-4469). What
+  stays restated on purpose: the refusal table in `docs/proxy-integration.md` is the API contract's. simple-dispatcher's
+  README and its docs/areas/README.md are its owner's; a waiting entry also leaves there when "a follow-up is filed for
+  it", which this README does not say. A cross-repo seam, named here, not edited. (Drift & Coherence Review, 13 Nov.;
+  `docs/reviews/drift-coherence-review-2026-11-13.md`.)
 - `lib/prompts/area-note-format.js`: the one reading of a waiting entry in code does not hold what a
   cited path is; that rule is in the guard (`tests/unit/area-notes.test.js`, a listed extension), in
   `lib/dispatch-leftover-answer.js` (any one to six characters, its comment calling it the guard's
