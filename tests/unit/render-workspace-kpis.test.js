@@ -149,11 +149,15 @@ test('a noscript line says charts need JavaScript', () => {
   assert.match(html, /<noscript><p[^>]*data-testid="workspace-kpis-noscript">Charts need JavaScript/);
 });
 
-test('scripts load Chart.js, the shared helper and the page script before common and app', () => {
+test('scripts load Chart.js and the shared helper before common and app; the page script is a module (LIN-4471)', () => {
   const html = render(stats());
-  const order = ['/chart.umd.min.js', '/chart-helpers.js', '/workspace-kpis.js', '/common.js', '/app.js'].map(src => html.indexOf(`src="${src}"`));
-  assert.ok(order.every(i => i > -1), 'all five present');
-  assert.deepEqual([...order].sort((a, b) => a - b), order);
+  // The classic scripts keep their order. The page script is a module, so its place in the list does not matter: a module
+  // runs after every classic script, wherever it is listed. Its own tag is pinned by source, not by index.
+  const classic = ['/chart.umd.min.js', '/chart-helpers.js', '/common.js', '/app.js'].map(src => html.indexOf(`src="${src}"`));
+  assert.ok(classic.every(i => i > -1), 'all four classic scripts present');
+  assert.deepEqual([...classic].sort((a, b) => a - b), classic);
+  assert.match(html, /<script type="module" src="\/workspace-kpis\.js"><\/script>/);
+  assert.equal(html.includes('/cost-format-global.js'), false, 'the page takes no bridge');
   assert.equal(html.includes('/kpis.css'), false, 'the public stylesheet is not loaded');
   assert.match(html, /<script type="application\/json" data-global="__WORKSPACE_KPI_DATA__">/);
 });

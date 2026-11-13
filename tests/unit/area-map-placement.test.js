@@ -114,4 +114,12 @@ describe('code-shape area map placement (LIN-3729)', () => {
       assert.doesNotMatch(src, /['"`]docs\/areas\/areas\.json\\?['"`]/, `${reader} does not spell the path itself`);
     }
   });
+
+  // LIN-4471: the one served leaf the browser imports (`lib/cost-format.js`, /lib/cost-format.js) is a front-end file, in
+  // the server-rendered pages area beside the other leaves a page renders with (task-page-href, timeline-zoom), not the
+  // `^lib/` catch-all. The usage-snapshot intake counter is the feedback intake's, so it sits in Runs & dispatch.
+  test('the served formatter leaf lands in front-end pages; the usage-snapshot intake counter lands in Runs & dispatch', () => {
+    assert.strictEqual(areaOf('lib/cost-format.js'), 'Front end: server-rendered pages');
+    assert.strictEqual(areaOf('lib/usage-snapshot-intake.js'), 'Runs & dispatch');
+  });
 });

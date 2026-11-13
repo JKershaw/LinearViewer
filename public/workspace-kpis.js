@@ -1,149 +1,149 @@
 /**
  * Workspace KPIs page script (LIN-3711). The shared public/chart-helpers.js
- * loads before this file.
+ * loads before this file (a classic script, so it has run by the time this module does).
  *
  * Draws the trend charts and card sparklines from the per-day series embedded
  * as window.__WORKSPACE_KPI_DATA__ (lib/workspace-kpi-stats.js `daily`). Rates,
  * and a running total behind a toggle on the tasks-done chart (LIN-3732). It builds no tables: the "Show the numbers" tables are in the server
  * HTML so the page works without JavaScript. A chart with nothing to draw
  * swaps its canvas for a short note.
- * LIN-4446: the cost chart's tick and tooltip callbacks read window.CostFormat, which the module shim
- * (public/cost-format-global.js) sets after this classic script has parsed. Chart.js calls a tick callback
- * synchronously inside its constructor, so the whole build waits for DOMContentLoaded, when module scripts
- * (which run before it) have set the global. The early returns stay inside that listener.
+ * LIN-4471: a page module. It imports the one formatter from '../lib/cost-format.js' (served at /lib/cost-format.js),
+ * so it needs no bridge global. A module runs after every classic script and before DOMContentLoaded, so the charts
+ * are built when the module runs, with the page parsed and chart-helpers.js already loaded; Chart.js's synchronous tick
+ * callbacks read the imported formatter, not a global.
  */
-(function () {
-  'use strict';
+import { formatUsd } from '../lib/cost-format.js';
 
-  document.addEventListener('DOMContentLoaded', function () {
-    const daily = window.__WORKSPACE_KPI_DATA__;
-    const charts = window.HarbourCharts;
-    if (!daily || !charts || typeof Chart === 'undefined') return;
+function drawWorkspaceKpis() {
+  const daily = window.__WORKSPACE_KPI_DATA__;
+  const charts = window.HarbourCharts;
+  if (!daily || !charts || typeof Chart === 'undefined') return;
 
-    const total = function (numbers) {
-      return numbers.reduce(function (acc, n) { return acc + n; }, 0);
-    };
-    const monthDay = function (dayKey) {
-      return dayKey.slice(5);
-    };
+  const total = function (numbers) {
+    return numbers.reduce(function (acc, n) { return acc + n; }, 0);
+  };
+  const monthDay = function (dayKey) {
+    return dayKey.slice(5);
+  };
 
-    // Sparklines on the activity cards: 30 daily points each.
-    const sparks = { dispatches: daily.dispatches, 'autopilot-runs': daily.autopilotRuns, 'agent-actions': daily.agentActions };
-    Object.keys(sparks).forEach(function (name) {
-      const el = document.querySelector('[data-testid="workspace-kpis-spark-' + name + '"]');
-      if (el) charts.sparkline(el, sparks[name], { label: el.dataset.label });
-    });
-
-    const dayLabels = daily.days.map(monthDay);
-
-    // Rate view: tasks done per day, counted on the day the agent marked done.
-    // Total view: the running total, a cumulative line of `doneTotal.done` from
-    // `since` (LIN-3732). Each view is drawn fresh into the emptied view element.
-    const doneTotal = daily.doneTotal;
-    const byTestId = function (id) {
-      return document.querySelector('[data-testid="' + id + '"]');
-    };
-    const showWhile = function (el) {
-      if (el) el.hidden = false;
-      return function () { if (el) el.hidden = true; };
-    };
-    const drawInto = function (viewEl, amount, note, build) {
-      const wrap = document.createElement('div');
-      wrap.className = 'kpi-chart-canvas';
-      const canvas = document.createElement('canvas');
-      canvas.id = 'chart-done-per-day';
-      canvas.dataset.testid = 'workspace-kpis-chart-done-per-day';
-      canvas.dataset.emptyClass = 'kpi-chart-empty';
-      wrap.appendChild(canvas);
-      viewEl.appendChild(wrap);
-      const chart = charts.draw('done-per-day', amount, note, build);
-      return function () { if (chart) chart.destroy(); };
-    };
-    const dayAfter = function (dayKey, n) {
-      const at = new Date(dayKey + 'T00:00:00Z');
-      at.setUTCDate(at.getUTCDate() + n);
-      return at.toISOString().slice(0, 10);
-    };
-    const toggleMount = byTestId('workspace-kpis-toggle-done-per-day');
-    const toggle = charts.rateTotalToggle(toggleMount, {
-      labels: { rate: 'Per day', total: 'Running total' },
-      rate: function (viewEl) {
-        return drawInto(viewEl, total(daily.done), '○ nothing done yet', function (canvas, tools) {
-          return {
-            type: 'bar',
-            data: { labels: dayLabels, datasets: [{ data: daily.done, backgroundColor: tools.ink.green }] },
-            options: {
-              plugins: { legend: { display: false } },
-              scales: {
-                x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
-                y: { beginAtZero: true, grid: { color: tools.ink.grid }, ticks: { precision: 0 } }
-              }
-            }
-          };
-        });
-      },
-      total: function (viewEl) {
-        if (!doneTotal) return showWhile(byTestId('workspace-kpis-total-empty'));
-        const showCaption = showWhile(byTestId('workspace-kpis-total-caption'));
-        let sum = 0;
-        const running = doneTotal.done.map(function (n) { sum += n; return sum; });
-        const days = doneTotal.done.map(function (n, i) { return dayAfter(doneTotal.since, i); });
-        const destroyChart = drawInto(viewEl, running.length, '○ no running total yet', function (canvas, tools) {
-          return {
-            type: 'line',
-            data: { labels: days, datasets: [{ data: running, borderColor: tools.ink.green, backgroundColor: tools.ink.green, borderWidth: 2, pointRadius: 0, tension: 0 }] },
-            options: {
-              plugins: { legend: { display: false } },
-              scales: {
-                x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
-                y: { beginAtZero: true, grid: { color: tools.ink.grid }, ticks: { precision: 0 } }
-              }
-            }
-          };
-        });
-        return function () { destroyChart(); showCaption(); };
-      }
-    });
-
-    // Runs by kind per 7-day week, stacked: the top kinds, then 'other'.
-    const kinds = daily.runsByKind.kinds;
-    charts.draw('runs-by-kind', total(kinds.map(function (k) { return total(k.counts); })), '○ nothing dispatched yet', function (canvas, tools) {
-      const ink = tools.ink;
-      const colors = [ink.blue, ink.purple, ink.green, ink.yellow];
-      return {
-        type: 'bar',
-        data: {
-          labels: daily.runsByKind.weeks.map(function (week) { return 'wk ' + monthDay(week); }),
-          datasets: kinds.map(function (kind, i) {
-            return { label: kind.label, data: kind.counts, backgroundColor: kind.label === 'other' ? ink.dim : colors[i % colors.length] };
-          })
-        },
-        options: {
-          interaction: { mode: 'index', intersect: false },
-          scales: {
-            x: { stacked: true, grid: { display: false } },
-            y: { stacked: true, beginAtZero: true, grid: { color: ink.grid }, ticks: { precision: 0 } }
-          }
-        }
-      };
-    });
-
-    // API-equivalent cost per day, by the day the task started.
-    charts.draw('cost', total(daily.cost.perDay), '○ no priced tasks yet', function (canvas, tools) {
-      return {
-        type: 'bar',
-        data: { labels: dayLabels, datasets: [{ data: daily.cost.perDay, backgroundColor: tools.ink.blue }] },
-        options: {
-          plugins: {
-            legend: { display: false },
-            tooltip: { callbacks: { label: function (item) { return window.CostFormat.formatUsd(item.parsed.y) ?? '\u2014'; } } }
-          },
-          scales: {
-            x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
-            y: { beginAtZero: true, grid: { color: tools.ink.grid }, ticks: { callback: function (v) { return window.CostFormat.formatUsd(Number(v)) ?? ''; } } }
-          }
-        }
-      };
-    });
+  // Sparklines on the activity cards: 30 daily points each.
+  const sparks = { dispatches: daily.dispatches, 'autopilot-runs': daily.autopilotRuns, 'agent-actions': daily.agentActions };
+  Object.keys(sparks).forEach(function (name) {
+    const el = document.querySelector('[data-testid="workspace-kpis-spark-' + name + '"]');
+    if (el) charts.sparkline(el, sparks[name], { label: el.dataset.label });
   });
-})();
+
+  const dayLabels = daily.days.map(monthDay);
+
+  // Rate view: tasks done per day, counted on the day the agent marked done.
+  // Total view: the running total, a cumulative line of `doneTotal.done` from
+  // `since` (LIN-3732). Each view is drawn fresh into the emptied view element.
+  const doneTotal = daily.doneTotal;
+  const byTestId = function (id) {
+    return document.querySelector('[data-testid="' + id + '"]');
+  };
+  const showWhile = function (el) {
+    if (el) el.hidden = false;
+    return function () { if (el) el.hidden = true; };
+  };
+  const drawInto = function (viewEl, amount, note, build) {
+    const wrap = document.createElement('div');
+    wrap.className = 'kpi-chart-canvas';
+    const canvas = document.createElement('canvas');
+    canvas.id = 'chart-done-per-day';
+    canvas.dataset.testid = 'workspace-kpis-chart-done-per-day';
+    canvas.dataset.emptyClass = 'kpi-chart-empty';
+    wrap.appendChild(canvas);
+    viewEl.appendChild(wrap);
+    const chart = charts.draw('done-per-day', amount, note, build);
+    return function () { if (chart) chart.destroy(); };
+  };
+  const dayAfter = function (dayKey, n) {
+    const at = new Date(dayKey + 'T00:00:00Z');
+    at.setUTCDate(at.getUTCDate() + n);
+    return at.toISOString().slice(0, 10);
+  };
+  const toggleMount = byTestId('workspace-kpis-toggle-done-per-day');
+  const toggle = charts.rateTotalToggle(toggleMount, {
+    labels: { rate: 'Per day', total: 'Running total' },
+    rate: function (viewEl) {
+      return drawInto(viewEl, total(daily.done), '○ nothing done yet', function (canvas, tools) {
+        return {
+          type: 'bar',
+          data: { labels: dayLabels, datasets: [{ data: daily.done, backgroundColor: tools.ink.green }] },
+          options: {
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
+              y: { beginAtZero: true, grid: { color: tools.ink.grid }, ticks: { precision: 0 } }
+            }
+          }
+        };
+      });
+    },
+    total: function (viewEl) {
+      if (!doneTotal) return showWhile(byTestId('workspace-kpis-total-empty'));
+      const showCaption = showWhile(byTestId('workspace-kpis-total-caption'));
+      let sum = 0;
+      const running = doneTotal.done.map(function (n) { sum += n; return sum; });
+      const days = doneTotal.done.map(function (n, i) { return dayAfter(doneTotal.since, i); });
+      const destroyChart = drawInto(viewEl, running.length, '○ no running total yet', function (canvas, tools) {
+        return {
+          type: 'line',
+          data: { labels: days, datasets: [{ data: running, borderColor: tools.ink.green, backgroundColor: tools.ink.green, borderWidth: 2, pointRadius: 0, tension: 0 }] },
+          options: {
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
+              y: { beginAtZero: true, grid: { color: tools.ink.grid }, ticks: { precision: 0 } }
+            }
+          }
+        };
+      });
+      return function () { destroyChart(); showCaption(); };
+    }
+  });
+
+  // Runs by kind per 7-day week, stacked: the top kinds, then 'other'.
+  const kinds = daily.runsByKind.kinds;
+  charts.draw('runs-by-kind', total(kinds.map(function (k) { return total(k.counts); })), '○ nothing dispatched yet', function (canvas, tools) {
+    const ink = tools.ink;
+    const colors = [ink.blue, ink.purple, ink.green, ink.yellow];
+    return {
+      type: 'bar',
+      data: {
+        labels: daily.runsByKind.weeks.map(function (week) { return 'wk ' + monthDay(week); }),
+        datasets: kinds.map(function (kind, i) {
+          return { label: kind.label, data: kind.counts, backgroundColor: kind.label === 'other' ? ink.dim : colors[i % colors.length] };
+        })
+      },
+      options: {
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: { stacked: true, grid: { display: false } },
+          y: { stacked: true, beginAtZero: true, grid: { color: ink.grid }, ticks: { precision: 0 } }
+        }
+      }
+    };
+  });
+
+  // API-equivalent cost per day, by the day the task started.
+  charts.draw('cost', total(daily.cost.perDay), '○ no priced tasks yet', function (canvas, tools) {
+    return {
+      type: 'bar',
+      data: { labels: dayLabels, datasets: [{ data: daily.cost.perDay, backgroundColor: tools.ink.blue }] },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function (item) { return formatUsd(item.parsed.y) ?? '\u2014'; } } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
+          y: { beginAtZero: true, grid: { color: tools.ink.grid }, ticks: { callback: function (v) { return formatUsd(Number(v)) ?? ''; } } }
+        }
+      }
+    };
+  });
+}
+
+drawWorkspaceKpis();

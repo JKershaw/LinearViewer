@@ -11,9 +11,10 @@
 
 // The browser's one home for the terminal (closed) set: non-actionable states.
 // The authority is TERMINAL_TYPES in lib/providers/models.js (isTerminalState,
-// LIN-276); public/ has no build step, so it cannot import it and mirrors it
-// here once. swipe.js, swim.js, ship.js and the record-target helpers below
-// read it from here rather than writing the list again.
+// LIN-276). This is a classic script, so it mirrors that list here once rather
+// than importing it; it is a leaf twin that retires when its last classic
+// consumer converts to a module (LIN-4471). swipe.js, swim.js, ship.js and the
+// record-target helpers below read it from here rather than writing the list again.
 window.TERMINAL_STATE_TYPES = ['completed', 'canceled', 'duplicate'];
 window.isTerminalState = function (stateType) {
   return window.TERMINAL_STATE_TYPES.indexOf(stateType) !== -1;

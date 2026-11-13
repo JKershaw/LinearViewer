@@ -644,7 +644,7 @@ const CONSUMED_MODULES = new Set([FAKE_HEADER, 'tests/unit/helpers/client-world.
  * The names the header's consumer paragraph may keep: the census (it imports nothing), and the two helpers the paragraph
  * describes as real importers. Any other consumer name in that paragraph is a hand-kept list again.
  */
-const HEADER_NAMES_ALLOWED = new Set(['fake-dom-census.test.js', 'client-world.js', 'live-console-world.js']);
+const HEADER_NAMES_ALLOWED = new Set(['fake-dom-census.test.js', 'client-world.js', 'live-console-world.js', 'import-world.js']);
 
 const IMPORT_LIKE = /^(ImportDeclaration|ExportNamedDeclaration|ExportAllDeclaration)$/;
 

@@ -12,7 +12,7 @@
  *  - calls a retired cost function (`buildTaskCost`, `joinCostLineages`, `reduceLineageCost`, `summarize`,
  *    `summarizeByIssue`, `summarizeByFeature`) anywhere, or calls `windowedSpend` / `listInHorizon` outside its list;
  *  - formats a dollar figure by hand (`$` + `toFixed` on the same line) outside the one formatter (lib/cost-format.js,
- *    served to the browser as /shared/cost-format.js, LIN-4446). The only exception is a per-token price line, which is a price, not a cost figure.
+ *    served to the browser as /lib/cost-format.js, LIN-4446, LIN-4471). The only exception is a per-token price line, which is a price, not a cost figure.
  *
  * Run with: node --test tests/unit/cost-read-census.test.js
  */

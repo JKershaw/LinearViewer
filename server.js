@@ -1224,7 +1224,7 @@ app.use((req, res, next) => {
 app.use(hstsHeader())
 
 // Browser libs from node_modules at their old URLs (LIN-3787), and the shared
-// leaf modules from lib/ at /shared/* (LIN-4446). Immediately
+// leaf modules from lib/ at /lib/* (LIN-4446, LIN-4471). Immediately
 // before static so they keep its cache headers and skip defaultCacheControl().
 app.use(createVendorAssetsRouter())
 app.use(express.static('public'))

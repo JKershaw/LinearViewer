@@ -40,7 +40,7 @@ AI agents, and verifies the work on real evidence.
 - Light is the default theme; **dark is an opt-in `.theme-dark` hook** applied to `<html>` pre-paint by the shared shell (`lib/components/page.js`) from a persisted preference, chosen in Settings › Account. Themes are pure overrides of the color tokens; the semantic token layer (`--text/--muted/--card/--line/--brand/--amber/--slate` …) and structural tokens stay shared. Default (no class) output is unchanged.
 - State indicators: ✓ (done/green), ◐ (in-progress/yellow), ○ (todo/dim)
 - Mobile-responsive layout
-- Keep it minimal - no frameworks, no build step; browser modules import natively (limits: `docs/areas/front-end-browser.md`)
+- Keep it minimal - no frameworks, no build step; page modules import natively, and a shared leaf is imported from `/lib/` by a relative specifier (limits: `docs/areas/front-end-browser.md`)
 
 ## E2E Testing Pattern (LIN-215)
 
