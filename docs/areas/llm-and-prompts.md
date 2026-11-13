@@ -82,9 +82,10 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   (`lib/run-view.js`), which no record carries; the byte ceilings (`tests/unit/prompt-size-budget.test.js`), which
   cover the registry. `VIRTUAL_PROMPTS` (`lib/workflow-config.js`) is gone: its one reader is the record's key.
   (Survey tally, LIN-4248; piece 3, LIN-4467.)
-- `tests/fixtures/lin-4467-witness.js`: the one-record refactor's witness stays in the suite as a permanent test. It
-  pins a sha256 for all 40 renders and for each table, so a later wording change in any stage must regenerate
-  `lin-4467-witness.json` as well as move the byte ceilings and the change log; and its fix-round mode differs from
+- `lib/prompts/stage-kinds.js`: the one-record refactor's witness (`tests/fixtures/lin-4467-witness.js`) stays in the
+  suite as a permanent test. It pins a sha256 for all 40 renders and for each table, so a later wording change in
+  any stage must regenerate `tests/fixtures/lin-4467-witness.json` as well as move the byte ceilings and the change
+  log; and its fix-round mode differs from
   fresh for `implementation` only. Decide whether to retire it once piece 5 (LIN-4469) has re-pinned, fold it into
   `tests/unit/prompt-size-budget.test.js`, or keep it as a ratchet: a decision about the test suite, not a fix.
   (LIN-4467 blind read.)
