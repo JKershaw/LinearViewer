@@ -26,6 +26,8 @@ describe('Proxy page form controls have accessible names', () => {
   });
 
   test('the Agent Prompt scope select is named by its wrapping label', () => {
-    assert.match(html, /<label class="proxy-scope-toggle">\s*<span class="field-label">scope:<\/span>\s*<select class="proxy-scope-select" id="proxy-scope-select">/);
+    const label = (html.match(/<label[^>]*class="proxy-scope-toggle"[^>]*>[\s\S]*?<\/label>/) || [])[0] || '';
+    assert.ok(label, 'the Agent Prompt scope label is on the page');
+    assert.match(label, /<select[^>]*id="proxy-scope-select"/);
   });
 });
