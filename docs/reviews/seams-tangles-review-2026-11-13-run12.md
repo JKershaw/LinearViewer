@@ -2,11 +2,11 @@
 
 Task: LIN-4444 · Parent: LIN-4344 · Previous: `seams-tangles-review-2026-11-10-run11.md` (run 11, LIN-4402, PR #2384, merge `3b1b57b15`) · Tools: `scripts/code-shape/seams.mjs` and `cochange.mjs`, HEAD versions (both unchanged in the window) · Evidence: `docs/reviews/_evidence-2026-11-13-run12/` (see its `README.md`). "E/" below means that folder.
 
-Review-only. This PR changes this report, E/, and two entries in `docs/areas/llm-and-prompts.md`: one Waiting entry added (the live-stage wait, §3.10) and one stale Waiting entry removed (the `lib/recommendation-input.js` five-caller entry, §9). No code, config, guide (`docs/areas/areas.json`), tool or other doc was edited. simple-dispatcher was read, not edited, and has no edit or PR from this run.
+Review-only. This PR changes this report, E/, one Waiting entry added in `docs/areas/llm-and-prompts.md` (the live-stage wait, §3.10) and one Waiting entry extended in `docs/areas/runs-and-dispatch.md` (the `landingPrUrls` entry, §3.0a). No entry is removed. No code, config, guide (`docs/areas/areas.json`), tool or other doc was edited. simple-dispatcher was read, not edited, and has no edit or PR from this run.
 
 ## Headline
 
-- **Ranked first: a landing-reader split on agent notes (High, new, reproduced; §3.0a).** The second read raised it, and I reproduced it. After an approved review, a comment citing a PR and opening `autopilot:` offers the blind-read step; the same comment as a plain note suppresses it. The landing predicate (`isLandingEvidence`) drops agent notes and `landingPrUrls` does not, and the comment in `lib/recommendation-facts.js` says the two readers agree. It is the only in-window finding that changes a recommendation output. Frequency in production is not measured.
+- **Ranked first: a landing-reader split on agent notes (High, new, reproduced; §3.0a).** The second read raised it, and I reproduced it. After an approved review, an agent note (first line `autopilot:`) that cites a *new* PR adds that PR to the blind read's landing (`landingPrUrls` does not drop agent notes) while not counting as work after review (`isLandingEvidence` drops them), so a blind read is offered over a PR no review covered; the same note as a plain comment sends the ticket back to review. The comment in `lib/recommendation-facts.js` says the two readers agree. It is the only in-window finding that changes a recommendation output. Frequency in production is not measured.
 - **Structure is unchanged in kind.** The same 13 reciprocal pairs, the same nine-area cycle, no pair opened or closed. Six directed counts moved, all in pairs already among the thirteen: F1, Agent API ⇄ LLM, F4, Pages → Runs, Pages → Other, and F3 (LLM → Providers).
 - **F1 `knot:agents-chat<->runs` (LLM & prompts ⇄ Runs & dispatch), High: 32/50 → 38/55.** The Runs → LLM side is mostly vocabulary: five of the six added edges import `prompts/*-words.js` or `leftover-words.js`. The LLM → Runs side gained six edges, all reading run state, all in the recommendation layer. Run 11 said look-first was the first LLM module to read run state. That was wrong: at run 11's commit `openrouter`, `recommendation-input`, `recommendation-facts` and `chat-tools` already did (§3.1). So the kind is not new; the count moved, and one of the new reads sits on a Runs dispatch refusal (`recommendation-live-wait`).
 - **Agent API ⇄ LLM: 43/4 → 46/4 (Medium).** The three new Agent API → LLM edges are two vocabulary imports and one import of the live-wait refusal code. The reverse four edges are unchanged; `applyDefaultDispatchHarness` remains the routing-policy import, owned by LIN-4155.
@@ -19,7 +19,7 @@ Review-only. This PR changes this report, E/, and two entries in `docs/areas/llm
 - **New watches:** `lib/recommendation-live-wait.js` (a Runs refusal placed in LLM, §3.10); `lib/run-ledger.js` (cross-area importers 2 → 7, §3.10); `lib/openrouter.js` (outbound 11 → 13, now reaching run state through the recommendation modules, §3.10).
 - **New tool blind spot, Low:** the seven registered Reports scripts are outside `seams.mjs`'s scope, and four of their imports reach into `lib/` (§0, §3.11).
 - **simple-dispatcher: unchanged.** Its scratch reader gives 52 files, 20 directed links, 6 reciprocal pairs at both commits, with identical edges. Its three commits touch its own notes and test file. The runner contract hash is `602ab014…` at both LinearViewer commits and both simple-dispatcher commits. The 60-second limiter window and the 60-second broker wait cap still match by comment only, and the leftover no-halt contract row is still absent.
-- **Notes.** One Waiting entry added (`llm-and-prompts.md`: live-stage wait placement); one stale entry removed (`llm-and-prompts.md`: `recommendation-input` five callers, no longer true); the run 11 `agent-api` entry on `applyDefaultDispatchHarness` was removed by LIN-4418 as a double home of LIN-4155 and stays out. The carried `agent-api` limiter entry and `runs-and-dispatch` no-halt entry are re-verified (§9).
+- **Notes.** One Waiting entry added (`llm-and-prompts.md`: live-stage wait placement); one extended (`runs-and-dispatch.md`: the `landingPrUrls` entry, §3.0a); no entry removed (the `llm-and-prompts.md` `recommendation-input` five-builders entry was re-verified and stays, §9); the run 11 `agent-api` entry on `applyDefaultDispatchHarness` was removed by LIN-4418 as a double home of LIN-4155 and stays out. The carried `agent-api` limiter entry, the `runs-and-dispatch` no-halt entry and the `recommendation-input` entry are re-verified (§9).
 - **Experiments.** Three labelled registry experiments reproduce the ticket's figures and are all negative: moving the sequence modules gives F1 35/59; isolating the words gives 38/49; a new sequence area gives 29/53 with three new reciprocal pairs. None is proposed as the F1 fix (§3.1, §7).
 - **Adversarial second read:** Tier 2, a fresh-context sub-agent (§Adversarial Second-Read).
 
@@ -153,10 +153,10 @@ Ordering: severity first, then the window's movement. Stable names are run 9's, 
 ### 3.0a `seam:landing-reader-agent-note` (`lib/recommendation-facts.js` ⇄ `lib/run-ledger.js`) · **High** · **new (in-window, reproduced)**
 
 - **What.** Two readers decide what counts as landed work on a ticket's trail. `isLandingEvidence` (`lib/recommendation-facts.js:85`) excludes agent notes (`isAgentNote`, line 60: a first line opening `autopilot`, `plan posted`/`plan revised`, or `revision N — addresses plan-review`), blind reads and Survey reports. `landingPrUrls` (`lib/run-ledger.js:555`, new in this window with LIN-4437/4438) excludes blind reads and Survey reports but not agent notes. The recommendation step reads both: `blindReadStep` (`lib/recommendation-blind-read.js:63`) returns nothing when `facts.workAfterReview` is true (that uses `isLandingEvidence`), and its landing comes from `landingPrUrls`.
-- **Effect, reproduced** (E/`landing-agent-note-repro.mjs` and `.txt`, run from the repo root with the HEAD modules). After an approved review, with PR 41 cited in an earlier summary, a later comment citing PR 41:
-  - an `autopilot:`-prefixed note gives `workAfterReview: false` and `blindReadStep` returns `blind-read`;
-  - a plain note gives `workAfterReview: true` and no step.
-  The same PR at the same position on the trail; the offer depends on the note's first word.
+- **Effect, reproduced** (E/`landing-agent-note-repro.mjs` and `.txt`, run from the repo root with the HEAD modules). After an approved review, with PR 41 cited in an earlier summary, a later comment cites a *new* PR 42:
+  - an `autopilot:`-prefixed note (`agentNewPr`): `landingPrUrls` = [41, 42], `workAfterReview: false`, and `blindReadStep` returns `blind-read`, its `why` listing PRs 41 and 42 (42 is covered by no review);
+  - the same text as a plain comment (`plainNewPr`): `landingPrUrls` = [41, 42], `workAfterReview: true`, and `blindReadStep` returns no step.
+  The defect is that the agent note adds PR 42 to the landing without counting as work after review, so a blind read is offered over a PR no review covered. The same-PR case (a note re-citing PR 41; `autopilotNote` vs `plainNote` in the same file) is not the defect: `landingPrUrls` returns [41] in both and `noNote` gives the same result as `autopilotNote`, because dropping agent notes from `workAfterReview` is designed behaviour (they never count as a reply).
 - **The comment says the readers agree.** `recommendation-facts.js` (its `isLandingEvidence` comment, lines 82–84) says every reader of the predicate "agrees, and agrees with lib/run-ledger.js landingPrUrls, which skips the same two". The two it names are excluded in both. The agent-note exclusion is not mirrored, and the comment does not say so.
 - **Not pinned.** `tests/unit/lin-4438-blind-read-gate.test.js` pins rows 14 and 15 (an audit re-citing a landing PR; a foreign PR before the first review). `docs/areas/runs-and-dispatch.md` carries those two as Waiting. No row covers an agent note.
 - **Where it sits in time.** The agent-note exclusion in `isLandingEvidence` predates the window. `landingPrUrls` does not exist at the baseline (it arrived with LIN-4437/4438), so the disagreement is in-window.
@@ -347,7 +347,7 @@ Recorded apart from code movement. None is applied. No test, check or count is a
 - **P-T1 `seams.mjs` CommonJS and a scope flag, carried, extended.** The tool reads `import` and scopes `server.js|lib|routes|public`. Two additions: a `require` reader (E/`require-graph.mjs` is the working sketch), and `scripts/` in scope for the seven Reports scripts, whose four `lib/` imports are the evidence (§3.11). The tool is not edited here.
 - **P-REV1 review cadence and compaction for `docs/reviews/`, carried.** 173 entries now, growing faster than the code they measure.
 - **P-AN1 `lib/prompts/area-note-format.js` placement, new.** Notes infrastructure filed under LLM & prompts by `^lib/prompts/`, with no in-scope importer (its one importer is `scripts/stability-measures.mjs`, outside the tool's scope). Proposal: file it under Reports, or give `^lib/prompts/` a notes exception. Low.
-- **P-R1 and P-L1.** The ticket's brief names these two proposals; their text is not in this repository's run 10 or run 11 reports, so they are not carried here. Flagged for the person.
+- **P-R1 and P-L1** (proposed in this ticket's research comment) are carried as P-T1 (extended) and P-AN1 respectively.
 
 ## 8. Existing tickets and carried items
 
@@ -376,9 +376,10 @@ Findings already filed as tickets stay in this report only.
 **Edited in this PR (`docs/areas/llm-and-prompts.md` and, after the second read, `docs/areas/runs-and-dispatch.md`).**
 - **Added, Waiting:** `lib/recommendation-live-wait.js`: the live-stage refusal is a Runs dispatch rule placed in LLM by prefix; three areas hold it; a size of move (P-LW1). Source: this report.
 - **Extended, Waiting (`docs/areas/runs-and-dispatch.md`, the `lib/run-ledger.js` `landingPrUrls` entry):** a third, unpinned case, the agent-note split of §3.0a. The entry keeps its two pinned cases; the extension cites this report.
-- **Removed, Waiting:** `lib/recommendation-input.js`, "the pinned-kind and in-app renders … build context by hand: a new field must reach all five". No longer true at the head. `routes/proxy.js:1521` and `routes/workspace-api.js:232` are the only callers of `prepareRecommendationInput`; `lib/dispatch-entrance.js`, `routes/proxy-compute.js` and `routes/workspace-api-prompts.js` neither import it nor read run state for a recommendation (`proxy-compute.js:186` is a test-mode mock context). The one-preparation the module's header describes is what the code does. The window's changes made the entry untrue, so it leaves (the README's rule). A builder who adds a field now edits one function.
+- **Removed, Waiting:** none.
 
 **Re-verified, no edit.**
+- `docs/areas/llm-and-prompts.md`, the `lib/recommendation-input.js` Waiting entry (the five hand-built contexts): still true. `lib/dispatch-entrance.js:1587`, `routes/proxy-compute.js:315` and `:474`, and `routes/workspace-api-prompts.js:239` build the `generatePrompt` context by hand.
 - `docs/areas/agent-api.md`, the limiter↔cap Waiting entry (run 10; carried): still true. `routes/proxy.js` line 257 holds the 60-second window (it was 256 at run 11); `lib/runner-kit/broker.mjs:97` holds the 60-second cap. Still by comment.
 - `docs/areas/runs-and-dispatch.md`, the no-halt follow-up Waiting entry (run 11): still true (§3.0b).
 - `docs/areas/agent-api.md`, the run 11 entry on `applyDefaultDispatchHarness`: removed by LIN-4418, which named LIN-4155 as the double home. The entry was true and still is; it stays out.
@@ -390,7 +391,7 @@ Findings already filed as tickets stay in this report only.
 **Not an entry, on purpose.**
 - The F1 kind (§3.1), the Pages/Other directions (§3.9), the run-ledger and openrouter watches (§3.10), the Reports scope gap (§3.11), the stale `lib/task-cost.js` comments (§3.13): watches, placements and comments that bind no builder's change now. Each is in the closing comment or in this report.
 
-**Closing comment (to the person) carries:** the larger tidy P-LW1; the findings with no area file to cite (`map:wake-credential`, the Reports scope gap, P-XN1's missing seams home); the stale `task-cost.js` references; Supply Chain's unowned limiter-keying seam (the limiter keys by proven credential; a dependency-and-supply review question, not a note); and the two named proposals P-R1 and P-L1 that this repo does not contain.
+**Closing comment (to the person) carries:** the larger tidy P-LW1; the findings with no area file to cite (`map:wake-credential`, the Reports scope gap, P-XN1's missing seams home); the stale `task-cost.js` references; Supply Chain's unowned limiter-keying seam (the limiter keys by proven credential; a dependency-and-supply review question, not a note).
 
 **No ticket is minted.** Waiting entries, not tickets, route the outside finds (`CONSEQUENCE_TEST`). No find here breaks, blocks, or touches safety.
 
@@ -403,7 +404,7 @@ Stable names are the ledger's own. Severity is this run's. "Δ run 11" is agains
 | `seam:runner-contract` (two repos) | Medium | pinned both sides; limiter↔cap by comment | same; sha `602ab014…` at both repos' commits | **carried** (§3.0) |
 | `seam:leftover-resume-contract` (two repos) | Low | no halt-free follow-up row | same; 66 rows both sides | **carried** (§3.0b) |
 | F1 `knot:agents-chat<->runs` (LLM & prompts ⇄ Runs & dispatch) | High | 32/50 | **38/55** | **worse in count; kind not new, widened into the recommendation layer** (§3.1) |
-| `seam:landing-reader-agent-note` (`isLandingEvidence` ⇄ `landingPrUrls`) | High, new | — | reproduced; agent-note first word decides the blind-read offer | **new** (§3.0a) |
+| `seam:landing-reader-agent-note` (`isLandingEvidence` ⇄ `landingPrUrls`) | High, new | — | reproduced; an agent note citing a new PR adds it to the blind read's landing without counting as work after review | **new** (§3.0a) |
 | `knot:agent-api<->llm` | Medium | 43/4 | **46/4** | worse in count; kind unchanged (§3.1b) |
 | F4 `knot:runs->agent-api(proxy-preamble)` | Medium | 44/10 | **48/10** | worse in count; cost reads better (§3.2) |
 | F3 `knot:providers->upward` | Medium | 14/4 | **15/4** | worse by one; reverse 4 (§3.3) |
@@ -503,9 +504,9 @@ Stable names are the ledger's own. Severity is this run's. "Δ run 11" is agains
 
 - **Check of the reader's claims (by me, after the reply):**
   - The split is real. `isLandingEvidence` (`recommendation-facts.js:85–86`) excludes agent notes; `landingPrUrls` (`run-ledger.js`) excludes blind reads and Survey reports only. The comment at `recommendation-facts.js:82–84` says "agrees" and "skips the same two".
-  - Reproduced with the HEAD modules and the test file's review and summary shapes (E/`landing-agent-note-repro.txt`): `autopilotNote` → `workAfterReview false`, `blindReadStep` `blind-read`; `plainNote` → `workAfterReview true`, no step.
+  - Reproduced with the HEAD modules and the test file's review and summary shapes (E/`landing-agent-note-repro.txt`), in the multi-PR case: `agentNewPr` → `landingPrUrls` [41, 42], `workAfterReview false`, `blindReadStep` `blind-read`; `plainNewPr` → `workAfterReview true`, no step. The same-PR cases (`autopilotNote`, `plainNote`, `noNote`) show designed agent-note behaviour and are not the defect.
   - "Introduced in this window" holds for `landingPrUrls`, which is absent at the baseline. The agent-note exclusion in `isLandingEvidence` predates the window; the mismatch is new because the second reader is new.
-  - The reader's multi-PR trail (PR 7 and PR 8) was not rebuilt; the single-PR reproduction is enough to show the first-word dependence.
+  - Multi-PR trail rebuilt (review stage): reproduces.
   - The reader's severity doubt stands: production frequency is not measured.
 - **Response.** Fixed in place. §3.0a added and ranked first; the headline, §3.10 and the §10 ledger updated; the existing `runs-and-dispatch.md` Waiting entry extended with the third, unpinned case; the reproduction saved into E/. I did not adopt the reader's F1 demotion: F1 stays High as the knot's measure, and I note its placement-cost reading in §3.1. The reader's "largest item" call is one judgement; the report keeps its own ranking of the other findings.
 

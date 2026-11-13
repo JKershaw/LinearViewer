@@ -1,3 +1,5 @@
-autopilotNote workAfterReview= false landing= 1 blindReadStep= blind-read
-plainNote    workAfterReview= true  landing= 1 blindReadStep= null
-noNote       workAfterReview= false landing= 1 blindReadStep= blind-read
+autopilotNote workAfterReview= false landing= ["41"] blindReadStep= blind-read
+plainNote    workAfterReview= true  landing= ["41"] blindReadStep= null
+noNote       workAfterReview= false landing= ["41"] blindReadStep= blind-read
+agentNewPr   workAfterReview= false landing= ["41","42"] blindReadStep= blind-read
+plainNewPr   workAfterReview= true  landing= ["41","42"] blindReadStep= null
