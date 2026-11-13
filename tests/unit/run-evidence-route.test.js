@@ -63,7 +63,7 @@ describe('GET /api/run-evidence/:issueIdentifier', () => {
     }));
     assert.equal(res.statusCode, 200);
     assert.deepEqual(Object.keys(res.jsonBody).sort(), ['closeOut', 'evidence', 'ledger', 'state']);
-    assert.equal(res.jsonBody.state.status, 'ready');
+    assert.equal(res.jsonBody.state.pr.state, 'open');
     assert.equal(res.jsonBody.state.pr.number, 12);
     assert.equal(res.jsonBody.evidence.checked.now.state, 'passing');
     assert.equal(res.jsonBody.ledger.verdict, 'approve-conditional');
@@ -72,14 +72,14 @@ describe('GET /api/run-evidence/:issueIdentifier', () => {
   test('zero PR URLs → no-pr (withholds)', async () => {
     const res = await callRoute(makeRouter({ comments: [comment('no PR here', '2026-07-01T00:00:00.000Z')] }));
     assert.equal(res.statusCode, 200);
-    assert.equal(res.jsonBody.state.status, 'no-pr');
+    assert.equal(res.jsonBody.closeOut.status, 'no-pr');
   });
 
   test('more than one PR URL → multiple-prs (withholds, says what is known)', async () => {
     const PR_A2 = 'https://github.com/acme/widget/pull/13';
     const res = await callRoute(makeRouter({ comments: [comment(`${PR_A} and ${PR_A2}`, '2026-07-01T00:00:00.000Z')] }));
-    assert.equal(res.jsonBody.state.status, 'multiple-prs');
-    assert.match(res.jsonBody.state.message, /more than one PR/);
+    assert.equal(res.jsonBody.closeOut.status, 'multiple-prs');
+    assert.match(res.jsonBody.closeOut.message, /more than one PR/);
   });
 
   test('an unreadable PR read → unknown, never a 500', async () => {
@@ -88,7 +88,7 @@ describe('GET /api/run-evidence/:issueIdentifier', () => {
       readPrStatus: async () => ({ readable: false, state: 'unknown', reason: 'not readable: private or unknown repository' }),
     }));
     assert.equal(res.statusCode, 200);
-    assert.equal(res.jsonBody.state.status, 'unknown');
+    assert.equal(res.jsonBody.closeOut.status, 'unknown');
     assert.equal(res.jsonBody.evidence.checked.now.state, 'unknown');
   });
 
@@ -98,7 +98,7 @@ describe('GET /api/run-evidence/:issueIdentifier', () => {
       comments: [comment(PR_FOREIGN, '2026-07-01T00:00:00.000Z')],
       readPrStatus: async () => ({ readable: true, repo: 'acme/other', number: 12, state: 'open', merged: false, head: { ref: 'f', sha: 'abc1234' }, ref: 'abc1234', checks: [] }),
     }));
-    assert.equal(res.jsonBody.state.status, 'ready');
+    assert.equal(res.jsonBody.state.pr.state, 'open');
     assert.equal(res.jsonBody.state.pr.repo, 'acme/other');
   });
 
@@ -111,7 +111,7 @@ describe('GET /api/run-evidence/:issueIdentifier', () => {
   test('identifier bound: 100 chars is read, 101 chars is refused with 400 (LIN-3913)', async () => {
     const atBound = await callRoute(makeRouter(), 'L'.repeat(100));
     assert.equal(atBound.statusCode, 200);
-    assert.equal(atBound.jsonBody.state.status, 'no-pr');
+    assert.equal(atBound.jsonBody.closeOut.status, 'no-pr');
 
     const overBound = await callRoute(makeRouter(), 'L'.repeat(101));
     assert.equal(overBound.statusCode, 400);

@@ -25,6 +25,14 @@ import { generateSessionSummary, parseSessionSummaryResponse, childLoops } from 
 import { hashSession } from '../lib/session-summary-cache.js';
 import { loopActivityMs } from './dashboard-session-state.js';
 
+// A summary that could not be generated: a cut-off answer says so (LIN-4358: nothing was cached),
+// anything else is a 502 with the handler's own message. One arm for both summary handlers.
+function summaryFailure(res, error, message) {
+  const truncated = truncationFailureOf(error);
+  if (truncated) return jsonError(res, ...truncated);
+  return jsonError(res, 502, message);
+}
+
 // A peek asks "is there a cached summary?" without paying to generate one.
 const isCachedOnly = (req) => req.query.cachedOnly === '1' || req.query.cachedOnly === 'true';
 
@@ -93,10 +101,7 @@ async function generateRunSummaryReply(ctx, req, res, { loop, inputHash }) {
     res.json({ status: 'fresh', loopId, summary, model, generatedAt: new Date().toISOString() });
   } catch (error) {
     console.error('Dashboard run-summary generation error:', error);
-    // LIN-4358: a cut-off answer says so (nothing was cached).
-    const truncated = truncationFailureOf(error);
-    if (truncated) return jsonError(res, ...truncated);
-    jsonError(res, 502, 'Could not generate the run summary');
+    summaryFailure(res, error, 'Could not generate the run summary');
   }
 }
 
@@ -284,10 +289,7 @@ async function generateSessionSummaryReply(ctx, req, res, { session, inputHash }
     res.json({ status: 'fresh', sessionId, live: false, summary, model, generatedAt: new Date().toISOString() });
   } catch (error) {
     console.error('Dashboard session-summary generation error:', error);
-    // LIN-4358: a cut-off answer says so (nothing was cached).
-    const truncated = truncationFailureOf(error);
-    if (truncated) return jsonError(res, ...truncated);
-    jsonError(res, 502, 'Could not generate the session summary');
+    summaryFailure(res, error, 'Could not generate the session summary');
   }
 }
 

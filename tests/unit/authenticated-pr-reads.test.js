@@ -245,7 +245,7 @@ describe('task page loader', () => {
 
   test('GitHub-bound workspace: the PR is readable and the close-out is ready', async () => {
     const { model } = await load(loaderFor(githubStub()), GH_SCOPE);
-    assert.equal(model.evidence.state.status, 'ready');
+    assert.equal(model.evidence.state.pr.state, 'open');
     assert.equal(model.evidence.evidence.checked.now.read, true);
     const html = renderTaskPullRequest(model, '', NOW);
     assert.ok(html.includes(PR_URL), 'the PR link is rendered');
@@ -256,7 +256,7 @@ describe('task page loader', () => {
     // /t/:token calls loadTaskPage with the owner's access (LIN-3330/3373);
     // pinned so the share-link behaviour stays a decision, not an accident.
     const { model } = await load(loaderFor(githubStub()), GH_SCOPE);
-    assert.equal(model.evidence.state.status, 'ready');
+    assert.equal(model.evidence.state.pr.state, 'open');
   });
 
   test('copy: a readable PR with no checks vs an unreadable PR', async () => {
@@ -271,14 +271,14 @@ describe('task page loader', () => {
   test('Linear access (string scope) stays anonymous → unknown', async () => {
     const stub = githubStub();
     const { model } = await load(loaderFor(stub), 'lin_token');
-    assert.equal(model.evidence.state.status, 'unknown');
+    assert.equal(model.evidence.closeOut.status, 'unknown');
     assert.ok(stub.calls.every(c => !c.headers.Authorization));
   });
 
   test('a PR in another repo than the bound one stays anonymous', async () => {
     const stub = githubStub();
     const { model } = await load(loaderFor(stub), { repo: 'acme/other', token: TOKEN });
-    assert.equal(model.evidence.state.status, 'unknown');
+    assert.equal(model.evidence.closeOut.status, 'unknown');
     assert.ok(stub.calls.every(c => !c.headers.Authorization));
   });
 });
@@ -289,13 +289,13 @@ describe('readRunEvidence default reader (run page / run-evidence route path)', 
   test('threads the token and urlKey into the default fail-open reader', async () => {
     const stub = githubStub();
     const model = await readRunEvidence({ ...base, callScope: GH_SCOPE, urlKey: 'ws-a', githubFetch: stub });
-    assert.equal(model.state.status, 'ready');
+    assert.equal(model.state.pr.state, 'open');
   });
 
   test('without a urlKey it reads anonymously rather than tripping the scope-key guard', async () => {
     const stub = githubStub();
     const model = await readRunEvidence({ ...base, callScope: GH_SCOPE, githubFetch: stub });
-    assert.equal(model.state.status, 'unknown');
+    assert.equal(model.closeOut.status, 'unknown');
     assert.ok(stub.calls.every(c => !c.headers.Authorization));
   });
 
@@ -336,7 +336,7 @@ describe('routes', () => {
       return res;
     };
     const a = await call('ws-a');
-    assert.equal(a.jsonBody.state.status, 'ready');
+    assert.equal(a.jsonBody.state.pr.state, 'open');
     const n = stub.calls.length;
     await call('ws-a');
     assert.equal(stub.calls.length, n, 'same workspace is served from its entry');

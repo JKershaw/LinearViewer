@@ -193,6 +193,6 @@ describe('readRunEvidence: optional comments (LIN-3329)', () => {
     const provider = countingProvider();
     const model = await readRunEvidence({ issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable, comments: [] });
     assert.equal(provider.counts.comments, 0);
-    assert.equal(model.state.status, 'no-pr');
+    assert.equal(model.closeOut.status, 'no-pr');
   });
 });

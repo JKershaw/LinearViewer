@@ -204,7 +204,7 @@ describe('a PR cited only outside the landing is not read (the box\'s one read i
     assert.deepEqual(reads, []);
     assert.equal(model.closeOut.status, 'no-pr');
     assert.equal(resolveRunPrRef(model).status, 'one');
-    assert.equal(model.state.status, 'unknown');
+    assert.equal(model.state.pr.state, null, 'the picker\'s one cited PR is not read');
   });
 });
 

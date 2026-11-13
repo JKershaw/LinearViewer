@@ -110,6 +110,22 @@ export function createComputeRoutes({
 }) {
   const router = Router();
 
+  // The reply a streamed compute route (recap and brief, read and generate) sends when it fails, in one
+  // place: issue not found, a cut-off model answer (LIN-4358: nothing was cached), the AI service down,
+  // else the tracker error (graphqlErrorStatus is this router's injected mapper). Each route names itself and its fallback.
+  function streamedFailureReply(err, req, { route, failure }) {
+    if (err.message?.includes('not found')) return { status: 404, body: { error: 'Issue not found' } };
+    const truncated = truncationFailureOf(err);
+    if (truncated) {
+      const [status, message, extra] = truncated;
+      return { status, body: { error: message, detail: err.message, ...extra } };
+    }
+    if (err.message?.includes('OpenRouter')) return { status: 503, body: { error: 'AI service temporarily unavailable', detail: err.message } };
+    const status = graphqlErrorStatus(err, req);
+    console.error(`Proxy ${route} error:`, err.message);
+    return { status, body: { error: failure, detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) } };
+  }
+
   // LIN-4381: a route running without the events store reads no landings, so no
   // Periodical lane can read `landed` and nothing else says so. Say it once per
   // router, not per request.
@@ -1172,24 +1188,7 @@ export function createComputeRoutes({
         });
       } catch (err) {
         keepalive.stop();
-        let status;
-        let body;
-        if (err.message?.includes('not found')) {
-          status = 404;
-          body = { error: 'Issue not found' };
-        } else if (truncationFailureOf(err)) {
-          // LIN-4358: the model's output was cut off; nothing was cached.
-          const [code, message, extra] = truncationFailureOf(err);
-          status = code;
-          body = { error: message, detail: err.message, ...extra };
-        } else if (err.message?.includes('OpenRouter')) {
-          status = 503;
-          body = { error: 'AI service temporarily unavailable', detail: err.message };
-        } else {
-          status = graphqlErrorStatus(err, req);
-          body = { error: 'Failed to fetch recap', detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) };
-          console.error('Proxy /recap error:', err.message);
-        }
+        const { status, body } = streamedFailureReply(err, req, { route: '/recap', failure: 'Failed to fetch recap' });
         logEvent(req, '/api/proxy/recap', status);
         keepalive.send(status, body);
       }
@@ -1301,24 +1300,7 @@ export function createComputeRoutes({
         });
       } catch (err) {
         keepalive.stop();
-        let status;
-        let body;
-        if (err.message?.includes('not found')) {
-          status = 404;
-          body = { error: 'Issue not found' };
-        } else if (truncationFailureOf(err)) {
-          // LIN-4358: the model's output was cut off; nothing was cached.
-          const [code, message, extra] = truncationFailureOf(err);
-          status = code;
-          body = { error: message, detail: err.message, ...extra };
-        } else if (err.message?.includes('OpenRouter')) {
-          status = 503;
-          body = { error: 'AI service temporarily unavailable', detail: err.message };
-        } else {
-          status = graphqlErrorStatus(err, req);
-          body = { error: 'Failed to fetch recap', detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) };
-          console.error('Proxy /recap error:', err.message);
-        }
+        const { status, body } = streamedFailureReply(err, req, { route: '/recap', failure: 'Failed to fetch recap' });
         logEvent(req, '/api/proxy/recap', status);
         keepalive.send(status, body);
       }
@@ -1466,24 +1448,7 @@ export function createComputeRoutes({
         });
       } catch (err) {
         keepalive.stop();
-        let status;
-        let body;
-        if (err.message?.includes('not found')) {
-          status = 404;
-          body = { error: 'Issue not found' };
-        } else if (truncationFailureOf(err)) {
-          // LIN-4358: the model's output was cut off; nothing was cached.
-          const [code, message, extra] = truncationFailureOf(err);
-          status = code;
-          body = { error: message, detail: err.message, ...extra };
-        } else if (err.message?.includes('OpenRouter')) {
-          status = 503;
-          body = { error: 'AI service temporarily unavailable', detail: err.message };
-        } else {
-          status = graphqlErrorStatus(err, req);
-          body = { error: 'Failed to fetch brief', detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) };
-          console.error('Proxy /brief error:', err.message);
-        }
+        const { status, body } = streamedFailureReply(err, req, { route: '/brief', failure: 'Failed to fetch brief' });
         logEvent(req, '/api/proxy/brief', status);
         keepalive.send(status, body);
       }
@@ -1594,24 +1559,7 @@ export function createComputeRoutes({
         });
       } catch (err) {
         keepalive.stop();
-        let status;
-        let body;
-        if (err.message?.includes('not found')) {
-          status = 404;
-          body = { error: 'Issue not found' };
-        } else if (truncationFailureOf(err)) {
-          // LIN-4358: the model's output was cut off; nothing was cached.
-          const [code, message, extra] = truncationFailureOf(err);
-          status = code;
-          body = { error: message, detail: err.message, ...extra };
-        } else if (err.message?.includes('OpenRouter')) {
-          status = 503;
-          body = { error: 'AI service temporarily unavailable', detail: err.message };
-        } else {
-          status = graphqlErrorStatus(err, req);
-          body = { error: 'Failed to generate brief', detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) };
-          console.error('Proxy /brief error:', err.message);
-        }
+        const { status, body } = streamedFailureReply(err, req, { route: '/brief', failure: 'Failed to generate brief' });
         logEvent(req, '/api/proxy/brief', status);
         keepalive.send(status, body);
       }
