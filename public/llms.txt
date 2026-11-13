@@ -27,7 +27,7 @@ The papers and essays behind Harbour are published unauthenticated at `/library`
 ## Navigation
 
 - **Workspace selector**: `workspace: {name}` in nav bar - click to switch
-- **View switcher**: `.nav-views` row in the header - switch between views (projects, shown as "tasks"; swipe, swim, observation, settings, kpis and proxy; the flag-gated roadmap and live-console; and dispatch for an owner whose workspace has a live runner key or queue token); at the top of the page, reachable without scrolling on mobile
+- **View switcher**: `.nav-views` row in the header - switch between views (projects, shown as "tasks"; swipe, swim, observation, settings, kpis and proxy; the flag-gated roadmap; live-console, for an owner with a live runner key or queue token unless their `liveConsole` flag is stored `false`; and dispatch for an owner whose workspace has a live runner key or queue token); at the top of the page, reachable without scrolling on mobile
 - **Team filter**: `team: {name}` in nav bar - filter issues by team
 - **Expand/collapse**: Click task row or ▶/▼ arrow
 - **Project collapse**: Click project header
@@ -154,7 +154,7 @@ The Running section (Home) and the Projects sections (`/backlog`) use the same n
 - `#team-options` - team dropdown panel
 - `[data-team="{id}"]` - team filter option (use "all" for all teams)
 - `.nav-views` - header-level cross-view switcher row (LIN-978); single scrolling row at the top of every workspace page
-- `[data-testid="nav-view-{name}"]` - a view-switcher link by its route key (e.g. `projects`, `observation`, `swipe`, `swim`, `settings`, `kpis`, `proxy`, and the gated `roadmap`/`live-console`/`dispatch`; the visible label can differ: `projects` reads "tasks", `live-console` reads "live console"); the active view renders as a `<strong class="nav-view-current">` instead of an `<a>`. First-class views and `proxy` always show; `dispatch` only with run controls (the workspace owner, with a live runner key or queue token); `roadmap` only with its per-user flag; experimental views appear in the `⋯ more` overflow group when their own flag is on (same gated-inclusion policy as power-user views, not Settings-only)
+- `[data-testid="nav-view-{name}"]` - a view-switcher link by its route key (e.g. `projects`, `observation`, `swipe`, `swim`, `settings`, `kpis`, `proxy`, and the gated `roadmap`/`live-console`/`dispatch`; the visible label can differ: `projects` reads "tasks", `live-console` reads "live console"); the active view renders as a `<strong class="nav-view-current">` instead of an `<a>`. First-class views and `proxy` always show; `dispatch` only with run controls (the workspace owner, with a live runner key or queue token); `roadmap` only with its per-user flag; `live-console` for an owner with a live runner key or queue token unless their `liveConsole` flag is stored `false`; experimental views appear in the `⋯ more` overflow group when their own flag is on (same gated-inclusion policy as power-user views, not Settings-only)
 
 ### Workspace KPIs page (`/workspace/:urlKey/kpis`)
 One workspace's counts, last 7 and 30 UTC days, plus 30-day trend charts as rates (LIN-3711), and a running total of tasks done behind a rate/total toggle on the tasks-done chart (LIN-3732); nothing instance-wide. Reads only the session's own workspace (a workspace the session lacks gets the 404 page, no session redirects to `/`).

@@ -59,7 +59,7 @@ Same 14 paths. Two blobs differ:
 | 4 | 932 | `public/cost-format-global.js` | `b7570fec8` | changed (LIN-4471) |
 | 14 | 43,000 | `public/task-page.js` | `5ba9b91ce` | changed (LIN-4472) |
 
-The other 12 blobs are identical at the two commits. Two of the 44 universe files changed, and both are in the sample. `public/common.js` and `public/workspace-kpis.js` changed too but are outside the sample.
+The other 12 blobs are identical at the two commits. Four of the 44 universe files changed, and two are in the sample (`public/cost-format-global.js` and `public/task-page.js`). `public/common.js` and `public/workspace-kpis.js` changed too but are outside the sample.
 
 ### Auth, accounts & workspaces, `c205190fd` and `0cf05ce8f` (universe 64 files, 945,008 B; sample 14 files, 205,106 B)
 

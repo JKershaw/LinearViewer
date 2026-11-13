@@ -84,6 +84,11 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
 - `public/observation.js`: about 5,000 lines. By the counting method of LIN-4446 (lines starting with `*`, `//` or `/*`)
   1,985 of its 4,679 non-blank lines are comments. Find out why it is this large before splitting it. An earlier survey
   used a different method, so its figure is not comparable. (LIN-4446 plan.)
+- `public/llms.txt`: the view list and the `nav-view-{name}` keys and labels are written by hand, and no test checks them
+  against `getViewNavLinks`, `DISPLAY_LABELS` or `EXPERIMENTAL_VIEWS` in `lib/components/view-nav.js` and
+  `lib/feature-defaults.js`. LIN-4463's close-out corrected the drift (the missing projects and live-console views, the
+  unscoped recommend-status path); the next view added will drift the same way. Decide how much of llms.txt is checked
+  against source, then add the conformance test: larger than a fix. (LIN-4463 blind read.)
 - `public/prompt-section.js`: on a server with no AI (`aiState: "unconfigured"`, a self-host with no
   OpenRouter key) the run control still offers Next step. Pressing it gets a 503 from the recommend
   stream, and "AI Recommend · generating…" / "Loading…" spin with no message, while Run to PR works
