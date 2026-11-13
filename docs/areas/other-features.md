@@ -11,10 +11,6 @@ Area notes for `other-features` in the registry. Format and rules: README.md.
 
 ## Waiting
 
-- `lib/cost-format.js`: still in the catch-all, as is LIN-4203's
-  `lib/usage-snapshot-intake.js`, while the rest of the cost code moved to Runs & dispatch
-  (LIN-4201). (Survey tally: LIN-4176, LIN-4195, LIN-4201.) Also served to the browser as
-  `/shared/cost-format.js` (LIN-4446), so it must stay a leaf: it imports nothing and names no browser or Node global.
 - `lib/home-view.js`: split it (over 600 lines), and separate `upNextOf`'s eligibility
   from its ranking, so both lists filter one candidate model. The module threads `shown`,
   `waiting`, `linked` and `onHome` through every placement. (Survey tally: LIN-4151,

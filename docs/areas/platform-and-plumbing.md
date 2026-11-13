@@ -15,7 +15,7 @@ Area notes for `platform-and-plumbing` in the registry. Format and rules: README
 ## Waiting
 
 - `lib/vendor-assets.js`: since LIN-4446 it also serves `SHARED_MODULES` (leaf files under `lib/` at
-  `/shared/*`), so the file name and `createVendorAssetsRouter` say less than it does. A rename touches
+  `/lib/*`, LIN-4471), so the file name and `createVendorAssetsRouter` say less than it does. A rename touches
   `server.js`'s mount, which `tests/unit/vendor-assets.test.js` pins as an exact string, and the source
   map; it was left out of the cost-format slice to keep that slice small. (LIN-4446 leftovers.)
 - `lib/db-indexes.js`: one shared in-memory collection fake that knows these semantics

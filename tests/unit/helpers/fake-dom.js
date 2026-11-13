@@ -13,7 +13,7 @@
  * The consumers are not listed in this header. The census computes them: the files whose imports reach this module or
  * `helpers/client-world.js`, directly or through a helper that does, found by an AST `ImportDeclaration` scan. It fails, and prints that set, if this paragraph
  * names a consumer other than the helpers below and the census itself. `helpers/client-world.js` (the vm loader over this
- * fake) and `helpers/live-console-world.js` (a page and lane fixture over that loader) are real importers, described here
+ * fake) and `helpers/live-console-world.js` (a page and lane fixture over that loader) and `helpers/import-world.js` (the native-import world for a page module, LIN-4471) are real importers, described here
  * as such. A suite moved onto this fake leaves `HAND_WRITTEN_FAKE_DOM_FILES` in the same PR; nothing else here needs editing.
  *
  * Modelled:

@@ -1,6 +1,6 @@
 /**
  * tests/fixtures/browser-cost-format.js: the shared USD formatter (lib/cost-format.js, LIN-4179; served to the browser
- * as /shared/cost-format.js, LIN-4446) given to a vm sandbox, as the module shim gives it to the page. A browser test
+ * as /lib/cost-format.js, LIN-4446, LIN-4471) given to a vm sandbox, as the module shim gives it to the page. A browser test
  * that evaluates a page script which formats a cost calls `loadCostFormat(sandbox)` after `vm.createContext(sandbox)`,
  * so `window.CostFormat` exists. The function is the server's own, so plain strings cross the vm boundary safely.
  */
