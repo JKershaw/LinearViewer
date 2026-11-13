@@ -3743,3 +3743,15 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **Some of it is front-loaded:** the switch reviews, the north star subagents and the long discussion.
   - **Per point 1, going fast with spare capacity is fine.** The plan: ask John for a reading about daily. At about 80%, stop starting new lanes or pieces and let the in-flight work finish, so nothing stops halfway.
 - **John: "Agreed, we were also running on Opus previously, etc."** The 80% stop is agreed. The 28% also includes the batch-1 lanes run on Opus up to this morning. Today's lanes run on the cheaper defaults, so the burn should fall from here. The next reading will show it.
+- **15:56 UTC: LIN-4448 planned and split** into seven pieces, LIN-4464–4470, with eight blocked-by links in plan order:
+  - LIN-4464, its own baseline area read (piece 0, the same duplication as LIN-4447's; A13/A14's Done-when wording invites it);
+  - LIN-4465, one ordered `CODE_ROUTES`;
+  - LIN-4466, the blind read's kind and heading from one leaf;
+  - LIN-4467, one record per stage kind, with the tables as views;
+  - LIN-4468, the proxy refuses writes outside a stage's limit, with two minting places the plan had missed added;
+  - LIN-4469, the prompt folds after the guard;
+  - LIN-4470, the Waiting entries, then the repeat read.
+
+  It settled the assignee rule itself (follow `stage-writes.js`).
+  - **Cross-lane again:** it posted a correction on LIN-4447 (`097a3442`) listing every Runs file each piece edits, and the clashes with LIN-4459, LIN-4460 and LIN-4455's open PR #2427. The other lane's review had asked for that before its pieces 1, 2 and 4 start.
+  - **Ruling `lin4448-lookinto-none`** (raised 15:55): once the proxy refuses look-into's writes, retire its "post only if a person asks" exception? It was recommended `retire`. **John answered it at 15:57, before I'd read it,** so no suggestion was made.
