@@ -37,3 +37,15 @@ Area notes for `platform-and-plumbing` in the registry. Format and rules: README
   several 30 ms ticks; under load it fails with the message of the defect it guards (the interval
   stopped after a throw), and a whole-run re-run turned it green. Count ticks or drive a fake clock.
   (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)
+- `lib/partial-write-error.js`: an edit that fails with `failed: 'property'` is `retryable: true` and its
+  provider message says "retrying is safe". A Jira site that always drops entity properties fails every
+  retry the same way, so a caller that follows `retryable` loops forever. Making property failures
+  non-retryable, or giving them a separate signal, changes the documented envelope
+  (`lib/proxy-instructions.js` PARTIAL_WRITE, `docs/proxy-integration.md`), so it is a decision, not a
+  fix; settle it once John's live evidence (LIN-4445, runbook step 2) shows whether his site drops it.
+  (LIN-4452 blind read.)
+- `lib/partial-write-error.js`: a landed create answers "do not retry the create, read the issue
+  instead", but `context` carries only `applied` and `failed`; the created key appears only inside the
+  prose `error` string, so a caller must parse a sentence to know which issue to read. Adding the issue id
+  to `PartialWriteError` and the envelope widens a documented shape on the proxy and session lanes.
+  (LIN-4452 blind read.)
