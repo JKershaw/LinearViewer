@@ -103,3 +103,9 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   and time as measure 1's cut-off, and `repoSlugOf` is another GitHub-URL parser beside `prOf`
   (`lib/run-ledger.js`). Taking the cut-off from data needs a decision about where the gate's start
   is recorded; the parser could fold in with it. (Blind read on LIN-4396.)
+- `scripts/stability-measures-seat.mjs`: says its ruling outcome buckets are "as
+  lib/escalation-kpis.js", but counts a withdrawn ruling as neither and a null outcome as
+  unreadable, where the home (`lib/escalation-kpis.js`, over `lib/digest-feedback.js`) counts every
+  resolved event that is not dismissed or self-resolved as answered. The inputs differ (proxy rulings
+  against feedback events), so the split may be meant; the citation should then say how they differ.
+  (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)

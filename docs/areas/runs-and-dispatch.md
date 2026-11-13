@@ -51,6 +51,9 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   confirm a custom kind from its own row before trusting it (LIN-4426).
 - A full PR URL's repository and number come from `prOf` beside `prUrlsIn` (`lib/run-ledger.js`),
   for the task page and measure 1 alike; compare repositories case-blind, as GitHub does (LIN-4439).
+- A per-dispatch figure (its model, cost or completeness) is the fold's answer, carried through
+  `lib/cost-read.js`; a reader never re-ranks `byModel` itself. `dispatchModelOf` in
+  `lib/task-timeline.js` did, and a lane can now name two models. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
 
 ## Waiting
 
@@ -113,3 +116,10 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   and `closeOutNotReadyRefusal` builds its error by capitalising `state.message`. A reasons constant
   (like `CLOSE_OUT_STATUS`) covering every reason, used by the box, the guard and the render, would
   give them one vocabulary. (Blind read on LIN-4396.)
+- `lib/task-timeline.js`: `dispatchModelOf` picks a dispatch's model by its own rule (`costUsd`, null as
+  -1, then request count), while the home, `foldRequestUsage` (`lib/request-usage-fold.js`), ranks by priced
+  dollars, then latest use, and names the latest model when nothing is priced. `modelRowOf`
+  (`lib/cost-read.js`) drops `pricedUsd`, so the lane label (`session.model`, the fold's answer) and
+  the rows inside it can name different models whenever any request is unpriced. The fix is for
+  `dispatchesOf` to carry the fold's `last.model`; a change to the dominant-model rule otherwise
+  leaves the timeline behind. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)

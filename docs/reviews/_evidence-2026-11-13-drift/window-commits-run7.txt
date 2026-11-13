@@ -1,0 +1,35 @@
+e2d4659c4 Merge pull request #2417 from JKershaw/feat/lin-4442-stability-review-run-6
+163efc069 Merge pull request #2416 from JKershaw/closeout/lin-4396-blind-read-fixes
+aebe61081 Merge pull request #2415 from JKershaw/feat/lin-4439-measure-1-reads-ledger
+ceda35127 Merge pull request #2411 from JKershaw/feat/lin-4424-stability-prompt-declared-measures
+e3a3268a1 Merge pull request #2414 from JKershaw/feat/lin-4441-parallel-unit-ci
+eb14b7fff Merge pull request #2413 from JKershaw/feat/lin-4438-blind-read-gate
+4f48068eb LIN-4419: accept Node >=24, pin production to 24, check newest LTS weekly (#2412)
+e3829b9f9 Merge pull request #2410 from JKershaw/feat/lin-4437-blind-read-stage
+b1f258ab4 Merge pull request #2409 from JKershaw/feat/lin-4423-declaration-and-reference
+b3d7c7988 Merge pull request #2407 from JKershaw/feat/lin-4436-blind-read-pilot
+720c1b1c2 LIN-2386: env-check finds Playwright's macOS browser cache (#2408)
+96fa23c24 Merge pull request #2406 from JKershaw/feat/lin-4422-blind-read-and-seat
+2022841a1 Merge pull request #2403 from JKershaw/feat/lin-4428-paper-v2-rewrite
+1d912cce7 Merge pull request #2405 from JKershaw/feat/lin-4421-tracker-reads
+a514506b6 Merge pull request #2404 from JKershaw/feat/lin-4432-audit-notes-pr
+c6d99f05e Merge pull request #2402 from JKershaw/feat/lin-4431-consequence-gate
+f57cc7e99 Merge pull request #2401 from JKershaw/feat/lin-4427-size-cost-freeze-fits
+94893cc35 Merge pull request #2400 from JKershaw/feat/lin-4426-paper-v2-script-inputs
+b349c219b Merge pull request #2399 from JKershaw/feat/lin-4414-area-notes-lessons-cap-retirement
+218ab7f64 Merge pull request #2398 from JKershaw/feat/lin-4420-stability-measures-core
+30a019289 Merge pull request #2397 from JKershaw/docs/lin-4418-test-coverage-gap-review-2026-11-11
+b5950f704 Merge pull request #2396 from JKershaw/feat/lin-4415-no-default-completion-periodical
+fe2f1f0cb docs(LIN-4413): Onboarding & Cold-Start Review run 4 (trend vs 2026-10-23) (#2395)
+da5df707d Merge pull request #2394 from JKershaw/docs/lin-4411-security-review-2026-11-10
+80f4c7c87 Merge pull request #2392 from JKershaw/docs/lin-4406-documentation-review-2026-11-10
+4d23fa158 Merge pull request #2393 from JKershaw/chore/LIN-4412-dependency-review
+008d38bb0 Merge pull request #2391 from JKershaw/feat/lin-4398-periodical-review-skip-surveys
+d94800931 Merge pull request #2390 from JKershaw/feat/lin-4405-sessions-on-one-clock
+730df21c2 LIN-4407: Integration & Surface Maturity Review, run 5 (trend vs 2026-10-21) (#2389)
+a36ad6195 Merge pull request #2387 from JKershaw/feat/lin-4392-live-stage-wait
+9cf51ef72 Merge pull request #2388 from JKershaw/chore/lin-4404-survey-fallback
+ecabd3d76 Merge pull request #2386 from JKershaw/feat/lin-4404-task-life-cost-read
+f5b1f5efa Merge pull request #2383 from JKershaw/feat/lin-4390-periodical-hand-off
+1e106e4e3 Merge pull request #2385 from JKershaw/docs/lin-4403-drift-coherence-run6
+3b1b57b15 Merge pull request #2384 from JKershaw/chore/lin-4402-seams-tangles-run11

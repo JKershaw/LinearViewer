@@ -1,0 +1,321 @@
+rank	id	detector	decision	areas/files/sites	status_vs_b315e0e8f	own_churn
+27	G0027	cmp	repeated comparison target == 'local'	2/5/5	unchanged	{'commits': 6, 'pattern': '[\'"`](local)[\'"`]'}
+28	G0028	record	literal record repeated verbatim {Cache-Control="no-cache", Connection="keep-alive", Content-Type="text/event-stream"}	2/5/7	unchanged	None
+29	G0029	set+discrim	string set {'aborted', 'done', 'failed', 'skipped'} as array/Set/or-chain/table-keys/if-chain [LOOP_TERMINAL_MARKERS, MARKER_TO_AGENT_STATE, TERMINAL_MARKER_TO_STATUS]	2/8/10	unchanged	{'commits': 16, 'pattern': '[\'"`](aborted|done|failed|skipped)[\'"`]'}
+31	G0031	cmp	repeated comparison status == 'queued'	2/5/6	unchanged	{'commits': 12, 'pattern': '[\'"`](queued)[\'"`]'}
+32	G0032	contract	text contract heading: what ci did not prove	2/6/8	unchanged	{'commits': 12, 'pattern': 'what[[:space:]]+ci[[:space:]]+did[[:space:]]+not[[:space:]]+prove'}
+38	G0038	cmp	repeated comparison marker == 'pending'	1/5/11	unchanged	{'commits': 6, 'pattern': '[\'"`](pending)[\'"`]'}
+47	G0047	clone	tiny rule copied as a helper clear(), 5 copies of 1-4 statements	2/5/5	unchanged	None
+50	G0050	cmp	repeated comparison disposition == 'resumable'	2/4/8	unchanged	{'commits': 14, 'pattern': '[\'"`](resumable)[\'"`]'}
+53	G0053	record	record assembled from the same sources {id=ID.id, title=ID.title, labels=LogicalExpression.map()}	2/3/3	unchanged	None
+54	G0054	contract	text contract marker: [db-indexes]	2/2/9	unchanged	{'commits': 2, 'pattern': '\\[db-indexes\\]'}
+56	G0056	clone	near-duplicate function clear() (also: clearHistory), ~7 statements, fuzzy	1/4/4	unchanged	None
+58	G0058	cmp	repeated comparison provider == 'github'	2/2/3	unchanged	{'commits': 10, 'pattern': '[\'"`](github)[\'"`]'}
+59	G0059	cmp	repeated comparison provider == 'github-projects'	2/2/2	unchanged	{'commits': 4, 'pattern': '[\'"`](github-projects)[\'"`]'}
+61	G0061	cmp	repeated comparison state == 'record'	2/3/3	unchanged	{'commits': 5, 'pattern': '[\'"`](record)[\'"`]'}
+62	G0062	contract	text contract marker: [dispatch]	2/3/4	unchanged	{'commits': 3, 'pattern': '\\[dispatch\\]'}
+63	G0063	record	literal record repeated verbatim {effort=null, harness=null, model=null}	2/2/2	unchanged	None
+64	G0064	const	named constant TOKEN_REFRESH_BUFFER_MS=300000	2/2/2	unchanged	{'commits': 4, 'pattern': 'TOKEN_REFRESH_BUFFER_MS'}
+65	G0065	cmp	repeated comparison rawTeam == 'all'	2/2/2	unchanged	{'commits': 6, 'pattern': '[\'"`](all)[\'"`]'}
+66	G0066	set	string set {'LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'} as array [OAUTH_ENV_VARS, oauthEnvVars]	2/2/2	unchanged	{'commits': 0, 'pattern': '[\'"`](LINEAR_CLIENT_ID|LINEAR_CLIENT_SECRET|LINEAR_REDIRECT_URI)[\'"`]'}
+67	G0067	cmp	repeated comparison getAttribute() == 'true'	1/4/7	unchanged	{'commits': 16, 'pattern': '[\'"`](true)[\'"`]'}
+68	G0068	contract	text contract marker: [ci-wake-sweep]	2/2/5	unchanged	{'commits': 1, 'pattern': '\\[ci-wake-sweep\\]'}
+69	G0069	contract	text contract marker: [liveness-alarm-sweep]	2/2/2	unchanged	{'commits': 1, 'pattern': '\\[liveness-alarm-sweep\\]'}
+70	G0070	cmp	repeated comparison kind == 'more-of-parent'	2/2/3	unchanged	{'commits': 4, 'pattern': '[\'"`](more-of-parent)[\'"`]'}
+71	G0071	cmp	repeated comparison kind == 'search'	2/2/2	unchanged	{'commits': 2, 'pattern': '[\'"`](search)[\'"`]'}
+72	G0072	record	record assembled from the same sources {urlKey=ID.urlKey, workspaceId=ID.id, accountId=ID.session.accountId}	2/2/2	unchanged	None
+73	G0073	cmp	repeated comparison kind == 'capture'	2/2/2	unchanged	{'commits': 17, 'pattern': '[\'"`](capture)[\'"`]'}
+74	G0074	cmp	repeated comparison urlKey == 'test-workspace'	2/2/6	unchanged	{'commits': 2, 'pattern': '[\'"`](test-workspace)[\'"`]'}
+75	G0075	record	record assembled from the same sources {githubEnabled=getProvider().entryCta.isConfigured(), jiraEnabled=getProvider().entryCta.isConfigured(), emailEnabled=isEmailSignInAvailable(), freeTierEnabled=isFreeTierOffered()}	2/2/2	unchanged	None
+76	G0076	cmp	repeated comparison via == 'proxy'	2/2/3	unchanged	{'commits': 3, 'pattern': '[\'"`](proxy)[\'"`]'}
+77	G0077	cmp	repeated comparison finishReason == 'length'	2/5/7	unchanged	{'commits': 8, 'pattern': '[\'"`](length)[\'"`]'}
+78	G0078	set+discrim	string set {'decision-answer', 'decision-withdrawal-reversed', 'decision-withdrawn'} as or-chain/Set [ID.kind, DECISION_STAMP_KINDS, DECISION_LIFECYCLE_STAMP_KINDS]	2/5/5	unchanged	{'commits': 12, 'pattern': '[\'"`](decision-answer|decision-withdrawal-reversed|decision-withdrawn)[\'"`]'}
+79	G0079	cmp	repeated comparison target == 'web'	2/4/5	unchanged	{'commits': 9, 'pattern': '[\'"`](web)[\'"`]'}
+80	G0080	set+discrim	string set {'github', 'github-projects'} as Set/array/or-chain [REMINT_KINDS, INSTALLATION_KEYED_PROVIDERS, ID.provider]	2/6/6	unchanged	{'commits': 4, 'pattern': '[\'"`](github|github-projects)[\'"`]'}
+82	G0082	const	named constant CONTEXT_FETCH_TIMEOUT_MS=45000	2/2/2	unchanged	{'commits': 5, 'pattern': 'CONTEXT_FETCH_TIMEOUT_MS'}
+85	G0085	cmp	repeated comparison subscription == 'none'	1/3/3	unchanged	{'commits': 3, 'pattern': '[\'"`](none)[\'"`]'}
+86	G0086	clone	tiny rule copied as a helper bump() (also: touchAndEvict, noteCredential), 3 copies of 1-4 statements	2/3/3	unchanged	None
+87	G0087	contract	text contract marker: [aborted]	2/3/9	unchanged	{'commits': 8, 'pattern': '\\[aborted\\]'}
+88	G0088	cmp	repeated comparison source == 'free'	2/3/3	unchanged	{'commits': 4, 'pattern': '[\'"`](free)[\'"`]'}
+89	G0089	cmp	repeated comparison kind == 'decision'	1/4/6	unchanged	{'commits': 11, 'pattern': '[\'"`](decision)[\'"`]'}
+90	G0090	const	named constant DANGEROUS_CHARS_REGEX=/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/	2/4/4	unchanged	{'commits': 4, 'pattern': 'DANGEROUS_CHARS_REGEX'}
+91	G0091	const	named constant MAX_NAME_LENGTH=1000	2/4/4	unchanged	{'commits': 8, 'pattern': 'MAX_NAME_LENGTH'}
+94	G0094	cmp	repeated comparison mode == 'add-source'	2/6/28	unchanged	{'commits': 10, 'pattern': '[\'"`](add-source)[\'"`]'}
+95	G0095	clone	tiny rule copied as a helper onEvent() (also: (anonymous)), 5 copies of 1-4 statements	2/4/5	unchanged	None
+99	G0099	clone	tiny rule copied as a helper buildPromptFilename(), 3 copies of 1-4 statements	2/3/3	unchanged	None
+100	G0100	set	string set {'autopilot', 'blind-read', 'blocked', 'breakdown', 'bug', 'close-out', +20} as table-keys [STAGE_LEADS, STAGE_LABELS, BUCKET_OF_KIND]	2/3/3	new	{'commits': 52, 'pattern': '[\'"`](autopilot|blind-read|blocked|breakdown|bug|close-out|context|custom|defer|design|implementation|leftover|look-into|periodical|plan|plan-review|research|retro|retrospective-audit|review|scoping|spike|survey-place|survey-task|triage|wake)[\'"`]'}
+103	G0103	clone	near-duplicate function (anonymous)() (also: relayDispatchRefusal), ~10 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+104	G0104	clone	tiny rule copied as a helper (anonymous)(), 3 copies of 1-4 statements	2/3/3	unchanged	None
+105	G0105	clone	near-duplicate function clear(), ~7 statements, structurally identical	2/8/8	unchanged	None
+106	G0106	cmp	repeated comparison readyState == 'loading'	1/4/4	unchanged	{'commits': 4, 'pattern': '[\'"`](loading)[\'"`]'}
+108	G0108	cmp	repeated comparison toLowerCase() == 'bug'	2/3/3	unchanged	{'commits': 13, 'pattern': '[\'"`](bug)[\'"`]'}
+109	G0109	clone	tiny rule copied as a helper (anonymous)(), 5 copies of 1-4 statements	1/3/5	unchanged	None
+110	G0110	cmp	repeated comparison phase == 'proposed'	2/4/5	unchanged	{'commits': 8, 'pattern': '[\'"`](proposed)[\'"`]'}
+113	G0113	contract	text contract heading: workflow	1/3/15	grown	{'commits': 9, 'pattern': 'workflow'}
+114	G0114	discrim	string set {'1', 'true'} as or-chain [ID.query.cachedOnly, ID.query.noDescend, ID.query.diff]	2/3/6	unchanged	{'commits': 8, 'pattern': '[\'"`](1|true)[\'"`]'}
+117	G0117	cmp	repeated comparison name == 'list_pending_decisions'	2/3/3	unchanged	{'commits': 5, 'pattern': '[\'"`](list_pending_decisions)[\'"`]'}
+120	G0120	cmp	repeated comparison tagName == 'SELECT'	1/3/3	unchanged	{'commits': 2, 'pattern': '[\'"`](SELECT)[\'"`]'}
+121	G0121	cmp	repeated comparison kind == 'close-out'	2/4/4	grown	{'commits': 9, 'pattern': '[\'"`](close-out)[\'"`]'}
+123	G0123	set+discrim	string set {'done', 'failed'} as or-chain/table-keys [ID.terminalStatus, PILL_GLYPHS]	2/3/3	unchanged	{'commits': 14, 'pattern': '[\'"`](done|failed)[\'"`]'}
+124	G0124	cmp	repeated comparison kind == 'periodical'	2/3/3	unchanged	{'commits': 6, 'pattern': '[\'"`](periodical)[\'"`]'}
+125	G0125	cmp	repeated comparison value == 'true'	2/3/3	unchanged	{'commits': 14, 'pattern': '[\'"`](true)[\'"`]'}
+126	G0126	cmp	repeated comparison state == 'closed'	2/5/5	unchanged	{'commits': 6, 'pattern': '[\'"`](closed)[\'"`]'}
+127	G0127	cmp	repeated comparison id == '__periodicals__'	2/4/5	unchanged	{'commits': 1, 'pattern': '[\'"`](__periodicals__)[\'"`]'}
+128	G0128	clone	tiny rule copied as a helper enqueueGuard() (also: haltRefusal), 3 copies of 1-4 statements	1/3/3	unchanged	None
+130	G0130	cmp	repeated comparison kind == 'recap'	2/2/3	unchanged	{'commits': 2, 'pattern': '[\'"`](recap)[\'"`]'}
+135	G0135	record	record assembled from the same sources {urlKey=ID.urlKey, identifier=ID.identifier, source=ID.source}	1/3/3	unchanged	None
+136	G0136	clone	tiny rule copied as a helper header() (also: setupNoticeHtml), 3 copies of 1-4 statements	1/3/3	unchanged	None
+139	G0139	cmp	repeated comparison section == 'prompt'	2/2/2	unchanged	{'commits': 12, 'pattern': '[\'"`](prompt)[\'"`]'}
+140	G0140	cmp	repeated comparison section == 'reasoning'	2/2/2	unchanged	{'commits': 10, 'pattern': '[\'"`](reasoning)[\'"`]'}
+143	G0143	contract	text contract marker: [pending]	2/2/4	unchanged	{'commits': 7, 'pattern': '\\[pending\\]'}
+144	G0144	set	string set {'backlog', 'done', 'failed', 'in-progress', 'todo'} as table-keys [STATE_GLYPHS, STATUS_PILL_GLYPHS]	2/3/3	unchanged	{'commits': 0, 'pattern': '[\'"`](backlog|done|failed|in-progress|todo)[\'"`]'}
+145	G0145	cmp	repeated comparison section == 'recent-activity'	2/3/5	unchanged	{'commits': 4, 'pattern': '[\'"`](recent-activity)[\'"`]'}
+148	G0148	record	record assembled from the same sources {urlKey=ID.urlKey, workspaceId=ID.id, ownerAccountId=ID.session.accountId}	2/3/3	unchanged	None
+149	G0149	cmp	repeated comparison agentState == 'queued'	2/3/4	unchanged	{'commits': 13, 'pattern': '[\'"`](queued)[\'"`]'}
+153	G0153	cmp	repeated comparison kind == 'bootstrap'	2/3/9	unchanged	{'commits': 6, 'pattern': '[\'"`](bootstrap)[\'"`]'}
+154	G0154	const	named constant HOUR_MS=3600000	2/4/4	unchanged	{'commits': 3, 'pattern': 'HOUR_MS'}
+160	G0160	const	named constant COMPANION_INSTANCE_PREFIX="companion:v1:"	2/3/3	unchanged	{'commits': 6, 'pattern': 'COMPANION_INSTANCE_PREFIX'}
+161	G0161	cmp	repeated comparison phase == 'error'	2/3/3	unchanged	{'commits': 4, 'pattern': '[\'"`](error)[\'"`]'}
+162	G0162	cmp	repeated comparison state == 'open'	2/5/6	unchanged	{'commits': 5, 'pattern': '[\'"`](open)[\'"`]'}
+163	G0163	set+discrim	string set {'complete', 'error'} as Set/or-chain [LOOP_TERMINAL_AGENT_STATES, TERMINAL_AGENT_STATES, ID.agentState]	2/3/4	unchanged	{'commits': 5, 'pattern': '[\'"`](complete|error)[\'"`]'}
+165	G0165	cmp	repeated comparison protocol == 'https:'	2/2/2	unchanged	{'commits': 1, 'pattern': '[\'"`](https:)[\'"`]'}
+169	G0169	clone	tiny rule copied as a helper (anonymous)(), 5 copies of 1-4 statements	1/3/5	unchanged	None
+176	G0176	clone	tiny rule copied as a helper constructor(), 6 copies of 1-4 statements	2/6/6	unchanged	None
+178	G0178	clone	tiny rule copied as a helper msSince() (also: (anonymous)), 3 copies of 1-4 statements	2/3/3	unchanged	None
+179	G0179	record	record assembled from the same sources {runs=ID.runs, priced=ID.priced, unpriced=ID.unpriced, noTelemetry=ID.noTelemetry, spendUsd=ID.spendUsd, +1}	2/2/2	unchanged	None
+181	G0181	clone	tiny rule copied as a helper (anonymous)(), 6 copies of 1-4 statements	1/4/6	unchanged	None
+183	G0183	set+discrim	string set {'http:', 'https:'} as array/or-chain [[...].includes, ID.protocol]	2/4/4	unchanged	{'commits': 4, 'pattern': '[\'"`](http:|https:)[\'"`]'}
+184	G0184	const	named constant POLL_MS=5000	1/3/3	unchanged	{'commits': 1, 'pattern': 'POLL_MS'}
+185	G0185	contract	text contract marker: [working]	2/3/3	unchanged	{'commits': 5, 'pattern': '\\[working\\]'}
+187	G0187	cmp	repeated comparison kind == 'brief'	2/3/4	unchanged	{'commits': 4, 'pattern': '[\'"`](brief)[\'"`]'}
+188	G0188	cmp	repeated comparison source == 'live'	1/3/4	unchanged	{'commits': 3, 'pattern': '[\'"`](live)[\'"`]'}
+189	G0189	cmp	repeated comparison status == 'aborted'	1/3/11	unchanged	{'commits': 7, 'pattern': '[\'"`](aborted)[\'"`]'}
+190	G0190	cmp	repeated comparison turnKind == 'boot'	2/3/18	unchanged	{'commits': 7, 'pattern': '[\'"`](boot)[\'"`]'}
+193	G0193	cmp	repeated comparison code == 'OUTPUT_TRUNCATED'	2/3/3	unchanged	{'commits': 1, 'pattern': '[\'"`](OUTPUT_TRUNCATED)[\'"`]'}
+197	G0197	clone	near-duplicate function relativeTime() (also: renderDeployInfo), ~22 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+198	G0198	cmp	repeated comparison disposition == 'gone'	2/2/5	unchanged	{'commits': 12, 'pattern': '[\'"`](gone)[\'"`]'}
+199	G0199	cmp	repeated comparison state == 'unknown'	2/3/5	unchanged	{'commits': 7, 'pattern': '[\'"`](unknown)[\'"`]'}
+200	G0200	cmp	repeated comparison status == 'merged'	2/3/4	unchanged	{'commits': 7, 'pattern': '[\'"`](merged)[\'"`]'}
+201	G0201	clone	near-duplicate function groupLoopsByLineage() (also: runsByLineage), ~10 statements, structurally identical	2/2/2	unchanged	None
+202	G0202	record	record assembled from the same sources {urlKey=ID.proxyUrlKey, createdBy=ID.proxyCreatedBy, clientSignal=ID.signal}	2/2/2	unchanged	None
+203	G0203	record	literal record repeated verbatim {label="__ai__", name=null, why="Generate the next prompt for this task"}	2/2/2	unchanged	None
+204	G0204	clone	near-duplicate function firstPromptLine() (also: toStackHeadline), ~6 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+205	G0205	cmp	repeated comparison rung == 'run-task'	2/2/2	unchanged	{'commits': 14, 'pattern': '[\'"`](run-task)[\'"`]'}
+206	G0206	set	string set {'done', 'next-step', 'pr'} as array	2/2/2	unchanged	{'commits': 10, 'pattern': '[\'"`](done|next-step|pr)[\'"`]'}
+207	G0207	discrim	string set {'done', 'pr'} as or-chain [ID.filledRung, ID()]	2/2/3	unchanged	{'commits': 10, 'pattern': '[\'"`](done|pr)[\'"`]'}
+208	G0208	set	string set {'canceled', 'completed', 'duplicate'} as array [TERMINAL_TYPES]	2/2/2	unchanged	{'commits': 2, 'pattern': '[\'"`](canceled|completed|duplicate)[\'"`]'}
+209	G0209	clone	near-duplicate function computeFitZoom(), ~11 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+212	G0212	clone	near-duplicate function (anonymous)(), ~7 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+213	G0213	clone	near-duplicate function clampTimelineWindow() (also: clampWindow), ~12 statements, fuzzy	2/2/2	unchanged	None
+214	G0214	clone	near-duplicate function computeTimelineFit(), ~10 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+215	G0215	clone	near-duplicate function computeTimelineZoom(), ~15 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+216	G0216	clone	near-duplicate function renderChip(), ~8 statements, fuzzy	2/2/2	unchanged	None
+217	G0217	clone	near-duplicate function renderSegmentBar(), ~17 statements, fuzzy	2/2/2	unchanged	None
+218	G0218	clone	near-duplicate function renderStatusPill(), ~18 statements, fuzzy	2/2/2	unchanged	None
+219	G0219	clone	near-duplicate function renderSurface(), ~11 statements, fuzzy	2/2/2	unchanged	None
+220	G0220	clone	near-duplicate function renderTag(), ~11 statements, fuzzy	2/2/2	unchanged	None
+221	G0221	clone	tiny rule copied as a helper (anonymous)(), 3 copies of 1-4 statements	1/3/3	unchanged	None
+222	G0222	record	record assembled from the same sources {remaining=ID.remaining, limit=ID.limit}	2/2/3	unchanged	None
+224	G0224	clone	tiny rule copied as a helper ui(), 4 copies of 1-4 statements	1/4/4	unchanged	None
+225	G0225	cmp	repeated comparison status == 'skipped'	2/3/3	unchanged	{'commits': 4, 'pattern': '[\'"`](skipped)[\'"`]'}
+226	G0226	discrim	string set {'closed', 'multiple-prs', 'no-pr', 'not-ready'} as or-chain [ID.status]	2/3/3	unchanged	{'commits': 3, 'pattern': '[\'"`](closed|multiple-prs|no-pr|not-ready)[\'"`]'}
+229	G0229	clone	tiny rule copied as a helper buildBriefMessages() (also: buildRoadmapGapMessages, buildRoadmapProductMessages, buildEditorMessages, buildRecapMessages), 8 copies of 1-4 statements	2/8/8	unchanged	None
+234	G0234	set	string set {'cli', 'web'} as Set/array [RESUMABLE_TARGETS]	1/3/3	unchanged	{'commits': 6, 'pattern': '[\'"`](cli|web)[\'"`]'}
+235	G0235	contract	text contract marker: [usage]	1/3/4	unchanged	{'commits': 5, 'pattern': '\\[usage\\]'}
+237	G0237	const	named constant MAX_IDENTIFIER_LENGTH=100	2/2/2	unchanged	{'commits': 3, 'pattern': 'MAX_IDENTIFIER_LENGTH'}
+238	G0238	cmp	repeated comparison mergedBy == 'close-out'	2/2/2	unchanged	{'commits': 8, 'pattern': '[\'"`](close-out)[\'"`]'}
+239	G0239	cmp	repeated comparison built == 'unknown'	2/2/2	unchanged	{'commits': 1, 'pattern': '[\'"`](unknown)[\'"`]'}
+241	G0241	cmp	repeated comparison reason == 'free-tier'	2/2/3	unchanged	{'commits': 6, 'pattern': '[\'"`](free-tier)[\'"`]'}
+242	G0242	cmp	repeated comparison status == 'proposed'	2/2/2	unchanged	{'commits': 3, 'pattern': '[\'"`](proposed)[\'"`]'}
+243	G0243	cmp	repeated comparison tierOf() == 'deferred'	2/2/3	unchanged	{'commits': 2, 'pattern': '[\'"`](deferred)[\'"`]'}
+247	G0247	set	string set {'cdn.linear.app', 'linear.app', 'uploads.linear.app'} as Set [LINEAR_IMAGE_HOSTS, allowedHosts]	2/2/2	unchanged	{'commits': 1, 'pattern': '[\'"`](cdn\\.linear\\.app|linear\\.app|uploads\\.linear\\.app)[\'"`]'}
+248	G0248	set+discrim	string set {'home-up-next', 'in-progress', 'project', 'recent-activity'} as or-chain/array [KNOWN_SECTIONS]	2/2/2	unchanged	{'commits': 9, 'pattern': '[\'"`](home-up-next|in-progress|project|recent-activity)[\'"`]'}
+249	G0249	set	string set {'High', 'Low', 'Medium', 'No priority', 'Urgent'} as array [PRIORITY_NAMES, PRIORITY_OPTION_LABELS]	2/2/2	unchanged	{'commits': 1, 'pattern': '[\'"`](High|Low|Medium|No priority|Urgent)[\'"`]'}
+250	G0250	clone	tiny rule copied as a helper (anonymous)(), 4 copies of 1-4 statements	2/3/4	unchanged	None
+251	G0251	cmp	repeated comparison pageMode == 'backlog'	2/2/2	unchanged	{'commits': 4, 'pattern': '[\'"`](backlog)[\'"`]'}
+252	G0252	cmp	repeated comparison singleUse == 'true'	2/2/2	unchanged	{'commits': 8, 'pattern': '[\'"`](true)[\'"`]'}
+253	G0253	clone	tiny rule copied as a helper countFor() (also: lookupsFor), 3 copies of 1-4 statements	2/3/3	unchanged	None
+254	G0254	const	named constant ARCHIVE_PAGE_SIZE=30	2/2/2	unchanged	{'commits': 1, 'pattern': 'ARCHIVE_PAGE_SIZE'}
+255	G0255	const	named constant STALE_AFTER_MS=86400000	2/2/2	unchanged	{'commits': 1, 'pattern': 'STALE_AFTER_MS'}
+256	G0256	clone	near-duplicate function (anonymous)(), ~6 statements, fuzzy	2/2/2	unchanged	None
+257	G0257	record	record assembled from the same sources {promptMeta=ID.promptMeta, defaultPromptKeys=ID.defaultPromptKeys, morePromptKeys=ID.morePromptKeys, customPrompts=ID.customPrompts, hasAI=ID.hasAI, +5}	2/2/2	unchanged	None
+258	G0258	cmp	repeated comparison status == 'priced'	2/2/3	unchanged	{'commits': 5, 'pattern': '[\'"`](priced)[\'"`]'}
+259	G0259	cmp	repeated comparison view == 'sessions'	2/2/2	unchanged	{'commits': 4, 'pattern': '[\'"`](sessions)[\'"`]'}
+261	G0261	record	literal record repeated verbatim {lastCensusSnapshot=null, lastCensusStateHash=null, lastTurnAt=null, notes="", reservationId=null, turnReservedUntil=n...}	2/2/2	unchanged	None
+263	G0263	cmp	repeated comparison openRouterSource == 'free'	2/3/3	unchanged	{'commits': 3, 'pattern': '[\'"`](free)[\'"`]'}
+265	G0265	cmp	repeated comparison format == 'md'	2/2/2	unchanged	{'commits': 2, 'pattern': '[\'"`](md)[\'"`]'}
+266	G0266	cmp	repeated comparison turnKind == 'auto-wake'	2/2/5	unchanged	{'commits': 5, 'pattern': '[\'"`](auto-wake)[\'"`]'}
+269	G0269	cmp	repeated comparison by == 'close-out'	2/2/2	unchanged	{'commits': 9, 'pattern': '[\'"`](close-out)[\'"`]'}
+274	G0274	clone	tiny rule copied as a helper isId() (also: shortString, (anonymous), isSafeSingleQuotedLiteral, isSafeDoubleQuotedLiteral), 6 copies of 1-4 statements	1/4/6	unchanged	None
+277	G0277	cmp	repeated comparison view == 'digest'	2/2/2	unchanged	{'commits': 1, 'pattern': '[\'"`](digest)[\'"`]'}
+281	G0281	discrim	string set {'gone', 'resumable', 'task-bound'} as or-chain	2/2/2	unchanged	{'commits': 12, 'pattern': '[\'"`](gone|resumable|task-bound)[\'"`]'}
+282	G0282	cmp	repeated comparison verdict == 'approve'	1/3/3	unchanged	{'commits': 3, 'pattern': '[\'"`](approve)[\'"`]'}
+283	G0283	record	literal record repeated verbatim {effort="none", harness="none", model="none"}	2/2/2	unchanged	None
+285	G0285	cmp	repeated comparison category == 'upstream'	2/2/2	unchanged	{'commits': 1, 'pattern': '[\'"`](upstream)[\'"`]'}
+286	G0286	cmp	repeated comparison state == 'none'	2/2/2	unchanged	{'commits': 3, 'pattern': '[\'"`](none)[\'"`]'}
+287	G0287	cmp	repeated comparison viewer == 'owner'	2/2/3	unchanged	{'commits': 10, 'pattern': '[\'"`](owner)[\'"`]'}
+288	G0288	discrim	string set {'comment', 'description'} as ternary-chain/or-chain [ID.where]	2/2/2	unchanged	{'commits': 6, 'pattern': '[\'"`](comment|description)[\'"`]'}
+289	G0289	clone	near-duplicate function deleteByConnection() (also: deleteUserPreferences, deleteWorkspacePreferences), ~8 statements, structurally identical	1/3/3	unchanged	None
+293	G0293	cmp	repeated comparison state == 'dead'	2/2/3	unchanged	{'commits': 1, 'pattern': '[\'"`](dead)[\'"`]'}
+296	G0296	clone	near-duplicate function listForWorkspaces() (also: listUnansweredForWorkspaces), ~7 statements, fuzzy	1/3/3	unchanged	None
+297	G0297	discrim	string set {'answered', 'dismissed'} as or-chain [ID.outcome]	2/4/7	unchanged	{'commits': 8, 'pattern': '[\'"`](answered|dismissed)[\'"`]'}
+300	G0300	cmp	repeated comparison tier == 'not reported'	2/2/2	unchanged	{'commits': 7, 'pattern': '[\'"`](not reported)[\'"`]'}
+301	G0301	cmp	repeated comparison outcome == 'dismissed'	2/3/4	unchanged	{'commits': 5, 'pattern': '[\'"`](dismissed)[\'"`]'}
+306	G0306	cmp	repeated comparison mode == 'new'	1/3/5	unchanged	{'commits': 7, 'pattern': '[\'"`](new)[\'"`]'}
+307	G0307	cmp	repeated comparison status == 'fulfilled'	2/4/6	unchanged	{'commits': 2, 'pattern': '[\'"`](fulfilled)[\'"`]'}
+308	G0308	clone	near-duplicate function cleanup(), ~8 statements, fuzzy	1/3/3	unchanged	None
+309	G0309	cmp	repeated comparison deriveTerminalStatus() == 'done'	1/3/3	unchanged	{'commits': 3, 'pattern': '[\'"`](done)[\'"`]'}
+311	G0311	cmp	repeated comparison kind == 'backlog'	2/2/2	unchanged	{'commits': 4, 'pattern': '[\'"`](backlog)[\'"`]'}
+313	G0313	contract	text contract marker: [as-asked]	2/2/10	unchanged	{'commits': 3, 'pattern': '\\[as-asked\\]'}
+314	G0314	clone	near-duplicate function constructor(), ~5 statements, fuzzy	1/3/3	unchanged	None
+315	G0315	clone	tiny rule copied as a helper resolveCanonicalDegraded() (also: resolveCanonicalOrMiss, canonical), 3 copies of 1-4 statements	1/3/3	unchanged	None
+324	G0324	cmp	repeated comparison state == 'reached'	2/2/2	unchanged	{'commits': 2, 'pattern': '[\'"`](reached)[\'"`]'}
+327	G0327	set	string set {'acting', 'deciding', 'orienting', 'reporting', 'watching'} as array [PROXY_PHASES, PHASE_NAMES]	2/2/2	unchanged	{'commits': 3, 'pattern': '[\'"`](acting|deciding|orienting|reporting|watching)[\'"`]'}
+329	G0329	set	string set {'blocked', 'queued', 'resolved', 'silent', 'terminal', 'unknown', +1} as array [CENSUS_LANE_KEYS, LANE_KEYS]	2/3/3	unchanged	{'commits': 10, 'pattern': '[\'"`](blocked|queued|resolved|silent|terminal|unknown|working)[\'"`]'}
+334	G0334	set	string set {'dispatch', 'record', 'resume'} as Set/table-keys [ON_ANSWER_EFFECTS, EFFECT_CAPTIONS]	2/2/2	unchanged	{'commits': 2, 'pattern': '[\'"`](dispatch|record|resume)[\'"`]'}
+335	G0335	discrim	string set {'indeterminate', 'mid-turn'} as or-chain [ID.disposition]	2/2/2	unchanged	{'commits': 6, 'pattern': '[\'"`](indeterminate|mid-turn)[\'"`]'}
+338	G0338	cmp	repeated comparison kind == 'decision-withdrawn'	2/2/2	unchanged	{'commits': 4, 'pattern': '[\'"`](decision-withdrawn)[\'"`]'}
+339	G0339	set	string set {'fable', 'haiku', 'opus', 'sonnet'} as array [CLAUDE_MAPPABLE_MODEL_FAMILIES]	2/2/3	unchanged	{'commits': 3, 'pattern': '[\'"`](fable|haiku|opus|sonnet)[\'"`]'}
+340	G0340	clone	near-duplicate function get(), ~7 statements, fuzzy	2/6/6	unchanged	None
+342	G0342	cmp	repeated comparison haltMode == 'pause'	2/2/2	unchanged	{'commits': 4, 'pattern': '[\'"`](pause)[\'"`]'}
+343	G0343	cmp	repeated comparison haltMode == 'stop'	2/2/2	unchanged	{'commits': 5, 'pattern': '[\'"`](stop)[\'"`]'}
+344	G0344	record	literal record repeated verbatim {_id=0, createdAt=1, createdBy=1, urlKey=1, workspaceId=1}	2/2/2	unchanged	None
+349	G0349	cmp	repeated comparison name == 'send_follow_up'	2/2/3	unchanged	{'commits': 5, 'pattern': '[\'"`](send_follow_up)[\'"`]'}
+351	G0351	contract	text contract heading: adversarial second-read	2/2/2	unchanged	{'commits': 4, 'pattern': 'adversarial[[:space:]]+second-read'}
+352	G0352	cmp	repeated comparison role == 'owner'	2/3/4	unchanged	{'commits': 3, 'pattern': '[\'"`](owner)[\'"`]'}
+356	G0356	cmp	repeated comparison role == 'user'	2/3/6	unchanged	{'commits': 5, 'pattern': '[\'"`](user)[\'"`]'}
+358	G0358	cmp	repeated comparison kind == 'review'	2/2/2	unchanged	{'commits': 3, 'pattern': '[\'"`](review)[\'"`]'}
+360	G0360	cmp	repeated comparison kind == 'plan'	2/3/3	unchanged	{'commits': 2, 'pattern': '[\'"`](plan)[\'"`]'}
+363	G0363	contract	text contract heading: blind read	2/2/4	new	{'commits': 2, 'pattern': 'blind[[:space:]]+read'}
+364	G0364	const	named constant DAY_MS=86400000	2/2/2	unchanged	{'commits': 2, 'pattern': 'DAY_MS'}
+365	G0365	const	named constant MAX_REASON_LENGTH=500	2/2/2	unchanged	{'commits': 4, 'pattern': 'MAX_REASON_LENGTH'}
+367	G0367	cmp	repeated comparison kind == 'blind-read'	2/2/2	new	{'commits': 1, 'pattern': '[\'"`](blind-read)[\'"`]'}
+368	G0368	cmp	repeated comparison message == 'reverseOutcome: row is not self-resolved'	2/2/2	unchanged	{'commits': 3, 'pattern': '[\'"`](reverseOutcome: row is not self-resolved)[\'"`]'}
+371	G0371	cmp	repeated comparison variant == 'standard'	2/2/2	unchanged	{'commits': 3, 'pattern': '[\'"`](standard)[\'"`]'}
+372	G0372	set	string set {'inside', 'outside', 'total', 'unknown'} as array/table-keys [[...].every, SCOPE_MARK]	2/2/2	unchanged	{'commits': 5, 'pattern': '[\'"`](inside|outside|total|unknown)[\'"`]'}
+374	G0374	clone	near-duplicate function _pruneToCapacity(), ~6 statements, fuzzy	2/5/5	unchanged	None
+375	G0375	clone	tiny rule copied as a helper clampText(), 3 copies of 1-4 statements	2/3/3	unchanged	None
+381	G0381	contract	text contract heading: workspace api access (auto-appended)	2/2/2	unchanged	{'commits': 0, 'pattern': 'workspace[[:space:]]+api[[:space:]]+access[[:space:]]+\\(auto-appended\\)'}
+387	G0387	cmp	repeated comparison code == 'ERR_FR_TOO_MANY_REDIRECTS'	2/2/2	unchanged	{'commits': 4, 'pattern': '[\'"`](ERR_FR_TOO_MANY_REDIRECTS)[\'"`]'}
+388	G0388	cmp	repeated comparison message == 'unexpected redirect'	2/2/2	unchanged	{'commits': 2, 'pattern': '[\'"`](unexpected redirect)[\'"`]'}
+389	G0389	clone	near-duplicate function generateBrief() (also: generateFeedbackTitle, generateRecap, generateRunSummary, generateSessionSummary), ~7 statements, fuzzy	2/5/5	unchanged	None
+392	G0392	const	named constant LANE_KEYS=[blocked,queued,resolved,silent,terminal,unknown,working]	2/2/2	unchanged	{'commits': 2, 'pattern': 'LANE_KEYS'}
+393	G0393	clone	near-duplicate function peakToolCount() (also: toolPeakOf), ~9 statements, fuzzy	2/2/2	unchanged	None
+397	G0397	set	string set {'/common-actions.css', '/escalation-kpis.css', '/style.css'} as array [stylesheets]	1/3/3	unchanged	{'commits': 3, 'pattern': '[\'"`](/common-actions\\.css|/escalation-kpis\\.css|/style\\.css)[\'"`]'}
+399	G0399	clone	near-duplicate function listEvents() (also: listTraces), ~9 statements, fuzzy	2/2/2	unchanged	None
+400	G0400	cmp	repeated comparison completeness == 'complete'	1/3/7	grown	{'commits': 6, 'pattern': '[\'"`](complete)[\'"`]'}
+401	G0401	cmp	repeated comparison kind == 'leftover'	1/3/3	grown	{'commits': 2, 'pattern': '[\'"`](leftover)[\'"`]'}
+405	G0405	cmp	repeated comparison s == 'complete'	2/2/2	unchanged	{'commits': 1, 'pattern': '[\'"`](complete)[\'"`]'}
+407	G0407	record	literal record repeated verbatim {_id=0, createdAt=1, createdBy=1, urlKey=1}	2/2/2	unchanged	None
+408	G0408	const	named constant TIMELINE_WINDOW_MS=86400000	2/2/2	unchanged	{'commits': 1, 'pattern': 'TIMELINE_WINDOW_MS'}
+410	G0410	record	record assembled from the same sources {urlKey=ID.urlKey, prUrl=ID.prUrl, headSha=ID.headSha, by=ID.by}	2/2/3	unchanged	None
+411	G0411	set	string set {'autopilot', 'save', 'triage'} as table-keys/Set [SENDING_STATUS, DONE_SUFFIX, FEEDBACK_ACTIONS]	2/2/3	unchanged	{'commits': 2, 'pattern': '[\'"`](autopilot|save|triage)[\'"`]'}
+413	G0413	set+discrim	string set {'dark', 'light'} as array/or-chain [VALID_THEMES, ID.session.theme]	2/2/2	unchanged	{'commits': 1, 'pattern': '[\'"`](dark|light)[\'"`]'}
+415	G0415	clone	tiny rule copied as a helper getAccount() (also: getById, getWorkspace, getWorkspaceByUrlKey), 4 copies of 1-4 statements	2/3/4	unchanged	None
+416	G0416	const	named constant DEFAULT_HUMAN_NICK="John"	2/2/2	unchanged	{'commits': 0, 'pattern': 'DEFAULT_HUMAN_NICK'}
+418	G0418	cmp	repeated comparison type == 'backlog'	2/2/3	unchanged	{'commits': 3, 'pattern': '[\'"`](backlog)[\'"`]'}
+419	G0419	set	string set {'first go', 'firstGo'} as array	2/2/2	unchanged	{'commits': 3, 'pattern': '[\'"`](first go|firstGo)[\'"`]'}
+420	G0420	set	string set {'login', 'signed up'} as array	2/2/2	unchanged	{'commits': 3, 'pattern': '[\'"`](login|signed up)[\'"`]'}
+421	G0421	set	string set {'merge clicked', 'mergeClicked'} as array	2/2/2	unchanged	{'commits': 2, 'pattern': '[\'"`](merge clicked|mergeClicked)[\'"`]'}
+422	G0422	set	string set {'pr opened', 'prOpened'} as array	2/2/2	unchanged	{'commits': 3, 'pattern': '[\'"`](pr opened|prOpened)[\'"`]'}
+423	G0423	clone	near-duplicate function delete(), ~7 statements, fuzzy	2/5/5	unchanged	None
+424	G0424	cmp	repeated comparison trim() == '---'	1/5/5	unchanged	{'commits': 4, 'pattern': '[\'"`](---)[\'"`]'}
+425	G0425	clone	tiny rule copied as a helper get(), 5 copies of 1-4 statements	2/5/5	unchanged	None
+427	G0427	clone	near-duplicate function briefUrl() (also: recapUrl, scanUrl), ~6 statements, fuzzy	1/3/3	unchanged	None
+428	G0428	cmp	repeated comparison field == 'harness'	2/3/3	unchanged	{'commits': 4, 'pattern': '[\'"`](harness)[\'"`]'}
+429	G0429	discrim	string set {'fresh', 'stale'} as if-chain [ID.status]	1/3/4	unchanged	{'commits': 6, 'pattern': '[\'"`](fresh|stale)[\'"`]'}
+434	G0434	cmp	repeated comparison provider == 'email'	2/2/2	unchanged	{'commits': 3, 'pattern': '[\'"`](email)[\'"`]'}
+436	G0436	set+discrim	string set {'jira', 'linear'} as Set/or-chain [REFRESH_TOKEN_KINDS]	2/2/2	unchanged	{'commits': 4, 'pattern': '[\'"`](jira|linear)[\'"`]'}
+437	G0437	contract	text contract marker: [credential-adopted]	2/2/3	unchanged	{'commits': 2, 'pattern': '\\[credential-adopted\\]'}
+442	G0442	cmp	repeated comparison source == 'model'	2/2/2	unchanged	{'commits': 2, 'pattern': '[\'"`](model)[\'"`]'}
+443	G0443	cmp	repeated comparison source == 'workspace'	2/2/2	unchanged	{'commits': 2, 'pattern': '[\'"`](workspace)[\'"`]'}
+444	G0444	cmp	repeated comparison type == 'heading'	2/2/2	unchanged	{'commits': 5, 'pattern': '[\'"`](heading)[\'"`]'}
+445	G0445	clone	tiny rule copied as a helper (anonymous)(), 3 copies of 1-4 statements	2/3/3	unchanged	None
+447	G0447	clone	near-duplicate function formatFossilThreshold() (also: formatStaleThreshold), ~10 statements, structurally identical	2/2/2	unchanged	None
+448	G0448	cmp	repeated comparison filter == 'set'	2/2/2	unchanged	{'commits': 1, 'pattern': '[\'"`](set)[\'"`]'}
+449	G0449	cmp	repeated comparison mode == 'resume'	2/2/3	unchanged	{'commits': 3, 'pattern': '[\'"`](resume)[\'"`]'}
+450	G0450	cmp	repeated comparison stage == 'blind-read'	2/2/2	new	{'commits': 2, 'pattern': '[\'"`](blind-read)[\'"`]'}
+452	G0452	clone	near-duplicate function list() (also: listByWorkspace), ~9 statements, fuzzy	2/4/4	unchanged	None
+453	G0453	contract	text contract marker: [string]	2/3/4	unchanged	{'commits': 0, 'pattern': '\\[string\\]'}
+454	G0454	clone	tiny rule copied as a helper fetchBriefStatus() (also: fetchContext, fetchRecapStatus), 3 copies of 1-4 statements	1/3/3	unchanged	None
+455	G0455	cmp	repeated comparison act == 'copy'	2/2/3	unchanged	{'commits': 2, 'pattern': '[\'"`](copy)[\'"`]'}
+458	G0458	cmp	repeated comparison scope == 'job'	2/2/3	unchanged	{'commits': 4, 'pattern': '[\'"`](job)[\'"`]'}
+463	G0463	clone	near-duplicate function get(), ~9 statements, structurally identical	2/4/4	unchanged	None
+464	G0464	clone	near-duplicate function orderByDependency(), ~59 statements, same vocabulary (dialect copy or close variant)	2/4/4	unchanged	None
+465	G0465	clone	tiny rule copied as a helper delete(), 4 copies of 1-4 statements	2/4/4	unchanged	None
+466	G0466	clone	tiny rule copied as a helper put(), 4 copies of 1-4 statements	2/4/4	unchanged	None
+467	G0467	clone	tiny rule copied as a helper put(), 4 copies of 1-4 statements	2/4/4	unchanged	None
+468	G0468	clone	near-duplicate function canonicalOf() (also: canonicalise), ~12 statements, structurally identical	2/2/2	unchanged	None
+469	G0469	clone	near-duplicate function revokeByCreator() (also: revokeByOwner), ~9 statements, fuzzy	2/2/2	unchanged	None
+470	G0470	clone	near-duplicate function (anonymous)() (also: graphql, request), ~15 statements, same vocabulary (dialect copy or close variant)	1/3/3	unchanged	None
+471	G0471	clone	tiny rule copied as a helper (anonymous)() (also: isActive), 3 copies of 1-4 statements	2/3/3	unchanged	None
+472	G0472	clone	tiny rule copied as a helper _docsSorted() (also: _docsFor), 3 copies of 1-4 statements	1/3/3	unchanged	None
+473	G0473	clone	tiny rule copied as a helper sweepStale() (also: sweep, pruneTombstones), 3 copies of 1-4 statements	2/3/3	new	None
+476	G0476	record	record assembled from the same sources {id=ID._id, by=ID.by, prUrl=ID.prUrl, headSha=ID.headSha}	2/2/2	unchanged	None
+478	G0478	cmp	repeated comparison scope == 'default'	2/2/2	unchanged	{'commits': 4, 'pattern': '[\'"`](default)[\'"`]'}
+480	G0480	set	string set {'preset-save', 'undo'} as array [[...].includes]	2/2/3	unchanged	{'commits': 4, 'pattern': '[\'"`](preset-save|undo)[\'"`]'}
+481	G0481	const	named constant DUPLICATE_KEY_CODE=11000	2/2/2	unchanged	{'commits': 2, 'pattern': 'DUPLICATE_KEY_CODE'}
+482	G0482	const	named constant FORMER_MEMBER="former member"	2/2/2	unchanged	{'commits': 5, 'pattern': 'FORMER_MEMBER'}
+485	G0485	clone	near-duplicate function clusterSiblingsInLane() (also: computeShipReachableIds, pullItemAndDescendants, promoteDependencyBlockers), ~33 statements, same vocabulary (dialect copy or close variant)	2/3/7	unchanged	None
+486	G0486	cmp	repeated comparison field == 'model'	2/3/3	unchanged	{'commits': 4, 'pattern': '[\'"`](model)[\'"`]'}
+487	G0487	cmp	repeated comparison stateType == 'completed'	2/3/3	unchanged	{'commits': 2, 'pattern': '[\'"`](completed)[\'"`]'}
+488	G0488	clone	tiny rule copied as a helper createDashboardDrilldownRoutes() (also: createDashboardEffortRoutes, createDashboardKpisRoutes), 3 copies of 1-4 statements	1/3/3	unchanged	None
+489	G0489	clone	tiny rule copied as a helper union(), 3 copies of 1-4 statements	2/3/3	unchanged	None
+491	G0491	set	string set {'halt', 'modelRoutingProxyWrites', 'periodicals'} as table-keys/array [SETTING_NAME, SETTINGS]	2/2/2	unchanged	{'commits': 4, 'pattern': '[\'"`](halt|modelRoutingProxyWrites|periodicals)[\'"`]'}
+492	G0492	set	string set {'none', 'pause', 'stop', 'unknown'} as table-keys [HALT_VALUE, HALT_WORDS]	2/2/2	unchanged	{'commits': 3, 'pattern': '[\'"`](none|pause|stop|unknown)[\'"`]'}
+493	G0493	clone	tiny rule copied as a helper deleteAll(), 4 copies of 1-4 statements	2/4/4	unchanged	None
+494	G0494	clone	near-duplicate function buildPassagePlannerKickoff() (also: buildPassageRunnerKickoff, buildWorkerLaneKickoff), ~11 statements, structurally identical	1/3/3	unchanged	None
+498	G0498	const	named constant PROJECTION_RISK_TYPES=Set[overdue,unestimated-critical,velocity-declining]	2/2/2	unchanged	{'commits': 1, 'pattern': 'PROJECTION_RISK_TYPES'}
+502	G0502	set	string set {'overdue', 'unestimated-critical', 'velocity-declining'} as Set [PROJECTION_RISK_TYPES]	2/2/2	unchanged	{'commits': 0, 'pattern': '[\'"`](overdue|unestimated-critical|velocity-declining)[\'"`]'}
+503	G0503	contract	text contract marker: [credential-rejected]	2/2/2	unchanged	{'commits': 3, 'pattern': '\\[credential-rejected\\]'}
+504	G0504	const	named constant REPO_RE=/^[A-Za-z0-9._-]{1,100}$/	2/2/2	unchanged	{'commits': 1, 'pattern': 'REPO_RE'}
+505	G0505	clone	near-duplicate function assignLanes(), ~32 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+506	G0506	clone	near-duplicate function assignSegments(), ~21 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+507	G0507	clone	near-duplicate function buildChainLabel(), ~10 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+508	G0508	clone	near-duplicate function cohereSubtaskGroups(), ~39 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+509	G0509	clone	near-duplicate function computeCrossLaneColumns(), ~108 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+510	G0510	clone	near-duplicate function groupByAssignee() (also: groupByProject), ~10 statements, same vocabulary (dialect copy or close variant)	2/2/4	unchanged	None
+511	G0511	clone	near-duplicate function groupByStatus(), ~12 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+513	G0513	clone	near-duplicate function mergeLabels(), ~6 statements, fuzzy	2/2/2	unchanged	None
+514	G0514	clone	near-duplicate function mergeLanes(), ~9 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+518	G0518	cmp	repeated comparison grouping == 'dependency'	2/2/4	unchanged	{'commits': 0, 'pattern': '[\'"`](dependency)[\'"`]'}
+519	G0519	cmp	repeated comparison rawKey == 'duplicate'	2/2/2	unchanged	{'commits': 1, 'pattern': '[\'"`](duplicate)[\'"`]'}
+522	G0522	set	string set {'/library.css', '/style.css'} as array [stylesheets]	2/2/2	unchanged	{'commits': 2, 'pattern': '[\'"`](/library\\.css|/style\\.css)[\'"`]'}
+523	G0523	discrim	string set {'assignee', 'dependency', 'project', 'status'} as switch	2/2/2	unchanged	{'commits': 0, 'pattern': '[\'"`](assignee|dependency|project|status)[\'"`]'}
+524	G0524	discrim	string set {'dependency', 'project'} as or-chain	2/2/2	unchanged	{'commits': 0, 'pattern': '[\'"`](dependency|project)[\'"`]'}
+525	G0525	discrim	string set {'implicit', 'label', 'state'} as switch [ID.type]	2/2/2	unchanged	{'commits': 0, 'pattern': '[\'"`](implicit|label|state)[\'"`]'}
+527	G0527	cmp	repeated comparison tone == 'bad'	1/3/3	unchanged	{'commits': 2, 'pattern': '[\'"`](bad)[\'"`]'}
+528	G0528	clone	tiny rule copied as a helper toRecord(), 3 copies of 1-4 statements	2/3/3	unchanged	None
+529	G0529	const	named constant COMPLETED="completed"	2/2/2	new	{'commits': 1, 'pattern': 'COMPLETED'}
+534	G0534	set	string set {'digest', 'gap', 'northStarReading', 'product', 'technical', 'trajectory'} as array/table-keys [NARRATIVE_LAYERS, collected, NARRATIVE_FIELD_TO_LAYER]	2/2/5	unchanged	{'commits': 0, 'pattern': '[\'"`](digest|gap|northStarReading|product|technical|trajectory)[\'"`]'}
+541	G0541	cmp	repeated comparison orientation == 'vertical'	2/2/6	unchanged	{'commits': 0, 'pattern': '[\'"`](vertical)[\'"`]'}
+545	G0545	record	literal record repeated verbatim {AFT="aft", DRIFT="drift", FORWARD="forward", PORT="port", SHIP="ship", STARBOARD="starboard"}	2/2/2	unchanged	None
+546	G0546	const	named constant MAX_CUSTOM_PRESETS=20	2/2/2	unchanged	{'commits': 0, 'pattern': 'MAX_CUSTOM_PRESETS'}
+547	G0547	const	named constant MAX_PRESET_NAME_LENGTH=50	2/2/2	unchanged	{'commits': 0, 'pattern': 'MAX_PRESET_NAME_LENGTH'}
+549	G0549	clone	near-duplicate function (anonymous)(), ~7 statements, fuzzy	2/2/2	unchanged	None
+550	G0550	clone	near-duplicate function bearingToAngle(), ~8 statements, structurally identical	2/2/2	unchanged	None
+551	G0551	clone	near-duplicate function buildSegments(), ~59 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+552	G0552	clone	near-duplicate function cardMatchesHeading(), ~13 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+553	G0553	clone	near-duplicate function clusterSubtaskSiblings(), ~35 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+554	G0554	clone	near-duplicate function computePosition(), ~11 statements, fuzzy	2/2/2	unchanged	None
+555	G0555	clone	near-duplicate function hash32(), ~11 statements, fuzzy	2/2/2	unchanged	None
+556	G0556	clone	near-duplicate function layoutIndex(), ~30 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+557	G0557	clone	near-duplicate function list(), ~7 statements, structurally identical	2/2/2	unchanged	None
+558	G0558	clone	near-duplicate function orientationLayout(), ~57 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+559	G0559	clone	near-duplicate function pickAngle(), ~10 statements, fuzzy	2/2/2	unchanged	None
+560	G0560	clone	near-duplicate function placeDriftBucket(), ~22 statements, fuzzy	2/2/2	unchanged	None
+561	G0561	clone	near-duplicate function placeSegmentBucket(), ~44 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged	None
+562	G0562	clone	near-duplicate function pushProjectSegments() (also: pushProjectSegs), ~8 statements, fuzzy	2/2/2	unchanged	None
+564	G0564	record	record assembled from the same sources {label=ID[].name, projectName=ID[].name, cards=ID[].group}	2/2/2	unchanged	None
+566	G0566	cmp	repeated comparison kind == 'label'	2/2/3	unchanged	{'commits': 0, 'pattern': '[\'"`](label)[\'"`]'}
+567	G0567	cmp	repeated comparison kind == 'project'	2/2/3	unchanged	{'commits': 0, 'pattern': '[\'"`](project)[\'"`]'}
+568	G0568	cmp	repeated comparison projectSector == 'port'	2/2/2	unchanged	{'commits': 0, 'pattern': '[\'"`](port)[\'"`]'}
+569	G0569	cmp	repeated comparison projectSector == 'starboard'	2/2/2	unchanged	{'commits': 0, 'pattern': '[\'"`](starboard)[\'"`]'}
+570	G0570	cmp	repeated comparison sector == 'drift'	2/2/2	unchanged	{'commits': 0, 'pattern': '[\'"`](drift)[\'"`]'}
+571	G0571	cmp	repeated comparison sector == 'ship'	2/2/2	unchanged	{'commits': 0, 'pattern': '[\'"`](ship)[\'"`]'}
+572	G0572	cmp	repeated comparison stateType == 'unstarted'	2/2/2	unchanged	{'commits': 1, 'pattern': '[\'"`](unstarted)[\'"`]'}
+575	G0575	discrim	string set {'E', 'W'} as or-chain	2/2/2	unchanged	{'commits': 0, 'pattern': '[\'"`](E|W)[\'"`]'}
+576	G0576	set	string set {'orchestration', 'resumed', 'wake', 'work'} as table-keys/array [DISPATCH_ROLE_WORD]	2/2/2	new	{'commits': 1, 'pattern': '[\'"`](orchestration|resumed|wake|work)[\'"`]'}
+577	G0577	discrim	string set {'resumed', 'wake'} as or-chain [ID.role]	2/2/2	new	{'commits': 1, 'pattern': '[\'"`](resumed|wake)[\'"`]'}
+578	G0578	record	record assembled from the same sources {access_token=ID.access_token, refresh_token=ID.refresh_token, expires_in=ID.expires_in}	2/2/2	unchanged	None
+579	G0579	cmp	repeated comparison error == 'invalid_grant'	2/2/2	unchanged	{'commits': 0, 'pattern': '[\'"`](invalid_grant)[\'"`]'}

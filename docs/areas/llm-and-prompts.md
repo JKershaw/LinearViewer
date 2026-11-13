@@ -77,9 +77,13 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - `lib/openrouter.js`: `SUGGESTED_MODEL_IDS` and `DISPATCH_MODEL_SUGGESTIONS`
   (`lib/model-routing-harnesses.js`) repeat ids by hand, unchecked; the first is also the
   cold-catalog fallback. (Area reads CG/CH.)
-- `lib/periodicals.js`: `docs/areas/` is spelled in 17 lines across 10 code files. (Drift &
-  Coherence Review, 10 Nov; `docs/reviews/drift-coherence-review-2026-11-10.md`; count,
-  Documentation Review.)
+- `lib/periodicals.js`: `docs/areas/` is spelled in 26 lines across 11 code files (`lib/`, `routes/`,
+  `public/`, `server.js`, `scripts/`), up from 17 in 10 at the 10 Nov reading, and two leaves now spell
+  the directory: `REGISTRY_PATH` (`lib/prompts/area-registry-path.js`) and `NOTES_DIR`
+  (`lib/prompts/area-note-format.js`, LIN-4420), neither derived from the other. Moving the notes
+  means editing both leaves and the prose. (Drift & Coherence Review, 10 Nov;
+  `docs/reviews/drift-coherence-review-2026-11-10.md`; count, Documentation Review; recounted, Drift &
+  Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
 - `lib/recommendation-live-wait.js`: a read, not a claim: two different-kind calls racing on
   one ticket both pass; claim compare-and-set, like `claimHeldWake` (LIN-4392).
 - `lib/periodicals.js`: two sizes of move: a ceiling for Periodical prompts (+18.8% in the window,
@@ -136,3 +140,29 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   dispatches d9bdf6d8, cced07ee and 0399b2e2 it ran `claude-opus-5-5`, so a record can misname
   the model that ran. Cost is already priced from the model the worker reports. Waiting: make the
   record carry the model the worker reports, or update the routed id. (LIN-4396 review.)
+- `lib/prompts/blind-read-words.js`: its header says none retypes its words, but the kind is typed
+  bare in `lib/recommendation-blind-read.js` (the run predicate and the dispatched step),
+  `lib/pipeline-churn.js`, `lib/run-view.js` and `lib/run-closeout-state.js`, and has a second constant,
+  `VIRTUAL_PROMPTS.BLIND_READ` (`lib/workflow-config.js`); `lib/completion-signals.js` types the
+  heading (three times) and the verdict words instead of importing them. Renaming the kind would leave
+  the route dispatching an unknown kind, and `tests/unit/stage-kind-tables.test.js` checks presence,
+  not these literals. `lib/recommendation-blind-read.js` also redeclares `COMPLETED`. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+- `lib/openrouter.js`: the four routes code settles (the live-stage wait, the review loop bound, the
+  blind read, the look-first sequence) are listed by hand in about nine places, no test pins any copy,
+  and two are already wrong: `docs/architecture/prompt-system.md` says "four routes" and then
+  restates three, without the blind read, and `public/llms.txt` says the blind read is "Sent by
+  hand", where its description (`lib/prompt-template-defs.js`) says code sends it. The
+  templates sync test checks that the catalogue bullet exists, not its words. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+- `lib/prompts/leftover-words.js`: the retirement line's words have one home and one checker
+  (`lib/dispatch-leftover-answer.js`), but which entry to settle (the busiest touched area, else
+  another) and the three forms are restated by hand in `docs/areas/README.md`, simple-dispatcher's
+  docs/areas/README.md, `docs/proxy-integration.md` (with the refusal kinds) and
+  `docs/architecture/dispatch-and-proxy.md`, and the verbatim guard reads only `lib/` and `routes/`.
+  simple-dispatcher's README says a waiting entry also leaves when "a follow-up is filed for it",
+  where this README says only when the consequence test sends it to a ticket. A cross-repo seam;
+  simple-dispatcher's side is named here, not edited. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+- `lib/prompts/area-note-format.js`: the one reading of a waiting entry in code does not hold what a
+  cited path is; that rule is in the guard (`tests/unit/area-notes.test.js`, a listed extension), in
+  `lib/dispatch-leftover-answer.js` (any one to six characters, its comment calling it the guard's
+  rule) and in simple-dispatcher's guard. A retirement line can name a path the guard would not read
+  as one. Borderline. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
