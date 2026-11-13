@@ -13,7 +13,6 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import {
   WORK_ISSUE_LABELS,
-  VIRTUAL_PROMPTS,
   getWorkIssueLabels
 } from '../../lib/workflow-config.js';
 
@@ -32,20 +31,6 @@ describe('WORK_ISSUE_LABELS', () => {
 
   test('has exactly 1 label', () => {
     assert.strictEqual(Object.keys(WORK_ISSUE_LABELS).length, 1);
-  });
-});
-
-describe('VIRTUAL_PROMPTS', () => {
-  test('has expected virtual prompts', () => {
-    assert.strictEqual(VIRTUAL_PROMPTS.PLAN, 'plan');
-    assert.strictEqual(VIRTUAL_PROMPTS.LOOK_INTO, 'look-into');
-    assert.strictEqual(VIRTUAL_PROMPTS.TRIAGE, 'triage');
-    assert.strictEqual(VIRTUAL_PROMPTS.REVIEW, 'review');
-    // LIN-550: close-out is a first-class universal step alongside review/retro.
-    assert.strictEqual(VIRTUAL_PROMPTS.CLOSE_OUT, 'close-out');
-    // LIN-2261: the post-merge audit verb, distinct from the pre-merge-framed review.
-    assert.strictEqual(VIRTUAL_PROMPTS.RETROSPECTIVE_AUDIT, 'retrospective-audit');
-    assert.strictEqual(VIRTUAL_PROMPTS.RETRO, 'retro');
   });
 });
 

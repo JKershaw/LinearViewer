@@ -9,7 +9,8 @@ const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer
 // Groups are summed; a path that does not exist at a snapshot counts 0.
 // prompt-templates.js held the template bodies until the 2026-02 split into -defs/-formatters.
 export const GROUPS = {
-  'worker templates': ['lib/prompt-templates.js', 'lib/prompt-template-defs.js', 'lib/prompt-formatters.js', 'lib/prompt-contract.js'],
+  // LIN-4467: the stage-kind records (lib/prompts/stage-kinds.js) hold the templates' data, so they are the templates' source.
+  'worker templates': ['lib/prompt-templates.js', 'lib/prompt-template-defs.js', 'lib/prompt-formatters.js', 'lib/prompt-contract.js', 'lib/prompts/stage-kinds.js'],
   // The meta-prompt template and the brief writer were deleted by LIN-3300; kept for history.
   'meta-prompt': ['lib/prompts/meta-prompt-template.js'],
   'stage router': ['lib/stage-router.js'],

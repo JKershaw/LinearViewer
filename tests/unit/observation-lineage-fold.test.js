@@ -1,5 +1,5 @@
 // LIN-1487 (S2c): the Observation feed folds a multi-wake lineage into one
-// visual unit at RENDER time, WITHOUT folding the payload. These vm-harness unit
+// visual unit at RENDER time, WITHOUT folding the payload. These unit
 // tests pin the four things the plan judged unit-provable:
 //
 //   T2 — `sessionSignature` is INVARIANT to lineage grouping (the fold must not
@@ -14,19 +14,13 @@
 //   T6 — a lineage spanning two issues splits across task blocks (deliberate
 //        limitation): `runsByTask` groups by issue BEFORE the fold sees it.
 //
-// public/observation.js is a browser script, not an ES module, so we evaluate it
-// in a vm sandbox (as observation-render.test.js does) and drive the real pure
-// helpers exported through its test-only `module.exports` seam.
+// public/observation.js is a native ES module (LIN-4463 piece 4). It is imported
+// through `importWorld` (tests/unit/helpers/import-world.js) and the real pure
+// helpers are read off the module namespace.
 
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import vm from 'node:vm';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const src = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
+import { importWorld } from './helpers/import-world.js';
 
 const escapeHtml = (str) => {
   if (str === undefined || str === null) return '';
@@ -34,15 +28,14 @@ const escapeHtml = (str) => {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 };
-const sandbox = {
-  module: { exports: {} },
+// One world for the file: the page's window stubs and the escapeHtml global, restored when the file's tests are done.
+const world = await importWorld({
   window: { addEventListener() {} },
-  document: { addEventListener() {} },
-  escapeHtml,
-  console,
-};
-vm.runInNewContext(src, sandbox, { filename: 'observation.js' });
-const { sessionSignature, runsByLineage, renderTaskBlock, renderTasks } = sandbox.module.exports;
+  globals: { escapeHtml },
+});
+after(() => world.restore());
+const page = await world.importPage('observation.js');
+const { sessionSignature, runsByLineage, renderTaskBlock, renderTasks } = page;
 
 // A minimal worker run. `agentState` drives the signature term and the node
 // state; `lineageId`/`issueIdentifier` drive the grouping.
@@ -64,9 +57,7 @@ const session = (runs, extra = {}) => ({
   sessionId: 's1', status: 'in-progress', runCount: runs.length,
   lastActivity: '2026-07-24T00:00:00.000Z', tasksTouched: [], runs, ...extra,
 });
-// `runsByLineage` runs inside the vm sandbox, so its arrays carry the sandbox
-// realm's Array.prototype. Rebuild in THIS realm (Array.from) so deepStrictEqual,
-// which checks prototype identity, compares structure not realm.
+// Rebuild the group arrays with Array.from so deepStrictEqual compares structure, not the realm the arrays were made in.
 const ids = (groups) => Array.from(groups, g => Array.from(g, r => r.loopId));
 const count = (hay, needle) => hay.split(needle).length - 1;
 

@@ -28,7 +28,14 @@
  *
  * Loaded only on the /observation page. Requires common.js (escapeHtml, window.api,
  * relativeTime).
+ *
+ * A native ES module (LIN-4463 piece 4): it imports the shared formatter and the duration leaf from /lib/ by a relative
+ * specifier, and its test seams are named exports. A module runs after every classic script on the page, so the
+ * common.js globals it reads are in place before its DOMContentLoaded listener (`init`) runs.
  */
+
+import { formatUsd } from '../lib/cost-format.js';
+import { fmtDuration } from '../lib/time-words.js';
 
 let observationData = null;
 let pollId = null;
@@ -513,17 +520,11 @@ function sessionHref(s) {
   return `/workspace/${encodeURIComponent(ws)}/observation/session/${encodeURIComponent(id)}`;
 }
 
+// LIN-4463 piece 4: the duration words are the shared leaf's (`fmtDuration`, lib/time-words.js), not a copy. The one
+// difference is deliberate: a non-finite `ms` (NaN, Infinity) reads '' here, where the copy printed `NaNh`.
 function formatRuntime(runtime) {
   const ms = runtime && typeof runtime.ms === 'number' ? runtime.ms : null;
-  if (ms == null || ms < 0) return '';
-  const totalSec = Math.round(ms / 1000);
-  if (totalSec < 60) return `${totalSec}s`;
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  if (m < 60) return s ? `${m}m ${s}s` : `${m}m`;
-  const h = Math.floor(m / 60);
-  const rm = m % 60;
-  return rm ? `${h}h ${rm}m` : `${h}h`;
+  return fmtDuration(ms) ?? '';
 }
 
 // A signature that changes when anything the card displays changes — drives
@@ -3392,7 +3393,9 @@ function askBulkApply(text, applyLabel) {
   });
 }
 
-async function bulkAgreeSelected() {
+// `rowCore` is the per-row step, defaulted to the real one (LIN-4463 piece 4): a test passes a stand-in that throws, which
+// the finally below must survive. The click listener wraps this call, so an event is never taken for a row core.
+async function bulkAgreeSelected(rowCore = bulkAgreeRow) {
   const keys = Array.from(rulingsSelected);
   if (keys.length === 0) return;
   const breakdown = computeBulkAgreeBreakdown();
@@ -3419,7 +3422,7 @@ async function bulkAgreeSelected() {
       const row = rulingsRowByKey.get(key);
       const li = renderedRulingRows.get(key);
       if (!row || !li) { skipped += 1; continue; } // vanished since the press — nothing left to act on
-      const outcome = await bulkAgreeRow(key, row, li);
+      const outcome = await rowCore(key, row, li);
       if (outcome === 'applied') ok += 1;
       else if (outcome === 'skipped') skipped += 1;
       else if (outcome === 'failed') failed += 1;
@@ -3441,7 +3444,7 @@ async function bulkAgreeSelected() {
 // builder now live in the ONE shared reply-delivery surface
 // (`window.ReplyDelivery`, public/common.js) so the run-page card and this
 // Rulings tab use the same implementation. These thin wrappers keep this
-// file's `module.exports` test seams (`resolveRecordTarget`,
+// file's exported test seams (`resolveRecordTarget`,
 // `composeDispatchPrompt`) resolving to the shared code, read at CALL time so
 // a sandbox without common.js still loads this script.
 function resolveRecordTarget(anchor, recordOn, hydrateResult) {
@@ -3973,7 +3976,7 @@ function dueSelectedCountText() {
 // same as a priced row that happens to average to zero. Mirrors their own
 // precision idiom (small per-call amounts keep 4 decimals; a larger total
 // rounds to 2). The formatter itself is the one shared copy (LIN-4446), read
-// from window.CostFormat, which the module shim sets before DOMContentLoaded.
+// from `../lib/cost-format.js` (LIN-4463 piece 4: this page is a module and imports it, not the bridge).
 //
 // Renders `meanUsd × selectedCount` as the estimate. `estimate` is
 // `observationData.scanCostEstimate`, threaded verbatim from the server
@@ -3986,10 +3989,10 @@ function formatDueScanCostEstimate(estimate, selectedCount) {
   if (!estimate || estimate.unknown || typeof estimate.meanUsd !== 'number' || !Number.isFinite(estimate.meanUsd)) {
     return 'est. unknown';
   }
-  // LIN-4179 / LIN-4446: the one formatter (window.CostFormat, set by the module shim). A per-call estimate keeps
+  // LIN-4179 / LIN-4446: the one formatter (`/lib/cost-format.js`, imported above). A per-call estimate keeps
   // 4 decimals under $1; null (unknown) is the same "est. unknown", never a dollar figure.
   const total = estimate.meanUsd * selectedCount;
-  const words = window.CostFormat.formatUsd(total, { fine: true });
+  const words = formatUsd(total, { fine: true });
   return words === null ? 'est. unknown' : `est. ${words}`;
 }
 
@@ -4789,7 +4792,7 @@ function initControls() {
   }
 
   const rulingAgreeSelected = document.getElementById('obs-ruling-agree-selected');
-  if (rulingAgreeSelected) rulingAgreeSelected.addEventListener('click', bulkAgreeSelected);
+  if (rulingAgreeSelected) rulingAgreeSelected.addEventListener('click', () => bulkAgreeSelected());
 
   // LIN-2758: sets the SAME flag bulkAgreeSelected's loop checks at the top
   // of each iteration — no separate stop function, mirroring the inline-
@@ -4866,11 +4869,16 @@ window.addEventListener('beforeunload', (e) => {
 
 document.addEventListener('DOMContentLoaded', init);
 
-// Test-only seam (inert in the browser, where `module` is undefined): expose the
-// pure presentation helpers so the §6.3/§6.4 fidelity rules can be unit-tested
-// without a DOM. Not part of the page's runtime contract.
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {
+// Module-state accessors for the test seams (LIN-4463 piece 4). A module namespace is read-only, so the `let`
+// state is reached through these, where the classic script exposed a getter/setter pair on its export object.
+function getOpenLoopIds() { return openLoopIds; }
+function setOpenLoopIds(v) { openLoopIds = v; }
+function lastRulingsRef() { return lastRulings; }
+function setObservationData(d) { observationData = d; }
+
+// Test seams (LIN-4463 piece 4): the page is a native module, so its pure helpers and seams are named exports. A
+// test imports the module fresh (tests/unit/helpers/import-world.js) and reads them off the namespace.
+export {
     renderActivityLog, renderArtifacts, classifyArtifact, renderObjective,
     // LIN-964: expose the card-list ordering seam so the expand-then-poll
     // stable-order regression can drive the real `diffSessionList` (with the
@@ -4956,6 +4964,8 @@ if (typeof module !== 'undefined' && module.exports) {
     // decision_id keys left the whole suite green. Exposed so the reuse path
     // is pinned by the same kind of unit test as the delivery path.
     renderRulings, renderedRulingRows,
+    // LIN-4463 piece 4: the Stop wiring and the bulk confirm, reached by the suites that drive them without a click.
+    initControls, askBulkApply, setObservationData,
     // LIN-2243: expose the worker-lane ticket-walk seam (read off runs[], since
     // the session-level field is inert on this lean feed) for unit testing.
     laneTicketWalk, ticketProgressText,
@@ -4971,14 +4981,14 @@ if (typeof module !== 'undefined' && module.exports) {
     compactWaitSessions, stripFeedbackMarkers, viewFromParams, scopeFromParams, renderWaitingBlock,
     pollCurrentView, pollRulings, pollWaitingSupplement, switchView, setFilter, sessionsUrl, feedKey, rulingsUrl,
     repaintWaitingCardHeads,
-    openLoopIds: () => openLoopIds, setOpenLoopIds: (v) => { openLoopIds = v; },
-    lastRulingsRef: () => lastRulings, standaloneWaitSupplement, sessionIndex,
+    getOpenLoopIds, setOpenLoopIds,
+    lastRulingsRef, standaloneWaitSupplement, sessionIndex,
     // LIN-2649 S4 / LIN-2667: the scan-due tab seam — tri-state copy/rendering,
     // the never-ambient dispatch (pollCurrentView, switchView), and pagination
     // (loadInitialDueCheckPage/loadMoreDueChecks, dueUrl) are all unit-testable
     // without a DOM via this export.
     dueStatusCopy, renderDueRowHtml, dueUrl, updateDueDayOneNotice, paintDuePage,
-    pollCurrentView, switchView, loadInitialDueCheckPage, loadMoreDueChecks,
+    loadInitialDueCheckPage, loadMoreDueChecks,
     // LIN-2706 §B.2/§B.3: the selection lifecycle + selection-UI seam.
     // `dueSelectedIds` is exported directly (a `const` Set, mutated in
     // place — never reassigned, so this reference stays live) so a test can
@@ -5015,5 +5025,4 @@ if (typeof module !== 'undefined' && module.exports) {
     // DOM, and so the bulk-scan run control passes paintBulkScanRowResult
     // straight into startBulkScan's onResult.
     classifyBulkScanResult, paintBulkScanRowResult, BULK_SCAN_RESULT_COPY,
-  };
-}
+};

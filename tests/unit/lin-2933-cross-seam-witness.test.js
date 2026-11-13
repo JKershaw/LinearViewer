@@ -37,50 +37,67 @@
  *  - persistent dead credential → the named LINEAR_AUTH message, the row
  *    is restored (buttons re-enabled), and the comment is never recorded.
  *
- * The two scripts run through `loadWorld` (tests/unit/helpers/client-world.js)
- * over the shared fake DOM (LIN-4283): the ruling row is parsed into the
- * world's document, and the buttons and feedback are read back from it.
+ * observation.js is a native ES module (LIN-4463 piece 4), imported fresh per
+ * test through `importWorld` (tests/unit/helpers/import-world.js) over the shared
+ * fake DOM (LIN-4283): the ruling row is parsed into the world's document, and
+ * the buttons and feedback are read back from it. common.js is still a classic
+ * script that must run in the same realm (it is what puts window.ReplyDelivery
+ * on the global), so it is run once per file with `runClassic`, not once per
+ * test: its top-level const and let bindings cannot be declared twice in one
+ * realm.
  */
-import { test, describe } from 'node:test';
+import { test, describe, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { harnessModelsBlock } from '../../lib/model-routing-harnesses.js';
-import { loadWorld } from './helpers/client-world.js';
+import { importWorld } from './helpers/import-world.js';
 
-// ─── Sandbox: the REAL common.js + the REAL observation.js, sharing one window ───
+// ─── World: the REAL common.js + the REAL observation.js, sharing one window ───
+
+// The real fetch, captured before importWorld installs the relative-URL stub below, which calls it.
+const realFetch = globalThis.fetch;
+
+// The origin of the server the current test started. `window.ReplyDelivery.postComment` builds `/workspace/...` paths,
+// and the world's `fetch` resolves them against this origin, so the call is a real round-trip. It is read through
+// a getter and a closure, so the one common.js run below serves every test.
+let origin = '';
+
+// common.js runs once for the file, in this realm. `__HARNESS_MODELS__` is the block a rendered page carries (common.js
+// reads it at load). Stubs go on the global first, as a page's own window is set before its scripts run.
+const world = await importWorld({
+  window: {
+    __HARNESS_MODELS__: harnessModelsBlock(),
+    addEventListener() {},
+    matchMedia: () => ({ matches: false }),
+    location: { get origin() { return origin; } },
+    ChatUI: { appendOptions() {}, resolveCaption: () => 'no action available yet' },
+  },
+  globals: {
+    confirm: () => true,
+    localStorage: { getItem: () => null, setItem() {} },
+    escapeHtml: (str) => (str === undefined || str === null ? '' : String(str)),
+    relativeTime: (ts) => (ts ? `stub-relative-time(${ts})` : ''),
+    console: { warn() {}, error() {}, log() {} },
+    // Relative-URL fetch, real network — window.ReplyDelivery.postComment
+    // builds `/workspace/...` paths, and native fetch needs an absolute URL.
+    fetch(url, opts) {
+      const absolute = typeof url === 'string' && url.startsWith('/') ? origin + url : url;
+      return realFetch(absolute, opts);
+    },
+  },
+});
+world.runClassic('common.js');
+after(() => world.restore());
 
 /**
- * `origin` is the started server's origin. `window.ReplyDelivery.postComment` builds `/workspace/...` paths, and the
- * world's `fetch` resolves them against it, so the call is a real round-trip. `__HARNESS_MODELS__` is the block a rendered
- * page carries (common.js reads it at load; loadWorld does not apply `withHarnessModels`).
+ * observation.js imported fresh for one test, against the test server at `serverOrigin`. Its module state (the ruling
+ * rows, the dedupe the page keeps) is its own, as a fresh page's is.
  */
-function makeSandbox(origin) {
-  return loadWorld({
-    window: {
-      __HARNESS_MODELS__: harnessModelsBlock(),
-      addEventListener() {},
-      matchMedia: () => ({ matches: false }),
-      location: { origin },
-      ChatUI: { appendOptions() {}, resolveCaption: () => 'no action available yet' },
-    },
-    scripts: ['common.js', 'observation.js'],
-    globals: {
-      module: { exports: {} },
-      confirm: () => true,
-      localStorage: { getItem: () => null, setItem() {} },
-      escapeHtml: (str) => (str === undefined || str === null ? '' : String(str)),
-      relativeTime: (ts) => (ts ? `stub-relative-time(${ts})` : ''),
-      console: { warn() {}, error() {}, log() {} },
-      // Relative-URL fetch, real network — window.ReplyDelivery.postComment
-      // builds `/workspace/...` paths, and native fetch needs an absolute URL.
-      fetch(url, opts) {
-        const absolute = typeof url === 'string' && url.startsWith('/') ? origin + url : url;
-        return fetch(absolute, opts);
-      },
-    },
-  });
+async function loadPageAt(serverOrigin) {
+  origin = serverOrigin;
+  return world.importPage('observation.js');
 }
 
 /**
@@ -88,8 +105,9 @@ function makeSandbox(origin) {
  * the feedback line `renderRulingRow` ends every row with. `rulingRowControls` reads these nodes, so the re-enable check
  * below reads real `disabled` state off real buttons.
  */
-function drawRow(world) {
-  const container = world.makeContainer();
+function drawRow() {
+  const container = world.document.createElement('div');
+  world.document.body.appendChild(container);
   container.innerHTML = '<li class="obs-ruling" data-testid="obs-ruling-row">'
     + '<button type="button" class="chat-option chat-option-btn">Approve</button>'
     + '<p class="obs-ruling-feedback" data-testid="obs-ruling-feedback"></p>'
@@ -185,9 +203,9 @@ describe('LIN-2933 cross-seam witness: real deliverRulingReply → real window.R
     const server = await startApp({ provider, ownerCredentialStore, accessToken: REJECTED_TOKEN });
     try {
       const { port } = server.address();
-      const world = makeSandbox(`http://127.0.0.1:${port}`);
-      const { deliverRulingReply } = world.sandbox.module.exports;
-      const li = drawRow(world);
+      const page = await loadPageAt(`http://127.0.0.1:${port}`);
+      const { deliverRulingReply } = page;
+      const li = drawRow();
 
       // Distinct prompt text from the other case below — the route's dedupe
       // cache is keyed on (urlKey, issueId, body, generation) and is a
@@ -214,9 +232,9 @@ describe('LIN-2933 cross-seam witness: real deliverRulingReply → real window.R
     const server = await startApp({ provider, ownerCredentialStore, accessToken: REJECTED_TOKEN });
     try {
       const { port } = server.address();
-      const world = makeSandbox(`http://127.0.0.1:${port}`);
-      const { deliverRulingReply } = world.sandbox.module.exports;
-      const li = drawRow(world);
+      const page = await loadPageAt(`http://127.0.0.1:${port}`);
+      const { deliverRulingReply } = page;
+      const li = drawRow();
 
       await deliverRulingReply(makeRow(), 'Approve — persistent-failure case', li);
 

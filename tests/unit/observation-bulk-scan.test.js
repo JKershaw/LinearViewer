@@ -19,32 +19,34 @@
  * `llm-call-log` row, and can still raise a ruling. Asserting server-side
  * cancellation here would assert a falsehood.
  *
- * `public/observation.js` is a browser script with DOM/fetch dependencies at
- * call time but none at load time, so it runs through `loadWorld`
- * (tests/unit/helpers/client-world.js) over the shared fake DOM. The bulk-scan
- * pool is exercised through the module it exports, with its own world per test.
+ * `public/observation.js` is a native ES module (LIN-4463 piece 4) with DOM/fetch
+ * dependencies at call time but none at load time, so it is imported fresh
+ * through `importWorld` (tests/unit/helpers/import-world.js) over the shared fake
+ * DOM. The bulk-scan pool is exercised through the module it exports, with its
+ * own world per test.
  *
  * Run with: node --test tests/unit/observation-bulk-scan.test.js
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWorld } from './helpers/client-world.js';
+import { importWorld } from './helpers/import-world.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 
 /**
- * observation.js loaded into a world (tests/unit/helpers/client-world.js), with
+ * observation.js imported into a world (tests/unit/helpers/import-world.js), with
  * the bulk-scan pool's only window dependency, `ScanSection.postScan`, supplied
  * per test. The pool must reach postScan through `window.ScanSection`, never
  * `window.api`: the `api` stub below throws if it is ever called.
  *
- * Each call is a fresh world with its own silent `console`, so a test that
- * replaces `sandbox.console.error` to capture a report cannot leak into another
- * test. `AbortController` (which the pool constructs) comes from loadWorld.
- * Returns the world's vm context, so the tests read `sandbox.module.exports`
- * and `sandbox.window` as they always have.
+ * Each call is a fresh world with its own silent `console` (returned as `con`),
+ * so a test that replaces `con.error` to capture a report cannot leak into
+ * another test. The caller restores the world: `t.after(() => world.restore())`.
+ * Returns the world, the imported page (its exports, read off the namespace), and
+ * the console stub.
  */
-function makeSandbox(postScanImpl) {
-  return loadWorld({
+async function makeSandbox(postScanImpl) {
+  const con = { warn() {}, error() {}, log() {} };
+  const world = await importWorld({
     window: {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
@@ -52,14 +54,14 @@ function makeSandbox(postScanImpl) {
       ScanSection: { postScan: postScanImpl },
       api: async () => { throw new Error('bulk-scan pool must call window.ScanSection.postScan, not window.api'); }
     },
-    scripts: ['observation.js'],
     globals: {
-      module: { exports: {} },
       escapeHtml: (s) => (s === undefined || s === null ? '' : String(s)),
       relativeTime: () => '',
-      console: { warn() {}, error() {}, log() {} }
+      console: con
     }
-  }).sandbox;
+  });
+  const page = await world.importPage('observation.js');
+  return { world, page, con };
 }
 
 /** A promise a test can resolve/reject on its own schedule. */
@@ -78,7 +80,7 @@ function items(n) {
 }
 
 test.describe('startBulkScan / pumpBulkScans — concurrency bound (Witness 1)', () => {
-  test('peak in-flight postScan calls equals BULK_SCAN_CONCURRENCY exactly, never merely <=', async () => {
+  test('peak in-flight postScan calls equals BULK_SCAN_CONCURRENCY exactly, never merely <=', async (t) => {
     // Strict equality, per tests/unit/settle-with-concurrency.test.js's own
     // rationale (its "peak concurrent in-flight calls never exceeds the
     // given limit" test asserts `peak === LIMIT`): `<=` passes trivially on
@@ -98,8 +100,9 @@ test.describe('startBulkScan / pumpBulkScans — concurrency bound (Witness 1)',
       inFlight--;
       return { ok: true };
     };
-    const sandbox = makeSandbox(postScan);
-    const { startBulkScan, BULK_SCAN_CONCURRENCY } = sandbox.module.exports;
+    const { world, page, con } = await makeSandbox(postScan);
+    t.after(() => world.restore());
+    const { startBulkScan, BULK_SCAN_CONCURRENCY } = page;
 
     const N = BULK_SCAN_CONCURRENCY * 3;
     let teardownFired = false;
@@ -128,7 +131,7 @@ test.describe('startBulkScan / pumpBulkScans — concurrency bound (Witness 1)',
 });
 
 test.describe('startBulkScan / stopBulkScan — no new issuance after abort (Witness 2)', () => {
-  test('a job still sitting in the queue when stop fires is NEVER issued — only calls already in flight at stop time ever happen', async () => {
+  test('a job still sitting in the queue when stop fires is NEVER issued — only calls already in flight at stop time ever happen', async (t) => {
     // Counts REAL invocations of the mocked postScan — never bulkScansInFlight,
     // queue length, or any other pool-internal state, which could all agree
     // with each other while the underlying code is wrong.
@@ -139,8 +142,9 @@ test.describe('startBulkScan / stopBulkScan — no new issuance after abort (Wit
         signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
       });
     };
-    const sandbox = makeSandbox(postScan);
-    const { startBulkScan, stopBulkScan, BULK_SCAN_CONCURRENCY } = sandbox.module.exports;
+    const { world, page, con } = await makeSandbox(postScan);
+    t.after(() => world.restore());
+    const { startBulkScan, stopBulkScan, BULK_SCAN_CONCURRENCY } = page;
 
     const N = 10;
     assert.ok(N > BULK_SCAN_CONCURRENCY, 'test needs a queue tail beyond the concurrency bound to be meaningful');
@@ -162,7 +166,7 @@ test.describe('startBulkScan / stopBulkScan — no new issuance after abort (Wit
     assert.equal(calls, BULK_SCAN_CONCURRENCY, `no NEW postScan call may happen after stop — expected calls to stay at ${BULK_SCAN_CONCURRENCY}, got ${calls}`);
   });
 
-  test('the dequeue-but-not-yet-issued window: a stop triggered synchronously during the initial fan-out must still block the next slot in that SAME batch', async () => {
+  test('the dequeue-but-not-yet-issued window: a stop triggered synchronously during the initial fan-out must still block the next slot in that SAME batch', async (t) => {
     // This is the exact structural window the placement of the stop check
     // exists to close, isolated from ordinary async timing: BULK_SCAN_CONCURRENCY
     // jobs are dequeued and issued in one synchronous walk of pumpBulkScans's
@@ -180,8 +184,9 @@ test.describe('startBulkScan / stopBulkScan — no new issuance after abort (Wit
       if (calls === 1) stopBulkScanRef();
       return new Promise(() => {}); // never resolves — only issuance count matters
     };
-    const sandbox = makeSandbox(postScan);
-    const { startBulkScan, stopBulkScan, BULK_SCAN_CONCURRENCY } = sandbox.module.exports;
+    const { world, page, con } = await makeSandbox(postScan);
+    t.after(() => world.restore());
+    const { startBulkScan, stopBulkScan, BULK_SCAN_CONCURRENCY } = page;
     stopBulkScanRef = stopBulkScan;
     assert.ok(BULK_SCAN_CONCURRENCY >= 2, 'this witness needs at least 2-wide concurrency to have a same-batch second slot to protect');
 
@@ -191,10 +196,11 @@ test.describe('startBulkScan / stopBulkScan — no new issuance after abort (Wit
     assert.equal(calls, 1, `stop landing mid-fan-out must block every slot after the one already issuing — expected exactly 1 call, got ${calls}`);
   });
 
-  test('an over-ceiling selection is refused before a single postScan call, never silently truncated', () => {
+  test('an over-ceiling selection is refused before a single postScan call, never silently truncated', async (t) => {
     let calls = 0;
-    const sandbox = makeSandbox(async () => { calls++; return { ok: true }; });
-    const { startBulkScan, BULK_SCAN_MAX_PER_RUN } = sandbox.module.exports;
+    const { world, page, con } = await makeSandbox(async () => { calls++; return { ok: true }; });
+    t.after(() => world.restore());
+    const { startBulkScan, BULK_SCAN_MAX_PER_RUN } = page;
 
     const res = startBulkScan(items(BULK_SCAN_MAX_PER_RUN + 1));
 
@@ -207,7 +213,7 @@ test.describe('startBulkScan / stopBulkScan — no new issuance after abort (Wit
 });
 
 test.describe('startBulkScan — client-side abort-signal propagation (Witness 3)', () => {
-  test('the shared AbortController fires and postScan receives that EXACT signal — proves client-side cancellation ONLY, not server-side', async () => {
+  test('the shared AbortController fires and postScan receives that EXACT signal — proves client-side cancellation ONLY, not server-side', async (t) => {
     // Per the accepted abort gap: `generateScan` (lib/scan.js:191-200)
     // forwards no signal onward and the scan route wires no disconnect
     // handler, so an already-issued scan still completes server-side, bills
@@ -221,8 +227,9 @@ test.describe('startBulkScan — client-side abort-signal propagation (Witness 3
       capturedSignal = signal;
       return new Promise(() => {}); // never resolves — only the signal identity/state matters
     };
-    const sandbox = makeSandbox(postScan);
-    const { startBulkScan, stopBulkScan } = sandbox.module.exports;
+    const { world, page, con } = await makeSandbox(postScan);
+    t.after(() => world.restore());
+    const { startBulkScan, stopBulkScan } = page;
 
     startBulkScan(items(1));
     await flush();
@@ -237,7 +244,7 @@ test.describe('startBulkScan — client-side abort-signal propagation (Witness 3
 });
 
 test.describe('startBulkScan — stop-then-restart isolation (beat 4 fix, cross-run corruption)', () => {
-  test('a stopped run\'s stragglers settling AFTER a second run has started must not corrupt the second run\'s concurrency bound', async () => {
+  test('a stopped run\'s stragglers settling AFTER a second run has started must not corrupt the second run\'s concurrency bound', async (t) => {
     // Found empirically in beat 4: run 1's queue/in-flight-counter/
     // AbortController used to be module-level (shared), so stopping run 1
     // and starting run 2 in the SAME synchronous turn (no await between them
@@ -257,8 +264,9 @@ test.describe('startBulkScan — stop-then-restart isolation (beat 4 fix, cross-
         signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
       });
     };
-    const sandbox = makeSandbox(run1PostScan);
-    const { startBulkScan, stopBulkScan, BULK_SCAN_CONCURRENCY } = sandbox.module.exports;
+    const { world, page, con } = await makeSandbox(run1PostScan);
+    t.after(() => world.restore());
+    const { startBulkScan, stopBulkScan, BULK_SCAN_CONCURRENCY } = page;
 
     startBulkScan(items(3, 'run1-'));
     await flush();
@@ -276,7 +284,7 @@ test.describe('startBulkScan — stop-then-restart isolation (beat 4 fix, cross-
       run2Peak = Math.max(run2Peak, run2InFlight);
       return new Promise(() => {}); // never resolves — only peak/call count matter
     };
-    sandbox.window.ScanSection.postScan = run2PostScan;
+    world.window.ScanSection.postScan = run2PostScan;
 
     stopBulkScan();
     startBulkScan(items(6, 'run2-'));
@@ -300,7 +308,7 @@ test.describe('startBulkScan — stop-then-restart isolation (beat 4 fix, cross-
 });
 
 test.describe('startBulkScan — two live runs are unreachable (Witness 6, LIN-2700 hand-off)', () => {
-  test('a second startBulkScan with no intervening stop is refused with reason: run-in-progress; global peak in-flight never exceeds BULK_SCAN_CONCURRENCY; stopBulkScan() still reaches the one live run', async () => {
+  test('a second startBulkScan with no intervening stop is refused with reason: run-in-progress; global peak in-flight never exceeds BULK_SCAN_CONCURRENCY; stopBulkScan() still reaches the one live run', async (t) => {
     // The LIN-2700 hand-off reproduction: an unguarded startBulkScan lets a
     // second call overwrite the module-level bulkScanStop pointer, orphaning
     // run 1 (permanently unreachable from stopBulkScan()) while doubling
@@ -324,8 +332,9 @@ test.describe('startBulkScan — two live runs are unreachable (Witness 6, LIN-2
         });
       });
     };
-    const sandbox = makeSandbox(postScan);
-    const { startBulkScan, stopBulkScan, BULK_SCAN_CONCURRENCY } = sandbox.module.exports;
+    const { world, page, con } = await makeSandbox(postScan);
+    t.after(() => world.restore());
+    const { startBulkScan, stopBulkScan, BULK_SCAN_CONCURRENCY } = page;
 
     const res1 = startBulkScan(items(6, 'run1-'));
     await flush();
@@ -366,7 +375,7 @@ test.describe('startBulkScan — two live runs are unreachable (Witness 6, LIN-2
 // recordScan (Witness 3), never a hand-built guess at either shape.
 
 test.describe('classifyBulkScanResult — skipped quota, fast 429 + its global-hourly variant (Witness 1)', () => {
-  test('a fast 429 throw classifies as skipped-quota; every row after the first also 429s and the batch still settles every remaining row rather than aborting', async () => {
+  test('a fast 429 throw classifies as skipped-quota; every row after the first also 429s and the batch still settles every remaining row rather than aborting', async (t) => {
     const N = 4; // > BULK_SCAN_CONCURRENCY, so this proves the pool keeps pumping past the first 429, not just tolerating one
     let calls = 0;
     const postScan = async () => {
@@ -376,8 +385,9 @@ test.describe('classifyBulkScanResult — skipped quota, fast 429 + its global-h
       err.body = { freeTier: { used: true, remaining: 0, limit: 50, resetsAt: '2026-09-07T13:00:00.000Z' } };
       throw err;
     };
-    const sandbox = makeSandbox(postScan);
-    const { startBulkScan, classifyBulkScanResult, BULK_SCAN_CONCURRENCY } = sandbox.module.exports;
+    const { world, page, con } = await makeSandbox(postScan);
+    t.after(() => world.restore());
+    const { startBulkScan, classifyBulkScanResult, BULK_SCAN_CONCURRENCY } = page;
     assert.ok(N > BULK_SCAN_CONCURRENCY, 'test needs a queue tail beyond the concurrency bound to be meaningful');
 
     let teardownResults = null;
@@ -396,7 +406,7 @@ test.describe('classifyBulkScanResult — skipped quota, fast 429 + its global-h
 });
 
 test.describe('classifyBulkScanResult — flushed scan failure (Witness 2)', () => {
-  test('a resolved 200 body carrying a statusCode field classifies as scan-failed, never zero-finding — the shape an "obvious" rejecting-stub test would miss entirely', async () => {
+  test('a resolved 200 body carrying a statusCode field classifies as scan-failed, never zero-finding — the shape an "obvious" rejecting-stub test would miss entirely', async (t) => {
     // Representative of the reachable flushed statuses (404/422/500/502/503/401,
     // per routes/workspace-api.js) — armKeepalive grafts `statusCode` onto the
     // route's OWN successful-shaped body when the flush already committed 200.
@@ -412,8 +422,9 @@ test.describe('classifyBulkScanResult — flushed scan failure (Witness 2)', () 
       statusCode: 503
     };
     const postScan = async () => flushedBody;
-    const sandbox = makeSandbox(postScan);
-    const { startBulkScan, classifyBulkScanResult } = sandbox.module.exports;
+    const { world, page, con } = await makeSandbox(postScan);
+    t.after(() => world.restore());
+    const { startBulkScan, classifyBulkScanResult } = page;
 
     let teardownResults = null;
     startBulkScan(items(1), { onTeardown: (results) => { teardownResults = results; } });
@@ -491,7 +502,7 @@ function sampleDecision(overrides = {}) {
 }
 
 test.describe('classifyBulkScanResult — decision / zero-finding / terminal-row, driven through the store\'s real recordScan (Witness 3)', () => {
-  test('a new decision classifies as new-decision', async () => {
+  test('a new decision classifies as new-decision', async (t) => {
     const collection = createMockDecisionsCollection();
     const store = new TaskDecisionsStore({ collection });
     const record = await store.recordScan({
@@ -499,13 +510,15 @@ test.describe('classifyBulkScanResult — decision / zero-finding / terminal-row
       decision: sampleDecision()
     });
 
-    const sandbox = makeSandbox(async () => ({}));
-    const { classifyBulkScanResult } = sandbox.module.exports;
+    const { world, page, con } = await makeSandbox(async () => ({}));
+
+    t.after(() => world.restore());
+    const { classifyBulkScanResult } = page;
     const entry = { item: { identifier: DECISIONS_ISSUE_ID }, outcome: 'fulfilled', value: record };
     assert.equal(classifyBulkScanResult(entry), 'new-decision');
   });
 
-  test('a zero-finding scan (decision: null, no statusCode) classifies as zero-finding', async () => {
+  test('a zero-finding scan (decision: null, no statusCode) classifies as zero-finding', async (t) => {
     const collection = createMockDecisionsCollection();
     const store = new TaskDecisionsStore({ collection });
     const record = await store.recordScan({
@@ -514,13 +527,15 @@ test.describe('classifyBulkScanResult — decision / zero-finding / terminal-row
     });
     assert.equal(record.decision, null);
 
-    const sandbox = makeSandbox(async () => ({}));
-    const { classifyBulkScanResult } = sandbox.module.exports;
+    const { world, page, con } = await makeSandbox(async () => ({}));
+
+    t.after(() => world.restore());
+    const { classifyBulkScanResult } = page;
     const entry = { item: { identifier: DECISIONS_ISSUE_ID }, outcome: 'fulfilled', value: record };
     assert.equal(classifyBulkScanResult(entry), 'zero-finding');
   });
 
-  test('a statusCode-bearing body is never routed to zero-finding even when decision is absent', async () => {
+  test('a statusCode-bearing body is never routed to zero-finding even when decision is absent', async (t) => {
     const collection = createMockDecisionsCollection();
     const store = new TaskDecisionsStore({ collection });
     const record = await store.recordScan({
@@ -532,14 +547,16 @@ test.describe('classifyBulkScanResult — decision / zero-finding / terminal-row
     // ticket calls out as the one an "obvious" classifier would miss.
     const flushedValue = { ...record, statusCode: 503 };
 
-    const sandbox = makeSandbox(async () => ({}));
-    const { classifyBulkScanResult } = sandbox.module.exports;
+    const { world, page, con } = await makeSandbox(async () => ({}));
+
+    t.after(() => world.restore());
+    const { classifyBulkScanResult } = page;
     const entry = { item: { identifier: DECISIONS_ISSUE_ID }, outcome: 'fulfilled', value: flushedValue };
     assert.equal(classifyBulkScanResult(entry), 'scan-failed');
     assert.notEqual(classifyBulkScanResult(entry), 'zero-finding');
   });
 
-  test('recordScan at an existing outcome-stamped id (the terminal-row fixture, tests/unit/task-decisions-store.test.js:182) classifies as terminal-row-no-op', async () => {
+  test('recordScan at an existing outcome-stamped id (the terminal-row fixture, tests/unit/task-decisions-store.test.js:182) classifies as terminal-row-no-op', async (t) => {
     const collection = createMockDecisionsCollection();
     const store = new TaskDecisionsStore({ collection });
     await store.recordScan({
@@ -563,8 +580,10 @@ test.describe('classifyBulkScanResult — decision / zero-finding / terminal-row
     assert.equal(record.outcome, 'dismissed');
     assert.equal(record.decision.question, 'original'); // the new result was discarded
 
-    const sandbox = makeSandbox(async () => ({}));
-    const { classifyBulkScanResult } = sandbox.module.exports;
+    const { world, page, con } = await makeSandbox(async () => ({}));
+
+    t.after(() => world.restore());
+    const { classifyBulkScanResult } = page;
     const entry = { item: { identifier: DECISIONS_ISSUE_ID }, outcome: 'fulfilled', value: record };
     assert.equal(classifyBulkScanResult(entry), 'terminal-row-no-op');
   });
@@ -574,7 +593,7 @@ test.describe('classifyBulkScanResult — decision / zero-finding / terminal-row
   // covering — the two cases above only ever exercised 'dismissed'. Uses the
   // real markOutcome path (not a direct doc mutation) since self-resolved
   // requires outcomeReason/outcomeBasisHash.
-  test('a self-resolved row (LIN-2650) classifies as terminal-row-no-op too — the presence check, not a two-value literal list', async () => {
+  test('a self-resolved row (LIN-2650) classifies as terminal-row-no-op too — the presence check, not a two-value literal list', async (t) => {
     const collection = createMockDecisionsCollection();
     const store = new TaskDecisionsStore({ collection });
     const first = await store.recordScan({
@@ -587,8 +606,10 @@ test.describe('classifyBulkScanResult — decision / zero-finding / terminal-row
     });
     assert.equal(record.outcome, 'self-resolved');
 
-    const sandbox = makeSandbox(async () => ({}));
-    const { classifyBulkScanResult } = sandbox.module.exports;
+    const { world, page, con } = await makeSandbox(async () => ({}));
+
+    t.after(() => world.restore());
+    const { classifyBulkScanResult } = page;
     const entry = { item: { identifier: DECISIONS_ISSUE_ID }, outcome: 'fulfilled', value: record };
     assert.equal(classifyBulkScanResult(entry), 'terminal-row-no-op');
   });
@@ -600,7 +621,7 @@ test.describe('classifyBulkScanResult — decision / zero-finding / terminal-row
 // source per kind (LIN-3332) an unsourced row simply resolves to the active
 // provider, so the failure is an ordinary provider error, not a binding refusal.
 test.describe('bulk scan — a per-row error fails one row, not the batch', () => {
-  test('one failing row is isolated; the sourced sibling still fulfils and the run tears down', async () => {
+  test('one failing row is isolated; the sourced sibling still fulfils and the run tears down', async (t) => {
     const calls = [];
     const postScan = async (urlKey, identifier, source, { signal } = {}) => {
       calls.push({ identifier, source });
@@ -609,8 +630,9 @@ test.describe('bulk scan — a per-row error fails one row, not the batch', () =
       }
       return { ok: true };
     };
-    const sandbox = makeSandbox(postScan);
-    const { startBulkScan, BULK_SCAN_CONCURRENCY } = sandbox.module.exports;
+    const { world, page, con } = await makeSandbox(postScan);
+    t.after(() => world.restore());
+    const { startBulkScan, BULK_SCAN_CONCURRENCY } = page;
     assert.ok(BULK_SCAN_CONCURRENCY >= 2, 'the fixture needs both rows in flight together');
 
     let results = null;
@@ -641,15 +663,16 @@ test.describe('bulk scan — a per-row error fails one row, not the batch', () =
 // next run was refused as 'run-in-progress'. onResult here throws on EVERY
 // settled item, the worst case, over several batches of the pool.
 test.describe('startBulkScan — a throwing callback cannot stall the run (LIN-2709)', () => {
-  test('a throwing onResult over several items: every item still posts, onTeardown still fires, and a second run starts', async () => {
+  test('a throwing onResult over several items: every item still posts, onTeardown still fires, and a second run starts', async (t) => {
     let posted = 0;
-    const sandbox = makeSandbox(async () => { posted++; return { ok: true }; });
+    const { world, page, con } = await makeSandbox(async () => { posted++; return { ok: true }; });
+    t.after(() => world.restore());
     // Capture console.error so the test proves each callback throw is
     // REPORTED, not silently swallowed. makeSandbox's console object is the
-    // one the vm context reads, so overriding its method here takes effect.
+    // one the page reads, so overriding its method here takes effect.
     const reported = [];
-    sandbox.console.error = (...args) => { reported.push(args); };
-    const { startBulkScan, BULK_SCAN_CONCURRENCY } = sandbox.module.exports;
+    con.error = (...args) => { reported.push(args); };
+    const { startBulkScan, BULK_SCAN_CONCURRENCY } = page;
     const N = BULK_SCAN_CONCURRENCY * 3;
 
     let onResultCalls = 0;
@@ -674,12 +697,13 @@ test.describe('startBulkScan — a throwing callback cannot stall the run (LIN-2
     assert.equal(posted, N + 1, 'the second run actually posted its item');
   });
 
-  test('a throwing onTeardown: the run still settles, its stop pointer is cleared, and a second run starts', async () => {
+  test('a throwing onTeardown: the run still settles, its stop pointer is cleared, and a second run starts', async (t) => {
     let posted = 0;
-    const sandbox = makeSandbox(async () => { posted++; return { ok: true }; });
+    const { world, page, con } = await makeSandbox(async () => { posted++; return { ok: true }; });
+    t.after(() => world.restore());
     const reported = [];
-    sandbox.console.error = (...args) => { reported.push(args); };
-    const { startBulkScan, stopBulkScan } = sandbox.module.exports;
+    con.error = (...args) => { reported.push(args); };
+    const { startBulkScan, stopBulkScan } = page;
 
     const first = startBulkScan(items(2), {
       onTeardown: () => { throw new Error('onTeardown boom'); }
@@ -697,14 +721,15 @@ test.describe('startBulkScan — a throwing callback cannot stall the run (LIN-2
     assert.equal(second.refused, false, 'a second run starts after a throwing onTeardown');
   });
 
-  test('a throwing onTeardown reached through stopBulkScan() mid-flight: stop does not throw into the caller, the throw is reported once, and a second run starts', async () => {
+  test('a throwing onTeardown reached through stopBulkScan() mid-flight: stop does not throw into the caller, the throw is reported once, and a second run starts', async (t) => {
     // postScan never settles, so the run is genuinely in flight when stopped:
     // stop() -> teardown() -> onTeardown is the path the Stop button's click
     // handler takes. Unguarded, the onTeardown throw would escape stopBulkScan().
-    const sandbox = makeSandbox(() => new Promise(() => {}));
+    const { world, page, con } = await makeSandbox(() => new Promise(() => {}));
+    t.after(() => world.restore());
     const reported = [];
-    sandbox.console.error = (...args) => { reported.push(args); };
-    const { startBulkScan, stopBulkScan, BULK_SCAN_CONCURRENCY } = sandbox.module.exports;
+    con.error = (...args) => { reported.push(args); };
+    const { startBulkScan, stopBulkScan, BULK_SCAN_CONCURRENCY } = page;
 
     const first = startBulkScan(items(BULK_SCAN_CONCURRENCY + 1), {
       onTeardown: () => { throw new Error('boom'); }

@@ -18,7 +18,7 @@
  * in the e2e harness for a terminal, past-the-reap-window loop (that would
  * need a backdating test endpoint that does not exist), so this exercises
  * the press handler directly against the shared fake DOM instead
- * (tests/unit/helpers/fake-dom.js, through `loadWorld`; LIN-4282).
+ * (tests/unit/helpers/fake-dom.js, through `importWorld`; LIN-4282).
  *
  * F4 — a `resumable` ruling with no issue anchor must degrade to the
  * existing issueless delivery path (public/session.js's own precedent:
@@ -35,18 +35,16 @@
  * essentially all of them in this codebase's current reconstruction — only
  * `issueIdentifier` is guaranteed present.)
  *
- * observation.js is a browser script (not an ES module) with real DOM/fetch
- * dependencies at call time but none at *load* time (its two
- * addEventListener calls only run inside `init()`, which this test never
- * calls) — so it runs in a client world (tests/unit/helpers/client-world.js,
- * `loadWorld({ scripts: [] })`, with common.js and observation.js run by hand
- * after it), with `module.exports` extended (see the
- * bottom of public/observation.js) to expose `deliverRulingReply` plus the
- * `rulingsPending`/`preservedRulingRows` state it reads/writes.
+ * observation.js is a native ES module (LIN-4463 piece 4): its exports are the pure helpers and test seams
+ * at the bottom of public/observation.js, and it reads the page through the global object. It has real DOM/fetch
+ * dependencies at call time but none at *load* time (its two addEventListener calls only run inside `init()`, which
+ * this test never calls). It is loaded with importWorld (tests/unit/helpers/import-world.js) over the fake DOM, as a
+ * fresh instance per test, so `page.deliverRulingReply` and the other exports read its live module state.
  *
  * Run with: node --test tests/unit/observation-ruling-delivery.test.js
  */
-import { test, describe } from 'node:test';
+
+import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
@@ -54,38 +52,96 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
 import { withHarnessModels } from '../fixtures/harness-models.js';
-import { loadWorld, clickOn } from './helpers/client-world.js';
+import { importWorld } from './helpers/import-world.js';
+import { clickOn } from './helpers/client-world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const OBSERVATION_JS_SRC = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
 const COMMON_JS_SRC = readFileSync(join(__dirname, '../../public/common.js'), 'utf8');
+const OBSERVATION_JS_SRC = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
 
-// ─── The page: the shared fake DOM through loadWorld (LIN-4282) ─────────────
-// Every sandbox here is a client world (tests/unit/helpers/client-world.js) over the one fake DOM
-// (tests/unit/helpers/fake-dom.js). `loadWorld({ scripts: [] })` builds the document and the vm; the two sources then
-// run by hand, because `withHarnessModels` has to wrap common.js and loadWorld runs a file as written (LIN-4279's
-// client-world note). The elements a test seeds for `document.getElementById` are real elements, given their id and
-// attached to the body, so the client finds them the way a page does.
+// ─── The page: a native module over the shared fake DOM (LIN-4463 piece 4) ──
+// observation.js is an ES module. makeWorld() installs the fake DOM and the window stubs on the real global
+// (importWorld); await makeSandbox() imports a fresh instance of the page into that world (importPage), so each test's module
+// state is its own. Every world a test makes is restored when the test ends (afterEach below), so no stub outlives it.
+//
+// common.js stays a classic script: the ReplyDelivery seam it owns is the delivery code these tests exercise. It has
+// top-level `const`/`let`, so it can run only once per realm, not once per test. It runs once, at load, under the
+// baseline world above, so its globals (ReplyDelivery, escapeHtml, relativeTime) are part of every test's starting
+// state. Each test then overrides the per-test stubs (api, dispatchPrompt, ReplyDelivery's seams) on the global, as
+// makeSandbox always did.
 
-// The page each sandbox stands for, keyed by its `module`: its world and how its operator answers a bulk apply.
+const WORLDS = [];
+
+afterEach(() => {
+  while (WORLDS.length) WORLDS.pop().restore();
+});
+
+// Every page namespace -> its world and its bulk-apply operator.
 const PAGES = new WeakMap();
 
-/** A fresh world with nothing loaded yet: create the elements a test seeds in `world.document`, then pass `world` on. */
+// The timers the old loadWorld gave a page: a real setTimeout, unref'd, so a pending timer never holds the process open.
+const realSetTimeout = globalThis.setTimeout;
+const realClearTimeout = globalThis.clearTimeout;
+
+const fakeFetch = async () => ({ ok: true, json: async () => ({}) });
+
+function installWorld() {
+  return importWorld({
+    window: {
+      // LIN-2758: recorded (not just a no-op) so a test can retrieve and directly invoke the ONE real registration
+      // observation.js makes at load (`window.addEventListener('beforeunload', ...)`). `dispatchEvent` is inert in the
+      // fake, so there is no real unload event to dispatch.
+      _listeners: {},
+      addEventListener(type, handler) {
+        (this._listeners[type] = this._listeners[type] || []).push(handler);
+      },
+      matchMedia: () => ({ matches: false }),
+      // LIN-2792: `resolveCaption` mirrors public/chat.js's own read-only DISPOSITION_CAPTIONS wording closely enough for
+      // tests that assert the refusal text NAMES the reason (mid-turn vs indeterminate) rather than asserting an exact
+      // string this file doesn't own.
+      ChatUI: {
+        appendOptions() {},
+        resolveCaption(disposition) {
+          if (disposition === 'mid-turn') return 'still running — reply disabled';
+          if (disposition === 'indeterminate') return 'no action available yet';
+          return 'no action available yet';
+        }
+      },
+    },
+    globals: {
+      fetch: fakeFetch,
+      console: { warn() {}, error() {}, log() {} },
+      requestAnimationFrame: (cb) => { cb(); return 1; },
+      setTimeout: (fn, ms) => { const t = realSetTimeout(fn, ms); if (t && t.unref) t.unref(); return t; },
+      clearTimeout: (t) => realClearTimeout(t),
+      navigator: { clipboard: { writeText: async () => {} } },
+    },
+  });
+}
+
+// Baseline: the fake DOM document common.js reads at load, installed once for the whole file and never restored. Its
+// per-test stubs (console, fetch, timers) are not installed here, so they never leak past a test.
+importWorld({});
+vm.runInThisContext(withHarnessModels(COMMON_JS_SRC), { filename: 'common.js' });
+
+/** A fresh world for one test: the fake DOM and the window stubs, restored when the test ends. */
 function makeWorld() {
-  return loadWorld({ scripts: [] });
+  const world = installWorld();
+  WORLDS.push(world);
+  return world;
 }
 
-/** The world a sandbox's `module` belongs to. */
-function worldOf(module) {
-  const page = PAGES.get(module);
-  if (!page) throw new Error('worldOf: this module did not come from makeSandbox');
-  return page.world;
+/** The world a page namespace belongs to. */
+function worldOf(page) {
+  const entry = PAGES.get(page);
+  if (!entry) throw new Error('worldOf: this page did not come from makeSandbox');
+  return entry.world;
 }
 
-// A row as the press handlers receive it: an <li> with an Approve button and the feedback line, drawn in the
-// sandbox's own document (never attached; deliverRulingReply only reads and writes inside it).
-function makeLi(module, { withFeedback = true } = {}) {
-  const { document } = worldOf(module);
+// A row as the press handlers receive it: an <li> with an Approve button and the feedback line, drawn in the world's
+// own document (never attached; deliverRulingReply only reads and writes inside it).
+function makeLi(page, { withFeedback = true } = {}) {
+  const { document } = worldOf(page);
   const li = document.createElement('li');
   const approve = document.createElement('button');
   approve.className = 'chat-option-btn';
@@ -109,9 +165,7 @@ function nonTerminalHydrateApi() {
 
 // `elements` seeds document.getElementById (default: none, so it answers null
 // exactly as before — the delivery tests below never touch the document). Each
-// is an element of `world.document`, given its id and attached to the body. The
-// ChatUI stub is likewise inert for those: only renderRulingRow calls
-// appendOptions, and only the LIN-2293 render test reaches it.
+// is an element of the world's document, given its id and attached to the body.
 //
 // LIN-2444 Phase 3: `api` stubs `window.api`, the fetch wrapper
 // issueDismissRequest/keepRulingRow call directly (not via
@@ -139,8 +193,8 @@ function bulkConfirmPanel(document) {
  * listeners are on), press Apply or Cancel with `clickOn`, as this sandbox's `answer` says. A run that never asks is
  * left alone. Returns what `run` resolves to.
  */
-async function answerBulk(module, run) {
-  const { world, answer } = PAGES.get(module);
+async function answerBulk(page, run) {
+  const { world, answer } = PAGES.get(page);
   const { document } = world;
   await new Promise((r) => setImmediate(r));
   const panel = document.getElementById('obs-ruling-bulk-confirm');
@@ -152,71 +206,32 @@ async function answerBulk(module, run) {
   return run;
 }
 
-function makeSandbox({ world = makeWorld(), postComment, dispatchPrompt, deliverReply, api, elements = {}, confirm: confirmImpl, answer } = {}) {
+/**
+ * A page instance in a fresh world (or in `world`, when a test has already made one to seed elements into). Returns the
+ * page namespace: `page.someExport` is what the old `module.exports.someExport` was.
+ */
+async function makeSandbox({ world = makeWorld(), postComment, dispatchPrompt, deliverReply, api, elements = {}, confirm: confirmImpl, answer } = {}) {
   const { document } = world;
-  const sandbox = world.sandbox;
   for (const [id, el] of Object.entries({ ...bulkConfirmPanel(document), ...elements })) {
     el.id = id;
     document.body.appendChild(el);
   }
-  // observation.js calls the bare global `confirm(...)` (LIN-511's
-  // ratified destructive-action primitive — public/scan.js's own
-  // RETIRE_CONFIRM_TEXT precedent), not `window.confirm` — the vm
-  // sandbox's free-variable lookup resolves that against the CONTEXT
-  // object itself (tests/unit/scan-retire-ui.test.js's same note), so
-  // `confirm` is stubbed at the top level, a sibling of `window`. Defaults
-  // to accepting, since most tests here aren't exercising the gate itself.
-  sandbox.confirm = confirmImpl || (() => true);
-  sandbox.module = { exports: {} };
-  sandbox.console = { warn() {}, error() {}, log() {} };
-  Object.assign(sandbox.window, {
-    // LIN-2758: recorded (not just a no-op) so a test can retrieve and
-    // directly invoke the ONE real registration observation.js makes at
-    // top-level script execution (`window.addEventListener('beforeunload',
-    // ...)`, :4242) — the beforeunload-guard-armed-only-while-running
-    // acceptance point has no other seam reachable from this harness
-    // (`dispatchEvent` is inert in the fake, so there is no real unload
-    // event to dispatch).
-    _listeners: {},
-    addEventListener(type, handler) {
-      (this._listeners[type] = this._listeners[type] || []).push(handler);
-    },
-    matchMedia: () => ({ matches: false }),
-    // LIN-2792: `resolveCaption` mirrors public/chat.js's own read-only
-    // DISPOSITION_CAPTIONS wording closely enough for tests that assert
-    // the refusal text NAMES the reason (mid-turn vs indeterminate) rather
-    // than asserting an exact string this file doesn't own.
-    ChatUI: {
-      appendOptions() {},
-      resolveCaption(disposition) {
-        if (disposition === 'mid-turn') return 'still running — reply disabled';
-        if (disposition === 'indeterminate') return 'no action available yet';
-        return 'no action available yet';
-      }
-    },
-  });
-  // LIN-3252 F1: the REAL common.js loads first, so observation.js's delegated
-  // record/dispatch delivery (window.ReplyDelivery.deliverRulingRecord /
-  // deliverRulingDispatch) is the same shared code the run-page card uses —
-  // then the per-test fetch seams are overridden on top, keeping every
-  // existing assertion about the calls actually made meaningful.
-  vm.runInContext(withHarnessModels(COMMON_JS_SRC), sandbox, { filename: 'common.js' });
-  // Browser globals common.js installs (`window.escapeHtml`, `window.relativeTime`) and observation.js references bare.
-  // The world's window is the global (LIN-4307), so these are set after common.js runs, or its own definitions would
-  // replace them. Same faithful-copy/stub pattern tests/unit/observation-render.test.js already uses; only
-  // renderRulingRow reaches them from this file.
-  sandbox.escapeHtml = (str) => (str === undefined || str === null ? '' : String(str)
+  // observation.js calls the bare global `confirm(...)` (LIN-511's ratified destructive-action primitive). Defaults to
+  // accepting, since most tests here aren't exercising the gate itself.
+  globalThis.confirm = confirmImpl || (() => true);
+  // common.js's own escapeHtml/relativeTime are replaced by these stubs, as the suite always did.
+  window.escapeHtml = (str) => (str === undefined || str === null ? '' : String(str)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#039;'));
-  sandbox.relativeTime = (ts) => (ts ? `stub-relative-time(${ts})` : '');
-  sandbox.window.ReplyDelivery.postComment = postComment;
-  sandbox.window.ReplyDelivery.deliverReply = deliverReply;
-  sandbox.window.ReplyDelivery.errorFromResult = (r) => new Error((r.data && r.data.error) || `HTTP ${r.status}`);
-  sandbox.window.dispatchPrompt = dispatchPrompt;
-  sandbox.window.api = api || (async () => { throw new Error('window.api not stubbed for this test'); });
-  vm.runInContext(OBSERVATION_JS_SRC, sandbox, { filename: 'observation.js' });
-  PAGES.set(sandbox.module, { world, answer: answer || confirmImpl || (() => true) });
-  return sandbox;
+  window.relativeTime = (ts) => (ts ? `stub-relative-time(${ts})` : '');
+  window.ReplyDelivery.postComment = postComment;
+  window.ReplyDelivery.deliverReply = deliverReply;
+  window.ReplyDelivery.errorFromResult = (r) => new Error((r.data && r.data.error) || `HTTP ${r.status}`);
+  window.dispatchPrompt = dispatchPrompt;
+  window.api = api || (async () => { throw new Error('window.api not stubbed for this test'); });
+  const page = await world.importPage('observation.js');
+  PAGES.set(page, { world, answer: answer || confirmImpl || (() => true) });
+  return page;
 }
 
 const ANCHOR = {
@@ -245,16 +260,17 @@ function makeRow({ decision, anchor, ...rest } = {}) {
   };
 }
 
+
 describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () => {
   test('F1: the comment write targets anchor.workspaceUrlKey, never a page urlKey', async () => {
     let capturedUrlKey = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey) => { capturedUrlKey = urlKey; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async () => ({ id: 'dispatched-1' }),
       api: nonTerminalHydrateApi()
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(makeRow(), 'Approve', li);
     // Flush the postComment/dispatchPrompt microtask chain.
@@ -269,13 +285,13 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
   // anchor alone, when they diverge.
   test('D3: gone/dispatch — the pre-dispatch comment carries stampLoopId as decisionLoopId, distinct from the anchor', async () => {
     let capturedExtra = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey, issueId, body, extra) => { capturedExtra = extra; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async () => ({ id: 'dispatched-1' }),
       api: nonTerminalHydrateApi()
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(
       makeRow({ decision: { decision_id: 'd-gone-stamp-1' }, stampLoopId: 'content-loop-77' }),
@@ -293,13 +309,13 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
 
   test('F1: the fresh dispatch also targets anchor.workspaceUrlKey', async () => {
     let capturedOpts = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async (opts) => { capturedOpts = opts; return { id: 'dispatched-1' }; },
       api: nonTerminalHydrateApi()
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(makeRow(), 'Approve', li);
     await new Promise((r) => setImmediate(r));
@@ -325,15 +341,14 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
   // raw-reply-text behaviour; confirmed red-first (see beat 3's own report).
   test('HEADLINE: the composed dispatch prompt carries the question, the chosen answer, and the decisionCase recap — never just the raw pressed text', async () => {
     let capturedOpts = null;
-    const sandbox = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async (opts) => { capturedOpts = opts; return { id: 'dispatched-1' }; },
       api: nonTerminalHydrateApi()
     });
-    const { module } = sandbox;
-    const { deliverRulingReply } = module.exports;
-    const { RULING_COMPOSED_RUN_MARKER } = sandbox.window.ReplyDelivery;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const { RULING_COMPOSED_RUN_MARKER } = window.ReplyDelivery;
+    const li = makeLi(page);
 
     const row = makeRow({
       decision: { decision_id: 'd-headline-1', question: 'Preserve the legacy adapter, or retire it?' },
@@ -367,7 +382,7 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
   test('F2: comment succeeds, the fresh run fails to start — a durable partial-failure surfaces with a retry affordance, the comment is never reposted', async () => {
     let commentCalls = 0;
     let dispatchCalls = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async () => {
         dispatchCalls += 1;
@@ -376,8 +391,8 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
       },
       api: nonTerminalHydrateApi()
     });
-    const { deliverRulingReply, rulingsPending, preservedRulingRows, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply, rulingsPending, preservedRulingRows, rulingKey } = page;
+    const li = makeLi(page);
     const row = makeRow();
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
 
@@ -421,13 +436,13 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
   test('the comment itself failing is a plain failure — no dispatch attempted, no partial-failure retry affordance', async () => {
     let commentCalls = 0;
     let dispatchCalls = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => { commentCalls += 1; return { ok: false, status: 502, data: { error: 'upstream write rejected' } }; },
       dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
       api: nonTerminalHydrateApi()
     });
-    const { deliverRulingReply, rulingsPending, preservedRulingRows, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply, rulingsPending, preservedRulingRows, rulingKey } = page;
+    const li = makeLi(page);
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-2');
 
     deliverRulingReply(makeRow({ decision: { decision_id: 'd-gone-2' } }), 'Approve', li);
@@ -455,13 +470,13 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
       detail: 'Linear rejected the request as unauthenticated.'
     });
     let dispatchCalls = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => { throw authErr; },
       dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
       api: nonTerminalHydrateApi()
     });
-    const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply, rulingsPending, rulingKey } = page;
+    const li = makeLi(page);
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-linear-auth');
 
     deliverRulingReply(makeRow({ decision: { decision_id: 'd-gone-linear-auth' } }), 'Approve', li);
@@ -488,13 +503,13 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     // resumable branch's own F4 fallback (`issueId || issueIdentifier`).
     let capturedCommentIssueId = null;
     let capturedDispatchOpts = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey, issueId) => { capturedCommentIssueId = issueId; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async (opts) => { capturedDispatchOpts = opts; return { id: 'dispatched-1' }; },
       api: nonTerminalHydrateApi()
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(makeRow({ anchor: { issueId: null, issueIdentifier: 'LIN-1728-G' }, decision: { decision_id: 'd-gone-4' } }), 'Approve', li);
     await new Promise((r) => setImmediate(r));
@@ -512,12 +527,12 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
 
   test('a gone ruling with no linked issue refuses cleanly rather than posting to /api/comments/null', async () => {
     let postCommentCalled = false;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => { postCommentCalled = true; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async () => ({ id: 'dispatched-1' })
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(makeRow({ anchor: { ...ANCHOR, issueId: null, issueIdentifier: null }, decision: { decision_id: 'd-gone-3' } }), 'Approve', li);
     await new Promise((r) => setImmediate(r));
@@ -552,7 +567,7 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
     let capturedIssueId = null;
     let capturedExtra = null;
     let dispatchCalls = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey, issueId, body, extra) => {
         commentCalls += 1; capturedIssueId = issueId; capturedExtra = extra;
         return { ok: true, status: 201, data: {} };
@@ -560,8 +575,8 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
       dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
       api: async () => { throw new Error('no record_on declared — the hydrate route must not be called'); }
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(makeRow({ decision: { decision_id: 'd-record-1' }, effect: 'record', alternate: null }), 'Approve', li);
     await new Promise((r) => setImmediate(r));
@@ -572,7 +587,7 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
     assert.equal(capturedIssueId, ANCHOR.issueId, 'the fallback prefers the real issueId, mirroring the gone branch\'s own issueId || issueIdentifier convention');
     // The stamp-triggering pair — proof this went through the NEW record
     // branch, not the task-bound branch's {taskDecisionId, taskDecisionIssueId}.
-    // Field-by-field, not deepEqual — capturedExtra crosses the vm sandbox
+    // Field-by-field, not deepEqual — capturedExtra crossed the old vm sandbox
     // boundary, so it is structurally but not reference-equal to a same-realm
     // object literal (same convention as the task-bound test above).
     assert.equal(capturedExtra.decisionLoopId, ANCHOR.loopId);
@@ -588,13 +603,13 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
   // call site (deliverAsRecord).
   test('D3: gone/record — decisionLoopId carries stampLoopId, distinct from the anchor', async () => {
     let capturedExtra = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey, issueId, body, extra) => { capturedExtra = extra; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async () => ({ id: 'dispatched-1' }),
       api: async () => { throw new Error('no record_on declared — the hydrate route must not be called'); }
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(
       makeRow({ decision: { decision_id: 'd-record-stamp-1' }, effect: 'record', alternate: null, stampLoopId: 'content-loop-88' }),
@@ -620,13 +635,13 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
       detail: 'Linear rejected the request as unauthenticated.'
     });
     let dispatchCalls = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => { throw authErr; },
       dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
       api: async () => { throw new Error('no record_on declared — the hydrate route must not be called'); }
     });
-    const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply, rulingsPending, rulingKey } = page;
+    const li = makeLi(page);
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-record-linear-auth');
 
     deliverRulingReply(makeRow({ decision: { decision_id: 'd-record-linear-auth' }, effect: 'record', alternate: null }), 'Approve', li);
@@ -652,13 +667,13 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
   test('T1: a null-anchored row with effect "record" refuses instead of posting to a null target', async () => {
     let commentCalls = 0;
     let dispatchCalls = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
       api: async () => { throw new Error('no record_on declared — the hydrate route must not be called'); }
     });
-    const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply, rulingsPending, rulingKey } = page;
+    const li = makeLi(page);
     const anchorlessAnchor = { ...ANCHOR, issueId: null, issueIdentifier: null };
     const key = rulingKey('the-ruling-workspace', anchorlessAnchor, 'd-record-null-anchor');
 
@@ -684,13 +699,13 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
   test('record_on misrouting: an UNKNOWN record_on (matches nothing in the neighbourhood) targets the anchor, and the note renders', async () => {
     let capturedIssueId = null;
     let dispatchCalls = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey, issueId) => { capturedIssueId = issueId; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
       api: async () => hydrateOk({ siblings: [neighbor('LIN-9001')] })
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(
       makeRow({ decision: { decision_id: 'd-record-2', on_answer: { effect: 'record', record_on: 'LIN-NOWHERE' } }, effect: 'record', alternate: null }),
@@ -709,14 +724,14 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
   test('record_on misrouting: a TERMINAL in-neighbourhood record_on targets the anchor, and the note renders', async () => {
     let capturedIssueId = null;
     let dispatchCalls = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey, issueId) => { capturedIssueId = issueId; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
       // In the neighbourhood, but itself Done — must not receive the comment.
       api: async () => hydrateOk({ siblings: [neighbor('LIN-DONE', 'completed')] })
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(
       makeRow({ decision: { decision_id: 'd-record-3', on_answer: { effect: 'record', record_on: 'LIN-DONE' } }, effect: 'record', alternate: null }),
@@ -745,13 +760,13 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
     // never accidentally validate an identifier that belongs to another one.
     let capturedIssueId = null;
     let dispatchCalls = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey, issueId) => { capturedIssueId = issueId; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
       api: async () => hydrateOk({ siblings: [neighbor('LIN-9001')] })
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(
       makeRow({ decision: { decision_id: 'd-record-4', on_answer: { effect: 'record', record_on: 'OTHER-WS-42' } }, effect: 'record', alternate: null }),
@@ -770,13 +785,13 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
   test('a valid, in-neighbourhood, non-terminal record_on targets ITS OWN identifier, not the anchor, and that identifier is shown', async () => {
     let capturedIssueId = null;
     let dispatchCalls = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey, issueId) => { capturedIssueId = issueId; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
       api: async () => hydrateOk({ children: [neighbor('LIN-CHILD-1')] })
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(
       makeRow({ decision: { decision_id: 'd-record-5', on_answer: { effect: 'record', record_on: 'LIN-CHILD-1' } }, effect: 'record', alternate: null }),
@@ -797,13 +812,13 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
   test('a record delivery stamps the decision answered (decisionLoopId/decisionId) and never calls startRun/dispatchPrompt', async () => {
     let capturedExtra = null;
     let dispatchCalls = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey, issueId, body, extra) => { capturedExtra = extra; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
       api: async () => hydrateOk({})
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(
       makeRow({ decision: { decision_id: 'd-record-6', on_answer: { effect: 'record' } }, effect: 'record', alternate: null }),
@@ -827,13 +842,13 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
   test('an operator\'s flip override (LIN-2775 Area 5) to "record" is honoured — a row whose server-resolved effect is "dispatch" still records, not dispatches', async () => {
     let commentCalls = 0;
     let dispatchCalls = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
       api: async () => hydrateOk({})
     });
-    const { deliverRulingReply, rulingEffectOverride, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply, rulingEffectOverride, rulingKey } = page;
+    const li = makeLi(page);
     const row = makeRow({ decision: { decision_id: 'd-record-7' }, effect: 'dispatch', alternate: 'record' });
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-record-7');
     rulingEffectOverride.set(key, 'record');
@@ -862,13 +877,13 @@ describe('deliverRulingReply — press-time check (LIN-2775 Area 8)', () => {
     test(`disagreement: an anchor now ${terminalType} downgrades to record, dispatchPrompt is never called, and the note renders`, async () => {
       let commentCalls = 0;
       let dispatchCalls = 0;
-      const { module } = makeSandbox({
+      const page = await makeSandbox({
         postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
         dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
         api: async () => hydrateOk({}, { name: 'Terminal', type: terminalType })
       });
-      const { deliverRulingReply } = module.exports;
-      const li = makeLi(module);
+      const { deliverRulingReply } = page;
+      const li = makeLi(page);
 
       deliverRulingReply(makeRow({ decision: { decision_id: `d-presstime-${terminalType}` } }), 'Approve', li);
       await new Promise((r) => setImmediate(r));
@@ -887,13 +902,13 @@ describe('deliverRulingReply — press-time check (LIN-2775 Area 8)', () => {
     test(`hydration failure (${reason}): fails CLOSED to record, dispatchPrompt is never called, and the note renders`, async () => {
       let commentCalls = 0;
       let dispatchCalls = 0;
-      const { module } = makeSandbox({
+      const page = await makeSandbox({
         postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
         dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
         api: async () => ({ hydrated: false, reason })
       });
-      const { deliverRulingReply } = module.exports;
-      const li = makeLi(module);
+      const { deliverRulingReply } = page;
+      const li = makeLi(page);
 
       deliverRulingReply(makeRow({ decision: { decision_id: `d-presstime-fail-${reason}` } }), 'Approve', li);
       await new Promise((r) => setImmediate(r));
@@ -911,13 +926,13 @@ describe('deliverRulingReply — press-time check (LIN-2775 Area 8)', () => {
   test('a network-level rejection from the hydrate call itself (not a well-formed {hydrated:false}) also fails CLOSED to record', async () => {
     let commentCalls = 0;
     let dispatchCalls = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
       api: async () => { throw new Error('network unreachable'); }
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(makeRow({ decision: { decision_id: 'd-presstime-throw' } }), 'Approve', li);
     await new Promise((r) => setImmediate(r));
@@ -934,15 +949,14 @@ describe('deliverRulingReply — press-time check (LIN-2775 Area 8)', () => {
   test('a non-terminal anchor confirmed at press time proceeds to the ordinary dispatch path, composedRunMarker included', async () => {
     let commentCalls = 0;
     let capturedOpts = null;
-    const sandbox = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async (opts) => { capturedOpts = opts; return { id: 'dispatched-1' }; },
       api: async () => hydrateOk({}, { name: 'In Progress', type: 'started' })
     });
-    const { module } = sandbox;
-    const { deliverRulingReply } = module.exports;
-    const { RULING_COMPOSED_RUN_MARKER } = sandbox.window.ReplyDelivery;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const { RULING_COMPOSED_RUN_MARKER } = window.ReplyDelivery;
+    const li = makeLi(page);
 
     deliverRulingReply(makeRow({ decision: { decision_id: 'd-presstime-ok' } }), 'Approve', li);
     await new Promise((r) => setImmediate(r));
@@ -959,13 +973,13 @@ describe('deliverRulingReply — press-time check (LIN-2775 Area 8)', () => {
 
   test('a row with no linked issue at all is refused before ever reaching the press-time hydrate call', async () => {
     let apiCalls = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async () => ({ id: 'dispatched-1' }),
       api: async () => { apiCalls += 1; return hydrateOk({}, { type: 'started' }); }
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(
       makeRow({ anchor: { ...ANCHOR, issueId: null, issueIdentifier: null }, decision: { decision_id: 'd-presstime-noissue' } }),
@@ -991,11 +1005,11 @@ function makeResumableRow({ decision, anchor, ...rest } = {}) {
 describe('deliverRulingReply — resumable disposition (LIN-1728 review F1/F4)', () => {
   test('F1: deliverReply is called with anchor.workspaceUrlKey, never a page urlKey', async () => {
     let capturedOpts = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       deliverReply: (opts, prompt, handlers) => { capturedOpts = opts; handlers.onDispatchOk(); }
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(makeResumableRow(), 'Approve', li);
 
@@ -1009,11 +1023,11 @@ describe('deliverRulingReply — resumable disposition (LIN-1728 review F1/F4)',
     // provider issueId is frequently absent. Mirrors public/session.js's own
     // `issueId = box.dataset.issueId || issueIdentifier` fallback exactly.
     let capturedOpts = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       deliverReply: (opts, prompt, handlers) => { capturedOpts = opts; handlers.onDispatchOk(); }
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(makeResumableRow({ anchor: { issueId: null, issueIdentifier: 'LIN-1728-R' } }), 'Approve', li);
 
@@ -1023,11 +1037,11 @@ describe('deliverRulingReply — resumable disposition (LIN-1728 review F1/F4)',
 
   test('F4: a truly issueless anchor (no issueId AND no issueIdentifier) degrades to the issueless path', async () => {
     let capturedOpts = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       deliverReply: (opts, prompt, handlers) => { capturedOpts = opts; handlers.onDispatchOk(); }
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(makeResumableRow({ anchor: { issueId: null, issueIdentifier: null } }), 'Approve', li);
 
@@ -1037,11 +1051,11 @@ describe('deliverRulingReply — resumable disposition (LIN-1728 review F1/F4)',
 
   test('a normal anchor carrying both issueId and issueIdentifier prefers the real issueId', async () => {
     let capturedOpts = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       deliverReply: (opts, prompt, handlers) => { capturedOpts = opts; handlers.onDispatchOk(); }
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(makeResumableRow({ anchor: { issueId: 'real-issue-id', issueIdentifier: 'LIN-1728-R' } }), 'Approve', li);
 
@@ -1057,11 +1071,11 @@ describe('deliverRulingReply — resumable disposition (LIN-1728 review F1/F4)',
   // values on purpose.
   test('D3: stampLoopId ≠ anchor.loopId — followUpTo resumes the anchor, decisionLoopId stamps the content loop', async () => {
     let capturedOpts = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       deliverReply: (opts, prompt, handlers) => { capturedOpts = opts; handlers.onDispatchOk(); }
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(
       makeResumableRow({ decision: { decision_id: 'd-stamp-1' }, stampLoopId: 'content-loop-99' }),
@@ -1088,11 +1102,11 @@ describe('deliverRulingReply — resumable disposition (LIN-1728 review F1/F4)',
       code: 'LINEAR_AUTH',
       detail: 'Linear rejected the request as unauthenticated.'
     });
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       deliverReply: (opts, prompt, handlers) => { handlers.onCommentFailed(authErr); }
     });
-    const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply, rulingsPending, rulingKey } = page;
+    const li = makeLi(page);
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-resumable-1');
 
     deliverRulingReply(makeResumableRow(), 'Approve', li);
@@ -1133,11 +1147,11 @@ function makeTaskBoundRow({ decision, anchor, ...rest } = {}) {
 describe('deliverRulingReply — task-bound disposition (LIN-2215 F1)', () => {
   test('a null decisionLoopId no longer trips the early-return guard — postComment is actually attempted', async () => {
     let postCommentCalled = false;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => { postCommentCalled = true; return { ok: true, status: 201, data: {} }; }
     });
-    const { deliverRulingReply } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply } = page;
+    const li = makeLi(page);
 
     deliverRulingReply(makeTaskBoundRow(), 'Approve', li);
     await new Promise((r) => setImmediate(r));
@@ -1149,13 +1163,13 @@ describe('deliverRulingReply — task-bound disposition (LIN-2215 F1)', () => {
     let capturedArgs = null;
     let dispatchCalls = 0;
     let deliverReplyCalls = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey, issueId, prompt, decision) => { capturedArgs = { urlKey, issueId, prompt, decision }; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
       deliverReply: () => { deliverReplyCalls += 1; }
     });
-    const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply, rulingsPending, rulingKey } = page;
+    const li = makeLi(page);
     const key = rulingKey('the-ruling-workspace', TASK_BOUND_ANCHOR, 'd-task-1');
 
     deliverRulingReply(makeTaskBoundRow(), 'Approve', li);
@@ -1170,7 +1184,7 @@ describe('deliverRulingReply — task-bound disposition (LIN-2215 F1)', () => {
     // taskDecisionIssueId must be the canonical UUID (anchor.issueId) — the
     // field TaskDecisionsStore.markOutcome guards on with its own UUID check —
     // never anchor.issueIdentifier. (Field-by-field, not deepEqual — the
-    // decision object crosses the vm sandbox boundary, so it is structurally
+    // decision object crossed the old vm sandbox boundary, so it is structurally
     // but not reference-equal to a same-realm object literal.)
     assert.equal(capturedArgs.decision.taskDecisionId, 'scan_11111111_aaaaaaaaaaaa');
     assert.equal(capturedArgs.decision.taskDecisionIssueId, '11111111-2222-3333-4444-555555555555');
@@ -1184,11 +1198,11 @@ describe('deliverRulingReply — task-bound disposition (LIN-2215 F1)', () => {
   });
 
   test('failure: the comment write rejecting surfaces a visible error and re-enables the buttons — never a silent no-op', async () => {
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => ({ ok: false, status: 502, data: { error: 'upstream write rejected' } })
     });
-    const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply, rulingsPending, rulingKey } = page;
+    const li = makeLi(page);
     const key = rulingKey('the-ruling-workspace', TASK_BOUND_ANCHOR, 'd-task-2');
 
     deliverRulingReply(makeTaskBoundRow({ decision: { decision_id: 'd-task-2' } }), 'Approve', li);
@@ -1204,11 +1218,11 @@ describe('deliverRulingReply — task-bound disposition (LIN-2215 F1)', () => {
   });
 
   test('a network-layer rejection (postComment itself throws) is caught the same way as a non-ok result', async () => {
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => { throw new Error('network offline'); }
     });
-    const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply, rulingsPending, rulingKey } = page;
+    const li = makeLi(page);
     const key = rulingKey('the-ruling-workspace', TASK_BOUND_ANCHOR, 'd-task-3');
 
     deliverRulingReply(makeTaskBoundRow({ decision: { decision_id: 'd-task-3' } }), 'Approve', li);
@@ -1235,7 +1249,7 @@ describe('deliverRulingReply — cross-workspace decision_id collision (LIN-2293
     let commentCallsB = 0;
     let dispatchCallsA = 0;
     let dispatchCallsB = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey) => {
         if (urlKey === 'workspace-a') commentCallsA += 1; else commentCallsB += 1;
         return { ok: true, status: 201, data: {} };
@@ -1246,10 +1260,10 @@ describe('deliverRulingReply — cross-workspace decision_id collision (LIN-2293
       },
       api: nonTerminalHydrateApi()
     });
-    const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
+    const { deliverRulingReply, rulingsPending, rulingKey } = page;
 
-    const liA = makeLi(module);
-    const liB = makeLi(module);
+    const liA = makeLi(page);
+    const liB = makeLi(page);
     const rowA = makeRow({ anchor: { workspaceUrlKey: 'workspace-a' }, decision: { decision_id: 'shared-decision' } });
     const rowB = makeRow({ anchor: { workspaceUrlKey: 'workspace-b' }, decision: { decision_id: 'shared-decision' } });
     const keyA = rulingKey('workspace-a', ANCHOR, 'shared-decision');
@@ -1287,22 +1301,22 @@ describe('deliverRulingReply — cross-workspace decision_id collision (LIN-2293
 // green, so green CI could not distinguish the fixed render path from the
 // broken one. These assertions fail under exactly that mutation.
 describe('renderRulings — cross-workspace decision_id reuse (LIN-2293 review F1)', () => {
-  function makeRenderSandbox() {
+  async function makeRenderSandbox() {
     const world = makeWorld();
     const list = world.document.createElement('ul');
     const empty = world.document.createElement('p');
     empty.hidden = false;
-    const { module } = makeSandbox({ world,
+    const page = await makeSandbox({ world,
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async () => ({ id: 'd' }),
       elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
     });
-    return { module, list, empty };
+    return { page, list, empty };
   }
 
-  test('two rows sharing decision_id in different workspaces get independent <li> nodes', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings, renderedRulingRows, rulingKey } = module.exports;
+  test('two rows sharing decision_id in different workspaces get independent <li> nodes', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings, renderedRulingRows, rulingKey } = page;
 
     const rowA = makeRow({ anchor: { workspaceUrlKey: 'workspace-a' }, decision: { decision_id: 'shared-decision' } });
     const rowB = makeRow({ anchor: { workspaceUrlKey: 'workspace-b' }, decision: { decision_id: 'shared-decision' } });
@@ -1324,9 +1338,9 @@ describe('renderRulings — cross-workspace decision_id reuse (LIN-2293 review F
     assert.notEqual(list.children[0], list.children[1], 'the two attached nodes must be distinct');
   });
 
-  test('a pending row is reused without the other workspace’s row reusing it too', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings, renderedRulingRows, rulingsPending, rulingKey } = module.exports;
+  test('a pending row is reused without the other workspace’s row reusing it too', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings, renderedRulingRows, rulingsPending, rulingKey } = page;
 
     const rowA = makeRow({ anchor: { workspaceUrlKey: 'workspace-a' }, decision: { decision_id: 'shared-decision' } });
     const rowB = makeRow({ anchor: { workspaceUrlKey: 'workspace-b' }, decision: { decision_id: 'shared-decision' } });
@@ -1367,17 +1381,17 @@ describe('renderRulings — cross-workspace decision_id reuse (LIN-2293 review F
 // widening `rulingKey` to `(urlKey, anchor, decisionId)`, folding in
 // `anchor.loopId ?? anchor.taskDecisionId` (LIN-2756 Proposal).
 describe('renderRulings — same-workspace, different-loop decision_id collision (LIN-2756)', () => {
-  function makeRenderSandbox() {
+  async function makeRenderSandbox() {
     const world = makeWorld();
     const list = world.document.createElement('ul');
     const empty = world.document.createElement('p');
     empty.hidden = false;
-    const { module } = makeSandbox({ world,
+    const page = await makeSandbox({ world,
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async () => ({ id: 'd' }),
       elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
     });
-    return { module, list, empty };
+    return { page, list, empty };
   }
 
   const REVIEW_LOOP = '07509b1e';
@@ -1387,9 +1401,9 @@ describe('renderRulings — same-workspace, different-loop decision_id collision
     return makeRow({ anchor: { loopId }, decision: { decision_id: 'lin2384-f6-gate' } });
   }
 
-  test('two loops in one workspace sharing decision_id get independent <li> nodes (LIN-2756 Acceptance #1)', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings, renderedRulingRows } = module.exports;
+  test('two loops in one workspace sharing decision_id get independent <li> nodes (LIN-2756 Acceptance #1)', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings, renderedRulingRows } = page;
 
     renderRulings([loopRow(REVIEW_LOOP), loopRow(CLOSEOUT_LOOP)]);
 
@@ -1411,17 +1425,17 @@ describe('renderRulings — same-workspace, different-loop decision_id collision
 // null` (the server's shape for both "never suggested" and "withdrawn") must
 // render exactly as today — no banner, no empty container.
 describe('renderRulingRow — suggestion banner (LIN-2444 Phase 2)', () => {
-  function makeRenderSandbox() {
+  async function makeRenderSandbox() {
     const world = makeWorld();
     const list = world.document.createElement('ul');
     const empty = world.document.createElement('p');
     empty.hidden = false;
-    const { module } = makeSandbox({ world,
+    const page = await makeSandbox({ world,
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async () => ({ id: 'd' }),
       elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
     });
-    return { module, list, empty };
+    return { page, list, empty };
   }
 
   const SUGGESTION = {
@@ -1430,9 +1444,9 @@ describe('renderRulingRow — suggestion banner (LIN-2444 Phase 2)', () => {
     suggestedAt: '2026-09-05T00:00:00.000Z'
   };
 
-  test('a standing suggestion renders the banner with reason + suggestedBy + a formatted suggestedAt', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings } = module.exports;
+  test('a standing suggestion renders the banner with reason + suggestedBy + a formatted suggestedAt', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings } = page;
 
     renderRulings([makeRow({ suggestedDismissal: SUGGESTION })]);
 
@@ -1446,9 +1460,9 @@ describe('renderRulingRow — suggestion banner (LIN-2444 Phase 2)', () => {
     assert.match(metaEl.textContent, /stub-relative-time\(2026-09-05T00:00:00\.000Z\)/, 'suggestedAt is run through relativeTime, not printed raw');
   });
 
-  test('the banner renders on a non-canReply (mid-turn) row too', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings } = module.exports;
+  test('the banner renders on a non-canReply (mid-turn) row too', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings } = page;
 
     renderRulings([makeRow({ suggestedDismissal: SUGGESTION, canReply: false })]);
 
@@ -1456,9 +1470,9 @@ describe('renderRulingRow — suggestion banner (LIN-2444 Phase 2)', () => {
     assert.ok(li.querySelector('.obs-ruling-suggestion'), 'the banner must not be gated on canReply');
   });
 
-  test('the banner renders on a canReply row too', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings } = module.exports;
+  test('the banner renders on a canReply row too', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings } = page;
 
     renderRulings([makeRow({ suggestedDismissal: SUGGESTION, canReply: true })]);
 
@@ -1466,9 +1480,9 @@ describe('renderRulingRow — suggestion banner (LIN-2444 Phase 2)', () => {
     assert.ok(li.querySelector('.obs-ruling-suggestion'));
   });
 
-  test('suggestedDismissal: null renders no banner at all — no empty container either', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings } = module.exports;
+  test('suggestedDismissal: null renders no banner at all — no empty container either', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings } = page;
 
     renderRulings([makeRow({ suggestedDismissal: null })]);
 
@@ -1476,9 +1490,9 @@ describe('renderRulingRow — suggestion banner (LIN-2444 Phase 2)', () => {
     assert.equal(li.querySelector('.obs-ruling-suggestion'), null);
   });
 
-  test('a row with no suggestedDismissal field at all (undefined) also renders no banner', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings } = module.exports;
+  test('a row with no suggestedDismissal field at all (undefined) also renders no banner', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings } = page;
 
     renderRulings([makeRow()]);
 
@@ -1486,9 +1500,9 @@ describe('renderRulingRow — suggestion banner (LIN-2444 Phase 2)', () => {
     assert.equal(li.querySelector('.obs-ruling-suggestion'), null);
   });
 
-  test('the reason text is rendered via textContent, never raw HTML interpolation', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings } = module.exports;
+  test('the reason text is rendered via textContent, never raw HTML interpolation', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings } = page;
 
     const hostileReason = '<img src=x onerror="alert(1)"> & "quoted" <b>bold</b>';
     renderRulings([makeRow({ suggestedDismissal: { ...SUGGESTION, reason: hostileReason } })]);
@@ -1514,11 +1528,11 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
 
   test('Agree on a loop-backed row posts to the rulings dismiss route with the right body, targeting anchor.workspaceUrlKey', async () => {
     let captured = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       api: async (url, opts) => { captured = { url, opts }; return { success: true }; }
     });
-    const { agreeRulingRow } = module.exports;
-    const li = makeLi(module);
+    const { agreeRulingRow } = page;
+    const li = makeLi(page);
 
     agreeRulingRow(makeRow(), li);
     await new Promise((r) => setImmediate(r));
@@ -1532,11 +1546,11 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
 
   test('Agree on a task-bound row posts to the scan dismiss route with {id: taskDecisionId}', async () => {
     let captured = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       api: async (url, opts) => { captured = { url, opts }; return { success: true }; }
     });
-    const { agreeRulingRow } = module.exports;
-    const li = makeLi(module);
+    const { agreeRulingRow } = page;
+    const li = makeLi(page);
     const taskBoundRow = makeRow({
       anchor: { loopId: null, taskDecisionId: 'td-1' },
       disposition: 'task-bound'
@@ -1553,11 +1567,11 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
 
   test('Agree targets anchor.workspaceUrlKey, never a page urlKey', async () => {
     let capturedUrl = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       api: async (url) => { capturedUrl = url; return { success: true }; }
     });
-    const { agreeRulingRow } = module.exports;
-    const li = makeLi(module);
+    const { agreeRulingRow } = page;
+    const li = makeLi(page);
     const row = makeRow({ anchor: { workspaceUrlKey: 'some-other-workspace' } });
 
     agreeRulingRow(row, li);
@@ -1569,11 +1583,11 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
 
   test('Agree issues no proxy-prefixed request', async () => {
     let capturedUrl = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       api: async (url) => { capturedUrl = url; return { success: true }; }
     });
-    const { agreeRulingRow } = module.exports;
-    const li = makeLi(module);
+    const { agreeRulingRow } = page;
+    const li = makeLi(page);
 
     agreeRulingRow(makeRow(), li);
     await new Promise((r) => setImmediate(r));
@@ -1584,9 +1598,9 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
   });
 
   test('a successful Agree writes "dismissed as proposed" feedback and clears its pending state (no dangling pending state)', async () => {
-    const { module } = makeSandbox({ api: async () => ({ success: true }) });
-    const { agreeRulingRow, rulingsPending, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const page = await makeSandbox({ api: async () => ({ success: true }) });
+    const { agreeRulingRow, rulingsPending, rulingKey } = page;
+    const li = makeLi(page);
     const row = makeRow();
 
     await agreeRulingRow(row, li);
@@ -1598,9 +1612,9 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
   });
 
   test('a failed Agree surfaces an error and re-enables the row for retry', async () => {
-    const { module } = makeSandbox({ api: async () => { throw new Error('boom'); } });
-    const { agreeRulingRow, rulingsPending, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const page = await makeSandbox({ api: async () => { throw new Error('boom'); } });
+    const { agreeRulingRow, rulingsPending, rulingKey } = page;
+    const li = makeLi(page);
     const row = makeRow();
 
     await agreeRulingRow(row, li);
@@ -1617,9 +1631,9 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
   // directly against the seam the fix reads/writes, not just its downstream
   // effect on a repaint.
   test('a successful single-click Agree marks the key rulingsSettled (review F2)', async () => {
-    const { module } = makeSandbox({ api: async () => ({ success: true }) });
-    const { agreeRulingRow, rulingsSettled, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const page = await makeSandbox({ api: async () => ({ success: true }) });
+    const { agreeRulingRow, rulingsSettled, rulingKey } = page;
+    const li = makeLi(page);
     const row = makeRow();
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
 
@@ -1635,17 +1649,17 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
   // closing the exact double-POST hole the plan review already closed for
   // bulk, now on the single-click path an operator actually uses.
   test('a repaint after a successful Agree reuses the row with controls disabled, not rebuilt re-armed (review F2)', async () => {
-    const { module, list } = (() => {
+    const { page, list } = await (async () => {
       const world = makeWorld();
       const l = world.document.createElement('ul');
       const e = world.document.createElement('p'); e.hidden = false;
-      const { module: m } = makeSandbox({ world,
+      const page = await makeSandbox({ world,
         api: async () => ({ success: true }),
         elements: { 'obs-rulings': l, 'obs-rulings-empty': e }
       });
-      return { module: m, list: l };
+      return { page, list: l };
     })();
-    const { renderRulings, agreeRulingRow, rulingKey } = module.exports;
+    const { renderRulings, agreeRulingRow, rulingKey } = page;
     const suggestedRow = makeRow({ suggestedDismissal: SUGGESTION });
 
     renderRulings([suggestedRow]);
@@ -1670,9 +1684,9 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
   // browser.
   test('a second Agree press on an already-settled key sends no request (review F2)', async () => {
     let apiCalls = 0;
-    const { module } = makeSandbox({ api: async () => { apiCalls++; return { success: true }; } });
-    const { agreeRulingRow } = module.exports;
-    const li = makeLi(module);
+    const page = await makeSandbox({ api: async () => { apiCalls++; return { success: true }; } });
+    const { agreeRulingRow } = page;
+    const li = makeLi(page);
     const row = makeRow();
 
     await agreeRulingRow(row, li);
@@ -1695,17 +1709,17 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
   // missing poll (same `<li>`, not rebuilt) and is released only on a SECOND
   // consecutive missing poll.
   test('a settled row survives one missing poll unrebuilt, then releases on the next (LIN-2797)', async () => {
-    const { module, list } = (() => {
+    const { page, list } = await (async () => {
       const world = makeWorld();
       const l = world.document.createElement('ul');
       const e = world.document.createElement('p'); e.hidden = false;
-      const { module: m } = makeSandbox({ world,
+      const page = await makeSandbox({ world,
         api: async () => ({ success: true }),
         elements: { 'obs-rulings': l, 'obs-rulings-empty': e }
       });
-      return { module: m, list: l };
+      return { page, list: l };
     })();
-    const { renderRulings, agreeRulingRow, rulingsSettled, rulingsSettledGhosted, rulingKey } = module.exports;
+    const { renderRulings, agreeRulingRow, rulingsSettled, rulingsSettledGhosted, rulingKey } = page;
     const row = makeRow();
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
 
@@ -1735,17 +1749,17 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
   // reset rather than carrying a stale "already shown once" count into a
   // LATER, unrelated disappearance.
   test('a settled row that reappears before release resets the ghost flag (LIN-2797)', async () => {
-    const { module, list } = (() => {
+    const { page, list } = await (async () => {
       const world = makeWorld();
       const l = world.document.createElement('ul');
       const e = world.document.createElement('p'); e.hidden = false;
-      const { module: m } = makeSandbox({ world,
+      const page = await makeSandbox({ world,
         api: async () => ({ success: true }),
         elements: { 'obs-rulings': l, 'obs-rulings-empty': e }
       });
-      return { module: m, list: l };
+      return { page, list: l };
     })();
-    const { renderRulings, agreeRulingRow, rulingsSettled, rulingsSettledGhosted, rulingKey } = module.exports;
+    const { renderRulings, agreeRulingRow, rulingsSettled, rulingsSettledGhosted, rulingKey } = page;
     const row = makeRow();
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
 
@@ -1772,11 +1786,11 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
   // row), never a dismiss endpoint.
   test('Keep posts to the keep route with {decisionId, decisionLoopId}, never a dismiss endpoint', async () => {
     let captured = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       api: async (url, opts) => { captured = { url, opts }; return { success: true, suggestion: { withdrawn: true } }; }
     });
-    const { keepRulingRow } = module.exports;
-    const li = makeLi(module);
+    const { keepRulingRow } = page;
+    const li = makeLi(page);
 
     keepRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li);
     await new Promise((r) => setImmediate(r));
@@ -1793,11 +1807,11 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
   });
 
   test('Keep\'s 404 (no matching suggestion) is handled benignly — not surfaced as an error', async () => {
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       api: async () => { const err = new Error('No matching suggestion to keep'); err.status = 404; throw err; }
     });
-    const { keepRulingRow } = module.exports;
-    const li = makeLi(module);
+    const { keepRulingRow } = page;
+    const li = makeLi(page);
 
     keepRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li);
     await new Promise((r) => setImmediate(r));
@@ -1809,11 +1823,11 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
   });
 
   test('a non-404 Keep failure IS surfaced as an error', async () => {
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       api: async () => { const err = new Error('store down'); err.status = 500; throw err; }
     });
-    const { keepRulingRow } = module.exports;
-    const li = makeLi(module);
+    const { keepRulingRow } = page;
+    const li = makeLi(page);
 
     keepRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li);
     await new Promise((r) => setImmediate(r));
@@ -1845,7 +1859,7 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     const selectAll = world.document.createElement('input');
     const countEl = world.document.createElement('span');
     const agreeBtn = world.document.createElement('button');
-    const { module } = makeSandbox({ world,
+    const page = await makeSandbox({ world,
       api: async () => ({ success: true }),
       elements: {
         'obs-rulings': list, 'obs-rulings-empty': empty, 'obs-ruling-bulk-bar': bar,
@@ -1853,7 +1867,7 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
         'obs-ruling-agree-selected': agreeBtn
       }
     });
-    const { renderRulings, agreeRulingRow, toggleRulingSelection, rulingsSelected, rulingKey } = module.exports;
+    const { renderRulings, agreeRulingRow, toggleRulingSelection, rulingsSelected, rulingKey } = page;
 
     const rowA = makeRow({ suggestedDismissal: SUGGESTION });
     const rowB = makeRow({ decision: { decision_id: 'd-b' }, suggestedDismissal: SUGGESTION });
@@ -1893,8 +1907,8 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
       posted.dismiss.push(body.decisionId);
       return { success: true };
     };
-    const { module } = makeSandbox({ world, api, elements: { 'obs-rulings': list, 'obs-rulings-empty': empty } });
-    const { renderRulings, keepRulingRow, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+    const page = await makeSandbox({ world, api, elements: { 'obs-rulings': list, 'obs-rulings-empty': empty } });
+    const { renderRulings, keepRulingRow, toggleRulingSelection, bulkAgreeSelected, rulingKey } = page;
 
     const kept = makeRow({ suggestedDismissal: SUGGESTION });
     const other = makeRow({ decision: { decision_id: 'd-other' }, suggestedDismissal: SUGGESTION });
@@ -1909,17 +1923,17 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     assert.deepEqual(posted.keep, ['d-gone-1']);
 
     // NO poll has landed yet — rulingsRowByKey still holds the pre-Keep row.
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.deepEqual(posted.dismiss, ['d-other'], 'the kept ruling must never be dismissed by a same-tab bulk press');
   });
 
   test('Keep\'s benign 404 (already withdrawn) also clears the row from rulingsSelected (review F7)', async () => {
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       api: async () => { const err = new Error('No matching suggestion to keep'); err.status = 404; throw err; }
     });
-    const { keepRulingRow, rulingsSelected, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const { keepRulingRow, rulingsSelected, rulingKey } = page;
+    const li = makeLi(page);
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
     rulingsSelected.add(key);
 
@@ -1940,9 +1954,9 @@ describe('dismissRulingRow selection-clearing (LIN-2444 review — third open in
   const SUGGESTION = { reason: 'shipped', suggestedBy: 'lane-e', suggestedAt: '2026-09-05T00:00:00.000Z' };
 
   test('a successful Dismiss clears the row from rulingsSelected at the moment of success', async () => {
-    const { module } = makeSandbox({ api: async () => ({ success: true }) });
-    const { dismissRulingRow, rulingsSelected, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const page = await makeSandbox({ api: async () => ({ success: true }) });
+    const { dismissRulingRow, rulingsSelected, rulingKey } = page;
+    const li = makeLi(page);
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
     rulingsSelected.add(key);
 
@@ -1959,8 +1973,8 @@ describe('dismissRulingRow selection-clearing (LIN-2444 review — third open in
     const empty = world.document.createElement('p'); empty.hidden = false;
     const posted = [];
     const api = async (url, opts) => { posted.push(JSON.parse(opts.body).decisionId); return { success: true }; };
-    const { module } = makeSandbox({ world, api, elements: { 'obs-rulings': list, 'obs-rulings-empty': empty } });
-    const { renderRulings, dismissRulingRow, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+    const page = await makeSandbox({ world, api, elements: { 'obs-rulings': list, 'obs-rulings-empty': empty } });
+    const { renderRulings, dismissRulingRow, toggleRulingSelection, bulkAgreeSelected, rulingKey } = page;
 
     const dismissed = makeRow({ suggestedDismissal: SUGGESTION });
     const other = makeRow({ decision: { decision_id: 'd-other' }, suggestedDismissal: SUGGESTION });
@@ -1974,7 +1988,7 @@ describe('dismissRulingRow selection-clearing (LIN-2444 review — third open in
     await new Promise((r) => setImmediate(r));
     posted.length = 0; // clear the dismiss call itself; only the bulk phase matters below
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.deepEqual(posted, ['d-other'], 'the already-dismissed row must not receive a second write from the bulk path');
   });
@@ -1991,9 +2005,9 @@ describe('shelveRulingRow selection-clearing (LIN-2444 review F8 — sixth open 
   const SUGGESTION = { reason: 'shipped', suggestedBy: 'lane-e', suggestedAt: '2026-09-05T00:00:00.000Z' };
 
   test('a successful Shelve clears the row from rulingsSelected at the moment of success', async () => {
-    const { module } = makeSandbox({ api: async () => ({ success: true }) });
-    const { shelveRulingRow, rulingsSelected, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const page = await makeSandbox({ api: async () => ({ success: true }) });
+    const { shelveRulingRow, rulingsSelected, rulingKey } = page;
+    const li = makeLi(page);
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
     rulingsSelected.add(key);
 
@@ -2015,8 +2029,8 @@ describe('shelveRulingRow selection-clearing (LIN-2444 review F8 — sixth open 
       posted.dismiss.push(body.decisionId);
       return { success: true };
     };
-    const { module } = makeSandbox({ world, api, elements: { 'obs-rulings': list, 'obs-rulings-empty': empty } });
-    const { renderRulings, shelveRulingRow, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+    const page = await makeSandbox({ world, api, elements: { 'obs-rulings': list, 'obs-rulings-empty': empty } });
+    const { renderRulings, shelveRulingRow, toggleRulingSelection, bulkAgreeSelected, rulingKey } = page;
 
     const shelved = makeRow({ suggestedDismissal: SUGGESTION });
     const other = makeRow({ decision: { decision_id: 'd-other' }, suggestedDismissal: SUGGESTION });
@@ -2032,7 +2046,7 @@ describe('shelveRulingRow selection-clearing (LIN-2444 review F8 — sixth open 
 
     // NO poll has landed yet — rulingsRowByKey still holds the pre-shelve row,
     // exactly the window the review's PROBE reproduced.
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.deepEqual(posted.dismiss, ['d-other'], 'the shelved ruling must never be dismissed by a same-tab bulk press');
   });
@@ -2046,11 +2060,11 @@ describe('shelveRulingRow selection-clearing (LIN-2444 review F8 — sixth open 
   // suppresses another loop's unshelved ruling with no error anywhere.
   test('Shelve posts to the shelve route with the row\'s own decisionLoopId (review N1)', async () => {
     let captured = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       api: async (url, opts) => { captured = { url, opts }; return { success: true }; }
     });
-    const { shelveRulingRow } = module.exports;
-    const li = makeLi(module);
+    const { shelveRulingRow } = page;
+    const li = makeLi(page);
 
     shelveRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li, 'deferred pending upstream fix', 24 * 60 * 60 * 1000);
     await new Promise((r) => setImmediate(r));
@@ -2081,12 +2095,12 @@ describe('deliverRulingReply also clears bulk selection (LIN-2444 review — fif
   const SUGGESTION = { reason: 'shipped', suggestedBy: 'lane-e', suggestedAt: '2026-09-05T00:00:00.000Z' };
 
   test('answering a selected, repliable-and-suggested row via reply clears it from rulingsSelected on full success', async () => {
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async () => ({ id: 'dispatched-1' })
     });
-    const { deliverRulingReply, rulingsSelected, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply, rulingsSelected, rulingKey } = page;
+    const li = makeLi(page);
     const row = makeRow({ suggestedDismissal: SUGGESTION });
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
     rulingsSelected.add(key);
@@ -2099,12 +2113,12 @@ describe('deliverRulingReply also clears bulk selection (LIN-2444 review — fif
   });
 
   test('a partial-failure reply (comment recorded, dispatch failed to start) also clears selection — the answer is already durable', async () => {
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async () => { throw new Error('queue temporarily unavailable'); }
     });
-    const { deliverRulingReply, rulingsSelected, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const { deliverRulingReply, rulingsSelected, rulingKey } = page;
+    const li = makeLi(page);
     const row = makeRow({ suggestedDismissal: SUGGESTION });
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
     rulingsSelected.add(key);
@@ -2125,25 +2139,25 @@ describe('deliverRulingReply also clears bulk selection (LIN-2444 review — fif
 // Driven through the real render + click path (not the bare handler) so the
 // assertion is against the actual DOM the plan says is load-bearing.
 describe('rulingRowControls widened for Agree/Keep (LIN-2444 Phase 4)', () => {
-  function makeRenderSandbox(api) {
+  async function makeRenderSandbox(api) {
     const world = makeWorld();
     const list = world.document.createElement('ul');
     const empty = world.document.createElement('p');
     empty.hidden = false;
-    const { module } = makeSandbox({ world,
+    const page = await makeSandbox({ world,
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async () => ({ id: 'd' }),
       api,
       elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
     });
-    return { module, list, empty };
+    return { page, list, empty };
   }
 
   test('pressing Agree disables every control on the row, including Agree and Keep themselves', async () => {
     let resolveApi;
     const pending = new Promise((resolve) => { resolveApi = resolve; });
-    const { module, list } = makeRenderSandbox(async () => pending);
-    const { renderRulings } = module.exports;
+    const { page, list } = await makeRenderSandbox(async () => pending);
+    const { renderRulings } = page;
 
     const row = makeRow({ suggestedDismissal: { reason: 'x', suggestedBy: 'y', suggestedAt: '2026-09-05T00:00:00.000Z' } });
     renderRulings([row]);
@@ -2175,8 +2189,8 @@ describe('rulingRowControls widened for Agree/Keep (LIN-2444 Phase 4)', () => {
   test('pressing Keep disables every control on the row, including Agree and Keep themselves', async () => {
     let resolveApi;
     const pending = new Promise((resolve) => { resolveApi = resolve; });
-    const { module, list } = makeRenderSandbox(async () => pending);
-    const { renderRulings } = module.exports;
+    const { page, list } = await makeRenderSandbox(async () => pending);
+    const { renderRulings } = page;
 
     const row = makeRow({ suggestedDismissal: { reason: 'x', suggestedBy: 'y', suggestedAt: '2026-09-05T00:00:00.000Z' } });
     renderRulings([row]);
@@ -2197,9 +2211,9 @@ describe('rulingRowControls widened for Agree/Keep (LIN-2444 Phase 4)', () => {
     assert.equal(keepBtn.disabled, false);
   });
 
-  test('Agree/Keep render only when row.suggestedDismissal is set — absent otherwise', () => {
-    const { module, list } = makeRenderSandbox(async () => ({ success: true }));
-    const { renderRulings } = module.exports;
+  test('Agree/Keep render only when row.suggestedDismissal is set — absent otherwise', async () => {
+    const { page, list } = await makeRenderSandbox(async () => ({ success: true }));
+    const { renderRulings } = page;
 
     renderRulings([makeRow({ suggestedDismissal: null })]);
     const li = list.children[0];
@@ -2222,7 +2236,7 @@ describe('rulingRowControls widened for Agree/Keep (LIN-2444 Phase 4)', () => {
 // decision-answer (markDecisionAnswered's unconditional $push has no
 // idempotence guard on the loop-backed branch).
 describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
-  function makeBulkSandbox({ api, confirm } = {}) {
+  async function makeBulkSandbox({ api, confirm } = {}) {
     const world = makeWorld();
     const list = world.document.createElement('ul');
     const empty = world.document.createElement('p');
@@ -2231,7 +2245,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     const selectAll = world.document.createElement('input');
     const countEl = world.document.createElement('span');
     const agreeBtn = world.document.createElement('button');
-    const sandbox = makeSandbox({ world,
+    const page = await makeSandbox({ world,
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async () => ({ id: 'd' }),
       api,
@@ -2245,7 +2259,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
         'obs-ruling-agree-selected': agreeBtn
       }
     });
-    return { sandbox, module: sandbox.module, list, bar, selectAll, countEl, agreeBtn };
+    return { page, list, bar, selectAll, countEl, agreeBtn };
   }
 
   const SUGGESTION = { reason: 'shipped', suggestedBy: 'lane-e', suggestedAt: '2026-09-05T00:00:00.000Z' };
@@ -2254,18 +2268,18 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     return makeRow({ suggestedDismissal: SUGGESTION, ...overrides });
   }
 
-  test('a checkbox renders only on a suggested row', () => {
-    const { module, list } = makeBulkSandbox();
-    const { renderRulings } = module.exports;
+  test('a checkbox renders only on a suggested row', async () => {
+    const { page, list } = await makeBulkSandbox();
+    const { renderRulings } = page;
 
     renderRulings([makeRow({ suggestedDismissal: null })]);
     const li = list.children[0];
     assert.equal(li.querySelector('.obs-ruling-select'), null);
   });
 
-  test('selection survives a repaint — the checkbox reflects rulingsSelected, never its own prior DOM state', () => {
-    const { module, list } = makeBulkSandbox();
-    const { renderRulings, toggleRulingSelection, rulingKey } = module.exports;
+  test('selection survives a repaint — the checkbox reflects rulingsSelected, never its own prior DOM state', async () => {
+    const { page, list } = await makeBulkSandbox();
+    const { renderRulings, toggleRulingSelection, rulingKey } = page;
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
 
     renderRulings([suggestedRow()]);
@@ -2283,9 +2297,9 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     assert.equal(checkbox.checked, true, 'the rebuilt checkbox must restore checked state from rulingsSelected, not default to unchecked');
   });
 
-  test('setAllRulingsSelected selects only currently-rendered suggested rows', () => {
-    const { module } = makeBulkSandbox();
-    const { renderRulings, setAllRulingsSelected, rulingsSelected, rulingKey } = module.exports;
+  test('setAllRulingsSelected selects only currently-rendered suggested rows', async () => {
+    const { page } = await makeBulkSandbox();
+    const { renderRulings, setAllRulingsSelected, rulingsSelected, rulingKey } = page;
 
     const suggested = suggestedRow({ decision: { decision_id: 'd-suggested' } });
     const plain = makeRow({ suggestedDismissal: null, decision: { decision_id: 'd-plain' } });
@@ -2309,10 +2323,10 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
   // tests don't touch.
   test('two rows sharing decision_id across DIFFERENT workspaces select and bulk-agree independently (review F5)', async () => {
     const calls = [];
-    const { module } = makeBulkSandbox({
+    const { page } = await makeBulkSandbox({
       api: async (url, opts) => { calls.push({ url, decisionId: JSON.parse(opts.body).decisionId }); return { success: true }; }
     });
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = module.exports;
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = page;
 
     const rowWsA = suggestedRow({ anchor: { workspaceUrlKey: 'workspace-a' }, decision: { decision_id: 'shared-decision' } });
     const rowWsB = suggestedRow({ anchor: { workspaceUrlKey: 'workspace-b' }, decision: { decision_id: 'shared-decision' } });
@@ -2327,7 +2341,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     assert.ok(rulingsSelected.has(keyA));
     assert.equal(rulingsSelected.has(keyB), false, "selecting one workspace's row must never select the other's, despite the shared decision_id");
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.deepEqual(calls.map((c) => c.decisionId), ['shared-decision'], 'exactly one POST for the whole batch — workspace B was never selected');
     assert.ok(calls[0].url.includes('/workspace/workspace-a/'), `the POST must target workspace A, never B, got ${calls[0].url}`);
@@ -2337,15 +2351,15 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
 
   test('bulk-agree acts only on selected suggested rows — an unselected suggested row is left untouched', async () => {
     const calls = [];
-    const { module } = makeBulkSandbox({ api: async (url, opts) => { calls.push(JSON.parse(opts.body).decisionId); return { success: true }; } });
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+    const { page } = await makeBulkSandbox({ api: async (url, opts) => { calls.push(JSON.parse(opts.body).decisionId); return { success: true }; } });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = page;
 
     const rowA = suggestedRow({ decision: { decision_id: 'd-a' } });
     const rowB = suggestedRow({ decision: { decision_id: 'd-b' } });
     renderRulings([rowA, rowB]);
     toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-a'), true);
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.deepEqual(calls, ['d-a'], 'only the selected row must be agreed');
   });
@@ -2353,17 +2367,17 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
   test('the confirm() gate is honoured — cancelling sends no request and leaves the selection untouched', async () => {
     let apiCalled = false;
     const confirmCalls = [];
-    const { module } = makeBulkSandbox({
+    const { page } = await makeBulkSandbox({
       api: async () => { apiCalled = true; return { success: true }; },
       confirm: (msg) => { confirmCalls.push(msg); return false; }
     });
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = module.exports;
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = page;
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
 
     renderRulings([suggestedRow()]);
     toggleRulingSelection(key, true);
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.equal(apiCalled, false, 'declining the confirm() dialog must send no request');
     assert.equal(confirmCalls.length, 1);
@@ -2374,27 +2388,27 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
   test('an empty selection is a no-op — no confirm(), no request', async () => {
     let confirmCalled = false;
     let apiCalled = false;
-    const { module } = makeBulkSandbox({
+    const { page } = await makeBulkSandbox({
       api: async () => { apiCalled = true; return { success: true }; },
       confirm: () => { confirmCalled = true; return true; }
     });
-    const { bulkAgreeSelected } = module.exports;
+    const { bulkAgreeSelected } = page;
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.equal(confirmCalled, false);
     assert.equal(apiCalled, false);
   });
 
   test('a succeeded key is deleted from the selection Set at the moment of success', async () => {
-    const { module } = makeBulkSandbox({ api: async () => ({ success: true }) });
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingsSettled, rulingKey } = module.exports;
+    const { page } = await makeBulkSandbox({ api: async () => ({ success: true }) });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingsSettled, rulingKey } = page;
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
 
     renderRulings([suggestedRow()]);
     toggleRulingSelection(key, true);
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.equal(rulingsSelected.has(key), false);
     assert.ok(rulingsSettled.has(key), 'a succeeded key must be marked settled');
@@ -2402,7 +2416,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
 
   test('a mid-batch failure leaves later rows still processed, and the failed row stays selected', async () => {
     const calls = [];
-    const { module } = makeBulkSandbox({
+    const { page } = await makeBulkSandbox({
       api: async (url, opts) => {
         const { decisionId } = JSON.parse(opts.body);
         calls.push(decisionId);
@@ -2410,7 +2424,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
         return { success: true };
       }
     });
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = module.exports;
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = page;
 
     const rowA = suggestedRow({ decision: { decision_id: 'd-a' } });
     const rowB = suggestedRow({ decision: { decision_id: 'd-b' } });
@@ -2421,7 +2435,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     const keyC = rulingKey('the-ruling-workspace', ANCHOR, 'd-c');
     [keyA, keyB, keyC].forEach((k) => toggleRulingSelection(k, true));
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.deepEqual(calls, ['d-a', 'd-b', 'd-c'], 'the loop must continue past a mid-batch failure');
     assert.equal(rulingsSelected.has(keyA), false, 'the succeeded row before the failure is deselected');
@@ -2431,14 +2445,14 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
 
   test('a second bulk-agree inside the stale window does not re-POST a succeeded row (plan-review finding)', async () => {
     let apiCalls = 0;
-    const { module } = makeBulkSandbox({ api: async () => { apiCalls++; return { success: true }; } });
-    const { renderRulings, toggleRulingSelection, setAllRulingsSelected, bulkAgreeSelected, rulingsSelected, rulingKey } = module.exports;
+    const { page } = await makeBulkSandbox({ api: async () => { apiCalls++; return { success: true }; } });
+    const { renderRulings, toggleRulingSelection, setAllRulingsSelected, bulkAgreeSelected, rulingsSelected, rulingKey } = page;
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
     const row = suggestedRow();
 
     renderRulings([row]);
     toggleRulingSelection(key, true);
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
     assert.equal(apiCalls, 1);
 
     // The stale feed cache still serves the SAME row, suggestion intact, on
@@ -2453,19 +2467,19 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     setAllRulingsSelected(true);
     assert.equal(rulingsSelected.has(key), false);
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
     assert.equal(apiCalls, 1, 'a second bulk-agree must not re-POST an already-succeeded row');
   });
 
   test('a settled row is REUSED (not rebuilt) with its controls still disabled, until it finally leaves the payload', async () => {
-    const { module, list } = makeBulkSandbox({ api: async () => ({ success: true }) });
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+    const { page, list } = await makeBulkSandbox({ api: async () => ({ success: true }) });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = page;
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
     const row = suggestedRow();
 
     renderRulings([row]);
     toggleRulingSelection(key, true);
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
     const settledLi = list.children[0];
     const checkbox = settledLi.querySelector('.obs-ruling-select');
     assert.equal(checkbox.disabled, true, 'a settled row keeps its controls disabled after success');
@@ -2495,13 +2509,20 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
   });
 
   test('exactly one pollRulings() and one badge refresh per batch, never one per row', async () => {
-    const { sandbox, module } = makeBulkSandbox({ api: async () => ({ success: true }) });
+    const { page } = await makeBulkSandbox({ api: async () => ({ success: true }) });
+    // LIN-4463 piece 4: pollRulings and refreshRulingsBadge are module-scope bindings, so they cannot be replaced to count
+    // calls. The counts are read where the calls surface instead: pollRulings' one fetch of the rulings GET, and the
+    // refreshRulingsBadge's one call to the window global it invokes.
     let pollCalls = 0;
-    sandbox.pollRulings = () => { pollCalls++; };
     let badgeCalls = 0;
-    sandbox.refreshRulingsBadge = () => { badgeCalls++; };
+    // pollRulings and the badge refresh both read the page's urlKey, which only the page's init sets: give it one here.
+    page.setObservationData({ urlKey: 'the-ruling-workspace' });
+    const rulingsGet = page.rulingsUrl('the-ruling-workspace');
+    const fetchAll = globalThis.fetch;
+    globalThis.fetch = (url, ...rest) => { if (url === rulingsGet) pollCalls += 1; return fetchAll(url, ...rest); };
+    globalThis.updateRulingsBadge = () => { badgeCalls += 1; };
 
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = page;
     const rowA = suggestedRow({ decision: { decision_id: 'd-a' } });
     const rowB = suggestedRow({ decision: { decision_id: 'd-b' } });
     const rowC = suggestedRow({ decision: { decision_id: 'd-c' } });
@@ -2512,15 +2533,15 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
       rulingKey('the-ruling-workspace', ANCHOR, 'd-c')
     ].forEach((k) => toggleRulingSelection(k, true));
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.equal(pollCalls, 1, 'exactly one pollRulings() for the whole batch');
     assert.equal(badgeCalls, 1, 'exactly one badge refresh for the whole batch');
   });
 
-  test('the bulk bar\'s Agree-selected label and select-all tri-state track the selection', () => {
-    const { module, agreeBtn, selectAll, bar } = makeBulkSandbox();
-    const { renderRulings, toggleRulingSelection, rulingKey } = module.exports;
+  test('the bulk bar\'s Agree-selected label and select-all tri-state track the selection', async () => {
+    const { page, agreeBtn, selectAll, bar } = await makeBulkSandbox();
+    const { renderRulings, toggleRulingSelection, rulingKey } = page;
 
     const rowA = suggestedRow({ decision: { decision_id: 'd-a' } });
     const rowB = suggestedRow({ decision: { decision_id: 'd-b' } });
@@ -2541,9 +2562,9 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     assert.equal(selectAll.indeterminate, false);
   });
 
-  test('the bulk bar hides when no row on screen is suggested', () => {
-    const { module, bar } = makeBulkSandbox();
-    const { renderRulings } = module.exports;
+  test('the bulk bar hides when no row on screen is suggested', async () => {
+    const { page, bar } = await makeBulkSandbox();
+    const { renderRulings } = page;
 
     renderRulings([makeRow({ suggestedDismissal: null })]);
     assert.equal(bar.hidden, true);
@@ -2556,9 +2577,9 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
   // stays unanswered). Checked directly against `renderRulings`, before
   // bulk-agree ever runs, so this pins the PRUNE itself rather than only its
   // downstream effect.
-  test('renderRulings drops a selected key from rulingsSelected once its suggestion is withdrawn (review F1)', () => {
-    const { module, bar, countEl, selectAll } = makeBulkSandbox();
-    const { renderRulings, toggleRulingSelection, rulingsSelected, rulingKey } = module.exports;
+  test('renderRulings drops a selected key from rulingsSelected once its suggestion is withdrawn (review F1)', async () => {
+    const { page, bar, countEl, selectAll } = await makeBulkSandbox();
+    const { renderRulings, toggleRulingSelection, rulingsSelected, rulingKey } = page;
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-w');
 
     renderRulings([suggestedRow({ decision: { decision_id: 'd-w' } })]);
@@ -2580,8 +2601,8 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
   // before the batch runs, then "Agree selected" must not dismiss it.
   test('bulk-agree never dismisses a row whose suggestion was withdrawn before the batch ran (review F1)', async () => {
     const calls = [];
-    const { module } = makeBulkSandbox({ api: async (url, opts) => { calls.push(JSON.parse(opts.body).decisionId); return { success: true }; } });
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+    const { page } = await makeBulkSandbox({ api: async (url, opts) => { calls.push(JSON.parse(opts.body).decisionId); return { success: true }; } });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = page;
 
     const withdrawn = suggestedRow({ decision: { decision_id: 'd-w' } });
     const live = suggestedRow({ decision: { decision_id: 'd-live' } });
@@ -2592,7 +2613,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     // Suggestion withdrawn elsewhere; the poll repaints before Agree-selected fires.
     renderRulings([makeRow({ suggestedDismissal: null, decision: { decision_id: 'd-w' } }), live]);
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.deepEqual(calls, ['d-live'], 'the withdrawn row must never be POSTed — only the still-live suggestion is agreed');
   });
@@ -2606,8 +2627,8 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
   // `bulkAgreeRow`'s own guard can still save it.
   test('bulkAgreeRow refuses a withdrawn row even if it is (re-)selected — the guard inside the loop, not just the prune (review F1)', async () => {
     const calls = [];
-    const { module } = makeBulkSandbox({ api: async (url, opts) => { calls.push(JSON.parse(opts.body).decisionId); return { success: true }; } });
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = module.exports;
+    const { page } = await makeBulkSandbox({ api: async (url, opts) => { calls.push(JSON.parse(opts.body).decisionId); return { success: true }; } });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = page;
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-w');
 
     renderRulings([suggestedRow({ decision: { decision_id: 'd-w' } })]);
@@ -2619,7 +2640,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     renderRulings([makeRow({ suggestedDismissal: null, decision: { decision_id: 'd-w' } })]);
     rulingsSelected.add(key);
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.deepEqual(calls, [], 'bulkAgreeRow must independently refuse a row with no live suggestedDismissal');
   });
@@ -2638,7 +2659,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
 // the server's markup) mirroring the sibling `<p>`/`<button>` lib/render-observation.js
 // now renders.
 describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)', () => {
-  function makeProgressSandbox({ api, confirm } = {}) {
+  async function makeProgressSandbox({ api, confirm } = {}) {
     const world = makeWorld();
     const list = world.document.createElement('ul');
     const empty = world.document.createElement('p'); empty.hidden = false;
@@ -2648,7 +2669,7 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
     const agreeBtn = world.document.createElement('button');
     const progressEl = world.document.createElement('p');
     const stopBtn = world.document.createElement('button');
-    const sandbox = makeSandbox({ world,
+    const page = await makeSandbox({ world,
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async () => ({ id: 'd' }),
       api,
@@ -2664,16 +2685,9 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
         'obs-ruling-bulk-stop': stopBtn
       }
     });
-    // initControls() is only ever called from init(), which this harness
-    // never invokes (see the file-header note on public/observation.js's own
-    // two addEventListener calls) — calling it standalone here is safe,
-    // since every binding inside is `if (el) ...`-guarded against elements
-    // this fixture doesn't provide, and it is what wires the Stop button's
-    // real click listener so a test can press Stop exactly the way an
-    // operator would, rather than reaching into module internals that don't
-    // exist yet.
-    sandbox.initControls();
-    return { sandbox, module: sandbox.module, list, bar, selectAll, countEl, agreeBtn, progressEl, stopBtn };
+    // initControls wires the Stop button's real click listener (LIN-4463 piece 4: reached through the page's export).
+    page.initControls();
+    return { page, list, bar, selectAll, countEl, agreeBtn, progressEl, stopBtn };
   }
 
   const SUGGESTION = { reason: 'shipped', suggestedBy: 'lane-e', suggestedAt: '2026-09-05T00:00:00.000Z' };
@@ -2683,16 +2697,16 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
 
   test('progress text updates per row, literally 1-based: "Applying 1 of N…" through "Applying N of N…"', async () => {
     const seenAtCallTime = [];
-    const { module, progressEl } = makeProgressSandbox({
+    const { page, progressEl } = await makeProgressSandbox({
       api: async () => { seenAtCallTime.push(progressEl.textContent); return { success: true }; }
     });
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = page;
 
     const rows = ['d-p1', 'd-p2', 'd-p3'].map((id) => suggestedRow({ decision: { decision_id: id } }));
     renderRulings(rows);
     rows.forEach((r) => toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, r.decision.decision_id), true));
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.deepEqual(
       seenAtCallTime,
@@ -2703,7 +2717,7 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
 
   test('Stop halts the loop before the next row — every unattempted row is still in rulingsSelected, and the summary reads the stopped-early shape', async () => {
     const calls = [];
-    const { module, stopBtn, progressEl } = makeProgressSandbox({
+    const { page, stopBtn, progressEl } = await makeProgressSandbox({
       api: async (url, opts) => {
         calls.push(JSON.parse(opts.body).decisionId);
         // Press Stop from INSIDE the first row's own settle: a row already
@@ -2714,14 +2728,14 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
         return { success: true };
       }
     });
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = module.exports;
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = page;
 
     const rows = ['d-s1', 'd-s2', 'd-s3'].map((id) => suggestedRow({ decision: { decision_id: id } }));
     renderRulings(rows);
     const keys = rows.map((r) => rulingKey('the-ruling-workspace', ANCHOR, r.decision.decision_id));
     keys.forEach((k) => toggleRulingSelection(k, true));
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.deepEqual(calls, ['d-s1'], 'only the row already underway when Stop was pressed may run — Stop must not let a second row start');
     assert.equal(rulingsSelected.has(keys[0]), false, 'the row that completed before Stop was pressed settles normally');
@@ -2736,7 +2750,7 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
 
   test('select-all and the bulk apply button are disabled for the duration of the run and re-enabled once it ends', async () => {
     let rejectFirst;
-    const { module, selectAll, agreeBtn } = makeProgressSandbox({
+    const { page, selectAll, agreeBtn } = await makeProgressSandbox({
       // The row FAILS (stays selected) so the assertions below isolate the
       // run-state portion of agreeBtn's disabled expression — a row that
       // SUCCEEDS empties the selection, which would re-disable the button
@@ -2744,7 +2758,7 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
       // and make this test pass for the wrong one.
       api: async () => new Promise((_resolve, reject) => { rejectFirst = reject; })
     });
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = module.exports;
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = page;
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
 
     renderRulings([suggestedRow()]);
@@ -2752,7 +2766,7 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
     assert.equal(selectAll.disabled, false, 'before the confirmed press, nothing is running yet');
     assert.equal(agreeBtn.disabled, false);
 
-    const runPromise = answerBulk(module, bulkAgreeSelected());
+    const runPromise = answerBulk(page, bulkAgreeSelected());
     await new Promise((r) => setImmediate(r));
     assert.equal(selectAll.disabled, true, 'select-all must be disabled while the batch is running');
     assert.equal(agreeBtn.disabled, true, 'the apply button must be disabled while the batch is running');
@@ -2766,14 +2780,14 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
   });
 
   test('completion summary: all rows applied', async () => {
-    const { module, progressEl } = makeProgressSandbox({ api: async () => ({ success: true }) });
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+    const { page, progressEl } = await makeProgressSandbox({ api: async () => ({ success: true }) });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = page;
 
     const rows = ['d-ok1', 'd-ok2'].map((id) => suggestedRow({ decision: { decision_id: id } }));
     renderRulings(rows);
     rows.forEach((r) => toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, r.decision.decision_id), true));
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.equal(progressEl.textContent, '2 applied.');
   });
@@ -2785,11 +2799,11 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
   // tests below pin `ok` against `total` directly, reproducing the review's
   // own throwaway-probe finding before the fix, and must go red on that tree.
   test('completion summary: a selected row that vanished before its turn tallies as skipped, not counted toward applied (review finding A)', async () => {
-    const { module, progressEl } = makeProgressSandbox({ api: async () => ({ success: true }) });
+    const { page, progressEl } = await makeProgressSandbox({ api: async () => ({ success: true }) });
     const {
       renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey,
       rulingsRowByKey, renderedRulingRows
-    } = module.exports;
+    } = page;
 
     const rows = ['d-ok1', 'd-vanish'].map((id) => suggestedRow({ decision: { decision_id: id } }));
     renderRulings(rows);
@@ -2802,7 +2816,7 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
     rulingsRowByKey.delete(keys[1]);
     renderedRulingRows.delete(keys[1]);
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.equal(
       progressEl.textContent,
@@ -2812,8 +2826,8 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
   });
 
   test('completion summary: a row that fails bulkAgreeRow\'s own top guard (already pending) tallies as skipped, not applied (review finding A)', async () => {
-    const { module, progressEl } = makeProgressSandbox({ api: async () => ({ success: true }) });
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey, rulingsPending } = module.exports;
+    const { page, progressEl } = await makeProgressSandbox({ api: async () => ({ success: true }) });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey, rulingsPending } = page;
 
     const rows = ['d-ok2', 'd-pending'].map((id) => suggestedRow({ decision: { decision_id: id } }));
     renderRulings(rows);
@@ -2828,7 +2842,7 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
     // real bucket.
     rulingsPending.add(keys[1]);
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.equal(
       progressEl.textContent,
@@ -2838,14 +2852,14 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
   });
 
   test('completion summary: a mixed batch names applied · skipped · failed (still selected), each tallied by its own bulkAgreeRow outcome', async () => {
-    const { module, progressEl } = makeProgressSandbox({
+    const { page, progressEl } = await makeProgressSandbox({
       api: async (url, opts) => {
         const { decisionId } = JSON.parse(opts.body);
         if (decisionId === 'd-fail') throw new Error('boom');
         return { success: true };
       }
     });
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = page;
 
     const applied = suggestedRow({ decision: { decision_id: 'd-ok' } });
     const failed = suggestedRow({ decision: { decision_id: 'd-fail' } });
@@ -2860,7 +2874,7 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
     renderRulings([applied, failed, skipped]);
     [applied, failed, skipped].forEach((r) => toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, r.decision.decision_id), true));
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.equal(progressEl.textContent, '1 applied · 1 skipped · 1 failed (still selected).');
   });
@@ -2871,21 +2885,19 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
   // nothing else here throws. Once beat 2 lands, comment out the `finally`
   // wrapper and confirm THIS test alone goes red before trusting it.
   test('a thrown row still tears down: the run flag resets, controls re-enable, a summary renders, and the error propagates (not swallowed)', async () => {
-    const { sandbox, module, selectAll, agreeBtn, progressEl } = makeProgressSandbox({ api: async () => ({ success: true }) });
-    // A test-only stub of a function bulkAgreeSelected's loop calls directly
-    // — mirrors the existing `sandbox.pollRulings = () => {...}` /
-    // `sandbox.refreshRulingsBadge = () => {...}` override idiom already
-    // used above in this same file — simulating a genuine, unanticipated
-    // regression inside the per-row core, which the plan's own Cleanup
-    // section names as exactly the scenario a `finally` must survive.
-    sandbox.bulkAgreeRow = () => { throw new Error('unexpected row failure'); };
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+    const { page, selectAll, agreeBtn, progressEl } = await makeProgressSandbox({ api: async () => ({ success: true }) });
+    // A test-only stub of a function bulkAgreeSelected's loop calls directly, simulating a genuine, unanticipated
+    // regression inside the per-row core, which the plan's own Cleanup section names as exactly the scenario a `finally`
+    // must survive. LIN-4463 piece 4: the per-row core is passed in (bulkAgreeSelected's rowCore parameter), so the throw
+    // reaches the loop without replacing a module-scope binding.
+    const { renderRulings, toggleRulingSelection, rulingKey } = page;
+    const throwingRowCore = async () => { throw new Error('unexpected row failure'); };
 
     renderRulings([suggestedRow()]);
     toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1'), true);
 
     await assert.rejects(
-      () => answerBulk(module, bulkAgreeSelected()),
+      () => answerBulk(page, page.bulkAgreeSelected(throwingRowCore)),
       /unexpected row failure/,
       'the finally block must not swallow the error — it must still propagate after teardown runs'
     );
@@ -2907,10 +2919,10 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
 
   test('the beforeunload guard is armed only while a batch is actually running', async () => {
     let resolveFirst;
-    const { sandbox, module } = makeProgressSandbox({
+    const { page } = await makeProgressSandbox({
       api: async () => new Promise((resolve) => { resolveFirst = resolve; })
     });
-    const beforeunloadHandlers = sandbox.window._listeners.beforeunload || [];
+    const beforeunloadHandlers = window._listeners.beforeunload || [];
     assert.ok(beforeunloadHandlers.length >= 1, 'observation.js must register its beforeunload listener at load time, as it already does today');
     const handler = beforeunloadHandlers[beforeunloadHandlers.length - 1];
     const makeEvent = () => {
@@ -2923,10 +2935,10 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
     handler(idleEvent);
     assert.equal(idleEvent.prevented, false, 'idle (no batch running) must not arm the guard');
 
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = page;
     renderRulings([suggestedRow()]);
     toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1'), true);
-    const runPromise = answerBulk(module, bulkAgreeSelected());
+    const runPromise = answerBulk(page, bulkAgreeSelected());
     await new Promise((r) => setImmediate(r));
 
     const runningEvent = makeEvent();
@@ -2954,7 +2966,7 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
 // Finding), so the mock API below can distinguish which loop's row actually
 // got dismissed.
 describe('bulk-agree / single-agree — same-workspace, different-loop decision_id collision (LIN-2756)', () => {
-  function makeLoopCollisionSandbox({ api } = {}) {
+  async function makeLoopCollisionSandbox({ api } = {}) {
     const world = makeWorld();
     const list = world.document.createElement('ul');
     const empty = world.document.createElement('p'); empty.hidden = false;
@@ -2962,7 +2974,7 @@ describe('bulk-agree / single-agree — same-workspace, different-loop decision_
     const selectAll = world.document.createElement('input');
     const countEl = world.document.createElement('span');
     const agreeBtn = world.document.createElement('button');
-    const { module } = makeSandbox({ world,
+    const page = await makeSandbox({ world,
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async () => ({ id: 'd' }),
       api,
@@ -2973,7 +2985,7 @@ describe('bulk-agree / single-agree — same-workspace, different-loop decision_
         'obs-ruling-agree-selected': agreeBtn
       }
     });
-    return { module, list, bar, selectAll, countEl, agreeBtn };
+    return { page, list, bar, selectAll, countEl, agreeBtn };
   }
 
   const LOOP_SUGGESTION = { reason: 'shipped', suggestedBy: 'lane-e', suggestedAt: '2026-09-05T00:00:00.000Z' };
@@ -2984,9 +2996,9 @@ describe('bulk-agree / single-agree — same-workspace, different-loop decision_
     return makeRow({ anchor: { loopId }, decision: { decision_id: 'lin2384-f6-gate' }, suggestedDismissal: LOOP_SUGGESTION });
   }
 
-  test('select-all counts BOTH loop rows, not one (LIN-2756 Acceptance #2)', () => {
-    const { module } = makeLoopCollisionSandbox();
-    const { renderRulings, setAllRulingsSelected, rulingsSelected } = module.exports;
+  test('select-all counts BOTH loop rows, not one (LIN-2756 Acceptance #2)', async () => {
+    const { page } = await makeLoopCollisionSandbox();
+    const { renderRulings, setAllRulingsSelected, rulingsSelected } = page;
 
     renderRulings([loopRow(REVIEW_LOOP), loopRow(CLOSEOUT_LOOP)]);
     setAllRulingsSelected(true);
@@ -3001,12 +3013,12 @@ describe('bulk-agree / single-agree — same-workspace, different-loop decision_
       calls.push({ decisionLoopId: body.decisionLoopId, decisionId: body.decisionId });
       return { success: true };
     };
-    const { module } = makeLoopCollisionSandbox({ api });
-    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected } = module.exports;
+    const { page } = await makeLoopCollisionSandbox({ api });
+    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected } = page;
 
     renderRulings([loopRow(REVIEW_LOOP), loopRow(CLOSEOUT_LOOP)]);
     setAllRulingsSelected(true);
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     const loopIds = calls.map((c) => c.decisionLoopId).sort();
     assert.deepEqual(
@@ -3022,8 +3034,8 @@ describe('bulk-agree / single-agree — same-workspace, different-loop decision_
       calls.push({ decisionLoopId: body.decisionLoopId, decisionId: body.decisionId });
       return { success: true };
     };
-    const { module, list } = makeLoopCollisionSandbox({ api });
-    const { renderRulings, agreeRulingRow } = module.exports;
+    const { page, list } = await makeLoopCollisionSandbox({ api });
+    const { renderRulings, agreeRulingRow } = page;
 
     const rowReview = loopRow(REVIEW_LOOP);
     const rowCloseout = loopRow(CLOSEOUT_LOOP);
@@ -3061,9 +3073,9 @@ describe('issueDismissRequest carries stampLoopId from all three callers (LIN-29
   test('dismissRulingRow', async () => {
     let capturedBody = null;
     const api = async (url, opts) => { capturedBody = JSON.parse(opts.body); return { success: true }; };
-    const { module } = makeSandbox({ api });
-    const { dismissRulingRow } = module.exports;
-    const li = makeLi(module);
+    const page = await makeSandbox({ api });
+    const { dismissRulingRow } = page;
+    const li = makeLi(page);
 
     dismissRulingRow(makeRow({ suggestedDismissal: SUGGESTION, stampLoopId: 'content-loop-d1' }), li);
     await new Promise((r) => setImmediate(r));
@@ -3077,9 +3089,9 @@ describe('issueDismissRequest carries stampLoopId from all three callers (LIN-29
   test('agreeRulingRow (dismiss branch)', async () => {
     let capturedBody = null;
     const api = async (url, opts) => { capturedBody = JSON.parse(opts.body); return { success: true }; };
-    const { module } = makeSandbox({ api });
-    const { agreeRulingRow } = module.exports;
-    const li = makeLi(module);
+    const page = await makeSandbox({ api });
+    const { agreeRulingRow } = page;
+    const li = makeLi(page);
 
     await agreeRulingRow(makeRow({ suggestedDismissal: SUGGESTION, stampLoopId: 'content-loop-d2' }), li);
 
@@ -3091,9 +3103,9 @@ describe('issueDismissRequest carries stampLoopId from all three callers (LIN-29
   test('bulkAgreeRow (dismiss branch)', async () => {
     let capturedBody = null;
     const api = async (url, opts) => { capturedBody = JSON.parse(opts.body); return { success: true }; };
-    const { module } = makeSandbox({ api });
-    const { bulkAgreeRow, rulingKey } = module.exports;
-    const li = makeLi(module);
+    const page = await makeSandbox({ api });
+    const { bulkAgreeRow, rulingKey } = page;
+    const li = makeLi(page);
     const row = makeRow({ suggestedDismissal: SUGGESTION, stampLoopId: 'content-loop-d3' });
     const key = rulingKey('the-ruling-workspace', ANCHOR, row.decision.decision_id);
 
@@ -3139,7 +3151,7 @@ describe('issueDismissRequest carries stampLoopId from all three callers (LIN-29
 // deliberately diverge from the file's own established pattern to evade
 // this, not merely omit one line.
 describe('the rulings selection-clearing invariant (LIN-2444 review — closing the enumeration itself)', () => {
-  test('every top-level function that guards itself via rulingsPending.add(key) also clears rulingsSelected.delete(key) on success', () => {
+  test('every top-level function that guards itself via rulingsPending.add(key) also clears rulingsSelected.delete(key) on success', async () => {
     const lines = OBSERVATION_JS_SRC.split('\n');
     const starts = [];
     const fnHeaderRe = /^(async )?function (\w+)\(/;
@@ -3190,17 +3202,17 @@ describe('the rulings selection-clearing invariant (LIN-2444 review — closing 
 // inside renderRulingRow — S12's mechanism correction, and the exact bug
 // class `8feb02c7`/LIN-2262 already fixed once in the shelf-gate keying.
 describe('rulingEffectOverride lifecycle (LIN-2775 Area 5)', () => {
-  function makeRenderSandbox() {
+  async function makeRenderSandbox() {
     const world = makeWorld();
     const list = world.document.createElement('ul');
     const empty = world.document.createElement('p');
     empty.hidden = false;
-    const { module } = makeSandbox({ world,
+    const page = await makeSandbox({ world,
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async () => ({ id: 'd' }),
       elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
     });
-    return { module, list, empty };
+    return { page, list, empty };
   }
 
   function flippableRow(overrides = {}) {
@@ -3212,9 +3224,9 @@ describe('rulingEffectOverride lifecycle (LIN-2775 Area 5)', () => {
     });
   }
 
-  test('pressing the flip control sets an override and swaps the row\'s caption/flip label in place', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings, rulingKey, rulingEffectOverride } = module.exports;
+  test('pressing the flip control sets an override and swaps the row\'s caption/flip label in place', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride } = page;
 
     renderRulings([flippableRow()]);
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-effect-1');
@@ -3239,9 +3251,9 @@ describe('rulingEffectOverride lifecycle (LIN-2775 Area 5)', () => {
     assert.equal(rulingEffectOverride.has(key), false, 'a second press clears the override entirely rather than storing the default back into the map');
   });
 
-  test('an override survives a repaint with the SAME payload (row.alternate unchanged) — fresh-render path', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings, rulingKey, rulingEffectOverride } = module.exports;
+  test('an override survives a repaint with the SAME payload (row.alternate unchanged) — fresh-render path', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride } = page;
 
     const row = flippableRow();
     renderRulings([row]);
@@ -3263,9 +3275,9 @@ describe('rulingEffectOverride lifecycle (LIN-2775 Area 5)', () => {
     assert.ok(repaintedFlip.classList.contains('obs-ruling-effect-flip--active'), 'the restored row must render the flip control already in its overridden state');
   });
 
-  test('a stale override (payload\'s alternate changed) is pruned — fresh-render path, row.effect wins', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings, rulingKey, rulingEffectOverride } = module.exports;
+  test('a stale override (payload\'s alternate changed) is pruned — fresh-render path, row.effect wins', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride } = page;
 
     renderRulings([flippableRow()]);
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-effect-1');
@@ -3286,9 +3298,9 @@ describe('rulingEffectOverride lifecycle (LIN-2775 Area 5)', () => {
     assert.equal(freshFlip.textContent, 'Use "resume" instead', 'the flip control now offers the NEW alternate, not the stale one');
   });
 
-  test('an override survives a repaint on the mustReuse (pending) reuse path — the same <li> is kept as-is', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings, rulingKey, rulingEffectOverride, rulingsPending } = module.exports;
+  test('an override survives a repaint on the mustReuse (pending) reuse path — the same <li> is kept as-is', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride, rulingsPending } = page;
 
     const row = flippableRow();
     renderRulings([row]);
@@ -3312,9 +3324,9 @@ describe('rulingEffectOverride lifecycle (LIN-2775 Area 5)', () => {
     rulingsPending.delete(key);
   });
 
-  test('a stale override is pruned on the mustReuse (pending) reuse path too — the staleness check does not live only inside renderRulingRow', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings, rulingKey, rulingEffectOverride, rulingsPending } = module.exports;
+  test('a stale override is pruned on the mustReuse (pending) reuse path too — the staleness check does not live only inside renderRulingRow', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride, rulingsPending } = page;
 
     renderRulings([flippableRow()]);
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-effect-1');
@@ -3335,9 +3347,9 @@ describe('rulingEffectOverride lifecycle (LIN-2775 Area 5)', () => {
     rulingsPending.delete(key);
   });
 
-  test('a row with row.alternate === null never renders the flip control (a hard override can never surface here)', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings } = module.exports;
+  test('a row with row.alternate === null never renders the flip control (a hard override can never surface here)', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings } = page;
 
     renderRulings([makeRow({ decision: { decision_id: 'd-hard-1' }, effect: 'resume', alternate: null })]);
 
@@ -3345,9 +3357,9 @@ describe('rulingEffectOverride lifecycle (LIN-2775 Area 5)', () => {
     assert.equal(li.querySelectorAll('.obs-ruling-effect-flip').length, 0);
   });
 
-  test('a vanished row\'s override is pruned in the seen sweep, so a later reused key never inherits a stale flip', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings, rulingKey, rulingEffectOverride } = module.exports;
+  test('a vanished row\'s override is pruned in the seen sweep, so a later reused key never inherits a stale flip', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride } = page;
 
     renderRulings([flippableRow()]);
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-effect-1');
@@ -3364,24 +3376,24 @@ describe('rulingEffectOverride lifecycle (LIN-2775 Area 5)', () => {
 
 // ─── resolveRecordTarget (LIN-2775 Area 6) — pure, no DOM/network ──────────
 describe('resolveRecordTarget (LIN-2775 Area 6)', () => {
-  function sandboxExports() {
+  async function sandboxExports() {
     // LIN-3252 F1: the pure resolver/composer now live on window.ReplyDelivery
     // (shared with the run-page card); merge both seams so the note constants
     // resolve alongside observation.js's own exports.
-    const sb = makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }) });
-    return Object.assign({}, sb.module.exports, sb.window.ReplyDelivery);
+    const sb = await makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }) });
+    return Object.assign({}, sb, window.ReplyDelivery);
   }
 
-  test('no record_on declared → the anchor, no note', () => {
-    const { resolveRecordTarget } = sandboxExports();
+  test('no record_on declared → the anchor, no note', async () => {
+    const { resolveRecordTarget } = await sandboxExports();
     const result = resolveRecordTarget(ANCHOR, null, { hydrated: true, neighborhood: { parent: null, siblings: [], children: [], cousins: [] } });
     assert.equal(result.issueId, ANCHOR.issueId);
     assert.equal(result.issueIdentifier, ANCHOR.issueIdentifier);
     assert.equal(result.note, null);
   });
 
-  test('record_on matches nothing in the neighbourhood → the anchor, the outside-neighbourhood note', () => {
-    const { resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE } = sandboxExports();
+  test('record_on matches nothing in the neighbourhood → the anchor, the outside-neighbourhood note', async () => {
+    const { resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE } = await sandboxExports();
     const result = resolveRecordTarget(ANCHOR, 'LIN-NOWHERE', {
       hydrated: true,
       neighborhood: { parent: null, siblings: [{ id: 'id-1', identifier: 'LIN-1', state: { type: 'started' } }], children: [], cousins: [] }
@@ -3390,11 +3402,11 @@ describe('resolveRecordTarget (LIN-2775 Area 6)', () => {
     assert.equal(result.note, RECORD_TARGET_OUTSIDE_NOTE);
   });
 
-  test('record_on matches a neighbour whose own state is terminal → the anchor, its OWN honest note (beat 3 correction)', () => {
+  test('record_on matches a neighbour whose own state is terminal → the anchor, its OWN honest note (beat 3 correction)', async () => {
     // NOT the not-found note — LIN-T WAS found in the neighbourhood, so
     // claiming "outside the checked neighbourhood" here would itself be a
     // false claim, which is exactly what this ticket exists to eliminate.
-    const { resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE, RECORD_TARGET_TERMINAL_NOTE } = sandboxExports();
+    const { resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE, RECORD_TARGET_TERMINAL_NOTE } = await sandboxExports();
     for (const type of ['completed', 'canceled', 'duplicate']) {
       const result = resolveRecordTarget(ANCHOR, 'LIN-T', {
         hydrated: true,
@@ -3406,8 +3418,8 @@ describe('resolveRecordTarget (LIN-2775 Area 6)', () => {
     }
   });
 
-  test('record_on matches a non-terminal neighbour → that neighbour, no note', () => {
-    const { resolveRecordTarget } = sandboxExports();
+  test('record_on matches a non-terminal neighbour → that neighbour, no note', async () => {
+    const { resolveRecordTarget } = await sandboxExports();
     const result = resolveRecordTarget(ANCHOR, 'LIN-COUSIN', {
       hydrated: true,
       neighborhood: { parent: null, siblings: [], children: [], cousins: [{ id: 'id-cousin', identifier: 'LIN-COUSIN', state: { type: 'started' } }] }
@@ -3417,8 +3429,8 @@ describe('resolveRecordTarget (LIN-2775 Area 6)', () => {
     assert.equal(result.note, null);
   });
 
-  test('record_on matches the parent specifically (not only siblings/children/cousins)', () => {
-    const { resolveRecordTarget } = sandboxExports();
+  test('record_on matches the parent specifically (not only siblings/children/cousins)', async () => {
+    const { resolveRecordTarget } = await sandboxExports();
     const result = resolveRecordTarget(ANCHOR, 'LIN-PARENT', {
       hydrated: true,
       neighborhood: { parent: { id: 'id-parent', identifier: 'LIN-PARENT', state: { type: 'unstarted' } }, siblings: [], children: [], cousins: [] }
@@ -3427,8 +3439,8 @@ describe('resolveRecordTarget (LIN-2775 Area 6)', () => {
     assert.equal(result.note, null);
   });
 
-  test('a failed/unavailable hydrate result (hydrated: false) → the anchor, the note — fails safe, never throws', () => {
-    const { resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE } = sandboxExports();
+  test('a failed/unavailable hydrate result (hydrated: false) → the anchor, the note — fails safe, never throws', async () => {
+    const { resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE } = await sandboxExports();
     const result = resolveRecordTarget(ANCHOR, 'LIN-SOMETHING', { hydrated: false, reason: 'unavailable' });
     assert.equal(result.issueId, ANCHOR.issueId);
     assert.equal(result.note, RECORD_TARGET_OUTSIDE_NOTE);
@@ -3437,16 +3449,16 @@ describe('resolveRecordTarget (LIN-2775 Area 6)', () => {
 
 // ─── composeDispatchPrompt (LIN-2775 Area 7) — pure, no DOM/network ────────
 describe('composeDispatchPrompt (LIN-2775 Area 7)', () => {
-  function sandboxExports() {
+  async function sandboxExports() {
     // LIN-3252 F1: the pure resolver/composer now live on window.ReplyDelivery
     // (shared with the run-page card); merge both seams so the note constants
     // resolve alongside observation.js's own exports.
-    const sb = makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }) });
-    return Object.assign({}, sb.module.exports, sb.window.ReplyDelivery);
+    const sb = await makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }) });
+    return Object.assign({}, sb, window.ReplyDelivery);
   }
 
-  test('carries the question, the chosen answer, and the full decisionCase recap', () => {
-    const { composeDispatchPrompt } = sandboxExports();
+  test('carries the question, the chosen answer, and the full decisionCase recap', async () => {
+    const { composeDispatchPrompt } = await sandboxExports();
     const row = { decision: { question: 'Ship or hold?' }, decisionCase: ['Tests are green.', 'The release window closes Friday.'] };
     const prompt = composeDispatchPrompt(row, 'Ship');
     assert.match(prompt, /Ship or hold\?/);
@@ -3455,22 +3467,22 @@ describe('composeDispatchPrompt (LIN-2775 Area 7)', () => {
     assert.match(prompt, /The release window closes Friday\./);
   });
 
-  test('the FULL decisionCase is used, never the UI\'s DECISION_EXCERPT_CHARS-truncated preview', () => {
-    const { composeDispatchPrompt, DECISION_EXCERPT_CHARS } = sandboxExports();
+  test('the FULL decisionCase is used, never the UI\'s DECISION_EXCERPT_CHARS-truncated preview', async () => {
+    const { composeDispatchPrompt, DECISION_EXCERPT_CHARS } = await sandboxExports();
     const longChunk = 'x'.repeat(DECISION_EXCERPT_CHARS + 50);
     const row = { decision: { question: 'Q' }, decisionCase: [longChunk] };
     const prompt = composeDispatchPrompt(row, 'A');
     assert.match(prompt, new RegExp(longChunk), 'a real agent brief must not be truncated to the UI\'s screen-space budget');
   });
 
-  test('no question and no decisionCase → still carries the chosen answer, never throws', () => {
-    const { composeDispatchPrompt } = sandboxExports();
+  test('no question and no decisionCase → still carries the chosen answer, never throws', async () => {
+    const { composeDispatchPrompt } = await sandboxExports();
     const prompt = composeDispatchPrompt({}, 'Approve');
     assert.match(prompt, /Approve/);
   });
 
-  test('free text (not a declared option label) is carried exactly as pressed', () => {
-    const { composeDispatchPrompt } = sandboxExports();
+  test('free text (not a declared option label) is carried exactly as pressed', async () => {
+    const { composeDispatchPrompt } = await sandboxExports();
     const row = { decision: { question: 'Why was I asked this?' }, decisionCase: [] };
     const prompt = composeDispatchPrompt(row, 'Because the migration touches this table too.');
     assert.match(prompt, /Because the migration touches this table too\./);
@@ -3510,38 +3522,38 @@ function answeredRow(overrides = {}) {
 }
 
 describe('resolveRulingOptionLabel / the answered-proposal banner (LIN-2792 Step 8)', () => {
-  test('resolveRulingOptionLabel finds the matching option label', () => {
-    const { resolveRulingOptionLabel } = makeSandbox().module.exports;
+  test('resolveRulingOptionLabel finds the matching option label', async () => {
+    const { resolveRulingOptionLabel } = await makeSandbox();
     const label = resolveRulingOptionLabel({ options: ANSWER_OPTIONS }, 'opt-no');
     assert.equal(label, 'No, hold off');
   });
 
-  test('resolveRulingOptionLabel falls back to the bare id when no option matches', () => {
-    const { resolveRulingOptionLabel } = makeSandbox().module.exports;
+  test('resolveRulingOptionLabel falls back to the bare id when no option matches', async () => {
+    const { resolveRulingOptionLabel } = await makeSandbox();
     assert.equal(resolveRulingOptionLabel({ options: ANSWER_OPTIONS }, 'opt-stale'), 'opt-stale');
     assert.equal(resolveRulingOptionLabel({}, 'opt-stale'), 'opt-stale');
   });
 
-  test('the banner reads "proposed answer: <label>" for an answered proposal, never "proposed dismissal"', () => {
-    const { module } = makeSandbox();
-    const { renderRulingRow } = module.exports;
+  test('the banner reads "proposed answer: <label>" for an answered proposal, never "proposed dismissal"', async () => {
+    const page = await makeSandbox();
+    const { renderRulingRow } = page;
     const li = renderRulingRow(answeredRow());
     const label = li.querySelector('.obs-ruling-suggestion-label');
     assert.ok(label, 'expected a suggestion banner');
     assert.equal(label.textContent, 'proposed answer: Yes, proceed with the migration');
   });
 
-  test('the banner still reads "proposed dismissal" for a dismissal proposal (unchanged)', () => {
-    const { module } = makeSandbox();
-    const { renderRulingRow } = module.exports;
+  test('the banner still reads "proposed dismissal" for a dismissal proposal (unchanged)', async () => {
+    const page = await makeSandbox();
+    const { renderRulingRow } = page;
     const li = renderRulingRow(makeRow({ suggestedDismissal: { reason: 'stale', suggestedBy: 'x', suggestedAt: '2026-09-05T00:00:00.000Z' } }));
     const label = li.querySelector('.obs-ruling-suggestion-label');
     assert.equal(label.textContent, 'proposed dismissal');
   });
 
-  test('a legacy suggestion with no proposedOutcome at all still reads "proposed dismissal"', () => {
-    const { module } = makeSandbox();
-    const { renderRulingRow } = module.exports;
+  test('a legacy suggestion with no proposedOutcome at all still reads "proposed dismissal"', async () => {
+    const page = await makeSandbox();
+    const { renderRulingRow } = page;
     // No `proposedOutcome` key — exactly a pre-LIN-2790 stored row.
     const li = renderRulingRow(makeRow({ suggestedDismissal: { reason: 'legacy', suggestedBy: 'x', suggestedAt: '2026-09-05T00:00:00.000Z' } }));
     assert.equal(li.querySelector('.obs-ruling-suggestion-label').textContent, 'proposed dismissal');
@@ -3556,23 +3568,23 @@ describe('resolveRulingOptionLabel / the answered-proposal banner (LIN-2792 Step
 // every existing test selects `.obs-ruling-agree`/`.obs-ruling-keep` by class
 // and never reads their text. These assertions pin the actual rendered copy.
 describe('row control labels are pinned by text, not just by class (LIN-2757 review F1/F1b)', () => {
-  test('a dismissal-kind row renders "dismiss as proposed"', () => {
-    const { module } = makeSandbox();
-    const { renderRulingRow } = module.exports;
+  test('a dismissal-kind row renders "dismiss as proposed"', async () => {
+    const page = await makeSandbox();
+    const { renderRulingRow } = page;
     const li = renderRulingRow(makeRow({ suggestedDismissal: { reason: 'x', suggestedBy: 'y', suggestedAt: '2026-09-05T00:00:00.000Z' } }));
     assert.equal(li.querySelector('.obs-ruling-agree').textContent, 'dismiss as proposed');
   });
 
-  test('an answer-kind row renders "answer as proposed"', () => {
-    const { module } = makeSandbox();
-    const { renderRulingRow } = module.exports;
+  test('an answer-kind row renders "answer as proposed"', async () => {
+    const page = await makeSandbox();
+    const { renderRulingRow } = page;
     const li = renderRulingRow(answeredRow());
     assert.equal(li.querySelector('.obs-ruling-agree').textContent, 'answer as proposed');
   });
 
-  test('the keep control renders "keep open"', () => {
-    const { module } = makeSandbox();
-    const { renderRulingRow } = module.exports;
+  test('the keep control renders "keep open"', async () => {
+    const page = await makeSandbox();
+    const { renderRulingRow } = page;
     const li = renderRulingRow(makeRow({ suggestedDismissal: { reason: 'x', suggestedBy: 'y', suggestedAt: '2026-09-05T00:00:00.000Z' } }));
     assert.equal(li.querySelector('.obs-ruling-keep').textContent, 'keep open');
   });
@@ -3581,13 +3593,13 @@ describe('row control labels are pinned by text, not just by class (LIN-2757 rev
 describe('agreeRulingRow — proposed answer, the four-way branch (LIN-2792 Step 7)', () => {
   test('BRANCH 1 — canReply: false refuses visibly, no write call reached, regardless of what effect reads', async () => {
     let apiCalls = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       api: async () => { apiCalls += 1; return { success: true }; },
       postComment: async () => { apiCalls += 1; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async () => { apiCalls += 1; return { id: 'x' }; }
     });
-    const { agreeRulingRow } = module.exports;
-    const li = makeLi(module);
+    const { agreeRulingRow } = page;
+    const li = makeLi(page);
     // Built exactly like tests/unit/dashboard-routes.test.js's own mid-turn
     // self-match fixture: disposition mid-turn, canReply false, but effect
     // STILL reads 'record' (branch 3's self-match) — proving the refusal
@@ -3603,11 +3615,11 @@ describe('agreeRulingRow — proposed answer, the four-way branch (LIN-2792 Step
   });
 
   test('BRANCH 1 — the same refusal fires for indeterminate, both effect sub-cases (self-matching record, and null)', async () => {
-    const { module } = makeSandbox({ api: async () => ({ success: true }) });
-    const { agreeRulingRow } = module.exports;
+    const page = await makeSandbox({ api: async () => ({ success: true }) });
+    const { agreeRulingRow } = page;
 
     for (const effect of ['record', null]) {
-      const li = makeLi(module);
+      const li = makeLi(page);
       await agreeRulingRow(answeredRow({ disposition: 'indeterminate', canReply: false, effect }), li);
       const feedback = li.querySelector('.obs-ruling-feedback');
       assert.match(feedback.textContent, /cannot answer/, `effect=${effect}`);
@@ -3617,12 +3629,12 @@ describe('agreeRulingRow — proposed answer, the four-way branch (LIN-2792 Step
   test('BRANCH 2 — task-bound stamps via the answered-without-comment route, with optionId, no comment posted', async () => {
     let captured = null;
     let commentCalls = 0;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       api: async (url, opts) => { captured = { url, opts }; return { success: true }; },
       postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; }
     });
-    const { agreeRulingRow } = module.exports;
-    const li = makeLi(module);
+    const { agreeRulingRow } = page;
+    const li = makeLi(page);
     const row = answeredRow({
       disposition: 'task-bound',
       anchor: { loopId: null, taskDecisionId: 'td-answer-1' },
@@ -3642,11 +3654,11 @@ describe('agreeRulingRow — proposed answer, the four-way branch (LIN-2792 Step
   test('BRANCH 3/4 — resumable Agree resumes the session and threads optionId onto the comment payload', async () => {
     let capturedOpts = null;
     let capturedPrompt = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       deliverReply: async (opts, prompt, handlers) => { capturedOpts = opts; capturedPrompt = prompt; handlers.onDispatchOk(); }
     });
-    const { agreeRulingRow } = module.exports;
-    const li = makeLi(module);
+    const { agreeRulingRow } = page;
+    const li = makeLi(page);
     const row = answeredRow({ disposition: 'resumable', effect: 'resume' });
 
     await agreeRulingRow(row, li);
@@ -3661,11 +3673,11 @@ describe('agreeRulingRow — proposed answer, the four-way branch (LIN-2792 Step
 
   test('BRANCH 3/4 — gone+record Agree delivers via deliverAsRecord and threads optionId onto the postComment call', async () => {
     let capturedDecision = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey, issueId, prompt, decision) => { capturedDecision = decision; return { ok: true, status: 201, data: {} }; }
     });
-    const { agreeRulingRow } = module.exports;
-    const li = makeLi(module);
+    const { agreeRulingRow } = page;
+    const li = makeLi(page);
     const row = answeredRow({ disposition: 'gone', effect: 'record' });
 
     await agreeRulingRow(row, li);
@@ -3680,13 +3692,13 @@ describe('agreeRulingRow — proposed answer, the four-way branch (LIN-2792 Step
   test('BRANCH 3/4 — gone+dispatch (default) Agree posts a comment carrying optionId, then dispatches a composed run', async () => {
     let capturedDecision = null;
     let capturedDispatch = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey, issueId, prompt, decision) => { capturedDecision = decision; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async (opts) => { capturedDispatch = opts; return { id: 'dispatched-answer-1' }; },
       api: nonTerminalHydrateApi()
     });
-    const { agreeRulingRow } = module.exports;
-    const li = makeLi(module);
+    const { agreeRulingRow } = page;
+    const li = makeLi(page);
     const row = answeredRow({ disposition: 'gone', effect: 'dispatch' });
 
     await agreeRulingRow(row, li);
@@ -3698,11 +3710,11 @@ describe('agreeRulingRow — proposed answer, the four-way branch (LIN-2792 Step
   });
 
   test('deliverRulingReply never rejects: a hard failure still resolves the promise agreeRulingRow returns', async () => {
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => { throw new Error('network down'); }
     });
-    const { agreeRulingRow } = module.exports;
-    const li = makeLi(module);
+    const { agreeRulingRow } = page;
+    const li = makeLi(page);
     const row = answeredRow({ disposition: 'gone', effect: 'record' });
 
     await assert.doesNotReject(agreeRulingRow(row, li));
@@ -3712,7 +3724,7 @@ describe('agreeRulingRow — proposed answer, the four-way branch (LIN-2792 Step
 });
 
 describe('bulkAgreeRow / bulkAgreeSelected — mixed dismiss/answer batch (LIN-2792 Step 7)', () => {
-  function makeAnswerBulkSandbox({ api, postComment, dispatchPrompt, deliverReply, confirm } = {}) {
+  async function makeAnswerBulkSandbox({ api, postComment, dispatchPrompt, deliverReply, confirm } = {}) {
     const world = makeWorld();
     const list = world.document.createElement('ul');
     const empty = world.document.createElement('p'); empty.hidden = false;
@@ -3720,7 +3732,7 @@ describe('bulkAgreeRow / bulkAgreeSelected — mixed dismiss/answer batch (LIN-2
     const selectAll = world.document.createElement('input');
     const countEl = world.document.createElement('span');
     const agreeBtn = world.document.createElement('button');
-    const sandbox = makeSandbox({ world,
+    const page = await makeSandbox({ world,
       api, postComment, dispatchPrompt, deliverReply, confirm,
       elements: {
         'obs-rulings': list, 'obs-rulings-empty': empty, 'obs-ruling-bulk-bar': bar,
@@ -3728,13 +3740,13 @@ describe('bulkAgreeRow / bulkAgreeSelected — mixed dismiss/answer batch (LIN-2
         'obs-ruling-agree-selected': agreeBtn
       }
     });
-    return { module: sandbox.module, list, bar, selectAll, countEl, agreeBtn };
+    return { page, list, bar, selectAll, countEl, agreeBtn };
   }
 
   test('a mixed selection (one dismissal, one answer) discharges each row per its own proposal, sequentially', async () => {
     const dismissCalls = [];
     const stampCalls = [];
-    const { module, list } = makeAnswerBulkSandbox({
+    const { page, list } = await makeAnswerBulkSandbox({
       api: async (url, opts) => {
         const body = JSON.parse(opts.body);
         if (url.includes('/rulings/dismiss')) dismissCalls.push(body);
@@ -3742,7 +3754,7 @@ describe('bulkAgreeRow / bulkAgreeSelected — mixed dismiss/answer batch (LIN-2
         return { success: true };
       }
     });
-    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected } = module.exports;
+    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected } = page;
 
     const dismissRow = makeRow({
       decision: { decision_id: 'd-mix-dismiss' },
@@ -3758,7 +3770,7 @@ describe('bulkAgreeRow / bulkAgreeSelected — mixed dismiss/answer batch (LIN-2
 
     renderRulings([dismissRow, answerRow]);
     setAllRulingsSelected(true);
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.equal(dismissCalls.length, 1, 'the dismissal row must be dismissed');
     assert.deepEqual(dismissCalls[0], { decisionLoopId: 'loop-mix-dismiss', decisionId: 'd-mix-dismiss' });
@@ -3774,10 +3786,10 @@ describe('bulkAgreeRow / bulkAgreeSelected — mixed dismiss/answer batch (LIN-2
 
   test('a canReply:false row in the selection is skipped with a visible, named reason, and the batch completes', async () => {
     const stampCalls = [];
-    const { module } = makeAnswerBulkSandbox({
+    const { page } = await makeAnswerBulkSandbox({
       api: async (url, opts) => { stampCalls.push(JSON.parse(opts.body)); return { success: true }; }
     });
-    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected } = module.exports;
+    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected } = page;
 
     const refusedRow = answeredRow({
       decision: { decision_id: 'd-refused', options: ANSWER_OPTIONS },
@@ -3792,54 +3804,54 @@ describe('bulkAgreeRow / bulkAgreeSelected — mixed dismiss/answer batch (LIN-2
 
     renderRulings([refusedRow, okRow]);
     setAllRulingsSelected(true);
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.equal(stampCalls.length, 1, 'only the answerable row is actually stamped');
     assert.deepEqual(stampCalls[0], { taskDecisionId: 'td-ok', taskDecisionIssueId: 'issue-1', optionId: 'opt-yes' });
 
-    const refusedLi = module.exports.renderedRulingRows.get(
-      module.exports.rulingKey('the-ruling-workspace', ANCHOR, 'd-refused')
+    const refusedLi = page.renderedRulingRows.get(
+      page.rulingKey('the-ruling-workspace', ANCHOR, 'd-refused')
     );
     assert.match(refusedLi.querySelector('.obs-ruling-feedback').textContent, /skipped — cannot answer/);
   });
 
   test('a dispatch-effect answer row is skipped in bulk (never fired blind), but Agree alone (single-row) still allows it', async () => {
     let dispatchCalls = 0;
-    const { module: bulkModule } = makeAnswerBulkSandbox({
+    const { page: bulkPage } = await makeAnswerBulkSandbox({
       api: async () => ({ success: true }),
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'x' }; }
     });
-    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected } = bulkModule.exports;
+    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected } = bulkPage;
 
     const dispatchRow = answeredRow({ disposition: 'gone', effect: 'dispatch' });
     renderRulings([dispatchRow]);
     setAllRulingsSelected(true);
-    await answerBulk(bulkModule, bulkAgreeSelected());
+    await answerBulk(bulkPage, bulkAgreeSelected());
 
     assert.equal(dispatchCalls, 0, 'bulk must never fire a fresh dispatch blind across N rows');
-    const li = bulkModule.exports.renderedRulingRows.get(bulkModule.exports.rulingKey('the-ruling-workspace', ANCHOR, 'd-answered-1'));
+    const li = bulkPage.renderedRulingRows.get(bulkPage.rulingKey('the-ruling-workspace', ANCHOR, 'd-answered-1'));
     assert.match(li.querySelector('.obs-ruling-feedback').textContent, /skipped — starting a fresh run/);
 
     // Single-row Agree on the SAME kind of row is unrestricted (branch 4).
-    const { module: singleModule } = makeSandbox({
+    const singlePage = await makeSandbox({
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'x' }; },
       api: nonTerminalHydrateApi()
     });
-    const { agreeRulingRow } = singleModule.exports;
-    await agreeRulingRow(answeredRow({ disposition: 'gone', effect: 'dispatch' }), makeLi(singleModule));
+    const { agreeRulingRow } = singlePage;
+    await agreeRulingRow(answeredRow({ disposition: 'gone', effect: 'dispatch' }), makeLi(singlePage));
     assert.equal(dispatchCalls, 1, 'single-row Agree must still allow a dispatch-effect answer');
   });
 });
 
 describe('computeBulkAgreeBreakdown / bulkAgreeConfirmText (LIN-2792 Step 7)', () => {
-  test('breakdown counts dismiss/answer/refused/dispatchSkipped independently', () => {
+  test('breakdown counts dismiss/answer/refused/dispatchSkipped independently', async () => {
     const world = makeWorld();
     const list = world.document.createElement('ul');
     const empty = world.document.createElement('p'); empty.hidden = false;
-    const { module } = makeSandbox({ world, elements: { 'obs-rulings': list, 'obs-rulings-empty': empty } });
-    const { renderRulings, setAllRulingsSelected, computeBulkAgreeBreakdown } = module.exports;
+    const page = await makeSandbox({ world, elements: { 'obs-rulings': list, 'obs-rulings-empty': empty } });
+    const { renderRulings, setAllRulingsSelected, computeBulkAgreeBreakdown } = page;
 
     const dismissRow = makeRow({
       decision: { decision_id: 'd-breakdown-dismiss' },
@@ -3853,7 +3865,7 @@ describe('computeBulkAgreeBreakdown / bulkAgreeConfirmText (LIN-2792 Step 7)', (
     setAllRulingsSelected(true);
 
     // Compared field-by-field, not via a whole-object deepEqual: the
-    // breakdown object is constructed inside the vm sandbox, a different
+    // breakdown object is constructed in the old vm sandbox, a different
     // realm than this literal, so a cross-realm deepStrictEqual would fail
     // on prototype identity alone despite matching structurally.
     const breakdown = computeBulkAgreeBreakdown();
@@ -3863,8 +3875,8 @@ describe('computeBulkAgreeBreakdown / bulkAgreeConfirmText (LIN-2792 Step 7)', (
     assert.equal(breakdown.dispatchSkipped, 1);
   });
 
-  test('bulkAgreeConfirmText names both dismiss and answer counts, and both skip categories, when present', () => {
-    const { bulkAgreeConfirmText } = makeSandbox().module.exports;
+  test('bulkAgreeConfirmText names both dismiss and answer counts, and both skip categories, when present', async () => {
+    const { bulkAgreeConfirmText } = await makeSandbox();
     const text = bulkAgreeConfirmText({ dismiss: 2, answer: 1, refused: 1, dispatchSkipped: 1 });
     assert.match(text, /Apply 5 selected proposals/);
     assert.match(text, /2 dismissals/);
@@ -3873,8 +3885,8 @@ describe('computeBulkAgreeBreakdown / bulkAgreeConfirmText (LIN-2792 Step 7)', (
     assert.match(text, /1 would start a fresh run and will be skipped in bulk/);
   });
 
-  test('bulkAgreeConfirmText with only dismissals reads singular/plural correctly and carries no skip parenthetical', () => {
-    const { bulkAgreeConfirmText } = makeSandbox().module.exports;
+  test('bulkAgreeConfirmText with only dismissals reads singular/plural correctly and carries no skip parenthetical', async () => {
+    const { bulkAgreeConfirmText } = await makeSandbox();
     const text = bulkAgreeConfirmText({ dismiss: 1, answer: 0, refused: 0, dispatchSkipped: 0 });
     assert.match(text, /Apply 1 selected proposal \(1 dismissal\)/);
     assert.doesNotMatch(text, /skipped/);
@@ -3899,12 +3911,12 @@ describe('computeBulkAgreeBreakdown / bulkAgreeConfirmText (LIN-2792 Step 7)', (
 // `deliverRulingReply` in bulk (`gone`+`record` and `resumable`); a
 // `gone`+`dispatch` row is skipped by bulk by design, so it cannot serve.
 describe('bulkAgreeSelected — answer rows through deliverRulingReply (LIN-2754 L1 / review F1)', () => {
-  function makeBulkReplySandbox({ api, postComment, dispatchPrompt, deliverReply, confirm } = {}) {
+  async function makeBulkReplySandbox({ api, postComment, dispatchPrompt, deliverReply, confirm } = {}) {
     const world = makeWorld();
     const list = world.document.createElement('ul');
     const empty = world.document.createElement('p'); empty.hidden = false;
     const progressEl = world.document.createElement('p');
-    const sandbox = makeSandbox({ world,
+    const page = await makeSandbox({ world,
       api, postComment, dispatchPrompt, deliverReply, confirm,
       elements: {
         'obs-rulings': list, 'obs-rulings-empty': empty,
@@ -3915,7 +3927,7 @@ describe('bulkAgreeSelected — answer rows through deliverRulingReply (LIN-2754
         'obs-ruling-bulk-progress': progressEl
       }
     });
-    return { module: sandbox.module, list, progressEl };
+    return { page, list, progressEl };
   }
 
   // A `gone` row at `effect: 'record'` — branch 3/4's record delivery, which
@@ -3932,7 +3944,7 @@ describe('bulkAgreeSelected — answer rows through deliverRulingReply (LIN-2754
 
   test('two gone+record answer rows settle SEQUENTIALLY — row 2 never starts before row 1 has finished', async () => {
     const events = [];
-    const { module } = makeBulkReplySandbox({
+    const { page } = await makeBulkReplySandbox({
       postComment: async (urlKey, targetId, prompt, opts) => {
         events.push(`start:${opts.decisionId}`);
         // Yield several times so an interleaved second row would have every
@@ -3944,14 +3956,14 @@ describe('bulkAgreeSelected — answer rows through deliverRulingReply (LIN-2754
         return { ok: true, status: 201, data: {} };
       }
     });
-    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected, rulingKey, rulingsSelected, rulingsSettled } = module.exports;
+    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected, rulingKey, rulingsSelected, rulingsSettled } = page;
 
     const rowA = goneRecordAnswerRow('d-seq-a', 'loop-seq-a');
     const rowB = goneRecordAnswerRow('d-seq-b', 'loop-seq-b');
     renderRulings([rowA, rowB]);
     setAllRulingsSelected(true);
 
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.deepEqual(
       events,
@@ -3964,7 +3976,7 @@ describe('bulkAgreeSelected — answer rows through deliverRulingReply (LIN-2754
     // leaves the selection and enters rulingsSettled.
     for (const [decisionId, loopId] of [['d-seq-a', 'loop-seq-a'], ['d-seq-b', 'loop-seq-b']]) {
       const key = rulingKey('the-ruling-workspace', { ...ANCHOR, loopId }, decisionId);
-      const li = module.exports.renderedRulingRows.get(key);
+      const li = page.renderedRulingRows.get(key);
       assert.ok(li, `expected a rendered row for ${decisionId}`);
       assert.equal(li.querySelector('.obs-ruling-feedback').textContent, 'recorded ✓', `${decisionId} must read as delivered`);
       assert.equal(li.querySelector('.obs-ruling-agree')?.disabled, true, `${decisionId}'s controls must NOT be re-enabled by the bulk arm (no restore())`);
@@ -3978,7 +3990,7 @@ describe('bulkAgreeSelected — answer rows through deliverRulingReply (LIN-2754
     let commentCalls = 0;
     let runCalls = 0;
     let failRun = true;
-    const { module } = makeBulkReplySandbox({
+    const { page } = await makeBulkReplySandbox({
       // The `resumable` branch delegates to window.ReplyDelivery.deliverReply,
       // whose real contract is: post the comment, then start the run, and on
       // a comment-succeeded/run-failed split call onPartialFailure(err,
@@ -4000,7 +4012,7 @@ describe('bulkAgreeSelected — answer rows through deliverRulingReply (LIN-2754
     const {
       renderRulings, setAllRulingsSelected, bulkAgreeSelected,
       rulingKey, rulingsSelected, rulingsSettled, rulingsPending, preservedRulingRows
-    } = module.exports;
+    } = page;
 
     const row = answeredRow({
       decision: { decision_id: 'd-partial', options: ANSWER_OPTIONS },
@@ -4010,7 +4022,7 @@ describe('bulkAgreeSelected — answer rows through deliverRulingReply (LIN-2754
 
     renderRulings([row]);
     setAllRulingsSelected(true);
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     assert.equal(commentCalls, 1, 'the comment (the durable half) is posted exactly once');
 
@@ -4024,7 +4036,7 @@ describe('bulkAgreeSelected — answer rows through deliverRulingReply (LIN-2754
     assert.equal(rulingsPending.has(key), false, 'the pending guard must be released');
     assert.ok(preservedRulingRows.has(key), 'the row must be preserved across the next poll(s) while the retry is outstanding');
 
-    const li = module.exports.renderedRulingRows.get(key);
+    const li = page.renderedRulingRows.get(key);
     assert.equal(li.querySelector('.obs-ruling-agree')?.disabled, true, 'controls must stay disabled — the bulk arm never calls restore()');
     const feedback = li.querySelector('.obs-ruling-feedback');
     assert.match(feedback.textContent, /Recorded\. Could not resume the session/, 'must say the answer was RECORDED — only the run failed');
@@ -4036,7 +4048,7 @@ describe('bulkAgreeSelected — answer rows through deliverRulingReply (LIN-2754
     // touch this row at all — and even if it were still selected,
     // bulkAgreeRow's own rulingsSettled guard refuses it.
     setAllRulingsSelected(true);
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
     assert.equal(commentCalls, 1, 'a second batch must NEVER re-post the already-succeeded comment');
 
     // The retry re-fires only the run, never the comment.
@@ -4067,12 +4079,12 @@ describe('bulkAgreeSelected — answer rows through deliverRulingReply (LIN-2754
   // above only checks the row's own state, not the batch-level tally — so a
   // future change could flip this silently. Both halves in one place:
   test('a bulk-mode partial failure (comment/answer durably recorded, fresh run failed to start) tallies as APPLIED, never "still selected" (LIN-2758 beat 2 deviation, pinned)', async () => {
-    const { module, progressEl } = makeBulkReplySandbox({
+    const { page, progressEl } = await makeBulkReplySandbox({
       deliverReply: async (opts, prompt, handlers) => {
         handlers.onPartialFailure(new Error('session gone'), async () => {});
       }
     });
-    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected, rulingsSelected, rulingsSettled, rulingKey } = module.exports;
+    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected, rulingsSelected, rulingsSettled, rulingKey } = page;
 
     const row = answeredRow({
       decision: { decision_id: 'd-partial-tally', options: ANSWER_OPTIONS },
@@ -4082,7 +4094,7 @@ describe('bulkAgreeSelected — answer rows through deliverRulingReply (LIN-2754
 
     renderRulings([row]);
     setAllRulingsSelected(true);
-    await answerBulk(module, bulkAgreeSelected());
+    await answerBulk(page, bulkAgreeSelected());
 
     // Half 1 — the premise: settled and deselected, not "still selected".
     assert.ok(rulingsSettled.has(key), 'a durably-recorded partial failure must settle the row');
@@ -4133,13 +4145,13 @@ describe('Agree-as-answer on a gone+record row — optionId survives the record_
     test(`${name} still records to the anchor WITH the chosen optionId, and says why`, async () => {
       let captured = null;
       let dispatchCalls = 0;
-      const { module } = makeSandbox({
+      const page = await makeSandbox({
         postComment: async (urlKey, issueId, prompt, decision) => { captured = { urlKey, issueId, prompt, decision }; return { ok: true, status: 201, data: {} }; },
         dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'x' }; },
         api: hydrate
       });
-      const { agreeRulingRow } = module.exports;
-      const li = makeLi(module);
+      const { agreeRulingRow } = page;
+      const li = makeLi(page);
       const row = answeredRow({
         decision: { decision_id: 'd-l7', options: ANSWER_OPTIONS, on_answer: { effect: 'record', record_on: recordOn } },
         disposition: 'gone',
@@ -4163,12 +4175,12 @@ describe('Agree-as-answer on a gone+record row — optionId survives the record_
 
   test('a RESOLVABLE record_on records to the resolved neighbour, also carrying the optionId', async () => {
     let captured = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey, issueId, prompt, decision) => { captured = { issueId, decision }; return { ok: true, status: 201, data: {} }; },
       api: async () => hydrateOk(neighborhoodOf({ children: [neighbor('LIN-CHILD-7')] }))
     });
-    const { agreeRulingRow } = module.exports;
-    const li = makeLi(module);
+    const { agreeRulingRow } = page;
+    const li = makeLi(page);
     const row = answeredRow({
       decision: { decision_id: 'd-l7-ok', options: ANSWER_OPTIONS, on_answer: { effect: 'record', record_on: 'LIN-CHILD-7' } },
       disposition: 'gone',
@@ -4190,18 +4202,18 @@ describe('Agree-as-answer on a gone+record row — optionId survives the record_
 // class names (e.g. `.obs-ruling-agree`) are wire/structural, not display
 // text — deliberately excluded, only textContent and aria-label are checked.
 describe('no rendered .obs-ruling-* control reads a bare "agree" (LIN-2757 acceptance criterion 1)', () => {
-  function makeRenderSandbox() {
+  async function makeRenderSandbox() {
     const world = makeWorld();
     const list = world.document.createElement('ul');
     const empty = world.document.createElement('p');
     empty.hidden = false;
-    const { module } = makeSandbox({ world,
+    const page = await makeSandbox({ world,
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async () => ({ id: 'd' }),
       api: async () => ({ success: true }),
       elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
     });
-    return { module, list, empty };
+    return { page, list, empty };
   }
 
   function collectRulingControls(li) {
@@ -4233,16 +4245,16 @@ describe('no rendered .obs-ruling-* control reads a bare "agree" (LIN-2757 accep
     }
   }
 
-  test('a proposed-DISMISSAL row: no control text or aria-label reads a bare "agree"', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings } = module.exports;
+  test('a proposed-DISMISSAL row: no control text or aria-label reads a bare "agree"', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings } = page;
     renderRulings([makeRow({ suggestedDismissal: { reason: 'x', suggestedBy: 'y', suggestedAt: '2026-09-05T00:00:00.000Z' } })]);
     assertNoBareAgree(collectRulingControls(list.children[0]));
   });
 
-  test('a proposed-ANSWER (task-bound) row: no control text or aria-label reads a bare "agree"', () => {
-    const { module, list } = makeRenderSandbox();
-    const { renderRulings } = module.exports;
+  test('a proposed-ANSWER (task-bound) row: no control text or aria-label reads a bare "agree"', async () => {
+    const { page, list } = await makeRenderSandbox();
+    const { renderRulings } = page;
     renderRulings([answeredRow({
       disposition: 'task-bound',
       anchor: { loopId: null, taskDecisionId: 'td-invariant' },
@@ -4266,15 +4278,15 @@ describe('LIN-3126 residual — the ruling anchors forward source to ReplyDelive
   test('gone/dispatch: the comment write AND the fresh run both carry the anchor source', async () => {
     let capturedExtra = null;
     let capturedOpts = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey, issueId, body, extra) => { capturedExtra = extra; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async (opts) => { capturedOpts = opts; return { id: 'dispatched-1' }; },
       api: nonTerminalHydrateApi()
     });
-    const { deliverRulingReply } = module.exports;
+    const { deliverRulingReply } = page;
     deliverRulingReply(
       makeRow({ anchor: STAMPED_ANCHOR, decision: { decision_id: 'd-pair-dispatch' } }),
-      'Approve', makeLi(module)
+      'Approve', makeLi(page)
     );
     await pairFlush();
 
@@ -4288,15 +4300,15 @@ describe('LIN-3126 residual — the ruling anchors forward source to ReplyDelive
 
   test('gone/record: the comment write carries the anchor source (mutation: observation.js:3337-3338)', async () => {
     let capturedExtra = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey, issueId, body, extra) => { capturedExtra = extra; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async () => ({ id: 'dispatched-1' }),
       api: async () => { throw new Error('no record_on declared — the hydrate route must not be called'); }
     });
-    const { deliverRulingReply } = module.exports;
+    const { deliverRulingReply } = page;
     deliverRulingReply(
       makeRow({ anchor: STAMPED_ANCHOR, decision: { decision_id: 'd-pair-record' }, effect: 'record', alternate: null }),
-      'Approve', makeLi(module)
+      'Approve', makeLi(page)
     );
     await pairFlush();
 
@@ -4307,18 +4319,18 @@ describe('LIN-3126 residual — the ruling anchors forward source to ReplyDelive
 
   test('task-bound: the comment write carries the anchor source (mutation: observation.js:3407-3408)', async () => {
     let capturedExtra = null;
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       postComment: async (urlKey, issueId, body, extra) => { capturedExtra = extra; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async () => ({ id: 'dispatched-1' }),
     });
-    const { deliverRulingReply } = module.exports;
+    const { deliverRulingReply } = page;
     deliverRulingReply(
       makeRow({
         anchor: { ...STAMPED_ANCHOR, loopId: null, taskDecisionId: 'td-pair-1' },
         decision: { decision_id: 'd-pair-taskbound' },
         disposition: 'task-bound'
       }),
-      'Approve', makeLi(module)
+      'Approve', makeLi(page)
     );
     await pairFlush();
 
@@ -4336,22 +4348,22 @@ describe('LIN-3126 residual — the ruling anchors forward source to ReplyDelive
 // repaint deferral: a row holding unsent input is reused as-is, and is
 // rebuilt again as soon as it holds none.
 describe('renderRulings — a poll keeps unsent input (LIN-3631)', () => {
-  function makeDraftSandbox() {
+  async function makeDraftSandbox() {
     const world = makeWorld();
     const list = world.document.createElement('ul');
     const empty = world.document.createElement('p');
-    const sandbox = makeSandbox({ world,
+    const page = await makeSandbox({ world,
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async () => ({ id: 'd' }),
       elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
     });
-    return { sandbox, module: sandbox.module, list };
+    return { page, list };
   }
   const draftRow = (rest = {}) => makeResumableRow({ decision: { decision_id: 'd-draft-1' }, canReply: true, ...rest });
 
-  test('typed text in the free-text answer survives a repaint, in the same box', () => {
-    const { module, list } = makeDraftSandbox();
-    const { renderRulings } = module.exports;
+  test('typed text in the free-text answer survives a repaint, in the same box', async () => {
+    const { page, list } = await makeDraftSandbox();
+    const { renderRulings } = page;
     const row = draftRow();
 
     renderRulings([row]);
@@ -4366,15 +4378,15 @@ describe('renderRulings — a poll keeps unsent input (LIN-3631)', () => {
     assert.equal(after.value, 'half-typed answer');
   });
 
-  test('a focused (still empty) answer box is not replaced', () => {
-    const { sandbox, module, list } = makeDraftSandbox();
-    const { renderRulings } = module.exports;
+  test('a focused (still empty) answer box is not replaced', async () => {
+    const { page, list } = await makeDraftSandbox();
+    const { renderRulings } = page;
     const row = draftRow();
 
     renderRulings([row]);
     const box = list.children[0].querySelector('.obs-ruling-answer-input');
     box.focus();
-    assert.equal(sandbox.document.activeElement, box, 'the drawn box takes the focus');
+    assert.equal(worldOf(page).document.activeElement, box, 'the drawn box takes the focus');
 
     renderRulings([row]);
 
@@ -4417,10 +4429,10 @@ describe('renderRulings — a poll keeps unsent input (LIN-3631)', () => {
     };
   }
 
-  test('an open shelve panel and its reason survive a repaint', () => {
-    const { sandbox, module, list } = makeDraftSandbox();
-    giveSelectsAValue(sandbox.document);
-    const { renderRulings } = module.exports;
+  test('an open shelve panel and its reason survive a repaint', async () => {
+    const { page, list } = await makeDraftSandbox();
+    giveSelectsAValue(worldOf(page).document);
+    const { renderRulings } = page;
     const row = draftRow();
 
     renderRulings([row]);
@@ -4433,7 +4445,7 @@ describe('renderRulings — a poll keeps unsent input (LIN-3631)', () => {
     // Opening the panel focuses its reason box (observation.js:2608), and a focused field holds the row on its own
     // (:2144). Blur it, so the open panel (:2142) is the only thing holding the row through this repaint.
     reason.blur();
-    assert.notEqual(sandbox.document.activeElement, reason);
+    assert.notEqual(worldOf(page).document.activeElement, reason);
 
     renderRulings([row]);
 
@@ -4444,9 +4456,9 @@ describe('renderRulings — a poll keeps unsent input (LIN-3631)', () => {
     assert.equal(duration.value, String(24 * 60 * 60 * 1000));
   });
 
-  test('a row holding no input is still rebuilt, and is rebuilt again once its draft is cleared', () => {
-    const { module, list } = makeDraftSandbox();
-    const { renderRulings } = module.exports;
+  test('a row holding no input is still rebuilt, and is rebuilt again once its draft is cleared', async () => {
+    const { page, list } = await makeDraftSandbox();
+    const { renderRulings } = page;
     const row = draftRow();
 
     renderRulings([row]);
@@ -4464,9 +4476,9 @@ describe('renderRulings — a poll keeps unsent input (LIN-3631)', () => {
     assert.notEqual(list.children[0], second, 'released once the draft is gone');
   });
 
-  test('the effect flip re-render carries the typed answer into the fresh row', () => {
-    const { module, list } = makeDraftSandbox();
-    const { renderRulings } = module.exports;
+  test('the effect flip re-render carries the typed answer into the fresh row', async () => {
+    const { page, list } = await makeDraftSandbox();
+    const { renderRulings } = page;
     const row = draftRow({ effect: 'resume', alternate: 'record' });
 
     renderRulings([row]);
@@ -4485,15 +4497,15 @@ describe('renderRulings — a poll keeps unsent input (LIN-3631)', () => {
 describe('a joined row forwards stampLoopIds as decisionLoopIds (LIN-3959)', () => {
   const settle = async () => { for (let i = 0; i < 4; i++) await new Promise((r) => setImmediate(r)); };
 
-  test('resumable reply: deliverReply gets decisionLoopIds when the row has stampLoopIds, and none otherwise', () => {
+  test('resumable reply: deliverReply gets decisionLoopIds when the row has stampLoopIds, and none otherwise', async () => {
     const seen = [];
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       deliverReply: (opts, prompt, handlers) => { seen.push(opts); handlers.onDispatchOk(); }
     });
-    const { deliverRulingReply } = module.exports;
+    const { deliverRulingReply } = page;
 
-    deliverRulingReply(makeResumableRow({ decision: { decision_id: 'd-join-4' }, stampLoopId: 'wk', stampLoopIds: ['wk', 'ap'] }), 'Approve', makeLi(module));
-    deliverRulingReply(makeResumableRow({ decision: { decision_id: 'd-join-5' } }), 'Approve', makeLi(module));
+    deliverRulingReply(makeResumableRow({ decision: { decision_id: 'd-join-4' }, stampLoopId: 'wk', stampLoopIds: ['wk', 'ap'] }), 'Approve', makeLi(page));
+    deliverRulingReply(makeResumableRow({ decision: { decision_id: 'd-join-5' } }), 'Approve', makeLi(page));
 
     assert.equal(seen.length, 2);
     assert.deepEqual(seen[0].decisionLoopIds, ['wk', 'ap']);
@@ -4506,16 +4518,16 @@ describe('a joined row forwards stampLoopIds as decisionLoopIds (LIN-3959)', () 
   ]) {
     test(`${label}: the comment carries decisionLoopIds when the row has stampLoopIds, and no key when it does not`, async () => {
       const extras = [];
-      const { module } = makeSandbox({
+      const page = await makeSandbox({
         postComment: async (urlKey, issueId, body, extra) => { extras.push(extra); return { ok: true, status: 201, data: {} }; },
         dispatchPrompt: async () => ({ id: 'dispatched-1' }),
         api: nonTerminalHydrateApi()
       });
-      const { deliverRulingReply } = module.exports;
+      const { deliverRulingReply } = page;
 
-      deliverRulingReply(makeRow({ ...rowOver, decision: { decision_id: 'd-join-1' }, stampLoopId: 'wk', stampLoopIds: ['wk', 'ap'] }), 'Approve', makeLi(module));
+      deliverRulingReply(makeRow({ ...rowOver, decision: { decision_id: 'd-join-1' }, stampLoopId: 'wk', stampLoopIds: ['wk', 'ap'] }), 'Approve', makeLi(page));
       await settle();
-      deliverRulingReply(makeRow({ ...rowOver, decision: { decision_id: 'd-join-2' } }), 'Approve', makeLi(module));
+      deliverRulingReply(makeRow({ ...rowOver, decision: { decision_id: 'd-join-2' } }), 'Approve', makeLi(page));
       await settle();
 
       assert.equal(extras.length, 2, 'both presses wrote a comment');
@@ -4526,14 +4538,14 @@ describe('a joined row forwards stampLoopIds as decisionLoopIds (LIN-3959)', () 
 
   test('Agree posts decisionLoopIds on the dismiss body when the row has stampLoopIds, and none otherwise', async () => {
     const bodies = [];
-    const { module } = makeSandbox({
+    const page = await makeSandbox({
       api: async (url, opts) => { bodies.push(JSON.parse(opts.body)); return { success: true }; }
     });
-    const { agreeRulingRow } = module.exports;
+    const { agreeRulingRow } = page;
 
-    agreeRulingRow(makeRow({ stampLoopId: 'wk', stampLoopIds: ['wk', 'ap'] }), makeLi(module));
+    agreeRulingRow(makeRow({ stampLoopId: 'wk', stampLoopIds: ['wk', 'ap'] }), makeLi(page));
     await settle();
-    agreeRulingRow(makeRow({ decision: { decision_id: 'd-join-3' } }), makeLi(module));
+    agreeRulingRow(makeRow({ decision: { decision_id: 'd-join-3' } }), makeLi(page));
     await settle();
 
     assert.equal(bodies.length, 2);
@@ -4545,9 +4557,9 @@ describe('a joined row forwards stampLoopIds as decisionLoopIds (LIN-3959)', () 
 // LIN-3983 PR 2: the Rulings words. A row names its task by id and title, never by workspace key; its
 // actions say what each does; a bulk apply asks in the page; and no path calls confirm().
 describe('Rulings in plain words (LIN-3983 PR 2)', () => {
-  test('the row names its task by id and title; the workspace key is never shown, the name only when several show', () => {
-    const { module } = makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }), dispatchPrompt: async () => ({ id: 'd' }) });
-    const { renderRulingRow } = module.exports;
+  test('the row names its task by id and title; the workspace key is never shown, the name only when several show', async () => {
+    const page = await makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }), dispatchPrompt: async () => ({ id: 'd' }) });
+    const { renderRulingRow } = page;
     const row = makeRow({ anchor: { issueIdentifier: 'LIN-42', issueTitle: 'Stop the nightly export', workspaceUrlKey: 'proto' } });
     const li = renderRulingRow(row);
     const head = li.children[0];
@@ -4556,9 +4568,9 @@ describe('Rulings in plain words (LIN-3983 PR 2)', () => {
     assert.ok(!head.innerHTML.includes('proto'), 'the raw workspace key is not shown');
   });
 
-  test('the row says what each action does, and when a shelved question comes back, before it is pressed', () => {
-    const { module } = makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }), dispatchPrompt: async () => ({ id: 'd' }) });
-    const { renderRulingRow } = module.exports;
+  test('the row says what each action does, and when a shelved question comes back, before it is pressed', async () => {
+    const page = await makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }), dispatchPrompt: async () => ({ id: 'd' }) });
+    const { renderRulingRow } = page;
     const li = renderRulingRow(makeRow());
     const note = li.children.find(c => c.className === 'obs-ruling-actions-note');
     assert.ok(note, 'an actions note is rendered');
@@ -4573,13 +4585,13 @@ describe('Rulings in plain words (LIN-3983 PR 2)', () => {
   test('a bulk apply asks in the page: the question is the page\'s own, Apply resolves true, Cancel false, and confirm() is never called', async () => {
     const asked = [];
     const forbidden = () => { throw new Error('confirm() must not be called for a bulk apply'); };
-    const sandbox = makeSandbox({
+    const page = await makeSandbox({
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async () => ({ id: 'd' }),
       confirm: forbidden,
       answer: (text) => { asked.push(text); return false; }
     });
-    assert.equal(await answerBulk(sandbox.module, vm.runInContext('askBulkApply("Apply 2 selected proposals?", "Apply 2")', sandbox)), false, 'Cancel resolves false');
+    assert.equal(await answerBulk(page, page.askBulkApply('Apply 2 selected proposals?', 'Apply 2')), false, 'Cancel resolves false');
     assert.deepEqual(asked, ['Apply 2 selected proposals?']);
     const source = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
     assert.ok(!/(^|[^\w.$])confirm\(/m.test(source.replace(/\/\/.*$/gm, '')), 'observation.js calls no confirm()');

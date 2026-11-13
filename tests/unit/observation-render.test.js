@@ -1,23 +1,17 @@
 // LIN-866: Observation activity-log / produced-artifact fidelity (design §6.3/§6.4).
 //
-// public/observation.js is a browser script (not an ES module), so we can't import
-// it. It only touches `window`/`document` at load time via two addEventListener
-// calls at the end. We evaluate its source in a vm sandbox that supplies a `module`
-// object (so its guarded CommonJS test export runs) plus stubbed browser globals,
-// then exercise the pure presentation helpers without a DOM.
+// public/observation.js is a native ES module (LIN-4463 piece 4). It is imported through `importWorld`
+// (tests/unit/helpers/import-world.js) over the fake DOM, with the browser globals the page reads at call time
+// (`escapeHtml`, `relativeTime`, and the common.js pill and bar replicas) installed on the global. The pure
+// presentation helpers are read off the module namespace, without a DOM.
 
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import vm from 'node:vm';
+import { importWorld } from './helpers/import-world.js';
 import { loadCommonWindow } from '../fixtures/client-common.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const src = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
 // `escapeHtml` is a browser global installed by common.js (`window.escapeHtml`),
-// which observation.js references bare. Supply a faithful copy in the sandbox.
+// which observation.js references bare. Supply a faithful copy on the global.
 const escapeHtml = (str) => {
   if (str === undefined || str === null) return '';
   return String(str)
@@ -31,23 +25,22 @@ const escapeHtml = (str) => {
 const relativeTime = (ts) => (ts ? `stub-relative-time(${ts})` : '');
 // The page loads common.js before this script, so its shared pill and bar replicas exist on the page.
 const commonWindow = loadCommonWindow();
-const sandbox = {
-  module: { exports: {} },
+// One world for the file, as the module-level sandbox it replaces: every test reads the same page instance, and the
+// world is restored when the file's tests are done.
+const world = await importWorld({
   window: { addEventListener() {}, renderStatusPill: commonWindow.renderStatusPill, renderSegmentBar: commonWindow.renderSegmentBar },
-  document: { addEventListener() {} },
-  escapeHtml,
-  relativeTime,
-  console,
-};
-vm.runInNewContext(src, sandbox, { filename: 'observation.js' });
-const { renderActivityLog, renderArtifacts, classifyArtifact, renderObjective } = sandbox.module.exports;
-const { renderSummaryLine, excerptDecisionCase, DECISION_EXCERPT_CHARS } = sandbox.module.exports;
-// The page's open-question set (the rulings response's openLoopIds), a top-level `let` of observation.js.
-const setOpen = (ids) => vm.runInContext(`openLoopIds = ${ids === null ? 'null' : `new Set(${JSON.stringify(ids)})`}`, sandbox);
-const { boundDecisionOptions, DECISION_OPTIONS_CHARS } = sandbox.module.exports;
-const { laneTicketWalk, ticketProgressText } = sandbox.module.exports;
-const { sessionParkedWait } = sandbox.module.exports;
-const { fillSessionHead } = sandbox.module.exports;
+  globals: { escapeHtml, relativeTime },
+});
+after(() => world.restore());
+const page = await world.importPage('observation.js');
+const { renderActivityLog, renderArtifacts, classifyArtifact, renderObjective } = page;
+const { renderSummaryLine, excerptDecisionCase, DECISION_EXCERPT_CHARS } = page;
+// The page's open-question set (the rulings response's openLoopIds), a module `let` of observation.js, reached through its setter.
+const setOpen = (ids) => page.setOpenLoopIds(ids === null ? null : new Set(ids));
+const { boundDecisionOptions, DECISION_OPTIONS_CHARS } = page;
+const { laneTicketWalk, ticketProgressText } = page;
+const { sessionParkedWait } = page;
+const { fillSessionHead } = page;
 
 test.describe('renderActivityLog — §6.3 burst copy', () => {
   test('drops the redundant per-burst total when a breakdown sums it', () => {
@@ -403,9 +396,7 @@ test.describe('fillSessionHead — budget "n of N" chip (LIN-2934, L3)', () => {
 
 test.describe('boundDecisionOptions — LIN-2195: the option run carries a budget', () => {
   const label = (n, len = 10) => `${String(n).repeat(len)}`;
-  // observation.js runs inside a vm sandbox, so arrays it returns are from
-  // another realm and `deepStrictEqual` fails on prototype identity alone.
-  // Copy into this realm before comparing structurally.
+  // The page's arrays are built in this realm now; the copy keeps the comparison structural either way.
   const here = (arr) => Array.from(arr);
 
   test('a short run is rendered whole, with no overflow marker', () => {

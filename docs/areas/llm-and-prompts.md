@@ -52,13 +52,17 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - `lib/periodicals.js`: Stability defers to a repo's committed declaration of its measures and names
   none (LIN-4424): change Harbour's measures in `docs/reviews/stability-measures/README.md` and its
   script, never in the shared template; a test links the bullet's list to that README.
-- A new stage kind is a row in every table `tests/unit/stage-kind-tables.test.js` reads: add it, or list it
-  there as out with the reason. A kind in `SPINE` (`lib/run-view.js`) also moves the run page's "n of N", the
+- A new stage kind is one record in `lib/prompts/stage-kinds.js`, with every field: its template, lead,
+  signals, labels, grounding, contract, intent, catalogue line and verb-override entry follow from it, and
+  `tests/unit/lin-4467-stage-kind-record.test.js` fails on a missing field. The public catalogue is generated
+  (`node scripts/gen-llms-catalogue.mjs`). A kind in `SPINE` (`lib/run-view.js`) also moves the run page's "n of N", the
   session and task-page goldens (`UPDATE_RENDER_SESSION_GOLDEN=1`, `UPDATE_RENDER_TASK_PAGE_GOLDEN=1`) and the
   E2E count pins; read the golden diff before accepting it (LIN-4437).
 - `formatCiGateCheck` (`lib/prompt-formatters.js`) renders in implementation, review and close-out:
   a rule for one stage gets its own formatter beside it. Prove the others unchanged by rendering every
   kind, fresh and fix round, at HEAD and on the branch, not by the budget test, whose ceilings are caps (LIN-4441).
+- The blind-read scan in `tests/unit/stage-kind-tables.test.js` reads `git ls-files`: a new file is not
+  scanned until it is committed, so a local pass before the first commit proves nothing about it (LIN-4467).
 
 ## Waiting
 
@@ -67,12 +71,24 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   new field must reach all five (LIN-4368 missed one; LIN-4393 leftovers.)
 - `lib/size-of-move.js`: the built-in policy (`DECIDED_BY.policy`, err larger) may stand in
   for John's "per task breakdown of options"; its size words are unexplained. (John, LIN-4393.)
-- `lib/prompts/stage-intent.js`: `CUT` writes the closing contract's token order (`DECISION:`
+- `lib/prompts/stage-kinds.js`: `CUT` writes the closing contract's token order (`DECISION:`
   before `BLOCKED:`) into a scope line beside `ASK`. Its "cut" and the plan-review and review
   "narrowing" (`lib/completion-signals.js`) name one thing; no test links them. (John, 8 Nov.)
-- `lib/prompt-template-defs.js`: a stage kind is a row in ~fourteen parallel tables
-  (`GROUNDING_BY_KIND`, ceilings, completion signals, labels…): fold them into one
-  definition. (Survey tally, LIN-4248.)
+- `lib/prompts/stage-kinds.js`: one record per stage kind (LIN-4467). The per-kind tables that stay, each with
+  its owner and reason: `JOBS` (`lib/llm-jobs.js`), pure data on purpose so its census test is not vacuous (19 of
+  its 39 rows are not template kinds); the route and writes pins (`tests/unit/lin-4253-stage-traits.test.js`),
+  hand-typed on purpose, the one check not read back from the record; `SPINE`, `BUCKET_OF_KIND`, `FIRST_PASS_KINDS`
+  and `OFF_SPINE_KINDS` (Runs & dispatch, A13); the six non-template labels and the two orchestration step words
+  (`lib/run-view.js`), which no record carries; the byte ceilings (`tests/unit/prompt-size-budget.test.js`), which
+  cover the registry. `VIRTUAL_PROMPTS` (`lib/workflow-config.js`) is gone: its one reader is the record's key.
+  (Survey tally, LIN-4248; piece 3, LIN-4467.)
+- `lib/prompts/stage-kinds.js`: the one-record refactor's witness (`tests/fixtures/lin-4467-witness.js`) stays in the
+  suite as a permanent test. It pins a sha256 for all 40 renders and for each table, so a later wording change in
+  any stage must regenerate `tests/fixtures/lin-4467-witness.json` as well as move the byte ceilings and the change
+  log; and its fix-round mode differs from
+  fresh for `implementation` only. Decide whether to retire it once piece 5 (LIN-4469) has re-pinned, fold it into
+  `tests/unit/prompt-size-budget.test.js`, or keep it as a ratchet: a decision about the test suite, not a fix.
+  (LIN-4467 blind read.)
 - `lib/call-budget.js`: the budget rule is untested live on anthropic/claude-haiku-5.5; before
   moving a call there, replay LIN-4352's snapshot through `scripts/replay-brief.mjs`: block [2] WHOLE,
   four sections, finishReason=stop, any retry's reasoning bound accepted. REFUSED: change the rule
@@ -157,14 +173,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   `lib/dispatch-leftover-answer.js` (any one to six characters, its comment calling it the guard's
   rule) and in simple-dispatcher's guard. A retirement line can name a path the guard would not read
   as one. Borderline. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
-- `lib/code-routes.js`: the review loop bound's step lives in its `CODE_ROUTES` entry, because the route has
-  no module of its own (`reviewLoopStop` is a fact in `lib/recommendation-facts.js`); the other three entries
-  only delegate to their modules. A fifth route, or a change to the bound, cannot follow one pattern. Waiting:
-  decide where the bound's step lives (its own module, or a `reviewLoopStep` beside `reviewLoopStop`) and make
-  the entry delegate like the rest. (LIN-4465 blind read.)
 - `lib/prompts/blind-read-words.js`: the blind read's kind has a constant and a scan, but every other kind in
   the same lists is still a literal (`SPINE` in `lib/run-view.js`, the `COMMENT_KINDS` rows in
   `lib/run-trail.js`, `CODE_ROUTES` in `lib/code-routes.js`), so the next stage added has two conventions to
-  choose from. Decide whether every kind gets a constant or only this one; LIN-4467 (one record per stage
-  kind) is the natural home, since a descriptor registry would make the spelling question disappear.
-  (LIN-4466 blind read.)
+  choose from. Decide whether every kind gets a constant or only this one. LIN-4467 made one record per stage
+  kind (`lib/prompts/stage-kinds.js`) but keys it by literals, so the question stands; the record is where a
+  constant per kind would live. (LIN-4466 blind read; LIN-4467 leftovers.)
