@@ -8,8 +8,9 @@
  * here runs the real chain with no stub on the token path: a real DispatchQueueStore over mock
  * collections, a real ProxyTokenStore, mint -> exchange -> validate.
  *
- * The held-wake release (server.js, setWakeCredentialProvisionerFactory) is NOT covered here: its
- * factory receives no resumed-parent id, and that is an open DECISION on LIN-4448.
+ * The held-wake release (lib/dispatch-store.js releaseHeldWake) is covered too, through the factory
+ * server.js binds (`buildHeldWakeProvisionerFactory`): the store hands it the producing build's id,
+ * and the wake takes the resumed parent's stage the same way (LIN-4448 ruling: allow the store change).
  */
 process.env.NODE_ENV = 'test';
 
@@ -22,6 +23,8 @@ import { createProxyRunnerRoutes } from '../../routes/proxy-runner.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
 import { enqueueFollowUp } from '../../lib/follow-up-dispatch.js';
+import { createLeftoverStep } from '../../lib/dispatch-leftover-hook.js';
+import { buildHeldWakeProvisionerFactory } from '../../lib/wake-credential.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 
 const URL_KEY = 'acme';
@@ -209,6 +212,63 @@ describe('LIN-4468 review F2 — enqueueFollowUp: a restricted kind takes its ow
 
     const row = world.collection._docs.find(d => d._id === outcome.body.itemId);
     const stamp = await exchangedStamp(world, row.bootstrapToken);
+    assert.deepEqual(stamp, { writes: null, writesTarget: null });
+  });
+});
+
+describe('LIN-4468 — a held wake\'s release takes the RESUMED parent\'s stage (server.js factory)', () => {
+  const TOKEN = 'token-a';
+  const DONE = '[done] Built LIN-7. PR https://github.com/o/r/pull/12 is green.';
+
+  /** A store bound to the real held-wake factory, and the leftover step that holds a build's wake. */
+  async function heldWorld() {
+    const world = await makeWorld();
+    world.store.setWakeCredentialProvisionerFactory(buildHeldWakeProvisionerFactory({
+      proxyTokenStore: world.tokenStore, baseUrl: 'http://127.0.0.1', store: world.store
+    }));
+    const step = createLeftoverStep({
+      dispatchStore: world.store,
+      ownerCheck: async () => ({ status: 'owner' }),
+      haltReader: async () => null,
+      resolveWorkspaceId: async () => 'ws-1',
+      log: () => {}
+    });
+    world.hook = step.forRequest({ baseUrl: 'http://127.0.0.1', workspaceId: 'ws-1' });
+    return world;
+  }
+
+  /** A parent on `kind`, a stage build reporting to it, the build's [done] held behind a queued leftover row. */
+  async function heldBuild(world, { kind, issueIdentifier }) {
+    const parent = await world.store.addItem(URL_KEY, { prompt: 'parent work', kind, issueIdentifier, harness: 'claude-code', dispatchedBy: OWNER });
+    await world.store.takeItem(parent._id, URL_KEY, 'orchestrator');
+    const build = await world.store.addItem(URL_KEY, {
+      prompt: 'build it', kind: 'implementation', promptName: 'implementation', issueIdentifier: 'LIN-7',
+      target: 'cli', dispatchedBy: OWNER, subscription: 'terminal-only', sessionId: parent._id
+    });
+    await world.store.takeItem(build._id, URL_KEY, TOKEN);
+    await world.store.addFeedback(build._id, URL_KEY, { message: DONE }, TOKEN, undefined, { wakeHook: world.hook });
+    const all = () => [...world.collection._docs, ...world.historyCollection._docs];
+    assert.equal(all().filter(d => d.kind === 'wake' && d.followUpTo === parent._id).length, 0, 'the build wake is held');
+    const leftover = world.collection._docs.find(d => d.kind === 'leftover');
+    assert.ok(leftover, 'a leftover row holds the wake');
+    return { parentId: parent._id, leftover };
+  }
+
+  test('a restricted parent woken by a held wake\'s release keeps its own stage and ticket', async () => {
+    const world = await heldWorld();
+    const { parentId, leftover } = await heldBuild(world, { kind: 'look-into', issueIdentifier: 'LIN-9' });
+    await world.store.removeItem(URL_KEY, leftover._id);
+
+    const stamp = await exchangedStamp(world, wakeFor(world, parentId).bootstrapToken);
+    assert.deepEqual(stamp, { writes: 'none', writesTarget: 'LIN-9' });
+  });
+
+  test('a work parent woken by a held wake\'s release is unrestricted, as before', async () => {
+    const world = await heldWorld();
+    const { parentId, leftover } = await heldBuild(world, { kind: 'autopilot', issueIdentifier: 'LIN-9' });
+    await world.store.removeItem(URL_KEY, leftover._id);
+
+    const stamp = await exchangedStamp(world, wakeFor(world, parentId).bootstrapToken);
     assert.deepEqual(stamp, { writes: null, writesTarget: null });
   });
 });

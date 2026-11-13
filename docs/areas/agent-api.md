@@ -41,14 +41,12 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   census fails (LIN-4468).
 - A token minted for a stage carries its `writes` and ticket, or has a reason not to. Pass both into
   the mint helpers (`lib/proxy-preamble.js`), or read them from the row (`lib/item-stage-stamp.js`).
-  A wake takes the stamp of the session it resumes, the parent, not the row that reported
-  (`stampForWakeParent`). A mint with neither is unrestricted, which is right only for a person's or a
-  `custom` mint, listed with its reason in `tests/unit/dispatch-entrance-mint-sweep.test.js`. The refire
-  broker minted unrestricted tokens for read-only rows because its mint was a bare `createToken`, which
-  no helper-name search finds (LIN-4468). **Open exception:** the held-wake release factory in
-  `server.js` mints unstamped, because `releaseHeldWake` passes it no resumed-parent id. Stamping it
-  needs a one-argument change in `lib/dispatch-store.js`, which the LIN-4468 brief keeps out of scope;
-  it is a DECISION on LIN-4448, not a listed reason.
+  A wake, immediate or held, takes the stamp of the session it resumes, the parent, not the row that
+  reported (`stampForWakeParent`; a held release gets the producing build's id from the store). A mint
+  with neither is unrestricted, which is right only for a person's or a `custom` mint, listed with its
+  reason in `tests/unit/dispatch-entrance-mint-sweep.test.js`. The refire broker minted unrestricted
+  tokens for read-only rows because its mint was a bare `createToken`, which no helper-name search
+  finds (LIN-4468).
 
 ## Waiting
 

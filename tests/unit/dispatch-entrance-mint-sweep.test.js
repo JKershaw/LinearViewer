@@ -20,7 +20,10 @@
  *   - the wake callback built at routes/dispatch.js `buildWakeCredentialProvisioner`:
  *     it fires only inside `dispatchQueueStore.addFeedback`, mints through
  *     `provisionResumeCredential` -> `mintGrantBootstrap` (already spied) and is
- *     covered by lin-3134-wake-declared.test.js, which stays where it is.
+ *     covered by lin-3134-wake-declared.test.js, which stays where it is. Its LIN-4468 stamp
+ *     (the resumed parent's stage, on both feedback routes and the held-wake release factory
+ *     `buildHeldWakeProvisionerFactory` that server.js binds) is witnessed in
+ *     lin-4468-wake-stamp.test.js.
  *
  * Origins of a mint (what each row of the table below must show):
  *
