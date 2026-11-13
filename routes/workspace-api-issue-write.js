@@ -35,7 +35,8 @@ import { RULING_SETTLED_REFUSAL } from '../lib/ruling-settled.js';
 // miss workspace-wide generation bumps, and its key-building primitive.
 import { dedupeKey, createDedupeCache } from '../lib/proxy-dedupe.js';
 import { commentDedupe, commentDedupeGenerations } from './proxy.js';
-import { isTestToken, refuseCapability } from './workspace-api-steps.js';
+import { isHermeticTestToken } from '../lib/should-mock-ai.js';
+import { refuseCapability } from './workspace-api-steps.js';
 import { sealForFiling } from '../lib/as-asked-seal.js';
 
 
@@ -409,7 +410,7 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
     // a `const` declared inside the `try` — a bare read from there would
     // throw a ReferenceError outside the inner error boundary and hang the
     // request exactly the way an unguarded failed retry would.
-    const isTestMode = isTestToken(workspace);
+    const isTestMode = isHermeticTestToken(workspace.accessToken);
 
     // Dedupe key and attribution are pure — neither calls the provider — so
     // both are computed once, up front, and reused unchanged by a recovered

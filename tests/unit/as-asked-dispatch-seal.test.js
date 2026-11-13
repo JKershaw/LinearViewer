@@ -16,8 +16,8 @@
  *     session-fit phrase or `plan-review due:` line; an empty description; an issue
  *     whose history read throws; a dispatch the duplicate guard refuses;
  *   - no issueAccess logs `seal skipped: no access` and still enqueues; a provider write
- *     that fails or hangs still enqueues and logs it; the Jira fake is skipped,
- *     unreformatted.
+ *     that fails or hangs still enqueues and logs it. The Jira fake is sealed, with
+ *     its words in the harbour.asAsked property (LIN-4450).
  * And the entrance census: every `createDispatchItem(` caller (and every
  * `enqueueRow(` lane, which forwards to it) passes `issueAccess` or is on the
  * never-first list with its reason.
@@ -38,7 +38,8 @@ import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { LocalProvider, localProvider } from '../../lib/providers/local/index.js';
 import { jiraProvider } from '../../lib/providers/jira/index.js';
 import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js';
-import { markdownToAdf } from '../../lib/providers/jira/adf.js';
+import { adfToMarkdown, markdownToAdf } from '../../lib/providers/jira/adf.js';
+import { AS_ASKED_PROPERTY, AS_ASKED_READ, readDescription } from '../../lib/providers/jira/as-asked-region.js';
 import { sealAsAsked, splitAsAsked } from '../../lib/as-asked.js';
 import { createLocalStore } from '../fixtures/local-harness.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
@@ -278,7 +279,7 @@ describe('first-dispatch seal — the Jira fake', () => {
   const kept = { client: jiraProvider.client, clientFactory: jiraProvider.clientFactory, site: jiraProvider.site };
   afterEach(() => Object.assign(jiraProvider, kept));
 
-  test('a first dispatch on a Jira ticket is skipped with its own log line; the ADF is untouched', async () => {
+  test('a first dispatch on a Jira-native ticket seals it: the block is written with its words in the harbour.asAsked property (LIN-4450)', async () => {
     const fake = createFakeJiraClient({
       projects: [{ id: '10001', key: 'ENG', name: 'Engineering' }],
       issues: [{
@@ -293,11 +294,16 @@ describe('first-dispatch seal — the Jira fake', () => {
       }],
     });
     jiraProvider.configure({ client: fake, clientFactory: () => fake, site: SCOPE.site });
-    const before = structuredClone((await fake.getIssue('ENG-1')).fields.description);
     await dispatch({ issueIdentifier: 'ENG-1', issueAccess: () => ({ provider: jiraProvider, token: SCOPE }) });
-    assert.deepEqual((await fake.getIssue('ENG-1')).fields.description, before, 'never reformatted');
-    assert.equal((await queuedRows()).length, 1);
-    assert.ok(logs.some((l) => l.includes('[as-asked] seal skipped: provider jira cannot hold the block')), JSON.stringify(logs));
+    assert.equal((await queuedRows()).length, 1, 'the dispatch still goes on');
+    assert.deepEqual(logs.filter((l) => /seal skipped|filed unsealed/.test(l)), [], 'a sealed ticket logs no skip');
+    // A Jira-native ticket's words are the converted text it already held (the
+    // first-dispatch seal reads what Jira stores), so that is what is sealed.
+    const converted = adfToMarkdown(markdownToAdf(WORDS));
+    const stored = await fake.getIssue('ENG-1', AS_ASKED_READ);
+    assert.equal(stored.properties[AS_ASKED_PROPERTY].words, converted);
+    const shown = readDescription(stored.fields.description, stored.properties[AS_ASKED_PROPERTY]);
+    assert.equal(splitAsAsked(shown).words, converted, 'the reader serves the words back, byte for byte');
   });
 });
 

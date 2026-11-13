@@ -609,7 +609,10 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
     sessionStorage: storage,
   };
   vm.createContext(sandbox);
-  loadCostFormat(sandbox); // LIN-4179: the shared browser formatter, loaded before the page script, as the page does
+  // LIN-4179 / LIN-4446: the shared formatter, installed before the page script here because this seam has no
+  // document.readyState, so flight-companion.js starts its session at load. In the browser the module shim installs it
+  // after the classic scripts, before DOMContentLoaded starts the session (tests/unit/cost-format-consumers.test.js).
+  loadCostFormat(sandbox);
   // readSSEStream first, same context — mirrors production's script order
   // (common.js, then flight-companion.js) so both share one realm.
   vm.runInContext(READ_SSE_STREAM_SRC, sandbox, { filename: 'common.js (readSSEStream slice)' });
@@ -2715,7 +2718,6 @@ function loadChatUI(doc) {
   sandbox.window.renderSurface = function () { return '<div class="chat-msg__body"></div>'; };
   sandbox.window.escapeHtml = function (s) { return s == null ? '' : String(s); };
   vm.createContext(sandbox);
-  loadCostFormat(sandbox); // LIN-4179: the shared browser formatter, loaded before the page script, as the page does
   // LIN-2987: chat.js's isPinnedToBottom moved to common.js and chat.js now
   // delegates to window.isPinnedToBottom, both at its two internal call
   // sites and in its ChatUI.isPinnedToBottom export — so the real predicate

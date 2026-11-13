@@ -146,7 +146,7 @@ import { createRunnerKitRoutes } from './routes/runner-kit.js'
 import { createGettingStartedRouter } from './routes/getting-started.js'
 import { createTestRoutes, installTestTokenLinearTransport } from './routes/test.js'
 import { createWorkspaceApiRoutes, decisionStampDedupe } from './routes/workspace-api.js'
-import { shouldMockAi } from './lib/should-mock-ai.js'
+import { isHermeticTestToken, shouldMockAi } from './lib/should-mock-ai.js'
 import { getModelCatalog, CATALOG_CACHE_TTL_MS, _seedCatalogFromBodyForTests } from './lib/openrouter-catalog.js'
 import { createLegacyRedirects } from './routes/legacy-redirects.js'
 import { testMockTeams, testMockData } from './lib/sample-data/mock-data.js'
@@ -1222,7 +1222,8 @@ app.use((req, res, next) => {
 // redirect, so the 301 and /health (above it) never carry it.
 app.use(hstsHeader())
 
-// Browser libs from node_modules at their old URLs (LIN-3787). Immediately
+// Browser libs from node_modules at their old URLs (LIN-3787), and the shared
+// leaf modules from lib/ at /shared/* (LIN-4446). Immediately
 // before static so they keep its cache headers and skip defaultCacheControl().
 app.use(createVendorAssetsRouter())
 app.use(express.static('public'))
@@ -1783,7 +1784,7 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
       // a selection key only — never a credential.
       const bindingCallScope = getBindingCallScope(binding);
       // Use mock data in test mode to avoid hitting the provider API
-      const isTestMode = process.env.NODE_ENV === 'test' && bindingToken === 'test-token';
+      const isTestMode = isHermeticTestToken(bindingToken);
       // LIN-4068: a mock set is never held (the write gate refuses it), so the result says whether one was used.
       if (isTestMode) stateMock = true;
 
@@ -3181,7 +3182,7 @@ const workspaceIssuesMemo = createWorkspaceIssuesMemo({ ttlMs: WORKSPACE_ISSUES_
 // Linear-shaped mock, real ones read through the provider. Returns [] defensively.
 async function fetchWorkspaceIssues(workspace) {
   if (!workspace) return [];
-  const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+  const isTestMode = isHermeticTestToken(workspace.accessToken);
   if (isTestMode) return testMockData.issues;
 
   const memoised = workspaceIssuesMemo.get(workspace);
@@ -4036,7 +4037,7 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
     // session and dropped this arm from the route; the visual maker deliberately
     // stays on the test-token mock fixtures (not local), so without it this route
     // auth-errors and the roadmap baseline silently captured the landing page.
-    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+    const isTestMode = isHermeticTestToken(workspace.accessToken);
     const provider = getProviderForWorkspace(workspace);
     const scope = getWorkspaceCallScope(workspace);
     // LIN-2025: resolve teamId against the workspace's actual team list

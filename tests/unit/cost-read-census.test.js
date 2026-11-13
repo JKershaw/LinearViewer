@@ -12,7 +12,7 @@
  *  - calls a retired cost function (`buildTaskCost`, `joinCostLineages`, `reduceLineageCost`, `summarize`,
  *    `summarizeByIssue`, `summarizeByFeature`) anywhere, or calls `windowedSpend` / `listInHorizon` outside its list;
  *  - formats a dollar figure by hand (`$` + `toFixed` on the same line) outside the one formatter (lib/cost-format.js,
- *    public/cost-format.js). The only exception is a per-token price line, which is a price, not a cost figure.
+ *    served to the browser as /shared/cost-format.js, LIN-4446). The only exception is a per-token price line, which is a price, not a cost figure.
  *
  * Run with: node --test tests/unit/cost-read-census.test.js
  */
@@ -82,7 +82,6 @@ const DOLLAR_TOFIXED = /\$\$\{[^}]*\.toFixed\(|'\$'\s*\+[^\n]*\.toFixed\(/;
 /** The formatter files themselves, and the lines that are not cost figures. */
 export const FORMAT_ALLOW = [
   { file: 'lib/cost-format.js' },
-  { file: 'public/cost-format.js' },
   // A model's per-token price in the catalog text, not a cost figure.
   { file: 'lib/openrouter.js', includes: 'per 1M tokens' },
 ];
@@ -144,7 +143,7 @@ export function censusProblems(files) {
       // 4. A hand-made dollar figure.
       if (DOLLAR_TOFIXED.test(line)) {
         const allowed = FORMAT_ALLOW.some(entry => entry.file === file && (entry.includes === undefined || line.includes(entry.includes)));
-        if (!allowed) problems.push(`${where} formats a dollar figure by hand ($ and toFixed): use formatUsd (lib/cost-format.js, public/cost-format.js)`);
+        if (!allowed) problems.push(`${where} formats a dollar figure by hand ($ and toFixed): use formatUsd (lib/cost-format.js)`);
       }
     });
   }

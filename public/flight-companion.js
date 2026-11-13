@@ -416,14 +416,9 @@
     return Math.min(currentDelayMs * 2, CADENCE_CAP_MS);
   }
 
-  // LIN-2621 beat 3: format a USD amount for display. Mirrors lib/render-
-  // settings.js's own formatCost (the settings page's AI usage KPI tree) —
-  // same house rule (small per-call amounts keep 4 decimals; a larger total
-  // rounds to 2) — restated here rather than imported, since this file is a
-  // browser IIFE with no module graph to lib/, the same reason every other
-  // vocabulary/prefix restatement in this codebase exists.
-  // LIN-4179: the one browser formatter (public/cost-format.js). Per-turn amounts keep 4 decimals under $1; an unknown
-  // cost is a dash, never $0.00.
+  // LIN-2621 beat 3: format a USD amount for display. LIN-4179 / LIN-4446: the one formatter, the same bytes as
+  // lib/cost-format.js, set on window.CostFormat by the module shim. Per-turn amounts keep 4 decimals under $1; an
+  // unknown cost is a dash, never $0.00. Called from the DOMContentLoaded handler, so the global is always set here.
   function formatCost(cost) {
     var words = window.CostFormat.formatUsd(cost, { fine: true });
     return words === null ? '\u2014' : words;

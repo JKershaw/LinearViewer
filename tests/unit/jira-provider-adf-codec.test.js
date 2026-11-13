@@ -231,6 +231,9 @@ const WRITER_SAFE_ADF = {
   'codeBlock with a language': adfDoc({ type: 'codeBlock', attrs: { language: 'js' }, content: [adfText('console.log(1)')] }),
   'codeBlock without a language': adfDoc({ type: 'codeBlock', content: [adfText('plain code')] }),
   'multi-line codeBlock': adfDoc({ type: 'codeBlock', content: [adfText('a\nb\nc')] }),
+  // LIN-4450: an empty fence is the bare fence, not a fence with a blank line in it.
+  'empty codeBlock': adfDoc({ type: 'codeBlock', content: [] }),
+  'empty codeBlock with a language': adfDoc({ type: 'codeBlock', attrs: { language: 'js' }, content: [] }),
   'single-paragraph blockquote': adfDoc({ type: 'blockquote', content: [adfPara(adfText('quoted'))] }),
   'blockquote with a hardBreak': adfDoc({ type: 'blockquote', content: [adfPara(adfText('l1'), HARD_BREAK, adfText('l2'))] }),
   rule: adfDoc({ type: 'rule' }),
@@ -360,7 +363,6 @@ const WRITER_UNSAFE_ADF = {
   'codeBlock containing a blank line': adfDoc({ type: 'codeBlock', content: [adfText('a\n\nb')] }),
   'codeBlock with a leading newline': adfDoc({ type: 'codeBlock', content: [adfText('\na')] }),
   'codeBlock with a trailing newline': adfDoc({ type: 'codeBlock', content: [adfText('a\n')] }),
-  'empty codeBlock': adfDoc({ type: 'codeBlock', content: [] }),
   // Adjacent code runs (LIN-3564): their fences touch, and CommonMark reads
   // ``a``b`` as ONE span. The same two runs with a different mark between them
   // are fine.

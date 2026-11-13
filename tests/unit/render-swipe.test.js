@@ -7,6 +7,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { flattenTrees } from '../../lib/task-order.js';
 import { issueSource } from '../../lib/providers/models.js';
+import { renderSwipePage } from '../../lib/render-swipe.js';
 
 // Build a single-project tree shaped like buildForest output, so flattenTrees
 // runs the real issueToCard mapping on the supplied raw issues (mirrors the
@@ -106,5 +107,16 @@ describe('issueToCard source stamp (LIN-2046)', () => {
     assert.deepStrictEqual(card.blocksIds, ['b']);
     assert.strictEqual(card.parentId, 'p');
     assert.strictEqual(card.source, 'github');
+  });
+});
+
+// The swipe page is public and must allow pinch zoom (WCAG 1.4.4; Lighthouse `meta-viewport`). It takes the shared
+// shell's default viewport rather than its own `user-scalable=no` (Design & Interface Review, 8 Nov 2026).
+describe('swipe page viewport', () => {
+  test('does not block zoom: the shared default viewport, with no user-scalable=no or maximum-scale', () => {
+    const html = renderSwipePage({ projectTrees: [], inProgressTrees: [], recentActivityTrees: [] }, { urlKey: 'ws', workspaces: [{ urlKey: 'ws', name: 'WS', provider: 'linear' }] });
+    const meta = html.match(/<meta name="viewport" content="([^"]*)">/);
+    assert.ok(meta, 'the page has a viewport meta');
+    assert.strictEqual(meta[1], 'width=device-width, initial-scale=1.0');
   });
 });

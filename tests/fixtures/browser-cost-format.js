@@ -1,14 +1,12 @@
 /**
- * tests/fixtures/browser-cost-format.js: the shared browser USD formatter (public/cost-format.js, LIN-4179) loaded into
- * a vm sandbox, as the page loads it before its own scripts. A browser test that evaluates a page script which formats
- * a cost calls `loadCostFormat(sandbox)` after `vm.createContext(sandbox)`, so `window.CostFormat` exists.
+ * tests/fixtures/browser-cost-format.js: the shared USD formatter (lib/cost-format.js, LIN-4179; served to the browser
+ * as /shared/cost-format.js, LIN-4446) given to a vm sandbox, as the module shim gives it to the page. A browser test
+ * that evaluates a page script which formats a cost calls `loadCostFormat(sandbox)` after `vm.createContext(sandbox)`,
+ * so `window.CostFormat` exists. The function is the server's own, so plain strings cross the vm boundary safely.
  */
-import { readFileSync } from 'node:fs';
-import vm from 'node:vm';
+import { formatUsd } from '../../lib/cost-format.js';
 
-export const COST_FORMAT_SRC = readFileSync(new URL('../../public/cost-format.js', import.meta.url), 'utf8');
-
-/** Runs the shared formatter into the sandbox (it sets `window.CostFormat` on the sandbox's window). */
+/** Sets `window.CostFormat` on the sandbox's window, as public/cost-format-global.js does in the browser. */
 export function loadCostFormat(sandbox) {
-  vm.runInContext(COST_FORMAT_SRC, sandbox, { filename: 'cost-format.js' });
+  sandbox.window.CostFormat = { formatUsd };
 }
