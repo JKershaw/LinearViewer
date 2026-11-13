@@ -8,8 +8,8 @@
  *   - THE NEW RULE: behaviour the one trail pass changes on purpose. Written as `todo` before
  *     lib/run-trail.js existed (beat 1, failing output recorded), lifted when it landed: row 14 flips;
  *     an agent note citing a new PR is work after review; an area read carries no landing; readTrail
- *     carries piece 1's fields. The box and the owner's Done check reading the landing stay `todo`
- *     until beat 3 moves their PR input (BEAT_3 below).
+ *     carries piece 1's fields. The box and the owner's Done check reading the landing were `todo`
+ *     until beat 3 moved their PR input to the landing; lifted there.
  *
  * The rule, as LIN-4458 reads "the PRs first cited after the anchor" (comment on LIN-4447):
  *   - the anchor is today's (the latest close-out before the latest review);
@@ -43,10 +43,6 @@ import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { findRouteLayer } from './lib/route-layer.js';
 import * as trail from '../../lib/run-trail.js';
-
-// The box and the owner's check take their PR list from the landing in beat 3; until then these run
-// as `todo` (they fail today, by design).
-const BEAT_3 = 'LIN-4458 beat 3: the box and the owner\'s check take their PRs from the landing';
 
 const REPO = 'acme/widget';
 const PR = (n) => `https://github.com/${REPO}/pull/${n}`;
@@ -209,7 +205,9 @@ describe('the box: a landing of [A] cited beside B', () => {
     assert.equal(resolveRunPrRef(model).status, 'multiple');
   });
 
-  test('the box counts the landing: its one PR read is A\'s, matched by URL, and it reads ready', { todo: BEAT_3 }, async () => {
+  // The plan's witness. Before (ad2ee9301): the box listed both cited PRs, read none (two cited) and
+  // read 'multiple-prs'.
+  test('a landing of [A] cited beside B reads A in the box and withholds in the picker', async () => {
     const reads = [];
     const model = await readRunEvidence({
       issueIdentifier: 'LIN-1', comments: CITED_NOT_LANDED, stopAt: 'pr', runnerReady: true, viewerIsOwner: true,
@@ -228,14 +226,14 @@ describe('the owner\'s Done check: the same trail through the check route', () =
   before(() => harness.connect());
   after(() => harness.close());
 
-  async function check(statuses) {
+  async function check(statuses, comments = CITED_NOT_LANDED) {
     const collection = harness.freshDb().collection('close-out-events');
     const calls = { markDone: 0, reads: [] };
     const router = createWorkspaceApiRoutes({
       workspaceFromUrl: (req, res, next) => next(),
       closeOutEventsStore: new CloseOutEventsStore({ collection }),
       closeOut: {
-        resolveProvider: () => ({ provider: { async fetchIssueComments() { return CITED_NOT_LANDED; } }, callScope: 'scope' }),
+        resolveProvider: () => ({ provider: { async fetchIssueComments() { return comments; } }, callScope: 'scope' }),
         readPrStatus: async ({ number }) => { calls.reads.push(number); return statuses[number]; },
         isStopAtRun: async () => 'pr',
         runnerReady: () => true,
@@ -252,13 +250,26 @@ describe('the owner\'s Done check: the same trail through the check route', () =
 
   // Named change (plan-review note 3 on LIN-4447): "no other unmerged PR" is checked over the landing.
   // B, abandoned and closed in an earlier round, no longer blocks the person's Done on A.
-  test('a merged, approved, read landing [A] sets Done on the person\'s check; B closed unmerged outside the landing does not block it', { todo: BEAT_3 }, async () => {
+  // Before (ad2ee9301): the chain read every cited PR (B and A), the state was 'partial'
+  // ("PR #41 merged · 1 more PR not merged"), and the person's check set no Done.
+  test('a merged, approved, read landing [A] sets Done on the person\'s check; B closed unmerged outside the landing does not block it', async () => {
     const { res, calls, events } = await check({ 41: mergedPr(41), 42: closedPr(42) });
+    assert.deepEqual(calls.reads, [41], 'the one read is the landing\'s: B, outside it, is not read');
     assert.equal(res.statusCode, 200);
     assert.equal(res.jsonBody.state.status, 'merged', 'the landing is merged');
     assert.equal(res.jsonBody.state.pr.url, A, 'the merged PR is A, found by URL');
     assert.equal(calls.markDone, 1, 'Done is set once');
     assert.deepEqual(events.map(e => e.prUrl), [A], 'the merge recorded is A\'s');
+  });
+
+  // Not widened: a PR INSIDE the landing that is closed unmerged still withholds the person's Done.
+  test('a landing of [A, C] with C closed unmerged still sets no Done (the bound holds over the landing)', async () => {
+    const C = PR(43);
+    const trail = [summary(1, `${A} and ${C}`), review(2, 'Approve', A), read(3, A, C)];
+    assert.deepEqual(landingPrUrls(trail), [A, C]);
+    const { res, calls } = await check({ 41: mergedPr(41), 43: closedPr(43) }, trail);
+    assert.equal(res.jsonBody.state.status, 'partial');
+    assert.equal(calls.markDone, 0);
   });
 
   test('pin: an unmerged landing [A] never sets Done, whatever B reads', async () => {

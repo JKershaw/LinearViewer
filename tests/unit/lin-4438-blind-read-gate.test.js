@@ -6,7 +6,7 @@
  *   - route: lib/openrouter.js codeRouteOf, through getRecommendation (the selector stubbed to answer
  *     `close-out` when the code routes stand aside);
  *   - state: deriveCloseOutState for a stop-at-PR run, through readCloseOutChain (the check route's chain);
- *   - box: buildRunEvidence, the task page's close-out box;
+ *   - box: readRunEvidence, the task page's close-out box (its one read is the landing's sole PR, LIN-4458);
  *   - guard, stop-at lane: closeOutNotReady on a stop-at-PR task;
  *   - guard, ladder lane: closeOutNotReady on an ordinary task.
  * A future place that decides readiness without closeOutWaitsOn and landingPrUrls disagrees with a row.
@@ -26,7 +26,7 @@ import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { getRecommendation, setFetchImpl, setPromptTraceRecorder } from '../../lib/openrouter.js';
 import { readCloseOutChain, closeOutNotReady } from '../../lib/close-out-readiness.js';
-import { buildRunEvidence } from '../../lib/run-evidence.js';
+import { readRunEvidence } from '../../lib/run-evidence.js';
 import { closeOutWaitsOn } from '../../lib/run-closeout-state.js';
 import { landingPrUrls, commentKindOf, isPersonComment } from '../../lib/run-trail.js';
 import { assembleTrailFacts } from '../../lib/recommendation-facts.js';
@@ -119,8 +119,8 @@ async function routeLane(row) {
 async function lanes(row) {
   const workspace = { urlKey: 'acme' };
   const { state } = await readCloseOutChain({ workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, 'pr'), stopAt: 'pr', runnerReady: true, owner: true, byPersonCheck: false, prStatusCache: new Map() });
-  const urls = [...new Set(row.comments.flatMap(x => x.body.match(/https:\/\/github\.com\/\S+?\/pull\/\d+/g) || []))];
-  const box = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: row.comments, prStatus: urls.length === 1 ? statusFor(row, urls[0]) : null, stopAt: 'pr', runnerReady: true, owner: true }).closeOut;
+  // LIN-4458: the box is read the way the page reads it (readRunEvidence: one read, of the landing's sole PR).
+  const box = (await readRunEvidence({ issueIdentifier: 'LIN-1', comments: row.comments, readPrStatus: async ({ repo, number }) => statusFor(row, `https://github.com/${repo}/pull/${number}`), stopAt: 'pr', runnerReady: true, viewerIsOwner: true })).closeOut;
   const stopAtGuard = await closeOutNotReady({ workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, 'pr') });
   const ladderGuard = await closeOutNotReady({ workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, null) });
   return { route: await routeLane(row), state, box, stopAtGuard, ladderGuard };
