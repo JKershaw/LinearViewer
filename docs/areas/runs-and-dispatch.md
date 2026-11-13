@@ -53,6 +53,11 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   box (`buildRunEvidence`) and both guard lanes (`closeOutNotReady`). A readiness rule goes in
   `closeOutWaitsOn` (`lib/run-closeout-state.js`) and gets a row in the shared-trail table
   (`lin-4438-blind-read-gate`); gating one lane let the page offer a press the guard refused (LIN-4438).
+- What a comment is, and which PRs are the task's, are read once in `lib/run-trail.js`: a comment kind
+  is a row of `COMMENT_KINDS` (`lin-4458-comment-kind-census` fails on a kind test elsewhere), and the
+  box, the guard, the owner's check and the merge take their PRs from `readTrail().landing`, statuses
+  keyed by PR URL: the cited list (newest first) and the landing (oldest first) order PRs differently,
+  so a shared index points at the wrong PR (LIN-4458).
 - A reader that classifies by kind routes `custom` before `bucketOf`: `BUCKET_OF_KIND` maps
   `custom` to orchestration, and `bucketOf` falls back to orchestration silently, so check membership
   (`lib/wall-clock-summary.js`). `dispatchesOf` turns a missing kind into `custom` (`lib/cost-read.js`):
@@ -100,29 +105,11 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   time. It sorts too early in the selector's five, and can land on the wrong side of a "since the latest
   review" cut, such as the ended-read count in `lib/recommendation-blind-read.js`. Fix: `listHistory`
   reports the lineage's end time, a store change that alters the Dispatch route's output. (LIN-4459 blind read.)
-- `lib/run-ledger.js`: `landingPrUrls` counts every full PR URL after its anchor, so it disagrees with
-  the other landing readers in two cases the shared-trail table pins as chosen, not designed
-  (`tests/unit/lin-4438-blind-read-gate.test.js` rows 14 and 15): an audit report that re-cites a
-  merged landing PR puts it in the notes PR's landing (`auditAfterLandingCloseOut` in
-  `lib/recommendation-facts.js` treats only the new PR as the notes PR), and a foreign PR cited
-  before the first review joins a first landing. Each costs a read that must name an extra PR. One
-  comment classifier and one landing reader would make both follow from one rule. A third case is not pinned: an agent's own note (first line
-  `autopilot`, `plan posted`, `plan revised`, or `revision N`) that cites a new PR after review joins
-  `landingPrUrls` but not `isLandingEvidence` (`lib/recommendation-facts.js`), so `blindReadStep`
-  offers a blind read naming a PR the approved review never covered, where a plain note sends it
-  back to review (reproduced at
-  e2d4659c4; Seams & Tangles, 13 Nov.; `docs/reviews/seams-tangles-review-2026-11-13-run12.md`, §3.0a).
-  (LIN-4438; Survey global on LIN-4438.)
-- `lib/run-ledger.js`: `landingPrUrls` skips only blind reads and survey reports, so a comment headed
-  `## Area read` that names a full PR URL would join the ticket's landing. Only the prose rule in
-  `docs/plans/survey/area-read.md` (cite `path@sha`, never a PR URL) keeps the LIN-4447 area reads
-  out today. An area-read kind in the one comment classifier (LIN-4458, piece 2) would make that rule code. (Leftover
-  of LIN-4453; Survey global on LIN-4453.)
-- `lib/run-closeout-state.js`: `deriveCloseOutState` works from two PR lists: `prs` (`extractPrUrls`,
-  every PR ever cited) drives the PR-shape reasons (multiple-prs, partial, merged) and `landingPrs`
-  (`landingPrUrls`) drives the blind-read gate, so the box can count PRs the gate ignores and the
-  other way round (pinned in `tests/unit/lin-4438-blind-read-gate.test.js` rows 14 and 15). Which
-  reader answers "this task's PRs" spans the box, the guard and the route. (Blind read on LIN-4439.)
+- `lib/run-trail.js`: a foreign PR cited by full URL before the first review (a research note, a plan)
+  joins a first landing, so the blind read must name it (`tests/unit/lin-4438-blind-read-gate.test.js`
+  row 15, kept as a stated limit): no caller holds the task's repository, so the landing cannot tell
+  another repository's PR from this task's. A task-repository fact, or a kind stamped on a comment when
+  it is posted, would let the landing drop it. (LIN-4438; why-not written by LIN-4458.)
 - `lib/close-out-readiness.js`: in the stop-at lane `deriveCloseOutState` lets merged and partial
   outrank the gate, then `closeOutNotReady` asks `closeOutWaitsOn` again to override it, so the box
   state is not the guard's whole answer and the precedence lives in two files. Carrying the gate's
