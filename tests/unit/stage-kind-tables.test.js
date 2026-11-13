@@ -178,16 +178,23 @@ describe('LIN-4437 — every per-kind table names every PROMPT_TEMPLATES key, or
 // ─── LIN-4466: the blind read's kind and heading have one home ─────────────────
 // The leaf (lib/prompts/blind-read-words.js) owns the kind, the heading and the verdict words. Outside
 // it, a source scan (AST, so comments never count) fails on:
-//   - the kind as an exact string literal, except (a) a property key in a file that names a table in
-//     TABLES above, where the key is that table's row, and (b) the template registry, which types the
-//     kind as a template key;
+//   - the kind as an exact string literal, except (a) a direct row key of a table in TABLES above: the
+//     key's enclosing `const NAME = { ... }` must be a TABLES entry labelled `NAME (file)` in that same
+//     file (a keyed object that is not a listed table fails, even in a table's file), and (b) the template
+//     registry (lib/prompt-template-defs.js), which types the kind as a template key (under
+//     PROMPT_TEMPLATES or STAGE_LEADS) and may type it as a literal anywhere in that file;
 //   - the heading as a substring of a string or template text, anywhere but the leaf;
 //   - the verdict words' prose ("better, the same or worse", "better, same or worse") likewise.
 // The scope is the code that ships (lib/, routes/, server.js) and the stability script that reads the
 // ledger. Eval fixtures under scripts/eval name kinds as data and are out of scope.
 const WORDS_LEAF = 'lib/prompts/blind-read-words.js';
 const TEMPLATE_REGISTRY = 'lib/prompt-template-defs.js';
-const TABLE_FILES = new Set(Object.keys(TABLES).map(name => /\((lib\/[^)]+)\)/.exec(name)?.[1]).filter(Boolean));
+// The tables whose rows may be keyed by the kind: `NAME (file)` labels in TABLES, plus the registry's
+// PROMPT_TEMPLATES (the registry's STAGE_LEADS is already a TABLES entry). One inventory, not a second.
+const KEYED_TABLES = new Set([
+  ...Object.keys(TABLES).map(label => /^([A-Z][A-Z_]*) \((lib\/[^)]+)\)$/.exec(label)).filter(Boolean).map(m => `${m[2]}#${m[1]}`),
+  `${TEMPLATE_REGISTRY}#PROMPT_TEMPLATES`
+]);
 
 /** The kind, heading and verdict-prose findings in one module's source. */
 function blindReadFindings(file, source) {
@@ -195,10 +202,14 @@ function blindReadFindings(file, source) {
   const out = [];
   const text = (node) => (node.type === 'Literal' && typeof node.value === 'string') ? node.value
     : (node.type === 'TemplateElement' ? node.value.cooked : null);
-  walk.full(parse(), (node) => {
+  walk.fullAncestor(parse(), (node, _state, ancestors) => {
     // acorn-walk does not descend into a non-computed property key, so a key is checked here, where it is a row.
     if (node.type === 'Property' && !node.computed && node.key.type === 'Literal' && node.key.value === BLIND_READ_KIND) {
-      if (!(TABLE_FILES.has(file) || file === TEMPLATE_REGISTRY)) out.push(`the kind '${BLIND_READ_KIND}' as a key outside a table`);
+      // A row is a direct property of the object a listed table is declared as: `const NAME = { ... }`.
+      const owner = ancestors[ancestors.length - 3];
+      const isRow = owner?.type === 'VariableDeclarator' && owner.id.type === 'Identifier'
+        && owner.init === ancestors[ancestors.length - 2] && KEYED_TABLES.has(`${file}#${owner.id.name}`);
+      if (!isRow) out.push(`the kind '${BLIND_READ_KIND}' as a key outside a listed table`);
     }
     if (node.type === 'Literal' && node.value === BLIND_READ_KIND && file !== TEMPLATE_REGISTRY) out.push(`the kind '${BLIND_READ_KIND}' as a literal`);
     const s = text(node);
@@ -239,8 +250,14 @@ describe('LIN-4466 — the blind read\'s kind, heading and verdict words have on
   test('the scan allows what it should: a table row keyed by the kind, a comment, a longer status, the registry', () => {
     assert.deepEqual(blindReadFindings('lib/run-view.js', `export const STAGE_LABELS = { '${BLIND_READ_KIND}': 'Blind read' };`), []);
     assert.deepEqual(blindReadFindings('lib/x.js', `// a ${BLIND_READ_KIND} note, and ${BLIND_READ_HEADING} in a comment\nexport const k = 'blind-read-missing';`), []);
-    assert.deepEqual(blindReadFindings(TEMPLATE_REGISTRY, `export const T = { '${BLIND_READ_KIND}': { name: '${BLIND_READ_KIND}' } };`), []);
+    assert.deepEqual(blindReadFindings(TEMPLATE_REGISTRY, `export const PROMPT_TEMPLATES = { '${BLIND_READ_KIND}': { name: '${BLIND_READ_KIND}' } };`), []);
     assert.ok(blindReadFindings('lib/x.js', `export const T = { '${BLIND_READ_KIND}': 1 };`).length > 0, 'a keyed object outside a table file is not a row');
+    // The key allowance is per table, not per file (LIN-4466 review): a non-table object in a table's file fails.
+    assert.ok(blindReadFindings('lib/run-view.js', `export const ZZ = { '${BLIND_READ_KIND}': 1 };`).length > 0, 'a non-table object in a table file is not a row');
+    assert.ok(blindReadFindings('lib/run-view.js', `export const STAGE_LABELS = { nested: { '${BLIND_READ_KIND}': 1 } };`).length > 0, 'a key nested below a table row is not a row');
+    assert.ok(blindReadFindings('lib/run-view.js', `export const STAGE_LABELS = f({ '${BLIND_READ_KIND}': 1 });`).length > 0, 'a table must be declared as the object itself');
+    assert.ok(blindReadFindings('lib/wall-clock-summary.js', `export const STAGE_LABELS = { '${BLIND_READ_KIND}': 1 };`).length > 0, 'a table name in another table\'s file is not a row');
+    assert.deepEqual(blindReadFindings(TEMPLATE_REGISTRY, `export const PROMPT_TEMPLATES = { '${BLIND_READ_KIND}': 1 };`), []);
   });
 
   test('the verdict prose is the words in the order the prompts print them', () => {

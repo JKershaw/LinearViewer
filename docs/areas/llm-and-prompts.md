@@ -162,3 +162,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   only delegate to their modules. A fifth route, or a change to the bound, cannot follow one pattern. Waiting:
   decide where the bound's step lives (its own module, or a `reviewLoopStep` beside `reviewLoopStop`) and make
   the entry delegate like the rest. (LIN-4465 blind read.)
+- `lib/prompts/blind-read-words.js`: the blind read's kind has a constant and a scan, but every other kind in
+  the same lists is still a literal (`SPINE` in `lib/run-view.js`, the `COMMENT_KINDS` rows in
+  `lib/run-trail.js`, `CODE_ROUTES` in `lib/code-routes.js`), so the next stage added has two conventions to
+  choose from. Decide whether every kind gets a constant or only this one; LIN-4467 (one record per stage
+  kind) is the natural home, since a descriptor registry would make the spelling question disappear.
+  (LIN-4466 blind read.)
