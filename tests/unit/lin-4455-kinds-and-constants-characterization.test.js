@@ -26,7 +26,8 @@ process.env.NODE_ENV = 'test';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { FEEDBACK_ENTRY_KINDS, DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { FEEDBACK_ENTRY_KINDS } from '../../lib/dispatch-feedback-kinds.js';
 import { validateFeedbackBody } from '../../lib/dispatch-feedback-validation.js';
 import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
 import { parseParkedWait, parseHeartbeats } from '../../lib/session-telemetry.js';

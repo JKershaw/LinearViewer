@@ -30,7 +30,7 @@ import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
 import { assembleTrailFacts, assemblePlanReviewFacts, isPersonComment } from '../../lib/recommendation-facts.js';
 import { buildSelectorArgs } from '../../lib/openrouter.js';
 import { recentRuns, stageRuns } from '../../lib/recent-runs.js';
-import { liveWaitOf } from '../../lib/recommendation-live-wait.js';
+import { liveWaitOf } from '../../lib/run-live-wait.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { buildProxyContextPreamble } from '../../lib/proxy-preamble.js';
 import { buildRunEvidence } from '../../lib/run-evidence.js';

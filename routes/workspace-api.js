@@ -56,7 +56,7 @@ import { armKeepalive, armSseKeepalive, clientGoneSignal } from '../lib/http-kee
 import { testMockData } from '../lib/sample-data/mock-data.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { sendSSE } from '../lib/sse.js';
-import { liveWaitRefusal } from '../lib/recommendation-live-wait.js';
+import { liveWaitRefusal } from '../lib/run-live-wait.js';
 import {
   MOCK_STAGE_KIND,
   generateMockRecommendation,

@@ -25,7 +25,9 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   by a skip held the re-report forever (LIN-4375 review).
 - Any session can park `[pending]` on CI and finish on a ci-wake `custom` row (`lib/ci-wake-sweep.js`).
   A rule keyed on the producing kind misses that ending: read the lineage (`heldWakeHolderOf`,
-  `resolveFollowUpRoot`). LIN-4373 covered eligibility, not the held wake's terminals.
+  `resolveFollowUpRoot`). LIN-4373 covered eligibility, not the held wake's terminals. Over a
+  ticket's runs, read it batched: `listHistory`'s `withLineage`, never a walk per row (`runFact`,
+  `lib/recent-runs.js`, LIN-4459: the walks go up, a parked stage's ending is below it).
 - Row-only kinds stay out of `DISPATCH_KINDS` (`lib/prompt-templates.js`) and sit in `ROW_ONLY_KINDS`
   (`lib/dispatch-fields.js`); kind-keyed maps are tested against both. A new bucket can pull a kind
   into the round-trip walk, which `OFF_SPINE_KINDS` stops (LIN-4376).
@@ -86,9 +88,8 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   (Survey tally: LIN-3257.)
 - `lib/runner-kit/runner.mjs`: the per-message transcript fold is here and in SD; one shared
   fold would turn a transcript into requests. (Survey tally: LIN-4203, LIN-4195.)
-- `lib/recent-runs.js`: `runFact` reads only the row's feedback: a stage parked `[pending]` whose
-  lineage ends `[blocked]` or `[skipped]` reads `running` and holds the live-stage wait until
-  aborted. (LIN-4392.)
+- `lib/run-live-wait.js`: a read, not a claim: two different-kind calls racing on
+  one ticket both pass; claim compare-and-set, like `claimHeldWake` (LIN-4392). (Moved from the LLM & prompts note by LIN-4459.)
 - `lib/run-ledger.js`: `landingPrUrls` counts every full PR URL after its anchor, so it disagrees with
   the other landing readers in two cases the shared-trail table pins as chosen, not designed
   (`tests/unit/lin-4438-blind-read-gate.test.js` rows 14 and 15): an audit report that re-cites a
