@@ -30,7 +30,7 @@ import { buildRunnerKickoff, createRunnerKickoffBuilder, RUNNER_KIT_FILES } from
 import { createRunnerKitRoutes } from '../../routes/runner-kit.js';
 import { RUNNER_BOOTSTRAP_TTL_SECONDS, RUNNER_WORKING_TTL_SECONDS } from '../../lib/proxy-scopes.js';
 import { HALT_MODES } from '../../lib/workspace-halt.js';
-import { FEEDBACK_ENTRY_KINDS } from '../../lib/dispatch-store.js';
+import { FEEDBACK_ENTRY_KINDS } from '../../lib/dispatch-feedback-kinds.js';
 import {
   OTHER_CONSUMER_RECENT_MS, FRESH_TAKE_MIN_TOKEN_LIFE_MS, WATCHDOG_STALL_MIN, WATCHDOG_FAIL_MIN, WAIT_CAP_MS, WAIT_HEARTBEAT_MS
 } from '../../lib/runner-kit/runner.mjs';

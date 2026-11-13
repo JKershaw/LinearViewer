@@ -16,7 +16,7 @@
  * decision-withdrawn/decision-withdrawal-reversed feedback entry needs a
  * write path this branch does not have yet. `POST /api/dispatch/feedback/:id`
  * (the only runner-facing feedback-write route) validates `kind` against
- * `FEEDBACK_ENTRY_KINDS` (lib/dispatch-store.js:101 —
+ * `FEEDBACK_ENTRY_KINDS` (lib/dispatch-feedback-kinds.js —
  * `['status','recap','heartbeat','evidence','assistant-text','tool','usage',
  * 'resources','refusal','decision']`), which deliberately excludes
  * `decision-answer` (see lib/dispatch-store.js:95, lib/observer-efficacy-

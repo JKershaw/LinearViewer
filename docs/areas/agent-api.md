@@ -11,8 +11,8 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   test drives the real chain with it flipped off, as
   `tests/unit/lin-4378-proxy-limiter-per-credential.test.js` does.
 - A recommend surface must not offer what the verb refuses: a rule for recommend-and-dispatch
-  goes in `codeRouteOf` (`lib/openrouter.js`), which GET /recommend (`routes/proxy-compute.js`)
-  and the task page also reach; a descent-arm check (`lib/dispatch-entrance.js`) covers one
+  goes in `CODE_ROUTES` (`lib/code-routes.js`, iterated by `codeRouteOf` in `lib/openrouter.js`),
+  which GET /recommend (`routes/proxy-compute.js`) and the task page also reach; a descent-arm check (`lib/dispatch-entrance.js`) covers one
   surface, without run facts. A caller's bypass rides the call options (`skipLiveWait`),
   never the recommendation context (LIN-4392).
 - `/cost/:identifier` (`routes/proxy-compute.js`) is pinned by frozen baselines. A change to its window or shape

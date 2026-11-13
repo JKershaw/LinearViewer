@@ -9,7 +9,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMockCollection } from '../fixtures/mock-collection.js';
-import { DispatchQueueStore, FEEDBACK_ENTRY_KINDS } from '../../lib/dispatch-store.js';
+import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { FEEDBACK_ENTRY_KINDS } from '../../lib/dispatch-feedback-kinds.js';
 
 const URL_KEY = 'acme';
 

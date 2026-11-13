@@ -30,7 +30,7 @@ import {
   FEEDBACK_KINDS, FEEDBACK_KIND_ROLES, FEEDBACK_ENTRY_KINDS, PARKED_WAIT_SKIPPED_KINDS,
   DECISION_LIFECYCLE_STAMP_KINDS, feedbackKindMayCarryWake
 } from '../../lib/dispatch-feedback-kinds.js';
-import { FEEDBACK_ENTRY_KINDS as STORE_REEXPORT } from '../../lib/dispatch-store.js';
+import * as dispatchStore from '../../lib/dispatch-store.js';
 import { findWakeEvent } from '../../lib/dispatch-terminal.js';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -78,9 +78,10 @@ describe('the leaf imports nothing', () => {
 });
 
 describe('every kind set is the table filtered by a role', () => {
-  test('FEEDBACK_ENTRY_KINDS is the runnerPostable rows in row order, and the store re-exports it', () => {
+  test('FEEDBACK_ENTRY_KINDS is the runnerPostable rows in row order, with one home (the store no longer re-exports it)', () => {
     assert.deepEqual([...FEEDBACK_ENTRY_KINDS], kindsWith('runnerPostable'));
-    assert.equal(STORE_REEXPORT, FEEDBACK_ENTRY_KINDS);
+    // LIN-4465 leftovers: the runner prompt imports the leaf, so the store's shim had no importer left.
+    assert.equal('FEEDBACK_ENTRY_KINDS' in dispatchStore, false);
   });
 
   test('PARKED_WAIT_SKIPPED_KINDS is the relay rows', () => {

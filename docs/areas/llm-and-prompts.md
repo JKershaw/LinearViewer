@@ -18,6 +18,11 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   can raise a ceiling while real renders shrink (LIN-4393).
 - The `## As asked` block's words have one owner, `lib/as-asked.js`: import its spellings,
   never retype the heading or end line (LIN-4362).
+- The code routes' order lives once, in `CODE_ROUTES` (`lib/code-routes.js`). A new route is an
+  entry with its `emits`, plus the one "Code route order" line in
+  `docs/architecture/prompt-system.md` and in `docs/architecture/source-map.md`;
+  `tests/unit/lin-4465-code-routes.test.js` fails until all three agree. Point at the list; never
+  restate the order or count the routes in prose (LIN-4465).
 - `lib/prompt-template-defs.js` cannot import what imports `lib/prompt-templates.js` (a
   cycle): shared words live in an import-free leaf, as `lib/prompts/leftover-words.js`
   (LIN-4376) and `lib/prompts/autopilot-precedence.js` (never restate a rank; LIN-4382).
@@ -87,8 +92,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   is a Runs dispatch rule placed here by the `^lib/recommendation-` prefix. `lib/dispatch-entrance.js`
   (Runs) enforces it, `routes/workspace-api.js` (Web) imports it, `lib/proxy-instructions.js` (Agent
   API) takes its code, and the one run-state test it makes, `isLiveRun`, is in `lib/recent-runs.js`
-  (Runs), so a change to what counts as live moves three areas. `lib/openrouter.js` (LLM) also routes
-  on it, as the first code-settled route in `codeRouteOf`, so the wait is recommendation logic as
+  (Runs), so a change to what counts as live moves three areas. `lib/code-routes.js` (LLM) also routes
+  on it, as the first entry of `CODE_ROUTES`, so the wait is recommendation logic as
   well. A size of move: give the wait a Runs home. (Seams & Tangles, 13 Nov.; `docs/reviews/seams-tangles-review-2026-11-13-run12.md`.)
 - `lib/periodicals.js`: two sizes of move: a ceiling for Periodical prompts (+18.8% in the window,
   185,952 to 220,882 B; only a sha256 tripwire), and an index or series archive for `docs/reviews/`
@@ -164,8 +169,3 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   `lib/dispatch-leftover-answer.js` (any one to six characters, its comment calling it the guard's
   rule) and in simple-dispatcher's guard. A retirement line can name a path the guard would not read
   as one. Borderline. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
-- `lib/prompts/runner-kickoff.js`: imports `FEEDBACK_ENTRY_KINDS` from the store (`lib/dispatch-store.js`), the only
-  importer of the store's re-export of it (`export { FEEDBACK_ENTRY_KINDS } from './dispatch-feedback-kinds.js'`).
-  Importing from the leaf `lib/dispatch-feedback-kinds.js` would let the store drop the shim and keep the prompt
-  module off the store's import graph. The runner prompt bytes and the kinds' exact order must not change.
-  (LIN-4455 blind read.)
