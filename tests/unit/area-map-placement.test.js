@@ -12,7 +12,7 @@ describe('code-shape area map placement (LIN-3729)', () => {
   // sit in Runs & dispatch beside the request-usage modules (the record fold and the loader); without their names they fell
   // through to the catch-all `^lib/` in "Other features". The workspace KPIs page cache sits with the page's read.
   test('the cost read and its folds land in Runs & dispatch, beside request-usage-*', () => {
-    for (const path of ['lib/cost-read.js', 'lib/row-usage.js', 'lib/lineage-membership.js', 'lib/request-usage-vocabulary.js',
+    for (const path of ['lib/cost-read.js', 'lib/cost-read-calls.js', 'lib/row-usage.js', 'lib/lineage-membership.js', 'lib/request-usage-vocabulary.js',
       'lib/request-usage-fold.js', 'lib/request-usage-loader.js']) {
       assert.strictEqual(areaOf(path), 'Runs & dispatch', path);
     }
