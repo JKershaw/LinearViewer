@@ -66,10 +66,6 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   for); the catalog lacks three snapshot and prompt routes; the verb-override lists (15 and 13 of 19)
   fall short, and no test keeps either in step. Generate or test them from the catalog: a size of
   move. (Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)
-- `lib/proxy-instructions.js`: the runner poll returns a `halt` key and never a `target: dash`
-  item (`routes/proxy-runner.js` filters on runner targets, `lib/dispatch-targets.js`). Neither
-  doc says so. (LIN-3622, Done; Documentation Review, 10 Nov.;
-  `docs/reviews/documentation-review-2026-11-10.md`.)
 - `lib/proxy-instructions.js`: `recommend` and `recommend-and-dispatch` give a fresh, unsized ticket survey-task, survey-place, then scoping (`lib/recommendation-look-first.js`), and a live step `prompt: null` with `liveWait`. The guide's GET /recommend omits this (the catalog has it), so an agent takes a Survey step as its task. (LIN-4370, Done; Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)
 - `routes/proxy-model-routing.js`: with `modelRoutingProxyWrites` on (any member), every readWrite
   key, leaf workers' included, can set any harness or model workspace-wide; a non-`claude-code`

@@ -155,6 +155,21 @@ describe('buildInstructions — grants table + take-gated runner section (LIN-31
     assert.match(text, /the `\+proxy` toggle-path copy, grant-less/);
   });
 
+  test('the runner poll entry says what the route returns: runner-target items only, and halt while one is set', async () => {
+    // LIN-4465 leftovers (the agent-api note's Waiting entry): routes/proxy-runner.js filters the
+    // items on isRunnerTarget and spreads `halt` only when set; the catalog and the guide now say so.
+    const { isRunnerTarget } = await import('../../lib/runner-owner-gate.js');
+    assert.equal(isRunnerTarget('dash'), false);
+    assert.equal(isRunnerTarget(undefined), true);
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite', grants: ['take', 'dispatch'] });
+    const entry = text.slice(text.indexOf(`GET ${BASE_URL}/api/proxy/runner/poll`), text.indexOf(`POST ${BASE_URL}/api/proxy/runner/take/:id`));
+    assert.match(entry, /"halt"\?: \{ "mode": "pause"\|"stop"/);
+    assert.match(entry, /a "target": "dash" item is never listed/);
+    const guide = (await import('node:fs')).readFileSync(new URL('../../docs/proxy-integration.md', import.meta.url), 'utf8');
+    assert.match(guide, /a `target: "dash"` item is never listed/);
+    assert.match(guide, /carries a `halt` key, the `GET \/api\/proxy\/dispatch\/halt` shape/);
+  });
+
   test('a take-grant bearer sees the runner endpoints and the refusal codes', () => {
     const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite', grants: ['take', 'dispatch'] });
     assert.match(text, /## Runner Endpoints/);
