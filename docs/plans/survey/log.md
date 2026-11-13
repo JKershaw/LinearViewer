@@ -3729,3 +3729,12 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **Timing, John:** "We can schedule it for when the tasks and related work has landed." The text is in `asks.md` under "Held: file when the lanes land", to file once LIN-4445, LIN-4447, LIN-4448 and LIN-4463 are done. The paper can then say whether the agreed border moves held.
   - **Area read 0 for A16:** both browser-area passes done; the Web routes pair is running.
 - **15:49 UTC: fresh proxy token from John** (`.tok8` in the scratchpad, valid to 15 Nov 15:48 UTC, readWrite with the dispatch grant). The watcher now uses it. Never printed.
+- **15:49 UTC: LIN-4457 merged** (LIN-4447 piece 7: Harbour's call reads moved into `lib/cost-read-calls.js`, `5dcf5bcda`, +246 / −179 across 21 files). Its blind-read fixes were made before merge.
+- **Area read 0 for A16: all four in.** The baseline at `c205190fd`:
+
+  | Area | Ease (p1, p2) | High + medium repeated rules (p1, p2) | What both passes name |
+  |---|---|---|---|
+  | Front end: browser code | hard, hard | 6, 5 | status-pill glyphs and markup mirrored from `lib/` in several files; the terminal-state set mirrored (and its "cannot import" comment now false, since `/shared/` exists); `observation.js` restating the server's stale-after window behind a stale pointer; prompt copy/download and `slugifyForFilename` copied; giant files |
+  | Web routes (control, again) | hard, hard | 9, 5 | the AI pre-flight pasted per route and drifted; the page-chrome options bag rebuilt in about 12 files; workspace teardown; the feature-gate idiom; hand-kept header lists |
+
+  - **The noise is larger than it looked.** Web routes at `4b5001ddf` read moderate/hard with 8/7 items. At `c205190fd` it reads hard/hard with 9/5, and nothing in between touched `routes/` meaningfully. So one step of ease, and a few items either way, is within noise on the same code. **Criterion (a), the paired before/after read, carries the verdict.** (b) is supporting evidence only, and counts only when it moves in both passes, clearly past the control's own drift.
