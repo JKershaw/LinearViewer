@@ -1,7 +1,7 @@
 /**
  * LIN-4179 / LIN-4446: the one USD formatter, lib/cost-format.js. The browser runs these same bytes through the
  * module shim (public/cost-format-global.js, served at /shared/cost-format.js), so this file pins the rules the
- * browser inherits. The browser-copy parity comparison it used to carry is retired with public/cost-format.js.
+ * browser inherits.
  *
  * Run with: node --test tests/unit/cost-format.test.js
  */
@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { formatUsd, sumWords } from '../../lib/cost-format.js';
 
 /** One table of edges: the half-cent and half-ten-thousandth floors, the $1 fine boundary, signs, unknowns. */
-export const TABLE = [
+const TABLE = [
   null, undefined, NaN, Infinity, -Infinity, '0.5', 0, -0,
   0.00004, 0.00005, 0.0001, 0.004, 0.005, 0.0049999, 0.0421, 0.5, 0.99995, 0.99999, 1, 1.005, 12.4, 1234.5,
   -1.5, -0.004, -0.00004,

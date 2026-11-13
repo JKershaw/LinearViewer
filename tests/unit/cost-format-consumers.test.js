@@ -60,13 +60,13 @@ describe('flight-companion.js: loads without window.CostFormat, formats the same
     assert.doesNotThrow(() => loadFlightCompanion());
   });
 
-  test('after the shim installs the formatter, and DOMContentLoaded fires, formatCost gives the browser copy\'s words', async () => {
+  test('after the shim installs the formatter, and DOMContentLoaded fires, formatCost gives the shared formatter\'s words', async () => {
     const world = loadFlightCompanion();
     loadCostFormat(world.sandbox);
     await fireDOMContentLoaded(world.document);
     const m = world.sandbox.module.exports;
     assert.equal(typeof m.formatCost, 'function');
-    // The browser copy's fine mode, character for character: four decimals under $1, a dash for an unknown cost.
+    // The shared formatter's fine mode, character for character: four decimals under $1, a dash for an unknown cost.
     assert.equal(m.formatCost(0.0421), '$0.0421');
     assert.equal(m.formatCost(0), '$0.0000');
     assert.equal(m.formatCost(0.00004), '<$0.0001');

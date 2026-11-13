@@ -45,6 +45,14 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   next candidates; the last two import other modules, so serving a single file will not do for them. Its
   `TERMINAL_TYPES` mirror of `lib/providers/models.js` (no imports) is another leaf candidate; its comment still says
   `public/` cannot import it. (LIN-4446 plan and leftovers.)
+- `public/cost-format-global.js`: the module-to-global bridge is specific to one module. `tests/unit/shared-modules.test.js`
+  hard-codes the shim, the `'window.CostFormat'` string and the four consumers, and the DOMContentLoaded-only rule is
+  restated in four files and witnessed per consumer, but no check covers a new consumer: a fifth trips only the
+  hard-coded list, with no hint of the timing rule. A second shared module needs a second shim and guard. Needs a design
+  call first: one shim per module, a general shim, or consumers that are modules. (LIN-4446 blind read.)
+- `public/ship.js` / `public/ship-biscuit.js`: still hand-synced copies ("mirror of lib/ship-layout.js", "kept in
+  lockstep with lib/render-ship-biscuit.js"). Each lib side would first have to become an import-free leaf before it
+  could join `SHARED_MODULES`. (LIN-4446 blind read.)
 - `public/prompt-section.js`: the browser files reach their suites through `tests/unit/helpers/client-world.js`, which
   loads them as classic scripts through `vm`. A module-capable client test loader is needed before any view becomes a
   module, since `lib/components/page.js` emits classic tags. (LIN-4446.)
