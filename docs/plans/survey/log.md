@@ -3697,3 +3697,13 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - LIN-4446 and LIN-4448 have no pieces yet.
 - **15:08 UTC: new ruling `lin4456-testtransport-placement`** (LIN-4447's piece LIN-4456). Scoping cut a clause from the piece's description: it declares `testTransport` once, on the Linear provider, rather than in the two test installers, because the planned spot would break a witness test and could send the test token to the network. **Suggested `static`.**
   - **A pattern to watch:** the cut rule sends *any* narrowing of a description to John as a ruling. A child piece's description was written by the parent's design, not by John, so cuts against it are engineering, not his call. Of the five rulings open now, three are engineering questions (this one, `recommend-path-outside-merge`, and the passenger scope, which scoping had already settled itself). For the review.
+- **15:22 UTC: LIN-4446 slice 1 merged** (`92676b1fe`, PR #2423): share the cost formatter with the browser.
+  - **What changed:**
+    - `lib/cost-format.js` is served as `/shared/cost-format.js` through a file-by-file `SHARED_MODULES` allow-list in `lib/vendor-assets.js`, with guards for leaf purity, boot failure and the 404s.
+    - `public/cost-format.js` and its parity test are retired.
+    - The no-build-step reading is now in CLAUDE.md and the area note.
+    - The swipe viewport Waiting entry was retired as the leftover step.
+  - **Size:** production +240 / −188 (net +52), tests +550 / −99.
+  - **Process:** plan review asked for changes once (a load-order break in the KPI chart that no planned witness would catch), and the revision fixed it.
+  - **Blind read: better.** The formatter has one owner again. Against that, `public/cost-format-global.js` turns it back into a global, and a DOMContentLoaded timing rule is now explained in four files with no general check. The larger finding: how classic pages take shared modules (one shim per module, a general shim, or consumers becoming modules) needs a design decision before a second shared module.
+  - **A8's Done-when:** John reads the first slice before the next starts. The lane is waiting on that, so this goes to John now.
