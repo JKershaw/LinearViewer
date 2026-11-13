@@ -192,7 +192,7 @@ describe('init(): the section is re-read and repainted from its fragment', () =>
   const runningTimeline = () => taskTimeline({
     sessions: [{
       rootItemId: 'r1', kind: 'implementation', dispatchedAt: new Date(T - 20 * MIN).toISOString(), model: 'claude-opus-5-5', costUsd: 1, durationMs: null, telemetry: true, incomplete: false,
-      dispatches: [{ itemId: 'r1', kind: 'implementation', dispatchedAt: new Date(T - 20 * MIN).toISOString(), followUpTo: null, byModel: null, requests: 2, costUsd: 1, firstRequestAt: new Date(T - 19 * MIN).toISOString(), lastRequestAt: new Date(T - 1 * MIN).toISOString() }],
+      dispatches: [{ itemId: 'r1', kind: 'implementation', dispatchedAt: new Date(T - 20 * MIN).toISOString(), followUpTo: null, byModel: null, requests: 2, costUsd: 1, firstRequestAt: new Date(T - 19 * MIN).toISOString(), lastRequestAt: new Date(T - 1 * MIN).toISOString(), model: 'claude-opus-5-5' }],
     }],
     openItemIds: ['r1'], now: NOW, totalUsd: 1, pricedUsd: 1,
   });
