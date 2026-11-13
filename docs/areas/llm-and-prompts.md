@@ -151,12 +151,6 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   heading (three times) and the verdict words instead of importing them. The route module does not
   import `BLIND_READ_KIND` at all, and `tests/unit/stage-kind-tables.test.js` checks presence, not
   these literals. LOW: a stored kind is rarely renamed; the leaf's claim is what is untrue. `lib/recommendation-blind-read.js` also redeclares `COMPLETED`. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
-- `lib/openrouter.js`: the four routes code settles (the live-stage wait, the review loop bound, the
-  blind read, the look-first sequence) are listed by hand in about nine places, no test pins any copy,
-  and two are already wrong: `docs/architecture/prompt-system.md` says "four routes" and then
-  restates three, without the blind read, and `public/llms.txt` says the blind read is "Sent by
-  hand", where its description (`lib/prompt-template-defs.js`) says code sends it. The
-  templates sync test checks that the catalogue bullet exists, not its words. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
 - `lib/prompts/leftover-words.js`: the retirement line's words have one home and one checker
   (`lib/dispatch-leftover-answer.js`), but which entry to settle (the busiest touched area, else
   another) and the three forms are restated by hand in `docs/areas/README.md`, simple-dispatcher's

@@ -109,7 +109,7 @@ export const TEMPLATES_RENDERED_CEILINGS = {
  * rules, its prompt and the reply parse. The stage options it lists are each stage's
  * `route`, counted in the template defs.
  */
-export const STAGE_ROUTER_SOURCE_CEILING = 8269; // LIN-4392: +25, the rules' comment names the live-stage wait as the first route code settles; a comment, not prompt text
+export const STAGE_ROUTER_SOURCE_CEILING = 8206; // LIN-4465: -63, the header points at CODE_ROUTES (lib/code-routes.js) instead of naming the four routes in order; lowered to match. LIN-4392: +25, the rules' comment names the live-stage wait as the first route code settles; a comment, not prompt text
 /**
  * The routing prompt, rendered bytes for the eval baseline's leaf (a leaf with no
  * comments and no plan, its view a placeholder). It also catches growth in the stage
