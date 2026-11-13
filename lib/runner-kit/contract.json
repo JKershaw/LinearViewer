@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "LIN-3451: Simple Dispatcher is the reference; each row pins sd plus kit and/or harbour (LIN-4384), and a column that differs from sd carries a difference. Test fixture only: the kit never loads this file. Byte-copied to simple-dispatcher test/fixtures/runner-contract.json.",
+  "note": "LIN-3451: Simple Dispatcher is the reference; each row pins sd plus kit and/or harbour (LIN-4384), and a column that differs from sd carries a difference. Test fixture only: the kit never loads this file. Byte-copied to simple-dispatcher test/fixtures/runner-contract.json. LIN-4475: `session` is running | finished | stopped | none; the retired `live` is gone. `[done]` is the runner's own post, read by Harbour only, so it has no report row: SD's pinReport asserts both of its readings against one sd value, and they differ on a [done] line. Harbour's reading is pinned in tests/unit/lin-4375-session-pr-wins.test.js. The kit's ledger also has a `lost` state that no session value names: resolveFollowUp refuses it as it refuses none, so the vocabulary leaves it out.",
   "rows": [
     {
       "area": "halt",
@@ -52,26 +52,26 @@
     },
     {
       "area": "halt",
-      "case": "follow-up to a live session under pause",
+      "case": "follow-up to a finished session under pause",
       "halt": {
         "mode": "pause"
       },
       "item": {
         "route": "follow-up",
-        "session": "live"
+        "session": "finished"
       },
       "sd": "claimed",
       "kit": "claimed"
     },
     {
       "area": "halt",
-      "case": "follow-up to a live session under stop (held)",
+      "case": "follow-up to a finished session under stop (held)",
       "halt": {
         "mode": "stop"
       },
       "item": {
         "route": "follow-up",
-        "session": "live"
+        "session": "finished"
       },
       "sd": "left",
       "kit": "left"
@@ -95,6 +95,52 @@
       "halt": {
         "mode": "stop"
       },
+      "item": {
+        "route": "follow-up",
+        "session": "none"
+      },
+      "sd": "failed",
+      "kit": "failed"
+    },
+    {
+      "area": "halt",
+      "case": "follow-up to a finished session with no halt",
+      "halt": null,
+      "item": {
+        "route": "follow-up",
+        "session": "finished"
+      },
+      "sd": "claimed",
+      "kit": "claimed"
+    },
+    {
+      "area": "halt",
+      "case": "follow-up to a running session with no halt",
+      "halt": null,
+      "item": {
+        "route": "follow-up",
+        "session": "running"
+      },
+      "sd": "failed",
+      "kit": "claimed",
+      "difference": "SD refuses a follow-up to a running session (session-busy): a second --resume would write the transcript while the live process holds it. The kit hands the message to the live subagent, so there is no second writer. This row covers neither queueIfBusy (SD leaves the item unclaimed to retry) nor force (SD resumes it kill-first)."
+    },
+    {
+      "area": "halt",
+      "case": "follow-up to a stopped session with no halt",
+      "halt": null,
+      "item": {
+        "route": "follow-up",
+        "session": "stopped"
+      },
+      "sd": "failed",
+      "kit": "claimed",
+      "difference": "SD refuses a follow-up to a cancelled session (session-stopped) unless a person forces it. Harbour's admission gate owns that refusal (guardRunStopped, lib/dispatch-factory.js), and the kit's stopped rows include subagents that finished (LIN-3675), which the kit continues."
+    },
+    {
+      "area": "halt",
+      "case": "follow-up with no live session with no halt",
+      "halt": null,
       "item": {
         "route": "follow-up",
         "session": "none"
@@ -234,7 +280,7 @@
       "halt": null,
       "item": {
         "route": "follow-up",
-        "session": "live",
+        "session": "finished",
         "repo": "missing"
       },
       "sd": "not-checked",
@@ -491,6 +537,25 @@
       },
       "sd": "https://github.com/JKershaw/LinearViewer/pull/2359",
       "harbour": "https://github.com/JKershaw/LinearViewer/pull/2359"
+    },
+    {
+      "area": "report",
+      "case": "a DONE: line with an http URL and a #x fragment: SD canonical https, Harbour none",
+      "item": {
+        "message": "Opened the PR.\n\nDONE: http://github.com/JKershaw/LinearViewer/pull/101#x"
+      },
+      "sd": "https://github.com/JKershaw/LinearViewer/pull/101",
+      "harbour": null,
+      "difference": "SD reads the http scheme and gives the canonical https URL on both its readings; Harbour's PR_URL_RE (lib/run-ledger.js) reads https only, so the report reads no PR."
+    },
+    {
+      "area": "report",
+      "case": "a DONE: line after U+2028: both read the PR",
+      "item": {
+        "message": "Opened the PR and CI is green. DONE: opened https://github.com/JKershaw/LinearViewer/pull/101"
+      },
+      "sd": "https://github.com/JKershaw/LinearViewer/pull/101",
+      "harbour": "https://github.com/JKershaw/LinearViewer/pull/101"
     },
     {
       "area": "sentinel",
