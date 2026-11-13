@@ -88,6 +88,7 @@ Combined: Runs code 3.15, note 3.25. Control code 3.40, note 3.00. Noise guard (
 
 - **Lessons byte counts.** The kit's beat 1 figures, Runs 4,257 bytes and front end 1,012 bytes, came from a local script with a slightly different section boundary. The guard's own function, `lessonsBytes` in `tests/unit/area-notes.test.js`, gives **Runs 4,268 bytes** and **front end 1,023 bytes**, both under the 6,144-byte cap. The guard's figures are the authoritative ones. The kit is frozen, so this correction lives here.
 - **Sample overlap.** The Runs sample holds 1 of the 13 planned files (`lib/cost-read.js`). The limit is stated in the kit (Known limits 1). The overlap was settled as an engineering call on LIN-4447 (comment `e6ca12b3-e640-4c51-934e-152b8cbdf047`).
+- **Combined-score convention.** An area's combined score is the mean of the two readers' reported one-decimal means (Runs 3.3/3.0 → 3.15; control 3.3/3.5 → 3.40), not recomputed from the individual criteria K1–K4 (which would give 3.125 and 3.375). The after-read uses the same convention.
 - **Base-commit file counts.** The code-scope counts are Runs 115 files and front end 92 files. The ticket's 116 counts `lib/runner-kit/contract.json`, which is JSON and outside the code scope.
 
 ## 8. Instructions for the after-read (LIN-4462)

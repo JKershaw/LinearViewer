@@ -108,7 +108,7 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - `lib/run-ledger.js`: `landingPrUrls` skips only blind reads and survey reports, so a comment headed
   `## Area read` that names a full PR URL would join the ticket's landing. Only the prose rule in
   `docs/plans/survey/area-read.md` (cite `path@sha`, never a PR URL) keeps the LIN-4447 area reads
-  out today. An area-read kind in the one comment classifier would make that rule code. (Leftover
+  out today. An area-read kind in the one comment classifier (LIN-4458, piece 2) would make that rule code. (Leftover
   of LIN-4453; Survey global on LIN-4453.)
 - `lib/run-closeout-state.js`: `deriveCloseOutState` works from two PR lists: `prs` (`extractPrUrls`,
   every PR ever cited) drives the PR-shape reasons (multiple-prs, partial, merged) and `landingPrs`
