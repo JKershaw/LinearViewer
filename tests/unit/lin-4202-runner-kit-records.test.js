@@ -117,13 +117,17 @@ describe('LIN-4202 records walk: the rules piece 0\'s data cannot prove', () => 
     assert.equal(records[0].at, '2026-11-02T09:00:00.000Z', 'at is the first line, stable across re-walks');
   });
 
-  test('a <synthetic> message with NON-zero tokens produces no record, and is counted', () => {
+  // LIN-4475: a <synthetic> usage line is skipped before it is keyed, so it is counted as synthetic
+  // whether or not it has an id. The third line has neither id nor requestId: it is synthetic, not noId.
+  test('a <synthetic> message with NON-zero tokens produces no record, and is counted (with or without an id)', () => {
     const { records, skipped } = transcriptRequestRecords([
       line({ id: 'msg_real', usage: u(100, 10) }),
-      line({ id: 'msg_synth', model: '<synthetic>', usage: u(250, 40, 0, 1000) })
+      line({ id: 'msg_synth', model: '<synthetic>', usage: u(250, 40, 0, 1000) }),
+      line({ model: '<synthetic>', usage: u(7, 7) })
     ], { agent: AGENT });
     assert.deepEqual(records.map((r) => r.requestId), ['msg_real']);
-    assert.equal(skipped.synthetic, 1);
+    assert.equal(skipped.synthetic, 2);
+    assert.equal(skipped.noId, 0);
   });
 
   test('an all-zero message produces no record, and is counted', () => {

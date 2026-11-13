@@ -26,6 +26,8 @@ import {
   haltSweep,
   preConfirmDecision,
   resolveFollowUp,
+  transcriptRequestRecords,
+  TRANSCRIPT_TOKEN_FIELDS,
   resolveRepo,
   capFeedbackMessage,
   runCommand,
@@ -46,7 +48,7 @@ const TABLE = JSON.parse(fs.readFileSync(CONTRACT_PATH, 'utf8'));
 // LIN-4384: the sha256 of contract.json's own bytes. simple-dispatcher pins the same value
 // (FIXTURE_SHA256 beside LV_COMMIT in test/runner-contract.test.js), so an edit here that is not
 // re-copied there would go unnoticed on this side without this tripwire.
-const CONTRACT_SHA256 = '616edd497f354fef71c50bb2a06e4b6275c845b7883c9d3eb35aadd608e415ff';
+const CONTRACT_SHA256 = '871ca615f627a02611957489f3abc83498f1dca64af07259800a174148ba23a2';
 
 const OWNER = 'acct-owner-1111';
 const NOW = Date.parse('2026-10-18T12:00:00.000Z');
@@ -292,9 +294,32 @@ function kitFor(row) {
       return kitExchangeOutcome(row);
     case 'forward':
       return kitForwardOutcome(row);
+    case 'fold':
+      return kitFoldOutcome(row);
     default:
       throw new Error(`unknown area ${row.area}`);
   }
+}
+
+// LIN-4475 (W8): the transcript fold, as one deterministic text per side. The records come in first-seen
+// order and each renders as [requestId, model, at, the five token fields]; an absent value renders null,
+// and "" stays "". Harness, agent, effort and the skipped counts are not rendered (the area note says so).
+const FOLD_FIELDS = ['requestId', 'model', 'at', ...TRANSCRIPT_TOKEN_FIELDS];
+const renderFold = (records) => JSON.stringify(records.map((r) => FOLD_FIELDS.map((f) => (r[f] === undefined ? null : r[f]))));
+
+// A corpus row names `<case>/<phase>` and the file's sha256. The file is read from the one existing
+// copy (tests/fixtures/runner-kit/transcript-corpus, no second set), and its bytes are checked before
+// they fold. The check is the pin: a changed byte fails here, not silently.
+const CORPUS_DIR = path.join(ROOT, 'tests', 'fixtures', 'runner-kit', 'transcript-corpus');
+function corpusLines(id, sha256, dir = CORPUS_DIR) {
+  const bytes = fs.readFileSync(path.join(dir, `${id.replace('/', '--')}.jsonl`));
+  const got = crypto.createHash('sha256').update(bytes).digest('hex');
+  if (got !== sha256) throw new Error(`${id}: the corpus file's sha256 is ${got}, the row pins ${sha256}`);
+  return bytes.toString('utf8').split('\n');
+}
+function kitFoldOutcome(row) {
+  const lines = row.item.lines ? row.item.lines.map((o) => JSON.stringify(o)) : corpusLines(row.item.id, row.item.sha256);
+  return renderFold(transcriptRequestRecords(lines, { agent: 'a1b2c3d4' }).records);
 }
 
 // LIN-4384: what each area's rows carry besides `area`, `case`, `item` and `sd`. `inputs` are
@@ -318,7 +343,9 @@ const AREA_SHAPES = {
   // simple-dispatcher's harbour-token-mcp-server.js each keep their own constants (the kit loads
   // no fixture at runtime) and are pinned against these rows.
   exchange: { inputs: [], columns: ['kit'] },
-  forward: { inputs: [], columns: ['kit'] }
+  forward: { inputs: [], columns: ['kit'] },
+  // LIN-4475 (W8): the transcript fold. Inputs none; the kit's rendered records are the one column.
+  fold: { inputs: [], columns: ['kit'] }
 };
 const COLUMNS = ['kit', 'harbour'];
 
@@ -376,6 +403,9 @@ describe('contract table shape', () => {
     assert.ok(TABLE.rows.some((r) => r.area === 'forward' && /refused 429/.test(r.case) && r.kit !== r.sd));
     // LIN-4475: an http-scheme DONE: line is read by SD as https and by Harbour not at all.
     assert.ok(TABLE.rows.some((r) => r.area === 'report' && /http URL and a #x fragment/.test(r.case) && r.harbour !== r.sd));
+    // LIN-4475 (W8): the two fold corners are the declared differences: a first line whose model or timestamp is "".
+    assert.ok(TABLE.rows.some((r) => r.area === 'fold' && /first line with model ""/.test(r.case) && r.kit !== r.sd));
+    assert.ok(TABLE.rows.some((r) => r.area === 'fold' && /first line with timestamp ""/.test(r.case) && r.kit !== r.sd));
   });
 
   // LIN-4384: the cases both repos must read the same way, each in both areas.
@@ -519,6 +549,30 @@ describe('LIN-4475 witnesses (session vocabulary and report rows)', () => {
     assert.ok(row, 'no report row for the U+2028 case');
     assert.equal(row.sd, 'https://github.com/JKershaw/LinearViewer/pull/101');
     assert.equal(row.harbour, row.sd);
+  });
+});
+
+// LIN-4475 (W-5): the corpus rows pin the bytes they fold. A one-byte change in a temp copy must fail the
+// row's sha256 check; the repository's own copy is never written.
+describe('LIN-4475 witness W-5: a corpus row pins its bytes', () => {
+  test('a one-byte change to a corpus file in a temp copy fails its sha256 check', () => {
+    const row = TABLE.rows.find((r) => r.area === 'fold' && r.case === 'corpus mixed-model/final');
+    assert.ok(row, 'no corpus row for mixed-model/final');
+    const dir = fs.mkdtempSync(path.join(fs.existsSync('/tmp') ? '/tmp' : os.tmpdir(), 'rkc-tamper-'));
+    try {
+      const original = fs.readFileSync(path.join(CORPUS_DIR, 'mixed-model--final.jsonl'));
+      const tampered = Buffer.from(original);
+      const at = tampered.findIndex((b) => b >= 0x31 && b <= 0x38); // a digit 1-8: XOR 1 keeps it a digit
+      tampered[at] ^= 0x01;
+      fs.writeFileSync(path.join(dir, 'mixed-model--final.jsonl'), tampered);
+      assert.equal(tampered.length, original.length);
+      assert.equal([...tampered].filter((b, i) => b !== original[i]).length, 1, 'exactly one byte differs');
+      assert.throws(() => corpusLines(row.item.id, row.item.sha256, dir), /sha256/, 'the tampered copy must not fold');
+      // The same call on the untouched file passes, so the throw above is the byte change alone.
+      assert.ok(corpusLines(row.item.id, row.item.sha256).length > 1);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
