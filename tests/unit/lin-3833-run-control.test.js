@@ -111,8 +111,10 @@ function load({ opened = null, previewFor = () => null, panelFor = serverPanel, 
     scripts: [],
     globals: { fetch: async () => ({ ok: true, json: async () => ({}) }) },
   });
-  loadCostFormat(world.sandbox); // LIN-4179: the shared browser formatter, loaded before the page script, as the page does
   world.run(SRC);
+  // LIN-4446: the page's shim is a module, so the formatter is installed after the classic page script has run, as in
+  // the browser. The script must not read it while it loads.
+  loadCostFormat(world.sandbox);
   return { PromptSection: world.window.PromptSection, calls, world };
 }
 

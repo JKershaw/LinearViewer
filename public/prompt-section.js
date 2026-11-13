@@ -1502,7 +1502,9 @@
       const defaultWhat = (preview && preview.words && preview.words.model) || 'Claude Code, the default';
       const defaultFrom = (preview && (sourceWordOf('model', preview) || sourceWordOf('harness', preview))) || 'from Models';
       const nums = state.run.panelNumbers;
-      // LIN-4179: the typical figure through the one browser formatter (public/cost-format.js).
+      // LIN-4179 / LIN-4446: the typical figure through the one formatter (window.CostFormat, set by the module shim).
+      // Read only from init or a fetch callback: every PromptSection.init caller runs at DOMContentLoaded or later
+      // (task-page.js, app.js, swipe.js), so the global is set by the time this runs.
       const typicalWords = typeof nums?.typicalUsd === 'number' ? window.CostFormat.formatUsd(nums.typicalUsd) : null;
       const numbersText = nums && !nums.unavailable && nums.runs != null
         ? `${nums.runs} ${nums.runs === 1 ? 'run' : 'runs'} in the last 30 days${typicalWords !== null ? `, about ${typicalWords} each` : ''}`
