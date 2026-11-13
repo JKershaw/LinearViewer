@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { createTaskPageRoutes } from '../../routes/task-page.js';
 import { renderTaskChatFold } from '../../lib/render-task-chat.js';
 import { loadWorld, clickOn } from './helpers/client-world.js';
+import { proposalsUrlOf } from '../../public/task-page.js';
 import { createTaskPageLoader } from '../../lib/task-page-loader.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 
@@ -227,12 +228,6 @@ describe('LIN-3975 — the fold tells the page when a turn proposed a follow-up'
 });
 
 describe('LIN-3975 — the page names the proposals read beside the state it polls', () => {
-  // The page script is an ES module-free IIFE; its helper is read from a loadWorld, as the other client tests do.
-  function proposalsUrlOf(stateUrl) {
-    const world = loadWorld({ scripts: ['task-page.js'], window: { module: { exports: {} } } });
-    return world.window.module.exports.proposalsUrlOf(stateUrl);
-  }
-
   test('the state URL becomes the proposals URL, the same task and query', () => {
     assert.equal(
       proposalsUrlOf('/workspace/acme/api/task/LIN-50/state?issueId=11111111-2222-3333-4444-555555555555'),

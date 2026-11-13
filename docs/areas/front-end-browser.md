@@ -19,7 +19,9 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
 - Shared leaves: a shared module is a leaf (it imports nothing and names no browser or Node global,
   `tests/unit/shared-modules.test.js`), served only through the explicit `SHARED_MODULES` allow-list in
   `lib/vendor-assets.js`, one route per file under the served /lib/ namespace, never by directory (a lib file not on the
-  list is a 404). A page imports one with a relative specifier that starts with ../lib/ (quoted in the code). That
+  list is a 404). A page imports one with a relative specifier that starts with ../lib/ (quoted in the code). The
+  second is `lib/time-words.js` (LIN-4472): the duration and relative-time words, which the server and the task page both
+  import; the page's own copies were removed, not kept under a parity test. That
   resolves to the same file in the browser and in Node only because `public/` is served at the URL root and stays flat,
   with no nested .js files (`tests/unit/front-end-import-layout.test.js`). Do not move `public/` under a prefix or add a
   subdirectory.
@@ -62,11 +64,6 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
 - `public/ship.js` / `public/ship-biscuit.js`: still hand-synced copies ("mirror of lib/ship-layout.js", "kept in
   lockstep with lib/render-ship-biscuit.js"). Each lib side would first have to become an import-free leaf before it
   could join `SHARED_MODULES`. (LIN-4446 blind read.)
-- `public/prompt-section.js`: the browser files reach their suites through `tests/unit/helpers/client-world.js`, which
-  loads them as classic scripts through `vm`. The premise that a module-capable client loader is needed before a view can
-  become a module is shown wrong by `tests/unit/workspace-kpis-module.test.js` (LIN-4471): a page module is tested by plain
-  `import` over `tests/unit/helpers/import-world.js`. The remaining classic suites are counted by
-  `tests/unit/classic-loader-census.test.js`. (LIN-4446; LIN-4471.)
 - `public/observation.js`: about 5,000 lines. By the counting method of LIN-4446 (lines starting with `*`, `//` or `/*`)
   1,985 of its 4,679 non-blank lines are comments. Find out why it is this large before splitting it. An earlier survey
   used a different method, so its figure is not comparable. (LIN-4446 plan.)

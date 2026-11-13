@@ -1,9 +1,10 @@
 /**
  * LIN-3329 — public/task-page.js, the task page's self-updating client.
  *
- * A plain browser script, so — following session-pr-state-poll.test.js — the
- * real shipped source runs in a vm sandbox with fake timers and a scripted
- * fetch. Nothing is re-implemented here.
+ * A native ES module (LIN-4472): the pure rules are plain imports of the shipped
+ * source, and each init() runs on a fresh instance over the fake DOM
+ * (tests/unit/helpers/import-world.js) with fake timers and a scripted api. Nothing
+ * is re-implemented here.
  *
  *   - `pollDelay`: 10 s while running, 45 s otherwise, nothing while hidden or
  *     done, backoff on failure;
@@ -15,7 +16,11 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWorld, fireDOMContentLoaded } from './helpers/client-world.js';
+import { fireDOMContentLoaded } from './helpers/client-world.js';
+import { importWorld } from './helpers/import-world.js';
+import { pageWorld } from './helpers/task-page-world.js';
+import { createFakeDom } from './helpers/fake-dom.js';
+import * as taskPage from '../../public/task-page.js';
 import { bodyOf } from './helpers/task-page-body.js';
 import { loop, NOW, PAGE_OPTIONS } from './helpers/task-page-loop.js';
 import { renderTaskPage, renderTaskStatus, renderTaskContext, renderTaskTrack } from '../../lib/render-task-page.js';
@@ -23,10 +28,6 @@ import { buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { gatherTaskStates } from '../../lib/home-row-states.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 
-/** The module's own functions: `public/task-page.js` run on loadWorld, its `module.exports` read back. Nothing re-implemented. */
-function load({ window = {} } = {}) {
-  return loadWorld({ scripts: ['task-page.js'], window: { ...window, module: { exports: {} } } }).window.module.exports;
-}
 
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
@@ -48,7 +49,7 @@ function makeTimers() {
 }
 
 describe('pollDelay', () => {
-  const { pollDelay, FAST_MS, SLOW_MS, MAX_BACKOFF_MS } = load();
+  const { pollDelay, FAST_MS, SLOW_MS, MAX_BACKOFF_MS } = taskPage;
   const cases = [
     ['running, visible', ['running', true, 0], 10000],
     ['waiting, visible', ['waiting', true, 0], 45000],
@@ -68,7 +69,7 @@ describe('pollDelay', () => {
 });
 
 describe('createPoller', () => {
-  const { createPoller } = load();
+  const { createPoller } = taskPage;
   const STATE_URL = '/workspace/acme/api/task/LIN-50/state?issueId=abc';
 
   function makePoller({ responses, visible = { value: true }, initial = { status: 'running', live: true }, onGone = null, unsettled = false }) {
@@ -231,7 +232,7 @@ describe('createPoller', () => {
 // LIN-3340: the poll must not leave a stale header on a merge-ready page, and a guest's
 // client-side markdown must survive an unchanged brief.
 describe('poll safety (LIN-3340)', () => {
-  const { paintsReadyHeader, runOptsOf } = load();
+  const { paintsReadyHeader, runOptsOf } = taskPage;
 
   test('the ready-to-merge header is painted only across an idle poll', () => {
     assert.equal(paintsReadyHeader('true', 'idle'), true);
@@ -254,9 +255,10 @@ describe('poll safety (LIN-3340)', () => {
     assert.equal(runOptsOf(null), null);
   });
 
-  test('a guest brief `<pre>` is upgraded to markdown and the upgrade is idempotent', () => {
-    const world = loadWorld({ scripts: ['task-page.js'], window: { renderMarkdown: (t) => `<p>${t}</p>`, module: { exports: {} } } });
-    const { enhanceContextMarkdown } = world.window.module.exports;
+  test('a guest brief `<pre>` is upgraded to markdown and the upgrade is idempotent', (t) => {
+    const world = importWorld({ window: { renderMarkdown: (text) => `<p>${text}</p>` } });
+    t.after(() => world.restore());
+    const { enhanceContextMarkdown } = taskPage;
     const mount = world.document.createElement('div');
     mount.innerHTML = renderTaskContext(taskModel([loop()], { brief: { brief: 'A **brief**' } }), { urlKey: 'acme', now: NOW });
     assert.equal(mount.querySelectorAll('pre.sess-ctx-body').length, 1, 'the server draws the brief as a plain <pre>');
@@ -269,9 +271,9 @@ describe('poll safety (LIN-3340)', () => {
   });
 });
 describe('isGuestStateUrl (the onGone gate)', () => {
-  const { isGuestStateUrl } = load();
+  const { isGuestStateUrl } = taskPage;
 
-  test('a guest share state URL reports gone', () => {
+  test('a guest share state URL reports gone', (t) => {
     assert.equal(isGuestStateUrl('/t/' + 'A'.repeat(43) + '/state'), true);
   });
 
@@ -288,7 +290,7 @@ describe('isGuestStateUrl (the onGone gate)', () => {
 // `onGone: false ? …` both passed. `goneHandlerFor` is now the one place that
 // decides, and the second block drives the real `init()` through it.
 describe('goneHandlerFor (the one decision)', () => {
-  const { goneHandlerFor } = load();
+  const { goneHandlerFor } = taskPage;
   const GUEST = '/t/' + 'A'.repeat(43) + '/state';
   const OWNER = '/workspace/acme/api/task/LIN-50/state?issueId=abc';
 
@@ -309,7 +311,7 @@ describe('goneHandlerFor (the one decision)', () => {
 });
 
 // ── the page on the client (LIN-4254 piece 5) ─────────────────────────────────
-// Each suite below runs the shipped task-page.js on loadWorld over the server's own markup: the page is `renderTaskPage`
+// Each suite below runs the shipped task-page.js over the server's own markup: the page is `renderTaskPage`
 // (body only), and a part of it is the renderer that draws that part (`renderTaskTrack`, `renderTaskContext`).
 
 const STATE_URL = '/workspace/acme/api/task/LIN-50/state';
@@ -352,16 +354,12 @@ describe('init() wires the 404 gate (LIN-3447)', () => {
   const OWNER = '/workspace/acme/api/task/LIN-50/state?issueId=abc';
 
   /** Run the real DOMContentLoaded -> init() on the server's running page, then deliver one 404 to its poll. */
-  async function pageThatGets404(stateUrl, viewer) {
+  async function pageThatGets404(t, stateUrl, viewer) {
     const timers = [];
     const fetched = [];
-    const world = loadWorld({
-      scripts: ['task-page.js'],
+    const { document: doc } = await pageWorld(t, {
       timers,
       window: {
-        addEventListener() {},
-        setInterval: () => 0,
-        clearInterval() {},
         api: async (url) => {
           if (url !== stateUrl) return { shares: [] }; // the owner's share list loads beside the page
           fetched.push(url);
@@ -369,7 +367,6 @@ describe('init() wires the 404 gate (LIN-3447)', () => {
         },
       },
     });
-    const { document: doc } = world;
     doc.body.innerHTML = pageBody(taskModel([loop()]), { viewer, stateUrl });
     await fireDOMContentLoaded(doc);
     await settle();
@@ -381,16 +378,16 @@ describe('init() wires the 404 gate (LIN-3447)', () => {
     return { main, before, fetched, timers };
   }
 
-  test('a guest page whose state URL 404s is replaced by the gone notice and stops polling', async () => {
-    const { main, fetched, timers } = await pageThatGets404(GUEST, 'guest');
+  test('a guest page whose state URL 404s is replaced by the gone notice and stops polling', async (t) => {
+    const { main, fetched, timers } = await pageThatGets404(t, GUEST, 'guest');
     assert.deepEqual(fetched, [GUEST]);
     assert.match(main.innerHTML, /data-testid="task-share-gone"/);
     assert.match(main.innerHTML, /This link is no longer available\./);
     assert.equal(timers.length, 0, 'no further poll is scheduled once the link is gone');
   });
 
-  test('an owner page whose state URL 404s is left intact and keeps polling', async () => {
-    const { main, before, fetched, timers } = await pageThatGets404(OWNER, 'owner');
+  test('an owner page whose state URL 404s is left intact and keeps polling', async (t) => {
+    const { main, before, fetched, timers } = await pageThatGets404(t, OWNER, 'owner');
     assert.deepEqual(fetched, [OWNER]);
     assert.equal(main.innerHTML, before, 'the page is not replaced');
     assert.equal(timers.length, 1, 'the poll loop backs off and carries on');
@@ -405,11 +402,11 @@ describe('apply(): the header after a session ends on a merge-ready page (LIN-34
   const poll = (status, m) => ({ status, live: status === 'running', headerHtml: headerOf(m) });
 
   /**
-   * One page on loadWorld: the server's page for `m` (its PR box and ready header come from the loader's evidence), the
+   * One page over the fake DOM: the server's page for `m` (its PR box and ready header come from the loader's evidence), the
    * real task-page.js, and `window.api` serving the queued poll states for the state URL. `realCloseOut` loads public/close-out.js
    * into the same world (case d); otherwise `window.CloseOut` is a stub whose `runCheck` is a spy.
    */
-  async function makePage({ m, polls = [], realCloseOut = false, checkResult = null }) {
+  async function makePage(t, { m, polls = [], realCloseOut = false, checkResult = null }) {
     const timers = [];
     const reloads = [];
     const runCheckSpy = [];
@@ -419,26 +416,22 @@ describe('apply(): the header after a session ends on a merge-ready page (LIN-34
       init: (doc) => doc.querySelector('[data-testid="run-evidence-closeout"]'),
       runCheck: (box, doc) => { runCheckSpy.push({ box, doc }); return Promise.resolve(null); },
     };
-    const world = loadWorld({
-      scripts: realCloseOut ? ['task-page.js', 'close-out.js'] : ['task-page.js'],
+    const { document: doc } = await pageWorld(t, {
       timers,
+      classic: realCloseOut ? ['close-out.js'] : [],
       window: {
-        addEventListener() {},
-        setInterval: () => 0,
-        clearInterval() {},
         location: { reload: () => reloads.push(1) },
         ...(realCloseOut ? {} : { CloseOut }),
         api: async (url) => {
           if (url === STATE_URL) return queue.shift();
           if (url === CHECK_URL) {
             checkCalls.push(url);
-            return typeof checkResult === 'function' ? checkResult(checkCalls.length, world.document) : { state: { status: 'ready' } };
+            return typeof checkResult === 'function' ? checkResult(checkCalls.length, doc) : { state: { status: 'ready' } };
           }
           throw new Error('unexpected url ' + url);
         },
       },
     });
-    const { document: doc } = world;
     doc.body.innerHTML = pageBody(m);
     doc.defaultView = { location: { reload: () => reloads.push(1) } };
     const main = doc.querySelector('[data-testid="task-page"][data-state-url]');
@@ -452,8 +445,8 @@ describe('apply(): the header after a session ends on a merge-ready page (LIN-34
     };
   }
 
-  test('(a) load running + merge-ready, poll idle: the ready sentence, not the running one; one check', async () => {
-    const page = await makePage({ m: prModel([loop()], 'ready'), polls: [poll('idle', IDLE)] });
+  test('(a) load running + merge-ready, poll idle: the ready sentence, not the running one; one check', async (t) => {
+    const page = await makePage(t, { m: prModel([loop()], 'ready'), polls: [poll('idle', IDLE)] });
     await page.pollOnce();
     assert.equal(textOf(page.answer.innerHTML), textOf(page.readyHtml));
     assert.doesNotMatch(page.answer.innerHTML, /running/);
@@ -461,8 +454,8 @@ describe('apply(): the header after a session ends on a merge-ready page (LIN-34
     assert.equal(page.runCheckSpy.length, 1, 'the running -> idle edge runs one check');
   });
 
-  test('(b) load ready, poll running then idle: ready again, one check; a second idle adds none', async () => {
-    const page = await makePage({ m: prModel([loop({ agentState: 'idle', terminalStatus: 'completed' })], 'ready'), polls: [poll('running', RUNNING), poll('idle', IDLE), poll('idle', IDLE)] });
+  test('(b) load ready, poll running then idle: ready again, one check; a second idle adds none', async (t) => {
+    const page = await makePage(t, { m: prModel([loop({ agentState: 'idle', terminalStatus: 'completed' })], 'ready'), polls: [poll('running', RUNNING), poll('idle', IDLE), poll('idle', IDLE)] });
     await page.pollOnce();
     assert.equal(textOf(page.answer.innerHTML), textOf(headerOf(RUNNING)), 'running paints the polled sentence');
     assert.equal(page.runCheckSpy.length, 0, 'no check while running');
@@ -475,36 +468,36 @@ describe('apply(): the header after a session ends on a merge-ready page (LIN-34
     assert.equal(page.runCheckSpy.length, 1, 'never per poll');
   });
 
-  test('(c) control: merge-ready false repaints the polled header; a page with no box makes no check', async () => {
-    const page = await makePage({ m: prModel([loop({ agentState: 'idle', terminalStatus: 'completed' })], 'running'), polls: [poll('idle', IDLE)] });
+  test('(c) control: merge-ready false repaints the polled header; a page with no box makes no check', async (t) => {
+    const page = await makePage(t, { m: prModel([loop({ agentState: 'idle', terminalStatus: 'completed' })], 'running'), polls: [poll('idle', IDLE)] });
     assert.equal(page.main.getAttribute('data-merge-ready'), 'false');
     await page.pollOnce();
     assert.equal(textOf(page.answer.innerHTML), textOf(headerOf(IDLE)));
     assert.equal(page.main.getAttribute('data-status'), 'idle');
-    const noBox = await makePage({ m: taskModel([loop({ agentState: 'idle', terminalStatus: 'completed' })]), polls: [poll('idle', IDLE)] });
+    const noBox = await makePage(t, { m: taskModel([loop({ agentState: 'idle', terminalStatus: 'completed' })]), polls: [poll('idle', IDLE)] });
     assert.equal(noBox.box, null, 'a page with no PR has no box');
     await noBox.pollOnce();
     assert.equal(noBox.runCheckSpy.length, 0, 'a guest page has no box, so no check');
     assert.equal(textOf(noBox.answer.innerHTML), textOf(headerOf(IDLE)));
   });
 
-  test('(d) the real close-out.js: running -> idle reloads once when the check wrote Done, never when the page is already done', async () => {
+  test('(d) the real close-out.js: running -> idle reloads once when the check wrote Done, never when the page is already done', async (t) => {
     // Check 1 is the load-time one (no Done); check 2 is the edge-triggered one.
-    const page = await makePage({ m: prModel([loop()], 'ready'), realCloseOut: true, polls: [poll('idle', IDLE)],
+    const page = await makePage(t, { m: prModel([loop()], 'ready'), realCloseOut: true, polls: [poll('idle', IDLE)],
       checkResult: (n) => (n === 1 ? { state: { status: 'ready' } } : { state: { status: 'merged' }, doneNow: true }) });
     await page.pollOnce();
     assert.equal(page.checkCalls.length, 2, 'one load check + one session-end check');
     assert.equal(page.reloads.length, 1, 'doneNow reloads through the existing path');
 
-    const already = await makePage({ m: prModel([loop()], 'ready'), realCloseOut: true, polls: [poll('idle', IDLE)],
+    const already = await makePage(t, { m: prModel([loop()], 'ready'), realCloseOut: true, polls: [poll('idle', IDLE)],
       checkResult: (n, doc) => { if (n > 1) doc.querySelector('[data-testid="task-page"]').setAttribute('data-status', 'done'); return n === 1 ? { state: { status: 'ready' } } : { state: { status: 'merged' }, doneNow: true }; } });
     await already.pollOnce();
     assert.equal(already.checkCalls.length, 2);
     assert.equal(already.reloads.length, 0, 'pageAlreadyDone guard holds');
   });
 
-  test('(e) ordering: a box moved off ready (merged, not Done) means the idle poll paints the polled header, not ready', async () => {
-    const page = await makePage({ m: prModel([loop()], 'ready'), polls: [poll('idle', IDLE)] });
+  test('(e) ordering: a box moved off ready (merged, not Done) means the idle poll paints the polled header, not ready', async (t) => {
+    const page = await makePage(t, { m: prModel([loop()], 'ready'), polls: [poll('idle', IDLE)] });
     page.box.setAttribute('data-state', 'merged'); // a /check moved it between polls
     await page.pollOnce();
     assert.equal(page.main.getAttribute('data-merge-ready'), 'false');
@@ -512,9 +505,9 @@ describe('apply(): the header after a session ends on a merge-ready page (LIN-34
     assert.equal(page.main.getAttribute('data-status'), 'idle');
   });
 
-  test('(f) the session-end check moves the box to merged without Done: the polled header is repainted, not "ready"', async () => {
+  test('(f) the session-end check moves the box to merged without Done: the polled header is repainted, not "ready"', async (t) => {
     // Check 1 is the load-time one (ready); check 2 is the edge one (merged, no doneNow, so no reload).
-    const page = await makePage({ m: prModel([loop({ agentState: 'idle', terminalStatus: 'completed' })], 'ready'), realCloseOut: true, polls: [poll('running', RUNNING), poll('idle', IDLE)],
+    const page = await makePage(t, { m: prModel([loop({ agentState: 'idle', terminalStatus: 'completed' })], 'ready'), realCloseOut: true, polls: [poll('running', RUNNING), poll('idle', IDLE)],
       checkResult: (n) => (n === 1 ? { state: { status: 'ready' } } : { state: { status: 'merged' }, doneNow: false }) });
     await page.pollOnce();
     await page.pollOnce();
@@ -525,8 +518,8 @@ describe('apply(): the header after a session ends on a merge-ready page (LIN-34
     assert.equal(page.reloads.length, 0);
   });
 
-  test('(h) LIN-3991: load merge-ready, poll failed: the ready sentence is kept, and the running -> failed edge still checks', async () => {
-    const page = await makePage({ m: prModel([loop({ agentState: 'idle', terminalStatus: 'completed' })], 'ready'), polls: [poll('running', RUNNING), poll('failed', FAILED)] });
+  test('(h) LIN-3991: load merge-ready, poll failed: the ready sentence is kept, and the running -> failed edge still checks', async (t) => {
+    const page = await makePage(t, { m: prModel([loop({ agentState: 'idle', terminalStatus: 'completed' })], 'ready'), polls: [poll('running', RUNNING), poll('failed', FAILED)] });
     await page.pollOnce();
     await page.pollOnce();
     assert.equal(textOf(page.answer.innerHTML), textOf(page.readyHtml), 'the failed poll does not repaint the red header over ready');
@@ -534,8 +527,8 @@ describe('apply(): the header after a session ends on a merge-ready page (LIN-34
     assert.equal(page.runCheckSpy.length, 1, 'a run that ends failed re-checks the close-out box');
   });
 
-  test('(g) a ready load seeds the edge as not-running: the first idle poll fires no check', async () => {
-    const page = await makePage({ m: prModel([loop({ agentState: 'idle', terminalStatus: 'completed' })], 'ready'), polls: [poll('idle', IDLE)] });
+  test('(g) a ready load seeds the edge as not-running: the first idle poll fires no check', async (t) => {
+    const page = await makePage(t, { m: prModel([loop({ agentState: 'idle', terminalStatus: 'completed' })], 'ready'), polls: [poll('idle', IDLE)] });
     await page.pollOnce();
     assert.equal(page.runCheckSpy.length, 0);
     assert.equal(textOf(page.answer.innerHTML), textOf(page.readyHtml));
@@ -547,35 +540,36 @@ describe('apply(): the header after a session ends on a merge-ready page (LIN-34
 // provider. A mutation dropping `source: source` left the suite green, because
 // the e2e compares pathnames only.
 describe('owner widget mount threads source (LIN-3340)', () => {
-  /** The owner's page (or a guest's) with a brief and a recap, on loadWorld; the widgets' inits are recorded. */
-  function makeDoc({ source, marker = true } = {}) {
+  /** The owner's page (or a guest's) with a brief and a recap, over the fake DOM; the widgets' inits are recorded. */
+  function makeDoc(t, { source, marker = true } = {}) {
     const calls = [];
     const init = (lib) => (el, opts) => calls.push({ lib, el, opts });
-    const world = loadWorld({ scripts: ['task-page.js'], window: { BriefSection: { init: init('brief') }, RecapSection: { init: init('recap') }, module: { exports: {} } } });
+    const world = importWorld({ window: { BriefSection: { init: init('brief') }, RecapSection: { init: init('recap') } } });
+    t.after(() => world.restore());
     const m = taskModel([loop()], { brief: { brief: 'A brief' }, recap: null });
     const binding = source === undefined ? {} : { source };
     world.document.body.innerHTML = pageBody(m, { viewer: marker ? 'owner' : 'guest', binding, urlKey: 'fbk' });
     const doc = world.document;
     const main = doc.querySelector('[data-testid="task-page"]');
-    return { doc, main, calls, mountWidgets: world.window.module.exports.mountWidgets };
+    return { doc, main, calls, mountWidgets: taskPage.mountWidgets };
   }
 
-  test('the task source reaches both widget inits (and both refresh POSTs)', () => {
-    const { doc, main, calls, mountWidgets } = makeDoc({ source: 'linear' });
+  test('the task source reaches both widget inits (and both refresh POSTs)', (t) => {
+    const { doc, main, calls, mountWidgets } = makeDoc(t, { source: 'linear' });
     assert.equal(mountWidgets(doc, main), true);
     assert.equal(calls.length, 2);
     assert.deepEqual(calls.map(c => c.lib).sort(), ['brief', 'recap']);
     for (const c of calls) assert.equal(c.opts.source, 'linear', `${c.lib} got the task source`);
   });
 
-  test('a task with no data-source mounts the widgets with no source', () => {
-    const { doc, main, calls, mountWidgets } = makeDoc({ source: undefined });
+  test('a task with no data-source mounts the widgets with no source', (t) => {
+    const { doc, main, calls, mountWidgets } = makeDoc(t, { source: undefined });
     mountWidgets(doc, main);
     for (const c of calls) assert.equal(c.opts.source, undefined, 'no source stays off the request');
   });
 
-  test('a guest (no owner marker) mounts nothing', () => {
-    const { doc, main, calls, mountWidgets } = makeDoc({ source: 'linear', marker: false });
+  test('a guest (no owner marker) mounts nothing', (t) => {
+    const { doc, main, calls, mountWidgets } = makeDoc(t, { source: 'linear', marker: false });
     assert.equal(mountWidgets(doc, main), false);
     assert.equal(calls.length, 0);
   });
@@ -583,14 +577,14 @@ describe('owner widget mount threads source (LIN-3340)', () => {
 
 /** The stage rows the server draws for `loops`, in a fresh world: `rows` are the `.task-step` items, `doc` the document. */
 function trackOf(loops, now = NOW) {
-  const world = loadWorld({ scripts: [] });
-  world.document.body.innerHTML = renderTaskTrack(taskModel(loops), { now, urlKey: 'acme', runLinks: true });
-  return { doc: world.document, rows: () => [...world.document.querySelectorAll('.task-step')] };
+  const { document } = createFakeDom();
+  document.body.innerHTML = renderTaskTrack(taskModel(loops), { now, urlKey: 'acme', runLinks: true });
+  return { doc: document, rows: () => [...document.querySelectorAll('.task-step')] };
 }
 const OPEN = 'sess-run--expanded';
 
 describe('open rows survive a repaint', () => {
-  const { createOpenMemory, rememberToggle, applyOpenMemory } = load();
+  const { createOpenMemory, rememberToggle, applyOpenMemory } = taskPage;
   const isOpen = (row) => row.classList.contains(OPEN);
 
   test('seeded from the rows rendered open', () => {
@@ -631,7 +625,7 @@ describe('open rows survive a repaint', () => {
 });
 
 describe('stage rows: head, clocks and check-ins across a repaint (LIN-3356)', () => {
-  const { applyOpenMemory, createOpenMemory, tickClocks, openCheckIns, restoreCheckIns } = load();
+  const { applyOpenMemory, createOpenMemory, tickClocks, openCheckIns, restoreCheckIns } = taskPage;
   const isOpen = (row) => row.classList.contains(OPEN);
 
   test('a stage head (not the legacy face head) carries aria-expanded', () => {
@@ -673,14 +667,14 @@ describe('stage rows: head, clocks and check-ins across a repaint (LIN-3356)', (
 });
 
 describe('repaintHeader keeps the load-time summary (LIN-3373)', () => {
-  const { repaintHeader } = load();
+  const { repaintHeader } = taskPage;
 
   /** A load-time answer: the page's own header, with its summary when the brief has one. */
   function answerOf(summaryBrief) {
-    const world = loadWorld({ scripts: [] });
+    const { document } = createFakeDom();
     const m = taskModel([loop()], summaryBrief ? { brief: { brief: summaryBrief } } : {});
-    world.document.body.innerHTML = `<section data-testid="task-page-answer">${headerOf(m)}</section>`;
-    return world.document.querySelector('[data-testid="task-page-answer"]');
+    document.body.innerHTML = `<section data-testid="task-page-answer">${headerOf(m)}</section>`;
+    return document.querySelector('[data-testid="task-page-answer"]');
   }
 
   test('a header with no summary does not delete the load-time one', () => {

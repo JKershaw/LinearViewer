@@ -94,7 +94,7 @@ export function purityProblems(src, name = 'module') {
 
 describe('the allow-lists', () => {
   test('SHARED_MODULES is separate from VENDOR_ASSETS, and VENDOR_ASSETS is unchanged', () => {
-    assert.deepEqual(Object.keys(SHARED_MODULES), ['/lib/cost-format.js']);
+    assert.deepEqual(Object.keys(SHARED_MODULES), ['/lib/cost-format.js', '/lib/time-words.js']);
     assert.deepEqual(Object.keys(VENDOR_ASSETS).sort(), ['/chart.umd.min.js', '/marked.min.js', '/purify.min.js']);
   });
 
@@ -125,6 +125,15 @@ describe('serving the shared module', () => {
     assert.equal(res.status, 200);
     assert.match(res.headers.get('content-type'), /javascript/);
     assert.deepEqual(Buffer.from(await res.arrayBuffer()), readFileSync(join(ROOT, 'lib/cost-format.js')));
+  });
+
+  // LIN-4472: the task page imports the duration and relative-time words from this leaf, so the browser gets the same bytes
+  // the server imports.
+  test('/lib/time-words.js: 200, a JavaScript type, and exactly the bytes of lib/time-words.js', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/lib/time-words.js`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type'), /javascript/);
+    assert.deepEqual(Buffer.from(await res.arrayBuffer()), readFileSync(join(ROOT, 'lib/time-words.js')));
   });
 
   for (const path of NOT_SERVED) {

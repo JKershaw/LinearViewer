@@ -585,8 +585,8 @@ describe('LIN-3975 — a staged chat proposal is applied or declined from the ru
 describe('LIN-3975 — the run control is wired before the first Markdown render', () => {
   test('public/task-page.js init: PromptSection.init on the run control precedes every Markdown render', () => {
     const src = read('public/task-page.js');
-    const start = src.indexOf('  function init(doc) {');
-    const end = src.indexOf('    function toggle(row) {');
+    const start = src.indexOf('function init(doc) {');
+    const end = src.indexOf('function toggle(row) {');
     assert.ok(start > 0 && end > start, 'init is found');
     const init = src.slice(start, end);
     const mount = init.indexOf('window.PromptSection.init(runRoot, runOpts)');
