@@ -159,6 +159,6 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   goes through `extractPrUrls`. Moving it onto `prUrlsIn` changes which park messages wake (a scheme-less URL
   would stop matching), so it needs its own witness. (LIN-4458 review.)
 - `lib/run-evidence.js`: the run page keeps two answers to "which PR is the task's". The close-out box counts `readTrail().landing` through `closeOutDecision` (LIN-4460 retired `deriveState`'s status decision: no reader outside the tests and the GET body reads it), but `deriveState` over `extractPrUrls` (every cited PR) still drives `state.pr`, `done`, `checked.now` and `resolveRunPrRef` (read by the `routes/dashboard.js` pr-state route), `state.prUrls` (`lib/pr-state-store.js`), and `lib/ci-wake-sweep.js` matches parks against every cited PR. Whether the page's PR and the CI-wake sweep follow the landing is a product decision touching several callers. Also, `readRunEvidence` reads the landing's sole PR and hands `buildRunEvidence` a bare `prStatus`, which `buildRunEvidence` re-pairs with the landing after reading the trail again: the same positional coupling the URL-keyed `Map` removed from the decision. Passing the status keyed by URL with the landing already read is a signature change for about 25 call sites (`tests/unit/run-evidence.test.js`, `routes/dashboard.js`), so larger than a fix. (LIN-4458 blind read; LIN-4460.)
-- `docs/plans/survey.md:98` cites `lib/recommendation-live-wait.js` for the live-stage wait; the file moved to
-  `lib/run-live-wait.js` in LIN-4459, so the path is stale. It names the file, not the route order, and breaks
-  nothing. (LIN-4465 review, 13 Nov.)
+- `lib/run-live-wait.js`: `docs/plans/survey.md` still names the live-stage wait's old file, the
+  recommendation-live-wait module under `lib/`, which LIN-4459 moved here, so that path in the survey plan is
+  stale. It names the file, not the route order, and breaks nothing. (LIN-4465 review, 13 Nov.)
