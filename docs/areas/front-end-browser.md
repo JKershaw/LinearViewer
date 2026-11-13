@@ -50,7 +50,7 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
 - `public/app.js`: Home's Running and Up next are refreshed by parsing a whole page with
   `DOMParser` (LIN-4243). Waiting on you is drawn as a server fragment by the page's own
   function (LIN-4242); doing the same for the other sections would mean the client never
-  parses a whole page. (Survey tally: LIN-4243.)
+  parses a whole page. (Survey tally: LIN-4243.) Not a module matter; outside LIN-4463 (plan table).
 - `public/common.js`: `buildDispatchModelOptionDescriptors` repeats the merge rule of
   `buildModelOptions` (`lib/openrouter-catalog.js`). That module is not a leaf (it imports
   `lib/catalog-rate.js`), so it cannot be served as one shared file (LIN-4446).
@@ -58,8 +58,10 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   the wire); only the rule is. The endpoint could send merged options instead. (LIN-4358.)
 - `public/brief.js`: its `postBrief`/`errorText` block is identical to `postRecap`/`errorText`
   in `public/recap.js`, and the check for a `statusCode` inside a keepalive 200 body is now
-  written four times (also `public/scan.js` and `public/observation.js`). One shared reader
-  in `public/common.js`. (Area reads CG/CH, 8 Nov, on LIN-4358.)
+  written four times (also `public/scan.js` and `public/observation.js`). One shared imported reader is possible only
+  once `public/scan.js`, `public/recap.js`, `public/observation.js` and `public/brief.js` are modules that can import it
+  (LIN-4463 converts pages top down); until then it would be a classic global in `public/common.js`. (Area reads CG/CH,
+  8 Nov, on LIN-4358.)
 - `public/common.js`: exported globals, and the "client twins" of `lib/task-page-href.js`, `lib/timeline-zoom.js`,
   `lib/ship-layout.js` and `lib/prompt-formatters.js`. The first two are leaves of the same shape as cost-format, the
   next candidates; the last two import other modules, so serving a single file will not do for them. Its
@@ -78,15 +80,19 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   1,985 of its 4,679 non-blank lines are comments. Find out why it is this large before splitting it. An earlier survey
   used a different method, so its figure is not comparable. (LIN-4446 plan.)
 - `public/llms.txt`: its H11 names the unscoped `/api/recommend/status`, which is now only a
-  legacy redirect (`routes/legacy-redirects.js`), and its view list omits `projects` and the
-  flag-gated `live-console` (`lib/components/view-nav.js`). The browser guide is otherwise sound:
-  its endpoints and selectors resolve. (Documentation Review, 10 Nov.;
-  `docs/reviews/documentation-review-2026-11-10.md`.)
+  legacy redirect (`routes/legacy-redirects.js`), and its view list omits `projects` and
+  `live-console` (`lib/components/view-nav.js`; live-console shows for an owner with a live runner key or queue token
+  unless their `liveConsole` flag is stored `false`, not simply behind a flag). The browser guide is otherwise sound:
+  its endpoints and selectors resolve. The view list and `nav-view-*` keys are written by hand and no test checks them
+  against source, so a fix will drift again unless a conformance test comes with it. Not a module matter; outside
+  LIN-4463 (plan table). (Documentation Review, 10 Nov.;
+  `docs/reviews/documentation-review-2026-11-10.md`; LIN-4463 blind read.)
 - `public/prompt-section.js`: on a server with no AI (`aiState: "unconfigured"`, a self-host with no
   OpenRouter key) the run control still offers Next step. Pressing it gets a 503 from the recommend
   stream, and "AI Recommend · generating…" / "Loading…" spin with no message, while Run to PR works
   beside it. Offer only what the server can do, or say why it can't. (Onboarding & Cold-Start
-  Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)
+  Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.) Not a module matter; outside
+  LIN-4463 (plan table).
 - `public/feedback-widget.js`: on any non-ok response it keeps the draft and shows `data.error`; it never
   checks `code: 'PARTIAL_WRITE'` or `retryable: false` (LIN-4452). After a Jira ticket that landed without
   its seal, the user sees agent wording ("do not retry the create, read the issue instead") with no
