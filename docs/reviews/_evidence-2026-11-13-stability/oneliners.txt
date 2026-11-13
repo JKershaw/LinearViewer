@@ -1,0 +1,678 @@
+$ git rev-parse 9574d537 HEAD; git -C ../simple-dispatcher rev-parse 5d8489e HEAD
+9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f
+163efc0698934c3e8a5f3c30e48dc15b51ac3a24
+5d8489e7fd8434f0e69af7df11a3746790abbe64
+af9b496d57f042972b912a30eb8c4d1164bbab77
+
+$ git log --first-parent --format='%h %cI %s' 9574d537..HEAD | wc -l
+      35
+
+$ git log --first-parent --format='%cd' --date=format-local:%F 9574d537..HEAD | sort | uniq -c
+   1 2026-11-08
+  12 2026-11-10
+   3 2026-11-11
+  19 2026-11-12
+
+$ git log --first-parent --format='%h%x09%cI%x09%s%x09%b' 9574d537..HEAD | awk -F'	' 'NF>=3{t=$4; if($3 ~ /^Merge pull request/) print $1"	"$2"	"$3"	"t; else print $1"	"$2"	"$3}'
+163efc069	2026-11-12T23:17:49Z	Merge pull request #2416 from JKershaw/closeout/lin-4396-blind-read-fixes	LIN-4396 close-out: the parent blind read's fixes and the review's Waiting entry
+aebe61081	2026-11-12T22:46:23Z	Merge pull request #2415 from JKershaw/feat/lin-4439-measure-1-reads-ledger	LIN-4439: measure 1 reads the ledger; the sampled and hand-run blind passes retire
+ceda35127	2026-11-12T22:35:24Z	Merge pull request #2411 from JKershaw/feat/lin-4424-stability-prompt-declared-measures	LIN-4424: Stability prompt opens with a repository's declared measures
+e3a3268a1	2026-11-12T21:22:35Z	Merge pull request #2414 from JKershaw/feat/lin-4441-parallel-unit-ci	LIN-4441: run the proxy unit arm beside unit; one local-testing rule; acorn-isolated test
+eb14b7fff	2026-11-12T21:06:21Z	Merge pull request #2413 from JKershaw/feat/lin-4438-blind-read-gate	LIN-4438: close-out waits on a recorded blind read; review's edges read retires
+4f48068eb	2026-11-12T20:03:28Z	LIN-4419: accept Node >=24, pin production to 24, check newest LTS weekly (#2412)
+e3829b9f9	2026-11-12T19:22:32Z	Merge pull request #2410 from JKershaw/feat/lin-4437-blind-read-stage	LIN-4437: the blind-read stage, sent by hand (ledger field, proxy shape check, kind tables)
+b1f258ab4	2026-11-12T19:01:12Z	Merge pull request #2409 from JKershaw/feat/lin-4423-declaration-and-reference	LIN-4423: Stability measures declaration and the 8 Nov reference reading
+b3d7c7988	2026-11-12T17:41:21Z	Merge pull request #2407 from JKershaw/feat/lin-4436-blind-read-pilot	LIN-4436: blind read pilot: the reader's prompt, piloted on five merged PRs (Go)
+720c1b1c2	2026-11-12T17:40:30Z	LIN-2386: env-check finds Playwright's macOS browser cache (#2408)
+96fa23c24	2026-11-12T17:35:19Z	Merge pull request #2406 from JKershaw/feat/lin-4422-blind-read-and-seat	LIN-4422: stability measures — blind-read sample and tally, the person's seat
+2022841a1	2026-11-12T16:11:50Z	Merge pull request #2403 from JKershaw/feat/lin-4428-paper-v2-rewrite	LIN-4428: size-and-cost paper v2, chart first, shelf updated
+1d912cce7	2026-11-12T15:53:15Z	Merge pull request #2405 from JKershaw/feat/lin-4421-tracker-reads	LIN-4421: stability measures tracker reads (finished tasks, speed, cost, tickets minted)
+a514506b6	2026-11-12T15:05:37Z	Merge pull request #2404 from JKershaw/feat/lin-4432-audit-notes-pr	LIN-4432: the after-merge audit's notes PR on a Done ticket (LIN-4401 B)
+c6d99f05e	2026-11-12T13:38:43Z	Merge pull request #2402 from JKershaw/feat/lin-4431-consequence-gate	LIN-4431: outside-find consequence gate, with docs (LIN-4401 piece A)
+f57cc7e99	2026-11-12T13:04:03Z	Merge pull request #2401 from JKershaw/feat/lin-4427-size-cost-freeze-fits	LIN-4427: size–cost fits, 12 Nov freeze, chart and bridge
+94893cc35	2026-11-12T11:34:01Z	Merge pull request #2400 from JKershaw/feat/lin-4426-paper-v2-script-inputs	LIN-4426: paper v2 scripts take --inputs and attribute per dispatch; v1 byte-identical
+b349c219b	2026-11-12T08:50:07Z	Merge pull request #2399 from JKershaw/feat/lin-4414-area-notes-lessons-cap-retirement	LIN-4414: Lessons capped, Waiting uncapped, one checked retirement per stage build
+218ab7f64	2026-11-12T08:36:23Z	Merge pull request #2398 from JKershaw/feat/lin-4420-stability-measures-core	feat(LIN-4420): stability measures core, repository reads and registry placement
+30a019289	2026-11-11T23:50:56Z	Merge pull request #2397 from JKershaw/docs/lin-4418-test-coverage-gap-review-2026-11-11	docs(LIN-4418): Test Coverage Gap Review 2026-11-11 (delta vs 2026-10-23)
+b5950f704	2026-11-11T22:32:27Z	Merge pull request #2396 from JKershaw/feat/lin-4415-no-default-completion-periodical	LIN-4415: a finished task no longer starts a Periodical by default
+fe2f1f0cb	2026-11-11T22:25:57Z	docs(LIN-4413): Onboarding & Cold-Start Review run 4 (trend vs 2026-10-23) (#2395)
+da5df707d	2026-11-10T15:05:25Z	Merge pull request #2394 from JKershaw/docs/lin-4411-security-review-2026-11-10	docs(LIN-4411): Security Review delta vs 2026-10-23 (4d23fa15)
+80f4c7c87	2026-11-10T14:28:35Z	Merge pull request #2392 from JKershaw/docs/lin-4406-documentation-review-2026-11-10	LIN-4406: documentation review, run 7 (10 Nov.)
+4d23fa158	2026-11-10T14:05:03Z	Merge pull request #2393 from JKershaw/chore/LIN-4412-dependency-review	LIN-4412: dependency & supply-chain review, 2026-11-10 (delta vs 2026-10-23)
+008d38bb0	2026-11-10T12:42:29Z	Merge pull request #2391 from JKershaw/feat/lin-4398-periodical-review-skip-surveys	LIN-4398: a gate-marked Periodical review starts at scoping, no Surveys
+d94800931	2026-11-10T12:31:23Z	Merge pull request #2390 from JKershaw/feat/lin-4405-sessions-on-one-clock	LIN-4405: "Sessions on one clock" on the task page
+730df21c2	2026-11-10T12:21:45Z	LIN-4407: Integration & Surface Maturity Review, run 5 (trend vs 2026-10-21) (#2389)
+a36ad6195	2026-11-10T11:59:12Z	Merge pull request #2387 from JKershaw/feat/lin-4392-live-stage-wait	LIN-4392: one live-stage wait before the selector on every recommendation surface
+9cf51ef72	2026-11-10T11:01:34Z	Merge pull request #2388 from JKershaw/chore/lin-4404-survey-fallback	LIN-4404: post-deploy — drop survey script's pre-task-life /cost fallback
+ecabd3d76	2026-11-10T10:42:08Z	Merge pull request #2386 from JKershaw/feat/lin-4404-task-life-cost-read	LIN-4404: whole-life task cost read (session timeline part 1, no UI)
+f5b1f5efa	2026-11-10T09:35:14Z	Merge pull request #2383 from JKershaw/feat/lin-4390-periodical-hand-off	LIN-4390: a Periodical run hands off; close-out merges its PR and sets Done
+1e106e4e3	2026-11-10T08:44:09Z	Merge pull request #2385 from JKershaw/docs/lin-4403-drift-coherence-run6	LIN-4403: Drift & Coherence Review run 6 (2026-11-10)
+3b1b57b15	2026-11-10T08:25:36Z	Merge pull request #2384 from JKershaw/chore/lin-4402-seams-tangles-run11	LIN-4402: Seams & Tangles run 11 (2026-11-10, delta vs run 10)
+b315e0e8f	2026-11-08T18:06:18Z	LIN-4394: Stability Review run 5 (2026-11-08), delta vs 2026-11-04 (#2382)
+
+$ for p in docs/areas/ docs/reviews/ docs/papers/ docs/plans/ scripts/ tests/unit/ tests/e2e/ tests/fixtures/ experiments/ .github/ lib/ routes/ public/ server.js docs/architecture/source-map.md public/llms.txt lib/periodicals.js lib/dispatch-store.js routes/proxy.js lib/runner-kit/runner.mjs lib/harbour-spawn.js lib/providers/registry.js lib/render-custom-prompts.js CLAUDE.md; do n=$(git log --first-parent -m --no-renames --name-only --format=@%h 9574d537..HEAD | awk -v p="$p" '/^@/{c=$0;next} index($0,p)==1{s[c]=1} END{print length(s)}'); echo "$p $n"; done
+docs/areas/ 28
+docs/reviews/ 11
+docs/papers/ 5
+docs/plans/ 5
+scripts/ 17
+tests/unit/ 22
+tests/e2e/ 3
+tests/fixtures/ 10
+experiments/ 0
+.github/ 2
+lib/ 18
+routes/ 7
+public/ 4
+server.js 1
+docs/architecture/source-map.md 10
+public/llms.txt 4
+lib/periodicals.js 4
+lib/dispatch-store.js 1
+routes/proxy.js 2
+lib/runner-kit/runner.mjs 0
+lib/harbour-spawn.js 0
+lib/providers/registry.js 0
+lib/render-custom-prompts.js 0
+CLAUDE.md 3
+
+$ git log --first-parent -m --no-renames --name-only --format=@%h 9574d537..HEAD | grep -v '^@' | grep -v '^$' | grep -v '_evidence' | sort | uniq -c | sort -rn | head -30
+  17 docs/areas/llm-and-prompts.md
+  13 docs/areas/runs-and-dispatch.md
+  10 docs/areas/agent-api.md
+  10 docs/architecture/source-map.md
+   8 docs/areas/reports-and-operator-tools.md
+   7 tests/unit/prompt-size-budget.test.js
+   7 scripts/prompt-template-change-log.md
+   7 lib/proxy-instructions.js
+   6 lib/prompt-template-defs.js
+   6 docs/architecture/prompt-system.md
+   5 tests/unit/stability-measures.test.js
+   5 scripts/stability-measures.mjs
+   5 scripts/stability-measures-core.mjs
+   5 lib/run-evidence.js
+   5 lib/recommendation-look-first.js
+   5 docs/proxy-integration.md
+   5 docs/areas/README.md
+   5 docs/areas/areas.json
+   4 tests/unit/lin-4374-review-leftover-read.test.js
+   4 tests/unit/area-map-placement.test.js
+   4 public/llms.txt
+   4 lib/run-ledger.js
+   4 lib/recommendation-facts.js
+   4 lib/prompts/leftover-words.js
+   4 lib/prompts/autopilot-kickoff.js
+   4 lib/periodicals.js
+   4 lib/completion-signals.js
+   4 docs/areas/front-end-pages.md
+   3 tests/unit/prompt-templates.test.js
+   3 tests/unit/periodicals.test.js
+
+$ git log --first-parent -m --no-renames --name-only --format=@%h 9574d537..HEAD | awk '/^@/{c=$0;next} /^(lib\/prompt-template-defs\.js|scripts\/prompt-template-change-log\.md|lib\/proxy-instructions\.js|lib\/proxy-preamble\.js|docs\/proxy-integration\.md|lib\/prompts\/|lib\/prompt-formatters\.js|lib\/prompt-templates\.js|tests\/unit\/prompt-size-budget\.test\.js)/{s[c]=1} END{print length(s)" of 35 landings touch the prompt-contract set"}'
+12 of 35 landings touch the prompt-contract set
+
+$ git log --first-parent -m --no-renames --numstat --format=@%h 9574d537..HEAD -- lib/prompt-template-defs.js scripts/prompt-template-change-log.md lib/proxy-instructions.js lib/proxy-preamble.js docs/proxy-integration.md lib/prompts lib/prompt-formatters.js lib/prompt-templates.js tests/unit/prompt-size-budget.test.js | awk '!/^@/ && NF==3{a+=$1;d+=$2} END{print "prompt-contract set: +"a" -"d}'
+prompt-contract set: +500 -173
+
+$ for f in lib/prompt-template-defs.js lib/proxy-instructions.js lib/proxy-preamble.js scripts/prompt-template-change-log.md lib/dispatch-store.js routes/proxy.js server.js lib/periodicals.js lib/harbour-spawn.js lib/providers/registry.js lib/render-custom-prompts.js lib/runner-kit/runner.mjs; do echo "$f $(git show 9574d537:$f | wc -l) -> $(git show HEAD:$f | wc -l)"; done
+lib/prompt-template-defs.js     1271 ->     1372
+lib/proxy-instructions.js     1312 ->     1325
+lib/proxy-preamble.js      931 ->      950
+scripts/prompt-template-change-log.md      560 ->      605
+lib/dispatch-store.js     4530 ->     4530
+routes/proxy.js     1676 ->     1659
+server.js     4757 ->     4769
+lib/periodicals.js     1353 ->     1416
+lib/harbour-spawn.js      228 ->      228
+lib/providers/registry.js       90 ->       90
+lib/render-custom-prompts.js      133 ->      133
+lib/runner-kit/runner.mjs     1481 ->     1481
+
+$ for c in 9574d537 HEAD; do git ls-tree -r -l $c | awk -v c=$c '{b=$4; t+=b; if($5 ~ /^docs\/reviews\//) r+=b; if($5 ~ /^docs\/papers\//) p+=b; if($5 ~ /^tests\//) te+=b} END{printf "%s total %.1f MB; docs/reviews %.1f MB; docs/papers %.1f MB; tests %.1f MB
+", c, t/1e6, r/1e6, p/1e6, te/1e6}'; done
+9574d537 total 219.7 MB; docs/reviews 84.4 MB; docs/papers 36.9 MB; tests 47.1 MB
+HEAD total 238.8 MB; docs/reviews 89.1 MB; docs/papers 50.6 MB; tests 47.5 MB
+
+$ git log --first-parent -m --no-renames --numstat --format=@%h 9574d537..HEAD -- docs/papers | awk '/^@/{c=$0;next} NF==3{a+=$1;d+=$2;s[c]=1} END{print length(s)" landings, +"a" -"d" lines in docs/papers"}'
+5 landings, +36613 -269 lines in docs/papers
+
+$ git log --first-parent -m --no-renames --numstat --format=@%h 9574d537..HEAD -- docs/reviews | awk '/^@/{c=$0;next} NF==3{a+=$1;d+=$2;s[c]=1} END{print length(s)" landings, +"a" -"d" lines in docs/reviews"}'
+11 landings, +112614 -35 lines in docs/reviews
+
+$ git log --first-parent -m --no-renames --numstat --format=@%h 9574d537..HEAD -- docs/areas | awk '/^@/{c=$0;next} NF==3{a+=$1;d+=$2;s[c]=1} END{print length(s)" landings, +"a" -"d" lines in docs/areas"}'
+28 landings, +754 -429 lines in docs/areas
+
+$ git log --first-parent -m --no-renames --numstat --format=@%h 9574d537..HEAD -- tests/fixtures | awk '!/^@/ && NF==3{a+=$1;d+=$2; f[$3]+=$1} END{print "tests/fixtures +"a" -"d; for(k in f) if(f[k]>500) print "  "f[k]" "k}'
+tests/fixtures +1607 -524
+  714 tests/fixtures/cost-replay/goldens-lin4197.json
+
+$ git log --first-parent -m --no-renames --numstat --format=@%h 9574d537..HEAD -- tests/unit scripts | awk '!/^@/ && NF==3{if($3 ~ /^tests/){ta+=$1;td+=$2} else {sa+=$1;sd+=$2}} END{print "tests/unit +"ta" -"td"; scripts +"sa" -"sd}'
+tests/unit +6490 -703; scripts +1832 -268
+
+$ for c in 9574d537 HEAD; do echo "$c unit test files: $(git ls-tree -r --name-only $c tests/unit | grep -c '\.test\.js$')"; done
+9574d537 unit test files: 1227
+HEAD unit test files: 1247
+
+$ git log --first-parent --format=%s 9574d537..HEAD | grep -ci revert; git -C ../simple-dispatcher log --first-parent --format=%s 5d8489e..af9b496 | grep -ci revert
+0
+0
+
+$ git log --first-parent -m --no-renames --diff-filter=D --name-only --format=@%h 9574d537..HEAD | grep -v '^$' | grep -v _evidence
+
+$ grep -n 'setInterval' server.js | head
+1035:  setInterval(() => { getModelCatalog().catch(() => {}) }, CATALOG_CACHE_TTL_MS / 2).unref()
+4708:  cleanupTimer = setInterval(runHourlyCleanup, CLEANUP_INTERVAL_MS)
+
+$ git diff --no-renames --diff-filter=D --name-only 9574d537 HEAD | grep -v _evidence | head; git diff --no-renames --diff-filter=D --name-only 9574d537 HEAD | wc -l
+       0
+
+$ jq length docs/reviews/_evidence-2026-11-13-stability/ci-main-runs-2026-11-13.json; jq -r 'map(select(.createdAt >= "2026-11-08T17:00")) | .[] | [.headSha[0:9], .conclusion, .createdAt, .startedAt, .updatedAt] | @tsv' docs/reviews/_evidence-2026-11-13-stability/ci-main-runs-2026-11-13.json
+120
+163efc069	success	2026-11-12T23:17:53Z	2026-11-12T23:17:53Z	2026-11-12T23:23:50Z
+aebe61081	success	2026-11-12T22:46:27Z	2026-11-12T22:46:27Z	2026-11-12T22:52:30Z
+ceda35127	success	2026-11-12T22:35:28Z	2026-11-12T22:35:28Z	2026-11-12T22:41:05Z
+e3a3268a1	success	2026-11-12T21:22:39Z	2026-11-12T21:22:39Z	2026-11-12T21:28:08Z
+eb14b7fff	success	2026-11-12T21:06:25Z	2026-11-12T21:06:25Z	2026-11-12T21:13:00Z
+4f48068eb	success	2026-11-12T20:03:32Z	2026-11-12T20:03:32Z	2026-11-12T20:13:34Z
+e3829b9f9	success	2026-11-12T19:22:36Z	2026-11-12T19:22:36Z	2026-11-12T19:32:33Z
+b1f258ab4	success	2026-11-12T19:01:15Z	2026-11-12T19:01:15Z	2026-11-12T19:10:19Z
+b3d7c7988	success	2026-11-12T17:41:24Z	2026-11-12T17:41:24Z	2026-11-12T17:51:23Z
+720c1b1c2	success	2026-11-12T17:40:34Z	2026-11-12T17:40:34Z	2026-11-12T17:50:33Z
+96fa23c24	success	2026-11-12T17:35:23Z	2026-11-12T17:35:23Z	2026-11-12T17:42:29Z
+2022841a1	success	2026-11-12T16:11:54Z	2026-11-12T16:11:54Z	2026-11-12T16:18:33Z
+1d912cce7	success	2026-11-12T15:53:19Z	2026-11-12T15:53:19Z	2026-11-12T16:03:51Z
+a514506b6	success	2026-11-12T15:05:40Z	2026-11-12T15:05:40Z	2026-11-12T15:13:15Z
+c6d99f05e	success	2026-11-12T13:38:46Z	2026-11-12T13:38:46Z	2026-11-12T13:46:57Z
+f57cc7e99	success	2026-11-12T13:04:06Z	2026-11-12T13:04:06Z	2026-11-12T13:13:04Z
+94893cc35	success	2026-11-12T11:34:04Z	2026-11-12T11:34:04Z	2026-11-12T11:41:39Z
+b349c219b	success	2026-11-12T08:50:11Z	2026-11-12T08:50:11Z	2026-11-12T08:59:51Z
+218ab7f64	success	2026-11-12T08:36:26Z	2026-11-12T08:36:26Z	2026-11-12T08:46:17Z
+30a019289	success	2026-11-11T23:50:59Z	2026-11-11T23:50:59Z	2026-11-11T23:58:39Z
+b5950f704	success	2026-11-11T22:32:31Z	2026-11-11T22:32:31Z	2026-11-11T22:41:48Z
+fe2f1f0cb	success	2026-11-11T22:26:01Z	2026-11-11T22:26:01Z	2026-11-11T22:35:30Z
+da5df707d	success	2026-11-10T15:05:28Z	2026-11-10T15:05:28Z	2026-11-10T15:12:33Z
+80f4c7c87	success	2026-11-10T14:28:39Z	2026-11-10T14:28:39Z	2026-11-10T14:38:33Z
+4d23fa158	success	2026-11-10T14:05:07Z	2026-11-10T14:05:07Z	2026-11-10T14:14:52Z
+008d38bb0	success	2026-11-10T12:42:32Z	2026-11-10T12:42:32Z	2026-11-10T12:52:19Z
+d94800931	success	2026-11-10T12:31:27Z	2026-11-10T12:31:27Z	2026-11-10T12:41:27Z
+730df21c2	success	2026-11-10T12:21:48Z	2026-11-10T12:21:48Z	2026-11-10T12:31:27Z
+a36ad6195	success	2026-11-10T11:59:16Z	2026-11-10T11:59:16Z	2026-11-10T12:09:03Z
+9cf51ef72	success	2026-11-10T11:01:38Z	2026-11-10T11:01:38Z	2026-11-10T11:09:15Z
+ecabd3d76	success	2026-11-10T10:42:11Z	2026-11-10T10:42:11Z	2026-11-10T10:49:52Z
+f5b1f5efa	success	2026-11-10T09:35:17Z	2026-11-10T09:35:17Z	2026-11-10T09:44:31Z
+1e106e4e3	success	2026-11-10T08:44:12Z	2026-11-10T08:44:12Z	2026-11-10T08:52:18Z
+3b1b57b15	success	2026-11-10T08:25:40Z	2026-11-10T08:25:40Z	2026-11-10T08:35:21Z
+b315e0e8f	success	2026-11-08T18:06:21Z	2026-11-08T18:06:21Z	2026-11-08T18:13:57Z
+9574d5371	success	2026-11-08T17:10:39Z	2026-11-08T17:10:39Z	2026-11-08T17:16:46Z
+
+$ for s in 163efc069 aebe61081 ceda35127 e3a3268a1 eb14b7fff 4f48068eb 30a019289 3b1b57b15 b315e0e8f 9574d5371; do id=$(jq -r --arg s $s '.[] | select(.headSha|startswith($s)) | .databaseId' docs/reviews/_evidence-2026-11-13-stability/ci-main-runs-2026-11-13.json | head -1); echo "== $s run $id"; gh run view $id --json jobs --jq '.jobs[] | select(.conclusion=="success") | [.name, (((.completedAt|fromdate)-(.startedAt|fromdate))/60*100|floor/100)] | @tsv' | sort -t$'	' -k2 -rn | head -4; done
+== 163efc069 run 43327645957
+E2E shard 2/4	5.78
+E2E shard 1/4	4.83
+E2E shard 4/4	4.59
+Unit tests	4.18
+== aebe61081 run 43322979944
+E2E shard 2/4	5.88
+Unit tests (proxy, clock +400d)	4.46
+E2E shard 1/4	4.26
+E2E shard 4/4	4.2
+== ceda35127 run 43321310793
+E2E shard 2/4	5.45
+E2E shard 1/4	4.73
+E2E shard 4/4	4.61
+Unit tests (proxy, clock +400d)	4.25
+== e3a3268a1 run 43309650368
+E2E shard 2/4	5.3
+E2E shard 1/4	4.59
+Unit tests	4.51
+E2E shard 4/4	4.16
+== eb14b7fff run 43306910125
+Unit tests	6.43
+E2E shard 2/4	5.81
+E2E shard 4/4	4.51
+E2E shard 1/4	4.21
+== 4f48068eb run 43296458356
+Unit tests	9.88
+E2E shard 2/4	5.83
+E2E shard 1/4	4.88
+E2E shard 4/4	4.45
+== 30a019289 run 43122920777
+Unit tests	7.5
+E2E shard 2/4	5.81
+E2E shard 1/4	4.7
+E2E shard 4/4	4.38
+== 3b1b57b15 run 42782548863
+Unit tests	9.51
+E2E shard 2/4	5.2
+E2E shard 1/4	4.8
+E2E shard 4/4	4.23
+== b315e0e8f run 42508285948
+Unit tests	7.45
+E2E shard 2/4	5.7
+E2E shard 4/4	4.33
+E2E shard 1/4	4.16
+== 9574d5371 run 42503639935
+Unit tests	5.93
+E2E shard 2/4	5.68
+E2E shard 1/4	4.73
+E2E shard 4/4	4.15
+
+$ for id in 42503639935 42782548863 43122920777 43296458356 43306910125 43309650368 43324102519; do sha=$(jq -r --argjson i $id '.[]|select(.databaseId==$i)|.headSha[0:9]' docs/reviews/_evidence-2026-11-13-stability/ci-main-runs-2026-11-13.json); for j in $(gh run view $id --json jobs --jq '.jobs[]|select(.name|startswith("Unit tests"))|.databaseId'); do n=$(gh run view --job $j --log 2>/dev/null | grep -E 'ℹ tests [0-9]+' | sed -E 's/.*ℹ tests ([0-9]+).*/\1/' | tr '
+' ' '); echo "$sha job $j: $n"; done; done
+9574d5371 job 128801491237: 24772 24772 
+3b1b57b15 job 129715809282: 24772 24772 
+30a019289 job 130867660050: 24923 24923 
+4f48068eb job 131455962524: 25276 25276 
+eb14b7fff job 131492493547: 25310 25310 
+e3a3268a1 job 131502056660: 25332 
+e3a3268a1 job 131502056723: 25332 
+(43324102519 was a mistyped run id; the 163efc069 run is read in the next command)
+
+$ id=$(jq -r '.[]|select(.headSha|startswith("163efc069"))|.databaseId' docs/reviews/_evidence-2026-11-13-stability/ci-main-runs-2026-11-13.json); for j in $(gh run view $id --json jobs --jq '.jobs[]|select(.name|startswith("Unit tests"))|.databaseId'); do echo "163efc069 run $id job $j: $(gh run view --job $j --log 2>/dev/null | grep -E 'ℹ tests [0-9]+' | sed -E 's/.*ℹ tests ([0-9]+).*/\1/' | tr '
+' ' ')"; done
+163efc069 run 43327645957 job 131564063322: 25350 
+163efc069 run 43327645957 job 131564063652: 25350 
+
+$ gh run list --workflow node-lts-scheduled.yml --limit 10 --json conclusion,event,createdAt,headBranch --jq '.[]|[.createdAt,.event,.headBranch,.conclusion]|@tsv'
+2026-11-12T20:03:36Z	workflow_dispatch	main	success
+2026-11-12T19:45:08Z	pull_request	feat/lin-4419-node-range	success
+2026-11-12T19:32:59Z	pull_request	feat/lin-4419-node-range	success
+
+$ git log --format='%h %cI %s' 9574d537..HEAD -- .github | head
+d574a5008 2026-11-12T21:14:14Z LIN-4441: run the proxy unit arm as its own job beside unit
+4f48068eb 2026-11-12T20:03:28Z LIN-4419: accept Node >=24, pin production to 24, check newest LTS weekly (#2412)
+
+$ gh pr list --state all --limit 45 --json number,createdAt,mergedAt,state,headRefName --jq 'sort_by(.createdAt) | .[] | select(.createdAt >= "2026-11-08") | [.number, .createdAt, (.mergedAt // "-"), .state, .headRefName] | @tsv'
+2372	2026-11-08T12:35:04Z	2026-11-08T13:11:30Z	MERGED	feat/lin-4387-seams-tangles-run10
+2373	2026-11-08T12:44:34Z	2026-11-08T12:58:00Z	MERGED	feat/lin-4358-free-tier-luna
+2374	2026-11-08T12:56:42Z	2026-11-08T13:16:02Z	MERGED	docs/lin-4358-free-tier-disposition
+2375	2026-11-08T13:34:32Z	2026-11-08T13:57:09Z	MERGED	feat/lin-4380-periodicals-feed-notes
+2376	2026-11-08T14:38:58Z	2026-11-08T15:01:51Z	MERGED	feat/lin-4381-landed-lane-state
+2377	2026-11-08T15:04:38Z	2026-11-08T15:34:51Z	MERGED	feat/lin-4393-remove-size-policy-setting
+2378	2026-11-08T15:06:48Z	2026-11-08T15:16:28Z	MERGED	review/lin-4391-design-interface-review-2026-11-08
+2379	2026-11-08T15:38:35Z	2026-11-08T16:08:44Z	MERGED	feat/lin-4382-autopilot-precedence-leaf
+2380	2026-11-08T15:57:16Z	2026-11-08T16:33:25Z	MERGED	feat/lin-4346-area-notes-pointer
+2381	2026-11-08T16:32:40Z	2026-11-08T17:10:37Z	MERGED	feat/lin-4349-tail-drives-review-in-place
+2382	2026-11-08T17:58:28Z	2026-11-08T18:06:19Z	MERGED	docs/lin-4394-stability-review-2026-11-08
+2383	2026-11-10T08:03:40Z	2026-11-10T09:35:14Z	MERGED	feat/lin-4390-periodical-hand-off
+2384	2026-11-10T08:17:29Z	2026-11-10T08:25:37Z	MERGED	chore/lin-4402-seams-tangles-run11
+2385	2026-11-10T08:30:10Z	2026-11-10T08:44:10Z	MERGED	docs/lin-4403-drift-coherence-run6
+2386	2026-11-10T09:01:21Z	2026-11-10T10:42:08Z	MERGED	feat/lin-4404-task-life-cost-read
+2387	2026-11-10T10:18:53Z	2026-11-10T11:59:13Z	MERGED	feat/lin-4392-live-stage-wait
+2388	2026-11-10T10:51:35Z	2026-11-10T11:01:35Z	MERGED	chore/lin-4404-survey-fallback
+2389	2026-11-10T11:43:15Z	2026-11-10T12:21:45Z	MERGED	feat/lin-4407-integration-surface-maturity-review-5
+2390	2026-11-10T11:46:55Z	2026-11-10T12:31:24Z	MERGED	feat/lin-4405-sessions-on-one-clock
+2391	2026-11-10T12:16:59Z	2026-11-10T12:42:29Z	MERGED	feat/lin-4398-periodical-review-skip-surveys
+2392	2026-11-10T12:30:17Z	2026-11-10T14:28:36Z	MERGED	docs/lin-4406-documentation-review-2026-11-10
+2393	2026-11-10T13:40:42Z	2026-11-10T14:05:04Z	MERGED	chore/LIN-4412-dependency-review
+2394	2026-11-10T14:33:05Z	2026-11-10T15:05:25Z	MERGED	docs/lin-4411-security-review-2026-11-10
+2395	2026-11-11T21:50:32Z	2026-11-11T22:25:58Z	MERGED	docs/lin-4413-onboarding-cold-start-review-2026-11-11
+2396	2026-11-11T22:04:59Z	2026-11-11T22:32:28Z	MERGED	feat/lin-4415-no-default-completion-periodical
+2397	2026-11-11T23:09:29Z	2026-11-11T23:50:56Z	MERGED	docs/lin-4418-test-coverage-gap-review-2026-11-11
+2398	2026-11-12T08:00:17Z	2026-11-12T08:36:23Z	MERGED	feat/lin-4420-stability-measures-core
+2399	2026-11-12T08:05:07Z	2026-11-12T08:50:08Z	MERGED	feat/lin-4414-area-notes-lessons-cap-retirement
+2400	2026-11-12T10:54:05Z	2026-11-12T11:34:02Z	MERGED	feat/lin-4426-paper-v2-script-inputs
+2401	2026-11-12T12:23:52Z	2026-11-12T13:04:03Z	MERGED	feat/lin-4427-size-cost-freeze-fits
+2402	2026-11-12T12:46:41Z	2026-11-12T13:38:44Z	MERGED	feat/lin-4431-consequence-gate
+2403	2026-11-12T13:35:25Z	2026-11-12T16:11:51Z	MERGED	feat/lin-4428-paper-v2-rewrite
+2404	2026-11-12T14:37:26Z	2026-11-12T15:05:37Z	MERGED	feat/lin-4432-audit-notes-pr
+2405	2026-11-12T15:05:13Z	2026-11-12T15:53:16Z	MERGED	feat/lin-4421-tracker-reads
+2406	2026-11-12T16:31:35Z	2026-11-12T17:35:20Z	MERGED	feat/lin-4422-blind-read-and-seat
+2407	2026-11-12T16:46:25Z	2026-11-12T17:41:22Z	MERGED	feat/lin-4436-blind-read-pilot
+2408	2026-11-12T17:13:12Z	2026-11-12T17:40:31Z	MERGED	feat/lin-2386-playwright-macos-cache
+2409	2026-11-12T18:14:36Z	2026-11-12T19:01:12Z	MERGED	feat/lin-4423-declaration-and-reference
+2410	2026-11-12T18:29:55Z	2026-11-12T19:22:33Z	MERGED	feat/lin-4437-blind-read-stage
+2411	2026-11-12T19:17:38Z	2026-11-12T22:35:25Z	MERGED	feat/lin-4424-stability-prompt-declared-measures
+2412	2026-11-12T19:32:54Z	2026-11-12T20:03:29Z	MERGED	feat/lin-4419-node-range
+2413	2026-11-12T20:19:38Z	2026-11-12T21:06:22Z	MERGED	feat/lin-4438-blind-read-gate
+2414	2026-11-12T20:31:00Z	2026-11-12T21:22:36Z	MERGED	feat/lin-4441-parallel-unit-ci
+2415	2026-11-12T21:42:28Z	2026-11-12T22:46:24Z	MERGED	feat/lin-4439-measure-1-reads-ledger
+2416	2026-11-12T23:11:39Z	2026-11-12T23:17:50Z	MERGED	closeout/lin-4396-blind-read-fixes
+
+$ gh pr list -R JKershaw/simple-dispatcher --state all --limit 30 --json number,createdAt,mergedAt,state,headRefName --jq 'sort_by(.createdAt) | .[] | select(.createdAt >= "2026-11-04") | [.number, .createdAt, (.mergedAt // "-"), .state, .headRefName] | @tsv'
+310	2026-11-04T00:44:53Z	2026-11-04T00:53:33Z	MERGED	feat/lin-4182-env-flag-helper
+311	2026-11-04T00:48:33Z	2026-11-04T01:10:14Z	MERGED	feat/lin-4183-shared-stop-hook-driver
+312	2026-11-04T01:52:00Z	2026-11-04T02:30:29Z	MERGED	feat/lin-4197-transcript-corpus
+313	2026-11-04T01:56:57Z	2026-11-04T08:08:09Z	MERGED	feat/lin-4196-mutation-copy-trees
+314	2026-11-04T04:44:02Z	2026-11-04T04:59:22Z	MERGED	feat/lin-4199-runner-request-records
+315	2026-11-04T05:01:50Z	2026-11-04T05:24:04Z	MERGED	feat/lin-4202-request-records
+316	2026-11-04T07:19:30Z	2026-11-04T07:41:45Z	MERGED	fix/lin-4186-halt-tests-follow-lin-4079
+317	2026-11-04T12:09:03Z	2026-11-04T12:48:33Z	MERGED	feat/lin-4223-stop-group
+318	2026-11-04T12:10:05Z	2026-11-04T12:24:47Z	MERGED	feat/lin-4220-child-env-nested-environment
+319	2026-11-04T13:18:45Z	2026-11-04T13:41:58Z	MERGED	feat/lin-4221-exit-codes-preflight
+320	2026-11-04T14:08:51Z	2026-11-04T14:21:55Z	MERGED	feat/lin-4222-one-owner-ports
+321	2026-11-04T15:17:17Z	2026-11-04T15:29:15Z	MERGED	feat/lin-4224-test-baseline
+322	2026-11-04T15:50:04Z	2026-11-04T16:31:58Z	MERGED	chore/lin-4219-groupstop-witnesses-npm-test
+323	2026-11-04T17:00:52Z	2026-11-04T17:18:22Z	MERGED	feat/lin-4203-stop-usage-snapshots
+324	2026-11-04T17:18:11Z	2026-11-04T17:44:16Z	MERGED	feat/lin-4187-sessions-feed-contract
+325	2026-11-04T18:45:27Z	2026-11-04T19:02:48Z	MERGED	feat/lin-4218-stop-relay-order
+326	2026-11-04T22:50:29Z	2026-11-04T22:59:52Z	MERGED	feat/lin-4239-defer-blocked-failed-status-last
+327	2026-11-04T23:26:47Z	2026-11-04T23:35:48Z	MERGED	lin-4240-present-tense
+328	2026-11-04T23:43:22Z	2026-11-04T23:46:42Z	MERGED	LIN-4233-stale-comments
+329	2026-11-08T02:45:11Z	2026-11-08T02:53:20Z	MERGED	feat/lin-4372-area-notes
+330	2026-11-08T05:32:19Z	2026-11-08T06:33:12Z	MERGED	fix/lin-4375-session-pr-wins
+331	2026-11-08T10:23:52Z	2026-11-08T11:02:47Z	MERGED	feat/lin-4378-broker-429-backoff
+332	2026-11-08T11:38:35Z	2026-11-08T11:53:15Z	MERGED	feat/lin-4385-contract-recopy-shared-readers
+333	2026-11-08T12:06:06Z	2026-11-08T12:12:22Z	MERGED	chore/lin-4383-area-notes-after-tidy
+334	2026-11-08T12:15:56Z	2026-11-08T12:19:26Z	MERGED	feat/lin-4378-contract-429-policy
+335	2026-11-08T12:29:30Z	2026-11-08T12:43:31Z	MERGED	chore/lin-4378-after-reads
+336	2026-11-11T21:51:07Z	2026-11-11T22:26:02Z	MERGED	docs/lin-4413-onboarding-cold-start-review-2026-11-11
+337	2026-11-12T08:02:27Z	2026-11-12T08:34:26Z	MERGED	feat/lin-4414-area-notes-lessons-cap
+338	2026-11-12T12:58:30Z	2026-11-12T13:38:58Z	MERGED	docs/lin-4431-consequence-test
+
+$ git -C ../simple-dispatcher log --first-parent --format='%h %cI %s' 5d8489e..af9b496
+af9b496 2026-11-12T13:38:58Z Merge pull request #338 from JKershaw/docs/lin-4431-consequence-test
+a42456c 2026-11-12T08:34:26Z Merge pull request #337 from JKershaw/feat/lin-4414-area-notes-lessons-cap
+7d6c5c6 2026-11-11T22:26:01Z docs(LIN-4413): loop-and-routing note from the Onboarding & Cold-Start Review (11 Nov) (#336)
+
+$ git -C ../simple-dispatcher log --first-parent -m --no-renames --numstat --format=@%h 5d8489e..af9b496 | awk '!/^@/&&NF==3'
+4	4	docs/areas/README.md
+36	8	docs/areas/README.md
+56	10	test/area-notes.test.js
+23	0	docs/areas/loop-and-routing.md
+
+$ git -C ../simple-dispatcher log --first-parent --format='%cd' --date=format-local:%G-W%V af9b496 | sort | uniq -c | tail -12
+  10 2026-W35
+  27 2026-W36
+   7 2026-W37
+   7 2026-W38
+  14 2026-W39
+   6 2026-W40
+   6 2026-W41
+   5 2026-W42
+  10 2026-W43
+  15 2026-W44
+  34 2026-W45
+   3 2026-W46
+
+$ git -C ../simple-dispatcher log --first-parent -m --no-renames --name-only --format='@%h %cI' af9b496 | awk '/^@/{c=$0;next} /^(lib|routes|public)\// || /^[^\/]+\.(m?js)$/ {if(!(c in s)){s[c]=1; print c}}' | head -3
+@5d8489e 2026-11-08T12:43:31Z
+@5172d0a 2026-11-08T12:19:26Z
+@59a0dc2 2026-11-08T11:53:15Z
+
+$ git -C ../simple-dispatcher log --first-parent --format='%cI' --since=2026-09-01 af9b496 | cut -c1-10 | sort | uniq | wc -l; git -C ../simple-dispatcher log --first-parent --format='%cI' --since=2026-09-01 af9b496 | wc -l
+      34
+     134
+
+$ git log --first-parent -m --no-renames --format='@@ %h' -p 9574d537..HEAD -- tests/unit/prompt-size-budget.test.js | grep -E '^@@ [0-9a-f]|^\+export const FROZEN_TOTAL_BYTES' | cut -c1-140
+@@ e3a3268a1
++export const FROZEN_TOTAL_BYTES = 378915; // LIN-4441: +1002 (377913 -> 378915): prompt-template-defs.js source +64, prompt-formatters.js s
+@@ eb14b7fff
++export const FROZEN_TOTAL_BYTES = 377913; // LIN-4438: +897 (377016 -> 377913): prompt-template-defs.js source +751, review -619, close-out
+@@ e3829b9f9
++export const FROZEN_TOTAL_BYTES = 377016; // LIN-4437: +13182 (363834 -> 377016): the blind-read stage: prompt-template-defs.js source +769
+@@ a514506b6
++export const FROZEN_TOTAL_BYTES = 363834; // LIN-4401 (LIN-4432 review fix): +163 (363671 -> 363834): prompt-template-defs.js source +90, c
+@@ c6d99f05e
++export const FROZEN_TOTAL_BYTES = 360997; // LIN-4401 (LIN-4431 close-out): +2588 (358409 -> 360997): the four ceilings raised above (revie
+@@ b349c219b
++export const FROZEN_TOTAL_BYTES = 358409; // LIN-4414: +435 (357974 -> 358409): the leftover prompt's ceiling, for the one checked retireme
+@@ a36ad6195
++export const FROZEN_TOTAL_BYTES = 357974; // LIN-4392: +25 (357949 -> 357974): stage-router source +25, a comment naming the live-stage wai
+
+$ git log --first-parent -m --no-renames --format='@@ %h %s' -p 9574d537..HEAD -- tests/unit/prompt-size-budget.test.js | grep -E '^@@ [0-9a-f]|^[+-][^+-]'
+(read by hand, not tallied by a script: every raised ceiling line in the 7 touching landings carries an inline '// LIN-NNNN: +N (old -> new): reason' comment; no raise without a reason was found)
+
+$ for c in f25aa127 5334c81a 9574d537 HEAD; do echo "$c $(git show ${c}:tests/unit/prompt-size-budget.test.js | grep -oE 'FROZEN_TOTAL_BYTES = [0-9]+')"; done
+f25aa127 FROZEN_TOTAL_BYTES = 343285
+5334c81a FROZEN_TOTAL_BYTES = 332910
+9574d537 FROZEN_TOTAL_BYTES = 357949
+HEAD FROZEN_TOTAL_BYTES = 378915
+
+$ git log --first-parent -m --format=%h 9574d537..HEAD -- public/prompt-section.js lib/task-page-loader.js lib/render.js lib/render-task-page.js routes/task-page.js public/app.js public/task-page.js lib/task-board-view.js 'lib/home-*.js' | sort -u | wc -l
+       2
+
+$ for f in public/prompt-section.js lib/task-page-loader.js lib/render.js; do echo "$f $(git show 9574d537:${f} | wc -l) -> $(git show HEAD:${f} | wc -l)"; done
+public/prompt-section.js     2967 ->     2967
+lib/task-page-loader.js     1544 ->     1578
+lib/render.js     1123 ->     1123
+
+$ git log --first-parent --format=%s%n%b 9574d537..HEAD | grep -oE 'LIN-[0-9]+' | sort -u > /dev/null; comm -12 <(git log --first-parent --format='%s %b' 9574d537..HEAD | grep -oE 'LIN-[0-9]+' | sort -u) <(git -C ../simple-dispatcher log --first-parent --format='%s %b' 5d8489e..af9b496 | grep -oE 'LIN-[0-9]+' | sort -u)
+LIN-4413
+LIN-4414
+LIN-4431
+
+$ git log --first-parent -m --no-renames --numstat --format=@%h 9574d537..HEAD -- experiments | awk '!/^@/&&NF==3{a+=$1;d+=$2} END{print "experiments +"a+0" -"d+0}'
+experiments +0 -0
+
+$ git log --first-parent -m --no-renames --numstat --format=@%h 9574d537..HEAD -- docs/plans | awk '!/^@/&&NF==3{a+=$1;d+=$2} END{print "docs/plans +"a+0" -"d+0}'
+docs/plans +82 -63
+
+$ git log --first-parent -m --no-renames --numstat --format=@%h 9574d537..HEAD -- 'scripts/stability-measures*' tests/unit/stability-measures.test.js | awk '!/^@/&&NF==3{a+=$1;d+=$2} END{print "stability tool + test: +"a+0" -"d+0}'
+stability tool + test: +2957 -324
+
+$ git grep -n -E 'TODO|FIXME' HEAD -- docs/areas/llm-and-prompts.md docs/areas/runs-and-dispatch.md docs/areas/agent-api.md lib/proxy-instructions.js lib/prompt-template-defs.js lib/run-evidence.js lib/recommendation-look-first.js 'scripts/stability-measures*.mjs' lib/periodicals.js | wc -l
+       0
+
+$ git log --first-parent -m --no-renames --numstat --format=@%H 9574d537..HEAD | awk '/^@/{c=substr($0,2);next} NF==3 && $2>=20 && $3 !~ /_evidence|\.json$/ {print c, $2, $3}' | while read c d f; do p=$(git show ${c}^1:${f} 2>/dev/null | wc -l); [ "$p" -gt 0 ] && [ $((d*2)) -ge $p ] && echo "${c:0:9} $f deleted $d of $p prior lines"; done; echo '(rewrite-in-place events: >=50% of prior lines deleted in one landing; JSON and _evidence excluded, as run 4/5 method)'
+aebe61081 scripts/stability-measures-blind.mjs deleted 102 of      128 prior lines
+e3829b9f9 docs/plans/survey/blind-read-prompt.md deleted 61 of       70 prior lines
+2022841a1 docs/papers/harbour/task-size-and-cost.md deleted 73 of      110 prior lines
+94893cc35 docs/papers/harbour/task-size-and-cost-scripts/freeze.mjs deleted 96 of      150 prior lines
+da5df707d docs/areas/llm-and-prompts.md deleted 53 of       81 prior lines
+1e106e4e3 docs/areas/runs-and-dispatch.md deleted 48 of       87 prior lines
+(rewrite-in-place events: >=50% of prior lines deleted in one landing; JSON and _evidence excluded, as run 4/5 method)
+
+$ git log --first-parent -m --no-renames --name-only --format=@%h 9574d537..HEAD | awk '/^@/{c=$0;next} /^(server\.js$|(lib|routes|public)\/.*\.[cm]?js$)/{s[c]=1} END{n=0; for(k in s){n++; printf "%s ", substr(k,2)}; print ""; print n" landings touch the production scope"}'
+a36ad6195 163efc069 a514506b6 f5b1f5efa 218ab7f64 aebe61081 b5950f704 e3a3268a1 94893cc35 ceda35127 d94800931 c6d99f05e eb14b7fff 008d38bb0 2022841a1 b349c219b ecabd3d76 e3829b9f9 
+18 landings touch the production scope
+
+$ git log --first-parent -m --no-renames --numstat --format=@%h 9574d537..HEAD | awk '/^@/{c=substr($0,2);next} NF==3 && $3 ~ /^(server\.js$|(lib|routes|public)\/.*\.[cm]?js$)/{a[c]+=$1;d[c]+=$2} END{for(k in a) print k, "+"a[k], "-"d[k]}' | sort -k2 -t+ -rn
+d94800931 +1115 -27
+e3829b9f9 +612 -94
+ecabd3d76 +403 -212
+eb14b7fff +358 -131
+b349c219b +212 -7
+a36ad6195 +188 -148
+f5b1f5efa +71 -36
+aebe61081 +52 -41
+a514506b6 +48 -10
+c6d99f05e +45 -30
+008d38bb0 +43 -7
+218ab7f64 +33 -0
+163efc069 +32 -33
+b5950f704 +24 -53
+ceda35127 +17 -2
+e3a3268a1 +13 -3
+2022841a1 +10 -12
+94893cc35 +1 -138
+
+$ for t in LIN-4399 LIN-4439 LIN-4441 LIN-4425 LIN-4435 LIN-4389; do curl -s "$HARBOUR_LOCAL_BASE/api/proxy/issues/$t" | jq -r '"\(.identifier) [\(.state.name)] \(.title[0:110])"'; done
+LIN-4399 [In Progress] The Stability Review opens with the five measures, per piece of work rather than per week
+LIN-4439 [Done] Blind read: measure 1 reads the ledger; retire the sampled and hand-run blind passes
+LIN-4441 [In Progress] Cut the time tasks spend waiting on tests: CI runs the full suite once in parallel, workers stop duplicating i
+LIN-4425 [Backlog] Ruling: retire the measuring scripts that overlap stability-measures (survey-growth-git, survey-growth-ci, ste
+LIN-4435 [Backlog] CI: run the paper-script tests (docs/papers/harbour/**/*.test.mjs)
+LIN-4389 [Todo] Advisory Periodicals still describe minting that no longer happens (Stability lead-in; adversarialRead/gapAudi
+
+$ jq -r 'map(select(.conclusion=="success" and .startedAt > "2026-11-08T17:11")) | group_by(.startedAt[0:10]) | .[] | (map(((.updatedAt|fromdate)-(.startedAt|fromdate))/60) | sort) as $d | [.[0].startedAt[0:10], ($d|length), ($d[(($d|length)/2|floor)]*100|floor/100), ($d[0]*100|floor/100), ($d[-1]*100|floor/100)] | @tsv' docs/reviews/_evidence-2026-11-13-stability/ci-main-runs-2026-11-13.json; echo '(day, runs, upper-median, min, max minutes; window landings only, base run excluded)'
+2026-11-08	1	7.6	7.6	7.6
+2026-11-10	12	9.68	7.08	10
+2026-11-11	3	9.28	7.66	9.48
+2026-11-12	19	8.18	5.48	10.53
+(day, runs, upper-median, min, max minutes; window landings only, base run excluded)
+
+$ git log --first-parent -m --no-renames --numstat --format=@%h 9574d537..HEAD -- tests/e2e public/llms.txt docs/architecture/source-map.md lib/periodicals.js | awk '!/^@/&&NF==3{a[$3]+=$1;d[$3]+=$2} END{for(k in a) print k, "+"a[k], "-"d[k]}' | sort
+docs/architecture/source-map.md +26 -16
+lib/periodicals.js +101 -38
+public/llms.txt +7 -4
+tests/e2e/audit.spec.js +3 -3
+tests/e2e/close-out.spec.js +2 -0
+tests/e2e/lin-3833-home-first-page.spec.js +2 -1
+tests/e2e/look-alike-controls.spec.js +2 -0
+tests/e2e/run-evidence.spec.js +3 -0
+tests/e2e/session-page.spec.js +3 -3
+tests/e2e/task-page.spec.js +7 -1
+tests/e2e/task-timeline.spec.js +147 -0
+tests/e2e/templates.spec.js +2 -2
+
+$ for c in 9574d537 HEAD; do echo "${c} areas notes: $(git ls-tree --name-only ${c} docs/areas/ | grep -c '\.md$') files, $(git ls-tree -r -l ${c} docs/areas | awk '{s+=$4} END{print s}') bytes"; done
+9574d537 areas notes: 12 files, 33916 bytes
+HEAD areas notes: 12 files, 65654 bytes
+
+$ jq -r '[.measures[].rows[]|select(.key=="speed")|.value.perTask[]] as $s | [.measures[].rows[]|select(.key=="cost")|.value.perTask[]] as $c | [ $c[] as $x | ($s[]|select(.id==$x.id)) as $y | {id:$x.id, usd:$x.usd, sessions:$y.sessions, minutes:$y.minutes, perSession:(if $y.sessions>0 then $x.usd/$y.sessions else null end)} ] | (map(.perSession)|sort) as $p | (map(.sessions)|sort) as $n | (map(.usd)|sort) as $u | "n=\(length) median usd=\($u[(length/2|floor)]) median sessions=\($n[(length/2|floor)]) median usd/session=\($p[(length/2|floor)]*100|floor/100) mean usd/session=\(($p|add)/length*100|floor/100)"' docs/reviews/stability-measures/reference-2026-11-08.json
+n=106 median usd=9.54 median sessions=5 median usd/session=1.72 mean usd/session=2.58
+
+$ jq -r '[.measures[].rows[]|select(.key=="speed")|.value.perTask[]] as $s | [.measures[].rows[]|select(.key=="cost")|.value.perTask[]] as $c | [ $c[] as $x | ($s[]|select(.id==$x.id)) as $y | {id:$x.id, usd:$x.usd, sessions:$y.sessions, minutes:$y.minutes, perSession:(if $y.sessions>0 then $x.usd/$y.sessions else null end)} ] | (map(.perSession)|sort) as $p | (map(.sessions)|sort) as $n | (map(.usd)|sort) as $u | "n=\(length) median usd=\($u[(length/2|floor)]) median sessions=\($n[(length/2|floor)]) median usd/session=\($p[(length/2|floor)]*100|floor/100) mean usd/session=\(($p|add)/length*100|floor/100)"' docs/reviews/_evidence-2026-11-13-stability/reading.json
+n=33 median usd=16.7 median sessions=7 median usd/session=2.31 mean usd/session=2.65
+
+$ jq -r '[.measures[].rows[]|select(.key=="speed")|.value.perTask[]] as $s | [.measures[].rows[]|select(.key=="cost")|.value.perTask[]] as $c | [ $c[] as $x | ($s[]|select(.id==$x.id)) as $y | {id:$x.id, usd:$x.usd, sessions:$y.sessions, minutes:$y.minutes, perSession:(if $y.sessions>0 then $x.usd/$y.sessions else null end)} ] | sort_by(-.usd) | .[] | [.id, .usd, .sessions, .minutes, (.perSession*100|floor/100)] | @tsv' docs/reviews/_evidence-2026-11-13-stability/reading.json
+LIN-4411	43.35	6	78.3	7.22
+LIN-4349	35.77	12	531	2.98
+LIN-4392	29.56	9	143.4	3.28
+LIN-4407	28.18	8	89.8	3.52
+LIN-4405	27.91	6	88	4.65
+LIN-4438	27.26	6	86.5	4.54
+LIN-4437	27.15	7	89.8	3.87
+LIN-4431	26.21	7	96.8	3.74
+LIN-4414	25.71	12	97.1	2.14
+LIN-4418	24.98	6	108.8	4.16
+LIN-4406	22.47	8	230.6	2.8
+LIN-4404	19.01	6	152.1	3.16
+LIN-4390	18.54	10	118.3	1.85
+LIN-4439	18.06	4	89	4.51
+LIN-4432	17.3	8	72.7	2.16
+LIN-4413	17.08	5	61.7	3.41
+LIN-4422	16.7	6	88.5	2.78
+LIN-4403	16.22	7	64.2	2.31
+LIN-4436	16.11	6	74	2.68
+LIN-4421	14.3	6	423.8	2.38
+LIN-4415	13.4	9	49.5	1.48
+LIN-4423	12.82	7	75.8	1.83
+LIN-4427	12.61	6	82	2.1
+LIN-4424	12.44	7	212.2	1.77
+LIN-4426	11.62	6	64.8	1.93
+LIN-4419	11.53	10	61.4	1.15
+LIN-4428	11.24	6	175.2	1.87
+LIN-4420	9.79	6	56.2	1.63
+LIN-4402	9.11	7	45.7	1.3
+LIN-4412	7.75	6	48	1.29
+LIN-4398	7.31	8	41.8	0.91
+LIN-4394	7.21	6	47.4	1.2
+LIN-2386	6.66	8	42.9	0.83
+
+$ jq -r '[.measures[].rows[]|select(.key=="speed")|.value.perTask[].sessions] | group_by(.) | map("\(.[0]):\(length)") | join(" ")' docs/reviews/stability-measures/reference-2026-11-08.json; echo '(sessions:tasks)'
+2:5 3:9 4:36 5:13 6:6 7:14 8:14 9:2 10:3 11:1 12:1 13:1 19:1
+(sessions:tasks)
+
+$ jq -r '[.measures[].rows[]|select(.key=="speed")|.value.perTask[].sessions] | group_by(.) | map("\(.[0]):\(length)") | join(" ")' docs/reviews/_evidence-2026-11-13-stability/reading.json; echo '(sessions:tasks)'
+4:1 5:1 6:14 7:6 8:5 9:2 10:2 12:2
+(sessions:tasks)
+
+$ jq -r --argjson p '["LIN-4394","LIN-4402","LIN-4403","LIN-4407","LIN-4406","LIN-4412","LIN-4411","LIN-4413","LIN-4418"]' '[.measures[].rows[]|select(.key=="cost")|.value.perTask[]] | (map(select(.id as $i | $p|index($i)))|map(.usd)|sort) as $a | (map(select(.id as $i | $p|index($i)|not))|map(.usd)|sort) as $b | "periodical n=\($a|length) median \($a[($a|length)/2|floor]); other n=\($b|length) median \($b[($b|length)/2|floor])"' docs/reviews/_evidence-2026-11-13-stability/reading.json
+periodical n=9 median 17.08; other n=24 median 16.7
+
+$ for t in $(jq -r '.measures[].rows[]|select(.key=="cost")|.value.perTask[].id' docs/reviews/_evidence-2026-11-13-stability/reading.json); do curl -s "$HARBOUR_LOCAL_BASE/api/proxy/issues/$t/cost" | jq -c '.workerSessions[]? | {kind, usd: .costUsd}'; sleep 1.3; done | jq -rs 'group_by(.kind) | map({kind: .[0].kind, sessions: length, usd: (map(.usd // 0)|add)}) | (map(.usd)|add) as $tot | sort_by(-.usd) | .[] | [.kind, .sessions, (.usd*100|floor/100), ((.usd/$tot*1000|floor)/10|tostring+"%")] | @tsv'; echo '(per stage kind over the finished tasks in docs/reviews/_evidence-2026-11-13-stability/reading.json: sessions, USD, share; /cost read live 2026-11-13)'
+implementation	33	233.14	39%
+research	9	74.7	12.5%
+review	32	52.51	8.7%
+autopilot	13	51.62	8.6%
+close-out	30	47.7	7.9%
+scoping	31	31.81	5.3%
+survey-task	28	31.44	5.2%
+survey-place	28	30.33	5%
+plan	18	23.6	3.9%
+plan-review	8	11.02	1.8%
+blind-read	4	4.76	0.7%
+design	2	3.46	0.5%
+breakdown	1	0.96	0.1%
+(per stage kind over the finished tasks in docs/reviews/_evidence-2026-11-13-stability/reading.json: sessions, USD, share; /cost read live 2026-11-13)
+
+$ jq -r '.measures[].rows[]|select(.key=="blind")|.value.perLanding[] | select(.status != "landed before the gate") | [.commit[0:9], .ticket, .pr, .status, (.verdict // .why // "")] | @tsv' docs/reviews/_evidence-2026-11-13-stability/reading.json
+b315e0e8f	LIN-4394	2382	not an ordinary landing	
+3b1b57b15	LIN-4402	2384	not an ordinary landing	
+1e106e4e3	LIN-4403	2385	not an ordinary landing	
+730df21c2	LIN-4407	2389	not an ordinary landing	
+4d23fa158	LIN-4412	2393	not an ordinary landing	
+80f4c7c87	LIN-4406	2392	not an ordinary landing	
+da5df707d	LIN-4411	2394	not an ordinary landing	
+fe2f1f0cb	LIN-4413	2395	not an ordinary landing	
+30a019289	LIN-4418	2397	not an ordinary landing	
+f57cc7e99	LIN-4427	2401	not an ordinary landing	
+b3d7c7988	LIN-4436	2407	not an ordinary landing	
+e3a3268a1	LIN-4441	2414	no read on record	no blind read naming #2414 before the merge
+ceda35127	LIN-4424	2411	read	same
+aebe61081	LIN-4439	2415	read	better
+163efc069	LIN-4396	2416	no read on record	#2416 is not on the ticket's landing before the merge
+
+$ for t in $(jq -r '.measures[].rows[]|select(.key=="cost")|.value.perTask[].id' docs/reviews/stability-measures/reference-2026-11-08.json); do curl -s "$HARBOUR_LOCAL_BASE/api/proxy/issues/$t/cost" | jq -c '.workerSessions[]? | {kind, usd: .costUsd}'; sleep 1.3; done | jq -rs 'group_by(.kind) | map({kind: .[0].kind, sessions: length, usd: (map(.usd // 0)|add)}) | (map(.usd)|add) as $tot | sort_by(-.usd) | .[] | [.kind, .sessions, (.usd*100|floor/100), ((.usd/$tot*1000|floor)/10|tostring+"%")] | @tsv'; echo '(per stage kind over the finished tasks in docs/reviews/stability-measures/reference-2026-11-08.json: sessions, USD, share; /cost read live 2026-11-13)'
+implementation	110	613.18	40.8%
+autopilot	83	174.97	11.6%
+review	114	172.86	11.5%
+research	19	139.4	9.2%
+close-out	101	135.44	9%
+custom	8	71.52	4.7%
+plan	51	52.79	3.5%
+survey-place	34	34.99	2.3%
+plan-review	22	34.39	2.2%
+survey-task	34	32.59	2.1%
+bug	2	18.57	1.2%
+breakdown	6	6.64	0.4%
+blocked	5	4.43	0.2%
+retrospective-audit	2	3.65	0.2%
+spike	1	2.82	0.1%
+scoping	2	1.6	0.1%
+triage	1	0.18	0%
+(per stage kind over the finished tasks in docs/reviews/stability-measures/reference-2026-11-08.json: sessions, USD, share; /cost read live 2026-11-13)
+
+$ git log --first-parent --format='%h %s %b' 9574d537..HEAD | grep -i -E 'cancel|halt|LIN-4079|LIN-4082|LIN-4080|LIN-4185|LIN-4186' | cut -c1-160; git -C ../simple-dispatcher log --first-parent --format='%h %s %b' 5d8489e..af9b496 | grep -i -E 'cancel|halt|stop' | cut -c1-160; echo '(end of keyword search)'
+(7): flow-dispatch-lifecycle and flow-dispatch-halt CFG stay carried N/A*, not
+(end of keyword search)
+
+$ git -C ../simple-dispatcher log --first-parent --format=%h 5d8489e..af9b496 -- opencode-runner.js dispatcher.js reapers.js | wc -l; wc -l < ../simple-dispatcher/opencode-runner.js
+       0
+    1836
+
+$ git log --first-parent -m --format='%h %cI %s' 9574d537..HEAD -- 'scripts/stability-measures*' tests/unit/stability-measures.test.js | sort -u -k1,1
+1d912cce7 2026-11-12T15:53:15Z Merge pull request #2405 from JKershaw/feat/lin-4421-tracker-reads
+218ab7f64 2026-11-12T08:36:23Z Merge pull request #2398 from JKershaw/feat/lin-4420-stability-measures-core
+96fa23c24 2026-11-12T17:35:19Z Merge pull request #2406 from JKershaw/feat/lin-4422-blind-read-and-seat
+aebe61081 2026-11-12T22:46:23Z Merge pull request #2415 from JKershaw/feat/lin-4439-measure-1-reads-ledger
+b1f258ab4 2026-11-12T19:01:12Z Merge pull request #2409 from JKershaw/feat/lin-4423-declaration-and-reference
+
+## Checks run after the second read (each re-run before accepting a reader's claim)
+
+$ git log --diff-filter=A --format='%h %cI %s' -- docs/areas/README.md | tail -1; git ls-tree 526bca66c^1 -- docs/areas | wc -l
+526bca66c 2026-11-08T02:29:09Z LIN-4371: area notes (1/3, LinearViewer): product-owned area registry, notes with guard test, seeds, grounding pointer (#2357)
+       0
+
+$ B=$(git log --first-parent --format=%H 5334c81a..9574d537 | while read c; do git merge-base --is-ancestor 526bca66c $c && echo $c; done | tail -1); echo first landing containing 526bca66c: ${B:0:9}; n=$(git rev-list --first-parent --count ${B}^1..9574d537); t=$(git log --first-parent -m --no-renames --name-only --format=@%h ${B}^1..9574d537 | awk '/^@/{c=$0;next} index($0,"docs/areas/")==1{s[c]=1} END{print length(s)}'); a=$(git log --first-parent -m --no-renames --numstat --format=@%h ${B}^1..9574d537 -- docs/areas | awk '!/^@/&&NF==3{a+=$1} END{print a}'); echo "$t of $n landings touched docs/areas; +$a lines"
+first landing containing 526bca66c: 526bca66c
+20 of 26 landings touched docs/areas; +698 lines
+
+$ git log --first-parent -m --no-renames --numstat --format=@%h f57cc7e99^1..f57cc7e99 | awk '!/^@/&&NF==3{a+=$1;f++} END{print f" files, +"a" lines"}'; git diff --no-renames --name-only --diff-filter=A f57cc7e99^1 f57cc7e99 | wc -l; git diff --raw --no-renames f57cc7e99^1 f57cc7e99 | awk '{print $4}' | git cat-file --batch-check='%(objectsize)' 2>/dev/null | awk '{s+=$1} END{printf "%.2f MB of new/changed blobs
+", s/1e6}'
+682 files, +35372 lines
+     680
+13.65 MB of new/changed blobs
+
+$ git diff --stat 94893cc35^1 94893cc35 -- lib/ | tail -3
+ lib/agent-status-store.js | 139 +---------------------------------------------
+ 1 file changed, 1 insertion(+), 138 deletions(-)
+
+$ git diff --no-renames --name-only --diff-filter=A f57cc7e99^1 f57cc7e99 | awk -F/ '{print $1"/"$2"/"$3"/"$4}' | sort | uniq -c | sort -rn | head -5
+ 674 docs/papers/harbour/task-size-and-cost-evidence
+   5 docs/papers/harbour/task-size-and-cost-scripts
+   1 docs/papers/harbour/figures
+
+$ git ls-tree -r -l f57cc7e99 docs/papers/harbour | awk '{split($5,p,"/"); d=p[1]"/"p[2]"/"p[3]"/"p[4]; s[d]+=$4; n[d]++} END{for(k in s) if(s[k]>1e6) printf "%.2f MB %d files %s
+", s[k]/1e6, n[k], k}' | sort -rn
+17.17 MB 901 files docs/papers/harbour/task-size-and-cost-evidence
+14.15 MB 816 files docs/papers/harbour/cleaner-than-it-started-evidence
+2.16 MB 99 files docs/papers/harbour/figures
+2.04 MB 1 files docs/papers/harbour/coherence-as-it-grows-exposure.json
+1.91 MB 3 files docs/papers/harbour/unwedge-or-breakdown-data
+1.64 MB 1 files docs/papers/harbour/test-surplus-coverage.json
+1.39 MB 1 files docs/papers/harbour/test-surplus-mutants.json
+1.15 MB 1 files docs/papers/harbour/coherence-as-it-grows-outcomes.json
+
+$ git diff --no-renames --name-only --diff-filter=A f57cc7e99^1 f57cc7e99 | awk -F/ '{print $1"/"$2"/"$3"/"$4"/"$5}' | sort | uniq -c | sort -rn | head -4
+ 674 docs/papers/harbour/task-size-and-cost-evidence/2026-11-12
+   1 docs/papers/harbour/task-size-and-cost-scripts/size-golden-glob.mjs
+   1 docs/papers/harbour/task-size-and-cost-scripts/fit.test.mjs
+   1 docs/papers/harbour/task-size-and-cost-scripts/fit.mjs
+
+$ git log --first-parent -m --no-renames --numstat --format=@%h 9574d537..HEAD -- docs/areas | awk '!/^@/&&NF==3{a+=$1} END{printf "%d lines added to docs/areas over 35 landings: %.1f per landing
+", a, a/35}'
+754 lines added to docs/areas over 35 landings: 21.5 per landing
+

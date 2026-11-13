@@ -1,0 +1,2727 @@
+{
+ "tool": "stability-measures",
+ "repo": ".",
+ "scope": {
+  "include": "^(server\\.js$|(lib|routes|public)/.*\\.[cm]?js$)",
+  "exclude": "(^|/)node_modules/|(^|/)vendor(ed)?/|\\.min\\.js$|(^|/)(tests?|__tests__)/|\\.(test|spec)\\.|^experiments/[^/]+/replay/(pinned|work)/"
+ },
+ "inputs": {
+  "runner": "../simple-dispatcher",
+  "api": "$HARBOUR_LOCAL_BASE/api/proxy",
+  "lookbackDays": 3,
+  "reference": "docs/reviews/stability-measures/reference-2026-11-08.json"
+ },
+ "sources": {
+  "runner": {
+   "dir": "../simple-dispatcher",
+   "branch": "main",
+   "tip": "af9b496d57f042972b912a30eb8c4d1164bbab77",
+   "tipDate": "2026-11-12T13:38:58Z",
+   "upstreamSha": "af9b496d57f042972b912a30eb8c4d1164bbab77",
+   "baseSha": "5d8489e7fd8434f0e69af7df11a3746790abbe64",
+   "headSha": "af9b496d57f042972b912a30eb8c4d1164bbab77"
+  },
+  "ci": {
+   "workflow": "test.yml",
+   "branch": "main",
+   "created": "2026-11-08..2026-11-13"
+  },
+  "tracker": {
+   "readOn": "2026-11-13",
+   "lookback": {
+    "days": 3,
+    "since": "2026-11-05T17:10:36.000Z"
+   },
+   "priorLandings": 70,
+   "calls": {
+    "calls": 662,
+    "retries429": 1,
+    "waitedMs": 755062
+   }
+  }
+ },
+ "window": {
+  "base": "9574d5371cd78a4ce0ab98bc5278706eb4e1bc6f",
+  "head": "163efc0698934c3e8a5f3c30e48dc15b51ac3a24",
+  "baseDate": "2026-11-08T17:10:36Z",
+  "headDate": "2026-11-12T23:17:49Z",
+  "landings": 35
+ },
+ "measures": [
+  {
+   "rank": 1,
+   "key": "no-new-mess",
+   "title": "No new mess",
+   "rows": [
+    {
+     "key": "blind",
+     "value": {
+      "landings": 35,
+      "read": 2,
+      "verdicts": {
+       "better": 1,
+       "same": 1,
+       "worse": 0
+      },
+      "unread": {
+       "no ticket": 0,
+       "not an ordinary landing": 11,
+       "landed before the gate": 20,
+       "no read on record": 2
+      },
+      "gate": {
+       "commit": "eb14b7fff9f1b0e0de623add1b1fc61fd924021a",
+       "pr": 2413,
+       "mergedAt": "2026-11-12T21:06:21Z"
+      },
+      "repo": "JKershaw/LinearViewer",
+      "perLanding": [
+       {
+        "commit": "b315e0e8f3e1e5f3b5d6e634e53c5dc83b41d754",
+        "ticket": "LIN-4394",
+        "pr": 2382,
+        "mergedAt": "2026-11-08T18:06:18Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "3b1b57b15ce9c4c468ea2602210ffe03383ccccf",
+        "ticket": "LIN-4402",
+        "pr": 2384,
+        "mergedAt": "2026-11-10T08:25:36Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "1e106e4e3772fad4018570eb6685a7b8d3b58e77",
+        "ticket": "LIN-4403",
+        "pr": 2385,
+        "mergedAt": "2026-11-10T08:44:09Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "f5b1f5efa25265a49cb3c6ca04879610fcc278f9",
+        "ticket": "LIN-4390",
+        "pr": 2383,
+        "mergedAt": "2026-11-10T09:35:14Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "ecabd3d764bf6ab967be7457226eb3b654886385",
+        "ticket": "LIN-4404",
+        "pr": 2386,
+        "mergedAt": "2026-11-10T10:42:08Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "9cf51ef7210f836c350d9d1d34e088a1bd850bcb",
+        "ticket": "LIN-4404",
+        "pr": 2388,
+        "mergedAt": "2026-11-10T11:01:34Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "a36ad619510be9de87c55115ec5581a2c3aa6014",
+        "ticket": "LIN-4392",
+        "pr": 2387,
+        "mergedAt": "2026-11-10T11:59:12Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "730df21c2e50eaa3e17627418c155d178f631308",
+        "ticket": "LIN-4407",
+        "pr": 2389,
+        "mergedAt": "2026-11-10T12:21:45Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "d9480093160fb0b9460c763c2ea47ca7a5e9a83b",
+        "ticket": "LIN-4405",
+        "pr": 2390,
+        "mergedAt": "2026-11-10T12:31:23Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "008d38bb088ca824f433940a227bffc27f3a60a1",
+        "ticket": "LIN-4398",
+        "pr": 2391,
+        "mergedAt": "2026-11-10T12:42:29Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "4d23fa1584f8e1b65e77ffcdf665237e7d13dc7e",
+        "ticket": "LIN-4412",
+        "pr": 2393,
+        "mergedAt": "2026-11-10T14:05:03Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "80f4c7c87c8fa0a4b97dffce279d6d2af9c828e0",
+        "ticket": "LIN-4406",
+        "pr": 2392,
+        "mergedAt": "2026-11-10T14:28:35Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "da5df707d76dab419ab9217b44844cfa890420ec",
+        "ticket": "LIN-4411",
+        "pr": 2394,
+        "mergedAt": "2026-11-10T15:05:25Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "fe2f1f0cb0a3e5857afab871b60e3552cc0802c3",
+        "ticket": "LIN-4413",
+        "pr": 2395,
+        "mergedAt": "2026-11-11T22:25:57Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "b5950f704aee77dd686d5908f7f2e591849223a7",
+        "ticket": "LIN-4415",
+        "pr": 2396,
+        "mergedAt": "2026-11-11T22:32:27Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "30a01928961b90132287e5daffab9192b4b76f65",
+        "ticket": "LIN-4418",
+        "pr": 2397,
+        "mergedAt": "2026-11-11T23:50:56Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "218ab7f6474a0b61dbee8daca119874705c87c71",
+        "ticket": "LIN-4420",
+        "pr": 2398,
+        "mergedAt": "2026-11-12T08:36:23Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "b349c219b5973e404f998ffdce7ee27f1918cb4c",
+        "ticket": "LIN-4414",
+        "pr": 2399,
+        "mergedAt": "2026-11-12T08:50:07Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "94893cc354d235273a1bba1f8ec21a680a2d86ce",
+        "ticket": "LIN-4426",
+        "pr": 2400,
+        "mergedAt": "2026-11-12T11:34:01Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "f57cc7e99225c31d16c49bf40457a7f85c18e08f",
+        "ticket": "LIN-4427",
+        "pr": 2401,
+        "mergedAt": "2026-11-12T13:04:03Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "c6d99f05e33e18f5647f6ebda52724bcab42d410",
+        "ticket": "LIN-4431",
+        "pr": 2402,
+        "mergedAt": "2026-11-12T13:38:43Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "a514506b69ebb62edebc7d4e87806ff6b926fa52",
+        "ticket": "LIN-4432",
+        "pr": 2404,
+        "mergedAt": "2026-11-12T15:05:37Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "1d912cce787aee0f86f0aa21089173dc031143e1",
+        "ticket": "LIN-4421",
+        "pr": 2405,
+        "mergedAt": "2026-11-12T15:53:15Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "2022841a1701d97645fd997b4d76932c03d954ce",
+        "ticket": "LIN-4428",
+        "pr": 2403,
+        "mergedAt": "2026-11-12T16:11:50Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "96fa23c2454c004c4ee33a166df4824f9adc554b",
+        "ticket": "LIN-4422",
+        "pr": 2406,
+        "mergedAt": "2026-11-12T17:35:19Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "720c1b1c288e06ea95c9f67da40b5875b0bc4135",
+        "ticket": "LIN-2386",
+        "pr": 2408,
+        "mergedAt": "2026-11-12T17:40:30Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "b3d7c798875ddfd0808bb56cc89fab89158bbeea",
+        "ticket": "LIN-4436",
+        "pr": 2407,
+        "mergedAt": "2026-11-12T17:41:21Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "b1f258ab4c41e12dfcdaca21425569aa1698a1e2",
+        "ticket": "LIN-4423",
+        "pr": 2409,
+        "mergedAt": "2026-11-12T19:01:12Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "e3829b9f9d5fe1cc9821cf0a6f99a6269082187c",
+        "ticket": "LIN-4437",
+        "pr": 2410,
+        "mergedAt": "2026-11-12T19:22:32Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "4f48068eb0ae049862989441e5ae655770e1cf4e",
+        "ticket": "LIN-4419",
+        "pr": 2412,
+        "mergedAt": "2026-11-12T20:03:28Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "eb14b7fff9f1b0e0de623add1b1fc61fd924021a",
+        "ticket": "LIN-4438",
+        "pr": 2413,
+        "mergedAt": "2026-11-12T21:06:21Z",
+        "status": "landed before the gate"
+       },
+       {
+        "commit": "e3a3268a17609e035a64c62d52fb6f827331e90d",
+        "ticket": "LIN-4441",
+        "pr": 2414,
+        "mergedAt": "2026-11-12T21:22:35Z",
+        "status": "no read on record",
+        "why": "no blind read naming #2414 before the merge"
+       },
+       {
+        "commit": "ceda351273fb63a6e975cf589accf7b1b1c2ef45",
+        "ticket": "LIN-4424",
+        "pr": 2411,
+        "mergedAt": "2026-11-12T22:35:24Z",
+        "status": "read",
+        "verdict": "same",
+        "readAt": "2026-11-12T22:25:56.611Z",
+        "commentId": "aceebb0c-d936-438e-883e-4d825c908b08",
+        "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2411"
+       },
+       {
+        "commit": "aebe6108191db720787d440e940c06cb6a00807f",
+        "ticket": "LIN-4439",
+        "pr": 2415,
+        "mergedAt": "2026-11-12T22:46:23Z",
+        "status": "read",
+        "verdict": "better",
+        "readAt": "2026-11-12T22:20:09.755Z",
+        "commentId": "21b23445-1ec4-431c-ab27-da900d8a77a2",
+        "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2415"
+       },
+       {
+        "commit": "163efc0698934c3e8a5f3c30e48dc15b51ac3a24",
+        "ticket": "LIN-4396",
+        "pr": 2416,
+        "mergedAt": "2026-11-12T23:17:49Z",
+        "status": "no read on record",
+        "why": "#2416 is not on the ticket's landing before the merge"
+       }
+      ]
+     },
+     "reference": {
+      "label": "8 Nov",
+      "status": "not measured",
+      "value": null,
+      "reason": "no 8 Nov reading; the first reading sets it",
+      "unreadable": null
+     },
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    }
+   ]
+  },
+  {
+   "rank": 2,
+   "key": "curve",
+   "title": "The curve",
+   "rows": [
+    {
+     "key": "lines",
+     "value": {
+      "base": {
+       "code": 110011,
+       "comment": 82161,
+       "blank": 14612,
+       "total": 206784,
+       "commentShare": 39.73
+      },
+      "head": {
+       "code": 111244,
+       "comment": 83095,
+       "blank": 14738,
+       "total": 209077,
+       "commentShare": 39.74
+      },
+      "net": {
+       "total": 2293,
+       "code": 1233,
+       "comment": 934,
+       "blank": 126
+      },
+      "perLanding": {
+       "total": 65.5,
+       "code": 35.2,
+       "comment": 26.7,
+       "blank": 3.6
+      }
+     },
+     "reference": {
+      "label": "8 Nov",
+      "status": "measured",
+      "value": {
+       "base": {
+        "code": 106977,
+        "comment": 78976,
+        "blank": 14273,
+        "total": 200226,
+        "commentShare": 39.44
+       },
+       "head": {
+        "code": 110011,
+        "comment": 82161,
+        "blank": 14612,
+        "total": 206784,
+        "commentShare": 39.73
+       },
+       "net": {
+        "total": 6558,
+        "code": 3034,
+        "comment": 3185,
+        "blank": 339
+       },
+       "perLanding": {
+        "total": 57.5,
+        "code": 26.6,
+        "comment": 27.9,
+        "blank": 3
+       }
+      },
+      "reason": null,
+      "unreadable": 0
+     },
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    },
+    {
+     "key": "churn",
+     "value": {
+      "landings": 35,
+      "added": 3277,
+      "deleted": 984,
+      "net": 2293,
+      "perLanding": {
+       "added": 93.6,
+       "deleted": 28.1,
+       "net": 65.5
+      },
+      "deletedPerAdded": 0.3
+     },
+     "reference": {
+      "label": "8 Nov",
+      "status": "measured",
+      "value": {
+       "landings": 114,
+       "added": 10235,
+       "deleted": 3677,
+       "net": 6558,
+       "perLanding": {
+        "added": 89.8,
+        "deleted": 32.3,
+        "net": 57.5
+       },
+       "deletedPerAdded": 0.36
+      },
+      "reason": null,
+      "unreadable": 0
+     },
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    },
+    {
+     "key": "ci",
+     "value": {
+      "medianMinutes": 9.07,
+      "runs": 35,
+      "landingsWithRun": 35,
+      "landings": 35,
+      "listingCapped": false
+     },
+     "reference": {
+      "label": "8 Nov",
+      "status": "measured",
+      "value": {
+       "medianMinutes": 8.59,
+       "runs": 114,
+       "landingsWithRun": 114,
+       "landings": 114,
+       "listingCapped": false
+      },
+      "reason": null,
+      "unreadable": 0
+     },
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    },
+    {
+     "key": "waiting.harbour",
+     "value": {
+      "base": 56,
+      "head": 98,
+      "change": 42,
+      "perLanding": 1.2
+     },
+     "reference": {
+      "label": "8 Nov",
+      "status": "measured",
+      "value": {
+       "base": 0,
+       "head": 56,
+       "change": 56,
+       "perLanding": 0.49
+      },
+      "reason": null,
+      "unreadable": 0
+     },
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    },
+    {
+     "key": "waiting.runner",
+     "value": {
+      "branch": "main",
+      "baseSha": "5d8489e7fd8434f0e69af7df11a3746790abbe64",
+      "headSha": "af9b496d57f042972b912a30eb8c4d1164bbab77",
+      "base": 10,
+      "head": 12,
+      "change": 2,
+      "perLanding": 0.06
+     },
+     "reference": {
+      "label": "8 Nov",
+      "status": "measured",
+      "value": {
+       "branch": "main",
+       "baseSha": "9478e1c534279e7877750d8032798ac35b92b883",
+       "headSha": "5d8489e7fd8434f0e69af7df11a3746790abbe64",
+       "base": 0,
+       "head": 10,
+       "change": 10,
+       "perLanding": 0.09
+      },
+      "reason": null,
+      "unreadable": 0
+     },
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    },
+    {
+     "key": "waiting.total",
+     "value": {
+      "base": 66,
+      "head": 110,
+      "change": 44,
+      "perLanding": 1.26
+     },
+     "reference": {
+      "label": "8 Nov",
+      "status": "measured",
+      "value": {
+       "base": 0,
+       "head": 66,
+       "change": 66,
+       "perLanding": 0.58
+      },
+      "reason": null,
+      "unreadable": 0
+     },
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    },
+    {
+     "key": "minted",
+     "value": {
+      "label": "ID-span estimate",
+      "base": "LIN-4394",
+      "head": "LIN-4442",
+      "span": 48,
+      "perLanding": 1.37,
+      "bracket": "LIN-4442",
+      "headAtBracket": true,
+      "probes": {
+       "base": [
+        4442,
+        2221,
+        3331,
+        3886,
+        4164,
+        4303,
+        4372,
+        4407,
+        4389,
+        4398,
+        4393,
+        4395,
+        4394
+       ],
+       "head": [
+        4442
+       ],
+       "detail": [
+        {
+         "n": 4442,
+         "status": "ok",
+         "createdAt": "2026-11-12T22:51:11.223Z"
+        },
+        {
+         "n": 2221,
+         "status": "ok",
+         "createdAt": "2026-08-22T18:57:01.405Z"
+        },
+        {
+         "n": 3331,
+         "status": "ok",
+         "createdAt": "2026-10-06T14:40:07.757Z"
+        },
+        {
+         "n": 3886,
+         "status": "ok",
+         "createdAt": "2026-10-24T17:49:11.900Z"
+        },
+        {
+         "n": 4164,
+         "status": "ok",
+         "createdAt": "2026-11-03T17:14:22.648Z"
+        },
+        {
+         "n": 4303,
+         "status": "ok",
+         "createdAt": "2026-11-05T20:13:25.437Z"
+        },
+        {
+         "n": 4372,
+         "status": "ok",
+         "createdAt": "2026-11-08T01:44:04.175Z"
+        },
+        {
+         "n": 4407,
+         "status": "ok",
+         "createdAt": "2026-11-10T09:54:45.500Z"
+        },
+        {
+         "n": 4389,
+         "status": "ok",
+         "createdAt": "2026-11-08T13:51:07.594Z"
+        },
+        {
+         "n": 4398,
+         "status": "ok",
+         "createdAt": "2026-11-10T07:36:04.373Z"
+        },
+        {
+         "n": 4393,
+         "status": "ok",
+         "createdAt": "2026-11-08T14:40:52.825Z"
+        },
+        {
+         "n": 4395,
+         "status": "ok",
+         "createdAt": "2026-11-08T20:03:53.881Z"
+        },
+        {
+         "n": 4394,
+         "status": "ok",
+         "createdAt": "2026-11-08T16:20:57.831Z"
+        },
+        {
+         "n": 4442,
+         "status": "ok",
+         "createdAt": "2026-11-12T22:51:11.223Z"
+        }
+       ]
+      }
+     },
+     "reference": {
+      "label": "8 Nov",
+      "status": "measured",
+      "value": {
+       "label": "ID-span estimate",
+       "base": "LIN-4204",
+       "head": "LIN-4394",
+       "span": 190,
+       "perLanding": 1.67,
+       "bracket": "LIN-4440",
+       "headAtBracket": false,
+       "probes": {
+        "base": [
+         4440,
+         2220,
+         3330,
+         3885,
+         4162,
+         4301,
+         4231,
+         4196,
+         4213,
+         4204,
+         4208,
+         4206,
+         4205
+        ],
+        "head": [
+         4440,
+         4322,
+         4381,
+         4410,
+         4395,
+         4388,
+         4391,
+         4393,
+         4394
+        ],
+        "detail": [
+         {
+          "n": 4440,
+          "status": "ok",
+          "createdAt": "2026-11-12T17:41:06.318Z"
+         },
+         {
+          "n": 2220,
+          "status": "ok",
+          "createdAt": "2026-08-22T18:56:42.038Z"
+         },
+         {
+          "n": 3330,
+          "status": "ok",
+          "createdAt": "2026-10-06T14:40:07.032Z"
+         },
+         {
+          "n": 3885,
+          "status": "ok",
+          "createdAt": "2026-10-24T17:46:59.273Z"
+         },
+         {
+          "n": 4162,
+          "status": "ok",
+          "createdAt": "2026-11-03T16:05:48.027Z"
+         },
+         {
+          "n": 4301,
+          "status": "ok",
+          "createdAt": "2026-11-05T19:51:47.234Z"
+         },
+         {
+          "n": 4231,
+          "status": "ok",
+          "createdAt": "2026-11-04T18:21:51.832Z"
+         },
+         {
+          "n": 4196,
+          "status": "ok",
+          "createdAt": "2026-11-04T01:28:04.342Z"
+         },
+         {
+          "n": 4213,
+          "status": "ok",
+          "createdAt": "2026-11-04T08:45:49.187Z"
+         },
+         {
+          "n": 4204,
+          "status": "ok",
+          "createdAt": "2026-11-04T05:01:14.216Z"
+         },
+         {
+          "n": 4208,
+          "status": "ok",
+          "createdAt": "2026-11-04T07:46:14.816Z"
+         },
+         {
+          "n": 4206,
+          "status": "ok",
+          "createdAt": "2026-11-04T07:45:30.893Z"
+         },
+         {
+          "n": 4205,
+          "status": "ok",
+          "createdAt": "2026-11-04T07:42:49.529Z"
+         },
+         {
+          "n": 4440,
+          "status": "ok",
+          "createdAt": "2026-11-12T17:41:06.318Z"
+         },
+         {
+          "n": 4322,
+          "status": "ok",
+          "createdAt": "2026-11-06T11:01:46.341Z"
+         },
+         {
+          "n": 4381,
+          "status": "ok",
+          "createdAt": "2026-11-08T10:09:29.587Z"
+         },
+         {
+          "n": 4410,
+          "status": "ok",
+          "createdAt": "2026-11-10T12:16:37.228Z"
+         },
+         {
+          "n": 4395,
+          "status": "ok",
+          "createdAt": "2026-11-08T20:03:53.881Z"
+         },
+         {
+          "n": 4388,
+          "status": "ok",
+          "createdAt": "2026-11-08T13:37:22.231Z"
+         },
+         {
+          "n": 4391,
+          "status": "ok",
+          "createdAt": "2026-11-08T14:13:42.217Z"
+         },
+         {
+          "n": 4393,
+          "status": "ok",
+          "createdAt": "2026-11-08T14:40:52.825Z"
+         },
+         {
+          "n": 4394,
+          "status": "ok",
+          "createdAt": "2026-11-08T16:20:57.831Z"
+         }
+        ]
+       }
+      },
+      "reason": null,
+      "unreadable": 0
+     },
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    }
+   ]
+  },
+  {
+   "rank": 3,
+   "key": "speed",
+   "title": "Speed",
+   "rows": [
+    {
+     "key": "tasks",
+     "value": {
+      "finished": 33,
+      "finishedLandedBefore": 1,
+      "windowTickets": 34,
+      "landedUnfinished": 1,
+      "landedDoneOutside": 1,
+      "unownedLandings": 0,
+      "lookback": {
+       "days": 3,
+       "since": "2026-11-05T17:10:36.000Z"
+      },
+      "ids": {
+       "finished": [
+        "LIN-2386",
+        "LIN-4349",
+        "LIN-4390",
+        "LIN-4392",
+        "LIN-4394",
+        "LIN-4398",
+        "LIN-4402",
+        "LIN-4403",
+        "LIN-4404",
+        "LIN-4405",
+        "LIN-4406",
+        "LIN-4407",
+        "LIN-4411",
+        "LIN-4412",
+        "LIN-4413",
+        "LIN-4414",
+        "LIN-4415",
+        "LIN-4418",
+        "LIN-4419",
+        "LIN-4420",
+        "LIN-4421",
+        "LIN-4422",
+        "LIN-4423",
+        "LIN-4424",
+        "LIN-4426",
+        "LIN-4427",
+        "LIN-4428",
+        "LIN-4431",
+        "LIN-4432",
+        "LIN-4436",
+        "LIN-4437",
+        "LIN-4438",
+        "LIN-4439"
+       ],
+       "landedUnfinished": [
+        {
+         "id": "LIN-4441",
+         "state": "In Progress"
+        }
+       ],
+       "landedDoneOutside": [
+        {
+         "id": "LIN-4396",
+         "completedAt": "2026-11-12T23:25:53.515Z"
+        }
+       ],
+       "unreadable": [],
+       "unownedLandings": []
+      }
+     },
+     "reference": {
+      "label": "8 Nov",
+      "status": "measured",
+      "value": {
+       "finished": 106,
+       "finishedLandedBefore": 1,
+       "windowTickets": 106,
+       "landedUnfinished": 0,
+       "landedDoneOutside": 1,
+       "unownedLandings": 0,
+       "lookback": {
+        "days": 3,
+        "since": "2026-11-01T05:23:59.000Z"
+       },
+       "ids": {
+        "finished": [
+         "LIN-4048",
+         "LIN-4143",
+         "LIN-4151",
+         "LIN-4200",
+         "LIN-4201",
+         "LIN-4202",
+         "LIN-4203",
+         "LIN-4206",
+         "LIN-4207",
+         "LIN-4208",
+         "LIN-4209",
+         "LIN-4212",
+         "LIN-4226",
+         "LIN-4231",
+         "LIN-4232",
+         "LIN-4234",
+         "LIN-4240",
+         "LIN-4241",
+         "LIN-4242",
+         "LIN-4243",
+         "LIN-4246",
+         "LIN-4247",
+         "LIN-4248",
+         "LIN-4249",
+         "LIN-4250",
+         "LIN-4251",
+         "LIN-4252",
+         "LIN-4253",
+         "LIN-4254",
+         "LIN-4255",
+         "LIN-4257",
+         "LIN-4263",
+         "LIN-4265",
+         "LIN-4266",
+         "LIN-4267",
+         "LIN-4268",
+         "LIN-4269",
+         "LIN-4270",
+         "LIN-4272",
+         "LIN-4276",
+         "LIN-4277",
+         "LIN-4279",
+         "LIN-4280",
+         "LIN-4281",
+         "LIN-4282",
+         "LIN-4283",
+         "LIN-4284",
+         "LIN-4285",
+         "LIN-4292",
+         "LIN-4293",
+         "LIN-4296",
+         "LIN-4298",
+         "LIN-4299",
+         "LIN-4300",
+         "LIN-4304",
+         "LIN-4306",
+         "LIN-4307",
+         "LIN-4308",
+         "LIN-4309",
+         "LIN-4310",
+         "LIN-4311",
+         "LIN-4312",
+         "LIN-4313",
+         "LIN-4314",
+         "LIN-4315",
+         "LIN-4317",
+         "LIN-4322",
+         "LIN-4323",
+         "LIN-4324",
+         "LIN-4330",
+         "LIN-4331",
+         "LIN-4332",
+         "LIN-4333",
+         "LIN-4334",
+         "LIN-4335",
+         "LIN-4338",
+         "LIN-4340",
+         "LIN-4345",
+         "LIN-4346",
+         "LIN-4351",
+         "LIN-4352",
+         "LIN-4353",
+         "LIN-4354",
+         "LIN-4358",
+         "LIN-4360",
+         "LIN-4361",
+         "LIN-4362",
+         "LIN-4367",
+         "LIN-4368",
+         "LIN-4369",
+         "LIN-4370",
+         "LIN-4371",
+         "LIN-4373",
+         "LIN-4374",
+         "LIN-4375",
+         "LIN-4376",
+         "LIN-4378",
+         "LIN-4379",
+         "LIN-4380",
+         "LIN-4381",
+         "LIN-4382",
+         "LIN-4383",
+         "LIN-4384",
+         "LIN-4387",
+         "LIN-4391",
+         "LIN-4393"
+        ],
+        "landedUnfinished": [],
+        "landedDoneOutside": [
+         {
+          "id": "LIN-4349",
+          "completedAt": "2026-11-08T17:19:09.514Z"
+         }
+        ],
+        "unreadable": [],
+        "unownedLandings": []
+       }
+      },
+      "reason": null,
+      "unreadable": 0
+     },
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    },
+    {
+     "key": "speed",
+     "value": {
+      "tasks": 33,
+      "read": 33,
+      "medianMinutes": 86.5,
+      "meanMinutes": 114.8,
+      "medianSessions": 7,
+      "meanSessions": 7.18,
+      "perTask": [
+       {
+        "id": "LIN-2386",
+        "minutes": 42.9,
+        "sessions": 8
+       },
+       {
+        "id": "LIN-4349",
+        "minutes": 531,
+        "sessions": 12
+       },
+       {
+        "id": "LIN-4390",
+        "minutes": 118.3,
+        "sessions": 10
+       },
+       {
+        "id": "LIN-4392",
+        "minutes": 143.4,
+        "sessions": 9
+       },
+       {
+        "id": "LIN-4394",
+        "minutes": 47.4,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4398",
+        "minutes": 41.8,
+        "sessions": 8
+       },
+       {
+        "id": "LIN-4402",
+        "minutes": 45.7,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4403",
+        "minutes": 64.2,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4404",
+        "minutes": 152.1,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4405",
+        "minutes": 88,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4406",
+        "minutes": 230.6,
+        "sessions": 8
+       },
+       {
+        "id": "LIN-4407",
+        "minutes": 89.8,
+        "sessions": 8
+       },
+       {
+        "id": "LIN-4411",
+        "minutes": 78.3,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4412",
+        "minutes": 48,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4413",
+        "minutes": 61.7,
+        "sessions": 5
+       },
+       {
+        "id": "LIN-4414",
+        "minutes": 97.1,
+        "sessions": 12
+       },
+       {
+        "id": "LIN-4415",
+        "minutes": 49.5,
+        "sessions": 9
+       },
+       {
+        "id": "LIN-4418",
+        "minutes": 108.8,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4419",
+        "minutes": 61.4,
+        "sessions": 10
+       },
+       {
+        "id": "LIN-4420",
+        "minutes": 56.2,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4421",
+        "minutes": 423.8,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4422",
+        "minutes": 88.5,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4423",
+        "minutes": 75.8,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4424",
+        "minutes": 212.2,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4426",
+        "minutes": 64.8,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4427",
+        "minutes": 82,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4428",
+        "minutes": 175.2,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4431",
+        "minutes": 96.8,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4432",
+        "minutes": 72.7,
+        "sessions": 8
+       },
+       {
+        "id": "LIN-4436",
+        "minutes": 74,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4437",
+        "minutes": 89.8,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4438",
+        "minutes": 86.5,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4439",
+        "minutes": 89,
+        "sessions": 4
+       }
+      ]
+     },
+     "reference": {
+      "label": "8 Nov",
+      "status": "measured",
+      "value": {
+       "tasks": 106,
+       "read": 106,
+       "medianMinutes": 56.3,
+       "meanMinutes": 124.6,
+       "medianSessions": 5,
+       "meanSessions": 5.61,
+       "perTask": [
+        {
+         "id": "LIN-4048",
+         "minutes": 62.7,
+         "sessions": 9
+        },
+        {
+         "id": "LIN-4143",
+         "minutes": 58.6,
+         "sessions": 5
+        },
+        {
+         "id": "LIN-4151",
+         "minutes": 36.4,
+         "sessions": 5
+        },
+        {
+         "id": "LIN-4200",
+         "minutes": 222,
+         "sessions": 5
+        },
+        {
+         "id": "LIN-4201",
+         "minutes": 318.2,
+         "sessions": 6
+        },
+        {
+         "id": "LIN-4202",
+         "minutes": 69.5,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4203",
+         "minutes": 37.2,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4206",
+         "minutes": 44.6,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4207",
+         "minutes": 43.5,
+         "sessions": 5
+        },
+        {
+         "id": "LIN-4208",
+         "minutes": 38.2,
+         "sessions": 5
+        },
+        {
+         "id": "LIN-4209",
+         "minutes": 54.2,
+         "sessions": 5
+        },
+        {
+         "id": "LIN-4212",
+         "minutes": 129,
+         "sessions": 8
+        },
+        {
+         "id": "LIN-4226",
+         "minutes": 163.8,
+         "sessions": 7
+        },
+        {
+         "id": "LIN-4231",
+         "minutes": 42.6,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4232",
+         "minutes": 96.9,
+         "sessions": 2
+        },
+        {
+         "id": "LIN-4234",
+         "minutes": 119.8,
+         "sessions": 5
+        },
+        {
+         "id": "LIN-4240",
+         "minutes": 20.8,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4241",
+         "minutes": 81.7,
+         "sessions": 7
+        },
+        {
+         "id": "LIN-4242",
+         "minutes": 81.8,
+         "sessions": 5
+        },
+        {
+         "id": "LIN-4243",
+         "minutes": 67.8,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4246",
+         "minutes": 185.8,
+         "sessions": 11
+        },
+        {
+         "id": "LIN-4247",
+         "minutes": 58.6,
+         "sessions": 7
+        },
+        {
+         "id": "LIN-4248",
+         "minutes": 74.9,
+         "sessions": 6
+        },
+        {
+         "id": "LIN-4249",
+         "minutes": 45.8,
+         "sessions": 2
+        },
+        {
+         "id": "LIN-4250",
+         "minutes": 153.7,
+         "sessions": 2
+        },
+        {
+         "id": "LIN-4251",
+         "minutes": 54,
+         "sessions": 8
+        },
+        {
+         "id": "LIN-4252",
+         "minutes": 54.6,
+         "sessions": 8
+        },
+        {
+         "id": "LIN-4253",
+         "minutes": 42.7,
+         "sessions": 8
+        },
+        {
+         "id": "LIN-4254",
+         "minutes": 943.9,
+         "sessions": 10
+        },
+        {
+         "id": "LIN-4255",
+         "minutes": 369.2,
+         "sessions": 8
+        },
+        {
+         "id": "LIN-4257",
+         "minutes": 88.9,
+         "sessions": 8
+        },
+        {
+         "id": "LIN-4263",
+         "minutes": 58,
+         "sessions": 8
+        },
+        {
+         "id": "LIN-4265",
+         "minutes": 35.9,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4266",
+         "minutes": 45.3,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4267",
+         "minutes": 113.3,
+         "sessions": 6
+        },
+        {
+         "id": "LIN-4268",
+         "minutes": 42.9,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4269",
+         "minutes": 97.3,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4270",
+         "minutes": 27.1,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4272",
+         "minutes": 33.3,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4276",
+         "minutes": 36.8,
+         "sessions": 7
+        },
+        {
+         "id": "LIN-4277",
+         "minutes": 39.6,
+         "sessions": 7
+        },
+        {
+         "id": "LIN-4279",
+         "minutes": 51.7,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4280",
+         "minutes": 48.9,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4281",
+         "minutes": 92,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4282",
+         "minutes": 70.3,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4283",
+         "minutes": 59.8,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4284",
+         "minutes": 44.9,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4285",
+         "minutes": 81,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4292",
+         "minutes": 67.2,
+         "sessions": 7
+        },
+        {
+         "id": "LIN-4293",
+         "minutes": 49.3,
+         "sessions": 7
+        },
+        {
+         "id": "LIN-4296",
+         "minutes": 70.7,
+         "sessions": 7
+        },
+        {
+         "id": "LIN-4298",
+         "minutes": 33.2,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4299",
+         "minutes": 35.6,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4300",
+         "minutes": 31.5,
+         "sessions": 2
+        },
+        {
+         "id": "LIN-4304",
+         "minutes": 46.5,
+         "sessions": 7
+        },
+        {
+         "id": "LIN-4306",
+         "minutes": 38.8,
+         "sessions": 3
+        },
+        {
+         "id": "LIN-4307",
+         "minutes": 648.2,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4308",
+         "minutes": 37.8,
+         "sessions": 3
+        },
+        {
+         "id": "LIN-4309",
+         "minutes": 24,
+         "sessions": 3
+        },
+        {
+         "id": "LIN-4310",
+         "minutes": 33.9,
+         "sessions": 3
+        },
+        {
+         "id": "LIN-4311",
+         "minutes": 36.1,
+         "sessions": 3
+        },
+        {
+         "id": "LIN-4312",
+         "minutes": 20.8,
+         "sessions": 3
+        },
+        {
+         "id": "LIN-4313",
+         "minutes": 79.2,
+         "sessions": 8
+        },
+        {
+         "id": "LIN-4314",
+         "minutes": 38.9,
+         "sessions": 6
+        },
+        {
+         "id": "LIN-4315",
+         "minutes": 175.2,
+         "sessions": 10
+        },
+        {
+         "id": "LIN-4317",
+         "minutes": 46.7,
+         "sessions": 8
+        },
+        {
+         "id": "LIN-4322",
+         "minutes": 56,
+         "sessions": 8
+        },
+        {
+         "id": "LIN-4323",
+         "minutes": 33,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4324",
+         "minutes": 56.6,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4330",
+         "minutes": 243.4,
+         "sessions": 7
+        },
+        {
+         "id": "LIN-4331",
+         "minutes": 209.3,
+         "sessions": 8
+        },
+        {
+         "id": "LIN-4332",
+         "minutes": 21.3,
+         "sessions": 6
+        },
+        {
+         "id": "LIN-4333",
+         "minutes": 40.5,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4334",
+         "minutes": 113.4,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4335",
+         "minutes": 98.9,
+         "sessions": 9
+        },
+        {
+         "id": "LIN-4338",
+         "minutes": 40.7,
+         "sessions": 7
+        },
+        {
+         "id": "LIN-4340",
+         "minutes": 53.4,
+         "sessions": 2
+        },
+        {
+         "id": "LIN-4345",
+         "minutes": 753,
+         "sessions": 19
+        },
+        {
+         "id": "LIN-4346",
+         "minutes": 1101.8,
+         "sessions": 12
+        },
+        {
+         "id": "LIN-4351",
+         "minutes": 68,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4352",
+         "minutes": 89.6,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4353",
+         "minutes": 171.5,
+         "sessions": 5
+        },
+        {
+         "id": "LIN-4354",
+         "minutes": 264.4,
+         "sessions": 10
+        },
+        {
+         "id": "LIN-4358",
+         "minutes": 1378.1,
+         "sessions": 13
+        },
+        {
+         "id": "LIN-4360",
+         "minutes": 132.4,
+         "sessions": 5
+        },
+        {
+         "id": "LIN-4361",
+         "minutes": 38.8,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4362",
+         "minutes": 65,
+         "sessions": 5
+        },
+        {
+         "id": "LIN-4367",
+         "minutes": 32.5,
+         "sessions": 3
+        },
+        {
+         "id": "LIN-4368",
+         "minutes": 42.7,
+         "sessions": 3
+        },
+        {
+         "id": "LIN-4369",
+         "minutes": 620.7,
+         "sessions": 7
+        },
+        {
+         "id": "LIN-4370",
+         "minutes": 171.3,
+         "sessions": 7
+        },
+        {
+         "id": "LIN-4371",
+         "minutes": 44.1,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4373",
+         "minutes": 72.1,
+         "sessions": 5
+        },
+        {
+         "id": "LIN-4374",
+         "minutes": 45.1,
+         "sessions": 3
+        },
+        {
+         "id": "LIN-4375",
+         "minutes": 36.7,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4376",
+         "minutes": 75.5,
+         "sessions": 8
+        },
+        {
+         "id": "LIN-4378",
+         "minutes": 179.6,
+         "sessions": 8
+        },
+        {
+         "id": "LIN-4379",
+         "minutes": 49.2,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4380",
+         "minutes": 40.6,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4381",
+         "minutes": 51,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4382",
+         "minutes": 53.5,
+         "sessions": 7
+        },
+        {
+         "id": "LIN-4383",
+         "minutes": 99.6,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4384",
+         "minutes": 37.7,
+         "sessions": 4
+        },
+        {
+         "id": "LIN-4387",
+         "minutes": 60.7,
+         "sessions": 6
+        },
+        {
+         "id": "LIN-4391",
+         "minutes": 62.7,
+         "sessions": 5
+        },
+        {
+         "id": "LIN-4393",
+         "minutes": 53.9,
+         "sessions": 8
+        }
+       ]
+      },
+      "reason": null,
+      "unreadable": 0
+     },
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    }
+   ]
+  },
+  {
+   "rank": 4,
+   "key": "seat",
+   "title": "The person's seat",
+   "rows": [
+    {
+     "key": "rulings",
+     "value": {
+      "label": "loop rulings only",
+      "finished": 33,
+      "raised": 16,
+      "perFinishedTask": 0.48,
+      "tasksWithRuling": 11,
+      "outcomes": {
+       "answered": 12,
+       "dismissed": 0,
+       "withdrawn": 4,
+       "self-resolved": 0,
+       "unknown": 0,
+       "open": 0
+      },
+      "answeredShare": 100,
+      "rules": {
+       "raised": "distinct decisions: a re-ask in one lineage collapses into one ruling row",
+       "answeredShare": "answered / (answered + dismissed), as lib/escalation-kpis.js; withdrawn and self-resolved are neither; a null outcome is unreadable"
+      },
+      "notRead": [
+       "answered task-bound rulings (anchor.taskDecisionId): no proxy read returns them",
+       "rulings anchored on a parent or another unfinished ticket are not counted against a finished task (4 on a finished task's parent)"
+      ],
+      "onParents": 4,
+      "perTaskCounts": {
+       "LIN-4419": 1,
+       "LIN-4436": 1,
+       "LIN-4421": 2,
+       "LIN-4414": 2,
+       "LIN-4418": 1,
+       "LIN-4415": 2,
+       "LIN-4392": 2,
+       "LIN-4398": 1,
+       "LIN-4407": 1,
+       "LIN-4390": 1,
+       "LIN-4349": 2
+      }
+     },
+     "reference": {
+      "label": "8 Nov",
+      "status": "not measured",
+      "value": null,
+      "reason": "no 8 Nov reading; the first reading sets it",
+      "unreadable": null
+     },
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    },
+    {
+     "key": "origin",
+     "value": null,
+     "reference": {
+      "label": "8 Nov",
+      "status": "not measured",
+      "value": null,
+      "reason": "no 8 Nov reading; the first reading sets it",
+      "unreadable": null
+     },
+     "status": "not measured",
+     "reason": "dispatchedBy is the workspace account for autopilot and person alike",
+     "unreadable": null
+    },
+    {
+     "key": "operator-free",
+     "value": {
+      "label": "upper bound",
+      "conditions": [
+       "no loop ruling",
+       "no [blocked] marker in any lineage member's feedback",
+       "no dispatch row closed with closedReason 'operator'"
+      ],
+      "missingCondition": "no person-started dispatch (not measured: dispatchedBy is the workspace account for autopilot and person alike)",
+      "caveats": [
+       "rulings not read (answered task-bound, parent-anchored) can only lower the true share",
+       "closedReason 'operator' is a catch-all for any close outside handed-on, lineage-terminal and ticket-closed (bulk fossil passes included), so it may count tasks no person touched and push the share down"
+      ],
+      "tasks": 33,
+      "read": 33,
+      "operatorFree": 22,
+      "share": 66.7,
+      "failing": {
+       "ruling": 11,
+       "blocked": 4,
+       "operatorClosed": 0
+      },
+      "rootOnlyLineages": 0,
+      "perTask": [
+       {
+        "id": "LIN-2386",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4349",
+        "ruling": true,
+        "blocked": true,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4390",
+        "ruling": true,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4392",
+        "ruling": true,
+        "blocked": true,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4394",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4398",
+        "ruling": true,
+        "blocked": true,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4402",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4403",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4404",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4405",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4406",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4407",
+        "ruling": true,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4411",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4412",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4413",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4414",
+        "ruling": true,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4415",
+        "ruling": true,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4418",
+        "ruling": true,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4419",
+        "ruling": true,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4420",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4421",
+        "ruling": true,
+        "blocked": true,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4422",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4423",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4424",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4426",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4427",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4428",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4431",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4432",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4436",
+        "ruling": true,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4437",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4438",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4439",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       }
+      ]
+     },
+     "reference": {
+      "label": "8 Nov",
+      "status": "not measured",
+      "value": null,
+      "reason": "no 8 Nov reading; the first reading sets it",
+      "unreadable": null
+     },
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    }
+   ]
+  },
+  {
+   "rank": 5,
+   "key": "cost",
+   "title": "Cost per finished task",
+   "rows": [
+    {
+     "key": "cost",
+     "value": {
+      "tasks": 33,
+      "priced": 33,
+      "medianUsd": 16.7,
+      "meanUsd": 18.34,
+      "nullTotal": {
+       "unpriced": 0,
+       "noTelemetry": 0,
+       "unreadable": 0,
+       "noLineage": 0,
+       "other": 0
+      },
+      "readFailures": [],
+      "counters": {
+       "unpriced": 0,
+       "noTelemetryCount": 0,
+       "unreadableCount": 0,
+       "noLineage": 0
+      },
+      "perTask": [
+       {
+        "id": "LIN-2386",
+        "usd": 6.66
+       },
+       {
+        "id": "LIN-4349",
+        "usd": 35.77
+       },
+       {
+        "id": "LIN-4390",
+        "usd": 18.54
+       },
+       {
+        "id": "LIN-4392",
+        "usd": 29.56
+       },
+       {
+        "id": "LIN-4394",
+        "usd": 7.21
+       },
+       {
+        "id": "LIN-4398",
+        "usd": 7.31
+       },
+       {
+        "id": "LIN-4402",
+        "usd": 9.11
+       },
+       {
+        "id": "LIN-4403",
+        "usd": 16.22
+       },
+       {
+        "id": "LIN-4404",
+        "usd": 19.01
+       },
+       {
+        "id": "LIN-4405",
+        "usd": 27.91
+       },
+       {
+        "id": "LIN-4406",
+        "usd": 22.47
+       },
+       {
+        "id": "LIN-4407",
+        "usd": 28.18
+       },
+       {
+        "id": "LIN-4411",
+        "usd": 43.35
+       },
+       {
+        "id": "LIN-4412",
+        "usd": 7.75
+       },
+       {
+        "id": "LIN-4413",
+        "usd": 17.08
+       },
+       {
+        "id": "LIN-4414",
+        "usd": 25.71
+       },
+       {
+        "id": "LIN-4415",
+        "usd": 13.4
+       },
+       {
+        "id": "LIN-4418",
+        "usd": 24.98
+       },
+       {
+        "id": "LIN-4419",
+        "usd": 11.53
+       },
+       {
+        "id": "LIN-4420",
+        "usd": 9.79
+       },
+       {
+        "id": "LIN-4421",
+        "usd": 14.3
+       },
+       {
+        "id": "LIN-4422",
+        "usd": 16.7
+       },
+       {
+        "id": "LIN-4423",
+        "usd": 12.82
+       },
+       {
+        "id": "LIN-4424",
+        "usd": 12.44
+       },
+       {
+        "id": "LIN-4426",
+        "usd": 11.62
+       },
+       {
+        "id": "LIN-4427",
+        "usd": 12.61
+       },
+       {
+        "id": "LIN-4428",
+        "usd": 11.24
+       },
+       {
+        "id": "LIN-4431",
+        "usd": 26.21
+       },
+       {
+        "id": "LIN-4432",
+        "usd": 17.3
+       },
+       {
+        "id": "LIN-4436",
+        "usd": 16.11
+       },
+       {
+        "id": "LIN-4437",
+        "usd": 27.15
+       },
+       {
+        "id": "LIN-4438",
+        "usd": 27.26
+       },
+       {
+        "id": "LIN-4439",
+        "usd": 18.06
+       }
+      ]
+     },
+     "reference": {
+      "label": "8 Nov",
+      "status": "measured",
+      "value": {
+       "tasks": 106,
+       "priced": 106,
+       "medianUsd": 9.53,
+       "meanUsd": 14.29,
+       "nullTotal": {
+        "unpriced": 0,
+        "noTelemetry": 0,
+        "unreadable": 0,
+        "noLineage": 0,
+        "other": 0
+       },
+       "readFailures": [],
+       "counters": {
+        "unpriced": 0,
+        "noTelemetryCount": 0,
+        "unreadableCount": 0,
+        "noLineage": 0
+       },
+       "perTask": [
+        {
+         "id": "LIN-4048",
+         "usd": 10.34
+        },
+        {
+         "id": "LIN-4143",
+         "usd": 6
+        },
+        {
+         "id": "LIN-4151",
+         "usd": 5.82
+        },
+        {
+         "id": "LIN-4200",
+         "usd": 12.75
+        },
+        {
+         "id": "LIN-4201",
+         "usd": 39.13
+        },
+        {
+         "id": "LIN-4202",
+         "usd": 21.66
+        },
+        {
+         "id": "LIN-4203",
+         "usd": 5.76
+        },
+        {
+         "id": "LIN-4206",
+         "usd": 6.82
+        },
+        {
+         "id": "LIN-4207",
+         "usd": 8.19
+        },
+        {
+         "id": "LIN-4208",
+         "usd": 6.09
+        },
+        {
+         "id": "LIN-4209",
+         "usd": 17.32
+        },
+        {
+         "id": "LIN-4212",
+         "usd": 22.11
+        },
+        {
+         "id": "LIN-4226",
+         "usd": 26.02
+        },
+        {
+         "id": "LIN-4231",
+         "usd": 12.28
+        },
+        {
+         "id": "LIN-4232",
+         "usd": 21.54
+        },
+        {
+         "id": "LIN-4234",
+         "usd": 5.29
+        },
+        {
+         "id": "LIN-4240",
+         "usd": 3.53
+        },
+        {
+         "id": "LIN-4241",
+         "usd": 9.54
+        },
+        {
+         "id": "LIN-4242",
+         "usd": 13.01
+        },
+        {
+         "id": "LIN-4243",
+         "usd": 8.43
+        },
+        {
+         "id": "LIN-4246",
+         "usd": 9.7
+        },
+        {
+         "id": "LIN-4247",
+         "usd": 7.34
+        },
+        {
+         "id": "LIN-4248",
+         "usd": 10.99
+        },
+        {
+         "id": "LIN-4249",
+         "usd": 12.9
+        },
+        {
+         "id": "LIN-4250",
+         "usd": 20.19
+        },
+        {
+         "id": "LIN-4251",
+         "usd": 11.19
+        },
+        {
+         "id": "LIN-4252",
+         "usd": 9.8
+        },
+        {
+         "id": "LIN-4253",
+         "usd": 10.68
+        },
+        {
+         "id": "LIN-4254",
+         "usd": 16.52
+        },
+        {
+         "id": "LIN-4255",
+         "usd": 34.13
+        },
+        {
+         "id": "LIN-4257",
+         "usd": 15.69
+        },
+        {
+         "id": "LIN-4263",
+         "usd": 13.74
+        },
+        {
+         "id": "LIN-4265",
+         "usd": 8.63
+        },
+        {
+         "id": "LIN-4266",
+         "usd": 4.99
+        },
+        {
+         "id": "LIN-4267",
+         "usd": 9.2
+        },
+        {
+         "id": "LIN-4268",
+         "usd": 4.42
+        },
+        {
+         "id": "LIN-4269",
+         "usd": 9.33
+        },
+        {
+         "id": "LIN-4270",
+         "usd": 2.45
+        },
+        {
+         "id": "LIN-4272",
+         "usd": 7.74
+        },
+        {
+         "id": "LIN-4276",
+         "usd": 6.26
+        },
+        {
+         "id": "LIN-4277",
+         "usd": 7.35
+        },
+        {
+         "id": "LIN-4279",
+         "usd": 4.37
+        },
+        {
+         "id": "LIN-4280",
+         "usd": 5.15
+        },
+        {
+         "id": "LIN-4281",
+         "usd": 5.88
+        },
+        {
+         "id": "LIN-4282",
+         "usd": 10.38
+        },
+        {
+         "id": "LIN-4283",
+         "usd": 5.13
+        },
+        {
+         "id": "LIN-4284",
+         "usd": 3.86
+        },
+        {
+         "id": "LIN-4285",
+         "usd": 4.49
+        },
+        {
+         "id": "LIN-4292",
+         "usd": 7.79
+        },
+        {
+         "id": "LIN-4293",
+         "usd": 8.26
+        },
+        {
+         "id": "LIN-4296",
+         "usd": 13.98
+        },
+        {
+         "id": "LIN-4298",
+         "usd": 5.74
+        },
+        {
+         "id": "LIN-4299",
+         "usd": 6.23
+        },
+        {
+         "id": "LIN-4300",
+         "usd": 19.48
+        },
+        {
+         "id": "LIN-4304",
+         "usd": 6.75
+        },
+        {
+         "id": "LIN-4306",
+         "usd": 2.3
+        },
+        {
+         "id": "LIN-4307",
+         "usd": 9.5
+        },
+        {
+         "id": "LIN-4308",
+         "usd": 2.72
+        },
+        {
+         "id": "LIN-4309",
+         "usd": 2.27
+        },
+        {
+         "id": "LIN-4310",
+         "usd": 2.45
+        },
+        {
+         "id": "LIN-4311",
+         "usd": 3.5
+        },
+        {
+         "id": "LIN-4312",
+         "usd": 4.03
+        },
+        {
+         "id": "LIN-4313",
+         "usd": 10.74
+        },
+        {
+         "id": "LIN-4314",
+         "usd": 3.41
+        },
+        {
+         "id": "LIN-4315",
+         "usd": 22.26
+        },
+        {
+         "id": "LIN-4317",
+         "usd": 7.38
+        },
+        {
+         "id": "LIN-4322",
+         "usd": 7.43
+        },
+        {
+         "id": "LIN-4323",
+         "usd": 6.79
+        },
+        {
+         "id": "LIN-4324",
+         "usd": 8.12
+        },
+        {
+         "id": "LIN-4330",
+         "usd": 8.21
+        },
+        {
+         "id": "LIN-4331",
+         "usd": 10.87
+        },
+        {
+         "id": "LIN-4332",
+         "usd": 3.22
+        },
+        {
+         "id": "LIN-4333",
+         "usd": 5
+        },
+        {
+         "id": "LIN-4334",
+         "usd": 10.62
+        },
+        {
+         "id": "LIN-4335",
+         "usd": 11.75
+        },
+        {
+         "id": "LIN-4338",
+         "usd": 8.14
+        },
+        {
+         "id": "LIN-4340",
+         "usd": 5.82
+        },
+        {
+         "id": "LIN-4345",
+         "usd": 137.86
+        },
+        {
+         "id": "LIN-4346",
+         "usd": 41.11
+        },
+        {
+         "id": "LIN-4351",
+         "usd": 15.38
+        },
+        {
+         "id": "LIN-4352",
+         "usd": 25.19
+        },
+        {
+         "id": "LIN-4353",
+         "usd": 43.37
+        },
+        {
+         "id": "LIN-4354",
+         "usd": 21.17
+        },
+        {
+         "id": "LIN-4358",
+         "usd": 60.17
+        },
+        {
+         "id": "LIN-4360",
+         "usd": 14.28
+        },
+        {
+         "id": "LIN-4361",
+         "usd": 10.29
+        },
+        {
+         "id": "LIN-4362",
+         "usd": 14.03
+        },
+        {
+         "id": "LIN-4367",
+         "usd": 6.08
+        },
+        {
+         "id": "LIN-4368",
+         "usd": 13.76
+        },
+        {
+         "id": "LIN-4369",
+         "usd": 110.71
+        },
+        {
+         "id": "LIN-4370",
+         "usd": 28.45
+        },
+        {
+         "id": "LIN-4371",
+         "usd": 10.01
+        },
+        {
+         "id": "LIN-4373",
+         "usd": 21.18
+        },
+        {
+         "id": "LIN-4374",
+         "usd": 7.9
+        },
+        {
+         "id": "LIN-4375",
+         "usd": 6.88
+        },
+        {
+         "id": "LIN-4376",
+         "usd": 20.79
+        },
+        {
+         "id": "LIN-4378",
+         "usd": 23.9
+        },
+        {
+         "id": "LIN-4379",
+         "usd": 13.72
+        },
+        {
+         "id": "LIN-4380",
+         "usd": 11.86
+        },
+        {
+         "id": "LIN-4381",
+         "usd": 16.81
+        },
+        {
+         "id": "LIN-4382",
+         "usd": 16.37
+        },
+        {
+         "id": "LIN-4383",
+         "usd": 24.08
+        },
+        {
+         "id": "LIN-4384",
+         "usd": 8.21
+        },
+        {
+         "id": "LIN-4387",
+         "usd": 9.52
+        },
+        {
+         "id": "LIN-4391",
+         "usd": 8
+        },
+        {
+         "id": "LIN-4393",
+         "usd": 14.94
+        }
+       ]
+      },
+      "reason": null,
+      "unreadable": 0
+     },
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    }
+   ]
+  }
+ ]
+}
