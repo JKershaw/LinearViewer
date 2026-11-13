@@ -50,7 +50,7 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
 - `public/app.js`: Home's Running and Up next are refreshed by parsing a whole page with
   `DOMParser` (LIN-4243). Waiting on you is drawn as a server fragment by the page's own
   function (LIN-4242); doing the same for the other sections would mean the client never
-  parses a whole page. (Survey tally: LIN-4243.)
+  parses a whole page. (Survey tally: LIN-4243.) Not a module matter; outside LIN-4463 (plan table).
 - `public/common.js`: `buildDispatchModelOptionDescriptors` repeats the merge rule of
   `buildModelOptions` (`lib/openrouter-catalog.js`). That module is not a leaf (it imports
   `lib/catalog-rate.js`), so it cannot be served as one shared file (LIN-4446).
@@ -58,8 +58,10 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   the wire); only the rule is. The endpoint could send merged options instead. (LIN-4358.)
 - `public/brief.js`: its `postBrief`/`errorText` block is identical to `postRecap`/`errorText`
   in `public/recap.js`, and the check for a `statusCode` inside a keepalive 200 body is now
-  written four times (also `public/scan.js` and `public/observation.js`). One shared reader
-  in `public/common.js`. (Area reads CG/CH, 8 Nov, on LIN-4358.)
+  written four times (also `public/scan.js` and `public/observation.js`). One shared imported reader is possible only
+  once `public/scan.js`, `public/recap.js`, `public/observation.js` and `public/brief.js` are modules that can import it
+  (LIN-4463 converts pages top down); until then it would be a classic global in `public/common.js`. (Area reads CG/CH,
+  8 Nov, on LIN-4358.)
 - `public/common.js`: exported globals, and the "client twins" of `lib/task-page-href.js`, `lib/timeline-zoom.js`,
   `lib/ship-layout.js` and `lib/prompt-formatters.js`. The first two are leaves of the same shape as cost-format, the
   next candidates; the last two import other modules, so serving a single file will not do for them. Its
@@ -86,4 +88,5 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   OpenRouter key) the run control still offers Next step. Pressing it gets a 503 from the recommend
   stream, and "AI Recommend · generating…" / "Loading…" spin with no message, while Run to PR works
   beside it. Offer only what the server can do, or say why it can't. (Onboarding & Cold-Start
-  Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)
+  Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.) Not a module matter; outside
+  LIN-4463 (plan table).
