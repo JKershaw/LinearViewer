@@ -3724,3 +3724,7 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - LIN-4447's plan records all three. simple-dispatcher becomes its piece 8, and design's duplicate R2 never reached John.
   - **The two tidy lanes are coordinating their seam on the tickets themselves.** At 15:39, LIN-4448 replied on LIN-4447 agreeing to all three seam moves: one comment classifier in `lib/run-trail.js`, the live-stage wait moving to `lib/run-live-wait.js` with no shim, and the third. No hand was involved.
   - No rulings are open.
+- **15:50 UTC: cross-lane coordination becomes a held paper (A17).** John: "I wonder if we could facilitate this kind of cross lane communication, and what opportunities it could unlock when it comes to parallel/networked sessions. Perhaps a paper then an interesting and visual essay could be interesting (opus not haiku)."
+  - **Agreed:** one Opus writer as a `custom` dispatch; my reviewer subagent reads the paper before merge, since John skips that read ("Sorry, I meant skipping the paper read"); the essay is a second ticket, written by Fable as a trial ("We could also try fable for the essay writing to get the best result?").
+  - **Timing, John:** "We can schedule it for when the tasks and related work has landed." The text is in `asks.md` under "Held: file when the lanes land", to file once LIN-4445, LIN-4447, LIN-4448 and LIN-4463 are done. The paper can then say whether the agreed border moves held.
+  - **Area read 0 for A16:** both browser-area passes done; the Web routes pair is running.

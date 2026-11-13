@@ -322,3 +322,27 @@ The code carries the same question in several places:
 - LIN-4215 and LIN-3836 are closed for that reason, or John has ruled they can wait.
 
 **Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.
+
+---
+
+## Held: file when the lanes land
+
+### A17. Paper (then essay): parallel lanes that coordinate (13 Nov)
+
+**Agreed with John on 13 Nov. Held until the current lanes and their related work have landed** (LIN-4445, LIN-4447, LIN-4448, LIN-4463). John: "We can schedule it for when the tasks and related work has landed." By then the paper can report whether the two tidy lanes built what they agreed. It goes to one writer on Opus as a `custom` dispatch, not through autopilot. An independent reviewer subagent sent by the driving agent reads the paper before merge; John skips that read. The essay is a second ticket after the paper merges, written by Fable as a trial; check first that Harbour can dispatch it.
+
+**Title:** Paper: can parallel lanes coordinate with each other, and what would helping them do it unlock?
+
+**Repository:** JKershaw/LinearViewer (Harbour).
+
+**What this is for.** John, 13 Nov, on two lanes agreeing their shared border through each other's tickets: "Lanes cross communicating is an interesting development. I wonder if we could facilitate this kind of cross lane communication, and what opportunities it could unlock when it comes to parallel/networked sessions." On 5 Nov he described the work as a network of tasks and agents for the "seemingly unbounded space of tangles and nests".
+
+**The case.** On 13 Nov four lanes ran at once. Two tidy lanes (LIN-4447, Runs & dispatch; LIN-4448, LLM & prompts) share the codebase's tightest tangle, and each ask named the other as owner of the far side. LIN-4447's design posted the changes it proposed at the border; LIN-4448 replied on LIN-4447 agreeing to all three, with no person involved.
+
+**The question.** What happened there, and why? What does Harbour already have that carries messages between sessions, and what was each part built for? What would make this kind of coordination easy and reliable, using what exists before building anything new? And what could it unlock for many sessions working in parallel, as a network rather than separate lines: which work becomes possible, cheaper or safer, and what new failures come with it (waits, knots, decisions made where nobody sees them)? Draw on what is known outside Harbour too.
+
+**What John wants.** A paper first, to the papers standard and grounded in the record, written by Opus ("opus not haiku"). John skips reading the paper: an independent reviewer sent by the driving agent reads it before merge, and what it finds is fixed first. Then a visual essay drawn from the paper, interesting and easy to read, written by Fable as a trial for the best result.
+
+**Done when** the paper is merged after that independent review, with every claim reachable from its evidence.
+
+**Questions:** settle research and engineering questions yourself; only John's calls go to him as rulings.
