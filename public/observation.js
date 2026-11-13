@@ -3972,8 +3972,8 @@ function dueSelectedCountText() {
 // genuine absence of history, not zero spend, and must never render the
 // same as a priced row that happens to average to zero. Mirrors their own
 // precision idiom (small per-call amounts keep 4 decimals; a larger total
-// rounds to 2) without importing it — this file has no module graph to
-// lib/, the same reason every other restatement in this codebase exists.
+// rounds to 2). The formatter itself is the one shared copy (LIN-4446), read
+// from window.CostFormat, which the module shim sets before DOMContentLoaded.
 //
 // Renders `meanUsd × selectedCount` as the estimate. `estimate` is
 // `observationData.scanCostEstimate`, threaded verbatim from the server
@@ -3986,7 +3986,7 @@ function formatDueScanCostEstimate(estimate, selectedCount) {
   if (!estimate || estimate.unknown || typeof estimate.meanUsd !== 'number' || !Number.isFinite(estimate.meanUsd)) {
     return 'est. unknown';
   }
-  // LIN-4179: the one browser formatter (public/cost-format.js, loaded before this file). A per-call estimate keeps
+  // LIN-4179 / LIN-4446: the one formatter (window.CostFormat, set by the module shim). A per-call estimate keeps
   // 4 decimals under $1; null (unknown) is the same "est. unknown", never a dollar figure.
   const total = estimate.meanUsd * selectedCount;
   const words = window.CostFormat.formatUsd(total, { fine: true });
