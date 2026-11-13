@@ -74,26 +74,20 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 
 ## Waiting
 
-- `lib/dispatch-wake.js`: `reportedPrUrlOf` and SD's `sessionPrs` pick a PR by one order, linked
-  only by a comment; changing one moves a PR link. (Drift & Coherence Review, 10 Nov;
-  `docs/reviews/drift-coherence-review-2026-11-10.md`.)
 - `lib/dispatch-leftover-hook.js`: a death between `claimHeldWake` and the enqueue, or a failed
   release write, leaves the wake held. No sweep: a lease sees no re-report, a sweep scans
   history, and clearing stamps reopens LIN-4375's double queue. (LIN-4377.)
 - `lib/dispatch-store.js`: `addFeedback` takes one `wakeHook`; a second held-wake feature
   first needs composable hooks. (Operator, LIN-4377.)
-- `lib/runner-kit/contract.json`: the row-shape rule is written twice (`checkRowShape`;
-  SD's `columnProblems`); `CONTRACT_SHA256` pins the bytes, not the rule. (Operator, LIN-4377.)
-- `lib/runner-kit/contract.json`: no row pins a follow-up to a finished, unhalted session
-  (rows cover pause and stop), though the leftover step resumes its build that way
-  (`lib/dispatch-leftover.js`). (Seams & Tangles, 10 Nov.;
-  `docs/reviews/seams-tangles-review-2026-11-10-run11.md`.)
-- `lib/session-summary.js`: do stored run paragraphs keep pre-cutover figures? (Survey
-  tally: LIN-4201.)
+- `lib/run-paragraph-hook.js`: stored run paragraphs are retained as written, and the cutover to request records
+  does not regenerate them. The gate key (`inputHash`, `gateFacts` in `lib/run-paragraph.js`) covers the title and
+  the ended loops only, so cost, usage and tier cannot move it: a stored `final` paragraph stays a cache hit when only
+  those change, and a newly ended loop still regenerates it. Nothing is labelled pre-cutover, because a stored
+  paragraph carries no figure: the hook writes its text, the model that wrote it, the gate key and `final`, and the
+  prompt forbids a price or a model id. The witness is `tests/unit/run-paragraph-hook.test.js` (the W-6 cases,
+  LIN-4475). (Survey tally: LIN-4201; answered in LIN-4475.)
 - `lib/wake-shadow.js`: one wake policy, from the LIN-3257 classifier this shadow records.
   (Survey tally: LIN-3257.)
-- `lib/runner-kit/runner.mjs`: the per-message transcript fold is here and in SD; one shared
-  fold would turn a transcript into requests. (Survey tally: LIN-4203, LIN-4195.)
 - `lib/run-live-wait.js`: a read, not a claim: two different-kind calls racing on
   one ticket both pass; claim compare-and-set, like `claimHeldWake` (LIN-4392). (Moved from the LLM & prompts note by LIN-4459.)
 - `lib/run-live-wait.js`: the run-outcome words have two homes. `QUEUED`/`RUNNING` live here (they moved
