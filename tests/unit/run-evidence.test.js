@@ -71,17 +71,19 @@ describe('run-evidence: state derivation', () => {
 
   test('zero PR URLs → no-pr', () => {
     const m = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [], });
-    assert.equal(m.state.status, 'no-pr');
-    assert.match(m.state.message, /no pull request/);
+    assert.equal(m.closeOut.status, 'no-pr');
+    assert.equal(m.state.pr, null, 'the picker names no PR');
+    assert.match(m.closeOut.message, /no pull request/);
   });
 
   test('exactly one open PR → ready, with the PR and checks link', () => {
     const m = buildRunEvidence({
       issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: oneOpen,
     });
-    assert.equal(m.state.status, 'ready');
+    assert.equal(m.state.pr.state, 'open', 'the picker reads the open PR');
     assert.equal(m.state.pr.number, 12);
     assert.equal(m.state.pr.checksUrl, `${PR_A}/checks`);
+    assert.equal(m.closeOut.pr.number, 12, 'the box names the same PR');
     assert.equal(m.evidence.checked.now.state, 'passing');
   });
 
@@ -90,7 +92,7 @@ describe('run-evidence: state derivation', () => {
       issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')],
       prStatus: { ...oneOpen, state: 'closed', merged: true, merged_at: '2026-07-02T10:00:00Z' },
     });
-    assert.equal(merged.state.status, 'merged');
+    assert.equal(merged.closeOut.status, 'merged');
     assert.equal(merged.state.pr.mergedAt, '2026-07-02T10:00:00Z');
     const open = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: oneOpen });
     assert.equal(open.state.pr.mergedAt, null);
@@ -103,28 +105,30 @@ describe('run-evidence: state derivation', () => {
       issueIdentifier: 'LIN-1',
       comments: [comment(`${PR_A} ${PR_B}`, '2026-07-01T00:00:00.000Z')],
     });
-    assert.equal(m.state.status, 'multiple-prs');
-    assert.match(m.state.message, /more than one PR/);
+    assert.equal(m.closeOut.status, 'multiple-prs');
+    assert.equal(m.state.pr, null);
+    assert.match(m.closeOut.message, /more than one PR/);
   });
 
   test('an unreadable PR read → unknown (fail-open), never throws', () => {
     const m = buildRunEvidence({
       issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: { readable: false, state: 'unknown', reason: 'private' },
     });
-    assert.equal(m.state.status, 'unknown');
+    assert.equal(m.closeOut.status, 'unknown');
     assert.equal(m.evidence.checked.now.state, 'unknown');
-    assert.match(m.state.message, /not checked/);
+    assert.match(m.closeOut.message, /not checked/);
   });
 
   test('a closed (unmerged) PR → pr-not-open; a merged one → merged', () => {
     const closed = buildRunEvidence({
       issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: { ...oneOpen, state: 'closed' },
     });
-    assert.equal(closed.state.status, 'pr-not-open');
+    assert.equal(closed.closeOut.status, 'closed');
+    assert.equal(closed.closeOut.reason, 'pr-not-open');
     const merged = buildRunEvidence({
       issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: { ...oneOpen, state: 'closed', merged: true },
     });
-    assert.equal(merged.state.status, 'merged');
+    assert.equal(merged.closeOut.status, 'merged');
   });
 });
 
@@ -145,7 +149,8 @@ describe('run-evidence: evidence rows and close-out', () => {
     assert.equal(m.evidence.checked.review.sha, 'abc1234');
     assert.equal(m.evidence.checked.now.headSha, 'deadbeefdead');
     assert.equal(m.evidence.checked.now.headMoved, true);
-    assert.equal(m.state.status, 'ready', 'head-moved does not withhold the ready state');
+    assert.equal(m.state.pr.state, 'open', 'head-moved does not withhold the picker\'s open PR');
+    assert.notEqual(m.closeOut.refuses, 'head-moved', 'a moved head refuses nothing on a run that does not stop at the PR');
   });
 
   test('asked comes from the issue title; done from the resolved PR', () => {

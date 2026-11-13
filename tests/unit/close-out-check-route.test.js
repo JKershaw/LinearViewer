@@ -652,6 +652,17 @@ describe('LIN-3657: close-out-press on a head-moved close-out', () => {
     assert.deepEqual(counts, { provider: 0, pr: 0 });
   });
 
+  test('LIN-4460: an approved, open, unread stop-at-PR landing is refused blind-read-missing and records nothing', async () => {
+    const unread = [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(headReview, '2026-07-02T00:00:00.000Z')];
+    const built = makeRouter({ comments: unread, statuses: { 41: openStatus(41, REVIEWED) } });
+    const res = await press(built, pressReq({ headSha: REVIEWED }));
+    assert.equal(res.statusCode, 409, JSON.stringify(res.jsonBody));
+    assert.equal(res.jsonBody.code, 'CLOSE_OUT_NOT_READY');
+    assert.equal(res.jsonBody.reason, 'blind-read-missing');
+    assert.equal(res.jsonBody.error, 'No blind read on record since the review');
+    assert.equal((await rows(built.collection)).length, 0);
+  });
+
   describe('source resolution (the press body carries no source)', () => {
     async function withRow(row) {
       const db = harness.freshDb();

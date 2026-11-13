@@ -146,7 +146,7 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   `VIRTUAL_PROMPTS.BLIND_READ` (`lib/workflow-config.js`); `lib/completion-signals.js` types the
   heading (three times) and the verdict words instead of importing them. The route module does not
   import `BLIND_READ_KIND` at all, and `tests/unit/stage-kind-tables.test.js` checks presence, not
-  these literals. LOW: a stored kind is rarely renamed; the leaf's claim is what is untrue. `lib/recommendation-blind-read.js` also redeclares `COMPLETED`. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+  these literals. LOW: a stored kind is rarely renamed; the leaf's claim is what is untrue. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
 - `lib/prompts/leftover-words.js`: the retirement line's words have one home and one checker
   (`lib/dispatch-leftover-answer.js`), but which entry to settle (the busiest touched area, else
   another) and the three forms are restated by hand in `docs/areas/README.md`, simple-dispatcher's

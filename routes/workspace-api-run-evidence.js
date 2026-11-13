@@ -11,7 +11,7 @@
 import { json } from 'express';
 import { badRequest, jsonError, unauthorized } from '../lib/errors.js';
 import { readRunEvidence } from '../lib/run-evidence.js';
-import { closeOutSetsDone } from '../lib/run-closeout-state.js';
+import { CLOSE_OUT_ACTOR } from '../lib/run-closeout-state.js';
 import { recordMergedPrs } from '../lib/close-out-merges.js';
 import { readCloseOutChain, closeOutNotReady, closeOutNotReadyRefusal } from '../lib/close-out-readiness.js';
 import { getLoopsForIssue, sessionIdByLoop } from '../lib/pipeline-loops.js';
@@ -36,7 +36,7 @@ const validCloseOutIdentifier = (identifier) => !!identifier && identifier.lengt
 // The signed-in person's own session: an authenticated session (workspaceFromUrl
 // already required one) and NOT a worker/proxy token. Computed from the
 // request, never from the body, so the route can never be handed
-// `byPersonCheck: true`.
+// `actor: 'person'` (LIN-4460: the person is the only actor that sets Done).
 function isPersonSession(req) {
   return !!req.session?.accountId && !req.proxyTokenId && !req.proxyUrlKey;
 }
@@ -248,9 +248,10 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
   /**
    * Close-out check (LIN-3248, P3 of LIN-2949). The page calls this on load and
    * on tab focus, only while the close-out state is `ready`. It re-reads the PR
-   * live, derives the close-out state with `deriveCloseOutState` (never P2's
-   * looser `closeOut.status`), records a `{ by: 'person' }` event when a PR is
-   * merged, and sets Done only within R1's bounds — all on the signed-in
+   * live, derives the close-out state with `deriveCloseOutState` over the one
+   * decision (`closeOutDecision`, `actor: 'person'`, LIN-4460), records a
+   * `{ by: 'person' }` event when a PR is merged, and sets Done when the
+   * decision's `setDone` says so — all on the signed-in
    * person's own provider session, never a worker or proxy token. Returns
    * `done` (a Done is recorded for the merge) and `doneNow` (THIS call wrote
    * the tracker's Done) so the client reloads only on the real transition.
@@ -277,7 +278,7 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
         seam,
         runnerReady: seam.runnerReady ? !!seam.runnerReady(req) : (await requestFeatureFlags(req)).runControls === true,
         owner: true,
-        byPersonCheck: true,
+        actor: CLOSE_OUT_ACTOR.PERSON,
         installationTokenFor,
       });
 
@@ -296,8 +297,8 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
         recorded = merges.recorded;
         let { mergedEvent } = merges;
 
-        // LIN-4458: the merged PR is the state's own, found by URL (no index shared across lists).
-        if (state.status === 'merged' && closeOutSetsDone({ prStatuses, prUrl: state.pr?.url ?? null, review: ledger, byPersonCheck: true })) {
+        // LIN-4460: the decision names whether the person's check sets Done (merged landing, approving review).
+        if (state.setDone) {
           ({ mergedEvent, ...outcome } = await settleDone({ workspace, provider, callScope, issueIdentifier, seam, mergedEvent }));
         }
 

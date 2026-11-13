@@ -49,3 +49,13 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   `createFields()` (the provider already sets the epic from it, but the form then needs an epic or project
   control scoped by team) or stop passing the parameter: a separate design decision, not a line edit.
   (LIN-4451 review.)
+- `lib/components/view-nav.js` and `lib/components/footer.js`: comments the view-switcher and footer fixes left stale.
+  The `lib/components/view-nav.js` header says the "Flagged power-user (roadmap / dispatch / proxy)" views show only
+  behind a flag, but proxy is always pushed; it omits live-console's roadmap-tier slot; and it says "the six in
+  EXPERIMENTAL_VIEWS" where `lib/feature-defaults.js` lists seven. `lib/components/footer.js` (near line 89) says the
+  model name is filled "from /api/recommend/status"; the client reads the workspace-scoped path. Comment fixes, no
+  behaviour. (LIN-4463 blind read.)
+- `lib/components/view-nav.js`: the docs that describe the view tiers disagree with it. `docs/view-tiers.md` names the
+  first-class root view "dashboard" where the route key is projects (label "tasks"), and it and
+  `docs/architecture/views.md` list proxy among the flagged power-user views although the header switcher always shows
+  it. Rewrite the tier lists from `getViewNavLinks` and `DISPLAY_LABELS`. (LIN-4463 blind read.)
