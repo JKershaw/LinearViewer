@@ -72,3 +72,9 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   does not know which stage a token was minted for. The blind read (LIN-4437) is blind by its prompt and preamble only: a
   reader that ignores them can read the ask and the plan. Holding it needs the stage on the token and a read guard per
   stage. By the consequence test it breaks nothing today, blocks no work and touches no safety. (LIN-4396 plan, witness 2.)
+- `routes/proxy-compute.js`: about 16 production sites (this file x7, `server.js` x3, `routes/test.js`, and
+  others) compare a credential to `'test-token'` inline, beside the one helper (`isHermeticTestToken`,
+  `lib/should-mock-ai.js`) that only two production modules import. Each is gated on `NODE_ENV=test`, so
+  production behaviour is right today; injecting transports from tests, instead of production code
+  recognising the token, would remove these checks and the `testTransport` declaration
+  (`lib/dispatch-factory.js`). It spans several areas. (LIN-4456 review and Survey global, 13 Nov.)

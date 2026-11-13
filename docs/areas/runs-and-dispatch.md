@@ -142,3 +142,9 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   stamps, and the column only records `findWakeEvent`'s behaviour. Removing the column or making it true to
   both readers means deciding whether `findWakeEvent` should skip stamps, which changes wake minting and
   every reader of stored rows. (LIN-4455 blind read.)
+- `lib/dispatch-factory.js`: `refusesHermeticToken` skips access for a provider that declares `testTransport`
+  (`LinearProvider`, `lib/providers/linear/index.js`), but nothing links that declaration to the transport
+  swaps it describes (`routes/test.js` `installTestTokenLinearTransport`, `tests/fixtures/hermetic-linear.js`),
+  so a new installer or a change to Linear's can drift from it silently. Closing it means deciding where test
+  transports register (for example installers that declare which provider they cover, plus a census test),
+  across providers, web routes and fixtures: larger than a fix. (LIN-4456 blind read, 13 Nov.)
