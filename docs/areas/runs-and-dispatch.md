@@ -90,6 +90,16 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   fold would turn a transcript into requests. (Survey tally: LIN-4203, LIN-4195.)
 - `lib/run-live-wait.js`: a read, not a claim: two different-kind calls racing on
   one ticket both pass; claim compare-and-set, like `claimHeldWake` (LIN-4392). (Moved from the LLM & prompts note by LIN-4459.)
+- `lib/run-live-wait.js`: the run-outcome words have two homes. `QUEUED`/`RUNNING` live here (they moved
+  with `isLiveRun` to avoid an import cycle), while `WAITING_ON_A_PERSON`, `'closed'` and `'aborted'` stay
+  in `lib/recent-runs.js`, and `lib/recommendation-look-first.js` still imports them from there. One home
+  (for example a leaf module of outcome words) touches importers in LLM & prompts, so it is larger than a
+  fix. (LIN-4459 blind read.)
+- `lib/recent-runs.js`: a parked stage whose lineage has ended is dated by its park time, not the lineage's
+  end, because the `withLineage` wire row from `listHistory` (`lib/dispatch-store.js`) carries no end
+  time. It sorts too early in the selector's five, and can land on the wrong side of a "since the latest
+  review" cut, such as the ended-read count in `lib/recommendation-blind-read.js`. Fix: `listHistory`
+  reports the lineage's end time, a store change that alters the Dispatch route's output. (LIN-4459 blind read.)
 - `lib/run-ledger.js`: `landingPrUrls` counts every full PR URL after its anchor, so it disagrees with
   the other landing readers in two cases the shared-trail table pins as chosen, not designed
   (`tests/unit/lin-4438-blind-read-gate.test.js` rows 14 and 15): an audit report that re-cites a
