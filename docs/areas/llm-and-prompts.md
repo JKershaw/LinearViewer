@@ -165,17 +165,11 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   choose from. Decide whether every kind gets a constant or only this one. LIN-4467 made one record per stage
   kind (`lib/prompts/stage-kinds.js`) but keys it by literals, so the question stands; the record is where a
   constant per kind would live. (LIN-4466 blind read; LIN-4467 leftovers.)
-- `tests/fixtures/lin-4467-witness.json` with `tests/unit/lin-4467-stage-kind-witness.test.js`: the
-  witness stays as a permanent ratchet on real-context renders (LIN-4469, decided), but it also
+- `lib/prompts/stage-kinds.js`, and its witness `tests/fixtures/lin-4467-witness.json` with
+  `tests/unit/lin-4467-stage-kind-witness.test.js`: the witness stays as a permanent ratchet on real-context renders (LIN-4469, decided), but it also
   holds a sha256 for each per-kind table (`COMPLETION_SIGNALS`, `STAGE_INTENT`, …), views that
   `tests/unit/lin-4467-stage-kind-record.test.js` already ties to the record by construction, and a
   hash failure says that something changed, never what. Every wording change regenerates it with
   the byte ceilings and the change log. Decide whether to trim it to the renders, or fold it into
   `tests/unit/prompt-size-budget.test.js`: a decision about the test suite, not a fix. (LIN-4469
   blind read.)
-- `lib/run-view.js` (runs-and-dispatch's file, the display words are this area's): `STEP_KIND_WORDS`
-  copies six labels from `STAGE_LABELS` through a hand-typed kind list, so `stageLabel('look-into')`
-  is "Look into" and `stepKindWord('look-into')` is "Look-into", and a new kind has to be added to
-  that list by hand. One display word per kind changes visible labels on the run page and settings
-  (`lib/render-session.js`, `lib/render-settings.js`), so it is a product call. (LIN-4469 blind
-  read.)

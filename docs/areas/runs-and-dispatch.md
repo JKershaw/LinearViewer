@@ -166,3 +166,9 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   `hasSignals`'s null branch is unreachable and the header still says "simplified 3-label system".
   Delete them and their tests, leaving `COMPLETION_SIGNALS`. Left here because the file is this
   area's and LIN-4467 (piece 3) made it a view; it breaks nothing today. (LIN-4469 blind read.)
+- `lib/run-view.js` (the display words come from llm-and-prompts' `STAGE_LABELS`, `lib/prompts/stage-kinds.js`): `STEP_KIND_WORDS`
+  copies six labels from `STAGE_LABELS` through a hand-typed kind list, so `stageLabel('look-into')`
+  is "Look into" and `stepKindWord('look-into')` is "Look-into", and a new kind has to be added to
+  that list by hand. One display word per kind changes visible labels on the run page and settings
+  (`lib/render-session.js`, `lib/render-settings.js`), so it is a product call. (LIN-4469 blind
+  read.)
