@@ -598,7 +598,8 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
     } catch (error) {
       console.error('Feedback submit error:', error);
       // A ticket that landed without its seal (LIN-4452): the same PARTIAL_WRITE envelope
-      // as the other create lanes, retryable:false, so the widget does not file a duplicate.
+      // as the other create lanes. retryable:false advises callers not to retry; the feedback
+      // widget (public/feedback-widget.js) does not read it yet, so it can still resubmit.
       if (answerPartialWrite(res, error)) return;
       return jsonError(res, 500, 'Failed to submit feedback');
     }

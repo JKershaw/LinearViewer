@@ -2140,6 +2140,7 @@ At least one field must be provided.
 - **GitHub-backed workspaces silently drop** `priority`/`priorityLevel` (both map to the same provider capability), `assigneeId`, `parentId`, `cycleId` — only `title`, `description`, and `stateId` take effect.
 - **Local-backed workspaces silently drop** `assigneeId`, `cycleId`.
 - **Linear-backed workspaces:** every field below takes effect.
+- **UUID-only fields (LIN-4452).** A present `assigneeId`, `parentId` or `cycleId` that is not a UUID is refused `400` before any read, on every provider, rather than dropped; `parentId: null` still clears.
 
 If you need certainty that a field you set actually landed, follow up with a `GET` on the issue — the echo below is **not** a reliable guarantee for every provider.
 

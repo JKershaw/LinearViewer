@@ -303,13 +303,6 @@ function issueRefResolutionFailed(res, err) {
   return true;
 }
 
-// A PartialWriteError (LIN-2012) is answered by lib/partial-write-error.js
-// `answerPartialWrite`, the same envelope the proxy lane sends (a landed create is
-// retryable:false), so a caller sees identical shapes on both lanes. This route has no
-// logEvent-equivalent audit trail today (unlike the proxy lane), so the provider-level
-// console.warn in lib/providers/jira/index.js is what covers this lane; adding one here
-// is a separate, out-of-scope concern.
-
 /**
  * Register the three issue-write routes, in order: comment write, issue create, issue patch.
  * @param {import('express').Router} router - the composer's router
@@ -796,6 +789,9 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
       const created = answerIssueWrite(res, await provider.createIssue(token, input), 'Issue was not created');
       if (created) res.status(201).json({ success: true, issue: created.issue });
     } catch (err) {
+      // A PartialWriteError (LIN-2012) gets the proxy lane's envelope (a landed create is
+      // retryable:false). This lane has no logEvent audit line (unlike the proxy lane); the
+      // provider's console.warn in lib/providers/jira/index.js covers it.
       if (issueRefResolutionFailed(res, err) || answerPartialWrite(res, err)) return;
       // NAMED MONITOR (LIN-1579) for the createdBy stamp: a createdBy-related
       // Linear rejection (5xx/502) surfaces here as a caught error under this
@@ -878,6 +874,9 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
           .catch(e => console.error('[close-out-merges] seam 2 failure:', e?.message || e));
       }
     } catch (err) {
+      // A PartialWriteError (LIN-2012) gets the proxy lane's envelope (a landed create is
+      // retryable:false). This lane has no logEvent audit line (unlike the proxy lane); the
+      // provider's console.warn in lib/providers/jira/index.js covers it.
       if (issueRefResolutionFailed(res, err) || answerPartialWrite(res, err)) return;
       console.error('Workspace-api update issue error:', err.message);
       return jsonError(res, 500, 'Failed to update issue');

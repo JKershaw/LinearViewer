@@ -318,6 +318,11 @@ export function createProxyWriteRoutes({
 
   const refuseBadUuid = (ctx, value, noun) => !UUID_REGEX.test(value) && refuse(ctx, 400, `Invalid ${noun} ID format`);
 
+  // The UUID-only ref rule (LIN-4451 create, LIN-4452 PATCH), written once so the two
+  // routes cannot drift: a present value that is not a UUID is refused 400. Returns the
+  // refusal, or false when the value is absent or a UUID (so `parentId: null` passes).
+  const refuseNonUuidRef = (ctx, name, value) => Boolean(value) && !UUID_REGEX.test(value) && refuse(ctx, 400, `${name} must be a UUID`);
+
   /**
    * The `## As asked` guard (LIN-4352): the agent lane may not
    * change the block that holds the words as filed, drop it, or forge one onto a
@@ -451,7 +456,6 @@ export function createProxyWriteRoutes({
     // LIN-2239: priorityLevel reuses isValidPriority's range check (both scales are
     // integers over [0,4]) and converts to the native scale; it has no
     // apiWriteFields entry of its own, so it is gated on `priority`.
-    const isUuid = (v) => Boolean(v) && UUID_REGEX.test(v);
     const isPriority = (v) => v !== undefined && isValidPriority(v);
     // LIN-4451 (review note 5, disposition (b)): assigneeId / parentId / cycleId are
     // UUID-only on Linear. A present value that is not a UUID is refused 400 here, not
@@ -469,7 +473,7 @@ export function createProxyWriteRoutes({
     for (const { name, key, gate = name, value, present, convert, uuid = false } of fields) {
       if (!present(value)) continue;
       if (!writable.includes(gate)) return unsupported(name);
-      if (uuid && !isUuid(value)) return refuse(ctx, 400, `${name} must be a UUID`);
+      if (uuid && refuseNonUuidRef(ctx, name, value)) return;
       input[key] = convert ? await convert(value) : value;
     }
 
@@ -528,7 +532,7 @@ export function createProxyWriteRoutes({
     // dropped on a 200 that applies the rest of the PATCH. A provider id form (a Jira
     // issue key) reads as a clear refusal. `parentId: null` clears the parent and passes.
     for (const [name, value] of [['assigneeId', assigneeId], ['parentId', parentId], ['cycleId', cycleId]]) {
-      if (value && !UUID_REGEX.test(value)) return refuse(ctx, 400, `${name} must be a UUID`);
+      if (refuseNonUuidRef(ctx, name, value)) return;
     }
 
     // LIN-556: one guard read serves both the trashed refusal AND the team scope a
