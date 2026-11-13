@@ -1,28 +1,22 @@
 /**
- * Every per-kind table names every stage kind (LIN-4437, the guard half of the Waiting entry "a stage
- * kind is a row in ~nine parallel tables", docs/areas/llm-and-prompts.md).
+ * Every per-kind table that STAYS names every stage kind, or says why not (LIN-4437, the guard half of the Waiting
+ * entry "a stage kind is a row in ~nine parallel tables"; docs/areas/llm-and-prompts.md).
  *
- * A stage kind is a PROMPT_TEMPLATES key. Each table below is keyed (or listed) by kind. The test
- * fails when any key is missing from any table. A table that leaves a kind out on purpose lists that
- * kind here, with the reason; a listed kind that the table does carry fails too, so the list cannot
- * go stale. Deleting `blind-read` from any table turns this file red.
+ * LIN-4467 made most of the per-kind tables views of one record per kind (lib/prompts/stage-kinds.js): a view
+ * carries every kind by construction, and tests/unit/lin-4467-stage-kind-record.test.js checks the record's fields
+ * and each view. What is left here is the tables that stay, each with its owner and reason:
+ *   - STAGE_KINDS itself, the record every view reads (every kind is a key);
+ *   - JOBS (lib/llm-jobs.js): pure data on purpose, so its census test is not vacuous (19 of its 39 rows are not
+ *     template kinds);
+ *   - the wall-clock bucket, the round-trip walk and the first-pass sets, which belong to Runs & dispatch (A13);
+ *   - SPINE (lib/run-view.js): the fixed run-page spine;
+ *   - the traits pin table (tests/unit/lin-4253-stage-traits.test.js PINNED): hand-typed on purpose, the one
+ *     non-circular check of route and writes (read from the record it would check the record against itself);
+ *   - the rendered byte ceilings (tests/unit/prompt-size-budget.test.js), which cover the registry.
  *
- * Partial checks that existed before it, and how this file accounts for them:
- *   - tests/unit/lin-4253-stage-traits.test.js pins each kind's `route` and `writes` with reasons;
- *     its PINNED table is read here as one more table.
- *   - tests/unit/prompt-templates.test.js's grounding matrix (EXPECTED) pins which notes each kind
- *     renders; GROUNDING_BY_KIND is read here directly (a kind missing from it silently gets the
- *     fallback list, lesson LIN-4371), and the matrix keeps the rendering half.
- *   - tests/unit/completion-signals.test.js pins the signal list by hand; COMPLETION_SIGNALS is read
- *     here directly.
- *   - tests/unit/prompt-size-budget.test.js asserts its rendered ceilings cover the registry; its
- *     ceiling table is also read here, from source, so this file is the one completeness guard.
- *   - the template count in docs/architecture/source-map.md and public/llms.txt's catalog keep their
- *     own tests in prompt-templates.test.js (a count and a bullet per kind); llms.txt is read here too.
- *
- * LIN-4466 adds a source scan below: outside lib/prompts/blind-read-words.js, the blind read's kind is a
- * literal only as a row key of a table listed in TABLES (or in the template registry), and its heading and
- * verdict prose are never typed. TABLES is that scan's table inventory, so a table is listed once.
+ * LIN-4466 adds a source scan below: outside lib/prompts/blind-read-words.js, the blind read's kind is a literal only
+ * as a row key of a table listed in TABLES (or in the template registry), and its heading and verdict prose are never
+ * typed. TABLES is that scan's table inventory, so a table is listed once.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -33,18 +27,13 @@ import * as acorn from 'acorn';
 import * as walk from 'acorn-walk';
 import { REPO, shippedSourceFiles } from './helpers/shipped-sources.js';
 import { BLIND_READ_KIND, BLIND_READ_HEADING, BLIND_READ_VERDICT_PROSE, BLIND_READ_VERDICT_LIST } from '../../lib/prompts/blind-read-words.js';
-import { PROMPT_TEMPLATES, STAGE_LEADS } from '../../lib/prompt-templates.js';
-import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
-import { STAGE_INTENT } from '../../lib/prompts/stage-intent.js';
-import { GROUNDING_BY_KIND } from '../../lib/prompt-formatters.js';
-import { STAGE_LABELS, SPINE } from '../../lib/run-view.js';
+import { PROMPT_TEMPLATES } from '../../lib/prompt-templates.js';
+import { STAGE_KINDS } from '../../lib/prompts/stage-kinds.js';
+import { SPINE } from '../../lib/run-view.js';
 import { BUCKET_OF_KIND } from '../../lib/wall-clock-summary.js';
 import { JOBS } from '../../lib/llm-jobs.js';
-import { VIRTUAL_PROMPTS } from '../../lib/workflow-config.js';
 import { FIRST_PASS_KINDS } from '../../lib/pipeline-churn.js';
 import { OFF_SPINE_KINDS } from '../../lib/plan-review-round-trips.js';
-import { formatStageContract } from '../../lib/prompt-contract.js';
-import { buildInstructions } from '../../lib/proxy-instructions.js';
 
 const KINDS = Object.keys(PROMPT_TEMPLATES);
 const read = (path) => readFileSync(fileURLToPath(new URL(`../../${path}`, import.meta.url)), 'utf8');
@@ -59,32 +48,10 @@ function keysInSource(path, from, to) {
   return new Set([...block.matchAll(/^\s*'?([a-z][a-z-]*)'?\s*:/gm)].map(m => m[1]));
 }
 
-/** The kinds the catalog's verb-override line lists. */
-function overrideKinds() {
-  const text = buildInstructions({ baseUrl: 'https://h', scope: 'readWrite' });
-  const m = /VERB OVERRIDE — pass "kind" \(a prompt template key: ([^)]*)\)/.exec(text);
-  assert.ok(m, 'the catalog carries the verb-override kind list');
-  return new Set(m[1].split(',').map(s => s.trim()));
-}
-
-// Each table: how to read the kinds it names, and the kinds it leaves out on purpose, with why.
+// The tables that stay: how to read the kinds each names, and the kinds it leaves out on purpose, with why.
 const TABLES = {
-  'COMPLETION_SIGNALS (lib/completion-signals.js)': { has: (k) => Object.hasOwn(COMPLETION_SIGNALS, k) },
-  'STAGE_LEADS (lib/prompt-template-defs.js)': { has: (k) => Object.hasOwn(STAGE_LEADS, k) },
-  'STAGE_INTENT (lib/prompts/stage-intent.js)': { has: (k) => Object.hasOwn(STAGE_INTENT, k) },
-  'GROUNDING_BY_KIND (lib/prompt-formatters.js)': { has: (k) => Object.hasOwn(GROUNDING_BY_KIND, k) },
-  'STAGE_LABELS (lib/run-view.js)': { has: (k) => Object.hasOwn(STAGE_LABELS, k) },
-  'BUCKET_OF_KIND (lib/wall-clock-summary.js)': { has: (k) => Object.hasOwn(BUCKET_OF_KIND, k) },
+  'STAGE_KINDS (lib/prompts/stage-kinds.js)': { has: (k) => Object.hasOwn(STAGE_KINDS, k) },
   'JOBS (lib/llm-jobs.js)': { has: (k) => JOBS.some(j => j.id === k) },
-  'VIRTUAL_PROMPTS (lib/workflow-config.js)': {
-    has: (k) => Object.values(VIRTUAL_PROMPTS).includes(k),
-    out: {
-      bug: 'label-based: WORK_ISSUE_LABELS.BUG, not a state-based prompt',
-      blocked: 'label-named workflow (lib/prompt-templates.js header), not a state-based prompt',
-      'survey-task': 'sent by the look-first route or by hand; nothing reads it as a state-based prompt (only LOOK_INTO is read)',
-      'survey-place': 'as survey-task'
-    }
-  },
   'FIRST_PASS_KINDS (lib/pipeline-churn.js)': {
     has: (k) => FIRST_PASS_KINDS.has(k),
     out: {
@@ -118,29 +85,13 @@ const TABLES = {
       'survey-task': 'on the walk: before work starts', 'survey-place': 'on the walk: before work starts'
     }
   },
-  'the stage contract (lib/prompt-contract.js)': {
-    has: (k) => formatStageContract(k, 'X-1') !== '',
-    out: Object.fromEntries(KINDS.filter(k => !['plan', 'plan-review', 'implementation', 'review', 'close-out'].includes(k))
-      .map(k => [k, k === 'blind-read'
-        ? 'its comment shape is in its own text and held by the proxy (lib/run-ledger.js checkBlindRead), not a contract line'
-        : 'writes no format a later step parses through the contract'])),
-  },
-  'the catalog\'s verb-override list (lib/proxy-instructions.js)': {
-    has: (k) => overrideKinds().has(k),
-    out: {
-      'plan-review': 'missing from the example list before LIN-4437; the override takes any template key (docs/areas/agent-api.md Waiting: the catalog\'s kind contract)',
-      'close-out': 'as plan-review',
-      'retrospective-audit': 'as plan-review',
-      bug: 'as plan-review'
-    }
-  },
+  'BUCKET_OF_KIND (lib/wall-clock-summary.js)': { has: (k) => Object.hasOwn(BUCKET_OF_KIND, k) },
   'rendered byte ceilings (tests/unit/prompt-size-budget.test.js)': {
     has: (k) => keysInSource('tests/unit/prompt-size-budget.test.js', 'export const TEMPLATES_RENDERED_CEILINGS = {', '\n};').has(k)
   },
   'the stage-traits pin table (tests/unit/lin-4253-stage-traits.test.js)': {
     has: (k) => keysInSource('tests/unit/lin-4253-stage-traits.test.js', 'const PINNED = {', '\n};').has(k)
   },
-  'the llms.txt prompt catalog (public/llms.txt)': { has: (k) => read('public/llms.txt').includes(`- \`${k}\` -`) },
   'SPINE (lib/run-view.js)': {
     has: (k) => SPINE.includes(k),
     out: Object.fromEntries(KINDS.filter(k => !['plan', 'implementation', 'review', 'blind-read', 'close-out'].includes(k))
@@ -148,7 +99,7 @@ const TABLES = {
   }
 };
 
-describe('LIN-4437 — every per-kind table names every PROMPT_TEMPLATES key, or says why not', () => {
+describe('LIN-4437 — every per-kind table that stays names every PROMPT_TEMPLATES key, or says why not', () => {
   for (const [table, { has, out = {} }] of Object.entries(TABLES)) {
     test(`${table}: each kind is in the table or listed out with a reason`, () => {
       const missing = KINDS.filter(k => !has(k) && !Object.hasOwn(out, k));
@@ -182,18 +133,18 @@ describe('LIN-4437 — every per-kind table names every PROMPT_TEMPLATES key, or
 //     key's enclosing `const NAME = { ... }` must be a TABLES entry labelled `NAME (file)` in that same
 //     file (a keyed object that is not a listed table fails, even in a table's file), and (b) the template
 //     registry (lib/prompt-template-defs.js), which types the kind as a template key (under
-//     PROMPT_TEMPLATES or STAGE_LEADS) and may type it as a literal anywhere in that file;
+//     GENERATE, keyed by kind) and may type it as a literal anywhere in that file;
 //   - the heading as a substring of a string or template text, anywhere but the leaf;
 //   - the verdict words' prose ("better, the same or worse", "better, same or worse") likewise.
 // The scope is the code that ships (lib/, routes/, server.js) and the stability script that reads the
 // ledger. Eval fixtures under scripts/eval name kinds as data and are out of scope.
 const WORDS_LEAF = 'lib/prompts/blind-read-words.js';
 const TEMPLATE_REGISTRY = 'lib/prompt-template-defs.js';
-// The tables whose rows may be keyed by the kind: `NAME (file)` labels in TABLES, plus the registry's
-// PROMPT_TEMPLATES (the registry's STAGE_LEADS is already a TABLES entry). One inventory, not a second.
+// The tables whose rows may be keyed by the kind: `NAME (file)` labels in TABLES, plus the registry's GENERATE map
+// (one generate() per kind, beside the record it is keyed to). One inventory, not a second.
 const KEYED_TABLES = new Set([
   ...Object.keys(TABLES).map(label => /^([A-Z][A-Z_]*) \((lib\/[^)]+)\)$/.exec(label)).filter(Boolean).map(m => `${m[2]}#${m[1]}`),
-  `${TEMPLATE_REGISTRY}#PROMPT_TEMPLATES`
+  `${TEMPLATE_REGISTRY}#GENERATE`
 ]);
 
 /** The kind, heading and verdict-prose findings in one module's source. */
@@ -248,16 +199,16 @@ describe('LIN-4466 — the blind read\'s kind, heading and verdict words have on
   });
 
   test('the scan allows what it should: a table row keyed by the kind, a comment, a longer status, the registry', () => {
-    assert.deepEqual(blindReadFindings('lib/run-view.js', `export const STAGE_LABELS = { '${BLIND_READ_KIND}': 'Blind read' };`), []);
+    assert.deepEqual(blindReadFindings('lib/prompts/stage-kinds.js', `export const STAGE_KINDS = { '${BLIND_READ_KIND}': { label: 'Blind read' } };`), []);
     assert.deepEqual(blindReadFindings('lib/x.js', `// a ${BLIND_READ_KIND} note, and ${BLIND_READ_HEADING} in a comment\nexport const k = 'blind-read-missing';`), []);
-    assert.deepEqual(blindReadFindings(TEMPLATE_REGISTRY, `export const PROMPT_TEMPLATES = { '${BLIND_READ_KIND}': { name: '${BLIND_READ_KIND}' } };`), []);
+    assert.deepEqual(blindReadFindings(TEMPLATE_REGISTRY, `export const GENERATE = { '${BLIND_READ_KIND}': () => 1 };`), []);
     assert.ok(blindReadFindings('lib/x.js', `export const T = { '${BLIND_READ_KIND}': 1 };`).length > 0, 'a keyed object outside a table file is not a row');
     // The key allowance is per table, not per file (LIN-4466 review): a non-table object in a table's file fails.
     assert.ok(blindReadFindings('lib/run-view.js', `export const ZZ = { '${BLIND_READ_KIND}': 1 };`).length > 0, 'a non-table object in a table file is not a row');
     assert.ok(blindReadFindings('lib/run-view.js', `export const STAGE_LABELS = { nested: { '${BLIND_READ_KIND}': 1 } };`).length > 0, 'a key nested below a table row is not a row');
     assert.ok(blindReadFindings('lib/run-view.js', `export const STAGE_LABELS = f({ '${BLIND_READ_KIND}': 1 });`).length > 0, 'a table must be declared as the object itself');
     assert.ok(blindReadFindings('lib/wall-clock-summary.js', `export const STAGE_LABELS = { '${BLIND_READ_KIND}': 1 };`).length > 0, 'a table name in another table\'s file is not a row');
-    assert.deepEqual(blindReadFindings(TEMPLATE_REGISTRY, `export const PROMPT_TEMPLATES = { '${BLIND_READ_KIND}': 1 };`), []);
+    assert.deepEqual(blindReadFindings(TEMPLATE_REGISTRY, `export const GENERATE = { '${BLIND_READ_KIND}': 1 };`), []);
   });
 
   test('the verdict prose is the words in the order the prompts print them', () => {

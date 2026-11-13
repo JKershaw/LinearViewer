@@ -1,6 +1,6 @@
 /**
  * LIN-4345: a stage that decides what gets built names each cut to the `## As asked` block and
- * raises one ruling. The rule has one home, `CUT` in lib/prompts/stage-intent.js, inside the
+ * raises one ruling. The rule has one home, `CUT` in lib/prompts/stage-kinds.js (LIN-4467), inside the
  * DECIDE scope line. So every deciding stage renders it once, and no judging, reading or filing
  * stage renders it at all. A template says only where its cuts are written.
  *
@@ -15,7 +15,8 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { generatePrompt, PROMPT_TEMPLATES } from '../../lib/prompt-templates.js';
-import { STAGE_INTENT, CUT, DECIDE } from '../../lib/prompts/stage-intent.js';
+import { STAGE_INTENT } from '../../lib/prompts/stage-intent.js';
+import { CUT, DECIDE } from '../../lib/prompts/stage-kinds.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 import { AS_ASKED_HEADING } from '../../lib/as-asked.js';
 import { CUTS_LABEL } from '../../lib/size-of-move.js';
@@ -68,7 +69,7 @@ describe('the cut rule has one home (LIN-4345)', () => {
 
   test('no other lib/ source spells out a copy of the rule', () => {
     assert.ok(CUT_LITERAL.length > 100, 'the stretch scanned for is the rule, not a fragment of it');
-    const found = libFiles('lib').filter(f => f !== join('lib', 'prompts', 'stage-intent.js') && copiesIn(readFileSync(f, 'utf8')) > 0);
+    const found = libFiles('lib').filter(f => f !== join('lib', 'prompts', 'stage-kinds.js') && copiesIn(readFileSync(f, 'utf8')) > 0);
     assert.deepEqual(found, []);
   });
 

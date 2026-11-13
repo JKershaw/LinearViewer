@@ -179,7 +179,8 @@ function lex(src) {
   for (const text of src.split('\n')) { const off = text.search(/\S/); lines.push({ text, state: off < 0 ? 'code' : names[cls[start + off]] }); start += text.length + 1; }
   return { bytes, lines };
 }
-const WORKER_TEMPLATES = ['lib/prompt-templates.js', 'lib/prompt-template-defs.js', 'lib/prompt-formatters.js'];
+// LIN-4467: the stage-kind records hold the templates' text (route, lead, signals, contract, intent).
+const WORKER_TEMPLATES = ['lib/prompt-templates.js', 'lib/prompt-template-defs.js', 'lib/prompt-formatters.js', 'lib/prompts/stage-kinds.js'];
 const PROMPT_FILES = [...WORKER_TEMPLATES, 'lib/prompts/meta-prompt-template.js', 'lib/prompts/autopilot-kickoff.js', 'lib/prompts/autopilot-manual.js'];
 const show = (rev, f) => { try { return git('show', `${rev}:${f}`); } catch { return null; } };
 const END_MAY = '05d33f51';

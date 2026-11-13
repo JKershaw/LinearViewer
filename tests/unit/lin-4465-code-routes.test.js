@@ -16,6 +16,7 @@ import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { CODE_ROUTES } from '../../lib/code-routes.js';
+import { reviewLoopStep } from '../../lib/recommendation-facts.js';
 import { getRecommendation, setFetchImpl, setPromptTraceRecorder } from '../../lib/openrouter.js';
 import { sealAsAsked } from '../../lib/as-asked.js';
 
@@ -158,6 +159,15 @@ describe('CODE_ROUTES: the bound keeps its reasons byte for byte', () => {
 
   test('no loop: the bound stands aside', () => {
     assert.equal(entry('review-bound').route(issue, { comments: [RCn(1, 3)], allRuns: [] }), null);
+  });
+
+  test('the entry delegates: its reasons are written once, beside the bound (lib/recommendation-facts.js reviewLoopStep)', () => {
+    for (const comments of [[RCn(1, 3), RCn(2, 3), RCn(3, 3)], [RCn(1, 3), RCn(2, 2), RCn(3, 2), RCn(4, 1), RCn(5, 1)]]) {
+      const step = reviewLoopStep(issue, comments);
+      assert.deepEqual(entry('review-bound').route(issue, { comments, allRuns: [] }), { action: step.step, codeRoute: step.codeRoute, why: step.why });
+    }
+    const source = readFileSync(new URL('../../lib/code-routes.js', import.meta.url), 'utf8');
+    assert.ok(!source.includes('findings are not narrowing') && !source.includes('whatever the findings count'), 'lib/code-routes.js spells no reason of its own');
   });
 });
 
