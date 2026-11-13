@@ -170,3 +170,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   `lib/dispatch-leftover-answer.js` (any one to six characters, its comment calling it the guard's
   rule) and in simple-dispatcher's guard. A retirement line can name a path the guard would not read
   as one. Borderline. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+- `lib/prompts/runner-kickoff.js`: imports `FEEDBACK_ENTRY_KINDS` from the store (`lib/dispatch-store.js`), the only
+  importer of the store's re-export of it (`export { FEEDBACK_ENTRY_KINDS } from './dispatch-feedback-kinds.js'`).
+  Importing from the leaf `lib/dispatch-feedback-kinds.js` would let the store drop the shim and keep the prompt
+  module off the store's import graph. The runner prompt bytes and the kinds' exact order must not change.
+  (LIN-4455 blind read.)

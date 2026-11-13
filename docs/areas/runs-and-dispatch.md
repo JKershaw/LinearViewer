@@ -138,3 +138,9 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   complete; `pricedUsd` never counts a partial) in its own words, and the lineage figure in `lib/cost-read.js`
   states it again, so a change to the rule is made twice. One shared helper would make it one, but it reaches the
   lineage path and its goldens: larger than a fix. (LIN-4457 leftovers; Survey global on LIN-4457.)
+- `lib/dispatch-feedback-kinds.js`: the table's `mayCarryWake` column is `true` on every row (unknown kinds
+  pass too), so `findWakeEvent` (`lib/dispatch-terminal.js`) never skips a kind, while `lastWakeEntry`
+  (`lib/run-view.js`) skips the decision-stamp kinds as "never a wake marker". Two wake scans disagree about
+  stamps, and the column only records `findWakeEvent`'s behaviour. Removing the column or making it true to
+  both readers means deciding whether `findWakeEvent` should skip stamps, which changes wake minting and
+  every reader of stored rows. (LIN-4455 blind read.)
