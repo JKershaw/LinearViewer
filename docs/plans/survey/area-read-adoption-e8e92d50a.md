@@ -73,7 +73,7 @@ The check reads each PR's file list as `gh` reports it. It does not inspect diff
 - #2428 (LIN-4456, `0092d8d9e`) touched neither note nor any sampled file.
 - No sampled file changed between `e8e92d50a` and `0092d8d9e`: `git diff --name-only e8e92d50a origin/main` meets none of the 28 sampled paths. The control note is still blob `ae9c007e1`.
 - No LIN-4465 to LIN-4470 commit is on `origin/main`.
-- Open PRs now: #2431 (LIN-4471, opened after the baseline check) touches no sampled file and neither note. #2429 (LIN-4451) touches no sampled file but adds 6 lines to the control note `docs/areas/front-end-pages.md`; if it merges before the after-read, the control note moves and the after-read reports that as note change. The other eleven open PRs (besides this one) touch neither note nor any sampled file.
+- Open PRs now: #2432 (LIN-4459, opened after the baseline check) touches the sampled file `lib/openrouter.js` and the LLM note `docs/areas/llm-and-prompts.md`. It has not merged, so the baseline still holds; if it merges before the after-read, the sampled file's blob and the note move, and the after-read must account for both. #2431 (LIN-4471, also opened after the baseline check) touches no sampled file and neither note. #2429 (LIN-4451) touches no sampled file but adds 6 lines to the control note `docs/areas/front-end-pages.md`; if it merges before the after-read, the control note moves and the after-read reports that as note change. The other eleven older open PRs (besides this one) touch neither note nor any sampled file.
 
 ## 4. Where the planned work is and is not
 
