@@ -244,7 +244,7 @@ function dismissSpec({ dispatchQueueStore }) {
 //
 // The write-side counterpart to `kind: 'decision-withdrawn'`
 // (routes/dispatch.js, runner-writable behind a required `reason` — see
-// `FEEDBACK_ENTRY_KINDS`'s docblock in lib/dispatch-store.js for the full
+// the kinds table's docblock in lib/dispatch-feedback-kinds.js for the full
 // credential-class audit). Reversal is deliberately the ONE decision-
 // lifecycle transition no token can ever reach: mounted under the same
 // session-only `workspaceFromUrl` as `.../dismiss` above, which never reads

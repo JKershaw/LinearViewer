@@ -12,7 +12,7 @@ import { Router } from 'express';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { jsonError, keepaliveError, notFound, replyStoreFault } from '../lib/errors.js';
 import { MAX_NAME_LENGTH, DANGEROUS_CHARS_REGEX } from '../lib/issue-write-validation.js';
-import { deriveCompletedAt, deriveWireStatus, deriveWireTerminal, closedProjection } from '../lib/dispatch-terminal.js';
+import { deriveCompletedAt, deriveWireStatus, deriveWireTerminal, closedProjection, NEVER_RAN } from '../lib/dispatch-terminal.js';
 import { wireStatusOf } from '../lib/dispatch-lineage-status.js';
 import { buildQueuedPollWarning, getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
 import { redactSessionItem } from '../lib/dispatch-session-redaction.js';
@@ -357,7 +357,7 @@ export function createDispatchRoutes({
       const scopeOpts = issueIdentifier ? { issueIdentifier } : {};
       // Only the queue half is not a history row; only a queued filter wants it.
       const wantsQueue = !statusFilter || statusFilter === 'queued';
-      const lineageDerived = statusFilter && !['queued', 'cancelled', 'expired'].includes(statusFilter);
+      const lineageDerived = statusFilter && statusFilter !== 'queued' && !NEVER_RAN.has(statusFilter);
       // A lineage-status filter reads the persisted field, so rows from before it existed
       // are derived first (once per process per workspace).
       if (lineageDerived) await dispatchQueueStore.ensureLineageStatus(req.proxyUrlKey);
