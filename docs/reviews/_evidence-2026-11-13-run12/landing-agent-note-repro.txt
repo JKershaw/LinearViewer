@@ -1,0 +1,3 @@
+autopilotNote workAfterReview= false landing= 1 blindReadStep= blind-read
+plainNote    workAfterReview= true  landing= 1 blindReadStep= null
+noNote       workAfterReview= false landing= 1 blindReadStep= blind-read

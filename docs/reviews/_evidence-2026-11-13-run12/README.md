@@ -54,3 +54,5 @@ Evidence for `docs/reviews/seams-tangles-review-2026-11-13-run12.md`. Review-onl
 The three ticket experiments reproduce the figures recorded in the ticket's brief (35/59, 38/49, 29/53 with three new reciprocal pairs), which fixes their membership as above. None of them is proposed as the F1 fix (see the report, §3.1 and §7).
 
 **What is not in this folder, on purpose.** No copies of run 11's files, no copies of source, no proposal registries beyond the labelled experiments. The adversarial reader's transcript is not in this folder; its answer is copied into the report's `## Adversarial Second-Read` section.
+
+**Added after the second read.** `landing-agent-note-repro.mjs` → `landing-agent-note-repro.txt`: the same PR-citing comment after an approved review gives a blind-read step when its first line is `autopilot:` (agent note: `workAfterReview` false), and no step when it is a plain note (`workAfterReview` true). Run from the repo root with the HEAD modules; the output is the file's content.
