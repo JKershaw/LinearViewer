@@ -662,8 +662,9 @@ export function createComputeRoutes({
    * LIN-4263: each `workerSessions` row stays one row per lineage, and gains
    * `tokens`, `byModel` (records lineages only) and `dispatches`: one entry per
    * true dispatch in the lineage, with its own model(s), tokens and USD, which
-   * sum to the lineage's own, and (LIN-4404) its `firstRequestAt` /
-   * `lastRequestAt`. `dispatches` is null for a snapshot-only lineage, where the
+   * sum to the lineage's own, (LIN-4404) its `firstRequestAt` /
+   * `lastRequestAt`, and (LIN-4454) its `model`, the fold's answer by the
+   * lineage's own rule. `dispatches` is null for a snapshot-only lineage, where the
    * split is not knowable. Only the task read builds it (`perDispatch`).
    */
   router.get(['/api/proxy/issues/:identifier/cost', '/api/proxy/cost/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {

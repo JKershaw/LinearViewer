@@ -30,12 +30,13 @@ const T0 = Date.UTC(2026, 10, 8, 12);
 const iso = ms => new Date(ms).toISOString();
 const atMin = m => iso(T0 + m * MIN);
 
-/** A dispatch entry, as part 1's `dispatchesOf` returns it. */
+/** A dispatch entry, as part 1's `dispatchesOf` returns it: `model` is its one `byModel` model (the fold's answer, LIN-4454), null with no records. */
 const d = (itemId, kind, startMin, firstMin, lastMin, { followUpTo = null, costUsd = 0.1, model = 'claude-opus-5-5' } = {}) => ({
   itemId, kind, dispatchedAt: atMin(startMin), followUpTo,
   byModel: firstMin === null ? null : [{ model, requests: 3, costUsd }],
   requests: firstMin === null ? 0 : 3, costUsd: firstMin === null ? null : costUsd,
   firstRequestAt: firstMin === null ? null : atMin(firstMin), lastRequestAt: lastMin === null ? null : atMin(lastMin),
+  model: firstMin === null ? null : model,
 });
 /** A `workerSessions` row. */
 const s = (rootItemId, kind, startMin, durationMin, dispatches, extra = {}) => ({

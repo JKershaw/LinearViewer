@@ -274,7 +274,7 @@ describe('the guest: no dollars in any of the three responses', () => {
     const at = m => new Date(T0 + m * MIN).toISOString();
     const d = (itemId, kind, start, first, last, { costUsd = 0.1, followUpTo = null } = {}) => ({
       itemId, kind, dispatchedAt: at(start), followUpTo, byModel: [{ model: 'claude-opus-5-5', requests: 3, costUsd }],
-      requests: 3, costUsd, firstRequestAt: at(first), lastRequestAt: at(last),
+      requests: 3, costUsd, firstRequestAt: at(first), lastRequestAt: at(last), model: 'claude-opus-5-5',
     });
     const s = (rootItemId, kind, start, dur, dispatches, extra = {}) => ({
       rootItemId, kind, dispatchedAt: at(start), harness: 'claude-code', model: 'claude-opus-5-5', effort: 'high',
