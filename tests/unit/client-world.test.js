@@ -3,7 +3,7 @@
  *
  * A `let` at the top of a loaded script is a script-scope binding: it is not a property of the vm context, so
  * `world.sandbox` cannot read or set it. `run` evaluates in that scope, which is how a suite drives client state that
- * has no other entry point (observation.js's `currentView`). These tests pin the seam itself: a no-op `run` fails them.
+ * has no other entry point. These tests pin the seam itself: a no-op `run` fails them.
  *
  * Run with: node --test tests/unit/client-world.test.js
  */
@@ -13,9 +13,11 @@ import { loadWorld, clickOn, clickDelegated, fireDOMContentLoaded } from './help
 
 describe('loadWorld — run(code) reaches script-scope bindings', () => {
   test('reads and writes a top-level let of a loaded script', () => {
-    // observation.js registers a window listener at load; the stub is the only window dependency it has at load time.
-    const world = loadWorld({ window: { addEventListener() {} }, scripts: ['observation.js'] });
-    assert.equal(world.run('currentView'), 'runs', 'observation.js declares currentView as a script-scope let, initially "runs"');
+    // observation.js was the real example of this (its currentView); it is a native module now (LIN-4463 piece 4), and a
+    // module's top-level let is not script scope, so the seam is pinned on a snippet that declares the let itself.
+    const world = loadWorld({ scripts: [] });
+    world.run('let currentView = "runs";');
+    assert.equal(world.run('currentView'), 'runs', 'a script declares currentView as a script-scope let, initially "runs"');
     world.run('currentView = "rulings";');
     assert.equal(world.run('currentView'), 'rulings');
   });

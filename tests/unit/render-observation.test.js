@@ -155,9 +155,11 @@ describe('render-observation: bulk-scan script wiring (LIN-2700 / LIN-2651 Phase
     // window.relativeTime at top level (common.js defines them), and
     // observation.js is the consumer of window.ScanSection.
     const out = html();
+    // observation.js is a native module (LIN-4463 piece 4), emitted as `<script type="module">`. A module runs after every
+    // classic script, so its place in the list is not what orders it; the indexOf below still pins where it is written.
     const commonAt = out.indexOf('<script src="/common.js"></script>');
     const scanAt = out.indexOf('<script src="/scan.js"></script>');
-    const observationAt = out.indexOf('<script src="/observation.js"></script>');
+    const observationAt = out.indexOf('<script type="module" src="/observation.js"></script>');
     assert.ok(commonAt > -1 && scanAt > -1 && observationAt > -1, 'all three scripts are present');
     assert.ok(scanAt > commonAt, '/scan.js must load after /common.js (it reads escapeHtml/relativeTime at top level)');
     assert.ok(scanAt < observationAt, '/scan.js must load before /observation.js (its consumer)');

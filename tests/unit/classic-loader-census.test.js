@@ -81,17 +81,7 @@ export const CLASSIC_LOADER_SUITES = [
   'lin-4293-tidy-after-repaint.test.js',
   'lin-4296-dispatch-reader.test.js',
   'lin-4296-scope-pick.test.js',
-  'observation-basis-check.test.js',
-  'observation-bulk-scan.test.js',
-  'observation-card-order.test.js',
-  'observation-card-words.test.js',
-  'observation-lineage-fold.test.js',
-  'observation-render.test.js',
   'observation-ruling-delivery.test.js',
-  'observation-scan-due.test.js',
-  'observation-scope.test.js',
-  'observation-waiting-block.test.js',
-  'observation-waiting-host.test.js',
   'prompt-section-go.test.js',
   'prompt-section-look-alike.test.js',
   'prompt-section-p0.test.js',
@@ -156,8 +146,8 @@ test('the classic-loader census matches its baseline: no new classic suite, and 
   assert.deepEqual(gone, [], `listed suites no longer load browser scripts as classic: lower the baseline in this change: ${gone.join(', ')}`);
 });
 
-test('the baseline is recorded at 99 suites (the count that must not rise)', () => {
-  assert.equal(CLASSIC_LOADER_SUITES.length, 99);
+test('the baseline is recorded at 89 suites (the count that must not rise)', () => {
+  assert.equal(CLASSIC_LOADER_SUITES.length, 89);
 });
 
 test('runClassic is counted unless it runs a named sibling: observation.js counts, chart-helpers.js does not', () => {

@@ -9,19 +9,32 @@
  *   - the block's paint, the three openLoopIds states, and the URL written
  *     when the view or filter moves.
  *
- * `public/observation.js` runs through `loadWorld` over the shared fake DOM (tests/unit/helpers/fake-dom.js).
+ * `public/observation.js` is a native ES module (LIN-4463 piece 4), loaded fresh per test through `importWorld`
+ * (tests/unit/helpers/import-world.js) over the shared fake DOM (tests/unit/helpers/fake-dom.js). The page boots the way
+ * a browser boots it: its data is on `window`, and its own DOMContentLoaded init runs, so the view, scope and filter
+ * come from the page itself. The boot runs with the tab hidden, as a background tab's does, so the page's pollers make
+ * no read and the open set stays null until a test reads it.
  * Run with: node --test tests/unit/observation-waiting-block.test.js
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readSheets, appliedDecls } from '../helpers/css-rules.js';
-import { loadWorld } from './helpers/client-world.js';
+import { importWorld } from './helpers/import-world.js';
+import { clickOn, fireDOMContentLoaded } from './helpers/client-world.js';
 import { loadCommonWindow } from '../fixtures/client-common.js';
 import { buildSessionPayload } from '../../routes/dashboard-feed.js';
 import { collectUnansweredDecisions, openDecisionLoopIds, MAX_STAMP_LOOP_IDS } from '../../lib/unanswered-decisions.js';
 
+// Every world a test makes is put back after the test, last made first, so a stub a later world installed
+// is removed before the earlier world's snapshot is restored.
+const worlds = [];
+afterEach(() => {
+  while (worlds.length) worlds.pop().restore();
+});
+
 // The regions these tests paint, as the page draws them. Each is a real element in the world's document, found by
-// the client with getElementById and read back by the test.
+// the client with getElementById and read back by the test. The scope buttons and the active list are the feed's own
+// controls: a scope press repaints the feed, which is how a card gets painted without a read.
 const REGIONS_MARKUP = `
   <div id="obs-waiting" hidden></div>
   <div id="obs-waiting-rulings"></div>
@@ -34,7 +47,13 @@ const REGIONS_MARKUP = `
   <div id="obs-rulings-section"></div>
   <div id="obs-due-section"></div>
   <div id="obs-poll-status"></div>
-  <div id="obs-view-hint"></div>`;
+  <div id="obs-view-hint"></div>
+  <div id="obs-scope">
+    <button type="button" data-scope="current"></button>
+    <button type="button" data-scope="all"></button>
+  </div>
+  <ul id="obs-active"></ul>
+  <p id="obs-active-empty"></p>`;
 
 // The page's escapeHtml: quotes too, so a value written into an attribute cannot end it early.
 const escapeHtml = (s) => (s == null ? '' : String(s)
@@ -44,11 +63,11 @@ const byId = (world, id) => world.document.getElementById(id);
 
 // observation.js in a world over the shared fake, with the window stubs the page's own scripts supply. The
 // location and history are the browser's, not DOM, so they stay as stubs; `world.replaced` holds every URL
-// the client wrote with replaceState.
-function makeWorld({ fetchImpl, href = 'https://harbour.test/workspace/acme/observation' } = {}) {
+// the client wrote with replaceState. `world.page` is the page's module, booted as a browser boots it.
+async function makeWorld({ fetchImpl, href = 'https://harbour.test/workspace/acme/observation' } = {}) {
   const replaced = [];
   const common = loadCommonWindow();
-  const world = loadWorld({
+  const world = importWorld({
     window: {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
@@ -60,19 +79,29 @@ function makeWorld({ fetchImpl, href = 'https://harbour.test/workspace/acme/obse
       renderSegmentBar: common.renderSegmentBar,
       api: async () => { throw new Error('window.api not stubbed'); }
     },
-    scripts: ['observation.js'],
     globals: {
-      module: { exports: {} },
       escapeHtml,
       relativeTime: () => '',
       console: { warn() {}, error() {}, log() {} },
       fetch: fetchImpl || (async () => { throw new Error('no fetch stub configured'); })
-    }
+    },
+    timers: [],
   });
+  worlds.push(world);
   world.document.body.innerHTML = REGIONS_MARKUP;
-  world.run('observationData = { urlKey: "acme", workspaces: [{ urlKey: "acme", name: "Acme" }] };');
   world.replaced = replaced;
+  world.window.__OBSERVATION_DATA__ = { urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }] };
+  world.page = await world.importPage('observation.js');
+  // The boot runs with the tab hidden: the page's pollers skip a hidden tab, so the boot makes no read.
+  world.document.hidden = true;
+  await fireDOMContentLoaded(world.document);
+  world.document.hidden = false;
   return world;
+}
+
+// Presses a scope button as a person does: the page's own click handler runs, and with it the feed's repaint.
+async function pressScope(world, scope) {
+  await clickOn(world.document.getElementById('obs-scope'), world.document.querySelector(`#obs-scope [data-scope="${scope}"]`));
 }
 
 // Values built inside the page's world carry that realm's prototypes, which
@@ -104,18 +133,18 @@ function waitingSession(over = {}) {
 }
 
 describe('stripFeedbackMarkers', () => {
-  test('removes the runner markers and leaves the words', () => {
-    const world = makeWorld();
-    const { stripFeedbackMarkers } = world.sandbox.module.exports;
+  test('removes the runner markers and leaves the words', async () => {
+    const world = await makeWorld();
+    const { stripFeedbackMarkers } = world.page;
     assert.equal(stripFeedbackMarkers('[blocked] need a ruling'), 'need a ruling');
     assert.equal(stripFeedbackMarkers('[done]  shipped [working]'), 'shipped');
   });
 });
 
 describe('compactWaitSessions — which waiting runs get a compact row (LIN-3983)', () => {
-  test('a waiting run whose only wait is not an open question gets a row with its producer message', () => {
-    const { module } = makeWorld().sandbox;
-    const { compactWaitSessions } = module.exports;
+  test('a waiting run whose only wait is not an open question gets a row with its producer message', async () => {
+    const world = await makeWorld();
+    const { compactWaitSessions } = world.page;
     const rows = compactWaitSessions([waitingSession()], new Set());
     assert.equal(rows.length, 1);
     assert.equal(rows[0].sessionId, 's-1');
@@ -123,45 +152,45 @@ describe('compactWaitSessions — which waiting runs get a compact row (LIN-3983
     assert.equal(rows[0].title, 'Remove the old route');
   });
 
-  test('a wait whose loop is an open question gets no row: the ruling row speaks for it', () => {
-    const { module } = makeWorld().sandbox;
-    const { compactWaitSessions } = module.exports;
+  test('a wait whose loop is an open question gets no row: the ruling row speaks for it', async () => {
+    const world = await makeWorld();
+    const { compactWaitSessions } = world.page;
     assert.deepEqual(plain(compactWaitSessions([waitingSession()], new Set(['loop-p']))), []);
   });
 
-  test('a day-dead run never gets a row: its status is stale, though its wait flag is still set (LIN-608, F5.1)', () => {
-    const { module } = makeWorld().sandbox;
-    const { compactWaitSessions } = module.exports;
+  test('a day-dead run never gets a row: its status is stale, though its wait flag is still set (LIN-608, F5.1)', async () => {
+    const world = await makeWorld();
+    const { compactWaitSessions } = world.page;
     // `waiting` is not gated on staleness in the feed, so the real shape is stale AND waiting.
     assert.deepEqual(plain(compactWaitSessions([waitingSession({ status: 'stale', waiting: true })], new Set())), []);
   });
 
-  test('a finished run never gets a row', () => {
-    const { module } = makeWorld().sandbox;
-    const { compactWaitSessions } = module.exports;
+  test('a finished run never gets a row', async () => {
+    const world = await makeWorld();
+    const { compactWaitSessions } = world.page;
     assert.deepEqual(plain(compactWaitSessions([waitingSession({ status: 'done', waiting: false, waitingLoopIds: [] })], new Set())), []);
   });
 
-  test('a message-less wait gets the fixed fallback text (no message)', () => {
-    const { module } = makeWorld().sandbox;
-    const { compactWaitSessions } = module.exports;
+  test('a message-less wait gets the fixed fallback text (no message)', async () => {
+    const world = await makeWorld();
+    const { compactWaitSessions } = world.page;
     const rows = compactWaitSessions([waitingSession({ waitingMessage: null, producerLoopId: null })], new Set());
     assert.equal(rows.length, 1);
     assert.equal(rows[0].message, '');
   });
 
-  test('when the producer is covered by a ruling but another loop of the run waits, the row shows the fallback', () => {
-    const { module } = makeWorld().sandbox;
-    const { compactWaitSessions } = module.exports;
+  test('when the producer is covered by a ruling but another loop of the run waits, the row shows the fallback', async () => {
+    const world = await makeWorld();
+    const { compactWaitSessions } = world.page;
     const session = waitingSession({ waitingLoopIds: ['loop-p', 'loop-b'] });
     const rows = compactWaitSessions([session], new Set(['loop-p']));
     assert.equal(rows.length, 1, 'loop-b is not covered, so the run gets a row');
     assert.equal(rows[0].message, '', 'the producer’s own question is on the ruling row, so the row does not repeat it');
   });
 
-  test('a session from an older payload without waitingLoopIds gets no row rather than a wrong one', () => {
-    const { module } = makeWorld().sandbox;
-    const { compactWaitSessions } = module.exports;
+  test('a session from an older payload without waitingLoopIds gets no row rather than a wrong one', async () => {
+    const world = await makeWorld();
+    const { compactWaitSessions } = world.page;
     const old = waitingSession();
     delete old.waitingLoopIds;
     assert.deepEqual(plain(compactWaitSessions([old], new Set())), []);
@@ -169,49 +198,50 @@ describe('compactWaitSessions — which waiting runs get a compact row (LIN-3983
 });
 
 describe('viewFromParams — the URL contract, with the old tab names (LIN-3983)', () => {
-  const { viewFromParams } = (() => makeWorld().sandbox.module.exports)();
+  let viewFromParams;
+  before(async () => { ({ viewFromParams } = (await makeWorld()).page); });
   const parse = (qs) => viewFromParams(new URLSearchParams(qs));
 
-  test('a bare URL opens on runs with the autopilot filter', () => {
+  test('a bare URL opens on runs with the autopilot filter', async () => {
     assert.deepEqual(plain(parse('')), { view: 'runs', filter: 'autopilot' });
   });
 
-  test('the rulings and due views keep their names', () => {
+  test('the rulings and due views keep their names', async () => {
     assert.deepEqual(plain(parse('view=rulings')), { view: 'rulings', filter: 'autopilot' });
     assert.deepEqual(plain(parse('view=due')), { view: 'due', filter: 'autopilot' });
   });
 
-  test('?view=sessions (the old Sessions tab) opens on runs with the all filter', () => {
+  test('?view=sessions (the old Sessions tab) opens on runs with the all filter', async () => {
     assert.deepEqual(plain(parse('view=sessions')), { view: 'runs', filter: 'all' });
   });
 
-  test('?view=autopilot (the old Autopilot tab) opens on runs with the autopilot filter', () => {
+  test('?view=autopilot (the old Autopilot tab) opens on runs with the autopilot filter', async () => {
     assert.deepEqual(plain(parse('view=autopilot')), { view: 'runs', filter: 'autopilot' });
   });
 
-  test('an explicit filter is read on runs, and an unknown one falls back', () => {
+  test('an explicit filter is read on runs, and an unknown one falls back', async () => {
     assert.deepEqual(plain(parse('filter=standalone')), { view: 'runs', filter: 'standalone' });
     assert.deepEqual(plain(parse('view=sessions&filter=standalone')), { view: 'runs', filter: 'standalone' });
     assert.deepEqual(plain(parse('filter=nonsense')), { view: 'runs', filter: 'autopilot' });
   });
 
-  test('an unknown view opens on runs', () => {
+  test('an unknown view opens on runs', async () => {
     assert.deepEqual(plain(parse('view=garbage')), { view: 'runs', filter: 'autopilot' });
   });
 });
 
 describe('the waiting block paint (LIN-3983)', () => {
-  test('the block is absent when nothing waits', () => {
-    const world = makeWorld();
-    const { renderWaitingBlock, setOpenLoopIds } = world.sandbox.module.exports;
+  test('the block is absent when nothing waits', async () => {
+    const world = await makeWorld();
+    const { renderWaitingBlock, setOpenLoopIds } = world.page;
     setOpenLoopIds(new Set());
     renderWaitingBlock();
     assert.equal(byId(world, 'obs-waiting').hidden, true);
   });
 
-  test('a waiting run with no ruling row shows as a compact row, under the runs view', () => {
-    const world = makeWorld();
-    const { renderWaitingBlock, setOpenLoopIds, sessionIndex } = world.sandbox.module.exports;
+  test('a waiting run with no ruling row shows as a compact row, under the runs view', async () => {
+    const world = await makeWorld();
+    const { renderWaitingBlock, setOpenLoopIds, sessionIndex } = world.page;
     sessionIndex.set('s-1', waitingSession());
     setOpenLoopIds(new Set());
     renderWaitingBlock();
@@ -222,18 +252,18 @@ describe('the waiting block paint (LIN-3983)', () => {
     assert.match(byId(world, 'obs-waiting-runs').innerHTML, /reply on its run page/);
   });
 
-  test('no compact rows paint while openLoopIds is still loading (null), so none duplicates a ruling row', () => {
-    const world = makeWorld();
-    const { renderWaitingBlock, sessionIndex } = world.sandbox.module.exports;
+  test('no compact rows paint while openLoopIds is still loading (null), so none duplicates a ruling row', async () => {
+    const world = await makeWorld();
+    const { renderWaitingBlock, sessionIndex } = world.page;
     sessionIndex.set('s-1', waitingSession());
     renderWaitingBlock();
     assert.equal(byId(world, 'obs-waiting').hidden, true);
     assert.equal(byId(world, 'obs-waiting-runs').innerHTML, '', 'no compact row is painted');
   });
 
-  test('off the runs view the block is hidden, whatever it holds', () => {
-    const world = makeWorld();
-    const { renderWaitingBlock, setOpenLoopIds, sessionIndex, switchView } = world.sandbox.module.exports;
+  test('off the runs view the block is hidden, whatever it holds', async () => {
+    const world = await makeWorld();
+    const { renderWaitingBlock, setOpenLoopIds, sessionIndex, switchView } = world.page;
     sessionIndex.set('s-1', waitingSession());
     setOpenLoopIds(new Set());
     renderWaitingBlock();
@@ -243,36 +273,34 @@ describe('the waiting block paint (LIN-3983)', () => {
   });
 
   test('a failed first rulings read settles openLoopIds to empty, so waiting runs still get rows', async () => {
-    const world = makeWorld({ fetchImpl: async () => jsonResponse({}, { ok: false, status: 500 }) });
-    const { pollRulings, sessionIndex, openLoopIds } = world.sandbox.module.exports;
+    const world = await makeWorld({ fetchImpl: async () => jsonResponse({}, { ok: false, status: 500 }) });
+    const { pollRulings, sessionIndex, getOpenLoopIds } = world.page;
     sessionIndex.set('s-1', waitingSession());
-    assert.equal(openLoopIds(), null);
+    assert.equal(getOpenLoopIds(), null);
     await pollRulings();
     await flush();
-    assert.equal(openLoopIds().size, 0, 'settled to the empty set');
+    assert.equal(getOpenLoopIds().size, 0, 'settled to the empty set');
     assert.equal(byId(world, 'obs-waiting').hidden, false, 'the run is still shown');
     assert.equal(byId(world, 'obs-poll-status').textContent, '', 'a block read never touches the live pill');
   });
 
   test('a later rulings failure keeps the last open set', async () => {
     let ok = true;
-    const world = makeWorld({
+    const world = await makeWorld({
       fetchImpl: async () => (ok
         ? jsonResponse({ rulings: [], openLoopIds: ['loop-p'] })
         : jsonResponse({}, { ok: false, status: 500 }))
     });
-    const { pollRulings, openLoopIds } = world.sandbox.module.exports;
+    const { pollRulings, getOpenLoopIds } = world.page;
     await pollRulings();
     await flush();
     ok = false;
     await pollRulings();
     await flush();
-    assert.deepEqual([...openLoopIds()], ['loop-p']);
+    assert.deepEqual([...getOpenLoopIds()], ['loop-p']);
   });
 
-  test('the block shows at most three ruling rows and says how many more are on the Rulings tab', () => {
-    const world = makeWorld();
-    const { renderWaitingBlock, setOpenLoopIds, renderedRulingRows } = world.sandbox.module.exports;
+  test('the block shows at most three ruling rows and says how many more are on the Rulings tab', async () => {
     const rows = [1, 2, 3, 4, 5].map(n => ({
       decision: { decision_id: `d-${n}`, question: `Q${n}?`, options: [] },
       decisionCase: [],
@@ -282,7 +310,11 @@ describe('the waiting block paint (LIN-3983)', () => {
       alternate: null,
       suggestedDismissal: null
     }));
-    world.run(`lastRulings = ${JSON.stringify(rows)};`);
+    const world = await makeWorld({ fetchImpl: async () => jsonResponse({ rulings: rows, openLoopIds: [] }) });
+    const { renderWaitingBlock, setOpenLoopIds, renderedRulingRows, pollRulings } = world.page;
+    // The page's own rulings read fills the rows the block shows, as it does on a load.
+    await pollRulings();
+    await flush();
     setOpenLoopIds(new Set());
     renderWaitingBlock();
     assert.equal(byId(world, 'obs-waiting-rulings').children.length, 3);
@@ -309,27 +341,22 @@ describe('a waiting card\'s answer choices follow the rulings read, whichever re
     ]
   }, { urlKey: 'acme', name: 'Acme' }, false);
 
-  // A card already on screen, as the feed paints it: the client's own card in a list, its head repainted in
-  // place by refreshSessionCard. Returns the real head element.
-  function paintedCard(world, payload) {
-    const list = world.document.createElement('ul');
-    world.document.body.appendChild(list);
-    const { sessionIndex } = world.sandbox.module.exports;
-    sessionIndex.set(String(payload.sessionId), payload);
-    const li = world.run('makeSessionCard')(payload);
-    list.appendChild(li);
-    world.run('activeCards').set(payload.sessionId, li);
-    world.run('refreshSessionCard')(payload.sessionId);
-    return li.querySelector('.obs-session-head');
+  // A card already on screen, as the feed paints it: the session goes into the feed's index, and a repaint of the
+  // feed (a scope press, which re-renders it) draws its card into the active list. No rulings read has run yet.
+  // Returns the real head element.
+  async function paintedCard(world, payload) {
+    world.page.sessionIndex.set(String(payload.sessionId), payload);
+    await pressScope(world, 'current');
+    return world.document.getElementById('obs-active').querySelector('.obs-session-head');
   }
 
   test('a card painted before the first rulings read gains its choices when the read lands, with no feed poll', async () => {
-    const world = makeWorld({ fetchImpl: async () => jsonResponse({ rulings: [], openLoopIds: ['w'] }) });
-    const { pollRulings, openLoopIds } = world.sandbox.module.exports;
+    const world = await makeWorld({ fetchImpl: async () => jsonResponse({ rulings: [], openLoopIds: ['w'] }) });
+    const { pollRulings, getOpenLoopIds } = world.page;
     const payload = waitingPayload();
     assert.equal(payload.producerLoopId, 'w');
-    assert.equal(openLoopIds(), null);
-    const head = paintedCard(world, payload);
+    assert.equal(getOpenLoopIds(), null);
+    const head = await paintedCard(world, payload);
     assert.doesNotMatch(head.innerHTML, /obs-summary-decision-options/, 'no choices before the rulings read');
     await pollRulings();
     await flush();
@@ -338,9 +365,9 @@ describe('a waiting card\'s answer choices follow the rulings read, whichever re
 
   test('a card drops its choices when a later rulings read no longer lists the question as open', async () => {
     let open = ['w'];
-    const world = makeWorld({ fetchImpl: async () => jsonResponse({ rulings: [], openLoopIds: open }) });
-    const { pollRulings } = world.sandbox.module.exports;
-    const head = paintedCard(world, waitingPayload());
+    const world = await makeWorld({ fetchImpl: async () => jsonResponse({ rulings: [], openLoopIds: open }) });
+    const { pollRulings } = world.page;
+    const head = await paintedCard(world, waitingPayload());
     await pollRulings();
     await flush();
     assert.match(head.innerHTML, /obs-summary-decision-options/);
@@ -351,19 +378,19 @@ describe('a waiting card\'s answer choices follow the rulings read, whichever re
   });
 
   test('a failed first rulings read settles the set to empty and repaints, so no choice is offered for want of a read', async () => {
-    const world = makeWorld({ fetchImpl: async () => jsonResponse({}, { ok: false, status: 500 }) });
-    const { pollRulings, openLoopIds } = world.sandbox.module.exports;
-    const head = paintedCard(world, waitingPayload());
+    const world = await makeWorld({ fetchImpl: async () => jsonResponse({}, { ok: false, status: 500 }) });
+    const { pollRulings, getOpenLoopIds } = world.page;
+    const head = await paintedCard(world, waitingPayload());
     await pollRulings();
     await flush();
-    assert.equal(openLoopIds().size, 0);
+    assert.equal(getOpenLoopIds().size, 0);
     assert.doesNotMatch(head.innerHTML, /obs-summary-decision-options/);
   });
 
   test('a read that leaves the set unchanged does not repaint any card', async () => {
-    const world = makeWorld({ fetchImpl: async () => jsonResponse({ rulings: [], openLoopIds: ['w'] }) });
-    const { pollRulings } = world.sandbox.module.exports;
-    const head = paintedCard(world, waitingPayload());
+    const world = await makeWorld({ fetchImpl: async () => jsonResponse({ rulings: [], openLoopIds: ['w'] }) });
+    const { pollRulings } = world.page;
+    const head = await paintedCard(world, waitingPayload());
     await pollRulings();
     await flush();
     head.innerHTML = 'untouched';
@@ -374,17 +401,17 @@ describe('a waiting card\'s answer choices follow the rulings read, whichever re
 });
 
 describe('the runs filter and the URL (LIN-3983)', () => {
-  test('the autopilot filter reads the plain feed; the others read the sessions source', () => {
-    const world = makeWorld();
-    const { sessionsUrl, setFilter } = world.sandbox.module.exports;
+  test('the autopilot filter reads the plain feed; the others read the sessions source', async () => {
+    const world = await makeWorld();
+    const { sessionsUrl, setFilter } = world.page;
     assert.equal(sessionsUrl('acme'), '/workspace/acme/api/dashboard/sessions');
     setFilter('standalone');
     assert.equal(sessionsUrl('acme'), '/workspace/acme/api/dashboard/sessions?view=sessions');
   });
 
-  test('moving between standalone and all keeps the feed; moving to or from autopilot resets it', () => {
-    const world = makeWorld();
-    const { setFilter, sessionIndex, sessionsUrl } = world.sandbox.module.exports;
+  test('moving between standalone and all keeps the feed; moving to or from autopilot resets it', async () => {
+    const world = await makeWorld();
+    const { setFilter, sessionIndex, sessionsUrl } = world.page;
     setFilter('standalone');
     sessionIndex.set('s-1', waitingSession());
     setFilter('all');
@@ -394,9 +421,9 @@ describe('the runs filter and the URL (LIN-3983)', () => {
     assert.equal(sessionsUrl('acme'), '/workspace/acme/api/dashboard/sessions');
   });
 
-  test('a view change writes the view into the URL, and a bare runs/autopilot view writes none', () => {
-    const world = makeWorld();
-    const { switchView, setFilter } = world.sandbox.module.exports;
+  test('a view change writes the view into the URL, and a bare runs/autopilot view writes none', async () => {
+    const world = await makeWorld();
+    const { switchView, setFilter } = world.page;
     switchView('rulings');
     assert.match(world.replaced.at(-1), /[?&]view=rulings/);
     switchView('runs');
@@ -405,9 +432,9 @@ describe('the runs filter and the URL (LIN-3983)', () => {
     assert.match(world.replaced.at(-1), /[?&]filter=standalone/);
   });
 
-  test('the URL keeps the other parameters the page was opened with', () => {
-    const world = makeWorld({ href: 'https://harbour.test/workspace/acme/observation?source=x&view=due' });
-    const { switchView } = world.sandbox.module.exports;
+  test('the URL keeps the other parameters the page was opened with', async () => {
+    const world = await makeWorld({ href: 'https://harbour.test/workspace/acme/observation?source=x&view=due' });
+    const { switchView } = world.page;
     switchView('rulings');
     assert.match(world.replaced.at(-1), /source=x/);
     assert.match(world.replaced.at(-1), /view=rulings/);
@@ -415,10 +442,10 @@ describe('the runs filter and the URL (LIN-3983)', () => {
 
   test('a filter change that keeps the source re-polls that source', async () => {
     const calls = [];
-    const world = makeWorld({
+    const world = await makeWorld({
       fetchImpl: async (url) => { calls.push(url); return jsonResponse({ active: [], recent: [], rulings: [] }); }
     });
-    const { setFilter } = world.sandbox.module.exports;
+    const { setFilter } = world.page;
     setFilter('standalone');
     await flush();
     const before = calls.length;
@@ -432,8 +459,8 @@ describe('the runs filter and the URL (LIN-3983)', () => {
 describe('the standalone waiting read (decision 8, LIN-3983)', () => {
   test('it makes no request off the autopilot filter or off the runs view', async () => {
     let calls = 0;
-    const world = makeWorld({ fetchImpl: async () => { calls++; return jsonResponse({ active: [] }); } });
-    const { pollWaitingSupplement, setFilter, switchView } = world.sandbox.module.exports;
+    const world = await makeWorld({ fetchImpl: async () => { calls++; return jsonResponse({ active: [] }); } });
+    const { pollWaitingSupplement, setFilter, switchView } = world.page;
     setFilter('standalone');
     switchView('due');
     await flush();
@@ -453,12 +480,12 @@ describe('the standalone waiting read (decision 8, LIN-3983)', () => {
 
   test('on the autopilot filter it adds the standalone waits, and keeps the block as it was when it fails', async () => {
     let ok = true;
-    const world = makeWorld({
+    const world = await makeWorld({
       fetchImpl: async () => (ok
         ? jsonResponse({ active: [waitingSession({ sessionId: 'sa-1' }), { ...waitingSession({ sessionId: 'ap-1' }), standalone: false }] })
         : jsonResponse({}, { ok: false, status: 500 }))
     });
-    const { pollWaitingSupplement, standaloneWaitSupplement, setOpenLoopIds } = world.sandbox.module.exports;
+    const { pollWaitingSupplement, standaloneWaitSupplement, setOpenLoopIds } = world.page;
     setOpenLoopIds(new Set());
     await pollWaitingSupplement();
     await flush();
@@ -472,10 +499,10 @@ describe('the standalone waiting read (decision 8, LIN-3983)', () => {
 
   test('on the standalone filter an autopilot run waiting on a plain [blocked] stays in the block (decision 8(i))', async () => {
     const autopilotWait = waitingSession({ sessionId: 'ap-1', standalone: false, waitingLoopIds: ['loop-ap'], producerLoopId: 'loop-ap' });
-    const world = makeWorld({
+    const world = await makeWorld({
       fetchImpl: async () => jsonResponse({ active: [autopilotWait], recent: [], rulings: [] })
     });
-    const { setFilter, setOpenLoopIds } = world.sandbox.module.exports;
+    const { setFilter, setOpenLoopIds } = world.page;
     setOpenLoopIds(new Set());
     setFilter('standalone'); // the filter change polls the feed, which fills the block's session list
     await flush();
@@ -580,7 +607,7 @@ function assertAgreement(payloads, rows, openIds, compact) {
   }
 }
 
-const { compactWaitSessions: compactOverBuilder } = makeWorld().sandbox.module.exports;
+const { compactWaitSessions: compactOverBuilder } = (await makeWorld()).page;
 
 // Runs the block's whole rule over one loop set, and checks agreement before returning.
 function runBlock({ loops, shelved = [] }) {
@@ -599,14 +626,14 @@ function runBlock({ loops, shelved = [] }) {
 }
 
 describe('the waiting block over the real builder (LIN-3983, step 8)', () => {
-  test('(1) a day-dead wait gets no compact row: the run is stale, though its wait flag is set (F5.1)', () => {
+  test('(1) a day-dead wait gets no compact row: the run is stale, though its wait flag is set (F5.1)', async () => {
     const { payloads, compact } = runBlock(FIXTURES.dayDead());
     assert.equal(payloads[0].status, 'stale');
     assert.equal(payloads[0].waiting, true, 'the wait flag is not gated on staleness, so the gate is on status');
     assert.deepEqual(compact, []);
   });
 
-  test('(2) a shelved question: no ruling row and no compact row, the same as before the shelve (F1)', () => {
+  test('(2) a shelved question: no ruling row and no compact row, the same as before the shelve (F1)', async () => {
     const before = runBlock({ loops: FIXTURES.shelved().loops });
     const after = runBlock(FIXTURES.shelved());
     assert.equal(before.rows.length, 1);
@@ -617,7 +644,7 @@ describe('the waiting block over the real builder (LIN-3983, step 8)', () => {
     assert.deepEqual(after.compact, [], 'the shelved wait is not a compact row');
   });
 
-  test('(3) a message-less open question: one ruling row, no compact row, and still none once shelved (F5.2)', () => {
+  test('(3) a message-less open question: one ruling row, no compact row, and still none once shelved (F5.2)', async () => {
     const open = runBlock(FIXTURES.messageLessOpen());
     assert.equal(open.rows.length, 1);
     assert.deepEqual(open.compact, []);
@@ -626,14 +653,14 @@ describe('the waiting block over the real builder (LIN-3983, step 8)', () => {
     assert.deepEqual(shelvedNow.compact, []);
   });
 
-  test('(4) a message-less wait with no question: one compact row with the fixed fallback (no message)', () => {
+  test('(4) a message-less wait with no question: one compact row with the fixed fallback (no message)', async () => {
     const { rows, compact } = runBlock(FIXTURES.messageLessPlain());
     assert.equal(rows.length, 0);
     assert.equal(compact.length, 1);
     assert.equal(compact[0].message, '');
   });
 
-  test('(5) a plain producer and another loop with a ruling row: the producer gets its row once, the ruling once (F4)', () => {
+  test('(5) a plain producer and another loop with a ruling row: the producer gets its row once, the ruling once (F4)', async () => {
     const { payloads, rows, openIds, compact } = runBlock(FIXTURES.producerPlainOtherOpen());
     assert.equal(payloads[0].producerLoopId, 'a');
     assert.deepEqual(openIds, ['b']);
@@ -642,7 +669,7 @@ describe('the waiting block over the real builder (LIN-3983, step 8)', () => {
     assert.equal(compact[0].message, PLAIN_TEXT, 'a is not covered, so its message shows');
   });
 
-  test('(6) a question dismissed through the dismiss route, on a run still blocked: one compact row, no ruling row (F6)', () => {
+  test('(6) a question dismissed through the dismiss route, on a run still blocked: one compact row, no ruling row (F6)', async () => {
     const { rows, openIds, compact } = runBlock(FIXTURES.dismissed());
     assert.equal(rows.length, 0);
     assert.deepEqual(openIds, []);
@@ -650,7 +677,7 @@ describe('the waiting block over the real builder (LIN-3983, step 8)', () => {
     assert.equal(compact[0].message, PLAIN_TEXT);
   });
 
-  test('(7) a question withdrawn, then a plain [blocked]: the run gets its compact row with the new message', () => {
+  test('(7) a question withdrawn, then a plain [blocked]: the run gets its compact row with the new message', async () => {
     const { rows, openIds, compact } = runBlock(FIXTURES.withdrawnThenPlain());
     assert.equal(rows.length, 0);
     assert.deepEqual(openIds, []);
@@ -658,7 +685,7 @@ describe('the waiting block over the real builder (LIN-3983, step 8)', () => {
     assert.equal(compact[0].message, 'a plain wait now');
   });
 
-  test('(8) an answer with no follow-up dispatch that ever landed: no ruling row, one compact row, the card says waiting (F6)', () => {
+  test('(8) an answer with no follow-up dispatch that ever landed: no ruling row, one compact row, the card says waiting (F6)', async () => {
     const { payloads, rows, openIds, compact } = runBlock(FIXTURES.answeredNoFollowUp());
     assert.equal(rows.length, 0);
     assert.deepEqual(openIds, []);
@@ -666,7 +693,7 @@ describe('the waiting block over the real builder (LIN-3983, step 8)', () => {
     assert.equal(compact.length, 1);
   });
 
-  test('(9) an answer stamped on a sibling loop of the lineage: the producer leaves the open set and gets its compact row (F6)', () => {
+  test('(9) an answer stamped on a sibling loop of the lineage: the producer leaves the open set and gets its compact row (F6)', async () => {
     const { rows, openIds, compact } = runBlock(FIXTURES.siblingAnswered());
     assert.equal(rows.length, 0);
     assert.deepEqual(openIds, []);
@@ -674,7 +701,7 @@ describe('the waiting block over the real builder (LIN-3983, step 8)', () => {
     assert.equal(compact[0].message, PLAIN_TEXT);
   });
 
-  test('(10) pressing Dismiss on a block ruling row with the run still blocked: the row leaves and one compact row appears (F6)', () => {
+  test('(10) pressing Dismiss on a block ruling row with the run still blocked: the row leaves and one compact row appears (F6)', async () => {
     const before = runBlock({ loops: [blocked({ loopId: 'p', decision: decision() })] });
     const after = runBlock({ loops: [blocked({ loopId: 'p', decision: decision(), answeredDecisions: answered('d-1', 'dismissed') })] });
     assert.equal(before.rows.length, 1);
@@ -683,7 +710,7 @@ describe('the waiting block over the real builder (LIN-3983, step 8)', () => {
     assert.equal(after.compact.length, 1, 'exactly one compact row');
   });
 
-  test('(11) a joined cluster answered on the worker copy only, the autopilot still blocked: one compact row, no ruling row (F7)', () => {
+  test('(11) a joined cluster answered on the worker copy only, the autopilot still blocked: one compact row, no ruling row (F7)', async () => {
     const { rows, openIds, compact, payloads } = runBlock(FIXTURES.joinedAnsweredOnWorker());
     assert.equal(rows.length, 0);
     assert.deepEqual(openIds, [], 'the answer closes the joined row, so the autopilot is not open');
@@ -692,7 +719,7 @@ describe('the waiting block over the real builder (LIN-3983, step 8)', () => {
     assert.equal(compact[0].message, PLAIN_TEXT);
   });
 
-  test('(12) a joined cluster with the worker withdrawn and the autopilot open: one joined row, both open, no compact row (F7)', () => {
+  test('(12) a joined cluster with the worker withdrawn and the autopilot open: one joined row, both open, no compact row (F7)', async () => {
     const { rows, openIds, compact, payloads } = runBlock(FIXTURES.joinedWithdrawnWorker());
     assert.equal(rows.length, 1, 'one joined row');
     assert.deepEqual(openIds, ['ap', 'w']);
@@ -700,7 +727,7 @@ describe('the waiting block over the real builder (LIN-3983, step 8)', () => {
     assert.deepEqual(compact, [], 'the withdrawn worker is open with its cluster, so its row speaks for it');
   });
 
-  test('(13) a cluster with more copies than MAX_STAMP_LOOP_IDS: the open set holds every copy, the row caps its stamps, the block is unchanged', () => {
+  test('(13) a cluster with more copies than MAX_STAMP_LOOP_IDS: the open set holds every copy, the row caps its stamps, the block is unchanged', async () => {
     const { rows, openIds, compact } = runBlock(FIXTURES.joinedOverStampCap());
     assert.equal(openIds.length, MAX_STAMP_LOOP_IDS + 2, 'every copy and the autopilot');
     assert.equal(rows.length, 1);
@@ -708,29 +735,29 @@ describe('the waiting block over the real builder (LIN-3983, step 8)', () => {
     assert.deepEqual(compact, [], 'the compact-row decision reads cluster members, not the stamp list');
   });
 
-  test('waitingLoopIds names the live waits: a superseded loop and a non-waiting loop are both left out', () => {
+  test('waitingLoopIds names the live waits: a superseded loop and a non-waiting loop are both left out', async () => {
     const { payloads } = runBlock(FIXTURES.supersededAndNonWaiting());
     assert.deepEqual(payloads[0].waitingLoopIds, ['c']);
   });
 
-  test('waitingLoopIds names the one wait of a run that is waiting', () => {
+  test('waitingLoopIds names the one wait of a run that is waiting', async () => {
     const { payloads } = runBlock({ loops: [blocked({ loopId: 'p' })] });
     assert.deepEqual(payloads[0].waitingLoopIds, ['p']);
   });
 
-  test('waitingLoopIds is empty for a run that is not waiting', () => {
+  test('waitingLoopIds is empty for a run that is not waiting', async () => {
     const { payloads } = runBlock({ loops: [loop({ loopId: 'p' })] });
     assert.deepEqual(payloads[0].waitingLoopIds, []);
     assert.equal(payloads[0].waiting, false);
   });
 
-  test('waitingLoopIds is empty for a finished run, even with a lingering [blocked] loop', () => {
+  test('waitingLoopIds is empty for a finished run, even with a lingering [blocked] loop', async () => {
     const { payloads } = runBlock({ loops: [blocked({ loopId: 'p', agentState: 'complete' })] });
     assert.equal(payloads[0].waiting, false);
     assert.deepEqual(payloads[0].waitingLoopIds, []);
   });
 
-  test('the agreement property holds over every fixture above', () => {
+  test('the agreement property holds over every fixture above', async () => {
     for (const build of Object.values(FIXTURES)) runBlock(build());
   });
 });
@@ -739,14 +766,14 @@ describe('the waiting accent is the strongest on the page (LIN-3983, outcome 1)'
   // The sheets the observation page loads, in order; a rule is asked for by what applies to it (LIN-4015).
   const OBSERVATION = readSheets(['/style.css', '/observation.css']);
 
-  test('a waiting card has its own, thicker accent, and it is not the in-progress amber', () => {
+  test('a waiting card has its own, thicker accent, and it is not the in-progress amber', async () => {
     const body = appliedDecls(OBSERVATION, '.obs-session[data-status="waiting"]');
     assert.equal(body.get('border-left-width'), '4px');
     assert.doesNotMatch([...body.values()].join(' '), /--amber/);
     assert.ok(appliedDecls(OBSERVATION, '.obs-session[data-status="in-progress"]'), 'the in-progress card has a rule');
   });
 
-  test('the waiting block is not amber either, so the card that needs a person is not the quietest', () => {
+  test('the waiting block is not amber either, so the card that needs a person is not the quietest', async () => {
     const body = appliedDecls(OBSERVATION, '.obs-waiting');
     assert.doesNotMatch([...body.values()].join(' '), /--amber/);
     assert.equal(body.get('border-left'), '4px solid var(--brand)');

@@ -5,14 +5,21 @@
  * between hosts, the block caps what it attaches, and a row that lands on the
  * Rulings tab after being built elsewhere is basis-checked there.
  *
- * `public/observation.js` runs through `loadWorld` over the shared fake DOM
- * (tests/unit/helpers/fake-dom.js). The Rulings tab and the block's list are
- * real elements in the world's document; the rows are built by the client.
+ * `public/observation.js` is a native ES module (LIN-4463 piece 4), loaded fresh per test through `importWorld`
+ * (tests/unit/helpers/import-world.js) over the shared fake DOM (tests/unit/helpers/fake-dom.js). The Rulings tab and
+ * the block's list are real elements in the world's document; the rows are built by the client. The page is not booted
+ * here: the host seam reads no page data, and a tab switch's own read has no URL to read until the page has booted.
  * Run with: node --test tests/unit/observation-waiting-host.test.js
  */
-import { test, describe } from 'node:test';
+import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWorld } from './helpers/client-world.js';
+import { importWorld } from './helpers/import-world.js';
+
+// Every world a test makes is put back after the test, last made first.
+const worlds = [];
+afterEach(() => {
+  while (worlds.length) worlds.pop().restore();
+});
 
 // The Rulings tab's list and empty state, and the waiting block's list, as the page draws them.
 const RULINGS_MARKUP = `
@@ -20,8 +27,8 @@ const RULINGS_MARKUP = `
   <p id="obs-rulings-empty"></p>
   <ul id="obs-waiting-rulings"></ul>`;
 
-function makeWorld({ api } = {}) {
-  const world = loadWorld({
+async function makeWorld({ api } = {}) {
+  const world = importWorld({
     window: {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
@@ -29,15 +36,17 @@ function makeWorld({ api } = {}) {
       sourceQuery: (source) => (source ? `?source=${encodeURIComponent(source)}` : ''),
       api: api || (async () => { throw new Error('window.api not stubbed'); })
     },
-    scripts: ['observation.js'],
     globals: {
-      module: { exports: {} },
       escapeHtml: (str) => (str === undefined || str === null ? '' : String(str)),
       relativeTime: (ts) => (ts ? `rel(${ts})` : ''),
-      console: { warn() {}, error() {}, log() {} }
-    }
+      console: { warn() {}, error() {}, log() {} },
+      fetch: async () => ({ ok: true, json: async () => ({}) })
+    },
+    timers: [],
   });
+  worlds.push(world);
   world.document.body.innerHTML = RULINGS_MARKUP;
+  world.page = await world.importPage('observation.js');
   return world;
 }
 
@@ -72,22 +81,20 @@ describe('renderRulings host seam (LIN-3983)', () => {
     // gated on the Rulings view at creation). If it is then reused on the tab
     // (here because a reply is pending), only the re-arm can check it.
     const calls = [];
-    const world = makeWorld({
+    const world = await makeWorld({
       api: async (url) => { calls.push(url); return { basisChanged: false }; }
     });
     const tabList = byId(world, 'obs-rulings');
     const blockList = byId(world, 'obs-waiting-rulings');
-    const { renderRulings, rulingKey, rulingsPending } = world.sandbox.module.exports;
+    const { renderRulings, rulingKey, rulingsPending, switchView } = world.page;
     const row = taskBoundRow(1);
     const key = rulingKey(row.anchor.workspaceUrlKey, row.anchor, row.decision.decision_id);
-
-    world.run('currentView = "runs";');
     renderRulings([row], { list: blockList, empty: null, limit: 3, onTab: false });
     await flush();
     assert.equal(calls.length, 0, 'no basis check while the block is on screen');
 
     rulingsPending.add(key);
-    world.run('currentView = "rulings";');
+    switchView('rulings');
     renderRulings([row]);
     await flush();
     rulingsPending.delete(key);
@@ -98,30 +105,28 @@ describe('renderRulings host seam (LIN-3983)', () => {
     assert.equal(blockList.children.length, 0, 'and detached from the block');
   });
 
-  test('the block attaches at most `limit` rows; the Rulings tab still lists every row', () => {
-    const world = makeWorld();
+  test('the block attaches at most `limit` rows; the Rulings tab still lists every row', async () => {
+    const world = await makeWorld();
     const tabList = byId(world, 'obs-rulings');
     const tabEmpty = byId(world, 'obs-rulings-empty');
     const blockList = byId(world, 'obs-waiting-rulings');
-    const { renderRulings, renderedRulingRows } = world.sandbox.module.exports;
+    const { renderRulings, renderedRulingRows, switchView } = world.page;
     const rows = [1, 2, 3].map(taskBoundRow);
-
-    world.run('currentView = "runs";');
     renderRulings(rows, { list: blockList, empty: null, limit: 2, onTab: false });
     assert.equal(blockList.children.length, 2, 'the block shows the first two rows only');
     assert.equal(renderedRulingRows.size, 3, 'the rest stay tracked, so the tab reuses them');
 
-    world.run('currentView = "rulings";');
+    switchView('rulings');
     renderRulings(rows);
     assert.equal(tabList.children.length, 3, 'the Rulings tab lists every row');
     assert.equal(blockList.children.length, 0, 'rows move out of the block when the tab paints');
     assert.equal(tabEmpty.hidden, true, 'the tab empty state hides while rows are listed');
   });
 
-  test('the default host is the Rulings tab, so existing one-argument callers are unchanged', () => {
-    const world = makeWorld();
+  test('the default host is the Rulings tab, so existing one-argument callers are unchanged', async () => {
+    const world = await makeWorld();
     const tabList = byId(world, 'obs-rulings');
-    const { renderRulings } = world.sandbox.module.exports;
+    const { renderRulings } = world.page;
     renderRulings([taskBoundRow(1), taskBoundRow(2)]);
     assert.equal(tabList.children.length, 2);
   });
