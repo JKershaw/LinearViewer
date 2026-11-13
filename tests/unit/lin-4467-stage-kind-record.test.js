@@ -17,7 +17,7 @@ import { PROMPT_TEMPLATES } from '../../lib/prompt-templates.js';
 import { STAGE_LEADS } from '../../lib/prompt-template-defs.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 import { STAGE_INTENT } from '../../lib/prompts/stage-intent.js';
-import { GROUNDING_BY_KIND, GROUNDING_LISTS } from '../../lib/prompt-formatters.js';
+import { GROUNDING_BY_KIND, GROUNDING_LISTS, PROMPT_CATEGORIES } from '../../lib/prompt-formatters.js';
 import { STAGE_LABELS, STEP_KIND_WORDS, stepKindWord } from '../../lib/run-view.js';
 import { formatStageContract } from '../../lib/prompt-contract.js';
 import { buildInstructions } from '../../lib/proxy-instructions.js';
@@ -28,7 +28,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (rel) => readFileSync(resolve(ROOT, rel), 'utf8');
 
 const REQUIRED = ['name', 'category', 'description', 'route', 'writes', 'lead', 'label', 'grounding', 'signals', 'intent', 'contract', 'catalogue'];
-const CATEGORIES = ['pre-work', 'work-issue', 'ready', 'universal'];
+const CATEGORIES = Object.values(PROMPT_CATEGORIES);
 const GROUPS = ['default', 'more'];
 
 /** The problems in one record, as strings. [] when it is complete and well-typed. */

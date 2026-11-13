@@ -162,24 +162,11 @@ describe('defer recommend-meta action', () => {
 // here instead of shipping a stale public claim again.
 // =============================================================================
 
+// The catalogue section itself (count header and one bullet per kind) is generated from the records and checked
+// byte for byte in lin-4467-stage-kind-record.test.js; this block keeps the one count outside that section.
 describe('public/llms.txt prompt catalog stays in sync with PROMPT_TEMPLATES', () => {
   const llmsTxt = fs.readFileSync(new URL('../../public/llms.txt', import.meta.url), 'utf8');
   const templateKeys = Object.keys(PROMPT_TEMPLATES);
-
-  test('the advertised count matches the registry size', () => {
-    const match = llmsTxt.match(/Available Prompt Templates \((\d+) total\)/);
-    assert.ok(match, 'llms.txt must carry an "Available Prompt Templates (N total)" header');
-    assert.strictEqual(Number(match[1]), templateKeys.length);
-  });
-
-  test('every registered template kind (including retrospective-audit) is listed as a bullet', () => {
-    for (const key of templateKeys) {
-      assert.ok(
-        llmsTxt.includes(`\`${key}\` -`),
-        `llms.txt is missing a catalog bullet for \`${key}\``,
-      );
-    }
-  });
 
   test('the "All N templates above" cross-reference also matches the registry size', () => {
     const match = llmsTxt.match(/All (\d+) templates above/);

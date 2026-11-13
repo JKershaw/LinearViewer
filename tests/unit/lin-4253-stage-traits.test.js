@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PROMPT_TEMPLATES, EXCLUDED_FROM_AI_RECOMMENDATION, getSelectableStages } from '../../lib/prompt-templates.js';
 import { rejectExcludedKind } from '../../lib/action-kind.js';
-import { WRITES, WRITES_VALUES } from '../../lib/stage-writes.js';
+import { WRITES } from '../../lib/stage-writes.js';
 import { STAGE_INTENT } from '../../lib/prompts/stage-intent.js';
 
 const DEFAULT = WRITES.WORK;
@@ -93,26 +93,7 @@ describe('LIN-4253 — the derived sets keep the order their tests pin', () => {
   });
 });
 
-describe('LIN-4253 — every template declares both traits (a missing one fails here)', () => {
-  for (const kind of Object.keys(PROMPT_TEMPLATES)) {
-    test(`${kind}: an own route, null or an object with when and whenNot`, () => {
-      const t = PROMPT_TEMPLATES[kind];
-      assert.ok(Object.hasOwn(t, 'route'), `${kind} declares route`);
-      if (t.route !== null) {
-        assert.equal(typeof t.route.when, 'string', `${kind} route.when`);
-        assert.equal(typeof t.route.whenNot, 'string', `${kind} route.whenNot`);
-      }
-    });
-
-    test(`${kind}: an own writes, one of the known values`, () => {
-      const t = PROMPT_TEMPLATES[kind];
-      assert.ok(Object.hasOwn(t, 'writes'), `${kind} declares writes`);
-      assert.ok(WRITES_VALUES.includes(t.writes), `${kind} writes "${t.writes}" is a known value`);
-    });
-  }
-});
-
-describe('LIN-4253 / LIN-4251 — writes and the reading pass (STAGE_INTENT), related, not folded', () => {
+describe('LIN-4253 / LIN-4251 — writes and the reading pass (STAGE_INTENT), the line derived from writes', () => {
   // The two-way statement (LIN-4251, LIN-4437): a stage is a reading pass exactly when its writes is
   // `none`, `one-comment` or `blind-comment`. Each direction is checked, so a stage that reads and
   // writes as work, or that writes and does not read, fails here.
