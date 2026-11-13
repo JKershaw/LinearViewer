@@ -31,8 +31,14 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   into the round-trip walk, which `OFF_SPINE_KINDS` stops (LIN-4376).
 - The store knows no leftovers (LIN-4383). It holds a parent wake by `heldWakeFor` (LIN-4373),
   released by the holder's terminal or `_archiveItem` under the build's guard key, so it wakes once.
-  Leftover wording lives in `lib/dispatch-leftover-hook.js`; a new held-wake feature brings a hook
-  (`lin-4377-store-knows-no-leftover` counts the word).
+  Leftover wording lives in `lib/dispatch-leftover-hook.js`, bound into the store late
+  (`setHeldWakeReleaseNote`) because most releases have no request; a new held-wake feature brings a
+  hook (`lin-4377-store-knows-no-leftover` counts the word and forbids the `formatHeldWakeNote` import).
+- A feedback-entry kind is one row in `FEEDBACK_KINDS` (`lib/dispatch-feedback-kinds.js`) that declares
+  every role; readers filter the table, and its row order is the runner prompt's bytes. A shared
+  constant is imported from its owner (`HALT_MODES`, `followUpTarget`, `NEVER_RAN` in
+  `lib/dispatch-terminal.js`). The decision-stamp set had four copies in `lib/`; the LIN-4455
+  censuses (`lin-4455-feedback-kinds-table`, `lin-4455-constants-owners`) fail on a new one.
 - Price a pulled extra like any piece: a cost read that rode along with LIN-4201 landed alone as
   LIN-4226.
 - A task timeline lane is running from the page's open session ids (`isOpenState`), never the
@@ -63,14 +69,9 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - `lib/dispatch-wake.js`: `reportedPrUrlOf` and SD's `sessionPrs` pick a PR by one order, linked
   only by a comment; changing one moves a PR link. (Drift & Coherence Review, 10 Nov;
   `docs/reviews/drift-coherence-review-2026-11-10.md`.)
-- `lib/dispatch-leftover.js`: restates the follow-up target, halt modes and `NEVER_RAN` (also in
-  `_releaseIfHeld`) beside their homes (`lib/workspace-halt.js`, `HALT_MODES`); a new halt mode
-  would not stop a leftover. (Drift & Coherence Review, 10 Nov; `docs/reviews/drift-coherence-review-2026-11-10.md`.)
 - `lib/dispatch-leftover-hook.js`: a death between `claimHeldWake` and the enqueue, or a failed
   release write, leaves the wake held. No sweep: a lease sees no re-report, a sweep scans
   history, and clearing stamps reopens LIN-4375's double queue. (LIN-4377.)
-- `lib/dispatch-store.js`: `releaseHeldWake` prepends `formatHeldWakeNote({status})`, so release
-  picks leftover wording; `lin-4377` counts the spelling, not the dependency. (Operator, LIN-4377.)
 - `lib/dispatch-store.js`: `addFeedback` takes one `wakeHook`; a second held-wake feature
   first needs composable hooks. (Operator, LIN-4377.)
 - `lib/runner-kit/contract.json`: the row-shape rule is written twice (`checkRowShape`;
@@ -79,13 +80,8 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   (rows cover pause and stop), though the leftover step resumes its build that way
   (`lib/dispatch-leftover.js`). (Seams & Tangles, 10 Nov.;
   `docs/reviews/seams-tangles-review-2026-11-10-run11.md`.)
-- `lib/dispatch-factory.js`: tests `provider.name === 'linear'` beside
-  `isHermeticTestToken` for a test-only transport. (LIN-4347.)
 - `lib/session-summary.js`: do stored run paragraphs keep pre-cutover figures? (Survey
   tally: LIN-4201.)
-- `lib/dispatch-feedback-validation.js`: feedback kinds lack one declaration with their
-  role: `PARKED_WAIT_SKIPPED_KINDS` (`lib/session-telemetry.js`), `FEEDBACK_ENTRY_KINDS`,
-  `findWakeEvent`'s skip rule. (Survey tally: LIN-4240, 4239, 4233.)
 - `lib/wake-shadow.js`: one wake policy, from the LIN-3257 classifier this shadow records.
   (Survey tally: LIN-3257.)
 - `lib/runner-kit/runner.mjs`: the per-message transcript fold is here and in SD; one shared
@@ -140,6 +136,12 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   complete; `pricedUsd` never counts a partial) in its own words, and the lineage figure in `lib/cost-read.js`
   states it again, so a change to the rule is made twice. One shared helper would make it one, but it reaches the
   lineage path and its goldens: larger than a fix. (LIN-4457 leftovers; Survey global on LIN-4457.)
+- `lib/dispatch-feedback-kinds.js`: the table's `mayCarryWake` column is `true` on every row (unknown kinds
+  pass too), so `findWakeEvent` (`lib/dispatch-terminal.js`) never skips a kind, while `lastWakeEntry`
+  (`lib/run-view.js`) skips the decision-stamp kinds as "never a wake marker". Two wake scans disagree about
+  stamps, and the column only records `findWakeEvent`'s behaviour. Removing the column or making it true to
+  both readers means deciding whether `findWakeEvent` should skip stamps, which changes wake minting and
+  every reader of stored rows. (LIN-4455 blind read.)
 - `lib/dispatch-factory.js`: `refusesHermeticToken` skips access for a provider that declares `testTransport`
   (`LinearProvider`, `lib/providers/linear/index.js`), but nothing links that declaration to the transport
   swaps it describes (`routes/test.js` `installTestTokenLinearTransport`, `tests/fixtures/hermetic-linear.js`),

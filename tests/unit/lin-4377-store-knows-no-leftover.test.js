@@ -9,6 +9,12 @@
  *
  * Comments are found by acorn's `onComment`, not a regex, so a `//` inside a string or
  * a URL is never read as one. A new held-wake feature brings a hook, not store branches.
+ *
+ * LIN-4455: the word count alone let the store pick leftover wording through a call
+ * (`releaseHeldWake` prepended `formatHeldWakeNote({status})`) without spelling the word.
+ * So this file also counts the dependency: the store neither imports nor names
+ * `formatHeldWakeNote`. The release wording is late-bound (`setHeldWakeReleaseNote`) or
+ * comes from `wakeHook.releaseNote`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,6 +22,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import * as acorn from 'acorn';
+import * as walk from 'acorn-walk';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const STORE = 'lib/dispatch-store.js';
@@ -77,5 +84,57 @@ test('lib/dispatch-store.js has zero code lines that say "leftover"', () => {
     [],
     `${lines.length} code line(s) in ${STORE} say "leftover". Leftover policy belongs in ` +
       `lib/dispatch-leftover-hook.js; the store keeps held-wake primitives keyed on heldWakeFor.\n${lines.join('\n')}`
+  );
+});
+
+/**
+ * The store's references to the held-wake wording helper: import specifiers (named,
+ * default or namespace members) and identifiers anywhere in its code.
+ *
+ * @param {string} source
+ * @returns {Array<string>}
+ */
+function wordingReferences(source) {
+  const ast = acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'module', locations: true });
+  const hits = [];
+  walk.full(ast, (node) => {
+    if (node.type === 'ImportDeclaration') {
+      for (const spec of node.specifiers) {
+        const imported = spec.imported?.name ?? spec.local.name;
+        if (imported === 'formatHeldWakeNote') hits.push(`${STORE}:${node.loc.start.line}: imports formatHeldWakeNote from ${node.source.value}`);
+      }
+    }
+    if ((node.type === 'Identifier' || node.type === 'PrivateIdentifier') && node.name === 'formatHeldWakeNote') {
+      hits.push(`${STORE}:${node.loc.start.line}: names formatHeldWakeNote`);
+    }
+    if (node.type === 'MemberExpression' && !node.computed && node.property?.name === 'formatHeldWakeNote') {
+      hits.push(`${STORE}:${node.loc.start.line}: reads .formatHeldWakeNote`);
+    }
+  });
+  return [...new Set(hits)];
+}
+
+test('the reference finder sees an import, a call and a member read (self-check)', () => {
+  const src = [
+    "import { formatHeldWakeNote, other } from './dispatch-wake.js';",
+    "import * as wake from './dispatch-wake.js';",
+    'const a = formatHeldWakeNote({ status: 1 });',
+    'const b = wake.formatHeldWakeNote;',
+    "const c = 'formatHeldWakeNote in a string is not a reference';"
+  ].join('\n');
+  assert.deepEqual(wordingReferences(src).map((l) => l.replace(`${STORE}:`, '')), [
+    '1: imports formatHeldWakeNote from ./dispatch-wake.js',
+    '3: names formatHeldWakeNote',
+    '4: reads .formatHeldWakeNote'
+  ]);
+});
+
+test('lib/dispatch-store.js neither imports nor names formatHeldWakeNote (LIN-4455)', () => {
+  const refs = wordingReferences(readFileSync(join(REPO, STORE), 'utf8'));
+  assert.deepEqual(
+    refs,
+    [],
+    `${STORE} reaches the held-wake wording helper. The release wording is bound late ` +
+      `(setHeldWakeReleaseNote) or comes from wakeHook.releaseNote; the store does not own it.\n${refs.join('\n')}`
   );
 });
