@@ -3684,3 +3684,14 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **Noise floor:** the control's two passes differ by one step on ease. So criterion (b)'s "one step up" has to hold in **both** passes, and against the control's own drift.
   - **The control overlaps:** two Web routes items have their owner in a lane area. The mock-AI rule (`should-mock-ai.js`) is in LLM & prompts, and the loop-terminal copy (`follow-up-dispatch.js`) is in Runs & dispatch. If LIN-4447 or LIN-4448 fixes them, the control improves through the lanes. I'll judge the control on its other items as well as on the whole.
   - **LIN-4447's piece 0** would repeat this read with `front-end-pages` as its control. Raised with John: I'm asking before I put the fact on the ticket.
+- **14:55 UTC: first landing, LIN-4447's piece 0** (LIN-4453, `cfd152fa4`, PR #2422, docs only, $11.0).
+  - **What it is:** a frozen "paired area-read kit" in `docs/plans/survey/area-read*.md`, with its own baseline reports at `4b5001ddf`.
+    - It samples 14 files per area by a stable hash rule.
+    - Its control is `front-end-pages`.
+    - The after-read is fixed as LIN-4462.
+  - **No tool or code was built.** It added one leftover to the area note: `landingPrUrls` would count a `## Area read` comment that names a PR URL; piece 2 (LIN-4458) makes that code.
+  - **So my piece-0 question to John is moot:** the overlap already ran. Two instruments now exist side by side: mine (whole area, Web routes control, comments on LIN-4150, no PR URLs) and the lane's (a sample of 14, a front-end-pages control the front-end lane will touch). Mine stays the measure for D12. The lane's is read as a second opinion.
+  - **The lanes' shape:**
+    - LIN-4447 split into ten pieces, LIN-4453–4462 (the planned 0–7, plus the after-read).
+    - The Jira lane LIN-4445 split into three, LIN-4450–4452 (LIN-4450 In Progress).
+    - LIN-4446 and LIN-4448 have no pieces yet.
