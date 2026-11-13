@@ -3738,3 +3738,7 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   | Web routes (control, again) | hard, hard | 9, 5 | the AI pre-flight pasted per route and drifted; the page-chrome options bag rebuilt in about 12 files; workspace teardown; the feature-gate idiom; hand-kept header lists |
 
   - **The noise is larger than it looked.** Web routes at `4b5001ddf` read moderate/hard with 8/7 items. At `c205190fd` it reads hard/hard with 9/5, and nothing in between touched `routes/` meaningfully. So one step of ease, and a few items either way, is within noise on the same code. **Criterion (a), the paired before/after read, carries the verdict.** (b) is supporting evidence only, and counts only when it moves in both passes, clearly past the control's own drift.
+- **15:55 UTC: weekly budget reading from John: 28% used; the week resets Thursday 07:00.**
+  - **Pace:** the week is about 33 hours old (about 20% of its time), so the burn is about 1.4 times even pace. At this rate the rest would run out around Monday night to Tuesday morning, leaving about 2.5 days dark before the reset.
+  - **Some of it is front-loaded:** the switch reviews, the north star subagents and the long discussion.
+  - **Per point 1, going fast with spare capacity is fine.** The plan: ask John for a reading about daily. At about 80%, stop starting new lanes or pieces and let the in-flight work finish, so nothing stops halfway.
