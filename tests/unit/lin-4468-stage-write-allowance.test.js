@@ -39,6 +39,7 @@ import {
 } from '../../lib/stage-writes.js';
 import { requireWriteScope, requireStageWrite } from '../../lib/stage-write-gate.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
+import { SPEC_OPERATIONS } from '../../routes/proxy-writes.js';
 import { BASE_DEPS, buildApp, call, makeFakeProvider, ACME } from './lib/proxy-fake-deps.js';
 import { enumerateRoutes, PROXY_ALLOWED_LAYERS } from './lib/entrance-route-sweep.js';
 import { buildInstructions } from '../../lib/proxy-instructions.js';
@@ -46,16 +47,14 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-const SPEC_OPS = ['createIssue', 'updateIssue', 'appendDescription', 'replaceDescription', 'belowDescription',
-  'createComment', 'deleteComment', 'updateComment', 'attachment', 'createRelation', 'deleteRelation', 'addLabel', 'removeLabel'];
-
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. The table, as plain data
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('LIN-4468 — the allowance table (lib/stage-writes.js)', () => {
   test('every SPEC operation name is a known write operation, and the list has no duplicates', () => {
-    for (const op of SPEC_OPS) assert.ok(STAGE_WRITE_OPS.includes(op), `${op} is classified`);
+    assert.ok(SPEC_OPERATIONS.length > 0, 'SPEC names operations');
+    for (const op of SPEC_OPERATIONS) assert.ok(STAGE_WRITE_OPS.includes(op), `${op} is classified`);
     assert.equal(new Set(STAGE_WRITE_OPS).size, STAGE_WRITE_OPS.length);
   });
 
@@ -433,6 +432,27 @@ describe('LIN-4468 — over HTTP: a none token is refused by every write mount',
       assert.deepEqual(calls.createIssue, []);
     });
   }
+});
+
+describe('LIN-4468 — over HTTP: a stage outside its ticket learns nothing from the blind-read check', () => {
+  const BLIND = '## Blind read\nVerdict: better. The change gave the parser one owner in `lib/a.js`.\n\nRead: https://github.com/o/r/pull/1 at `abc` against `def`.\n\n### Inside the area, fix-sized\nNone.';
+
+  test('a blind-comment token posting a blind read to another ticket gets the 403 before its comment trail is read', async () => {
+    const { provider, calls } = targetProvider();
+    const trailReads = [];
+    // Another ticket's trail cites a different PR, so an un-gated blind-read check would answer 422 with it.
+    provider.fetchIssueComments = async (_token, id) => {
+      trailReads.push(id);
+      return [{ id: 'k1', body: 'Landing: https://github.com/o/r/pull/99', createdAt: '2026-01-01T00:00:00Z' }];
+    };
+    const app = stageAppOn(provider, { writes: 'blind-comment', writesTarget: 'LIN-9' });
+    const res = await call(app, 'POST', '/api/proxy/issues/LIN-10/comments', { body: { body: BLIND } });
+    assert.equal(res.status, 403, JSON.stringify(res.body));
+    assert.match(res.body.error, /may write only to LIN-9; LIN-10 is outside its allowance/);
+    assert.equal(res.body.expected, undefined, 'no landing PRs of the other ticket in the answer');
+    assert.deepEqual(trailReads, [], "the other ticket's comment trail is not read");
+    assert.deepEqual(calls.createComment, []);
+  });
 });
 
 describe('LIN-4468 — over HTTP: one-comment holds the comment to its own ticket', () => {

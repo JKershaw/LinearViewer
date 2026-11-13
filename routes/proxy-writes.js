@@ -147,6 +147,9 @@ const SPEC = {
   removeLabel: { endpoint: '/api/proxy/issues/labels', needs: 'removeLabel', source: true, issueId: 'silent', failure: 'Failed to remove label', label: 'remove label', refs: true },
 };
 
+/** The operation names the SPEC table holds, so a test reads the table itself (LIN-4468: each must be classified in lib/stage-writes.js). */
+export const SPEC_OPERATIONS = Object.freeze(Object.keys(SPEC));
+
 /**
  * @param {Object} deps
  * @param {Function} deps.proxyLimiter - The proxy rate limiter, injected (see `proxyLimiter` in routes/proxy.js)
@@ -806,8 +809,10 @@ export function createProxyWriteRoutes({
     if (refuseBadCommentBody(ctx, body)) return;
     // LIN-4414: before the dedupe lookup, so a body refused once can never pass on a cache hit.
     if (refusedByLeftoverAnswer(ctx, body)) return;
-    if (await refusedByBlindRead(ctx, body)) return;
+    // LIN-4468: the stage-target check comes before the blind read, which reads the target's comment trail
+    // and can answer with its landing PRs: a stage outside its ticket is refused before any answer about it.
     if (!await guardTarget(ctx, 'issueWriteGuard', { onNull: 'proceed' })) return;
+    if (await refusedByBlindRead(ctx, body)) return;
 
     // Deterministic dedupe (LIN-399): an identical comment just created for this
     // issue is returned instead of minting a duplicate. The generation tag
