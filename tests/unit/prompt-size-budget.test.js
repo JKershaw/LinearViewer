@@ -72,10 +72,11 @@ import { leftoverPrompt } from '../../lib/dispatch-leftover.js';
 /** Templates, source bytes. Same files `steady-base-growth.mjs` GROUPS as
  * "worker templates". */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 120682, // LIN-4441: +64 (120618 -> 120682): step 5 and guideline 5 point at the one local-testing rule ("Test Before Pushing") instead of two full-suite instructions; the rule itself renders from lib/prompt-formatters.js
+  'lib/prompt-template-defs.js': 99235, // LIN-4467: -21447 (120682 -> 99235; the formatter import is multi-line again): the data half of each template (route, writes, lead, signals, description, catalogue) moved to lib/prompts/stage-kinds.js; generate() and the views stay here
   'lib/prompt-templates.js': 19903, // LIN-4437: +241, finishStagePrompt skips the attachments section for the blind read (code and its comment; the skip is witnessed in tests/unit/lin-4437-blind-read.test.js)
-  'lib/prompt-formatters.js': 48509, // LIN-4441: +541 (47968 -> 48509): formatLocalTestRule, the one local-testing rule for implementation work (targeted run with CI, the no-CI substitute deferred to Establish CI)
-  'lib/prompt-contract.js': 3875, // LIN-4362: the `## As asked` spellings interpolate AS_ASKED_HEADING (code, not prompt text)
+  'lib/prompt-formatters.js': 48728, // LIN-4467: +219 (48509 -> 48728): GROUNDING_LISTS, the names each record's grounding points at (the note functions stay here)
+  'lib/prompt-contract.js': 2057, // LIN-4467: -1818 (3875 -> 2057): the contract lines moved to each kind's record (lib/prompts/stage-kinds.js); this file reads them
+  'lib/prompts/stage-kinds.js': 43001, // LIN-4467: new at 42495, raised to 43001 (+506) for the LIN-4248 and LIN-4437 comments on the Survey and blind-read records, restored from the STAGE_LEADS block they came from: one record per stage kind (route, writes, lead, label, grounding, signals, intent, contract, catalogue). It holds text that sat outside the budget before (the completion signals in lib/completion-signals.js, the catalogue lines in public/llms.txt, the contract and intent lines), and the records' own structure
 };
 
 /** Templates, rendered bytes for each PROMPT_TEMPLATES key under FIXTURE_ISSUE +
@@ -119,7 +120,7 @@ export const STAGE_ROUTER_SOURCE_CEILING = 8206; // LIN-4465: -63, the header po
 export const ROUTER_PROMPT_RENDERED_CEILING = 10110; // LIN-4401 (LIN-4432 beat 4): +223 (9887 -> 10110): the audit's whenNot clause for a landing an audit already ran on (TRAIL FACTS), with the notes PR's route, and close-out's when for an approved notes PR on a Done ticket; LIN-4370 before it: +96, scoping's `when` covers a size ruling answered after the look-first route's one scoping run; whether a comment answers the ruling is the selector's reading, so code cannot settle it
 
 /** Every stage's Scope and Authority lines, source bytes (lib/prompts/stage-intent.js). */
-export const STAGE_INTENT_SOURCE_CEILING = 3719; // LIN-4437: +296, the blind read's own reading-pass line, which names no ticket (READING and JUDGE both point at it); whether the reader stays blind is held by the preamble and the attachments skip, tested
+export const STAGE_INTENT_SOURCE_CEILING = 1424; // LIN-4467: -2295 (3719 -> 1424): the Scope and Authority texts moved to each kind's record (lib/prompts/stage-kinds.js, counted in TEMPLATES_SOURCE_CEILINGS); this file is the view. LIN-4437 before it: +296, the blind read's own reading-pass line, which names no ticket (READING and JUDGE both point at it); whether the reader stays blind is held by the preamble and the attachments skip, tested
 
 /** Served runner prompt, source bytes (docs/runner-prompt.md). */
 export const RUNNER_PROMPT_SOURCE_CEILING = 17638; // LIN-3669: §5 names the watchdog's three outcomes; the parent's response to a finished-but-unposted subagent is prose (the parent is a model)
@@ -140,7 +141,7 @@ export const LEFTOVER_PROMPT_RENDERED_CEILING = 2498; // LIN-4401 (LIN-4431 beat
  * THIS number with it, in the same change, and says why in the comment beside the
  * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  */
-export const FROZEN_TOTAL_BYTES = 378915; // LIN-4441: +1002 (377913 -> 378915): prompt-template-defs.js source +64, prompt-formatters.js source +541, implementation rendered +397
+export const FROZEN_TOTAL_BYTES = 396575; // LIN-4467: +17660 (378915 -> 396575): the records' text moved in from unbudgeted files (completion signals, catalogue lines) and the record's own structure; see the ceilings above. LIN-4441 before it: +1002 (377913 -> 378915): prompt-template-defs.js source +64, prompt-formatters.js source +541, implementation rendered +397
 
 const BASE_URL = 'https://harbour.example';
 

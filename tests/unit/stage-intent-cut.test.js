@@ -68,7 +68,7 @@ describe('the cut rule has one home (LIN-4345)', () => {
 
   test('no other lib/ source spells out a copy of the rule', () => {
     assert.ok(CUT_LITERAL.length > 100, 'the stretch scanned for is the rule, not a fragment of it');
-    const found = libFiles('lib').filter(f => f !== join('lib', 'prompts', 'stage-intent.js') && copiesIn(readFileSync(f, 'utf8')) > 0);
+    const found = libFiles('lib').filter(f => f !== join('lib', 'prompts', 'stage-kinds.js') && copiesIn(readFileSync(f, 'utf8')) > 0);
     assert.deepEqual(found, []);
   });
 
