@@ -140,7 +140,7 @@ describe('LIN-3975 — the chat fold is the owner\'s, behind the taskChat flag',
 describe('LIN-3975 — the fold is wired before the first Markdown render, and its hooks are read once', () => {
   test('task-page.js mounts the fold, from its direct child, before the first Markdown render in init', () => {
     const src = read('public/task-page.js');
-    const init = src.slice(src.indexOf('  function init(doc) {'), src.indexOf('    function toggle(row) {'));
+    const init = src.slice(src.indexOf('function init(doc) {'), src.indexOf('function toggle(row) {'));
     const mount = init.indexOf('window.TaskChat.init(chatFold, foldOpts)');
     const markdown = init.search(/enhanceContextMarkdown\(|enhanceMarkdown\(/);
     assert.ok(mount > 0, 'the fold is mounted in init');

@@ -146,6 +146,10 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   so a new installer or a change to Linear's can drift from it silently. Closing it means deciding where test
   transports register (for example installers that declare which provider they cover, plus a census test),
   across providers, web routes and fixtures: larger than a fix. (LIN-4456 blind read, 13 Nov.)
+- `lib/task-page-loader.js`: `fmtWhen` (the absolute UTC stamp, `8 Nov, 14:40 UTC`) stays in the loader, so
+  `lib/components/time.js` and `lib/render-task-timeline.js` import a page-formatting helper from a
+  runs-and-dispatch module, the tangle LIN-4472 removed for `relativeAgo`. Moving it into `lib/time-words.js` first
+  needs a call on whether that leaf also owns absolute stamps; about five importers. (LIN-4472 blind read.)
 - `lib/run-trail.js` `readTrail`: a re-review after a not-ready close-out that names the PR only as `#N` leaves the
   landing empty. `closeOutWaitsOn` (`lib/run-closeout-state.js`) then opens the gate with no blind read, and
   since LIN-4458 the box reads `no-pr`, the person's check sets no Done and the merge recorder records nothing

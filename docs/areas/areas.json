@@ -11,7 +11,7 @@
       "name": "Front end: server-rendered pages",
       "slug": "front-end-pages",
       "match": [
-        "^lib/(render[^/]*|components/.*|tree|task-board-view|ship-layout|swim-graph|swim-lanes|timeline-zoom|parse-landing|mask-secrets-in-html|task-page-href|cost-format|question-card|security-headers|ship-journey|settings-areas|settings-copy-first-card)\\.js$"
+        "^lib/(render[^/]*|components/.*|tree|task-board-view|ship-layout|swim-graph|swim-lanes|timeline-zoom|parse-landing|mask-secrets-in-html|task-page-href|cost-format|time-words|question-card|security-headers|ship-journey|settings-areas|settings-copy-first-card)\\.js$"
       ]
     },
     {

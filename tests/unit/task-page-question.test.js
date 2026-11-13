@@ -18,6 +18,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderTaskPage, renderTaskStatus, renderTaskQuestion } from '../../lib/render-task-page.js';
 import { loadWorld, fireDOMContentLoaded, clickOn } from './helpers/client-world.js';
+import { pageWorld } from './helpers/task-page-world.js';
 import { bodyOf } from './helpers/task-page-body.js';
 import { buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { gatherTaskStates } from '../../lib/home-row-states.js';
@@ -216,27 +217,23 @@ const replyFor = (m, { asked = true } = {}) => ({
 });
 
 /**
- * The task page as the server draws it, on loadWorld with the real `public/task-page.js`. `m` is the model it is drawn
- * from; `owner: false` draws the guest page. The page loads (DOMContentLoaded), then `pollOnce` runs one poll with the
- * next of `polls`. `QuestionCards` is a stub: the poll does not reach the card's own script.
+ * The task page as the server draws it, with the real `public/task-page.js` imported as a module over the fake DOM
+ * (LIN-4472). `m` is the model it is drawn from; `owner: false` draws the guest page. The page loads (DOMContentLoaded),
+ * then `pollOnce` runs one poll with the next of `polls`. `QuestionCards` is a stub: the poll does not reach the card's
+ * own script.
  */
-async function makePage({ m, owner = true, polls = [] }) {
+async function makePage(t, { m, owner = true, polls = [] }) {
   const timers = [];
   const reloads = [];
   const inits = [];
   const queue = [...polls];
-  const world = loadWorld({
-    scripts: ['task-page.js'],
+  const { document: doc } = await pageWorld(t, {
     timers,
     window: {
-      addEventListener() {},
-      setInterval: () => 0,
-      clearInterval() {},
       QuestionCards: { initQuestionCards: () => inits.push(1) },
       api: async (url) => { if (url === STATE_URL) return queue.shift(); throw new Error('unexpected ' + url); },
     },
   });
-  const { document: doc } = world;
   doc.body.innerHTML = bodyOf(render(m, owner ? 'owner' : 'guest', STATE_URL));
   doc.defaultView = { location: { reload: () => reloads.push(1) } };
   await fireDOMContentLoaded(doc);
@@ -255,13 +252,13 @@ async function makePage({ m, owner = true, polls = [] }) {
 }
 
 describe('the poll leaves a half-typed answer alone and removes the card when the wait ends', () => {
-  test('init captures the card once, before any poll', async () => {
-    const page = await makePage({ m: ASKED() });
+  test('init captures the card once, before any poll', async (t) => {
+    const page = await makePage(t, { m: ASKED() });
     assert.equal(page.inits.length, 1);
   });
 
-  test('a poll that still says waiting repaints the header but keeps the card and the typed text', async () => {
-    const page = await makePage({ m: ASKED(), polls: [replyFor(ASKED())] });
+  test('a poll that still says waiting repaints the header but keeps the card and the typed text', async (t) => {
+    const page = await makePage(t, { m: ASKED(), polls: [replyFor(ASKED())] });
     page.textarea.value = 'half a typed answer';
     await page.pollOnce();
     assert.equal(page.wasRemoved(), false, 'the card stays');
@@ -273,31 +270,31 @@ describe('the poll leaves a half-typed answer alone and removes the card when th
     assert.equal(page.reloads.length, 0);
   });
 
-  test('a poll that finds the task no longer waiting removes the card', async () => {
-    const page = await makePage({ m: ASKED(), polls: [replyFor(RUNNING())] });
+  test('a poll that finds the task no longer waiting removes the card', async (t) => {
+    const page = await makePage(t, { m: ASKED(), polls: [replyFor(RUNNING())] });
     await page.pollOnce();
     assert.equal(page.wasRemoved(), true);
   });
 
-  test('a poll that says waiting with no question (questionHtml "") removes the card and does not reload (LIN-4038)', async () => {
+  test('a poll that says waiting with no question (questionHtml "") removes the card and does not reload (LIN-4038)', async (t) => {
     // Shelving the ruling while the page is open: the status is still waiting, but the server says no question.
-    const page = await makePage({ m: ASKED(), polls: [replyFor(ASKED(), { asked: false })] });
+    const page = await makePage(t, { m: ASKED(), polls: [replyFor(ASKED(), { asked: false })] });
     await page.pollOnce();
     assert.equal(page.wasRemoved(), true, 'the card goes');
     assert.equal(page.reloads.length, 0, 'no reload for a card that should not be there');
   });
 
-  test('a waiting-but-parked poll on a page with no card does not reload (LIN-4038)', async () => {
-    const page = await makePage({ m: RUNNING(), polls: [replyFor(PARKED(), { asked: false })] });
+  test('a waiting-but-parked poll on a page with no card does not reload (LIN-4038)', async (t) => {
+    const page = await makePage(t, { m: RUNNING(), polls: [replyFor(PARKED(), { asked: false })] });
     await page.pollOnce();
     assert.equal(page.reloads.length, 0);
   });
 
-  test('an owner page that becomes asked reloads once to fetch the card; a page with no owner marker does not', async () => {
-    const own = await makePage({ m: RUNNING(), polls: [replyFor(ASKED())] });
+  test('an owner page that becomes asked reloads once to fetch the card; a page with no owner marker does not', async (t) => {
+    const own = await makePage(t, { m: RUNNING(), polls: [replyFor(ASKED())] });
     await own.pollOnce();
     assert.equal(own.reloads.length, 1);
-    const guest = await makePage({ m: RUNNING(), owner: false, polls: [replyFor(ASKED())] });
+    const guest = await makePage(t, { m: RUNNING(), owner: false, polls: [replyFor(ASKED())] });
     await guest.pollOnce();
     assert.equal(guest.reloads.length, 0);
   });
