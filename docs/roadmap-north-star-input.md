@@ -1,7 +1,8 @@
 # Harbour — North Star
 
 *The workspace north star: prose, singular, normative. Native to Harbour (not a Linear
-primitive). This file is the version-controlled canonical copy; paste it into the Roadmap page's
+primitive). This file is the original v1 text, kept for history; the current north star is
+`docs/north-star.md`, and that is the text to paste into the Roadmap page's
 north-star input (`PUT /workspace/:urlKey/api/roadmap/north-star`) to make it live. The layer-3b
 reader (`lib/prompts/roadmap-north-star-template.js`) scores work against it; the same
 classification eventually orients the Ship view's FORWARD sector.*
