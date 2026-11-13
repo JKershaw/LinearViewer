@@ -23,7 +23,12 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import * as acorn from 'acorn';
+import * as walk from 'acorn-walk';
+import { BLIND_READ_KIND, BLIND_READ_HEADING, BLIND_READ_VERDICT_PROSE, BLIND_READ_VERDICT_LIST } from '../../lib/prompts/blind-read-words.js';
 import { PROMPT_TEMPLATES, STAGE_LEADS } from '../../lib/prompt-templates.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 import { STAGE_INTENT } from '../../lib/prompts/stage-intent.js';
@@ -163,5 +168,81 @@ describe('LIN-4437 — every per-kind table names every PROMPT_TEMPLATES key, or
   test('blind-read buckets after the diff, and is off the round-trip walk', () => {
     assert.equal(BUCKET_OF_KIND['blind-read'], 'after');
     assert.ok(OFF_SPINE_KINDS.has('blind-read'));
+  });
+});
+
+// ─── LIN-4466: the blind read's kind and heading have one home ─────────────────
+// The leaf (lib/prompts/blind-read-words.js) owns the kind, the heading and the verdict words. Outside
+// it, a source scan (AST, so comments never count) fails on:
+//   - the kind as an exact string literal, except (a) a property key in a file that names a table in
+//     TABLES above, where the key is that table's row, and (b) the template registry, which types the
+//     kind as a template key;
+//   - the heading as a substring of a string or template text, anywhere but the leaf;
+//   - the verdict words' prose ("better, the same or worse", "better, same or worse") likewise.
+// The scope is the code that ships (lib/, routes/, server.js) and the stability script that reads the
+// ledger. Eval fixtures under scripts/eval name kinds as data and are out of scope.
+const WORDS_LEAF = 'lib/prompts/blind-read-words.js';
+const TEMPLATE_REGISTRY = 'lib/prompt-template-defs.js';
+const SCAN_ROOTS = ['lib', 'routes', 'server.js', 'scripts/stability-measures-blind.mjs'];
+const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const TABLE_FILES = new Set(Object.keys(TABLES).map(name => /\((lib\/[^)]+)\)/.exec(name)?.[1]).filter(Boolean));
+
+/** The kind, heading and verdict-prose findings in one module's source. */
+function blindReadFindings(file, source) {
+  const parse = () => acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'module', allowHashBang: true });
+  const out = [];
+  const text = (node) => (node.type === 'Literal' && typeof node.value === 'string') ? node.value
+    : (node.type === 'TemplateElement' ? node.value.cooked : null);
+  walk.full(parse(), (node) => {
+    // acorn-walk does not descend into a non-computed property key, so a key is checked here, where it is a row.
+    if (node.type === 'Property' && !node.computed && node.key.type === 'Literal' && node.key.value === BLIND_READ_KIND) {
+      if (!(TABLE_FILES.has(file) || file === TEMPLATE_REGISTRY)) out.push(`the kind '${BLIND_READ_KIND}' as a key outside a table`);
+    }
+    if (node.type === 'Literal' && node.value === BLIND_READ_KIND && file !== TEMPLATE_REGISTRY) out.push(`the kind '${BLIND_READ_KIND}' as a literal`);
+    const s = text(node);
+    if (s === null) return;
+    if (s.includes(BLIND_READ_HEADING)) out.push(`the heading "${BLIND_READ_HEADING}" as text`);
+    if (s.includes(BLIND_READ_VERDICT_PROSE) || s.includes(BLIND_READ_VERDICT_LIST)) out.push('the verdict words as prose');
+  });
+  return out;
+}
+
+const scannedFiles = () => [...new Set(execFileSync('git', ['ls-files', ...SCAN_ROOTS], { cwd: REPO, encoding: 'utf8' }).split('\n'))]
+  .filter(f => /\.m?js$/.test(f) && f !== WORDS_LEAF);
+
+describe('LIN-4466 — the blind read\'s kind, heading and verdict words have one home', () => {
+  test('the scan reaches the files that type them today', () => {
+    const files = scannedFiles();
+    for (const f of ['lib/run-view.js', 'lib/completion-signals.js', 'lib/code-routes.js', 'lib/llm-jobs.js', 'lib/workflow-config.js']) assert.ok(files.includes(f), f);
+  });
+
+  test('no module outside the leaf types the kind, its heading or its verdict words', () => {
+    const hits = scannedFiles().flatMap(f => blindReadFindings(f, readFileSync(join(REPO, f), 'utf8')).map(x => `${f}: ${x}`));
+    assert.deepEqual(hits, [], 'import BLIND_READ_KIND, BLIND_READ_HEADING or the verdict constants from lib/prompts/blind-read-words.js');
+  });
+
+  test('the scan would catch each shape the Waiting entry names: predicate, array member, call argument, returned value, heading, verdict prose', () => {
+    const shapes = [
+      `export const f = (r) => r.kind === '${BLIND_READ_KIND}';`,
+      `export const SPINE = ['plan', '${BLIND_READ_KIND}'];`,
+      `agent('${BLIND_READ_KIND}', 'judge');`,
+      `export const g = () => ({ step: '${BLIND_READ_KIND}' });`,
+      `export const h = 'posted as one ${BLIND_READ_HEADING} comment';`,
+      `export const i = \`its first line exactly ${BLIND_READ_HEADING}\`;`,
+      `export const j = 'whether the change left its area ${BLIND_READ_VERDICT_PROSE}';`,
+    ];
+    for (const src of shapes) assert.ok(blindReadFindings('lib/x.js', src).length > 0, src);
+  });
+
+  test('the scan allows what it should: a table row keyed by the kind, a comment, a longer status, the registry', () => {
+    assert.deepEqual(blindReadFindings('lib/run-view.js', `export const STAGE_LABELS = { '${BLIND_READ_KIND}': 'Blind read' };`), []);
+    assert.deepEqual(blindReadFindings('lib/x.js', `// a ${BLIND_READ_KIND} note, and ${BLIND_READ_HEADING} in a comment\nexport const k = 'blind-read-missing';`), []);
+    assert.deepEqual(blindReadFindings(TEMPLATE_REGISTRY, `export const T = { '${BLIND_READ_KIND}': { name: '${BLIND_READ_KIND}' } };`), []);
+    assert.ok(blindReadFindings('lib/x.js', `export const T = { '${BLIND_READ_KIND}': 1 };`).length > 0, 'a keyed object outside a table file is not a row');
+  });
+
+  test('the verdict prose is the words in the order the prompts print them', () => {
+    assert.equal(BLIND_READ_VERDICT_PROSE, 'better, the same or worse');
+    assert.equal(BLIND_READ_VERDICT_LIST, 'better, same or worse');
   });
 });
