@@ -43,3 +43,7 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
 - `lib/render-session.js`: the run page's `session-run-chat` link is missing on the first attempt
   and present on retry in 10 sampled green runs (no ticket); whether the link renders late or
   the seed lands late is unknown. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)
+- `lib/render-task-timeline.js`: picks a tick's bare style by restating the model's tick rule
+  (`lib/task-timeline.js`: wake, resumed, or no records), and the legend's "woken or resumed" restates
+  it again, though its header says it derives nothing. If the model ticks another role, the renderer
+  styles it wrongly and the legend goes stale; the tick could carry its style. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)

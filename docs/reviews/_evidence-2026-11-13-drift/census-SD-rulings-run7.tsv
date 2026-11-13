@@ -1,0 +1,28 @@
+rank	id	decision	areas/files/sites	status_vs_5d8489e	ruling	reason
+1	G0001	text contract marker: [failed]	6/10/39	unchanged	borderline	The terminal marker each emitter writes; the grammar is the runner contract's (held byte-identical with Harbour's), so the copies are emit sites of one contract, not a second rule.
+2	G0002	string set {'ignore', 'pipe'} as array [stdio]	5/10/15	unchanged	noise	Node spawn stdio options; a platform idiom, each site configures its own child.
+3	G0003	text contract marker: [working]	4/6/12	unchanged	real	The heartbeat grammar is spelled at both ends with no named home: Harbour ledger row 140 (LIN-3828, Backlog). heartbeat.js should own it.
+4	G0004	tiny rule copied as a helper onAttemptFailed(), 4 copies of 1-4 statements	4/4/4	unchanged	noise	One-line oplog callbacks per terminal-post caller; each logs its own event.
+5	G0005	text contract marker: [done]	5/5/8	unchanged	borderline	Emit sites of the contract's report line; parse authority is Harbour's dispatch-terminal; held by the contract's report rows.
+6	G0006	repeated comparison phase == 'AWAITING_FOLLOWUP'	3/5/8	unchanged	borderline	Phase literal read in hook, liveness and heartbeat; a phase constant would name it, but each site asks a different question of the phase.
+7	G0007	text contract marker: [blocked]	4/4/4	unchanged	borderline	As [done]: emit sites (hook, opencode-runner) plus a test and a report script; the contract holds the grammar.
+8	G0008	text contract marker: [pending]	4/4/5	unchanged	borderline	As [blocked].
+9	G0009	repeated comparison phase == 'CANCELLED'	2/2/5	unchanged	noise	Phase checks in the dispatcher and the hook's own cancel path; one state machine read locally.
+10	G0010	repeated comparison code == 'ENOENT'	3/3/3	unchanged	noise	Standard missing-file errno check.
+11	G0011	repeated comparison harness == 'opencode'	2/3/16	unchanged	borderline	Harness switch at 16 sites, mostly reapers.js; each branch differs, but no harness table owns the per-harness facts.
+12	G0012	text contract marker: [evidence]	2/3/4	unchanged	borderline	Emit sites of the evidence prefix in both harness relays and links.js; the prefix is a contract row.
+13	G0013	repeated comparison livenessSignal == 'transcript-hook'	2/2/7	unchanged	borderline	Liveness-signal literal in dispatcher and reapers; one enum without a constant, read for different decisions.
+14	G0014	repeated comparison type == 'text'	3/4/10	unchanged	noise	Claude/opencode content-block type; an external enum.
+15	G0015	repeated comparison kind == 'pending'	2/2/2	unchanged	noise	Two different kind spaces (a sentinel kind in hook.js, an outstanding-work kind in reapers.js).
+16	G0016	repeated comparison role == 'assistant'	3/4/6	unchanged	noise	Transcript message role; an external enum.
+17	G0017	named constant LINK_CAP=8	2/2/2	unchanged	borderline	Deliberately local per opencode-runner.js's own comment (plan decision 5); two relays, one number, joined by that comment only.
+18	G0018	near-duplicate function deriveEvidenceScope() (also: resolveScope)	2/2/2	unchanged	real	The evidence scope (GitHub owner, Linear org) is derived twice: hook.js resolveScope and opencode-runner.js deriveEvidenceScope, each over links.js's parsers; one helper in links.js would hold it.
+19	G0019	repeated comparison kind == 'blocked'	2/2/3	unchanged	borderline	The sentinel parse is shared (parseCompletionSentinel, imported by opencode-runner.js); the per-kind actions differ by harness.
+20	G0020	repeated comparison kind == 'failed'	2/2/2	unchanged	borderline	As G0019.
+21	G0021	repeated comparison kind == 'pending-external'	2/2/3	unchanged	borderline	As G0019.
+22	G0022	repeated comparison kind == 'pending-internal'	2/2/2	unchanged	borderline	As G0019.
+23	G0023	repeated comparison mode == 'stop'	1/2/6	unchanged	borderline	Halt mode literal in dispatcher and halt.js; halt.js is the home and the dispatcher re-reads the literal (Harbour row 10, cross-repo halt vocabulary).
+24	G0024	repeated comparison action == 'reject'	1/2/4	unchanged	noise	A local action enum in the dispatcher and the follow-up path; one module family.
+25	G0025	text contract marker: [aborted]	2/2/3	unchanged	borderline	Emit and report-read of one marker; a contract row would hold it.
+42	G0042	repeated comparison type == 'tool_use'	3/3/6	unchanged	noise	Transcript content-block type; external enum.
+43	G0043	tiny rule copied as a helper readJson() (also: readMarkerFile, readRecordedIdentity)	3/4/5	unchanged	noise	Small JSON-read helpers in test probes and stores; coincidental.

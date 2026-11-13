@@ -1,0 +1,39 @@
+new nodes (with edges): ['lib/dispatch-leftover-answer.js', 'lib/prompts/blind-read-words.js', 'lib/prompts/survey-words.js', 'lib/recommendation-blind-read.js', 'lib/recommendation-live-wait.js', 'lib/render-task-timeline.js', 'lib/session-roles.js', 'lib/task-cost-read.js', 'lib/task-timeline.js']
+gone nodes: []
+static edges + 51 - 6
+fan-in of new edges: [('lib/prompts/blind-read-words.js', 6), ('lib/run-ledger.js', 5), ('lib/recommendation-live-wait.js', 4), ('lib/task-cost-read.js', 3), ('lib/task-timeline.js', 3), ('lib/render-task-timeline.js', 3), ('lib/dispatch-leftover-answer.js', 2), ('lib/recent-runs.js', 2), ('lib/utils/time.js', 2), ('lib/prompts/leftover-words.js', 2), ('lib/prompts/survey-words.js', 2), ('lib/run-view.js', 2)]
+lib/task-cost-read.js 
+  imports -> ['lib/cost-read.js', 'lib/lineage-membership.js', 'lib/request-usage-loader.js']
+  imported by <- ['lib/task-timeline.js', 'routes/proxy-compute.js', 'routes/proxy.js']
+lib/task-timeline.js 
+  imports -> ['lib/session-roles.js', 'lib/task-cost-read.js', 'lib/utils/time.js']
+  imported by <- ['lib/task-page-loader.js', 'routes/task-share.js', 'server.js']
+lib/render-task-timeline.js 
+  imports -> ['lib/components/section.js', 'lib/cost-format.js', 'lib/render-run-steps.js', 'lib/run-view.js', 'lib/task-page-loader.js', 'lib/utils/html.js']
+  imported by <- ['lib/render-task-page.js', 'routes/task-page.js', 'routes/task-share.js']
+lib/recommendation-blind-read.js 
+  imports -> ['lib/providers/state-map.js', 'lib/recent-runs.js', 'lib/recommendation-facts.js', 'lib/run-closeout-state.js', 'lib/run-ledger.js', 'lib/utils/time.js']
+  imported by <- ['lib/openrouter.js']
+lib/dispatch-leftover-answer.js 
+  imports -> ['lib/prompts/leftover-words.js']
+  imported by <- ['lib/proxy-instructions.js', 'routes/proxy-writes.js']
+lib/session-roles.js 
+  imports -> ['lib/dispatch-fields.js', 'lib/run-view.js']
+  imported by <- ['lib/task-timeline.js']
+lib/prompts/blind-read-words.js 
+  imports -> []
+  imported by <- ['lib/plan-review-round-trips.js', 'lib/prompt-template-defs.js', 'lib/prompt-templates.js', 'lib/proxy-instructions.js', 'lib/recent-runs.js', 'lib/run-ledger.js']
+lib/prompts/area-note-format.js 
+  imports -> []
+  imported by <- []
+lib/recommendation-live-wait.js 
+  imports -> ['lib/recent-runs.js']
+  imported by <- ['lib/dispatch-entrance.js', 'lib/openrouter.js', 'lib/proxy-instructions.js', 'routes/workspace-api.js']
+lib/cost-read.js 
+  imports -> ['lib/dispatch-terminal.js', 'lib/lineage-membership.js', 'lib/llm-call-log.js', 'lib/request-usage-fold.js', 'lib/row-usage.js', 'lib/session-telemetry.js', 'lib/utils/time.js']
+  imported by <- ['lib/effort-readout.js', 'lib/kpi-stats.js', 'lib/model-routing-history.js', 'lib/model-routing-spend.js', 'lib/run-view.js', 'lib/task-cost-read.js', 'lib/terminal-marked-task-cost.js', 'lib/weekly-budget.js', 'lib/workspace-kpi-stats.js', 'routes/proxy-compute.js', 'routes/settings.js', 'routes/ship-biscuit.js']
+lib/run-ledger.js 
+  imports -> ['lib/prompts/blind-read-words.js', 'lib/prompts/survey-words.js']
+  imported by <- ['lib/close-out-readiness.js', 'lib/dispatch-wake.js', 'lib/prompt-template-defs.js', 'lib/prompts/revision-brief.js', 'lib/proxy-instructions.js', 'lib/recommendation-blind-read.js', 'lib/recommendation-facts.js', 'lib/recommendation-look-first.js', 'lib/run-evidence.js', 'lib/task-page-loader.js', 'routes/proxy-writes.js']
+removed edges: [('lib/agent-status-store.js', 'lib/read-horizon.js'), ('lib/dispatch-entrance.js', 'lib/recommendation-look-first.js'), ('lib/recommendation-look-first.js', 'lib/prompt-template-defs.js'), ('routes/proxy-compute.js', 'lib/lineage-membership.js'), ('routes/proxy-compute.js', 'lib/request-usage-loader.js'), ('routes/workspace-api.js', 'lib/recommendation-look-first.js')]
+SCCs: [{'size': 6, 'members': ['lib/components/settings-key-row.js', 'lib/render-pages.js', 'lib/render-settings-models.js', 'lib/render-settings-workspace.js', 'lib/render-settings.js', 'lib/render.js']}, {'size': 6, 'members': ['lib/digest-feedback.js', 'lib/live-console.js', 'lib/pipeline-loops.js', 'lib/run-loop-state.js', 'lib/run-summary.js', 'lib/session-summary.js']}]
