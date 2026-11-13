@@ -1144,6 +1144,10 @@ const leftoverStep = createLeftoverStep({
     getProviderByName: (name) => getProviderForWorkspace({ provider: name })
   }))
 })
+// LIN-4468 OPEN (DECISION on LIN-4448): a held wake (lib/dispatch-store.js releaseHeldWake) resumes the
+// parent but this factory receives only {urlKey, createdBy}, so the token mints UNSTAMPED, i.e.
+// unrestricted. Stamping it needs the resumed parent id passed from the store, which the LIN-4468 brief
+// keeps out of lib/dispatch-store.js. Until ruled, the wake stays as it was before LIN-4468.
 dispatchQueueStore.setWakeCredentialProvisionerFactory(({ urlKey, createdBy }) => buildWakeCredentialProvisioner({
   proxyTokenStore,
   urlKey,

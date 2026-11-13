@@ -595,3 +595,100 @@ describe('LIN-4468 — the edges: the PATCH field list and the instructions page
     assert.match(res.body, /Your stage write allowance: none \(ticket LIN-9\)/);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LIN-4468 review, Finding 3: the Jira and GitHub identifier forms, over HTTP
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A provider whose ticket resolution maps each identifier form to one ticket id, as the real Jira and
+ * GitHub issue-write guards do: a Jira key and its numeric id, a GitHub `owner/repo#N`, `#N` and `N`.
+ * `aliases` maps every form to the canonical id. An unknown form resolves to nothing.
+ */
+function formProvider(aliases) {
+  const calls = { createComment: [] };
+  const base = makeFakeProvider();
+  return {
+    calls,
+    provider: {
+      ...base,
+      issueWriteGuard: async (_token, id) => {
+        const canonical = Object.prototype.hasOwnProperty.call(aliases, id) ? aliases[id] : null;
+        return canonical ? { id: canonical, trashed: false, team: { id: 't1' } } : null;
+      },
+      createComment: async (_token, issueId, body) => {
+        calls.createComment.push(issueId);
+        return { success: true, comment: { id: 'c1', body, createdAt: new Date().toISOString(), user: { name: 'Fake' } } };
+      }
+    }
+  };
+}
+
+/** A proxy app whose token is a one-comment stage on `writesTarget`, over the given provider. */
+function stageAppOn(provider, { writes, writesTarget }) {
+  const identity = { tokenId: 't1', urlKey: ACME, label: 'stage', scope: 'readWrite', createdBy: 'u1', grants: ['take', 'dispatch'], workspaceId: 'ws-acme', writes, writesTarget };
+  const proxyTokenStore = { ...BASE_DEPS().proxyTokenStore, validateToken: async () => identity };
+  return buildApp({ proxyTokenStore, provider });
+}
+
+describe('LIN-4468 — over HTTP: a Jira-shaped ticket is held to its one ticket, by key and by numeric id', () => {
+  const JIRA = { 'PROJ-12': '10012', '10012': '10012', 'PROJ-13': '10013', '10013': '10013' };
+
+  test('the stamped key, and the same issue by its numeric id, are allowed', async () => {
+    const { provider, calls } = formProvider(JIRA);
+    const app = stageAppOn(provider, { writes: 'one-comment', writesTarget: 'PROJ-12' });
+    const byKey = await call(app, 'POST', '/api/proxy/issues/PROJ-12/comments', { body: { body: 'a' } });
+    const byId = await call(app, 'POST', '/api/proxy/issues/10012/comments', { body: { body: 'b' } });
+    assert.ok(byKey.status < 300, JSON.stringify(byKey.body));
+    assert.ok(byId.status < 300, JSON.stringify(byId.body));
+    assert.deepEqual(calls.createComment, ['PROJ-12', '10012']);
+  });
+
+  test('another Jira ticket, by key or by numeric id, is refused and names the ticket it may write to', async () => {
+    const { provider, calls } = formProvider(JIRA);
+    const app = stageAppOn(provider, { writes: 'one-comment', writesTarget: 'PROJ-12' });
+    for (const id of ['PROJ-13', '10013']) {
+      const res = await call(app, 'POST', `/api/proxy/issues/${id}/comments`, { body: { body: 'wrong' } });
+      assert.equal(res.status, 403, `${id}: ${JSON.stringify(res.body)}`);
+      assert.match(res.body.error, /may write only to PROJ-12; /, id);
+    }
+    assert.deepEqual(calls.createComment, [], 'nothing written');
+  });
+});
+
+describe('LIN-4468 — over HTTP: a GitHub-shaped ticket is held to its one ticket, by #N and N', () => {
+  // The stamped target is the stored identifier, `owner/repo#N`; the proxy path takes `#N` or `N` (ISSUE_ID_REGEX).
+  const GITHUB = { 'owner/repo#12': '12', '#12': '12', '12': '12', '#13': '13', '13': '13' };
+  // A `#` in a path segment is percent-encoded, as a client must send it.
+  const path = (id) => `/api/proxy/issues/${encodeURIComponent(id)}/comments`;
+
+  test('the stamped owner/repo#N target is resolved, and the same issue as #N or N is allowed', async () => {
+    const { provider, calls } = formProvider(GITHUB);
+    const app = stageAppOn(provider, { writes: 'one-comment', writesTarget: 'owner/repo#12' });
+    for (const id of ['#12', '12']) {
+      const res = await call(app, 'POST', path(id), { body: { body: 'a' } });
+      assert.ok(res.status < 300, `${id}: ${JSON.stringify(res.body)}`);
+    }
+    assert.deepEqual(calls.createComment, ['#12', '12']);
+  });
+
+  test('another GitHub issue, as #N or N, is refused and names the ticket it may write to', async () => {
+    const { provider, calls } = formProvider(GITHUB);
+    const app = stageAppOn(provider, { writes: 'one-comment', writesTarget: 'owner/repo#12' });
+    for (const id of ['#13', '13']) {
+      const res = await call(app, 'POST', path(id), { body: { body: 'wrong' } });
+      assert.equal(res.status, 403, `${id}: ${JSON.stringify(res.body)}`);
+      assert.match(res.body.error, /may write only to owner\/repo#12; /, id);
+    }
+    assert.deepEqual(calls.createComment, [], 'nothing written');
+  });
+
+  test('owner/repo#N is not a path form the proxy accepts: refused at the format check, before any gate or write', async () => {
+    const { provider, calls } = formProvider(GITHUB);
+    const app = stageAppOn(provider, { writes: 'one-comment', writesTarget: 'owner/repo#12' });
+    const res = await call(app, 'POST', path('owner/repo#13'), { body: { body: 'x' } });
+    assert.equal(res.status, 400, JSON.stringify(res.body));
+    assert.equal(res.body.error, 'Invalid issue ID format');
+    assert.deepEqual(calls.createComment, []);
+  });
+});

@@ -209,7 +209,7 @@ export function createProxyRunnerRoutes({
       urlKey: req.proxyUrlKey,
       baseUrl,
       createdBy,
-      // LIN-4468: the woken row's stage stamps the wake token.
+      // LIN-4468: the resumed PARENT's stage stamps the wake token (lib/wake-credential.js).
       itemStamp: { store: dispatchQueueStore, itemId: id }
     });
     // LIN-4373: the same leftover step as the dispatch feedback route, bound to this
