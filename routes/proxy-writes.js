@@ -452,18 +452,23 @@ export function createProxyWriteRoutes({
     // apiWriteFields entry of its own, so it is gated on `priority`.
     const isUuid = (v) => Boolean(v) && UUID_REGEX.test(v);
     const isPriority = (v) => v !== undefined && isValidPriority(v);
+    // LIN-4451 (review note 5, disposition (b)): assigneeId / parentId / cycleId are
+    // UUID-only on Linear. A present value that is not a UUID is refused 400 here, not
+    // dropped on a 201 as the old `present: isUuid` gate did. A provider id form (a Jira
+    // issue key) therefore reads as a clear refusal, never as a filed issue without its parent.
     const fields = [
       { name: 'projectId', key: 'projectId', value: projectId, present: Boolean, convert: (v) => resolveProjectInput(provider, token, v) },
       { name: 'stateId', key: 'stateId', value: stateId, present: Boolean, convert: (v) => resolveStateInput(provider, token, resolvedTeamId, v) },
-      { name: 'assigneeId', key: 'assigneeId', value: assigneeId, present: isUuid },
-      { name: 'parentId', key: 'parentId', value: parentId, present: isUuid },
-      { name: 'cycleId', key: 'cycleId', value: cycleId, present: isUuid },
+      { name: 'assigneeId', key: 'assigneeId', value: assigneeId, present: Boolean, uuid: true },
+      { name: 'parentId', key: 'parentId', value: parentId, present: Boolean, uuid: true },
+      { name: 'cycleId', key: 'cycleId', value: cycleId, present: Boolean, uuid: true },
       { name: 'priority', key: 'priority', value: priority, present: isPriority },
       { name: 'priorityLevel', key: 'priority', gate: 'priority', value: priorityLevel, present: isPriority, convert: canonicalPriorityToLinear },
     ];
-    for (const { name, key, gate = name, value, present, convert } of fields) {
+    for (const { name, key, gate = name, value, present, convert, uuid = false } of fields) {
       if (!present(value)) continue;
       if (!writable.includes(gate)) return unsupported(name);
+      if (uuid && !isUuid(value)) return refuse(ctx, 400, `${name} must be a UUID`);
       input[key] = convert ? await convert(value) : value;
     }
 

@@ -556,8 +556,8 @@ describe('createFields() capability contract (LIN-1504/LIN-1972)', () => {
     assert.strictEqual(githubProvider.createFields().includes('priority'), false);
   });
 
-  test('Jira and github-projects: no override — inherit the base default', () => {
-    assert.deepStrictEqual(jiraProvider.createFields(), ['title', 'description']);
+  test('Jira: its own create contract (LIN-4451: the project is the team); github-projects: no override — inherit the base default', () => {
+    assert.deepStrictEqual(jiraProvider.createFields(), ['title', 'description', 'teamId']);
     assert.deepStrictEqual(githubProjectsProvider.createFields(), ['title', 'description']);
   });
 
@@ -614,8 +614,8 @@ describe('apiWriteFields() headless write-door capability contract (LIN-1557)', 
     assert.deepStrictEqual(githubProvider.apiWriteFields(), ['title', 'description', 'projectId']);
   });
 
-  test('Jira and github-projects: no override — inherit the base default', () => {
-    assert.deepStrictEqual(jiraProvider.apiWriteFields(), ['title', 'description']);
+  test('Jira: apiWriteFields adds the epic (projectId) only, never stateId or parentId (LIN-4451); github-projects: no override', () => {
+    assert.deepStrictEqual(jiraProvider.apiWriteFields(), ['title', 'description', 'teamId', 'projectId']);
     assert.deepStrictEqual(githubProjectsProvider.apiWriteFields(), ['title', 'description']);
   });
 });

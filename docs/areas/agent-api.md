@@ -72,3 +72,6 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   does not know which stage a token was minted for. The blind read (LIN-4437) is blind by its prompt and preamble only: a
   reader that ignores them can read the ask and the plan. Holding it needs the stage on the token and a read guard per
   stage. By the consequence test it breaks nothing today, blocks no work and touches no safety. (LIN-4396 plan, witness 2.)
+- `routes/proxy-writes.js`: the PATCH route still drops a non-UUID `assigneeId`, `parentId` or
+  `cycleId` silently. Disposition (b) was applied to create only, and PATCH is the same shape.
+  (LIN-4451 Survey open-0 and open questions.)

@@ -2078,6 +2078,9 @@ Content-Type: application/json
 
 - **GitHub-backed workspaces** do not support `teamId`, `stateId`, `assigneeId`, `parentId`, `cycleId`, `priority`/`priorityLevel` (both map to the same provider capability).
 - **Local-backed workspaces** do not support `teamId`, `assigneeId`, `cycleId`.
+- **Jira-backed workspaces** (LIN-4451) take `teamId` as the project key (e.g. `ENG`, from `GET /api/proxy/teams`) and `projectId` as an epic (the epic's id, from `GET /api/proxy/projects`). The epic is set as `parent` when the project's create screen offers it, else as Epic Link; a create screen with neither is refused `422`. `stateId`, `priority`, `priorityLevel`, `assigneeId`, `parentId` and `cycleId` are refused `400`: a status move after create would be a second, non-atomic write, and a parent is an issue key where this API takes a UUID.
+
+**UUID-only fields (LIN-4451).** On a Linear-backed workspace `assigneeId`, `parentId` and `cycleId` must be UUIDs. A value that is not one (an issue key such as `LIN-123`, for example) is refused `400` rather than dropped on a `201`.
 - **Linear-backed workspaces** support every field above.
 
 Returns `201`. The echoed `issue` is the **same flat shape as `GET /issues/{id}`** (minus the `children` / `comments` / `relations` collections, which a create cannot set) — self-verifying, so you do **not** need a follow-up `GET` to confirm the fields the request set (an unsupported field never reaches this point, per the compatibility note above). `priorityLevel` is always present alongside `priority`/`priorityLabel` on every read and write echo, for every provider — it is derived, not something you have to request:

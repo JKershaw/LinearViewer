@@ -499,10 +499,14 @@ describe('"+ Add task" across real providers (LIN-1973 F2)', () => {
     assert.ok(!result.includes('data-action="create-task"'), 'no external deep-link either');
   });
 
-  test('Jira (createIssue NOT implemented, external create URL only) — keeps the unchanged deep-link, never /task/new', () => {
+  // LIN-4451: Jira implements createIssue, so it takes the same in-app path as Linear. The
+  // external create dialog is retired as the create action; the deep-link override remains
+  // only as the `ui.write` gate, which is not rendered as a link when `inlineCreate` is true.
+  test('Jira (createIssue implemented, LIN-4451) — links to the in-app /task/new page, not the external create dialog', () => {
     const result = renderForProvider('jira');
-    assert.ok(!result.includes('data-testid="create-task-trigger"'), 'Jira never gets the in-app create page');
-    assert.ok(result.includes('data-action="create-task"'), 'Jira keeps its external deep-link affordance');
+    assert.ok(result.includes('data-testid="create-task-trigger"'), 'Jira gets the in-app create page');
+    assert.ok(/href="\/workspace\/ws\/task\/new\?projectId=real-project"/.test(result));
+    assert.ok(!result.includes('data-action="create-task"'), 'the external deep link is retired as the create action');
   });
 });
 
