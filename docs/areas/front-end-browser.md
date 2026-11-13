@@ -38,7 +38,11 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
 - A converted page is tested by plain `import` over the fake DOM (`tests/unit/helpers/import-world.js`), not by `loadWorld`.
   Each import is a fresh module instance, and the world puts every global back when it is restored. The classic-loader
   census (`tests/unit/classic-loader-census.test.js`) is a ratchet on the suites that still load classic scripts: it may
-  only fall. A suite that runs a classic file through `runClassic` counts, except `public/chart-helpers.js` and `public/close-out.js`,
+  only fall. `importWorld` installs only what it is given, unlike `loadWorld`: no stub `fetch`, `setInterval` or
+  clipboard, and real timers unless `timers` is passed, so a page's init would reach the network or leave a poll
+  running. Test pure exports by a static import; drive an init through one shared world with inert defaults
+  (`tests/unit/helpers/task-page-world.js`, LIN-4472), made before the import so the page's DOMContentLoaded listener
+  lands on the fake document. A suite that runs a classic file through `runClassic` counts, except `public/chart-helpers.js` and `public/close-out.js`,
   the two IIFE siblings a module page may read.
 
 ## Waiting
@@ -64,6 +68,12 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
 - `public/ship.js` / `public/ship-biscuit.js`: still hand-synced copies ("mirror of lib/ship-layout.js", "kept in
   lockstep with lib/render-ship-biscuit.js"). Each lib side would first have to become an import-free leaf before it
   could join `SHARED_MODULES`. (LIN-4446 blind read.)
+- `public/session.js`: its `formatElapsed` is a copy of `fmtDuration` (`lib/time-words.js`, LIN-4472), and
+  `formatRuntime` in `public/observation.js` is the same rule again (it returns `''` where the leaf returns null).
+  `fmtDuration` in `public/live-console.js` words seconds with no hour rung (`66m 40s` where the leaf says `1h 6m`),
+  so the duration rule is spelled two ways. All three are classic scripts, so none can import the leaf until its
+  page is a module (observation.js is next in LIN-4463's order; session.js shares close-out.js with the task page).
+  Each copy goes when its page converts; Live Console's wording is a choice to make then. (LIN-4472 leftovers.)
 - `public/observation.js`: about 5,000 lines. By the counting method of LIN-4446 (lines starting with `*`, `//` or `/*`)
   1,985 of its 4,679 non-blank lines are comments. Find out why it is this large before splitting it. An earlier survey
   used a different method, so its figure is not comparable. (LIN-4446 plan.)

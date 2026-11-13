@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { inReadWindow, READ_HORIZON_MS, READ_HORIZON_DAYS } from '../../lib/read-horizon.js';
 import { runPageHref } from '../../lib/task-page-href.js';
-import { fmtDuration } from '../../lib/render-run-steps.js';
+import { fmtDuration } from '../../lib/time-words.js';
 import { createFakeDom } from './helpers/fake-dom.js';
 import { tickClocks } from '../../public/task-page.js';
 import { runIdsOf, buildTaskPageModel } from '../../lib/task-page-loader.js';
