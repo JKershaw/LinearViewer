@@ -32,6 +32,7 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
 import { parseParkedWait, parseHeartbeats } from '../../lib/session-telemetry.js';
 import { decomposeEffort } from '../../lib/wall-clock-summary.js';
 import { isDecisionLifecycleStampEntry } from '../../lib/digest-feedback.js';
+import { buildRunViewOverRecords } from '../../lib/run-view.js';
 import { findWakeEvent } from '../../lib/dispatch-terminal.js';
 import { HALT_MODES } from '../../lib/workspace-halt.js';
 import { decideLeftover } from '../../lib/dispatch-leftover.js';
@@ -101,6 +102,21 @@ describe('the hand-written kind sets, read through their readers', () => {
     const ignored = UNIVERSE.filter((kind) =>
       decomposeEffort({ feedback: [entry(kind, 'ran npm test', '2026-11-13T10:00:00Z')] }).touchedCi === false);
     assert.deepEqual(ignored.map(label).sort(), [...STAMP_KINDS].sort());
+  });
+
+  test('the run view\'s waiting clock looks past exactly the stamp kinds to an earlier [blocked]', () => {
+    // run-view's stamp set is private: a later [done] carried by a stamp kind is skipped, so
+    // the session is still waiting on the earlier [blocked]; any other kind's [done] ends it.
+    const skipped = UNIVERSE.filter((kind) => buildRunViewOverRecords({
+      loops: [{
+        loopId: 'l1', lineageId: 'l1', kind: 'implementation', terminalStatus: null,
+        feedback: [
+          { kind: 'status', message: '[blocked] waiting on a person', timestamp: '2026-11-13T10:00:00Z' },
+          entry(kind, '[done] finished', '2026-11-13T10:01:00Z')
+        ]
+      }]
+    }, { now: '2026-11-13T11:00:00Z', records: [] }).waiting.active);
+    assert.deepEqual(skipped.map(label).sort(), [...STAMP_KINDS].sort());
   });
 
   test('isDecisionLifecycleStampEntry is true for exactly the stamp kinds', () => {
