@@ -14,13 +14,14 @@ import { freeTierRefusalBlock } from '../lib/chat-request.js';
 import { buildMockRecapContext } from '../lib/workspace-api-mocks.js';
 import { truncationFailureOf } from '../lib/openrouter.js';
 import { isValidIssueId, resolveIssueBinding } from '../lib/workspace.js';
+import { isHermeticTestToken } from '../lib/should-mock-ai.js';
 
 /**
  * The test-token workspace (`/test/set-session`): data comes from `testMockData`,
  * never from a provider. `mockAi` (lib/should-mock-ai.js) is the separate, wider
  * predicate for the AI mock, which local-provider sessions also trip (LIN-388/LIN-405).
  */
-export const isTestToken = (workspace) => process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+export const isTestToken = (workspace) => isHermeticTestToken(workspace.accessToken);
 
 /**
  * The error ladder shared by the upstream-calling routes, as `[status, message, extra]`

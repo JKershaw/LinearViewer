@@ -58,9 +58,6 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   new field must reach all five (LIN-4368 missed one; LIN-4393 leftovers.)
 - `lib/size-of-move.js`: the built-in policy (`DECIDED_BY.policy`, err larger) may stand in
   for John's "per task breakdown of options"; its size words are unexplained. (John, LIN-4393.)
-- `lib/should-mock-ai.js`: `isHermeticTestToken` is a third test-token check beside
-  `isTestToken` (`routes/workspace-api-steps.js`) and inline `isTestMode` in
-  `routes/proxy-compute.js` and `routes/task-chat.js`. (LIN-4347.)
 - `lib/prompts/stage-intent.js`: `CUT` writes the closing contract's token order (`DECISION:`
   before `BLOCKED:`) into a scope line beside `ASK`. Its "cut" and the plan-review and review
   "narrowing" (`lib/completion-signals.js`) name one thing; no test links them. (John, 8 Nov.)
