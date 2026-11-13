@@ -127,6 +127,17 @@ describe('Jira create contract (LIN-4451)', () => {
     assert.equal(stored.properties[AS_ASKED_PROPERTY].words, WORDS, 'the exact words sit in the property');
   });
 
+  test('Task is preferred over an earlier standard type: Bug listed first, Task still chosen (not standard[0])', async () => {
+    fake = seed({
+      types: [BUG, TASK, SUBTASK],
+      fields: { [BUG.id]: SCREEN_TEAM_MANAGED, [TASK.id]: SCREEN_TEAM_MANAGED },
+    });
+    provider = new JiraProvider({ client: fake, clientFactory: () => fake, site: SITE });
+    const created = await provider.createIssue(SCOPE, { teamId: 'ENG', title: 'Which type', description: 'Words.' });
+    const stored = await fake.getIssue(created.identifier);
+    assert.equal(stored.fields.issuetype.id, TASK.id, 'Task, not the first standard type (Bug)');
+  });
+
   test('a plain description (no block) creates with no property', async () => {
     const created = await provider.createIssue(SCOPE, { teamId: 'ENG', title: 'Plain', description: 'Just words.' });
     const stored = await fake.getIssue(created.identifier, AS_ASKED_READ);
@@ -356,6 +367,45 @@ async function call(app, method, path, body) {
     await new Promise(r => server.close(r));
   }
 }
+
+describe('Periodical gate on Jira, end to end (PATCH /api/proxy/issues/:id)', () => {
+  const DONE = { id: '11', name: 'Done', statusCategory: { key: 'done' } };
+  const TODO = { id: '10', name: 'To Do', statusCategory: { key: 'new' } };
+
+  beforeEach(() => {
+    const marker = buildPeriodicalGateMarker('Security review');
+    fake = createFakeJiraClient({
+      projects: [{ id: '10001', key: 'ENG', name: 'Engineering' }],
+      projectStatuses: { ENG: [{ id: '10100', name: 'Task', subtask: false, statuses: [TODO, DONE] }] },
+      issues: [{
+        id: '30200',
+        key: 'ENG-20',
+        fields: {
+          summary: 'Periodical',
+          description: { type: 'doc', version: 1, content: [{ type: 'paragraph', content: [{ type: 'text', text: marker }] }] },
+          status: TODO,
+          project: { id: '10001', key: 'ENG', name: 'Engineering' },
+          issuetype: TASK,
+          labels: [], parent: null,
+          _transitions: [{ id: '31', name: 'Done', to: DONE }],
+          _comments: [],
+        },
+      }],
+    });
+    jiraProvider.configure({ client: fake, clientFactory: () => fake, site: SITE });
+  });
+  afterEach(() => {
+    jiraProvider.configure(savedJira);
+  });
+
+  test('moving a gate-marked task to Done with no report comment is refused 409 PERIODICAL_REPORT_NOT_PERSISTED', async () => {
+    const { status, body } = await call(buildProxyApp(), 'PATCH', '/api/proxy/issues/ENG-20', { stateId: 'done' });
+    assert.equal(status, 409, JSON.stringify(body));
+    assert.equal(body.code, 'PERIODICAL_REPORT_NOT_PERSISTED');
+    const stored = await fake.getIssue('ENG-20');
+    assert.equal(stored.fields.status.id, TODO.id, 'the refusal moved nothing');
+  });
+});
 
 describe('proxy create lane on Jira (POST /api/proxy/issues)', () => {
   beforeEach(() => {

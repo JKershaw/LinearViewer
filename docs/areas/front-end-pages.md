@@ -51,3 +51,9 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   `inlineCreate` would retire four overrides, the branch, its byte pin (`tests/unit/render.test.js`),
   the `public/llms.txt` sentence and the decoupling guard in `tests/unit/providers.test.js`: larger
   than a fix. (LIN-4451 leftovers.)
+- `lib/render-task-create.js`: on Jira, "+ Add task" under an epic opens `/task/new?projectId=<epic>`,
+  but Jira's `createFields()` has no `projectId`, so `routes/task-create.js` ignores it and the epic is
+  dropped silently; the task files in the chosen project with no epic. Either declare `projectId` in
+  `createFields()` (the provider already sets the epic from it, but the form then needs an epic or project
+  control scoped by team) or stop passing the parameter: a separate design decision, not a line edit.
+  (LIN-4451 review.)
