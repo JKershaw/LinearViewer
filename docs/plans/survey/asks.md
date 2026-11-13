@@ -275,7 +275,7 @@ The area's note holds 20 Waiting entries, and `lib/dispatch-store.js` is 4,530 l
 **What this is for.** The tightest tangle in Harbour is between LLM & prompts and Runs & dispatch: the links between the two areas grew from 32 one way and 50 the other to 38 and 55 over batch 1 (Seams run 12). On this side:
 - the list of routes that code settles without asking a model is copied about nine times, and `docs/architecture/prompt-system.md` and `public/llms.txt` already describe it wrongly (Drift, row 154);
 - the blind read's name and heading are retyped outside the file that defines them (Drift, row 151);
-- the frozen prompt total rose about 21,000 bytes over batch 1 (A6 +5,425, A1 +14,079, A10 +435, LIN-4441 +1,002) and is now 378,915 bytes;
+- batch 1 added rules to the prompts as text (the frozen prompt total rose about 21,000 bytes, to 378,915). John on that limit: "That limit is to push against lists if rules. Worth knowing, but not hard and fast.";
 - LIN-4350 asks to fold the rules together into plainer, more general instructions.
 
 The safety pass (A5, LIN-4400) found two themes here: merge and read-only limits that exist only in prompt text (LIN-1242, LIN-1273, LIN-3417), and tokens inside prompt text (LIN-1372, LIN-1395, LIN-1408). Both are part of A12 (LIN-4416). The area's note holds 26 Waiting entries.
@@ -283,7 +283,7 @@ The safety pass (A5, LIN-4400) found two themes here: merge and read-only limits
 **What we want.**
 - Each rule has one home; the copies are gone, and the docs say what the code does.
 - A limit that matters is held in code, not only in a prompt's words.
-- The prompts end smaller than they started.
+- Fewer rules are restated as lists in prompt text.
 - The area's Waiting entries are settled, or each says why it can't be yet.
 - Each piece finishes one move and names what it retired; piece sizes vary, leaning larger.
 - The Runs & dispatch side of the seam is A13's.
@@ -291,7 +291,6 @@ The safety pass (A5, LIN-4400) found two themes here: merge and read-only limits
 **Done when**
 - the cases above are settled, or John has ruled they can wait;
 - the safety tickets named above are closed in code for that reason, or John has ruled they can wait;
-- the prompts themselves are measurably smaller than at the start, not just their limits;
 - the area's Waiting entries are settled or say why not;
 - the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.
 
