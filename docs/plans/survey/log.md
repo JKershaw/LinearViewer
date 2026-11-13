@@ -3756,3 +3756,12 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **Cross-lane again:** it posted a correction on LIN-4447 (`097a3442`) listing every Runs file each piece edits, and the clashes with LIN-4459, LIN-4460 and LIN-4455's open PR #2427. The other lane's review had asked for that before its pieces 1, 2 and 4 start.
   - **Ruling `lin4448-lookinto-none`** (raised 15:55): once the proxy refuses look-into's writes, retire its "post only if a person asks" exception? It was recommended `retire`. **John answered it at 15:57, before I'd read it,** so no suggestion was made.
 - **15:59 UTC: LIN-4456 merged** (LIN-4447 piece 6: the test transport keyed on a declared capability, per John's `static` ruling; `e8e92d50a`). **The watcher now records landings in `sw/landings.log` without waking me.** It still wakes me for a new ruling, a lane changing state, or after about 110 minutes. I log landings in batches.
+- **16:10–17:30 UTC, landings in one batch** (LV main `e8e92d50a` → `5cf4f6aa2`):
+  - LIN-4455 (LIN-4447: feedback-kind constants) `192e1f81f`; its larger blind-read finds went to Waiting.
+  - LIN-4456 docs follow-up: Waiting entries for test-transport drift `0092d8d9e`.
+  - LIN-4464 (LIN-4448 piece 0: the lane's own baseline area read, LLM & prompts plus front-end pages at `e8e92d50a`) `2aab32bf0`. It is a duplicate of my baseline, as noted for the review.
+  - LIN-4459 (LIN-4447: live-stage wait moved to `lib/run-live-wait.js`, one terminal set) `c174185f6`, plus a docs close-out `5cf4f6aa2`.
+  - LIN-4471 (LIN-4463 piece 1: `/lib/` serving with an allow-list, the bridge and import checks, workspace KPIs as a module) `17faa83f4`.
+  - LIN-4451 (LIN-4445: Jira create opens the proxy, session and feedback lanes; "+ Add task" is the in-app create link) `904719353`.
+- **Lane state at 17:35:** LIN-4445 2 of 3 pieces done (LIN-4452 left). LIN-4447 has 7 of 10 done, with LIN-4458 in progress. LIN-4448 has 1 of 7 done, with LIN-4465 in progress. LIN-4463: piece 1 is done and LIN-4472 (task page) is in progress.
+- **17:33 UTC ruling `lin4472-served-leaf`:** the task page restates two helpers (duration and relative-time wording). The piece's "Session fit" line said "no serving change". So may it first extract one small served `lib/` leaf so the page drops both copies? It was recommended `extract`. **I suggested `extract`:** A16 asks that each converted view drops its copies, and "no serving change" was a size forecast, not a rule. Another cut-rule escalation that the lane could have settled itself.
