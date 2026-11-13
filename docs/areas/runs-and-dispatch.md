@@ -49,10 +49,11 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - A test that dispatches a close-out passes a `closeOut` seam (`resolveProvider`): the readiness
   guard reads comments for every close-out since LIN-4438, and without the seam it reaches the real
   provider and fails open, a pass the hermetic watcher catches only in CI.
-- Close-out readiness has five lanes: the route (`codeRouteOf`), the stop-at state, the task page's
-  box (`buildRunEvidence`) and both guard lanes (`closeOutNotReady`). A readiness rule goes in
-  `closeOutWaitsOn` (`lib/run-closeout-state.js`) and gets a row in the shared-trail table
-  (`lin-4438-blind-read-gate`); gating one lane let the page offer a press the guard refused (LIN-4438).
+- Close-out readiness is one decision, `closeOutDecision` (`lib/run-closeout-state.js`, LIN-4460): every surface
+  renders or enforces its answer. A readiness rule goes in the decision, with a row in `lin-4438-blind-read-gate` and
+  `lin-4460-close-out-decision` (LIN-4438: gating one lane let the page offer a press the guard refused).
+- When a person acts, Harbour follows (LIN-4447, John): a landing whose every PR reads merged stands the gate aside;
+  a Done ticket with no close-out on its landing stands only the recommendation's read aside. Harbour never sets Done.
 - What a comment is, and which PRs are the task's, are read once in `lib/run-trail.js`: a comment kind
   is a row of `COMMENT_KINDS` (`lin-4458-comment-kind-census` fails on a kind test elsewhere), and the
   box, the guard, the owner's check and the merge take their PRs from `readTrail().landing`, statuses
@@ -110,26 +111,6 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   row 15, kept as a stated limit): no caller holds the task's repository, so the landing cannot tell
   another repository's PR from this task's. A task-repository fact, or a kind stamped on a comment when
   it is posted, would let the landing drop it. (LIN-4438; why-not written by LIN-4458.)
-- `lib/close-out-readiness.js`: in the stop-at lane `deriveCloseOutState` lets merged and partial
-  outrank the gate, then `closeOutNotReady` asks `closeOutWaitsOn` again to override it, so the box
-  state is not the guard's whole answer and the precedence lives in two files. Carrying the gate's
-  answer in the state changes the box model the renderers read. (Blind read on LIN-4439.) `ladderNotReady`
-  asks the gate a third time, so the box and the guard order the same reasons two ways and the next
-  close-out reason must be placed in both; one order is a decision about what the box shows versus
-  what the guard refuses. (Blind read on LIN-4396.)
-- `lib/run-closeout-state.js`: the close-out reasons are bare string literals: `'blind-read-missing'`
-  is spelled here and again in `REFUSED_REASONS` (`lib/close-out-readiness.js`, beside `'head-moved'`),
-  and `closeOutNotReadyRefusal` builds its error by capitalising `state.message`. A reasons constant
-  (like `CLOSE_OUT_STATUS`) covering every reason, used by the box, the guard and the render, would
-  give them one vocabulary. (Blind read on LIN-4396.)
-- `lib/run-closeout-state.js`: `closeOutSetsDone` never asks `closeOutWaitsOn`, so the owner's check
-  (`routes/workspace-api-run-evidence.js`) sets a stop-at-PR task Done when its landing PR is merged
-  and approved with no blind read, while the close-out guard (`lib/close-out-readiness.js`) refuses
-  the same trail as `blind-read-missing`, and `blindReadStep` (`lib/recommendation-blind-read.js`)
-  then routes a read to the Done ticket (it stands aside on a completed ticket only after a
-  close-out). The entries above name the box/guard precedence split; this is its Done path. Whether
-  a person's own check may pass the gate is a decision; the shared-trail test runs with
-  `byPersonCheck: false`, so it never reaches this path. (Drift & Coherence Review, 13 Nov., second read; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
 - `lib/cost-read-calls.js`: `readCalls` states the figure rule (`totalUsd` only when everything is priced and
   complete; `pricedUsd` never counts a partial) in its own words, and the lineage figure in `lib/cost-read.js`
   states it again, so a change to the rule is made twice. One shared helper would make it one, but it reaches the
@@ -147,22 +128,21 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   transports register (for example installers that declare which provider they cover, plus a census test),
   across providers, web routes and fixtures: larger than a fix. (LIN-4456 blind read, 13 Nov.)
 - `lib/run-trail.js` `readTrail`: a re-review after a not-ready close-out that names the PR only as `#N` leaves the
-  landing empty. `closeOutWaitsOn` (`lib/run-closeout-state.js`) then opens the gate with no blind read, and
+  landing empty. The decision's gate (`closeOutWaitsOn`, `lib/run-closeout-state.js`) then opens with no blind read, and
   since LIN-4458 the box reads `no-pr`, the person's check sets no Done and the merge recorder records nothing
   (pinned in `tests/unit/lin-4458-landing-consumers.test.js`). The review prompt asks for the head, not the PR
   URL. Fix: fall back to the anchor close-out's PRs when nothing after the anchor cites one, or have the review
   prompt require the full URL (LLM & prompts' side). No live trail has this shape. (LIN-4458 review.)
+- `lib/close-out-readiness.js` (the ladder lane) and `lib/recommendation-blind-read.js`: an outside merge on a
+  ticket still In Progress is not seen, because neither reads a PR (the recommend path makes no GitHub read by
+  contract, and the ladder reads none). The recommendation still routes a blind read, and the ladder still refuses
+  on the gate. John accepted this on 13 Nov: "no new GitHub reads on the recommend path or ladder lane; add the fact
+  later if a stuck case shows up." Pinned by `tests/unit/lin-4460-close-out-decision.test.js` (named for that ruling).
+  Why not now: a PR read on the recommend path costs budget (`PR_STATE_READ_COST` against the 36/h anonymous limit in
+  `lib/pr-state-store.js`), needs token resolution on a path that has none, and the process-wide PR cache is not
+  workspace-scoped. Supplying a landing-merged fact later is one more input to `closeOutDecision`. (LIN-4460.)
 - `lib/ci-wake-sweep.js` `prRefsFromPark` parses a runner's park message with its own `FULL_PR_URL_RE` (scheme
   optional, repo key case-folded) beside `prUrlsIn`/`prOf` (`lib/run-ledger.js`). Its comment-side read already
   goes through `extractPrUrls`. Moving it onto `prUrlsIn` changes which park messages wake (a scheme-less URL
   would stop matching), so it needs its own witness. (LIN-4458 review.)
-- `lib/run-evidence.js`: the run page keeps two answers to "which PR is the task's". The close-out box counts
-  `readTrail().landing`, but `deriveState` over `extractPrUrls` (every cited PR) still drives `done`,
-  `checked.now` and `resolveRunPrRef` (read by the `routes/dashboard.js` pr-state route), and
-  `lib/ci-wake-sweep.js` matches parks against every cited PR. Whether the page's PR and the CI-wake sweep
-  follow the landing is a product decision touching several callers. Also, `readRunEvidence` reads the
-  landing's sole PR and hands `buildRunEvidence` a bare `prStatus`, which `buildRunEvidence` re-pairs with the
-  landing after reading the trail again: the same positional coupling the URL-keyed `Map` removed from
-  `deriveCloseOutState`. Passing the status keyed by URL with the landing already read is a signature change
-  for about 25 call sites (`tests/unit/run-evidence.test.js`, `routes/dashboard.js`), so larger than a fix.
-  (LIN-4458 blind read.)
+- `lib/run-evidence.js`: the run page keeps two answers to "which PR is the task's". The close-out box counts `readTrail().landing` through `closeOutDecision` (LIN-4460 retired `deriveState`'s status decision: no reader outside the tests and the GET body reads it), but `deriveState` over `extractPrUrls` (every cited PR) still drives `state.pr`, `done`, `checked.now` and `resolveRunPrRef` (read by the `routes/dashboard.js` pr-state route), `state.prUrls` (`lib/pr-state-store.js`), and `lib/ci-wake-sweep.js` matches parks against every cited PR. Whether the page's PR and the CI-wake sweep follow the landing is a product decision touching several callers. Also, `readRunEvidence` reads the landing's sole PR and hands `buildRunEvidence` a bare `prStatus`, which `buildRunEvidence` re-pairs with the landing after reading the trail again: the same positional coupling the URL-keyed `Map` removed from the decision. Passing the status keyed by URL with the landing already read is a signature change for about 25 call sites (`tests/unit/run-evidence.test.js`, `routes/dashboard.js`), so larger than a fix. (LIN-4458 blind read; LIN-4460.)

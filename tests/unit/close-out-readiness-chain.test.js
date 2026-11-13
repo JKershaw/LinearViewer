@@ -28,7 +28,7 @@ const chainFor = (comments) => readCloseOutChain({
   },
   runnerReady: true,
   owner: true,
-  byPersonCheck: true,
+  actor: 'person',
   stopAt: null,
 });
 
@@ -105,7 +105,7 @@ describe('readCloseOutChain when the comment read hits the cap (LIN-4322)', () =
           },
           runnerReady: true,
           owner: true,
-          byPersonCheck: true,
+          actor: 'person',
           stopAt: null,
         }),
         /cannot read the latest review/,

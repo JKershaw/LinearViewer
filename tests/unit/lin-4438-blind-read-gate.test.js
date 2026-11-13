@@ -118,7 +118,7 @@ async function routeLane(row) {
 
 async function lanes(row) {
   const workspace = { urlKey: 'acme' };
-  const { state } = await readCloseOutChain({ workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, 'pr'), stopAt: 'pr', runnerReady: true, owner: true, byPersonCheck: false, prStatusCache: new Map() });
+  const { state } = await readCloseOutChain({ workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, 'pr'), stopAt: 'pr', runnerReady: true, owner: true, actor: 'harbour', prStatusCache: new Map() });
   // LIN-4458: the box is read the way the page reads it (readRunEvidence: one read, of the landing's sole PR).
   const box = (await readRunEvidence({ issueIdentifier: 'LIN-1', comments: row.comments, readPrStatus: async ({ repo, number }) => statusFor(row, `https://github.com/${repo}/pull/${number}`), stopAt: 'pr', runnerReady: true, viewerIsOwner: true })).closeOut;
   const stopAtGuard = await closeOutNotReady({ workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, 'pr') });
@@ -195,12 +195,17 @@ describe('rows that need more than the lanes', () => {
 describe('the route\'s own edges', () => {
   const approved = [summary(1), review(2)];
 
-  test('a Canceled or Duplicate ticket stands aside; a Done ticket with no close-out after the review does not', () => {
+  test('a Canceled or Duplicate ticket stands aside; a Done ticket stands aside unless an audit\'s notes PR reads after it', () => {
     for (const type of ['canceled', 'duplicate']) {
       assert.equal(blindReadStep({ state: { type } }, { comments: approved, allRuns: [] }), null, type);
     }
-    assert.equal(blindReadStep({ state: DONE }, { comments: approved, allRuns: [] }).step, 'blind-read');
+    // Row 196, first half (flipped by LIN-4460): a person set the ticket Done outside Harbour and the trail holds
+    // no close-out on its landing, so Harbour follows and sends no read to a Done ticket.
+    assert.equal(blindReadStep({ state: DONE }, { comments: approved, allRuns: [] }), null, 'Done with no close-out on the landing: the person\'s Done stands');
+    // Row 196, second half (unchanged): a close-out after the review.
     assert.equal(blindReadStep({ state: DONE }, { comments: [summary(1), review(2), closeOut(3, `Merged ${PR1}; set Done.`)], allRuns: [] }), null, 'Done, closed out after the review, no read: stands aside');
+    // Added by LIN-4460: an audit's notes PR opened after Done still gets its read (its own review comes after the close-out).
+    assert.equal(blindReadStep({ state: DONE }, { comments: [summary(1), review(2), closeOut(3, `Merged ${PR1}; set Done.`), audit(4), review(5, 'Approve', PR2)], allRuns: [] }).step, 'blind-read', 'a post-Done audit notes PR is still read');
   });
 
   test('a live blind read is not an ended attempt; runs before the review do not count', () => {
