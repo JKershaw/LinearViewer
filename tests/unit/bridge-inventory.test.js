@@ -22,7 +22,6 @@ const SHIM = '/cost-format-global.js';
 const BRIDGED = ['CostFormat'];
 /** Registered readers of the bridge, each with the witness that loads it first and installs the global after. */
 const CONSUMERS = {
-  '/flight-companion.js': 'tests/unit/cost-format-consumers.test.js',
   '/observation.js': 'tests/unit/observation-scan-due.test.js',
   '/prompt-section.js': 'tests/unit/lin-3833-run-control.test.js',
 };
@@ -68,8 +67,8 @@ describe('the bridge over the real repo', () => {
     assert.deepEqual(Object.keys(inputs.emitted).filter((f) => bridgeWrites(inputs.emitted[f]).size), ['cost-format-global.js']);
   });
 
-  test('the emitted modules are the shim and the two page modules: workspace-kpis.js (imports the formatter directly) and task-page.js (LIN-4472, no bridge read)', () => {
-    assert.deepEqual(Object.keys(inputs.emitted).sort(), ['cost-format-global.js', 'task-page.js', 'workspace-kpis.js']);
+  test('the emitted modules are the shim and the three page modules that import the formatter or read no bridge (workspace-kpis.js, task-page.js, flight-companion.js)', () => {
+    assert.deepEqual(Object.keys(inputs.emitted).sort(), ['cost-format-global.js', 'flight-companion.js', 'task-page.js', 'workspace-kpis.js']);
   });
 
   test('the renderer lists the check read are the five that name a consumer, so a list the reader cannot match fails here', () => {
@@ -77,8 +76,8 @@ describe('the bridge over the real repo', () => {
     // coverage half of the check without a failure, so the lists it did read are pinned by name and number.
     const named = inputs.renderers.filter((r) => r.entries.some((e) => CONSUMERS[e.src])).map((r) => r.rel);
     assert.ok(named.includes('lib/render-task-page.js'), `lib/render-task-page.js (the const SCRIPTS shape) is not among the lists read: ${named.join(', ')}`);
-    assert.ok(new Set(named).size >= 5, `expected at least 5 renderers that name a consumer, read ${new Set(named).size}: ${named.join(', ')}`);
-    for (const rel of ['lib/render.js', 'lib/render-swipe.js', 'lib/render-task-page.js', 'lib/render-observation.js', 'lib/render-flight-companion.js']) {
+    assert.ok(new Set(named).size >= 4, `expected at least 4 renderers that name a consumer, read ${new Set(named).size}: ${named.join(', ')}`);
+    for (const rel of ['lib/render.js', 'lib/render-swipe.js', 'lib/render-task-page.js', 'lib/render-observation.js']) {
       assert.ok(named.includes(rel), `${rel} is missing from the consumer-naming lists read: ${named.join(', ')}`);
     }
   });
@@ -87,9 +86,10 @@ describe('the bridge over the real repo', () => {
     assert.deepEqual(scriptLists("const SCRIPTS = Object.freeze(['/common.js', '/prompt-section.js']);"), []);
   });
 
-  test('the bridge keeps exactly three classic readers, and the workspace KPIs page is not one', () => {
+  test('the bridge keeps exactly two classic readers (observation.js, prompt-section.js), and the pages converted to modules are not among them', () => {
     assert.deepEqual([...result.readers.keys()].sort(), Object.keys(CONSUMERS).sort());
-    assert.equal(result.readers.has('/workspace-kpis.js'), false);
+    assert.deepEqual([...result.readers.keys()].sort(), ['/observation.js', '/prompt-section.js']);
+    for (const converted of ['/workspace-kpis.js', '/task-page.js', '/flight-companion.js']) assert.equal(result.readers.has(converted), false, converted);
   });
 });
 
@@ -166,6 +166,6 @@ describe('the checks fail on each synthetic breach (witnesses for the inventory)
   });
 
   test('timing: a witness that never loads its consumer is named, so the order cannot pass by omission', () => {
-    assert.match(witnessProblem('/flight-companion.js', 'w.test.js', 'loadCostFormat(world.sandbox);'), /never loads the consumer/);
+    assert.match(witnessProblem('/prompt-section.js', 'w.test.js', 'loadCostFormat(world.sandbox);'), /never loads the consumer/);
   });
 });

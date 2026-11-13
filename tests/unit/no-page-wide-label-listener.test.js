@@ -232,7 +232,7 @@ describe('Rule C: Harbour controls are captured before the first markdown render
     const src = stripComments(read('public/flight-companion.js'));
     // Restored-thread rendering lives only inside startSession().
     const start = src.indexOf('function startSession()');
-    const end = src.indexOf("if (document.readyState === 'loading')");
+    const end = src.indexOf("document.addEventListener('DOMContentLoaded', startSession)");
     assert.ok(start > 0 && end > start);
     const restore = src.indexOf('window.ChatUI.renderMarkdownText(restoredBody');
     assert.ok(restore > start && restore < end, 'the restore render sits inside startSession()');

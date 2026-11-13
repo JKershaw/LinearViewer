@@ -1,17 +1,14 @@
 /**
  * Unit tests for public/flight-companion.js (LIN-2435 Commit 3).
  *
- * public/flight-companion.js is a browser script (not an ES module) with
- * real DOM/fetch/timer dependencies at call time but none at load time — so
- * it is vm-sandboxed (mirrors tests/unit/observation-ruling-delivery.test.js)
- * with a hand-rolled DOM shim just deep enough for this file's own usage
- * (getElementById/querySelector/createElement/classList/dataset/
- * addEventListener), plus a fake `window.ChatUI`/`window.api` and a
- * test-controlled `fetch`. The module.exports test seam at the bottom of
- * flight-companion.js exposes the pure cadence/classification/history
- * helpers plus the cadence-scheduler and turn-send entry points, so cadence
- * behavior is driven through REAL timers via `t.mock.timers` rather than
- * re-derived by inspection.
+ * public/flight-companion.js is a native ES module (LIN-4463): it imports the shared formatter from /lib/cost-format.js
+ * and has real DOM/fetch/timer dependencies at call time but none at load time. Each loadClient() imports a fresh
+ * instance over a hand-rolled DOM shim just deep enough for this file's own usage (getElementById/querySelector/
+ * createElement/classList/dataset/addEventListener), plus a fake `window.ChatUI`/`window.api` and a test-controlled
+ * `fetch`, installed on the real global by tests/unit/helpers/import-world.js. The page starts on DOMContentLoaded, which
+ * loadClient fires the way a browser does after a deferred module runs (unless readyState is 'loading'). The module
+ * exports the pure cadence/classification/history helpers plus the cadence-scheduler and turn-send entry points, so
+ * cadence behavior is driven through REAL timers via `t.mock.timers` rather than re-derived by inspection.
  *
  * Run with: node --test tests/unit/flight-companion-client.test.js
  */
@@ -22,7 +19,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { loadCostFormat } from '../fixtures/browser-cost-format.js';
+import { importWorld } from './helpers/import-world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLIENT_SRC = readFileSync(join(__dirname, '../../public/flight-companion.js'), 'utf8');
@@ -57,14 +54,19 @@ function sliceReadSSEStreamSource() {
   const endIdx = COMMON_JS_SRC.indexOf(endMarker, startIdx);
   assert.ok(endIdx !== -1, 'closing `};` for readSSEStream not found');
   const slice = COMMON_JS_SRC.slice(startIdx, endIdx + endMarker.length);
-  // Rebind `window.readSSEStream = ...` to `var readSSEStream = ...` — this
-  // sandbox's `window` is a plain data shim (windowShim below), not the vm
-  // global, so flight-companion.js's bare `readSSEStream(...)` calls need a
-  // top-level binding, same as production gets from common.js loading first
-  // as a classic script.
-  return slice.replace('window.readSSEStream', 'var readSSEStream');
+  return slice;
 }
 const READ_SSE_STREAM_SRC = sliceReadSSEStreamSource();
+
+// The real timer, captured before any test can mock it. loadClient hands the module an unref'd wrapper of it while the
+// test runs on real timers, so the module's load-time cadence timer never keeps the test process alive.
+const REAL_SET_TIMEOUT = globalThis.setTimeout;
+function unrefTimeout(...args) {
+  const id = REAL_SET_TIMEOUT(...args);
+  if (id && typeof id.unref === 'function') id.unref();
+  return id;
+}
+
 
 // LIN-2987: isPinnedToBottom moved out of chat.js into the shared
 // public/common.js (window.isPinnedToBottom), same slice-by-marker approach
@@ -471,7 +473,10 @@ function sseResponse(frames) {
   };
 }
 
-function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl, storageImpl, pageDataset, readyState } = {}) {
+// The window stubs a single test adds (for example a formatLocalTime helper). They are globals in the module's realm,
+// so they are removed when the next client loads, and never reach the next test.
+let previousExtraWindowKeys = [];
+async function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl, storageImpl, pageDataset, readyState, extraWindow = {}, omitMounts = [] } = {}) {
   const doc = makeDocument({ hiddenInitial, readyState });
   const page = new FakeElement('main');
   page.dataset.urlKey = 'acme';
@@ -545,6 +550,7 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
   doc._byId['flight-companion-checkin'] = checkIn;
   doc._byId['flight-companion-question'] = questionInput;
   doc._byId['flight-companion-send'] = sendBtn;
+  for (const id of omitMounts) delete doc._byId[id];
   doc._byId['flight-companion-start'] = startBtn;
   doc._byId['flight-companion-reorient'] = reorientBtn;
   doc._byId['flight-companion-strip-next'] = stripNextEl;
@@ -574,7 +580,10 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
   // `window.sessionStorage` — mirrors how a real browser exposes it.
   const storage = storageImpl || makeFakeStorage();
 
+  for (const key of previousExtraWindowKeys) Reflect.deleteProperty(globalThis, key);
+  previousExtraWindowKeys = Object.keys(extraWindow);
   const windowShim = {
+    ...extraWindow,
     ChatUI: chatUI,
     api: apiSpy,
     ReplyDelivery: { postComment: postCommentSpy },
@@ -587,40 +596,33 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
     dispatch(type) { (windowShim._listeners[type] || []).forEach(fn => fn()); },
   };
 
-  const sandbox = {
-    document: doc,
+  // The browser order (LIN-4463): the classic common.js slices first, then the page module, then DOMContentLoaded. The
+  // slices assign to `window`, the real global here, so they run in this realm; the module is imported fresh over the
+  // fake DOM installed on that global (tests/unit/helpers/import-world.js). Every global a client needs is installed
+  // again by each call, so nothing is restored between clients: a restore here would undo a timer mock the test
+  // enabled before it called loadClient.
+  const world = importWorld({
     window: windowShim,
-    module: { exports: {} },
-    console,
-    // `.unref()` so a real (unmocked) auto-scheduled timer — the module
-    // schedules one unconditionally at load whenever `document.hidden` is
-    // false — never keeps the test process alive after the test itself has
-    // finished. Mock-timer Timeout objects (t.mock.timers) may not expose
-    // `.unref`, hence the guard.
-    setTimeout: (...args) => {
-      const id = setTimeout(...args);
-      if (id && typeof id.unref === 'function') id.unref();
-      return id;
+    globals: {
+      document: doc,
+      navigator: { clipboard: { writeText: async () => {} } },
+      sessionStorage: storage,
+      fetch: fetchSpy,
+      ...(globalThis.setTimeout === REAL_SET_TIMEOUT ? { setTimeout: unrefTimeout } : {}),
     },
-    clearTimeout: (...args) => clearTimeout(...args),
-    fetch: fetchSpy,
-    TextDecoder,
-    navigator: { clipboard: { writeText: async () => {} } },
-    sessionStorage: storage,
-  };
-  vm.createContext(sandbox);
-  // LIN-4179 / LIN-4446: the shared formatter, installed before the page script here because this seam has no
-  // document.readyState, so flight-companion.js starts its session at load. In the browser the module shim installs it
-  // after the classic scripts, before DOMContentLoaded starts the session (tests/unit/cost-format-consumers.test.js).
-  loadCostFormat(sandbox);
-  // readSSEStream first, same context — mirrors production's script order
-  // (common.js, then flight-companion.js) so both share one realm.
-  vm.runInContext(READ_SSE_STREAM_SRC, sandbox, { filename: 'common.js (readSSEStream slice)' });
-  vm.runInContext(TASK_PAGE_HREF_SRC, sandbox, { filename: 'common.js (taskPageHref slice)' });
-  vm.runInContext(CLIENT_SRC, sandbox, { filename: 'flight-companion.js' });
+  });
+  vm.runInThisContext(READ_SSE_STREAM_SRC, { filename: 'common.js (readSSEStream slice)' });
+  vm.runInThisContext(TASK_PAGE_HREF_SRC, { filename: 'common.js (taskPageHref slice)' });
+  const m = await world.importPage('flight-companion.js');
+  // A deferred module runs before DOMContentLoaded, and the page starts on that event. A test that holds the document
+  // loading (readyState 'loading') fires DOMContentLoaded itself.
+  if (readyState !== 'loading') doc.dispatch('DOMContentLoaded');
+  // The page's own load-time read of its playbook (LIN-2625, loadPlaybookEmptyState) is not what any suite here
+  // drives, so it is dropped from the record: apiCalls holds only what the suite's own act made.
+  apiSpy.calls.length = 0;
 
   return {
-    exports: sandbox.module.exports,
+    exports: m,
     doc, thread, emptyState, checkIn, questionInput, sendBtn, startBtn, reorientBtn, stripNextEl, stripTabTotalEl,
     chatUICalls: chatUI.calls,
     fetchCalls: fetchSpy.calls,
@@ -638,8 +640,8 @@ async function flush(n = 8) {
 // ─── Pure helpers ────────────────────────────────────────────────────────
 
 describe('flight-companion.js — pure helpers (no DOM/timers)', () => {
-  test('capHistory keeps only the most recent `cap` entries', () => {
-    const { exports: m } = loadClient();
+  test('capHistory keeps only the most recent `cap` entries', async () => {
+    const { exports: m } = await loadClient();
     const history = [];
     for (let i = 0; i < 45; i++) { history.push({ role: 'user', content: String(i) }); m.capHistory(history); }
     assert.strictEqual(history.length, 40);
@@ -647,36 +649,36 @@ describe('flight-companion.js — pure helpers (no DOM/timers)', () => {
     assert.strictEqual(history[39].content, '44');
   });
 
-  test('nextCadenceDelay doubles then caps at 180s', () => {
-    const { exports: m } = loadClient();
+  test('nextCadenceDelay doubles then caps at 180s', async () => {
+    const { exports: m } = await loadClient();
     assert.strictEqual(m.nextCadenceDelay(30000), 60000);
     assert.strictEqual(m.nextCadenceDelay(60000), 120000);
     assert.strictEqual(m.nextCadenceDelay(120000), 180000);
     assert.strictEqual(m.nextCadenceDelay(180000), 180000, 'must not exceed the 180s cap');
   });
 
-  test('doneCadenceEffect: user-initiated always resets, regardless of surface', () => {
-    const { exports: m } = loadClient();
+  test('doneCadenceEffect: user-initiated always resets, regardless of surface', async () => {
+    const { exports: m } = await loadClient();
     assert.strictEqual(m.doneCadenceEffect('user-initiated', undefined), 'reset');
     assert.strictEqual(m.doneCadenceEffect('user-initiated', true), 'reset');
     assert.strictEqual(m.doneCadenceEffect('user-initiated', false), 'reset');
   });
 
-  test('doneCadenceEffect: auto-wake resets only on surface:true, doubles on surface:false', () => {
-    const { exports: m } = loadClient();
+  test('doneCadenceEffect: auto-wake resets only on surface:true, doubles on surface:false', async () => {
+    const { exports: m } = await loadClient();
     assert.strictEqual(m.doneCadenceEffect('auto-wake', true), 'reset');
     assert.strictEqual(m.doneCadenceEffect('auto-wake', false), 'double');
   });
 
-  test('doneCadenceEffect: a boot always resets, regardless of surface — LIN-2622, "reset on done ONLY"', () => {
-    const { exports: m } = loadClient();
+  test('doneCadenceEffect: a boot always resets, regardless of surface — LIN-2622, "reset on done ONLY"', async () => {
+    const { exports: m } = await loadClient();
     assert.strictEqual(m.doneCadenceEffect('boot', undefined), 'reset');
     assert.strictEqual(m.doneCadenceEffect('boot', true), 'reset');
     assert.strictEqual(m.doneCadenceEffect('boot', false), 'reset');
   });
 
-  test('advanceCadence: double/reset/stop reducer, and stopped is a true terminal state', () => {
-    const { exports: m } = loadClient();
+  test('advanceCadence: double/reset/stop reducer, and stopped is a true terminal state', async () => {
+    const { exports: m } = await loadClient();
     // LIN-2771 beat 3: the reducer also carries `stoppedReason` — null while
     // running, the reason while stopped (null when 'stop' is applied with no
     // reason).
@@ -703,8 +705,8 @@ describe('flight-companion.js — pure helpers (no DOM/timers)', () => {
     looseDeepEqual(m.advanceCadence(s, 'double'), { delayMs: 30000, stopped: true, stoppedReason: null });
   });
 
-  test('autoWakeErrorCadenceEffect: session-expired/flag-off/ai-not-configured stop; everything else doubles', () => {
-    const { exports: m } = loadClient();
+  test('autoWakeErrorCadenceEffect: session-expired/flag-off/ai-not-configured stop; everything else doubles', async () => {
+    const { exports: m } = await loadClient();
     assert.strictEqual(m.autoWakeErrorCadenceEffect('session-expired'), 'stop');
     assert.strictEqual(m.autoWakeErrorCadenceEffect('flag-off'), 'stop');
     assert.strictEqual(m.autoWakeErrorCadenceEffect('ai-not-configured'), 'stop');
@@ -714,8 +716,8 @@ describe('flight-companion.js — pure helpers (no DOM/timers)', () => {
     assert.strictEqual(m.autoWakeErrorCadenceEffect('sse-error'), 'double');
   });
 
-  test('classifyTurnResponse: the full response matrix, F4 + F6', () => {
-    const { exports: m } = loadClient();
+  test('classifyTurnResponse: the full response matrix, F4 + F6', async () => {
+    const { exports: m } = await loadClient();
     looseDeepEqual(m.classifyTurnResponse({ ok: true, status: 200, isEventStream: true, jsonBody: null }), { kind: 'sse' });
     looseDeepEqual(
       m.classifyTurnResponse({ ok: true, status: 200, isEventStream: false, jsonBody: { turnKind: 'auto-wake', spent: false, reason: 'floor' } }),
@@ -735,8 +737,8 @@ describe('flight-companion.js — pure helpers (no DOM/timers)', () => {
     assert.strictEqual(m.classifyTurnResponse({ ok: false, status: 404, isEventStream: false, jsonBody: null }).kind, 'server-error');
   });
 
-  test('LIN-2438 T16: classifyTurnResponse carries reason "sweep-not-seen" through as gate-silent, with sweepLastSeenAt attached', () => {
-    const { exports: m } = loadClient();
+  test('LIN-2438 T16: classifyTurnResponse carries reason "sweep-not-seen" through as gate-silent, with sweepLastSeenAt attached', async () => {
+    const { exports: m } = await loadClient();
     looseDeepEqual(
       m.classifyTurnResponse({
         ok: true, status: 200, isEventStream: false,
@@ -750,8 +752,8 @@ describe('flight-companion.js — pure helpers (no DOM/timers)', () => {
     assert.deepStrictEqual(Object.keys(ordinary).sort(), ['kind', 'reason']);
   });
 
-  test('parseProposalResult: valid shape parses; a truncated/malformed payload fails safely, never throws', () => {
-    const { exports: m } = loadClient();
+  test('parseProposalResult: valid shape parses; a truncated/malformed payload fails safely, never throws', async () => {
+    const { exports: m } = await loadClient();
     const ok = m.parseProposalResult(JSON.stringify({ proposed: true, sessionId: 'sess-1', prompt: 'go' }));
     looseDeepEqual(ok, { ok: true, proposal: { proposed: true, sessionId: 'sess-1', prompt: 'go' } });
 
@@ -763,8 +765,8 @@ describe('flight-companion.js — pure helpers (no DOM/timers)', () => {
   });
 
   // LIN-2621 beat 3
-  test('formatCost: the one browser formatter, fine (LIN-4179): 4 decimals under $1, a zero reads $0.0000, an unknown is a dash', () => {
-    const { exports: m } = loadClient();
+  test('formatCost: the one browser formatter, fine (LIN-4179): 4 decimals under $1, a zero reads $0.0000, an unknown is a dash', async () => {
+    const { exports: m } = await loadClient();
     assert.strictEqual(m.formatCost(0.00042), '$0.0004');
     assert.strictEqual(m.formatCost(0.5), '$0.5000');
     assert.strictEqual(m.formatCost(1), '$1.00');
@@ -774,8 +776,8 @@ describe('flight-companion.js — pure helpers (no DOM/timers)', () => {
     assert.strictEqual(m.formatCost(NaN), '\u2014');
   });
 
-  test('formatTurnMeta: tokens + cost, reading exactly what the usage payload carries', () => {
-    const { exports: m } = loadClient();
+  test('formatTurnMeta: tokens + cost, reading exactly what the usage payload carries', async () => {
+    const { exports: m } = await loadClient();
     assert.strictEqual(
       m.formatTurnMeta({ prompt_tokens: 100, completion_tokens: 47, total_tokens: 147, cost: 0.00042 }),
       '147 tokens · $0.0004'
@@ -792,8 +794,8 @@ describe('flight-companion.js — pure helpers (no DOM/timers)', () => {
     assert.strictEqual(m.formatTurnMeta(undefined), '');
   });
 
-  test('formatTabTotal: the ticket\'s own literal template, applied as-is', () => {
-    const { exports: m } = loadClient();
+  test('formatTabTotal: the ticket\'s own literal template, applied as-is', async () => {
+    const { exports: m } = await loadClient();
     assert.strictEqual(m.formatTabTotal(0, 0), '0 check-ins · $0.0000 this tab');
     assert.strictEqual(m.formatTabTotal(1, 0.00042), '1 check-in · $0.0004 this tab');
     assert.strictEqual(m.formatTabTotal(5, 1.2), '5 check-ins · $1.20 this tab');
@@ -842,9 +844,9 @@ describe('flight-companion.js — source-text constraints', () => {
 // ─── Cadence scheduling (real timers, mocked) ───────────────────────────────
 
 describe('flight-companion.js — cadence: base interval, doubling, cap, reset, visibility floor', () => {
-  test('base interval: no call before 30s, one call at 30s', (t) => {
+  test('base interval: no call before 30s, one call at 30s', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    const { exports: m, fetchCalls } = loadClient({
+    const { exports: m, fetchCalls } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
     });
     t.mock.timers.tick(29999);
@@ -855,7 +857,7 @@ describe('flight-companion.js — cadence: base interval, doubling, cap, reset, 
 
   test('doubling: three consecutive "nothing to report" outcomes double the delay 30→60→120→180(capped)', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    const { exports: m, fetchCalls } = loadClient({
+    const { exports: m, fetchCalls } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'floor' }),
     });
     t.mock.timers.tick(30000);
@@ -876,7 +878,7 @@ describe('flight-companion.js — cadence: base interval, doubling, cap, reset, 
 
   test('180s cap: a long virtual run never schedules a gap longer than 180s', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    const { exports: m, fetchCalls } = loadClient({
+    const { exports: m, fetchCalls } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'floor' }),
     });
     for (let i = 0; i < 6; i++) {
@@ -890,7 +892,7 @@ describe('flight-companion.js — cadence: base interval, doubling, cap, reset, 
   test('reset on user turn: saturate the backoff, then a completed user send resets the NEXT auto-wake firing to send+30s', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     let respondUserWithDone = false;
-    const { exports: m, fetchCalls, questionInput } = loadClient({
+    const { exports: m, fetchCalls, questionInput } = await loadClient({
       fetchImpl: (url, opts) => {
         const body = JSON.parse(opts.body);
         if (body.message) { respondUserWithDone = true; return sseResponse([sseFrame('done', {})]); }
@@ -918,7 +920,7 @@ describe('flight-companion.js — cadence: base interval, doubling, cap, reset, 
 
   test('reset on surfaced result: surface:true resets to 30s; surface:false renders/records but keeps doubling', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    const { exports: m, fetchCalls } = loadClient({
+    const { exports: m, fetchCalls } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('token', { token: 'hi' }), sseFrame('done', { surface: false })]),
     });
     t.mock.timers.tick(30000);
@@ -926,7 +928,7 @@ describe('flight-companion.js — cadence: base interval, doubling, cap, reset, 
     assert.strictEqual(m.getCadenceState().delayMs, 60000, 'surface:false must still double');
     assert.strictEqual(fetchCalls.length, 1);
 
-    const { exports: m2, fetchCalls: fetchCalls2 } = loadClient({
+    const { exports: m2, fetchCalls: fetchCalls2 } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('token', { token: 'hi' }), sseFrame('done', { surface: true })]),
     });
     t.mock.timers.tick(30000);
@@ -934,8 +936,8 @@ describe('flight-companion.js — cadence: base interval, doubling, cap, reset, 
     assert.strictEqual(m2.getCadenceState().delayMs, 30000, 'surface:true must reset to the 30s base');
   });
 
-  test('30s floor: a burst of resets never schedules two auto-wake calls less than 30s apart', (t) => {
-    const { exports: m } = loadClient();
+  test('30s floor: a burst of resets never schedules two auto-wake calls less than 30s apart', async (t) => {
+    const { exports: m } = await loadClient();
     let s = { delayMs: 30000, stopped: false };
     for (let i = 0; i < 10; i++) {
       s = m.advanceCadence(s, i % 2 === 0 ? 'reset' : 'double');
@@ -945,7 +947,7 @@ describe('flight-companion.js — cadence: base interval, doubling, cap, reset, 
 
   test('hidden→visible mid-floor: no call fires while hidden, and regaining visibility does not fire an eager call', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    const { exports: m, fetchCalls, doc } = loadClient({ hiddenInitial: false });
+    const { exports: m, fetchCalls, doc } = await loadClient({ hiddenInitial: false });
     // Go hidden before the first scheduled tick fires.
     doc.hidden = true;
     doc.dispatch('visibilitychange');
@@ -966,8 +968,8 @@ describe('flight-companion.js — cadence: base interval, doubling, cap, reset, 
 });
 
 describe('flight-companion.js — LIN-2621: the strip\'s "next check-in due" mount', () => {
-  test('formatNextCheckIn renders the wall-clock time the countdown ENDS at, not a duration', () => {
-    const { exports: m } = loadClient({});
+  test('formatNextCheckIn renders the wall-clock time the countdown ENDS at, not a duration', async () => {
+    const { exports: m } = await loadClient({});
     const now = new Date('2026-09-05T12:00:00.000Z').getTime();
     const got = m.formatNextCheckIn(90000, now);
     const expectedDue = new Date(now + 90000);
@@ -975,22 +977,22 @@ describe('flight-companion.js — LIN-2621: the strip\'s "next check-in due" mou
     assert.strictEqual(got, expected);
   });
 
-  test('the mount updates as soon as the module arms its first countdown (tab visible at load)', (t) => {
+  test('the mount updates as soon as the module arms its first countdown (tab visible at load)', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    const { stripNextEl } = loadClient({
+    const { stripNextEl } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
     });
     assert.match(stripNextEl.textContent, /^next check-in: (?!—)/, 'expected a real predicted time, not the server-rendered placeholder');
   });
 
-  test('the mount stays at the placeholder while the tab starts hidden — nothing is scheduled yet', () => {
-    const { stripNextEl } = loadClient({ hiddenInitial: true });
+  test('the mount stays at the placeholder while the tab starts hidden — nothing is scheduled yet', async () => {
+    const { stripNextEl } = await loadClient({ hiddenInitial: true });
     assert.strictEqual(stripNextEl.textContent, 'next check-in: —');
   });
 
-  test('the mount reads the placeholder again once the cadence stops (e.g. a session expiry)', (t) => {
+  test('the mount reads the placeholder again once the cadence stops (e.g. a session expiry)', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    const { exports: m, stripNextEl } = loadClient({
+    const { exports: m, stripNextEl } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
     });
     assert.doesNotMatch(stripNextEl.textContent, /—$/);
@@ -1007,7 +1009,7 @@ describe('flight-companion.js — LIN-2621: the strip\'s "next check-in due" mou
     // end by the 'doubling' test above. This test only pins that the mount
     // is still non-placeholder immediately after a reschedule.
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    const { exports: m, stripNextEl } = loadClient({
+    const { exports: m, stripNextEl } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'floor' }),
     });
     t.mock.timers.tick(30000); // fires the base-interval tick, which doubles the cadence and reschedules
@@ -1022,7 +1024,7 @@ describe('flight-companion.js — single-flight guard (client overlap)', () => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     let resolveFetch;
     let callCount = 0;
-    const { exports: m, fetchCalls } = loadClient({
+    const { exports: m, fetchCalls } = await loadClient({
       fetchImpl: () => {
         callCount += 1;
         if (callCount === 1) return new Promise((resolve) => { resolveFetch = resolve; });
@@ -1053,7 +1055,7 @@ describe('flight-companion.js — single-flight guard (client overlap)', () => {
 
   test('a user send during an in-flight auto-wake is blocked (composer disabled) until it resolves', async () => {
     let resolveFetch;
-    const { exports: m, fetchCalls, questionInput, sendBtn } = loadClient({
+    const { exports: m, fetchCalls, questionInput, sendBtn } = await loadClient({
       fetchImpl: () => new Promise((resolve) => { resolveFetch = resolve; }),
     });
     questionInput.value = 'hello';
@@ -1074,7 +1076,7 @@ describe('flight-companion.js — single-flight guard (client overlap)', () => {
   test('N1: a pending auto-wake timer firing while a user turn is in flight makes no overlapping request', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     let resolveUserFetch;
-    const { exports: m, fetchCalls, questionInput } = loadClient({
+    const { exports: m, fetchCalls, questionInput } = await loadClient({
       fetchImpl: (url, opts) => {
         const body = JSON.parse(opts.body);
         if (body.message) return new Promise((resolve) => { resolveUserFetch = resolve; });
@@ -1109,7 +1111,7 @@ describe('flight-companion.js — single-flight guard (client overlap)', () => {
 describe('flight-companion.js — LIN-2718: composer busy/focus split by turn kind', () => {
   test('a user-initiated turn locks the composer while streaming, and releases it on completion', async () => {
     let resolveFetch;
-    const { exports: m, questionInput, sendBtn, startBtn, reorientBtn } = loadClient({
+    const { exports: m, questionInput, sendBtn, startBtn, reorientBtn } = await loadClient({
       fetchImpl: () => new Promise((resolve) => { resolveFetch = resolve; }),
     });
     questionInput.value = 'hello';
@@ -1127,7 +1129,7 @@ describe('flight-companion.js — LIN-2718: composer busy/focus split by turn ki
   });
 
   test('a boot turn locks and releases the composer, but never restores focus on completion', async () => {
-    const { exports: m, doc, questionInput } = loadClient({
+    const { exports: m, doc, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     doc.activeElement = questionInput;
@@ -1139,7 +1141,7 @@ describe('flight-companion.js — LIN-2718: composer busy/focus split by turn ki
   });
 
   test('an auto-wake turn never touches the composer\'s disabled state, on a clean silent done', async () => {
-    const { exports: m, questionInput, sendBtn } = loadClient({
+    const { exports: m, questionInput, sendBtn } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { surface: true })]),
     });
     m.autoWakeTick();
@@ -1152,7 +1154,7 @@ describe('flight-companion.js — LIN-2718: composer busy/focus split by turn ki
   });
 
   test('an auto-wake turn never touches the composer\'s disabled state on a mid-stream SSE error', async () => {
-    const { exports: m, questionInput } = loadClient({
+    const { exports: m, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('error', { message: 'boom' })]),
     });
     m.autoWakeTick();
@@ -1162,7 +1164,7 @@ describe('flight-companion.js — LIN-2718: composer busy/focus split by turn ki
   });
 
   test('an auto-wake turn never touches the composer\'s disabled state on a network failure', async () => {
-    const { exports: m, questionInput } = loadClient({
+    const { exports: m, questionInput } = await loadClient({
       fetchImpl: () => Promise.reject(new Error('network down')),
     });
     m.autoWakeTick();
@@ -1172,7 +1174,7 @@ describe('flight-companion.js — LIN-2718: composer busy/focus split by turn ki
   });
 
   test('focus is restored after a user-initiated turn when the input held focus at turn start', async () => {
-    const { exports: m, doc, questionInput } = loadClient({
+    const { exports: m, doc, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     doc.activeElement = questionInput;
@@ -1184,7 +1186,7 @@ describe('flight-companion.js — LIN-2718: composer busy/focus split by turn ki
   });
 
   test('focus is NOT restored after a user-initiated turn when the input did not hold focus at turn start', async () => {
-    const { exports: m, doc, questionInput, sendBtn } = loadClient({
+    const { exports: m, doc, questionInput, sendBtn } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     doc.activeElement = sendBtn; // something else had focus (e.g. the Send button, on click)
@@ -1196,7 +1198,7 @@ describe('flight-companion.js — LIN-2718: composer busy/focus split by turn ki
 
   test('the inFlight guard still rejects a second concurrent turn during an in-flight auto-wake tick, even though the composer is left enabled', async () => {
     let resolveFetch;
-    const { exports: m, fetchCalls, questionInput } = loadClient({
+    const { exports: m, fetchCalls, questionInput } = await loadClient({
       fetchImpl: () => new Promise((resolve) => { resolveFetch = resolve; }),
     });
     m.autoWakeTick();
@@ -1217,7 +1219,7 @@ describe('flight-companion.js — cadence resiliency across a hidden/visible tra
   test('a user-initiated failure that spans a hidden→visible transition mid-turn does not stall the cadence', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     let rejectUserFetch;
-    const { exports: m, fetchCalls, questionInput, doc } = loadClient({
+    const { exports: m, fetchCalls, questionInput, doc } = await loadClient({
       fetchImpl: (url, opts) => {
         const body = JSON.parse(opts.body);
         if (body.message) return new Promise((_resolve, reject) => { rejectUserFetch = reject; });
@@ -1270,7 +1272,7 @@ describe('flight-companion.js — cadence resiliency across a hidden/visible tra
 
 describe('flight-companion.js — conversation history', () => {
   test('body.history is sent on every turn, including auto-wake, and is non-empty once a prior turn exists', async () => {
-    const { exports: m, fetchCalls } = loadClient({
+    const { exports: m, fetchCalls } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('token', { token: 'ok' }), sseFrame('done', { surface: true })]),
     });
     m.autoWakeTick();
@@ -1284,7 +1286,7 @@ describe('flight-companion.js — conversation history', () => {
   });
 
   test('an auto-wake done pushes only an assistant entry — no synthetic user entry', async () => {
-    const { exports: m } = loadClient({
+    const { exports: m } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('token', { token: 'all quiet' }), sseFrame('done', { surface: true })]),
     });
     m.autoWakeTick();
@@ -1293,7 +1295,7 @@ describe('flight-companion.js — conversation history', () => {
   });
 
   test('a user-initiated turn pushes both a user entry and an assistant entry, in order', async () => {
-    const { exports: m, questionInput } = loadClient({
+    const { exports: m, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('token', { token: 'ack' }), sseFrame('done', {})]),
     });
     questionInput.value = 'status please';
@@ -1311,7 +1313,7 @@ describe('flight-companion.js — conversation history', () => {
     // exactly one row), which is strictly stronger than the `/no response/`
     // assertion it replaces — that literal is deliberately deleted by
     // LIN-2443 AC1/AC2.
-    const { exports: m } = loadClient({
+    const { exports: m } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { surface: true })]),
     });
     m.autoWakeTick();
@@ -1319,8 +1321,8 @@ describe('flight-companion.js — conversation history', () => {
     looseDeepEqual(m.getChatHistory(), []);
   });
 
-  test('history cap: pushing 45 turns worth never exceeds 40 entries', () => {
-    const { exports: m } = loadClient();
+  test('history cap: pushing 45 turns worth never exceeds 40 entries', async () => {
+    const { exports: m } = await loadClient();
     const history = m.getChatHistory();
     for (let i = 0; i < 45; i++) { history.push({ role: 'assistant', content: String(i) }); m.capHistory(history); }
     assert.strictEqual(history.length, 40);
@@ -1331,7 +1333,7 @@ describe('flight-companion.js — conversation history', () => {
 
 describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
   test('AC1: a silent auto-wake done appends ZERO rows, leaves history empty, and shows the check-in line', async () => {
-    const { exports: m, thread, checkIn } = loadClient({
+    const { exports: m, thread, checkIn } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { surface: true })]),
     });
     m.autoWakeTick();
@@ -1343,7 +1345,7 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
   });
 
   test('AC2: an empty USER-initiated done appends exactly one assistant row with an honest no-reply sentence, still not in history', async () => {
-    const { exports: m, thread, questionInput } = loadClient({
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     questionInput.value = 'anything to report?';
@@ -1360,7 +1362,7 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
 
   // LIN-3359: a `finishReason: 'length'` done is a cut-off, never a finished answer.
   test('LIN-3359: text + length shows the cut-off note under the bubble, and history keeps only the raw answer', async () => {
-    const { exports: m, thread, questionInput } = loadClient({
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('token', { token: 'partial answer' }), sseFrame('done', { finishReason: 'length' })]),
     });
     questionInput.value = 'readout?';
@@ -1374,7 +1376,7 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
   });
 
   test('LIN-3359: finishReason stop shows no cut-off note', async () => {
-    const { exports: m, thread, questionInput } = loadClient({
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('token', { token: 'whole answer' }), sseFrame('done', { finishReason: 'stop' })]),
     });
     questionInput.value = 'readout?';
@@ -1384,7 +1386,7 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
   });
 
   test('LIN-3359: empty + length on a user-initiated turn says "cut off before it could answer", not history', async () => {
-    const { exports: m, thread, questionInput } = loadClient({
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { finishReason: 'length' })]),
     });
     questionInput.value = 'anything?';
@@ -1395,7 +1397,7 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
   });
 
   test('LIN-3359: empty + length on a boot turn says "cut off before it could answer"', async () => {
-    const { exports: m, thread } = loadClient({
+    const { exports: m, thread } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { finishReason: 'length' })]),
     });
     m.startBoot();
@@ -1405,7 +1407,7 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
   });
 
   test('LIN-3359: an auto-wake that ends empty + length paints the cut-off bubble and still leaves the composer untouched', async () => {
-    const { exports: m, thread, questionInput, sendBtn } = loadClient({
+    const { exports: m, thread, questionInput, sendBtn } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { finishReason: 'length', surface: true })]),
     });
     m.autoWakeTick();
@@ -1425,7 +1427,7 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
   // the thread is no longer empty on a tool-only tick, but it still must
   // never contain an assistant bubble (chat-msg / ChatUI.appendMessage).
   test('AC3: an auto-wake tick emitting only tool call/result frames appends breadcrumbs but never an assistant bubble', async () => {
-    const { exports: m, thread, chatUICalls } = loadClient({
+    const { exports: m, thread, chatUICalls } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'call', id: '1', name: 'get_stack' }),
         sseFrame('tool', { phase: 'result', id: '1', name: 'get_stack', result: '{}' }),
@@ -1442,7 +1444,7 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
 
   test('AC3 preservation: a `proposed` event on a text-free turn still renders a wired Approve/Dismiss card (null-beforeLi fallback)', async () => {
     const proposal = { proposed: true, sessionId: 'sess-1', prompt: 'go do the thing' };
-    const { exports: m, thread, apiCalls } = loadClient({
+    const { exports: m, thread, apiCalls } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { id: 'c1', name: 'send_follow_up', phase: 'proposed', result: JSON.stringify(proposal) }),
         sseFrame('done', { surface: true }),
@@ -1460,7 +1462,7 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
   });
 
   test('AC4: the pill leaves in-progress on done (\u2713) and on error (\u2715)', async () => {
-    const done = loadClient({
+    const done = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('token', { token: 'all quiet' }), sseFrame('done', { surface: true })]),
     });
     done.exports.autoWakeTick();
@@ -1470,7 +1472,7 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
     assert.ok(pill.classList.contains('status-pill--done'));
     assert.strictEqual(pill.querySelector('.status-pill__char').textContent, '\u2713');
 
-    const failed = loadClient({
+    const failed = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('token', { token: 'partial' }), sseFrame('error', { message: 'boom' })]),
     });
     failed.exports.autoWakeTick();
@@ -1482,7 +1484,7 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
   });
 
   test('AC4: an error on a text-free turn still creates a bubble — a failure is never silent', async () => {
-    const { thread, exports: m } = loadClient({ fetchImpl: () => sseResponse([sseFrame('error', { message: 'boom' })]) });
+    const { thread, exports: m } = await loadClient({ fetchImpl: () => sseResponse([sseFrame('error', { message: 'boom' })]) });
     m.autoWakeTick();
     await flush();
     assert.strictEqual(thread.children.length, 1, 'an error frame must surface a row even with no text');
@@ -1490,7 +1492,7 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
   });
 
   test('AC1 non-stacking: two consecutive silent ticks update the SAME status node and still append no rows', async () => {
-    const { exports: m, thread, checkIn } = loadClient({
+    const { exports: m, thread, checkIn } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { surface: true })]),
     });
     m.autoWakeTick();
@@ -1508,7 +1510,7 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
   });
 
   test('a gate-silent tick also refreshes the check-in line (and still appends no row)', async () => {
-    const { exports: m, thread, checkIn, chatUICalls } = loadClient({
+    const { exports: m, thread, checkIn, chatUICalls } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'hash-identical' }),
     });
     m.autoWakeTick();
@@ -1519,8 +1521,8 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
     assert.strictEqual(chatUICalls.appendNote.length, 0, 'gate-silent stays silent in the thread');
   });
 
-  test('formatCheckIn is pure — same clock in, exact string out', () => {
-    const { exports: m } = loadClient();
+  test('formatCheckIn is pure — same clock in, exact string out', async () => {
+    const { exports: m } = await loadClient();
     const at = new Date('2026-09-01T22:03:00Z');
     const expected = 'checked in ' + at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' \u00b7 nothing new';
     assert.strictEqual(m.formatCheckIn(at), expected);
@@ -1528,7 +1530,7 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
   });
 
   test('a streamed answer still paints, records history and keeps the cursor discipline (the non-empty path is unchanged)', async () => {
-    const { exports: m, thread } = loadClient({
+    const { exports: m, thread } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('token', { token: 'all ' }),
         sseFrame('token', { token: 'quiet' }),
@@ -1548,7 +1550,7 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
 describe('flight-companion.js — LIN-2621 beat 3: per-turn cost + the running "this tab so far" total', () => {
   test('a visible (user-initiated) turn with usage on done renders its own meta line inside the bubble', async () => {
     const usage = { prompt_tokens: 100, completion_tokens: 47, total_tokens: 147, cost: 0.00042 };
-    const { exports: m, thread, questionInput } = loadClient({
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('token', { token: 'hi' }), sseFrame('done', { usage })]),
     });
     questionInput.value = 'are you there?';
@@ -1564,7 +1566,7 @@ describe('flight-companion.js — LIN-2621 beat 3: per-turn cost + the running "
   });
 
   test('a visible turn with NO usage on done renders no meta line at all', async () => {
-    const { exports: m, thread, questionInput } = loadClient({
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('token', { token: 'hi' }), sseFrame('done', {})]),
     });
     questionInput.value = 'are you there?';
@@ -1579,7 +1581,7 @@ describe('flight-companion.js — LIN-2621 beat 3: per-turn cost + the running "
   // way; the gate is bubble existence, not answerText).
   test('AC2\'s empty-reply bubble also renders a meta line when usage is present', async () => {
     const usage = { total_tokens: 12, cost: 0.0001 };
-    const { exports: m, thread, questionInput } = loadClient({
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { usage })]),
     });
     questionInput.value = 'anything to report?';
@@ -1592,7 +1594,7 @@ describe('flight-companion.js — LIN-2621 beat 3: per-turn cost + the running "
 
   test('AC1 unchanged: a silent auto-wake tick with usage paints no bubble and no meta line — the running total is the ONLY other effect', async () => {
     const usage = { total_tokens: 210, cost: 0.0009 };
-    const { exports: m, thread, checkIn } = loadClient({
+    const { exports: m, thread, checkIn } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { usage })]),
     });
     m.autoWakeTick();
@@ -1603,7 +1605,7 @@ describe('flight-companion.js — LIN-2621 beat 3: per-turn cost + the running "
   });
 
   test('the running total sums EVERY done frame — visible and silent, any turn kind — and the check-in count matches', async () => {
-    const { exports: m, questionInput } = loadClient({
+    const { exports: m, questionInput } = await loadClient({
       fetchImpl: (url, opts) => {
         const body = JSON.parse(opts.body);
         return body.message
@@ -1626,7 +1628,7 @@ describe('flight-companion.js — LIN-2621 beat 3: per-turn cost + the running "
   });
 
   test('a done frame with no usage still counts as a check-in (cost contribution is zero)', async () => {
-    const { exports: m } = loadClient({
+    const { exports: m } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     m.autoWakeTick();
@@ -1635,7 +1637,7 @@ describe('flight-companion.js — LIN-2621 beat 3: per-turn cost + the running "
   });
 
   test('a gate-silent (non-stream) refusal — no model call at all — does NOT count as a check-in', async () => {
-    const { exports: m } = loadClient({
+    const { exports: m } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
     });
     m.autoWakeTick();
@@ -1644,7 +1646,7 @@ describe('flight-companion.js — LIN-2621 beat 3: per-turn cost + the running "
   });
 
   test('the strip\'s tab-total mount renders the formatted running total in place', async () => {
-    const { exports: m } = loadClient({
+    const { exports: m } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { usage: { total_tokens: 5, cost: 0.5 } })]),
     });
     assert.strictEqual(m.getTabTotalText(), '0 check-ins · $0.0000 this tab');
@@ -1654,7 +1656,7 @@ describe('flight-companion.js — LIN-2621 beat 3: per-turn cost + the running "
   });
 
   test('LIN-3360: the total stays hidden at 0 check-ins and is revealed after the first done', async () => {
-    const { exports: m, stripTabTotalEl } = loadClient({
+    const { exports: m, stripTabTotalEl } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { usage: { total_tokens: 5, cost: 0.5 } })]),
     });
     // At 0 check-ins updateTabTotalDisplay itself must hide the total (the
@@ -1671,7 +1673,7 @@ describe('flight-companion.js — LIN-2621 beat 3: per-turn cost + the running "
 describe('flight-companion.js — LIN-2670: done-frame Markdown swap, in place', () => {
   test('renders Markdown IN PLACE — the same element/li instance before and after the done frame — and the .fc-msg-meta line survives it', async () => {
     const usage = { total_tokens: 5, cost: 0.001 };
-    const { exports: m, thread, questionInput } = loadClient({
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('token', { token: '**hi**' }), sseFrame('done', { usage })]),
     });
     questionInput.value = 'hello';
@@ -1717,7 +1719,7 @@ describe('flight-companion.js — LIN-2670: done-frame Markdown swap, in place',
   });
 
   test('the mid-stream error path keeps textContent and never gains chat-md', async () => {
-    const { exports: m, thread, questionInput } = loadClient({
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('token', { token: '**partial**' }), sseFrame('error', { message: 'boom' })]),
     });
     questionInput.value = 'hello';
@@ -1731,7 +1733,7 @@ describe('flight-companion.js — LIN-2670: done-frame Markdown swap, in place',
   });
 
   test('AC2\'s "no reply" empty-answer path keeps textContent and never gains chat-md', async () => {
-    const { exports: m, thread, questionInput } = loadClient({
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     questionInput.value = 'anything to report?';
@@ -1748,8 +1750,8 @@ describe('flight-companion.js — LIN-2670: done-frame Markdown swap, in place',
 // ─── The thinking state + "checking in…" status line (LIN-2632 beat 3) ─────
 
 describe('flight-companion.js — the thinking state (typed turns) and "checking in…" (auto-wake)', () => {
-  test('a typed turn shows the thinking row immediately, in-progress, before any network response', () => {
-    const { exports: m, thread, questionInput } = loadClient({
+  test('a typed turn shows the thinking row immediately, in-progress, before any network response', async () => {
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => new Promise(() => {}), // never resolves — this checks the pre-response state only
     });
     questionInput.value = 'status please';
@@ -1764,7 +1766,7 @@ describe('flight-companion.js — the thinking state (typed turns) and "checking
   });
 
   test('the first token replaces the thinking placeholder outright — never concatenated after it', async () => {
-    const { exports: m, thread, questionInput } = loadClient({
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('token', { token: 'ack' }), sseFrame('done', {})]),
     });
     questionInput.value = 'status please';
@@ -1776,7 +1778,7 @@ describe('flight-companion.js — the thinking state (typed turns) and "checking
   });
 
   test('a tool breadcrumb during a hop inserts BEFORE the thinking row, not after it', async () => {
-    const { exports: m, thread, questionInput } = loadClient({
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'call', id: '1', name: 'get_stack', arguments: {} }),
         sseFrame('token', { token: 'done hop' }),
@@ -1792,8 +1794,8 @@ describe('flight-companion.js — the thinking state (typed turns) and "checking
     assert.strictEqual(thread.children[2].querySelector('.fc-msg-body').textContent, 'done hop');
   });
 
-  test('the thinking placeholder never leaks into history — even mid-turn, before any token arrives', () => {
-    const { exports: m, questionInput } = loadClient({ fetchImpl: () => new Promise(() => {}) });
+  test('the thinking placeholder never leaks into history — even mid-turn, before any token arrives', async () => {
+    const { exports: m, questionInput } = await loadClient({ fetchImpl: () => new Promise(() => {}) });
     questionInput.value = 'anything?';
     m.submitQuestion();
     looseDeepEqual(m.getChatHistory(), [{ role: 'user', content: 'anything?' }],
@@ -1801,7 +1803,7 @@ describe('flight-companion.js — the thinking state (typed turns) and "checking
   });
 
   test('an empty typed turn still leaves nothing in history, with the thinking row settling into the honest no-reply sentence (AC2 unchanged)', async () => {
-    const { exports: m, thread, questionInput } = loadClient({
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     questionInput.value = 'anything to report?';
@@ -1826,7 +1828,7 @@ describe('flight-companion.js — the thinking state (typed turns) and "checking
   // retry stacked a second one on top rather than replacing the first.
 
   test('LIN-2632 review F1: a user-initiated turn that fails outside the SSE stream (e.g. a 500 non-JSON response) settles the thinking row to failed, never left stuck in-progress', async () => {
-    const { exports: m, thread, questionInput } = loadClient({
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => htmlResponse(500),
     });
     questionInput.value = 'what is in flight?';
@@ -1845,7 +1847,7 @@ describe('flight-companion.js — the thinking state (typed turns) and "checking
   });
 
   test('LIN-2632 review F1: a network failure (fetch rejects) on a user-initiated turn also settles the thinking row to failed', async () => {
-    const { exports: m, thread, questionInput } = loadClient({
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => Promise.reject(new Error('network down')),
     });
     questionInput.value = 'what is in flight?';
@@ -1859,7 +1861,7 @@ describe('flight-companion.js — the thinking state (typed turns) and "checking
   });
 
   test('LIN-2632 review F1: repeated failed turns never leave more than one settled row each — no permanently in-progress rows accumulate across retries', async () => {
-    const { exports: m, thread, questionInput } = loadClient({
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => htmlResponse(500),
     });
     questionInput.value = 'first attempt';
@@ -1877,7 +1879,7 @@ describe('flight-companion.js — the thinking state (typed turns) and "checking
   });
 
   test('LIN-2632 review F1: an auto-wake tick that fails outside the SSE stream still creates no assistant bubble (F1\'s fix is user-initiated only, since ensureAssistantBubble is never called on auto-wake)', async () => {
-    const { exports: m, thread, chatUICalls } = loadClient({
+    const { exports: m, thread, chatUICalls } = await loadClient({
       fetchImpl: () => htmlResponse(500),
     });
     m.autoWakeTick();
@@ -1887,7 +1889,7 @@ describe('flight-companion.js — the thinking state (typed turns) and "checking
   });
 
   test('a silent auto-wake tick still paints no bubble (AC1 unchanged by the thinking-state work)', async () => {
-    const { exports: m, thread, chatUICalls } = loadClient({
+    const { exports: m, thread, chatUICalls } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { surface: true })]),
     });
     m.autoWakeTick();
@@ -1897,7 +1899,7 @@ describe('flight-companion.js — the thinking state (typed turns) and "checking
   });
 
   test('"checking in…" appears on the status line immediately on an auto-wake tick, before the network round-trip resolves, and clears on done', async () => {
-    const { exports: m, checkIn } = loadClient({
+    const { exports: m, checkIn } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { surface: true })]),
     });
     m.autoWakeTick();
@@ -1910,7 +1912,7 @@ describe('flight-companion.js — the thinking state (typed turns) and "checking
   });
 
   test('"checking in…" also clears on a gate-silent (non-stream) auto-wake outcome', async () => {
-    const { exports: m, checkIn } = loadClient({
+    const { exports: m, checkIn } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'hash-identical' }),
     });
     m.autoWakeTick();
@@ -1920,7 +1922,7 @@ describe('flight-companion.js — the thinking state (typed turns) and "checking
   });
 
   test('an auto-wake tick that surfaces a real narrated bubble still clears "checking in…" — restored to its prior state, never left stuck', async () => {
-    const { exports: m, checkIn } = loadClient({
+    const { exports: m, checkIn } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('token', { token: 'heads up' }), sseFrame('done', { surface: true })]),
     });
     m.autoWakeTick();
@@ -1935,7 +1937,7 @@ describe('flight-companion.js — the thinking state (typed turns) and "checking
   });
 
   test('"checking in…" also clears (restored) on a mid-stream auto-wake error', async () => {
-    const { exports: m, checkIn } = loadClient({
+    const { exports: m, checkIn } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('error', { message: 'boom' })]),
     });
     m.autoWakeTick();
@@ -1952,7 +1954,7 @@ function toolSummary(row) { return row.children[0].children[0]; }
 
 describe('flight-companion.js — tool-wire phases (F5) + the proposal control', () => {
   test('phase: "cap" renders exactly one note, does not throw, and is never mistaken for a proposal', async () => {
-    const { exports: m, chatUICalls } = loadClient({
+    const { exports: m, chatUICalls } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'cap', iteration: 4, maxIterations: 4 }),
         sseFrame('done', { surface: true }),
@@ -1969,7 +1971,7 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
   // 'result' settles it, and 'error' marks it — correlated by the tool
   // event's own `id`.
   test('"call" renders a pending breadcrumb using the shared label helper', async () => {
-    const { exports: m, chatUICalls, thread } = loadClient({
+    const { exports: m, chatUICalls, thread } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'call', id: '1', name: 'get_stack', arguments: {} }),
         sseFrame('done', { surface: true }),
@@ -1985,7 +1987,7 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
   });
 
   test('"result" settles the matching "call" breadcrumb in place (no new note), dropping the pending ellipsis', async () => {
-    const { exports: m, chatUICalls, thread } = loadClient({
+    const { exports: m, chatUICalls, thread } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'call', id: '1', name: 'list_task_sessions', arguments: { issueId: 'LIN-9' } }),
         sseFrame('tool', { phase: 'result', id: '1', name: 'list_task_sessions', result: '[]' }),
@@ -2006,7 +2008,7 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
   });
 
   test('"error" marks the matching "call" breadcrumb failed, recomputed from the error event', async () => {
-    const { exports: m, chatUICalls, thread } = loadClient({
+    const { exports: m, chatUICalls, thread } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'call', id: '2', name: 'get_session', arguments: { sessionId: 'abc' } }),
         sseFrame('tool', { phase: 'error', id: '2', name: 'get_session', error: 'boom' }),
@@ -2022,7 +2024,7 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
   });
 
   test('a result/error with no matching call id is a defensive no-op (never throws, no orphan note)', async () => {
-    const { exports: m, chatUICalls } = loadClient({
+    const { exports: m, chatUICalls } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'result', id: 'orphan', name: 'get_stack', result: '{}' }),
         sseFrame('tool', { phase: 'error', id: 'orphan-2', name: 'get_stack', error: 'x' }),
@@ -2034,7 +2036,7 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
   });
 
   test('two concurrent tool calls in one turn settle independently, correlated by id', async () => {
-    const { chatUICalls, thread, exports: m } = loadClient({
+    const { chatUICalls, thread, exports: m } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'call', id: 'a', name: 'get_stack', arguments: {} }),
         sseFrame('tool', { phase: 'call', id: 'b', name: 'get_session', arguments: { sessionId: 'xyz' } }),
@@ -2059,7 +2061,7 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
 
   test('a valid proposal renders Approve/Dismiss; Dismiss is zero-fetch and terminal', async () => {
     const proposal = { proposed: true, sessionId: 'sess-1', prompt: 'go do the thing' };
-    const { exports: m, thread, apiCalls } = loadClient({
+    const { exports: m, thread, apiCalls } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { id: 'c1', name: 'send_follow_up', phase: 'proposed', result: JSON.stringify(proposal) }),
         sseFrame('done', { surface: true }),
@@ -2081,8 +2083,8 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
 
   test('Approve: 200 confirms and never re-enables; 404/422 is terminal; 429/500 restores for retry; 403 also stops the cadence', async () => {
     const proposal = { proposed: true, sessionId: 'sess-1', prompt: 'go' };
-    function loadWithApprove(apiImpl) {
-      return loadClient({
+    async function loadWithApprove(apiImpl) {
+      return await loadClient({
         fetchImpl: () => sseResponse([
           sseFrame('tool', { id: 'c1', name: 'send_follow_up', phase: 'proposed', result: JSON.stringify(proposal) }),
           sseFrame('done', { surface: true }),
@@ -2096,7 +2098,7 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
     }
 
     // 200
-    let env = loadWithApprove(async () => ({ queued: true, target: 'cli' }));
+    let env = await loadWithApprove(async () => ({ queued: true, target: 'cli' }));
     env.exports.autoWakeTick();
     await flush();
     let btn = approveButton(env);
@@ -2106,7 +2108,7 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
     assert.match(btn.parentNode.parentNode.querySelector('.fc-proposal-feedback').textContent, /Approved/);
 
     // 404 terminal
-    env = loadWithApprove(async () => { throw Object.assign(new Error('Session x not found'), { status: 404 }); });
+    env = await loadWithApprove(async () => { throw Object.assign(new Error('Session x not found'), { status: 404 }); });
     env.exports.autoWakeTick();
     await flush();
     btn = approveButton(env);
@@ -2115,7 +2117,7 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
     assert.strictEqual(btn.disabled, true, '404 must not offer a retry');
 
     // 429 restores
-    env = loadWithApprove(async () => { throw Object.assign(new Error('Too many'), { status: 429 }); });
+    env = await loadWithApprove(async () => { throw Object.assign(new Error('Too many'), { status: 429 }); });
     env.exports.autoWakeTick();
     await flush();
     btn = approveButton(env);
@@ -2124,7 +2126,7 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
     assert.strictEqual(btn.disabled, false, '429 must restore the control for retry');
 
     // 500 restores
-    env = loadWithApprove(async () => { throw Object.assign(new Error('boom'), { status: 500 }); });
+    env = await loadWithApprove(async () => { throw Object.assign(new Error('boom'), { status: 500 }); });
     env.exports.autoWakeTick();
     await flush();
     btn = approveButton(env);
@@ -2133,7 +2135,7 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
     assert.strictEqual(btn.disabled, false, '500 must restore the control for retry');
 
     // 403 also stops the cadence
-    env = loadWithApprove(async () => { throw Object.assign(new Error('Flight Companion feature is not enabled'), { status: 403 }); });
+    env = await loadWithApprove(async () => { throw Object.assign(new Error('Flight Companion feature is not enabled'), { status: 403 }); });
     env.exports.autoWakeTick();
     await flush();
     btn = approveButton(env);
@@ -2144,7 +2146,7 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
 
   test('a truncated/unparseable proposal payload falls back to a dismiss-only note, never throws', async () => {
     const truncated = '{"proposed":true,"sessionId":"s1","prompt":"' + 'x'.repeat(20) + '\n… [truncated 4000 chars]';
-    const { exports: m, chatUICalls } = loadClient({
+    const { exports: m, chatUICalls } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { id: 'c1', name: 'send_follow_up', phase: 'proposed', result: truncated }),
         sseFrame('done', { surface: true }),
@@ -2196,8 +2198,8 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
     return sseFrame('tool', { phase: 'result', id: 't1', name: 'list_pending_decisions', result: decisionsResult(decisions) });
   }
 
-  test('parseDecisionsResult: valid shape, malformed JSON, non-array decisions, and per-row shape filtering', () => {
-    const { exports: m } = loadClient();
+  test('parseDecisionsResult: valid shape, malformed JSON, non-array decisions, and per-row shape filtering', async () => {
+    const { exports: m } = await loadClient();
     const d = decision();
     looseDeepEqual(m.parseDecisionsResult(decisionsResult([d])), { ok: true, decisions: [d] });
     assert.strictEqual(m.parseDecisionsResult('not json').ok, false);
@@ -2214,7 +2216,7 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
 
   test('renders the question and one option button per option, with the recommended star on the recommended one', async () => {
     const d = decision();
-    const { exports: m, thread } = loadClient({ fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]) });
+    const { exports: m, thread } = await loadClient({ fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]) });
     m.autoWakeTick();
     await flush();
 
@@ -2231,7 +2233,7 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
 
   test('a read-only disposition (mid-turn) renders the caption only — no buttons, matching appendOptions\' own allow-list', async () => {
     const d = decision({ disposition: 'mid-turn', canReply: false });
-    const { exports: m, thread } = loadClient({ fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]) });
+    const { exports: m, thread } = await loadClient({ fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]) });
     m.autoWakeTick();
     await flush();
     const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
@@ -2242,7 +2244,7 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
   test('multiple decisions in one result each render their own card', async () => {
     const d1 = decision({ decisionId: 'dec-1', question: 'First?' });
     const d2 = decision({ decisionId: 'dec-2', question: 'Second?' });
-    const { exports: m, thread } = loadClient({ fetchImpl: () => sseResponse([decisionToolFrame([d1, d2]), sseFrame('done', { surface: true })]) });
+    const { exports: m, thread } = await loadClient({ fetchImpl: () => sseResponse([decisionToolFrame([d1, d2]), sseFrame('done', { surface: true })]) });
     m.autoWakeTick();
     await flush();
     // LIN-3361: both cards sit in ONE closed fold, all in the DOM.
@@ -2254,7 +2256,7 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
   });
 
   test('a malformed/truncated tool result shows an inline note and renders no decision card, without throwing', async () => {
-    const { exports: m, thread, chatUICalls } = loadClient({
+    const { exports: m, thread, chatUICalls } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'result', id: 't1', name: 'list_pending_decisions', result: '{"decisions": [' }),
         sseFrame('done', { surface: true }),
@@ -2267,7 +2269,7 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
 
   test('a tap on a loop-anchored (resumable) decision posts through window.ReplyDelivery.postComment ONLY, with decisionLoopId + decisionId, to the raw issueId target', async () => {
     const d = decision({ disposition: 'resumable', loopId: 'loop-7', decisionId: 'dec-7', issueId: 'uuid-77', issueIdentifier: 'LIN-77' });
-    const { exports: m, thread, replyDeliveryCalls, apiCalls } = loadClient({
+    const { exports: m, thread, replyDeliveryCalls, apiCalls } = await loadClient({
       fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
     });
     m.autoWakeTick();
@@ -2306,7 +2308,7 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
       disposition: 'task-bound', loopId: null, decisionId: 'scan_abc123',
       issueId: 'uuid-9', issueIdentifier: 'LIN-9', taskDecisionId: 'scan_abc123',
     });
-    const { exports: m, thread, replyDeliveryCalls, apiCalls } = loadClient({
+    const { exports: m, thread, replyDeliveryCalls, apiCalls } = await loadClient({
       fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
     });
     m.autoWakeTick();
@@ -2335,7 +2337,7 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
       disposition: 'task-bound', loopId: null, decisionId: 'scan-9',
       issueId: 'uuid-9-task', issueIdentifier: 'LIN-19', taskDecisionId: 'scan-9',
     });
-    const { exports: m, thread, replyDeliveryCalls } = loadClient({
+    const { exports: m, thread, replyDeliveryCalls } = await loadClient({
       fetchImpl: () => sseResponse([decisionToolFrame([loopBound, taskBound]), sseFrame('done', { surface: true })]),
     });
     m.autoWakeTick();
@@ -2358,7 +2360,7 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
 
   test('the row settles visibly on a successful reply: buttons disabled, feedback shown, card marked resolved', async () => {
     const d = decision();
-    const { exports: m, thread } = loadClient({
+    const { exports: m, thread } = await loadClient({
       fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
       postCommentImpl: () => ({ ok: true, status: 200, data: {} }),
     });
@@ -2375,7 +2377,7 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
 
   test('a double tap never posts twice — the second click on an already-disabled/resolved row is a no-op', async () => {
     const d = decision();
-    const { exports: m, thread, replyDeliveryCalls } = loadClient({
+    const { exports: m, thread, replyDeliveryCalls } = await loadClient({
       fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
     });
     m.autoWakeTick();
@@ -2390,7 +2392,7 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
 
   test('canReply: false is respected even on an (in practice unreachable) interactive-looking disposition — the onSelect guard is a real second gate, not decorative', async () => {
     const d = decision({ disposition: 'resumable', canReply: false });
-    const { exports: m, thread, replyDeliveryCalls } = loadClient({
+    const { exports: m, thread, replyDeliveryCalls } = await loadClient({
       fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
     });
     m.autoWakeTick();
@@ -2403,7 +2405,7 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
 
   test('a failed reply (4xx) is handled honestly, never silently swallowed, and stays disabled (retrying would fail the same way)', async () => {
     const d = decision();
-    const { exports: m, thread } = loadClient({
+    const { exports: m, thread } = await loadClient({
       fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
       postCommentImpl: () => ({ ok: false, status: 422, data: { error: 'decision already answered' } }),
     });
@@ -2419,7 +2421,7 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
 
   test('a failed reply (5xx) re-enables the row for retry', async () => {
     const d = decision();
-    const { exports: m, thread } = loadClient({
+    const { exports: m, thread } = await loadClient({
       fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
       postCommentImpl: () => ({ ok: false, status: 500, data: {} }),
     });
@@ -2435,7 +2437,7 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
 
   test('a network failure (postComment rejects) re-enables the row for retry with an honest message', async () => {
     const d = decision();
-    const { exports: m, thread } = loadClient({
+    const { exports: m, thread } = await loadClient({
       fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
       postCommentImpl: () => { throw new Error('offline'); },
     });
@@ -2454,7 +2456,7 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
 
 describe('flight-companion.js — response matrix outcomes end-to-end', () => {
   test('gate-silent (200 spent:false): silent, no DOM note, doubles', async () => {
-    const { exports: m, chatUICalls, fetchCalls } = loadClient({
+    const { exports: m, chatUICalls, fetchCalls } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'hash-identical' }),
     });
     m.autoWakeTick();
@@ -2465,7 +2467,7 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
 
   test('LIN-2438 T17: gate-silent + sweep-not-seen updates the single status line with the not-seen text, doubles the cadence, and appends no row', async () => {
     const seenAt = '2026-09-02T20:00:00.000Z';
-    const { exports: m, thread, checkIn, chatUICalls } = loadClient({
+    const { exports: m, thread, checkIn, chatUICalls } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'sweep-not-seen', sweepLastSeenAt: seenAt }),
     });
     m.autoWakeTick();
@@ -2480,7 +2482,7 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
   });
 
   test('LIN-2438 T18: gate-silent with any other reason still only refreshes the ordinary check-in line (LIN-2443 AC1 unchanged), no warning class', async () => {
-    const { exports: m, thread, checkIn, chatUICalls } = loadClient({
+    const { exports: m, thread, checkIn, chatUICalls } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'floor' }),
     });
     m.autoWakeTick();
@@ -2506,7 +2508,7 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
   // restarts), and precisely the silence LIN-2438 exists to break.
 
   test('LIN-2487: gate-silent + no-census says so, instead of claiming a quiet scan', async () => {
-    const { exports: m, thread, checkIn, chatUICalls } = loadClient({
+    const { exports: m, thread, checkIn, chatUICalls } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
     });
     m.autoWakeTick();
@@ -2526,7 +2528,7 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
     // that wait runs to roster-length × 60s, since observer-sweep is
     // round-robin one workspace per tick, not 60s flat. Clearing a leftover
     // class matters because the previous tick may have been sweep-not-seen.
-    const { exports: m, checkIn } = loadClient({
+    const { exports: m, checkIn } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
     });
     checkIn.classList.add('fc-checkin--warning');
@@ -2535,8 +2537,8 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
     assert.strictEqual(checkIn.classList.contains('fc-checkin--warning'), false);
   });
 
-  test('LIN-2487: formatNoCensus reports THIS tick\'s time, not the sweep\'s — there is no sweep instant to name', () => {
-    const { exports: m } = loadClient({ fetchImpl: () => jsonResponse(200, {}) });
+  test('LIN-2487: formatNoCensus reports THIS tick\'s time, not the sweep\'s — there is no sweep instant to name', async () => {
+    const { exports: m } = await loadClient({ fetchImpl: () => jsonResponse(200, {}) });
     const line = m.formatNoCensus(new Date('2026-09-05T09:00:00.000Z'));
     assert.match(line, /no fleet scan yet$/, 'the state being reported');
     assert.match(line, /^checked in /, 'and the ordinary line\'s leading clause, so a stopped/hidden/offline page is still distinguishable from a ticking one');
@@ -2545,11 +2547,11 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
     assert.notStrictEqual(line, m.formatNoCensus(new Date('2026-09-05T11:00:00.000Z')));
   });
 
-  test('LIN-2487: the three gate-silent lines are mutually distinct', () => {
+  test('LIN-2487: the three gate-silent lines are mutually distinct', async () => {
     // The regression this guards: a future edit that collapses two of these
     // onto the same wording would silently restore the ambiguity the branch
     // exists to remove, while every assertion above still passed.
-    const { exports: m } = loadClient({ fetchImpl: () => jsonResponse(200, {}) });
+    const { exports: m } = await loadClient({ fetchImpl: () => jsonResponse(200, {}) });
     const lines = [
       m.formatCheckIn(new Date('2026-09-05T09:00:00.000Z')),
       m.formatSweepNotSeen(new Date('2026-09-05T08:00:00.000Z')),
@@ -2559,7 +2561,7 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
   });
 
   test('an ordinary check-in clears a previously-set sweep-not-seen warning class (the line settles)', async () => {
-    const { exports: m, checkIn } = loadClient({
+    const { exports: m, checkIn } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'hash-identical' }),
     });
     checkIn.classList.add('fc-checkin--warning'); // simulate a prior sweep-not-seen tick's leftover state
@@ -2569,13 +2571,13 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
   });
 
   test('403 flag-off: EITHER path stops the cadence entirely and shows a note', async () => {
-    const auto = loadClient({ fetchImpl: () => jsonResponse(403, { error: 'Flight Companion feature is not enabled' }) });
+    const auto = await loadClient({ fetchImpl: () => jsonResponse(403, { error: 'Flight Companion feature is not enabled' }) });
     auto.exports.autoWakeTick();
     await flush();
     assert.strictEqual(auto.exports.getCadenceState().stopped, true);
     assert.ok(auto.chatUICalls.appendNote.some(c => /not enabled/.test(c.text)));
 
-    const user = loadClient({ fetchImpl: () => jsonResponse(403, { error: 'Flight Companion feature is not enabled' }) });
+    const user = await loadClient({ fetchImpl: () => jsonResponse(403, { error: 'Flight Companion feature is not enabled' }) });
     user.questionInput.value = 'hi';
     user.exports.submitQuestion();
     await flush();
@@ -2583,7 +2585,7 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
   });
 
   test('F6: 401 (middleware session expiry) stops the cadence and shows a re-auth note', async () => {
-    const { exports: m, chatUICalls } = loadClient({ fetchImpl: () => jsonResponse(401, { error: 'Not authenticated' }) });
+    const { exports: m, chatUICalls } = await loadClient({ fetchImpl: () => jsonResponse(401, { error: 'Not authenticated' }) });
     m.autoWakeTick();
     await flush();
     assert.strictEqual(m.getCadenceState().stopped, true);
@@ -2591,12 +2593,12 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
   });
 
   test('503 ai-not-configured: auto-wake stops; a user-initiated turn does not touch the cadence', async () => {
-    const auto = loadClient({ fetchImpl: () => jsonResponse(503, { error: 'AI is not configured.' }) });
+    const auto = await loadClient({ fetchImpl: () => jsonResponse(503, { error: 'AI is not configured.' }) });
     auto.exports.autoWakeTick();
     await flush();
     assert.strictEqual(auto.exports.getCadenceState().stopped, true);
 
-    const user = loadClient({ fetchImpl: () => jsonResponse(503, { error: 'AI is not configured.' }) });
+    const user = await loadClient({ fetchImpl: () => jsonResponse(503, { error: 'AI is not configured.' }) });
     user.questionInput.value = 'hi';
     user.exports.submitQuestion();
     await flush();
@@ -2605,7 +2607,7 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
   });
 
   test('F6: 500 / a non-JSON, non-OK response doubles the auto-wake cadence (transient, may resolve) and never assumes the body is JSON', async () => {
-    const { exports: m } = loadClient({ fetchImpl: () => htmlResponse(404) });
+    const { exports: m } = await loadClient({ fetchImpl: () => htmlResponse(404) });
     m.autoWakeTick();
     await flush();
     assert.strictEqual(m.getCadenceState().delayMs, 60000);
@@ -2613,7 +2615,7 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
   });
 
   test('429 free-tier limit is reachable only on a user-initiated turn; composer re-enabled, no auto-retry, no cadence effect', async () => {
-    const { exports: m, chatUICalls, sendBtn, questionInput } = loadClient({
+    const { exports: m, chatUICalls, sendBtn, questionInput } = await loadClient({
       fetchImpl: () => jsonResponse(429, { error: 'Free tier limit reached', freeTier: { remaining: 0, limit: 10, resetsAt: 'soon' } }),
     });
     questionInput.value = 'status please';
@@ -2626,10 +2628,10 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
 
   test('LIN-3360: the free-tier note shows resetsAt via window.formatLocalTime when present, else the raw value', async () => {
     const run = async (withHelper) => {
-      const loaded = loadClient({
+      const loaded = await loadClient({
         fetchImpl: () => jsonResponse(429, { error: 'Free tier limit reached', freeTier: { remaining: 0, limit: 10, resetsAt: '2026-10-09T00:00:00.000Z' } }),
+        extraWindow: withHelper ? { formatLocalTime: (iso) => `LOCAL(${iso})` } : {},
       });
-      if (withHelper) loaded.windowShim.formatLocalTime = (iso) => `LOCAL(${iso})`;
       loaded.questionInput.value = 'status please';
       loaded.exports.submitQuestion();
       await flush();
@@ -2640,7 +2642,7 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
   });
 
   test('400 message-too-long is user-initiated only; composer text is preserved for editing, no auto-retry', async () => {
-    const { exports: m, questionInput } = loadClient({
+    const { exports: m, questionInput } = await loadClient({
       fetchImpl: () => jsonResponse(400, { error: 'message must be 2000 characters or fewer' }),
     });
     questionInput.value = 'x'.repeat(2001);
@@ -2650,12 +2652,12 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
   });
 
   test('a mid-stream SSE error frame: auto-wake doubles; user-initiated drops the unanswered turn from history and re-enables the composer', async () => {
-    const auto = loadClient({ fetchImpl: () => sseResponse([sseFrame('error', { message: 'boom' })]) });
+    const auto = await loadClient({ fetchImpl: () => sseResponse([sseFrame('error', { message: 'boom' })]) });
     auto.exports.autoWakeTick();
     await flush();
     assert.strictEqual(auto.exports.getCadenceState().delayMs, 60000);
 
-    const user = loadClient({ fetchImpl: () => sseResponse([sseFrame('error', { message: 'boom' })]) });
+    const user = await loadClient({ fetchImpl: () => sseResponse([sseFrame('error', { message: 'boom' })]) });
     user.questionInput.value = 'hi';
     user.exports.submitQuestion();
     await flush();
@@ -2664,12 +2666,12 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
   });
 
   test('a network failure (fetch rejects): auto-wake doubles; user-initiated shows a note and restores composer text', async () => {
-    const auto = loadClient({ fetchImpl: () => Promise.reject(new Error('network down')) });
+    const auto = await loadClient({ fetchImpl: () => Promise.reject(new Error('network down')) });
     auto.exports.autoWakeTick();
     await flush();
     assert.strictEqual(auto.exports.getCadenceState().delayMs, 60000);
 
-    const user = loadClient({ fetchImpl: () => Promise.reject(new Error('network down')) });
+    const user = await loadClient({ fetchImpl: () => Promise.reject(new Error('network down')) });
     user.questionInput.value = 'status please';
     user.exports.submitQuestion();
     await flush();
@@ -3123,7 +3125,7 @@ describe('window.ChatUI.isPinnedToBottom — the 60px boundary (LIN-2811 ledger 
 
 describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the start/reorient pair', () => {
   test('startBoot() posts to the boot endpoint, never /turn', async () => {
-    const { exports: m, fetchCalls } = loadClient({
+    const { exports: m, fetchCalls } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     m.startBoot();
@@ -3134,7 +3136,7 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
   });
 
   test('a boot never sends a client-asserted message — only history', async () => {
-    const { exports: m, fetchCalls } = loadClient({
+    const { exports: m, fetchCalls } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     m.startBoot();
@@ -3143,8 +3145,8 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
     assert.deepStrictEqual(fetchCalls[0].body.history, []);
   });
 
-  test('renders as a user-initiated turn: a synthetic "Start" user bubble, then a thinking placeholder, before any network response', () => {
-    const { exports: m, thread } = loadClient({
+  test('renders as a user-initiated turn: a synthetic "Start" user bubble, then a thinking placeholder, before any network response', async () => {
+    const { exports: m, thread } = await loadClient({
       fetchImpl: () => new Promise(() => {}), // never resolves — pre-response state only
     });
     m.startBoot();
@@ -3155,7 +3157,7 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
   });
 
   test('a successful boot pushes a real {role:"user", content:"Start"} entry into history, matching what the server actually turned', async () => {
-    const { exports: m } = loadClient({
+    const { exports: m } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('token', { token: 'orient ready' }), sseFrame('done', {})]),
     });
     m.startBoot();
@@ -3167,7 +3169,7 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
   });
 
   test('the cadence resets on a boot\'s `done` — same as a typed turn', async () => {
-    const { exports: m } = loadClient({
+    const { exports: m } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     m.getCadenceState().delayMs = 120000; // simulate several prior doublings
@@ -3177,7 +3179,7 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
   });
 
   test('the cadence is left UNTOUCHED by a mid-stream boot error — not reset, not doubled', async () => {
-    const { exports: m } = loadClient({
+    const { exports: m } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('error', { message: 'boom' })]),
     });
     m.getCadenceState().delayMs = 120000;
@@ -3187,7 +3189,7 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
   });
 
   test('the cadence is left UNTOUCHED by a boot network failure — not reset, not doubled', async () => {
-    const { exports: m } = loadClient({
+    const { exports: m } = await loadClient({
       fetchImpl: () => Promise.reject(new Error('network down')),
     });
     m.getCadenceState().delayMs = 120000;
@@ -3197,7 +3199,7 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
   });
 
   test('a mid-stream boot error settles the thinking row to failed and drops the turn from history — the button must not strand the UI in-progress', async () => {
-    const { exports: m, thread } = loadClient({
+    const { exports: m, thread } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('error', { message: 'boom' })]),
     });
     m.startBoot();
@@ -3209,7 +3211,7 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
   });
 
   test('a boot that loses the reservation race (gate-silent, spent:false) settles the bubble failed with an honest message, pops history, and leaves the cadence untouched', async () => {
-    const { exports: m, thread } = loadClient({
+    const { exports: m, thread } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'boot', spent: false, reason: 'lost-race' }),
     });
     m.getCadenceState().delayMs = 60000;
@@ -3223,7 +3225,7 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
   });
 
   test('a boot 429 (free tier spent) settles the bubble failed with the free-tier message and pops history — same shape as a typed turn\'s 429', async () => {
-    const { exports: m, thread } = loadClient({
+    const { exports: m, thread } = await loadClient({
       fetchImpl: () => jsonResponse(429, {
         error: 'Free tier limit reached',
         freeTier: { used: true, remaining: 0, limit: 10, resetsAt: '2026-09-01T00:00:00.000Z' },
@@ -3236,7 +3238,7 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
   });
 
   test('the start button and the re-orient affordance are a complementary pair, never shown together', async () => {
-    const { exports: m, startBtn, reorientBtn } = loadClient({
+    const { exports: m, startBtn, reorientBtn } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     // Initial state (mirrors the real render): start visible, reorient hidden.
@@ -3251,7 +3253,7 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
   });
 
   test('both the start button and the re-orient button drive the exact same boot turn', async () => {
-    const { exports: m, fetchCalls, reorientBtn } = loadClient({
+    const { exports: m, fetchCalls, reorientBtn } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     reorientBtn.dispatch('click');
@@ -3261,7 +3263,7 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
   });
 
   test('the start/reorient buttons are disabled while a turn is in flight, and re-enabled after', async () => {
-    const { exports: m, startBtn, reorientBtn } = loadClient({
+    const { exports: m, startBtn, reorientBtn } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     m.startBoot();
@@ -3273,7 +3275,7 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
   });
 
   test('reuses the existing SSE reader unchanged: the SAME event frame set (token/tool/done/error) is understood on the boot endpoint', async () => {
-    const { exports: m, thread } = loadClient({
+    const { exports: m, thread } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'call', id: 't1', name: 'get_stack' }),
         sseFrame('tool', { phase: 'result', id: 't1', name: 'get_stack', result: '{}' }),
@@ -3304,8 +3306,8 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
 // for exactly this and the cost is low.
 
 describe('flight-companion.js — LIN-2717: composer key handler (U6)', () => {
-  test('Enter without Shift prevents the default newline and submits', () => {
-    const { questionInput, fetchCalls } = loadClient({
+  test('Enter without Shift prevents the default newline and submits', async () => {
+    const { questionInput, fetchCalls } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     questionInput.value = 'hello';
@@ -3315,8 +3317,8 @@ describe('flight-companion.js — LIN-2717: composer key handler (U6)', () => {
     assert.strictEqual(fetchCalls.length, 1, 'submitQuestion ran');
   });
 
-  test('Shift+Enter does not submit, and leaves the newline to the browser default', () => {
-    const { questionInput, fetchCalls } = loadClient({
+  test('Shift+Enter does not submit, and leaves the newline to the browser default', async () => {
+    const { questionInput, fetchCalls } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     questionInput.value = 'hello';
@@ -3326,8 +3328,8 @@ describe('flight-companion.js — LIN-2717: composer key handler (U6)', () => {
     assert.strictEqual(fetchCalls.length, 0);
   });
 
-  test('a non-Enter key never submits', () => {
-    const { questionInput, fetchCalls } = loadClient({
+  test('a non-Enter key never submits', async () => {
+    const { questionInput, fetchCalls } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     questionInput.value = 'hello';
@@ -3349,7 +3351,7 @@ describe('flight-companion.js — LIN-2717: composer key handler (U6)', () => {
 
 describe('flight-companion.js — LIN-2717: composer auto-grow (S4 unit witnesses)', () => {
   test('U7 — resize after submitQuestion() clears the composer', async () => {
-    const { exports: m, questionInput } = loadClient({
+    const { exports: m, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     // loadClient's own init-time resizeComposer() call (production :1348 —
@@ -3381,7 +3383,7 @@ describe('flight-companion.js — LIN-2717: composer auto-grow (S4 unit witnesse
   });
 
   test('U8 — resize after a server-error draft restore, while the composer is still disabled', async () => {
-    const { exports: m, questionInput } = loadClient({
+    const { exports: m, questionInput } = await loadClient({
       fetchImpl: () => jsonResponse(500, { error: 'boom' }),
     });
     questionInput.setContent(48);
@@ -3405,7 +3407,7 @@ describe('flight-companion.js — LIN-2717: composer auto-grow (S4 unit witnesse
   });
 
   test('U9 — an auto-wake turn writes no height, provably (positive control closes the vacuum)', async () => {
-    const { exports: m, questionInput } = loadClient({
+    const { exports: m, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { surface: true })]),
     });
     // loadClient's own init-time resizeComposer() call already wrote once,
@@ -3448,7 +3450,7 @@ describe('flight-companion.js — LIN-2717: composer auto-grow (S4 unit witnesse
 // use, extended (see the describe block below this one) rather than forked.
 describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends the choice', () => {
   test('mandated red-first sibling: an untouched picker (empty value, "current default") sends NO model field', async () => {
-    const { exports: m, fetchCalls, questionInput } = loadClient({
+    const { exports: m, fetchCalls, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     questionInput.value = 'status please';
@@ -3460,7 +3462,7 @@ describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends t
   });
 
   test('picking a curated model sends it as `model` on the turn request', async () => {
-    const { exports: m, fetchCalls, questionInput, doc } = loadClient({
+    const { exports: m, fetchCalls, questionInput, doc } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     doc._byId['flight-companion-model'].value = 'anthropic/claude-opus-5';
@@ -3472,7 +3474,7 @@ describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends t
   });
 
   test('the picker never rides an auto-wake tick — no human choice to carry on an unattended tick', async () => {
-    const { exports: m, fetchCalls, doc } = loadClient({
+    const { exports: m, fetchCalls, doc } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
     });
     doc._byId['flight-companion-model'].value = 'anthropic/claude-opus-5';
@@ -3483,7 +3485,7 @@ describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends t
   });
 
   test('the picker never rides a boot turn — boot hardcodes its own turn content and reads no body field', async () => {
-    const { exports: m, fetchCalls, doc } = loadClient({
+    const { exports: m, fetchCalls, doc } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
     doc._byId['flight-companion-model'].value = 'anthropic/claude-opus-5';
@@ -3502,8 +3504,8 @@ describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends t
     list.dispatch('click', { target: row });
   };
 
-  test('picking a row commits the hidden input, shows its name, updates the rate card from data-pricing', () => {
-    const { exports: m, doc } = loadClient();
+  test('picking a row commits the hidden input, shows its name, updates the rate card from data-pricing', async () => {
+    const { exports: m, doc } = await loadClient();
     pick(doc, 'anthropic/claude-opus-5');
     assert.strictEqual(doc._byId['flight-companion-model'].value, 'anthropic/claude-opus-5');
     assert.strictEqual(doc._byId['flight-companion-model-search'].value, 'Claude Opus 5');
@@ -3511,8 +3513,8 @@ describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends t
     assert.strictEqual(doc._byId['flight-companion-model-list'].hidden, true, 'the list closes on a pick');
   });
 
-  test('a model with no data-pricing shows the honest — fallback, and picking the default row clears the commit', () => {
-    const { exports: m, doc } = loadClient();
+  test('a model with no data-pricing shows the honest — fallback, and picking the default row clears the commit', async () => {
+    const { exports: m, doc } = await loadClient();
     pick(doc, 'mock-provider/catalog-model-two');
     assert.strictEqual(m.getModelPriceText(), '—');
     pick(doc, '');
@@ -3520,8 +3522,8 @@ describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends t
     assert.strictEqual(doc._byId['flight-companion-model-search'].value, '');
   });
 
-  test('filtering: case-insensitive substring of id OR name; the default row only matches an empty query', () => {
-    const { doc } = loadClient();
+  test('filtering: case-insensitive substring of id OR name; the default row only matches an empty query', async () => {
+    const { doc } = await loadClient();
     const search = doc._byId['flight-companion-model-search'];
     const visible = () => doc._byId['flight-companion-model-list'].querySelectorAll('[role="option"]').filter((o) => !o.hidden).map((o) => o.getAttribute('data-id'));
     search.value = 'CATALOG';
@@ -3539,8 +3541,8 @@ describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends t
     assert.strictEqual(visible().length, 3);
   });
 
-  test('keyboard: ArrowDown opens, Enter commits the active row, Escape abandons without committing', () => {
-    const { doc } = loadClient();
+  test('keyboard: ArrowDown opens, Enter commits the active row, Escape abandons without committing', async () => {
+    const { doc } = await loadClient();
     const search = doc._byId['flight-companion-model-search'];
     const list = doc._byId['flight-companion-model-list'];
     const key = (k) => search.dispatch('keydown', { key: k, preventDefault() {} });
@@ -3558,8 +3560,8 @@ describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends t
   });
 
   // LIN-3363 S2: the warning is always in the DOM; the pick toggles `hidden`.
-  test('warning: a tools-off pick reveals it, a tools-on pick hides it again (tool-capable default)', () => {
-    const { doc } = loadClient();
+  test('warning: a tools-off pick reveals it, a tools-on pick hides it again (tool-capable default)', async () => {
+    const { doc } = await loadClient();
     const warn = doc._byId['flight-companion-tools-warning'];
     assert.strictEqual(warn.hidden, true);
     pick(doc, 'mock-provider/catalog-model-two');
@@ -3568,8 +3570,8 @@ describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends t
     assert.strictEqual(warn.hidden, true, 'a curated pick hides it');
   });
 
-  test('warning: with a tools-off DEFAULT it stays visible on "current default" and hides on a tools-on pick', () => {
-    const { doc } = loadClient();
+  test('warning: with a tools-off DEFAULT it stays visible on "current default" and hides on a tools-on pick', async () => {
+    const { doc } = await loadClient();
     const warn = doc._byId['flight-companion-tools-warning'];
     warn.setAttribute('data-default-tools-on', 'false');
     warn.hidden = false;
@@ -3579,16 +3581,16 @@ describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends t
     assert.strictEqual(warn.hidden, false);
   });
 
-  test('warning: a disabled (free-tier) picker ignores a stored pick — the clamped default decides', () => {
-    const { exports: m, doc } = loadClient();
+  test('warning: a disabled (free-tier) picker ignores a stored pick — the clamped default decides', async () => {
+    const { exports: m, doc } = await loadClient();
     doc._byId['flight-companion-model-search'].disabled = true;
     m.commitModel('mock-provider/catalog-model-two', { persist: false });
     assert.strictEqual(doc._byId['flight-companion-tools-warning'].hidden, true);
   });
 
-  test('a pick persists the choice immediately — before any turn is sent', () => {
+  test('a pick persists the choice immediately — before any turn is sent', async () => {
     const storage = makeFakeStorage();
-    const { doc } = loadClient({ storageImpl: storage });
+    const { doc } = await loadClient({ storageImpl: storage });
     pick(doc, 'anthropic/claude-opus-5');
     const raw = storage.getItem('flight-companion-session:acme');
     assert.ok(raw, 'expected a write to sessionStorage on pick, not just at turn completion');
@@ -3597,10 +3599,10 @@ describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends t
 
   test('the selection persists across a reload: a fresh loadClient() restores it (committed value, name, warning)', async () => {
     const storage = makeFakeStorage();
-    const first = loadClient({ storageImpl: storage, fetchImpl: () => sseResponse([sseFrame('done', {})]) });
+    const first = await loadClient({ storageImpl: storage, fetchImpl: () => sseResponse([sseFrame('done', {})]) });
     pick(first.doc, 'mock-provider/catalog-model-two');
 
-    const second = loadClient({ storageImpl: storage, fetchImpl: () => sseResponse([sseFrame('done', {})]) });
+    const second = await loadClient({ storageImpl: storage, fetchImpl: () => sseResponse([sseFrame('done', {})]) });
     assert.strictEqual(second.doc._byId['flight-companion-model'].value, 'mock-provider/catalog-model-two',
       'the reloaded page must restore the previously-chosen model, not the empty "current default"');
     assert.strictEqual(second.doc._byId['flight-companion-model-search'].value, 'Catalog Model Two');
@@ -3616,13 +3618,13 @@ describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends t
     const storage = makeFakeStorage({
       'flight-companion-session:acme': JSON.stringify({ history: [], tabCheckInCount: 0, tabTotalCost: 0, selectedModel: 'removed/model-gone', cadence: null }),
     });
-    const { doc, fetchCalls } = loadClient({ storageImpl: storage, fetchImpl: () => sseResponse([sseFrame('done', {})]) });
+    const { doc, fetchCalls } = await loadClient({ storageImpl: storage, fetchImpl: () => sseResponse([sseFrame('done', {})]) });
     assert.strictEqual(doc._byId['flight-companion-model'].value, '', 'a stale id never becomes the committed value');
     assert.strictEqual(doc._byId['flight-companion-model-search'].value, '');
     assert.strictEqual(JSON.parse(storage.getItem('flight-companion-session:acme')).selectedModel, null, 're-saved without the stale id');
     doc._byId['flight-companion-question'].value = 'hello';
     // A turn after the reset must not carry the stale id (it would 400).
-    const m = loadClient({ storageImpl: storage, fetchImpl: () => sseResponse([sseFrame('done', {})]) });
+    const m = await loadClient({ storageImpl: storage, fetchImpl: () => sseResponse([sseFrame('done', {})]) });
     m.doc._byId['flight-companion-question'].value = 'hello';
     m.exports.submitQuestion();
     await flush();
@@ -3677,8 +3679,8 @@ describe('flight-companion.js — session persistence helper (LIN-2716)', () => 
   // an old blob, or a timer that is not armed).
   const EMPTY_SESSION = { history: [], tabCheckInCount: 0, tabTotalCost: 0, selectedModel: null, cadence: null, seenIdentifiers: [] };
 
-  test('round-trip: a saved session reloads with the same thread and the same history the next turn would carry', () => {
-    const { exports: m } = loadClient();
+  test('round-trip: a saved session reloads with the same thread and the same history the next turn would carry', async () => {
+    const { exports: m } = await loadClient();
     const session = {
       history: [
         { role: 'user', content: 'are you there?' },
@@ -3701,8 +3703,8 @@ describe('flight-companion.js — session persistence helper (LIN-2716)', () => 
     looseDeepEqual(m.loadStoredSession('acme'), session);
   });
 
-  test('cap: the existing 40-turn bound still holds across a save/restore', () => {
-    const { exports: m } = loadClient();
+  test('cap: the existing 40-turn bound still holds across a save/restore', async () => {
+    const { exports: m } = await loadClient();
     const history = [];
     for (let i = 0; i < 45; i++) history.push({ role: i % 2 === 0 ? 'user' : 'assistant', content: String(i) });
     m.saveStoredSession('acme', { history, tabCheckInCount: 0, tabTotalCost: 0 });
@@ -3712,9 +3714,9 @@ describe('flight-companion.js — session persistence helper (LIN-2716)', () => 
     assert.strictEqual(loaded.history[loaded.history.length - 1].content, '44');
   });
 
-  test('corrupt storage -> empty: malformed JSON yields a clean empty session and never throws into the page', () => {
+  test('corrupt storage -> empty: malformed JSON yields a clean empty session and never throws into the page', async () => {
     const storage = makeFakeStorage({ [STORAGE_KEY]: '{not json' });
-    const { exports: m } = loadClient({ storageImpl: storage });
+    const { exports: m } = await loadClient({ storageImpl: storage });
     // loadClient arms the load-time timer, which (LIN-2771) persists a
     // cadence record and thereby heals the corrupt blob into a valid one —
     // so re-corrupt the entry to test loadStoredSession's PURE degradation,
@@ -3725,15 +3727,15 @@ describe('flight-companion.js — session persistence helper (LIN-2716)', () => 
     looseDeepEqual(loaded, EMPTY_SESSION);
   });
 
-  test('corrupt storage -> empty: well-formed JSON of the wrong shape also yields a clean empty session', () => {
+  test('corrupt storage -> empty: well-formed JSON of the wrong shape also yields a clean empty session', async () => {
     const storage = makeFakeStorage({ [STORAGE_KEY]: JSON.stringify([1, 2, 3]) });
-    const { exports: m } = loadClient({ storageImpl: storage });
+    const { exports: m } = await loadClient({ storageImpl: storage });
     storage.setItem(STORAGE_KEY, JSON.stringify([1, 2, 3]));
     looseDeepEqual(m.loadStoredSession('acme'), EMPTY_SESSION);
   });
 
-  test('no stored entry yields the same clean empty session, never throws', () => {
-    const { exports: m, storage } = loadClient();
+  test('no stored entry yields the same clean empty session, never throws', async () => {
+    const { exports: m, storage } = await loadClient();
     // Same re-seed rationale as the two corrupt tests above: drop the entry
     // the load-time schedule wrote so loadStoredSession's missing-entry
     // degradation is what is actually asserted.
@@ -3743,17 +3745,17 @@ describe('flight-companion.js — session persistence helper (LIN-2716)', () => 
     looseDeepEqual(loaded, EMPTY_SESSION);
   });
 
-  test('keyed by urlKey: two workspaces in the same browser do not cross-contaminate', () => {
-    const { exports: m } = loadClient();
+  test('keyed by urlKey: two workspaces in the same browser do not cross-contaminate', async () => {
+    const { exports: m } = await loadClient();
     m.saveStoredSession('acme', { history: [{ role: 'user', content: 'acme q' }], tabCheckInCount: 0, tabTotalCost: 0 });
     m.saveStoredSession('other', { history: [{ role: 'user', content: 'other q' }], tabCheckInCount: 0, tabTotalCost: 0 });
     assert.strictEqual(m.loadStoredSession('acme').history[0].content, 'acme q');
     assert.strictEqual(m.loadStoredSession('other').history[0].content, 'other q');
   });
 
-  test('clearStoredSession removes the entry — a subsequent load returns the clean empty session', () => {
+  test('clearStoredSession removes the entry — a subsequent load returns the clean empty session', async () => {
     const storage = makeFakeStorage();
-    const { exports: m } = loadClient({ storageImpl: storage });
+    const { exports: m } = await loadClient({ storageImpl: storage });
     m.saveStoredSession('acme', { history: [{ role: 'user', content: 'hi' }], tabCheckInCount: 1, tabTotalCost: 0.01 });
     assert.notStrictEqual(storage.getItem(STORAGE_KEY), null, 'sanity: something was actually written');
     m.clearStoredSession('acme');
@@ -3761,17 +3763,17 @@ describe('flight-companion.js — session persistence helper (LIN-2716)', () => 
     looseDeepEqual(m.loadStoredSession('acme'), EMPTY_SESSION);
   });
 
-  test('saveStoredSession never throws when the underlying storage.setItem throws (quota/private-browsing)', () => {
+  test('saveStoredSession never throws when the underlying storage.setItem throws (quota/private-browsing)', async () => {
     const storage = makeFakeStorage();
     storage.setItem = () => { throw new Error('QuotaExceededError'); };
-    const { exports: m } = loadClient({ storageImpl: storage });
+    const { exports: m } = await loadClient({ storageImpl: storage });
     assert.doesNotThrow(() => m.saveStoredSession('acme', { history: [], tabCheckInCount: 0, tabTotalCost: 0 }));
   });
 
-  test('clearStoredSession never throws when the underlying storage.removeItem throws', () => {
+  test('clearStoredSession never throws when the underlying storage.removeItem throws', async () => {
     const storage = makeFakeStorage();
     storage.removeItem = () => { throw new Error('boom'); };
-    const { exports: m } = loadClient({ storageImpl: storage });
+    const { exports: m } = await loadClient({ storageImpl: storage });
     assert.doesNotThrow(() => m.clearStoredSession('acme'));
   });
 
@@ -3780,9 +3782,9 @@ describe('flight-companion.js — session persistence helper (LIN-2716)', () => 
   // regression guards against. Checked synchronously, right after the click
   // and before the async boot turn resolves, so this is a direct test of
   // reorientClick's own wiring, not of anything a later turn re-saves.
-  test('reorientClick preserves the stored session — reorient is not a fresh start (LIN-2770)', () => {
+  test('reorientClick preserves the stored session — reorient is not a fresh start (LIN-2770)', async () => {
     const storage = makeFakeStorage();
-    const { reorientBtn } = loadClient({
+    const { reorientBtn } = await loadClient({
       storageImpl: storage,
       fetchImpl: () => new Promise(() => {}), // never resolves — pre-response state only
     });
@@ -3820,7 +3822,7 @@ describe('flight-companion.js — LIN-2771: cadence resumes against a wall-clock
         cadence: { delayMs: 60000, nextFireAt: Date.now() + 5000 },
       }),
     });
-    const { exports: m, fetchCalls } = loadClient({
+    const { exports: m, fetchCalls } = await loadClient({
       storageImpl: storage,
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
     });
@@ -3844,7 +3846,7 @@ describe('flight-companion.js — LIN-2771: cadence resumes against a wall-clock
         selectedModel: null,
       }),
     });
-    const { exports: m, fetchCalls } = loadClient({
+    const { exports: m, fetchCalls } = await loadClient({
       storageImpl: storage,
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
     });
@@ -3861,7 +3863,7 @@ describe('flight-companion.js — LIN-2771: cadence resumes against a wall-clock
   test('persisted blob carries cadence.delayMs + cadence.nextFireAt right after a schedule arms the timer', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     const NOW = 1_700_000_000_000;
-    const { exports: m, storage } = loadClient();
+    const { exports: m, storage } = await loadClient();
     m.setNowFn(() => NOW);
     // Drive the exported schedule entry point DIRECTLY (no turn, no finishTurn
     // save) so this pins the "persist on EVERY schedule" half of LIN-2771 in
@@ -3892,7 +3894,7 @@ describe('flight-companion.js — LIN-2771: cadence resumes against a wall-clock
         cadence: { delayMs: 60000, nextFireAt: Date.now() + 5000 },
       }),
     });
-    const { exports: m, fetchCalls, doc } = loadClient({
+    const { exports: m, fetchCalls, doc } = await loadClient({
       hiddenInitial: true,
       storageImpl: storage,
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
@@ -3926,7 +3928,7 @@ describe('flight-companion.js — LIN-2771 beat 3: persisted stop reason decides
         cadence: { delayMs: 60000, nextFireAt: null, stoppedReason: 'session-expired' },
       }),
     });
-    const { exports: m, fetchCalls } = loadClient({
+    const { exports: m, fetchCalls } = await loadClient({
       storageImpl: storage,
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
     });
@@ -3950,7 +3952,7 @@ describe('flight-companion.js — LIN-2771 beat 3: persisted stop reason decides
         cadence: { delayMs: 60000, nextFireAt: null, stoppedReason: 'ai-not-configured' },
       }),
     });
-    const { exports: m, fetchCalls } = loadClient({
+    const { exports: m, fetchCalls } = await loadClient({
       storageImpl: storage,
       pageDataset: { fcAiConfigured: 'false' },
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
@@ -3964,7 +3966,7 @@ describe('flight-companion.js — LIN-2771 beat 3: persisted stop reason decides
 
   test('live stop: a session-expired turn writes the reason into storage and clears nextFireAt', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    const { exports: m, storage } = loadClient({
+    const { exports: m, storage } = await loadClient({
       fetchImpl: () => jsonResponse(401, {}),
     });
     t.mock.timers.tick(30000);
@@ -3986,7 +3988,7 @@ describe('flight-companion.js — LIN-2771 beat 3: persisted stop reason decides
         cadence: { delayMs: 60000, nextFireAt: null },
       }),
     });
-    const { exports: m, fetchCalls } = loadClient({
+    const { exports: m, fetchCalls } = await loadClient({
       storageImpl: storage,
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
     });
@@ -4015,7 +4017,7 @@ describe('flight-companion.js — proposal persistence + read-only rehydrate (LI
 
   test('a live proposal enters chatHistory as {kind, sessionId, prompt} and round-trips through storage', async () => {
     const storage = makeFakeStorage();
-    const { exports: m, questionInput } = loadClient({
+    const { exports: m, questionInput } = await loadClient({
       storageImpl: storage,
       fetchImpl: () => sseResponse([
         proposalFrame(PROPOSAL),
@@ -4047,7 +4049,7 @@ describe('flight-companion.js — proposal persistence + read-only rehydrate (LI
     assert.strictEqual(stored.cadence.stoppedReason, null, 'the cadence record is present but not stopped');
   });
 
-  test('a persisted proposal survives the loadStoredSession filter and rehydrates as a read-only card', () => {
+  test('a persisted proposal survives the loadStoredSession filter and rehydrates as a read-only card', async () => {
     const storage = makeFakeStorage({
       'flight-companion-session:acme': JSON.stringify({
         history: [
@@ -4060,7 +4062,7 @@ describe('flight-companion.js — proposal persistence + read-only rehydrate (LI
         selectedModel: null,
       }),
     });
-    const { exports: m, thread } = loadClient({ storageImpl: storage });
+    const { exports: m, thread } = await loadClient({ storageImpl: storage });
 
     const proposal = findByClass(thread, 'fc-proposal');
     assert.notStrictEqual(proposal, null, 'the restored proposal card re-renders after a reload');
@@ -4079,7 +4081,7 @@ describe('flight-companion.js — proposal persistence + read-only rehydrate (LI
     assert.strictEqual(m.getChatHistory().length, 3, 'restored history keeps exactly the three stored turns');
   });
 
-  test('a malformed proposal entry is dropped by the load filter like any other malformed turn', () => {
+  test('a malformed proposal entry is dropped by the load filter like any other malformed turn', async () => {
     const storage = makeFakeStorage({
       'flight-companion-session:acme': JSON.stringify({
         history: [
@@ -4092,7 +4094,7 @@ describe('flight-companion.js — proposal persistence + read-only rehydrate (LI
         tabTotalCost: 0,
       }),
     });
-    const { exports: m, thread } = loadClient({ storageImpl: storage });
+    const { exports: m, thread } = await loadClient({ storageImpl: storage });
     assert.strictEqual(findByClass(thread, 'fc-proposal').classList.contains('fc-proposal--resolved'), true, 'only the well-formed proposal renders');
     looseDeepEqual(m.getChatHistory(), [
       { role: 'user', content: 'hi' },
@@ -4106,7 +4108,7 @@ describe('flight-companion.js — proposal persistence + read-only rehydrate (LI
   // unanswered user message in history — forwarded to the model on the very
   // next turn. The rollback must clear both.
   test('a failed turn rolls back both the rendered proposal and the unanswered user message', async () => {
-    const { exports: m, questionInput } = loadClient({
+    const { exports: m, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([
         proposalFrame(PROPOSAL),
         sseFrame('error', { message: 'boom' }),
@@ -4130,7 +4132,7 @@ describe('flight-companion.js — proposal persistence + read-only rehydrate (LI
   // proposal must be rendered first.
   test('a network failure mid-stream rolls back the rendered proposal and the unanswered user message from chatHistory and the stored session', async () => {
     const storage = makeFakeStorage();
-    const { exports: m, questionInput } = loadClient({
+    const { exports: m, questionInput } = await loadClient({
       storageImpl: storage,
       fetchImpl: () => ({
         ok: true,
@@ -4189,7 +4191,7 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
   }, over || {});
 
   test('two consecutive tool calls compact into one "checked 2 things" group', async () => {
-    const { exports: m, thread } = loadClient({
+    const { exports: m, thread } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'call', id: 'a', name: 'get_stack', arguments: {} }),
         sseFrame('tool', { phase: 'call', id: 'b', name: 'list_active_sessions', arguments: {} }),
@@ -4208,7 +4210,7 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
 
   test('a proposal card between two calls splits the run — the card is never a group member', async () => {
     const proposal = { proposed: true, sessionId: 'sess-1', prompt: 'go' };
-    const { exports: m, thread } = loadClient({
+    const { exports: m, thread } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'call', id: 'a', name: 'get_stack', arguments: {} }),
         sseFrame('tool', { id: 'p', name: 'send_follow_up', phase: 'proposed', result: JSON.stringify(proposal) }),
@@ -4222,7 +4224,7 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
   });
 
   test('tool-row and fold text never reach chatHistory', async () => {
-    const { exports: m, questionInput } = loadClient({
+    const { exports: m, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'call', id: 'a', name: 'list_task_sessions', arguments: { issueId: 'LIN-9' } }),
         sseFrame('tool', { phase: 'result', id: 'a', name: 'list_task_sessions', result: '{"secret":"row-body"}' }),
@@ -4239,7 +4241,7 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
 
   test('identifiers from structured args/results are collected and persisted with the session; prose ones are not', async () => {
     const storage = makeFakeStorage();
-    const { exports: m, questionInput } = loadClient({
+    const { exports: m, questionInput } = await loadClient({
       storageImpl: storage,
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'call', id: 'a', name: 'list_task_sessions', arguments: { issueId: 'LIN-9' } }),
@@ -4255,11 +4257,11 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
     assert.deepStrictEqual([...stored.seenIdentifiers].sort(), ['LIN-12', 'LIN-9']);
   });
 
-  test('the persisted set is restored on load and cleared with the session', () => {
+  test('the persisted set is restored on load and cleared with the session', async () => {
     const storage = makeFakeStorage({
       'flight-companion-session:acme': JSON.stringify({ history: [], seenIdentifiers: ['LIN-5', 'junk', 7] }),
     });
-    const { exports: m } = loadClient({ storageImpl: storage });
+    const { exports: m } = await loadClient({ storageImpl: storage });
     looseDeepEqual(m.loadStoredSession('acme').seenIdentifiers, ['LIN-5']);
     m.clearStoredSession('acme');
     looseDeepEqual(m.loadStoredSession('acme').seenIdentifiers, []);
@@ -4272,14 +4274,14 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
   // wrapped to record what startSession()'s restore hands them. Goes red
   // without `foldReadout(restoredBody)` (no calls) and without re-seeding
   // `seenIdentifiers` (linkify gets an empty set).
-  test('a restored readout is folded with the page headings, then linked from the restored seen set', () => {
+  test('a restored readout is folded with the page headings, then linked from the restored seen set', async () => {
     const storage = makeFakeStorage({
       'flight-companion-session:acme': JSON.stringify({
         history: [{ role: 'assistant', content: 'Two things need you.\n\n## The big thread\n\nLIN-5 is moving.' }],
         seenIdentifiers: ['LIN-5'],
       }),
     });
-    const { windowShim, doc } = loadClient({
+    const { windowShim, doc } = await loadClient({
       readyState: 'loading', storageImpl: storage, pageDataset: { fcReadoutHeadings: '["The big thread"]' },
     });
     const calls = [];
@@ -4304,7 +4306,7 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
 
   test('a save from a partial session object keeps the live set (no call site can drop it)', async () => {
     const storage = makeFakeStorage();
-    const { exports: m } = loadClient({
+    const { exports: m } = await loadClient({
       storageImpl: storage,
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'call', id: 'a', name: 'list_task_sessions', arguments: { issueId: 'LIN-9' } }),
@@ -4318,7 +4320,7 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
   });
 
   test('decisions: one closed fold "N decisions waiting" with a Rulings link, rows all in the DOM', async () => {
-    const { exports: m, thread } = loadClient({
+    const { exports: m, thread } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'result', id: 't', name: 'list_pending_decisions', result: decisionResult([dec(), dec({ decisionId: 'dec-2', issueIdentifier: 'LIN-101' })]) }),
         sseFrame('done', { surface: true }),
@@ -4335,7 +4337,7 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
   });
 
   test('a single decision reads "1 decision waiting"; zero decisions render nothing', async () => {
-    const one = loadClient({
+    const one = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'result', id: 't', name: 'list_pending_decisions', result: decisionResult([dec()]) }),
         sseFrame('done', { surface: true }),
@@ -4345,7 +4347,7 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
     await flush();
     assert.strictEqual(findByClass(one.thread, 'fc-decisions-fold').children[0].textContent, '1 decision waiting');
 
-    const none = loadClient({
+    const none = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'result', id: 't', name: 'list_pending_decisions', result: decisionResult([]) }),
         sseFrame('done', { surface: true }),
@@ -4358,7 +4360,7 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
 
   test('a decision row links its task and adds it to the persisted set; the option click still replies', async () => {
     const storage = makeFakeStorage();
-    const { exports: m, thread, replyDeliveryCalls } = loadClient({
+    const { exports: m, thread, replyDeliveryCalls } = await loadClient({
       storageImpl: storage,
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'result', id: 't', name: 'list_pending_decisions', result: decisionResult([dec()]) }),
@@ -4378,10 +4380,10 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
     assert.ok(card.classList.contains('fc-decision--resolved'));
   });
 
-  test('readout headings come from the page attribute; a malformed attribute degrades to none', () => {
-    const ok = loadClient({ pageDataset: { fcReadoutHeadings: '["The big thread"]' } });
+  test('readout headings come from the page attribute; a malformed attribute degrades to none', async () => {
+    const ok = await loadClient({ pageDataset: { fcReadoutHeadings: '["The big thread"]' } });
     assert.ok(ok.exports);
-    assert.doesNotThrow(() => loadClient({ pageDataset: { fcReadoutHeadings: '{oops' } }));
+    assert.doesNotThrow(async () => await loadClient({ pageDataset: { fcReadoutHeadings: '{oops' } }));
   });
 });
 
@@ -4404,9 +4406,9 @@ describe('flight-companion.js — restore runs late, in order (LIN-3385)', () =>
     }),
   });
 
-  test('while the document is loading, nothing is restored and nothing is armed; DOMContentLoaded then runs the block once, in order', (t) => {
+  test('while the document is loading, nothing is restored and nothing is armed; DOMContentLoaded then runs the block once, in order', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    const c = loadClient({ readyState: 'loading', storageImpl: stored() });
+    const c = await loadClient({ readyState: 'loading', storageImpl: stored() });
     const { exports: m, thread, doc, windowShim, fetchCalls } = c;
 
     assert.strictEqual(c.chatUICalls.appendMessage.length, 0, 'no restored bubble before DOMContentLoaded');
@@ -4419,13 +4421,15 @@ describe('flight-companion.js — restore runs late, in order (LIN-3385)', () =>
 
     // Record what is on the page at the instant beforeunload is wired.
     let atBeforeUnload = null;
-    const origAdd = windowShim.addEventListener;
-    windowShim.addEventListener = function (type, fn) {
+    // The page reads window.addEventListener at call time, and window is the global, so the wrap goes on the global.
+    const origAdd = globalThis.addEventListener;
+    globalThis.addEventListener = function (type, fn) {
       if (type === 'beforeunload') atBeforeUnload = { proposal: findByClass(thread, 'fc-proposal') !== null, history: m.getChatHistory().length };
       return origAdd.call(windowShim, type, fn);
     };
 
     doc.dispatch('DOMContentLoaded');
+    globalThis.addEventListener = origAdd;
 
     assert.strictEqual(m.getChatHistory().length, 3, 'the stored turns are restored');
     assert.notStrictEqual(findByClass(thread, 'fc-proposal'), null, 'the proposal is restored (read-only)');
@@ -4438,8 +4442,9 @@ describe('flight-companion.js — restore runs late, in order (LIN-3385)', () =>
 
   test('the block is not run at script top level: the only call sites are the readyState guard', () => {
     const calls = CLIENT_CODE_ONLY.match(/\bstartSession\(\)/g) || [];
-    // one definition `function startSession()` + one immediate-run branch
-    assert.strictEqual(calls.length, 2, 'startSession is defined once and called once (immediate branch)');
+    // one definition `function startSession()`, and no call anywhere: the page starts it only from its DOMContentLoaded
+    // registration, which a deferred module always makes (readyState is already 'interactive' when it runs).
+    assert.strictEqual(calls.length, 1, 'startSession is defined once and never called directly');
     assert.match(CLIENT_CODE_ONLY, /addEventListener\('DOMContentLoaded', startSession\)/);
   });
 });
@@ -4447,7 +4452,7 @@ describe('flight-companion.js — restore runs late, in order (LIN-3385)', () =>
 
 describe('flight-companion.js — LIN-3362: hello, interim hop text, browser zone', () => {
   test('a boot paints a hello that is display-only: the first token replaces it and history never holds it', async () => {
-    const { exports: m, thread } = loadClient({
+    const { exports: m, thread } = await loadClient({
       fetchImpl: () => sseResponse([sseFrame('token', { token: 'orient ready' }), sseFrame('done', {})]),
     });
     m.startBoot();
@@ -4458,7 +4463,7 @@ describe('flight-companion.js — LIN-3362: hello, interim hop text, browser zon
   });
 
   test('a hop-text frame renders a muted note before the answer row — not a bubble, not in history', async () => {
-    const { exports: m, thread, questionInput } = loadClient({
+    const { exports: m, thread, questionInput } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('hop-text', { text: 'Looking at the stalled sessions first' }),
         sseFrame('token', { token: 'final answer' }),
@@ -4478,26 +4483,44 @@ describe('flight-companion.js — LIN-3362: hello, interim hop text, browser zon
   });
 
   test('timeZone is sent on both /turn and /boot', async () => {
-    const turn = loadClient({ fetchImpl: () => sseResponse([sseFrame('done', {})]) });
+    const turn = await loadClient({ fetchImpl: () => sseResponse([sseFrame('done', {})]) });
     turn.questionInput.value = 'hi';
     turn.exports.submitQuestion();
     await flush();
     assert.strictEqual(typeof turn.fetchCalls[0].body.timeZone, 'string');
     assert.ok(turn.fetchCalls[0].body.timeZone.length > 0);
-    const boot = loadClient({ fetchImpl: () => sseResponse([sseFrame('done', {})]) });
+    const boot = await loadClient({ fetchImpl: () => sseResponse([sseFrame('done', {})]) });
     boot.exports.startBoot();
     await flush();
     assert.strictEqual(typeof boot.fetchCalls[0].body.timeZone, 'string');
   });
 
-  test('timeZone is sent on an auto-wake /turn too', (t) => {
+  test('timeZone is sent on an auto-wake /turn too', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    const { fetchCalls } = loadClient({
+    const { fetchCalls } = await loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
     });
     t.mock.timers.tick(30000);
     assert.strictEqual(fetchCalls.length, 1);
     assert.strictEqual(typeof fetchCalls[0].body.timeZone, 'string');
     assert.ok(fetchCalls[0].body.timeZone.length > 0);
+  });
+});
+
+describe('flight-companion.js — a native module (LIN-4463)', () => {
+  test('a page missing a core mount wires nothing and throws nothing (the old top-level early return)', async () => {
+    const c = await loadClient({ omitMounts: ['flight-companion-send'] });
+    assert.strictEqual(c.fetchCalls.length, 0, 'no boot and no cadence start without the mounts');
+    assert.strictEqual(c.exports.getCadenceState(), undefined, 'the wiring block never ran');
+  });
+
+  test('imports the one formatter from its served leaf and reads no window.CostFormat bridge', () => {
+    assert.match(CLIENT_SRC, /^import \{ formatUsd \} from '\.\.\/lib\/cost-format\.js';$/m);
+    assert.doesNotMatch(CLIENT_CODE_ONLY, /CostFormat/);
+  });
+
+  test('has no module.exports seam: its test seam is named exports, and the page starts only from DOMContentLoaded', () => {
+    assert.doesNotMatch(CLIENT_CODE_ONLY, /module\.exports|typeof module/);
+    assert.match(CLIENT_CODE_ONLY, /^export \{$/m);
   });
 });

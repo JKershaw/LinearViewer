@@ -45,6 +45,12 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   lands on the fake document. A suite that runs a classic file through `runClassic` counts, except `public/chart-helpers.js` and `public/close-out.js`,
   the two IIFE siblings a module page may read.
 
+- A page module runs while `document.readyState` is already `'interactive'`, before DOMContentLoaded, so a module page
+  that starts on DOMContentLoaded registers that listener unconditionally: its old `readyState === 'loading'` branch is
+  false under a module and would start the page early. A top-level early return becomes `var mounted = ...` with the
+  statements after it in `if (mounted) { }`: `var` stays module-scoped, and function declarations stay top-level and
+  hoisted, as they were in the IIFE. (LIN-4463 piece 3, flight-companion.js.)
+
 ## Waiting
 
 - `public/app.js`: Home's Running and Up next are refreshed by parsing a whole page with
