@@ -34,7 +34,6 @@ import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { badRequest, jsonError, keepaliveError, notFound } from '../lib/errors.js';
 import { isHermeticTestToken } from '../lib/should-mock-ai.js';
 
-
 /**
  * @param {Object} deps
  * @param {Object} deps.recapCacheStore - Recap cache storage instance

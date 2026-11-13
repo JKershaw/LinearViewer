@@ -29,6 +29,7 @@ import {
 import { BLIND_READ_HEADING } from '../../lib/prompts/blind-read-words.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
 import { assembleTrailFacts, assemblePlanReviewFacts } from '../../lib/recommendation-facts.js';
+import { readTrail } from '../../lib/run-trail.js';
 import { buildSelectorArgs } from '../../lib/openrouter.js';
 import { recentRuns, stageRuns } from '../../lib/recent-runs.js';
 import { liveWaitOf } from '../../lib/run-live-wait.js';
@@ -265,9 +266,9 @@ describe('the prompt is the piloted text', () => {
 
 describe('the ledger carries the read', () => {
   const trail = [summary(1), review(2), read1(3, [PR], 'same')];
-  test('assembleTrailFacts attaches blindRead (the route reads it); readRunLedger no longer does (LIN-4438: nothing read it)', () => {
-    assert.equal(assembleTrailFacts(trail, '').review.blindRead.verdict, 'same');
-    assert.equal(assembleTrailFacts([summary(1), review(2)], '').review.blindRead, null);
+  test('readTrail carries blindRead (the route reads it there); readRunLedger no longer does (LIN-4438: nothing read it)', () => {
+    assert.equal(readTrail(trail).review.blindRead.verdict, 'same');
+    assert.equal(readTrail([summary(1), review(2)]).review.blindRead, null);
     assert.equal(Object.hasOwn(readRunLedger(trail), 'blindRead'), false);
   });
   test('buildRunEvidence carries it, and the fragment shows the verdict and reason, or none on record', () => {
@@ -280,7 +281,7 @@ describe('the ledger carries the read', () => {
     assert.match(renderRunEvidence(buildRunEvidence({ comments: [summary(1), review(2)], issueIdentifier: 'LIN-1' })), /no blind read on record/);
   });
   test('a precomputed ledger brings its own read', () => {
-    const ledger = { ...readRunLedger(trail), blindRead: assembleTrailFacts(trail, '').review.blindRead };
+    const ledger = { ...readRunLedger(trail), blindRead: readTrail(trail).review.blindRead };
     assert.equal(buildRunEvidence({ comments: [], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead.verdict, 'same');
   });
   test('a precomputed ledger with no blindRead key reads the read after ITS review, not the whole trail (LIN-4438)', () => {

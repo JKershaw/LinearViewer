@@ -36,7 +36,7 @@ const closedStatus = (sha = 'aaaaaaa') => ({
 });
 const unknownStatus = (reason = 'not checked') => ({ repo: REPO, readable: false, state: 'unknown', reason });
 
-// LIN-4458: deriveCloseOutState and closeOutSetsDone take statuses keyed by PR URL, never by position.
+// LIN-4458: deriveCloseOutState takes statuses keyed by PR URL, never by position.
 // These fixtures list one status per PR; `derive` keys each to its own PR's URL, once, here (a status
 // left out reads as unread).
 const byUrl = (prs = [], statuses = []) => new Map(prs.map((p, i) => [p.url, statuses[i]]).filter(([, st]) => st !== undefined));
@@ -181,7 +181,7 @@ describe('deriveCloseOutState — truth table', () => {
     );
   });
 
-  test('a merge after a moved head still sets Done as before (closeOutSetsDone unchanged)', () => {
+  test('a person\'s check sets Done on a merged landing even after its head moved since the review', () => {
     // `actor: 'person'` is required for setDone to be true at all; without it both
     // sides read false and the equality below pins nothing.
     const base = movedArgs({ prStatuses: [mergedStatus('bbbbbbb')], actor: 'person' });

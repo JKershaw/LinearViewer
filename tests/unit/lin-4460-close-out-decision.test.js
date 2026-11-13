@@ -205,9 +205,18 @@ describe('dropping a fact never moves the passenger fact or the gate the wrong w
       const full = closeOutDecision({ trail, prStatuses: new Map(trail.landing.map(u => [u, statusOf.merged(u)])), actor: 'person' });
       const dropped = closeOutDecision({ trail, prStatuses: new Map(trail.landing.map(u => [u, statusOf.unreadable()])), actor: 'person' });
       const unread = closeOutDecision({ trail, prStatuses: new Map(), actor: 'person' });
-      for (const later of [dropped, unread]) {
+      // An unreadable status that still carries a merged flag (review F1): the flag is not evidence.
+      const unreadableMerged = closeOutDecision({
+        trail, actor: 'person',
+        prStatuses: new Map(trail.landing.map(u => [u, { readable: false, state: 'closed', merged: true }])),
+      });
+      for (const later of [dropped, unread, unreadableMerged]) {
         assert.notEqual(later.followsPerson, 'merged', 'followsPerson never moves from null to merged on a dropped fact');
         if (full.waitsOn === 'blind-read') assert.equal(later.waitsOn, 'blind-read', 'a dropped fact never clears the gate');
+      }
+      assert.equal(unreadableMerged.setDone, false, 'unreadable evidence carrying a merged flag never sets Done');
+      if (full.waitsOn === 'blind-read') {
+        assert.equal(unreadableMerged.waitsOn, 'blind-read', 'approved and unread: the gate holds on unreadable merged evidence');
       }
     });
   }
@@ -318,6 +327,10 @@ describe('the recommendation\'s read: the decision\'s advice answer (LIN-4460, r
       assert.equal(step !== null, row.route);
     });
   }
+
+  test('ticket unknown routes like In Progress, with no passenger loosening (review F2b)', () => {
+    assert.notEqual(blindReadStep({}, { comments: approved, allRuns: [] }), null);
+  });
 
   test('Done alone does not stand the enforcement gate aside: an approved, unmerged, unread landing is still refused (both lanes)', async () => {
     const got = await surfaces(approved, { issue: DONE });
