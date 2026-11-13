@@ -81,15 +81,6 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   means editing both leaves and the prose. (Drift & Coherence Review, 10 Nov;
   `docs/reviews/drift-coherence-review-2026-11-10.md`; count, Documentation Review; recounted, Drift &
   Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
-- `lib/recommendation-live-wait.js`: a read, not a claim: two different-kind calls racing on
-  one ticket both pass; claim compare-and-set, like `claimHeldWake` (LIN-4392).
-- `lib/recommendation-live-wait.js`: the live-stage refusal (`liveWaitRefusal`, 409 `STAGE_IN_FLIGHT`)
-  is a Runs dispatch rule placed here by the `^lib/recommendation-` prefix. `lib/dispatch-entrance.js`
-  (Runs) enforces it, `routes/workspace-api.js` (Web) imports it, `lib/proxy-instructions.js` (Agent
-  API) takes its code, and the one run-state test it makes, `isLiveRun`, is in `lib/recent-runs.js`
-  (Runs), so a change to what counts as live moves three areas. `lib/openrouter.js` (LLM) also routes
-  on it, as the first code-settled route in `codeRouteOf`, so the wait is recommendation logic as
-  well. A size of move: give the wait a Runs home. (Seams & Tangles, 13 Nov.; `docs/reviews/seams-tangles-review-2026-11-13-run12.md`.)
 - `lib/periodicals.js`: two sizes of move: a ceiling for Periodical prompts (+18.8% in the window,
   185,952 to 220,882 B; only a sha256 tripwire), and an index or series archive for `docs/reviews/`
   (109 top-level reports, 88 MB). (Documentation Review, 10 Nov.;

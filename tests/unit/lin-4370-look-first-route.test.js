@@ -21,7 +21,7 @@
  *   - the LIN-4369 handoff: a scoping run's final message with builder notes never reaches the
  *     prompt of the stage after it, while the size record does;
  *   - waiting on a live run (close-out ledger item 2, since LIN-4392 the general live-stage
- *     wait in lib/recommendation-live-wait.js): while a look-first step is queued or running,
+ *     wait in lib/run-live-wait.js): while a look-first step is queued or running,
  *     nothing else is sent, scoping included, and the ticket is not handed to the selector;
  *     recommend-and-dispatch refuses 409 STAGE_IN_FLIGHT naming the live dispatch, the UI
  *     stream says the same, and aborting a wedged step moves the sequence on.
@@ -38,7 +38,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { lookFirstStep, lookFirstOff, lookFirstSteps, holdingComment, isSurveyComment, LOOK_FIRST_STEPS } from '../../lib/recommendation-look-first.js';
 import { buildPeriodicalGateMarker, isPeriodicalReview } from '../../lib/periodicals.js';
-import { liveWaitOf, STAGE_IN_FLIGHT_CODE } from '../../lib/recommendation-live-wait.js';
+import { liveWaitOf, STAGE_IN_FLIGHT_CODE } from '../../lib/run-live-wait.js';
 import { getRecommendation, getRecommendationStream, setFetchImpl, setPromptTraceRecorder, buildSelectorArgs } from '../../lib/openrouter.js';
 import { generatePrompt, PROMPT_TEMPLATES, deriveDispatchKind } from '../../lib/prompt-templates.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';

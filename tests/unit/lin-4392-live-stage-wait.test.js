@@ -1,7 +1,7 @@
 /**
  * LIN-4392: recommend-and-dispatch must not start a second, different stage beside a live one.
  *
- * One rule, the live-stage wait (lib/recommendation-live-wait.js), runs first in
+ * One rule, the live-stage wait (lib/run-live-wait.js), runs first in
  * lib/openrouter.js codeRouteOf, before the review loop bound, the look-first sequence and the
  * stage selector. While any stage run on the ticket is queued or running, every recommendation
  * surface answers wait: recommend-and-dispatch refuses 409 STAGE_IN_FLIGHT naming the live
@@ -29,13 +29,15 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe, afterEach } from 'node:test';
+import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import express from 'express';
 import { setFetchImpl, setPromptTraceRecorder } from '../../lib/openrouter.js';
-import { newestLiveRun, liveWaitOf, liveWaitRefusal, STAGE_IN_FLIGHT_CODE } from '../../lib/recommendation-live-wait.js';
-import { stageRuns } from '../../lib/recent-runs.js';
+import { newestLiveRun, liveWaitOf, liveWaitRefusal, STAGE_IN_FLIGHT_CODE, RUNNING } from '../../lib/run-live-wait.js';
+import { stageRuns, loadRecentRuns, WAITING_ON_A_PERSON } from '../../lib/recent-runs.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { buildInstructions } from '../../lib/proxy-instructions.js';
 import { sealAsAsked } from '../../lib/as-asked.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
@@ -429,9 +431,102 @@ describe('W13: the agent instructions name the shared code, imported, and not th
     assert.match(text, /force.*also skips/s, 'the force bullet says it skips the wait, beside its warning');
   });
 
-  test('source: the code is interpolated from lib/recommendation-live-wait.js, never retyped', () => {
+  test('source: the code is interpolated from lib/run-live-wait.js, never retyped', () => {
     const src = readFileSync(new URL('../../lib/proxy-instructions.js', import.meta.url), 'utf8');
-    assert.match(src, /import \{ STAGE_IN_FLIGHT_CODE \} from '\.\/recommendation-live-wait\.js'/);
+    assert.match(src, /import \{ STAGE_IN_FLIGHT_CODE \} from '\.\/run-live-wait\.js'/);
     assert.equal((src.match(/STAGE_IN_FLIGHT(?!_CODE)/g) || []).length, 0, 'no hand-spelled STAGE_IN_FLIGHT');
+  });
+});
+
+// ── LIN-4459: a stage parked [pending] ends with its lineage ──────────────────
+// Rows here are the real store's: a DispatchQueueStore over the Mango harness, written through
+// addItem / takeItem / addFeedback, so the rootItemId, followUpTo, heldWakeFor and entry tags are
+// the ones production writes. The stage's own row reads running while parked; its follow-up
+// (a ci-wake `custom` row, or a held-wake holder) can end the lineage on a person's word.
+
+describe('LIN-4459: a stage parked [pending] is not live once its lineage ends blocked or skipped', () => {
+  const harness = createMangoTmpdir('lin-4459-');
+  const U = 'ws-lin-4459';
+  const ISSUE = 'LIN-4459';
+  let store;
+
+  before(() => harness.connect());
+  after(() => harness.close());
+  beforeEach(() => {
+    const db = harness.freshDb();
+    store = new DispatchQueueStore({ collection: db.collection('dispatch-queue'), historyCollection: db.collection('dispatch-history'), ttl: 86400 });
+  });
+
+  // A taken stage, optionally parked [pending]; then an optional follow-up of it, taken and
+  // ending with `follow.message`, tagged with the stage's lineage as the runner tags its entries.
+  async function lineage({ park = '[pending] waiting on a reviewer', follow = null } = {}) {
+    const stage = await store.addItem(U, { prompt: 'p', promptName: 'implementation', kind: 'implementation', issueIdentifier: ISSUE, dispatchedBy: 'acct', target: 'cli' });
+    await store.takeItem(stage._id, U);
+    if (park) await store.addFeedback(stage._id, U, { message: park }, null);
+    if (follow) {
+      const row = await store.addItem(U, {
+        prompt: 'f', promptName: follow.kind, kind: follow.kind, issueIdentifier: ISSUE, dispatchedBy: 'acct', target: 'cli',
+        followUpTo: stage._id, rootItemId: stage._id, ...(follow.heldWakeFor ? { heldWakeFor: stage._id } : {})
+      });
+      await store.takeItem(row._id, U);
+      await store.addFeedback(row._id, U, { message: follow.message, rootItemId: stage._id }, null);
+    }
+    return stage._id;
+  }
+
+  const runsOf = async () => (await loadRecentRuns(store, U, ISSUE)).allRuns;
+  const stageOf = (runs, id) => runs.find(r => r.id === id);
+
+  test('W1 witness: a parked stage whose ci-wake follow-up ends [blocked] is not live', async () => {
+    const stage = await lineage({ follow: { kind: 'custom', message: '[blocked] need a human' } });
+    const runs = await runsOf();
+    assert.equal(stageOf(runs, stage).outcome, WAITING_ON_A_PERSON, JSON.stringify(runs));
+    assert.equal(liveWaitOf(runs), null, 'the ticket does not wait on a stage its lineage ended');
+  });
+
+  test('W2 witness: a parked stage whose held-wake holder ends [skipped] is not live', async () => {
+    const stage = await lineage({ follow: { kind: 'leftover', message: '[skipped] the runner refused a cascade', heldWakeFor: true } });
+    const runs = await runsOf();
+    assert.equal(stageOf(runs, stage).outcome, 'skipped', JSON.stringify(runs));
+    assert.equal(liveWaitOf(runs), null);
+  });
+
+  test('control: a parked stage whose follow-up is parked too stays live, and the wait names it', async () => {
+    const stage = await lineage({ follow: { kind: 'custom', message: '[pending] still waiting on the PR' } });
+    const runs = await runsOf();
+    assert.equal(stageOf(runs, stage).outcome, RUNNING);
+    assert.equal(liveWaitOf(runs).wait.id, stage);
+  });
+
+  test('control: a parked stage with no follow-up stays live', async () => {
+    const stage = await lineage({});
+    assert.equal(liveWaitOf(await runsOf()).wait.id, stage);
+  });
+
+  test('control: a stage NOT parked is judged by its own row only, as before (a follow-up block does not end it)', async () => {
+    const stage = await lineage({ park: null, follow: { kind: 'custom', message: '[blocked] need a human' } });
+    assert.equal(liveWaitOf(await runsOf()).wait.id, stage);
+  });
+});
+
+describe('LIN-4459: the live-stage wait is defined once, in lib/run-live-wait.js', () => {
+  const NAMES = ['liveWaitOf', 'liveWaitRefusal', 'STAGE_IN_FLIGHT_CODE', 'newestLiveRun', 'isLiveRun'];
+  const SCANNED = ['lib', 'routes', 'tests', 'scripts'];
+  const files = (dir) => readdirSync(new URL(`../../${dir}`, import.meta.url), { recursive: true })
+    .filter(f => /\.(m?js)$/.test(f))
+    .map(f => `${dir}/${f}`);
+  const sources = [...SCANNED.flatMap(files), 'server.js'].map(path => [path, readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8')]);
+
+  test('census: each name is defined (exported) in exactly one file, lib/run-live-wait.js', () => {
+    for (const name of NAMES) {
+      const definers = sources.filter(([, src]) => new RegExp(`export\\s+(const|function)\\s+${name}\\b`).test(src)).map(([path]) => path);
+      assert.deepEqual(definers, ['lib/run-live-wait.js'], `${name} is defined in ${definers.join(', ')}`);
+    }
+  });
+
+  test('census: the retired module is spelled nowhere in code, tests or the server entry', () => {
+    // This file names the retired path in the census itself, so it is the one file left out.
+    const hits = sources.filter(([path, src]) => path !== 'tests/unit/lin-4392-live-stage-wait.test.js' && src.includes('recommendation-live-wait')).map(([path]) => path);
+    assert.deepEqual(hits, []);
   });
 });
