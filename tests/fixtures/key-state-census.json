@@ -107,6 +107,10 @@
     "disposition": "not-state",
     "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
   },
+  "lib/providers/jira/fake-client.js::propertiesByIssue": {
+    "disposition": "not-state",
+    "why": "A test fake's per-issue entity-property store (LIN-4450), owned by one createFakeJiraClient instance that each test builds afresh; it holds no workspace state and is never shared between fakes."
+  },
   "lib/providers/linear/index.js::linearFetch": {
     "disposition": "not-state",
     "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
