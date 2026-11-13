@@ -61,6 +61,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - `formatCiGateCheck` (`lib/prompt-formatters.js`) renders in implementation, review and close-out:
   a rule for one stage gets its own formatter beside it. Prove the others unchanged by rendering every
   kind, fresh and fix round, at HEAD and on the branch, not by the budget test, whose ceilings are caps (LIN-4441).
+- `tests/fixtures/lin-4467-witness.json` stays as a ratchet: a sha256 for all 40 real-context renders, fresh and fix
+  round. A rendered-text change regenerates it (`node tests/fixtures/lin-4467-witness.js --write`) beside the byte
+  ceilings and the change log; its byte counts are the real-context witness the budget's caps are not (LIN-4469).
 - The blind-read scan in `tests/unit/stage-kind-tables.test.js` reads `git ls-files`: a new file is not
   scanned until it is committed, so a local pass before the first commit proves nothing about it (LIN-4467).
 
@@ -83,13 +86,6 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   (`lib/run-view.js`), which no record carries; the byte ceilings (`tests/unit/prompt-size-budget.test.js`), which
   cover the registry. `VIRTUAL_PROMPTS` (`lib/workflow-config.js`) is gone: its one reader is the record's key.
   (Survey tally, LIN-4248; piece 3, LIN-4467.)
-- `lib/prompts/stage-kinds.js`: the one-record refactor's witness (`tests/fixtures/lin-4467-witness.js`) stays in the
-  suite as a permanent test. It pins a sha256 for all 40 renders and for each table, so a later wording change in
-  any stage must regenerate `tests/fixtures/lin-4467-witness.json` as well as move the byte ceilings and the change
-  log; and its fix-round mode differs from
-  fresh for `implementation` only. Decide whether to retire it once piece 5 (LIN-4469) has re-pinned, fold it into
-  `tests/unit/prompt-size-budget.test.js`, or keep it as a ratchet: a decision about the test suite, not a fix.
-  (LIN-4467 blind read.)
 - `lib/call-budget.js`: the budget rule is untested live on anthropic/claude-haiku-5.5; before
   moving a call there, replay LIN-4352's snapshot through `scripts/replay-brief.mjs`: block [2] WHOLE,
   four sections, finishReason=stop, any retry's reasoning bound accepted. REFUSED: change the rule
