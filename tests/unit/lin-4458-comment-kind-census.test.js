@@ -24,12 +24,12 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import * as acorn from 'acorn';
 import * as walk from 'acorn-walk';
+import { shippedSourceFiles } from './helpers/shipped-sources.js';
 
 import {
   COMMENT_KINDS, COMMENT_KIND_READINGS, SURVEY_KINDS, RULING_MARK,
@@ -255,11 +255,8 @@ const DESCRIPTION_READERS = [
 ];
 const excepted = (file, pattern) => DESCRIPTION_READERS.some(e => e.file === file && e.pattern === pattern);
 
-function scannedFiles() {
-  const tracked = execFileSync('git', ['ls-files', 'lib', 'routes', 'server.js', 'scripts/stability-measures-blind.mjs'], { cwd: REPO, encoding: 'utf8' }).split('\n');
-  // lib/run-trail.js is new on this branch and may be untracked in a working copy; it is the home either way.
-  return [...new Set(tracked)].filter(f => /\.m?js$/.test(f) && f !== HOME && existsSync(join(REPO, f)));
-}
+// The scope is shared with LIN-4466's blind-read words scan (tests/unit/helpers/shipped-sources.js).
+const scannedFiles = () => shippedSourceFiles().filter(f => f !== HOME);
 
 // A kind check written as a string method, not a regex: `x.startsWith('## Blind read')`,
 // `x.includes(BLIND_READ_HEADING)`, `x.startsWith(SURVEY_HEADINGS[k])` (LIN-4458 review, ledger 2).

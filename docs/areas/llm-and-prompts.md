@@ -18,6 +18,10 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   can raise a ceiling while real renders shrink (LIN-4393).
 - The `## As asked` block's words have one owner, `lib/as-asked.js`: import its spellings,
   never retype the heading or end line (LIN-4362).
+- The blind read's kind, heading and verdict words have one owner, `lib/prompts/blind-read-words.js`;
+  the verdict prose ("better, the same or worse") is built there from the words. Import them; the scan
+  in `tests/unit/stage-kind-tables.test.js` fails on a literal elsewhere, but a row key of a table it
+  lists. Prove a move byte-identical by rendering every kind, fresh and fix round (LIN-4466).
 - The code routes' order lives once, in `CODE_ROUTES` (`lib/code-routes.js`). A new route is an
   entry with its `emits`, plus the one "Code route order" line in
   `docs/architecture/prompt-system.md` and in `docs/architecture/source-map.md`;
@@ -140,13 +144,6 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   dispatches d9bdf6d8, cced07ee and 0399b2e2 it ran `claude-opus-5-5`, so a record can misname
   the model that ran. Cost is already priced from the model the worker reports. Waiting: make the
   record carry the model the worker reports, or update the routed id. (LIN-4396 review.)
-- `lib/prompts/blind-read-words.js`: its header says none retypes its words, but the kind is typed
-  bare in `lib/recommendation-blind-read.js` (the run predicate and the dispatched step),
-  `lib/pipeline-churn.js`, `lib/run-view.js` and `lib/run-closeout-state.js`, and has a second constant,
-  `VIRTUAL_PROMPTS.BLIND_READ` (`lib/workflow-config.js`); `lib/completion-signals.js` types the
-  heading (three times) and the verdict words instead of importing them. The route module does not
-  import `BLIND_READ_KIND` at all, and `tests/unit/stage-kind-tables.test.js` checks presence, not
-  these literals. LOW: a stored kind is rarely renamed; the leaf's claim is what is untrue. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
 - `lib/prompts/leftover-words.js`: the retirement line's words have one home and one checker
   (`lib/dispatch-leftover-answer.js`), but which entry to settle (the busiest touched area, else
   another) and the three forms are restated by hand in `docs/areas/README.md`, simple-dispatcher's
@@ -165,3 +162,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   only delegate to their modules. A fifth route, or a change to the bound, cannot follow one pattern. Waiting:
   decide where the bound's step lives (its own module, or a `reviewLoopStep` beside `reviewLoopStop`) and make
   the entry delegate like the rest. (LIN-4465 blind read.)
+- `lib/prompts/blind-read-words.js`: the blind read's kind has a constant and a scan, but every other kind in
+  the same lists is still a literal (`SPINE` in `lib/run-view.js`, the `COMMENT_KINDS` rows in
+  `lib/run-trail.js`, `CODE_ROUTES` in `lib/code-routes.js`), so the next stage added has two conventions to
+  choose from. Decide whether every kind gets a constant or only this one; LIN-4467 (one record per stage
+  kind) is the natural home, since a descriptor registry would make the spelling question disappear.
+  (LIN-4466 blind read.)
