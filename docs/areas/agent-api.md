@@ -95,3 +95,9 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   production behaviour is right today; injecting transports from tests, instead of production code
   recognising the token, would remove these checks and the `testTransport` declaration
   (`lib/dispatch-factory.js`). It spans several areas. (LIN-4456 review and Survey global, 13 Nov.)
+- `routes/proxy-writes.js`: the stage write gate reaches the proxy's write routers two ways. `routes/proxy-runner.js`
+  imports `requireStageWrite` (`lib/stage-write-gate.js`) directly, so a test cannot drop it; the seven others
+  (`routes/proxy-writes.js`, `routes/proxy-dispatch.js`, `routes/proxy-kickoff.js`, `routes/proxy-halt.js`,
+  `routes/proxy-agent-status.js`, `routes/proxy-model-routing.js`, `routes/proxy-rulings.js`) take `requireWriteScope` as an injected dependency, and some tests pass
+  a no-op in its place (`tests/unit/proxy-rulings-routes.test.js`). Moving them all to the direct import touches
+  seven routers and their test harnesses, so larger than a fix. (LIN-4468 blind read.)
