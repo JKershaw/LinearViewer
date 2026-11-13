@@ -1,19 +1,25 @@
 /**
  * LIN-4465 (piece 1 of LIN-4448): the code routes are one ordered list, CODE_ROUTES
  * (lib/code-routes.js), and codeRouteOf iterates it. Witnesses:
- *   - the contract: the order and the count are pinned, the first entry is the live-stage wait
- *     (skipLiveWait drops it and only it), and every entry names its trace values (`emits`);
+ *   - the contract: the order and the count are pinned, the first entry is the live-stage wait,
+ *     and every entry names its trace values (`emits`);
+ *   - skipLiveWait drops that first entry and only it: through getRecommendation, a ticket with a
+ *     live run and an exhausted review loop skips the wait and still stops at the bound (a skip
+ *     of the first two entries fails here);
  *   - each entry's route, given a fixture that makes it fire, records a `codeRoute` its `emits`
  *     declare (a route with no trace name fails here);
  *   - the bound's two reasons, byte for byte as codeRouteOf wrote them before the list;
  *   - the docs say the same order: prompt-system.md, source-map.md, CLAUDE.md, and the
  *     blind-read bullet in public/llms.txt, which said "Sent by hand" when this was written.
  */
-import { test, describe } from 'node:test';
+import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { CODE_ROUTES } from '../../lib/code-routes.js';
+import { getRecommendation, setFetchImpl, setPromptTraceRecorder } from '../../lib/openrouter.js';
 import { sealAsAsked } from '../../lib/as-asked.js';
+
+afterEach(() => { setFetchImpl(null); setPromptTraceRecorder(null); });
 
 const read = (rel) => readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
 
@@ -44,7 +50,7 @@ describe('CODE_ROUTES: the contract', () => {
     assert.equal(new Set(CODE_ROUTES.map(r => r.name)).size, CODE_ROUTES.length);
   });
 
-  test('the first entry is the live-stage wait, the one skipLiveWait drops', () => {
+  test('the first entry is the live-stage wait (the position skipLiveWait drops)', () => {
     assert.equal(CODE_ROUTES[0].name, 'live-wait');
   });
 
@@ -92,6 +98,39 @@ describe('CODE_ROUTES: each route fires on its fixture and records a declared tr
     const issue = { identifier: 'T-1', state: STARTED, description: '' };
     const comments = [RCn(1, 3), RCn(2, 3), RCn(3, 3)];
     assert.equal(entry('review-bound').route(issue, { comments, allRuns: [] })?.codeRoute, 'blocked');
+  });
+});
+
+describe('skipLiveWait drops the first entry only', () => {
+  // A ticket that meets two routes at once: a live implementation run (the live-stage wait) and
+  // three Request Changes verdicts that do not narrow (the review loop bound). No model is asked:
+  // the fetch stub fails the test if the selector is reached.
+  const issue = { identifier: 'T-1', state: STARTED, description: '', labels: [] };
+  const context = {
+    parent: null, siblings: [], project: null, children: [], focusedChild: null, attachments: [], runs: [],
+    comments: [RCn(1, 3), RCn(2, 3), RCn(3, 3)],
+    allRuns: [run('implementation', 5, 'running')]
+  };
+  const traced = [];
+  const ask = async (options) => {
+    traced.length = 0;
+    setPromptTraceRecorder((trace) => { traced.push(trace); });
+    setFetchImpl(async () => { throw new Error('a code route must settle this without asking the selector'); });
+    return getRecommendation(issue, context, { apiKey: 'stub', model: 'x', ...options });
+  };
+
+  test('without the skip, the live-stage wait settles it first', async () => {
+    const rec = await ask({});
+    assert.equal(rec.recommendedAction, null);
+    assert.ok(rec.liveWait, 'the live run is named');
+    assert.equal(traced[0]?.codeRoute, 'live-wait');
+  });
+
+  test('with the skip, the review bound (the second entry) still settles it: blocked, no model call', async () => {
+    const rec = await ask({ skipLiveWait: true });
+    assert.equal(rec.recommendedAction, 'blocked');
+    assert.equal(rec.codeRoute, 'blocked');
+    assert.equal(traced[0]?.codeRoute, 'blocked');
   });
 });
 
