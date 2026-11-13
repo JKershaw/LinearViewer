@@ -1233,7 +1233,8 @@ matching zero rows and returning an authoritative-looking `$0.00`.
         { "itemId": "…", "kind": "implementation", "dispatchedAt": "2026-08-01T10:00:00Z",
           "followUpTo": null, "byModel": [{ "model": "claude-sonnet-5", "requests": 40, "tokens": "…", "costUsd": 4.90 }],
           "requests": 40, "tokens": "…", "costUsd": 4.90,
-          "firstRequestAt": "2026-08-01T10:00:20Z", "lastRequestAt": "2026-08-01T10:02:30Z" }
+          "firstRequestAt": "2026-08-01T10:00:20Z", "lastRequestAt": "2026-08-01T10:02:30Z",
+          "model": "claude-sonnet-5" }
       ] }
   ],
   "appCalls": {
@@ -1266,7 +1267,7 @@ matching zero rows and returning an authoritative-looking `$0.00`.
   lineage's token sum) and `byModel` (requests, tokens and USD per model; records
   lineages only), and `dispatches`, one entry per dispatch in the lineage, in dispatch
   order: `{itemId, kind, dispatchedAt, followUpTo, byModel, requests, tokens, costUsd,
-  firstRequestAt, lastRequestAt}`.
+  firstRequestAt, lastRequestAt, model}`.
   The entries sum to the lineage's `requests`, `tokens` and `costUsd`. A record belongs to
   the dispatch whose row posted it, unless it was made before that row was dispatched (a
   build that ran before the records deploy is posted under its follow-up's `itemId`); then
@@ -1274,7 +1275,11 @@ matching zero rows and returning an authoritative-looking `$0.00`.
   records of its own (snapshot-only, records plus snapshots, no usage or unreadable),
   whose cumulative total carries one model and cannot be split, and for any lineage read
   without the `/cost` route's per-dispatch flag. A dispatch with no records reads
-  `requests: 0` and `null` tokens, `byModel` and cost, never `0`.
+  `requests: 0` and `null` tokens, `byModel`, cost and `model`, never `0`.
+- **A dispatch's model (LIN-4454)**: `model` on a `dispatches` entry follows the same rule as
+  the lineage's `model`, over that dispatch's own records: the priced model with the largest
+  priced cost, else the latest record's model (which can be `null`). Read it as given; do not
+  re-rank `byModel` to find it, since `byModel` rows omit the priced figures the rule ranks by.
 - **Working span (LIN-4404)**: `firstRequestAt` / `lastRequestAt` on a `dispatches` entry are
   the earliest and latest `at` (ISO) of the request records that entry owns under the rule
   above, so a late-posted record's time counts toward the dispatch that made it. Both are
