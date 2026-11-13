@@ -77,3 +77,9 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
 - `routes/proxy-writes.js`: the PATCH route still drops a non-UUID `assigneeId`, `parentId` or
   `cycleId` silently. Disposition (b) was applied to create only, and PATCH is the same shape.
   (LIN-4451 Survey open-0 and open questions.)
+- `routes/proxy-compute.js`: about 16 production sites (this file x7, `server.js` x3, `routes/test.js`, and
+  others) compare a credential to `'test-token'` inline, beside the one helper (`isHermeticTestToken`,
+  `lib/should-mock-ai.js`) that only two production modules import. Each is gated on `NODE_ENV=test`, so
+  production behaviour is right today; injecting transports from tests, instead of production code
+  recognising the token, would remove these checks and the `testTransport` declaration
+  (`lib/dispatch-factory.js`). It spans several areas. (LIN-4456 review and Survey global, 13 Nov.)

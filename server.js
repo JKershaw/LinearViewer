@@ -1130,7 +1130,8 @@ scheduler.register({
 // each binds its own request origin. The dispatch-token route has no workspace id, so it is
 // resolved the ci-wake way (a session-derived resolver). The held wake's release, which has
 // no request, mints its credential through the factory bound below, keyed on the lineage
-// root's `dispatchedBy`, with the canonical link origin.
+// root's `dispatchedBy`, with the canonical link origin. Its wording is the step's own: the
+// step binds it into the store as it is built (`setHeldWakeReleaseNote`, LIN-4455).
 const leftoverStep = createLeftoverStep({
   dispatchStore: dispatchQueueStore,
   workspacePreferencesStore,

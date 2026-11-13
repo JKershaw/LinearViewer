@@ -46,7 +46,7 @@ import { readHaltForPoll, projectHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 import { buildQueuedPollWarning, getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
-import { deriveTerminalStatus } from '../lib/dispatch-terminal.js';
+import { deriveTerminalStatus, NEVER_RAN } from '../lib/dispatch-terminal.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
 import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
 import { readPlanFacts } from '../lib/chat-request.js';
@@ -1467,7 +1467,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           throw err;
         }
         if (!row) return refuse('status-unreadable');
-        if (row.status === 'expired' || row.status === 'cancelled') return refuse('terminal');
+        if (NEVER_RAN.has(row.status)) return refuse('terminal');
         if (row.status !== 'taken' || !req.dispatchTokenLabel || row.takenByTokenLabel !== req.dispatchTokenLabel) {
           return refuse('not-taker');
         }
