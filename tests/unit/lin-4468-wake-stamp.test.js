@@ -25,6 +25,7 @@ import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
 import { enqueueFollowUp } from '../../lib/follow-up-dispatch.js';
 import { createLeftoverStep } from '../../lib/dispatch-leftover-hook.js';
 import { buildHeldWakeProvisionerFactory } from '../../lib/wake-credential.js';
+import { BASE_DEPS, buildApp, call, makeFakeProvider } from './lib/proxy-fake-deps.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 
 const URL_KEY = 'acme';
@@ -270,5 +271,39 @@ describe('LIN-4468 — a held wake\'s release takes the RESUMED parent\'s stage 
 
     const stamp = await exchangedStamp(world, wakeFor(world, parentId).bootstrapToken);
     assert.deepEqual(stamp, { writes: null, writesTarget: null });
+  });
+
+  test('the held-wake token is refused a comment by the proxy over HTTP: the allowance names none, and nothing is written', async () => {
+    const world = await heldWorld();
+    const { parentId, leftover } = await heldBuild(world, { kind: 'look-into', issueIdentifier: 'LIN-9' });
+    await world.store.removeItem(URL_KEY, leftover._id);
+
+    const wake = wakeFor(world, parentId);
+    assert.ok(wake.bootstrapToken, 'the held wake carries its own bootstrap');
+    const working = await world.tokenStore.exchangeBootstrapToken(wake.bootstrapToken);
+    const identity = await world.tokenStore.validateToken(working.token);
+    const comments = [];
+    const provider = {
+      ...makeFakeProvider(),
+      issueWriteGuard: async () => ({ id: 'uuid-9', trashed: false, team: { id: 't1' } }),
+      createComment: async (_token, issueId, body) => { comments.push({ issueId, body }); return { id: 'c1', body }; }
+    };
+    const app = buildApp({ proxyTokenStore: { ...BASE_DEPS().proxyTokenStore, validateToken: async () => identity }, provider });
+    const res = await call(app, 'POST', '/api/proxy/issues/LIN-9/comments', { body: { body: 'a finding' } });
+    assert.equal(res.status, 403, JSON.stringify(res.body));
+    assert.match(res.body.error, /write allowance \(none\)/, JSON.stringify(res.body));
+    assert.deepEqual(comments, [], 'nothing written');
+  });
+
+  test('a held-wake release with no producing-build id mints nothing: it is refused, never minted unstamped', async () => {
+    const world = await heldWorld();
+    const minted = [];
+    const realCreate = world.tokenStore.createToken.bind(world.tokenStore);
+    world.tokenStore.createToken = async (...args) => { minted.push(args); return realCreate(...args); };
+    const provision = buildHeldWakeProvisionerFactory({ proxyTokenStore: world.tokenStore, baseUrl: 'http://127.0.0.1', store: world.store })({ urlKey: URL_KEY, createdBy: OWNER, itemId: undefined });
+    const outcome = await provision('claude-code', null);
+    assert.equal(outcome.token, null, 'no token');
+    assert.match(outcome.reason, /wake parent unresolvable/);
+    assert.deepEqual(minted, [], 'no bootstrap was minted');
   });
 });
