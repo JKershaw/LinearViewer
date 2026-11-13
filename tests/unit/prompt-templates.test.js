@@ -1436,16 +1436,17 @@ describe('triage template', () => {
       'should warn against presenting analysis as completed research');
   });
 
-  // LIN-1227: triage must not change task scope — no description/scope rewrite, no
-  // follow-up task/subtask creation, mirroring breakdown's scope guardrail.
-  test('(handwritten) forbids rewriting scope and creating follow-up tasks/subtasks', () => {
+  // LIN-1227: triage must not change task scope, mirroring breakdown's scope guardrail. LIN-4469: the
+  // description rewrite and the subtask creation are refused by the write guard (LIN-4468, `ticket-fields`),
+  // so the template keeps the scope rule and its observations-only sentence, and no longer restates the refusals.
+  test('(handwritten) keeps the scope rule: findings are observations, never new work items', () => {
     const result = generatePrompt('triage', mockIssue, mockContext);
     assert.ok(/preserves? scope/i.test(result.prompt),
       'handwritten triage should state that it preserves scope');
-    assert.ok(/rewrite the task's description/i.test(result.prompt),
-      'handwritten triage should forbid rewriting the task description');
-    assert.ok(/follow-up tasks or subtasks/i.test(result.prompt),
-      'handwritten triage should forbid creating follow-up tasks or subtasks');
+    assert.ok(/Findings stay observations in a comment, never new work items/.test(result.prompt),
+      'handwritten triage should keep findings as observations, never new work items');
+    assert.doesNotMatch(result.prompt, /rewrite the task's description/i,
+      'the description rewrite is guard-backed (LIN-4468), not restated in the template');
   });
 
 

@@ -42,13 +42,13 @@
     },
     "triage:fresh": {
       "name": "triage",
-      "bytes": 3838,
-      "sha256": "b3a7f92fbe460f4d84610c289b0b1f356c85825d07fbbcc824905f03034acdd6"
+      "bytes": 3661,
+      "sha256": "09fa02ddb5066bdc2023d70638d04de0488163aa1d9e93477fa88a7efd9c1bd1"
     },
     "triage:fix": {
       "name": "triage",
-      "bytes": 3838,
-      "sha256": "b3a7f92fbe460f4d84610c289b0b1f356c85825d07fbbcc824905f03034acdd6"
+      "bytes": 3661,
+      "sha256": "09fa02ddb5066bdc2023d70638d04de0488163aa1d9e93477fa88a7efd9c1bd1"
     },
     "breakdown:fresh": {
       "name": "breakdown",

@@ -28,7 +28,7 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   `tests/unit/lin-4465-code-routes.test.js` fails until all three agree. Point at the list; never
   restate the order or count the routes in prose (LIN-4465).
 - `lib/prompt-template-defs.js` cannot import what imports `lib/prompt-templates.js` (a
-  cycle): shared words live in an import-free leaf, as `lib/prompts/leftover-words.js`
+  cycle): shared words live in a leaf that imports only leaves, as `lib/prompts/leftover-words.js`
   (LIN-4376) and `lib/prompts/autopilot-precedence.js` (never restate a rank; LIN-4382).
 - Prompt words banning a kind of how do not hold it (LIN-4369's replay: closing one channel
   moved it to the next). Hold the shape in code or a test (`SIZE_RECORD_SHAPE`,
@@ -152,8 +152,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   the model that ran. Cost is already priced from the model the worker reports. Waiting: make the
   record carry the model the worker reports, or update the routed id. (LIN-4396 review.)
 - `lib/prompts/leftover-words.js`: the retirement line's words have one home and one checker
-  (`lib/dispatch-leftover-answer.js`). This repo's docs now say what the code does: `docs/areas/README.md` points to
-  the leaf for the three forms, and `docs/architecture/dispatch-and-proxy.md` names the words' home (LIN-4469). What
+  (`lib/dispatch-leftover-answer.js`). This repo's docs point to the leaf and no longer restate the three forms:
+  `docs/areas/README.md` and `docs/architecture/dispatch-and-proxy.md` (LIN-4469). What
   stays restated on purpose: the refusal table in `docs/proxy-integration.md` is the API contract's. simple-dispatcher's
   README and its docs/areas/README.md are its owner's; a waiting entry also leaves there when "a follow-up is filed for
   it", which this README does not say. A cross-repo seam, named here, not edited. (Drift & Coherence Review, 13 Nov.;

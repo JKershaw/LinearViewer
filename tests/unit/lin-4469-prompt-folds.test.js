@@ -29,6 +29,7 @@ const RETIRED = [
   'Don\'t change code, branches, pull requests, tickets or tracker state',
   'rebase it onto main and get it green under the notes guard',
   'search for the repo\'s committed code-shape census-review tool',
+  'search the repo for a committed change-coupling tool (it reads',
   'naming any narrowing',
   'is a narrowing, which only',
 ];

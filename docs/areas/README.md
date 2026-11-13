@@ -69,12 +69,9 @@ step, review and close-out render both word for word. For the notes:
   reaches it settles one fix-sized waiting entry on its PR branch, before it pushes:
   in the area its change touched with the most waiting entries, or, if none there is
   fix-sized, in another area it touched. It removes the entry and names it on the one
-  retirement line of its leftover answer. That line has three forms, spelled in
-  `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`): the settled
-  entry's cited file and opening words; none, because no touched area has a waiting
-  entry or there are no notes; or none, because no touched area has a fix-sized entry,
-  naming the smallest entry in the busiest touched area and why it is larger than a
-  fix. The proxy refuses an answer without a valid line (`lib/dispatch-leftover-answer.js`).
+  retirement line of its leftover answer. The line's forms and words are spelled once,
+  in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`). The proxy refuses
+  an answer without a valid line (`lib/dispatch-leftover-answer.js`).
   A ticket never counts as the retirement. The build itself still treats
   Waiting as context.
 
