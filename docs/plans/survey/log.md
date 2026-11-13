@@ -3794,3 +3794,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - Relayed on LIN-4463, read back word for word first (comment `db14ecf4`).
   - My candidate figure, for later: at least 4 of 6 readers prefer "after", with the control no better than an even split.
   - This does not change my own area read 1 criteria, logged before the baseline.
+- **20:40 UTC ruling `lin4474-describe-blocks-cut`** (LIN-4447 piece 8, PR 1 in simple-dispatcher, which retires `columnProblems`, the duplicate row-shape checker). The ask says to delete "two describe blocks", but one also holds the sha256 drift check the ask relies on. So delete only the `columnProblems` test from it? It was recommended `accept`. **I suggested `accept`:** keeping the drift check is what the ask means. This is the fourth cut-rule false escalation today.
