@@ -53,7 +53,7 @@ The kit is frozen and is not edited. These are the differences this adoption car
    - LLM & prompts: note blob `b6b4c726d`, 14,838 B, Lessons **3,960 B**, **25** Waiting entries. The brief's figure of 26 is out of date; #2421 removed one.
    - Front end: server-rendered pages: note blob `ae9c007e1`, 5,825 B, Lessons **1,023 B**, **12** Waiting entries.
 
-   The kit's Lessons figures (1,012 and 4,257 B at `4b5001ddf`) came from a different section boundary; the guard's figures are the authoritative ones (see the method-as-run addendum, section 7).
+   The kit's own Lessons figures are for its pair at `4b5001ddf` (front end 1,012 B, Runs 4,257 B) and came from a different section boundary; the guard gives 1,023 B and 4,268 B for those (method-as-run addendum, section 7). Only the guard's counting is used here, and the kit has no figure for LLM & prompts.
 
 ## 3. Open pull requests, checked against both samples and both notes
 
