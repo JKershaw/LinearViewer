@@ -3695,3 +3695,5 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
     - LIN-4447 split into ten pieces, LIN-4453–4462 (the planned 0–7, plus the after-read).
     - The Jira lane LIN-4445 split into three, LIN-4450–4452 (LIN-4450 In Progress).
     - LIN-4446 and LIN-4448 have no pieces yet.
+- **15:08 UTC: new ruling `lin4456-testtransport-placement`** (LIN-4447's piece LIN-4456). Scoping cut a clause from the piece's description: it declares `testTransport` once, on the Linear provider, rather than in the two test installers, because the planned spot would break a witness test and could send the test token to the network. **Suggested `static`.**
+  - **A pattern to watch:** the cut rule sends *any* narrowing of a description to John as a ruling. A child piece's description was written by the parent's design, not by John, so cuts against it are engineering, not his call. Of the five rulings open now, three are engineering questions (this one, `recommend-path-outside-merge`, and the passenger scope, which scoping had already settled itself). For the review.
