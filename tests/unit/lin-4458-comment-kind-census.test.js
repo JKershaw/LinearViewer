@@ -10,11 +10,17 @@
  *     lib/, routes/, server.js and scripts/stability-measures-blind.mjs,
  *       1. no declaration of a retired kind predicate or opening helper (the list below);
  *       2. no regular expression that spells a comment kind's opening (close-out, audit, plan-review
- *          verdict, area read, blind read, Survey, an agent's note opening, the ruling mark);
+ *          verdict, area read, blind read, Survey, an agent's note opening, a plan comment's opening
+ *          and its `Implementation Plan` heading, the ruling mark), but for the named description
+ *          readers in DESCRIPTION_READERS, each with its reason;
  *       3. no string literal of the ruling mark (the in-app route writes `RULING_MARK`).
  *     Verdict-VALUE parsers are outside it: `extractVerdict` (lib/plan-review-round-trips.js) and the
  *     verdict word `planReviewVerdictOf` reads stay where they are; only "is this a plan-review
  *     verdict" moved into the table.
+ *   - A PLAN COMMENT (`isPlanComment`) lives beside the table but is not a kind: it overlaps agent
+ *     notes and plan reviews on purpose; the overlaps are pinned below.
+ *   - THE READING CHANGES one kind per comment made, each pinned by name, with what the code before
+ *     it (f9a8cbcd1) answered.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,8 +33,9 @@ import * as walk from 'acorn-walk';
 
 import {
   COMMENT_KINDS, COMMENT_KIND_READINGS, SURVEY_KINDS, RULING_MARK,
-  commentKindOf, isRuling, isPersonComment, reportsLandedWork, opensWithCloseOutTitle
+  commentKindOf, isRuling, isPersonComment, reportsLandedWork, opensWithCloseOutTitle, isPlanComment, readTrail
 } from '../../lib/run-trail.js';
+import { assembleTrailFacts, assemblePlanReviewFacts } from '../../lib/recommendation-facts.js';
 import { BLIND_READ_HEADING } from '../../lib/prompts/blind-read-words.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
 
@@ -158,6 +165,74 @@ describe('the old checks, one by one (lib/run-ledger.js and lib/recommendation-f
   });
 });
 
+describe('a plan comment: beside the table, not a kind, overlapping on purpose (lib/run-trail.js isPlanComment)', () => {
+  test('an Implementation Plan heading anywhere, or a first line opening "Plan"', () => {
+    assert.equal(isPlanComment('Here it is.\n\n## Implementation Plan\n\n1. step'), true);
+    assert.equal(isPlanComment('**Plan** — three steps'), true, 'leading markdown stripped');
+    assert.equal(isPlanComment('Planning to start tomorrow'), false, 'a word that only begins with "plan"');
+    assert.equal(isPlanComment('The plan is fine.'), false);
+  });
+
+  test('overlap 1: a planner\'s "Plan posted" note is a plan comment AND stays an agent-note comment', () => {
+    const body = 'Plan posted in the description.\n\n## Implementation Plan\n\n1. step';
+    assert.equal(isPlanComment(body), true);
+    assert.equal(commentKindOf(body), 'agent-note', 'the agent-note readings still apply to it');
+  });
+
+  test('overlap 2: a plan-review verdict opens "Plan" and is a plan comment by opening; the selector skips it by its verdict word', () => {
+    const verdict = '### Plan Review Verdict\n\n**Verdict:** Approve';
+    assert.equal(isPlanComment(verdict), true);
+    assert.equal(commentKindOf(verdict), 'plan-review');
+    const plan = { createdAt: '2026-11-12T01:00:00.000Z', body: 'Plan posted.\n\nfits one session' };
+    const facts = assembleTrailFacts([plan, { createdAt: '2026-11-12T02:00:00.000Z', body: verdict }], '');
+    assert.equal(facts.plan.where, 'comment');
+    assert.equal(facts.plan.at, plan.createdAt, 'the latest plan comment that is not a verdict is the plan');
+  });
+
+  test('a plan-review heading with no verdict word stays a plan comment for the selector, as before', () => {
+    const noVerdict = { createdAt: '2026-11-12T03:00:00.000Z', body: '## Plan review notes\n\nfits one session' };
+    assert.equal(assembleTrailFacts([noVerdict], '').plan.at, noVerdict.createdAt);
+  });
+});
+
+describe('the reading changes one kind per comment made (LIN-4458), each pinned by name', () => {
+  const PR1 = 'https://github.com/acme/widget/pull/41';
+  const PR2 = 'https://github.com/acme/widget/pull/42';
+  const c = (n, body) => ({ id: `c${n}`, body, createdAt: `2026-11-12T0${n}:00:00.000Z` });
+
+  // Before (f9a8cbcd1): true. The heading made it no plan-review VERDICT (no verdict word), so nothing
+  // excluded it. Now the comment is of kind plan-review, which is never a person's comment.
+  test('change 1: a plain-first-line comment with a plan-review heading lower down, no verdict word and no PR, is no longer a person\'s comment', () => {
+    const body = 'Thanks, see below.\n\n## Plan review notes\n\nStill reading.';
+    assert.equal(commentKindOf(body), 'plan-review');
+    assert.equal(isPersonComment(body), false);
+  });
+
+  // Before (f9a8cbcd1): 1 verdict. The heading test ignored the agent-note opening. Now the agent-note
+  // row is matched first, so the note is the planner's, and its quoted verdict is not counted.
+  test('change 2: an agent\'s note that carries a plan-review heading with a verdict is no longer counted as a plan-review verdict', () => {
+    const note = c(1, 'Plan revised to address the review.\n\n### Plan Review Verdict\n\n**Verdict:** Approve');
+    assert.equal(commentKindOf(note), 'agent-note');
+    const f = assemblePlanReviewFacts([note]);
+    assert.equal(f.verdicts, 0);
+    assert.equal(f.latestVerdict, null);
+  });
+
+  // Before (f9a8cbcd1): true. The audit check's own close-out test counted a review whose title mentions
+  // a close-out as the landing's close-out. Now that review is a review (as the landing and the
+  // after-review readings already read it), so no close-out is on the trail and no audit "already ran".
+  test('change 3: the audit-already-ran check no longer takes a review titled with "close-out" as the landing\'s close-out', () => {
+    const trail = [
+      c(1, `Implementation done: ${PR1}, CI green.`),
+      c(2, `## Review — conditional on close-out\n\nReviewed ${PR1}.\n\n**Verdict: Approve**`),
+      c(3, `## Retrospective audit — LIN-1\n\nNotes PR: ${PR2}.`),
+    ];
+    assert.equal(commentKindOf(trail[1]), 'review');
+    assert.equal(readTrail(trail).auditAfterCloseOut, false);
+    assert.equal(assembleTrailFacts(trail, '', { leaf: false }).auditAfterCloseOut, false);
+  });
+});
+
 // ─── The census ────────────────────────────────────────────────────────────────
 
 const RETIRED = [
@@ -165,8 +240,20 @@ const RETIRED = [
   'isAgentNote', 'isRuling', 'isPersonComment', 'isLandingEvidence', 'isAuditReport', 'isAreaRead',
   'auditAfterLandingCloseOut', 'opensWithHeading', 'firstHeading', 'firstLineOf', 'titleOf',
   'AGENT_NOTE_RE', 'RULING_MARK', 'CLOSE_OUT_TITLE_RE', 'PLAN_REVIEW_VERDICT_HEADING', 'PLAN_REVIEW_LEGACY_HEADING',
+  'isPlanComment', 'PLAN_HEADING_ANY',
 ];
-const OPENING = /close-\??out|retrospective audit|plan review verdict|plan\[-\\s\]\+review|area read|blind read|survey (?:open|global)|autopilot\\b|plan\\s\+\(\?:posted|ruling recorded/i;
+const OPENING = /close-\??out|retrospective audit|plan review verdict|plan\[-\\s\]\+review|area read|blind read|survey (?:open|global)|autopilot\\b|plan\\s\+\(\?:posted|ruling recorded|\^plan\\b|implementation plan/i;
+
+/**
+ * Regexes that spell an opening but read a DESCRIPTION, never a comment, so they are not comment
+ * kinds. Each is named with its file and why; an exception that no longer matches its file fails.
+ */
+const DESCRIPTION_READERS = [
+  { file: 'lib/file-pointer.js', pattern: '^##[ \\t]+Implementation Plan\\b[^\\n]*$', why: 'extractPlanSection cuts the plan section out of a description' },
+  { file: 'lib/recommendation-facts.js', pattern: '^##[ \\t]+Implementation Plan\\b[^\\n]*$', why: 'condensePlan condenses the plan section of a description for routing' },
+  { file: 'lib/follow-on-ratio.js', pattern: '#{1,4}\\s*implementation plan\\b|\\bfits one session\\b|\\bneeds multiple sessions\\b', why: 'PLAN_MARKER, the follow-on ratio\'s did-plan-run marker, is matched against the description only (its limit 7)' },
+];
+const excepted = (file, pattern) => DESCRIPTION_READERS.some(e => e.file === file && e.pattern === pattern);
 
 function scannedFiles() {
   const tracked = execFileSync('git', ['ls-files', 'lib', 'routes', 'server.js', 'scripts/stability-measures-blind.mjs'], { cwd: REPO, encoding: 'utf8' }).split('\n');
@@ -181,7 +268,7 @@ function findings(file) {
     const declared = node.type === 'FunctionDeclaration' ? node.id?.name
       : node.type === 'VariableDeclarator' && node.id.type === 'Identifier' ? node.id.name : null;
     if (declared && RETIRED.includes(declared)) out.push(`declares ${declared}`);
-    if (node.type === 'Literal' && node.regex && OPENING.test(node.regex.pattern)) out.push(`regex /${node.regex.pattern}/`);
+    if (node.type === 'Literal' && node.regex && OPENING.test(node.regex.pattern) && !excepted(file, node.regex.pattern)) out.push(`regex /${node.regex.pattern}/`);
     if (node.type === 'Literal' && typeof node.value === 'string' && node.value.includes('Ruling recorded via Harbour')) out.push('the ruling mark as a string');
   });
   return out;
@@ -205,6 +292,20 @@ describe('the census: no comment-kind test outside lib/run-trail.js', () => {
   test('outside lib/run-trail.js: no retired predicate, no opening regex, no ruling-mark string', () => {
     const hits = scannedFiles().flatMap(f => findings(f).map(x => `${f}: ${x}`));
     assert.deepEqual(hits, []);
+  });
+
+  test('each description-reader exception still names a regex in its file (no stale exception)', () => {
+    for (const e of DESCRIPTION_READERS) {
+      const patterns = [];
+      walk.full(acorn.parse(readFileSync(join(REPO, e.file), 'utf8'), { ecmaVersion: 'latest', sourceType: 'module', allowHashBang: true }), (n) => { if (n.type === 'Literal' && n.regex) patterns.push(n.regex.pattern); });
+      assert.ok(patterns.includes(e.pattern), `${e.file}: ${e.why}`);
+    }
+  });
+
+  test('the plan-comment opening, written outside the home, is a finding', () => {
+    const scan = (src) => { const out = []; walk.full(acorn.parse(src, { ecmaVersion: 'latest', sourceType: 'module' }), (n) => { if (n.type === 'Literal' && n.regex && OPENING.test(n.regex.pattern)) out.push(n.regex.pattern); }); return out; };
+    assert.equal(scan('const a = /^plan\\b/i;').length, 1);
+    assert.equal(scan('const a = /^#{1,3}[ \\t]+Implementation Plan\\b/im;').length, 1);
   });
 
   test('lib/run-trail.js holds the openings the census forbids elsewhere', () => {

@@ -152,7 +152,7 @@ describe('no local copies: recommendation-facts imports the moved readers', () =
         assert.doesNotMatch(read(file), new RegExp(`(?:function|const)\\s+${name}\\b`), `${file}: ${name} has no local definition`);
       }
     }
-    assert.match(read('lib/run-trail.js'), /export const firstLineOf\b/);
+    assert.match(read('lib/run-trail.js'), /const firstLineOf\b/);
     assert.match(read('lib/run-trail.js'), /function firstHeading\b/);
   });
 });
