@@ -1,9 +1,8 @@
 /**
  * Shared steps for the workspace API routers (LIN-2246: extracted from
  * workspace-api.js). routes/workspace-api.js, routes/workspace-api-prompts.js
- * (isTestToken, failureOf) and routes/workspace-api-issue-read.js (isTestToken,
- * failureOf, openIssue) and routes/workspace-api-issue-write.js (isTestToken,
- * refuseCapability) and routes/workspace-api-scan.js (failureOf, openIssue,
+ * (failureOf) and routes/workspace-api-issue-read.js (failureOf, openIssue) and
+ * routes/workspace-api-issue-write.js (refuseCapability) and routes/workspace-api-scan.js (failureOf, openIssue,
  * refuseCapability, refuseFreeTier, aiNotConfigured, keepaliveFailure, loadContext) and
  * routes/workspace-api-feedback.js (refuseCapability) import them; each is defined here once. `openIssue` and
  * `refuseCapability` moved here with LIN-3872; `refuseFreeTier`, `aiNotConfigured`,
@@ -15,13 +14,6 @@ import { buildMockRecapContext } from '../lib/workspace-api-mocks.js';
 import { truncationFailureOf } from '../lib/openrouter.js';
 import { isValidIssueId, resolveIssueBinding } from '../lib/workspace.js';
 import { isHermeticTestToken } from '../lib/should-mock-ai.js';
-
-/**
- * The test-token workspace (`/test/set-session`): data comes from `testMockData`,
- * never from a provider. `mockAi` (lib/should-mock-ai.js) is the separate, wider
- * predicate for the AI mock, which local-provider sessions also trip (LIN-388/LIN-405).
- */
-export const isTestToken = (workspace) => isHermeticTestToken(workspace.accessToken);
 
 /**
  * The error ladder shared by the upstream-calling routes, as `[status, message, extra]`
@@ -105,7 +97,7 @@ export function keepaliveFailure(keepalive, label, error, fallbackMessage, arms)
  * a provider's answer is taken as given.
  */
 export async function loadContext(workspace, issueId, { provider, callScope }) {
-  if (isTestToken(workspace)) {
+  if (isHermeticTestToken(workspace.accessToken)) {
     const context = buildMockRecapContext(issueId);
     return { context, missing: !context };
   }

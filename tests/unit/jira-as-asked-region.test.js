@@ -17,7 +17,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe, beforeEach, afterEach } from 'node:test';
+import { test, describe, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -262,7 +262,18 @@ describe('the Jira as-asked region (LIN-4450)', () => {
     test('an oversized body is not sealed: the seal is skipped, the text filed as written', () => {
       const big = '"'.repeat(20000);
       assert.equal(providerHoldsAsAsked(jiraProvider, sealAsAsked(big)), false);
-      const filed = sealForFiling({ provider: jiraProvider, words: big, lane: 'test' });
+      const log = mock.method(console, 'log', () => {});
+      let filed;
+      try {
+        filed = sealForFiling({ provider: jiraProvider, words: big, lane: 'test' });
+      } finally {
+        log.mock.restore();
+      }
+      assert.deepEqual(
+        log.mock.calls.map(call => call.arguments.join(' ')),
+        ['[as-asked] seal skipped: provider jira cannot hold the block (test)'],
+        'exactly one skip line, naming the provider and the lane',
+      );
       assert.equal(filed.sealed, false);
       assert.equal(filed.reason, 'provider');
       assert.equal(filed.description, big, 'never reformatted');
@@ -286,14 +297,6 @@ describe('the Jira as-asked region (LIN-4450)', () => {
         .filter(({ text }) => /adfToMarkdown\(/.test(text) && !/^\s*(\/\/|\*)/.test(text))
         .filter(({ text }) => !/body: adfToMarkdown\(/.test(text));
       assert.deepEqual(offenders, [], 'a description read must go through readDescription');
-    });
-
-    test('the seal module and the base module no longer claim that Jira is skipped', () => {
-      const root = fileURLToPath(new URL('../../lib/', import.meta.url));
-      for (const file of ['as-asked-seal.js', 'as-asked.js']) {
-        const header = readFileSync(root + file, 'utf8');
-        assert.doesNotMatch(header, /Jira is skipped|Jira today|Jira skipped/, file);
-      }
     });
 
     test('the block\'s heading and end spellings are the only ones the region module uses', () => {

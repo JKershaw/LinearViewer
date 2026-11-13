@@ -24,7 +24,8 @@ import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { testMockData } from '../lib/sample-data/mock-data.js';
 import { publicOrigin } from '../lib/public-origin.js';
 import { buildMockPromptInput } from '../lib/workspace-api-mocks.js';
-import { isTestToken, failureOf } from './workspace-api-steps.js';
+import { isHermeticTestToken } from '../lib/should-mock-ai.js';
+import { failureOf } from './workspace-api-steps.js';
 
 /**
  * Send a generated prompt as JSON (default) or as a downloadable markdown
@@ -224,7 +225,7 @@ export function createPromptsRoutes({ workspaceFromUrl, promptTraceStore, custom
     try {
       // The issue and the context the template reads: fixtures in test mode, else the provider's.
       let identifier, issue, context;
-      if (isTestToken(workspace)) {
+      if (isHermeticTestToken(workspace.accessToken)) {
         const mock = buildMockPromptInput(issueId);
         if (!mock) {
           return notFound.json(res, 'Issue not found');
@@ -321,7 +322,7 @@ export function createPromptsRoutes({ workspaceFromUrl, promptTraceStore, custom
 
     try {
       // Use mock data in test mode
-      if (isTestToken(workspace)) {
+      if (isHermeticTestToken(workspace.accessToken)) {
         const mockIssue = testMockData.issues.find(i => i.id === issueId);
         if (!mockIssue) {
           return notFound.json(res, 'Issue not found');
