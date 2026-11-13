@@ -3444,7 +3444,7 @@ async function bulkAgreeSelected(rowCore = bulkAgreeRow) {
 // builder now live in the ONE shared reply-delivery surface
 // (`window.ReplyDelivery`, public/common.js) so the run-page card and this
 // Rulings tab use the same implementation. These thin wrappers keep this
-// file's `module.exports` test seams (`resolveRecordTarget`,
+// file's exported test seams (`resolveRecordTarget`,
 // `composeDispatchPrompt`) resolving to the shared code, read at CALL time so
 // a sandbox without common.js still loads this script.
 function resolveRecordTarget(anchor, recordOn, hydrateResult) {
@@ -4869,9 +4869,6 @@ window.addEventListener('beforeunload', (e) => {
 
 document.addEventListener('DOMContentLoaded', init);
 
-// Test-only seam (inert in the browser, where `module` is undefined): expose the
-// pure presentation helpers so the §6.3/§6.4 fidelity rules can be unit-tested
-// without a DOM. Not part of the page's runtime contract.
 // Module-state accessors for the test seams (LIN-4463 piece 4). A module namespace is read-only, so the `let`
 // state is reached through these, where the classic script exposed a getter/setter pair on its export object.
 function getOpenLoopIds() { return openLoopIds; }

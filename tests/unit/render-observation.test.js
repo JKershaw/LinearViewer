@@ -162,7 +162,9 @@ describe('render-observation: bulk-scan script wiring (LIN-2700 / LIN-2651 Phase
     const observationAt = out.indexOf('<script type="module" src="/observation.js"></script>');
     assert.ok(commonAt > -1 && scanAt > -1 && observationAt > -1, 'all three scripts are present');
     assert.ok(scanAt > commonAt, '/scan.js must load after /common.js (it reads escapeHtml/relativeTime at top level)');
-    assert.ok(scanAt < observationAt, '/scan.js must load before /observation.js (its consumer)');
+    // A layout pin only: the module's execution order comes from `type="module"`, not from this position.
+    assert.ok(scanAt < observationAt, '/scan.js is written before /observation.js in the page (layout pin, not an execution-order witness)');
+    assert.equal(out.includes('/cost-format-global.js'), false, 'the page takes no bridge');
   });
 });
 

@@ -53,7 +53,7 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
 
 - A module's exports are its test seams, and a namespace is read-only. A classic getter/setter pair on the export object
   becomes a named function (`getOpenLoopIds`/`setOpenLoopIds` in `public/observation.js`); a `let` read through the
-  namespace is live. Keep each export's name from the old seam, so a suite changes how it loads and not what it asserts.
+  namespace is live. Keep each export's name from the old seam where it can stay a function (`lastRulingsRef`); an accessor named after its own state gains a verb (`openLoopIds` → `getOpenLoopIds`), so a suite changes how it loads and not what it asserts.
   A suite reaches module state through the seam, never by a script-scope probe. (LIN-4463 piece 4.)
 
 ## Waiting
@@ -90,6 +90,16 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   1,985 of its 4,679 non-blank lines are comments. Find out why it is this large before splitting it. An earlier survey
   used a different method, so its figure is not comparable. (LIN-4446 plan.) It is a native module now (LIN-4463
   piece 4); converting it did not change its size, and its suites still run most of its 105 seams.
+- `public/observation.js`: it is a module but still reads `public/common.js` globals bare (`escapeHtml`,
+  `relativeTime`, `window.api`, `taskPageHref`/`sourceQuery`, `ReplyDelivery`, `ScanSection`), and each of its module
+  suites (`tests/unit/observation-module.test.js`, `tests/unit/task-page-link-client-surfaces.test.js`,
+  `tests/unit/observation-ruling-delivery.test.js`) rebuilds that contract by hand, differently: one stubs `escapeHtml`
+  and `relativeTime`, one passes the real lib leaves, and the ruling-delivery suite runs `public/common.js` into the
+  process global with `vm.runInThisContext` and an `importWorld({})` baseline it never restores (that keeps it in the
+  classic-loader census). Two ways out, and the choice is a design call spanning several suites: one shared
+  observation-world helper for the suites, or move the page's `public/common.js` reads to imports (which needs those
+  names extracted from `public/common.js` as leaves). Settle it with the next change to `public/observation.js`.
+  (LIN-4463 piece 4 blind read.)
 - `public/llms.txt`: its H11 names the unscoped `/api/recommend/status`, which is now only a
   legacy redirect (`routes/legacy-redirects.js`), and its view list omits `projects` and
   `live-console` (`lib/components/view-nav.js`; live-console shows for an owner with a live runner key or queue token
