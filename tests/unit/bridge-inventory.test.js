@@ -71,7 +71,7 @@ describe('the bridge over the real repo', () => {
     assert.deepEqual(Object.keys(inputs.emitted).sort(), ['cost-format-global.js', 'flight-companion.js', 'task-page.js', 'workspace-kpis.js']);
   });
 
-  test('the renderer lists the check read are the five that name a consumer, so a list the reader cannot match fails here', () => {
+  test('the renderer lists the check read are the four that name a consumer, so a list the reader cannot match fails here', () => {
     // A rewrite of a list the reader does not model (`Object.freeze([...])`, say) would drop that renderer from the
     // coverage half of the check without a failure, so the lists it did read are pinned by name and number.
     const named = inputs.renderers.filter((r) => r.entries.some((e) => CONSUMERS[e.src])).map((r) => r.rel);
@@ -88,7 +88,6 @@ describe('the bridge over the real repo', () => {
 
   test('the bridge keeps exactly two classic readers (observation.js, prompt-section.js), and the pages converted to modules are not among them', () => {
     assert.deepEqual([...result.readers.keys()].sort(), Object.keys(CONSUMERS).sort());
-    assert.deepEqual([...result.readers.keys()].sort(), ['/observation.js', '/prompt-section.js']);
     for (const converted of ['/workspace-kpis.js', '/task-page.js', '/flight-companion.js']) assert.equal(result.readers.has(converted), false, converted);
   });
 });

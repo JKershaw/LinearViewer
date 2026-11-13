@@ -214,17 +214,17 @@ if (mounted) {
   // candidate) must set it too, or F5 silently returns with nothing going red:
   // the e2e witness only drives the finishTurn path.
   var restoringFocusProgrammatically = false;
-
-  // ─── Pure helpers (exposed via the test seam at the bottom — no DOM) ────
-
-  // LIN-2771: the wall clock the cadence anchor is stamped against. A module
-  // function (defaulting to Date.now) rather than a bare Date.now() call at
-  // each anchor site, so unit tests can pin the clock deterministically via
-  // the exported setNowFn seam below — the anchors and the resume arithmetic
-  // are wall-clock, never elapsed-time guesses. formatNextCheckIn keeps its
-  // OWN injected nowMs argument, unchanged.
-  var nowFn = null;
 }
+
+// ─── Pure helpers (exposed via the test seam at the bottom — no DOM) ────
+
+// LIN-2771: the wall clock the cadence anchor is stamped against. A module
+// function (defaulting to Date.now) rather than a bare Date.now() call at
+// each anchor site, so unit tests can pin the clock deterministically via
+// the exported setNowFn seam below — the anchors and the resume arithmetic
+// are wall-clock, never elapsed-time guesses. formatNextCheckIn keeps its
+// OWN injected nowMs argument, unchanged.
+var nowFn = null;
 function now() {
   return typeof nowFn === 'function' ? nowFn() : Date.now();
 }
