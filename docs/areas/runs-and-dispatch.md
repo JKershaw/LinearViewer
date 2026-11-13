@@ -144,3 +144,7 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   close-out). The entries above name the box/guard precedence split; this is its Done path. Whether
   a person's own check may pass the gate is a decision; the shared-trail test runs with
   `byPersonCheck: false`, so it never reaches this path. (Drift & Coherence Review, 13 Nov., second read; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+- `lib/cost-read-calls.js`: `readCalls` states the figure rule (`totalUsd` only when everything is priced and
+  complete; `pricedUsd` never counts a partial) in its own words, and the lineage figure in `lib/cost-read.js`
+  states it again, so a change to the rule is made twice. One shared helper would make it one, but it reaches the
+  lineage path and its goldens: larger than a fix. (LIN-4457 leftovers; Survey global on LIN-4457.)
