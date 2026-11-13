@@ -14,7 +14,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fmtDuration, relativeAgo } from '../../lib/time-words.js';
-import { shareTime } from '../../public/task-page.js';
+import { shareTime, tickClocks } from '../../public/task-page.js';
 import { createFakeDom } from './helpers/fake-dom.js';
 
 const NOW = new Date('2026-10-26T12:00:00.000Z');
@@ -68,5 +68,17 @@ describe('LIN-4472 — one home for the duration and relative-time words', () =>
     const { document } = createFakeDom();
     assert.equal(shareTime(document, '2026-10-26T10:00:00.000Z', NOW).textContent, '2 hours ago');
     assert.equal(shareTime(document, 'not a date', NOW).textContent, '');
+  });
+
+  test('the page\'s running clock paints fmtDuration\'s words for every span it can show', (t) => {
+    const NOW_MS = Date.parse('2026-10-26T12:00:00.000Z');
+    t.mock.method(Date, 'now', () => NOW_MS);
+    const { document } = createFakeDom();
+    for (const ms of [0, 999, 45_000, 59_000, 60_000, 6 * 60_000, 6 * 60_000 + 30_000, 59 * 60_000, 60 * 60_000, 4 * 3600_000 + 4 * 60_000, 26 * 3600_000]) {
+      const root = document.createElement('div');
+      root.innerHTML = `<span data-testid="session-run-elapsed" data-dispatched-at="${new Date(NOW_MS - ms).toISOString()}"></span>`;
+      tickClocks(root);
+      assert.equal(root.querySelector('[data-testid="session-run-elapsed"]').textContent, `in progress · ${fmtDuration(ms)}`, `${ms} ms`);
+    }
   });
 });

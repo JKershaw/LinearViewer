@@ -901,7 +901,7 @@ if (typeof document !== 'undefined' && document.addEventListener) {
 }
 
 // Named exports: the pure poll rule, the poll loop, the open-row memory and the render helpers the suites test. The page
-// itself starts from DOMContentLoaded, below; nothing here reads or writes a global (LIN-4472).
+// itself starts from the DOMContentLoaded listener above; the module writes no global (it reads some, behind guards) (LIN-4472).
 export {
   pollDelay,
   cadenceStatus,

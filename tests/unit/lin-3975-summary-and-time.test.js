@@ -57,7 +57,7 @@ describe('LIN-3975 — a moment reads as relative words, and taps to its exact t
   });
 });
 
-describe('LIN-3975 — the share list\'s words are the server\'s relativeAgo words', () => {
+describe('LIN-3975 — the share list is wired to relativeAgo (wiring check; the words themselves are pinned in lin-4472-time-words.test.js)', () => {
   test('the share list paints relativeAgo\'s words at every span the page shows', () => {
     const { document } = createFakeDom();
     const spans = [0, 59_000, 60_000, 59 * 60_000, 60 * 60_000, 23 * 3600_000, 24 * 3600_000, 3 * 86_400_000];

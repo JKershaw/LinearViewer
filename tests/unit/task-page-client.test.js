@@ -28,7 +28,6 @@ import { buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { gatherTaskStates } from '../../lib/home-row-states.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 
-
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
 function makeTimers() {
@@ -273,7 +272,7 @@ describe('poll safety (LIN-3340)', () => {
 describe('isGuestStateUrl (the onGone gate)', () => {
   const { isGuestStateUrl } = taskPage;
 
-  test('a guest share state URL reports gone', (t) => {
+  test('a guest share state URL reports gone', () => {
     assert.equal(isGuestStateUrl('/t/' + 'A'.repeat(43) + '/state'), true);
   });
 

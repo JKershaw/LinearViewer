@@ -7,7 +7,8 @@
  *   - `runIdsOf` links only the loops inside the 30-day window, built over store-shaped loops;
  *   - the rendered attempt: a link when the run is known, the plain reason when it is aged out, nothing for a guest;
  *   - `runPageHref` (server) and `window.runPageHref` (public/common.js) draw the same URL;
- *   - the server's duration (`fmtDuration`) and the page's ticking clock (`tickClocks`, which imports the same `fmtDuration` from lib/time-words.js) draw the same text.
+ *   - the server's running suffix is `fmtDuration`'s words, not minutes or hours spelled locally; the page's ticking clock is
+ *     pinned to the same words in lin-4472-time-words.test.js.
  *
  * Run with: node --test tests/unit/lin-3975-task-run-links.test.js
  */
@@ -20,8 +21,6 @@ import vm from 'node:vm';
 import { inReadWindow, READ_HORIZON_MS, READ_HORIZON_DAYS } from '../../lib/read-horizon.js';
 import { runPageHref } from '../../lib/task-page-href.js';
 import { fmtDuration } from '../../lib/time-words.js';
-import { createFakeDom } from './helpers/fake-dom.js';
-import { tickClocks } from '../../public/task-page.js';
 import { runIdsOf, buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { sessionIdByLoop } from '../../lib/pipeline-loops.js';
 import { sessionIdOf } from '../../lib/live-console.js';
@@ -209,18 +208,6 @@ describe('LIN-3975 — the server and the browser draw the same run link', () =>
 });
 
 describe('LIN-3975 — one duration format: the server\'s and the ticking clock\'s', () => {
-  test('the page\'s running clock paints fmtDuration\'s words for every span it can show', (t) => {
-    const NOW_MS = Date.parse('2026-10-26T12:00:00.000Z');
-    t.mock.method(Date, 'now', () => NOW_MS);
-    const { document } = createFakeDom();
-    for (const ms of [0, 999, 45_000, 59_000, 60_000, 6 * 60_000, 6 * 60_000 + 30_000, 59 * 60_000, 60 * 60_000, 4 * 3600_000 + 4 * 60_000, 26 * 3600_000]) {
-      const root = document.createElement('div');
-      root.innerHTML = `<span data-testid="session-run-elapsed" data-dispatched-at="${new Date(NOW_MS - ms).toISOString()}"></span>`;
-      tickClocks(root);
-      assert.equal(root.querySelector('[data-testid="session-run-elapsed"]').textContent, `in progress · ${fmtDuration(ms)}`, `${ms} ms`);
-    }
-  });
-
   test('the duration words are fmtDuration\'s: no formatSpan, and the running suffix is not spelled in minutes or hours', () => {
     const renderer = read('lib/render-task-page.js');
     assert.doesNotMatch(renderer, /formatSpan/);
