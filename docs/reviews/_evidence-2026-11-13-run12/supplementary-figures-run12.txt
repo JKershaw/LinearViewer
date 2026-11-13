@@ -1,0 +1,197 @@
+
+## S1. Scope and could-not-read counts
+H    e2d4659c4 files 566 parseFailures 0 unresolvedRelative 4 nonLiteralDynamic 0 unmapped 0 registry areas.head-registry.json
+B    b315e0e8f files 556 parseFailures 0 unresolvedRelative 4 nonLiteralDynamic 0 unmapped 0 registry areas.head-registry.json
+B11  b315e0e8f files 556 parseFailures 0 unresolvedRelative 4 nonLiteralDynamic 0 unmapped 0 registry areas.run11-registry-b315e0e8f.json
+window (B..H, first-parent): 35 commits; 67 files changed, 3201 insertions(+), 841 deletions(-)
+
+## S2. Guide-only check: run 11 commit with its own registry vs with the HEAD registry
+links, knots, areas identical: True | only areaMapSource differs: True
+
+## S3. Reciprocal pairs (a->b / b->a), H vs B, same HEAD registry
+pair set identical: True | count 13
+  Agent API (proxy)        <-> LLM & prompts             46/4    (B: 43/4)
+  Agent API (proxy)        <-> Other features             2/1  
+  Agent API (proxy)        <-> Providers (Linear, GitHu  21/3  
+  Agent API (proxy)        <-> Runs & dispatch           48/10   (B: 44/10)
+  Auth, accounts & workspa <-> Front end: server-render  14/11 
+  Auth, accounts & workspa <-> LLM & prompts              5/3  
+  Auth, accounts & workspa <-> Providers (Linear, GitHu  13/1  
+  Front end: server-render <-> Other features            10/8    (B: 9/8)
+  Front end: server-render <-> Runs & dispatch           15/8    (B: 13/8)
+  LLM & prompts            <-> Other features             2/2  
+  LLM & prompts            <-> Providers (Linear, GitHu  15/4    (B: 14/4)
+  LLM & prompts            <-> Runs & dispatch           38/55   (B: 32/50)
+  Other features           <-> Runs & dispatch            6/6  
+cycle groups H: [9] B: [9]
+
+## S4. File-level edge diff B -> H (edge dump, same registry)
+edges 2135 -> 2180 added 51 removed 6
+listing: edge-diff-B-to-H.txt
+  LLM & prompts        -> Runs & dispatch      B  32  H  38
+  Runs & dispatch      -> LLM & prompts        B  50  H  55
+  Agent API (proxy)    -> LLM & prompts        B  43  H  46
+  Agent API (proxy)    -> Runs & dispatch      B  44  H  48
+  Runs & dispatch      -> Agent API (proxy)    B  10  H  10
+  Front end: server-re -> Runs & dispatch      B  13  H  15
+  Front end: server-re -> Other features       B   9  H  10
+  LLM & prompts        -> Providers (Linear, G B  14  H  15
+  Providers (Linear, G -> LLM & prompts        B   4  H   4
+  Auth, accounts & wor -> LLM & prompts        B   5  H   5
+  Other features       -> Runs & dispatch      B   6  H   6
+LLM -> Runs edges added: ['lib/prompt-template-defs.js -> lib/run-ledger.js', 'lib/recommendation-blind-read.js -> lib/recent-runs.js', 'lib/recommendation-blind-read.js -> lib/run-closeout-state.js', 'lib/recommendation-blind-read.js -> lib/run-ledger.js', 'lib/recommendation-live-wait.js -> lib/recent-runs.js', 'lib/recommendation-look-first.js -> lib/run-ledger.js']
+Runs -> LLM edges added: ['lib/dispatch-entrance.js -> lib/recommendation-live-wait.js', 'lib/dispatch-leftover-answer.js -> lib/prompts/leftover-words.js', 'lib/plan-review-round-trips.js -> lib/prompts/blind-read-words.js', 'lib/recent-runs.js -> lib/prompts/blind-read-words.js', 'lib/run-ledger.js -> lib/prompts/blind-read-words.js', 'lib/run-ledger.js -> lib/prompts/survey-words.js']
+Runs -> LLM edges removed: ['lib/dispatch-entrance.js -> lib/recommendation-look-first.js']
+
+## S5. Hubs and doors: importers (in) / cross-area in / outbound / cross-area out / lines, B -> H
+file | in/crossIn/out/crossOut (B) | (H) | lines B -> H
+lib/run-ledger.js                    6/2/0/0      11/7/2/2     433 -> 728
+lib/openrouter.js                    33/25/11/2   33/25/13/2   2242 -> 2254
+lib/workspace-preferences.js         16/16/4/4    16/16/4/4    511 -> 511
+lib/dispatch-factory.js              9/5/18/14    9/5/18/14    1408 -> 1408
+lib/dispatch-store.js                7/6/10/3     7/6/10/3     4530 -> 4530
+lib/periodicals.js                   8/8/1/0      9/8/1/0      1353 -> 1416
+lib/task-page-loader.js              8/7/21/10    9/8/22/10    1544 -> 1578
+lib/run-controls.js                  21/19/3/3    21/19/3/3    152 -> 152
+lib/cost-read.js                     11/7/7/2     12/7/7/2     762 -> 854
+lib/tree.js                          8/6/3/3      8/6/3/3      684 -> 684
+lib/as-asked.js                      25/12/1/1    25/12/1/1    350 -> 348
+lib/recommendation-look-first.js     3/2/7/3      1/0/8/4      228 -> 184
+lib/recommendation-blind-read.js     0/0/0/0      1/0/6/5      None -> 79
+lib/recommendation-live-wait.js      0/0/0/0      4/3/1/1      None -> 80
+lib/recent-runs.js                   3/3/3/2      5/5/4/3      127 -> 141
+lib/run-view.js                      15/11/5/1    17/12/5/1    561 -> 570
+lib/prompt-template-defs.js          2/0/8/2      1/0/11/3     1271 -> 1372
+lib/proxy-preamble.js                11/10/6/4    11/10/6/4    931 -> 950
+lib/providers/state-map.js           29/27/1/0    30/28/1/0    117 -> 117
+lib/task-timeline.js                 0/0/0/0      3/2/3/1      None -> 506
+lib/render-task-timeline.js          0/0/0/0      3/2/6/4      None -> 230
+lib/task-cost-read.js                0/0/0/0      3/2/3/0      None -> 120
+lib/session-roles.js                 0/0/0/0      1/0/2/0      None -> 61
+lib/dispatch-leftover-answer.js      0/0/0/0      2/2/1/1      None -> 147
+lib/recommendation-facts.js          10/6/7/4     11/6/7/4     718 -> 737
+lib/chat-tools.js                    4/3/16/14    4/3/16/14    2029 -> 2029
+lib/dispatch-entrance.js             3/2/25/15    3/2/25/15    2057 -> 2057
+routes/proxy-writes.js               1/0/15/12    1/0/17/14    908 -> 976
+routes/proxy-compute.js              1/0/26/25    1/0/25/24    1682 -> 1633
+server.js                            0/0/204/204  0/0/205/205  4757 -> 4769
+
+## S6. Catch-all (Other features) and the ten new production files
+N1 Other-features files with a cross-area edge: B 18 H 18 | same set: True
+  new lib/dispatch-leftover-answer.js          -> Runs & dispatch
+  new lib/prompts/area-note-format.js          -> LLM & prompts
+  new lib/prompts/blind-read-words.js          -> LLM & prompts
+  new lib/prompts/survey-words.js              -> LLM & prompts
+  new lib/recommendation-blind-read.js         -> LLM & prompts
+  new lib/recommendation-live-wait.js          -> LLM & prompts
+  new lib/render-task-timeline.js              -> Front end: server-rendered pages
+  new lib/session-roles.js                     -> Runs & dispatch
+  new lib/task-cost-read.js                    -> Runs & dispatch
+  new lib/task-timeline.js                     -> Runs & dispatch
+
+## S7. Wrong-way and direction checks (H)
+lib -> routes edges: 0
+edges into server.js: 0
+non-Pages files importing lib/render-*.js (B, H): 20 20
+   renderer import from Runs & dispatch : lib/task-page-loader.js -> lib/render-run-steps.js
+   renderer import from Other features : lib/task-state.js -> lib/render-run-steps.js
+   renderer import from Runs & dispatch : routes/live-console.js -> lib/render-live-console.js
+   renderer import from Runs & dispatch : routes/runner-setup.js -> lib/render-runner-setup.js
+Runs modules importing a renderer (carried, LIN-4154 family): ['lib/task-page-loader.js -> lib/render-run-steps.js', 'routes/live-console.js -> lib/render-live-console.js', 'routes/runner-setup.js -> lib/render-runner-setup.js']
+render-task-timeline.js outbound edges (a renderer importing run logic is the right way round): ['lib/render-task-timeline.js -> lib/components/section.js', 'lib/render-task-timeline.js -> lib/cost-format.js', 'lib/render-task-timeline.js -> lib/render-run-steps.js', 'lib/render-task-timeline.js -> lib/run-view.js', 'lib/render-task-timeline.js -> lib/task-page-loader.js', 'lib/render-task-timeline.js -> lib/utils/html.js']
+
+## S8. Reports scripts outside the import tool scope that import lib/ (the tool reads server.js, lib, routes, public)
+  scripts/code-shape/retention.mjs                   lib imports: []
+  scripts/code-shape/retention-core.mjs              lib imports: []
+  scripts/stability-measures.mjs                     lib imports: ['../lib/prompts/area-note-format.js']
+  scripts/stability-measures-core.mjs                lib imports: []
+  scripts/stability-measures-tracker.mjs             lib imports: []
+  scripts/stability-measures-blind.mjs               lib imports: ['../lib/prompts/blind-read-words.js', '../lib/run-ledger.js']
+  scripts/stability-measures-seat.mjs                lib imports: ['../lib/dispatch-terminal.js']
+
+## S9. Co-change, 60 days, the same registry (HEAD) for both commits
+B: 942 418 76 8061 shallow False
+H: 914 399 76 8855 shallow False
+B under run-11 registry: 942 418 76 8061
+pairs moved by the guide edit alone (B under run-11 registry vs under HEAD registry):
+  Agent API (proxy) <-> Other features: 17 -> 20
+  Agent API (proxy) <-> Runs & dispatch: 123 -> 122
+  Front end: browser code <-> Other features: 28 -> 30
+  Front end: browser code <-> Runs & dispatch: 90 -> 89
+  Front end: server-render <-> Other features: 31 -> 34
+  Front end: server-render <-> Runs & dispatch: 97 -> 96
+  LLM & prompts <-> Other features: 16 -> 18
+  LLM & prompts <-> Runs & dispatch: 109 -> 108
+  Other features <-> Reports & operator tools: 5 -> 7
+  Other features <-> Runs & dispatch: 37 -> 41
+  Other features <-> Web routes (pages & work: 33 -> 34
+  Other features <-> Wiring (server.js): 27 -> 28
+  Runs & dispatch <-> Web routes (pages & work: 120 -> 119
+  Runs & dispatch <-> Wiring (server.js): 85 -> 84
+pairs B -> H (HEAD registry, same 60-day length):
+  Front end: browser code <-> Front end: server-render: 138 -> 128
+  Agent API (proxy) <-> Runs & dispatch: 122 -> 124
+  Runs & dispatch <-> Web routes (pages & work: 119 -> 117
+  LLM & prompts <-> Runs & dispatch: 108 -> 112
+  Front end: browser code <-> Web routes (pages & work: 103 -> 94
+  Front end: server-render <-> Web routes (pages & work: 99 -> 96
+  Web routes (pages & work <-> Wiring (server.js): 93 -> 89
+  Front end: browser code <-> Runs & dispatch: 89 -> 88
+  LLM & prompts <-> Web routes (pages & work: 83 -> 78
+  Agent API (proxy) <-> Web routes (pages & work: 82 -> 78
+  Agent API (proxy) <-> LLM & prompts: 82 -> 81
+  Front end: server-render <-> Wiring (server.js): 81 -> 80
+  Front end: browser code <-> Wiring (server.js): 71 -> 68
+  Auth, accounts & workspa <-> Wiring (server.js): 58 -> 56
+  Auth, accounts & workspa <-> Web routes (pages & work: 57 -> 54
+  Front end: browser code <-> LLM & prompts: 49 -> 47
+  Agent API (proxy) <-> Wiring (server.js): 48 -> 46
+  Agent API (proxy) <-> Front end: browser code: 47 -> 43
+  Platform & plumbing <-> Runs & dispatch: 43 -> 45
+  Auth, accounts & workspa <-> Front end: server-render: 45 -> 41
+  Other features <-> Runs & dispatch: 41 -> 42
+  LLM & prompts <-> Wiring (server.js): 40 -> 39
+  Agent API (proxy) <-> Platform & plumbing: 35 -> 37
+  Platform & plumbing <-> Web routes (pages & work: 35 -> 36
+  Agent API (proxy) <-> Auth, accounts & workspa: 36 -> 35
+  Auth, accounts & workspa <-> Front end: browser code: 29 -> 27
+  Front end: server-render <-> Platform & plumbing: 28 -> 29
+  Front end: browser code <-> Platform & plumbing: 27 -> 28
+  Auth, accounts & workspa <-> LLM & prompts: 26 -> 25
+  LLM & prompts <-> Platform & plumbing: 23 -> 24
+  Providers (Linear, GitHu <-> Runs & dispatch: 24 -> 23
+  Front end: server-render <-> Providers (Linear, GitHu: 23 -> 21
+  Agent API (proxy) <-> Other features: 20 -> 21
+  Providers (Linear, GitHu <-> Web routes (pages & work: 20 -> 18
+  LLM & prompts <-> Other features: 18 -> 19
+  LLM & prompts <-> Providers (Linear, GitHu: 19 -> 18
+  Reports & operator tools <-> Web routes (pages & work: 18 -> 19
+  Agent API (proxy) <-> Providers (Linear, GitHu: 18 -> 16
+  Platform & plumbing <-> Reports & operator tools: 18 -> 17
+  LLM & prompts <-> Reports & operator tools: 14 -> 16
+  Providers (Linear, GitHu <-> Wiring (server.js): 14 -> 13
+  Auth, accounts & workspa <-> Providers (Linear, GitHu: 14 -> 12
+  Front end: browser code <-> Providers (Linear, GitHu: 13 -> 12
+  Other features <-> Platform & plumbing: 10 -> 11
+  Auth, accounts & workspa <-> Other features: 8 -> 7
+
+## S10. Window reconciliation of co-change pairs (commits in each 60-day window)
+B window 942 H window 914 shared 879 B-only 63 H-only 35
+  Front end: browser cod <-> Front end: server-rend: B 138 - B-only 12 + H-only 2 = 128 (H reads 128)
+  Agent API (proxy) <-> Runs & dispatch: B 122 - B-only 4 + H-only 6 = 124 (H reads 124)
+  LLM & prompts <-> Runs & dispatch: B 108 - B-only 6 + H-only 10 = 112 (H reads 112)
+  Front end: browser cod <-> Web routes (pages & wo: B 103 - B-only 10 + H-only 1 = 94 (H reads 94)
+  Web routes (pages & wo <-> Runs & dispatch: B 119 - B-only 6 + H-only 4 = 117 (H reads 117)
+
+## S11. Carried measures re-read at HEAD
+F6 window.X = assignments in public/: B 67, H 67 (grep -oE "window\.[A-Za-z_$][A-Za-z0-9_$]* ?=[^=]")
+route -> route edges (F5): B 53 H 53
+route -> route cross-area: B 3 H 3
+unresolved relative imports: B 4 H 4
+
+## S12. simple-dispatcher (scratch reader; seams.mjs reads 0 CommonJS files)
+5d8489e files 52 unmapped 0 unresolved 0 nonLiteral 0 fileEdges 157 areaLinks 20 reciprocal 6
+af9b496 files 52 unmapped 0 unresolved 0 nonLiteral 0 fileEdges 157 areaLinks 20 reciprocal 6
+reader output identical across the window (areaLinks, fileEdges, pairs): True
+cochange 5d8489e 104 50 15 243
+cochange af9b496 100 46 15 240

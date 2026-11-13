@@ -1,0 +1,7 @@
+sha256 of the runner contract at each commit
+LinearViewer lib/runner-kit/contract.json:
+  e2d4659c4bf07ed266735f718e85232e5f2a6458  602ab014062857bfba3e9aa543088472c3ba5dbc7cb0673da909e67ed727eb40
+  b315e0e8f3e1e5f3b5d6e634e53c5dc83b41d754  602ab014062857bfba3e9aa543088472c3ba5dbc7cb0673da909e67ed727eb40
+simple-dispatcher test/fixtures/runner-contract.json:
+  5d8489e7fd8434f0e69af7df11a3746790abbe64  602ab014062857bfba3e9aa543088472c3ba5dbc7cb0673da909e67ed727eb40
+  af9b496d57f042972b912a30eb8c4d1164bbab77  602ab014062857bfba3e9aa543088472c3ba5dbc7cb0673da909e67ed727eb40

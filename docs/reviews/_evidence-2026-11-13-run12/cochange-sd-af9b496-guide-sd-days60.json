@@ -1,0 +1,117 @@
+{
+ "commit": "af9b496d57f042972b912a30eb8c4d1164bbab77",
+ "windowStart": "2026-09-13T13:38:58.000Z",
+ "windowEnd": "2026-11-12T13:38:58.000Z",
+ "days": 60,
+ "changes": 100,
+ "shallow": false,
+ "changesTouchingMultipleAreas": 46,
+ "unmappedFiles": 240,
+ "pairs": [
+  {
+   "areas": [
+    "Loop, poll & routing",
+    "State, config & host process"
+   ],
+   "changes": 18
+  },
+  {
+   "areas": [
+    "Loop, poll & routing",
+    "Reapers & liveness"
+   ],
+   "changes": 15
+  },
+  {
+   "areas": [
+    "Reapers & liveness",
+    "State, config & host process"
+   ],
+   "changes": 15
+  },
+  {
+   "areas": [
+    "Loop, poll & routing",
+    "Test harnesses"
+   ],
+   "changes": 13
+  },
+  {
+   "areas": [
+    "Launch & harnesses",
+    "State, config & host process"
+   ],
+   "changes": 11
+  },
+  {
+   "areas": [
+    "State, config & host process",
+    "Stop hook & relay"
+   ],
+   "changes": 10
+  },
+  {
+   "areas": [
+    "State, config & host process",
+    "Test harnesses"
+   ],
+   "changes": 10
+  },
+  {
+   "areas": [
+    "Loop, poll & routing",
+    "Stop hook & relay"
+   ],
+   "changes": 9
+  },
+  {
+   "areas": [
+    "Reapers & liveness",
+    "Stop hook & relay"
+   ],
+   "changes": 9
+  },
+  {
+   "areas": [
+    "Reapers & liveness",
+    "Test harnesses"
+   ],
+   "changes": 9
+  },
+  {
+   "areas": [
+    "Launch & harnesses",
+    "Loop, poll & routing"
+   ],
+   "changes": 8
+  },
+  {
+   "areas": [
+    "Launch & harnesses",
+    "Test harnesses"
+   ],
+   "changes": 8
+  },
+  {
+   "areas": [
+    "Stop hook & relay",
+    "Test harnesses"
+   ],
+   "changes": 8
+  },
+  {
+   "areas": [
+    "Launch & harnesses",
+    "Reapers & liveness"
+   ],
+   "changes": 7
+  },
+  {
+   "areas": [
+    "Launch & harnesses",
+    "Stop hook & relay"
+   ],
+   "changes": 6
+  }
+ ]
+}
