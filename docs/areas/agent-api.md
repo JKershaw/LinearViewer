@@ -24,14 +24,16 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   the same `### Leftovers` heading mid-comment, so matching any heading line would refuse the verdict
   that gates merge (`routes/proxy-writes.js` `refusedByLeftoverAnswer`; caught at LIN-4414's plan
   review). Test it against real comments, review verdicts included (`tests/unit/dispatch-leftover-answer.test.js`).
+- A format check on an optional create field refuses (400); it is never the field's `present`
+  gate. As a `present` gate it skipped the value, and the issue was filed on a 201 without it: a
+  Jira key or a Linear identifier in `parentId` vanished. Check presence first, then the writable
+  contract, then the format (`routes/proxy-writes.js`, LIN-4451).
 
 ## Waiting
 
 - `routes/proxy-compute.js`: the recap/brief GET and POST handlers repeat one error-mapping chain
   and match provider errors by an "OpenRouter" substring; one helper beside `failureOf`, keyed on
   an error code, would hold "whole or loud". (Review, 8 Nov, on LIN-4358; area reads CG/CH.)
-- `routes/proxy.js`: `hashCredential` (proxyLimiter's key) is a second sha256-of-a-token helper
-  beside `ProxyTokenStore._hashToken`. One exported token hash. (Area reads CE/CF, LIN-4378.)
 - `lib/proxy-instructions.js`: the rate-limit rule (60/min per token; on a 429 wait `Retry-After`)
   is restated in ~eight places (quote one); it keys on the proven credential, else the IP
   (`routes/proxy.js`), so "per token" is wrong before auth. (Area reads
@@ -72,6 +74,9 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   does not know which stage a token was minted for. The blind read (LIN-4437) is blind by its prompt and preamble only: a
   reader that ignores them can read the ask and the plan. Holding it needs the stage on the token and a read guard per
   stage. By the consequence test it breaks nothing today, blocks no work and touches no safety. (LIN-4396 plan, witness 2.)
+- `routes/proxy-writes.js`: the PATCH route still drops a non-UUID `assigneeId`, `parentId` or
+  `cycleId` silently. Disposition (b) was applied to create only, and PATCH is the same shape.
+  (LIN-4451 Survey open-0 and open questions.)
 - `routes/proxy-compute.js`: about 16 production sites (this file x7, `server.js` x3, `routes/test.js`, and
   others) compare a credential to `'test-token'` inline, beside the one helper (`isHermeticTestToken`,
   `lib/should-mock-ai.js`) that only two production modules import. Each is gated on `NODE_ENV=test`, so

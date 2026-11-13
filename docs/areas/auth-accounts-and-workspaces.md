@@ -21,3 +21,7 @@ Area notes for `auth-accounts-and-workspaces` in the registry. Format and rules:
   them or says so, and Settings' "member" copy cannot hold there. That is a team-workspace
   decision bigger than a tidy; the missing invite itself is v1's deferral. (Onboarding &
   Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)
+- `lib/task-share-store.js`: share tokens are hashed by their own sha256-hex helper, the same
+  digest as `hashHarbourToken` (`lib/harbour-token-format.js`), which the proxy, dispatch and
+  feedback stores and the proxy limiter now share. A share token is not a Harbour-format token (no
+  prefix), so whether it takes the same helper is a naming call, not a fix. (LIN-4451 leftovers.)

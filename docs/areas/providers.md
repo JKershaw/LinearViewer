@@ -17,6 +17,17 @@
 - The Jira fake proves only the provider's own logic. It stores whatever it is handed and
   never normalises ADF, so it cannot show whether live Jira keeps a region's rendering.
   A claim about live behaviour needs a live check. (LIN-4450; the live check is LIN-4452.)
+- A Jira create chooses the epic field from its own project's create screen, never from the
+  tenant's field list. `parent` if the screen lists it, else Epic Link if it does; a screen with
+  neither is refused 422 before the create. A field that exists on the tenant can still be absent
+  from this screen, and writing it there is a 400 after the issue is half-filed. (LIN-4451,
+  `lib/providers/jira/index.js` `_epicCreateField`.)
+- The create metadata is read fresh on every create, with no cache. It is filtered by the
+  caller's own permissions, and a cache keyed on the site cannot tell two callers apart. Creates
+  are infrequent, so the round trips cost little. (LIN-4451, `createIssue` in the same file.)
+- A create that fails after the issue exists is a PartialWriteError telling the caller not to
+  retry. A retry would file a duplicate. Only the re-read can fail after the create, so that is
+  the one place this applies. (LIN-4451.)
 
 ## Waiting
 
@@ -26,3 +37,6 @@
   single-issue reads serve the exact words. `POST /rest/api/3/search/jql` accepts
   `properties`, so asking for it there would make the bulk path exact too. No guard or cache
   compares the two today. (LIN-4450 leftovers; Survey global, LIN-4450.)
+- `lib/providers/jira/index.js`: a Jira `parentId` is refused 400 (LIN-4451, review note 5,
+  disposition (b)), so subtask filing is not advertised. Accepting the issue key as the parent
+  (disposition (a)) needs an end-to-end filing test through the lanes. (LIN-4451 Survey open-0.)

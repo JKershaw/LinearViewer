@@ -116,7 +116,8 @@ describe('shared two-stage contract (all periodicals)', () => {
       });
 
       test('Stage 1: mints one review task and stops (the task is the deliverable)', () => {
-        assert.match(prompt, /Linear task/i);
+        // LIN-4451: the prompt names no tracker, so a Jira-backed mint reads the same.
+        assert.doesNotMatch(prompt, /Linear task/i);
         assert.match(prompt, /mint \*\*one\*\*|mint one/i);
         assert.match(prompt, /then stop/i);
         // The periodical does not do the review itself.
@@ -399,7 +400,8 @@ describe('corrective reviews: feed the notes, mint nothing (LIN-4380)', () => {
 // by a converted-template list, so a template cannot opt out of it by being left off a list.
 // Repeatable search for what it guards: grep -n "follow-up task\|mint\b" lib/periodicals.js
 describe('prompt census: no Periodical mints a follow-up (LIN-4380)', () => {
-  const STAGE2_OPEN = 'Write a Linear task whose description directs whoever runs it to:';
+  // LIN-4451: the connector no longer names Linear (a Jira-backed mint reads the same wording).
+  const STAGE2_OPEN = 'Write a task whose description directs whoever runs it to:';
   const STAGE2_CLOSE = 'Include this exact line as the first line';
   // Stage 1 keeps minting the ONE review task (the plan keeps the two-stage shape), so the
   // census reads only the review task's contract: the bullets between these two lines.

@@ -255,7 +255,7 @@ const resolveIssueStateRef = (provider, token, teamId, rawRef) =>
 
 // The first reason a create body is refused, or null. Order is the contract:
 // team, title, the shared field validation, then the LIN-1973 restrictive half.
-function issueCreateRefusal({ title, description, teamId, stateId, priority }, declared) {
+function issueCreateRefusal({ title, description, teamId, projectId, parentId, stateId, priority }, declared) {
   if (declared.includes('teamId') && (!teamId || typeof teamId !== 'string')) return 'Valid teamId is required';
   if (!title || typeof title !== 'string') return 'title is required';
   // Shared seam (length caps, control characters, priority range). Unlike the
@@ -268,6 +268,11 @@ function issueCreateRefusal({ title, description, teamId, stateId, priority }, d
   // explicit `stateId: ''` is still caught.
   if (stateId !== undefined && !declared.includes('stateId')) return 'stateId is not supported by this provider';
   if (priority !== undefined && !declared.includes('priority')) return 'priority is not supported by this provider';
+  // LIN-4451: the same rule for the epic and the parent. Without it a Jira session
+  // create would file the issue with its epic silently dropped (the in-app form never
+  // sends either, so only a direct API caller can reach this).
+  if (projectId !== undefined && !declared.includes('projectId')) return 'projectId is not supported by this provider';
+  if (parentId !== undefined && !declared.includes('parentId')) return 'parentId is not supported by this provider';
   return null;
 }
 

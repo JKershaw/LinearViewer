@@ -46,7 +46,6 @@ import { PartialWriteError } from '../../lib/partial-write-error.js'
 import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js'
 import { createJiraClient } from '../../lib/providers/jira/client.js'
 import { getProvider } from '../../lib/providers/registry.js'
-import { NotImplementedError } from '../../lib/providers/interface.js'
 import { SOURCE_JIRA } from '../../lib/providers/models.js'
 import { buildForest } from '../../lib/tree.js'
 
@@ -331,9 +330,8 @@ describe('JiraProvider capability profile', () => {
     assert.equal(p.supports('fetchRecommendationContext'), true, 'LIN-1910 — recap/brief/recommend/task-chat')
     assert.equal(p.supports('fetchIssueFields'), true, 'backs the dashboard lazy per-issue detail load, LIN-442')
     assert.equal(p.supports('fetchProjectsList'), true, 'LIN-1886 Step 2')
-    // createIssue stays deferred behind LIN-1557; everything else in the
-    // LIN-1886 write surface is now implemented.
-    assert.equal(p.supports('createIssue'), false)
+    // LIN-4451: createIssue is implemented (the project is the team, the epic is projectId).
+    assert.equal(p.supports('createIssue'), true)
     assert.equal(p.supports('updateIssue'), true)
     assert.equal(p.supports('createComment'), true)
     assert.equal(p.supports('addLabel'), true)
@@ -348,10 +346,10 @@ describe('JiraProvider capability profile', () => {
     }
   })
 
-  test('ui surface: write true (external create link) decoupled from inlineCreate false; inlineEdit true (LIN-1886)', () => {
+  test('ui surface: write true (create-URL gate) and inlineCreate true (LIN-4451, in-app form); inlineEdit true (LIN-1886)', () => {
     const p = new JiraProvider({ site: SITE })
     assert.equal(p.ui.write, true, 'getCreateTaskUrl is overridden')
-    assert.equal(p.ui.inlineCreate, false, 'createIssue is not implemented (deferred behind LIN-1557)')
+    assert.equal(p.ui.inlineCreate, true, 'createIssue is implemented (LIN-4451), so render shows the in-app form')
     assert.equal(p.ui.inlineEdit, true, 'updateIssue is implemented (LIN-1886)')
     assert.equal(p.ui.comments, true)
     assert.equal(p.ui.estimates, false)
@@ -779,8 +777,8 @@ describe('JiraProvider reads (fake client)', () => {
     assert.equal(comments[0].body, 'First comment')
   })
 
-  test('createIssue stays unimplemented (deferred behind LIN-1557) — still throws NotImplementedError', () => {
-    assert.throws(() => provider.createIssue({}, {}), NotImplementedError)
+  test('createIssue is implemented (LIN-4451): supports() is true, so the lanes route creates here', () => {
+    assert.equal(provider.supports('createIssue'), true)
   })
 
   test('fetchProjectsList returns the same canonical projects fetchProjects emits (LIN-1886 Step 2; LIN-2011 epic-derived)', async () => {
