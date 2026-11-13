@@ -11,6 +11,10 @@ Area notes for `other-features` in the registry. Format and rules: README.md.
 
 ## Waiting
 
+- `lib/stage-writes.js`: its header says `lib/prompts/stage-intent.js` keeps the reading-pass text and that
+  every prompt template declares `writes`; since LIN-4467 the text and `writes` are on each kind's record
+  (`lib/prompts/stage-kinds.js`), and stage-intent.js and the template are views. A two-path comment fix.
+  (LIN-4467 leftovers.)
 - `lib/home-view.js`: split it (over 600 lines), and separate `upNextOf`'s eligibility
   from its ranking, so both lists filter one candidate model. The module threads `shown`,
   `waiting`, `linked` and `onHome` through every placement. (Survey tally: LIN-4151,

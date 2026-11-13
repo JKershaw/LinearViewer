@@ -1,5 +1,6 @@
 /**
- * LIN-4253: a stage's traits are declared once, on its template. `route` says whether it is
+ * LIN-4253: a stage's traits are declared once, on its record (lib/prompts/stage-kinds.js since LIN-4467;
+ * the template is a view of it). `route` says whether it is
  * offered as a next step (`null` = hand-only). `writes` says what the stage may write. Every
  * reader asks the template: the stage selector, the router's refusal, the "Another step" list,
  * dispatch-entrance (which hands `writes` down) and the dispatch preamble.

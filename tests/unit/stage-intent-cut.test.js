@@ -1,6 +1,6 @@
 /**
  * LIN-4345: a stage that decides what gets built names each cut to the `## As asked` block and
- * raises one ruling. The rule has one home, `CUT` in lib/prompts/stage-intent.js, inside the
+ * raises one ruling. The rule has one home, `CUT` in lib/prompts/stage-kinds.js (LIN-4467), inside the
  * DECIDE scope line. So every deciding stage renders it once, and no judging, reading or filing
  * stage renders it at all. A template says only where its cuts are written.
  *

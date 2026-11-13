@@ -19,7 +19,7 @@ directory-wide `scripts/` one, because that would re-file the scripts already th
 move the code-shape census and co-change counts (the LIN-3829 caution in
 `tests/unit/area-map-placement.test.js`, which pins each named script). So a note entry
 about a doc, a test or an unnamed script cites the code that owns it first. For prompt
-text, that is usually `lib/prompt-template-defs.js` or `lib/prompts/stage-intent.js`.
+text, that is usually `lib/prompts/stage-kinds.js` or `lib/prompt-template-defs.js`.
 
 A new production file with no pattern falls through to the `^lib/` catch-all in
 Other features. Give it a home in the same change. A placement that was once wrong is

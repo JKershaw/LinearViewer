@@ -61,6 +61,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - `formatCiGateCheck` (`lib/prompt-formatters.js`) renders in implementation, review and close-out:
   a rule for one stage gets its own formatter beside it. Prove the others unchanged by rendering every
   kind, fresh and fix round, at HEAD and on the branch, not by the budget test, whose ceilings are caps (LIN-4441).
+- The blind-read scan in `tests/unit/stage-kind-tables.test.js` reads `git ls-files`: a new file is not
+  scanned until it is committed, so a local pass before the first commit proves nothing about it (LIN-4467).
 
 ## Waiting
 
@@ -164,14 +166,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   `lib/dispatch-leftover-answer.js` (any one to six characters, its comment calling it the guard's
   rule) and in simple-dispatcher's guard. A retirement line can name a path the guard would not read
   as one. Borderline. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
-- `lib/code-routes.js`: the review loop bound's step lives in its `CODE_ROUTES` entry, because the route has
-  no module of its own (`reviewLoopStop` is a fact in `lib/recommendation-facts.js`); the other three entries
-  only delegate to their modules. A fifth route, or a change to the bound, cannot follow one pattern. Waiting:
-  decide where the bound's step lives (its own module, or a `reviewLoopStep` beside `reviewLoopStop`) and make
-  the entry delegate like the rest. (LIN-4465 blind read.)
 - `lib/prompts/blind-read-words.js`: the blind read's kind has a constant and a scan, but every other kind in
   the same lists is still a literal (`SPINE` in `lib/run-view.js`, the `COMMENT_KINDS` rows in
   `lib/run-trail.js`, `CODE_ROUTES` in `lib/code-routes.js`), so the next stage added has two conventions to
-  choose from. Decide whether every kind gets a constant or only this one; LIN-4467 (one record per stage
-  kind) is the natural home, since a descriptor registry would make the spelling question disappear.
-  (LIN-4466 blind read.)
+  choose from. Decide whether every kind gets a constant or only this one. LIN-4467 made one record per stage
+  kind (`lib/prompts/stage-kinds.js`) but keys it by literals, so the question stands; the record is where a
+  constant per kind would live. (LIN-4466 blind read; LIN-4467 leftovers.)

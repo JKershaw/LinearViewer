@@ -49,8 +49,3 @@ Area notes for `platform-and-plumbing` in the registry. Format and rules: README
   prose `error` string, so a caller must parse a sentence to know which issue to read. Adding the issue id
   to `PartialWriteError` and the envelope widens a documented shape on the proxy and session lanes.
   (LIN-4452 blind read.)
-- `lib/workflow-config.js`: a label-config file that imported nothing now imports `BLIND_READ_KIND` from
-  `lib/prompts/`, which adds a plumbing -> llm-and-prompts edge; `VIRTUAL_PROMPTS.BLIND_READ` and
-  `BLIND_READ_KIND` are two exported names for one value while the other 15 entries stay literals. Putting
-  the literal back trips `tests/unit/stage-kind-tables.test.js`'s scan, which exempts keys, not values, so
-  it needs a decision on where the kind constants live. The edge was accepted on LIN-4448 (LIN-4466).

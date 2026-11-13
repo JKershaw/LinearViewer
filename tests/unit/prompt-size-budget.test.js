@@ -26,15 +26,17 @@
  * `scripts/steady-base-growth.mjs` (the four-week growth read), so a drift in
  * one instrument is visible in the other:
  *   - Templates source  : lib/prompt-template-defs.js, lib/prompt-templates.js,
- *                         lib/prompt-formatters.js, lib/prompt-contract.js
+ *                         lib/prompt-formatters.js, lib/prompt-contract.js,
+ *                         lib/prompts/stage-kinds.js (the stage-kind records, LIN-4467)
  *   - Templates rendered: generatePrompt() for each PROMPT_TEMPLATES key under one
  *                         fixed fixture (composed output, catches leaks through a
  *                         source the frozen file does not itself contain)
  *   - Stage router      : lib/stage-router.js, source (LIN-3304) + the routing prompt
  *                         rendered with the leaf fixture the eval baseline uses — the
  *                         one prompt a recommendation call sends (LIN-3300)
- *   - Stage intent      : lib/prompts/stage-intent.js, source — every stage's Scope
- *                         and Authority lines (was lib/prompts/brief-writer.js)
+ *   - Stage intent      : lib/prompts/stage-intent.js, source — the view of every
+ *                         stage's Scope and Authority lines, whose text is on the
+ *                         records since LIN-4467 (was lib/prompts/brief-writer.js)
  *   - Served runner     : docs/runner-prompt.md, source + buildRunnerKickoff() rendered
  *   - Leftover step     : leftoverPrompt() rendered (lib/dispatch-leftover.js, LIN-4373), the
  *                         one question a resumed builder is asked at its build's [done]
@@ -119,7 +121,7 @@ export const STAGE_ROUTER_SOURCE_CEILING = 8206; // LIN-4465: -63, the header po
  */
 export const ROUTER_PROMPT_RENDERED_CEILING = 10110; // LIN-4401 (LIN-4432 beat 4): +223 (9887 -> 10110): the audit's whenNot clause for a landing an audit already ran on (TRAIL FACTS), with the notes PR's route, and close-out's when for an approved notes PR on a Done ticket; LIN-4370 before it: +96, scoping's `when` covers a size ruling answered after the look-first route's one scoping run; whether a comment answers the ruling is the selector's reading, so code cannot settle it
 
-/** Every stage's Scope and Authority lines, source bytes (lib/prompts/stage-intent.js). */
+/** The Scope and Authority view, source bytes (lib/prompts/stage-intent.js; the lines are on the records, LIN-4467). */
 export const STAGE_INTENT_SOURCE_CEILING = 1424; // LIN-4467: -2295 (3719 -> 1424): the Scope and Authority texts moved to each kind's record (lib/prompts/stage-kinds.js, counted in TEMPLATES_SOURCE_CEILINGS); this file is the view. LIN-4437 before it: +296, the blind read's own reading-pass line, which names no ticket (READING and JUDGE both point at it); whether the reader stays blind is held by the preamble and the attachments skip, tested
 
 /** Served runner prompt, source bytes (docs/runner-prompt.md). */
