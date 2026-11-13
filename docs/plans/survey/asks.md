@@ -231,3 +231,92 @@ John expects agents to reach for big moves here: "very likely to get agents tryi
 **Done when** each confirmed problem is fixed in code and its ticket closed for that reason, or John has ruled it can wait.
 
 **Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.
+
+---
+
+## Batch 3: after the switch (drafted 13 Nov; not yet read back)
+
+From the gate discussion (`gate-2026-11-13.md`, section 5). Points 2 and 3 decided one ask per tidy lane, written from real cases, and workspace sharing as one big tidy.
+
+### A13. Runs & dispatch, left simpler (gate point 2)
+
+**Title:** Runs & dispatch, left simpler: each rule written once, the area's waiting work settled, in pieces of varied size
+
+**Repository:** JKershaw/LinearViewer (Harbour).
+
+**What this is for.** John: "we've not been applying quite the right force to bend the curve… now want to run both real work, and some real tidies." The Seams & Tangles and Drift & Coherence reviews of 13 Nov found the area carrying rules written twice. Batch 1 introduced several of them:
+- The owner's check sets a stop-at-PR task Done without asking the blind-read gate, while close-out's guard refuses the same trail, and a read is then sent to a ticket that's already Done (Drift run 7, row 158). John's ruling: "if I choose to do something, Harbour is a passenger. This reflects that for many real projects, they're unlikely to be exclusively changed via Harbour."
+- Two readers decide which PRs belong to a task's landing, and they disagree on agent notes, so a blind read can be offered over a PR no review covered (Seams run 12, §3.0a).
+- The task timeline picks a dispatch's model by its own rule, beside the cost fold's (Drift row 150).
+- The live-stage wait is a runs refusal kept with the prompts (Seams P-LW1).
+
+The area's note holds 20 Waiting entries, and `lib/dispatch-store.js` is 4,530 lines.
+
+**What we want.**
+- Each rule in the area has one home, and the copies are gone.
+- The area's Waiting entries are settled, or each says why it can't be yet.
+- When a person acts, Harbour follows: one rule, written once.
+- Each piece finishes one move and names what it retired. John: "I'd be happy to run a small variety, erring larger, to see", so piece sizes vary, leaning larger.
+- The other side of the LLM & prompts seam is A14's. Moving files between areas was tried three ways and didn't help (Seams run 12).
+
+**Done when**
+- the cases above are settled, or John has ruled they can wait;
+- the area's Waiting entries are settled or say why not;
+- the area reads better in a blind read after the lane than before it, beside an untouched area read at the same times.
+
+**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.
+
+### A14. LLM & prompts, left simpler, with its safety problems closed in code (gate points 2 and 3)
+
+**Title:** LLM & prompts, left simpler: rules written once, limits held in code rather than prompt words, in pieces of varied size
+
+**Repository:** JKershaw/LinearViewer (Harbour).
+
+**What this is for.** The tightest knot in Harbour runs between LLM & prompts and Runs & dispatch (Seams run 12: 32/50 → 38/55 links over batch 1). On this side:
+- the list of code-settled routes is copied about nine times, and `docs/architecture/prompt-system.md` and `public/llms.txt` already describe it wrongly (Drift row 154);
+- the blind read's kind and heading are retyped outside their words file (Drift row 151);
+- the frozen prompt total rose with every batch-1 ask (A6 +5,425 bytes, A1 +13,182 and +897, LIN-4441 +1,002) and is now 378,915 bytes;
+- LIN-4350 asks to fold the rules together into plainer, more general instructions.
+
+The safety pass (A5, LIN-4400) found two themes here: merge and read-only limits that exist only in prompt text (LIN-1242, LIN-1273, LIN-3417), and tokens inside prompt text (LIN-1372, LIN-1395, LIN-1408). These are part of A12 (LIN-4416). The area's note holds 26 Waiting entries.
+
+**What we want.**
+- Each rule has one home; the copies are gone, and the docs say what the code does.
+- A limit that matters is held in code, not only in a prompt's words.
+- The prompt total ends smaller than it started.
+- The area's Waiting entries are settled, or each says why it can't be yet.
+- Each piece finishes one move and names what it retired; piece sizes vary, leaning larger.
+- The other side of the Runs & dispatch seam is A13's.
+
+**Done when**
+- the cases above are settled, or John has ruled they can wait;
+- the safety tickets named above are closed in code for that reason, or John has ruled they can wait;
+- the frozen prompt total is lower than 378,915 bytes;
+- the area reads better in a blind read after the lane than before it, beside an untouched area read at the same times.
+
+**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.
+
+### A15. A team shares a workspace, set up the way people expect (gate point 3)
+
+**Title:** A team shares a workspace, set up the way people expect from a SaaS or CI tool: one idea of who belongs and what they can do
+
+**Repository:** JKershaw/LinearViewer (Harbour), and JKershaw/simple-dispatcher if the runner needs it.
+
+**What this is for.** A small outside team will hand Harbour real work, and today they can't share a workspace. Each person's "Continue with Jira" makes their own workspace, with its own owner and runner key, and nothing joins them or says so. Linear workspaces are keyed on the organisation, so they share. John: "Sharing workspaces and how that's set up (essentially following a standard Saas/CICD model) feels like one big tidy?"
+
+The code carries the same question in several places:
+- "owner" means two things: the workspace's owner edge, and a credential-scope `ownerAccountId` (about 269 references), and CLAUDE.md has an invariant warning not to confuse them;
+- any workspace member can mint read and read-write proxy tokens (LIN-4215, on A12's safety list);
+- removing a workspace doesn't revoke tokens for accounts merged into the user's (LIN-3836).
+
+**What we want.**
+- A team shares one workspace, whatever tracker it uses, set up the way a team expects from a standard SaaS or CI tool.
+- One idea, written once, of who belongs to a workspace and what each person can do.
+- Taken as one big tidy, in pieces that each finish a move and name what they retired, erring larger.
+
+**Done when**
+- on John's Jira, a second person joins the same workspace as John and can use it;
+- the code has one meaning of workspace owner;
+- LIN-4215 and LIN-3836 are closed for that reason, or John has ruled they can wait.
+
+**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.
