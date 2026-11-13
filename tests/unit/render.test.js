@@ -511,15 +511,16 @@ describe('"+ Add task" across real providers (LIN-1973 F2)', () => {
 });
 
 // =============================================================================
-// Jira external deep-link branch byte-identity (LIN-1973 review F2): the
+// External deep-link branch byte-identity (LIN-1973 review F2): the
 // landing comment for PR #1101 claimed this was pinned by a diff-equality
 // check that did not actually exist. This is that pin — any edit to the
 // `ui.write` branch below must be a deliberate, reviewed change, not a silent
 // side effect of touching the neighbouring `ui.inlineCreate` branch this
-// session added.
+// session added. Jira took this branch until LIN-4451 gave it createIssue; no
+// in-tree provider takes it now, so the pin guards the branch's text only.
 // =============================================================================
 
-describe('Jira/external deep-link branch stays byte-identical (LIN-1973 F2)', () => {
+describe('External deep-link branch stays byte-identical (LIN-1973 F2)', () => {
   test('the `else if (isRealProject && ui.write)` branch in lib/render.js is pinned verbatim', async () => {
     const fs = await import('node:fs/promises');
     const src = await fs.readFile(new URL('../../lib/render.js', import.meta.url), 'utf8');

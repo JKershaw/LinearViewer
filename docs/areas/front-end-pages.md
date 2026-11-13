@@ -45,3 +45,9 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   (`lib/task-timeline.js`: wake, resumed, or no records), and the legend's "woken or resumed" restates
   it again, though its header says it derives nothing. If the model ticks another role, the renderer
   styles it wrongly and the legend goes stale; the tick could carry its style. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+- `lib/render.js`: the external deep-link "+ Add task" branch has no in-tree provider since LIN-4451
+  (Jira was the last; GitHub Projects has no create affordance at all). The `getCreateTaskUrl`
+  overrides on Linear, GitHub, Local and Jira now only gate `ui.write`. Folding that gate into
+  `inlineCreate` would retire four overrides, the branch, its byte pin (`tests/unit/render.test.js`),
+  the `public/llms.txt` sentence and the decoupling guard in `tests/unit/providers.test.js`: larger
+  than a fix. (LIN-4451 leftovers.)
