@@ -5,7 +5,7 @@
  *    (the area lookup, the notes pull request, the committed-tool search, "cut") or a tracker clause the
  *    proxy's write guard refuses (lib/stage-writes.js, LIN-4468). A retired phrase must appear in no
  *    rendered prompt: not in a stage template, not in a Periodical reading, not in the dispatch preamble.
- *    (The rule is "more than one template fails"; the target is zero, which satisfies it.)
+ *    Each is asserted to occur zero times: a phrase left in even one prompt fails.
  * 2. The mandates the guard now enforces say what the stage is told about its token, and nothing the
  *    guard refuses: each non-work preamble is checked for the tracker words it used to restate.
  */
@@ -63,9 +63,9 @@ describe('LIN-4469: the folded spellings appear in no rendered prompt', () => {
   const prompts = renderedPrompts();
 
   for (const phrase of RETIRED) {
-    test(`"${phrase}" is in at most one template (none, once folded)`, () => {
+    test(`"${phrase}" is in no rendered prompt`, () => {
       const where = Object.entries(prompts).filter(([, text]) => text.includes(phrase)).map(([name]) => name);
-      assert.ok(where.length <= 1, `retired spelling appears in ${where.length} templates: ${where.join(', ')}`);
+      assert.equal(where.length, 0, `retired spelling appears in ${where.length} prompts: ${where.join(', ')}`);
     });
   }
 });

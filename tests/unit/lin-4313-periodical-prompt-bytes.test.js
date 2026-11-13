@@ -64,8 +64,9 @@
  *
  * LIN-4469 (piece 5) re-pinned 13 (all but Stability, Recent Headwinds and Integration Surface): the notes bullet's
  * "one docs-only pull request" sentence now reads NOTES_PR (lib/prompts/leftover-words.js), the committed-tool
- * sentences of Drift & Coherence and Seams & Tangles (both bullets) are built by `committedSearch` (lib/periodicals.js;
- * Stability's is built the same way, its bytes unchanged), and the rebase instruction is gone (the clause says "off main"). The three
+ * sentences of Drift & Coherence, Seams & Tangles' second bullet and Stability are built by `committedSearch` (lib/periodicals.js;
+ * Stability passes its look-beside tail as the helper's second argument, its bytes unchanged; Seams & Tangles' first bullet is
+ * main's own words and does not use the helper), and the rebase instruction is gone (the clause says "off main"). The three
  * unchanged hashes are the witness that only the notes-bearing and tool-naming templates moved.
  */
 import { test } from 'node:test';
@@ -91,7 +92,7 @@ const PINNED = {
   "data-fetch-architecture": { plain: "baae7f6da1b0e984e02c785bb2648a6c91495a4410902b439bd89a64a3dfc910", autopilot: "d7468144971c5055c57d8a301097d1c9a5b91c76decba93e9d454b3cea99086c" },
   "integration-surface-maturity": { plain: "27e1d9f872b8e5301ec6132626e94df41353f24b5458c4614a83fc9278b2c139", autopilot: "d19a166bacb512047677c0665834a8eb50dc67e1f2e7f71179d96e6f25daaec6" },
   "onboarding-journey": { plain: "777ed2b45377f914ba7e72c68692ce46afdb181e6d4576dcc969af1198edb795", autopilot: "cb3cfcdf7cff642d0064ea098008d4fd6540cbe5beea6a4041619698dc249533" },
-  "seams-tangles": { plain: "4827c1da4a13cf42770cf36f57fc91bd49a8326dd5aad48715320030ba8f0a00", autopilot: "287148dc6dd1552c7f87b5d55c0eb9b94da7b6841e6612f8b4967986a8a8d0b7" },
+  "seams-tangles": { plain: "2db80fe6fc811372db2996bc8211cc88da20307628bae3196ce2ec5188468bde", autopilot: "ec8a33b09f331f60fca153866ba8ac097b5121f40a76f5f749819b60654da4d6" },
 };
 
 test('LIN-4313: every registry id has a pinned plain and Mint + Autopilot prompt, byte for byte', () => {
