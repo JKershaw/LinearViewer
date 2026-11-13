@@ -3797,3 +3797,12 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - **20:40 UTC ruling `lin4474-describe-blocks-cut`** (LIN-4447 piece 8, PR 1 in simple-dispatcher, which retires `columnProblems`, the duplicate row-shape checker). The ask says to delete "two describe blocks", but one also holds the sha256 drift check the ask relies on. So delete only the `columnProblems` test from it? It was recommended `accept`. **I suggested `accept`:** keeping the drift check is what the ask means. This is the fourth cut-rule false escalation today.
 - **21:48 UTC: John answered `lin4474-describe-blocks-cut`: accept** (keep the sha drift test). No rulings are open.
 - **~22:00 UTC: overnight rulings.** John asked whether I could keep lanes moving through rulings I could handle. The proxy can only suggest; a person's Agree discharges a ruling, by design. I offered a relayed standing direction on cuts for the three active lanes. **John: leave it, "we don't want to fight the system."** Overnight, I suggest on each new ruling, and lanes continue other pieces while one waits. Still to raise tomorrow: an ask to fix the cut rule in Harbour, so that only narrowing John's own words needs him, and so that answer options say what happens next. It needs his go-ahead.
+- **~22:20 UTC: budget plan for the week.**
+  - **Reading:** 41%, 6 points since 19:00, about 1.9% an hour.
+  - **What fits:** the reset is Thursday 19 Nov 07:00, about 129 hours away. Staying under 80% allows about 0.3% an hour, so we must slow down.
+  - **Agreed with John:**
+    - Runs & dispatch and LLM & prompts finish (about four items each).
+    - The front end pauses after the observation piece (PR #2445) merges. I relayed this on LIN-4463, read back word for word first.
+    - Everything else waits until after the reset: LIN-4342, LIN-4343, LIN-4449, the safety work, the Duplicate-state pass.
+  - **Rough forecast** (guesses): the finishing lanes 10–15 points, my after-reads 3–5, the A17 paper and review 3–5, the essay 3–5, Jira about 1. That lands at about 65–75%.
+  - I ask for a reading in the morning.
