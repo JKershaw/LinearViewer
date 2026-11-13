@@ -23,7 +23,8 @@
 // it lives beside that coder (docs/papers/harbour/cleaner-than-it-started-scripts/balance-sign.mjs).
 
 import { BLIND_READ_VERDICTS } from '../lib/prompts/blind-read-words.js';
-import { landingPrUrls, parseBlindRead, prOf } from '../lib/run-ledger.js';
+import { prOf } from '../lib/run-ledger.js';
+import { landingPrUrls, parseBlindRead } from '../lib/run-trail.js';
 import { landingPr, notMeasured, ownTicket, row } from './stability-measures-core.mjs';
 
 /** Piece 3's landing (LIN-4438): from this merge, close-out waits on a recorded `## Blind read` naming the PR. */

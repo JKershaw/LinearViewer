@@ -36,7 +36,8 @@ process.env.NODE_ENV = 'test';
 import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { lookFirstStep, lookFirstOff, lookFirstSteps, holdingComment, isSurveyComment, LOOK_FIRST_STEPS } from '../../lib/recommendation-look-first.js';
+import { lookFirstStep, lookFirstOff, lookFirstSteps, holdingComment, LOOK_FIRST_STEPS } from '../../lib/recommendation-look-first.js';
+import { commentKindOf } from '../../lib/run-trail.js';
 import { buildPeriodicalGateMarker, isPeriodicalReview } from '../../lib/periodicals.js';
 import { liveWaitOf, STAGE_IN_FLIGHT_CODE } from '../../lib/run-live-wait.js';
 import { getRecommendation, getRecommendationStream, setFetchImpl, setPromptTraceRecorder, buildSelectorArgs } from '../../lib/openrouter.js';
@@ -111,11 +112,12 @@ describe('step choice: survey-task, then survey-place, then scoping, each once',
     assert.equal(stepOf(leaf(), ctx(drill)), 'scoping');
   });
 
-  test('isSurveyComment reads the heading constant both Surveys post under, and only it', () => {
-    assert.ok(isSurveyComment(surveyTask('10:00').body, 'survey-task'));
-    assert.ok(!isSurveyComment(surveyTask('10:00').body, 'survey-place'));
-    assert.ok(!isSurveyComment(`${SURVEY_HEADINGS['survey-task']}x: T-1`, 'survey-task'), 'a longer heading is another heading');
-    assert.ok(!isSurveyComment('Survey open-0 looks fine', 'survey-task'), 'prose naming it is not the report');
+  // LIN-4458: a Survey's report is a comment of that Survey's kind (lib/run-trail.js, the one classifier).
+  test('a Survey\'s kind reads the heading constant both Surveys post under, and only it', () => {
+    assert.equal(commentKindOf(surveyTask('10:00').body), 'survey-task');
+    assert.notEqual(commentKindOf(surveyTask('10:00').body), 'survey-place');
+    assert.notEqual(commentKindOf(`${SURVEY_HEADINGS['survey-task']}x: T-1`), 'survey-task', 'a longer heading is another heading');
+    assert.notEqual(commentKindOf('Survey open-0 looks fine'), 'survey-task', 'prose naming it is not the report');
   });
 });
 

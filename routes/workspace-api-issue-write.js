@@ -38,6 +38,7 @@ import { commentDedupe, commentDedupeGenerations } from './proxy.js';
 import { isHermeticTestToken } from '../lib/should-mock-ai.js';
 import { refuseCapability } from './workspace-api-steps.js';
 import { sealForFiling } from '../lib/as-asked-seal.js';
+import { RULING_MARK } from '../lib/run-trail.js';
 
 
 // LIN-2208: whether the decision-answer stamp(s) for a given comment-dedupe
@@ -422,7 +423,7 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
     // retry (LIN-2933): an identical resubmission must still hit the same
     // dedupe entry, and the written body must not diverge between attempts.
     const key = dedupeKey(workspace.urlKey, issueId, body, commentDedupeGenerations.current(workspace.urlKey), 'human-comment');
-    const attributedBody = `${body}\n\n— Ruling recorded via Harbour`;
+    const attributedBody = `${body}\n\n${RULING_MARK}`;
 
     // Attribution (OQ2): a static fallback line, not a `provider.fetchViewer`
     // round-trip — see the plan's Attribution note for why. Reversible,

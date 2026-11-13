@@ -1,8 +1,8 @@
 /**
  * LIN-4437 (piece 2 of LIN-4396): the `blind-read` stage, sent by hand. Nothing gates on it yet.
  *
- *   - the readers' one home (lib/run-ledger.js): the comment shape, `landingPrUrls`, `latestBlindRead`,
- *     and `isCloseOut` with `firstHeading`/`firstLineOf` moved there (no local copies left);
+ *   - the readers' one home (lib/run-trail.js since LIN-4458): the comment shape, `landingPrUrls`,
+ *     `latestBlindRead`, and the comment kinds, `firstLineOf` with them (no local copies left);
  *   - witness 1: a read is never landing work and never an answer to a person (no loop, no silenced
  *     person), down to the selector's rendered facts with runs known;
  *   - witness 2: the read is blind: the prompt and its preamble carry no ticket text, no attachment
@@ -21,13 +21,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
+import { BLIND_READ_CODES } from '../../lib/run-ledger.js';
 import {
-  landingPrUrls, latestBlindRead, parseBlindRead, checkBlindRead, isBlindRead, BLIND_READ_CODES,
-  readRunLedger, latestReviewComment, isCloseOut
-} from '../../lib/run-ledger.js';
+  landingPrUrls, latestBlindRead, parseBlindRead, checkBlindRead, commentKindOf,
+  readRunLedger, latestReviewComment, isPersonComment
+} from '../../lib/run-trail.js';
 import { BLIND_READ_HEADING } from '../../lib/prompts/blind-read-words.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
-import { assembleTrailFacts, assemblePlanReviewFacts, isPersonComment } from '../../lib/recommendation-facts.js';
+import { assembleTrailFacts, assemblePlanReviewFacts } from '../../lib/recommendation-facts.js';
 import { buildSelectorArgs } from '../../lib/openrouter.js';
 import { recentRuns, stageRuns } from '../../lib/recent-runs.js';
 import { liveWaitOf } from '../../lib/run-live-wait.js';
@@ -83,14 +84,14 @@ describe('the comment shape (checkBlindRead, parseBlindRead)', () => {
     assert.equal(checkBlindRead(read1(1, [PR, OLD]).body, { landing: [PR] }).code, BLIND_READ_CODES.prsMismatch, 'an extra URL');
   });
   test('the heading is matched exactly: a longer heading, or a mention further down, is not a read', () => {
-    assert.equal(isBlindRead(`${BLIND_READ_HEADING} pilot\nVerdict: mixed`), false);
+    assert.equal(commentKindOf(`${BLIND_READ_HEADING} pilot\nVerdict: mixed`) === 'blind-read', false);
     assert.deepEqual(checkBlindRead(`${BLIND_READ_HEADING} pilot\nVerdict: mixed`), { ok: true, applies: false });
     assert.deepEqual(checkBlindRead(review(1).body + `\n\nThe ${BLIND_READ_HEADING} comment said same.\nVerdict: mixed`), { ok: true, applies: false });
-    assert.equal(isBlindRead(`\n\n${BLIND_READ_HEADING}: LIN-1\nVerdict: same. a b c ${PR}`), true, 'a `:` tail, after blank lines');
+    assert.equal(commentKindOf(`\n\n${BLIND_READ_HEADING}: LIN-1\nVerdict: same. a b c ${PR}`) === 'blind-read', true, 'a `:` tail, after blank lines');
   });
   test('a read is neither a review nor a close-out nor a person\'s comment', () => {
     assert.equal(latestReviewComment([read1(1)]), null);
-    assert.equal(isCloseOut(read1(1).body), false);
+    assert.notEqual(commentKindOf(read1(1).body), 'close-out');
     assert.equal(isPersonComment(read1(1).body), false);
   });
   test('parseBlindRead gives the model, or null for a malformed read', () => {
@@ -143,12 +144,16 @@ describe('latestBlindRead: over the whole trail', () => {
 });
 
 describe('no local copies: recommendation-facts imports the moved readers', () => {
-  test('isCloseOut, firstHeading and firstLineOf are defined only in lib/run-ledger.js', () => {
-    const facts = read('lib/recommendation-facts.js');
-    for (const name of ['isCloseOut', 'firstHeading', 'firstLineOf']) {
-      assert.doesNotMatch(facts, new RegExp(`(?:function|const)\\s+${name}\\b`), `${name} has no local definition`);
-      assert.match(read('lib/run-ledger.js'), new RegExp(`export (?:function|const) ${name}\\b`));
+  // LIN-4458 moved the openings to lib/run-trail.js; tests/unit/lin-4458-comment-kind-census.test.js
+  // holds every file to it. This keeps the original pin on the two files it named.
+  test('the close-out opening, firstHeading and firstLineOf are defined only in lib/run-trail.js', () => {
+    for (const file of ['lib/recommendation-facts.js', 'lib/run-ledger.js']) {
+      for (const name of ['isCloseOut', 'firstHeading', 'firstLineOf']) {
+        assert.doesNotMatch(read(file), new RegExp(`(?:function|const)\\s+${name}\\b`), `${file}: ${name} has no local definition`);
+      }
     }
+    assert.match(read('lib/run-trail.js'), /export const firstLineOf\b/);
+    assert.match(read('lib/run-trail.js'), /function firstHeading\b/);
   });
 });
 

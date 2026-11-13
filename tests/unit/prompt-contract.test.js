@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { formatStageContract } from '../../lib/prompt-contract.js';
-import { latestReviewComment, readRunLedger } from '../../lib/run-ledger.js';
+import { latestReviewComment, readRunLedger } from '../../lib/run-trail.js';
 import { extractPlanSection } from '../../lib/file-pointer.js';
 import { extractSessionFit } from '../../lib/recommendation-facts.js';
 import { extractVerdict, planReviewDueOf } from '../../lib/plan-review-round-trips.js';

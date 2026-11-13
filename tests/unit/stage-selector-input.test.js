@@ -16,8 +16,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  assembleTrailFacts, formatTrailFactsBlock, condensePlan, RULING_MARK, isRuling
+  assembleTrailFacts, formatTrailFactsBlock, condensePlan
 } from '../../lib/recommendation-facts.js';
+import { RULING_MARK, isRuling } from '../../lib/run-trail.js';
 import { formatSelectorView, formatIssueContext, buildSelectorArgs } from '../../lib/openrouter.js';
 
 const at = (d) => `2026-10-0${d}T10:00:00.000Z`;

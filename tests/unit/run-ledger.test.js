@@ -14,7 +14,8 @@ import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { parseRunLedger, readRunLedger, latestReviewComment } from '../../lib/run-ledger.js';
+import { parseRunLedger } from '../../lib/run-ledger.js';
+import { readRunLedger, latestReviewComment } from '../../lib/run-trail.js';
 import { RUN_LEDGER_COMMENTS } from '../fixtures/run-ledger-comments.js';
 import { RUN_COMMENT_TRAILS } from '../fixtures/run-ledger-trails.js';
 

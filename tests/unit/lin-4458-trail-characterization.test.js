@@ -5,11 +5,11 @@
  *   - PINS: behaviour that holds today and must still hold after the one trail pass lands. They run
  *     now and pass now. Rows 3, 11, 13 and 15 of tests/unit/lin-4438-blind-read-gate.test.js, plus an
  *     agent note that re-cites the reviewed PR.
- *   - THE NEW RULE: behaviour the one trail pass changes on purpose. Each is marked `todo` while
- *     lib/run-trail.js is missing, so it runs and reports its failure without failing the suite; once
- *     the module exists the mark lifts and each must pass. Row 14 flips; an agent note citing a new PR
- *     is work after review; an area read carries no landing; the box counts the landing and reads its
- *     sole PR by URL; the owner's Done check reads the same landing.
+ *   - THE NEW RULE: behaviour the one trail pass changes on purpose. Written as `todo` before
+ *     lib/run-trail.js existed (beat 1, failing output recorded), lifted when it landed: row 14 flips;
+ *     an agent note citing a new PR is work after review; an area read carries no landing; readTrail
+ *     carries piece 1's fields. The box and the owner's Done check reading the landing stay `todo`
+ *     until beat 3 moves their PR input (BEAT_3 below).
  *
  * The rule, as LIN-4458 reads "the PRs first cited after the anchor" (comment on LIN-4447):
  *   - the anchor is today's (the latest close-out before the latest review);
@@ -32,7 +32,7 @@ import assert from 'node:assert/strict';
 import { closeOutNotReady } from '../../lib/close-out-readiness.js';
 import { readRunEvidence } from '../../lib/run-evidence.js';
 import { closeOutWaitsOn } from '../../lib/run-closeout-state.js';
-import { landingPrUrls } from '../../lib/run-ledger.js';
+import { landingPrUrls } from '../../lib/run-trail.js';
 import { assembleTrailFacts } from '../../lib/recommendation-facts.js';
 import { blindReadStep } from '../../lib/recommendation-blind-read.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
@@ -42,11 +42,11 @@ import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { findRouteLayer } from './lib/route-layer.js';
+import * as trail from '../../lib/run-trail.js';
 
-// The new rule's tests run as `todo` until the module they exercise exists (beat 2 builds it). The
-// import is dynamic so this file loads, and the pins run, before it does.
-const trail = await import('../../lib/run-trail.js').catch(() => null);
-const NEW_RULE = trail ? false : 'LIN-4458: lib/run-trail.js is not built yet; this pins the rule it must meet';
+// The box and the owner's check take their PR list from the landing in beat 3; until then these run
+// as `todo` (they fail today, by design).
+const BEAT_3 = 'LIN-4458 beat 3: the box and the owner\'s check take their PRs from the landing';
 
 const REPO = 'acme/widget';
 const PR = (n) => `https://github.com/${REPO}/pull/${n}`;
@@ -135,8 +135,8 @@ describe('pins: rows that hold today and after the one trail pass (LIN-4458)', (
   });
 });
 
-describe('the new rule (LIN-4458): todo until lib/run-trail.js exists', () => {
-  test('row 14 flips: the audit re-cites the merged landing PR, so the notes PR\'s landing is the notes PR alone', { todo: NEW_RULE }, () => {
+describe('the new rule (LIN-4458)', () => {
+  test('row 14 flips: the audit re-cites the merged landing PR, so the notes PR\'s landing is the notes PR alone', () => {
     const comments = ROWS[14];
     assert.deepEqual(landingPrUrls(comments), [PR2]);
     const { review: rv } = facts(comments);
@@ -146,21 +146,20 @@ describe('the new rule (LIN-4458): todo until lib/run-trail.js exists', () => {
     assert.ok(prompt.includes(`**The change:** ${PR2}`) && !prompt.includes(`**The change:** ${PR1}`), 'the reader is told to read the notes PR only');
   });
 
-  test('an agent note after review that cites a new PR is work after review (Seams §3.0a fails toward review)', { todo: NEW_RULE }, () => {
+  test('an agent note after review that cites a new PR is work after review (Seams §3.0a fails toward review)', () => {
     const comments = [summary(1), review(2), agentNote(3, PR2)];
     assert.equal(facts(comments).workAfterReview, true);
     assert.equal(step(comments), null, 'no blind read is offered over a PR the approved review never covered');
   });
 
-  test('an area read carries no landing and is not work after review, even when it names a PR', { todo: NEW_RULE }, () => {
+  test('an area read carries no landing and is not work after review, even when it names a PR', () => {
     const comments = [summary(1), review(2), areaRead(3, PR_OLD)];
     assert.deepEqual(landingPrUrls(comments), [PR1]);
     assert.equal(facts(comments).workAfterReview, false);
     assert.equal(step(comments), 'blind-read');
   });
 
-  test('readTrail returns the fields piece 1 reads, and its landing is landingPrUrls\'s', { todo: NEW_RULE }, () => {
-    assert.ok(trail, 'lib/run-trail.js exports readTrail');
+  test('readTrail returns the fields piece 1 reads, and its landing is landingPrUrls\'s', () => {
     for (const [n, comments] of Object.entries(ROWS)) {
       const got = trail.readTrail(comments);
       for (const key of ['review', 'landing', 'closeOutAfterReview', 'workAfterReview', 'closeOutOnTrail', 'landingHasNotesPr']) {
@@ -210,7 +209,7 @@ describe('the box: a landing of [A] cited beside B', () => {
     assert.equal(resolveRunPrRef(model).status, 'multiple');
   });
 
-  test('the box counts the landing: its one PR read is A\'s, matched by URL, and it reads ready', { todo: NEW_RULE }, async () => {
+  test('the box counts the landing: its one PR read is A\'s, matched by URL, and it reads ready', { todo: BEAT_3 }, async () => {
     const reads = [];
     const model = await readRunEvidence({
       issueIdentifier: 'LIN-1', comments: CITED_NOT_LANDED, stopAt: 'pr', runnerReady: true, viewerIsOwner: true,
@@ -253,7 +252,7 @@ describe('the owner\'s Done check: the same trail through the check route', () =
 
   // Named change (plan-review note 3 on LIN-4447): "no other unmerged PR" is checked over the landing.
   // B, abandoned and closed in an earlier round, no longer blocks the person's Done on A.
-  test('a merged, approved, read landing [A] sets Done on the person\'s check; B closed unmerged outside the landing does not block it', { todo: NEW_RULE }, async () => {
+  test('a merged, approved, read landing [A] sets Done on the person\'s check; B closed unmerged outside the landing does not block it', { todo: BEAT_3 }, async () => {
     const { res, calls, events } = await check({ 41: mergedPr(41), 42: closedPr(42) });
     assert.equal(res.statusCode, 200);
     assert.equal(res.jsonBody.state.status, 'merged', 'the landing is merged');
