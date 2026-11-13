@@ -325,11 +325,11 @@ The code carries the same question in several places:
 
 ---
 
-## Held: file when the lanes land
+## Held: file when its trigger lands
 
 ### A17. Paper (then essay): parallel lanes that coordinate (13 Nov)
 
-**Agreed with John on 13 Nov. Held until the current lanes and their related work have landed** (LIN-4445, LIN-4447, LIN-4448, LIN-4463). John: "We can schedule it for when the tasks and related work has landed." By then the paper can report whether the two tidy lanes built what they agreed. It goes to one writer on Opus as a `custom` dispatch, not through autopilot. An independent reviewer subagent sent by the driving agent reads the paper before merge; John skips that read. The essay is a second ticket after the paper merges, written by Fable as a trial; check first that Harbour can dispatch it.
+**Agreed with John on 13 Nov. Held until the current lanes and their related work have landed** (LIN-4445, LIN-4447, LIN-4448, LIN-4463). John: "We can schedule it for when the tasks and related work has landed." **Trigger narrowed at about 23:10 UTC on 13 Nov, with John's yes:** file it once LIN-4447 and LIN-4448 are finished. Those are the two lanes that coordinated, and they hold the case. LIN-4445 is waiting on John's Jira check, and LIN-4463 is paused for budget. By then the paper can report whether the two tidy lanes built what they agreed. It goes to one writer on Opus as a `custom` dispatch, not through autopilot. An independent reviewer subagent sent by the driving agent reads the paper before merge; John skips that read. The essay is a second ticket after the paper merges, written by Fable as a trial; check first that Harbour can dispatch it.
 
 **Title:** Paper: can parallel lanes coordinate with each other, and what would helping them do it unlock?
 

@@ -3817,3 +3817,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 
   The options were `accept` or `fold` the three templates too, recommended `accept`. Yet the lane itself recommends shrinking the three on point 2. **I suggested `fold`:** point 1 can't apply to kinds with nothing to fold, the guard now backs the three clauses, and it's small and on aim. **Flaw for the review:** two questions bundled into one choice, and a recommendation that contradicts its own advice.
 - **23:03 UTC: John answered `lin-4469-cuts`: fold** (the three read-only templates are trimmed too). No rulings are open.
+- **~23:10 UTC: A17's trigger narrowed, with John's yes.** It is filed once LIN-4447 and LIN-4448 finish, not all four lanes. Jira waits on John's check and the front end is paused, so the old trigger could have held the paper all week. The essay still follows the paper's merge, on Fable.
