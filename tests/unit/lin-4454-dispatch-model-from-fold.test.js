@@ -11,6 +11,8 @@
  *  - Case 1: model A has $5 priced plus one unpriced request, model B has $1 priced: both name A.
  *  - Case 2: nothing priced: both name the latest model, even when another model has more requests.
  *  - Case 3: nothing priced and the latest record names no model: both read null (no fallback to another model).
+ *  - Case 4: a model priced at $0 and a later unpriced one: both name the priced model, though `byModel[0]` (ranked by
+ *    priced dollars, then latest use) is the unpriced one. So a reader cannot take `byModel`'s first row for the answer.
  *
  * Run with: node scripts/run-unit-tests.mjs tests/unit/lin-4454-dispatch-model-from-fold.test.js
  */
@@ -80,5 +82,14 @@ describe('LIN-4454: a one-dispatch lane and its row name the fold\'s model', () 
     ]);
     assert.equal(lane.model, null);
     assert.equal(only.model, null, 'the row takes the fold\'s null, not the next model it can find');
+  });
+
+  test('case 4: a $0 priced model and a later unpriced one: both name the priced model, not byModel[0]', async () => {
+    const records = [rec('b1', 5, MODEL_B, 0), rec('a1', 10, MODEL_A)];
+    const read = await readCost({ fetchedRows: [row], requestSource: loaderOver(records), urlKey: URL_KEY, perDispatch: true });
+    assert.equal(read.workerSessions[0].dispatches[0].byModel[0].model, MODEL_A, 'the fixture holds: byModel leads with the unpriced model');
+    const { lane, row: only } = await laneAndRow(records);
+    assert.equal(lane.model, MODEL_B);
+    assert.equal(only.model, MODEL_B, 'the row names the fold\'s answer, not byModel\'s first row');
   });
 });
