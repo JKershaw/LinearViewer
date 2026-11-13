@@ -22,11 +22,11 @@ import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProviderInterface } from '../../lib/providers/interface.js';
 import { BLIND_READ_CODES } from '../../lib/run-ledger.js';
-import { landingPrUrls } from '../../lib/run-trail.js';
+import { landingPrUrls, readTrail } from '../../lib/run-trail.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { closeOutNotReady } from '../../lib/close-out-readiness.js';
 import { createPipelineMergeRecorder } from '../../lib/close-out-merges.js';
-import { readRunEvidence } from '../../lib/run-evidence.js';
+import { readRunEvidence, buildRunEvidence } from '../../lib/run-evidence.js';
 import { resolveRunPrRef } from '../../lib/pr-state-store.js';
 import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
@@ -205,5 +205,38 @@ describe('a PR cited only outside the landing is not read (the box\'s one read i
     assert.equal(model.closeOut.status, 'no-pr');
     assert.equal(resolveRunPrRef(model).status, 'one');
     assert.equal(model.state.status, 'unknown');
+  });
+});
+
+describe('an empty landing with a PR cited: the box reads no-pr (LIN-4458 review, ledger 1)', () => {
+  // The distinguishing precondition: a not-ready `## Close-out` citing A sits before the latest review,
+  // and the re-review names the PR only as `#41` (the review prompt asks for the head, not the URL), so
+  // nothing after the anchor cites a full URL and the landing is empty.
+  // Before (main, and the box's every-cited-PR list): the box read `merged` and the person's check could
+  // set Done. Now the box counts the landing, so it reads `no-pr`, the person's check sets no Done and
+  // the merge recorder records nothing (LIN-3863). This fails closed; it follows from "the box counts
+  // the landing". The cause, the anchor rule and the gate, predates LIN-4458: see Waiting in
+  // docs/areas/runs-and-dispatch.md (the empty-landing entry).
+  const reReviewByNumber = c(4, `## Code Review\n\nReviewed head \`${REVIEWED}\` of #41.\n\n### What CI Did Not Prove\n| # | Claim | In/Out | Discharge |\n| --- | --- | --- | --- |\n| 1 | one claim | In | a repro |\n\n**Verdict: Approve**`);
+  const EMPTY_LANDING = [
+    summary(1, A),
+    review(2, 'Approve', A),
+    closeOut(3, `Not ready: the ledger has an open item on ${A}. Next: implementation.`),
+    reReviewByNumber,
+  ];
+  const merged = status(41, { state: 'closed', merged: true, merged_at: T(8), created_at: T(1) });
+
+  test('re-review naming the PR only as #41: readTrail().landing is [] and the box reads no-pr given a merged status (before: merged)', () => {
+    assert.deepEqual(readTrail(EMPTY_LANDING).landing, []);
+    assert.deepEqual(landingPrUrls(EMPTY_LANDING), []);
+    const model = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: EMPTY_LANDING, prStatus: merged, stopAt: 'pr', runnerReady: true, owner: true });
+    assert.equal(model.closeOut.status, 'no-pr');
+  });
+
+  test('the same trail with the re-review naming the full URL keeps the landing, and the box reads the merged PR', () => {
+    const named = [...EMPTY_LANDING.slice(0, 3), review(4, 'Approve', A)];
+    assert.deepEqual(readTrail(named).landing, [A]);
+    const model = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: named, prStatus: merged, stopAt: 'pr', runnerReady: true, owner: true });
+    assert.notEqual(model.closeOut.status, 'no-pr');
   });
 });

@@ -261,10 +261,28 @@ function scannedFiles() {
   return [...new Set(tracked)].filter(f => /\.m?js$/.test(f) && f !== HOME && existsSync(join(REPO, f)));
 }
 
+// A kind check written as a string method, not a regex: `x.startsWith('## Blind read')`,
+// `x.includes(BLIND_READ_HEADING)`, `x.startsWith(SURVEY_HEADINGS[k])` (LIN-4458 review, ledger 2).
+const STRING_METHODS = ['startsWith', 'includes', 'indexOf', 'match', 'test', 'endsWith'];
+const HEADING_LITERAL = /^#{1,6}\s/;
+
+function stringMethodFinding(node) {
+  if (node.type !== 'CallExpression' || node.callee.type !== 'MemberExpression' || node.callee.computed) return null;
+  if (!STRING_METHODS.includes(node.callee.property.name)) return null;
+  for (const arg of node.arguments) {
+    if (arg.type === 'Identifier' && arg.name === 'BLIND_READ_HEADING') return `${node.callee.property.name}(BLIND_READ_HEADING)`;
+    if (arg.type === 'MemberExpression' && arg.object.type === 'Identifier' && arg.object.name === 'SURVEY_HEADINGS') return `${node.callee.property.name}(SURVEY_HEADINGS…)`;
+    if (arg.type === 'Literal' && typeof arg.value === 'string' && HEADING_LITERAL.test(arg.value) && OPENING.test(arg.value)) return `${node.callee.property.name}(${JSON.stringify(arg.value)})`;
+  }
+  return null;
+}
+
 function findings(file) {
   const ast = acorn.parse(readFileSync(join(REPO, file), 'utf8'), { ecmaVersion: 'latest', sourceType: 'module', allowHashBang: true });
   const out = [];
   walk.full(ast, (node) => {
+    const viaMethod = stringMethodFinding(node);
+    if (viaMethod) out.push(`string method ${viaMethod}`);
     const declared = node.type === 'FunctionDeclaration' ? node.id?.name
       : node.type === 'VariableDeclarator' && node.id.type === 'Identifier' ? node.id.name : null;
     if (declared && RETIRED.includes(declared)) out.push(`declares ${declared}`);
@@ -289,7 +307,21 @@ describe('the census: no comment-kind test outside lib/run-trail.js', () => {
     assert.equal(scan('const a = /^Plan Review Verdict\\b/i;').length, 1);
   });
 
-  test('outside lib/run-trail.js: no retired predicate, no opening regex, no ruling-mark string', () => {
+  // The string-method shapes (LIN-4458 review, ledger 2): each passed the census before it read them.
+  test('the census would catch a kind check written with a string method: literal, identifier and member-expression forms', () => {
+    const scan = (src) => { const out = []; walk.full(acorn.parse(src, { ecmaVersion: 'latest', sourceType: 'module' }), (n) => { const f = stringMethodFinding(n); if (f) out.push(f); }); return out; };
+    assert.equal(scan('const a = String(b).startsWith("## Blind read");').length, 1, 'a heading literal');
+    assert.equal(scan('const a = b.includes(BLIND_READ_HEADING);').length, 1, 'the heading identifier');
+    assert.equal(scan('const a = b.startsWith(SURVEY_HEADINGS[k]);').length, 1, 'a member of SURVEY_HEADINGS');
+    assert.equal(scan('const a = b.indexOf(SURVEY_HEADINGS["survey-task"]) === 0;').length, 1, 'indexOf, string key');
+    for (const m of ['match', 'test', 'endsWith']) assert.equal(scan(`const a = b.${m}(BLIND_READ_HEADING);`).length, 1, m);
+    assert.equal(scan('const a = b.startsWith("## Close-out");').length, 1, 'any heading literal spelling an opening');
+    assert.equal(scan('const a = b.startsWith("## Notes");').length, 0, 'a heading that is no comment kind');
+    assert.equal(scan('const a = b.startsWith("close-out");').length, 0, 'not a heading literal');
+    assert.equal(scan('const a = b.replace(BLIND_READ_HEADING, "");').length, 0, 'a method outside the list');
+  });
+
+  test('outside lib/run-trail.js: no retired predicate, no opening regex, no ruling-mark string, no string-method kind check', () => {
     const hits = scannedFiles().flatMap(f => findings(f).map(x => `${f}: ${x}`));
     assert.deepEqual(hits, []);
   });

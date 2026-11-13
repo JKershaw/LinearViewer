@@ -146,3 +146,23 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   so a new installer or a change to Linear's can drift from it silently. Closing it means deciding where test
   transports register (for example installers that declare which provider they cover, plus a census test),
   across providers, web routes and fixtures: larger than a fix. (LIN-4456 blind read, 13 Nov.)
+- `lib/run-trail.js` `readTrail`: a re-review after a not-ready close-out that names the PR only as `#N` leaves the
+  landing empty. `closeOutWaitsOn` (`lib/run-closeout-state.js`) then opens the gate with no blind read, and
+  since LIN-4458 the box reads `no-pr`, the person's check sets no Done and the merge recorder records nothing
+  (pinned in `tests/unit/lin-4458-landing-consumers.test.js`). The review prompt asks for the head, not the PR
+  URL. Fix: fall back to the anchor close-out's PRs when nothing after the anchor cites one, or have the review
+  prompt require the full URL (LLM & prompts' side). No live trail has this shape. (LIN-4458 review.)
+- `lib/ci-wake-sweep.js` `prRefsFromPark` parses a runner's park message with its own `FULL_PR_URL_RE` (scheme
+  optional, repo key case-folded) beside `prUrlsIn`/`prOf` (`lib/run-ledger.js`). Its comment-side read already
+  goes through `extractPrUrls`. Moving it onto `prUrlsIn` changes which park messages wake (a scheme-less URL
+  would stop matching), so it needs its own witness. (LIN-4458 review.)
+- `lib/run-evidence.js`: the run page keeps two answers to "which PR is the task's". The close-out box counts
+  `readTrail().landing`, but `deriveState` over `extractPrUrls` (every cited PR) still drives `done`,
+  `checked.now` and `resolveRunPrRef` (read by the `routes/dashboard.js` pr-state route), and
+  `lib/ci-wake-sweep.js` matches parks against every cited PR. Whether the page's PR and the CI-wake sweep
+  follow the landing is a product decision touching several callers. Also, `readRunEvidence` reads the
+  landing's sole PR and hands `buildRunEvidence` a bare `prStatus`, which `buildRunEvidence` re-pairs with the
+  landing after reading the trail again: the same positional coupling the URL-keyed `Map` removed from
+  `deriveCloseOutState`. Passing the status keyed by URL with the landing already read is a signature change
+  for about 25 call sites (`tests/unit/run-evidence.test.js`, `routes/dashboard.js`), so larger than a fix.
+  (LIN-4458 blind read.)
