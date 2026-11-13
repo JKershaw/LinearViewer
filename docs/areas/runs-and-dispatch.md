@@ -53,6 +53,10 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   for the task page and measure 1 alike; compare repositories case-blind, as GitHub does (LIN-4439).
 - A per-dispatch figure (its model, cost or completeness) is the fold's answer, carried through
   `lib/cost-read.js`; a reader never re-ranks `byModel` itself. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+- The Harbour calls read is `lib/cost-read-calls.js` (LIN-4457): `readCalls`, `appCallsOf` and
+  `callsSurfaceOf` are pure over docs their caller keys to one workspace (`listInHorizon(urlKey)`). The
+  instance-wide boundary is the `urlKey` / `instanceWide` guard on `lineageRecords` and `readCost`
+  (LIN-4226), not these readers. A new calls shape goes beside them, and `appCallsOf([])` is the one empty shape.
 
 ## Waiting
 
@@ -77,8 +81,6 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   `docs/reviews/seams-tangles-review-2026-11-10-run11.md`.)
 - `lib/dispatch-factory.js`: tests `provider.name === 'linear'` beside
   `isHermeticTestToken` for a test-only transport. (LIN-4347.)
-- `lib/cost-read.js`: split out `readCalls` and `callsSurfaceOf`; settle whether
-  instance-wide reads sit beside workspace-keyed stores. (Survey tally: LIN-4201.)
 - `lib/session-summary.js`: do stored run paragraphs keep pre-cutover figures? (Survey
   tally: LIN-4201.)
 - `lib/dispatch-feedback-validation.js`: feedback kinds lack one declaration with their
@@ -134,3 +136,7 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   close-out). The entries above name the box/guard precedence split; this is its Done path. Whether
   a person's own check may pass the gate is a decision; the shared-trail test runs with
   `byPersonCheck: false`, so it never reaches this path. (Drift & Coherence Review, 13 Nov., second read; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+- `lib/cost-read-calls.js`: `readCalls` states the figure rule (`totalUsd` only when everything is priced and
+  complete; `pricedUsd` never counts a partial) in its own words, and the lineage figure in `lib/cost-read.js`
+  states it again, so a change to the rule is made twice. One shared helper would make it one, but it reaches the
+  lineage path and its goldens: larger than a fix. (LIN-4457 leftovers; Survey global on LIN-4457.)

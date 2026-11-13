@@ -33,7 +33,7 @@ import { mergeChangeLog, ChangeLogError, UNKNOWN_VALUE } from '../lib/workspace-
 import { DEFAULT_MODEL, getModelDisplayName, resolveFreeTierModel } from '../lib/openrouter.js';
 import { AGENT_JOB_IDS, HARBOUR_JOB_IDS, effectiveTable, resolveAgentFromTable, prefillDefaults } from '../lib/model-routing.js';
 import { agentSpendByJob, harbourSpendByJob, typicalByModel, spendByEffectiveModel } from '../lib/model-routing-spend.js';
-import { callsSurfaceOf } from '../lib/cost-read.js';
+import { callsSurfaceOf } from '../lib/cost-read-calls.js';
 import { summariseRouting, summariseSpend } from '../lib/model-routing-summary.js';
 import { runnableGuard } from '../lib/model-routing-edit.js';
 import { readModelsHistory } from '../lib/model-routing-history.js';
