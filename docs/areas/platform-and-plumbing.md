@@ -11,6 +11,11 @@ Area notes for `platform-and-plumbing` in the registry. Format and rules: README
   this file serves, check the embedded versions in the served file (its banner and inlined
   dependencies), not only `package-lock.json`. (Dependency & Supply-Chain Review, 10 Nov.;
   `docs/reviews/dependency-supply-chain-review-2026-11-10.md`)
+- A served-path boundary (`lib/vendor-assets.js`) is tested two ways, never by a probe list alone. Its structure: the
+  router holds exact routes only, one per allow-listed URL, with no `use()` mount. And raw requests: `fetch` collapses
+  dot segments before it sends, so a traversal probe over `fetch` really asks for the root server.js and proves nothing.
+  `tests/unit/shared-modules.test.js` sends them with `node:http`. LIN-4471's review found that a static mount of the
+  repo root passed every probe the list did not name; the structure test is what catches it.
 
 ## Waiting
 

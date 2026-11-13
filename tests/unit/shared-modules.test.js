@@ -194,9 +194,9 @@ describe('purity: shared modules are leaves', () => {
 
 describe('renderPage: a module entry is a module script, a string stays classic', () => {
   test('emits <script type="module"> for a { module } entry and <script src> for a string, in order', () => {
-    const html = renderPage({ title: 'T', scripts: ['/a.js', { module: '/shared-shim.js' }, '/b.js'] });
+    const html = renderPage({ title: 'T', scripts: ['/a.js', { module: '/page-module.js' }, '/b.js'] });
     const a = html.indexOf('<script src="/a.js"></script>');
-    const m = html.indexOf('<script type="module" src="/shared-shim.js"></script>');
+    const m = html.indexOf('<script type="module" src="/page-module.js"></script>');
     const b = html.indexOf('<script src="/b.js"></script>');
     assert.ok(a > 0 && m > a && b > m, 'three tags, in order');
   });

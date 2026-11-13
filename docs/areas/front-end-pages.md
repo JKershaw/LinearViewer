@@ -25,10 +25,6 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   path (no server config) works there. That path is only reachable from Settings › Sources inside a
   workspace, so a Jira team without OAuth consent has to find "make a workspace, then Settings" alone.
   (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)
-- `lib/render-proxy.js`: the Proxy page header and hint say agents "interact with Linear" and its
-  examples use `LIN-123`, on Local and Jira workspaces too. The onboarding guide sends every agent here.
-  The copied prompt is already provider-correct (LIN-2370); the page copy around it is not.
-  (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)
 - `lib/render-runner-setup.js`: the runner page defines itself as working "with no Simple Dispatcher"
   and makes the two exclusive per workspace, but no page a newcomer reads says what Simple Dispatcher
   is or when a team would want it (an always-on host), and its queue token lives on the Dispatch page.
