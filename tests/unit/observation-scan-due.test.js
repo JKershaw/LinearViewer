@@ -3,19 +3,27 @@
  * tri-state rendering, the never-ambient guarantee, the shared poll-status pill,
  * and cursor-based pagination.
  *
- * `public/observation.js` is a browser script with DOM/fetch dependencies at call
- * time but none at LOAD time. It runs through `loadWorld` over the shared fake DOM
- * (tests/unit/helpers/fake-dom.js); the due tab's markup is drawn into the world's
- * document by `DUE_PAGE`, and the assertions read the rows back from that DOM
- * (LIN-4283), not from the list's serialized string. The one script-scope binding the
- * suite sets, `currentView`, goes through `world.run`.
+ * `public/observation.js` is a native ES module (LIN-4463 piece 4): it imports its shared
+ * leaves and is loaded fresh per test through `importWorld` (tests/unit/helpers/import-world.js)
+ * over the shared fake DOM (tests/unit/helpers/fake-dom.js). The page boots the way a browser
+ * boots it: `window.__OBSERVATION_DATA__` is set, and the page's own DOMContentLoaded init runs,
+ * so the data and the view it opens on come from the page, not from a probe. The due tab's
+ * markup is drawn into the world's document by `DUE_PAGE`, and the assertions read the rows
+ * back from that DOM (LIN-4283), not from the list's serialized string.
  *
  * Run with: node --test tests/unit/observation-scan-due.test.js
  */
-import test from 'node:test';
+import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWorld } from './helpers/client-world.js';
-import { loadCostFormat } from '../fixtures/browser-cost-format.js';
+import { importWorld } from './helpers/import-world.js';
+import { fireDOMContentLoaded } from './helpers/client-world.js';
+
+// Every world a test makes is put back after the test, last made first, so a stub a later world installed
+// is removed before the earlier world's snapshot is restored.
+const worlds = [];
+afterEach(() => {
+  while (worlds.length) worlds.pop().restore();
+});
 
 /**
  * The due tab's elements, under the ids observation.js looks up. Nothing is hidden up front: the client sets `hidden`,
@@ -42,13 +50,24 @@ const DUE_PAGE = `
   </div>
 </section>`;
 
-/** observation.js loaded into a world with the due tab drawn in (see `DUE_PAGE`). */
-function makeSandbox({ fetchImpl, scanCostEstimate, postScanImpl } = {}) {
-  const world = loadWorld({
+/**
+ * The page's boot read: init polls the feed and the rulings as a browser page does, and a test that counts reads must not
+ * count the page's own first ones. Until the test is armed, a read is answered with this empty payload, which holds every
+ * key a read of any of the page's endpoints looks for.
+ */
+const BOOT_READ = { active: [], recent: [], rulings: [], items: [], nextCursor: null, pageCandidateCount: 0, totalCandidateCount: 0 };
+
+/**
+ * observation.js booted into a world with the due tab drawn in (see `DUE_PAGE`). `search` is the query the page was opened
+ * with (for example `?view=due`); `fetchImpl` answers the reads the test makes, once the page has booted.
+ */
+async function makeSandbox({ fetchImpl, scanCostEstimate, postScanImpl, search = '' } = {}) {
+  let armed = false;
+  const world = importWorld({
     window: {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
-      location: { href: '' },
+      location: { href: '', search },
       // LIN-2701 §B.7: the pool reaches postScan via window.ScanSection ONLY
       // (never window.api directly — that would be re-deriving the scan
       // endpoint, the same "no fourth scan-URL builder" non-goal
@@ -56,23 +75,27 @@ function makeSandbox({ fetchImpl, scanCostEstimate, postScanImpl } = {}) {
       // in this file never start a run, so this default is never invoked.
       ScanSection: { postScan: postScanImpl || (async () => { throw new Error('no postScan stub configured'); }) },
     },
-    scripts: ['observation.js'],
     globals: {
-      module: { exports: {} },
       escapeHtml: (s) => (s == null ? '' : String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')),
       relativeTime: () => '',
       console: { warn() {}, error() {}, log() {} },
-      fetch: fetchImpl || (async () => { throw new Error('no fetch stub configured'); }),
+      fetch: (url, opts) => (armed
+        ? (fetchImpl || (async () => { throw new Error('no fetch stub configured'); }))(url, opts)
+        : Promise.resolve(jsonResponse(BOOT_READ))),
     },
+    timers: [],
   });
-  // LIN-4446: the shared formatter (lib/cost-format.js) is handed in as the module shim hands it to the page;
-  // observation.js reads window.CostFormat only when it draws the estimate, never while it loads.
-  loadCostFormat(world.sandbox);
+  worlds.push(world);
   world.document.body.innerHTML = DUE_PAGE;
-  world.run(`observationData = { urlKey: "acme", scanCostEstimate: ${JSON.stringify(scanCostEstimate ?? null)} };`);
+  // The page's data, as the server hands it over; init reads it on DOMContentLoaded.
+  world.window.__OBSERVATION_DATA__ = { urlKey: 'acme', scanCostEstimate: scanCostEstimate ?? null };
+  const page = await world.importPage('observation.js');
+  await fireDOMContentLoaded(world.document);
+  await flush();
+  armed = true;
   return {
     ...world,
-    exports: world.sandbox.module.exports,
+    page,
     node: (id) => world.document.getElementById(id),
   };
 }
@@ -92,53 +115,53 @@ function jsonResponse(body, { ok = true, status = 200 } = {}) {
 // ─── Tri-state rendering (design §3/§6/§8) ──────────────────────────────────
 
 test.describe('dueStatusCopy / renderDueRowHtml — tri-state rendering', () => {
-  test('dueStatus: true renders as due', () => {
-    const { dueStatusCopy } = makeSandbox().exports;
+  test('dueStatus: true renders as due', async () => {
+    const { dueStatusCopy } = (await makeSandbox()).page;
     const result = dueStatusCopy({ dueStatus: true });
     assert.match(result.text, /due/i);
     assert.doesNotMatch(result.text, /not due/i);
   });
 
-  test('dueStatus: false renders as not-due', () => {
-    const { dueStatusCopy } = makeSandbox().exports;
+  test('dueStatus: false renders as not-due', async () => {
+    const { dueStatusCopy } = (await makeSandbox()).page;
     const result = dueStatusCopy({ dueStatus: false });
     assert.match(result.text, /not due/i);
   });
 
-  test('plain null (no error) renders the scan-baseline copy, never "not due"', () => {
-    const { dueStatusCopy } = makeSandbox().exports;
+  test('plain null (no error) renders the scan-baseline copy, never "not due"', async () => {
+    const { dueStatusCopy } = (await makeSandbox()).page;
     const result = dueStatusCopy({ dueStatus: null });
     assert.match(result.text, /not checked yet — scan it once to set its baseline/);
     assert.doesNotMatch(result.text, /not due/i);
   });
 
-  test('null WITH error:true renders the distinct retry copy, never the scan-baseline copy', () => {
-    const { dueStatusCopy } = makeSandbox().exports;
+  test('null WITH error:true renders the distinct retry copy, never the scan-baseline copy', async () => {
+    const { dueStatusCopy } = (await makeSandbox()).page;
     const result = dueStatusCopy({ dueStatus: null, error: true });
     assert.match(result.text, /provider read failed/i);
     assert.doesNotMatch(result.text, /not checked yet/i);
     assert.doesNotMatch(result.text, /not due/i);
   });
 
-  test('a non-boolean, non-null dueStatus (defensive) never renders as due/not-due', () => {
+  test('a non-boolean, non-null dueStatus (defensive) never renders as due/not-due', async () => {
     // Mirrors the `typeof x === 'boolean'` guard requestBasisCheck already
     // uses for basisChanged — a malformed wire value must fall through to
     // "unknown", never be coerced into a due/not-due claim.
-    const { dueStatusCopy } = makeSandbox().exports;
+    const { dueStatusCopy } = (await makeSandbox()).page;
     const result = dueStatusCopy({ dueStatus: 'true' });
     assert.match(result.text, /not checked yet — scan it once to set its baseline/);
   });
 
-  test('renderDueRowHtml renders a Retry affordance ONLY on the error branch', () => {
-    const { renderDueRowHtml } = makeSandbox().exports;
+  test('renderDueRowHtml renders a Retry affordance ONLY on the error branch', async () => {
+    const { renderDueRowHtml } = (await makeSandbox()).page;
     const errorRow = renderDueRowHtml({ issueId: 'i1', issueIdentifier: 'LIN-1', dueStatus: null, error: true });
     const okRow = renderDueRowHtml({ issueId: 'i2', issueIdentifier: 'LIN-2', dueStatus: null });
     assert.match(errorRow, /obs-due-retry/);
     assert.doesNotMatch(okRow, /obs-due-retry/);
   });
 
-  test('renderDueRowHtml always carries the provider-read badge, distinct from a scan affordance', () => {
-    const { renderDueRowHtml } = makeSandbox().exports;
+  test('renderDueRowHtml always carries the provider-read badge, distinct from a scan affordance', async () => {
+    const { renderDueRowHtml } = (await makeSandbox()).page;
     const row = renderDueRowHtml({ issueId: 'i1', issueIdentifier: 'LIN-1', dueStatus: true });
     assert.match(row, /obs-due-badge/);
     assert.match(row, /provider read/);
@@ -150,9 +173,9 @@ test.describe('dueStatusCopy / renderDueRowHtml — tri-state rendering', () => 
 test.describe('pollCurrentView — the due tab is never polled ambiently', () => {
   test('pollCurrentView performs NO fetch while currentView is "due"', async () => {
     let calls = 0;
-    const sandbox = makeSandbox({ fetchImpl: async () => { calls++; return jsonResponse({}); } });
-    sandbox.run('currentView = "due";');
-    const { pollCurrentView } = sandbox.exports;
+    // The page is opened on the due tab (`?view=due`), as a browser opens it: its own boot loads the first page.
+    const sandbox = await makeSandbox({ search: '?view=due', fetchImpl: async () => { calls++; return jsonResponse({}); } });
+    const { pollCurrentView } = sandbox.page;
 
     // Simulate all three real call sites: the tick loop, a visibilitychange
     // firing, and a repeated call — none may fetch while the due tab is active.
@@ -169,9 +192,8 @@ test.describe('pollCurrentView — the due tab is never polled ambiently', () =>
     // waiting block. Neither is a due-tab read, so the due early return above
     // leaves both pollers alone.
     const calls = [];
-    const sandbox = makeSandbox({ fetchImpl: async (url) => { calls.push(url); return jsonResponse({ active: [], recent: [], rulings: [] }); } });
-    sandbox.run('currentView = "runs";');
-    const { pollCurrentView } = sandbox.exports;
+    const sandbox = await makeSandbox({ fetchImpl: async (url) => { calls.push(url); return jsonResponse({ active: [], recent: [], rulings: [] }); } });
+    const { pollCurrentView } = sandbox.page;
     pollCurrentView();
     await flush();
     assert.equal(calls.length, 2, `expected the feed and the rulings read, got ${calls.length}`);
@@ -183,10 +205,10 @@ test.describe('pollCurrentView — the due tab is never polled ambiently', () =>
 test.describe('switchView("due") — the one-shot load, and only from here', () => {
   test('switching to due triggers exactly one fetch, to the scan-due endpoint', async () => {
     const calls = [];
-    const sandbox = makeSandbox({
+    const sandbox = await makeSandbox({
       fetchImpl: async (url) => { calls.push(url); return jsonResponse({ items: [], nextCursor: null, pageCandidateCount: 0, totalCandidateCount: 0 }); }
     });
-    const { switchView } = sandbox.exports;
+    const { switchView } = sandbox.page;
     switchView('due');
     await flush();
     assert.equal(calls.length, 1, `expected exactly one fetch on tab switch, got ${calls.length}`);
@@ -194,8 +216,8 @@ test.describe('switchView("due") — the one-shot load, and only from here', () 
   });
 
   test('the due section is shown and the session/rulings containers are hidden', async () => {
-    const sandbox = makeSandbox({ fetchImpl: async () => jsonResponse({ items: [], nextCursor: null, pageCandidateCount: 0, totalCandidateCount: 0 }) });
-    const { switchView } = sandbox.exports;
+    const sandbox = await makeSandbox({ fetchImpl: async () => jsonResponse({ items: [], nextCursor: null, pageCandidateCount: 0, totalCandidateCount: 0 }) });
+    const { switchView } = sandbox.page;
     switchView('due');
     await flush();
     assert.equal(sandbox.node('obs-due-section').hidden, false);
@@ -205,8 +227,8 @@ test.describe('switchView("due") — the one-shot load, and only from here', () 
 
   test('switching to due twice in a row (no-op on the second) still issues only one fetch', async () => {
     let calls = 0;
-    const sandbox = makeSandbox({ fetchImpl: async () => { calls++; return jsonResponse({ items: [], nextCursor: null, pageCandidateCount: 0, totalCandidateCount: 0 }); } });
-    const { switchView } = sandbox.exports;
+    const sandbox = await makeSandbox({ fetchImpl: async () => { calls++; return jsonResponse({ items: [], nextCursor: null, pageCandidateCount: 0, totalCandidateCount: 0 }); } });
+    const { switchView } = sandbox.page;
     switchView('due');
     switchView('due'); // same view — switchView's own `view === currentView` guard no-ops this
     await flush();
@@ -218,8 +240,8 @@ test.describe('switchView("due") — the one-shot load, and only from here', () 
 
 test.describe('setPollStatus pill — entering the due tab resolves, never strands', () => {
   test('a successful due load leaves the pill on "● live", not "loading…"', async () => {
-    const sandbox = makeSandbox({ fetchImpl: async () => jsonResponse({ items: [], nextCursor: null, pageCandidateCount: 0, totalCandidateCount: 0 }) });
-    const { switchView } = sandbox.exports;
+    const sandbox = await makeSandbox({ fetchImpl: async () => jsonResponse({ items: [], nextCursor: null, pageCandidateCount: 0, totalCandidateCount: 0 }) });
+    const { switchView } = sandbox.page;
     switchView('due');
     await flush();
     const pill = sandbox.node('obs-poll-status');
@@ -228,8 +250,8 @@ test.describe('setPollStatus pill — entering the due tab resolves, never stran
   });
 
   test('a failed due load leaves the pill on "● disconnected", not "loading…"', async () => {
-    const sandbox = makeSandbox({ fetchImpl: async () => jsonResponse({}, { ok: false, status: 500 }) });
-    const { switchView } = sandbox.exports;
+    const sandbox = await makeSandbox({ fetchImpl: async () => jsonResponse({}, { ok: false, status: 500 }) });
+    const { switchView } = sandbox.page;
     switchView('due');
     await flush();
     const pill = sandbox.node('obs-poll-status');
@@ -243,7 +265,7 @@ test.describe('setPollStatus pill — entering the due tab resolves, never stran
 test.describe('loadInitialDueCheckPage / loadMoreDueChecks — pagination', () => {
   test('load-more replays the stored nextCursor VERBATIM as ?cursor=', async () => {
     const calls = [];
-    const sandbox = makeSandbox({
+    const sandbox = await makeSandbox({
       fetchImpl: async (url) => {
         calls.push(url);
         if (calls.length === 1) {
@@ -252,7 +274,7 @@ test.describe('loadInitialDueCheckPage / loadMoreDueChecks — pagination', () =
         return jsonResponse({ items: [{ issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], nextCursor: null, pageCandidateCount: 1, totalCandidateCount: 2 });
       }
     });
-    const { loadInitialDueCheckPage, loadMoreDueChecks } = sandbox.exports;
+    const { loadInitialDueCheckPage, loadMoreDueChecks } = sandbox.page;
 
     await loadInitialDueCheckPage();
     await loadMoreDueChecks();
@@ -262,12 +284,12 @@ test.describe('loadInitialDueCheckPage / loadMoreDueChecks — pagination', () =
   });
 
   test('load-more APPENDS rather than replacing the list', async () => {
-    const sandbox = makeSandbox({
+    const sandbox = await makeSandbox({
       fetchImpl: async (url) => (url.includes('cursor')
         ? jsonResponse({ items: [{ issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], nextCursor: null, pageCandidateCount: 1, totalCandidateCount: 2 })
         : jsonResponse({ items: [{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }], nextCursor: 'CUR1', pageCandidateCount: 1, totalCandidateCount: 2 }))
     });
-    const { loadInitialDueCheckPage, loadMoreDueChecks } = sandbox.exports;
+    const { loadInitialDueCheckPage, loadMoreDueChecks } = sandbox.page;
     await loadInitialDueCheckPage();
     await loadMoreDueChecks();
 
@@ -278,28 +300,28 @@ test.describe('loadInitialDueCheckPage / loadMoreDueChecks — pagination', () =
   });
 
   test('the load-more button is hidden when nextCursor is null, shown when non-null', async () => {
-    const sandbox = makeSandbox({
+    const sandbox = await makeSandbox({
       fetchImpl: async () => jsonResponse({ items: [{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }], nextCursor: 'CUR1', pageCandidateCount: 1, totalCandidateCount: 2 })
     });
-    const { loadInitialDueCheckPage } = sandbox.exports;
+    const { loadInitialDueCheckPage } = sandbox.page;
     await loadInitialDueCheckPage();
     assert.equal(sandbox.node('obs-due-more').hidden, false, 'a non-null nextCursor must show the load-more button');
 
-    const sandbox2 = makeSandbox({
+    const sandbox2 = await makeSandbox({
       fetchImpl: async () => jsonResponse({ items: [], nextCursor: null, pageCandidateCount: 0, totalCandidateCount: 0 })
     });
-    const { loadInitialDueCheckPage: load2 } = sandbox2.exports;
+    const { loadInitialDueCheckPage: load2 } = sandbox2.page;
     await load2();
     assert.equal(sandbox2.node('obs-due-more').hidden, true, 'a null nextCursor must hide/disable the load-more button');
   });
 
   test('the "checked N of M" readout comes from pageCandidateCount/totalCandidateCount', async () => {
-    const sandbox = makeSandbox({
+    const sandbox = await makeSandbox({
       fetchImpl: async (url) => (url.includes('cursor')
         ? jsonResponse({ items: [{ issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], nextCursor: null, pageCandidateCount: 1, totalCandidateCount: 41 })
         : jsonResponse({ items: Array.from({ length: 40 }, (_, i) => ({ issueId: `i${i}`, issueIdentifier: `LIN-${i}`, dueStatus: null })), nextCursor: 'CUR1', pageCandidateCount: 40, totalCandidateCount: 41 }))
     });
-    const { loadInitialDueCheckPage, loadMoreDueChecks } = sandbox.exports;
+    const { loadInitialDueCheckPage, loadMoreDueChecks } = sandbox.page;
     await loadInitialDueCheckPage();
     assert.equal(sandbox.node('obs-due-progress').textContent, 'checked 40 of 41');
     await loadMoreDueChecks();
@@ -307,34 +329,34 @@ test.describe('loadInitialDueCheckPage / loadMoreDueChecks — pagination', () =
   });
 
   test('day-one notice shows when the first page is entirely dueStatus:null, hides otherwise', async () => {
-    const allNull = makeSandbox({
+    const allNull = await makeSandbox({
       fetchImpl: async () => jsonResponse({ items: [{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: null }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: null }], nextCursor: null, pageCandidateCount: 2, totalCandidateCount: 2 })
     });
-    await allNull.exports.loadInitialDueCheckPage();
+    await allNull.page.loadInitialDueCheckPage();
     assert.equal(allNull.node('obs-due-dayone').hidden, false);
 
-    const mixed = makeSandbox({
+    const mixed = await makeSandbox({
       fetchImpl: async () => jsonResponse({ items: [{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: null }], nextCursor: null, pageCandidateCount: 2, totalCandidateCount: 2 })
     });
-    await mixed.exports.loadInitialDueCheckPage();
+    await mixed.page.loadInitialDueCheckPage();
     assert.equal(mixed.node('obs-due-dayone').hidden, true);
   });
 
   test('day-one notice stays hidden when the first page is entirely provider-read errors', async () => {
-    const allError = makeSandbox({
+    const allError = await makeSandbox({
       fetchImpl: async () => jsonResponse({ items: [{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: null, error: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: null, error: true }], nextCursor: null, pageCandidateCount: 2, totalCandidateCount: 2 })
     });
-    await allError.exports.loadInitialDueCheckPage();
+    await allError.page.loadInitialDueCheckPage();
     assert.equal(allError.node('obs-due-dayone').hidden, true, 'an all-error page must not get scan-baseline day-one copy');
   });
 
   test('loadInitialDueCheckPage guards re-entrancy: a second call while one is in flight is a no-op', async () => {
     let calls = 0;
     let resolveFirst;
-    const sandbox = makeSandbox({
+    const sandbox = await makeSandbox({
       fetchImpl: () => { calls++; return new Promise((resolve) => { resolveFirst = resolve; }); }
     });
-    const { loadInitialDueCheckPage } = sandbox.exports;
+    const { loadInitialDueCheckPage } = sandbox.page;
     const p1 = loadInitialDueCheckPage();
     const p2 = loadInitialDueCheckPage();
     resolveFirst(jsonResponse({ items: [], nextCursor: null, pageCandidateCount: 0, totalCandidateCount: 0 }));
@@ -357,10 +379,10 @@ test.describe('dueSelectedIds — lifecycle (LIN-2706 §B.2)', () => {
     // clears unconditionally. Re-using issueId 'a' on both loads is what
     // distinguishes this from paintDuePage's own prune-by-intersection,
     // which would leave 'a' selected since it is still present.
-    const sandbox = makeSandbox({
+    const sandbox = await makeSandbox({
       fetchImpl: async () => jsonResponse({ items: [{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }], nextCursor: null, pageCandidateCount: 1, totalCandidateCount: 1 })
     });
-    const { loadInitialDueCheckPage, dueSelectedIds, toggleDueSelection } = sandbox.exports;
+    const { loadInitialDueCheckPage, dueSelectedIds, toggleDueSelection } = sandbox.page;
     await loadInitialDueCheckPage();
     toggleDueSelection('a', true);
     assert.ok(dueSelectedIds.has('a'), 'selection sanity check before reload');
@@ -370,12 +392,12 @@ test.describe('dueSelectedIds — lifecycle (LIN-2706 §B.2)', () => {
   });
 
   test('survives loadMoreDueChecks — an in-progress selection is not dropped by pagination', async () => {
-    const sandbox = makeSandbox({
+    const sandbox = await makeSandbox({
       fetchImpl: async (url) => (url.includes('cursor')
         ? jsonResponse({ items: [{ issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], nextCursor: null, pageCandidateCount: 1, totalCandidateCount: 2 })
         : jsonResponse({ items: [{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }], nextCursor: 'CUR1', pageCandidateCount: 1, totalCandidateCount: 2 }))
     });
-    const { loadInitialDueCheckPage, loadMoreDueChecks, dueSelectedIds, toggleDueSelection } = sandbox.exports;
+    const { loadInitialDueCheckPage, loadMoreDueChecks, dueSelectedIds, toggleDueSelection } = sandbox.page;
     await loadInitialDueCheckPage();
     toggleDueSelection('a', true);
 
@@ -385,12 +407,12 @@ test.describe('dueSelectedIds — lifecycle (LIN-2706 §B.2)', () => {
     assert.ok(dueSelectedIds.has('a'), 'appending a page must not silently drop an in-progress selection');
   });
 
-  test('prunes a vanished row on a full repaint — the count can never exceed what is on screen', () => {
+  test('prunes a vanished row on a full repaint — the count can never exceed what is on screen', async () => {
     // Isolates paintDuePage's OWN prune-by-intersection mechanism from
     // loadInitialDueCheckPage's unconditional clear (tested separately
     // above) by driving paintDuePage directly.
-    const sandbox = makeSandbox();
-    const { paintDuePage, dueSelectedIds, toggleDueSelection } = sandbox.exports;
+    const sandbox = await makeSandbox();
+    const { paintDuePage, dueSelectedIds, toggleDueSelection } = sandbox.page;
     paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], 2, { append: false });
     toggleDueSelection('a', true);
     toggleDueSelection('b', true);
@@ -402,12 +424,12 @@ test.describe('dueSelectedIds — lifecycle (LIN-2706 §B.2)', () => {
   });
 
   test('loaded-rows-only: a load-more page never prunes rows from an EARLIER page', async () => {
-    const sandbox = makeSandbox({
+    const sandbox = await makeSandbox({
       fetchImpl: async (url) => (url.includes('cursor')
         ? jsonResponse({ items: [{ issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], nextCursor: null, pageCandidateCount: 1, totalCandidateCount: 2 })
         : jsonResponse({ items: [{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }], nextCursor: 'CUR1', pageCandidateCount: 1, totalCandidateCount: 2 }))
     });
-    const { loadInitialDueCheckPage, loadMoreDueChecks, dueSelectedIds, toggleDueSelection } = sandbox.exports;
+    const { loadInitialDueCheckPage, loadMoreDueChecks, dueSelectedIds, toggleDueSelection } = sandbox.page;
     await loadInitialDueCheckPage();
     toggleDueSelection('a', true);
     await loadMoreDueChecks();
@@ -419,9 +441,9 @@ test.describe('dueSelectedIds — lifecycle (LIN-2706 §B.2)', () => {
 });
 
 test.describe('per-row checkbox + select-all — rendering and tri-state (LIN-2706 §B.3)', () => {
-  test('renderDueRowHtml reflects Set membership: checked when selected, unchecked otherwise', () => {
-    const sandbox = makeSandbox();
-    const { renderDueRowHtml, dueSelectedIds } = sandbox.exports;
+  test('renderDueRowHtml reflects Set membership: checked when selected, unchecked otherwise', async () => {
+    const sandbox = await makeSandbox();
+    const { renderDueRowHtml, dueSelectedIds } = sandbox.page;
     const item = { issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true };
 
     assert.doesNotMatch(renderDueRowHtml(item), /obs-due-select[^>]*checked/, 'unselected row must not render checked');
@@ -433,8 +455,8 @@ test.describe('per-row checkbox + select-all — rendering and tri-state (LIN-27
   // span, so the checkbox has no accessible name unless it carries one of its
   // own — a screen reader would otherwise announce an unnamed checkbox with no
   // way to tell which task it selects.
-  test('renderDueRowHtml gives every per-row checkbox an accessible name carrying the row identifier', () => {
-    const { renderDueRowHtml } = makeSandbox().exports;
+  test('renderDueRowHtml gives every per-row checkbox an accessible name carrying the row identifier', async () => {
+    const { renderDueRowHtml } = (await makeSandbox()).page;
 
     const row = renderDueRowHtml({ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true });
     assert.match(row, /<input type="checkbox" aria-label="select LIN-1"/, 'the checkbox must name the row it selects');
@@ -451,9 +473,9 @@ test.describe('per-row checkbox + select-all — rendering and tri-state (LIN-27
     assert.doesNotMatch(nasty, /aria-label="select <img/);
   });
 
-  test('a repaint with the SAME items preserves checked state (idempotent repaint)', () => {
-    const sandbox = makeSandbox();
-    const { paintDuePage, toggleDueSelection } = sandbox.exports;
+  test('a repaint with the SAME items preserves checked state (idempotent repaint)', async () => {
+    const sandbox = await makeSandbox();
+    const { paintDuePage, toggleDueSelection } = sandbox.page;
     const items = [{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }];
     paintDuePage(items, 2, { append: false });
     toggleDueSelection('a', true);
@@ -473,9 +495,9 @@ test.describe('per-row checkbox + select-all — rendering and tri-state (LIN-27
   // stopping the blind billing of the other two statuses: not-due rows are
   // unchanged by definition, and errored rows must not be re-billed blindly
   // — each selected row costs one billable LLM scan.
-  test('select-all selects due + unknown only — not-due and errored rows are skipped, exactly two of the four-status fixture selected', () => {
-    const sandbox = makeSandbox({ scanCostEstimate: { calls: 4, pricedCalls: 4, meanUsd: 0.02, unknown: false } });
-    const { paintDuePage, setAllDueSelected, dueSelectedIds } = sandbox.exports;
+  test('select-all selects due + unknown only — not-due and errored rows are skipped, exactly two of the four-status fixture selected', async () => {
+    const sandbox = await makeSandbox({ scanCostEstimate: { calls: 4, pricedCalls: 4, meanUsd: 0.02, unknown: false } });
+    const { paintDuePage, setAllDueSelected, dueSelectedIds } = sandbox.page;
     paintDuePage([
       { issueId: 'due', issueIdentifier: 'LIN-1', dueStatus: true },
       { issueId: 'unknown', issueIdentifier: 'LIN-2', dueStatus: null },
@@ -499,9 +521,9 @@ test.describe('per-row checkbox + select-all — rendering and tri-state (LIN-27
 
   // The per-row checkbox stays free under LIN-2760's rule: select-all skips
   // not-due/errored rows, but an operator can still hand-pick one.
-  test('a hand-picked not-due row stays selected — select-all off still clears it with the rest', () => {
-    const sandbox = makeSandbox();
-    const { paintDuePage, toggleDueSelection, setAllDueSelected, dueSelectedIds } = sandbox.exports;
+  test('a hand-picked not-due row stays selected — select-all off still clears it with the rest', async () => {
+    const sandbox = await makeSandbox();
+    const { paintDuePage, toggleDueSelection, setAllDueSelected, dueSelectedIds } = sandbox.page;
     paintDuePage([
       { issueId: 'due', issueIdentifier: 'LIN-1', dueStatus: true },
       { issueId: 'not-due', issueIdentifier: 'LIN-2', dueStatus: false },
@@ -515,9 +537,9 @@ test.describe('per-row checkbox + select-all — rendering and tri-state (LIN-27
     assert.equal(dueSelectedIds.size, 0, 'select-all off clears every loaded row, hand-picked ones included');
   });
 
-  test('select-all-loaded repaints the list so every row reflects the new membership', () => {
-    const sandbox = makeSandbox();
-    const { paintDuePage, setAllDueSelected } = sandbox.exports;
+  test('select-all-loaded repaints the list so every row reflects the new membership', async () => {
+    const sandbox = await makeSandbox();
+    const { paintDuePage, setAllDueSelected } = sandbox.page;
     // LIN-2760: one due + one not-due row — the repaint must reflect the
     // FILTERED membership, not just "everything checked", so this fixture
     // pins both halves of the render at once.
@@ -529,12 +551,12 @@ test.describe('per-row checkbox + select-all — rendering and tri-state (LIN-27
   });
 
   test('select-all-loaded, driven across a load-more, covers BOTH pages — the loaded population grows additively', async () => {
-    const sandbox = makeSandbox({
+    const sandbox = await makeSandbox({
       fetchImpl: async (url) => (url.includes('cursor')
         ? jsonResponse({ items: [{ issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: null }], nextCursor: null, pageCandidateCount: 1, totalCandidateCount: 2 })
         : jsonResponse({ items: [{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }], nextCursor: 'CUR1', pageCandidateCount: 1, totalCandidateCount: 2 }))
     });
-    const { loadInitialDueCheckPage, loadMoreDueChecks, setAllDueSelected, dueSelectedIds } = sandbox.exports;
+    const { loadInitialDueCheckPage, loadMoreDueChecks, setAllDueSelected, dueSelectedIds } = sandbox.page;
     await loadInitialDueCheckPage();
     await loadMoreDueChecks();
     assert.ok(dueBox(sandbox, 'a') && dueBox(sandbox, 'b'), 'both pages\' rows must be drawn after the append');
@@ -544,9 +566,9 @@ test.describe('per-row checkbox + select-all — rendering and tri-state (LIN-27
     assert.deepEqual([...dueSelectedIds].sort(), ['a', 'b']);
   });
 
-  test('tri-state: none/some/all loaded selected, and the bulk bar is hidden with nothing loaded', () => {
-    const sandbox = makeSandbox();
-    const { paintDuePage, toggleDueSelection } = sandbox.exports;
+  test('tri-state: none/some/all loaded selected, and the bulk bar is hidden with nothing loaded', async () => {
+    const sandbox = await makeSandbox();
+    const { paintDuePage, toggleDueSelection } = sandbox.page;
     const selectAll = sandbox.node('obs-due-select-all');
     const bar = sandbox.node('obs-due-bulk-bar');
 
@@ -579,9 +601,9 @@ test.describe('per-row checkbox + select-all — rendering and tri-state (LIN-27
   // and asserts the states where they differ. Without the re-base the
   // checkbox snaps back unchecked the moment a not-due/errored row exists on
   // screen, even though the click did exactly what its label says.
-  test('select-all tri-state is keyed on the due+unknown population — checked survives skipped rows, hand-picks alone never read indeterminate', () => {
-    const sandbox = makeSandbox();
-    const { paintDuePage, setAllDueSelected, toggleDueSelection, dueSelectedIds } = sandbox.exports;
+  test('select-all tri-state is keyed on the due+unknown population — checked survives skipped rows, hand-picks alone never read indeterminate', async () => {
+    const sandbox = await makeSandbox();
+    const { paintDuePage, setAllDueSelected, toggleDueSelection, dueSelectedIds } = sandbox.page;
     const selectAll = sandbox.node('obs-due-select-all');
 
     paintDuePage([
@@ -619,9 +641,9 @@ test.describe('per-row checkbox + select-all — rendering and tri-state (LIN-27
   // is empty — the same all-loaded keying the bar's own visibility already
   // uses, and the same rationale: a skipped row is still hand-pickable, so
   // the control that can clear it must stay reachable.
-  test('empty-coverable fallback: on an all-skipped page the tri-state keys on all loaded rows so a hand-picked selection is clearable from select-all', () => {
-    const sandbox = makeSandbox();
-    const { paintDuePage, toggleDueSelection, setAllDueSelected, dueSelectedIds } = sandbox.exports;
+  test('empty-coverable fallback: on an all-skipped page the tri-state keys on all loaded rows so a hand-picked selection is clearable from select-all', async () => {
+    const sandbox = await makeSandbox();
+    const { paintDuePage, toggleDueSelection, setAllDueSelected, dueSelectedIds } = sandbox.page;
     const selectAll = sandbox.node('obs-due-select-all');
 
     paintDuePage([
@@ -660,9 +682,9 @@ test.describe('per-row checkbox + select-all — rendering and tri-state (LIN-27
 // startBulkScan. These are pre-run-only surfaces.
 
 test.describe('dueSelectedCountText — exact count (LIN-2706 §B.4)', () => {
-  test('renders the exact selected count, never merged with the cost figure', () => {
-    const sandbox = makeSandbox();
-    const { paintDuePage, toggleDueSelection, dueSelectedCountText } = sandbox.exports;
+  test('renders the exact selected count, never merged with the cost figure', async () => {
+    const sandbox = await makeSandbox();
+    const { paintDuePage, toggleDueSelection, dueSelectedCountText } = sandbox.page;
     paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], 2, { append: false });
     assert.match(dueSelectedCountText(), /^0 selected/);
     assert.doesNotMatch(dueSelectedCountText(), /\$/, 'the count text must never carry a dollar figure');
@@ -673,9 +695,9 @@ test.describe('dueSelectedCountText — exact count (LIN-2706 §B.4)', () => {
     assert.match(dueSelectedCountText(), /^2 selected/);
   });
 
-  test('the rendered #obs-due-selected-count hook tracks selection via syncDueBulkBar', () => {
-    const sandbox = makeSandbox();
-    const { paintDuePage, toggleDueSelection } = sandbox.exports;
+  test('the rendered #obs-due-selected-count hook tracks selection via syncDueBulkBar', async () => {
+    const sandbox = await makeSandbox();
+    const { paintDuePage, toggleDueSelection } = sandbox.page;
     paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }], 1, { append: false });
     const countEl = sandbox.node('obs-due-selected-count');
     assert.match(countEl.textContent, /^0 selected/);
@@ -685,28 +707,28 @@ test.describe('dueSelectedCountText — exact count (LIN-2706 §B.4)', () => {
 });
 
 test.describe('formatDueScanCostEstimate — honest unknown, never $0.00 for it (LIN-2706 §B.5)', () => {
-  test('unknown:true renders "est. unknown"', () => {
-    const sandbox = makeSandbox();
-    const { formatDueScanCostEstimate } = sandbox.exports;
+  test('unknown:true renders "est. unknown"', async () => {
+    const sandbox = await makeSandbox();
+    const { formatDueScanCostEstimate } = sandbox.page;
     assert.equal(formatDueScanCostEstimate({ calls: 0, pricedCalls: 0, meanUsd: null, unknown: true }, 5), 'est. unknown');
   });
 
-  test('a null/absent estimate renders "est. unknown"', () => {
-    const sandbox = makeSandbox();
-    const { formatDueScanCostEstimate } = sandbox.exports;
+  test('a null/absent estimate renders "est. unknown"', async () => {
+    const sandbox = await makeSandbox();
+    const { formatDueScanCostEstimate } = sandbox.page;
     assert.equal(formatDueScanCostEstimate(null, 5), 'est. unknown');
     assert.equal(formatDueScanCostEstimate(undefined, 5), 'est. unknown');
   });
 
-  test('a priced row averaging exactly zero renders est. $0.0000 (fine: a real zero), unknown:false — distinct from the unknown state', () => {
-    const sandbox = makeSandbox();
-    const { formatDueScanCostEstimate } = sandbox.exports;
+  test('a priced row averaging exactly zero renders est. $0.0000 (fine: a real zero), unknown:false — distinct from the unknown state', async () => {
+    const sandbox = await makeSandbox();
+    const { formatDueScanCostEstimate } = sandbox.page;
     assert.equal(formatDueScanCostEstimate({ calls: 3, pricedCalls: 3, meanUsd: 0, unknown: false }, 5), 'est. $0.0000');
   });
 
-  test('a normal priced mean renders meanUsd × selectedCount', () => {
-    const sandbox = makeSandbox();
-    const { formatDueScanCostEstimate } = sandbox.exports;
+  test('a normal priced mean renders meanUsd × selectedCount', async () => {
+    const sandbox = await makeSandbox();
+    const { formatDueScanCostEstimate } = sandbox.page;
     // Sub-$1 totals keep 4 decimals, mirroring formatCost's own precision idiom
     // (0.02 * 5 = 0.10, still < 1).
     assert.equal(formatDueScanCostEstimate({ calls: 10, pricedCalls: 10, meanUsd: 0.02, unknown: false }, 5), 'est. $0.1000');
@@ -715,9 +737,9 @@ test.describe('formatDueScanCostEstimate — honest unknown, never $0.00 for it 
     assert.equal(formatDueScanCostEstimate({ calls: 10, pricedCalls: 10, meanUsd: 0.5, unknown: false }, 5), 'est. $2.50');
   });
 
-  test('regression: no input path yields $0.00 for an unknown estimate', () => {
-    const sandbox = makeSandbox();
-    const { formatDueScanCostEstimate } = sandbox.exports;
+  test('regression: no input path yields $0.00 for an unknown estimate', async () => {
+    const sandbox = await makeSandbox();
+    const { formatDueScanCostEstimate } = sandbox.page;
     const unknownInputs = [
       { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true },
       null,
@@ -732,9 +754,9 @@ test.describe('formatDueScanCostEstimate — honest unknown, never $0.00 for it 
     }
   });
 
-  test('the rendered #obs-due-selected-cost hook reflects the wired scanCostEstimate via syncDueBulkBar', () => {
-    const sandbox = makeSandbox({ scanCostEstimate: { calls: 4, pricedCalls: 4, meanUsd: 0.02, unknown: false } });
-    const { paintDuePage, toggleDueSelection } = sandbox.exports;
+  test('the rendered #obs-due-selected-cost hook reflects the wired scanCostEstimate via syncDueBulkBar', async () => {
+    const sandbox = await makeSandbox({ scanCostEstimate: { calls: 4, pricedCalls: 4, meanUsd: 0.02, unknown: false } });
+    const { paintDuePage, toggleDueSelection } = sandbox.page;
     paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], 2, { append: false });
     const estimateEl = sandbox.node('obs-due-selected-cost');
     assert.equal(estimateEl.textContent, 'est. $0.0000', 'zero selected: meanUsd × 0');
@@ -743,9 +765,9 @@ test.describe('formatDueScanCostEstimate — honest unknown, never $0.00 for it 
     assert.equal(estimateEl.textContent, 'est. $0.0400');
   });
 
-  test('the rendered hook renders "est. unknown" (never $0.00) when the wired estimate is unknown', () => {
-    const sandbox = makeSandbox({ scanCostEstimate: { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true } });
-    const { paintDuePage, toggleDueSelection } = sandbox.exports;
+  test('the rendered hook renders "est. unknown" (never $0.00) when the wired estimate is unknown', async () => {
+    const sandbox = await makeSandbox({ scanCostEstimate: { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true } });
+    const { paintDuePage, toggleDueSelection } = sandbox.page;
     paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }], 1, { append: false });
     toggleDueSelection('a', true);
     assert.equal(sandbox.node('obs-due-selected-cost').textContent, 'est. unknown');
@@ -757,21 +779,21 @@ test.describe('formatDueScanCostEstimate — honest unknown, never $0.00 for it 
   // longest paragraph on the tab; this pins the estimate/count readouts
   // specifically, since those are the two that grow with the data
   // (selectedCount, meanUsd) rather than being fixed prose.
-  test('bounded copy: the estimate and count readouts stay short regardless of selection size or price', () => {
-    const sandbox = makeSandbox();
-    const { formatDueScanCostEstimate, dueSelectedCountText } = sandbox.exports;
+  test('bounded copy: the estimate and count readouts stay short regardless of selection size or price', async () => {
+    const sandbox = await makeSandbox();
+    const { formatDueScanCostEstimate, dueSelectedCountText } = sandbox.page;
     const worstCaseEstimate = formatDueScanCostEstimate({ calls: 40, pricedCalls: 40, meanUsd: 999999.9999, unknown: false }, 40);
     assert.ok(worstCaseEstimate.length <= 40, `estimate readout too long: "${worstCaseEstimate}" (${worstCaseEstimate.length} chars)`);
-    for (let i = 0; i < 45; i++) sandbox.exports.toggleDueSelection(`row-${i}`, true);
+    for (let i = 0; i < 45; i++) sandbox.page.toggleDueSelection(`row-${i}`, true);
     const countText = dueSelectedCountText();
     assert.ok(countText.length <= 40, `count readout too long: "${countText}" (${countText.length} chars)`);
   });
 });
 
 test.describe('over-ceiling refusal — refuse, never truncate (LIN-2706 §B.8)', () => {
-  test('selecting past BULK_SCAN_MAX_PER_RUN shows the refusal, interpolating the REAL constant', () => {
-    const sandbox = makeSandbox();
-    const { paintDuePage, setAllDueSelected, BULK_SCAN_MAX_PER_RUN, dueBulkScanRefusalMessage } = sandbox.exports;
+  test('selecting past BULK_SCAN_MAX_PER_RUN shows the refusal, interpolating the REAL constant', async () => {
+    const sandbox = await makeSandbox();
+    const { paintDuePage, setAllDueSelected, BULK_SCAN_MAX_PER_RUN, dueBulkScanRefusalMessage } = sandbox.page;
     const items = Array.from({ length: BULK_SCAN_MAX_PER_RUN + 5 }, (_, i) => ({ issueId: `i${i}`, issueIdentifier: `LIN-${i}`, dueStatus: null }));
     paintDuePage(items, items.length, { append: false });
     setAllDueSelected(true);
@@ -797,9 +819,9 @@ test.describe('over-ceiling refusal — refuse, never truncate (LIN-2706 §B.8)'
   // guard for the pairing (a future change that capped the selection to
   // "fix" the refusal display would fail this), just not one this specific
   // beat's diff could ever fail on its own.
-  test('a refusal enqueues nothing and leaves the selection COMPLETELY intact — no truncation', () => {
-    const sandbox = makeSandbox();
-    const { paintDuePage, setAllDueSelected, dueSelectedIds, BULK_SCAN_MAX_PER_RUN } = sandbox.exports;
+  test('a refusal enqueues nothing and leaves the selection COMPLETELY intact — no truncation', async () => {
+    const sandbox = await makeSandbox();
+    const { paintDuePage, setAllDueSelected, dueSelectedIds, BULK_SCAN_MAX_PER_RUN } = sandbox.page;
     const items = Array.from({ length: BULK_SCAN_MAX_PER_RUN + 5 }, (_, i) => ({ issueId: `i${i}`, issueIdentifier: `LIN-${i}`, dueStatus: null }));
     paintDuePage(items, items.length, { append: false });
     setAllDueSelected(true);
@@ -812,9 +834,9 @@ test.describe('over-ceiling refusal — refuse, never truncate (LIN-2706 §B.8)'
     // no new call site), not a runtime behaviour this test can probe.
   });
 
-  test('the refusal clears on the next selection change once back within the ceiling', () => {
-    const sandbox = makeSandbox();
-    const { paintDuePage, setAllDueSelected, toggleDueSelection, dueBulkScanRefusalMessage, BULK_SCAN_MAX_PER_RUN } = sandbox.exports;
+  test('the refusal clears on the next selection change once back within the ceiling', async () => {
+    const sandbox = await makeSandbox();
+    const { paintDuePage, setAllDueSelected, toggleDueSelection, dueBulkScanRefusalMessage, BULK_SCAN_MAX_PER_RUN } = sandbox.page;
     const items = Array.from({ length: BULK_SCAN_MAX_PER_RUN + 1 }, (_, i) => ({ issueId: `i${i}`, issueIdentifier: `LIN-${i}`, dueStatus: null }));
     paintDuePage(items, items.length, { append: false });
     setAllDueSelected(true);
@@ -827,9 +849,9 @@ test.describe('over-ceiling refusal — refuse, never truncate (LIN-2706 §B.8)'
     assert.equal(sandbox.node('obs-due-bulk-refusal').hidden, true, 'the drawn refusal must hide, not stay on screen');
   });
 
-  test('a within-ceiling selection never shows a refusal', () => {
-    const sandbox = makeSandbox();
-    const { paintDuePage, setAllDueSelected, dueBulkScanRefusalMessage } = sandbox.exports;
+  test('a within-ceiling selection never shows a refusal', async () => {
+    const sandbox = await makeSandbox();
+    const { paintDuePage, setAllDueSelected, dueBulkScanRefusalMessage } = sandbox.page;
     paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], 2, { append: false });
     setAllDueSelected(true);
     assert.equal(dueBulkScanRefusalMessage(), null);
@@ -849,8 +871,8 @@ test.describe('"Scan selected (N)" / Stop — button enablement (Witness 6, move
   test('enabled state tracks (selection non-empty) AND (no live run), across all four combinations', async () => {
     const gates = [];
     const postScan = async () => new Promise((_resolve, reject) => { gates.push(reject); });
-    const sandbox = makeSandbox({ postScanImpl: postScan });
-    const { paintDuePage, setAllDueSelected, toggleDueSelection, startDueBulkScan, stopBulkScan } = sandbox.exports;
+    const sandbox = await makeSandbox({ postScanImpl: postScan });
+    const { paintDuePage, setAllDueSelected, toggleDueSelection, startDueBulkScan, stopBulkScan } = sandbox.page;
     const scanBtn = sandbox.node('obs-due-scan-selected');
     const stopBtn = sandbox.node('obs-due-stop');
 
@@ -900,13 +922,13 @@ test.describe('startBulkScan — cancellation / late settlement (Witness 10, LIN
     const gates = [];
     const postScan = async () => new Promise((_resolve, reject) => { gates.push(reject); });
     let createElementCalls = 0;
-    const sandbox = makeSandbox({ postScanImpl: postScan });
+    const sandbox = await makeSandbox({ postScanImpl: postScan });
     const realCreateElement = sandbox.document.createElement;
     sandbox.document.createElement = (...args) => { createElementCalls++; return realCreateElement.apply(sandbox.document, args); };
 
     const {
       paintDuePage, setAllDueSelected, startDueBulkScan, stopBulkScan, paintBulkScanRowResult
-    } = sandbox.exports;
+    } = sandbox.page;
 
     paintDuePage([
       { issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true },

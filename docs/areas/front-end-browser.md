@@ -51,6 +51,11 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   statements after it in `if (mounted) { }`: `var` stays module-scoped, and function declarations stay top-level and
   hoisted, as they were in the IIFE. (LIN-4463 piece 3, flight-companion.js.)
 
+- A module's exports are its test seams, and a namespace is read-only. A classic getter/setter pair on the export object
+  becomes a named function (`getOpenLoopIds`/`setOpenLoopIds` in `public/observation.js`); a `let` read through the
+  namespace is live. Keep each export's name from the old seam where it can stay a function (`lastRulingsRef`); an accessor named after its own state gains a verb (`openLoopIds` → `getOpenLoopIds`), so a suite changes how it loads and not what it asserts.
+  A suite reaches module state through the seam, never by a script-scope probe. (LIN-4463 piece 4.)
+
 ## Waiting
 
 - `public/app.js`: Home's Running and Up next are refreshed by parsing a whole page with
@@ -65,9 +70,9 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
 - `public/brief.js`: its `postBrief`/`errorText` block is identical to `postRecap`/`errorText`
   in `public/recap.js`, and the check for a `statusCode` inside a keepalive 200 body is now
   written four times (also `public/scan.js` and `public/observation.js`). One shared imported reader is possible only
-  once `public/scan.js`, `public/recap.js`, `public/observation.js` and `public/brief.js` are modules that can import it
-  (LIN-4463 converts pages top down); until then it would be a classic global in `public/common.js`. (Area reads CG/CH,
-  8 Nov, on LIN-4358.)
+  once `public/scan.js`, `public/recap.js` and `public/brief.js` are modules that can import it (LIN-4463 converts pages
+  top down; `public/observation.js` became a module in piece 4); until then it would be a classic global in
+  `public/common.js`. (Area reads CG/CH, 8 Nov, on LIN-4358.)
 - `public/common.js`: exported globals, and the "client twins" of `lib/task-page-href.js`, `lib/timeline-zoom.js`,
   `lib/ship-layout.js` and `lib/prompt-formatters.js`. The first two are leaves of the same shape as cost-format, the
   next candidates; the last two import other modules, so serving a single file will not do for them. Its
@@ -76,15 +81,25 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
 - `public/ship.js` / `public/ship-biscuit.js`: still hand-synced copies ("mirror of lib/ship-layout.js", "kept in
   lockstep with lib/render-ship-biscuit.js"). Each lib side would first have to become an import-free leaf before it
   could join `SHARED_MODULES`. (LIN-4446 blind read.)
-- `public/session.js`: its `formatElapsed` is a copy of `fmtDuration` (`lib/time-words.js`, LIN-4472), and
-  `formatRuntime` in `public/observation.js` is the same rule again (it returns `''` where the leaf returns null).
-  `fmtDuration` in `public/live-console.js` words seconds with no hour rung (`66m 40s` where the leaf says `1h 6m`),
-  so the duration rule is spelled two ways. All three are classic scripts, so none can import the leaf until its
-  page is a module (observation.js is next in LIN-4463's order; session.js shares close-out.js with the task page).
-  Each copy goes when its page converts; Live Console's wording is a choice to make then. (LIN-4472 leftovers.)
+- `public/session.js`: its `formatElapsed` is a copy of `fmtDuration` (`lib/time-words.js`, LIN-4472). `fmtDuration`
+  in `public/live-console.js` words seconds with no hour rung (`66m 40s` where the leaf says `1h 6m`), so the duration
+  rule is spelled two ways. Both are classic scripts, so neither can import the leaf until its page is a module
+  (session.js shares close-out.js with the task page). Each copy goes when its page converts; Live Console's wording is a
+  choice to make then. (LIN-4472 leftovers. The copy in `public/observation.js` went with its conversion, LIN-4463 piece 4.)
 - `public/observation.js`: about 5,000 lines. By the counting method of LIN-4446 (lines starting with `*`, `//` or `/*`)
   1,985 of its 4,679 non-blank lines are comments. Find out why it is this large before splitting it. An earlier survey
-  used a different method, so its figure is not comparable. (LIN-4446 plan.)
+  used a different method, so its figure is not comparable. (LIN-4446 plan.) It is a native module now (LIN-4463
+  piece 4); converting it did not change its size, and its suites still run most of its 105 seams.
+- `public/observation.js`: it is a module but still reads `public/common.js` globals bare (`escapeHtml`,
+  `relativeTime`, `window.api`, `taskPageHref`/`sourceQuery`, `ReplyDelivery`, `ScanSection`), and each of its module
+  suites (`tests/unit/observation-module.test.js`, `tests/unit/task-page-link-client-surfaces.test.js`,
+  `tests/unit/observation-ruling-delivery.test.js`) rebuilds that contract by hand, differently: one stubs `escapeHtml`
+  and `relativeTime`, one passes the real lib leaves, and the ruling-delivery suite runs `public/common.js` into the
+  process global with `vm.runInThisContext` and an `importWorld({})` baseline it never restores (that keeps it in the
+  classic-loader census). Two ways out, and the choice is a design call spanning several suites: one shared
+  observation-world helper for the suites, or move the page's `public/common.js` reads to imports (which needs those
+  names extracted from `public/common.js` as leaves). Settle it with the next change to `public/observation.js`.
+  (LIN-4463 piece 4 blind read.)
 - `public/llms.txt`: its H11 names the unscoped `/api/recommend/status`, which is now only a
   legacy redirect (`routes/legacy-redirects.js`), and its view list omits `projects` and
   `live-console` (`lib/components/view-nav.js`; live-console shows for an owner with a live runner key or queue token

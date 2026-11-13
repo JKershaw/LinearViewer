@@ -11,13 +11,16 @@
  * Every surface runs in a client world (tests/unit/helpers/client-world.js over the one fake DOM, LIN-4310): the
  * swipe card is the server's own markup (helpers/swipe-page.js), and the Live Console lane is the client's own builder.
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withHarnessModels } from '../fixtures/harness-models.js';
 import { loadWorld } from './helpers/client-world.js';
+import { importWorld } from './helpers/import-world.js';
+import { taskPageHref, sourceQuery } from '../../lib/task-page-href.js';
+import { escapeHtml } from '../../lib/utils/html.js';
 import { loadLiveConsole, makeLaneNode } from './helpers/live-console-world.js';
 import { swipePageBody } from './helpers/swipe-page.js';
 
@@ -102,10 +105,19 @@ describe('Sessions section task-page link (LIN-3331)', () => {
   });
 });
 
+// observation.js is a native module (LIN-4463 piece 4), so it is imported over the fake DOM. Its window helpers are the
+// lib leaves common.js exposes (taskPageHref, sourceQuery) and the shared escapeHtml, so the hrefs are the real ones.
 describe('Observation task-block task-page link (LIN-3331)', () => {
-  const world = worldWithCommon();
-  world.run(read('public/observation.js'));
-  const { renderTaskBlock } = world.sandbox.module.exports;
+  let world;
+  let renderTaskBlock;
+  before(async () => {
+    world = await importWorld({
+      window: { addEventListener() {}, matchMedia: () => ({ matches: false }), taskPageHref, sourceQuery },
+      globals: { escapeHtml, relativeTime: () => '', console: { warn() {}, error() {}, log() {} } },
+    });
+    ({ renderTaskBlock } = await world.importPage('observation.js'));
+  });
+  after(() => world.restore());
 
   test('carries the run source on obs-task-page-link', () => {
     const html = renderTaskBlock({ workspaceUrlKey: 'ws' }, 'LIN-1', null, [
