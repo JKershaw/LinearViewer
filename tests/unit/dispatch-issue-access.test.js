@@ -7,8 +7,8 @@
  *   - a counting provider WITH `issueDescription` is read exactly once, for the row's
  *     identifier, and the plan paths still reach the prompt; the seal still writes by the
  *     id the read returned;
- *   - a provider that declares `testTransport` (a plain property, set where that provider's
- *     transport is swapped under test) has no access to the hermetic `test-token` under
+ *   - a provider that declares `testTransport` (a plain, fixed property declared on the
+ *     provider class) has no access to the hermetic `test-token` under
  *     NODE_ENV=test: Linear with `test-token` makes no transport call at all, with or
  *     without an installed transport (the e2e transport answers that token with a 401),
  *     still enqueues, and logs `seal skipped: no access`; a real token on the same provider
@@ -93,7 +93,7 @@ function countingProvider({ identifier, id, description, trashed = false, testTr
     writes,
     provider: {
       name: 'counting',
-      // The declared capability is a plain property, present only when asked for.
+      // The declared property is a plain property, present only when asked for.
       ...(testTransport ? { testTransport: true } : {}),
       async issueDescription(token, key) {
         reads.push(['issueDescription', key]);
@@ -179,7 +179,7 @@ describe('the hermetic test token: a declared testTransport is skipped, an undec
   });
 });
 
-describe('the testTransport capability, not the provider name', () => {
+describe('the declared testTransport property, not the provider name', () => {
   test('a stand-in that declares testTransport has no access under the hermetic test token: no read, no plan', async () => {
     const fake = countingProvider({ identifier: 'FAKE-10', id: 'uuid-10', description: PLAN, testTransport: true });
     await dispatch({ issueIdentifier: 'FAKE-10', issueAccess: () => ({ provider: fake.provider, token: 'test-token' }) });
