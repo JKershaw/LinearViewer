@@ -3728,3 +3728,4 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - **Agreed:** one Opus writer as a `custom` dispatch; my reviewer subagent reads the paper before merge, since John skips that read ("Sorry, I meant skipping the paper read"); the essay is a second ticket, written by Fable as a trial ("We could also try fable for the essay writing to get the best result?").
   - **Timing, John:** "We can schedule it for when the tasks and related work has landed." The text is in `asks.md` under "Held: file when the lanes land", to file once LIN-4445, LIN-4447, LIN-4448 and LIN-4463 are done. The paper can then say whether the agreed border moves held.
   - **Area read 0 for A16:** both browser-area passes done; the Web routes pair is running.
+- **15:49 UTC: fresh proxy token from John** (`.tok8` in the scratchpad, valid to 15 Nov 15:48 UTC, readWrite with the dispatch grant). The watcher now uses it. Never printed.
