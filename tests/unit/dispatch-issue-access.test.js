@@ -7,10 +7,13 @@
  *   - a counting provider WITH `issueDescription` is read exactly once, for the row's
  *     identifier, and the plan paths still reach the prompt; the seal still writes by the
  *     id the read returned;
- *   - the Linear provider with the hermetic `test-token` under NODE_ENV=test makes no
- *     transport call at all (the e2e transport answers that token with a 401), still
- *     enqueues, and logs `seal skipped: no access`; a real token on the same provider
- *     does reach the transport, and LocalProvider with `test-token` still seals;
+ *   - a provider that declares `testTransport` (a plain property, set where that provider's
+ *     transport is swapped under test) has no access to the hermetic `test-token` under
+ *     NODE_ENV=test: Linear with `test-token` makes no transport call at all, with or
+ *     without an installed transport (the e2e transport answers that token with a 401),
+ *     still enqueues, and logs `seal skipped: no access`; a real token on the same provider
+ *     does reach the transport; a provider that does not declare it still takes
+ *     `test-token` as a working credential, and LocalProvider with `test-token` still seals;
  *   - a trashed issue is not sealed (the seal's existing "found nothing" line) but its
  *     plan still reaches the prompt.
  *
@@ -30,6 +33,7 @@ import { LocalProvider } from '../../lib/providers/local/index.js';
 import { sealAsAsked } from '../../lib/as-asked.js';
 import { createLocalStore } from '../fixtures/local-harness.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
+import { guardSockets } from '../fixtures/network-guard.js';
 
 const URL_KEY = 'acme';
 const PLAN = '## Implementation Plan\nlib/plan.js\nroutes/plan-route.js';
@@ -80,7 +84,7 @@ function dispatch({ issueIdentifier, issueAccess, ...rest }) {
  * every issue read, through either method. It takes a write ONLY by the id its read
  * returned, as Linear's uuid and GitHub's and Jira's own ids do.
  */
-function countingProvider({ identifier, id, description, trashed = false }) {
+function countingProvider({ identifier, id, description, trashed = false, testTransport }) {
   const reads = [];
   const writes = [];
   const issue = () => ({ id, identifier, description, trashed });
@@ -89,6 +93,8 @@ function countingProvider({ identifier, id, description, trashed = false }) {
     writes,
     provider: {
       name: 'counting',
+      // The declared capability is a plain property, present only when asked for.
+      ...(testTransport ? { testTransport: true } : {}),
       async issueDescription(token, key) {
         reads.push(['issueDescription', key]);
         return key === identifier ? issue() : null;
@@ -128,7 +134,7 @@ describe('one read per dispatch, shared by the seal and the plan read', () => {
   });
 });
 
-describe('the hermetic test token, on Linear only', () => {
+describe('the hermetic test token: a declared testTransport is skipped, an undeclared provider is not', () => {
   let calls;
   let kept;
   beforeEach(() => {
@@ -170,6 +176,42 @@ describe('the hermetic test token, on Linear only', () => {
     await dispatch({ issueIdentifier: 'TEST-1', issueAccess: () => ({ provider, token: 'test-token' }) });
     assert.equal((await issues.getIssue('test-token', 'TEST-1')).description, sealAsAsked(WORDS));
     assert.deepEqual(calls, [], 'LocalProvider never touches the Linear transport');
+  });
+});
+
+describe('the testTransport capability, not the provider name', () => {
+  test('a stand-in that declares testTransport has no access under the hermetic test token: no read, no plan', async () => {
+    const fake = countingProvider({ identifier: 'FAKE-10', id: 'uuid-10', description: PLAN, testTransport: true });
+    await dispatch({ issueIdentifier: 'FAKE-10', issueAccess: () => ({ provider: fake.provider, token: 'test-token' }) });
+    assert.deepEqual(fake.reads, [], 'no issue read through the declared provider');
+    assert.deepEqual(fake.writes, [], 'never sealed');
+    const [row] = await queuedRows();
+    assert.ok(row, 'the dispatch enqueued');
+    assert.ok(!row.prompt.startsWith(FILE_POINTER_MARKER), 'no plan paths without access');
+    assert.ok(logs.some((l) => l.includes('[as-asked] seal skipped: no access')), JSON.stringify(logs));
+  });
+
+  test('a stand-in that does not declare it still takes test-token as a working credential: one read, plan reaches the prompt', async () => {
+    const fake = countingProvider({ identifier: 'FAKE-11', id: 'uuid-11', description: PLAN });
+    await dispatch({ issueIdentifier: 'FAKE-11', issueAccess: () => ({ provider: fake.provider, token: 'test-token' }) });
+    assert.deepEqual(fake.reads, [['issueDescription', 'FAKE-11']], 'access kept: exactly one issue read');
+    const [row] = await queuedRows();
+    assert.ok(row.prompt.startsWith(FILE_POINTER_MARKER), row.prompt);
+    assert.match(row.prompt, /- lib\/plan\.js/);
+  });
+
+  test('Linear with test-token and NO installed transport is skipped, and no socket leaves the process', async () => {
+    assert.equal(getLinearFetchImpl(), null, 'no transport installed for this test');
+    const sockets = guardSockets();
+    try {
+      await dispatch({ issueIdentifier: 'LIN-10', issueAccess: () => ({ provider: linearProvider, token: 'test-token' }) });
+    } finally {
+      sockets.restore();
+    }
+    assert.deepEqual(sockets.connections, [], 'no non-loopback socket opened');
+    assert.ok(logs.some((l) => l.includes('[as-asked] seal skipped: no access')), JSON.stringify(logs));
+    assert.ok(!logs.some((l) => l.includes('[as-asked] seal failed')), JSON.stringify(logs));
+    assert.equal((await queuedRows()).length, 1);
   });
 });
 
