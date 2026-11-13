@@ -16,7 +16,7 @@ import { getProvider } from '../../lib/providers/registry.js';
 // (`getProvider(b.provider)?.ui?.displayName || b.provider`) against a real
 // singleton, not a hand-typed stand-in.
 import '../../lib/providers/jira/index.js';
-import { callsSurfaceOf } from '../../lib/cost-read.js';
+import { callsSurfaceOf } from '../../lib/cost-read-calls.js';
 
 const BASE = { urlKey: 'acme', workspaces: [], currentModel: 'openai/gpt-5.4-mini', availableModels: [] };
 

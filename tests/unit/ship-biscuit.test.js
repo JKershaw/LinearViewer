@@ -21,7 +21,7 @@ import {
   DEFAULT_WINDOW,
   MAX_WINDOW
 } from '../../lib/ship-biscuit.js';
-import { callsSurfaceOf } from '../../lib/cost-read.js';
+import { callsSurfaceOf } from '../../lib/cost-read-calls.js';
 
 const NOW = Date.UTC(2026, 6, 9, 12, 0, 0); // 2026-07-09T12:00:00Z, fixed clock
 
