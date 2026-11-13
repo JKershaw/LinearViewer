@@ -234,7 +234,9 @@ John expects agents to reach for big moves here: "very likely to get agents tryi
 
 ---
 
-## Batch 3: after the switch (drafted 13 Nov; checked by a fresh reader; not yet read back)
+## Batch 3: after the switch
+
+**Approved by John on 13 Nov** ("The rest reads spot on", after A14's prompt-size lines were reframed) **and filed 13 Nov, about 12:10 UTC,** each sealed by Harbour: A13 LIN-4447, A14 LIN-4448, A15 LIN-4449. Batch 2's A7 and A8 were filed at the same time as LIN-4445 and LIN-4446.
 
 From the gate discussion (`gate-2026-11-13.md`, section 5). Points 2 and 3 decided one ask per tidy lane, written from real cases, and workspace sharing as one big tidy.
 
