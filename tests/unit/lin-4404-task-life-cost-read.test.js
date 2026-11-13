@@ -87,10 +87,14 @@ describe('LIN-4404: per-dispatch working spans follow split rule C', () => {
     assert.equal(untimed.lastRequestAt, null);
   });
 
-  test('the span keys are additive: placed last in each entry, after costUsd', () => {
-    const rows = [dispatch('b1', 'b1', 60)];
-    const [entry] = sessionOf(readCostOverRecords({ fetchedRows: rows, perDispatch: true }, [request('b1', 'b1', 'q1', 50)]), 'b1').dispatches;
-    assert.deepEqual(Object.keys(entry), ['itemId', 'kind', 'dispatchedAt', 'followUpTo', 'byModel', 'requests', 'tokens', 'costUsd', 'firstRequestAt', 'lastRequestAt']);
+  test('the span keys are additive: placed after costUsd, and only LIN-4454\'s model follows them', () => {
+    const rows = [dispatch('b1', 'b1', 60), dispatch('w1', 'b1', 30, { kind: 'wake' })];
+    const [entry, quiet] = sessionOf(readCostOverRecords({ fetchedRows: rows, perDispatch: true }, [request('b1', 'b1', 'q1', 50)]), 'b1').dispatches;
+    const keys = ['itemId', 'kind', 'dispatchedAt', 'followUpTo', 'byModel', 'requests', 'tokens', 'costUsd', 'firstRequestAt', 'lastRequestAt', 'model'];
+    assert.deepEqual(Object.keys(entry), keys);
+    assert.deepEqual(Object.keys(quiet), keys, 'a dispatch with no records has the same keys, in the same order');
+    assert.equal(entry.model, HAIKU);
+    assert.equal(quiet.model, null, 'no records: the model is unknown, never a guess');
   });
 });
 

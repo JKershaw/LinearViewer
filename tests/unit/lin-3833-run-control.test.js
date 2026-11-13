@@ -104,15 +104,18 @@ function load({ opened = null, previewFor = () => null, panelFor = serverPanel, 
     isPinnedToBottom: () => false,
     toast: () => {},
   };
-  // No scripts at load: the cost formatter runs first, then the page script, in the same sandbox, as the page loads them.
+  // No scripts at load: the page script runs first, then the cost formatter is installed in the same sandbox, as the
+  // page's module shim does (it runs after the classic scripts).
   // The Go poll's own timers are the client world's (collected by no one, unref'd), as before.
   const world = loadWorld({
     window,
     scripts: [],
     globals: { fetch: async () => ({ ok: true, json: async () => ({}) }) },
   });
-  loadCostFormat(world.sandbox); // LIN-4179: the shared browser formatter, loaded before the page script, as the page does
   world.run(SRC);
+  // LIN-4446: the page's shim is a module, so the formatter is installed after the classic page script has run, as in
+  // the browser. The script must not read it while it loads.
+  loadCostFormat(world.sandbox);
   return { PromptSection: world.window.PromptSection, calls, world };
 }
 

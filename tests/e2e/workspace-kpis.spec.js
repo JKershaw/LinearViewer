@@ -204,3 +204,24 @@ test.describe('LIN-3689 — workspace KPIs page (e2e)', () => {
     }
   });
 });
+
+// LIN-4446: the page's cost formatter is the shared lib/cost-format.js, reached through the module shim
+// (public/cost-format-global.js). A vm cannot prove module order, MIME or CSP, so this runs in the browser: the global
+// is installed and formats a sub-cent figure as the server does, and the page throws nothing and is refused nothing.
+test.describe('LIN-4446 — the shared cost formatter on the KPI page (e2e)', () => {
+  test('the module shim installs window.CostFormat, with no page error and no CSP refusal', async ({ page }) => {
+    const pageErrors = [];
+    const cspRefusals = [];
+    page.on('pageerror', (err) => pageErrors.push(String(err)));
+    page.on('console', (msg) => {
+      if (msg.type() === 'error' && /Content Security Policy/i.test(msg.text())) cspRefusals.push(msg.text());
+    });
+
+    await page.goto(`/workspace/${keyA}/kpis`);
+    const words = await page.evaluate(() => window.CostFormat.formatUsd(0.004));
+
+    expect(words).toBe('<$0.01');
+    expect(pageErrors).toEqual([]);
+    expect(cspRefusals).toEqual([]);
+  });
+});

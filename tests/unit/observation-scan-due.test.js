@@ -15,6 +15,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadWorld } from './helpers/client-world.js';
+import { loadCostFormat } from '../fixtures/browser-cost-format.js';
 
 /**
  * The due tab's elements, under the ids observation.js looks up. Nothing is hidden up front: the client sets `hidden`,
@@ -55,8 +56,7 @@ function makeSandbox({ fetchImpl, scanCostEstimate, postScanImpl } = {}) {
       // in this file never start a run, so this default is never invoked.
       ScanSection: { postScan: postScanImpl || (async () => { throw new Error('no postScan stub configured'); }) },
     },
-    // cost-format.js first, as the page loads it before its own scripts (the formatter observation.js reads).
-    scripts: ['cost-format.js', 'observation.js'],
+    scripts: ['observation.js'],
     globals: {
       module: { exports: {} },
       escapeHtml: (s) => (s == null ? '' : String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')),
@@ -65,6 +65,9 @@ function makeSandbox({ fetchImpl, scanCostEstimate, postScanImpl } = {}) {
       fetch: fetchImpl || (async () => { throw new Error('no fetch stub configured'); }),
     },
   });
+  // LIN-4446: the shared formatter (lib/cost-format.js) is handed in as the module shim hands it to the page;
+  // observation.js reads window.CostFormat only when it draws the estimate, never while it loads.
+  loadCostFormat(world.sandbox);
   world.document.body.innerHTML = DUE_PAGE;
   world.run(`observationData = { urlKey: "acme", scanCostEstimate: ${JSON.stringify(scanCostEstimate ?? null)} };`);
   return {

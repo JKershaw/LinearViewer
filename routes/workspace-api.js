@@ -14,7 +14,7 @@
  * Shape (LIN-3596): every route is registered explicitly, in the order below, as a
  * thin handler over a small set of shared steps. The steps sit in two places:
  *   - module level, where they need no dependency (`recommendCallOptions`, `toHopRecord`, ...;
- *     `openIssue`, `refuseCapability`, `failureOf`, `isTestToken`, `refuseFreeTier`, `aiNotConfigured`, `keepaliveFailure` and `loadContext` live in workspace-api-steps.js, shared with workspace-api-prompts.js, workspace-api-issue-read.js, workspace-api-issue-write.js, workspace-api-scan.js, workspace-api-audit.js and workspace-api-feedback.js);
+ *     `openIssue`, `refuseCapability`, `failureOf`, `refuseFreeTier`, `aiNotConfigured`, `keepaliveFailure` and `loadContext` live in workspace-api-steps.js, shared with workspace-api-prompts.js, workspace-api-issue-read.js, workspace-api-issue-write.js, workspace-api-scan.js, workspace-api-audit.js and workspace-api-feedback.js);
  *   - inside `createWorkspaceApiRoutes`, where they close over the injected stores.
  * The AI pre-flight calls (`resolveChatCredential`, `checkFreeTierGate`, the
  * `forceDefault` model clamp) are deliberately NOT shared: each route names its own,
@@ -37,7 +37,8 @@ import { registerFeedbackRoutes } from './workspace-api-feedback.js';
 import { registerSessionsRoutes, registerRunEvidenceRoutes } from './workspace-api-run-evidence.js';
 export { feedbackSubmitLimiter } from './workspace-api-feedback.js';
 export { decisionStampDedupe } from './workspace-api-issue-write.js';
-import { isTestToken, failureOf, openIssue, refuseFreeTier, aiNotConfigured, keepaliveFailure, loadContext } from './workspace-api-steps.js';
+import { isHermeticTestToken } from '../lib/should-mock-ai.js';
+import { failureOf, openIssue, refuseFreeTier, aiNotConfigured, keepaliveFailure, loadContext } from './workspace-api-steps.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, getModelDisplayName } from '../lib/openrouter.js';
 import { resolveChatCredential, isAiUnavailable, checkFreeTierGate, isFlagFreeTier, freeTierRefusalBlock } from '../lib/chat-request.js';
 import { getModelCatalog, isFreeModel } from '../lib/openrouter-catalog.js';
@@ -412,7 +413,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const sessionApiKey = req.session.openRouterApiKey;
     const source = getOpenRouterSource(req);
 
-    const enabled = isTestToken(workspace) || isRecommendationEnabled(sessionApiKey) || source === 'free';
+    const enabled = isHermeticTestToken(workspace.accessToken) || isRecommendationEnabled(sessionApiKey) || source === 'free';
 
     // Resolve the workspace's configured LLM model so the footer can surface it.
     // Same single-source-of-truth helper every LLM call site uses.
@@ -441,7 +442,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     // the AI mock for local-provider sessions, whose data comes from the provider
     // (LIN-388/LIN-405). The 503/free-tier guards key off `mockAi` so a migrated
     // local session isn't 503'd for lacking an OpenRouter key.
-    const isTestMode = isTestToken(workspace);
+    const isTestMode = isHermeticTestToken(workspace.accessToken);
     const mockAi = shouldMockAi(workspace);
     const credential = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
     const { apiKey: apiKeyToUse, isFreeTier } = credential;
@@ -566,7 +567,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
     // See the GET handler: `isTestMode` gates the DATA mock; `mockAi` fires the
     // AI mock for local sessions; 503/free-tier guards key off `mockAi` (LIN-405).
-    const isTestMode = isTestToken(workspace);
+    const isTestMode = isHermeticTestToken(workspace.accessToken);
     const mockAi = shouldMockAi(workspace);
     const credential = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
     const { apiKey: apiKeyToUse, isFreeTier } = credential;
@@ -799,7 +800,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const { workspace, issueId } = found;
 
     try {
-      const issues = isTestToken(workspace)
+      const issues = isHermeticTestToken(workspace.accessToken)
         ? testMockData.issues
         : (await found.provider.fetchProjects(found.callScope)).issues;
 

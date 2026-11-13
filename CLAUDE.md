@@ -21,7 +21,7 @@ AI agents, and verifies the work on real evidence.
 - `npm start` - Start the server (runs on PORT from .env, default 3000)
 - `npm test` - Run all tests (unit via `npm run test:unit`, then Playwright E2E)
 - `npm run test:unit` - Run unit tests only (`node --test` over `tests/unit/*.test.js` + the `scripts/` tests (`scripts/eval/eval-dense.test.mjs`, `scripts/code-shape/*.test.mjs`); locally at half the CPUs, `UNIT_TEST_CONCURRENCY=N` overrides; CI unchanged). Use this, not a bare `node --test` glob
-- `npm run test:hermetic` - Run the SAME unit suite under a socket-level watcher and additionally fail if any test opens a non-loopback socket (LIN-1880). CI runs its keyed form in `unit`, the proxy form in `unit-proxy`. The unit suite reached `api.linear.app` on every run for months while two other instruments reported clean — see `tests/fixtures/network-guard.js`
+- `npm run test:hermetic` - Run the SAME unit suite under a socket-level watcher and additionally fail if any test opens a non-loopback socket (LIN-1880). CI runs its keyed form in `unit`, the proxy form in `unit-proxy`. See `tests/fixtures/network-guard.js`
 - `npm run test:hermetic:proxy` - The same check with `HTTPS_PROXY`/`HTTP_PROXY` set. A connect to the configured proxy endpoint itself now counts as an escape (LIN-2992); both arms are part of LIN-1880's acceptance. `npm run test:hermetic:keyed` is the same check with dummy `OPENROUTER_API_KEY`/`OPENROUTER_FREE_TIER_KEY` set (LIN-2369, the CI keyed arm); the runner blanks both keys for every unit run, so the result must not change
 - `npm run test:ui` - Run Playwright tests with the Playwright UI
 - `npm run secret-scan` - Run secret scan over repository source in CI (LIN-2573)
@@ -40,7 +40,7 @@ AI agents, and verifies the work on real evidence.
 - Light is the default theme; **dark is an opt-in `.theme-dark` hook** applied to `<html>` pre-paint by the shared shell (`lib/components/page.js`) from a persisted preference, chosen in Settings › Account. Themes are pure overrides of the color tokens; the semantic token layer (`--text/--muted/--card/--line/--brand/--amber/--slate` …) and structural tokens stay shared. Default (no class) output is unchanged.
 - State indicators: ✓ (done/green), ◐ (in-progress/yellow), ○ (todo/dim)
 - Mobile-responsive layout
-- Keep it minimal - no frameworks, no build step
+- Keep it minimal - no frameworks, no build step; browser modules import natively (limits: `docs/areas/front-end-browser.md`)
 
 ## E2E Testing Pattern (LIN-215)
 

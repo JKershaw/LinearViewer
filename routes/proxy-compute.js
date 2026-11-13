@@ -32,6 +32,7 @@ import { buildPromptFilename } from '../lib/prompt-formatters.js';
 import { armKeepalive, clientGoneSignal } from '../lib/http-keepalive.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { badRequest, jsonError, keepaliveError, notFound } from '../lib/errors.js';
+import { isHermeticTestToken } from '../lib/should-mock-ai.js';
 
 /**
  * @param {Object} deps
@@ -248,7 +249,7 @@ export function createComputeRoutes({
       const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 5, 1), 50);
 
       // Fetch projects and issues (use mock data in test mode)
-      const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+      const isTestMode = isHermeticTestToken(accessToken);
       let projects, issues;
       if (isTestMode) {
         const mockData = await getTestMockData();
@@ -306,7 +307,7 @@ export function createComputeRoutes({
       }
 
       // Fetch issue context (use mock data in test mode)
-      const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+      const isTestMode = isHermeticTestToken(accessToken);
       const ctx = await resolvePromptIssueContext(provider, accessToken, identifier, isTestMode);
       if (!ctx) {
         logEvent(req, '/api/proxy/prompt', 404);
@@ -369,7 +370,7 @@ export function createComputeRoutes({
       if (denyIfUnsupported(provider, 'fetchIssueContext', req, res, '/api/proxy/recommend')) return;
       if (denyIfUnsupported(provider, 'fetchRecommendationContext', req, res, '/api/proxy/recommend')) return;
 
-      const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+      const isTestMode = isHermeticTestToken(accessToken);
 
       // Resolve OpenRouter API key: token creator's OAuth key or server env var
       const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
@@ -661,8 +662,9 @@ export function createComputeRoutes({
    * LIN-4263: each `workerSessions` row stays one row per lineage, and gains
    * `tokens`, `byModel` (records lineages only) and `dispatches`: one entry per
    * true dispatch in the lineage, with its own model(s), tokens and USD, which
-   * sum to the lineage's own, and (LIN-4404) its `firstRequestAt` /
-   * `lastRequestAt`. `dispatches` is null for a snapshot-only lineage, where the
+   * sum to the lineage's own, (LIN-4404) its `firstRequestAt` /
+   * `lastRequestAt`, and (LIN-4454) its `model`, the fold's answer by the
+   * lineage's own rule. `dispatches` is null for a snapshot-only lineage, where the
    * split is not knowable. Only the task read builds it (`perDispatch`).
    */
   router.get(['/api/proxy/issues/:identifier/cost', '/api/proxy/cost/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
@@ -1071,7 +1073,7 @@ export function createComputeRoutes({
       }
 
       const noRefresh = req.query.noRefresh === '1' || req.query.noRefresh === 'true';
-      const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+      const isTestMode = isHermeticTestToken(accessToken);
       const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
 
       // Regenerate path calls OpenRouter; arm a Heroku H12 guard.
@@ -1223,7 +1225,7 @@ export function createComputeRoutes({
         return badRequest.json(res, 'Invalid identifier format');
       }
 
-      const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+      const isTestMode = isHermeticTestToken(accessToken);
       const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
 
       // A free-tier-only deployment is accepted via isFreeTier. POST always
@@ -1366,7 +1368,7 @@ export function createComputeRoutes({
       }
 
       const noRefresh = req.query.noRefresh === '1' || req.query.noRefresh === 'true';
-      const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+      const isTestMode = isHermeticTestToken(accessToken);
       const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
 
       // Regenerate path calls OpenRouter; arm a Heroku H12 guard.
@@ -1517,7 +1519,7 @@ export function createComputeRoutes({
         return badRequest.json(res, 'Invalid identifier format');
       }
 
-      const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+      const isTestMode = isHermeticTestToken(accessToken);
       const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
 
       // Free-tier-only deployments accepted via isFreeTier. POST always regenerates,

@@ -1,7 +1,8 @@
 /**
  * LIN-4393's real sessions (LIN-4405 fixture): `GET /api/proxy/cost/LIN-4393` on 10 Nov 2026, after LIN-4404 landed
  * (task-life window, per-dispatch `firstRequestAt`/`lastRequestAt`). Token counts are dropped (the timeline does not
- * read them). The wire strips each lineage's `incomplete` and the read's `lineagesTruncated`, so they are set here from
+ * read them). Each dispatch's `model` (LIN-4454, added after the capture) is its one fully priced `byModel` model: the
+ * fold's answer the read now carries. The wire strips each lineage's `incomplete` and the read's `lineagesTruncated`, so they are set here from
  * what the read reported: every lineage complete (`totalUsd` was a figure, `noTelemetryCount` 0), nothing truncated.
  * `pricedUsd` is the read's own; with no Harbour calls passed in (the timeline passes none) `totalUsd` equals it.
  *
@@ -35,7 +36,8 @@ export const LIN_4393_SESSIONS = [
         requests: 9,
         costUsd: 0.2718226,
         firstRequestAt: '2026-11-08T14:45:19.013Z',
-        lastRequestAt: '2026-11-08T14:45:56.932Z'
+        lastRequestAt: '2026-11-08T14:45:56.932Z',
+        model: 'claude-sonnet-5-5'
       },
       {
         itemId: '43dcde42-4aa7-41cc-a089-f11754ea387b',
@@ -52,7 +54,8 @@ export const LIN_4393_SESSIONS = [
         requests: 5,
         costUsd: 0.0889743,
         firstRequestAt: '2026-11-08T14:47:24.721Z',
-        lastRequestAt: '2026-11-08T14:47:50.169Z'
+        lastRequestAt: '2026-11-08T14:47:50.169Z',
+        model: 'claude-sonnet-5-5'
       },
       {
         itemId: '3d4aaf93-c1cc-4d7a-b745-ea6ca76c4647',
@@ -69,7 +72,8 @@ export const LIN_4393_SESSIONS = [
         requests: 5,
         costUsd: 0.0917858,
         firstRequestAt: '2026-11-08T14:52:12.910Z',
-        lastRequestAt: '2026-11-08T14:52:28.581Z'
+        lastRequestAt: '2026-11-08T14:52:28.581Z',
+        model: 'claude-sonnet-5-5'
       },
       {
         itemId: 'c63c6855-aec8-42a5-a2a7-176ffe6e3be5',
@@ -86,7 +90,8 @@ export const LIN_4393_SESSIONS = [
         requests: 8,
         costUsd: 0.1940923,
         firstRequestAt: '2026-11-08T15:30:14.247Z',
-        lastRequestAt: '2026-11-08T15:30:47.892Z'
+        lastRequestAt: '2026-11-08T15:30:47.892Z',
+        model: 'claude-sonnet-5-5'
       },
       {
         itemId: '06a2334a-d215-4dd8-a392-db840459bde3',
@@ -103,7 +108,8 @@ export const LIN_4393_SESSIONS = [
         requests: 4,
         costUsd: 0.09118760000000001,
         firstRequestAt: '2026-11-08T15:33:11.825Z',
-        lastRequestAt: '2026-11-08T15:33:27.331Z'
+        lastRequestAt: '2026-11-08T15:33:27.331Z',
+        model: 'claude-sonnet-5-5'
       },
       {
         itemId: '2ae6d4d8-06f3-4c9b-9d45-026bc5cbad1e',
@@ -120,7 +126,8 @@ export const LIN_4393_SESSIONS = [
         requests: 4,
         costUsd: 0.10201110000000001,
         firstRequestAt: '2026-11-08T15:48:07.920Z',
-        lastRequestAt: '2026-11-08T15:48:21.275Z'
+        lastRequestAt: '2026-11-08T15:48:21.275Z',
+        model: 'claude-sonnet-5-5'
       }
     ],
     telemetry: true,
@@ -151,7 +158,8 @@ export const LIN_4393_SESSIONS = [
         requests: 45,
         costUsd: 1.6063451999999998,
         firstRequestAt: '2026-11-08T15:33:32.797Z',
-        lastRequestAt: '2026-11-08T15:47:57.908Z'
+        lastRequestAt: '2026-11-08T15:47:57.908Z',
+        model: 'claude-opus-5-5'
       }
     ],
     telemetry: true,
@@ -182,7 +190,8 @@ export const LIN_4393_SESSIONS = [
         requests: 18,
         costUsd: 0.9839708000000001,
         firstRequestAt: '2026-11-08T15:30:50.537Z',
-        lastRequestAt: '2026-11-08T15:33:03.614Z'
+        lastRequestAt: '2026-11-08T15:33:03.614Z',
+        model: 'claude-opus-5-5'
       }
     ],
     telemetry: true,
@@ -213,7 +222,8 @@ export const LIN_4393_SESSIONS = [
         requests: 78,
         costUsd: 5.082193600000001,
         firstRequestAt: '2026-11-08T14:52:34.893Z',
-        lastRequestAt: '2026-11-08T15:15:37.556Z'
+        lastRequestAt: '2026-11-08T15:15:37.556Z',
+        model: 'claude-opus-5-5'
       },
       {
         itemId: 'b3cc4c7d-cf3e-4065-9799-460b2d2346f4',
@@ -230,7 +240,8 @@ export const LIN_4393_SESSIONS = [
         requests: 26,
         costUsd: 1.8707733999999998,
         firstRequestAt: '2026-11-08T15:15:43.504Z',
-        lastRequestAt: '2026-11-08T15:30:03.047Z'
+        lastRequestAt: '2026-11-08T15:30:03.047Z',
+        model: 'claude-opus-5-5'
       }
     ],
     telemetry: true,
@@ -261,7 +272,8 @@ export const LIN_4393_SESSIONS = [
         requests: 31,
         costUsd: 1.9293415999999997,
         firstRequestAt: '2026-11-08T14:47:59.524Z',
-        lastRequestAt: '2026-11-08T14:52:01.482Z'
+        lastRequestAt: '2026-11-08T14:52:01.482Z',
+        model: 'claude-opus-5-5'
       }
     ],
     telemetry: true,
@@ -292,7 +304,8 @@ export const LIN_4393_SESSIONS = [
         requests: 15,
         costUsd: 0.6435784000000001,
         firstRequestAt: '2026-11-08T14:46:05.997Z',
-        lastRequestAt: '2026-11-08T14:47:17.579Z'
+        lastRequestAt: '2026-11-08T14:47:17.579Z',
+        model: 'claude-opus-5-5'
       }
     ],
     telemetry: true,
@@ -323,7 +336,8 @@ export const LIN_4393_SESSIONS = [
         requests: 22,
         costUsd: 0.9241177999999999,
         firstRequestAt: '2026-11-08T14:41:33.720Z',
-        lastRequestAt: '2026-11-08T14:43:35.124Z'
+        lastRequestAt: '2026-11-08T14:43:35.124Z',
+        model: 'claude-opus-5-5'
       }
     ],
     telemetry: true,
@@ -354,7 +368,8 @@ export const LIN_4393_SESSIONS = [
         requests: 20,
         costUsd: 0.8699514,
         firstRequestAt: '2026-11-08T14:41:12.387Z',
-        lastRequestAt: '2026-11-08T14:43:18.622Z'
+        lastRequestAt: '2026-11-08T14:43:18.622Z',
+        model: 'claude-opus-5-5'
       }
     ],
     telemetry: true,

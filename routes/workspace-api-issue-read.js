@@ -15,7 +15,8 @@ import { sniffRasterType } from '../lib/attachment-upload.js';
 import { getWorkspaceToken, isActiveProviderLinear } from '../lib/workspace.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { testMockData } from '../lib/sample-data/mock-data.js';
-import { isTestToken, failureOf, openIssue } from './workspace-api-steps.js';
+import { isHermeticTestToken } from '../lib/should-mock-ai.js';
+import { failureOf, openIssue } from './workspace-api-steps.js';
 
 // Max image size: 10MB to prevent memory exhaustion
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
@@ -90,7 +91,7 @@ export function registerIssueReadRoutes(router, { workspaceFromUrl, getOpenRoute
       // the Linear provider with 'test-token' would hit the network. Mirrors the
       // prompt route's test-mode branch.
       let issue;
-      if (isTestToken(workspace)) {
+      if (isHermeticTestToken(workspace.accessToken)) {
         issue = testMockData.issues.find(i => i.id === issueId);
         if (!issue) {
           return notFound.json(res, 'Issue not found');
