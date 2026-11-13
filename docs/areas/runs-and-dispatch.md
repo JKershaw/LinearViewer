@@ -25,7 +25,9 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   by a skip held the re-report forever (LIN-4375 review).
 - Any session can park `[pending]` on CI and finish on a ci-wake `custom` row (`lib/ci-wake-sweep.js`).
   A rule keyed on the producing kind misses that ending: read the lineage (`heldWakeHolderOf`,
-  `resolveFollowUpRoot`). LIN-4373 covered eligibility, not the held wake's terminals.
+  `resolveFollowUpRoot`). LIN-4373 covered eligibility, not the held wake's terminals. Over a
+  ticket's runs, read it batched: `listHistory`'s `withLineage`, never a walk per row (`runFact`,
+  `lib/recent-runs.js`, LIN-4459: the walks go up, a parked stage's ending is below it).
 - Row-only kinds stay out of `DISPATCH_KINDS` (`lib/prompt-templates.js`) and sit in `ROW_ONLY_KINDS`
   (`lib/dispatch-fields.js`); kind-keyed maps are tested against both. A new bucket can pull a kind
   into the round-trip walk, which `OFF_SPINE_KINDS` stops (LIN-4376).

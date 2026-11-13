@@ -22,6 +22,9 @@
  *   - W9: a parent with a live run waits, and its child is never fetched;
  *   - W10: a failed run read stands the wait aside; W11: aborting the wedged row frees the ticket;
  *   - W13: the instructions name the shared code, imported, and not the retired one;
+ *   - LIN-4459, over a real store: a stage parked `[pending]` whose ci-wake or held-wake follow-up
+ *     ends `[blocked]` or `[skipped]` is not live; a census keeps the wait defined in
+ *     lib/run-live-wait.js alone;
  *   - the predicate over real dispatch rows: newest live named; ended, waiting, aborted and
  *     non-stage rows never count.
  *
@@ -477,14 +480,14 @@ describe('LIN-4459: a stage parked [pending] is not live once its lineage ends b
   const runsOf = async () => (await loadRecentRuns(store, U, ISSUE)).allRuns;
   const stageOf = (runs, id) => runs.find(r => r.id === id);
 
-  test('W1 witness: a parked stage whose ci-wake follow-up ends [blocked] is not live', async () => {
+  test('LIN-4459 witness (blocked): a parked stage whose ci-wake follow-up ends [blocked] is not live', async () => {
     const stage = await lineage({ follow: { kind: 'custom', message: '[blocked] need a human' } });
     const runs = await runsOf();
     assert.equal(stageOf(runs, stage).outcome, WAITING_ON_A_PERSON, JSON.stringify(runs));
     assert.equal(liveWaitOf(runs), null, 'the ticket does not wait on a stage its lineage ended');
   });
 
-  test('W2 witness: a parked stage whose held-wake holder ends [skipped] is not live', async () => {
+  test('LIN-4459 witness (skipped): a parked stage whose held-wake holder ends [skipped] is not live', async () => {
     const stage = await lineage({ follow: { kind: 'leftover', message: '[skipped] the runner refused a cascade', heldWakeFor: true } });
     const runs = await runsOf();
     assert.equal(stageOf(runs, stage).outcome, 'skipped', JSON.stringify(runs));
