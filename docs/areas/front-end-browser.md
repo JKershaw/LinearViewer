@@ -90,3 +90,9 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   beside it. Offer only what the server can do, or say why it can't. (Onboarding & Cold-Start
   Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.) Not a module matter; outside
   LIN-4463 (plan table).
+- `public/feedback-widget.js`: on any non-ok response it keeps the draft and shows `data.error`; it never
+  checks `code: 'PARTIAL_WRITE'` or `retryable: false` (LIN-4452). After a Jira ticket that landed without
+  its seal, the user sees agent wording ("do not retry the create, read the issue instead") with no
+  identifier and Save still active, so pressing Save again files a duplicate. Read the code, show the
+  created key if the envelope carries one, and disable resubmit. Only reachable on a Jira-backed
+  workspace whose property write fails; revisit with John's live evidence on LIN-4445. (LIN-4452 blind read.)
