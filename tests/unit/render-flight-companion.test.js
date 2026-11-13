@@ -47,6 +47,13 @@ describe('renderFlightCompanionPage — LIN-2435 Commit 2: chat-thread render + 
     assert.match(html, /<script src="\/chat\.js"/);
   });
 
+  // LIN-4463: flight-companion.js is a native module (deferred, after every classic script above). It imports the
+  // formatter itself, so the page loads no window.CostFormat bridge.
+  test('flight-companion.js is a module script, and the page loads no formatter bridge (LIN-4463)', () => {
+    assert.match(html, /<script type="module" src="\/flight-companion\.js"><\/script>/);
+    assert.doesNotMatch(html, /cost-format-global/);
+  });
+
   test('/chat.js loads BEFORE /flight-companion.js — the proposal control calls window.ChatUI', () => {
     const chatJsIdx = html.indexOf('src="/chat.js"');
     const fcJsIdx = html.indexOf('src="/flight-companion.js"');

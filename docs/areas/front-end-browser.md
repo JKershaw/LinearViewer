@@ -45,6 +45,12 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   lands on the fake document. A suite that runs a classic file through `runClassic` counts, except `public/chart-helpers.js` and `public/close-out.js`,
   the two IIFE siblings a module page may read.
 
+- A page module runs while `document.readyState` is already `'interactive'`, before DOMContentLoaded, so a module page
+  that starts on DOMContentLoaded registers that listener unconditionally: its old `readyState === 'loading'` branch is
+  false under a module and would start the page early. A top-level early return becomes `var mounted = ...` with the
+  statements after it in `if (mounted) { }`: `var` stays module-scoped, and function declarations stay top-level and
+  hoisted, as they were in the IIFE. (LIN-4463 piece 3, flight-companion.js.)
+
 ## Waiting
 
 - `public/app.js`: Home's Running and Up next are refreshed by parsing a whole page with
@@ -99,3 +105,12 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   identifier and Save still active, so pressing Save again files a duplicate. Read the code, show the
   created key if the envelope carries one, and disable resubmit. Only reachable on a Jira-backed
   workspace whose property write fails; revisit with John's live evidence on LIN-4445. (LIN-4452 blind read.)
+- `public/flight-companion.js`: whether the page has its core mounts (`thread`, `questionInput`, `sendBtn`) is one
+  decision spread over eight `if (mounted) { }` blocks (the first declares the turn state; the rest wire listeners and
+  restore the stored session). Module state such as `chatHistory`, `cadence`, `seenIdentifiers`, `PILL_GLYPHS`,
+  `modelActiveIdx`, `resumeAnchorMs` and `keepStopped` is declared inside those blocks, and the hoisted functions read it
+  unconditionally. A new top-level `var` or listener has to remember the wrapper, and nothing fails if it does not,
+  except under the `omitMounts` test. Give the decision one owner: an `init()` entry point like `public/task-page.js`'s
+  `init(doc)`, or state declared unconditionally with the wiring guarded in one place. Keep the missing-mount
+  behaviour. Larger than a fix for a 2,200-line file; do it with the next change to this file. (LIN-4463 piece 3
+  blind read.)
