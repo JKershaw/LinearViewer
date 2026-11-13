@@ -356,7 +356,7 @@ describe('corrective reviews: feed the notes, mint nothing (LIN-4380)', () => {
         /map each changed file to its area through the registry/i,
         /prune entries you find settled or no longer true/i,
         /one docs-only pull request/i,
-        /rebase it onto main/i
+        /off main, green under the notes guard and required checks/i
       ]) assert.match(notesBullet, re, `${template.id}: ${re}`);
       // LIN-4414: the notes' own rules are not restated here, and nothing tells a reading to shorten a note.
       for (const re of SQUEEZE_AND_RESTATEMENT) assert.doesNotMatch(notesBullet, re, `${template.id}: ${re}`);
@@ -676,7 +676,7 @@ describe('Drift & Coherence Review specifics (LIN-369)', () => {
 
     test('the instruction is present and names the tool by search, with no path', () => {
       assert.ok(census.length > 100, 'census instruction found');
-      assert.match(census, /search for the repo's committed code-shape census-review tool/);
+      assert.match(census, /search the repo for a committed code-shape census-review tool/);
       assert.match(census, /no path is written here/);
       assert.doesNotMatch(prompt, /scripts\/|\.mjs/);
     });
@@ -1485,7 +1485,7 @@ describe('Seams & Tangles feeds the area notes, mints nothing (LIN-4379)', () =>
       /Seams & Tangles, <the date of this run>/,
       /already filed as a ticket stays in the report only/i,
       /one docs-only pull request/i,
-      /rebase it onto main/i,
+      /off main, green under the notes guard and required checks/i,
       /review approves it and close-out merges it, never this run/i
     ]) assert.match(notesBullet, re);
   });

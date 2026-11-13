@@ -28,7 +28,7 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   `tests/unit/lin-4465-code-routes.test.js` fails until all three agree. Point at the list; never
   restate the order or count the routes in prose (LIN-4465).
 - `lib/prompt-template-defs.js` cannot import what imports `lib/prompt-templates.js` (a
-  cycle): shared words live in an import-free leaf, as `lib/prompts/leftover-words.js`
+  cycle): shared words live in a leaf that imports only leaves, as `lib/prompts/leftover-words.js`
   (LIN-4376) and `lib/prompts/autopilot-precedence.js` (never restate a rank; LIN-4382).
 - Prompt words banning a kind of how do not hold it (LIN-4369's replay: closing one channel
   moved it to the next). Hold the shape in code or a test (`SIZE_RECORD_SHAPE`,
@@ -61,6 +61,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - `formatCiGateCheck` (`lib/prompt-formatters.js`) renders in implementation, review and close-out:
   a rule for one stage gets its own formatter beside it. Prove the others unchanged by rendering every
   kind, fresh and fix round, at HEAD and on the branch, not by the budget test, whose ceilings are caps (LIN-4441).
+- `tests/fixtures/lin-4467-witness.json` stays as a ratchet: a sha256 for all 40 real-context renders, fresh and fix
+  round. A rendered-text change regenerates it (`node tests/fixtures/lin-4467-witness.js --write`) beside the byte
+  ceilings and the change log; its byte counts are the real-context witness the budget's caps are not (LIN-4469).
 - The blind-read scan in `tests/unit/stage-kind-tables.test.js` reads `git ls-files`: a new file is not
   scanned until it is committed, so a local pass before the first commit proves nothing about it (LIN-4467).
 
@@ -72,8 +75,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - `lib/size-of-move.js`: the built-in policy (`DECIDED_BY.policy`, err larger) may stand in
   for John's "per task breakdown of options"; its size words are unexplained. (John, LIN-4393.)
 - `lib/prompts/stage-kinds.js`: `CUT` writes the closing contract's token order (`DECISION:`
-  before `BLOCKED:`) into a scope line beside `ASK`. Its "cut" and the plan-review and review
-  "narrowing" (`lib/completion-signals.js`) name one thing; no test links them. (John, 8 Nov.)
+  before `BLOCKED:`) into a scope line beside `ASK`. The vocabulary is settled (LIN-4469): the cut
+  and the verdicts' "naming any cut" are one word, in `CUT` and the plan-review and review verdicts. The
+  token order still sits in the scope line and no test links the two. (John, 8 Nov.; LIN-4469 settled the word.)
 - `lib/prompts/stage-kinds.js`: one record per stage kind (LIN-4467). The per-kind tables that stay, each with
   its owner and reason: `JOBS` (`lib/llm-jobs.js`), pure data on purpose so its census test is not vacuous (19 of
   its 39 rows are not template kinds); the route and writes pins (`tests/unit/lin-4253-stage-traits.test.js`),
@@ -82,13 +86,6 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   (`lib/run-view.js`), which no record carries; the byte ceilings (`tests/unit/prompt-size-budget.test.js`), which
   cover the registry. `VIRTUAL_PROMPTS` (`lib/workflow-config.js`) is gone: its one reader is the record's key.
   (Survey tally, LIN-4248; piece 3, LIN-4467.)
-- `lib/prompts/stage-kinds.js`: the one-record refactor's witness (`tests/fixtures/lin-4467-witness.js`) stays in the
-  suite as a permanent test. It pins a sha256 for all 40 renders and for each table, so a later wording change in
-  any stage must regenerate `tests/fixtures/lin-4467-witness.json` as well as move the byte ceilings and the change
-  log; and its fix-round mode differs from
-  fresh for `implementation` only. Decide whether to retire it once piece 5 (LIN-4469) has re-pinned, fold it into
-  `tests/unit/prompt-size-budget.test.js`, or keep it as a ratchet: a decision about the test suite, not a fix.
-  (LIN-4467 blind read.)
 - `lib/call-budget.js`: the budget rule is untested live on anthropic/claude-haiku-5.5; before
   moving a call there, replay LIN-4352's snapshot through `scripts/replay-brief.mjs`: block [2] WHOLE,
   four sections, finishReason=stop, any retry's reasoning bound accepted. REFUSED: change the rule
@@ -131,29 +128,19 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   Waiting entries in other areas' notes where tickets used to be filed. LIN-4414's one retirement
   per build drains only the areas a build touches, so rarely touched notes (other-features) will
   grow; their Waiting counts are the honest measure. (LIN-4431.)
-- `lib/prompt-template-defs.js` (retrospective-audit Reporting) and `lib/periodicals.js`
-  (`areaNotesRoutes`) each state the docs-only notes-PR rule in their own words; one shared
-  constant in `lib/prompts/leftover-words.js` would make it one, at the cost of re-pinning the 13
-  Periodical prompt hashes. (LIN-4432.)
-- `lib/prompts/leftover-words.js`: the first-match area lookup is spelled three ways: `CONSEQUENCE_TEST`'s
-  "first match wins" parenthetical, `docs/areas/README.md` ("take the first area with a pattern that
-  matches its path") and the blind-read prompt's own sentence (`lib/prompt-template-defs.js`, the
-  `blind-read` template), which shipped as piloted (LIN-4437), so it was not retyped after the pilot. One constant in the leaf would make it
-  one, at the cost of re-piloting that sentence. (LIN-4436 leftovers.)
+- `lib/prompt-template-defs.js`: the blind read's own area sentence (the `blind-read`
+  template: "A file's area is the first area in ...") keeps its own words, as piloted (LIN-4437): re-piloting is a
+  person's run. Every other spelling of the lookup now renders `areaLookup` (CONSEQUENCE_TEST and the area-notes
+  pointer, LIN-4469). `docs/areas/README.md` still states first match in prose. (LIN-4436 leftovers; LIN-4469.)
 - `lib/prompt-formatters.js`: `formatLocalTestRule` names this repo's runner command
   (`node scripts/run-unit-tests.mjs tests/unit/<files>`) in a template that also drives other
   repos, and `CLAUDE.md` spells the same rule; a repo-supplied test command would make the line
   right elsewhere and give it one spelling. (LIN-4441 leftovers.)
-- `lib/periodicals.js`: "search the repo for a committed tool (no path is written here) and run it"
-  is spelled four times: Drift & Coherence's census bullet, Seams & Tangles' two bullets and
-  Stability's declaration bullet. One shared helper would make it one, at the cost of re-pinning
-  those three templates' hashes. (LIN-4424 leftovers; Survey global.) The rule it answers, whether
-  a review may run a tool the repo commits, is itself worded per template: Stability's run bullet
-  says "introducing no tooling beyond what the repo commits", while Recent Headwinds (which reads
-  the same rework and churn trajectory) and Drift & Coherence still say "introducing no new
-  tooling", Code Quality says "introduce no new tooling", and Seams & Tangles allows committed tools in its own bullets. No
-  `periodicalBullet` helper owns it; deciding it is one rule re-pins every template that states
-  it. (LIN-4424 blind read.)
+- `lib/periodicals.js`: the policy, whether a review may run a tool the repo commits, is worded per template. Drift &
+  Coherence and Recent Headwinds say "introducing no new tooling", Code Quality says "introduce no new tooling", and
+  Stability says "introducing no tooling beyond what the repo commits"; Seams & Tangles allows committed tools in its own
+  bullets. The search clause itself is one spelling now (`committedSearch`, Stability's wording, LIN-4469). Deciding the
+  policy is one rule that re-pins every template that states it. (LIN-4424 blind read.)
 - `lib/model-routing-harnesses.js`: a dispatch record's `model` names the routed id
   ("anthropic/claude-opus-4.8" for the `opus` route), but the claude-code harness runs a Claude id
   by its family token (`isModelRunnableOn`, `CLAUDE_MAPPABLE_MODEL_FAMILIES`), and on blind-read
@@ -161,13 +148,12 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   the model that ran. Cost is already priced from the model the worker reports. Waiting: make the
   record carry the model the worker reports, or update the routed id. (LIN-4396 review.)
 - `lib/prompts/leftover-words.js`: the retirement line's words have one home and one checker
-  (`lib/dispatch-leftover-answer.js`), but which entry to settle (the busiest touched area, else
-  another) and the three forms are restated by hand in `docs/areas/README.md`, simple-dispatcher's
-  docs/areas/README.md, `docs/proxy-integration.md` (with the refusal kinds) and
-  `docs/architecture/dispatch-and-proxy.md`, and the verbatim guard reads only `lib/` and `routes/`.
-  simple-dispatcher's README says a waiting entry also leaves when "a follow-up is filed for it",
-  where this README says only when the consequence test sends it to a ticket. A cross-repo seam;
-  simple-dispatcher's side is named here, not edited. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+  (`lib/dispatch-leftover-answer.js`). This repo's docs point to the leaf and no longer restate the three forms:
+  `docs/areas/README.md` and `docs/architecture/dispatch-and-proxy.md` (LIN-4469). What
+  stays restated on purpose: the refusal table in `docs/proxy-integration.md` is the API contract's. simple-dispatcher's
+  README and its docs/areas/README.md are its owner's; a waiting entry also leaves there when "a follow-up is filed for
+  it", which this README does not say. A cross-repo seam, named here, not edited. (Drift & Coherence Review, 13 Nov.;
+  `docs/reviews/drift-coherence-review-2026-11-13.md`.)
 - `lib/prompts/area-note-format.js`: the one reading of a waiting entry in code does not hold what a
   cited path is; that rule is in the guard (`tests/unit/area-notes.test.js`, a listed extension), in
   `lib/dispatch-leftover-answer.js` (any one to six characters, its comment calling it the guard's
@@ -179,3 +165,11 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   choose from. Decide whether every kind gets a constant or only this one. LIN-4467 made one record per stage
   kind (`lib/prompts/stage-kinds.js`) but keys it by literals, so the question stands; the record is where a
   constant per kind would live. (LIN-4466 blind read; LIN-4467 leftovers.)
+- `lib/prompts/stage-kinds.js`, and its witness `tests/fixtures/lin-4467-witness.json` with
+  `tests/unit/lin-4467-stage-kind-witness.test.js`: the witness stays as a permanent ratchet on real-context renders (LIN-4469, decided), but it also
+  holds a sha256 for each per-kind table (`COMPLETION_SIGNALS`, `STAGE_INTENT`, …), views that
+  `tests/unit/lin-4467-stage-kind-record.test.js` already ties to the record by construction, and a
+  hash failure says that something changed, never what. Every wording change regenerates it with
+  the byte ceilings and the change log. Decide whether to trim it to the renders, or fold it into
+  `tests/unit/prompt-size-budget.test.js`: a decision about the test suite, not a fix. (LIN-4469
+  blind read.)

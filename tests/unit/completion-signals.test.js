@@ -365,7 +365,7 @@ describe('judging signals read the As asked block (LIN-4353)', () => {
   const doneSignal = (type, re) => COMPLETION_SIGNALS[type].signals.find(s => re.test(s));
 
   for (const [type, what] of [['review', 'work'], ['plan-review', 'plan']]) {
-    test(`${type}: the verdict signal says how the ${what} meets what was asked and names any narrowing`, () => {
+    test(`${type}: the verdict signal says how the ${what} meets what was asked and names any cut`, () => {
       const verdict = doneSignal(type, /^Explicit verdict issued/);
       assert.ok(verdict, `${type} has a verdict signal`);
       // LIN-4345: review accounts for each sentence of the block; plan-review keeps one line.
@@ -373,11 +373,11 @@ describe('judging signals read the As asked block (LIN-4353)', () => {
         ? /where the work meets each sentence of what was asked/
         : new RegExp(`in one line how the ${what} meets what was asked`));
       assert.match(verdict, /`## As asked` block/);
-      assert.match(verdict, /naming any narrowing/);
+      assert.match(verdict, /naming any cut/);
     });
   }
 
-  test('review: a narrowing nobody agreed to is Needs Discussion', () => {
+  test('review: a cut nobody agreed to is Needs Discussion', () => {
     assert.match(doneSignal('review', /^Explicit verdict issued/), /nobody agreed to is Needs Discussion/);
   });
 

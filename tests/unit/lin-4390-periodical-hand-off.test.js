@@ -70,7 +70,7 @@ for (const p of PERIODICALS) {
         assert.match(text, /hands its decision to the human through that summary/);
       } else {
         // areaNotes: the notes PR is handed off, never merged by the run.
-        assert.match(text, /one docs-only pull request\*\*: rebase it onto main and get it green under the notes guard and the required checks, then hand it off/);
+        assert.match(text, /one docs-only pull request off main, green under the notes guard and required checks, then hand it off/);
         assert.match(text, /review approves it and close-out merges it, never this run/);
         // conclude: the PR link comes first (the gate's evidence), then the closing comment.
         assert.match(text, /As soon as the area-notes pull request is open, post its full URL as a comment on this task/);
