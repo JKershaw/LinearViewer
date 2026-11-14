@@ -186,9 +186,9 @@ Run 6's breakdown is over its 33 tasks, which included nine Periodical tasks. Th
 
 ## 12. Revision round (review of `4dea5be07`): witnesses, classification, known-issue reads, CI critical path
 
-Added for the review's gaps 1–4. Scripts and sample lists are in `revision-r1/`. Run from the LV root (`cd LinearViewer`). Every figure in the report's new sections is one of these outputs.
+Added for the review's gaps 1–4. Sample lists and the CI listing are in `revision-r1/`. Run from the LV root (`cd LinearViewer`). Every figure in the report's new sections is one of these outputs.
 
-**12.1 Paired area reads against git (gap 1).** Sample lists are the 14 paths in each after-read's table (`revision-r1/runs_sample.txt`, `llm_sample.txt`, `fe_sample.txt`). `sample_git.py` runs `git log --first-parent -m --numstat` on each window, path-limited to the sample.
+**12.1 Paired area reads against git (gap 1).** Sample lists are the 14 paths in each after-read's table (`revision-r1/runs_sample.txt`, `llm_sample.txt`, `fe_sample.txt`). Each window is read with `git log --first-parent -m --numstat <range> -- <the 14 paths in revision-r1/<area>_sample.txt>`.
 
 ```
 RUNS before->after   4b5001ddf..302edafc3  3 landings touch sample, 3/14 files, +20/-112 net -92; after 302edafc3: 0 landings
@@ -200,7 +200,7 @@ FE   e8->49776       e8e92d50a..49776653d  3 landings, 3/14 files, +9/-7 net +2
 FE   after->head     302edafc3..fb358dbda  0 landings
 ```
 
-Area-wide (`area_landings.py`, the area's `areas.json` patterns, first match wins):
+Area-wide (`git log --first-parent -m --numstat <range>`, each path mapped to its area through `docs/areas/areas.json` **at `fb358dbda`**, first match wins; `06a7da871`, after this window, moved `lib/completion-signals.js` from Runs & dispatch to LLM & prompts, so a re-read on a later `areas.json` differs):
 
 ```
 runs-and-dispatch  4b5001ddf..302edafc3  14 landings  +1959/-1352 net +607
