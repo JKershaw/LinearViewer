@@ -438,8 +438,8 @@
     "id": "eb8c3123-393e-424d-825c-7b913aee17fc",
     "identifier": "LIN-4448",
     "state": {
-     "name": "In Progress",
-     "type": "started"
+     "name": "Done",
+     "type": "completed"
     },
     "title": "LLM & prompts, left simpler: rules written once, limits held in code rather than prompt words, in pieces of varied size"
    },

@@ -6,8 +6,9 @@ Needs:   HARBOUR_LOCAL_BASE (the workspace proxy, GET only) and an authenticated
          in a LinearViewer checkout (for the merged-PR file lists).
 
 Writes to <out-dir>:
-  issues/LIN-nnnn.json   the four lanes' tickets as fetched (description + comments)
-  dispatches.json        dispatch rows for LIN-4447 and LIN-4448
+  issues/LIN-nnnn.json   the four lanes' tickets as fetched (description + comments), with
+                         commit-author names redacted (see redact() below)
+  dispatches.json        dispatch rows for every Runs & dispatch and LLM & prompts ticket
   prs.json               LinearViewer PRs merged in the window, with their files
   census.json            the counts the paper quotes
 
@@ -58,6 +59,19 @@ DIRECTED = [
 ]
 DIRECTED_IDS = {d[0] for d in DIRECTED}
 
+# Comments sometimes name a commit's author in brackets after its sha ("<sha> (<Name>)").
+# Those names can identify an employer, which the archive never publishes, so the snapshot
+# replaces them before anything is written. Only the bracketed name changes; the sha stays.
+AUTHOR_AFTER_SHA = re.compile(r'\b([0-9a-f]{7,40}) \(([A-Z][A-Za-z]+)\)')
+
+
+def redact(issue):
+    for c in issue.get('comments', []):
+        c['body'] = AUTHOR_AFTER_SHA.sub(r'\1 (committer redacted)', c['body'])
+    if issue.get('description'):
+        issue['description'] = AUTHOR_AFTER_SHA.sub(r'\1 (committer redacted)', issue['description'])
+    return issue
+
 
 def get(path):
     base = os.environ['HARBOUR_LOCAL_BASE'].rstrip('/')
@@ -77,7 +91,7 @@ def main(out):
     os.makedirs(f'{out}/issues', exist_ok=True)
     issues = {}
     for ident in sorted(LANE_OF):
-        d = get(f'issues/{ident}')
+        d = redact(get(f'issues/{ident}'))
         issues[ident] = d
         with open(f'{out}/issues/{ident}.json', 'w') as f:
             json.dump(d, f, indent=1, sort_keys=True)
@@ -121,10 +135,12 @@ def main(out):
             'cited_by_writing_lane': cited_by_writer,
         })
 
-    # 3. Dispatch rows for the two lanes (when each lane's sessions ran).
+    # 3. Dispatch rows for the two tidy lanes' tickets (when each lane's sessions ran, and on
+    # which ticket: finding 3 needs the children's rows, not only the parents').
     disp = {}
-    for ident in ('LIN-4447', 'LIN-4448'):
+    for ident in sorted(i for i, lane in LANE_OF.items() if lane in ('Runs & dispatch', 'LLM & prompts')):
         rows = get(f'dispatch?issueIdentifier={ident}&limit=100')['items']
+        time.sleep(1.1)
         disp[ident] = sorted(
             ({k: r[k] for k in ('id', 'kind', 'dispatchedAt', 'status', 'sessionId', 'closedReason')}
              for r in rows), key=lambda r: r['dispatchedAt'])

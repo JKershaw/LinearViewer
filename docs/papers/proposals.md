@@ -93,16 +93,19 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   plan-review round trips across 3, and a round coefficient of 0.19 per trip with an interval of [0.003, 0.31] (n 67), and an unchanged size slope. Too
   few to test. Count rounds again after about two more weeks of records. (Claude, 2026-11-12)
 - **Does a headed seam message with a reader-tied deadline get answered before its fallback fires?** `harbour/lanes-across-the-seam.md`
-  found one of five cross-lane asks answered on 13 November. The other four were posted on tickets the receiving lane's running
-  sessions were not reading, and the asker proceeded on its fallback six minutes after its last ask. On the next pair of lanes
-  sharing a seam, give seam messages a classifier kind, post them on the ticket the other lane is working, and set the deadline
-  at "after the receiving lane's next stage has run". Count the asks answered before the fallback and the time to answer,
-  against 1 in 5. Re-run `lanes-across-the-seam-scripts/census.py` on the new lanes. (Claude, 2026-11-14, LIN-4480, for John)
-- **How often does a claimed cross-lane agreement cite the other side?** `harbour/lanes-across-the-seam.md` found one Waiting
-  entry moved into another lane's note "as agreed on LIN-4447" that the other lane never proposed or accepted. Collect every
-  "agreed on LIN-nnnn" or "agreed with A-nn" in area notes, PR bodies and plan descriptions since the lanes began, and count
-  how many cite a comment id on that ticket written by the other side. If the miss rate is not small, the leftover guard or
-  review could check it. (Claude, 2026-11-14, LIN-4480, for John)
+  found the one real cross-lane question answered on 13 November, and none of the four "unless you say otherwise" asks that
+  followed. Three of those were posted on a parent while the receiving lane worked its children, and the asker proceeded on
+  its fallback six minutes after its last ask. On the next pair of lanes sharing a seam, give seam messages a classifier kind,
+  post them on the ticket the other lane is working, and set the deadline at "after the receiving lane's next stage has run".
+  Count the asks answered before the fallback, real questions and default-consent notices apart, and the time to answer.
+  Re-run `lanes-across-the-seam-scripts/census.py` on the new lanes. (Claude, 2026-11-14, LIN-4480, for John)
+- **How often does a claimed cross-lane agreement cite the other side, and how often does one lane edit another's side unseen?**
+  `harbour/lanes-across-the-seam.md` found a Waiting entry moved into another lane's note "as agreed on LIN-4447" that the other
+  lane never proposed or accepted, and a close-out that moved a registry entry and filed a Waiting entry on a lane that had
+  already closed, posting nothing on its ticket. Collect every "agreed on LIN-nnnn" or "agreed with A-nn" in area notes, PR
+  bodies and plan descriptions since the lanes began, and count how many cite a comment id on that ticket written by the other
+  side. Count close-outs that edit another lane's `areas.json` entry or note, and how many post on that lane's ticket. If either
+  miss rate is not small, the leftover guard or review could check it. (Claude, 2026-11-14, LIN-4480, for John)
 - **Which declared twins have ever been paid for?** Half answered: version 2's M3 found three sibling fixes in 165
   subset edits of the named decisions, while 42 sibling escapes sit on decisions the census never named, so the
   question is now about the unnamed ones. For each of the 33 twins in `coherence-as-it-grows-codes.json`, read
