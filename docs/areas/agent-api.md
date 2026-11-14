@@ -74,7 +74,7 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
 - `lib/proxy-instructions.js`: the catalog omits the `leftover` row kind and the hold on a
   build's DONE wake until its leftover row ends (`lib/dispatch-leftover.js`; the architecture doc
   has it). Its `kind` contract, "prompt-template keys plus custom", misses
-  `DISPATCH_KINDS` that are neither (24 kinds now; `autopilot`, `defer` and `periodical` among them) and the `ROW_ONLY_KINDS` (`lib/dispatch-fields.js`). (Documentation Review,
+  the three `DISPATCH_KINDS` that are neither (`autopilot`, `defer`, `periodical`; 24 kinds in all) and the `ROW_ONLY_KINDS` (`lib/dispatch-fields.js`). (Documentation Review,
   10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)
 - `lib/proxy-instructions.js`: the guide (`docs/proxy-integration.md`) lacks eight routes the code
   serves (seven `model-routing`, `POST runner/usage/:id`, which the kit's contract also has no row
