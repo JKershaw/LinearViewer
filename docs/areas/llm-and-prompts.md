@@ -88,8 +88,8 @@ kept are counted apart in LIN-4470's PR and measurement (`docs/areas/README.md`:
   and the routing pair get the budget, not the retry. Not scheduled: no ticket takes it, and the area reads (CG/CH) named
   it as the next move for this file. Owner: this area, which needs a ticket to take it. (Area reads CG/CH.; `canReason`
   left this entry in LIN-4470: it had test callers only.)
-- `lib/periodicals.js`: `docs/areas/` is spelled in 19 lines across 11 code files (`lib/`, `routes/`, `public/`,
-  `server.js`, `scripts/`), recounted at this base by `grep`. The leaves spell the directory and the registry's file
+- `lib/periodicals.js`: `docs/areas/` is spelled in 19 lines across 12 code files (`lib/` and `scripts/`,
+  JavaScript files only), recounted by `grep -rc docs/areas lib routes public server.js scripts`. The leaves spell the directory and the registry's file
   name once each: `NOTES_DIR` and `REGISTRY_FILE` in `lib/prompts/area-registry-path.js`, which derives `REGISTRY_PATH`
   from them and which `lib/prompts/area-note-format.js` re-exports (LIN-4470). The prose spellings remain, mostly prompt text that names the registry
   for a reader. Moving the notes means editing them. Blocker: a move of the notes directory itself, which no ticket asks

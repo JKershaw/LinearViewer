@@ -75,6 +75,13 @@ describe('the three valid forms', () => {
     assert.equal(check.line.number, 6);
   });
 
+  test('an entry may cite another repo\'s bare path with any 1-6 character extension (the checker\'s own extension policy, not the note guard\'s)', () => {
+    const check = checkLeftoverAnswer(answer(`${RETIRES_LABEL} \`main.py\`: the stale handler is deleted`));
+    assert.equal(check.ok, true);
+    assert.equal(check.form, 'entry');
+    assert.equal(check.path, 'main.py');
+  });
+
   test('none, no waiting entry (alone, or with a reason after it)', () => {
     assert.equal(checkLeftoverAnswer(answer(NO_WAITING)).form, 'no-waiting');
     assert.equal(checkLeftoverAnswer(answer(`${NO_WAITING} (this repo has no area notes)`)).form, 'no-waiting');

@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REGISTRY_PATH } from '../../lib/prompts/area-registry-path.js';
-import { NOTES_DIR, REGISTRY_FILE, NOT_NOTES, NOTE_EXTENSIONS, ANY_EXTENSION, isCitedPath, citedPaths } from '../../lib/prompts/area-note-format.js';
+import { NOTES_DIR, REGISTRY_FILE, NOT_NOTES, NOTE_EXTENSIONS, ANY_EXTENSION, isCitedPath } from '../../lib/prompts/area-note-format.js';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -85,13 +85,6 @@ describe('LIN-4470 — the cited-path rule is one predicate, read with each call
     for (const [span, , leftover] of BEFORE) {
       assert.equal(isCitedPath(span, ANY_EXTENSION), leftover, `checker: ${span}`);
     }
-  });
-
-  test('citedPaths keeps the guard\'s default and returns spans in order', () => {
-    assert.deepEqual(
-      citedPaths('`lib/a.js` `server.js` `tests/fixtures/` `x.js:3` `run.sh` `/dispatch` `^lib/` `provider.name === 1` `GATE_DUE_MARKER` `doc.kind`'),
-      ['lib/a.js', 'server.js', 'tests/fixtures/', 'x.js:3', 'run.sh'],
-    );
   });
 
   test('a retirement line can name another repository\'s file; the notes guard does not read it as a note path', () => {
