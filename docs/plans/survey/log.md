@@ -3955,3 +3955,13 @@ The history subagent read main back to January. Key citations spot-checked: the 
   3. Waiting "context, not scope" vs the LIN-4414 quota.
   4. "Keep moving" vs rulings that park the lane.
   5. "Worth or done is the human's" vs measurement Done-whens (mine, in A13).
+
+## 14 Nov, about 11:20 — John on getting out of Groundhog Day
+
+I answered "how do we get out?" with removal, and in the same answer proposed new rules: free removal for agents, "adding goes to John", a number on the wall. John: "You propose the only solution is removing things. But then suggested rules, additional complexity, and giving agents authority to change the core parts. I think we're seeing the issue."
+
+John's direction:
+- **Scaffolding is fine.** "No new mess, and the notes are mess. But, we do want to keep making progress and extra scaffolding and temporary structures are fine. We just need to plan their removal."
+- **A hidden backlog is a warning sign.** "If code is getting 'cleaner' whilst a secret backlog grows, something is afoot and the note about the types of information I think is important."
+- **His idea for the notes:** "simply saving the notes as TS, so they get checks, and can have a reliable, duplicate free, easy to use data structure."
+- **Asked for:** a recap of the goal, plan and progress, the core work to keep moving, and every issue found, ranked by increasing trouble.
