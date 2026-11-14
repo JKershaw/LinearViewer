@@ -4060,3 +4060,4 @@ John's direction:
   - **LIN-4485:** A20, the shape of knowledge (`7a2d17e7`);
   - **LIN-4486:** A21, every choice was right at the time (`88b3ea3b`).
   - Each gets a reviewer subagent before merge; they merge one at a time because of the shared index.
+- **John has read the three papers:** "they're all rather fascinating views, converging."
