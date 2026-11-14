@@ -4035,3 +4035,4 @@ John's direction:
   - Gate contents: three papers (A17, A18, A19), Stability run 7, and two essays (A17b, A20).
   - Then the read and discussion: notes and scaffolding first, readiness as "work lands clean and right".
 - **John on shape and Theseus:** "I imagine Harbour looks at the code, maps it out, then figures out what's holding complexity or mess simply because a square peg is trying to go in a round hole. Eg in hindsight our UI could be 100x simpler, and get the same results. The right shape for the right choices, and that's the Theseus method in full effect." For the discussion's "bigger intentional tidies".
+- **11:21 UTC: Stability run 7 merged** (LIN-4483, `2c58c6517`). All three Periodicals are in. Left at the gate: the three paper fixes, then the two essays.
