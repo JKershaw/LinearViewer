@@ -4031,3 +4031,6 @@ John's direction:
   - The A17 essay (A17b) becomes reasoned with Fable, written by Opus. A20 is agreed as read back, my additions included.
   - Both get my reviewer before merge; John reads them in the Library.
   - Text in `asks.md`. A17b is filed once LIN-4480 merges; A20 once all three papers merge.
+- **John:** "The pause point is now a new gate, and what lies beyond awaits our read and discussion."
+  - Gate contents: three papers (A17, A18, A19), Stability run 7, and two essays (A17b, A20).
+  - Then the read and discussion: notes and scaffolding first, readiness as "work lands clean and right".
