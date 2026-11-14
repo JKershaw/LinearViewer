@@ -12,10 +12,8 @@
  *
  * The table is a test fixture: the kit never loads it at runtime.
  *
- * LIN-4475 beat 5 (verification only): Simple Dispatcher's `sd` cells for the session, report and fold rows were
- * verified at SD commit f98e44256a21ea03b02f77f97b9771c6fc42010a (branch feat/lin-4476-session-fold-drivers, based
- * on SD origin/main 47fb6af6085ed6b94e79e66faf00236a15dd9d9f). That branch is NOT merged and is superseded: PR 3
- * (LIN-4476) re-copies this file from this PR's merge commit and re-pins LV_COMMIT and FIXTURE_SHA256 there.
+ * LIN-4475: the `sd` cells of the session, report and fold rows were verified against Simple Dispatcher's own
+ * contract test at SD commit f98e44256a21ea03b02f77f97b9771c6fc42010a (branch feat/lin-4476-session-fold-drivers).
  */
 process.env.NODE_ENV = 'test';
 
