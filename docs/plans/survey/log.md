@@ -4052,3 +4052,5 @@ John's direction:
   - Lanes show only while running or waiting.
   - `custom` writers post no stage summaries.
   - The survey session's subagents (fresh reads, history map, paper reviewers) never touch Harbour at all.
+- **12:49 UTC: A19 merged** (PR #2452, squash `5f6de1eb7`) after its writer merged main in (CI green at `9721d21f0`). The fix had finished at 12:08, but the watcher doesn't treat a writer's report as a hand-back, so I missed it for 40 minutes; I'm now polling the dispatch itself.
+- **A17's conflict fix sent** (`5cfcf4e8`).
