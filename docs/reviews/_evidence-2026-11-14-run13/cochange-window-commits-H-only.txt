@@ -1,0 +1,32 @@
+0072d1b78c71061b5a5674b36d4e79cb97290e72 docs(LIN-4443): Drift & Coherence Review run 7 (2026-11-13), trend vs 2026-11-10 (#2418)
+5e09b564340c31dda02f19a097037a1e164a5231 LIN-4444: Seams & Tangles run 12 (2026-11-13, delta vs run 11) (#2419)
+4b5001ddfa185eed683ccb8b9805d493c8c380da North star v4: toward settled, leave it better, use what exists (#2420)
+cfd152fa477d047c670a2ab59672b8cc79d8e17b LIN-4453: paired area-read baseline, piece 0 (docs only) (#2422)
+92676b1febeb5407878d69b5e7a8f166a9371777 LIN-4446: share the cost formatter with the browser (slice 1) (#2423)
+2bf788b6da71c82db6a1d84b361da98ef9cdedbb LIN-4450: Jira seal — exact words in harbour.asAsked, formatted block in the description (#2421)
+c205190fdd0628e36f6fcfd26fb333f66a6a6e0b LIN-4454: a dispatch's model is the cost fold's answer; retire dispatchModelOf (piece 3) (#2425)
+5dcf5bcda359846d695ecb52a49e9b022c6ec089 Merge pull request #2424 from JKershaw/feat/lin-4457-cost-read-calls-file
+e8e92d50afbad748587ba0fb884cb1e57d5af49c LIN-4456: test transport keyed on a declared capability (piece 6) (#2426)
+192e1f81fa9ea13d16c3b34eab9303d4a67ebebe Merge pull request #2427 from JKershaw/feat/lin-4455-feedback-kinds-constants
+0092d8d9e8fef6feb878809d1a215c3e55681304 LIN-4456: Waiting entries for testTransport drift and inline test-token checks (docs only) (#2428)
+2aab32bf03ab5ad00e0d93a7d2d8997b8e44b9d8 Merge pull request #2430 from JKershaw/feat/lin-4464-baseline-area-read
+c174185f64af0238ee875f66dc84d5bd43a3d758 Merge pull request #2432 from JKershaw/feat/lin-4459-run-live-wait
+17faa83f4807ea7c8c8db52faf492607d06fdcb0 Merge pull request #2431 from JKershaw/feat/lin-4471-lib-serving-workspace-kpis
+904719353b71595152b24260b357c1629c80b1e1 Merge pull request #2429 from JKershaw/feat/lin-4451-jira-create-lanes
+5cf4f6aa23b2483d2f8de569505dca38234319d2 Merge pull request #2434 from JKershaw/docs/lin-4459-close-out-waiting
+0dbf2d4eac531e6f8f85b6a129ba160ebec63110 Merge pull request #2435 from JKershaw/feat/lin-4458-one-trail-pass
+0cf05ce8f5234277e5aecde1800f50f652131e33 LIN-4472: task page as a module, its suites as imports (#2436)
+49d4c880e000d440a49fc350bed62104b5e1c4ae Merge pull request #2437 from JKershaw/feat/lin-4452-jira-live-check-guard
+091c8c934738df556b29d628f5fbb8a813330b6f Merge pull request #2440 from JKershaw/docs/lin-4452-waiting-notes
+23ebfcb4ad883b017a637fd4cb6d582239f9cc49 Merge pull request #2439 from JKershaw/feat/lin-4463-browser-area-read
+d52c676fabb1623d4d65417afa3ab96e2c7448f2 Merge pull request #2438 from JKershaw/feat/lin-4460-one-close-out-decision
+e666c4b609f1779efec16f507bdf47abcdb6fd05 LIN-4465: one ordered CODE_ROUTES list that codeRouteOf iterates (piece 1) (#2433)
+dc12ca51b2275caabda68af077b7fef98a3ed2a4 LIN-4466: the blind read's kind, heading and verdict words from one leaf (piece 2) (#2441)
+b8e2a0aad2e4990524d5e7213ba48cac9c512a08 LIN-4463: flight-companion.js as a module, the page drops the formatter bridge (#2442)
+8fea3869f019530c0e3ec7847e138d3b25718d98 LIN-4467: one record per stage kind; the per-kind tables become views (piece 3) (#2444)
+6348e57810df58682100f42cc3869d2889f40f35 LIN-4463: observation.js as a module, its suites as imports (piece 4) (#2445)
+b937237a414ece3affc57ebaaf6273834aea85a7 LIN-4468: proxy refuses writes outside the stage's allowance (piece 4) (#2443)
+ca77a891e8e32f8132b9d3d0da0c860bfd0b213b LIN-4469: prompt folds after the guard, one re-pin (piece 5) (#2447)
+302edafc3a27a8d0d64a88435766625ab8d24cb5 LIN-4475: contract session vocabulary, report rows, kit fold, paragraph witness (piece 8, PR 2) (#2448)
+a886fb50691383b02cd230d4dfd685aca6b4a9b4 LIN-4462: paired area reads after, at 302edafc3 (repeat of piece 0, docs only) (#2449)
+fb358dbda7f26ab44b3f58acb15886b21ac20950 LIN-4470: settle the Waiting entries, one prompt context, one cited-path predicate (piece 6) (#2450)

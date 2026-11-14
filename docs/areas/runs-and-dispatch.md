@@ -91,8 +91,9 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - `lib/run-live-wait.js`: a read, not a claim: two different-kind calls racing on
   one ticket both pass; claim compare-and-set, like `claimHeldWake` (LIN-4392). (Moved from the LLM & prompts note by LIN-4459.)
 - `lib/run-live-wait.js`: the run-outcome words have two homes. `QUEUED`/`RUNNING` live here (they moved
-  with `isLiveRun` to avoid an import cycle), while `WAITING_ON_A_PERSON`, `'closed'` and `'aborted'` stay
-  in `lib/recent-runs.js`, and `lib/recommendation-look-first.js` still imports them from there. One home
+  with `isLiveRun` to avoid an import cycle), while `WAITING_ON_A_PERSON` and `'closed'` stay
+  in `lib/recent-runs.js` (`'aborted'` is in `LINEAGE_TERMINAL_STATUSES`, `lib/dispatch-lineage-status.js`), and
+  `lib/recommendation-look-first.js` still imports `WAITING_ON_A_PERSON` from there. One home
   (for example a leaf module of outcome words) touches importers in LLM & prompts, so it is larger than a
   fix. (LIN-4459 blind read.)
 - `lib/recent-runs.js`: a parked stage whose lineage has ended is dated by its park time, not the lineage's
@@ -153,7 +154,7 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   goes through `extractPrUrls`. Moving it onto `prUrlsIn` changes which park messages wake (a scheme-less URL
   would stop matching), so it needs its own witness. (LIN-4458 review.)
 - `lib/run-evidence.js`: the run page keeps two answers to "which PR is the task's". The close-out box counts `readTrail().landing` through `closeOutDecision` (LIN-4460 retired `deriveState`'s status decision: no reader outside the tests and the GET body reads it), but `deriveState` over `extractPrUrls` (every cited PR) still drives `state.pr`, `done`, `checked.now` and `resolveRunPrRef` (read by the `routes/dashboard.js` pr-state route), `state.prUrls` (`lib/pr-state-store.js`), and `lib/ci-wake-sweep.js` matches parks against every cited PR. Whether the page's PR and the CI-wake sweep follow the landing is a product decision touching several callers. Also, `readRunEvidence` reads the landing's sole PR and hands `buildRunEvidence` a bare `prStatus`, which `buildRunEvidence` re-pairs with the landing after reading the trail again: the same positional coupling the URL-keyed `Map` removed from the decision. Passing the status keyed by URL with the landing already read is a signature change for about 25 call sites (`tests/unit/run-evidence.test.js`, `routes/dashboard.js`), so larger than a fix. (LIN-4458 blind read; LIN-4460.)
-- `lib/run-view.js` (the display words come from llm-and-prompts' `STAGE_LABELS`, `lib/prompts/stage-kinds.js`): `STEP_KIND_WORDS`
+- `lib/run-view.js` (the display words: `STAGE_LABELS` is defined here, built from each record's `label` in llm-and-prompts' `lib/prompts/stage-kinds.js`): `STEP_KIND_WORDS`
   copies six labels from `STAGE_LABELS` through a hand-typed kind list, so `stageLabel('look-into')`
   is "Look into" and `stepKindWord('look-into')` is "Look-into", and a new kind has to be added to
   that list by hand. One display word per kind changes visible labels on the run page and settings

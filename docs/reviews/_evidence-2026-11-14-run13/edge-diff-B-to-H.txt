@@ -1,0 +1,143 @@
++ lib/close-out-merges.js -> lib/run-closeout-state.js | Runs & dispatch -> Runs & dispatch
++ lib/close-out-readiness.js -> lib/run-trail.js | Runs & dispatch -> Runs & dispatch
++ lib/code-routes.js -> lib/prompts/blind-read-words.js | LLM & prompts -> LLM & prompts
++ lib/code-routes.js -> lib/recommendation-blind-read.js | LLM & prompts -> LLM & prompts
++ lib/code-routes.js -> lib/recommendation-facts.js | LLM & prompts -> LLM & prompts
++ lib/code-routes.js -> lib/recommendation-look-first.js | LLM & prompts -> LLM & prompts
++ lib/code-routes.js -> lib/run-live-wait.js | LLM & prompts -> Runs & dispatch
++ lib/completion-signals.js -> lib/prompts/stage-kinds.js | Runs & dispatch -> LLM & prompts
++ lib/components/time.js -> lib/time-words.js | Front end: server-rendered pages -> Front end: server-rendered pages
++ lib/cost-read-calls.js -> lib/llm-call-log.js | Runs & dispatch -> LLM & prompts
++ lib/cost-read.js -> lib/cost-read-calls.js | Runs & dispatch -> Runs & dispatch
++ lib/digest-feedback.js -> lib/dispatch-feedback-kinds.js | Runs & dispatch -> Runs & dispatch
++ lib/dispatch-entrance.js -> lib/item-stage-stamp.js | Runs & dispatch -> Runs & dispatch
++ lib/dispatch-entrance.js -> lib/prompts/prompt-context.js | Runs & dispatch -> LLM & prompts
++ lib/dispatch-entrance.js -> lib/run-live-wait.js | Runs & dispatch -> Runs & dispatch
++ lib/dispatch-feedback-validation.js -> lib/dispatch-feedback-kinds.js | Runs & dispatch -> Runs & dispatch
++ lib/dispatch-leftover-answer.js -> lib/prompts/area-note-format.js | Runs & dispatch -> LLM & prompts
++ lib/dispatch-leftover.js -> lib/dispatch-targets.js | Runs & dispatch -> Runs & dispatch
++ lib/dispatch-leftover.js -> lib/workspace-halt.js | Runs & dispatch -> Runs & dispatch
++ lib/dispatch-terminal.js -> lib/dispatch-feedback-kinds.js | Runs & dispatch -> Runs & dispatch
++ lib/follow-up-dispatch.js -> lib/item-stage-stamp.js | Runs & dispatch -> Runs & dispatch
++ lib/item-stage-stamp.js -> lib/prompt-templates.js | Runs & dispatch -> LLM & prompts
++ lib/item-stage-stamp.js -> lib/stage-writes.js | Runs & dispatch -> Other features
++ lib/llm-jobs.js -> lib/prompts/blind-read-words.js | LLM & prompts -> LLM & prompts
++ lib/model-routing-spend.js -> lib/cost-read-calls.js | LLM & prompts -> Runs & dispatch
++ lib/openrouter.js -> lib/code-routes.js | LLM & prompts -> LLM & prompts
++ lib/openrouter.js -> lib/run-trail.js | LLM & prompts -> Runs & dispatch
++ lib/partial-write-error.js -> lib/errors.js | Platform & plumbing -> Platform & plumbing
++ lib/periodicals.js -> lib/prompts/leftover-words.js | LLM & prompts -> LLM & prompts
++ lib/pipeline-churn.js -> lib/prompts/blind-read-words.js | Runs & dispatch -> LLM & prompts
++ lib/prompt-contract.js -> lib/prompts/stage-kinds.js | LLM & prompts -> LLM & prompts
++ lib/prompt-formatters.js -> lib/prompts/leftover-words.js | LLM & prompts -> LLM & prompts
++ lib/prompt-formatters.js -> lib/prompts/stage-kinds.js | LLM & prompts -> LLM & prompts
++ lib/prompt-template-defs.js -> lib/prompts/stage-kinds.js | LLM & prompts -> LLM & prompts
++ lib/prompt-template-defs.js -> lib/run-trail.js | LLM & prompts -> Runs & dispatch
++ lib/prompts/area-note-format.js -> lib/prompts/area-registry-path.js | LLM & prompts -> LLM & prompts
++ lib/prompts/leftover-words.js -> lib/prompts/area-registry-path.js | LLM & prompts -> LLM & prompts
++ lib/prompts/revision-brief.js -> lib/run-trail.js | LLM & prompts -> Runs & dispatch
++ lib/prompts/runner-kickoff.js -> lib/dispatch-feedback-kinds.js | LLM & prompts -> Runs & dispatch
++ lib/prompts/stage-catalogue.js -> lib/prompts/stage-kinds.js | LLM & prompts -> LLM & prompts
++ lib/prompts/stage-intent.js -> lib/prompts/stage-kinds.js | LLM & prompts -> LLM & prompts
++ lib/prompts/stage-kinds.js -> lib/as-asked.js | LLM & prompts -> LLM & prompts
++ lib/prompts/stage-kinds.js -> lib/prompts/blind-read-words.js | LLM & prompts -> LLM & prompts
++ lib/prompts/stage-kinds.js -> lib/size-of-move.js | LLM & prompts -> LLM & prompts
++ lib/prompts/stage-kinds.js -> lib/stage-writes.js | LLM & prompts -> Other features
++ lib/providers/jira/as-asked-region.js -> lib/as-asked.js | Providers (Linear, GitHub, Jira, local) -> LLM & prompts
++ lib/providers/jira/as-asked-region.js -> lib/providers/jira/adf.js | Providers (Linear, GitHub, Jira, local) -> Providers (Linear, GitHub, Jira, local)
++ lib/providers/jira/index.js -> lib/periodicals.js | Providers (Linear, GitHub, Jira, local) -> LLM & prompts
++ lib/providers/jira/index.js -> lib/providers/jira/as-asked-region.js | Providers (Linear, GitHub, Jira, local) -> Providers (Linear, GitHub, Jira, local)
++ lib/proxy-instructions.js -> lib/prompts/stage-kinds.js | Agent API (proxy) -> LLM & prompts
++ lib/proxy-instructions.js -> lib/run-live-wait.js | Agent API (proxy) -> Runs & dispatch
++ lib/proxy-instructions.js -> lib/stage-writes.js | Agent API (proxy) -> Other features
++ lib/proxy-tokens.js -> lib/stage-writes.js | Agent API (proxy) -> Other features
++ lib/recent-runs.js -> lib/dispatch-lineage-status.js | Runs & dispatch -> Runs & dispatch
++ lib/recent-runs.js -> lib/run-live-wait.js | Runs & dispatch -> Runs & dispatch
++ lib/recommendation-blind-read.js -> lib/prompts/blind-read-words.js | LLM & prompts -> LLM & prompts
++ lib/recommendation-blind-read.js -> lib/run-live-wait.js | LLM & prompts -> Runs & dispatch
++ lib/recommendation-blind-read.js -> lib/run-trail.js | LLM & prompts -> Runs & dispatch
++ lib/recommendation-facts.js -> lib/run-trail.js | LLM & prompts -> Runs & dispatch
++ lib/recommendation-look-first.js -> lib/run-trail.js | LLM & prompts -> Runs & dispatch
++ lib/render-session.js -> lib/time-words.js | Front end: server-rendered pages -> Front end: server-rendered pages
++ lib/render-task-page.js -> lib/run-closeout-state.js | Front end: server-rendered pages -> Runs & dispatch
++ lib/render-task-page.js -> lib/time-words.js | Front end: server-rendered pages -> Front end: server-rendered pages
++ lib/render-task-timeline.js -> lib/time-words.js | Front end: server-rendered pages -> Front end: server-rendered pages
++ lib/run-closeout-state.js -> lib/prompts/blind-read-words.js | Runs & dispatch -> LLM & prompts
++ lib/run-closeout-state.js -> lib/providers/state-map.js | Runs & dispatch -> Providers (Linear, GitHub, Jira, local)
++ lib/run-closeout-state.js -> lib/run-ledger.js | Runs & dispatch -> Runs & dispatch
++ lib/run-evidence.js -> lib/run-trail.js | Runs & dispatch -> Runs & dispatch
++ lib/run-trail.js -> lib/prompts/blind-read-words.js | Runs & dispatch -> LLM & prompts
++ lib/run-trail.js -> lib/prompts/survey-words.js | Runs & dispatch -> LLM & prompts
++ lib/run-trail.js -> lib/run-ledger.js | Runs & dispatch -> Runs & dispatch
++ lib/run-view.js -> lib/dispatch-feedback-kinds.js | Runs & dispatch -> Runs & dispatch
++ lib/run-view.js -> lib/prompts/blind-read-words.js | Runs & dispatch -> LLM & prompts
++ lib/run-view.js -> lib/prompts/stage-kinds.js | Runs & dispatch -> LLM & prompts
++ lib/session-telemetry.js -> lib/dispatch-feedback-kinds.js | Runs & dispatch -> Runs & dispatch
++ lib/stage-write-gate.js -> lib/errors.js | Agent API (proxy) -> Platform & plumbing
++ lib/stage-write-gate.js -> lib/proxy-scopes.js | Agent API (proxy) -> Agent API (proxy)
++ lib/stage-write-gate.js -> lib/stage-writes.js | Agent API (proxy) -> Other features
++ lib/task-page-loader.js -> lib/run-trail.js | Runs & dispatch -> Runs & dispatch
++ lib/task-page-loader.js -> lib/time-words.js | Runs & dispatch -> Front end: server-rendered pages
++ lib/task-state.js -> lib/time-words.js | Other features -> Front end: server-rendered pages
++ lib/wake-credential.js -> lib/item-stage-stamp.js | Runs & dispatch -> Runs & dispatch
++ lib/wall-clock-summary.js -> lib/dispatch-feedback-kinds.js | Runs & dispatch -> Runs & dispatch
++ public/cost-format-global.js -> lib/cost-format.js | Front end: browser code -> Front end: server-rendered pages
++ public/flight-companion.js -> lib/cost-format.js | Front end: browser code -> Front end: server-rendered pages
++ public/observation.js -> lib/cost-format.js | Front end: browser code -> Front end: server-rendered pages
++ public/observation.js -> lib/time-words.js | Front end: browser code -> Front end: server-rendered pages
++ public/task-page.js -> lib/time-words.js | Front end: browser code -> Front end: server-rendered pages
++ public/workspace-kpis.js -> lib/cost-format.js | Front end: browser code -> Front end: server-rendered pages
++ routes/dispatch.js -> lib/item-stage-stamp.js | Runs & dispatch -> Runs & dispatch
++ routes/dispatch.js -> lib/stage-writes.js | Runs & dispatch -> Other features
++ routes/proxy-compute.js -> lib/cost-read-calls.js | Agent API (proxy) -> Runs & dispatch
++ routes/proxy-compute.js -> lib/prompts/prompt-context.js | Agent API (proxy) -> LLM & prompts
++ routes/proxy-compute.js -> lib/should-mock-ai.js | Agent API (proxy) -> LLM & prompts
++ routes/proxy-runner.js -> lib/stage-write-gate.js | Agent API (proxy) -> Agent API (proxy)
++ routes/proxy-writes.js -> lib/run-trail.js | Agent API (proxy) -> Runs & dispatch
++ routes/proxy-writes.js -> lib/stage-writes.js | Agent API (proxy) -> Other features
++ routes/proxy.js -> lib/harbour-token-format.js | Agent API (proxy) -> Agent API (proxy)
++ routes/proxy.js -> lib/stage-write-gate.js | Agent API (proxy) -> Agent API (proxy)
++ routes/settings.js -> lib/cost-read-calls.js | Web routes (pages & workspace API) -> Runs & dispatch
++ routes/ship-biscuit.js -> lib/cost-read-calls.js | Web routes (pages & workspace API) -> Runs & dispatch
++ routes/workspace-api-audit.js -> lib/should-mock-ai.js | Web routes (pages & workspace API) -> LLM & prompts
++ routes/workspace-api-feedback.js -> lib/partial-write-error.js | Web routes (pages & workspace API) -> Platform & plumbing
++ routes/workspace-api-issue-read.js -> lib/should-mock-ai.js | Web routes (pages & workspace API) -> LLM & prompts
++ routes/workspace-api-issue-write.js -> lib/run-trail.js | Web routes (pages & workspace API) -> Runs & dispatch
++ routes/workspace-api-issue-write.js -> lib/should-mock-ai.js | Web routes (pages & workspace API) -> LLM & prompts
++ routes/workspace-api-prompts.js -> lib/prompts/prompt-context.js | Web routes (pages & workspace API) -> LLM & prompts
++ routes/workspace-api-prompts.js -> lib/should-mock-ai.js | Web routes (pages & workspace API) -> LLM & prompts
++ routes/workspace-api-steps.js -> lib/should-mock-ai.js | Web routes (pages & workspace API) -> LLM & prompts
++ routes/workspace-api.js -> lib/run-live-wait.js | Web routes (pages & workspace API) -> Runs & dispatch
+- lib/close-out-readiness.js -> lib/run-ledger.js | Runs & dispatch -> Runs & dispatch
+- lib/completion-signals.js -> lib/as-asked.js | Runs & dispatch -> LLM & prompts
+- lib/completion-signals.js -> lib/size-of-move.js | Runs & dispatch -> LLM & prompts
+- lib/completion-signals.js -> lib/workflow-config.js | Runs & dispatch -> Platform & plumbing
+- lib/cost-read.js -> lib/llm-call-log.js | Runs & dispatch -> LLM & prompts
+- lib/dispatch-entrance.js -> lib/recommendation-live-wait.js | Runs & dispatch -> LLM & prompts
+- lib/dispatch-feedback-validation.js -> lib/dispatch-store.js | Runs & dispatch -> Runs & dispatch
+- lib/model-routing-spend.js -> lib/cost-read.js | LLM & prompts -> Runs & dispatch
+- lib/openrouter.js -> lib/recommendation-blind-read.js | LLM & prompts -> LLM & prompts
+- lib/openrouter.js -> lib/recommendation-live-wait.js | LLM & prompts -> LLM & prompts
+- lib/openrouter.js -> lib/recommendation-look-first.js | LLM & prompts -> LLM & prompts
+- lib/prompt-contract.js -> lib/as-asked.js | LLM & prompts -> LLM & prompts
+- lib/prompt-template-defs.js -> lib/stage-writes.js | LLM & prompts -> Other features
+- lib/prompts/revision-brief.js -> lib/run-ledger.js | LLM & prompts -> Runs & dispatch
+- lib/prompts/runner-kickoff.js -> lib/dispatch-store.js | LLM & prompts -> Runs & dispatch
+- lib/prompts/stage-intent.js -> lib/as-asked.js | LLM & prompts -> LLM & prompts
+- lib/proxy-instructions.js -> lib/recommendation-live-wait.js | Agent API (proxy) -> LLM & prompts
+- lib/recommendation-blind-read.js -> lib/providers/state-map.js | LLM & prompts -> Providers (Linear, GitHub, Jira, local)
+- lib/recommendation-blind-read.js -> lib/recent-runs.js | LLM & prompts -> Runs & dispatch
+- lib/recommendation-blind-read.js -> lib/recommendation-facts.js | LLM & prompts -> LLM & prompts
+- lib/recommendation-blind-read.js -> lib/run-ledger.js | LLM & prompts -> Runs & dispatch
+- lib/recommendation-live-wait.js -> lib/recent-runs.js | LLM & prompts -> Runs & dispatch
+- lib/recommendation-look-first.js -> lib/run-ledger.js | LLM & prompts -> Runs & dispatch
+- lib/render-task-timeline.js -> lib/render-run-steps.js | Front end: server-rendered pages -> Front end: server-rendered pages
+- lib/run-ledger.js -> lib/prompts/survey-words.js | Runs & dispatch -> LLM & prompts
+- lib/task-page-loader.js -> lib/render-run-steps.js | Runs & dispatch -> Front end: server-rendered pages
+- lib/task-page-loader.js -> lib/run-ledger.js | Runs & dispatch -> Runs & dispatch
+- lib/task-state.js -> lib/render-run-steps.js | Other features -> Front end: server-rendered pages
+- routes/proxy-compute.js -> lib/cost-read.js | Agent API (proxy) -> Runs & dispatch
+- routes/proxy.js -> lib/proxy-scopes.js | Agent API (proxy) -> Agent API (proxy)
+- routes/settings.js -> lib/cost-read.js | Web routes (pages & workspace API) -> Runs & dispatch
+- routes/ship-biscuit.js -> lib/cost-read.js | Web routes (pages & workspace API) -> Runs & dispatch
+- routes/workspace-api.js -> lib/recommendation-live-wait.js | Web routes (pages & workspace API) -> LLM & prompts
