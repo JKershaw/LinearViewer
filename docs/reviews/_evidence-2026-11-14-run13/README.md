@@ -45,6 +45,7 @@ Evidence for `docs/reviews/seams-tangles-review-2026-11-14-run13.md`. This run i
 | `make-experiments.py` → `areas.exp-{E..J}-*.json`; `seams-code-$H-exp-*.json` | labelled registry experiments, measured at the head | `python3 -I $R/make-experiments.py $R`, then `node scripts/code-shape/seams.mjs . $H $R/areas.exp-<x>.json` |
 | `experiments-summary.py` → `experiments-run13.txt` | each experiment's pair and link moves against the head | `python3 -I $R/experiments-summary.py $R > $R/experiments-run13.txt` |
 | `f1-edge-kinds.py` → `f1-edge-kinds.txt` | F1's edges by target, and how many go into strict leaves (files that import nothing) | `python3 -I $R/f1-edge-kinds.py $R > $R/f1-edge-kinds.txt` |
+| `two-lanes.py` → `two-lanes.txt` | added after the second read: links between the two HTTP lanes (Web → Agent API 9 → 9), the outside files both import (52 → 55; five new doors), Agent API ⇄ Web co-change (78 → 87), and the 9 window commits touching both | `python3 -I $R/two-lanes.py $R . > $R/two-lanes.txt` |
 | `supplementary-figures-run13.py` → `.txt` | the figures the report quotes: scope (S1), guide-only (S2), pairs (S3), the edge diff by direction (S4), hubs (S5), the catch-all and new files (S6), direction checks (S7), scripts outside the scope (S8), co-change (S9), window reconciliation (S10), F6 and carried measures (S11), the per-area rollup (S12) and simple-dispatcher (S13) | `SD_DIR=$SD python3 -I $R/supplementary-figures-run13.py . > $R/supplementary-figures-run13.txt` |
 
 An empty `.stderr` file means that tool wrote nothing to stderr.

@@ -10,6 +10,7 @@ Review-only. This PR changes this report, E/, and the area notes listed in §9. 
 - **Three more run 12 rows are resolved or settled in code.** P-LW1 was carried out: the live-stage wait is `lib/run-live-wait.js` in Runs, with no outbound import (§3.10). The leftover follow-up now has a contract row ("follow-up to a finished session with no halt", claimed on both sides), so `seam:leftover-resume-contract` is closed (§3.0b). The limiter window is now read against the contract's cap by `tests/unit/proxy-limiter-window-contract.test.js` (LIN-4468), which removes the unpinned half of `seam:runner-contract` (§3.0). LIN-4154 is settled in substance: `fmtDuration` lives in `lib/time-words.js`, and no Runs or Other module imports a renderer for it (§3.9). LIN-4154 itself is still Backlog. This report does not edit it.
 - **No new High.** F1 stays the top-ranked knot. It is **High, worse in count (38/55 → 41/61) and better in kind.** On the LLM → Runs side, six LLM modules now read one Runs door, `run-trail.js`, where five used to read `run-ledger.js` and two read `recent-runs.js`. The Runs refusal that run 12 found held in LLM has moved to Runs. Of the eleven new Runs → LLM edges, nine import vocabulary: stage-kind records and word leaves. One swaps `llm-call-log.js` from one cost file to another. One reads the template registry for `stageWrites` (§3.1).
 - **The largest new cross-area shape is `hub:stage-writes.js` (Medium, new; §3.2b).** LIN-4468's write gate turned `lib/stage-writes.js`, a catch-all file, into the stage write-allowance table. Three areas read it. Its cross-area importers went from 2 to 8, and it grew from 40 to 146 lines. It accounts for the whole of Agent API → Other (2 → 6), for Runs → Other's rise (5 → 7), and for keeping LLM ⇄ Other open. The guide gave the gate (`stage-write-gate.js`) a home in Agent API and left its table in the catch-all. Labelled experiments E and F (Agent API or LLM as its home) each close LLM ⇄ Other, and each adds edges to an existing knot.
+- **Raised by the second read, and verified: `seam:two-http-lanes` (Agent API ⇄ Web, Low–Medium, new; §3.2c).** The agent lane (`routes/proxy*.js`) and the workspace lane (`routes/workspace-api*.js` and the other Web routes) are parallel ways into the same domain code. Neither imports the other more than before: Web → Agent API is 9 at both commits and Agent API → Web is 0. Every new door this window built went to both lanes as a pair: `run-trail`, `run-live-wait`, `prompt-context`, `cost-read-calls` and `should-mock-ai`. Their co-change rose 78 → 87, the fourth-largest rise, and 9 of the 32 window commits touch both lanes. The import tool counts each lane's edge into a door as the right direction, one at a time, so it cannot show the doubling.
 - **F3 is worse in the reverse direction: Providers → LLM 4 → 6, LLM → Providers 15 → 14 (Medium; §3.3).** One new edge is the Jira as-asked region importing the `as-asked.js` door, which is by design (LIN-4450). The other is `lib/providers/jira/index.js` importing `extractPeriodicalGateId` from `lib/periodicals.js`, the 1,428-line Periodical engine. A provider now reads a Harbour feature's marker in order to decide how many comments to fetch. This run adds a note entry for it.
 - **The pair count rose from 13 to 14, and the rise is the guide's edit, not code.** The guide moved `lib/cost-format.js` into Pages, which re-files one edge, `lib/ship-biscuit.js` → `cost-format.js`, as LLM → Pages, and that opens Pages ⇄ LLM (37/1). Under one registry, the 14 pairs are the same at both commits. No code change opened or closed a pair. The cycle group is still the same nine areas (§1.1).
 - **The browser area has import edges for the first time: Browser → Pages, 0 → 6 (Low, the right direction; §3.6).** Five pages are ES modules that import two served leaves, `lib/cost-format.js` and `lib/time-words.js`. The leaves come through an allow-list, and tests pin them as leaves with a front-end owner. F6 (window globals) is unchanged at 67. Browser ⇄ Pages, the second-busiest co-change pair (133), now has its first import link. `scripts/code-shape/README.md` line 10 ("`public/` holds classic scripts with no import statements") is now stale.
@@ -243,6 +244,14 @@ Ordering: severity first, then the window's movement. Stable names follow runs 9
 - **Reading.** Each home for the table removes a catch-all pair and adds weight to a knot that already exists. None opens a pair. Choosing between E and F decides whether the allowance is the proxy's policy or the stage record's vocabulary. That is an owner's decision about the guide, not a builder rule. The size of move is a one-line registry edit plus a placement pin.
 - **Filed.** A Waiting entry in `docs/areas/other-features.md` (§9). No ticket.
 
+### 3.2c `seam:two-http-lanes` (Agent API ⇄ Web routes) · **Low–Medium** · **new** (raised by the second read; verified)
+
+- **What.** Harbour has two HTTP lanes into the same domain code: the agent lane (`routes/proxy*.js`, Agent API) and the workspace lane (`routes/workspace-api*.js` and the other Web routes). They hardly import each other. Web → Agent API is **9 → 9** and Agent API → Web is **0** (E/`two-lanes.txt`). What they share are doors. Of the files outside both lanes that either lane imports, both import **52 of 213 → 55 of 216**.
+- **The window's doors were each wired twice.** The five shared targets new at HEAD are exactly the doors this window built: `lib/run-trail.js` (`proxy-writes.js`, `workspace-api-issue-write.js`), `lib/run-live-wait.js` (`proxy-instructions.js`, `workspace-api.js`), `lib/prompts/prompt-context.js` (`proxy-compute.js`, `workspace-api-prompts.js`), `lib/cost-read-calls.js` (`proxy-compute.js`, `settings.js`, `ship-biscuit.js`) and `lib/should-mock-ai.js` (`proxy-compute.js` and 12 Web routes). The two shared targets that left are the files those doors replaced (`cost-read.js`, `recommendation-live-wait.js`). The Jira work (LIN-4450–4452) wired the same rules into three create lanes: `routes/proxy-writes.js`, `routes/workspace-api-issue-write.js` and `routes/workspace-api-feedback.js`.
+- **Change coupling.** Agent API ⇄ Web went **78 → 87**, the fourth-largest rise in the window, after the three F1/F4/`agent-api<->llm` corners. **9 of the 32** window commits touch both lanes (E/`two-lanes.txt` lists them). With Runs ⇄ Web +7 and LLM ⇄ Web +7, the Web lane's three pairs rose 23, beside the consolidation triangle's 31.
+- **Why the tools miss it.** Each lane's import of a door is the right direction (§2.1, §3.2), and the pair has an import link that did not move. So neither the knot table nor the "no import link" rule for candidate seams (§6) can see a pair that co-changes because both sides import the same new things.
+- **Reading.** This is the price of two ways in to one domain, not a defect: every consolidation that adds a door touches both lanes. The rules restated per lane belong to Drift & Coherence, and to the notes that already carry them: `docs/areas/web-routes.md`'s `routes/workspace-api-issue-write.js` entry ("one create pipeline with one resolver and one refuse-or-drop rule") and `docs/areas/agent-api.md`'s Lesson on the three create lanes. No new note entry: the size of move, one shared route layer for the lanes, is the existing create-pipeline entry's, widened. The trend to watch is Agent API ⇄ Web co-change beside an unmoving link.
+
 ### 3.3 F3 `knot:providers->upward` (LLM ⇄ Providers) · **Medium** · **LLM → Providers better by one; Providers → LLM worse by two**
 
 - **Count.** LLM → Providers went **15 → 14**: `recommendation-blind-read.js` → `providers/state-map.js` left, because the close-out reading moved into `run-closeout-state.js`, in Runs, which gives Runs → Providers 10 → 11. Providers → LLM went **4 → 6**.
@@ -373,15 +382,15 @@ Per area at the head: files, internal imports, cross-area in and out, and entry 
 
 Under run 12's own registry, the baseline reads 914 / 399 / 76 / 8855, as published. Seven pairs differ by 1, and that is the guide-only effect (§1.1).
 
-**Window reconciliation (S10).** The two windows share 913 commits. One baseline commit dropped out and 32 head commits entered (E/`cochange-window-commits-H-only.txt`). Every pair checked reconciles exactly: Agent API ⇄ Runs 124 + 11 = 135, LLM ⇄ Runs 112 + 10 = 122, Agent API ⇄ LLM 81 + 10 = 91, Browser ⇄ Pages 128 + 5 = 133, Runs ⇄ Web 117 + 7 = 124, Other ⇄ Runs 41 + 4 = 45, Agent API ⇄ Other 21 + 3 = 24. This time the moves are the window's own work, not the slide: almost nothing left the window.
+**Window reconciliation (S10).** The two windows share 913 commits. One baseline commit dropped out and 32 head commits entered (E/`cochange-window-commits-H-only.txt`). Every pair checked reconciles exactly: Agent API ⇄ Runs 124 + 11 = 135, LLM ⇄ Runs 112 + 10 = 122, Agent API ⇄ LLM 81 + 10 = 91, Agent API ⇄ Web 78 + 9 = 87 (E/`two-lanes.txt`), Browser ⇄ Pages 128 + 5 = 133, Runs ⇄ Web 117 + 7 = 124, Other ⇄ Runs 41 + 4 = 45, Agent API ⇄ Other 21 + 3 = 24. This time the moves are the window's own work, not the slide: almost nothing left the window.
 
 **The top pairs at the head:** Agent API ⇄ Runs 135 (link); Browser ⇄ Pages 133 (**link, new**); Runs ⇄ Web 124; LLM ⇄ Runs 122 (F1); Pages ⇄ Runs 100; Pages ⇄ Web 100; Browser ⇄ Web 94 (no link); Agent API ⇄ LLM 91; Browser ⇄ Runs 91 (no link); Web ⇄ Wiring 91.
 
-Read beside the knots, the three pairs that grew most (Agent API ⇄ Runs +11, LLM ⇄ Runs +10, Agent API ⇄ LLM +10) are the three corners of the LIN-4448 consolidation: stage records, write gate and trail pass. Each corner is linked by imports in both directions, and each is a knot (F4, F1, `agent-api<->llm`). The co-change confirms that those knots are where merges queue.
+Read beside the knots, the three pairs that grew most (Agent API ⇄ Runs +11, LLM ⇄ Runs +10, Agent API ⇄ LLM +10) are the three corners of the LIN-4448 consolidation: stage records, write gate and trail pass. Each corner is linked by imports in both directions, and each is a knot (F4, F1, `agent-api<->llm`). The co-change confirms that those knots are where merges queue. The next three rises are the Web lane's: Agent API ⇄ Web +9, Runs ⇄ Web +7, LLM ⇄ Web +7. The first of these has an import link that did not move (§3.2c). So the co-change shape is a square, with the two HTTP lanes on one side, not only a triangle. The first draft of this section read only the triangle, and the second read corrected it.
 
 **Pairs with no import link: 19 → 18.** Browser ⇄ Pages gained its first link (§3.6). Eleven browser pairs remain (F6), led by Browser ⇄ Web 94 and Browser ⇄ Runs 91. Of the seven non-browser no-link pairs, one moved: Agent API ⇄ Reports 14 → 15. The other six (Other ⇄ Reports 7, Agent API ⇄ Task, Auth ⇄ Task, Providers ⇄ Reports, Task ⇄ Web 2 each, Task ⇄ Wiring 1) did not move.
 
-**Candidate seams from change coupling: none new.** Agent API ⇄ Reports (15) is the largest non-browser no-link pair. Of its 15 changes, 14 touch Reports' `lib/` files (`kpi-stats.js` ×8, `account-erasure.js` ×4, `workspace-kpi-stats.js` ×3) beside proxy files, in cost and token work. The one added in the window is LIN-4458, which touched `scripts/stability-measures-blind.mjs` (a script the import tool does not read, §3.11). It is the same pair run 12 carried, one change larger.
+**Candidate seams from change coupling: one, outside the rule.** The tool's rule reads pairs with no import link, and that rule finds none new. Agent API ⇄ Web is a linked pair whose co-change rose while its link stayed at 9/0. That is the candidate seam this window shows (§3.2c). Agent API ⇄ Reports (15) is the largest non-browser no-link pair. Of its 15 changes, 14 touch Reports' `lib/` files (`kpi-stats.js` ×8, `account-erasure.js` ×4, `workspace-kpi-stats.js` ×3) beside proxy files, in cost and token work. The one added in the window is LIN-4458, which touched `scripts/stability-measures-blind.mjs` (a script the import tool does not read, §3.11). It is the same pair run 12 carried, one change larger.
 
 **simple-dispatcher, 60 days** (E/`cochange-sd-*`): 100 / 46 / 15 / 240 at `af9b496`, and 102 / 46 / 15 / 241 at `7d5fe7d`. The pairs are the same 15. Loop ⇄ Test harnesses (13) is still the one co-change pair with no `require` link, the `e2e-*.js` process boundary.
 
@@ -479,6 +488,7 @@ Stable names are the ledger's own. Severity is this run's. "Δ run 12" is measur
 | `knot:agent-api<->llm` | Medium | 46/4 | **48/4** | worse by two (§3.1b) |
 | F4 `knot:runs->agent-api(proxy-preamble)` | Medium | 48/10 | **50/10** | worse by two (§3.2) |
 | `hub:stage-writes.js` | Medium, new | 2 importers (2 cross); 40 lines | **8 (8 cross)**; 146 lines | **new** (§3.2b) |
+| `seam:two-http-lanes` (Agent API ⇄ Web) | Low–Medium, new | link 9/0; co-change 78; 52 shared doors | link 9/0; co-change **87**; **55** shared doors; 9 of 32 commits touch both | **new** (second read; §3.2c) |
 | F3 `knot:providers->upward` | Medium | 15/4 | **14/6** | LLM side better by one; Providers side worse by two (§3.3) |
 | N1 `knot:other-features-catch-all` | Medium | 18 (16 under HEAD registry) | 16 | guide −2; code unchanged (§3.4) |
 | `knot:agent-api<->other-features` | Medium | 2/1 | **6/1** | **worse** (§3.5) |
@@ -558,4 +568,53 @@ Stable names are the ledger's own. Severity is this run's. "Δ run 12" is measur
 
 ## Adversarial Second-Read
 
-(Filled after the second read.)
+- **Tier:** 2 (accepted), a fresh-context general-purpose sub-agent with no memory of the report-writing turn. It had read access to both clones, the report and E/, and the question below. It was told not to trust the report's conclusions, and to check them against the repositories and the window's commits.
+- **Question (verbatim):** "What is the largest item in this window that this report missed or misfiled?"
+- **Reader's answer (in full, lightly trimmed for form):**
+
+> **Short answer:** the report missed the coupling between the two HTTP "lanes", the agent lane (`routes/proxy-*.js`, Agent API) and the workspace lane (`routes/workspace-api-*.js`, Web). It is not larger than F1, so F1's ranking stands.
+>
+> **1. The item.** The two lanes are parallel ways into the same domain code. In this window, each new or moved door went to both lanes as a pair:
+> - `lib/run-trail.js`: `proxy-writes.js` and `workspace-api-issue-write.js`
+> - `lib/run-live-wait.js`: `proxy-instructions.js` and `workspace-api.js`
+> - `lib/prompts/prompt-context.js`: `proxy-compute.js` and `workspace-api-prompts.js`
+> - `lib/cost-read-calls.js`: `proxy-compute.js` and `settings.js` / `ship-biscuit.js`
+> - `lib/should-mock-ai.js` (`isHermeticTestToken`): `proxy-compute.js` and 12 Web routes
+>
+> The Jira work (LIN-4450–4452) also had to rewire the same rules into three create lanes: `proxy-writes.js`, `workspace-api-issue-write.js` and `workspace-api-feedback.js`. Those rules are the seal, the PARTIAL_WRITE envelope and the UUID-only refs. `docs/areas/agent-api.md` names the "three create lanes"; the report does not.
+>
+> **2. Evidence.**
+> - **Co-change.** Diffing E/'s co-change files by pair ranks the window's rises: Agent API ⇄ Runs +11, LLM ⇄ Runs +10, Agent API ⇄ LLM +10, then **Agent API ⇄ Web +9 (78 → 87)**, Runs ⇄ Web +7 and LLM ⇄ Web +7. The report's own evidence prints this pair.
+> - **Commits.** Nine of the 32 window commits touch both lanes: `2bf788b6d`, `5dcf5bcda`, `192e1f81f`, `c174185f6`, `904719353`, `0dbf2d4ea`, `49d4c880e`, `d52c676fa` and `fb358dbda`.
+> - **Imports between the lanes did not move.** `seams.mjs` at both commits under the head registry gives Web → Agent API 9 → 9 and Agent API → Web 0. No edge between the two lanes is in `edge-diff-B-to-H.txt`.
+> - **Shared targets.** These are files outside both lanes that both lanes import: 52 of 213 at the baseline, 55 of 216 at the head. The five new ones are exactly the window's doors, and the two lost are the files they replaced.
+> - **Checks on the report itself.** All of §1.3's link deltas reproduce exactly. There are no file-level import cycles that cross areas at either commit (strongly connected components on the edge dumps).
+>
+> **3. Why the report missed or misfiled it.**
+> - §6's reconciliation leaves out Agent API ⇄ Web, the fourth-largest rise.
+> - §6 reads the rise as "the three corners of the LIN-4448 consolidation", but the Web lane rose by 23 in three pairs, beside the triangle's 31. The co-change shape is a square.
+> - "Candidate seams: none new" checks only pairs with no import link. It cannot see a linked pair that co-changes while its link does not move.
+> - §3.12 files the one visible part, `isHermeticTestToken` spreading into 11 routes, as a map item. Experiment G would re-label those edges; it would not touch the pairing of the two lanes.
+> - §2.1 and §3.2 call each lane's import "the right direction". That is true edge by edge, which is why the doubling is never added up.
+>
+> **4. Confidence.** Medium-high that it is missed. Medium on its size: most of the 52 shared targets were already there at the baseline, and the window added three net. What would change my mind: an earlier report already tracking the lanes as a seam; evidence that the nine co-changes are incidental (LIN-4451's and LIN-4452's route diffs are behaviour changes made in step); or an owner's ruling that the duplication across lanes is Drift & Coherence's. The rules held in several places are theirs, but the area pair and its change coupling are this review's.
+>
+> **5. Ranking.** AGREE: this item is Medium at most, and F1 (41/61, growing both ways) stays the top knot. Differs from the top finding: YES.
+>
+> **6. Rejected:** `/api/dispatch/broker-token` behaviour (simple-dispatcher falls back on any non-ok response; smaller); `runner*` ops missing from `ALLOWED_OPS` (separate grant-gated copies); simple-dispatcher's `sentinelLine` (covered by the contract's sentinel rows); file-level cycles across areas (none); stage stamp injection (§3.2b covers it); `as-asked-seal` read by all three lanes (P10a); the duck-typed `testTransport` (tiny).
+
+- **Check of the reader's claims (by me, after the reply).** All verified (E/`two-lanes.py` → `two-lanes.txt`):
+  - Web → Agent API is 9 at both commits, and Agent API → Web is 0.
+  - Shared outside targets are 52 of 213 → 55 of 216. The five new ones and the two gone are as the reader named them.
+  - Agent API ⇄ Web co-change is 78 → 87, and it reconciles as 78 + 9 window commits.
+  - The nine commits touching both lanes are the ones the reader listed.
+- **Response: fixed in place.**
+  - Added §3.2c `seam:two-http-lanes` (Low–Medium, new), a headline bullet and a §10 ledger row.
+  - Corrected §6: the reconciliation now includes the pair, the "triangle" reading is now a square, and the candidate-seam line names this linked pair.
+  - Saved the check to E/.
+  - No note entry: the create-lane rules are already in `web-routes.md` (one create pipeline) and in `agent-api.md`'s Lesson. The duplicated rules are Drift & Coherence's.
+  - F1's ranking is unchanged, as the reader agreed.
+
+Adversarial second-read verdict: AGREE
+Differed from top finding: YES
+Disposition: fixed in place
