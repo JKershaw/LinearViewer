@@ -1,9 +1,10 @@
 /**
- * LIN-4470 (piece 6 of LIN-4448): four of the five hand-built recommendation contexts retire into one builder; the fifth is pinned by a test.
+ * LIN-4470 (piece 6 of LIN-4448): the hand-built recommendation contexts retire into one builder.
  *
  * Four prompt surfaces built the same six-field object from a fetched context by hand (the pinned dispatch entrance,
  * the proxy's /prompt and /recommend overrides, the workspace API's in-app prompt). The fifth, the proxy's routing input
- * (prepareRecommendationInput), builds a superset of it by hand and stays hand-built: it is pinned by a test, not derived. promptContextOf (lib/prompts/prompt-context.js) is the one projection. These tests pin three things:
+ * (prepareRecommendationInput), spreads the same builder and adds its own fields. promptContextOf
+ * (lib/prompts/prompt-context.js) is the one projection. These tests pin three things:
  * it projects exactly the six fields generatePrompt reads; the four surfaces use it and no longer retype the list; and
  * the routing input carries every one of its fields, so a field added to the projection cannot miss the routing input.
  */

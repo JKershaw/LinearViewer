@@ -98,3 +98,6 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   instead of production code recognising the token, would remove these checks and the `testTransport`
   declaration (`lib/dispatch-factory.js`). It spans several areas. (LIN-4456 review and Survey global, 13 Nov.)
   (Corrected by Seams & Tangles, 14 Nov.; `docs/reviews/seams-tangles-review-2026-11-14-run13.md`.)
+- `routes/proxy-writes.js`: the `updateIssue` handler destructures nine body fields and `ISSUE_PATCH_FIELDS`
+  (`lib/stage-writes.js`) lists the same nine; only a comment and a source test keep them in step. One list would
+  mean reshaping the handler's field-by-field conversion. Not scheduled; no ticket takes it. (LIN-4448 blind read.)

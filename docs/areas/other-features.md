@@ -20,7 +20,10 @@ Area notes for `other-features` in the registry. Format and rules: README.md.
   only edge into this area. Measured homes: Agent API (beside the gate) or LLM (beside the
   records) each close LLM ↔ Other features and leave Agent API ↔ Other features to the seal, at a cost to an
   existing knot (Runs → Agent API +2, or Agent API → LLM +5). Whose the allowance is, the proxy's policy or the
-  stage record's vocabulary, is the guide owner's size of move, not a tidy.
+  stage record's vocabulary, is the guide owner's size of move, not a tidy. Also: `STAGE_WRITE_OPS` hand-lists the
+  `SPEC` keys and route operation names, and only the route census test keeps them in step; whether the `writes`
+  vocabulary (read by prompts and the preamble) splits from the enforcement table belongs to the same decision.
+  Not scheduled; no ticket takes it. (LIN-4448 blind read, folded in here.)
   (Seams & Tangles, 14 Nov.; `docs/reviews/seams-tangles-review-2026-11-14-run13.md`.)
 - `lib/home-view.js`: split it (over 600 lines), and separate `upNextOf`'s eligibility
   from its ranking, so both lists filter one candidate model. The module threads `shown`,
