@@ -863,6 +863,10 @@ All 167 rows under their stable names (`ledger-run8.tsv`; the next run compares 
 None minted. Every finding is in this report and, where it binds a builder or waits in an area, in that area's note.
 
 
+## Addendum at close-out (14 Nov.): row 167 settled after measurement
+
+The report measures Harbour `fb358dbda` and keeps its ledger as measured. After that, main took `06a7da871` (LIN-4448 close-out, #2457), which makes `prepareRecommendationInput` in `lib/recommendation-input.js` spread `promptContextOf` and add only `focusedChild`, `runs` and `allRuns`, so the header's claim that one projection feeds every surface now holds. Row 167 (`prompt-context-header-overclaims`) is therefore resolved at that head, with its old copy deleted; the next run should carry it as resolved. Its Waiting entry in `llm-and-prompts.md` was removed in this PR for that reason (seven Harbour entries remain from this run, not eight). The same commit moved `lib/completion-signals.js` from `runs-and-dispatch` to `llm-and-prompts` in `docs/areas/areas.json`; no note entry from this run cites that file. Nothing else in the report changed.
+
 ## Adversarial Second-Read
 
 - **Tier:** 2 — a fresh-context sub-agent with no memory of the report-writing turn. It was given the two repositories, their windows and the finished report, and none of the writer's notes.
