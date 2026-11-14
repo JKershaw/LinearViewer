@@ -3899,3 +3899,27 @@ John asked for a subagent that was given the problem but not our solution. Its f
   - Authorship isn't the main issue; how text is read is.
   - The kit had no power to detect a change, so making it a gate guaranteed a ruling.
   - The asks say "settle yourself" while the prompts say only John can agree a cut. Fix the conflict at the prompts.
+
+## 14 Nov, about 10:40 — Rulings applied; fresh view on the notes
+
+John applied both rulings: accept on lin4447 (I'd reposted the suggestion as accept) and cut on lin4470.
+
+The notes subagent was given John's words only, not ours or the last agent's. Its findings:
+- **Three jobs share one format:** Lessons (traps and invariants), Waiting (a debt ledger with "why not now" reasoning), and the LIN-4414 conveyor (one retirement per build, which holds Waiting at about 110–120).
+- **Growth:** 10.6 KB / 41 entries on 8 Nov → 88.8 KB / 203 today. Lessons went 11 → 85, about 13 a day.
+  - The cap was patched by changing the rule (LIN-4414), not the structure.
+  - Runs Lessons sit at 6009 of 6144 bytes.
+  - The README has had 14 rewrites in 6 days.
+  - There's a 147-line validator plus a `Retires:` proxy refusal policing the prose.
+- **Second copies:** about 31 of 85 lessons name the test that enforces them; `_planWake` repeats comments in the code; an answered Waiting entry stays put. Owner decisions are buried in Waiting.
+- **Recommendation:** route each kind to where it can't drift.
+  - Tested lessons → the test's failure message.
+  - Module lessons → a header comment.
+  - Playbooks → a temporary plan.
+  - Decisions → the rulings queue.
+  - Waiting → anchored to symbols, with kind, source and last-verified date.
+  - Lessons → a staging area only.
+  - Do the migration through the retirement step. A new format alone wouldn't fix it.
+- **Confidence:** about 80% on the diagnosis, about 60% on the shape of Waiting.
+
+The steering-layer history agent is still running.
