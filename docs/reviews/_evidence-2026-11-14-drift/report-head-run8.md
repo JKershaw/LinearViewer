@@ -1,0 +1,90 @@
+# Drift & Coherence Review — 2026-11-14, run 8 (trend vs the 2026-11-13 run 7)
+
+**Ticket:** LIN-4481. **Previous edition:** `docs/reviews/drift-coherence-review-2026-11-13.md` (run 7, LIN-4443, PR #2418, merged `0072d1b78`), called **run 7** below. **Evidence:** `docs/reviews/_evidence-2026-11-14-drift/`.
+
+**Review-only.** This edition adds this report, its evidence folder and area-note edits under `docs/areas/` (`llm-and-prompts.md`, `runs-and-dispatch.md`, `front-end-pages.md`, `front-end-browser.md`, `agent-api.md`, `other-features.md`, `providers.md`). A companion docs-only PR in simple-dispatcher (SD) adds one Waiting entry to its `docs/areas/stop-hook-and-relay.md` (row 164). No code, config, guide, script, CI file or secret was changed in either repo.
+
+The Harbour window is `e2d4659c4..fb358dbda`: 32 first-parent commits, run 7's own report (#2418) through LIN-4470 (#2450). It starts at run 7's measured commit, so there is no gap. SD is `af9b496..7d5fe7d`: 3 first-parent merges (#339 run 7's note, #340 LIN-4474, #341 LIN-4476). `origin/main` was `fb358dbda` in Harbour and `7d5fe7d` in SD when this was written, so the window was not extended.
+
+## Better or worse, by area
+
+**For the whole window: better.** This is the first window aimed squarely at run 7's findings, and the loop bent the curve. Seven of run 7's open rows are resolved at HEAD with their old copies deleted (142, 150, 151, 153, 154, 155, 158), and 131 is resolved in code. Eleven rows improved and none worsened. The census lost three real groups and gained none. The eight new rows are all LOW or LOW–MEDIUM. Most are one shape: a new home's header or doc claims every caller now reads it, while one reader still keeps its own rule (159, 160, 161, 163). The window settled nearly as many Waiting entries as it recorded. Most of the growth is leftovers the pieces wrote down with a stated why, not new drift (see "Waiting counts" below).
+
+| Area | Verdict | Evidence (code at `fb358dbda`, against `e2d4659c4`) |
+|---|---|---|
+| **Runs & dispatch** (`lib/run-trail.js`, `lib/run-closeout-state.js`, `lib/close-out-readiness.js`, `lib/run-live-wait.js`, `lib/cost-read*.js`, `lib/dispatch-feedback-kinds.js`, `lib/dispatch-leftover.js`, `lib/item-stage-stamp.js`) | **better** | **Better:** one close-out decision (`closeOutDecision`) answers the box, the guard, the check route and `blindReadStep`. `closeOutSetsDone`, `byPersonCheck`, `REFUSED_REASONS` and `readGateTrail` are gone (158 and 153 resolved; 58 improved). One comment classifier, `COMMENT_KINDS` (`lib/run-trail.js`): `landingPrUrls` is a view of it, `isLandingEvidence` is deleted, and the readers agree on agent notes (Seams run 12 §3.0a answered). `dispatchModelOf` is gone and the timeline reads the fold's model (150 resolved). The leftover gate reads `NEVER_RAN`, `HALT_MODES` and `followUpTarget` from their owners (142 resolved; census G0022, G0049, G0234 gone). The stamp kinds have one table (56 improved; G0078, G0345 gone). The calls cost read moved whole into `lib/cost-read-calls.js`. **Worse:** the Done bound is still split between the decision and the check route, and the decision's header says it is in one place (163, LOW). A leaf header is stale (165, LOW). |
+| **LLM & prompts** (`lib/code-routes.js`, `lib/prompts/stage-kinds.js`, `lib/prompts/stage-catalogue.js`, `lib/prompts/prompt-context.js`, `lib/prompts/area-note-format.js`, `lib/recommendation-*.js`, `lib/periodicals.js`) | **better** | **Better:** `CODE_ROUTES` is the one list and every prose copy points at it; the `public/llms.txt` catalogue is generated and pinned byte for byte (154 resolved). One record per stage kind, with the old per-kind tables as views (136 improved, census G0100 gone; the VERB OVERRIDE list is derived, so 131 is resolved in code). The blind read's kind and heading come from the leaf, under an AST scan (151 resolved). One cited-path predicate, `isCitedPath` (155 resolved). `REGISTRY_PATH` derives from `NOTES_DIR` (145 improved). One prompt-context builder (`promptContextOf`). `committedSearch` folds four spellings (143 improved). **Worse:** the selector's PR list and the look-first gate read every cited PR, beside the one landing; reproduced, a Survey report that cites a PR switches look-first off (159, LOW–MEDIUM). `catalogue.group` is a second home for the default-prompt split, and the source map overstates what became a view (161, LOW). |
+| **Agent API (proxy)** (`lib/stage-write-gate.js`, `routes/proxy*.js`, `lib/proxy-instructions.js`) | **better** | The proxy now refuses writes outside a stage's allowance, from one table keyed by value (`ALLOWED_OPS`, `lib/stage-writes.js`). Every write mount names a classified operation, checked at mount. The VERB OVERRIDE list renders `Object.keys(STAGE_KINDS)`. The test-token check is one helper with 12 importers (G0008 gone). **Not yet:** "no stamp means work" is written in three modules, and the allowance table has no completeness check (162, LOW, filed under `lib/stage-writes.js`'s area, Other features). The enqueue list (137) is unchanged. |
+| **Front end: browser** (`public/flight-companion.js`, `public/observation.js`, `public/task-page.js`, `public/cost-format-global.js`) | **neutral** | The three pages became modules with no globals written and no dual export (the old `public/live-console.js` one stays, row 139). One cost formatter (`lib/cost-format.js`), with the global shim inventoried and shrinking only. `public/task-page.js` dropped its `formatElapsed` copy (row 19 improved, G0264 gone). Seven Waiting entries were recorded. Two describe drift the conversion itself caused (`observation.js` reads `common.js` globals bare; `flight-companion.js`'s eight `if (mounted)` blocks); five record pre-existing copies. |
+| **Front end: server-rendered pages** (`lib/time-words.js`, `lib/render*.js`, `lib/components/*`) | **neutral** | `fmtDuration` and `relativeAgo` got one leaf, served to the browser at `/lib/time-words.js` (row 40 improved). But the leaf, its test, the source map and `lib/components/time.js` claim it is the one home for relative time, while `formatRelativeTime` (`lib/render.js`), `window.relativeTime` (`public/common.js`) and `formatGeneratedAge` word the same moment differently (160, LOW–MEDIUM). Run 7's 157 (the timeline's tick style) is unchanged. |
+| **Providers** (`lib/providers/jira/*`) | **neutral** | The Jira seal and create lanes import the As-asked markers and retype none. The region reader's end-line rule is looser than `splitAsAsked`, and the Lesson that calls it safe covers filing only (166, LOW). The four new Waiting entries hold at HEAD. |
+| **Cross-repo (runner contract, SD)** | **better** | Both contract copies are byte-identical (sha256 `871ca615f627a026…`). The new `report` rows pin the session-PR pick on both sides (149 improved), and the `fold` rows pin the two transcript folds to each other. One named fold leftover has no home in either repo (164, LOW; SD note in the companion PR). SD's census is unchanged. |
+| **Web routes, wiring, platform** (`server.js`, `lib/vendor-assets.js`, `routes/*`) | **neutral** | Wiring, the `/lib/` serving mount, and the write gate per operation. `res.status(` in `routes/` and `server.js`: 275 at both ends. |
+
+**LIN-3449's gauge question: across the two programmes, did the readings move toward one place per decision, and where did a consolidation add a second home?**
+- **Yes, toward one place.** Every targeted run-7 row moved, and in seven the old copies are deleted, so a caller cannot reach the old rule. That is LIN-3449's own done-when: "one place makes the decision, every caller uses it, old copies deleted in the same work". The census agrees: three real groups gone (G0008 test-token, G0022 `NEVER_RAN`, G0049 the leftover's halt test, which re-keyed as G0076), plus five table groups and G0171 shrunk to a table.
+- **Where a consolidation left or added a second home:**
+  - **LIN-4458 (one trail pass):** `assembleTrailFacts` still builds its own PR list from every comment, though the new leaf's header says the selector's facts are a view of it (159). This is the window's top finding.
+  - **LIN-4467 (stage records):** `catalogue.group` beside `DEFAULT_PROMPT_KEYS` is a new second home (161).
+  - **LIN-4468 (write allowance):** added a third copy of "no stamp means work" (162).
+  - **LIN-4472 (time words):** declared one home beside three existing formatters (160).
+  - **LIN-4460 (one close-out decision):** left the stop-at bound in the route, while claiming it is in one place (163).
+  - **LIN-4459 (live wait):** split the run-outcome words between `lib/run-live-wait.js` and `lib/recent-runs.js` to avoid an import cycle. Its own leftover step recorded this as a Waiting entry, so it is not re-filed here.
+- **A move is not always a removal.** The LIN-4448 after-read (`docs/plans/survey/area-read-reports/`) measured no detectable code difference for LLM & prompts (D = −0.3, inside the ±0.5 band) while this review reads the area as better. The two instruments measure different things: the area read scores a 14-file sample that leaves out most of the moved files, and this review follows each duplicated decision to its callers. Both are reported. Neither overrides the other.
+
+## Headline
+
+1. **Better overall.** Seven run-7 rows are resolved with their old copies deleted (142, 150, 151, 153, 154, 155, 158), and 131 is resolved in code. Eleven improved (19, 40, 47, 56, 58, 136, 143, 145, 148, 149, 152). None worsened. Eight new, none above LOW–MEDIUM.
+2. **Top window finding: the selector and the look-first gate read every cited PR beside the one landing (159, LOW–MEDIUM, new; reproduced).**
+   - `assembleTrailFacts` (`lib/recommendation-facts.js:466-471`) collects `prUrls` from every comment, with no kind filter.
+   - That list feeds the selector line `- PRs linked on the trail:` (`:554`) and the look-first gate `if (facts.prUrls.length) return 'has a PR'` (`lib/recommendation-look-first.js:152`).
+   - The one landing (`readTrail().landing`, `lib/run-trail.js`) gives blind reads, Survey reports and area reads no landing (`COMMENT_KINDS`, `:134-145`). Yet `lib/run-trail.js:15-17` says the selector's `assembleTrailFacts` is a view of the trail, "so the box, the guard, the route and the prompt cannot disagree about which PRs are the task's".
+   - Reproduced (`look-first-survey-pr-repro.mjs`): a `## Survey open-0` report that cites a related PR makes `lookFirstOff` return `"has a PR"`, so survey-place and scoping are skipped, while `readTrail().landing` is `[]`. The same report without the link sends survey-place next.
+   - The reader predates the window. The claim, and the table it contradicts, are LIN-4458's.
+   - Production frequency is not measured: it depends on how often a survey-task report cites a PR. Note: `llm-and-prompts.md`, naming `lib/run-trail.js` on the other side.
+3. **Second: relative time has four homes, and the window's new leaf claims to be the one (160, LOW–MEDIUM, new).**
+   - `lib/time-words.js:2` says it is "one home for the server and the task page". So do `tests/unit/lin-4472-time-words.test.js:2`, `docs/architecture/source-map.md:151` and `lib/components/time.js:4-5`.
+   - Three more formatters word the same moment:
+     - `formatRelativeTime` (`lib/render.js:122`, "25m ago", then "yesterday"; Settings, Home, KPIs);
+     - `window.relativeTime` (`public/common.js:576`, read bare by the Observation module);
+     - `formatGeneratedAge` (`public/prompt-section.js:103`, which rounds).
+   - The task page says "5 minutes ago" where Observation says "5m ago".
+   - The guard keys on two names, so it sees none of these. Byte-identical `formatDuration` copies also sit in `lib/render-escalation-kpis.js:21` and `lib/render-effort-readout.js:21`.
+   - Note: `front-end-pages.md`, worded as a size of move.
+4. **The new homes' claims outrun their callers in three more places, each LOW:**
+   - **161:** `catalogue.group` (`lib/prompts/stage-kinds.js`) and `DEFAULT_PROMPT_KEYS` (`lib/render-prompt-opts.js:14`) are two unlinked homes of the default-prompt split. The source map says every per-kind table is a view, while about eight stay kind-keyed.
+   - **163:** `lib/run-closeout-state.js:31-34` says the Done rule is "bounded here, in one place". But `setDone` (`:269`) has no stop-at term, and the route applies it (`routes/workspace-api-run-evidence.js:296-302`). The person-acted rule is also spelled twice inside the decision (`:261`, `:265`).
+   - **165:** `lib/dispatch-feedback-kinds.js:15-16, 48-49` describes a store re-export that no longer exists.
+5. **The write allowance (LIN-4468) added a third copy of a default (162, LOW, new).**
+   - "No stamp means work" is in `lib/item-stage-stamp.js:22, 67`, `lib/proxy-preamble.js:246-248` and `lib/stage-writes.js:98-101, 114`.
+   - An unknown value throws in one and reads `none` in another.
+   - `ALLOWED_OPS` has no completeness check, so a new value would answer 500, not 403.
+   - "One comment" is enforced by the prompt only: the gate allows the operation any number of times.
+6. **Cross-repo.** The contract copies are byte-identical, and each repo pins its own copy's sha256. That is two pins, not one check, as before.
+   - The session-PR pick is now pinned by nine `report` rows on both sides (149 improved). Only the no-`DONE:` fallback is unpinned.
+   - The contract names SD's raw `""` model and `""` timestamp as "a leftover for Simple Dispatcher, not fixed here", and neither repo's notes held it. Harbour's intake rejects `at: ""` (`lib/request-usage-intake.js:91`), so such a request record is lost (164, LOW; SD note).
+   - The `[working]` grammar (140) is unchanged.
+7. **Jira (166, LOW, new).** For a block edited in Jira, the region reader takes the first end paragraph, matched as plain text. A plain copy of the end sentence inside the words cuts them short. The providers Lesson's safety argument covers filing, not a later edit.
+8. **Census.** Harbour has 107 `mustRule` groups (102 unchanged, 2 grown, 2 shrunk, 1 new). Rulings: 32 real, 29 borderline, 46 noise (run 7: 34 / 28 / 46).
+   - Three real groups are gone (G0008, G0022, G0049).
+   - G0049 re-keyed as G0076 (real) when the leftover gate took `HALT_MODES`.
+   - G0171 (`name === 'linear'`, borderline) dropped to a table group when LIN-4456 removed the provider-name test.
+   - G0025 and G0176 are ruled for the first time (both borderline).
+   - Eleven groups are gone in all, eight of them table groups.
+   - **SD:** 61 groups, 27 `mustRule`, all unchanged; no ruled site is in a window hunk.
+9. **Import graph.** 533 nodes, 2249 static edges, 2 dynamic (+104 / −33 static against run 7's reproduced graph). SCCs are unchanged (6 + 6, the same members). Upward `lib/` → `routes/` edges: 0 / 0. The largest new fan-ins are `lib/run-trail.js` (11), `lib/prompts/blind-read-words.js` and `lib/prompts/stage-kinds.js` (8 each), and `lib/dispatch-feedback-kinds.js` (7). `lib/prompts/stage-catalogue.js` has no importer under `lib/` or `routes/`; only `scripts/gen-llms-catalogue.mjs` and its test read it.
+10. **Notes.** Eight Waiting entries were added, one per new row: seven in Harbour (159, 160, 161, 162, 163, 165, 166) and one in SD (164). Three existing entries were made true: the `docs/areas/` count and its first citation, the test-token recount, and the `session.js` blocker. Nothing else was pruned, because the window's own pieces already removed what they settled (39 removals). Every Lessons section is under the 6144-byte cap. The notes guard passes in both repos.
+11. **Zero new tickets.** Carried tickets at writing: LIN-4320, 4318, 4302, 4256, 4303, 3828, 4301 and 4416 are Backlog; LIN-3449 is Todo with 22 comments and 45 children. LIN-4302's defect (131) is gone in code while the ticket is still Backlog; that is for the person, below.
+12. **Second read:** see `## Adversarial Second-Read`.
+
+## Grounding (HEADs measured)
+
+- **LinearViewer: window end `fb358dbda7f26ab44b3f58acb15886b21ac20950`** (LIN-4470, #2450); window start `e2d4659c4bf07ed266735f718e85232e5f2a6458`.
+  - Production plus scripts (`git diff --shortstat e2d4659c4 fb358dbda -- lib routes public server.js scripts`): **142 files, +8221 / −6257**, matching the ticket. Without `scripts`: 137 files, +8151 / −6254. All files: 442, +122776 / −9276. Without `docs/papers` and `docs/reviews`: 355, +22498 / −9276.
+  - Window file list and numstat: `window-commits-run8.txt`, `window-numstat-all-run8.tsv`.
+- **SD: window end `7d5fe7d9473232152365e6837ececcd6f2876987`**, start `af9b496d57f042972b912a30eb8c4d1164bbab77`: 7 files, +737 / −86. The code files are `hook.js`, `transcript.js`, `test/fixtures/runner-contract.json`, `test/runner-contract.test.js` and `test/lin-4474-sentinel-family.test.js`.
+- **Area registry (Harbour):** `docs/areas/areas.json`, git blob `a4f33893e57fd7e936b05879f515c1edd4115078`, sha256 `3dcdfb1a711e6974…`. Run 7 used blob `d13fca20` (kept here as `areas-run7-d13fca20.json`). The window's edit files `cost-format`, `time-words`, `stage-write-gate`, `item-stage-stamp`, `usage-snapshot-intake`, `cost-read-calls` and `code-routes`. The guide-only check below shows the edit changes nothing at the baseline.
+- **Area registry (SD):** blob `c977bd0c0a186c1314202673da22cf31b8a0da29`, unchanged since run 6.
+- **Runner contract:** `lib/runner-kit/contract.json` and SD's `test/fixtures/runner-contract.json` are byte-identical (sha256 `871ca615f627a026…`; it was `602ab014…` at run 7, so the window re-pinned both sides). `EXCHANGE_MAX_WAIT_SECONDS = 60` in both repos, now pinned by exchange rows at 60 and 61 on each side.
+- **TODO / FIXME markers added in the window:** none in Harbour (`lib`, `routes`, `public`, `server.js`, `scripts`, `tests`; one Jira test fixture names a variable `TODO`) and none in SD.
+- **Ticket staleness check:** `git log --since=2026-11-14T10:01:39.508Z` is empty in both repos, so the ticket's description of the code holds at HEAD. Where it is inexact, that is said in place: the Waiting counts it quotes are bullets at `fb358dbda`, before this PR.

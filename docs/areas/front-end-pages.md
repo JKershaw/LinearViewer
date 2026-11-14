@@ -59,3 +59,13 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   first-class root view "dashboard" where the route key is projects (label "tasks"), and it and
   `docs/architecture/views.md` list proxy among the flagged power-user views although the header switcher always shows
   it. Rewrite the tier lists from `getViewNavLinks` and `DISPLAY_LABELS`. (LIN-4463 blind read.)
+- `lib/time-words.js`: says it is the one home for relative-time words on the server and the task page. Its test
+  (`tests/unit/lin-4472-time-words.test.js`) and the source map say so too, and `lib/components/time.js` says every
+  other surface uses `relativeAgo`. Three more formatters word the same moment: `formatRelativeTime` (`lib/render.js`,
+  "25m ago", then "yesterday"; Settings, Home and the KPI pages), `window.relativeTime` (`public/common.js`, read bare by
+  the Observation module, Live Console, Proxy and Dispatch) and `formatGeneratedAge` (`public/prompt-section.js`, which
+  rounds where the others floor). Byte-identical `formatDuration` copies sit in `lib/render-escalation-kpis.js` and
+  `lib/render-effort-readout.js`. The guard keys on the names `fmtDuration` and `relativeAgo`, so it sees none of these.
+  The two converted module pages word one moment two ways ("5 minutes ago" on the task page, "5m ago" on Observation).
+  One wording across Settings, Home, KPIs and the browser pages is a size of move (visible copy and goldens change), not a
+  tidy; the untrue claims are a fix. (Drift & Coherence Review, 14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)

@@ -88,8 +88,10 @@ kept are counted apart in LIN-4470's PR and measurement (`docs/areas/README.md`:
   and the routing pair get the budget, not the retry. Not scheduled: no ticket takes it, and the area reads (CG/CH) named
   it as the next move for this file. Owner: this area, which needs a ticket to take it. (Area reads CG/CH.; `canReason`
   left this entry in LIN-4470: it had test callers only.)
-- `lib/periodicals.js`: `docs/areas/` is spelled in 19 lines across 12 code files (`lib/` and `scripts/`,
-  JavaScript files only), recounted by `grep -rc docs/areas lib routes public server.js scripts`. The leaves spell the directory and the registry's file
+- `lib/prompt-template-defs.js` (six of the spellings): `docs/areas/` is spelled in 19 lines across 12 code files (`lib/` and `scripts/`,
+  JavaScript files only; `git grep -c docs/areas -- lib routes public server.js scripts` gives 28 lines in 14 files, the
+  other two being Markdown under `scripts/`). `lib/periodicals.js`, which this entry cited first until 14 Nov., spells it
+  nowhere (recounted, Drift & Coherence Review, 14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`). The leaves spell the directory and the registry's file
   name once each: `NOTES_DIR` and `REGISTRY_FILE` in `lib/prompts/area-registry-path.js`, which derives `REGISTRY_PATH`
   from them and which `lib/prompts/area-note-format.js` re-exports (LIN-4470). The prose spellings remain, mostly prompt text that names the registry
   for a reader. Moving the notes means editing them. Blocker: a move of the notes directory itself, which no ticket asks
@@ -130,3 +132,20 @@ kept are counted apart in LIN-4470's PR and measurement (`docs/areas/README.md`:
   repo's README does not say. That repo's owner changes its copies; this repo does not edit them. The refusal table in
   `docs/proxy-integration.md` stays restated on purpose: it is the API contract's. (Drift & Coherence Review, 13 Nov.;
   `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+- `lib/recommendation-facts.js`: `assembleTrailFacts` builds `prUrls` from every comment's PR links, with no kind filter,
+  beside the one landing (`readTrail().landing`, `lib/run-trail.js`, whose `COMMENT_KINDS` gives blind reads, Survey
+  reports and area reads no landing). That list feeds the selector's "PRs linked on the trail" line and the look-first
+  gate's "has a PR" (`lib/recommendation-look-first.js`). So a `## Survey open-0` report that cites a related PR turns the
+  look-first route off: survey-place and scoping are skipped while the landing is empty (reproduced,
+  `docs/reviews/_evidence-2026-11-14-drift/look-first-survey-pr-repro.mjs`). `lib/run-trail.js`'s header says the prompt is
+  a view of the trail and cannot disagree. Fix: read the PR list from the trail (the landing, or the table's PR column),
+  then re-pin the selector facts. The other side is Runs & dispatch (`lib/run-trail.js`). (Drift & Coherence Review,
+  14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)
+- `lib/prompts/stage-kinds.js`: each record's `catalogue.group` decides the Default and More split that
+  `scripts/gen-llms-catalogue.mjs` writes into `public/llms.txt`, while the split the pages show is `DEFAULT_PROMPT_KEYS`
+  (`lib/render-prompt-opts.js`). They agree today and no test links them, so changing the UI's defaults leaves the
+  generated catalogue wrong while its byte-for-byte test stays green. Read one from the other. Also,
+  `docs/architecture/source-map.md` says every per-kind table is a view of the record, but about eight kind-keyed tables
+  remain (`GENERATE`, `BUCKET_OF_KIND`, `FIRST_PASS_KINDS`, `JOBS`, `SPINE` and others, each listed with a reason by
+  `tests/unit/stage-kind-tables.test.js`), and each `catalogue.line` retypes the kind's display name. (Drift & Coherence
+  Review, 14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)

@@ -1,0 +1,28 @@
+id_run8	id_run7	decision	status	ruling_run7	sites_in_hunk
+G0001	G0001	text contract marker: [failed]	unchanged	borderline	
+G0002	G0002	string set {'ignore', 'pipe'} as array [stdio]	unchanged	noise	
+G0003	G0003	text contract marker: [working]	unchanged	real	
+G0004	G0004	tiny rule copied as a helper onAttemptFailed(), 4 copies of 1-4 statements	unchanged	noise	
+G0005	G0005	text contract marker: [done]	unchanged	borderline	
+G0006	G0006	repeated comparison phase == 'AWAITING_FOLLOWUP'	unchanged	borderline	
+G0007	G0007	text contract marker: [blocked]	unchanged	borderline	
+G0008	G0008	text contract marker: [pending]	unchanged	borderline	
+G0009	G0009	repeated comparison phase == 'CANCELLED'	unchanged	noise	
+G0010	G0010	repeated comparison code == 'ENOENT'	unchanged	noise	
+G0011	G0011	repeated comparison harness == 'opencode'	unchanged	borderline	
+G0012	G0012	text contract marker: [evidence]	unchanged	borderline	
+G0013	G0013	repeated comparison livenessSignal == 'transcript-hook'	unchanged	borderline	
+G0014	G0014	repeated comparison type == 'text'	unchanged	noise	
+G0015	G0015	repeated comparison kind == 'pending'	unchanged	noise	
+G0016	G0016	repeated comparison role == 'assistant'	unchanged	noise	
+G0017	G0017	named constant LINK_CAP=8	unchanged	borderline	
+G0018	G0018	near-duplicate function deriveEvidenceScope() (also: resolveScope), ~7 statements, same vocabulary (dialect copy or close variant)	unchanged	real	
+G0019	G0019	repeated comparison kind == 'blocked'	unchanged	borderline	
+G0020	G0020	repeated comparison kind == 'failed'	unchanged	borderline	
+G0021	G0021	repeated comparison kind == 'pending-external'	unchanged	borderline	
+G0022	G0022	repeated comparison kind == 'pending-internal'	unchanged	borderline	
+G0023	G0023	repeated comparison mode == 'stop'	unchanged	borderline	
+G0024	G0024	repeated comparison action == 'reject'	unchanged	noise	
+G0025	G0025	text contract marker: [aborted]	unchanged	borderline	
+G0041	G0042	repeated comparison type == 'tool_use'	unchanged	noise	
+G0043	G0043	tiny rule copied as a helper readJson() (also: readMarkerFile, (anonymous), readRecordedIdentity, readStateUncached), 5 copies of 1-4 statements	unchanged	noise	

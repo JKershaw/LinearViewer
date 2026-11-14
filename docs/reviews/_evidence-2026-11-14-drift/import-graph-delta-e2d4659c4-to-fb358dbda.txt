@@ -1,0 +1,173 @@
+# import graph delta e2d4659c4 -> fb358dbda (static edges; walker docs/reviews/_evidence-2026-11-06-drift/import-walker.mjs)
+# +104 / -33 ; nodes 522 -> 533
+# SCCs unchanged: True ; upward {'static': 0, 'dynamic': 0}
+## largest new fan-ins
+11 lib/run-trail.js
+8 lib/prompts/blind-read-words.js
+8 lib/prompts/stage-kinds.js
+7 lib/stage-writes.js
+7 lib/dispatch-feedback-kinds.js
+6 lib/should-mock-ai.js
+6 lib/run-live-wait.js
+6 lib/time-words.js
+5 lib/cost-read-calls.js
+4 lib/item-stage-stamp.js
+3 lib/prompts/prompt-context.js
+2 lib/stage-write-gate.js
+2 lib/as-asked.js
+2 lib/run-ledger.js
+2 lib/errors.js
+## importers lib/code-routes.js ['lib/openrouter.js']
+## importers lib/cost-read-calls.js ['lib/cost-read.js', 'lib/model-routing-spend.js', 'routes/proxy-compute.js', 'routes/settings.js', 'routes/ship-biscuit.js']
+## importers lib/dispatch-feedback-kinds.js ['lib/digest-feedback.js', 'lib/dispatch-feedback-validation.js', 'lib/dispatch-terminal.js', 'lib/prompts/runner-kickoff.js', 'lib/run-view.js', 'lib/session-telemetry.js', 'lib/wall-clock-summary.js']
+## importers lib/item-stage-stamp.js ['lib/dispatch-entrance.js', 'lib/follow-up-dispatch.js', 'lib/wake-credential.js', 'routes/dispatch.js']
+## importers lib/prompts/prompt-context.js ['lib/dispatch-entrance.js', 'routes/proxy-compute.js', 'routes/workspace-api-prompts.js']
+## importers lib/prompts/stage-catalogue.js []
+## importers lib/prompts/stage-kinds.js ['lib/completion-signals.js', 'lib/prompt-contract.js', 'lib/prompt-formatters.js', 'lib/prompt-template-defs.js', 'lib/prompts/stage-catalogue.js', 'lib/prompts/stage-intent.js', 'lib/proxy-instructions.js', 'lib/run-view.js']
+## importers lib/providers/jira/as-asked-region.js ['lib/providers/jira/index.js']
+## importers lib/run-live-wait.js ['lib/code-routes.js', 'lib/dispatch-entrance.js', 'lib/proxy-instructions.js', 'lib/recent-runs.js', 'lib/recommendation-blind-read.js', 'routes/workspace-api.js']
+## importers lib/run-trail.js ['lib/close-out-readiness.js', 'lib/openrouter.js', 'lib/prompt-template-defs.js', 'lib/prompts/revision-brief.js', 'lib/recommendation-blind-read.js', 'lib/recommendation-facts.js', 'lib/recommendation-look-first.js', 'lib/run-evidence.js', 'lib/task-page-loader.js', 'routes/proxy-writes.js', 'routes/workspace-api-issue-write.js']
+## importers lib/stage-write-gate.js ['routes/proxy-runner.js', 'routes/proxy.js']
+## importers lib/time-words.js ['lib/components/time.js', 'lib/render-session.js', 'lib/render-task-page.js', 'lib/render-task-timeline.js', 'lib/task-page-loader.js', 'lib/task-state.js']
+## importers lib/prompts/blind-read-words.js ['lib/code-routes.js', 'lib/llm-jobs.js', 'lib/pipeline-churn.js', 'lib/plan-review-round-trips.js', 'lib/prompt-template-defs.js', 'lib/prompt-templates.js', 'lib/prompts/stage-kinds.js', 'lib/proxy-instructions.js', 'lib/recent-runs.js', 'lib/recommendation-blind-read.js', 'lib/run-closeout-state.js', 'lib/run-ledger.js', 'lib/run-trail.js', 'lib/run-view.js']
+## importers lib/prompts/area-note-format.js ['lib/dispatch-leftover-answer.js']
+## importers lib/cost-format.js ['lib/components/decision-panel.js', 'lib/render-effort-readout.js', 'lib/render-kpis.js', 'lib/render-run-steps.js', 'lib/render-settings.js', 'lib/render-task-timeline.js', 'lib/render-workspace-kpis.js', 'lib/ship-biscuit.js']
+## added
++ lib/close-out-merges.js -> lib/run-closeout-state.js
++ lib/close-out-readiness.js -> lib/run-trail.js
++ lib/code-routes.js -> lib/prompts/blind-read-words.js
++ lib/code-routes.js -> lib/recommendation-blind-read.js
++ lib/code-routes.js -> lib/recommendation-facts.js
++ lib/code-routes.js -> lib/recommendation-look-first.js
++ lib/code-routes.js -> lib/run-live-wait.js
++ lib/completion-signals.js -> lib/prompts/stage-kinds.js
++ lib/components/time.js -> lib/time-words.js
++ lib/cost-read-calls.js -> lib/llm-call-log.js
++ lib/cost-read.js -> lib/cost-read-calls.js
++ lib/digest-feedback.js -> lib/dispatch-feedback-kinds.js
++ lib/dispatch-entrance.js -> lib/item-stage-stamp.js
++ lib/dispatch-entrance.js -> lib/prompts/prompt-context.js
++ lib/dispatch-entrance.js -> lib/run-live-wait.js
++ lib/dispatch-feedback-validation.js -> lib/dispatch-feedback-kinds.js
++ lib/dispatch-leftover-answer.js -> lib/prompts/area-note-format.js
++ lib/dispatch-leftover.js -> lib/dispatch-targets.js
++ lib/dispatch-leftover.js -> lib/workspace-halt.js
++ lib/dispatch-terminal.js -> lib/dispatch-feedback-kinds.js
++ lib/follow-up-dispatch.js -> lib/item-stage-stamp.js
++ lib/item-stage-stamp.js -> lib/prompt-templates.js
++ lib/item-stage-stamp.js -> lib/stage-writes.js
++ lib/llm-jobs.js -> lib/prompts/blind-read-words.js
++ lib/model-routing-spend.js -> lib/cost-read-calls.js
++ lib/openrouter.js -> lib/code-routes.js
++ lib/openrouter.js -> lib/run-trail.js
++ lib/partial-write-error.js -> lib/errors.js
++ lib/periodicals.js -> lib/prompts/leftover-words.js
++ lib/pipeline-churn.js -> lib/prompts/blind-read-words.js
++ lib/prompt-contract.js -> lib/prompts/stage-kinds.js
++ lib/prompt-formatters.js -> lib/prompts/leftover-words.js
++ lib/prompt-formatters.js -> lib/prompts/stage-kinds.js
++ lib/prompt-template-defs.js -> lib/prompts/stage-kinds.js
++ lib/prompt-template-defs.js -> lib/run-trail.js
++ lib/prompts/area-note-format.js -> lib/prompts/area-registry-path.js
++ lib/prompts/leftover-words.js -> lib/prompts/area-registry-path.js
++ lib/prompts/revision-brief.js -> lib/run-trail.js
++ lib/prompts/runner-kickoff.js -> lib/dispatch-feedback-kinds.js
++ lib/prompts/stage-catalogue.js -> lib/prompts/stage-kinds.js
++ lib/prompts/stage-intent.js -> lib/prompts/stage-kinds.js
++ lib/prompts/stage-kinds.js -> lib/as-asked.js
++ lib/prompts/stage-kinds.js -> lib/prompts/blind-read-words.js
++ lib/prompts/stage-kinds.js -> lib/size-of-move.js
++ lib/prompts/stage-kinds.js -> lib/stage-writes.js
++ lib/providers/jira/as-asked-region.js -> lib/as-asked.js
++ lib/providers/jira/as-asked-region.js -> lib/providers/jira/adf.js
++ lib/providers/jira/index.js -> lib/periodicals.js
++ lib/providers/jira/index.js -> lib/providers/jira/as-asked-region.js
++ lib/proxy-instructions.js -> lib/prompts/stage-kinds.js
++ lib/proxy-instructions.js -> lib/run-live-wait.js
++ lib/proxy-instructions.js -> lib/stage-writes.js
++ lib/proxy-tokens.js -> lib/stage-writes.js
++ lib/recent-runs.js -> lib/dispatch-lineage-status.js
++ lib/recent-runs.js -> lib/run-live-wait.js
++ lib/recommendation-blind-read.js -> lib/prompts/blind-read-words.js
++ lib/recommendation-blind-read.js -> lib/run-live-wait.js
++ lib/recommendation-blind-read.js -> lib/run-trail.js
++ lib/recommendation-facts.js -> lib/run-trail.js
++ lib/recommendation-look-first.js -> lib/run-trail.js
++ lib/render-session.js -> lib/time-words.js
++ lib/render-task-page.js -> lib/run-closeout-state.js
++ lib/render-task-page.js -> lib/time-words.js
++ lib/render-task-timeline.js -> lib/time-words.js
++ lib/run-closeout-state.js -> lib/prompts/blind-read-words.js
++ lib/run-closeout-state.js -> lib/providers/state-map.js
++ lib/run-closeout-state.js -> lib/run-ledger.js
++ lib/run-evidence.js -> lib/run-trail.js
++ lib/run-trail.js -> lib/prompts/blind-read-words.js
++ lib/run-trail.js -> lib/prompts/survey-words.js
++ lib/run-trail.js -> lib/run-ledger.js
++ lib/run-view.js -> lib/dispatch-feedback-kinds.js
++ lib/run-view.js -> lib/prompts/blind-read-words.js
++ lib/run-view.js -> lib/prompts/stage-kinds.js
++ lib/session-telemetry.js -> lib/dispatch-feedback-kinds.js
++ lib/stage-write-gate.js -> lib/errors.js
++ lib/stage-write-gate.js -> lib/proxy-scopes.js
++ lib/stage-write-gate.js -> lib/stage-writes.js
++ lib/task-page-loader.js -> lib/run-trail.js
++ lib/task-page-loader.js -> lib/time-words.js
++ lib/task-state.js -> lib/time-words.js
++ lib/wake-credential.js -> lib/item-stage-stamp.js
++ lib/wall-clock-summary.js -> lib/dispatch-feedback-kinds.js
++ routes/dispatch.js -> lib/item-stage-stamp.js
++ routes/dispatch.js -> lib/stage-writes.js
++ routes/proxy-compute.js -> lib/cost-read-calls.js
++ routes/proxy-compute.js -> lib/prompts/prompt-context.js
++ routes/proxy-compute.js -> lib/should-mock-ai.js
++ routes/proxy-runner.js -> lib/stage-write-gate.js
++ routes/proxy-writes.js -> lib/run-trail.js
++ routes/proxy-writes.js -> lib/stage-writes.js
++ routes/proxy.js -> lib/harbour-token-format.js
++ routes/proxy.js -> lib/stage-write-gate.js
++ routes/settings.js -> lib/cost-read-calls.js
++ routes/ship-biscuit.js -> lib/cost-read-calls.js
++ routes/workspace-api-audit.js -> lib/should-mock-ai.js
++ routes/workspace-api-feedback.js -> lib/partial-write-error.js
++ routes/workspace-api-issue-read.js -> lib/should-mock-ai.js
++ routes/workspace-api-issue-write.js -> lib/run-trail.js
++ routes/workspace-api-issue-write.js -> lib/should-mock-ai.js
++ routes/workspace-api-prompts.js -> lib/prompts/prompt-context.js
++ routes/workspace-api-prompts.js -> lib/should-mock-ai.js
++ routes/workspace-api-steps.js -> lib/should-mock-ai.js
++ routes/workspace-api.js -> lib/run-live-wait.js
+## removed
+- lib/close-out-readiness.js -> lib/run-ledger.js
+- lib/completion-signals.js -> lib/as-asked.js
+- lib/completion-signals.js -> lib/size-of-move.js
+- lib/completion-signals.js -> lib/workflow-config.js
+- lib/cost-read.js -> lib/llm-call-log.js
+- lib/dispatch-entrance.js -> lib/recommendation-live-wait.js
+- lib/dispatch-feedback-validation.js -> lib/dispatch-store.js
+- lib/model-routing-spend.js -> lib/cost-read.js
+- lib/openrouter.js -> lib/recommendation-blind-read.js
+- lib/openrouter.js -> lib/recommendation-live-wait.js
+- lib/openrouter.js -> lib/recommendation-look-first.js
+- lib/prompt-contract.js -> lib/as-asked.js
+- lib/prompt-template-defs.js -> lib/stage-writes.js
+- lib/prompts/revision-brief.js -> lib/run-ledger.js
+- lib/prompts/runner-kickoff.js -> lib/dispatch-store.js
+- lib/prompts/stage-intent.js -> lib/as-asked.js
+- lib/proxy-instructions.js -> lib/recommendation-live-wait.js
+- lib/recommendation-blind-read.js -> lib/providers/state-map.js
+- lib/recommendation-blind-read.js -> lib/recent-runs.js
+- lib/recommendation-blind-read.js -> lib/recommendation-facts.js
+- lib/recommendation-blind-read.js -> lib/run-ledger.js
+- lib/recommendation-live-wait.js -> lib/recent-runs.js
+- lib/recommendation-look-first.js -> lib/run-ledger.js
+- lib/render-task-timeline.js -> lib/render-run-steps.js
+- lib/run-ledger.js -> lib/prompts/survey-words.js
+- lib/task-page-loader.js -> lib/render-run-steps.js
+- lib/task-page-loader.js -> lib/run-ledger.js
+- lib/task-state.js -> lib/render-run-steps.js
+- routes/proxy-compute.js -> lib/cost-read.js
+- routes/proxy.js -> lib/proxy-scopes.js
+- routes/settings.js -> lib/cost-read.js
+- routes/ship-biscuit.js -> lib/cost-read.js
+- routes/workspace-api.js -> lib/recommendation-live-wait.js

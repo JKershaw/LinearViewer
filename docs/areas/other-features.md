@@ -41,3 +41,10 @@ Area notes for `other-features` in the registry. Format and rules: README.md.
   `lib/stage-writes.js`, the entry above). Moving it to LLM & prompts still closes the pair, leaving five one-way
   edges, but reverses the pin and moves this entry, so it is a size of move for the
   guide's owner, not a tidy. (Seams & Tangles, 8 Nov.; `docs/reviews/seams-tangles-review-2026-11-08-run10.md`.)
+- `lib/stage-writes.js`: since LIN-4468 the stamp gates proxy writes, and three rules about it are written in more than
+  one place. "No stamp means work" is in `lib/item-stage-stamp.js` (twice), `resolveWrites` in `lib/proxy-preamble.js` and
+  `isRestrictedStamp` / `stageWriteAllows` here; an unknown value throws in the preamble and reads `none` in
+  `normalizeWritesStamp`. `ALLOWED_OPS` has no test that every restricted value in `WRITES_VALUES` has a row, and the
+  preamble's "adding a value means" checklist does not name it, so a new value without a row answers 500, not 403. The
+  mandates and this header say "one comment", while the gate allows the `createComment` operation any number of times.
+  (Drift & Coherence Review, 14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)
