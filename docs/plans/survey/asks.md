@@ -430,3 +430,36 @@ Follow wherever the record leads, and draw on what is known outside Harbour too.
 - The form is open.
 
 **Questions:** settle research and writing questions yourself.
+
+### A21. Essay: every choice was right at the time (14 Nov)
+
+**Agreed with John on 14 Nov.** He asked for "a cheeky extra essay arguing this, with my framing, and which will naturally read our rich evidence", and added: "You can include additional context from this session, so the momentum/direction/path of the idea is present for additional context." File it alongside A20 once LIN-4478, LIN-4479 and LIN-4480 have merged. Reviewer subagent before merge; John reads it in the Library.
+
+**Repository:** JKershaw/LinearViewer (Harbour).
+
+**Title:** "Every choice was right at the time" is a working title; the writer may change it.
+
+**What this is for.** John, 14 Nov, the framing to argue:
+- "I imagine Harbour looks at the code, maps it out, then figures out what's holding complexity or mess simply because a square peg is trying to go in a round hole. Eg in hindsight our UI could be 100x simpler, and get the same results. The right shape for the right choices, and that's the Theseus method in full effect."
+- "I assume every choice was right at the time. The mistake was continuing to build on it when it had outlived it's original intention. But, prior to the past few weeks, that wasn't a natural part of Harbour's process. Now we understand how it happens, and for the first time we have a mechanism to clear that tech debt easily. It requires humans to rule (eg switching to a react front end, or htnx, or ejs), but that's exactly right."
+- "That's also the exact pattern we've built in our loop. It's fractal."
+
+**The essay.** Argue John's framing, reading Harbour's record as the evidence. Where the evidence doesn't fit the argument, say so.
+
+**How the idea arrived (one session, 14 Nov).** The path is context for the argument. In order:
+1. **The lanes stalled on rulings that weren't John's.** A measurement written as a Done-when had become a gate. The area notes had grown from about 11 KB to 89 KB in six days and were acting as a second backlog. John: "a rule added by an agent, becomes a rule that blocks or causes more work to be done unnecessarily."
+2. **A fresh read of the steering text's history** found that additions outnumber removals about six to one, and that the text has shrunk mainly when code took over its job. John: "How do we get out of Groundhog Day?"
+3. **The survey session answered with removal, and in the same reply proposed three new rules.** John: "You propose the only solution is removing things. But then suggested rules, additional complexity, and giving agents authority to change the core parts. I think we're seeing the issue." Then: "extra scaffolding and temporary structures are fine. We just need to plan their removal." And: "If code is getting 'cleaner' whilst a secret backlog grows, something is afoot."
+4. **On the notes:** "If the notes are functionally code, I'd refactor large files with repetition into small files and references." And: "simply saving the notes as TS, so they get checks, and can have a reliable, duplicate free, easy to use data structure."
+5. **Widening to all information:** "code, comments, docs, notes, papers, tasks, logs... how do these (and others) relate, move, and need to be held in a shape." That became the A20 essay.
+6. **On the person's seat:** "If I need to click ok a few times, but all the work lands clean and right, that's a great place to be in." **On tangles:** "if everything is in its right place, no tangles. And, likely, much much simpler. Nothing fights its shape."
+7. **Then the three quotes above:** the square peg, choices that outlived their intention, and the fractal.
+
+**Related records:**
+- the three papers from the same day (LIN-4478, LIN-4479, LIN-4480) and the A20 essay if it has landed;
+- the Theseus method (`docs/papers/harbour/theseus-method.md`);
+- the survey log's 14 Nov entries (`docs/plans/survey/log.md` on branch `claude/cool-rubin-6acj5j`).
+
+**Who makes it.** Reasoned and designed with Fable, written by Opus.
+
+**Questions:** settle research and writing questions yourself.
