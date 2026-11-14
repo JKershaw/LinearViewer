@@ -4012,3 +4012,8 @@ John's direction:
     - The cut-word regex is wider than described.
     - The Finding 5 table rows are wrong.
     - Suggestion: "growth moves next door" is barely shown by its own data.
+- **~11:15 UTC: A19 review back, "merge after fixes".** Relayed on LIN-4479; follow-up `daabb3bb`.
+  - The measurements reproduce exactly.
+  - Must-fix: the LIN-4400 claim fails on timing (the safety entries appeared 5.5 h after it finished); PR #2450 is called "open" though it merged first (Waiting is now 108, a counter-example to "growing backlog"); three wrong figures.
+  - Suggestion: John's TS option is weighed narrowly; a data module under a census with checkable fields deserves its own row.
+- **11:02 UTC: Seams & Tangles run 13 merged** (LIN-4482, `0a1adcf9b`, PR #2454).
