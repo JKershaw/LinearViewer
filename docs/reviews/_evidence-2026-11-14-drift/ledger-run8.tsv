@@ -1,0 +1,168 @@
+row	finding	severity	run8_delta	noted_in
+1	lib-import-cycles	low-medium	unchanged (SCCs 6 + 6 with the same members at fb358dbda; 533 nodes, 2249 static edges; the stage-writes.js hit is a basename match on old citation text)	—
+2	provider-auth-router-upward-imports	resolved	resolved (held; 0 upward lib->routes edges at fb358dbda)	—
+3	routes-error-envelope-fragmentation	low-medium	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+4	production-to-test-fixture-imports	resolved	resolved (held; no cited file touched in the window)	—
+5	periodical-report-filename-convention-split	medium-low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+6	dispatch-kind-vocabulary-cross-repo	low	unchanged (touched: routes/dispatch.js; its hunks are the LIN-4468 mint stamp and NEVER_RAN; cited decision not in a hunk)	—
+7	provider-resolution-incantation	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+8	ui-divergences-registry-staleness	low	unchanged (touched: public/common.js, a comment naming the classic twin LIN-4471 will retire; cited decision not in a hunk)	—
+9	simple-dispatcher-api-base-duplication	low	unchanged (false hit: server.js matched by basename only)	—
+10	cross-repo-halt-vocabulary	low-medium (sub-row)	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+11	cross-repo-sentinel-decision-marker-vocabulary	medium	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+12	target-vocabulary	low	unchanged (touched files: lib/dispatch-store.js, routes/dispatch.js, server.js; no hunk reaches the cited decision)	—
+13	sse-frame-writer-duplication	resolved	resolved (held; no cited file touched in the window)	—
+14	routes-proxy-decomposition	—	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+15	cross-repo-repo-list	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+16	ci-convention-split-across-repos	informational	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+17	semicolon-style-split	low	unchanged (touched: server.js; its hunks are isHermeticTestToken at three test-mode sites, the held-wake provisioner factory and the /lib/ serving comment; cited decision not in a hunk)	—
+18	client-escape-html-duplication	—	unchanged (touched: public/common.js, a comment naming the classic twin LIN-4471 will retire; cited decision not in a hunk)	—
+19	client-shared-helper-duplication	—	improved: the formatElapsed pair lost its public/task-page.js half (census G0264 gone; the task page imports fmtDuration from lib/time-words.js, LIN-4472); public/session.js keeps its copy, a front-end-browser Waiting entry	—
+20	client-section-fetch-idiom-duplication	—	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+21	linear-cli-parallel-graphql-surface	—	unchanged (touched: server.js; its hunks are isHermeticTestToken at three test-mode sites, the held-wake provisioner factory and the /lib/ serving comment; cited decision not in a hunk)	—
+22	store-module-uniformity	—	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+23	server-side-escaping	—	unchanged (touched files: lib/render.js, server.js; no hunk reaches the cited decision)	—
+24	dispatch-payload-centralization	—	unchanged (touched files: public/common.js, public/prompt-section.js (a comment naming window.CostFormat), routes/dispatch.js; no hunk reaches the cited decision)	—
+25	renderer-provider-abstraction	—	unchanged (touched: lib/render.js, Home's script list now loads { module: /cost-format-global.js }; cited decision not in a hunk)	—
+26	cache-module-family	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+27	lib-components-primitive-adoption	—	unchanged (touched files: lib/render-run-steps.js (fmtDuration moved to lib/time-words.js), lib/render.js; no hunk reaches the cited decision)	—
+28	state-store-write-seam	—	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+29	phase-vocabulary-centralization	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+30	target-harness-axis-orthogonality	—	unchanged (touched: routes/dispatch.js; its hunks are the LIN-4468 mint stamp and NEVER_RAN; cited decision not in a hunk)	—
+31	test-seam-separation	—	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+32	css-token-layer	—	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+33	runner-contract-semantics-cross-repo	medium	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+34	connection-binding-predicate-drift	low-medium	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+35	run-page-identity-scrape	medium	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+36	dispatch-entrance-field-duplication	low	unchanged (touched: routes/proxy-compute.js, now promptContextOf (LIN-4470) and isHermeticTestToken; the entrance field re-projection is not in a hunk)	—
+37	owner-word-collision	low	unchanged (touched: lib/run-view.js, stamp kinds from lib/dispatch-feedback-kinds.js and BLIND_READ_KIND; the owner word is not in a hunk)	—
+38	run-family-render-primitives	low	unchanged (touched files: lib/render-run-steps.js (fmtDuration moved to lib/time-words.js), lib/render.js; no hunk reaches the cited decision)	—
+39	persist-binding-sibling-seams	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+40	server-formatter-duplication	low	improved: fmtDuration and relativeAgo have one leaf (lib/time-words.js, LIN-4472) and the public/task-page.js formatElapsed copy is gone; byte-identical formatDuration copies stay in lib/render-escalation-kpis.js and lib/render-effort-readout.js, and relative time is still worded four ways (row 160)	—
+41	wake-marker-regex-copies	resolved	resolved (held; no cited file touched in the window)	—
+42	runner-liveness-assumption	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+43	workspace-urlkey-consolidation	—	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+44	credential-decision-multiplicity	medium-high	unchanged (touched: routes/settings.js, callsSurfaceOf now imported from lib/cost-read-calls.js; cited decision not in a hunk)	—
+45	keepalive-error-envelope-writer	resolved	resolved (held; no cited file touched in the window)	—
+46	html-error-page-two-writers	resolved	resolved (held; no cited file touched in the window)	—
+47	ai-availability-gate-duplication	medium-low	improved (partly): the inline NODE_ENV-and-test-token test mode is now isHermeticTestToken (lib/should-mock-ai.js, 12 importers in lib/routes/server.js; census G0008 gone, G0002 43 -> 31 sites); the not-configured gates outside isAiUnavailable are not in a hunk	—
+48	dispatch-refusal-relay-duplication	resolved	resolved (held; no cited file touched in the window)	—
+49	tolerant-date-parse-date-twins	resolved	resolved (held; no cited file touched in the window)	—
+50	timestamp-parse-consolidation	—	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+51	loose-json-consolidation	—	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+52	ai-mock-predicate-consolidation	—	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+53	batch-guard-residue	informational	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+54	decision-dialect-split	medium (sub-row)	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+55	human-wait-derivation-split	low-medium	unchanged (touched files: lib/digest-feedback.js (stamp kinds from the table), lib/render-run-steps.js, lib/render-session.js, lib/render.js, lib/run-view.js, lib/task-page-loader.js, routes/dispatch.js; no hunk reaches the cited decision)	—
+56	decision-stamp-classifier-copies	low-medium	improved: the decision-stamp set has one home (DECISION_LIFECYCLE_STAMP_KINDS, lib/dispatch-feedback-kinds.js, LIN-4455), read by digest-feedback, session-telemetry, run-view and wall-clock-summary; two predicates over it remain (_isStampEntry in lib/session-telemetry.js, isDecisionLifecycleStampEntry in lib/digest-feedback.js), and the classic public/dispatch.js and public/session.js restate the set under a drift test	—
+57	provider-write-field-contract	low-medium	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+58	close-out-merged-refusal-split	low-medium	improved: one close-out decision (closeOutDecision, lib/run-closeout-state.js, LIN-4460) answers every surface; closeOutSetsDone, byPersonCheck, REFUSED_REASONS and readGateTrail are gone; the Done bound is still split with the check route (row 163)	—
+59	periodic-loop-two-mechanisms	informational	unchanged (touched: server.js; its hunks are isHermeticTestToken at three test-mode sites, the held-wake provisioner factory and the /lib/ serving comment; cited decision not in a hunk)	—
+60	consumer-liveness-signal-conflation	resolved	resolved (held; no cited file touched in the window)	—
+61	consumer-heartbeat-wire-restated	low-medium (sub-row of 60)	unchanged (touched: routes/dispatch.js; its hunks are the LIN-4468 mint stamp and NEVER_RAN; cited decision not in a hunk)	—
+62	owner-answer-reader-copies	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+63	mock-ai-builder-copies	low-medium	unchanged (touched: routes/proxy-compute.js; census G0121 still has the three mock child-shaping copies, workspace-api-mocks.js, proxy-compute.js, task-chat.js)	—
+64	fresh-run-definition-copies	low-medium	unchanged (touched: lib/dispatch-store.js; its hunks move FEEDBACK_ENTRY_KINDS to lib/dispatch-feedback-kinds.js, use NEVER_RAN and bind the held-wake release wording late; cited decision not in a hunk)	—
+65	terminal-loop-rule-copies	low-medium	unchanged (touched: server.js; its hunks are isHermeticTestToken at three test-mode sites, the held-wake provisioner factory and the /lib/ serving comment; cited decision not in a hunk)	—
+66	state-type-label-rank-maps	low-medium	unchanged (touched files: public/common.js, server.js; no hunk reaches the cited decision)	—
+67	csp-decision-split	resolved	resolved (held; no cited file touched in the window)	—
+68	priority-label-maps	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+69	localhost-predicate-split	low	unchanged (touched files: routes/dispatch.js, server.js; no hunk reaches the cited decision)	—
+70	observer-instance-key-copies	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+71	pilot-eligibility-copies	low	unchanged (touched files: lib/render.js, routes/dispatch.js; no hunk reaches the cited decision)	—
+72	linear-image-host-allowlist	low	unchanged (touched: lib/render.js, Home's script list now loads { module: /cost-format-global.js }; cited decision not in a hunk)	—
+73	page-chrome-options	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+74	ship-biscuit-desk-list	low	unchanged (touched: lib/render.js, Home's script list now loads { module: /cost-format-global.js }; cited decision not in a hunk)	—
+75	free-tier-rule-copies	resolved	resolved (held; no cited file touched in the window)	—
+76	sd-blocked-child-last-activity-split	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+77	census-gone-overstates-resolution	informational	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+78	follow-up-target-rule-copies	resolved	resolved (held; no cited file touched in the window)	—
+79	lineage-row-read-copies	low	unchanged (touched: lib/pipeline-churn.js, the blind-read literal now BLIND_READ_KIND; cited decision not in a hunk)	—
+80	pr-url-regex-copies	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+81	pause-marker-predicate-gap	low	unchanged (touched files: lib/dispatch-store.js, lib/task-page-loader.js, routes/dispatch.js; no hunk reaches the cited decision)	—
+82	review-on-record-readers	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+83	credential-block-grammar-split	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+84	review-loop-ceiling-restated	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+85	sweep-as-library-imports	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+86	github-envelope-walker-split	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+87	binding-active-answer-copies	low-medium (sub-row of 44)	unchanged (touched files: lib/render.js, server.js; no hunk reaches the cited decision)	—
+88	auth-failure-answer-copies	low-medium	unchanged (touched: routes/dispatch.js; its hunks are the LIN-4468 mint stamp and NEVER_RAN; cited decision not in a hunk)	—
+89	account-group-reader-copies	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+90	stable-stringify-copies	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+91	kpi-page-twin-copies	low-medium	unchanged (touched: lib/render.js, Home's script list now loads { module: /cost-format-global.js }; cited decision not in a hunk)	—
+92	kit-terminal-status-copy	low	unchanged (touched: routes/dispatch.js; its hunks are the LIN-4468 mint stamp and NEVER_RAN; cited decision not in a hunk)	—
+93	sd-parked-predicate-inline	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+94	https-predicate-restated	low	unchanged (touched: server.js; its hunks are isHermeticTestToken at three test-mode sites, the held-wake provisioner factory and the /lib/ serving comment; cited decision not in a hunk)	—
+95	harbour-token-format-restated	—	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+96	registry-providers-restated	low (sub-row of 44)	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+97	sd-401-layers-three	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+98	expire-ownerless-has-owner-copy	low	unchanged (touched: routes/dispatch.js; its hunks are the LIN-4468 mint stamp and NEVER_RAN; cited decision not in a hunk)	—
+99	vendor-script-list-restated	low	unchanged: still one hand-written scripts list per renderer; Home, Swipe and the task page each repeat { module: /cost-format-global.js }, /prompt-section.js (census G0233 left by a re-key, not a fold)	—
+100	prune-to-capacity-clones	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+101	resume-model-effort-cross-repo	medium-high	unchanged (touched: routes/dispatch.js; its hunks are the LIN-4468 mint stamp and NEVER_RAN; cited decision not in a hunk)	—
+102	halt-word-map-copies	medium	unchanged: the mode-to-word maps stay (HALT_BANNER_WORD lib/render.js, HALT_MODE_LABELS public/dispatch.js); census G0049 re-keyed as G0076 when lib/dispatch-leftover.js took HALT_MODES (row 142)	—
+103	home-next-answer-split	medium	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+104	coherence-loop-stalled	medium (process)	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+105	settings-run-setup-rebuilt	low-medium	unchanged (touched: routes/settings.js, callsSurfaceOf now imported from lib/cost-read-calls.js; cited decision not in a hunk)	—
+106	settings-preset-systems	low-medium	unchanged (touched files: lib/render.js, routes/dispatch.js, routes/settings.js; no hunk reaches the cited decision)	—
+107	routes-as-library	low-medium	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+108	model-vocabulary-rule-copies	low-medium	unchanged (touched files: lib/render.js, public/common.js; no hunk reaches the cited decision)	—
+109	task-page-state-outside-owner	low-medium	unchanged: READY_TASK_STATE still lib/render-task-page.js:116; public/task-page.js became a module (LIN-4472) and its status reads moved with it	—
+110	live-anchor-old-home-alive	low-medium	unchanged (touched: routes/proxy-rulings.js, the write gate per op; the inline live-anchor copy is not in a hunk)	agent-api
+111	lineage-anchor-rules-three	low-medium	unchanged (touched: lib/dispatch-store.js; its hunks move FEEDBACK_ENTRY_KINDS to lib/dispatch-feedback-kinds.js, use NEVER_RAN and bind the held-wake release wording late; cited decision not in a hunk)	—
+112	model-constants-server-client-twins	resolved	resolved (held; no cited file touched in the window)	—
+113	low-rows-unpromoted	low	unchanged (touched files: lib/render.js, lib/task-page-loader.js (relativeAgo moved out, NEVER_RAN, latestReviewComment from run-trail); no hunk reaches the cited decision)	—
+114	halt-poll-cold-cache-fail-open	medium (conditional)	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+115	usage-relay-flag-partial	resolved	resolved (held; no cited file touched in the window)	—
+116	usage-record-vocabulary-two-readers	low-medium	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+117	lineage-identity-read-twins	resolved	resolved (held; touched: lib/dispatch-store.js, not the identity read)	—
+118	reap-window-constant-cross-repo	low-medium	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+119	cost-fold-partition-restated	resolved	resolved (held: lib/cost-read.js lost readCalls/callsSurfaceOf to lib/cost-read-calls.js, LIN-4457; the partition read is unmoved)	—
+120	key-state-residue	informational	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+121	unit-census-convention-split	informational	unchanged (touched: tests/unit/fake-dom-census.test.js, one line)	—
+122	usage-snapshot-prose-residue	low	unchanged: the snapshot wording count in the cited files is 24 at both ends; lib/model-routing-spend.js changed only its import path	—
+123	completeness-precedence-restated	borderline (not graded)	unchanged (lib/cost-read.js -97 lines are the calls move; the precedence ladder stays in lib/row-usage.js)	—
+124	erasure-inventory-lockstep-gap	resolved	resolved (held; touched: server.js wiring only)	—
+125	parked-wait-text-cross-repo	low-medium	unchanged (touched: lib/session-telemetry.js, PARKED_WAIT_SKIPPED_KINDS now from the kinds table; PARKED_WAIT_HINT still reads one of SD's four wait kinds)	—
+126	error-code-case-split	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+127	ruling-settled-row-predicate-inline	low	unchanged: answered-or-dismissed is still inline at routes/dashboard-rulings.js:327, routes/workspace-api-issue-write.js:165,171,636 and routes/workspace-api-scan.js:389	—
+128	waiting-standing-comment-residue	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+129	request-source-guard-copies	low	unchanged: the three inline loader-shape checks remain (lib/cost-read.js:157, lib/run-view.js:374, lib/kpi-stats.js:1067)	—
+130	reply-effect-default-split	borderline (not graded)	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+131	override-kind-list-stale	low	resolved in code: the VERB OVERRIDE list is OVERRIDE_KINDS = Object.keys(STAGE_KINDS) (lib/proxy-instructions.js:15, LIN-4467), so it names every template key; LIN-4302 is still Backlog	—
+132	path-class-predicate-copies	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+133	world-helper-convention-half-guarded	low	unchanged in rule: a module loader (tests/unit/helpers/import-world.js, importWorld) joined loadWorld, recorded in docs/areas/front-end-browser.md but not in CLAUDE.md, which names only loadWorld	—
+134	stage-writes-threading-per-entrance	low	unchanged in shape, stakes raised: writes is still threaded by hand at the four entrance sites (lib/dispatch-entrance.js x2, routes/workspace-api-feedback.js x2); refire and wake mints now share lib/item-stage-stamp.js; since LIN-4468 the value gates proxy writes and an unstamped token is unrestricted, so a missed thread fails open (row 162)	—
+135	in-progress-predicate-server-client-split	low	unchanged (touched files: lib/task-state.js (an import path), public/prompt-section.js (a comment); no hunk reaches the cited decision)	—
+136	stage-kind-roster-tables	low	improved: one record per stage kind (lib/prompts/stage-kinds.js, LIN-4467); STAGE_LEADS, PROMPT_TEMPLATES, COMPLETION_SIGNALS, STAGE_INTENT, STAGE_LABELS and the VERB OVERRIDE list are views; census G0100 gone; about eight kind-keyed tables remain (GENERATE, BUCKET_OF_KIND, FIRST_PASS_KINDS/OFF_SPINE_KINDS, JOBS, SPINE/STEP_KIND_WORDS, SURVEY_HEADINGS, TEMPLATES_RENDERED_CEILINGS), each listed by tests/unit/stage-kind-tables.test.js; the Waiting entry left (settled by LIN-4467/4470); the claim that every table is a view is row 161	—
+137	enqueue-route-list-restated	low	unchanged: CLAUDE.md:107 and lib/proxy-scopes.js:24-26 still list three enqueue routes; LIN-4320 Backlog	—
+138	element-method-guard-idiom-beyond-scan	low	unchanged (no cited file touched in e2d4659c4..fb358dbda)	—
+139	client-dual-export-split	low (borderline)	unchanged: public/live-console.js keeps its dual export; the three converted pages kept none	—
+141	session-lane-grant-from-client-text	low-medium	unchanged: lib/dispatch-entrance.js:1230 still passes isAutopilotVariant(prompt) to declaresPeriodicalGrant; LIN-4318 Backlog	—
+140	working-beat-grammar-cross-repo	low-medium	unchanged: no [working] line in any window hunk in either repo; Harbour still parses the beat grammar itself (lib/session-telemetry.js HEARTBEAT_HINT) and the contract's heartbeat row covers the host heartbeat only; LIN-3828 Backlog	—
+142	leftover-gate-restates-three-decisions (R1)	resolved	resolved: lib/dispatch-leftover.js imports NEVER_RAN (lib/dispatch-terminal.js), HALT_MODES (lib/workspace-halt.js) and followUpTarget (lib/dispatch-targets.js) and keeps none of its own (LIN-4455 beat 3); census G0022, G0049 and G0234 left; the Waiting entry left with it	runs-and-dispatch
+143	periodical-notes-bullet-restates-leftover-rule (P1)	LOW	improved: the four "search the repo for a committed tool" spellings are one helper, committedSearch (lib/periodicals.js, LIN-4469), and the notes-PR rule reads NOTES_PR from the leaf; the hand-off rule is still spelled in three bullets, pinned by tests/unit/lin-4390-periodical-hand-off.test.js	llm-and-prompts
+144	context-not-scope-three-homes (P2)	LOW	unchanged: "Waiting entries are context, not scope" in lib/prompt-formatters.js:614 and both READMEs	llm-and-prompts
+145	area-notes-dir-outside-registry-path (P3)	LOW	improved (one constant pair), count up by comments: REGISTRY_PATH now derives from NOTES_DIR and REGISTRY_FILE (lib/prompts/area-registry-path.js, LIN-4470); docs/areas spelled in 28 lines / 14 files at fb358dbda (26 / 11 at e2d4659c4; JavaScript only 18 / 9 -> 19 / 12), the added lines comments citing note files; the kept entry cites lib/periodicals.js, which spells it 0 times, and gives the JS-only count beside the all-files command (recounted in this PR)	llm-and-prompts
+146	area-notes-guard-copied-and-diverged (P4)	LOW	unchanged: the guards stay copied by design; Harbour's reads isCitedPath, SD's keeps its own spelling, which agrees (same path span, same extensions)	llm-and-prompts
+147	as-asked-rule-sentence-two-homes (A1)	LOW (borderline)	unchanged: "no step may change them" in AS_ASKED_LEAD (routes/proxy-writes.js:80) and BRIEF_HINT (lib/as-asked.js:298)	agent-api
+148	agent-api-literals-restate-homes (A2)	LOW (borderline)	improved (partly): DECIDED_BY is read from lib/size-of-move.js by the stage records; "a day" (lib/proxy-instructions.js:501) and "four lines" (routes/proxy-writes.js:405) remain	agent-api
+149	session-pr-pick-mirror-cross-repo	LOW–MEDIUM	improved: nine report rows in the contract now pin the session-PR pick on both sides (LIN-4475/4476) and the Waiting entry left; still unpinned: a message with no DONE: line, where Harbour takes the first PR and SD its tracked ranking; one report row pins a disagreement (an http DONE: URL: SD canonical https, Harbour none, PR_URL_RE in lib/run-ledger.js), held by a runs-and-dispatch entry (second read)	runs-and-dispatch
+150	dispatch-model-pick-second-rule	resolved	resolved: dispatchModelOf is gone; dispatchesOf carries fold.last.model from foldRequestUsage (lib/cost-read.js) and the timeline reads dispatch.model (LIN-4454); the Waiting entry and Lesson's cause left	runs-and-dispatch
+151	blind-read-kind-and-heading-retyped	resolved	resolved (code): the kind and heading come from lib/prompts/blind-read-words.js in every runtime reader, VIRTUAL_PROMPTS is gone and an AST scan enforces it (LIN-4466); the template registry is exempt (goal('blind-read')) and lib/render-run-evidence.js:87 hand-types the label 'Blind read'	llm-and-prompts
+152	retirement-rule-restated-per-reader	LOW	improved: Harbour's README now points at the leaf for the forms; docs/proxy-integration.md still lists the refusal kinds by hand; SD's README keeps "a follow-up is filed for it", held as SD's own in the llm-and-prompts entry	llm-and-prompts
+153	landing-exclusions-two-lists	resolved	resolved: one comment classifier, COMMENT_KINDS (lib/run-trail.js, LIN-4458); landingPrUrls is a view of it and isLandingEvidence/isSurveyReport are deleted; the landing readers agree on agent notes (Seams run 12 section 3.0a answered); the selector's own PR list is row 159	runs-and-dispatch (existing entry)
+154	code-settled-routes-list-copies	resolved	resolved: CODE_ROUTES (lib/code-routes.js, LIN-4465) is the one list, codeRouteOf iterates it, and every prose copy points at it; public/llms.txt's catalogue is generated (scripts/gen-llms-catalogue.mjs) and pinned byte for byte; the order line in docs/architecture/prompt-system.md is pinned	llm-and-prompts
+155	cited-path-rule-three-spellings	resolved	resolved: one predicate, isCitedPath (lib/prompts/area-note-format.js, LIN-4470), read by the guard and lib/dispatch-leftover-answer.js; SD's guard is a third spelling that agrees, kept as SD's own	llm-and-prompts
+156	ruling-outcome-buckets-claim-home	LOW	unchanged (no cited file touched; the reports-and-operator-tools entry stands)	reports-and-operator-tools
+157	timeline-renderer-rederives-tick-style	LOW	unchanged: lib/render-task-timeline.js still restates the tick rule (its one window hunk is an import path); the front-end-pages entry stands	front-end-pages
+158	close-out-gate-precedence-split	resolved	resolved: closeOutSetsDone is gone; one decision, closeOutDecision (lib/run-closeout-state.js, LIN-4460), answers the box, the guard, the check route and blindReadStep; a merged landing is followed (John's R1 ruling, 13 Nov); the stop-at bound is still applied in the route (row 163)	runs-and-dispatch
+159	trail-pr-list-beside-landing	LOW–MEDIUM	new (window claim, LIN-4458; the reader predates it): assembleTrailFacts builds prUrls from every comment with no kind filter (lib/recommendation-facts.js:466-471), feeding the selector line "PRs linked on the trail" (:554) and the look-first gate (lib/recommendation-look-first.js:152), while lib/run-trail.js:15-17 says the prompt is a view of the one trail pass and cannot disagree; reproduced: a survey-task report citing a PR turns look-first off ("has a PR"), skipping survey-place and scoping, with an empty landing (evidence look-first-survey-pr-repro.txt)	llm-and-prompts
+160	relative-time-four-formatters-one-home-claim	LOW–MEDIUM	new (window claim, LIN-4472; the copies predate it): lib/time-words.js says it is the one home for relative-time words on the server and the task page, as do tests/unit/lin-4472-time-words.test.js, docs/architecture/source-map.md and lib/components/time.js; but formatRelativeTime (lib/render.js, Settings/Home/KPIs, "25m ago"), window.relativeTime (public/common.js, read by the Observation module), formatGeneratedAge (public/prompt-section.js, rounds) word the same moment; byte-identical formatDuration in lib/render-escalation-kpis.js and lib/render-effort-readout.js; the guard keys on two names	front-end-pages
+161	stage-record-claims-and-catalogue-group	LOW	new (window, LIN-4467): the record's catalogue.group (lib/prompts/stage-kinds.js) drives the generated Default/More split in public/llms.txt, while the UI split is DEFAULT_PROMPT_KEYS (lib/render-prompt-opts.js); they agree today and no test links them; docs/architecture/source-map.md says every per-kind table is a view of the record, while about eight kind-keyed tables remain (row 136); catalogue lines retype the display name	llm-and-prompts
+162	stage-write-default-and-allowance-unguarded	LOW	new (window, LIN-4468): "no stamp means work" is restated in lib/item-stage-stamp.js (x2), lib/proxy-preamble.js resolveWrites and lib/stage-writes.js (isRestrictedStamp, stageWriteAllows); an unknown value throws in the preamble and reads none in normalizeWritesStamp; ALLOWED_OPS has no completeness test against WRITES_VALUES (a new value 500s, not 403s); the mandates say "one comment", the gate allows the createComment op any number of times	other-features
+163	closeout-done-bound-split	LOW	new (window, LIN-4460): lib/run-closeout-state.js says the Done rule is bounded there in one place, but setDone has no stop-at term and the stop-at-PR bound is applied in routes/workspace-api-run-evidence.js; inside closeOutDecision the person-acted rule is spelled twice (doneWithoutHarbour, and routesRead's inline variant), and followsPerson/waitsOn have no production reader	runs-and-dispatch
+164	fold-empty-corner-leftover-unhomed	LOW	new (window, cross-repo, LIN-4475/4476): the contract's fold corner rows name SD's raw "" model and "" timestamp as a leftover for SD (lib/runner-kit/contract.json); Harbour's intake rejects at "" (lib/request-usage-intake.js), so such a request record is lost; neither repo's notes held it	SD stop-hook-and-relay
+165	feedback-kinds-header-stale	LOW	new (window, LIN-4455/4459): lib/dispatch-feedback-kinds.js says the runner prompt renders the kinds through the store's re-export and that the store imports it; the store does neither (its comment says so) and lib/prompts/runner-kickoff.js imports the leaf	runs-and-dispatch
+167	prompt-context-header-overclaims	LOW	new (window, LIN-4470; found by the second read): lib/prompts/prompt-context.js says every prompt surface that renders a stage from a fetched context hands generatePrompt its one projection, but the routed and code-routed recommendation (composeRoutedRecommendation, lib/openrouter.js) passes prepareRecommendationInput's hand-built superset (lib/recommendation-input.js, adding focusedChild, runs, allRuns); a test pins that every projected field reaches it, so a miss fails CI rather than drifting	llm-and-prompts
+166	jira-as-asked-end-line-looser	LOW	new (window, LIN-4450): the Jira region reader accepts an end line whatever its marks and, for a block edited in Jira, takes the first end paragraph (lib/providers/jira/as-asked-region.js), looser than splitAsAsked; the providers Lesson calls it safe because filing refuses such a block, which does not cover an edit made in Jira later	providers

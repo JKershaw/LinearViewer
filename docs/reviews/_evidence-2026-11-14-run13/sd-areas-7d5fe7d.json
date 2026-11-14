@@ -1,0 +1,51 @@
+{
+  "areas": [
+    {
+      "name": "Loop, poll & routing",
+      "slug": "loop-and-routing",
+      "match": [
+        "^(dispatcher|queue|auth-stop|admission|followup|abort|halt|pacing|launch-breaker|duplicate-launch|targets)\\.js$"
+      ]
+    },
+    {
+      "name": "Launch & harnesses",
+      "slug": "launch-and-harnesses",
+      "match": [
+        "^(harnesses|executors|terminal-driver|harbour-token-mcp-server|opencode-runner|opencode-request-records|net-util|clones)\\.js$"
+      ]
+    },
+    {
+      "name": "Stop hook & relay",
+      "slug": "stop-hook-and-relay",
+      "match": [
+        "^(hook|transcript|links|chunk|refusal|feedback|http|request-usage|request-usage-flush)\\.js$"
+      ]
+    },
+    {
+      "name": "Reapers & liveness",
+      "slug": "reapers-and-liveness",
+      "match": [
+        "^(reapers|heartbeat|host-heartbeat|host-heartbeat-sender|opencode-liveness|subscription|resources|resource-metrics|signal-guard)\\.js$"
+      ]
+    },
+    {
+      "name": "State, config & host process",
+      "slug": "state-and-config",
+      "match": [
+        "^(config|env-flag|load-env|state-store|state-dir|phases|oplog|format|instance-guard|shutdown)\\.js$",
+        "^watch-restart\\.sh$",
+        "^deploy/",
+        "^scripts/"
+      ]
+    },
+    {
+      "name": "Test harnesses",
+      "slug": "test-harnesses",
+      "match": [
+        "^e2e-[^/]*\\.js$",
+        "^test/system/",
+        "^experiments/"
+      ]
+    }
+  ]
+}

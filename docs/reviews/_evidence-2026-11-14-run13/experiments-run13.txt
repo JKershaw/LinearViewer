@@ -1,0 +1,86 @@
+Experiments at HEAD fb358dbda (labelled; not applied). Head: 14 pairs, one cycle group of 9.
+
+E-stage-writes-to-agent-api | pairs 13 | cycle groups [9] | cross-area links 1365 (head 1370 )
+   pair Agent API <-> LLM: head 48/4 -> 48/5
+   pair Agent API <-> Other: head 6/1 -> 1/1
+   pair Agent API <-> Runs: head 50/10 -> 50/12
+   pair LLM <-> Other: head 1/2 -> -/-  (closed)
+   pair Other <-> Runs: head 6/7 -> 6/5
+   link Agent API -> Other: 6 -> 1
+   link LLM -> Agent API: 4 -> 5
+   link LLM -> Other: 1 -> 0
+   link Runs -> Agent API: 10 -> 12
+   link Runs -> Other: 7 -> 5
+
+F-stage-writes-to-llm | pairs 13 | cycle groups [9] | cross-area links 1369 (head 1370 )
+   pair Agent API <-> LLM: head 48/4 -> 53/4
+   pair Agent API <-> Other: head 6/1 -> 1/1
+   pair LLM <-> Other: head 1/2 -> -/-  (closed)
+   pair LLM <-> Runs: head 41/61 -> 41/63
+   pair Other <-> Runs: head 6/7 -> 6/5
+   link Agent API -> LLM: 48 -> 53
+   link Agent API -> Other: 6 -> 1
+   link LLM -> Other: 1 -> 0
+   link Runs -> LLM: 61 -> 63
+   link Runs -> Other: 7 -> 5
+
+G-should-mock-ai-to-platform | pairs 14 | cycle groups [9] | cross-area links 1370 (head 1370 )
+   pair Agent API <-> LLM: head 48/4 -> 47/4
+   pair LLM <-> Runs: head 41/61 -> 41/58
+   link Agent API -> LLM: 48 -> 47
+   link Agent API -> Platform: 31 -> 32
+   link Runs -> LLM: 61 -> 58
+   link Runs -> Platform: 60 -> 63
+   link Web -> LLM: 92 -> 80
+   link Web -> Platform: 56 -> 68
+   link Wiring -> LLM: 23 -> 22
+   link Wiring -> Platform: 13 -> 14
+
+H-shared-leaves-to-platform | pairs 13 | cycle groups [9] | cross-area links 1381 (head 1370 )
+   pair Pages <-> LLM: head 37/1 -> -/-  (closed)
+   pair Pages <-> Other: head 3/8 -> 3/7
+   pair Pages <-> Runs: head 16/8 -> 16/7
+   link Browser -> Pages: 6 -> 0
+   link Browser -> Platform: 0 -> 6
+   link Pages -> Platform: 80 -> 91
+   link LLM -> Pages: 1 -> 0
+   link LLM -> Platform: 22 -> 23
+   link Other -> Pages: 8 -> 7
+   link Other -> Platform: 2 -> 3
+   link Runs -> Pages: 8 -> 7
+   link Runs -> Platform: 60 -> 61
+
+I-seal-to-llm | pairs 13 | cycle groups [9] | cross-area links 1369 (head 1370 )
+   pair Agent API <-> LLM: head 48/4 -> 49/5
+   pair Agent API <-> Other: head 6/1 -> -/-  (closed)
+   pair LLM <-> Other: head 1/2 -> 1/1
+   pair LLM <-> Runs: head 41/61 -> 41/62
+   pair Other <-> Runs: head 6/7 -> 6/6
+   link Agent API -> LLM: 48 -> 49
+   link Agent API -> Other: 6 -> 5
+   link LLM -> Agent API: 4 -> 5
+   link Other -> Agent API: 1 -> 0
+   link Other -> LLM: 2 -> 1
+   link Runs -> LLM: 61 -> 62
+   link Runs -> Other: 7 -> 6
+   link Web -> LLM: 92 -> 94
+   link Web -> Other: 8 -> 6
+
+J-seal-to-llm-and-stage-writes-to-agent-api | pairs 12 | cycle groups [9] | cross-area links 1364 (head 1370 )
+   pair Agent API <-> LLM: head 48/4 -> 49/6
+   pair Agent API <-> Other: head 6/1 -> -/-  (closed)
+   pair Agent API <-> Runs: head 50/10 -> 50/12
+   pair LLM <-> Other: head 1/2 -> -/-  (closed)
+   pair LLM <-> Runs: head 41/61 -> 41/62
+   pair Other <-> Runs: head 6/7 -> 6/4
+   link Agent API -> LLM: 48 -> 49
+   link Agent API -> Other: 6 -> 0
+   link LLM -> Agent API: 4 -> 6
+   link LLM -> Other: 1 -> 0
+   link Other -> Agent API: 1 -> 0
+   link Other -> LLM: 2 -> 1
+   link Runs -> Agent API: 10 -> 12
+   link Runs -> LLM: 61 -> 62
+   link Runs -> Other: 7 -> 4
+   link Web -> LLM: 92 -> 94
+   link Web -> Other: 8 -> 6

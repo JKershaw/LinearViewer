@@ -1,0 +1,14 @@
+B: Web->Agent API 9, Agent API->Web 0; outside targets: Agent API 91, Web 174, shared 52 of 213
+H: Web->Agent API 9, Agent API->Web 0; outside targets: Agent API 95, Web 176, shared 55 of 216
+  shared targets new at H: ['lib/cost-read-calls.js', 'lib/prompts/prompt-context.js', 'lib/run-live-wait.js', 'lib/run-trail.js', 'lib/should-mock-ai.js'] | gone: ['lib/cost-read.js', 'lib/recommendation-live-wait.js']
+co-change Agent API <-> Web: B 78 H 87
+window commits touching both lanes: 9
+   fb358dbda LIN-4470: settle the Waiting entries, one prompt context, one cited-path predica
+   d52c676fa Merge pull request #2438 from JKershaw/feat/lin-4460-one-close-out-decision
+   49d4c880e Merge pull request #2437 from JKershaw/feat/lin-4452-jira-live-check-guard
+   0dbf2d4ea Merge pull request #2435 from JKershaw/feat/lin-4458-one-trail-pass
+   904719353 Merge pull request #2429 from JKershaw/feat/lin-4451-jira-create-lanes
+   c174185f6 Merge pull request #2432 from JKershaw/feat/lin-4459-run-live-wait
+   192e1f81f Merge pull request #2427 from JKershaw/feat/lin-4455-feedback-kinds-constants
+   5dcf5bcda Merge pull request #2424 from JKershaw/feat/lin-4457-cost-read-calls-file
+   2bf788b6d LIN-4450: Jira seal — exact words in harbour.asAsked, formatted block in the des

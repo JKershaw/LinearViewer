@@ -1,0 +1,114 @@
+{
+ "repo": "simple-dispatcher",
+ "ref": "7d5fe7d9473232152365e6837ececcd6f2876987",
+ "entries": [
+  {
+   "id": "SD:launch-and-harnesses:L1",
+   "slug": "launch-and-harnesses",
+   "section": "Lessons",
+   "text": "`harbour-token-mcp-server.js` retries only its own bootstrap exchange, and only on a 429 whose `Retry-After` is 60 s or less. It never retries a 5xx, a timeout or a forwarded request: the bootstrap is single-use, and a forward may be a write. The runner contract's `exchange` and `forward` rows own the policy for this broker and Harbour's runner kit (LIN-4378)."
+  },
+  {
+   "id": "SD:launch-and-harnesses:W1",
+   "slug": "launch-and-harnesses",
+   "section": "Waiting",
+   "text": "`opencode-runner.js`: cut its size. It was 1,966 lines when LIN-4203 named it, and is 1,836 at `07c88f7`: the server lifecycle, the session turn, the hold beats and the usage and telemetry relays still share one file. (Survey tally: LIN-4203.)"
+  },
+  {
+   "id": "SD:launch-and-harnesses:W2",
+   "slug": "launch-and-harnesses",
+   "section": "Waiting",
+   "text": "`harbour-token-mcp-server.js`: the LIN-4378 B1-B5 witness cases here (`test/harbour-token-mcp-server.test.js`) and in Harbour's runner-kit broker test still assert fetch counts and waits the contract's `exchange`/`forward` rows now own; trim both to the log, no-token and shared-exchange checks. (Area reads CE/CF, LIN-4378.)"
+  },
+  {
+   "id": "SD:loop-and-routing:W1",
+   "slug": "loop-and-routing",
+   "section": "Waiting",
+   "text": "`dispatcher.js`: a zero-config start (a fresh clone, `npm install`, `node dispatcher.js`) prints `Failed to load workspaces.json: ENOENT` and exits 1, with no pointer to what the file is. There is no example file, and `README.md` explains it about 180 lines below Setup. This has been unchanged across four Onboarding & Cold-Start runs. (Onboarding & Cold-Start Review, 11 Nov.; Harbour's docs/reviews/onboarding-cold-start-review-2026-11-11.md, R4-19.)"
+  },
+  {
+   "id": "SD:loop-and-routing:W2",
+   "slug": "loop-and-routing",
+   "section": "Waiting",
+   "text": "`dispatcher.js`: a newcomer is never told when to pick this dispatcher over Harbour's own-session runner kit, which the product points every team to. `README.md` never names the kit, and its \"Tokens are created in LinearViewer's workspace settings\" doesn't lead to the Dispatch page, where queue tokens are minted. The two consumers are exclusive per workspace (the kit aborts if this one polled recently). It is a seam: Harbour's runner page names this repo only as what it replaces. (Onboarding & Cold-Start Review, 11 Nov.; Harbour's docs/reviews/onboarding-cold-start-review-2026-11-11.md, R4-9.)"
+  },
+  {
+   "id": "SD:state-and-config:W1",
+   "slug": "state-and-config",
+   "section": "Waiting",
+   "text": "`config.js`: settings are not one described list. About 130 `process.env` reads are fixed when the module is first required, each with its own parse and fallback, and nothing states a setting's type, default, bounds or what `0` means in one place, or re-reads it. The flags are part of it: `env-flag.js` (LIN-4182) owns how a flag is parsed, but nothing lists the flags, and a flag that has always been on is never retired (8 of the 11 `SD_*` flags in `config.js` default on). A registry of flags, with retirement, can land on its own as the first half. (Survey tally: LIN-4127, LIN-4182, LIN-4183: \"config at require time is the real cost of this area\".)"
+  },
+  {
+   "id": "SD:state-and-config:W2",
+   "slug": "state-and-config",
+   "section": "Waiting",
+   "text": "`config.js`: how long a finished session stays resumable is a contract between two repositories. `REAP_INACTIVITY_MS` (the record window, 7 days, LIN-4172) is mirrored by a fixed copy in Harbour's lib/unanswered-decisions.js (LIN-4173). Nothing checks that they agree, and an operator who sets `REAP_INACTIVITY_MS` in the environment changes only this side. (Survey tally: LIN-4164.)"
+  },
+  {
+   "id": "SD:stop-hook-and-relay:L1",
+   "slug": "stop-hook-and-relay",
+   "section": "Lessons",
+   "text": "Harbour reads the terminal `[done]` entry's `url` as the session's own PR. In `links.js`, `selectCanonical` lets a PR on the session's `DONE:` line, then a PR its `gh pr create` printed, outrank the mention-count ranking. A build that reads an epic's earlier PRs mentions them more often than its own: LIN-4374's build read #2357 26 times, opened #2359, and its `[done]` named #2357 (LIN-4375). Keep that order when changing the link ranking."
+  },
+  {
+   "id": "SD:stop-hook-and-relay:L2",
+   "slug": "stop-hook-and-relay",
+   "section": "Lessons",
+   "text": "Among `DONE:` lines, `sessionPrs` puts the newest line first and keeps the order of the PRs on it. Harbour's `reportedPrUrlOf` reads the same order. Reversing the flat URL list put the line's last PR first, so the two disagreed (LIN-4375 review)."
+  },
+  {
+   "id": "SD:stop-hook-and-relay:L3",
+   "slug": "stop-hook-and-relay",
+   "section": "Lessons",
+   "text": "`transcript.js` holds the one `DONE:` line rule (`doneLineRest`) and the one tool call/result join (`toolCallsWithResults`). A change there moves both the outcome (`parseCompletionSentinel`, first line wins) and the reported PR (`sessionPrs`, newest wins), so keep each caller's own selection and line splitting. Harbour reads the same cases, pinned in `test/fixtures/runner-contract.json`'s `report` and `sentinel` rows (LIN-4385). Don't merge the matchers or skip DECISION blocks in `links.js`: either would part SD from Harbour."
+  },
+  {
+   "id": "SD:stop-hook-and-relay:L4",
+   "slug": "stop-hook-and-relay",
+   "section": "Lessons",
+   "text": "Every sentinel line rule is `sentinelLine` in `transcript.js`: `DONE:` through `doneLineRest`, then `FAILED:`, the `PENDING` forms and `BLOCKED:`. A new token goes there, never as a regex in `hook.js`; a test fails if one comes back (LIN-4474)."
+  },
+  {
+   "id": "SD:stop-hook-and-relay:L5",
+   "slug": "stop-hook-and-relay",
+   "section": "Lessons",
+   "text": "`walkRequestRecords` is the transcript fold's reference. The runner kit is pinned to its output by the contract's `fold` rows, so changed fold output is re-pinned in LinearViewer first; until that merges, SD's fold pin stays red (LIN-4476)."
+  },
+  {
+   "id": "SD:stop-hook-and-relay:W1",
+   "slug": "stop-hook-and-relay",
+   "section": "Waiting",
+   "text": "`feedback.js`: runner → Harbour posts have no acknowledged outbox. A terminal post can retry within a deadline when its caller opts in (LIN-3208); every other post is sent once, and a post lost to a timeout or a restart is gone. Only the per-request usage records keep a ledger of acknowledged batches (`postRecordsWithLedger` in `request-usage-flush.js`). One outbox would take the volume risk away from every relay. (Survey tally: LIN-4165, a feedback outbox; LIN-4195, a typed telemetry channel.)"
+  },
+  {
+   "id": "SD:stop-hook-and-relay:W2",
+   "slug": "stop-hook-and-relay",
+   "section": "Waiting",
+   "text": "`hook.js`: the evidence scope (the GitHub owner and Linear org an evidence link is scoped to) is derived twice, by `resolveScope` here and by `deriveEvidenceScope` in `opencode-runner.js`, each over the parsers in `links.js`, with different inputs (the session's metadata against the working directory and issue URL). A change to how a link's scope is chosen must be made in both relays; one helper in `links.js` would hold it. (Drift & Coherence Review, 13 Nov.; the report is Harbour's docs/reviews/drift-coherence-review-2026-11-13.md, census group G0018.)"
+  },
+  {
+   "id": "SD:stop-hook-and-relay:W3",
+   "slug": "stop-hook-and-relay",
+   "section": "Waiting",
+   "text": "`transcript.js` / `hook.js`: the sentinel family is split across two files. The line rules and kind strings are `SENTINEL_LINES` in `transcript.js`; the prompt that teaches the tokens (`SELF_CHECK_PROMPT`, which `reapers.js` calls the single source of truth for the format) and the routing by kind (`decideHookAction`) stay in `hook.js`. `sentinelLine` has one reader (`hook.js`), unlike `doneLineRest`, which `links.js` also reads. Adding or renaming a sentinel is now a two-file change and nothing ties the kind list to the prompt or the router. Deciding which module owns the whole family (tokens, prompt, kinds) is a design call, not a fix. (LIN-4474 blind read.)"
+  },
+  {
+   "id": "SD:stop-hook-and-relay:W4",
+   "slug": "stop-hook-and-relay",
+   "section": "Waiting",
+   "text": "`transcript.js`: the pinned copy of LinearViewer's runner contract (`test/runner-contract.test.js` checks it against `FIXTURE_SHA256`; its `report` and `sentinel` rows pin this module's output, and its `fold` rows pin `request-usage.js` instead). Since `columnProblems` was retired (LIN-4474), nothing in this repo checks a row's shape. W-4 shows only that editing the fixture bytes changes the sha, and a re-pin moves the sha anyway, so a malformed row copied in at re-pin is caught by nothing here; the rule is the \"To take a new copy\" step (copy only from a merged LinearViewer `main` commit whose `checkRowShape` passed). W-4 also looks the row `abort row under an unknown halt mode` up by name and needs `JSON.stringify(table, null, 2) + '\\n'` to reproduce the fixture, so a legitimate re-pin that drops that row or reformats the file fails it at its precondition. Behaviour is not wrong today; the ruling `lin4474-describe-blocks-cut` accepted this trade. (LIN-4474 blind read.)"
+  },
+  {
+   "id": "SD:test-harnesses:W1",
+   "slug": "test-harnesses",
+   "section": "Waiting",
+   "text": "`test/system/mutation/run-mutations.js`: each curated mutant finds its edit by a source substring (`find`), and only `npm run test:mutation` reads them. `npm test` does not check that each one is still present exactly once in its file, so an edit to a mutated line in `dispatcher.js`, `reapers.js` or `hook.js` shows up only at the next mutation run, as an errored mutant. (Survey tally: LIN-4196: \"cheap and outside this ticket\".)"
+  },
+  {
+   "id": "SD:test-harnesses:W2",
+   "slug": "test-harnesses",
+   "section": "Waiting",
+   "text": "`test/system/park-read.test.js`: the first system test to import Harbour's modules (lib/session-telemetry.js and lib/dispatch-terminal.js in Harbour's tree) instead of talking to Harbour over HTTP, so it breaks when Harbour moves them. A precedent to watch: a new test should not copy it without a reason as strong. (Survey tally: LIN-4239, q6.)"
+  }
+ ]
+}

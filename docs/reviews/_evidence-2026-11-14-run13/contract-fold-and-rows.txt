@@ -1,0 +1,17 @@
+fold corpus: LinearViewer tests/fixtures/runner-kit/transcript-corpus/<id>.jsonl vs simple-dispatcher test/fixtures/transcript-corpus/<dir>/<stage>/*-session.jsonl (FOLD_CORPUS in test/runner-contract.test.js), sha256 first 16 hex
+haiku-over-100k--final LV d2cfd639d38d41cf SD d2cfd639d38d41cf same
+killed-before-stop--final LV 5b666d76bb1d5d86 SD 5b666d76bb1d5d86 same
+mixed-model--final LV 27515938e6b28e6e SD 27515938e6b28e6e same
+reap-tail--atReap LV c9fae74c8fdbcaa6 SD c9fae74c8fdbcaa6 same
+reap-tail--atStop LV 6d240de4e7699121 SD 6d240de4e7699121 same
+resumed-across-deploy--earlier LV 3dfaadc20d6a2dae SD 3dfaadc20d6a2dae same
+resumed-across-deploy--later LV e6c08e5dfc16bfda SD e6c08e5dfc16bfda same
+synthetic-tail--final LV 3335c93cfc9dc3de SD 3335c93cfc9dc3de same
+
+contract rows by area at fb358dbda:
+86 {'halt': 14, 'halt-text': 1, 'target': 5, 'repo': 5, 'cap': 2, 'heartbeat': 1, 'auth': 10, 'report': 9, 'sentinel': 7, 'store': 4, 'exchange': 11, 'forward': 3, 'fold': 14}
+no-halt follow-up rows:
+   follow-up to a finished session with no halt | sd claimed | kit claimed
+   follow-up to a running session with no halt | sd failed | kit claimed
+   follow-up to a stopped session with no halt | sd failed | kit claimed
+   follow-up with no live session with no halt | sd failed | kit failed

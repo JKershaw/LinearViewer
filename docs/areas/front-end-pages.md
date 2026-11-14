@@ -19,7 +19,7 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
 - `lib/components/halt-controls.js`: in the `buttons` presentation (Dispatch) Pause, Stop and Resume compute to the same style, and the tone the component declares (red for Pause and Stop) is not applied. Stop stops running sessions. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)
 - `lib/render-library.js`: every Library document renders two `<h1>` (the shell "Harbour" and the document title), 117 of 117. The index renders one. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)
 - `lib/render-styleguide.js`: in dark theme the swatch captions under `.sg-value` show light-theme values (`#ffffff` for `--bg`, `#1a1a1a` for `--fg`) beside dark swatches. LIN-3957 and LIN-3960 are open on this page and do not cover it. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)
-- `lib/mask-secrets-in-html.js`: on a Jira workspace `/t/` masks text after `lib/providers/jira/adf.js` has escaped every `_` to `\_`, so underscore-bearing shapes (Resend, Harbour, Linear, GitHub, env-style) reach a guest unmasked; OpenRouter, Mongo, Atlassian and PEM still match. Strip CommonMark backslash escapes, with a position map, before matching. A seam: providers has no note. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)
+- `lib/mask-secrets-in-html.js`: on a Jira workspace `/t/` masks text after `lib/providers/jira/adf.js` has escaped every `_` to `\_`, so underscore-bearing shapes (Resend, Harbour, Linear, GitHub, env-style) reach a guest unmasked; OpenRouter, Mongo, Atlassian and PEM still match. Strip CommonMark backslash escapes, with a position map, before matching. A seam with Providers (`lib/providers/jira/adf.js`; its note, `docs/areas/providers.md`, has no mask entry). (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)
 - `lib/components/navbar.js`: the workspace switcher's `+ Jira` goes to Jira OAuth `mode=new` (a new
   sign-in), and on a server with no Jira OAuth env it is not shown at all, although the Jira API-token
   path (no server config) works there. That path is only reachable from Settings › Sources inside a
@@ -59,3 +59,13 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   first-class root view "dashboard" where the route key is projects (label "tasks"), and it and
   `docs/architecture/views.md` list proxy among the flagged power-user views although the header switcher always shows
   it. Rewrite the tier lists from `getViewNavLinks` and `DISPLAY_LABELS`. (LIN-4463 blind read.)
+- `lib/time-words.js`: says it is the one home for relative-time words on the server and the task page. Its test
+  (`tests/unit/lin-4472-time-words.test.js`) and the source map say so too, and `lib/components/time.js` says every
+  other surface uses `relativeAgo`. Three more formatters word the same moment: `formatRelativeTime` (`lib/render.js`,
+  "25m ago", then "yesterday"; Settings, Home and the KPI pages), `window.relativeTime` (`public/common.js`, read bare by
+  the Observation module, Live Console, Proxy and Dispatch) and `formatGeneratedAge` (`public/prompt-section.js`, which
+  rounds where the others floor). Byte-identical `formatDuration` copies sit in `lib/render-escalation-kpis.js` and
+  `lib/render-effort-readout.js`. The guard keys on the names `fmtDuration` and `relativeAgo`, so it sees none of these.
+  The two converted module pages word one moment two ways ("5 minutes ago" on the task page, "5m ago" on Observation).
+  One wording across Settings, Home, KPIs and the browser pages is a size of move (visible copy and goldens change), not a
+  tidy; the untrue claims are a fix. (Drift & Coherence Review, 14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)

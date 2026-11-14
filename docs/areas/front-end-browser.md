@@ -83,8 +83,9 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   could join `SHARED_MODULES`. (LIN-4446 blind read.)
 - `public/session.js`: its `formatElapsed` is a copy of `fmtDuration` (`lib/time-words.js`, LIN-4472). `fmtDuration`
   in `public/live-console.js` words seconds with no hour rung (`66m 40s` where the leaf says `1h 6m`), so the duration
-  rule is spelled two ways. Both are classic scripts, so neither can import the leaf until its page is a module
-  (session.js shares close-out.js with the task page). Each copy goes when its page converts; Live Console's wording is a
+  rule is spelled two ways. Both are classic scripts, so neither can import the leaf until its page is a module (the run
+  page does not load `public/close-out.js`, so that file is no blocker; corrected, Drift & Coherence Review, 14 Nov.,
+  `docs/reviews/drift-coherence-review-2026-11-14.md`). Each copy goes when its page converts; Live Console's wording is a
   choice to make then. (LIN-4472 leftovers. The copy in `public/observation.js` went with its conversion, LIN-4463 piece 4.)
 - `public/observation.js`: about 5,000 lines. By the counting method of LIN-4446 (lines starting with `*`, `//` or `/*`)
   1,985 of its 4,679 non-blank lines are comments. Find out why it is this large before splitting it. An earlier survey

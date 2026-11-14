@@ -1,0 +1,1991 @@
+[
+ {
+  "id": "LV:agent-api:L1",
+  "kind": "trap",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Limiter-before-auth order; lin-4378 test H2 drives real chain and fails on junk-bearer buckets."
+ },
+ {
+  "id": "LV:agent-api:L2",
+  "kind": "home",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Recommend rules belong in CODE_ROUTES; no test ties recommend surfaces to verb refusals."
+ },
+ {
+  "id": "LV:agent-api:L3",
+  "kind": "recipe",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Checklist for cost route changes; fixtures fail on change, but not re-recording goldens.json is prose only."
+ },
+ {
+  "id": "LV:agent-api:L4",
+  "kind": "trap",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Opening-line keying; dispatch-leftover-answer test runs the real LIN-4393 review comment."
+ },
+ {
+  "id": "LV:agent-api:L5",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "Existing fields pinned by 400 tests; the presence-then-format rule for new fields is unchecked."
+ },
+ {
+  "id": "LV:agent-api:L6",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "Create-lane envelope test pins current lanes; a newly added typed error is not caught generically."
+ },
+ {
+  "id": "LV:agent-api:L7",
+  "kind": "recipe",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "New write route must add op and CENSUS row; lin-4468 census fails otherwise."
+ },
+ {
+  "id": "LV:agent-api:L8",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "Mint sweep spies createToken and lists stage-less mints, but only over entrance files."
+ },
+ {
+  "id": "LV:agent-api:W1",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Repeated error-mapping chain matched by substring; fix is one helper keyed on code."
+ },
+ {
+  "id": "LV:agent-api:W2",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Rate-limit rule restated ~eight places, one wording wrong; fix is quote one source."
+ },
+ {
+  "id": "LV:agent-api:W3",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "API lacks createdAt, forcing 22 probes; fix adds a field or filter."
+ },
+ {
+  "id": "LV:agent-api:W4",
+  "kind": "copy",
+  "held": "partly",
+  "volatile": "yes",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "As-asked rule written twice; census pins markers, not the rule."
+ },
+ {
+  "id": "LV:agent-api:W5",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "skipLiveWait exempts any followUpTo; lineage check needed per hop."
+ },
+ {
+  "id": "LV:agent-api:W6",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Catalog omits leftover kind and misdescribes kind contract (23 kinds); docs mislead agents."
+ },
+ {
+  "id": "LV:agent-api:W7",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "check",
+  "why": "Guide and catalog miss routes; proposed fix is generating or testing them from the catalog."
+ },
+ {
+  "id": "LV:agent-api:W8",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Guide omits look-first behaviour so agents mistake a Survey step for their task."
+ },
+ {
+  "id": "LV:agent-api:W9",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "person",
+  "home": "tracker",
+  "why": "Security gap: any readWrite key sets workspace-wide harness; scope needs a ruling."
+ },
+ {
+  "id": "LV:agent-api:W10",
+  "kind": "ruling",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "decision",
+  "why": "Read guard per stage deferred with consequence-test reason; records why not now."
+ },
+ {
+  "id": "LV:agent-api:W11",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "~16 inline test-token checks, behaviour correct; remove via injected transports."
+ },
+ {
+  "id": "LV:auth-accounts-and-workspaces:L1",
+  "kind": "recipe",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Steps to retire a logged setting; change-log tests cover parts, not the whole procedure."
+ },
+ {
+  "id": "LV:auth-accounts-and-workspaces:W1",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Email aliases get fresh budgets and provider refusals hidden; security fault today."
+ },
+ {
+  "id": "LV:auth-accounts-and-workspaces:W2",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Seven controls fail open on one env signal; needs second signal or boot refusal."
+ },
+ {
+  "id": "LV:auth-accounts-and-workspaces:W3",
+  "kind": "question",
+  "held": "no",
+  "volatile": "no",
+  "needs": "person",
+  "home": "tracker",
+  "why": "Jira workspace keyed per person splits teams; a team-workspace product decision."
+ },
+ {
+  "id": "LV:auth-accounts-and-workspaces:W4",
+  "kind": "question",
+  "held": "no",
+  "volatile": "no",
+  "needs": "person",
+  "home": "tracker",
+  "why": "Whether share tokens share the hash helper is explicitly a naming call."
+ },
+ {
+  "id": "LV:front-end-browser:L1",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "note",
+  "why": "Second-request discipline for page scripts; refresher tests pin the pattern, not new scripts."
+ },
+ {
+  "id": "LV:front-end-browser:L2",
+  "kind": "ruling",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "Phone-first CSS and type tokens; ui-authorities and type-size tests enforce them."
+ },
+ {
+  "id": "LV:front-end-browser:L3",
+  "kind": "ruling",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "decision",
+  "why": "Reading of no-build-step rule and top-down conversion order, with reasons."
+ },
+ {
+  "id": "LV:front-end-browser:L4",
+  "kind": "home",
+  "held": "yes",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "check",
+  "why": "SHARED_MODULES allow-list and flat public/; shared-modules and import-layout tests enforce."
+ },
+ {
+  "id": "LV:front-end-browser:L5",
+  "kind": "home",
+  "held": "yes",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "check",
+  "why": "Only bridge module; bridge-inventory fails on new names or dead readers."
+ },
+ {
+  "id": "LV:front-end-browser:L6",
+  "kind": "trap",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "Read global after DOMContentLoaded; inventory fails a witness loading out of order."
+ },
+ {
+  "id": "LV:front-end-browser:L7",
+  "kind": "trap",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "note",
+  "why": "Module position in script list is meaningless; nothing checks it."
+ },
+ {
+  "id": "LV:front-end-browser:L8",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "note",
+  "why": "How to test converted pages; census ratchets classic loaders, importWorld pitfalls unchecked."
+ },
+ {
+  "id": "LV:front-end-browser:L9",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "note",
+  "why": "Module pages start before DOMContentLoaded; flight-companion test covers one page."
+ },
+ {
+  "id": "LV:front-end-browser:L10",
+  "kind": "recipe",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "note",
+  "why": "Convention for turning classic seams into module exports; no check."
+ },
+ {
+  "id": "LV:front-end-browser:W1",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Whole-page DOMParser refresh works; server fragments would be a structural tidy."
+ },
+ {
+  "id": "LV:front-end-browser:W2",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Client repeats catalog merge rule; endpoint could send merged options."
+ },
+ {
+  "id": "LV:front-end-browser:W3",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Statuscode-in-200 check written four times; joining waits on module conversion."
+ },
+ {
+  "id": "LV:front-end-browser:W4",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Client twins of lib modules; leaves are next to share."
+ },
+ {
+  "id": "LV:front-end-browser:W5",
+  "kind": "copy",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Hand-synced ship mirrors; ship-layout parity test links one pair only."
+ },
+ {
+  "id": "LV:front-end-browser:W6",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Duration rule spelled two ways; copies retire as pages convert."
+ },
+ {
+  "id": "LV:front-end-browser:W7",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "5,000-line file; investigate size before splitting. Figures go stale."
+ },
+ {
+  "id": "LV:front-end-browser:W8",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Suites rebuild the common.js contract differently; pick shared helper or imports."
+ },
+ {
+  "id": "LV:front-end-browser:W9",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "check",
+  "why": "llms.txt names stale route and omits views; needs conformance test to stay fixed."
+ },
+ {
+  "id": "LV:front-end-browser:W10",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Next step offered without AI configured; spins silently."
+ },
+ {
+  "id": "LV:front-end-browser:W11",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Feedback widget ignores PARTIAL_WRITE; resubmit files duplicates."
+ },
+ {
+  "id": "LV:front-end-browser:W12",
+  "kind": "cleanup",
+  "held": "partly",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Mount decision spread over eight blocks; no wrong behaviour; omitMounts test partial."
+ },
+ {
+  "id": "LV:front-end-pages:L1",
+  "kind": "trap",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "fix",
+  "home": "check",
+  "why": "Per-row controls need accessible names; 86 unnamed today; an a11y lint could hold it."
+ },
+ {
+  "id": "LV:front-end-pages:L2",
+  "kind": "home",
+  "held": "yes",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "check",
+  "why": "Guest money strip; three-response guest test is the gate."
+ },
+ {
+  "id": "LV:front-end-pages:L3",
+  "kind": "trap",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "site",
+  "why": "New task-page section needs a grid-area; grid tests check order, not coverage."
+ },
+ {
+  "id": "LV:front-end-pages:W1",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Accessibility fault: 86 unnamed Settings controls."
+ },
+ {
+  "id": "LV:front-end-pages:W2",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Jira site picker overflows narrow viewports by measured pixels."
+ },
+ {
+  "id": "LV:front-end-pages:W3",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Halt buttons lack declared danger tone."
+ },
+ {
+  "id": "LV:front-end-pages:W4",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Library documents render two h1 elements, 117 of 117."
+ },
+ {
+  "id": "LV:front-end-pages:W5",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Dark-theme swatch captions show light values."
+ },
+ {
+  "id": "LV:front-end-pages:W6",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Secret masking misses escaped underscores on Jira; guest leak."
+ },
+ {
+  "id": "LV:front-end-pages:W7",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Jira API-token path unreachable from switcher; onboarding gap."
+ },
+ {
+  "id": "LV:front-end-pages:W8",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "No page explains Simple Dispatcher to newcomers; cross-repo docs seam."
+ },
+ {
+  "id": "LV:front-end-pages:W9",
+  "kind": "measure",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Observed flaky link on first attempt; cause unknown."
+ },
+ {
+  "id": "LV:front-end-pages:W10",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Renderer and legend restate the model's tick rule; tick could carry style."
+ },
+ {
+  "id": "LV:front-end-pages:W11",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Dead deep-link create branch and four overrides; retiring spans several pins."
+ },
+ {
+  "id": "LV:front-end-pages:W12",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "person",
+  "home": "tracker",
+  "why": "Epic dropped silently on Jira create; fix needs a design decision."
+ },
+ {
+  "id": "LV:front-end-pages:W13",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Stale comments in view-nav and footer; no behaviour change."
+ },
+ {
+  "id": "LV:front-end-pages:W14",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Docs describe view tiers wrongly; rewrite from source."
+ },
+ {
+  "id": "LV:llm-and-prompts:L1",
+  "kind": "recipe",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "Prompt growth needs ticket and reason; budget test enforces ceilings."
+ },
+ {
+  "id": "LV:llm-and-prompts:L2",
+  "kind": "trap",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Grounding lists are shared across stages; give one stage its own list."
+ },
+ {
+  "id": "LV:llm-and-prompts:L3",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "Keep scoping/Survey renders byte-identical; witness hashes catch changes."
+ },
+ {
+  "id": "LV:llm-and-prompts:L4",
+  "kind": "ruling",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "decision",
+  "why": "Surveys deliberately get no notes pointer, with reason."
+ },
+ {
+  "id": "LV:llm-and-prompts:L5",
+  "kind": "trap",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Budget fixture uses empty context, so ceilings can mislead; rebase and re-measure."
+ },
+ {
+  "id": "LV:llm-and-prompts:L6",
+  "kind": "home",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "as-asked words have one owner; as-asked-one-home test enforces."
+ },
+ {
+  "id": "LV:llm-and-prompts:L7",
+  "kind": "home",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "Blind-read words owner; stage-kind-tables scan fails on literals elsewhere."
+ },
+ {
+  "id": "LV:llm-and-prompts:L8",
+  "kind": "home",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "CODE_ROUTES order in one place; lin-4465 test fails until docs agree."
+ },
+ {
+  "id": "LV:llm-and-prompts:L9",
+  "kind": "trap",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Import cycle forces shared words into leaves; nothing checks it."
+ },
+ {
+  "id": "LV:llm-and-prompts:L10",
+  "kind": "trap",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "note",
+  "why": "Prompt bans do not hold behaviour; hold shape in code or test."
+ },
+ {
+  "id": "LV:llm-and-prompts:L11",
+  "kind": "recipe",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Changing stage lead needs snapshot and baseline updates; drift test covers baseline."
+ },
+ {
+  "id": "LV:llm-and-prompts:L12",
+  "kind": "trap",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Check real rows reach server guard; Periodical opt-in rule."
+ },
+ {
+  "id": "LV:llm-and-prompts:L13",
+  "kind": "ruling",
+  "held": "partly",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "decision",
+  "why": "No Periodical-specific merge rule; five copies linked only by a test."
+ },
+ {
+  "id": "LV:llm-and-prompts:L14",
+  "kind": "home",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "Model facts from catalog only; no test forbids a hand list."
+ },
+ {
+  "id": "LV:llm-and-prompts:L15",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Summary taken by position; fixture re-pins, alt-text rule unchecked."
+ },
+ {
+  "id": "LV:llm-and-prompts:L16",
+  "kind": "trap",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "note",
+  "why": "Blind reader limits are instructions; code must hand SHAs not bodies."
+ },
+ {
+  "id": "LV:llm-and-prompts:L17",
+  "kind": "home",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "Measures live in README; periodicals test links bullet list to it."
+ },
+ {
+  "id": "LV:llm-and-prompts:L18",
+  "kind": "recipe",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "New stage kind checklist; record test catches missing fields, goldens and pins are manual."
+ },
+ {
+  "id": "LV:llm-and-prompts:L19",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Shared formatter across stages; prove unchanged by rendering all kinds; witness helps."
+ },
+ {
+  "id": "LV:llm-and-prompts:L20",
+  "kind": "ruling",
+  "held": "yes",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "check",
+  "why": "Witness kept as ratchet; witness test fails on render change. All 40 count."
+ },
+ {
+  "id": "LV:llm-and-prompts:L21",
+  "kind": "trap",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Scan reads git ls-files; uncommitted files are unscanned."
+ },
+ {
+  "id": "LV:llm-and-prompts:W1",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Context built by hand in five places; a new field must reach all."
+ },
+ {
+  "id": "LV:llm-and-prompts:W2",
+  "kind": "question",
+  "held": "no",
+  "volatile": "no",
+  "needs": "person",
+  "home": "tracker",
+  "why": "Whether built-in policy meets John's request; awaits his view."
+ },
+ {
+  "id": "LV:llm-and-prompts:W3",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "check",
+  "why": "Token order in scope line unlinked to contract; a test would link them."
+ },
+ {
+  "id": "LV:llm-and-prompts:W4",
+  "kind": "ruling",
+  "held": "partly",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "decision",
+  "why": "Lists per-kind tables kept on purpose with owner and reason."
+ },
+ {
+  "id": "LV:llm-and-prompts:W5",
+  "kind": "recipe",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Before moving a call to haiku, replay snapshot; conditions are prose."
+ },
+ {
+  "id": "LV:llm-and-prompts:W6",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Split call-budget module; structural tidy."
+ },
+ {
+  "id": "LV:llm-and-prompts:W7",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Suggested model ids repeated by hand, unchecked."
+ },
+ {
+  "id": "LV:llm-and-prompts:W8",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "docs/areas spelled in 26 lines and two underived leaves."
+ },
+ {
+  "id": "LV:llm-and-prompts:W9",
+  "kind": "measure",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Periodical prompt growth and reviews archive size; proposes two moves."
+ },
+ {
+  "id": "LV:llm-and-prompts:W10",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "person",
+  "home": "tracker",
+  "why": "No content boundary on who adds a Lesson; security policy call."
+ },
+ {
+  "id": "LV:llm-and-prompts:W11",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Goal and note attribution misattribute minting token; security."
+ },
+ {
+  "id": "LV:llm-and-prompts:W12",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Front-matter summary field would end positional summaries; changes every doc."
+ },
+ {
+  "id": "LV:llm-and-prompts:W13",
+  "kind": "question",
+  "held": "no",
+  "volatile": "no",
+  "needs": "person",
+  "home": "tracker",
+  "why": "Two rules answer the live-secret case oppositely; needs John's ruling."
+ },
+ {
+  "id": "LV:llm-and-prompts:W14",
+  "kind": "measure",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "note",
+  "why": "Observation that rarely touched notes will grow; Waiting counts are the measure."
+ },
+ {
+  "id": "LV:llm-and-prompts:W15",
+  "kind": "ruling",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "person",
+  "home": "decision",
+  "why": "Blind-read sentence keeps own words as piloted; re-piloting is a person's run."
+ },
+ {
+  "id": "LV:llm-and-prompts:W16",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Template names this repo's test command for other repos too."
+ },
+ {
+  "id": "LV:llm-and-prompts:W17",
+  "kind": "question",
+  "held": "no",
+  "volatile": "no",
+  "needs": "person",
+  "home": "tracker",
+  "why": "Review tooling policy worded per template; deciding it is a ruling."
+ },
+ {
+  "id": "LV:llm-and-prompts:W18",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Dispatch record can misname the model that actually ran."
+ },
+ {
+  "id": "LV:llm-and-prompts:W19",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "person",
+  "home": "tracker",
+  "why": "Retirement-line words restated in simple-dispatcher docs; cross-repo owner."
+ },
+ {
+  "id": "LV:llm-and-prompts:W20",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Path rule spelled in three places; borderline."
+ },
+ {
+  "id": "LV:llm-and-prompts:W21",
+  "kind": "question",
+  "held": "no",
+  "volatile": "no",
+  "needs": "person",
+  "home": "tracker",
+  "why": "Whether every stage kind gets a constant is an open decision."
+ },
+ {
+  "id": "LV:llm-and-prompts:W22",
+  "kind": "question",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Trim witness or fold into budget test: a test-suite decision."
+ },
+ {
+  "id": "LV:other-features:L1",
+  "kind": "home",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "Catch-all area; placement test requires owning area pattern."
+ },
+ {
+  "id": "LV:other-features:W1",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Stale header comment in stage-writes.js."
+ },
+ {
+  "id": "LV:other-features:W2",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Split over-600-line home-view module."
+ },
+ {
+  "id": "LV:other-features:W3",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Two rankers for what's next; one ranking."
+ },
+ {
+  "id": "LV:other-features:W4",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Test-side reset registry could be production container."
+ },
+ {
+  "id": "LV:other-features:W5",
+  "kind": "cleanup",
+  "held": "yes",
+  "volatile": "yes",
+  "needs": "person",
+  "home": "tracker",
+  "why": "Homeless by placement pin; moving is the guide owner's call."
+ },
+ {
+  "id": "LV:platform-and-plumbing:L1",
+  "kind": "trap",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "site",
+  "why": "Bundled dependency versions differ from lockfile; audit served file."
+ },
+ {
+  "id": "LV:platform-and-plumbing:L2",
+  "kind": "trap",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "Structure test catches root mount; probes alone pass falsely."
+ },
+ {
+  "id": "LV:platform-and-plumbing:W1",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "vendor-assets name says less than file does; rename."
+ },
+ {
+  "id": "LV:platform-and-plumbing:W2",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Two in-memory collection fakes; one shared fake."
+ },
+ {
+  "id": "LV:platform-and-plumbing:W3",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "person",
+  "home": "tracker",
+  "why": "No owned deploy check; Railway held by John."
+ },
+ {
+  "id": "LV:platform-and-plumbing:W4",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Secret shapes unmatched and mint sites unpinned; security gap."
+ },
+ {
+  "id": "LV:platform-and-plumbing:W5",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Flaky wall-clock scheduler test; use fake clock."
+ },
+ {
+  "id": "LV:platform-and-plumbing:W6",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "person",
+  "home": "tracker",
+  "why": "Retryable property failures loop forever; envelope change needs decision and live evidence."
+ },
+ {
+  "id": "LV:platform-and-plumbing:W7",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Created key only in prose; widening envelope is a contract change."
+ },
+ {
+  "id": "LV:providers:L1",
+  "kind": "home",
+  "held": "yes",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "check",
+  "why": "One reader/writer for Jira description; region test fails on direct adfToMarkdown."
+ },
+ {
+  "id": "LV:providers:L2",
+  "kind": "trap",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Compare renderings not ADF; localId test holds it."
+ },
+ {
+  "id": "LV:providers:L3",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Seal check and reads share one reader; test covers read-back partly."
+ },
+ {
+  "id": "LV:providers:L4",
+  "kind": "trap",
+  "held": "no",
+  "volatile": "no",
+  "needs": "person",
+  "home": "site",
+  "why": "Fake cannot prove live Jira; live check pending a person."
+ },
+ {
+  "id": "LV:providers:L5",
+  "kind": "trap",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Epic field from create screen; jira-create tests pin the three cases."
+ },
+ {
+  "id": "LV:providers:L6",
+  "kind": "ruling",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "No metadata cache, with permission and cost reasons."
+ },
+ {
+  "id": "LV:providers:L7",
+  "kind": "trap",
+  "held": "yes",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "check",
+  "why": "Every create lane maps PartialWriteError; envelope test pins lanes."
+ },
+ {
+  "id": "LV:providers:L8",
+  "kind": "trap",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "200 does not prove property kept; property-guard test uses dropProperties."
+ },
+ {
+  "id": "LV:providers:W1",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Bulk reads serve converted text, not exact words."
+ },
+ {
+  "id": "LV:providers:W2",
+  "kind": "ruling",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Jira parentId refused for now; acceptance needs end-to-end test."
+ },
+ {
+  "id": "LV:providers:W3",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Seal cannot tell verbatim from converting provider; capability proposed."
+ },
+ {
+  "id": "LV:providers:W4",
+  "kind": "ruling",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Rich-content write gate not widened; accepted limit pending."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:L1",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "Not measured, never zero; use countWaiting; stability tests cover parts."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:L2",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Explicit diff-merges flag; test passes without it on new git."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:L3",
+  "kind": "home",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "ownTicket and createProxyClient are the readers; tests cover them."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:L4",
+  "kind": "trap",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Upper bracket and trashed gaps; stability test exercises 404 and trashed."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:L5",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Lookback bound on finished tasks; widen via flag only."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:L6",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Went-blocked reads every marker and member; partly tested."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:L7",
+  "kind": "home",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Measure 1 from pre-merge blind read via run-trail parsers."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:L8",
+  "kind": "home",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Landing subject read only through core regexes."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:L9",
+  "kind": "home",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "Rounding helpers from core; no lint forbids re-spelling."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:L10",
+  "kind": "ruling",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "References only from tool's own readings; README lists fields."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:L11",
+  "kind": "recipe",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "New reads get end-to-end case; keep flag for older git."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:W1",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Rate rule spelled two ways across 47 scripts; one shared client."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:W2",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Seat share is upper bound; needs two proxy reads."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:W3",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Seat read takes half hour; batch read would cut calls."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:W4",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Collection facts in separate tables; declare once."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:W5",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Misleading conformance name; rename touches several places."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:W6",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Declaration contract checked from two files; move to one."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:W7",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Squash-landing rule spelled four ways."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:W8",
+  "kind": "question",
+  "held": "no",
+  "volatile": "no",
+  "needs": "person",
+  "home": "tracker",
+  "why": "Hard-coded gate cut-off needs decision on where gate start is recorded."
+ },
+ {
+  "id": "LV:reports-and-operator-tools:W9",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Citation claims parity but buckets differ; comment should say how."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L1",
+  "kind": "home",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Always-present fields in RUN_FIELDS; test pins 23 fields, not sparse rule."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L2",
+  "kind": "home",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "check",
+  "why": "Every non-take exit archives via _archiveItem; no census found."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L3",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Wake guard order matters; census pins write sites, not order."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L4",
+  "kind": "home",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Session PR from report line; session-pr-wins test pins it."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L5",
+  "kind": "trap",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Claim with compare-and-set; claim test pins first-wins."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L6",
+  "kind": "trap",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Release claim on every skip path; tests pin it."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L7",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Read lineage for parked sessions; held-wake seam test partly."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L8",
+  "kind": "home",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "Row-only kinds separate; kind-keyed maps tested against both."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L9",
+  "kind": "home",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "Store knows no leftovers; lin-4377 census enforces."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L10",
+  "kind": "home",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "Feedback kinds table and constant owners; lin-4455 censuses fail on copies."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L11",
+  "kind": "ruling",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "note",
+  "why": "Price pulled extras like any piece; process lesson."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L12",
+  "kind": "trap",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Lane running from open ids; task-timeline tests pin it."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L13",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Close-out test needs seam; hermetic watcher catches only in CI."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L14",
+  "kind": "home",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "One close-out decision; two censuses fail on unlisted reasons."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L15",
+  "kind": "ruling",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "decision",
+  "why": "John's rule: Harbour follows the person, never sets Done."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L16",
+  "kind": "home",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "check",
+  "why": "run-trail owns comment kinds and landing; census fails elsewhere."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L17",
+  "kind": "trap",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Route custom before bucketOf; partly tested."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L18",
+  "kind": "home",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "prOf is the PR URL reader; no census forbids others."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L19",
+  "kind": "home",
+  "held": "no",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Per-dispatch figures from the fold; no check."
+ },
+ {
+  "id": "LV:runs-and-dispatch:L20",
+  "kind": "home",
+  "held": "partly",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "site",
+  "why": "Calls readers and boundary; one empty shape."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W1",
+  "kind": "ruling",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "decision",
+  "why": "Held wake may stick on death; no sweep, with reasons."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W2",
+  "kind": "ruling",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "site",
+  "why": "One wakeHook; a second feature needs composable hooks first."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W3",
+  "kind": "ruling",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "decision",
+  "why": "Stored paragraphs retained as written; witness test pins cases."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W4",
+  "kind": "question",
+  "held": "no",
+  "volatile": "no",
+  "needs": "person",
+  "home": "tracker",
+  "why": "One wake policy pending the shadow classifier's evidence."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W5",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Live-wait is a read not a claim; race passes both."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W6",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Run-outcome words have two homes."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W7",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Parked stage dated by park time; store change needed."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W8",
+  "kind": "ruling",
+  "held": "yes",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "decision",
+  "why": "Foreign PR joins landing, a stated limit pinned by row 15."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W9",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Figure rule stated twice; shared helper touches goldens."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W10",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Two wake scans disagree about stamps; deciding changes minting."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W11",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "testTransport declaration unlinked to installers."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W12",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Misplaced fmtWhen helper; move to time-words."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W13",
+  "kind": "defect",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Empty landing opens gate without read; behaviour pinned in landing-consumers test."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W14",
+  "kind": "ruling",
+  "held": "yes",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "decision",
+  "why": "John accepted no PR reads on recommend path; test pins it."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W15",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Reads-only chain would drop unused flags."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W16",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Two trail facts differ only without a review."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W17",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Own PR regex beside prUrlsIn; needs witness."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W18",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "person",
+  "home": "tracker",
+  "why": "Two answers to the task's PR; product decision, ~25 call sites."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W19",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Six dead exports and stale header; delete."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W20",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "person",
+  "home": "tracker",
+  "why": "Step words copy six labels; one word is a product call."
+ },
+ {
+  "id": "LV:runs-and-dispatch:W21",
+  "kind": "copy",
+  "held": "partly",
+  "volatile": "no",
+  "needs": "person",
+  "home": "tracker",
+  "why": "PR readers disagree on http across repos; contract records split; design call."
+ },
+ {
+  "id": "LV:web-routes:W1",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Fold test routes into registry and split file."
+ },
+ {
+  "id": "LV:web-routes:W2",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Two reductions of rulings set."
+ },
+ {
+  "id": "LV:web-routes:W3",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Public timeline leaks ids; no test fails without mask."
+ },
+ {
+  "id": "LV:web-routes:W4",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Preview leaks YAP_PASSWORD; send placeholder."
+ },
+ {
+  "id": "LV:web-routes:W5",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "check",
+  "why": "No e2e egress guard; a standing check is the fix."
+ },
+ {
+  "id": "LV:web-routes:W6",
+  "kind": "question",
+  "held": "no",
+  "volatile": "no",
+  "needs": "person",
+  "home": "tracker",
+  "why": "Jira screenshot handling is open."
+ },
+ {
+  "id": "LV:web-routes:W7",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Undeclared-field rule spelled three ways."
+ },
+ {
+  "id": "LV:wiring:W1",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Test scaffolding in server.js; catalog option would replace hooks."
+ },
+ {
+  "id": "LV:wiring:W2",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Body parsers inflate compressed bodies; small hardening."
+ },
+ {
+  "id": "SD:launch-and-harnesses:L1",
+  "kind": "ruling",
+  "held": "yes",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "check",
+  "why": "Retry policy with reasons; contract exchange/forward rows own and pin it."
+ },
+ {
+  "id": "SD:launch-and-harnesses:W1",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "opencode-runner too large; line counts stale."
+ },
+ {
+  "id": "SD:launch-and-harnesses:W2",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Witness tests duplicate what contract rows own; trim both."
+ },
+ {
+  "id": "SD:loop-and-routing:W1",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Zero-config start fails with bare ENOENT."
+ },
+ {
+  "id": "SD:loop-and-routing:W2",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "README never says when to pick SD over runner kit."
+ },
+ {
+  "id": "SD:state-and-config:W1",
+  "kind": "cleanup",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "130 env reads with no settings registry; flags never retired."
+ },
+ {
+  "id": "SD:state-and-config:W2",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "Reap window mirrored in Harbour unchecked."
+ },
+ {
+  "id": "SD:stop-hook-and-relay:L1",
+  "kind": "trap",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "DONE line outranks mention count; session-pr test pins order."
+ },
+ {
+  "id": "SD:stop-hook-and-relay:L2",
+  "kind": "trap",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "site",
+  "why": "Newest DONE line first, line order kept; tests pin both repos."
+ },
+ {
+  "id": "SD:stop-hook-and-relay:L3",
+  "kind": "home",
+  "held": "partly",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "site",
+  "why": "One DONE rule and join in transcript.js; contract pins report and sentinel rows."
+ },
+ {
+  "id": "SD:stop-hook-and-relay:L4",
+  "kind": "home",
+  "held": "yes",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "check",
+  "why": "sentinelLine owns line rules; lin-4474 test fails on a regex copy."
+ },
+ {
+  "id": "SD:stop-hook-and-relay:L5",
+  "kind": "recipe",
+  "held": "yes",
+  "volatile": "no",
+  "needs": "none",
+  "home": "note",
+  "why": "Fold changes re-pinned in LinearViewer first; contract fold rows pin it."
+ },
+ {
+  "id": "SD:stop-hook-and-relay:W1",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "larger",
+  "home": "tracker",
+  "why": "No acknowledged outbox; lost posts gone."
+ },
+ {
+  "id": "SD:stop-hook-and-relay:W2",
+  "kind": "copy",
+  "held": "no",
+  "volatile": "no",
+  "needs": "fix",
+  "home": "tracker",
+  "why": "Evidence scope derived twice."
+ },
+ {
+  "id": "SD:stop-hook-and-relay:W3",
+  "kind": "question",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "person",
+  "home": "tracker",
+  "why": "Which module owns the sentinel family is a design call."
+ },
+ {
+  "id": "SD:stop-hook-and-relay:W4",
+  "kind": "ruling",
+  "held": "partly",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "decision",
+  "why": "Accepted trade: row shape unchecked here, per ruling."
+ },
+ {
+  "id": "SD:test-harnesses:W1",
+  "kind": "defect",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "fix",
+  "home": "check",
+  "why": "Mutant anchors unchecked by npm test; add a presence check."
+ },
+ {
+  "id": "SD:test-harnesses:W2",
+  "kind": "ruling",
+  "held": "no",
+  "volatile": "yes",
+  "needs": "none",
+  "home": "note",
+  "why": "Precedent of importing Harbour modules; new tests should not copy."
+ }
+]

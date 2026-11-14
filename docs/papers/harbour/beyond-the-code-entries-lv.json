@@ -1,0 +1,1224 @@
+{
+ "repo": "LinearViewer",
+ "ref": "a886fb50691383b02cd230d4dfd685aca6b4a9b4",
+ "entries": [
+  {
+   "id": "LV:agent-api:L1",
+   "slug": "agent-api",
+   "section": "Lessons",
+   "text": "`proxyLimiter` runs before `authenticateProxyToken` on purpose, so its key may trust a bearer only after auth has proved it (`provenCredentials` in `routes/proxy.js`); a key from an unverified bearer gives each junk bearer a fresh bucket and floods reach the token store (LIN-4378). The limiters skip under `NODE_ENV=test`, so a limiter test drives the real chain with it flipped off, as `tests/unit/lin-4378-proxy-limiter-per-credential.test.js` does."
+  },
+  {
+   "id": "LV:agent-api:L2",
+   "slug": "agent-api",
+   "section": "Lessons",
+   "text": "A recommend surface must not offer what the verb refuses: a rule for recommend-and-dispatch goes in `CODE_ROUTES` (`lib/code-routes.js`, iterated by `codeRouteOf` in `lib/openrouter.js`), which GET /recommend (`routes/proxy-compute.js`) and the task page also reach; a descent-arm check (`lib/dispatch-entrance.js`) covers one surface, without run facts. A caller's bypass rides the call options (`skipLiveWait`), never the recommendation context (LIN-4392)."
+  },
+  {
+   "id": "LV:agent-api:L3",
+   "slug": "agent-api",
+   "section": "Lessons",
+   "text": "`/cost/:identifier` (`routes/proxy-compute.js`) is pinned by frozen baselines. A change to its window or shape moves `tests/fixtures/cost-replay/expected-changes.json` (W9 checks paths, not values, so pin moved values in `tests/unit/cost-read.test.js`), `tests/fixtures/cost-replay/goldens-lin4197.json` (amend its header with the reason; record with `tests/fixtures/cost-replay/record-lin4197.mjs`) and the `docs/passage-runner-prompt.md` drift guard. `tests/fixtures/cost-replay/goldens.json` stays the baseline: re-recording it erases the change list (LIN-4404)."
+  },
+  {
+   "id": "LV:agent-api:L4",
+   "slug": "agent-api",
+   "section": "Lessons",
+   "text": "A check on comment bodies keys on the comment's opening line, never on any line: reviewers write the same `### Leftovers` heading mid-comment, so matching any heading line would refuse the verdict that gates merge (`routes/proxy-writes.js` `refusedByLeftoverAnswer`; caught at LIN-4414's plan review). Test it against real comments, review verdicts included (`tests/unit/dispatch-leftover-answer.test.js`)."
+  },
+  {
+   "id": "LV:agent-api:L5",
+   "slug": "agent-api",
+   "section": "Lessons",
+   "text": "A format check on an optional create or PATCH field refuses (400); it is never the field's `present` gate. As a `present` gate it skipped the value, and the write succeeded without it: a Jira key or a Linear identifier in `parentId` vanished. Check presence first, then the writable contract, then the format (`routes/proxy-writes.js`, LIN-4451 create, LIN-4452 PATCH)."
+  },
+  {
+   "id": "LV:agent-api:L6",
+   "slug": "agent-api",
+   "section": "Lessons",
+   "text": "A typed error a provider method gains reaches a caller only if every route calling that method maps it: `refs`/`partial` in the proxy write `SPEC`, and each session or feedback catch by hand. Provider tests passed while all three create lanes answered a bare 500 for a landed create. Pin it at the route boundary (`routes/proxy-writes.js`; `tests/unit/lin-4452-create-lane-envelope.test.js`)."
+  },
+  {
+   "id": "LV:agent-api:L7",
+   "slug": "agent-api",
+   "section": "Lessons",
+   "text": "Every proxy write mount names its operation: `requireWriteScope('<op>')` for a readWrite route, `requireStageWrite('<op>')` for a grant-gated one, with `<op>` in `STAGE_WRITE_OPS` (`lib/stage-writes.js`; the gate is `lib/stage-write-gate.js`). A stamped token is refused any operation its allowance does not list, so a route nobody named would be refused to a reading stage without a word, and an unnamed name throws at mount. A new write route adds its operation to that list and a row to `CENSUS` in `tests/unit/lin-4468-stage-write-allowance.test.js`, or the census fails (LIN-4468)."
+  },
+  {
+   "id": "LV:agent-api:L8",
+   "slug": "agent-api",
+   "section": "Lessons",
+   "text": "A token minted for a stage carries its `writes` and ticket, or has a reason not to. Pass both into the mint helpers (`lib/proxy-preamble.js`), or read them from the row (`lib/item-stage-stamp.js`). A wake, immediate or held, takes the stamp of the session it resumes, the parent, not the row that reported (`stampForWakeParent`; a held release gets the producing build's id from the store). A mint with neither is unrestricted, which is right only for a person's or a `custom` mint, listed with its reason in `tests/unit/dispatch-entrance-mint-sweep.test.js`. The refire broker minted unrestricted tokens for read-only rows because its mint was a bare `createToken`, which no helper-name search finds (LIN-4468)."
+  },
+  {
+   "id": "LV:agent-api:W1",
+   "slug": "agent-api",
+   "section": "Waiting",
+   "text": "`routes/proxy-compute.js`: the recap/brief GET and POST handlers repeat one error-mapping chain and match provider errors by an \"OpenRouter\" substring; one helper beside `failureOf`, keyed on an error code, would hold \"whole or loud\". (Review, 8 Nov, on LIN-4358; area reads CG/CH.)"
+  },
+  {
+   "id": "LV:agent-api:W2",
+   "slug": "agent-api",
+   "section": "Waiting",
+   "text": "`lib/proxy-instructions.js`: the rate-limit rule (60/min per token; on a 429 wait `Retry-After`) is restated in ~eight places (quote one); it keys on the proven credential, else the IP (`routes/proxy.js`), so \"per token\" is wrong before auth. (Area reads CE/CF, LIN-4378; Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)"
+  },
+  {
+   "id": "LV:agent-api:W3",
+   "slug": "agent-api",
+   "section": "Waiting",
+   "text": "`routes/proxy-reads.js`: GET /issues returns no `createdAt`, so the stability measure's tickets-minted row bisects single-issue reads for it (`scripts/stability-measures-tracker.mjs` `idSpanSearch`: 22 probes on the 8 Nov window, with 404, trashed and bracket edge cases). A `createdAt` on the list, or a created-before filter, would replace them with one read. (LIN-4421 leftovers; Survey global.)"
+  },
+  {
+   "id": "LV:agent-api:W4",
+   "slug": "agent-api",
+   "section": "Waiting",
+   "text": "`routes/proxy-writes.js`: \"no step may change them\" (the `## As asked` words) is written twice, in `AS_ASKED_LEAD` and in `BRIEF_HINT` (`lib/as-asked.js`); the census pins the markers, not this rule; `lib/proxy-instructions.js` spells \"a day\" beside `LANDED_MIN_GAP_MS`. Borderline, LOW. (Drift & Coherence Review, 10 Nov; `docs/reviews/drift-coherence-review-2026-11-10.md`.)"
+  },
+  {
+   "id": "LV:agent-api:W5",
+   "slug": "agent-api",
+   "section": "Waiting",
+   "text": "`routes/proxy.js`: recommend-and-dispatch's `skipLiveWait` exempts any `followUpTo`, so a follow-up into an *ended* session of another stage proceeds while one is live. Requiring `followUpTo` in the live row's lineage needs a lineage read per hop (`lib/dispatch-entrance.js` sets it; wait and race: `lib/run-live-wait.js`). (LIN-4392 review.)"
+  },
+  {
+   "id": "LV:agent-api:W6",
+   "slug": "agent-api",
+   "section": "Waiting",
+   "text": "`lib/proxy-instructions.js`: the catalog omits the `leftover` row kind and the hold on a build's DONE wake until its leftover row ends (`lib/dispatch-leftover.js`; the architecture doc has it). Its `kind` contract, \"prompt-template keys plus custom\", misses 23 `DISPATCH_KINDS` and the `ROW_ONLY_KINDS` (`lib/dispatch-fields.js`). (Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)"
+  },
+  {
+   "id": "LV:agent-api:W7",
+   "slug": "agent-api",
+   "section": "Waiting",
+   "text": "`lib/proxy-instructions.js`: the guide (`docs/proxy-integration.md`) lacks eight routes the code serves (seven `model-routing`, `POST runner/usage/:id`, which the kit's contract also has no row for); the catalog lacks three snapshot and prompt routes. Generate or test them from the catalog: a size of move. (The verb-override list is derived from the stage-kind records since LIN-4467.) (Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)"
+  },
+  {
+   "id": "LV:agent-api:W8",
+   "slug": "agent-api",
+   "section": "Waiting",
+   "text": "`lib/proxy-instructions.js`: `recommend` and `recommend-and-dispatch` give a fresh, unsized ticket survey-task, survey-place, then scoping (`lib/recommendation-look-first.js`), and a live step `prompt: null` with `liveWait`. The guide's GET /recommend omits this (the catalog has it), so an agent takes a Survey step as its task. (LIN-4370, Done; Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)"
+  },
+  {
+   "id": "LV:agent-api:W9",
+   "slug": "agent-api",
+   "section": "Waiting",
+   "text": "`routes/proxy-model-routing.js`: with `modelRoutingProxyWrites` on (any member), every readWrite key, leaf workers' included, can set any harness or model workspace-wide; a non-`claude-code` harness puts later bootstraps inline. No runnable check; `urlKey` filters untested. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)"
+  },
+  {
+   "id": "LV:agent-api:W10",
+   "slug": "agent-api",
+   "section": "Waiting",
+   "text": "`routes/proxy.js`: a stage's token now carries its stage's write allowance and its one ticket (LIN-4468), so the proxy holds a reading stage to its writes. It does not yet hold its reads: a dispatch token can still GET ticket context (`/brief/`, `/issues/`, relations), and the blind read (LIN-4437) is blind by its prompt and preamble only, so a reader that ignores them can read the ask and the plan. Holding that needs a read guard per stage on the stamped token; the table in `lib/stage-writes.js` has no read column yet. By the consequence test it breaks nothing today, blocks no work and touches no safety. (LIN-4396 plan, witness 2; LIN-4468.)"
+  },
+  {
+   "id": "LV:agent-api:W11",
+   "slug": "agent-api",
+   "section": "Waiting",
+   "text": "`routes/proxy-compute.js`: about 16 production sites (this file x7, `server.js` x3, `routes/test.js`, and others) compare a credential to `'test-token'` inline, beside the one helper (`isHermeticTestToken`, `lib/should-mock-ai.js`) that only two production modules import. Each is gated on `NODE_ENV=test`, so production behaviour is right today; injecting transports from tests, instead of production code recognising the token, would remove these checks and the `testTransport` declaration (`lib/dispatch-factory.js`). It spans several areas. (LIN-4456 review and Survey global, 13 Nov.)"
+  },
+  {
+   "id": "LV:auth-accounts-and-workspaces:L1",
+   "slug": "auth-accounts-and-workspaces",
+   "section": "Lessons",
+   "text": "To retire a logged workspace setting, take it out of `SETTINGS` in `lib/workspace-change-log.js` and keep its words in `summarizeWorkspaceEntry`. Its old rows then still read, are not undoable, and `undo` refuses them before `readCurrent` or `apply` runs. Removing only the Settings undo sink is not enough: the route falls back to writing a workspace feature flag. Leave the stored preference unread; don't migrate it (LIN-4393)."
+  },
+  {
+   "id": "LV:auth-accounts-and-workspaces:W1",
+   "slug": "auth-accounts-and-workspaces",
+   "section": "Waiting",
+   "text": "`lib/email-auth.js`: `normalizeEmail` only trims and lowercases, so plus and dot aliases of one inbox each get a fresh per-address budget; and a provider refusal (quota, suspension) is logged by name only behind the same \"check your inbox\" page, so the silent lockout returns at Resend's limit. Not latent: the hosted email door is on (Onboarding & Cold-Start Review, 11 Nov.). (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)"
+  },
+  {
+   "id": "LV:auth-accounts-and-workspaces:W2",
+   "slug": "auth-accounts-and-workspaces",
+   "section": "Waiting",
+   "text": "`lib/session-options.js`: `NODE_ENV==='production'` is the only production signal for seven controls (the `SESSION_SECRET` refusal, both secure cookies, `trust proxy`, the HTTPS 301, HSTS, the console-email refusal); unset, each fails open silently. Waiting: a second signal, or a boot refusal when hosted without it. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)"
+  },
+  {
+   "id": "LV:auth-accounts-and-workspaces:W3",
+   "slug": "auth-accounts-and-workspaces",
+   "section": "Waiting",
+   "text": "`routes/jira-auth.js`: a Jira sign-in's workspace is keyed on the person (`jira:<accountId>`), as GitHub's is, while Linear's is keyed on the organisation. So each teammate who presses \"Continue with Jira\" gets a separate workspace over the same site, with its own owner, run controls and runner key, and their runners can take the same issue unseen. Nothing joins them or says so, and Settings' \"member\" copy cannot hold there. That is a team-workspace decision bigger than a tidy; the missing invite itself is v1's deferral. (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)"
+  },
+  {
+   "id": "LV:auth-accounts-and-workspaces:W4",
+   "slug": "auth-accounts-and-workspaces",
+   "section": "Waiting",
+   "text": "`lib/task-share-store.js`: share tokens are hashed by their own sha256-hex helper, the same digest as `hashHarbourToken` (`lib/harbour-token-format.js`), which the proxy, dispatch and feedback stores and the proxy limiter now share. A share token is not a Harbour-format token (no prefix), so whether it takes the same helper is a naming call, not a fix. (LIN-4451 leftovers.)"
+  },
+  {
+   "id": "LV:front-end-browser:L1",
+   "slug": "front-end-browser",
+   "section": "Lessons",
+   "text": "A page script's second request keeps the poll's discipline: coalesce every reason into one fetch per window, and stop when the poll stops (hidden tab, 401, revoked link). `createTimelineRefresher` (`public/task-page.js`, LIN-4405) is the pattern; a running chip changes the poll's track about once a minute, so \"fetch when it changes\" alone repeats. Done reads once more first (`finish`): the poll that says done carries the last change, and stopping drops it."
+  },
+  {
+   "id": "LV:front-end-browser:L2",
+   "slug": "front-end-browser",
+   "section": "Lessons",
+   "text": "Task-page CSS is phone-first at `min-width: 600px` (only the listed breakpoints pass `tests/unit/ui-authorities.test.js`), with `--font-size-*` tokens and no new mono selector (`tests/unit/lin-4107-type-sizes.test.js`)."
+  },
+  {
+   "id": "LV:front-end-browser:L3",
+   "slug": "front-end-browser",
+   "section": "Lessons",
+   "text": "The no-build-step rule (`CLAUDE.md`) allows browser sharing, not only forbids it (LIN-4446). The browser may import natively, and the restated copies came from reading the rule as \"no sharing\" (`docs/papers/harbour/the-second-copy.md` §9–10). Pages become ES modules that import what they share (LIN-4471), converted top down: a page module before the files it uses. A module runs after every classic script, so it reads any classic global safely; a leaf converted first would have classic consumers and need a bridge. A lib twin retires when its last classic consumer converts."
+  },
+  {
+   "id": "LV:front-end-browser:L4",
+   "slug": "front-end-browser",
+   "section": "Lessons",
+   "text": "Shared leaves: a shared module is a leaf (it imports nothing and names no browser or Node global, `tests/unit/shared-modules.test.js`), served only through the explicit `SHARED_MODULES` allow-list in `lib/vendor-assets.js`, one route per file under the served /lib/ namespace, never by directory (a lib file not on the list is a 404). A page imports one with a relative specifier that starts with ../lib/ (quoted in the code). The second is `lib/time-words.js` (LIN-4472): the duration and relative-time words, which the server and the task page both import; the page's own copies were removed, not kept under a parity test. That resolves to the same file in the browser and in Node only because `public/` is served at the URL root and stays flat, with no nested .js files (`tests/unit/front-end-import-layout.test.js`). Do not move `public/` under a prefix or add a subdirectory."
+  },
+  {
+   "id": "LV:front-end-browser:L5",
+   "slug": "front-end-browser",
+   "section": "Lessons",
+   "text": "One bridge, no new names: `public/cost-format-global.js` is the only module that writes a global for classic scripts. Its names, its one emitter and its classic readers are inventoried (`tests/unit/bridge-inventory.test.js`). A new name fails the check, and so does a registered reader that no longer reads, so the bridge only shrinks. A page that is a module imports the formatter directly and reads no bridge."
+  },
+  {
+   "id": "LV:front-end-browser:L6",
+   "slug": "front-end-browser",
+   "section": "Lessons",
+   "text": "A bridge reader reads the global only from a handler or callback that runs after DOMContentLoaded, never while its script executes: Chart.js calls scale tick callbacks synchronously. Its witness loads the reader first and installs the global after it (`loadCostFormat`, `tests/fixtures/browser-cost-format.js`), which is the order a page has. The inventory reads each witness's calls and fails a witness whose first `loadCostFormat(` comes before it loads the reader."
+  },
+  {
+   "id": "LV:front-end-browser:L7",
+   "slug": "front-end-browser",
+   "section": "Lessons",
+   "text": "A `{ module }` entry's place in a renderer's script list means nothing: a module runs after every classic script, wherever it is listed. A bridge reader is safe because of when it reads the global, not where the shim sits."
+  },
+  {
+   "id": "LV:front-end-browser:L8",
+   "slug": "front-end-browser",
+   "section": "Lessons",
+   "text": "A converted page is tested by plain `import` over the fake DOM (`tests/unit/helpers/import-world.js`), not by `loadWorld`. Each import is a fresh module instance, and the world puts every global back when it is restored. The classic-loader census (`tests/unit/classic-loader-census.test.js`) is a ratchet on the suites that still load classic scripts: it may only fall. `importWorld` installs only what it is given, unlike `loadWorld`: no stub `fetch`, `setInterval` or clipboard, and real timers unless `timers` is passed, so a page's init would reach the network or leave a poll running. Test pure exports by a static import; drive an init through one shared world with inert defaults (`tests/unit/helpers/task-page-world.js`, LIN-4472), made before the import so the page's DOMContentLoaded listener lands on the fake document. A suite that runs a classic file through `runClassic` counts, except `public/chart-helpers.js` and `public/close-out.js`, the two IIFE siblings a module page may read."
+  },
+  {
+   "id": "LV:front-end-browser:L9",
+   "slug": "front-end-browser",
+   "section": "Lessons",
+   "text": "A page module runs while `document.readyState` is already `'interactive'`, before DOMContentLoaded, so a module page that starts on DOMContentLoaded registers that listener unconditionally: its old `readyState === 'loading'` branch is false under a module and would start the page early. A top-level early return becomes `var mounted = ...` with the statements after it in `if (mounted) { }`: `var` stays module-scoped, and function declarations stay top-level and hoisted, as they were in the IIFE. (LIN-4463 piece 3, flight-companion.js.)"
+  },
+  {
+   "id": "LV:front-end-browser:L10",
+   "slug": "front-end-browser",
+   "section": "Lessons",
+   "text": "A module's exports are its test seams, and a namespace is read-only. A classic getter/setter pair on the export object becomes a named function (`getOpenLoopIds`/`setOpenLoopIds` in `public/observation.js`); a `let` read through the namespace is live. Keep each export's name from the old seam where it can stay a function (`lastRulingsRef`); an accessor named after its own state gains a verb (`openLoopIds` → `getOpenLoopIds`), so a suite changes how it loads and not what it asserts. A suite reaches module state through the seam, never by a script-scope probe. (LIN-4463 piece 4.)"
+  },
+  {
+   "id": "LV:front-end-browser:W1",
+   "slug": "front-end-browser",
+   "section": "Waiting",
+   "text": "`public/app.js`: Home's Running and Up next are refreshed by parsing a whole page with `DOMParser` (LIN-4243). Waiting on you is drawn as a server fragment by the page's own function (LIN-4242); doing the same for the other sections would mean the client never parses a whole page. (Survey tally: LIN-4243.) Not a module matter; outside LIN-4463 (plan table)."
+  },
+  {
+   "id": "LV:front-end-browser:W2",
+   "slug": "front-end-browser",
+   "section": "Waiting",
+   "text": "`public/common.js`: `buildDispatchModelOptionDescriptors` repeats the merge rule of `buildModelOptions` (`lib/openrouter-catalog.js`). That module is not a leaf (it imports `lib/catalog-rate.js`), so it cannot be served as one shared file (LIN-4446). The lists are not copied (they come from `window.__HARNESS_MODELS__` and the catalog over the wire); only the rule is. The endpoint could send merged options instead. (LIN-4358.)"
+  },
+  {
+   "id": "LV:front-end-browser:W3",
+   "slug": "front-end-browser",
+   "section": "Waiting",
+   "text": "`public/brief.js`: its `postBrief`/`errorText` block is identical to `postRecap`/`errorText` in `public/recap.js`, and the check for a `statusCode` inside a keepalive 200 body is now written four times (also `public/scan.js` and `public/observation.js`). One shared imported reader is possible only once `public/scan.js`, `public/recap.js` and `public/brief.js` are modules that can import it (LIN-4463 converts pages top down; `public/observation.js` became a module in piece 4); until then it would be a classic global in `public/common.js`. (Area reads CG/CH, 8 Nov, on LIN-4358.)"
+  },
+  {
+   "id": "LV:front-end-browser:W4",
+   "slug": "front-end-browser",
+   "section": "Waiting",
+   "text": "`public/common.js`: exported globals, and the \"client twins\" of `lib/task-page-href.js`, `lib/timeline-zoom.js`, `lib/ship-layout.js` and `lib/prompt-formatters.js`. The first two are leaves of the same shape as cost-format, the next candidates; the last two import other modules, so serving a single file will not do for them. Its `TERMINAL_STATE_TYPES` mirror of `lib/providers/models.js` (no imports) is another leaf twin, and it retires when its last classic consumer converts (LIN-4471 corrected its comment to say so). (LIN-4446 plan and leftovers.)"
+  },
+  {
+   "id": "LV:front-end-browser:W5",
+   "slug": "front-end-browser",
+   "section": "Waiting",
+   "text": "`public/ship.js` / `public/ship-biscuit.js`: still hand-synced copies (\"mirror of lib/ship-layout.js\", \"kept in lockstep with lib/render-ship-biscuit.js\"). Each lib side would first have to become an import-free leaf before it could join `SHARED_MODULES`. (LIN-4446 blind read.)"
+  },
+  {
+   "id": "LV:front-end-browser:W6",
+   "slug": "front-end-browser",
+   "section": "Waiting",
+   "text": "`public/session.js`: its `formatElapsed` is a copy of `fmtDuration` (`lib/time-words.js`, LIN-4472). `fmtDuration` in `public/live-console.js` words seconds with no hour rung (`66m 40s` where the leaf says `1h 6m`), so the duration rule is spelled two ways. Both are classic scripts, so neither can import the leaf until its page is a module (session.js shares close-out.js with the task page). Each copy goes when its page converts; Live Console's wording is a choice to make then. (LIN-4472 leftovers. The copy in `public/observation.js` went with its conversion, LIN-4463 piece 4.)"
+  },
+  {
+   "id": "LV:front-end-browser:W7",
+   "slug": "front-end-browser",
+   "section": "Waiting",
+   "text": "`public/observation.js`: about 5,000 lines. By the counting method of LIN-4446 (lines starting with `*`, `//` or `/*`) 1,985 of its 4,679 non-blank lines are comments. Find out why it is this large before splitting it. An earlier survey used a different method, so its figure is not comparable. (LIN-4446 plan.) It is a native module now (LIN-4463 piece 4); converting it did not change its size, and its suites still run most of its 105 seams."
+  },
+  {
+   "id": "LV:front-end-browser:W8",
+   "slug": "front-end-browser",
+   "section": "Waiting",
+   "text": "`public/observation.js`: it is a module but still reads `public/common.js` globals bare (`escapeHtml`, `relativeTime`, `window.api`, `taskPageHref`/`sourceQuery`, `ReplyDelivery`, `ScanSection`), and each of its module suites (`tests/unit/observation-module.test.js`, `tests/unit/task-page-link-client-surfaces.test.js`, `tests/unit/observation-ruling-delivery.test.js`) rebuilds that contract by hand, differently: one stubs `escapeHtml` and `relativeTime`, one passes the real lib leaves, and the ruling-delivery suite runs `public/common.js` into the process global with `vm.runInThisContext` and an `importWorld({})` baseline it never restores (that keeps it in the classic-loader census). Two ways out, and the choice is a design call spanning several suites: one shared observation-world helper for the suites, or move the page's `public/common.js` reads to imports (which needs those names extracted from `public/common.js` as leaves). Settle it with the next change to `public/observation.js`. (LIN-4463 piece 4 blind read.)"
+  },
+  {
+   "id": "LV:front-end-browser:W9",
+   "slug": "front-end-browser",
+   "section": "Waiting",
+   "text": "`public/llms.txt`: its H11 names the unscoped `/api/recommend/status`, which is now only a legacy redirect (`routes/legacy-redirects.js`), and its view list omits `projects` and `live-console` (`lib/components/view-nav.js`; live-console shows for an owner with a live runner key or queue token unless their `liveConsole` flag is stored `false`, not simply behind a flag). The browser guide is otherwise sound: its endpoints and selectors resolve. The view list and `nav-view-*` keys are written by hand and no test checks them against source, so a fix will drift again unless a conformance test comes with it. Not a module matter; outside LIN-4463 (plan table). (Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`; LIN-4463 blind read.)"
+  },
+  {
+   "id": "LV:front-end-browser:W10",
+   "slug": "front-end-browser",
+   "section": "Waiting",
+   "text": "`public/prompt-section.js`: on a server with no AI (`aiState: \"unconfigured\"`, a self-host with no OpenRouter key) the run control still offers Next step. Pressing it gets a 503 from the recommend stream, and \"AI Recommend · generating…\" / \"Loading…\" spin with no message, while Run to PR works beside it. Offer only what the server can do, or say why it can't. (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.) Not a module matter; outside LIN-4463 (plan table)."
+  },
+  {
+   "id": "LV:front-end-browser:W11",
+   "slug": "front-end-browser",
+   "section": "Waiting",
+   "text": "`public/feedback-widget.js`: on any non-ok response it keeps the draft and shows `data.error`; it never checks `code: 'PARTIAL_WRITE'` or `retryable: false` (LIN-4452). After a Jira ticket that landed without its seal, the user sees agent wording (\"do not retry the create, read the issue instead\") with no identifier and Save still active, so pressing Save again files a duplicate. Read the code, show the created key if the envelope carries one, and disable resubmit. Only reachable on a Jira-backed workspace whose property write fails; revisit with John's live evidence on LIN-4445. (LIN-4452 blind read.)"
+  },
+  {
+   "id": "LV:front-end-browser:W12",
+   "slug": "front-end-browser",
+   "section": "Waiting",
+   "text": "`public/flight-companion.js`: whether the page has its core mounts (`thread`, `questionInput`, `sendBtn`) is one decision spread over eight `if (mounted) { }` blocks (the first declares the turn state; the rest wire listeners and restore the stored session). Module state such as `chatHistory`, `cadence`, `seenIdentifiers`, `PILL_GLYPHS`, `modelActiveIdx`, `resumeAnchorMs` and `keepStopped` is declared inside those blocks, and the hoisted functions read it unconditionally. A new top-level `var` or listener has to remember the wrapper, and nothing fails if it does not, except under the `omitMounts` test. Give the decision one owner: an `init()` entry point like `public/task-page.js`'s `init(doc)`, or state declared unconditionally with the wiring guarded in one place. Keep the missing-mount behaviour. Larger than a fix for a 2,200-line file; do it with the next change to this file. (LIN-4463 piece 3 blind read.)"
+  },
+  {
+   "id": "LV:front-end-pages:L1",
+   "slug": "front-end-pages",
+   "section": "Lessons",
+   "text": "A control a page renders per row (a select or input in each Settings row) needs its own accessible name: a `<label>`, `aria-label` or `aria-labelledby`. A placeholder or a visible word beside it is not enough. Settings › Models renders 86 unnamed controls, one set per job row (Design & Interface Review, 8 Nov 2026; `lib/render-settings.js`, `docs/reviews/design-interface-review-2026-11-08.md`)."
+  },
+  {
+   "id": "LV:front-end-pages:L2",
+   "slug": "front-end-pages",
+   "section": "Lessons",
+   "text": "The task page carries money (LIN-4405). A guest sees none: the guest route strips the timeline with `withoutSpend` (`lib/task-timeline.js`, a copy, since the page result is cached), and `lib/render-task-timeline.js` never puts a cost in an attribute. Any new figure on the page goes through the same strip, and the three-response guest test (`tests/unit/task-timeline-page.test.js`) is the gate."
+  },
+  {
+   "id": "LV:front-end-pages:L3",
+   "slug": "front-end-pages",
+   "section": "Lessons",
+   "text": "The task page's desktop grid (`public/task-page.css`, ≥1024px) places every child by `grid-area`. A new section needs its own area in both templates, or it renders at the top of the page (LIN-4405)."
+  },
+  {
+   "id": "LV:front-end-pages:W1",
+   "slug": "front-end-pages",
+   "section": "Waiting",
+   "text": "`lib/render-settings.js`: Settings › Models has 42 unnamed `select.harness-select`, 42 unnamed `input.dispatch-effort-input` (one per job row) and 2 unnamed `input.dispatch-preset-name-input` (WCAG 4.1.2). The other seven areas have none. Lighthouse on Settings ran on the sources area and missed this. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)"
+  },
+  {
+   "id": "LV:front-end-pages:W2",
+   "slug": "front-end-pages",
+   "section": "Waiting",
+   "text": "`lib/render-pages.js`: the Jira site picker, `renderJiraSiteSelectPage`, overflows a 390px viewport by 52px and a 320px one by 122px. The native `select#jira-site-select` has its right edge at 442px. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)"
+  },
+  {
+   "id": "LV:front-end-pages:W3",
+   "slug": "front-end-pages",
+   "section": "Waiting",
+   "text": "`lib/components/halt-controls.js`: in the `buttons` presentation (Dispatch) Pause, Stop and Resume compute to the same style, and the tone the component declares (red for Pause and Stop) is not applied. Stop stops running sessions. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)"
+  },
+  {
+   "id": "LV:front-end-pages:W4",
+   "slug": "front-end-pages",
+   "section": "Waiting",
+   "text": "`lib/render-library.js`: every Library document renders two `<h1>` (the shell \"Harbour\" and the document title), 117 of 117. The index renders one. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)"
+  },
+  {
+   "id": "LV:front-end-pages:W5",
+   "slug": "front-end-pages",
+   "section": "Waiting",
+   "text": "`lib/render-styleguide.js`: in dark theme the swatch captions under `.sg-value` show light-theme values (`#ffffff` for `--bg`, `#1a1a1a` for `--fg`) beside dark swatches. LIN-3957 and LIN-3960 are open on this page and do not cover it. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)"
+  },
+  {
+   "id": "LV:front-end-pages:W6",
+   "slug": "front-end-pages",
+   "section": "Waiting",
+   "text": "`lib/mask-secrets-in-html.js`: on a Jira workspace `/t/` masks text after `lib/providers/jira/adf.js` has escaped every `_` to `\\_`, so underscore-bearing shapes (Resend, Harbour, Linear, GitHub, env-style) reach a guest unmasked; OpenRouter, Mongo, Atlassian and PEM still match. Strip CommonMark backslash escapes, with a position map, before matching. A seam: providers has no note. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)"
+  },
+  {
+   "id": "LV:front-end-pages:W7",
+   "slug": "front-end-pages",
+   "section": "Waiting",
+   "text": "`lib/components/navbar.js`: the workspace switcher's `+ Jira` goes to Jira OAuth `mode=new` (a new sign-in), and on a server with no Jira OAuth env it is not shown at all, although the Jira API-token path (no server config) works there. That path is only reachable from Settings › Sources inside a workspace, so a Jira team without OAuth consent has to find \"make a workspace, then Settings\" alone. (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)"
+  },
+  {
+   "id": "LV:front-end-pages:W8",
+   "slug": "front-end-pages",
+   "section": "Waiting",
+   "text": "`lib/render-runner-setup.js`: the runner page defines itself as working \"with no Simple Dispatcher\" and makes the two exclusive per workspace, but no page a newcomer reads says what Simple Dispatcher is or when a team would want it (an always-on host), and its queue token lives on the Dispatch page. A seam with the simple-dispatcher repo, whose README never names this page. (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)"
+  },
+  {
+   "id": "LV:front-end-pages:W9",
+   "slug": "front-end-pages",
+   "section": "Waiting",
+   "text": "`lib/render-session.js`: the run page's `session-run-chat` link is missing on the first attempt and present on retry in 10 sampled green runs (no ticket); whether the link renders late or the seed lands late is unknown. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)"
+  },
+  {
+   "id": "LV:front-end-pages:W10",
+   "slug": "front-end-pages",
+   "section": "Waiting",
+   "text": "`lib/render-task-timeline.js`: picks a tick's bare style by restating the model's tick rule (`lib/task-timeline.js`: wake, resumed, or no records), and the legend's \"woken or resumed\" restates it again, though its header says it derives nothing. If the model ticks another role, the renderer styles it wrongly and the legend goes stale; the tick could carry its style. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)"
+  },
+  {
+   "id": "LV:front-end-pages:W11",
+   "slug": "front-end-pages",
+   "section": "Waiting",
+   "text": "`lib/render.js`: the external deep-link \"+ Add task\" branch has no in-tree provider since LIN-4451 (Jira was the last; GitHub Projects has no create affordance at all). The `getCreateTaskUrl` overrides on Linear, GitHub, Local and Jira now only gate `ui.write`. Folding that gate into `inlineCreate` would retire four overrides, the branch, its byte pin (`tests/unit/render.test.js`), the `public/llms.txt` sentence and the decoupling guard in `tests/unit/providers.test.js`: larger than a fix. (LIN-4451 leftovers.)"
+  },
+  {
+   "id": "LV:front-end-pages:W12",
+   "slug": "front-end-pages",
+   "section": "Waiting",
+   "text": "`lib/render-task-create.js`: on Jira, \"+ Add task\" under an epic opens `/task/new?projectId=<epic>`, but Jira's `createFields()` has no `projectId`, so `routes/task-create.js` ignores it and the epic is dropped silently; the task files in the chosen project with no epic. Either declare `projectId` in `createFields()` (the provider already sets the epic from it, but the form then needs an epic or project control scoped by team) or stop passing the parameter: a separate design decision, not a line edit. (LIN-4451 review.)"
+  },
+  {
+   "id": "LV:front-end-pages:W13",
+   "slug": "front-end-pages",
+   "section": "Waiting",
+   "text": "`lib/components/view-nav.js` and `lib/components/footer.js`: comments the view-switcher and footer fixes left stale. The `lib/components/view-nav.js` header says the \"Flagged power-user (roadmap / dispatch / proxy)\" views show only behind a flag, but proxy is always pushed; it omits live-console's roadmap-tier slot; and it says \"the six in EXPERIMENTAL_VIEWS\" where `lib/feature-defaults.js` lists seven. `lib/components/footer.js` (near line 89) says the model name is filled \"from /api/recommend/status\"; the client reads the workspace-scoped path. Comment fixes, no behaviour. (LIN-4463 blind read.)"
+  },
+  {
+   "id": "LV:front-end-pages:W14",
+   "slug": "front-end-pages",
+   "section": "Waiting",
+   "text": "`lib/components/view-nav.js`: the docs that describe the view tiers disagree with it. `docs/view-tiers.md` names the first-class root view \"dashboard\" where the route key is projects (label \"tasks\"), and it and `docs/architecture/views.md` list proxy among the flagged power-user views although the header switcher always shows it. Rewrite the tier lists from `getViewNavLinks` and `DISPLAY_LABELS`. (LIN-4463 blind read.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:L1",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "Prompt size is frozen (`tests/unit/prompt-size-budget.test.js`): text grows only with its ticket and reason beside the ceiling and `FROZEN_TOTAL_BYTES`; old reasons go to \"Ceiling history\" in `scripts/prompt-template-change-log.md`."
+  },
+  {
+   "id": "LV:llm-and-prompts:L2",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "Grounding lists in `lib/prompt-formatters.js` are shared (`WORK` serves several stages, `GROUNDING_NOTES` unknown kinds): give one stage its own list (LIN-4371)."
+  },
+  {
+   "id": "LV:llm-and-prompts:L3",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "Keep scoping and both Survey renders byte-identical unless a ticket is about them (replays compare them, LIN-4369)."
+  },
+  {
+   "id": "LV:llm-and-prompts:L4",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "The Surveys get no area notes pointer: survey-place reads no shape reports, which feed the notes. Scoping cites its pointer in its final message; both share `AREA_NOTES_WHERE` (LIN-4346)."
+  },
+  {
+   "id": "LV:llm-and-prompts:L5",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "`lib/prompt-template-defs.js` and the budget test change in almost every merge: rebase, then re-measure. Its fixture passes no context (the empty-context branch), so dropping one can raise a ceiling while real renders shrink (LIN-4393)."
+  },
+  {
+   "id": "LV:llm-and-prompts:L6",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "The `## As asked` block's words have one owner, `lib/as-asked.js`: import its spellings, never retype the heading or end line (LIN-4362)."
+  },
+  {
+   "id": "LV:llm-and-prompts:L7",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "The blind read's kind, heading and verdict words have one owner, `lib/prompts/blind-read-words.js`; the verdict prose (\"better, the same or worse\") is built there from the words. Import them; the scan in `tests/unit/stage-kind-tables.test.js` fails on a literal elsewhere, but a row key of a table it lists. Prove a move byte-identical by rendering every kind, fresh and fix round (LIN-4466)."
+  },
+  {
+   "id": "LV:llm-and-prompts:L8",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "The code routes' order lives once, in `CODE_ROUTES` (`lib/code-routes.js`). A new route is an entry with its `emits`, plus the one \"Code route order\" line in `docs/architecture/prompt-system.md` and in `docs/architecture/source-map.md`; `tests/unit/lin-4465-code-routes.test.js` fails until all three agree. Point at the list; never restate the order or count the routes in prose (LIN-4465)."
+  },
+  {
+   "id": "LV:llm-and-prompts:L9",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "`lib/prompt-template-defs.js` cannot import what imports `lib/prompt-templates.js` (a cycle): shared words live in a leaf that imports only leaves, as `lib/prompts/leftover-words.js` (LIN-4376) and `lib/prompts/autopilot-precedence.js` (never restate a rank; LIN-4382)."
+  },
+  {
+   "id": "LV:llm-and-prompts:L10",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "Prompt words banning a kind of how do not hold it (LIN-4369's replay: closing one channel moved it to the next). Hold the shape in code or a test (`SIZE_RECORD_SHAPE`, `lib/size-of-move.js`, arm 3) or hold the reader's side (arm 4)."
+  },
+  {
+   "id": "LV:llm-and-prompts:L11",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "A stage lead's first sentence is the selector's purpose line: changing it means new router snapshots, `scripts/eval/meta-prompt.baseline.txt` and routing ceiling (LIN-4369)."
+  },
+  {
+   "id": "LV:llm-and-prompts:L12",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "`lib/prompts/autopilot-precedence.js`: check real rows reach a server guard before prompt text bypasses it (LIN-4349). A scoped run's Periodical is opt-in by goal: no tail, no flag (LIN-4415)."
+  },
+  {
+   "id": "LV:llm-and-prompts:L13",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "`lib/periodicals.js`: close-out merges a Periodical's PR and sets Done as for any task; give no Periodical its own merge rule: notes are prompt input (LIN-4390). The rule is retyped in five files; only a test links them."
+  },
+  {
+   "id": "LV:llm-and-prompts:L14",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "Model facts come from the OpenRouter catalog: add no model list or rate (LIN-4358); tests seed `tests/unit/helpers/pinned-catalog.js`."
+  },
+  {
+   "id": "LV:llm-and-prompts:L15",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "`lib/library.js` takes a shelf doc's summary by position (`firstParagraphAfterTitle`): a paper that opens with a figure keeps its alt text under 12 words, or the alt text becomes the summary; a rewritten first paragraph re-pins `tests/fixtures/library-doc-summaries.json` (LIN-4428)."
+  },
+  {
+   "id": "LV:llm-and-prompts:L16",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "A blind reader's limits are instructions, not access: with the repository checked out it can still see commit subjects (`git worktree add` prints the head's) and area notes. Both slipped, harmlessly, in the LIN-4436 pilot. Code hands a blind stage SHAs and PR URLs, never a PR body or commit log."
+  },
+  {
+   "id": "LV:llm-and-prompts:L17",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "`lib/periodicals.js`: Stability defers to a repo's committed declaration of its measures and names none (LIN-4424): change Harbour's measures in `docs/reviews/stability-measures/README.md` and its script, never in the shared template; a test links the bullet's list to that README."
+  },
+  {
+   "id": "LV:llm-and-prompts:L18",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "A new stage kind is one record in `lib/prompts/stage-kinds.js`, with every field: its template, lead, signals, labels, grounding, contract, intent, catalogue line and verb-override entry follow from it, and `tests/unit/lin-4467-stage-kind-record.test.js` fails on a missing field. The public catalogue is generated (`node scripts/gen-llms-catalogue.mjs`). A kind in `SPINE` (`lib/run-view.js`) also moves the run page's \"n of N\", the session and task-page goldens (`UPDATE_RENDER_SESSION_GOLDEN=1`, `UPDATE_RENDER_TASK_PAGE_GOLDEN=1`) and the E2E count pins; read the golden diff before accepting it (LIN-4437)."
+  },
+  {
+   "id": "LV:llm-and-prompts:L19",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "`formatCiGateCheck` (`lib/prompt-formatters.js`) renders in implementation, review and close-out: a rule for one stage gets its own formatter beside it. Prove the others unchanged by rendering every kind, fresh and fix round, at HEAD and on the branch, not by the budget test, whose ceilings are caps (LIN-4441)."
+  },
+  {
+   "id": "LV:llm-and-prompts:L20",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "`tests/fixtures/lin-4467-witness.json` stays as a ratchet: a sha256 for all 40 real-context renders, fresh and fix round. A rendered-text change regenerates it (`node tests/fixtures/lin-4467-witness.js --write`) beside the byte ceilings and the change log; its byte counts are the real-context witness the budget's caps are not (LIN-4469)."
+  },
+  {
+   "id": "LV:llm-and-prompts:L21",
+   "slug": "llm-and-prompts",
+   "section": "Lessons",
+   "text": "The blind-read scan in `tests/unit/stage-kind-tables.test.js` reads `git ls-files`: a new file is not scanned until it is committed, so a local pass before the first commit proves nothing about it (LIN-4467)."
+  },
+  {
+   "id": "LV:llm-and-prompts:W1",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/recommendation-input.js`: the pinned-kind and in-app renders (`lib/dispatch-entrance.js`, `routes/proxy-compute.js` twice, `routes/workspace-api-prompts.js`) build context by hand: a new field must reach all five (LIN-4368 missed one; LIN-4393 leftovers.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W2",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/size-of-move.js`: the built-in policy (`DECIDED_BY.policy`, err larger) may stand in for John's \"per task breakdown of options\"; its size words are unexplained. (John, LIN-4393.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W3",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/prompts/stage-kinds.js`: `CUT` writes the closing contract's token order (`DECISION:` before `BLOCKED:`) into a scope line beside `ASK`. The vocabulary is settled (LIN-4469): the cut and the verdicts' \"naming any cut\" are one word, in `CUT` and the plan-review and review verdicts. The token order still sits in the scope line and no test links the two. (John, 8 Nov.; LIN-4469 settled the word.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W4",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/prompts/stage-kinds.js`: one record per stage kind (LIN-4467). The per-kind tables that stay, each with its owner and reason: `JOBS` (`lib/llm-jobs.js`), pure data on purpose so its census test is not vacuous (19 of its 39 rows are not template kinds); the route and writes pins (`tests/unit/lin-4253-stage-traits.test.js`), hand-typed on purpose, the one check not read back from the record; `SPINE`, `BUCKET_OF_KIND`, `FIRST_PASS_KINDS` and `OFF_SPINE_KINDS` (Runs & dispatch, A13); the six non-template labels and the two orchestration step words (`lib/run-view.js`), which no record carries; the byte ceilings (`tests/unit/prompt-size-budget.test.js`), which cover the registry. `VIRTUAL_PROMPTS` (`lib/workflow-config.js`) is gone: its one reader is the record's key. (Survey tally, LIN-4248; piece 3, LIN-4467.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W5",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/call-budget.js`: the budget rule is untested live on anthropic/claude-haiku-5.5; before moving a call there, replay LIN-4352's snapshot through `scripts/replay-brief.mjs`: block [2] WHOLE, four sections, finishReason=stop, any retry's reasoning bound accepted. REFUSED: change the rule first. (John, LIN-4358.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W6",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/call-budget.js`: split: `resolveReasoningBudget`/`isReasoningModel` stay in `lib/openrouter.js`; tool hops and the routing pair get the budget, not the retry; `canReason` has test callers only. (Area reads CG/CH.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W7",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/openrouter.js`: `SUGGESTED_MODEL_IDS` and `DISPATCH_MODEL_SUGGESTIONS` (`lib/model-routing-harnesses.js`) repeat ids by hand, unchecked; the first is also the cold-catalog fallback. (Area reads CG/CH.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W8",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/periodicals.js`: `docs/areas/` is spelled in 26 lines across 11 code files (`lib/`, `routes/`, `public/`, `server.js`, `scripts/`), up from 17 in 10 at the 10 Nov reading, and two leaves now spell the directory: `REGISTRY_PATH` (`lib/prompts/area-registry-path.js`) and `NOTES_DIR` (`lib/prompts/area-note-format.js`, LIN-4420), neither derived from the other. Moving the notes means editing both leaves and the prose. (Drift & Coherence Review, 10 Nov; `docs/reviews/drift-coherence-review-2026-11-10.md`; count, Documentation Review; recounted, Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W9",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/periodicals.js`: two sizes of move: a ceiling for Periodical prompts (+18.8% in the window, 185,952 to 220,882 B; only a sha256 tripwire), and an index or series archive for `docs/reviews/` (109 top-level reports, 88 MB). (Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W10",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/prompt-formatters.js`: eight stage kinds are told notes bind, yet `tests/unit/area-notes.test.js` checks shape only and close-out writes review-worded entries to main unreviewed: no content boundary on who adds a Lesson. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W11",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/prompts/autopilot-kickoff.js`: a dispatch holder's `goal` is \"Goal from the human\" (ranked first), a periodical mint `note` \"the operator\" (`lib/periodicals.js`): attribute both to the minting token. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W12",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/library.js`: summaries come from first-paragraph position, so an opening image's alt text can become the summary and every shelf rewrite churns `tests/fixtures/library-doc-summaries.json`; a `summary:` front-matter field would end both, but changes every doc's summary source. (Survey global, LIN-4428.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W13",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/periodicals.js`: a reading's finding with no file in an area to cite goes to the closing comment, \"never in a ticket\", a live secret included, while `CONSEQUENCE_TEST` (`lib/prompts/leftover-words.js`) sends a find that touches safety to a ticket. The two rules in this area answer the live-secret case oppositely; having Periodicals render the gate needs John's ruling on that case first. (LIN-4401, LIN-4431.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W14",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/prompts/leftover-words.js`: since `CONSEQUENCE_TEST` (LIN-4401), outside finds gather as Waiting entries in other areas' notes where tickets used to be filed. LIN-4414's one retirement per build drains only the areas a build touches, so rarely touched notes (other-features) will grow; their Waiting counts are the honest measure. (LIN-4431.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W15",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/prompt-template-defs.js`: the blind read's own area sentence (the `blind-read` template: \"A file's area is the first area in ...\") keeps its own words, as piloted (LIN-4437): re-piloting is a person's run. Every other spelling of the lookup now renders `areaLookup` (CONSEQUENCE_TEST and the area-notes pointer, LIN-4469). `docs/areas/README.md` still states first match in prose. (LIN-4436 leftovers; LIN-4469.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W16",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/prompt-formatters.js`: `formatLocalTestRule` names this repo's runner command (`node scripts/run-unit-tests.mjs tests/unit/<files>`) in a template that also drives other repos, and `CLAUDE.md` spells the same rule; a repo-supplied test command would make the line right elsewhere and give it one spelling. (LIN-4441 leftovers.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W17",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/periodicals.js`: the policy, whether a review may run a tool the repo commits, is worded per template. Drift & Coherence and Recent Headwinds say \"introducing no new tooling\", Code Quality says \"introduce no new tooling\", and Stability says \"introducing no tooling beyond what the repo commits\"; Seams & Tangles allows committed tools in its own bullets. The search clause itself is one spelling now (`committedSearch`, Stability's wording, LIN-4469). Deciding the policy is one rule that re-pins every template that states it. (LIN-4424 blind read.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W18",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/model-routing-harnesses.js`: a dispatch record's `model` names the routed id (\"anthropic/claude-opus-4.8\" for the `opus` route), but the claude-code harness runs a Claude id by its family token (`isModelRunnableOn`, `CLAUDE_MAPPABLE_MODEL_FAMILIES`), and on blind-read dispatches d9bdf6d8, cced07ee and 0399b2e2 it ran `claude-opus-5-5`, so a record can misname the model that ran. Cost is already priced from the model the worker reports. Waiting: make the record carry the model the worker reports, or update the routed id. (LIN-4396 review.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W19",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/prompts/leftover-words.js`: the retirement line's words have one home and one checker (`lib/dispatch-leftover-answer.js`). This repo's docs point to the leaf and no longer restate the three forms: `docs/areas/README.md` and `docs/architecture/dispatch-and-proxy.md` (LIN-4469). What stays restated on purpose: the refusal table in `docs/proxy-integration.md` is the API contract's. simple-dispatcher's README and its docs/areas/README.md are its owner's; a waiting entry also leaves there when \"a follow-up is filed for it\", which this README does not say. A cross-repo seam, named here, not edited. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W20",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/prompts/area-note-format.js`: the one reading of a waiting entry in code does not hold what a cited path is; that rule is in the guard (`tests/unit/area-notes.test.js`, a listed extension), in `lib/dispatch-leftover-answer.js` (any one to six characters, its comment calling it the guard's rule) and in simple-dispatcher's guard. A retirement line can name a path the guard would not read as one. Borderline. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W21",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/prompts/blind-read-words.js`: the blind read's kind has a constant and a scan, but every other kind in the same lists is still a literal (`SPINE` in `lib/run-view.js`, the `COMMENT_KINDS` rows in `lib/run-trail.js`, `CODE_ROUTES` in `lib/code-routes.js`), so the next stage added has two conventions to choose from. Decide whether every kind gets a constant or only this one. LIN-4467 made one record per stage kind (`lib/prompts/stage-kinds.js`) but keys it by literals, so the question stands; the record is where a constant per kind would live. (LIN-4466 blind read; LIN-4467 leftovers.)"
+  },
+  {
+   "id": "LV:llm-and-prompts:W22",
+   "slug": "llm-and-prompts",
+   "section": "Waiting",
+   "text": "`lib/prompts/stage-kinds.js`, and its witness `tests/fixtures/lin-4467-witness.json` with `tests/unit/lin-4467-stage-kind-witness.test.js`: the witness stays as a permanent ratchet on real-context renders (LIN-4469, decided), but it also holds a sha256 for each per-kind table (`COMPLETION_SIGNALS`, `STAGE_INTENT`, …), views that `tests/unit/lin-4467-stage-kind-record.test.js` already ties to the record by construction, and a hash failure says that something changed, never what. Every wording change regenerates it with the byte ceilings and the change log. Decide whether to trim it to the renders, or fold it into `tests/unit/prompt-size-budget.test.js`: a decision about the test suite, not a fix. (LIN-4469 blind read.)"
+  },
+  {
+   "id": "LV:other-features:L1",
+   "slug": "other-features",
+   "section": "Lessons",
+   "text": "This area is the `^lib/` catch-all: a file lands here when no earlier pattern names it. A new production file belongs in its owning area, given a pattern in the same change, checked in `tests/unit/area-map-placement.test.js`. A file here is often homeless, not owned."
+  },
+  {
+   "id": "LV:other-features:W1",
+   "slug": "other-features",
+   "section": "Waiting",
+   "text": "`lib/stage-writes.js`: its header says `lib/prompts/stage-intent.js` keeps the reading-pass text and that every prompt template declares `writes`; since LIN-4467 the text and `writes` are on each kind's record (`lib/prompts/stage-kinds.js`), and stage-intent.js and the template are views. A two-path comment fix. (LIN-4467 leftovers.)"
+  },
+  {
+   "id": "LV:other-features:W2",
+   "slug": "other-features",
+   "section": "Waiting",
+   "text": "`lib/home-view.js`: split it (over 600 lines), and separate `upNextOf`'s eligibility from its ranking, so both lists filter one candidate model. The module threads `shown`, `waiting`, `linked` and `onHome` through every placement. (Survey tally: LIN-4151, LIN-4144.)"
+  },
+  {
+   "id": "LV:other-features:W3",
+   "slug": "other-features",
+   "section": "Waiting",
+   "text": "`lib/home-view.js`: one ranking for \"what's next\" everywhere. `compareRank` here sits beside `orderIssuesForSwipe` in `lib/task-board-view.js`. (Survey tally: LIN-4151 and the 11-03 Drift review's three rankers.)"
+  },
+  {
+   "id": "LV:other-features:W4",
+   "slug": "other-features",
+   "section": "Waiting",
+   "text": "`lib/key-state-holders.js`: per-key state is reset through this test-side registry; a per-workspace state container in production would let a reset drop the container instead. (Survey tally: LIN-4168.)"
+  },
+  {
+   "id": "LV:other-features:W5",
+   "slug": "other-features",
+   "section": "Waiting",
+   "text": "`lib/as-asked-seal.js`: homeless by a deliberate pin in `tests/unit/area-map-placement.test.js`, so it sits in this catch-all. It opens the Agent API ↔ Other features pair (2/1, through `routes/proxy-writes.js` and `lib/proxy-graphql-errors.js`). Moving it to LLM & prompts closes the pair, but reverses the pin and moves this entry, so it is a size of move for the guide's owner, not a tidy. (Seams & Tangles, 8 Nov.; `docs/reviews/seams-tangles-review-2026-11-08-run10.md`.)"
+  },
+  {
+   "id": "LV:platform-and-plumbing:L1",
+   "slug": "platform-and-plumbing",
+   "section": "Lessons",
+   "text": "A browser library served from `node_modules` is audited at the version the lockfile resolves, not at the version its bundle embeds. `lib/vendor-assets.js` serves the Chart.js bundle, which inlines `@kurkle/color` 0.3.2 while the lock installs 0.3.4, so `npm audit` checks a copy the browser never runs. When you change what this file serves, check the embedded versions in the served file (its banner and inlined dependencies), not only `package-lock.json`. (Dependency & Supply-Chain Review, 10 Nov.; `docs/reviews/dependency-supply-chain-review-2026-11-10.md`)"
+  },
+  {
+   "id": "LV:platform-and-plumbing:L2",
+   "slug": "platform-and-plumbing",
+   "section": "Lessons",
+   "text": "A served-path boundary (`lib/vendor-assets.js`) is tested two ways, never by a probe list alone. Its structure: the router holds exact routes only, one per allow-listed URL, with no `use()` mount. And raw requests: `fetch` collapses dot segments before it sends, so a traversal probe over `fetch` really asks for the root server.js and proves nothing. `tests/unit/shared-modules.test.js` sends them with `node:http`. LIN-4471's review found that a static mount of the repo root passed every probe the list did not name; the structure test is what catches it."
+  },
+  {
+   "id": "LV:platform-and-plumbing:W1",
+   "slug": "platform-and-plumbing",
+   "section": "Waiting",
+   "text": "`lib/vendor-assets.js`: since LIN-4446 it also serves `SHARED_MODULES` (leaf files under `lib/` at `/lib/*`, LIN-4471), so the file name and `createVendorAssetsRouter` say less than it does. A rename touches `server.js`'s mount, which `tests/unit/vendor-assets.test.js` pins as an exact string, and the source map; it was left out of the cost-format slice to keep that slice small. (LIN-4446 leftovers.)"
+  },
+  {
+   "id": "LV:platform-and-plumbing:W2",
+   "slug": "platform-and-plumbing",
+   "section": "Waiting",
+   "text": "`lib/db-indexes.js`: one shared in-memory collection fake that knows these semantics (unique indexes among them). Today `memoryCollection` in `tests/unit/helpers/routing-fakes.js` sits beside `fakeCollection` in `tests/fixtures/cost-replay/harness.js`, and the \"copy fails once\" store is written inline in several tests. The fake DOM half of this landed as `tests/unit/helpers/fake-dom.js`. (Survey tally: LIN-4177, LIN-4178, LIN-4241.)"
+  },
+  {
+   "id": "LV:platform-and-plumbing:W3",
+   "slug": "platform-and-plumbing",
+   "section": "Waiting",
+   "text": "`lib/deploy-info.js`: merged to live is not owned in code (no deploy job or Railway config in the repository); John holds Railway today. A no-secret \"did it go live\" check, reading the deployed commit, is a candidate on its own. (Survey tally: LIN-4167.)"
+  },
+  {
+   "id": "LV:platform-and-plumbing:W4",
+   "slug": "platform-and-plumbing",
+   "section": "Waiting",
+   "text": "`lib/secret-scan.js`: shapes still unmatched beyond the ticketed four: quoted or YAML/JSON secret assignments, env values holding `/` or `.`, credentialed postgres/redis/mysql URIs, a cut PEM inside a blockquote or JSON string, PuTTY keys; Slack tokens are only partly masked. No census pins mint sites, so a new raw random credential would mint unprefixed and unscanned: mint through `lib/harbour-token-format.js`. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)"
+  },
+  {
+   "id": "LV:platform-and-plumbing:W5",
+   "slug": "platform-and-plumbing",
+   "section": "Waiting",
+   "text": "`lib/scheduler.js`: its \"(e) error containment\" unit test sleeps 300 ms of wall clock for several 30 ms ticks; under load it fails with the message of the defect it guards (the interval stopped after a throw), and a whole-run re-run turned it green. Count ticks or drive a fake clock. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)"
+  },
+  {
+   "id": "LV:platform-and-plumbing:W6",
+   "slug": "platform-and-plumbing",
+   "section": "Waiting",
+   "text": "`lib/partial-write-error.js`: an edit that fails with `failed: 'property'` is `retryable: true` and its provider message says \"retrying is safe\". A Jira site that always drops entity properties fails every retry the same way, so a caller that follows `retryable` loops forever. Making property failures non-retryable, or giving them a separate signal, changes the documented envelope (`lib/proxy-instructions.js` PARTIAL_WRITE, `docs/proxy-integration.md`), so it is a decision, not a fix; settle it once John's live evidence (LIN-4445, runbook step 2) shows whether his site drops it. (LIN-4452 blind read.)"
+  },
+  {
+   "id": "LV:platform-and-plumbing:W7",
+   "slug": "platform-and-plumbing",
+   "section": "Waiting",
+   "text": "`lib/partial-write-error.js`: a landed create answers \"do not retry the create, read the issue instead\", but `context` carries only `applied` and `failed`; the created key appears only inside the prose `error` string, so a caller must parse a sentence to know which issue to read. Adding the issue id to `PartialWriteError` and the envelope widens a documented shape on the proxy and session lanes. (LIN-4452 blind read.)"
+  },
+  {
+   "id": "LV:providers:L1",
+   "slug": "providers",
+   "section": "Lessons",
+   "text": "A Jira description has one reader and one writer: `readDescription` and `holdAsAsked` in `lib/providers/jira/as-asked-region.js`. They are the only code that knows the ADF region and the `harbour.asAsked` entity property, and every provider-side `getIssue` passes `AS_ASKED_READ`. Shape B keeps the words in two places, the region and the property, and that is safe only while one module knows both. A new description read that calls `adfToMarkdown` directly serves converted words and breaks the seal without anyone being told. `tests/unit/jira-as-asked-region.test.js` fails on it. (LIN-4450.)"
+  },
+  {
+   "id": "LV:providers:L2",
+   "slug": "providers",
+   "section": "Lessons",
+   "text": "Decide whether the words are kept by comparing renderings, never ADF. Jira stamps `localId` and similar attributes on ordinary saves, and `adfToMarkdown` ignores them. A hash of the ADF would read every human save as an edit. (LIN-4450.)"
+  },
+  {
+   "id": "LV:providers:L3",
+   "slug": "providers",
+   "section": "Lessons",
+   "text": "The region reader accepts an end line whatever its marks, which is looser than `splitAsAsked`. It stays safe because `descriptionRoundTrip` runs the same reader the reads do, so a block the reader would misplace is refused at filing. Keep the seal's check and the reads on one reader. (LIN-4450, Survey open-0.)"
+  },
+  {
+   "id": "LV:providers:L4",
+   "slug": "providers",
+   "section": "Lessons",
+   "text": "The Jira fake proves only the provider's own logic. It stores whatever it is handed and never normalises ADF, so it cannot show whether live Jira keeps a region's rendering. A claim about live behaviour needs a live check. (LIN-4450.) The live check is LIN-4452. It is not yet run: the build session has no access to John's Jira, so it is a handoff (the commands and evidence list are in the LIN-4445 comment), and no live outcome is recorded here."
+  },
+  {
+   "id": "LV:providers:L5",
+   "slug": "providers",
+   "section": "Lessons",
+   "text": "A Jira create chooses the epic field from its own project's create screen, never from the tenant's field list. `parent` if the screen lists it, else Epic Link if it does; a screen with neither is refused 422 before the create. A field that exists on the tenant can still be absent from this screen, and writing it there is a 400 after the issue is half-filed. (LIN-4451, `lib/providers/jira/index.js` `_epicCreateField`.)"
+  },
+  {
+   "id": "LV:providers:L6",
+   "slug": "providers",
+   "section": "Lessons",
+   "text": "The create metadata is read fresh on every create, with no cache. It is filtered by the caller's own permissions, and a cache keyed on the site cannot tell two callers apart. Creates are infrequent, so the round trips cost little. (LIN-4451, `createIssue` in the same file.)"
+  },
+  {
+   "id": "LV:providers:L7",
+   "slug": "providers",
+   "section": "Lessons",
+   "text": "A create that fails after the issue exists is a PartialWriteError telling the caller not to retry. A retry would file a duplicate. The re-read and the property check (below) are the two places this applies. Every create lane (proxy, session, feedback) maps it through `lib/partial-write-error.js` `partialWriteEnvelope`: `retryable:false`, answered 500. A lane that does not map it answers a bare 500 that hides the landed issue. (LIN-4451, LIN-4452.)"
+  },
+  {
+   "id": "LV:providers:L8",
+   "slug": "providers",
+   "section": "Lessons",
+   "text": "A write's success status does not prove Jira kept the `harbour.asAsked` property: a site can answer 200 and drop it, and the words would then be served as converted text, marked kept. `createIssue` and `updateIssue` therefore compare the property on the confirmation re-read with the one they sent, and a difference is a PartialWriteError naming `property`. The fake's `dropProperties` seed is the witness; without it the fake keeps every property. (LIN-4452.)"
+  },
+  {
+   "id": "LV:providers:W1",
+   "slug": "providers",
+   "section": "Waiting",
+   "text": "`lib/providers/jira/index.js`: the bulk reads (`fetchProjects`, and `fetchIssueContext`'s children through `searchAllIssues`) do not ask for `harbour.asAsked`. A sealed block therefore shows its converted rendering on the dashboard and in a parent's children, while single-issue reads serve the exact words. `POST /rest/api/3/search/jql` accepts `properties`, so asking for it there would make the bulk path exact too. No guard or cache compares the two today. (LIN-4450 leftovers; Survey global, LIN-4450.)"
+  },
+  {
+   "id": "LV:providers:W2",
+   "slug": "providers",
+   "section": "Waiting",
+   "text": "`lib/providers/jira/index.js`: a Jira `parentId` is refused 400 (LIN-4451, review note 5, disposition (b)), so subtask filing is not advertised. Accepting the issue key as the parent (disposition (a)) needs an end-to-end filing test through the lanes. (LIN-4451 Survey open-0.)"
+  },
+  {
+   "id": "LV:providers:W3",
+   "slug": "providers",
+   "section": "Waiting",
+   "text": "`lib/providers/interface.js`: a \"holds verbatim text\" provider capability would replace the Markdown comparison that decides whether a provider can hold a block. Today `providerHoldsAsAsked` in `lib/as-asked-seal.js` asks the provider's own round trip and compares renderings through `checkAsAsked`, which normalises escapes, so it cannot tell a verbatim provider from a converting one. Waiting since LIN-4445's plan (item 13) and the LIN-4452 Survey global; the provider contract is the first home, the seal module second."
+  },
+  {
+   "id": "LV:providers:W4",
+   "slug": "providers",
+   "section": "Waiting",
+   "text": "`lib/providers/jira/adf.js`: the D1 write gate's rich-content vocabulary (@-mentions, emoji, tables, and the other constructs `adfHasUnrenderableContent` names) is not widened. A later below-the-line write to a Jira description holding one is refused 422, and a Jira-native ticket holding one fails its first-dispatch seal, logged, with dispatch continuing. Waiting since LIN-4445's plan (\"what stays open\") and the LIN-4451 Survey; the Jira live check (LIN-4452) does not exercise it."
+  },
+  {
+   "id": "LV:reports-and-operator-tools:L1",
+   "slug": "reports-and-operator-tools",
+   "section": "Lessons",
+   "text": "A measure whose source is missing or unreadable reads `not measured: <reason>`, never 0; zero is a reading only from a source that was read (a commit with no notes directory has 0 Waiting entries). New stability rows use the row shape in `scripts/stability-measures-core.mjs` (measured, partial with its unreadable count, not measured) and count Waiting entries with `countWaiting` from `lib/prompts/area-note-format.js`, never a regex of their own (LIN-4420)."
+  },
+  {
+   "id": "LV:reports-and-operator-tools:L2",
+   "slug": "reports-and-operator-tools",
+   "section": "Lessons",
+   "text": "Churn passes `--diff-merges=first-parent` explicitly: with merge diffs off, the 8 Nov window's 14 merge landings vanish and churn reads a plausible 8,590 / 3,055 instead of 10,235 / 3,677. Filter its paths with the kit's `compileScope`, not a git pathspec, so churn and line totals share one scope (LIN-4420)."
+  },
+  {
+   "id": "LV:reports-and-operator-tools:L3",
+   "slug": "reports-and-operator-tools",
+   "section": "Lessons",
+   "text": "A landing names only its own ticket (`ownTicket` in the core: first id in a squash subject, else the merge's branch, else its PR title). Whole-message matching read 163 tickets in the 8 Nov window against 106 and gave precedents fake last landings. A session is a `/cost` lineage, not a non-wake row (LIN-4393: 14 rows, 5 wakes, 8 sessions). Proxy reads go through `createProxyClient` in `scripts/stability-measures-tracker.mjs` (paced, honours 429 `Retry-After`), and a null `totalUsd` keeps its cause apart from a failed read (LIN-4421)."
+  },
+  {
+   "id": "LV:reports-and-operator-tools:L4",
+   "slug": "reports-and-operator-tools",
+   "section": "Lessons",
+   "text": "An issue-number search needs a known existing upper bracket: past the maximum is a 404 too, and a trashed issue is a 200 with `trashed: true`. Both count as gaps (LIN-4421)."
+  },
+  {
+   "id": "LV:reports-and-operator-tools:L5",
+   "slug": "reports-and-operator-tools",
+   "section": "Lessons",
+   "text": "Finished tasks are read from the window's landings plus `--lookback-days` (default 3) before base, not all of history: a task whose only landings predate the lookback and that finished in the window is missed. The bound is printed on the `tasks` row; widen it there, never by matching more of each message (LIN-4421)."
+  },
+  {
+   "id": "LV:reports-and-operator-tools:L6",
+   "slug": "reports-and-operator-tools",
+   "section": "Lessons",
+   "text": "\"Went blocked\" is any `[blocked]` feedback entry (`WAKE_FEEDBACK_REGEX` with `isWaitingWakeMarker`), never `status` or `deriveBlockedStatus`: both read only the last marker, so a lineage that blocked and then finished reads unblocked. Read every member `/cost` lists, not roots: on LIN-4393 each member's own resume lines were missing from its root's merged read. `dispatchedBy` is never origin (one account for autopilot and person), and `/rulings` returns loop rulings only (LIN-4422)."
+  },
+  {
+   "id": "LV:reports-and-operator-tools:L7",
+   "slug": "reports-and-operator-tools",
+   "section": "Lessons",
+   "text": "Measure 1 has one source, the pre-merge `## Blind read`: a landing counts as read only when a read naming its PR was posted before its merge, matched through `landingPrUrls` and `parseBlindRead` from `lib/run-trail.js`, never a parser of its own; anything else is unread under a named reason. A hand-run Balance cell becomes a sign only in `docs/papers/harbour/cleaner-than-it-started-scripts/balance-sign.mjs`, beside the paper's coder, which must reproduce both frozen codes files (LIN-4439)."
+  },
+  {
+   "id": "LV:reports-and-operator-tools:L8",
+   "slug": "reports-and-operator-tools",
+   "section": "Lessons",
+   "text": "A landing's subject is read through the core's regexes only: `MERGE_PR` gives a merge landing both its branch (`ownTicket`) and its PR number (`landingPr`), so the two never parse it apart (LIN-4439 leftovers)."
+  },
+  {
+   "id": "LV:reports-and-operator-tools:L9",
+   "slug": "reports-and-operator-tools",
+   "section": "Lessons",
+   "text": "Rounding, the mean and percentages come from the core (`round`, `mean`, `percent`); a new stability module imports them, never re-spells `Math.round(x * 1000) / 10`. A landing or a commit is credited to one ticket only through `ownTicket`; `scripts/delivery-composition.mjs` uses it too since LIN-4422 (its weekly ticket counts since 1 Oct moved by 1 to 5: down in five weeks, up 1 in one) (LIN-4422 leftovers)."
+  },
+  {
+   "id": "LV:reports-and-operator-tools:L10",
+   "slug": "reports-and-operator-tools",
+   "section": "Lessons",
+   "text": "A reference beside a live stability row comes only from a reading the tool wrote itself (`--as-reference <label>`) and reads back (`--reference`; `referencesFrom` refuses another scope), so both share one definition. The ask's per-day 8 Nov figures stay quoted in `docs/reviews/stability-measures/README.md`, never in a reference slot. Rows a starting point never had are written `no <label> reading`, not read today and passed off as then, and the README names every field a re-run may change; a new live field joins that list (LIN-4423)."
+  },
+  {
+   "id": "LV:reports-and-operator-tools:L11",
+   "slug": "reports-and-operator-tools",
+   "section": "Lessons",
+   "text": "The CLI's own reads are tested end to end in `tests/unit/stability-measures.test.js` on fixture repositories (`makeRepo`), with a stand-in `gh` first on PATH and a loopback stand-in proxy; a new read gets a case there, not only a hand run. On git 2.46 `--first-parent` already gives first-parent merge diffs, so dropping the explicit `--diff-merges=first-parent` passes the test there; keep the flag for older git (LIN-4423 leftovers)."
+  },
+  {
+   "id": "LV:reports-and-operator-tools:W1",
+   "slug": "reports-and-operator-tools",
+   "section": "Waiting",
+   "text": "`scripts/stability-measures-tracker.mjs`: `createProxyClient` is the one proxy client in `scripts/` that paces from the start and honours 429 `Retry-After`. The other 47 scripts that read the proxy pace by fixed sleeps (`scripts/pipeline-churn.mjs` sleeps 1.1 s, and 5 s × attempt on a 429; the `steady-base-*` and `survey-*` scripts likewise), so the rate rule is spelled two ways. One shared client under `scripts/lib/` would retire the copies. (LIN-4421 leftovers; Survey global.)"
+  },
+  {
+   "id": "LV:reports-and-operator-tools:W2",
+   "slug": "reports-and-operator-tools",
+   "section": "Waiting",
+   "text": "`scripts/stability-measures-seat.mjs`: the person's seat reads loop rulings only and cannot read person origin, so its operator-free share is an upper bound. Two proxy reads would make it whole: an origin field on the dispatch read (the server records it as press events in `lib/task-mode-store.js` and `personOriginated` in `lib/dispatch-wake.js`), and a read of resolved task-bound rulings (or of `computeEscalationKpis` itself, which already reads both halves). Whether a parent's rulings count against its pieces is LIN-4399's call. (LIN-4422; LIN-4399 plan review note 1; Survey open-0.)"
+  },
+  {
+   "id": "LV:reports-and-operator-tools:W3",
+   "slug": "reports-and-operator-tools",
+   "section": "Waiting",
+   "text": "`scripts/stability-measures-tracker.mjs`: `readSeat` reads every lineage member's detail, one call each: 1,576 members for the 106 finished tasks of the 8 Nov window, about half an hour at 50 a minute. A dispatch-detail read by issue or by lineage that returns each member's own feedback would cut that to one call per task. (LIN-4422; Survey global.)"
+  },
+  {
+   "id": "LV:reports-and-operator-tools:W4",
+   "slug": "reports-and-operator-tools",
+   "section": "Waiting",
+   "text": "`lib/account-erasure.js`: each collection should be declared once with all its facts (name, store module, erasure row, urlKey class, dry-run shape), and opening an undeclared name should fail. LIN-4234 gave both guards one source of collection names; the other facts still sit in separate tables. Route counts are also pinned by hand in several tests. (Survey tally: LIN-4168, LIN-4179, LIN-4198, LIN-4234.)"
+  },
+  {
+   "id": "LV:reports-and-operator-tools:W5",
+   "slug": "reports-and-operator-tools",
+   "section": "Waiting",
+   "text": "`lib/pricing-conformance-sweep.js`: the name says \"conformance\", but since LIN-4358 there is no rate table to conform; the sweep checks that the catalog's prices parse, that models in use are priced and that the choice lists name listed models. Renaming moves the scheduler job name (its `scheduler-locks` doc), the server.js registration, the scheduler census and `docs/architecture/source-map.md`. (LIN-4358 leftovers.)"
+  },
+  {
+   "id": "LV:reports-and-operator-tools:W6",
+   "slug": "reports-and-operator-tools",
+   "section": "Waiting",
+   "text": "`scripts/stability-measures.mjs`: its declaration's contract (`docs/reviews/stability-measures/README.md`) is checked from two files. The `DECLARATION` block in `tests/unit/stability-measures.test.js` checks that it names every row the tool emits; a LIN-4424 test in `tests/unit/periodicals.test.js` reads the same README again to check it carries each element the shared Stability prompt asks a declaration for (including the literal `node scripts/stability-measures.mjs`), so a prompt-template test depends on one repo's docs file. Moving that check into `tests/unit/stability-measures.test.js`, beside the rest of the contract, with the prompt's element list exported for it, would give the contract one home. (LIN-4424 blind read.)"
+  },
+  {
+   "id": "LV:reports-and-operator-tools:W7",
+   "slug": "reports-and-operator-tools",
+   "section": "Waiting",
+   "text": "`scripts/stability-measures-core.mjs`: `landingPr` reads which PR a landing merged, but the survey scripts tell a squash landing by their own trailing-`(#N)` test (`scripts/survey-growth-git.mjs`, `scripts/survey-halving-git.mjs`, `scripts/survey-tests-friction-git.mjs`), so the rule is spelled four ways. Importing `landingPr` would make it one, at the cost of re-checking their frozen survey counts. (LIN-4439 leftovers.)"
+  },
+  {
+   "id": "LV:reports-and-operator-tools:W8",
+   "slug": "reports-and-operator-tools",
+   "section": "Waiting",
+   "text": "`scripts/stability-measures-blind.mjs`: `GATE_LANDING` hard-codes the gate's merge commit, PR and time as measure 1's cut-off, and `repoSlugOf` is another GitHub-URL parser beside `prOf` (`lib/run-ledger.js`). Taking the cut-off from data needs a decision about where the gate's start is recorded; the parser could fold in with it. (Blind read on LIN-4396.)"
+  },
+  {
+   "id": "LV:reports-and-operator-tools:W9",
+   "slug": "reports-and-operator-tools",
+   "section": "Waiting",
+   "text": "`scripts/stability-measures-seat.mjs`: says its ruling outcome buckets are \"as lib/escalation-kpis.js\", but counts a withdrawn ruling as neither and a null outcome as unreadable, where the home (`lib/escalation-kpis.js`, over `lib/digest-feedback.js`) counts every resolved event that is not dismissed or self-resolved as answered. The inputs differ (proxy rulings against feedback events), so the split may be meant; the citation should then say how they differ. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:L1",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "A run-row field that is always present with a default is one entry in `RUN_FIELDS` (`lib/dispatch-fields.js`). A sparse field stays a conditional spread in `addItem` and `_archiveItem`, so other rows keep their key sets byte-identical. Six fields were once dropped on one hop of four."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L2",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "Every exit from the queue except a take archives through `_archiveItem` (`lib/dispatch-store.js`); a new exit must archive through it too."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L3",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "The wake path is `_planWake` (decide) then `_deliverWake` (deliver) in `lib/dispatch-store.js`, shared by `addFeedback` and the held-wake release (LIN-4373). Its guards (LIN-1059, 1165, 1357, 2297, 4080, 4166) run in an order that matters: change the pair whole, keep the wake suites passing, and update the two census pins (`lin-3134-declared-mint-census`, `lin-4080-addItem-census`) if the write moves."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L4",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "\"This run's PR\" is the session's own report: `prUrlOfFeedback` (`lib/dispatch-wake.js`) takes a PR on a report line before the `[done]` `url`, which older runners filled by mention count (LIN-4375)."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L5",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "Two `[done]` posts can reach a decide-then-enqueue at once, so \"no row yet\" is no guard: claim first, compare-and-set on the row (`claimHeldWake`). LIN-4373 relied on the read and queued two leftover rows (LIN-4375)."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L6",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "A claim whose holder skips is released on every path out (`releaseHeldWakeClaim`). A stamp left by a skip held the re-report forever (LIN-4375 review)."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L7",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "Any session can park `[pending]` on CI and finish on a ci-wake `custom` row (`lib/ci-wake-sweep.js`). A rule keyed on the producing kind misses that ending: read the lineage (`heldWakeHolderOf`, `resolveFollowUpRoot`). LIN-4373 covered eligibility, not the held wake's terminals. Over a ticket's runs, read it batched: `listHistory`'s `withLineage`, never a walk per row (`runFact`, `lib/recent-runs.js`, LIN-4459: the walks go up, a parked stage's ending is below it)."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L8",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "Row-only kinds stay out of `DISPATCH_KINDS` (`lib/prompt-templates.js`) and sit in `ROW_ONLY_KINDS` (`lib/dispatch-fields.js`); kind-keyed maps are tested against both. A new bucket can pull a kind into the round-trip walk, which `OFF_SPINE_KINDS` stops (LIN-4376)."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L9",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "The store knows no leftovers (LIN-4383). It holds a parent wake by `heldWakeFor` (LIN-4373), released by the holder's terminal or `_archiveItem` under the build's guard key, so it wakes once. Leftover wording lives in `lib/dispatch-leftover-hook.js`, bound into the store late (`setHeldWakeReleaseNote`) because most releases have no request; a new held-wake feature brings a hook (`lin-4377-store-knows-no-leftover` counts the word and forbids the `formatHeldWakeNote` import)."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L10",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "A feedback-entry kind is one row in `FEEDBACK_KINDS` (`lib/dispatch-feedback-kinds.js`) that declares every role; readers filter the table, and its row order is the runner prompt's bytes. A shared constant is imported from its owner (`HALT_MODES`, `followUpTarget`, `NEVER_RAN` in `lib/dispatch-terminal.js`). The decision-stamp set had four copies in `lib/`; the LIN-4455 censuses (`lin-4455-feedback-kinds-table`, `lin-4455-constants-owners`) fail on a new one."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L11",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "Price a pulled extra like any piece: a cost read that rode along with LIN-4201 landed alone as LIN-4226."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L12",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "A task timeline lane is running from the page's open session ids (`isOpenState`), never the cost row; a lineage's own `incomplete`, not the shared `lineagesTruncated`, decides \"not complete\" (LIN-4405, `lib/task-timeline.js`)."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L13",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "A test that dispatches a close-out passes a `closeOut` seam (`resolveProvider`): the readiness guard reads comments for every close-out since LIN-4438, and without the seam it reaches the real provider and fails open, a pass the hermetic watcher catches only in CI."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L14",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "Close-out readiness is one decision, `closeOutDecision` (`lib/run-closeout-state.js`, LIN-4460): every surface renders or enforces its answer. A new reason is a row of `CLOSE_OUT_REASONS` plus a row in `lin-4438-blind-read-gate` and `lin-4460-close-out-decision`, whose census reads code, not comments."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L15",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "When a person acts, Harbour follows (LIN-4447, John): a landing whose every PR reads merged stands the gate aside; a Done ticket with no close-out on its landing stands only the recommendation's read aside. Harbour never sets Done."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L16",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "What a comment is, and which PRs are the task's, are read once in `lib/run-trail.js`: a comment kind is a row of `COMMENT_KINDS` (`lin-4458-comment-kind-census` fails on a kind test elsewhere), and the box, the guard, the owner's check and the merge take their PRs from `readTrail().landing`, statuses keyed by PR URL: the cited list (newest first) and the landing (oldest first) order PRs differently, so a shared index points at the wrong PR (LIN-4458)."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L17",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "A reader that classifies by kind routes `custom` before `bucketOf`: `BUCKET_OF_KIND` maps `custom` to orchestration, and `bucketOf` falls back to orchestration silently, so check membership (`lib/wall-clock-summary.js`). `dispatchesOf` turns a missing kind into `custom` (`lib/cost-read.js`): confirm a custom kind from its own row before trusting it (LIN-4426)."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L18",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "A full PR URL's repository and number come from `prOf` beside `prUrlsIn` (`lib/run-ledger.js`), for the task page and measure 1 alike; compare repositories case-blind, as GitHub does (LIN-4439)."
+  },
+  {
+   "id": "LV:runs-and-dispatch:L19",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "A per-dispatch figure (its model, cost or completeness) is the fold's answer, carried through `lib/cost-read.js`; a reader never re-ranks `byModel` itself. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:L20",
+   "slug": "runs-and-dispatch",
+   "section": "Lessons",
+   "text": "The Harbour calls read is `lib/cost-read-calls.js` (LIN-4457): `readCalls`, `appCallsOf` and `callsSurfaceOf` are pure over docs their caller keys to one workspace (`listInHorizon(urlKey)`). The instance-wide boundary is the `urlKey` / `instanceWide` guard on `lineageRecords` and `readCost` (LIN-4226), not these readers. A new calls shape goes beside them, and `appCallsOf([])` is the one empty shape."
+  },
+  {
+   "id": "LV:runs-and-dispatch:W1",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/dispatch-leftover-hook.js`: a death between `claimHeldWake` and the enqueue, or a failed release write, leaves the wake held. No sweep: a lease sees no re-report, a sweep scans history, and clearing stamps reopens LIN-4375's double queue. (LIN-4377.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W2",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/dispatch-store.js`: `addFeedback` takes one `wakeHook`; a second held-wake feature first needs composable hooks. (Operator, LIN-4377.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W3",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/run-paragraph-hook.js`: stored run paragraphs are retained as written, and the cutover to request records does not regenerate them. The gate key (`inputHash`, `gateFacts` in `lib/run-paragraph.js`) covers the title and the ended loops only, so cost, usage and tier cannot move it: a stored `final` paragraph stays a cache hit when only those change, and a newly ended loop still regenerates it. Nothing is labelled pre-cutover, because a stored paragraph carries no figure: the hook writes its text, the model that wrote it, the gate key and `final`, and the prompt forbids a price or a model id. The witness is `tests/unit/run-paragraph-hook.test.js` (the W-6 cases, LIN-4475). (Survey tally: LIN-4201; answered in LIN-4475.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W4",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/wake-shadow.js`: one wake policy, from the LIN-3257 classifier this shadow records. (Survey tally: LIN-3257.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W5",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/run-live-wait.js`: a read, not a claim: two different-kind calls racing on one ticket both pass; claim compare-and-set, like `claimHeldWake` (LIN-4392). (Moved from the LLM & prompts note by LIN-4459.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W6",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/run-live-wait.js`: the run-outcome words have two homes. `QUEUED`/`RUNNING` live here (they moved with `isLiveRun` to avoid an import cycle), while `WAITING_ON_A_PERSON`, `'closed'` and `'aborted'` stay in `lib/recent-runs.js`, and `lib/recommendation-look-first.js` still imports them from there. One home (for example a leaf module of outcome words) touches importers in LLM & prompts, so it is larger than a fix. (LIN-4459 blind read.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W7",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/recent-runs.js`: a parked stage whose lineage has ended is dated by its park time, not the lineage's end, because the `withLineage` wire row from `listHistory` (`lib/dispatch-store.js`) carries no end time. It sorts too early in the selector's five, and can land on the wrong side of a \"since the latest review\" cut, such as the ended-read count in `lib/recommendation-blind-read.js`. Fix: `listHistory` reports the lineage's end time, a store change that alters the Dispatch route's output. (LIN-4459 blind read.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W8",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/run-trail.js`: a foreign PR cited by full URL before the first review (a research note, a plan) joins a first landing, so the blind read must name it (`tests/unit/lin-4438-blind-read-gate.test.js` row 15, kept as a stated limit): no caller holds the task's repository, so the landing cannot tell another repository's PR from this task's. A task-repository fact, or a kind stamped on a comment when it is posted, would let the landing drop it. (LIN-4438; why-not written by LIN-4458.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W9",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/cost-read-calls.js`: `readCalls` states the figure rule (`totalUsd` only when everything is priced and complete; `pricedUsd` never counts a partial) in its own words, and the lineage figure in `lib/cost-read.js` states it again, so a change to the rule is made twice. One shared helper would make it one, but it reaches the lineage path and its goldens: larger than a fix. (LIN-4457 leftovers; Survey global on LIN-4457.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W10",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/dispatch-feedback-kinds.js`: the table's `mayCarryWake` column is `true` on every row (unknown kinds pass too), so `findWakeEvent` (`lib/dispatch-terminal.js`) never skips a kind, while `lastWakeEntry` (`lib/run-view.js`) skips the decision-stamp kinds as \"never a wake marker\". Two wake scans disagree about stamps, and the column only records `findWakeEvent`'s behaviour. Removing the column or making it true to both readers means deciding whether `findWakeEvent` should skip stamps, which changes wake minting and every reader of stored rows. (LIN-4455 blind read.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W11",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/dispatch-factory.js`: `refusesHermeticToken` skips access for a provider that declares `testTransport` (`LinearProvider`, `lib/providers/linear/index.js`), but nothing links that declaration to the transport swaps it describes (`routes/test.js` `installTestTokenLinearTransport`, `tests/fixtures/hermetic-linear.js`), so a new installer or a change to Linear's can drift from it silently. Closing it means deciding where test transports register (for example installers that declare which provider they cover, plus a census test), across providers, web routes and fixtures: larger than a fix. (LIN-4456 blind read, 13 Nov.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W12",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/task-page-loader.js`: `fmtWhen` (the absolute UTC stamp, `8 Nov, 14:40 UTC`) stays in the loader, so `lib/components/time.js` and `lib/render-task-timeline.js` import a page-formatting helper from a runs-and-dispatch module, the tangle LIN-4472 removed for `relativeAgo`. Moving it into `lib/time-words.js` first needs a call on whether that leaf also owns absolute stamps; about five importers. (LIN-4472 blind read.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W13",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/run-trail.js` `readTrail`: a re-review after a not-ready close-out that names the PR only as `#N` leaves the landing empty. The decision's gate (`closeOutWaitsOn`, `lib/run-closeout-state.js`) then opens with no blind read, and since LIN-4458 the box reads `no-pr`, the person's check sets no Done and the merge recorder records nothing (pinned in `tests/unit/lin-4458-landing-consumers.test.js`). The review prompt asks for the head, not the PR URL. Fix: fall back to the anchor close-out's PRs when nothing after the anchor cites one, or have the review prompt require the full URL (LLM & prompts' side). No live trail has this shape. (LIN-4458 review.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W14",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/close-out-readiness.js` (the ladder lane) and `lib/recommendation-blind-read.js`: an outside merge on a ticket still In Progress is not seen, because neither reads a PR (the recommend path makes no GitHub read by contract, and the ladder reads none). The recommendation still routes a blind read, and the ladder still refuses on the gate. John accepted this on 13 Nov: \"no new GitHub reads on the recommend path or ladder lane; add the fact later if a stuck case shows up.\" Pinned by `tests/unit/lin-4460-close-out-decision.test.js` (named for that ruling). Why not now: a PR read on the recommend path costs budget (`PR_STATE_READ_COST` against the 36/h anonymous limit in `lib/pr-state-store.js`), needs token resolution on a path that has none, and the process-wide PR cache is not workspace-scoped. Supplying a landing-merged fact later is one more input to `closeOutDecision`. (LIN-4460.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W15",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/close-out-readiness.js` `readCloseOutChain`: every caller gets the derived box, but the merge recorder (`lib/close-out-merges.js`) wants only the reads, so it passes `actor: 'harbour'`, `runnerReady` and `owner` for a state it discards. A reads-only chain (trail, statuses, stop-at) with each surface calling `deriveCloseOutState` would drop those flags, at the cost of the check route, the guard and the tests that read `state` from the chain (`lin-4438-blind-read-gate`, `close-out-readiness-chain`): larger than a fix. (LIN-4460 leftovers; Survey global.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W16",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/run-trail.js` `readTrail`: `closeOutOnTrail` (the decision's advice fact) and `closeOutAfterReview` (the selector's TRAIL FACTS line, `lib/recommendation-facts.js`) agree whenever a review is on record and differ only without one. Folding them to one fact changes `followsPerson` for a Done ticket with no review and touches the selector's facts on the LLM & prompts side. (LIN-4460 leftovers.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W17",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/ci-wake-sweep.js` `prRefsFromPark` parses a runner's park message with its own `FULL_PR_URL_RE` (scheme optional, repo key case-folded) beside `prUrlsIn`/`prOf` (`lib/run-ledger.js`). Its comment-side read already goes through `extractPrUrls`. Moving it onto `prUrlsIn` changes which park messages wake (a scheme-less URL would stop matching), so it needs its own witness. (LIN-4458 review.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W18",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/run-evidence.js`: the run page keeps two answers to \"which PR is the task's\". The close-out box counts `readTrail().landing` through `closeOutDecision` (LIN-4460 retired `deriveState`'s status decision: no reader outside the tests and the GET body reads it), but `deriveState` over `extractPrUrls` (every cited PR) still drives `state.pr`, `done`, `checked.now` and `resolveRunPrRef` (read by the `routes/dashboard.js` pr-state route), `state.prUrls` (`lib/pr-state-store.js`), and `lib/ci-wake-sweep.js` matches parks against every cited PR. Whether the page's PR and the CI-wake sweep follow the landing is a product decision touching several callers. Also, `readRunEvidence` reads the landing's sole PR and hands `buildRunEvidence` a bare `prStatus`, which `buildRunEvidence` re-pairs with the landing after reading the trail again: the same positional coupling the URL-keyed `Map` removed from the decision. Passing the status keyed by URL with the landing already read is a signature change for about 25 call sites (`tests/unit/run-evidence.test.js`, `routes/dashboard.js`), so larger than a fix. (LIN-4458 blind read; LIN-4460.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W19",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/completion-signals.js`: the module is now a view of the stage-kind record (`lib/prompts/stage-kinds.js`) but keeps six exports that nothing under `lib/`, `routes/` or `server.js` calls (`hasSignals`, `getDefinedSignalTypes`, `getSignal`, `assessCompletion`, `getBlockers`, `formatSignalsForPrompt`), only `tests/unit/completion-signals.test.js`. `hasSignals`'s null branch is unreachable and the header still says \"simplified 3-label system\". Delete them and their tests, leaving `COMPLETION_SIGNALS`. Left here because the file is this area's and LIN-4467 (piece 3) made it a view; it breaks nothing today. (LIN-4469 blind read.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W20",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/run-view.js` (the display words come from llm-and-prompts' `STAGE_LABELS`, `lib/prompts/stage-kinds.js`): `STEP_KIND_WORDS` copies six labels from `STAGE_LABELS` through a hand-typed kind list, so `stageLabel('look-into')` is \"Look into\" and `stepKindWord('look-into')` is \"Look-into\", and a new kind has to be added to that list by hand. One display word per kind changes visible labels on the run page and settings (`lib/render-session.js`, `lib/render-settings.js`), so it is a product call. (LIN-4469 blind read.)"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W21",
+   "slug": "runs-and-dispatch",
+   "section": "Waiting",
+   "text": "`lib/run-ledger.js`: Harbour's `PR_URL_RE` in this file, which feeds every run's PR attribution (`prUrlsIn` and `extractPrUrls`), reads an `https://github.com/<owner>/<repo>/pull/<n>` URL only, while simple-dispatcher's `sessionPrs`, which reads the session's `DONE:` line in the other repository, also reads an `http://` one and returns the canonical https URL. So a run whose `DONE:` line carries an http PR link reports its PR in SD and none in Harbour. Harbour already has a second reader that disagrees with `PR_URL_RE` about http: `isPullRequestUrl` in `lib/milestone-funnel.js` accepts `http://` (pinned in `tests/unit/milestone-funnel.test.js`) and feeds the \"PR opened\" step of the per-person milestone funnel, reading the `url` of a run's `[evidence]` feedback entries, not its `DONE:` line. The runner-kit contract (`lib/runner-kit/contract.json`, area `report`, the case \"a DONE: line with an http URL and a #x fragment\") records the SD/Harbour split as a declared difference and decides neither side. Which reader is right, and whether Harbour's PR reading should widen to http, is a design call: widening `PR_URL_RE` changes which PRs a task owns, and narrowing SD changes the other repository. The divergence was found by reading the contract row and the readers, not from a recorded run; it was not checked against recorded runs, so how often an http PR link occurs is not known. When it is decided, change the reader and the row's cells together, then re-copy the contract into SD. (LIN-4475 blind read.)"
+  },
+  {
+   "id": "LV:web-routes:W1",
+   "slug": "web-routes",
+   "section": "Waiting",
+   "text": "`routes/test.js`: fold the `/test/clear-*` routes into the key-state registry (`lib/key-state-holders.js`), split the file, and give `createTestRoutes` one context object. (Survey tally: LIN-4168.)"
+  },
+  {
+   "id": "LV:web-routes:W2",
+   "slug": "web-routes",
+   "section": "Waiting",
+   "text": "`routes/dashboard-rulings.js`: the rulings badge counts through `collectUnansweredDecisions` (`lib/unanswered-decisions.js`), while Home's Waiting on you reads `readRulingStanding` (`lib/ruling-standing.js`, via `lib/home-row-states.js`). Two reductions of one set, which counted differently when it was named. One rulings reduction for both. (Survey tally: LIN-4144.)"
+  },
+  {
+   "id": "LV:web-routes:W3",
+   "slug": "web-routes",
+   "section": "Waiting",
+   "text": "`routes/task-share.js`: the public timeline fragment shows model names, dispatch item ids and, for a lineage founded elsewhere, that task's identifier, against its own comment; no test fails with its mask removed (0 of 84). (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)"
+  },
+  {
+   "id": "LV:web-routes:W4",
+   "slug": "web-routes",
+   "section": "Waiting",
+   "text": "`routes/collective.js`: the preview returns a prompt carrying the server's `YAP_PASSWORD` to any member who turns on the self-service `collective` flag, and Collective channels on one Yap server are shared across tenants. Send a placeholder, as the proxy token already is. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)"
+  },
+  {
+   "id": "LV:web-routes:W5",
+   "slug": "web-routes",
+   "section": "Waiting",
+   "text": "`routes/test.js`: the e2e server has no egress guard, so a live call is seen only if it logs an error; the task-facts refresh (`lib/task-facts-holder.js`, Other features) calls GitHub live with a seeded fake token. A size of move: a standing guard like the unit `test:hermetic` that fails the e2e job on any non-loopback connect. LIN-3815 fixes named sites, not the guard. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)"
+  },
+  {
+   "id": "LV:web-routes:W6",
+   "slug": "web-routes",
+   "section": "Waiting",
+   "text": "`routes/workspace-api-feedback.js`: a feedback screenshot on a Jira workspace is refused 422, because Jira has no `uploadFile` and an attachment needs an issue to exist first. Deciding whether to file the words without the picture, or to upload after the create, is open. (LIN-4451 Survey global; a live check belongs with LIN-4452.)"
+  },
+  {
+   "id": "LV:web-routes:W7",
+   "slug": "web-routes",
+   "section": "Waiting",
+   "text": "`routes/workspace-api-issue-write.js`: \"a create field the provider does not declare is a 400\" is spelled per field here (against `createFields()`), as a loop over `apiWriteFields()` in `routes/proxy-writes.js`, and not at all in feedback (`routes/workspace-api-feedback.js`), which picks its env defaults by provider name (`feedbackEnvDefault`, `jira`) instead of a provider declaration. One create pipeline with one resolver and one refuse-or-drop rule would make it one rule. (LIN-4451 Survey global; leftovers.)"
+  },
+  {
+   "id": "LV:wiring:W1",
+   "slug": "wiring",
+   "section": "Waiting",
+   "text": "`server.js`: test scaffolding in product code. Under NODE_ENV=test it seeds the catalog from `tests/fixtures/openrouter-models-2026-11-08.json`, `scripts/replay-brief.mjs` calls `_resetCatalogCacheForTests` (`lib/openrouter-catalog.js`), and two pinned catalogs are kept: `tests/fixtures/openrouter-models-2026-11-07.json` is read only by `tests/unit/stream-chat-whole-or-loud.test.js`. A catalog-source option on the product side would replace the test hooks. (Area reads CG/CH, 8 Nov, on LIN-4358.)"
+  },
+  {
+   "id": "LV:wiring:W2",
+   "slug": "wiring",
+   "section": "Waiting",
+   "text": "`server.js`: the app-wide JSON and urlencoded body parsers accept compressed request bodies (body-parser's default `inflate: true`). No first-party client sends compressed bodies, so `inflate: false` on those parsers is a small parser-hardening move. The package advisory is tracked on LIN-620 and is not repeated here. (Dependency & Supply-Chain Review, 10 Nov.; `docs/reviews/dependency-supply-chain-review-2026-11-10.md`)"
+  }
+ ]
+}
