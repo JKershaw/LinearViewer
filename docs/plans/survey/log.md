@@ -4041,3 +4041,9 @@ John's direction:
   - John: "You can include additional context from this session, so the momentum/direction/path of the idea is present." I added "How the idea arrived", seven steps in John's words.
   - Fable reasons, Opus writes; filed with A20 once the papers merge. Text in `asks.md`.
 - **Budget reading: 51%** (John, about midday 14 Nov; 45% this morning). John: "I suspect we'll use the rest of this week exploring all this."
+- **~12:05 UTC: papers after their fixes.** All three writers pushed review fixes with CI green; I spot-checked the must-fixes.
+  - A17: the company name is gone from its evidence. Two older files already on main still carry it; noted for the survey record's privacy check.
+  - A18: LIN-462 and the 817 KB figure corrected.
+  - A19: the LIN-4400 claim now states the timing.
+- **A18 merged** (PR #2451, squash `8fe484929`).
+- **A19 (#2452) and A17 (#2453) conflict with main** in `docs/papers/README.md` and `tests/fixtures/library-doc-summaries.json`: each adds index rows. A19's writer was sent to merge main and keep both entries (`2b6cc880`); A17 goes after A19 merges, so it isn't resolved twice.
