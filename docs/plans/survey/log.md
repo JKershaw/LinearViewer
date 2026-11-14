@@ -4034,3 +4034,4 @@ John's direction:
 - **John:** "The pause point is now a new gate, and what lies beyond awaits our read and discussion."
   - Gate contents: three papers (A17, A18, A19), Stability run 7, and two essays (A17b, A20).
   - Then the read and discussion: notes and scaffolding first, readiness as "work lands clean and right".
+- **John on shape and Theseus:** "I imagine Harbour looks at the code, maps it out, then figures out what's holding complexity or mess simply because a square peg is trying to go in a round hole. Eg in hindsight our UI could be 100x simpler, and get the same results. The right shape for the right choices, and that's the Theseus method in full effect." For the discussion's "bigger intentional tidies".
