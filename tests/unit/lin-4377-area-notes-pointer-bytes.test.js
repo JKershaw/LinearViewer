@@ -15,11 +15,11 @@ import assert from 'node:assert/strict';
 import { formatAreaNotesPointer } from '../../lib/prompt-formatters.js';
 
 const POINTER = '\n\n## Area Notes\n\nRead `docs/areas/README.md` and the notes for each area this work touches ' +
-  '(`docs/areas/areas.json` maps a path to its area, first match wins; no notes file means nothing known yet). ' +
+  '(`docs/areas/areas.json`, first match wins; no notes file means nothing known yet). ' +
   'Lessons bind how you work. Waiting entries are context, not scope, unless the size of the move takes them on. ' +
   'Where a note entry bears on this work, name it (its file and source) where you record your decisions.';
 
 test('formatAreaNotesPointer() renders byte-identical output', () => {
   assert.strictEqual(formatAreaNotesPointer(), POINTER);
-  assert.strictEqual(Buffer.byteLength(formatAreaNotesPointer()), 410);
+  assert.strictEqual(Buffer.byteLength(formatAreaNotesPointer()), 386); // LIN-4469: was 410; the lookup's clause is one constant (areaLookup)
 });

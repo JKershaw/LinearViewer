@@ -2,7 +2,7 @@ Repository: JKershaw/LinearViewer (Harbour). Clone or fetch it as you need.
 
 You are reading one change blind, before it merges. Not whether it does its job: whether the code it leaves behind in its area is in better, the same or worse shape for the next change. You didn't write it, you are not told why it was made, and you shouldn't try to find out.
 
-**This is read-only.** Don't change code, branches, pull requests, tickets or tracker state. {DESTINATION}
+**This is read-only.** Don't change code, branches or pull requests. {DESTINATION}
 
 **The change:** {PRS}, read at `{HEAD}` against its merge-base `{BASE}`.
 

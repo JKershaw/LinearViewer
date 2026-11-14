@@ -2,6 +2,8 @@
  * LIN-4467 witness: what every stage kind renders, and what the per-kind tables say, captured as hashes.
  *
  * Captured at HEAD before the one-record refactor, and compared after it (tests/unit/lin-4467-stage-kind-witness.test.js).
+ * Kept since as a permanent ratchet (LIN-4469): it is the identity pin on real-context renders, which the budget's
+ * caps (tests/unit/prompt-size-budget.test.js, context-free fixture) are not.
  * Renders use REAL context: a ticket with a parent, siblings, children, a project, comments that carry a PR, a
  * leftover and an attachment, not the context-free budget fixture (LIN-4393). Each kind renders twice: a fresh
  * start, and a fix round whose latest review requested changes (the revision section and the fix-round workflow).

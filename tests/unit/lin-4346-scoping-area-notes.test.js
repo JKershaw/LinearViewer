@@ -68,7 +68,7 @@ describe('scoping reads the area notes by pointer (LIN-4346)', () => {
 
   test('the pointers share their opening, so the seven stages\' pointer is unchanged', () => {
     const opening = '\n\n## Area Notes\n\nRead `docs/areas/README.md` and the notes for each area this work touches ' +
-      '(`docs/areas/areas.json` maps a path to its area, first match wins; no notes file means nothing known yet).';
+      '(`docs/areas/areas.json`, first match wins; no notes file means nothing known yet).';
     assert.ok(pointer.startsWith(opening));
     assert.ok(formatAreaNotesPointer().startsWith(opening));
   });
