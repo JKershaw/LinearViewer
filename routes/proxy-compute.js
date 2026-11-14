@@ -24,6 +24,7 @@ import { hashContext } from '../lib/recap-cache.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
 import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, deriveDispatchKind } from '../lib/prompt-templates.js';
+import { promptContextOf } from '../lib/prompts/prompt-context.js';
 import { getPeriodicals } from '../lib/periodicals.js';
 import { foldPeriodicalRuns, DEFAULT_HORIZON_MS } from '../lib/periodical-runs.js';
 import { READ_HORIZON_MS, TASK_LIFE_SCOPE, taskLifeStart } from '../lib/read-horizon.js';
@@ -329,13 +330,13 @@ export function createComputeRoutes({
         logEvent(req, '/api/proxy/prompt', 404);
         return notFound.json(res, 'Issue not found');
       }
-      const { issue, parent, siblings, project, children, comments, attachments } = ctx;
+      const { issue } = ctx;
 
       // Generate the prompt. Forward `attachments` so generatePrompt's
       // formatAttachmentsSection post-pass surfaces the worker-facing Attachments
       // section (LIN-776) — fetchIssueContext now carries it at top-level (LIN-772),
       // and dropping it here is what silently hid the section on this route.
-      const result = generatePrompt(templateKey, issue, { parent, siblings, project, children, comments, attachments }, {}, provider?.ui || null);
+      const result = generatePrompt(templateKey, issue, promptContextOf(ctx), {}, provider?.ui || null);
 
       if (!result) {
         logEvent(req, '/api/proxy/prompt', 500);
@@ -488,8 +489,8 @@ export function createComputeRoutes({
             logEvent(req, '/api/proxy/recommend', 404);
             return keepaliveError(keepalive, 404, 'Issue not found');
           }
-          const { issue, parent, siblings, project, children, comments, attachments } = ctx;
-          const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {}, provider?.ui || null);
+          const { issue } = ctx;
+          const generated = generatePrompt(kind, issue, promptContextOf(ctx), {}, provider?.ui || null);
           if (!generated) {
             logEvent(req, '/api/proxy/recommend', 500);
             return keepaliveError(keepalive, 500, 'Failed to generate prompt');

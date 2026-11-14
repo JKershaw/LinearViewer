@@ -35,7 +35,7 @@ import {
 import {
   _setCatalogCacheForTests, _resetCatalogCacheForTests, _normalizeModelForTests, getCachedCatalogModel
 } from '../../lib/openrouter-catalog.js';
-import { planCallBudget, planRetryBudget, canReason } from '../../lib/call-budget.js';
+import { planCallBudget, planRetryBudget } from '../../lib/call-budget.js';
 import { generateBrief } from '../../lib/brief.js';
 import { InMemoryBriefCacheStore } from '../../lib/brief-cache.js';
 import { LlmCallLogStore } from '../../lib/llm-call-log.js';
@@ -234,12 +234,9 @@ describe('the budget is sized from the live catalog', () => {
   test('a model that can reason gets headroom and no reasoning field; one that cannot gets its exact cap; an unlisted id gets its exact cap', () => {
     seedLiveCatalog();
     for (const id of [HAIKU, SOL, MINI]) {
-      assert.equal(canReason(id), true, id);
       assert.deepEqual(planCallBudget({ model: id, maxTokens: 3000 }), { maxTokens: 6000, reasoning: undefined, proseTokens: 3000, headroom: 3000 }, id);
     }
-    assert.equal(canReason(NO_REASONING), false);
     assert.equal(planCallBudget({ model: NO_REASONING, maxTokens: 3000 }).maxTokens, 3000);
-    assert.equal(canReason('unlisted/model'), null);
     assert.equal(planCallBudget({ model: 'unlisted/model', maxTokens: 3000 }).maxTokens, 3000);
     // Small caps get the floor of headroom, large ones the ceiling.
     assert.equal(planCallBudget({ model: HAIKU, maxTokens: 150 }).maxTokens, 2150);

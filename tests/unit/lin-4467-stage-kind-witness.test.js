@@ -1,8 +1,8 @@
 /**
  * LIN-4467 witness (piece 3 of LIN-4448): one record per stage kind, tables become views.
  *
- * Every stage kind renders the same text, fresh and in a fix round, with real context, and every per-kind
- * table serialises to the same hash it had before the refactor. The fixture is captured at HEAD
+ * Every stage kind renders the same text, fresh and in a fix round, with real context (a sha256 per render), and every
+ * per-kind table serialises to the text the fixture holds (LIN-4470: text, not a hash, so a diff shows what changed). The fixture is captured at HEAD
  * (tests/fixtures/lin-4467-witness.json; see tests/fixtures/lin-4467-witness.js for how it is regenerated).
  * A change to a rendered text or a table is then a visible edit of that fixture, in the PR that makes it.
  */
@@ -38,7 +38,7 @@ describe('LIN-4467 — every stage kind renders byte-identically, fresh and fix 
 describe('LIN-4467 — the per-kind tables serialise to the witnessed content', () => {
   for (const name of Object.keys(expected.tables)) {
     test(`${name} is unchanged`, () => {
-      assert.equal(actual.tables[name], expected.tables[name], `${name} changed`);
+      assert.deepEqual(actual.tables[name], expected.tables[name], `${name} changed (the fixture holds its text; see the diff)`);
     });
   }
   test('the stage labels, the step words and the stage contracts are unchanged', () => {

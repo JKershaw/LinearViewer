@@ -91,8 +91,9 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - `lib/run-live-wait.js`: a read, not a claim: two different-kind calls racing on
   one ticket both pass; claim compare-and-set, like `claimHeldWake` (LIN-4392). (Moved from the LLM & prompts note by LIN-4459.)
 - `lib/run-live-wait.js`: the run-outcome words have two homes. `QUEUED`/`RUNNING` live here (they moved
-  with `isLiveRun` to avoid an import cycle), while `WAITING_ON_A_PERSON`, `'closed'` and `'aborted'` stay
-  in `lib/recent-runs.js`, and `lib/recommendation-look-first.js` still imports them from there. One home
+  with `isLiveRun` to avoid an import cycle), while `WAITING_ON_A_PERSON` and `'closed'` stay
+  in `lib/recent-runs.js` (`'aborted'` is in `LINEAGE_TERMINAL_STATUSES`, `lib/dispatch-lineage-status.js`), and
+  `lib/recommendation-look-first.js` still imports `WAITING_ON_A_PERSON` from there. One home
   (for example a leaf module of outcome words) touches importers in LLM & prompts, so it is larger than a
   fix. (LIN-4459 blind read.)
 - `lib/recent-runs.js`: a parked stage whose lineage has ended is dated by its park time, not the lineage's
@@ -153,14 +154,7 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   goes through `extractPrUrls`. Moving it onto `prUrlsIn` changes which park messages wake (a scheme-less URL
   would stop matching), so it needs its own witness. (LIN-4458 review.)
 - `lib/run-evidence.js`: the run page keeps two answers to "which PR is the task's". The close-out box counts `readTrail().landing` through `closeOutDecision` (LIN-4460 retired `deriveState`'s status decision: no reader outside the tests and the GET body reads it), but `deriveState` over `extractPrUrls` (every cited PR) still drives `state.pr`, `done`, `checked.now` and `resolveRunPrRef` (read by the `routes/dashboard.js` pr-state route), `state.prUrls` (`lib/pr-state-store.js`), and `lib/ci-wake-sweep.js` matches parks against every cited PR. Whether the page's PR and the CI-wake sweep follow the landing is a product decision touching several callers. Also, `readRunEvidence` reads the landing's sole PR and hands `buildRunEvidence` a bare `prStatus`, which `buildRunEvidence` re-pairs with the landing after reading the trail again: the same positional coupling the URL-keyed `Map` removed from the decision. Passing the status keyed by URL with the landing already read is a signature change for about 25 call sites (`tests/unit/run-evidence.test.js`, `routes/dashboard.js`), so larger than a fix. (LIN-4458 blind read; LIN-4460.)
-- `lib/completion-signals.js`: the module is now a view of the stage-kind record
-  (`lib/prompts/stage-kinds.js`) but keeps six exports that nothing under `lib/`, `routes/` or
-  `server.js` calls (`hasSignals`, `getDefinedSignalTypes`, `getSignal`, `assessCompletion`,
-  `getBlockers`, `formatSignalsForPrompt`), only `tests/unit/completion-signals.test.js`.
-  `hasSignals`'s null branch is unreachable and the header still says "simplified 3-label system".
-  Delete them and their tests, leaving `COMPLETION_SIGNALS`. Left here because the file is this
-  area's and LIN-4467 (piece 3) made it a view; it breaks nothing today. (LIN-4469 blind read.)
-- `lib/run-view.js` (the display words come from llm-and-prompts' `STAGE_LABELS`, `lib/prompts/stage-kinds.js`): `STEP_KIND_WORDS`
+- `lib/run-view.js` (the display words: `STAGE_LABELS` is defined here, built from each record's `label` in llm-and-prompts' `lib/prompts/stage-kinds.js`): `STEP_KIND_WORDS`
   copies six labels from `STAGE_LABELS` through a hand-typed kind list, so `stageLabel('look-into')`
   is "Look into" and `stepKindWord('look-into')` is "Look-into", and a new kind has to be added to
   that list by hand. One display word per kind changes visible labels on the run page and settings
@@ -180,3 +174,24 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   the readers, not from a recorded run; it was not checked against recorded runs, so how often an http PR link occurs
   is not known. When it is decided, change the reader and the row's cells together, then re-copy the contract into SD.
   (LIN-4475 blind read.)
+- `lib/dispatch-factory.js`: the record's `model` (`routing.model`) names the routed id ("anthropic/claude-opus-4.8" for
+  the `opus` route), but the claude-code harness runs a Claude id by its family token (`isModelRunnableOn` and
+  `CLAUDE_MAPPABLE_MODEL_FAMILIES`, `lib/model-routing-harnesses.js`), and on blind-read dispatches d9bdf6d8, cced07ee and
+  0399b2e2 it ran `claude-opus-5-5`, so a record can misname the model that ran. Cost is already priced from the model the
+  worker reports. Waiting: make the record carry the model the worker reports, or update the routed id. (LIN-4396 review;
+  moved here from LLM & prompts by LIN-4470, as agreed on LIN-4447.)
+- `lib/run-view.js`: `STAGE_LABELS` spreads the labels from `STAGE_KINDS` and `STEP_KIND_WORDS` hand-lists six
+  kinds to read back from it, so the run page's display words now live on the prompt record and Runs depends on
+  LLM & prompts; `lib/run-closeout-state.js` and `lib/pipeline-churn.js` also import
+  `lib/prompts/blind-read-words.js`. Waiting on a design choice: whether display labels belong on the stage
+  record or in Runs. Not scheduled; no ticket takes it. (LIN-4448 blind read.)
+- `lib/run-closeout-state.js`: its header says the Done rule is bounded here, in one place, but `setDone` in
+  `closeOutDecision` has no stop-at term: the stop-at-PR bound is applied by the check route
+  (`routes/workspace-api-run-evidence.js`), so the route's JSON can carry `setDone: true` for a task nothing set Done
+  (no client reads it today). Inside the decision the person-acted rule is spelled twice: `doneWithoutHarbour` feeds
+  `followsPerson`, and `routesRead` writes its own variant inline. `followsPerson` and `waitsOn` have no production
+  reader; `blindReadStep` reads `routesRead` alone. A change to the rule in one expression leaves the published fact
+  disagreeing with the read routed. (Drift & Coherence Review, 14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)
+- `lib/dispatch-feedback-kinds.js`: its header says the runner prompt renders the kinds through the store's re-export and
+  that the store imports the table. The store does neither (its own comment says so) and `lib/prompts/runner-kickoff.js`
+  imports the leaf. A header fix. (Drift & Coherence Review, 14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)

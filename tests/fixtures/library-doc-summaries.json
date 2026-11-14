@@ -107,5 +107,6 @@
   "task-size-and-cost": "Cost rises with size, but slowly. Across 98 exact tickets (dollars at API prices), the planning, review and close-out part of a ticket (the floor) grows about 16% for each doubling of production lines changed (slope 0.21, 95% interval 0.10…",
   "cleaner-than-it-started": "Areas read better in both passes, where one of four ordinary pairs did; the Periodicals broadly agree on direction; tasks on average: not shown. Nine area readings over fifteen tickets read better in both blind passes, and no pass read one…",
   "model-choice-by-call": "On the catalog read 8 Nov 2026 11:14 UTC and the Library analysis of 23 Oct 2026, John's sense is right, for one model. OpenAI's GPT-6 Luna (openai/gpt-6-luna) costs $0.10 in and $0.50 out per million tokens, against $0.75 and $4.50 for…",
+  "steering-text": "The text grows because every lesson enters it as a sentence at the point where something went wrong, and nothing in the system ever asks a sentence to leave. Of 2,501 first-parent commits, 831 grew the steering text and 59 shrank it. 3.4…",
   "beyond-the-code": "Agents need four kinds of knowledge the code does not show: traps (how a change here goes wrong), homes (which one place owns a rule), reasons (why something is the way it is, and who decided), and known work (what is wrong or waiting).…"
 }

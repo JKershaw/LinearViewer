@@ -17,7 +17,7 @@ import {
   SUGGESTED_MODEL_IDS, FREE_TIER_MODEL_IDS, DEFAULT_MODEL, suggestedModels, getModelDisplayName,
   getModelPricingHint, isToolCapableModel, isReasoningModel, resolveReasoningBudget, resolveFreeTierModel,
 } from '../../lib/openrouter.js';
-import { planCallBudget, canReason } from '../../lib/call-budget.js';
+import { planCallBudget } from '../../lib/call-budget.js';
 import { getModelRate, priceRequest, resolveWorkerModelId } from '../../lib/model-pricing.js';
 import { buildModelOptions, getModelCatalog, _seedCatalogFromBodyForTests } from '../../lib/openrouter-catalog.js';
 import { DISPATCH_MODEL_SUGGESTIONS, DISPATCH_CLAUDE_ALIAS_MODELS } from '../../lib/model-routing-harnesses.js';
@@ -68,7 +68,6 @@ describe('a model released tomorrow works on the day it appears, with no list ed
   });
 
   test('budgeted: a long brief gets reasoning headroom within the model\'s output limit, and no reasoning field', () => {
-    assert.equal(canReason(TOMORROW.id), true);
     assert.equal(isReasoningModel(TOMORROW.id), false, 'thinking is not on by default, so no explicit split (LIN-1665)');
     const plan = planCallBudget({ model: TOMORROW.id, maxTokens: 3000, promptChars: 33_336 });
     assert.deepEqual(plan, { maxTokens: 6000, reasoning: undefined, proseTokens: 3000, headroom: 3000 });

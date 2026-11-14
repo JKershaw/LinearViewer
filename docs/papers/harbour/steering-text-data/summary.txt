@@ -1,0 +1,104 @@
+# Weekly steering and carried text (KB), and product code (KB)
+2025-12-29 a82b87582 steering 2 carried 2 product 23 ratio 0.10
+2026-01-05 fda48e990 steering 24 carried 24 product 174 ratio 0.14
+2026-01-12 47c04451e steering 69 carried 64 product 313 ratio 0.22
+2026-01-19 c65508fdc steering 103 carried 69 product 444 ratio 0.23
+2026-01-26 6c959c2bb steering 132 carried 81 product 478 ratio 0.28
+2026-02-02 8e4c99d38 steering 142 carried 92 product 532 ratio 0.27
+2026-02-09 07b7d131b steering 156 carried 93 product 566 ratio 0.28
+2026-02-16 c35a4721a steering 157 carried 93 product 591 ratio 0.27
+2026-02-23 cd20df11b steering 159 carried 94 product 599 ratio 0.27
+2026-03-02 9a23fd5cf steering 159 carried 93 product 747 ratio 0.21
+2026-03-09 425b5b210 steering 161 carried 95 product 845 ratio 0.19
+2026-03-16 3e206335b steering 173 carried 95 product 898 ratio 0.19
+2026-03-23 1b2dc696d steering 194 carried 103 product 983 ratio 0.20
+2026-03-30 ff08e05ae steering 198 carried 106 product 985 ratio 0.20
+2026-04-06 4f6b58d0e steering 230 carried 108 product 1179 ratio 0.20
+2026-04-13 d3083458b steering 230 carried 108 product 1230 ratio 0.19
+2026-04-20 8298af180 steering 230 carried 108 product 1326 ratio 0.17
+2026-05-11 06cb20725 steering 250 carried 108 product 1414 ratio 0.18
+2026-05-18 4457af25a steering 265 carried 109 product 1460 ratio 0.18
+2026-05-25 05d33f511 steering 319 carried 115 product 1612 ratio 0.20
+2026-06-01 45bf490a6 steering 559 carried 224 product 1797 ratio 0.31
+2026-06-08 5d00b4950 steering 764 carried 272 product 2400 ratio 0.32
+2026-06-15 d40500c08 steering 818 carried 291 product 2607 ratio 0.31
+2026-06-22 03328427f steering 879 carried 326 product 3192 ratio 0.28
+2026-06-29 c5232bf77 steering 1006 carried 414 product 3631 ratio 0.28
+2026-07-06 2c9eec3d2 steering 1087 carried 436 product 3999 ratio 0.27
+2026-07-13 2312ddc5c steering 1148 carried 450 product 4258 ratio 0.27
+2026-07-20 7f1efdb81 steering 1214 carried 499 product 4633 ratio 0.26
+2026-07-27 dcec558b0 steering 1264 carried 518 product 4794 ratio 0.26
+2026-08-03 a63a72d85 steering 1353 carried 564 product 5213 ratio 0.26
+2026-08-10 b0a986649 steering 1376 carried 575 product 5480 ratio 0.25
+2026-08-17 ffacb38a4 steering 1496 carried 624 product 5976 ratio 0.25
+2026-08-24 705b85aff steering 1530 carried 654 product 6167 ratio 0.25
+2026-08-31 4f59a79ae steering 1690 carried 786 product 6717 ratio 0.25
+2026-09-07 fcd0a71fe steering 1732 carried 817 product 7078 ratio 0.24
+2026-09-14 0d652fbc0 steering 1799 carried 683 product 7161 ratio 0.25
+2026-09-21 50588aef3 steering 1895 carried 732 product 7378 ratio 0.26
+2026-09-28 3ad349359 steering 2343 carried 796 product 8505 ratio 0.28
+2026-10-05 d6cf6a986 steering 2231 carried 663 product 8952 ratio 0.25
+2026-10-12 9bc8d373d steering 2354 carried 665 product 8884 ratio 0.26
+2026-10-19 f2b68b80a steering 2559 carried 668 product 9275 ratio 0.28
+2026-10-26 24f448b59 steering 2597 carried 662 product 9696 ratio 0.27
+2026-11-02 b315e0e8f steering 2725 carried 731 product 10181 ratio 0.27
+2026-11-09 a886fb506 steering 2865 carried 823 product 10391 ratio 0.28
+
+# steering: 2501 first-parent commits, 893 touch it, 831 grow it, 59 shrink it; added 3406 KB, removed 544 KB, ratio 6.26
+  all: cut-worded 57 (37 grew, 20 shrank, net 88 KB); other 836 (net 2774 KB)
+  to September: cut-worded 26 (16 grew, 10 shrank, net 68 KB); other 518 (net 1919 KB)
+  October on: cut-worded 31 (21 grew, 10 shrank, net 20 KB); other 318 (net 855 KB)
+  version 1's 24-term pattern, all: 98 (75 grew, 23 shrank, net 120 KB)
+  shrinks of 1 KB or more:
+   2026-10-05 845992420 -79.8 KB | ref docs -8+0 product -40 tests -151 | LIN-3300: one path for every recommendation
+   2026-10-05 af3b20705 -37.6 KB | ref docs 3+0 product 8 tests -29 | LIN-3300: one generic stage selector, reading the task's recent runs
+   2026-10-08 ac8a522a3 -12.2 KB | ref docs 0+-8 product -27 tests -52 | LIN-3333: retire repo= lines on projects
+   2026-10-06 229f5c9b7 -11.9 KB | ref docs -0+1 product 0 tests -13 | LIN-3326: close-out finishes the work
+   2026-10-29 8f6690f20 -11.2 KB | ref docs -3+1 product 0 tests -4 | LIN-4021: land the agreed plan and plan-review prompt text (#2178)
+   2026-08-03 31fcf36ba -9.6 KB | ref docs 0+0 product 0 tests 0 | LIN-1850: revise passage planner prompt to v0.1 (#1065)
+   2026-10-11 159909051 -9.2 KB | ref docs 0+-3 product -8 tests -34 | LIN-3461: per-task session cap becomes a fixed failsafe (one constant, one check) (#1833)
+   2026-01-20 856d4ad65 -8.8 KB | ref docs 0+0 product -3 tests -25 | Remove complex phase-based label system
+   2026-01-12 690ab6123 -8.5 KB | ref docs 0+0 product 0 tests -5 | Simplify prompt templates and remove MCP instructions
+   2026-06-14 1403655cf -6.9 KB | ref docs 0+0 product 0 tests 0 | Rebalance Autopilot kickoff: cut abstract warnings, consolidate instrument facts (#462)
+   2026-06-25 683d504dd -5.5 KB | ref docs 0+-0 product -31 tests -1 | LIN-580: Remove obsolete linear-cli.js
+   2026-07-12 35dc0e14f -4.5 KB | ref docs 0+-1 product -13 tests -20 | LIN-1270: revert the inert grounding-freshness / HEAD-report layer (LIN-1239/1240) (#903)
+   2026-10-24 d738a7678 -4.4 KB | ref docs -0+-0 product -9 tests -7 | LIN-3848: remove the nine settings switches that do nothing or are superseded (#2082)
+   2026-10-25 2c8366760 -3.9 KB | ref docs -4+-0 product -101 tests -108 | LIN-3912: retire the Next run page, its flag and job, and delete prototypes/ (#2115)
+   2026-07-10 3d883c977 -3.6 KB | ref docs 0+0 product 0 tests -0 | LIN-1206: autopilot stops closing session windows (runner owns DONE close)
+   2026-11-11 b5950f704 -3.5 KB | ref docs -0+-0 product -0 tests 0 | LIN-4415: a finished task no longer starts a Periodical by default
+   2026-06-04 e455dd16e -3.1 KB | ref docs 0+0 product -1 tests -6 | LIN-286: Remove the preparing label from prompts and workflow
+   2026-11-02 30db20520 -2.8 KB | ref docs -3+0 product -32 tests -37 | LIN-4129: remove cost code that nothing reads (#2234)
+   2026-01-15 7ea8f819a -2.6 KB | ref docs 0+0 product 0 tests -1 | Update prompts
+   2026-10-04 4fd90d87b -2.5 KB | ref docs 2+0 product 2 tests 16 | LIN-3299: a short lead, then Scope and Authority, then the process verbatim
+   2026-06-16 a0ad73102 -1.7 KB | ref docs 0+-1 product -100 tests -67 | LIN-451: retire Foreman observer page + playbook surfaces, relabel engine heading (#498)
+   2026-11-05 0c3d3448b -1.4 KB | ref docs 0+0 product 0 tests 3 | LIN-4277: one endpoint-hint ladder and one closing lead-in in the preamble (#2301)
+   2026-11-13 c174185f6 -1.0 KB | ref docs 0+0 product 2 tests 6 | LIN-4459: live-stage wait moves to lib/run-live-wait.js; a parked stage reads its lineage's end
+
+# carried: 2501 first-parent commits, 586 touch it, 524 grow it, 60 shrink it; added 1328 KB, removed 507 KB, ratio 2.62
+  all: cut-worded 35 (18 grew, 17 shrank, net -25 KB); other 551 (net 846 KB)
+  to September: cut-worded 17 (7 grew, 10 shrank, net -26 KB); other 380 (net 793 KB)
+  October on: cut-worded 18 (11 grew, 7 shrank, net 1 KB); other 171 (net 53 KB)
+  version 1's 24-term pattern, all: 63 (42 grew, 21 shrank, net -204 KB)
+  shrinks of 1 KB or more:
+   2026-09-18 d4f749c1d -140.8 KB | ref docs 144+0 product 0 tests 33 | LIN-2896: shrink CLAUDE.md to a conventions file plus 8 area docs, with a line+byte guard
+   2026-10-05 845992420 -72.4 KB | ref docs -8+0 product -40 tests -151 | LIN-3300: one path for every recommendation
+   2026-10-05 af3b20705 -41.0 KB | ref docs 3+0 product 8 tests -29 | LIN-3300: one generic stage selector, reading the task's recent runs
+   2026-10-06 229f5c9b7 -12.4 KB | ref docs -0+1 product 0 tests -13 | LIN-3326: close-out finishes the work
+   2026-08-03 31fcf36ba -9.6 KB | ref docs 0+0 product 0 tests 0 | LIN-1850: revise passage planner prompt to v0.1 (#1065)
+   2026-01-20 856d4ad65 -8.8 KB | ref docs 0+0 product -3 tests -25 | Remove complex phase-based label system
+   2026-10-29 8f6690f20 -8.6 KB | ref docs -3+1 product 0 tests -4 | LIN-4021: land the agreed plan and plan-review prompt text (#2178)
+   2026-01-12 690ab6123 -8.5 KB | ref docs 0+0 product 0 tests -5 | Simplify prompt templates and remove MCP instructions
+   2026-06-14 1403655cf -6.9 KB | ref docs 0+0 product 0 tests 0 | Rebalance Autopilot kickoff: cut abstract warnings, consolidate instrument facts (#462)
+   2026-10-11 159909051 -6.3 KB | ref docs 0+-3 product -8 tests -34 | LIN-3461: per-task session cap becomes a fixed failsafe (one constant, one check) (#1833)
+   2026-06-25 683d504dd -5.1 KB | ref docs 0+-0 product -31 tests -1 | LIN-580: Remove obsolete linear-cli.js
+   2026-10-04 4fd90d87b -4.9 KB | ref docs 2+0 product 2 tests 16 | LIN-3299: a short lead, then Scope and Authority, then the process verbatim
+   2026-10-08 ac8a522a3 -4.6 KB | ref docs 0+-8 product -27 tests -52 | LIN-3333: retire repo= lines on projects
+   2026-10-24 d738a7678 -4.3 KB | ref docs -0+-0 product -9 tests -7 | LIN-3848: remove the nine settings switches that do nothing or are superseded (#2082)
+   2026-07-10 3d883c977 -3.6 KB | ref docs 0+0 product 0 tests -0 | LIN-1206: autopilot stops closing session windows (runner owns DONE close)
+   2026-11-11 b5950f704 -3.4 KB | ref docs -0+-0 product -0 tests 0 | LIN-4415: a finished task no longer starts a Periodical by default
+   2026-07-12 35dc0e14f -3.2 KB | ref docs 0+-1 product -13 tests -20 | LIN-1270: revert the inert grounding-freshness / HEAD-report layer (LIN-1239/1240) (#903)
+   2026-06-04 e455dd16e -3.1 KB | ref docs 0+0 product -1 tests -6 | LIN-286: Remove the preparing label from prompts and workflow
+   2026-01-15 7ea8f819a -2.6 KB | ref docs 0+0 product 0 tests -1 | Update prompts
+   2026-05-31 05d33f511 -1.8 KB | ref docs 0+5 product 0 tests 0 | Standardize proxy issue endpoints on plural /issues
+   2026-11-05 0c3d3448b -1.4 KB | ref docs 0+0 product 0 tests 3 | LIN-4277: one endpoint-hint ladder and one closing lead-in in the preamble (#2301)
+   2026-11-13 c174185f6 -1.2 KB | ref docs 0+0 product 2 tests 6 | LIN-4459: live-stage wait moves to lib/run-live-wait.js; a parked stage reads its lineage's end
