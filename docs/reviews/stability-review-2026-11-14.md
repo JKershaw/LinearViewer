@@ -104,11 +104,11 @@ three moved the right way: the Waiting stock stopped growing across the 29 landi
 after +10 in the four landings before it), tickets minted per landing fell from 1.37 to 1.12, and the CI wall-time level held at about 5.7 minutes.
 Cost per finished task fell 9% against run 6 on a changed population ($16.70 → $15.25), and the look-first prefix that run 6 flagged is flat (about $2.9 a task).
 
-Three things moved the wrong way or did not settle. The **rate of production change rose** per landing against run 6: added lines ×2.7 (×1.45 whitespace-ignored) and deleted lines ×7.3 (×3.3 whitespace-ignored),
-so deletions now make up a larger share of additions (0.30 → 0.82; 0.66 without whitespace). Net production growth per landing fell (65.5 → 45.8), but the
+Two things moved the wrong way or did not settle. The **rate of production change rose** per landing against run 6: added lines ×2.7 (×1.45 whitespace-ignored) and deleted lines ×7.3 (×3.3 whitespace-ignored),
+so deletions now make up a larger share of additions (0.30 → 0.82; 0.66 without whitespace), which this report reads as replacement churn (F1). Net production growth per landing fell (65.5 → 45.8), but the
 declared comment-only share rose slightly (39.74% → 39.86%). And the test suite re-accelerated per landing
 (runtime tests 16.5 → 20.8 per landing; test files 0.57 → 1.06 per landing), mostly in ticket-named witness and census suites written for the module moves.
-Sessions per finished task are up (median 5 → 7 → 8), but the step from 7 to 8 is the blind-read stage, which every one of the 25 finished tasks now runs once; without it the median is 7, as in run 6 (see F2).
+Sessions per finished task rose (median 5 → 7 → 8), but neither step is counted as moving the wrong way: the 5 → 7 step came with the look-first prefix, and the 7 → 8 step is the blind-read stage, which every one of the 25 finished tasks now runs once; without it the median is 7, as in run 6 (see F2).
 
 So the answer to "converging or failing to settle?" is **converging on the stock and the wall time, not yet on the churn**. The wave's churn is the wave's job, and the
 trajectory after it is unobserved. The next run is the first that can see whether the tidied areas go quiet.
@@ -117,7 +117,23 @@ trajectory after it is unobserved. The next run is the first that can see whethe
   (`gh pr list`, n = 25). That is parallel programmes, not a queue flush. Per-landing rows stand; per-day rates would mislead.
 - **Shape.** Production churn per landing rose ×2.7 added and ×7.3 deleted; deleted per added rose 0.30 → 0.82. Tidy programmes net +781 production lines; the Jira feature nets +730.
 - **Converging, by the same measures.** Waiting stock (flat over the wave), minted per landing (down 18%), CI wall time (5.78 → 5.72), review-report landings (31% → 9% of landings), `docs/reviews` bytes per landing (0.13 → 0.12 MB), SD runner-quiet files, `lib/periodicals.js` touches (4 → 2). The blind read ran on 22 of 22 ordinary landings, and its verdicts are 20 better, 2 same, 0 worse (self-reported, see F10.3).
-- **Not converging.** Churn relative to size; test-suite growth per landing; sessions per finished task, whose step is one new by-design stage and not yet a trend (F2); `source-map.md` co-change with structural moves (11 of 11); the proxy write-gate and dispatch-store surfaces.
+- **Not converging.** Churn relative to size; test-suite growth per landing; `source-map.md` co-change with structural moves (11 of 11); the proxy write-gate and dispatch-store surfaces.
+
+## Paired area reads, checked against git
+
+The survey's paired area reads (`docs/plans/survey/area-read-reports/`, LIN-4462) each make a before/after convergence claim for one area. They are a
+witness, not a verdict. Each claim is set beside git for the same 14 sampled files and for the whole area (`analysis-notes.md` §12.1, inputs in
+`_evidence-2026-11-14-stability/revision-r1/`). Git windows run from each read's own base commit to the head of `main`, `fb358dbda`.
+
+| Area (read pair) | The read's convergence claim | Git, the same 14 sampled files | Git, whole area | Agree / disagree |
+|---|---|---|---|---|
+| **Runs & dispatch** (`4b5001ddf` → `302edafc3`, LIN-4447) | "No detectable difference" in code (D = +0.25, inside ±0.5). Note 11,540 → 18,045 bytes; Waiting 20 → 21. The read says its sample missed the work: 3 of 14 files changed, 35 of 121 area files differ, none of the six new homes sampled. | 3 landings touch the sample, the same 3 files the read saw change (`cost-read.js`, `digest-feedback.js`, `wall-clock-summary.js`); +20/−112, net −92. Quiet after `302edafc3`: 0 landings to head. | 14 landings to `302edafc3`: +1,959/−1,352, **net +607**. After the read, one more landing (LIN-4470, `fb358dbda`) cut −117 from the area (`lib/completion-signals.js` −111). | **Agree** on the sample's facts and on the Waiting count (git 20 → 21). **Disagree** that the sample shows anything about convergence: it is 14 of 121 files and none of the new files that carry the net growth. The area grew net during the wave and was touched after the read. No convergence is witnessed. |
+| **LLM & prompts** (`e8e92d50a` → `49776653d`, LIN-4448 / LIN-4470 piece 6) | Code score fell 3.3 → 3.0 in both passes (D = −0.3 against the control, no detectable difference), so the area does not beat its control on code. Note 3.25 → 4.0. Waiting 25 → 12. | 6 of 14 files changed in 7 landings: +1,536/−1,202, net +334, most of it the new `lib/prompts/stage-kinds.js` (594 lines). The sample is byte-identical on `fb358dbda`, the squash of the same piece (#2450). | 9 landings to `49776653d`: +1,896/−1,516, **net +380**. | **Agree** on the note: `docs/areas/llm-and-prompts.md` lost 102 of 175 lines in `fb358dbda` ("Waiting entries settled"), and a plain count of its Waiting bullets is 26 → 12 (the read counted 25 → 12). **Git cannot test the code score**: the churn is consistent with a fall but does not show one. **Disagree** with any reading that the area has settled: its quiet tail is zero days, so the convergence claim is right-censored. |
+| **Front end: server-rendered pages**, the control (`4b5001ddf` → `302edafc3`) | The kit calls it untouched, but the read flags verdict 4: the control moved. 4 of 14 sampled files changed. Code 3.3 in both reads, note 3.5. | 4 of 14 files changed in 5 landings: +13/−12, net +1. Quiet after `302edafc3`: 0 landings to head. | 8 landings: +91/−45, **net +46**, from the pieces of LIN-4446, 4451, 4457, 4460, 4463, 4471 and 4472. Last touch 13 Nov 22:01Z (LIN-4463). | **Agree** the control was not untouched. The four sampled files moved by small amounts in both sources. The control's changes come from the tidy programmes themselves, so the control carries part of the wave, and the direction of D's bias is unknown. |
+
+What the three reads show together: none witnesses convergence on code. Each sample is 14 files, and the quiet period after the last piece is zero to one day,
+so every read is right-censored (Measurement decision 6). Where the reads and git can both see something, they agree: the LLM note was settled, the Runs note gained one
+Waiting entry, and the control moved. The next read should come after a quiet period and should sample the new homes, which is where Runs' net growth sits.
 
 ## Findings (severity-ranked; each a delta against run 6, 2026-11-13)
 
@@ -125,7 +141,7 @@ Ranking reason, stated once: **F1 ranks first** because the rate of production c
 (added lines ×2.7 per landing plain, ×1.45 whitespace-ignored), and it is the measure most directly about "toward settled". **F2 ranks second** because per-task cost is the declared row with the largest move
 in run 6, and this run's first like-for-like reading is inconclusive. F3 and F4 follow because each is a rise in a stated concern (test growth, runtime contract coupling).
 
-### F1 — `production-churn-rate` (new) · Severity: Medium · **worsened on the size-normalised rate; improved on the deletion ratio**
+### F1 — `production-churn-rate` (new) · Severity: Medium · **worsened on the size-normalised rate and on the deletion ratio (0.30 → 0.82, replacement churn)**
 
 | | run 6 window (35 landings) | this window (33 landings) | change |
 |---|---|---|---|
@@ -150,7 +166,10 @@ in run 6, and this run's first like-for-like reading is inconclusive. F3 and F4 
 - **Comment lines.** In the production diff, 2,762 added lines are comment-like, 488 of them citing a `LIN-` ticket (59 of those in `public/flight-companion.js`).
   Comment-only share is a declared signal; the rise is small (+0.12 points) but in the wrong direction.
 - **Reading.** Run 6 read the lower deletion-per-added as "less rewriting". With a window that adds 2.7× as much code per landing and deletes 7.3× as much,
-  the ratio alone no longer means that. Per landing and against the code base the rate of change rose (×1.44 whitespace-ignored, ×2.6 plain, against run 6); the tidy wave is a step, and
+  the ratio alone no longer means that. This report reads the higher ratio as **replacement churn, not improved consolidation**, and uses that reading in the heading, the table and the ledger. Real consolidation is present
+  (`lib/completion-signals.js` −338 net; `lib/run-ledger.js` −239 net), but deletions rose in step with additions rather than instead of them: the move
+  of code into twelve new files adds about 1,724 lines, and 56% of the deleted lines are whitespace-only. The one consolidation signal is net growth per landing, which fell (65.5 → 45.8), and it is paired with a comment-only share that rose.
+  Per landing and against the code base the rate of change rose (added lines ×2.6 as a share of the base, ×1.44 whitespace-ignored, against run 6); the tidy wave is a step, and
   whether the curve settles after it is the next run's question. Severity is Medium because the step is large and it is the first run with a tidy-wave window, not because
   the code is unstable: deletions and conversions are real and the wave has a stated end.
 - **Altitude.** The function-size × churn question for the large files belongs to Code Quality (`docs/reviews/code-quality-review-2026-11-04.md`, due). Not re-flagged here.
@@ -175,7 +194,7 @@ Run 6's breakdown was over 33 tasks including nine Periodicals; the populations 
   Run 6's question was whether a new level or a still-rising curve. On this evidence it is a new level.
 - **The fixed floor has moved to a different stage.** Blind read now runs on every task (1.00 sessions, $1.02), where run 6 saw it on 4 tasks. Survey, scoping, blind read
   and close-out together are about $4.9 a task, against about $4.4 in run 6. Implementation and research fell by more than that.
-- **The session step is one stage.** The median went 5 → 7 → 8 over the three readings. The blind-read stage runs once on every one of the 25 finished tasks (`cost-per-task-raw.json`, `kind == 'blind-read'`: 25 of 25 tasks with exactly one session). Excluding it, the median is 7 (mean 7.04), the same as run 6's median. Its LIN-4437 to LIN-4439 build was on 12 Nov, just before the window. The 5 → 7 step is a by-design stage arriving, and the 7 → 8 is the same stage's count, not a climb in the rest of the loop.
+- **The session step has two causes, one per step.** The median went 5 → 7 → 8 over the three readings. The **5 → 7 step (8 Nov to run 6)** came with the look-first prefix: that prefix went from 0.66 to 2.64 sessions per task in the table above, while the blind-read stage ran on 4 of 33 tasks in run 6 (0.12 sessions a task). The **7 → 8 step (run 6 to this run)** is the blind-read stage: it runs once on every one of the 25 finished tasks (`cost-per-task-raw.json`, `kind == 'blind-read'`: 25 of 25 tasks with exactly one session), and its LIN-4437 to LIN-4439 build landed on 12 Nov, just before the window. Excluding the blind-read session, the median is 7 (mean 7.04), the same as run 6's median. This run's increase is not attributed to the look-first prefix, which is flat at 2.48 to 2.64 sessions a task across the two runs.
 - **Outlier.** LIN-4396 ($32.24, 14 sessions, 468 minutes) is the long tail the mean reflects; without it the mean is $16.55.
 - **Reading.** Not diverging. The cost level is roughly flat against run 6 on a changed population, and the rest of the session count (excluding blind read) is flat at 7. Run 6's option 2 (the look-first prefix's worth) and the blind-read floor are the decisions this measure now carries; the blind-read stage is the one new fixed cost to judge.
 
@@ -270,7 +289,7 @@ Run 6's breakdown was over 33 tasks including nine Periodicals; the populations 
 ### F9 — `ci-critical-path-floor` and `review-layer-rate` · Severity: Low · **CI settled at the E2E floor; review-report landings fell**
 
 - **CI.** The declared `ci` median is 5.72 min over 32 runs (run 6: 5.78 over 4 post-break runs). The post-break level has held across 32 runs, so it is a level now, not a series of four.
-  The E2E 2/4 critical path (run 6, F8) was not re-read this run (`gh run view --json jobs` was not run), so that statement carries forward unverified. The wall time is still set by one shard.
+  The critical path was re-measured this run, over the eight most recent successful `test.yml` runs on `main` (`b8e2a0aad`…`fb358dbda`; `gh run view <id> --json jobs`, longest job by wall clock; `analysis-notes.md` §12.4). **E2E shard 2/4 is the longest job in 6 of 8 runs (320–359 s).** The unit job is the longest in 2 of 8: `a886fb506` at 330 s (E2E 2/4 at 308 s) and `8fea3869f` at 313 s (E2E 2/4 at 304 s). The wall time is therefore set by E2E 2/4 in most runs and by the unit job in the rest, so it is not one shard alone. Run 6's statement that one shard sets it holds for most runs, not all.
 - **Review layer.** Landings touching `docs/reviews`: 3 of 33 (run 6: 11 of 35). Periodical report landings: 3 (run 6: 9). Their bytes per landing went 0.13 → 0.12 MB.
   Periodical cadence fell with the tidy wave. The stability run 6 report, the Drift run 7 and the Seams run 12 are the only reports in the window, and the north star is the only other governance landing.
 - **Reading.** A fall in the review layer's share is not, by itself, a settling. It is one reason the next readings will be thinner than run 6's. Run 6's option 4 (periodical cadence) is the decision this carries.
@@ -306,19 +325,19 @@ Run 6's breakdown was over 33 tasks including nine Periodicals; the populations 
 ## Trend ledger
 
 Severity: none / low / low–med / med / high. Delta vs 2026-11-13 (run 6): new / unchanged / improved / worsened / changed / resolved / superseded / not re-measured.
-All 32 of run 6's names are accounted for below; none is retired this run. Three rows are new.
+All 32 of run 6's names are accounted for below; none is retired this run. Two names are new (`production-churn-rate`, `measurement-layer-defects`); `rebuild-wave` is an existing name, re-read this run.
 
 | Signal (stable name) | Repo | Class | Severity | Reading (this window) | Delta vs 2026-11-13 |
 |---|---|---|---|---|---|
 | `production-churn-rate` (**new**, F1) | LV | rework / rate | med | 249.6 added, 203.8 deleted per landing (×2.7 and ×7.3; ×1.45 and ×3.3 whitespace-ignored); added lines 3.94% of base; deleted per added 0.82 (0.66 `-w`); net +45.8 per landing | **new** (worsened on rate; deletion ratio worse than run 6's 0.30) |
 | `per-task-expense` (F2) | tracker | speed / cost | med | cost median $15.25 (ex-periodicals $14.82); sessions 5 → 7 → 8, of which the 7 → 8 step is the blind-read stage on every task (median 7 without it); look-first prefix flat $2.88 | **changed** (cost level −9% on changed population; sessions unchanged excluding the new stage) |
-| `change-composition-inward` (F8) | LV | growth shape / process | low–med | 25 of 33 tidy programme landings (19 code, 6 docs-only); 4 Jira feature; 4 governance; 0 measuring-programme landings | **changed** (first trend read; the mix moved to product code in one burst) |
+| `change-composition-inward` (F8) | LV | growth shape / process | low | 25 of 33 tidy programme landings (19 code, 6 docs-only); 4 Jira feature; 4 governance; 0 measuring-programme landings | **changed** (first trend read; the mix moved to product code in one burst) |
 | `waiting-stock-vs-minting` (F6) | LV+SD | backlog shape | low | Waiting 110 → 120 total, 0 net over the 29 post-v4 landings; `minted` 1.37 → 1.12 | **improved** |
 | `review-evidence-weight` | LV | evidence volume | low | `docs/reviews` +3.94 MB (0.12 MB per landing; run 6 0.13); `docs/papers` 0 touches; `docs/plans` +175 KB (survey) | **improved** (flat per landing; no papers this window) |
 | `prompt-contract-text-rate` | LV | rework / contract | low–med | `FROZEN_TOTAL_BYTES` 378,915 → 396,064 (+4.5%), of which LIN-4467's +17,969 is re-budgeting of text moved in from unbudgeted files; LIN-4469 −465 and −355; share of landings touching the ceiling test not re-counted | **changed** (net mostly re-budget; not a rise in new text) |
 | `decision-reversal` | LV | rework / direction | low | 0 reverts (LV, SD); build-then-retire not found beyond programme pieces (LIN-4454 retires `dispatchModelOf`) | **unchanged** |
 | `test-suite-accretion` (F3) | LV | growth shape / CI | low–med | runtime +2.7% (+688), 20.8 per landing (run 6 16.5); unit files 1.06 per landing (run 6 0.57); 34% of new files census or witness | **worsened** (per landing; medium-low) |
-| `ci-critical-path-floor` (F9) | LV | CI topology | low | `ci` 5.72 over 32 runs, a level since the #2414 break; E2E 2/4 not re-read this run | **unchanged** (settled level; E2E not re-verified) |
+| `ci-critical-path-floor` (F9) | LV | CI topology | low | `ci` 5.72 over 32 runs, a level since the #2414 break; critical path re-measured: E2E 2/4 longest in 6 of 8 main runs (320–359 s), unit job in 2 of 8 (313–330 s) | **unchanged** (settled level; the critical path is mostly one shard, sometimes the unit job) |
 | `opencode-runner-convergence` (F11) | SD | surface rate | low | 2 of 3 SD landings runtime (hook.js, transcript.js, contract fixture); 0 touches on opencode-runner, dispatcher, reapers | **changed** (episodic runtime change, not a sweep) |
 | `dispatch-entrance-churn` (F7) | LV | surface rate | low | `dispatch-store.js` 3 touches, +41 lines | **worsened** |
 | `proxy-churn-concentration` (F7) | LV | surface rate | low | `routes/proxy-compute.js` 5, `proxy-writes.js` 4, `workspace-api-issue-write.js` 4, `proxy.js` 3, `proxy-instructions.js` 7 | **worsened** (write-gate programme) |
@@ -363,18 +382,41 @@ Run 6's rule was approximate and its counts are not strictly comparable. The `--
 | surface | window | reading |
 |---|---|---|
 | `.github/` | unchanged (`git diff --stat 163efc069 fb358dbda -- .github` empty) | CI topology unchanged; the `ci` series is one workflow |
-| `scripts/` | the stability tool's own files: 1 landing touches them in the window | the measuring layer is nearly quiet; LIN-4425 (Backlog) not re-read this run |
+| `scripts/` | the stability tool's own files: 1 landing touches them in the window | the measuring layer is nearly quiet; LIN-4425 (Backlog, ruling pending) read below |
 | `tests/unit/` | 38 files added, 35 net; 1,247 → 1,282 | F3 |
 | `tests/fixtures/` | `lin-4467-witness.json` (869 lines), `runner-contract.json` (+398, SD) | witness fixtures for the conversion and the contract fold |
-| `tests/e2e/` | not counted this run | the E2E floor is F9's unverified statement |
+| `tests/e2e/` | not counted by line; the E2E job's critical path was measured this run | F9 (eight main runs) |
 | `docs/plans/` | 19 → 38 files, 0.66 → 0.83 MB | `docs/plans/survey/` (area-read reports and the reader prompt) |
 | `docs/papers` | 0 touches; 50.56 MB at both pins | two paper PRs open (#2451, #2452), right-censored |
-| `docs/areas/` | 29 of 33 landings (88%); 65,654 → 97,835 bytes (+49%; run 6 +94%) | F6 and §Evidence |
+| `docs/areas/` | 29 of 33 landings (88%); 65,654 → 97,835 bytes (+49%; run 6 +94%) | classified as a standing rate below |
 | `experiments/` | 0 touches | quiet |
 | `lib/periodicals.js` | 2 touches (run 6 4); 1,416 lines | cooling |
 | open PRs | #2446 (LIN-4468 notes, open since 13 Nov 22:37Z), #2451, #2452 (papers), nine older PRs unchanged | the notes PR is a split of the write-gate programme |
 | parent-programme pattern | LIN-4447 Done (12 landings); LIN-4448 In Progress with 7 of 7 children Done; LIN-4463 In Progress (2 of 2 children Done); LIN-4446 Done; LIN-4445 In Progress | tracker parents lag their children; read as declared |
 | SD | 3 landings | F11 |
+
+### `docs/areas` churn: classified as a standing rate
+
+The question run 6 left open was whether area-note churn is bookkeeping for a burst or a standing rate. Its share of landings was 77% (20 of 26 in
+`526bca66c^..9574d537`, the window the 8 Nov reference closes), 80% (28 of 35, run 6's window) and 88% (29 of 33, this run). Its volume per landing did not rise: 26.8 → 21.5 → 21.2 added lines per
+landing. Bytes per landing are 907 in run 6 and 975 now (+7%); the +49% this window is a share of a shorter window, not more writing per landing.
+The share rose because more of the landings are programme pieces that write or settle notes (the 88% includes six docs-only tidy landings).
+
+**Classification: a standing rate, with bookkeeping at its core.** The share was already 77% before the wave, and the volume per landing is flat, so the
+note-writing is the process's ordinary rate, not a burst of bookkeeping for the wave. The one way it would turn into a problem, volume per landing rising, is not
+present. The next run should read volume per landing, not the share.
+
+### Known-issue surfaces read this run
+
+Each item below was read this run through the proxy or on disk, and its bearing on the trajectory is stated, or the reason it has none.
+
+| Surface (state at the run) | What was read | Bearing on the trajectory |
+|---|---|---|
+| **LIN-4441**, CI wall time (In Progress; PR #2414 merged `e3a3268a1`, 12 Nov 21:22Z, ticket held open) | The `ci` series steps from 8.59 min (8 Nov) to 5.72 min after #2414. The close-out (12 Nov 21:23Z) records that the deploy could not be evidenced from its session, so the post-merge sample is still open. | **Direct.** It is the change behind the `ci` row. F9's "settled level" is read from 32 post-merge runs, but the ticket's own post-merge sample and deploy evidence are not on record. |
+| **LIN-4425**, retire overlapping measuring scripts (Backlog, John's ruling pending) | `scripts/survey-growth-git.mjs`, `scripts/survey-growth-ci.mjs` and `scripts/steady-base-check.mjs` all still exist beside `scripts/stability-measures.mjs`. | Measuring layer, not the product. It decides which instrument the next run reads. F10 records the instrument defects. Not this review's to decide. |
+| **LIN-4435**, paper-script tests in CI (Backlog) | Still in none of the CI globs. Papers: 0 touches in the window; #2451 and #2452 open. | **Latent.** The papers' numbers can change with no CI signal. It bears on the trajectory once #2451 or #2452 lands. |
+| **LIN-4389**, stale Periodical prompt text (Todo) | The three stale strings are still in `lib/periodicals.js` (lines 327, 409, 625). | **Low.** Documentation drift in the advisory prompts, not a rate of change. Its only bearing is on the review layer (F9), since those prompts still describe minting. |
+| **TODO / FIXME markers** in every file touched in the window | None in process code at `fb358dbda`, none at `163efc069`. The grep hits are identifiers (`TODO_TIER_CAP`), a test constant, `LIN-XXXX` placeholders, fixture JSON, and the counting pattern in `scripts/survey-landing-halfdone.mjs`. | None. |
 
 ## Class completeness (bounds and members)
 
@@ -384,7 +426,7 @@ Run 6's rule was approximate and its counts are not strictly comparable. The `--
 | SD landings | first-parent, `af9b496..7d5fe7d` | 3: #339, #340, #341 |
 | Declared rows | the declaration's 14, in order | 14 printed; 13 measured, `origin` not measured with its declared reason |
 | Run-6 ledger rows | 32 names | all 32 accounted for above (none retired this run; delta stated on each) |
-| New rows | — | 3: `production-churn-rate`, `measurement-layer-defects`, and the rebuild-wave reclassification (a reading, not a new name) |
+| New rows | — | 2: `production-churn-rate`, `measurement-layer-defects`. The rebuild-wave reclassification re-reads an existing name (changed), so it is not a new name |
 | Tidy programmes | parent of each landing's ticket | LIN-4447 (12), LIN-4448 (7), LIN-4463 (5), LIN-4446 (1); 6 docs-only |
 | Post-break CI runs | `test.yml` on `main`, head sha a window landing after `eb14b7fff` | 32 of 33 by the tool; 33 of 33 exist with `conclusion: success` |
 | Sub-windows | the v4 split | 2 readings (`subwindow-pre-v4`, `subwindow-post-v4`), git and `gh` rows only |
@@ -397,7 +439,7 @@ Run 6's rule was approximate and its counts are not strictly comparable. The `--
 filed per landing fell, the CI wall time sits at a settled level, and a finished task costs about what it did in run 6 (on a different sample) rather than more. Those are the
 things a settled project shows.
 
-But the wave churns hard to get there. Normalised to the code base, the rate of change is about 2.6 times what it was in run 6 and in the 8 Nov reference, and the test
+But the wave churns hard to get there. Normalised to the code base, added lines per landing are ×2.6 what they were in run 6 and in the 8 Nov reference, plain (×1.44 whitespace-ignored), and the test
 suite grew faster per landing. Half the added lines are re-indentation, and the other half includes real deletions (`completion-signals.js` went from 367 lines to 29) and a
 new Jira feature. Net production growth per landing fell, but the comment share rose. Sessions per finished task rose to a median of 8, and that step is the blind-read stage, which every finished task now runs once (7 without it, as in run 6).
 
@@ -448,6 +490,8 @@ Disposition: fixed in place
 
 (The reader's largest item is the session step in F2, not F1 `production-churn-rate`, the report's top-ranked finding. The reader's verdict is DISAGREE; the three corrections above were made in place, and the report's ranking is unchanged.)
 
+**Revision after the LIN-4483 review (`4dea5be07`).** The review requested changes. The fixes that followed are: the paired-area witness section, the `docs/areas` classification, the known-issue reads, the re-measured CI critical path, and the ten review corrections (F1 heading and reading, F2 attribution, the ×2.6 and ×1.44 figures, the headline and "not converging" list, F8 severity, the new-row count, and the F9 wording). **This second read did not review those changes.** Its verdict and fields above stand for the report as it was read. The revision is for the next reader, and the review that follows it.
+
 ## Evidence
 
 `docs/reviews/_evidence-2026-11-14-stability/`:
@@ -458,3 +502,4 @@ Disposition: fixed in place
 - `cost-per-task-raw.json` — `GET /issues/{id}/cost` for the 25 finished tasks.
 - `analysis-notes.md` — every ad hoc read behind this report, with its commands and outputs, and the sections the tables above cite.
 - `README.md` — the folder's index.
+- `revision-r1/` — the inputs and scripts for the revision round (§12 of `analysis-notes.md`): the three area-sample lists, `area_git.py`, `area_landings.py`, `sample_git.py`, and `ci-main-runs-last8.json`.

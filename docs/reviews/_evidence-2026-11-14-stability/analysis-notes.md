@@ -183,3 +183,74 @@ Run 6's breakdown is over its 33 tasks, which included nine Periodical tasks. Th
   - share of base, added only: 0.065% (4,448 / 33 / 209,077) against 0.045% (3,243 / 35 / 206,784)
 - Blind-read sessions per finished task: `cost-per-task-raw.json`, count of `kind == 'blind-read'` per task is 1 for all 25 tasks.
   Median sessions 8 with it, 7 without (mean 7.04 without); run 6's median was 7.
+
+## 12. Revision round (review of `4dea5be07`): witnesses, classification, known-issue reads, CI critical path
+
+Added for the review's gaps 1–4. Scripts and sample lists are in `revision-r1/`. Run from the LV root (`cd LinearViewer`). Every figure in the report's new sections is one of these outputs.
+
+**12.1 Paired area reads against git (gap 1).** Sample lists are the 14 paths in each after-read's table (`revision-r1/runs_sample.txt`, `llm_sample.txt`, `fe_sample.txt`). `sample_git.py` runs `git log --first-parent -m --numstat` on each window, path-limited to the sample.
+
+```
+RUNS before->after   4b5001ddf..302edafc3  3 landings touch sample, 3/14 files, +20/-112 net -92; after 302edafc3: 0 landings
+RUNS after->head     302edafc3..fb358dbda  0 landings; sample byte-identical at head (git diff --numstat 302edafc3 fb358dbda -- sample: empty)
+LLM  before->after   e8e92d50a..49776653d  7 landings, 6/14 files, +1536/-1202 net +334 (lib/prompts/stage-kinds.js new, +594)
+LLM  after->head     49776653d..fb358dbda  1 landing (the #2450 merge), +14/-2 vs its first parent; sample byte-identical at head (empty diff 49776653d fb358dbda)
+FE   before->after   4b5001ddf..302edafc3  5 landings touch sample, 4/14 files, +13/-12 net +1; after 302edafc3: 0 landings
+FE   e8->49776       e8e92d50a..49776653d  3 landings, 3/14 files, +9/-7 net +2
+FE   after->head     302edafc3..fb358dbda  0 landings
+```
+
+Area-wide (`area_landings.py`, the area's `areas.json` patterns, first match wins):
+
+```
+runs-and-dispatch  4b5001ddf..302edafc3  14 landings  +1959/-1352 net +607
+runs-and-dispatch  302edafc3..fb358dbda   1 landing   +12/-117  net -105   (fb358dbda: lib/completion-signals.js +4/-111)
+llm-and-prompts    e8e92d50a..49776653d   9 landings  +1896/-1516 net +380
+llm-and-prompts    49776653d..fb358dbda   1 landing   +61/-24   net +37
+front-end-pages    4b5001ddf..302edafc3   8 landings  +91/-45    net +46
+front-end-pages    302edafc3..fb358dbda   0 landings
+```
+
+Waiting entries (plain count of `- ` bullets under `## Waiting`, `git show <sha>:docs/areas/<slug>.md`): runs-and-dispatch 20 (4b5001ddf) → 21 (302edafc3) → 21 (fb358dbda); llm-and-prompts 26 → 22 → 12; front-end-pages 14 → 14 → 14. The LLM read counted 25 → 12; the difference is in how a bullet is counted, not in direction.
+
+Note: the LLM before-window is walked from its after-read commit, as the read's own anchor. On `fb358dbda` the squash of PR #2450 brings the piece-6 content onto main; the sample is byte-identical there.
+
+**12.2 `docs/areas` classification (gap 2).** `git log --first-parent --format=%h <range> -- docs/areas | wc -l` over the landings in each range:
+
+```
+526bca66c^..9574d537  20 of 26 landings (77%)
+9574d537..163efc069   28 of 35 (80%)
+163efc069..fb358dbda  29 of 33 (88%)
+```
+
+Lines added per landing (`analysis-notes.md` §10): 26.8 → 21.5 → 21.2. Bytes per landing: (65,654 − 33,916) / 35 = 907 (run 6), (97,835 − 65,654) / 33 = 975 (this window), +7%. Bytes per window went +94% → +49%, because the window is shorter in landings.
+
+**12.3 Known-issue surfaces (gap 3).** Read through the proxy (`GET /api/proxy/issues/<id>`) on the run date:
+
+- LIN-4389: state Todo. Its three stale strings are still in `lib/periodicals.js` at lines 327, 409 and 625 (`whatever follow-up work this review mints`, `(and any follow-up tasks)`, `unlike the code-surface reviews that mint fix-tasks`).
+- LIN-4425: state Backlog (ruling pending). `scripts/survey-growth-git.mjs`, `scripts/survey-growth-ci.mjs` and `scripts/steady-base-check.mjs` all still exist.
+- LIN-4435: state Backlog. Paper-script tests are still in none of the CI globs; papers 0 touches in the window; PRs #2451 and #2452 open.
+- LIN-4441: state In Progress. PR #2414 merged `e3a3268a1` on 12 Nov 21:22Z and the ticket was held open for a post-merge sample and deploy evidence. The close-out comment on LIN-4441 (12 Nov 21:23Z) records the same hold.
+
+TODO/FIXME markers. Over every file touched in `163efc069..fb358dbda` (excluding `_evidence`; 360 path entries, unique files listed by `git log --first-parent -m --name-only`):
+
+```
+at 163efc069: 6 grep hits, none a marker (TODO_TIER_CAP identifier, a TODO test const, LIN-XXXX placeholders, a \uXXXX escape)
+at fb358dbda: 12 grep hits, none a marker in process code (the same kinds, plus fixtures under scripts/eval/fixtures-widened and the counting pattern in scripts/survey-landing-halfdone.mjs)
+strict  git grep -E 'TODO\b|FIXME' over lib routes public server.js scripts tests docs/architecture docs/areas, excluding TODO_TIER_CAP / const TODO: 5 hits (2 fixture JSON bodies, 3 lines of survey-landing-halfdone.mjs that count the markers)
+```
+
+**12.4 CI critical path (gap 4).** `gh run list --workflow test.yml --branch main --status success --limit 8` (`revision-r1/ci-main-runs-last8.json`), then `gh run view <id> --json jobs`, longest job by wall clock:
+
+```
+fb358dbda  E2E 2/4  359 s   (Unit tests 218)
+a886fb506  Unit     330 s   (E2E 2/4 308)
+302edafc3  E2E 2/4  350 s   (Unit 314)
+ca77a891e  E2E 2/4  330 s   (Unit 225)
+b937237a4  E2E 2/4  333 s   (Unit 211)
+6348e5781  E2E 2/4  320 s   (Unit 253)
+8fea3869f  Unit     313 s   (E2E 2/4 304)
+b8e2a0aad  E2E 2/4  332 s   (Unit 257)
+```
+
+E2E 2/4 is longest in 6 of 8 (320–359 s). Unit tests is longest in 2 of 8. This matches the review's own reading of the same runs.
