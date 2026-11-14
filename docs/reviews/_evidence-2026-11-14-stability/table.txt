@@ -1,0 +1,34 @@
+stability measures 163efc069..fb358dbda (2026-11-12T23:17:49Z → 2026-11-14T09:49:26Z), 33 landings
+1. No new mess
+   blind            22 of 33 landings read blind before merge (better 20, same 2, worse 0); unread: no ticket 1, not an ordinary landing 10, landed before the gate 0, no read on record 0
+                    8 Nov: not measured: no 8 Nov reading; the first reading sets it
+2. The curve
+   lines            net +1,511 (code +570, comment-only +836, blank +105); +45.8 per landing; totals 209,077 → 210,588; comment-only share 39.74% → 39.86%
+                    8 Nov: net +6,558 (code +3,034, comment-only +3,185, blank +339); +57.5 per landing; totals 200,226 → 206,784; comment-only share 39.44% → 39.73%
+   churn            8,237 added, 6,726 deleted over 33 landings; 249.6 added and 203.8 deleted per landing; 0.82 deleted per added
+                    8 Nov: 10,235 added, 3,677 deleted over 114 landings; 89.8 added and 32.3 deleted per landing; 0.36 deleted per added
+   ci               median 5.72 min over 32 runs (32 of 33 landings) [partial: 1 unreadable — 1 landing(s) have no successful run]
+                    8 Nov: median 8.59 min over 114 runs (114 of 114 landings)
+   waiting.harbour  98 → 108 (+10, +0.3 per landing)
+                    8 Nov: 0 → 56 (+56, +0.49 per landing)
+   waiting.runner   12 → 12 (0, 0 per landing); main af9b496d5..7d5fe7d94
+                    8 Nov: 0 → 10 (+10, +0.09 per landing); main 9478e1c53..5d8489e7f
+   waiting.total    110 → 120 (+10, +0.3 per landing)
+                    8 Nov: 0 → 66 (+66, +0.58 per landing)
+   minted           37 over LIN-4442 → LIN-4479, 1.12 per landing (ID-span estimate; 20 probes)
+                    8 Nov: 190 over LIN-4204 → LIN-4394, 1.67 per landing (ID-span estimate; 22 probes)
+3. Speed
+   tasks            25 finished (1 landed before base); of 27 tickets landed here, 2 not done and 1 done outside the window; 1 landing(s) own no ticket; lookback 3 days
+                    8 Nov: 106 finished (1 landed before base); of 106 tickets landed here, 0 not done and 1 done outside the window; 0 landing(s) own no ticket; lookback 3 days
+   speed            median 69.5 min (mean 93.7) first dispatch → last landing; median 8 sessions (mean 8.04); 25 of 25 tasks
+                    8 Nov: median 56.3 min (mean 124.6) first dispatch → last landing; median 5 sessions (mean 5.61); 106 of 106 tasks
+4. The person's seat
+   rulings          loop rulings only: 7 raised over 25 finished tasks, 0.28 per task (distinct decisions); answered 100% of answered + dismissed (answered 6, dismissed 0, withdrawn 1, open 0); not read: answered task-bound rulings (anchor.taskDecisionId): no proxy read returns them; rulings anchored on a parent or another unfinished ticket are not counted against a finished task (10 on a finished task's parent)
+                    8 Nov: not measured: no 8 Nov reading; the first reading sets it
+   origin           not measured: dispatchedBy is the workspace account for autopilot and person alike
+                    8 Nov: not measured: no 8 Nov reading; the first reading sets it
+   operator-free    upper bound: 72% (18 of 25 tasks) with no loop ruling, no [blocked] marker in any lineage member's feedback, no dispatch row closed with closedReason 'operator'; failing: ruling 7, blocked 3, operator-closed 0; missing condition: no person-started dispatch (not measured: dispatchedBy is the workspace account for autopilot and person alike); closedReason 'operator' is a catch-all and may push the share down
+                    8 Nov: not measured: no 8 Nov reading; the first reading sets it
+5. Cost per finished task
+   cost             median $15.25 (mean $17.17) over 25 of 25 tasks; unpriced 0, noTelemetryCount 0, unreadableCount 0, noLineage 0
+                    8 Nov: median $9.53 (mean $14.29) over 106 of 106 tasks; unpriced 0, noTelemetryCount 0, unreadableCount 0, noLineage 0
