@@ -1,0 +1,14 @@
+lib/context-graph.js
+lib/custom-prompts-store.js
+lib/openrouter.js
+lib/prompt-template-defs.js
+lib/prompts/area-registry-path.js
+lib/prompts/autopilot-kickoff.js
+lib/prompts/autopilot-manual.js
+lib/prompts/collective-participant.js
+lib/prompts/flight-companion-kickoff.js
+lib/prompts/roadmap-gap-template.js
+lib/prompts/roadmap-orientation-template.js
+lib/prompts/runner-kickoff.js
+lib/prompts/stage-kinds.js
+lib/recommendation-input.js

@@ -1,0 +1,34 @@
+commit	ticket	programme	prod_added	prod_deleted	prod_added_ws	prod_deleted_ws	docs_added	docs_deleted	docs_areas_touched	files	subject
+fb358dbda	LIN-4470	LIN-4448 LLM & prompts	82	148	82	148	383	112	1	30	LIN-4470: settle the Waiting entries, one prompt context, one cited-path predicate (piece 
+a886fb506	LIN-4462	LIN-4447 Runs & dispatch	0	0	0	0	342	0	0	3	LIN-4462: paired area reads after, at 302edafc3 (repeat of piece 0, docs only) (#2449)
+302edafc3	LIN-4475	LIN-4447 Runs & dispatch	29	26	29	26	21	13	1	6	LIN-4475: contract session vocabulary, report rows, kit fold, paragraph witness (piece 8, 
+ca77a891e	LIN-4469	LIN-4448 LLM & prompts	67	35	67	35	48	44	1	26	LIN-4469: prompt folds after the guard, one re-pin (piece 5) (#2447)
+b937237a4	LIN-4468	LIN-4448 LLM & prompts	485	89	485	89	30	10	1	42	LIN-4468: proxy refuses writes outside the stage's allowance (piece 4) (#2443)
+6348e5781	LIN-4463	LIN-4463 front-end modules	41	30	40	29	27	12	1	23	LIN-4463: observation.js as a module, its suites as imports (piece 4) (#2445)
+8fea3869f	LIN-4467	LIN-4448 LLM & prompts	1587	1526	772	711	41	30	1	37	LIN-4467: one record per stage kind; the per-kind tables become views (piece 3) (#2444)
+b8e2a0aad	LIN-4463	LIN-4463 front-end modules	1974	1964	45	35	17	2	1	10	LIN-4463: flight-companion.js as a module, the page drops the formatter bridge (#2442)
+dc12ca51b	LIN-4466	LIN-4448 LLM & prompts	52	29	52	29	17	12	1	19	LIN-4466: the blind read's kind, heading and verdict words from one leaf (piece 2) (#2441)
+e666c4b60	LIN-4465	LIN-4448 LLM & prompts	117	63	117	63	29	21	1	23	LIN-4465: one ordered CODE_ROUTES list that codeRouteOf iterates (piece 1) (#2433)
+d52c676fa	-	LIN-4447 Runs & dispatch	383	513	383	513	31	45	1	28	Merge pull request #2438 from JKershaw/feat/lin-4460-one-close-out-decision
+23ebfcb4a	-	LIN-4463 front-end modules	0	0	0	0	490	8	1	7	Merge pull request #2439 from JKershaw/feat/lin-4463-browser-area-read
+091c8c934	-	LIN-4445 Jira	0	0	0	0	18	0	1	2	Merge pull request #2440 from JKershaw/docs/lin-4452-waiting-notes
+49d4c880e	-	LIN-4445 Jira	191	71	190	70	39	15	1	15	Merge pull request #2437 from JKershaw/feat/lin-4452-jira-live-check-guard
+0cf05ce8f	LIN-4472	LIN-4463 front-end modules	900	913	92	105	22	14	1	31	LIN-4472: task page as a module, its suites as imports (#2436)
+0dbf2d4ea	-	LIN-4447 Runs & dispatch	643	476	643	476	38	30	1	39	Merge pull request #2435 from JKershaw/feat/lin-4458-one-trail-pass
+5cf4f6aa2	-	LIN-4447 Runs & dispatch	0	0	0	0	10	0	1	1	Merge pull request #2434 from JKershaw/docs/lin-4459-close-out-waiting
+904719353	-	LIN-4445 Jira	421	50	421	50	51	3	1	34	Merge pull request #2429 from JKershaw/feat/lin-4451-jira-create-lanes
+17faa83f4	-	LIN-4463 front-end modules	155	149	39	33	41	33	1	37	Merge pull request #2431 from JKershaw/feat/lin-4471-lib-serving-workspace-kpis
+c174185f6	-	LIN-4447 Runs & dispatch	145	115	145	115	9	22	1	27	Merge pull request #2432 from JKershaw/feat/lin-4459-run-live-wait
+2aab32bf0	-	LIN-4448 LLM & prompts	0	0	0	0	367	0	0	3	Merge pull request #2430 from JKershaw/feat/lin-4464-baseline-area-read
+0092d8d9e	LIN-4456	LIN-4447 Runs & dispatch	0	0	0	0	12	0	1	2	LIN-4456: Waiting entries for testTransport drift and inline test-token checks (docs only)
+192e1f81f	-	LIN-4447 Runs & dispatch	273	123	273	123	20	10	1	27	Merge pull request #2427 from JKershaw/feat/lin-4455-feedback-kinds-constants
+e8e92d50a	LIN-4456	LIN-4447 Runs & dispatch	28	10	28	10	1	3	1	6	LIN-4456: test transport keyed on a declared capability (piece 6) (#2426)
+5dcf5bcda	-	LIN-4447 Runs & dispatch	119	104	119	104	11	5	1	21	Merge pull request #2424 from JKershaw/feat/lin-4457-cost-read-calls-file
+c205190fd	LIN-4454	LIN-4447 Runs & dispatch	18	17	18	17	9	12	1	12	LIN-4454: a dispatch's model is the cost fold's answer; retire dispatchModelOf (piece 3) (
+2bf788b6d	LIN-4450	LIN-4445 Jira	331	92	331	92	32	6	1	27	LIN-4450: Jira seal — exact words in harbour.asAsked, formatted block in the description (
+92676b1fe	LIN-4446	LIN-4446 shared formatter	195	182	76	63	43	4	1	35	LIN-4446: share the cost formatter with the browser (slice 1) (#2423)
+cfd152fa4	LIN-4453	LIN-4447 Runs & dispatch	0	0	0	0	490	0	1	6	LIN-4453: paired area-read baseline, piece 0 (docs only) (#2422)
+4b5001ddf	-	other (north star, reviews)	1	1	1	1	125	6	0	4	North star v4: toward settled, leave it better, use what exists (#2420)
+5e09b5643	LIN-4444	other (north star, reviews)	0	0	0	0	41885	1	1	59	LIN-4444: Seams & Tangles run 12 (2026-11-13, delta vs run 11) (#2419)
+0072d1b78	LIN-4443	other (north star, reviews)	0	0	0	0	58468	3	1	34	docs(LIN-4443): Drift & Coherence Review run 7 (2026-11-13), trend vs 2026-11-10 (#2418)
+e2d4659c4	-	other (north star, reviews)	0	0	0	0	10844	0	0	14	Merge pull request #2417 from JKershaw/feat/lin-4442-stability-review-run-6

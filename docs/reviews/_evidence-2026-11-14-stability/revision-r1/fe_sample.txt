@@ -1,0 +1,14 @@
+lib/components/navbar.js
+lib/render-swipe.js
+lib/render-audit.js
+lib/render-session.js
+lib/settings-copy-first-card.js
+lib/render-ship-journey.js
+lib/render-task-page.js
+lib/ship-journey.js
+lib/render-collective.js
+lib/components/settings-group.js
+lib/render-passage-planner.js
+lib/render-settings-you.js
+lib/render-proxy.js
+lib/render-custom-prompts.js
