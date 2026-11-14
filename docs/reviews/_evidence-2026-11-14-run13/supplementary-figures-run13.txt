@@ -1,0 +1,411 @@
+
+## S1. Scope and could-not-read counts
+H    fb358dbda files 577 parseFailures 0 unresolvedRelative 4 nonLiteralDynamic 0 unmapped 0 crossAreaLinks 1370 pairs 14 groups [9] registry areas.head-registry.json
+B    e2d4659c4 files 566 parseFailures 0 unresolvedRelative 4 nonLiteralDynamic 0 unmapped 0 crossAreaLinks 1334 pairs 14 groups [9] registry areas.head-registry.json
+B12  e2d4659c4 files 566 parseFailures 0 unresolvedRelative 4 nonLiteralDynamic 0 unmapped 0 crossAreaLinks 1342 pairs 13 groups [9] registry areas.run12-registry-e2d4659c4.json
+H    edge dump: edges 2257, cross-area 1370
+B    edge dump: edges 2180, cross-area 1334
+B12  edge dump: edges 2180, cross-area 1342
+cycle group H == B: True [['Agent API (proxy)', 'Auth, accounts & workspaces', 'Front end: server-rendered pages', 'LLM & prompts', 'Other features', 'Providers (Linear, GitHub, Jira, local)', 'Reports & operator tools', 'Runs & dispatch', 'Task model']]
+window (B..H, first-parent): 32 commits; 137 files changed, 8151 insertions(+), 6254 deletions(-)
+reproduces run 12 at B under its own registry (links, knots, areas equal to run 12 E/ head file): True
+
+## S2. Guide-only check: run 12 commit under its own registry (B12) vs under the HEAD registry (B)
+  link Pages -> Other: 10 -> 3
+  link LLM -> Pages: 0 -> 1
+  link LLM -> Other: 2 -> 1
+  link Runs -> Other: 6 -> 5
+  link Wiring -> Other: 9 -> 8
+  link Wiring -> Runs: 48 -> 49
+pairs B12 13 B 14 | opened by the guide alone: ['Pages <-> LLM'] | closed: []
+  re-filed edge lib/components/decision-panel.js -> lib/cost-format.js: Pages->Other becomes Pages->Pages
+  re-filed edge lib/dispatch-store.js -> lib/usage-snapshot-intake.js: Runs->Other becomes Runs->Runs
+  re-filed edge lib/render-effort-readout.js -> lib/cost-format.js: Pages->Other becomes Pages->Pages
+  re-filed edge lib/render-kpis.js -> lib/cost-format.js: Pages->Other becomes Pages->Pages
+  re-filed edge lib/render-run-steps.js -> lib/cost-format.js: Pages->Other becomes Pages->Pages
+  re-filed edge lib/render-settings.js -> lib/cost-format.js: Pages->Other becomes Pages->Pages
+  re-filed edge lib/render-task-timeline.js -> lib/cost-format.js: Pages->Other becomes Pages->Pages
+  re-filed edge lib/render-workspace-kpis.js -> lib/cost-format.js: Pages->Other becomes Pages->Pages
+  re-filed edge lib/ship-biscuit.js -> lib/cost-format.js: LLM->Other becomes LLM->Pages
+  re-filed edge server.js -> lib/usage-snapshot-intake.js: Wiring->Other becomes Wiring->Runs
+
+## S3. Reciprocal pairs (a->b / b->a): B12 (run 12 as published) | B (HEAD registry) | H (HEAD registry)
+  Agent API  <-> LLM            46/4 |    46/4 |    48/4
+  Agent API  <-> Other           2/1 |     2/1 |     6/1
+  Agent API  <-> Providers      21/3 |    21/3 |    21/3
+  Agent API  <-> Runs          48/10 |   48/10 |   50/10
+  Auth       <-> Pages         14/11 |   14/11 |   14/11
+  Auth       <-> LLM             5/3 |     5/3 |     5/3
+  Auth       <-> Providers      13/1 |    13/1 |    13/1
+  Pages      <-> LLM               - |    37/1 |    37/1
+  Pages      <-> Other          10/8 |     3/8 |     3/8
+  Pages      <-> Runs           15/8 |    15/8 |    16/8
+  LLM        <-> Other           2/2 |     1/2 |     1/2
+  LLM        <-> Providers      15/4 |    15/4 |    14/6
+  LLM        <-> Runs          38/55 |   38/55 |   41/61
+  Other      <-> Runs            6/6 |     6/5 |     6/7
+pair set H == B: True | count H 14
+
+## S4. File-level edge diff B -> H (edge dump, HEAD registry)
+edges 2180 -> 2257 added 110 removed 33 | cross-area added 58 removed 22
+listing: edge-diff-B-to-H.txt
+  Agent API -> LLM: +3 -1
+      + lib/proxy-instructions.js -> lib/prompts/stage-kinds.js
+      + routes/proxy-compute.js -> lib/prompts/prompt-context.js
+      + routes/proxy-compute.js -> lib/should-mock-ai.js
+      - lib/proxy-instructions.js -> lib/recommendation-live-wait.js
+  Agent API -> Other: +4 -0
+      + lib/proxy-instructions.js -> lib/stage-writes.js
+      + lib/proxy-tokens.js -> lib/stage-writes.js
+      + lib/stage-write-gate.js -> lib/stage-writes.js
+      + routes/proxy-writes.js -> lib/stage-writes.js
+  Agent API -> Platform: +1 -0
+      + lib/stage-write-gate.js -> lib/errors.js
+  Agent API -> Runs: +3 -1
+      + lib/proxy-instructions.js -> lib/run-live-wait.js
+      + routes/proxy-compute.js -> lib/cost-read-calls.js
+      + routes/proxy-writes.js -> lib/run-trail.js
+      - routes/proxy-compute.js -> lib/cost-read.js
+  Browser -> Pages: +6 -0
+      + public/cost-format-global.js -> lib/cost-format.js
+      + public/flight-companion.js -> lib/cost-format.js
+      + public/observation.js -> lib/cost-format.js
+      + public/observation.js -> lib/time-words.js
+      + public/task-page.js -> lib/time-words.js
+      + public/workspace-kpis.js -> lib/cost-format.js
+  Pages -> Runs: +1 -0
+      + lib/render-task-page.js -> lib/run-closeout-state.js
+  LLM -> Other: +1 -1
+      + lib/prompts/stage-kinds.js -> lib/stage-writes.js
+      - lib/prompt-template-defs.js -> lib/stage-writes.js
+  LLM -> Providers: +0 -1
+      - lib/recommendation-blind-read.js -> lib/providers/state-map.js
+  LLM -> Runs: +10 -7
+      + lib/code-routes.js -> lib/run-live-wait.js
+      + lib/model-routing-spend.js -> lib/cost-read-calls.js
+      + lib/openrouter.js -> lib/run-trail.js
+      + lib/prompt-template-defs.js -> lib/run-trail.js
+      + lib/prompts/revision-brief.js -> lib/run-trail.js
+      + lib/prompts/runner-kickoff.js -> lib/dispatch-feedback-kinds.js
+      + lib/recommendation-blind-read.js -> lib/run-live-wait.js
+      + lib/recommendation-blind-read.js -> lib/run-trail.js
+      + lib/recommendation-facts.js -> lib/run-trail.js
+      + lib/recommendation-look-first.js -> lib/run-trail.js
+      - lib/model-routing-spend.js -> lib/cost-read.js
+      - lib/prompts/revision-brief.js -> lib/run-ledger.js
+      - lib/prompts/runner-kickoff.js -> lib/dispatch-store.js
+      - lib/recommendation-blind-read.js -> lib/recent-runs.js
+      - lib/recommendation-blind-read.js -> lib/run-ledger.js
+      - lib/recommendation-live-wait.js -> lib/recent-runs.js
+      - lib/recommendation-look-first.js -> lib/run-ledger.js
+  Other -> Pages: +1 -1
+      + lib/task-state.js -> lib/time-words.js
+      - lib/task-state.js -> lib/render-run-steps.js
+  Providers -> LLM: +2 -0
+      + lib/providers/jira/as-asked-region.js -> lib/as-asked.js
+      + lib/providers/jira/index.js -> lib/periodicals.js
+  Runs -> Pages: +1 -1
+      + lib/task-page-loader.js -> lib/time-words.js
+      - lib/task-page-loader.js -> lib/render-run-steps.js
+  Runs -> LLM: +11 -5
+      + lib/completion-signals.js -> lib/prompts/stage-kinds.js
+      + lib/cost-read-calls.js -> lib/llm-call-log.js
+      + lib/dispatch-entrance.js -> lib/prompts/prompt-context.js
+      + lib/dispatch-leftover-answer.js -> lib/prompts/area-note-format.js
+      + lib/item-stage-stamp.js -> lib/prompt-templates.js
+      + lib/pipeline-churn.js -> lib/prompts/blind-read-words.js
+      + lib/run-closeout-state.js -> lib/prompts/blind-read-words.js
+      + lib/run-trail.js -> lib/prompts/blind-read-words.js
+      + lib/run-trail.js -> lib/prompts/survey-words.js
+      + lib/run-view.js -> lib/prompts/blind-read-words.js
+      + lib/run-view.js -> lib/prompts/stage-kinds.js
+      - lib/completion-signals.js -> lib/as-asked.js
+      - lib/completion-signals.js -> lib/size-of-move.js
+      - lib/cost-read.js -> lib/llm-call-log.js
+      - lib/dispatch-entrance.js -> lib/recommendation-live-wait.js
+      - lib/run-ledger.js -> lib/prompts/survey-words.js
+  Runs -> Other: +2 -0
+      + lib/item-stage-stamp.js -> lib/stage-writes.js
+      + routes/dispatch.js -> lib/stage-writes.js
+  Runs -> Platform: +0 -1
+      - lib/completion-signals.js -> lib/workflow-config.js
+  Runs -> Providers: +1 -0
+      + lib/run-closeout-state.js -> lib/providers/state-map.js
+  Web -> LLM: +6 -1
+      + routes/workspace-api-audit.js -> lib/should-mock-ai.js
+      + routes/workspace-api-issue-read.js -> lib/should-mock-ai.js
+      + routes/workspace-api-issue-write.js -> lib/should-mock-ai.js
+      + routes/workspace-api-prompts.js -> lib/prompts/prompt-context.js
+      + routes/workspace-api-prompts.js -> lib/should-mock-ai.js
+      + routes/workspace-api-steps.js -> lib/should-mock-ai.js
+      - routes/workspace-api.js -> lib/recommendation-live-wait.js
+  Web -> Platform: +1 -0
+      + routes/workspace-api-feedback.js -> lib/partial-write-error.js
+  Web -> Runs: +4 -2
+      + routes/settings.js -> lib/cost-read-calls.js
+      + routes/ship-biscuit.js -> lib/cost-read-calls.js
+      + routes/workspace-api-issue-write.js -> lib/run-trail.js
+      + routes/workspace-api.js -> lib/run-live-wait.js
+      - routes/settings.js -> lib/cost-read.js
+      - routes/ship-biscuit.js -> lib/cost-read.js
+
+## S5. Hubs and doors: in / cross-area in / outbound / cross-area out, B -> H; lines B -> H
+file | B in/xIn/out/xOut | H in/xIn/out/xOut | lines B -> H
+lib/run-trail.js                     0/0/0/0      11/8/3/2     None -> 422
+lib/run-ledger.js                    11/7/2/2     8/4/1/1      728 -> 489
+lib/run-live-wait.js                 0/0/0/0      6/4/0/0      None -> 97
+lib/recommendation-live-wait.js      4/3/1/1      0/0/0/0      80 -> None
+lib/stage-writes.js                  2/2/0/0      8/8/0/0      40 -> 146
+lib/stage-write-gate.js              0/0/0/0      2/0/3/2      None -> 57
+lib/prompts/stage-kinds.js           0/0/0/0      8/3/4/1      None -> 594
+lib/item-stage-stamp.js              0/0/0/0      4/0/2/2      None -> 71
+lib/code-routes.js                   0/0/0/0      1/0/5/1      None -> 70
+lib/time-words.js                    0/0/0/0      8/4/0/0      None -> 47
+lib/cost-format.js                   8/1/0/0      12/5/0/0     46 -> 46
+lib/cost-read.js                     12/7/7/2     8/3/7/1      854 -> 769
+lib/cost-read-calls.js               0/0/0/0      5/4/1/1      None -> 105
+lib/should-mock-ai.js                11/11/0/0    17/17/0/0    39 -> 40
+lib/prompts/prompt-context.js        0/0/0/0      3/3/0/0      None -> 15
+lib/openrouter.js                    33/25/13/2   33/25/12/3   2254 -> 2240
+lib/workspace-preferences.js         16/16/4/4    16/16/4/4    511 -> 511
+lib/dispatch-factory.js              9/5/18/14    9/5/18/14    1408 -> 1417
+lib/dispatch-store.js                7/6/10/2     5/5/10/2     4530 -> 4571
+lib/periodicals.js                   9/8/1/0      10/9/2/0     1416 -> 1428
+lib/task-page-loader.js              9/8/22/10    9/8/22/10    1578 -> 1557
+lib/run-controls.js                  21/19/3/3    21/19/3/3    152 -> 152
+lib/tree.js                          8/6/3/3      8/6/3/3      684 -> 684
+lib/as-asked.js                      25/12/1/1    24/12/1/1    348 -> 352
+lib/recommendation-look-first.js     1/0/8/4      1/0/8/4      184 -> 180
+lib/recommendation-blind-read.js     1/0/6/5      1/0/5/4      79 -> 74
+lib/recommendation-facts.js          11/6/7/4     11/6/8/5     737 -> 662
+lib/recent-runs.js                   5/5/4/3      3/3/6/3      141 -> 152
+lib/run-view.js                      17/12/5/1    17/12/8/3    570 -> 545
+lib/prompt-template-defs.js          1/0/11/3     1/0/12/3     1372 -> 1114
+lib/proxy-preamble.js                11/10/6/4    11/10/6/4    950 -> 972
+lib/proxy-instructions.js            1/0/9/7      1/0/11/9     1325 -> 1346
+lib/providers/state-map.js           30/28/1/0    30/28/1/0    117 -> 117
+lib/run-closeout-state.js            5/2/0/0      7/3/3/2      455 -> 421
+lib/completion-signals.js            2/2/3/3      2/2/1/1      367 -> 29
+lib/dispatch-entrance.js             3/2/25/15    3/2/27/15    2057 -> 2061
+lib/chat-tools.js                    4/3/16/14    4/3/16/14    2029 -> 2029
+lib/prompts/area-note-format.js      0/0/0/0      1/1/1/0      33 -> 55
+routes/proxy-writes.js               1/0/17/14    1/0/19/16    976 -> 1036
+routes/proxy-compute.js              1/0/25/24    1/0/27/26    1633 -> 1584
+server.js                            0/0/205/205  0/0/205/205  4769 -> 4771
+  cross-area importers of lib/run-trail.js (H): ['lib/openrouter.js [LLM]', 'lib/prompt-template-defs.js [LLM]', 'lib/prompts/revision-brief.js [LLM]', 'lib/recommendation-blind-read.js [LLM]', 'lib/recommendation-facts.js [LLM]', 'lib/recommendation-look-first.js [LLM]', 'routes/proxy-writes.js [Agent API]', 'routes/workspace-api-issue-write.js [Web]']
+  cross-area importers of lib/run-ledger.js (H): ['lib/prompt-template-defs.js [LLM]', 'lib/proxy-instructions.js [Agent API]', 'lib/recommendation-facts.js [LLM]', 'routes/proxy-writes.js [Agent API]']
+  cross-area importers of lib/stage-writes.js (H): ['lib/item-stage-stamp.js [Runs]', 'lib/prompts/stage-kinds.js [LLM]', 'lib/proxy-instructions.js [Agent API]', 'lib/proxy-preamble.js [Agent API]', 'lib/proxy-tokens.js [Agent API]', 'lib/stage-write-gate.js [Agent API]', 'routes/dispatch.js [Runs]', 'routes/proxy-writes.js [Agent API]']
+  cross-area importers of lib/time-words.js (H): ['lib/task-page-loader.js [Runs]', 'lib/task-state.js [Other]', 'public/observation.js [Browser]', 'public/task-page.js [Browser]']
+  cross-area importers of lib/cost-format.js (H): ['lib/ship-biscuit.js [LLM]', 'public/cost-format-global.js [Browser]', 'public/flight-companion.js [Browser]', 'public/observation.js [Browser]', 'public/workspace-kpis.js [Browser]']
+  cross-area importers of lib/run-live-wait.js (H): ['lib/code-routes.js [LLM]', 'lib/proxy-instructions.js [Agent API]', 'lib/recommendation-blind-read.js [LLM]', 'routes/workspace-api.js [Web]']
+  cross-area importers of lib/should-mock-ai.js (H): ['lib/dispatch-entrance.js [Runs]', 'lib/dispatch-factory.js [Runs]', 'routes/dispatch.js [Runs]', 'routes/flight-companion.js [Web]', 'routes/proxy-compute.js [Agent API]', 'routes/ship-biscuit.js [Web]', 'routes/task-chat.js [Web]', 'routes/workspace-api-audit.js [Web]', 'routes/workspace-api-feedback.js [Web]', 'routes/workspace-api-issue-read.js [Web]', 'routes/workspace-api-issue-write.js [Web]', 'routes/workspace-api-prompts.js [Web]', 'routes/workspace-api-roadmap.js [Web]', 'routes/workspace-api-scan.js [Web]', 'routes/workspace-api-steps.js [Web]', 'routes/workspace-api.js [Web]', 'server.js [Wiring]']
+  cross-area importers of lib/prompts/stage-kinds.js (H): ['lib/completion-signals.js [Runs]', 'lib/proxy-instructions.js [Agent API]', 'lib/run-view.js [Runs]']
+  cross-area importers of lib/cost-read-calls.js (H): ['lib/model-routing-spend.js [LLM]', 'routes/proxy-compute.js [Agent API]', 'routes/settings.js [Web]', 'routes/ship-biscuit.js [Web]']
+  cross-area importers of lib/run-ledger.js (B): ['lib/prompt-template-defs.js [LLM]', 'lib/prompts/revision-brief.js [LLM]', 'lib/proxy-instructions.js [Agent API]', 'lib/recommendation-blind-read.js [LLM]', 'lib/recommendation-facts.js [LLM]', 'lib/recommendation-look-first.js [LLM]', 'routes/proxy-writes.js [Agent API]']
+  run-trail.js outbound (H): ['lib/prompts/blind-read-words.js', 'lib/prompts/survey-words.js', 'lib/run-ledger.js']
+  run-live-wait.js outbound (H): []
+  stage-writes.js outbound (H): []
+
+## S6. Catch-all (Other features) and the new production files
+N1 Other-features files with a cross-area edge: B12 18 B 16 H 16
+  left by the guide edit (B12 - B): ['lib/cost-format.js', 'lib/usage-snapshot-intake.js']
+  B -> H: gone [] new []
+  H set: ['as-asked-seal', 'dashboard-refresh', 'home-pipeline', 'home-row-states', 'home-rows', 'home-view', 'key-state-holders', 'key-state', 'live-anchor', 'ruling-settled', 'ruling-standing', 'stage-writes', 'subtree-index', 'task-facts-holder', 'task-state', 'waiting-section']
+  Other-features files in any edge (H): 16
+  A     lib/code-routes.js                         -> LLM
+  A     lib/cost-read-calls.js                     -> Runs
+  A     lib/dispatch-feedback-kinds.js             -> Runs
+  A     lib/item-stage-stamp.js                    -> Runs
+  A     lib/prompts/prompt-context.js              -> LLM
+  A     lib/prompts/stage-catalogue.js             -> LLM
+  A     lib/prompts/stage-kinds.js                 -> LLM
+  A     lib/providers/jira/as-asked-region.js      -> Providers
+  R075  lib/run-live-wait.js                       -> Runs
+  A     lib/run-trail.js                           -> Runs
+  A     lib/stage-write-gate.js                    -> Agent API
+  A     lib/time-words.js                          -> Pages
+  A     public/cost-format-global.js               -> Browser
+  scripts change: A	scripts/gen-llms-catalogue.mjs
+  scripts change: M	scripts/prompt-template-change-log.md
+  scripts change: M	scripts/stability-measures-blind.mjs
+  scripts change: M	scripts/steady-base-check.mjs
+  scripts change: M	scripts/steady-base-growth.mjs
+
+## S7. Direction checks (H)
+lib -> routes edges: B 0 H 0
+edges into server.js: 0
+public/ -> anything (B): []
+public/ -> anything (H): ['public/cost-format-global.js -> lib/cost-format.js [Pages]', 'public/flight-companion.js -> lib/cost-format.js [Pages]', 'public/observation.js -> lib/cost-format.js [Pages]', 'public/observation.js -> lib/time-words.js [Pages]', 'public/task-page.js -> lib/time-words.js [Pages]', 'public/workspace-kpis.js -> lib/cost-format.js [Pages]']
+anything -> public/ (H): []
+public/ -> public/ (H, intra-browser imports): 0
+renderer (lib/render*) imported from Runs/Other/LLM/Providers/Agent/Platform (B): ['lib/task-page-loader.js -> lib/render-run-steps.js [Runs]', 'lib/task-state.js -> lib/render-run-steps.js [Other]', 'routes/live-console.js -> lib/render-live-console.js [Runs]', 'routes/live-console.js -> lib/render.js [Runs]', 'routes/runner-setup.js -> lib/render-runner-setup.js [Runs]', 'routes/runner-setup.js -> lib/render.js [Runs]']
+renderer (lib/render*) imported from Runs/Other/LLM/Providers/Agent/Platform (H): ['routes/live-console.js -> lib/render-live-console.js [Runs]', 'routes/live-console.js -> lib/render.js [Runs]', 'routes/runner-setup.js -> lib/render-runner-setup.js [Runs]', 'routes/runner-setup.js -> lib/render.js [Runs]']
+Pages-area files imported from Runs or Other (B): ['lib/home-pipeline.js -> lib/task-board-view.js', 'lib/home-pipeline.js -> lib/tree.js', 'lib/home-rows.js -> lib/tree.js', 'lib/home-view.js -> lib/tree.js', 'lib/live-console.js -> lib/timeline-zoom.js', 'lib/ship-biscuit.js -> lib/cost-format.js', 'lib/subtree-index.js -> lib/tree.js', 'lib/task-page-loader.js -> lib/render-run-steps.js', 'lib/task-stack.js -> lib/tree.js', 'lib/task-state.js -> lib/render-run-steps.js', 'lib/waiting-section.js -> lib/question-card.js', 'lib/waiting-section.js -> lib/task-page-href.js', 'routes/dispatch.js -> lib/components/decision-panel.js', 'routes/live-console.js -> lib/render-live-console.js', 'routes/live-console.js -> lib/render.js', 'routes/runner-setup.js -> lib/render-runner-setup.js', 'routes/runner-setup.js -> lib/render.js']
+Pages-area files imported from Runs or Other (H): ['lib/home-pipeline.js -> lib/task-board-view.js', 'lib/home-pipeline.js -> lib/tree.js', 'lib/home-rows.js -> lib/tree.js', 'lib/home-view.js -> lib/tree.js', 'lib/live-console.js -> lib/timeline-zoom.js', 'lib/ship-biscuit.js -> lib/cost-format.js', 'lib/subtree-index.js -> lib/tree.js', 'lib/task-page-loader.js -> lib/time-words.js', 'lib/task-stack.js -> lib/tree.js', 'lib/task-state.js -> lib/time-words.js', 'lib/waiting-section.js -> lib/question-card.js', 'lib/waiting-section.js -> lib/task-page-href.js', 'routes/dispatch.js -> lib/components/decision-panel.js', 'routes/live-console.js -> lib/render-live-console.js', 'routes/live-console.js -> lib/render.js', 'routes/runner-setup.js -> lib/render-runner-setup.js', 'routes/runner-setup.js -> lib/render.js']
+Platform & plumbing cross-area out (H): 0
+Providers -> LLM (H): ['lib/providers/jira/as-asked-region.js -> lib/as-asked.js', 'lib/providers/jira/index.js -> lib/periodicals.js', 'lib/providers/jira/index.js -> lib/recommendation-facts.js', 'lib/providers/linear/index.js -> lib/openrouter.js', 'lib/providers/linear/index.js -> lib/recommendation-facts.js', 'lib/providers/local/index.js -> lib/recommendation-facts.js']
+LLM -> Providers (H): ['lib/as-asked.js -> lib/description-edit.js', 'lib/audit.js -> lib/linear-fetch.js', 'lib/audit.js -> lib/providers/state-map.js', 'lib/chat-tools.js -> lib/github-pr-status.js', 'lib/context-graph.js -> lib/providers/state-map.js', 'lib/openrouter.js -> lib/providers/state-map.js', 'lib/prompt-formatters.js -> lib/providers/models.js', 'lib/prompt-template-defs.js -> lib/providers/models.js', 'lib/prompt-templates.js -> lib/providers/state-map.js', 'lib/recommend-recurse.js -> lib/providers/state-map.js', 'lib/recommendation-facts.js -> lib/providers/state-map.js', 'lib/recommendation-look-first.js -> lib/providers/state-map.js', 'lib/roadmap.js -> lib/providers/state-map.js', 'lib/size-of-move.js -> lib/description-edit.js']
+Agent API -> Other (H): ['lib/proxy-instructions.js -> lib/stage-writes.js', 'lib/proxy-preamble.js -> lib/stage-writes.js', 'lib/proxy-tokens.js -> lib/stage-writes.js', 'lib/stage-write-gate.js -> lib/stage-writes.js', 'routes/proxy-writes.js -> lib/as-asked-seal.js', 'routes/proxy-writes.js -> lib/stage-writes.js']
+Other -> Agent API (H): ['lib/as-asked-seal.js -> lib/proxy-graphql-errors.js']
+Runs -> Other (H): ['lib/dispatch-factory.js -> lib/as-asked-seal.js', 'lib/item-stage-stamp.js -> lib/stage-writes.js', 'lib/task-page-loader.js -> lib/ruling-standing.js', 'lib/task-page-loader.js -> lib/subtree-index.js', 'lib/task-page-loader.js -> lib/task-state.js', 'lib/unanswered-decisions.js -> lib/live-anchor.js', 'routes/dispatch.js -> lib/stage-writes.js']
+Other -> Runs (H): ['lib/dashboard-refresh.js -> lib/poll-halt.js', 'lib/dashboard-refresh.js -> lib/run-controls.js', 'lib/home-row-states.js -> lib/task-page-loader.js', 'lib/live-anchor.js -> lib/run-loop-state.js', 'lib/ruling-standing.js -> lib/unanswered-decisions.js', 'lib/task-state.js -> lib/run-view.js']
+LLM -> Pages (H): ['lib/ship-biscuit.js -> lib/cost-format.js']
+LLM -> Agent API (H): ['lib/chat-tools.js -> lib/proxy-preamble.js', 'lib/model-routing-harnesses.js -> lib/proxy-preamble.js', 'lib/model-routing.js -> lib/proxy-preamble.js', 'lib/prompts/runner-kickoff.js -> lib/proxy-scopes.js']
+Runs -> Agent API (H): ['lib/consumer-poll-warning.js -> lib/proxy-scopes.js', 'lib/dispatch-entrance.js -> lib/proxy-graphql-errors.js', 'lib/dispatch-entrance.js -> lib/proxy-preamble.js', 'lib/dispatch-factory.js -> lib/proxy-preamble.js', 'lib/follow-up-dispatch.js -> lib/proxy-preamble.js', 'lib/run-controls.js -> lib/settings-keys.js', 'lib/wake-credential.js -> lib/proxy-preamble.js', 'routes/dispatch.js -> lib/proxy-preamble.js', 'routes/dispatch.js -> lib/proxy-scopes.js', 'routes/dispatch.js -> lib/proxy-tokens.js']
+
+## S8. Scripts outside the import tool scope that import lib/ (the tool reads server.js, lib, routes, public)
+  scripts/code-shape/retention.mjs               area Reports    lib imports: []
+  scripts/code-shape/retention-core.mjs          area Reports    lib imports: []
+  scripts/stability-measures.mjs                 area Reports    lib imports: ['../lib/prompts/area-note-format.js']
+  scripts/stability-measures-core.mjs            area Reports    lib imports: []
+  scripts/stability-measures-tracker.mjs         area Reports    lib imports: []
+  scripts/stability-measures-blind.mjs           area Reports    lib imports: ['../lib/prompts/blind-read-words.js', '../lib/run-ledger.js', '../lib/run-trail.js']
+  scripts/stability-measures-seat.mjs            area Reports    lib imports: ['../lib/dispatch-terminal.js']
+  scripts/gen-llms-catalogue.mjs                 area (no area)  lib imports: ['../lib/prompts/stage-catalogue.js']
+  scripts/pipeline-churn.mjs                     area Runs       lib imports: ['../lib/pipeline-churn.js']
+  all non-test scripts/ files importing lib/ at H: 54 | of which registered to an area: 4
+
+## S9. Co-change, 60 days, the same registry (HEAD) for both commits
+B: changes 914 multi 399 pairs 76 unmapped 8855 shallow False window 2026-09-14..2026-11-13
+H: changes 945 multi 420 pairs 76 unmapped 9015 shallow False window 2026-09-15..2026-11-14
+B12: changes 914 multi 399 pairs 76 unmapped 8855 shallow False window 2026-09-14..2026-11-13
+pairs moved by the guide edit alone (B under run-12 registry -> under HEAD registry):
+  Agent API <-> Pages: 38 -> 39
+  Pages <-> LLM: 46 -> 47
+  Pages <-> Other: 34 -> 35
+  Pages <-> Runs: 96 -> 97
+  Pages <-> Web: 96 -> 97
+  Other <-> Runs: 42 -> 41
+  Other <-> Wiring: 28 -> 27
+top 14 pairs at H (with B), and whether an import link exists at H (either direction):
+  Agent API  <-> Runs       B  124 H  135  link H True  link B True
+  Browser    <-> Pages      B  128 H  133  link H True  link B False
+  Runs       <-> Web        B  117 H  124  link H True  link B True
+  LLM        <-> Runs       B  112 H  122  link H True  link B True
+  Pages      <-> Runs       B   97 H  100  link H True  link B True
+  Pages      <-> Web        B   97 H  100  link H True  link B True
+  Browser    <-> Web        B   94 H   94  link H False  link B False
+  Agent API  <-> LLM        B   81 H   91  link H True  link B True
+  Browser    <-> Runs       B   88 H   91  link H False  link B False
+  Web        <-> Wiring     B   89 H   91  link H True  link B True
+  Agent API  <-> Web        B   78 H   87  link H True  link B True
+  Runs       <-> Wiring     B   84 H   87  link H True  link B True
+  LLM        <-> Web        B   78 H   85  link H True  link B True
+  Pages      <-> Wiring     B   80 H   82  link H True  link B True
+pairs B -> H that moved (HEAD registry):
+  Agent API <-> Runs: 124 -> 135
+  Browser <-> Pages: 128 -> 133
+  Runs <-> Web: 117 -> 124
+  LLM <-> Runs: 112 -> 122
+  Pages <-> Web: 97 -> 100
+  Pages <-> Runs: 97 -> 100
+  Browser <-> Runs: 88 -> 91
+  Web <-> Wiring: 89 -> 91
+  Agent API <-> LLM: 81 -> 91
+  Agent API <-> Web: 78 -> 87
+  Runs <-> Wiring: 84 -> 87
+  LLM <-> Web: 78 -> 85
+  Pages <-> Wiring: 80 -> 82
+  Browser <-> Wiring: 68 -> 70
+  Pages <-> LLM: 47 -> 50
+  Browser <-> LLM: 47 -> 49
+  Agent API <-> Wiring: 46 -> 49
+  Platform <-> Runs: 45 -> 48
+  Agent API <-> Browser: 43 -> 45
+  Other <-> Runs: 41 -> 45
+  Platform <-> Wiring: 43 -> 45
+  Agent API <-> Pages: 39 -> 42
+  LLM <-> Wiring: 39 -> 40
+  Agent API <-> Platform: 37 -> 39
+  Platform <-> Web: 36 -> 37
+  Pages <-> Other: 35 -> 36
+  Other <-> Web: 34 -> 35
+  Browser <-> Other: 30 -> 32
+  Browser <-> Platform: 28 -> 32
+  Pages <-> Platform: 29 -> 32
+  Other <-> Wiring: 27 -> 29
+  Reports <-> Runs: 28 -> 29
+  LLM <-> Platform: 24 -> 26
+  Providers <-> Runs: 23 -> 25
+  Agent API <-> Other: 21 -> 24
+  Pages <-> Providers: 21 -> 22
+  LLM <-> Providers: 18 -> 21
+  Providers <-> Web: 18 -> 21
+  LLM <-> Other: 19 -> 21
+  Reports <-> Web: 19 -> 20
+  Agent API <-> Providers: 16 -> 19
+  LLM <-> Reports: 16 -> 17
+  Agent API <-> Reports: 14 -> 15
+  Providers <-> Wiring: 13 -> 14
+  Other <-> Platform: 11 -> 13
+  Other <-> Providers: 8 -> 9
+  Platform <-> Providers: 3 -> 4
+pairs with no import link: B 19 H 18
+  gained a link B -> H: ['Browser <-> Pages']
+  lost a link B -> H: []
+  no link H: Browser <-> Web: B 94 H 94
+  no link H: Browser <-> Runs: B 88 H 91
+  no link H: Browser <-> Wiring: B 68 H 70
+  no link H: Browser <-> LLM: B 47 H 49
+  no link H: Agent API <-> Browser: B 43 H 45
+  no link H: Browser <-> Other: B 30 H 32
+  no link H: Browser <-> Platform: B 28 H 32
+  no link H: Auth <-> Browser: B 27 H 27
+  no link H: Agent API <-> Reports: B 14 H 15
+  no link H: Browser <-> Reports: B 14 H 14
+  no link H: Browser <-> Providers: B 12 H 12
+  no link H: Other <-> Reports: B 7 H 7
+  no link H: Browser <-> Task: B 3 H 3
+  no link H: Agent API <-> Task: B 2 H 2
+  no link H: Auth <-> Task: B 2 H 2
+  no link H: Providers <-> Reports: B 2 H 2
+  no link H: Task <-> Web: B 2 H 2
+  no link H: Task <-> Wiring: B 1 H 1
+
+## S10. Window reconciliation of co-change pairs (commits in each 60-day window)
+B window 914 H window 945 shared 913 B-only 1 H-only 32
+  Browser <-> Pages: B 128 - B-only 0 + H-only 5 = 133 (H reads 133)
+  Agent API <-> Runs: B 124 - B-only 0 + H-only 11 = 135 (H reads 135)
+  LLM <-> Runs: B 112 - B-only 0 + H-only 10 = 122 (H reads 122)
+  Browser <-> Web: B 94 - B-only 0 + H-only 0 = 94 (H reads 94)
+  Runs <-> Web: B 117 - B-only 0 + H-only 7 = 124 (H reads 124)
+  Agent API <-> LLM: B 81 - B-only 0 + H-only 10 = 91 (H reads 91)
+  Agent API <-> Other: B 21 - B-only 0 + H-only 3 = 24 (H reads 24)
+  Other <-> Runs: B 41 - B-only 0 + H-only 4 = 45 (H reads 45)
+  LLM <-> Other: B 19 - B-only 0 + H-only 2 = 21 (H reads 21)
+  Pages <-> Runs: B 97 - B-only 0 + H-only 3 = 100 (H reads 100)
+  Browser <-> Runs: B 88 - B-only 0 + H-only 3 = 91 (H reads 91)
+
+## S11. Carried measures re-read at B and H
+F6 B: window.X = assignments in public/*.js: 67 across 17 files; public files 44; ES-module files 0: []
+F6 H: window.X = assignments in public/*.js: 67 across 17 files; public files 44; ES-module files 5: ['public/cost-format-global.js', 'public/flight-companion.js', 'public/observation.js', 'public/task-page.js', 'public/workspace-kpis.js']
+   moved: public/cost-format-global.js 0 -> 1
+   moved: public/cost-format.js 1 -> 0
+route -> route edges (F5): B 53 H 53
+unresolved relative imports: B 4 H 4
+
+## S12. Per-area rollup (files, internal imports, cross in / out, entry files), B -> H, HEAD registry
+  Agent API  files 33 [32]    internal 48 [45]    xin 34         xout 178 [169]  entry 13
+  Auth       files 64         internal 115        xin 188        xout 38         entry 57
+  Browser    files 44         internal 0          xin 0          xout 6 [0]      entry 0
+  Pages      files 94 [93]    internal 299 [296]  xin 111 [105]  xout 176 [175]  entry 57
+  LLM        files 94 [91]    internal 113 [100]  xin 280 [265]  xout 88 [86]    entry 78 [76]
+  Other      files 16         internal 6          xin 33 [27]    xout 26         entry 15
+  Platform   files 25         internal 3 [2]      xin 286 [285]  xout 0          entry 23
+  Providers  files 38 [37]    internal 42 [40]    xin 130        xout 16 [14]    entry 32
+  Reports    files 8          internal 3          xin 8          xout 35         entry 6
+  Runs       files 120 [115]  internal 226 [207]  xin 269 [261]  xout 189 [181]  entry 102 [98]
+  Task       files 2          internal 1          xin 9          xout 3          entry 2
+  Web        files 38         internal 31         xin 22         xout 410 [402]  entry 22
+  Wiring     files 1          internal 0          xin 0          xout 205        entry 0
+
+## S13. simple-dispatcher (scratch reader; seams.mjs reads 0 CommonJS files)
+af9b496 files 52 unmapped 0 unresolved 0 nonLiteral 0 fileEdges 157 areaLinks 20 reciprocal 6
+7d5fe7d files 52 unmapped 0 unresolved 0 nonLiteral 0 fileEdges 157 areaLinks 20 reciprocal 6
+reader output identical across the window (areaLinks, fileEdges, pairs): True
+sd window commits: 7d5fe7d Merge pull request #341 from JKershaw/feat/lin-4476-merged-contract-session-fold | 47fb6af Merge pull request #340 from JKershaw/feat/lin-4474-retire-columnproblems | 1616b19 docs(LIN-4443): evidence-scope note from the Drift & Coherence Review (13 Nov) (#339)
+sd files changed: M	docs/areas/stop-hook-and-relay.md | M	docs/module-map.md | M	hook.js | M	test/fixtures/runner-contract.json | A	test/lin-4474-sentinel-family.test.js | M	test/runner-contract.test.js | M	transcript.js
+  require lines changed in hook.js: ["-const { readTranscriptLines, classifyTurnDriver, lastAssistantText, settleAssistantText, stableLastAssistantText, walkAssistantTextBlocks, findFlushedCopy, walkToolActivity, walkTicketMarkers, doneLineRest } = require('./transcript');", "+const { readTranscriptLines, classifyTurnDriver, lastAssistantText, settleAssistantText, stableLastAssistantText, walkAssistantTextBlocks, findFlushedCopy, walkToolActivity, walkTicketMarkers, sentinelLine } = require('./transcript');"]
+  require lines changed in transcript.js: []
+cochange af9b496 100 46 15 240 shallow False
+cochange 7d5fe7d 102 46 15 241 shallow False

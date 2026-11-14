@@ -62,3 +62,11 @@
   holding one fails its first-dispatch seal, logged, with dispatch continuing. Waiting since
   LIN-4445's plan ("what stays open") and the LIN-4451 Survey; the Jira live check (LIN-4452)
   does not exercise it.
+- `lib/providers/jira/index.js`: `_periodicalGateComments` imports `extractPeriodicalGateId` from
+  `lib/periodicals.js`, LLM & prompts' Periodical engine (about 1,400 lines), to decide whether to walk every
+  comment for the Periodical gate's evidence (LIN-4451). A provider now depends on the engine, and on what it
+  imports, for one marker regex; it is one of Providers → LLM & prompts' two new edges (4 → 6). The marker's other
+  readers are `lib/periodical-report-gate.js` and `routes/proxy-writes.js`. A marker leaf that all three import (as
+  `lib/prompts/blind-read-words.js` is for the blind read), or the gate asking the provider for a comment tail
+  without naming the feature, would remove the edge. The other side is LLM & prompts' `lib/periodicals.js`.
+  (Seams & Tangles, 14 Nov.; `docs/reviews/seams-tangles-review-2026-11-14-run13.md`.)
