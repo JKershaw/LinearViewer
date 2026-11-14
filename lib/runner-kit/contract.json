@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "LIN-3451: Simple Dispatcher is the reference; each row pins sd plus kit and/or harbour (LIN-4384), and a column that differs from sd carries a difference. Test fixture only: the kit never loads this file. Byte-copied to simple-dispatcher test/fixtures/runner-contract.json.",
+  "note": "LIN-3451: Simple Dispatcher is the reference; each row pins sd plus kit and/or harbour (LIN-4384), and a column that differs from sd carries a difference. Test fixture only: the kit never loads this file. Byte-copied to simple-dispatcher test/fixtures/runner-contract.json. LIN-4475: `session` is running | finished | stopped | none; the retired `live` is gone. `[done]` is the runner's own post, read by Harbour only, so it has no report row: SD's pinReport asserts both of its readings against one sd value, and they differ on a [done] line. Harbour's reading is pinned in tests/unit/lin-4375-session-pr-wins.test.js. The kit's ledger also has a `lost` state that no session value names: resolveFollowUp refuses it as it refuses none, so the vocabulary leaves it out. LIN-4475 `fold` (W8): per request, the kit transcript fold (runner.mjs transcriptRequestRecords) against Simple Dispatcher's walkRequestRecords. It compares requestId, model, at and the five token fields, in first-seen order, rendered as one JSON array per side: an absent value renders null, a \"\" stays \"\", an absent token field is 0. It excludes harness, agent, effort, the skipped counts, and SD's attribution of one request across several transcripts. Its corpus rows name the eight files in tests/fixtures/runner-kit/transcript-corpus by id and sha256; its inline rows carry their own lines.",
   "rows": [
     {
       "area": "halt",
@@ -52,26 +52,26 @@
     },
     {
       "area": "halt",
-      "case": "follow-up to a live session under pause",
+      "case": "follow-up to a finished session under pause",
       "halt": {
         "mode": "pause"
       },
       "item": {
         "route": "follow-up",
-        "session": "live"
+        "session": "finished"
       },
       "sd": "claimed",
       "kit": "claimed"
     },
     {
       "area": "halt",
-      "case": "follow-up to a live session under stop (held)",
+      "case": "follow-up to a finished session under stop (held)",
       "halt": {
         "mode": "stop"
       },
       "item": {
         "route": "follow-up",
-        "session": "live"
+        "session": "finished"
       },
       "sd": "left",
       "kit": "left"
@@ -95,6 +95,52 @@
       "halt": {
         "mode": "stop"
       },
+      "item": {
+        "route": "follow-up",
+        "session": "none"
+      },
+      "sd": "failed",
+      "kit": "failed"
+    },
+    {
+      "area": "halt",
+      "case": "follow-up to a finished session with no halt",
+      "halt": null,
+      "item": {
+        "route": "follow-up",
+        "session": "finished"
+      },
+      "sd": "claimed",
+      "kit": "claimed"
+    },
+    {
+      "area": "halt",
+      "case": "follow-up to a running session with no halt",
+      "halt": null,
+      "item": {
+        "route": "follow-up",
+        "session": "running"
+      },
+      "sd": "failed",
+      "kit": "claimed",
+      "difference": "SD refuses a follow-up to a running session (session-busy): a second --resume would write the transcript while the live process holds it. The kit hands the message to the live subagent, so there is no second writer. This row covers neither queueIfBusy (SD leaves the item unclaimed to retry) nor force (SD resumes it kill-first)."
+    },
+    {
+      "area": "halt",
+      "case": "follow-up to a stopped session with no halt",
+      "halt": null,
+      "item": {
+        "route": "follow-up",
+        "session": "stopped"
+      },
+      "sd": "failed",
+      "kit": "claimed",
+      "difference": "SD refuses a follow-up to a cancelled session (session-stopped) unless a person forces it. Harbour's admission gate owns that refusal (guardRunStopped, lib/dispatch-factory.js), and the kit's stopped rows include subagents that finished (LIN-3675), which the kit continues."
+    },
+    {
+      "area": "halt",
+      "case": "follow-up with no live session with no halt",
+      "halt": null,
       "item": {
         "route": "follow-up",
         "session": "none"
@@ -234,7 +280,7 @@
       "halt": null,
       "item": {
         "route": "follow-up",
-        "session": "live",
+        "session": "finished",
         "repo": "missing"
       },
       "sd": "not-checked",
@@ -491,6 +537,25 @@
       },
       "sd": "https://github.com/JKershaw/LinearViewer/pull/2359",
       "harbour": "https://github.com/JKershaw/LinearViewer/pull/2359"
+    },
+    {
+      "area": "report",
+      "case": "a DONE: line with an http URL and a #x fragment: SD canonical https, Harbour none",
+      "item": {
+        "message": "Opened the PR.\n\nDONE: http://github.com/JKershaw/LinearViewer/pull/101#x"
+      },
+      "sd": "https://github.com/JKershaw/LinearViewer/pull/101",
+      "harbour": null,
+      "difference": "SD reads the http scheme and gives the canonical https URL on both its readings; Harbour's PR_URL_RE (lib/run-ledger.js) reads https only, so the report reads no PR."
+    },
+    {
+      "area": "report",
+      "case": "a DONE: line after U+2028: both read the PR",
+      "item": {
+        "message": "Opened the PR and CI is green. DONE: opened https://github.com/JKershaw/LinearViewer/pull/101"
+      },
+      "sd": "https://github.com/JKershaw/LinearViewer/pull/101",
+      "harbour": "https://github.com/JKershaw/LinearViewer/pull/101"
     },
     {
       "area": "sentinel",
@@ -856,6 +921,327 @@
       "sd": "the agent's request is answered 429; retry-after 1",
       "kit": "start fails naming HTTP 429 and Retry-After: 1",
       "difference": "LIN-4378: each side answers whoever asked for the exchange. The kit exchanges once in `start`, before the broker serves any agent request, so the runner that called `start` gets the refusal (an error naming HTTP 429 and the wait) and can start again. SD exchanges lazily on the agent's first request, so that request is answered 429 with its Retry-After. Neither turns the 429 into a generic failure."
+    },
+    {
+      "area": "fold",
+      "case": "corpus haiku-over-100k/final",
+      "item": {
+        "id": "haiku-over-100k/final",
+        "sha256": "d2cfd639d38d41cfddaaf94dc45678d767933327ea73ac082551524a40df0df8"
+      },
+      "sd": "[[\"msg_hk_1\",\"claude-haiku-5-5\",\"2026-11-02T09:01:00.000Z\",40000,800,5000,1000,30000],[\"msg_hk_2\",\"claude-haiku-5-5\",\"2026-11-02T09:03:00.000Z\",3000,1500,2000,0,120000],[\"msg_hk_3\",\"claude-haiku-5-5\",\"2026-11-02T09:05:00.000Z\",1200,600,0,0,110000]]",
+      "kit": "[[\"msg_hk_1\",\"claude-haiku-5-5\",\"2026-11-02T09:01:00.000Z\",40000,800,5000,1000,30000],[\"msg_hk_2\",\"claude-haiku-5-5\",\"2026-11-02T09:03:00.000Z\",3000,1500,2000,0,120000],[\"msg_hk_3\",\"claude-haiku-5-5\",\"2026-11-02T09:05:00.000Z\",1200,600,0,0,110000]]"
+    },
+    {
+      "area": "fold",
+      "case": "corpus killed-before-stop/final",
+      "item": {
+        "id": "killed-before-stop/final",
+        "sha256": "5b666d76bb1d5d865ce819a8124570b68223812d43eef1f01f34abd2a1a64d54"
+      },
+      "sd": "[[\"msg_kl_1\",\"claude-sonnet-5\",\"2026-11-02T09:01:00.000Z\",5000,400,0,0,20000],[\"msg_kl_2\",\"claude-sonnet-5\",\"2026-11-02T09:03:00.000Z\",2500,260,3000,0,25000]]",
+      "kit": "[[\"msg_kl_1\",\"claude-sonnet-5\",\"2026-11-02T09:01:00.000Z\",5000,400,0,0,20000],[\"msg_kl_2\",\"claude-sonnet-5\",\"2026-11-02T09:03:00.000Z\",2500,260,3000,0,25000]]"
+    },
+    {
+      "area": "fold",
+      "case": "corpus mixed-model/final",
+      "item": {
+        "id": "mixed-model/final",
+        "sha256": "27515938e6b28e6e4790974409bb3b95e2fae70148096598469cdd12ed42668b"
+      },
+      "sd": "[[\"msg_mx_1\",\"claude-opus-5\",\"2026-11-02T09:01:00.000Z\",20000,2000,0,0,50000],[\"msg_mx_2\",\"claude-sonnet-5\",\"2026-11-02T09:03:00.000Z\",9000,1200,4000,0,60000],[\"msg_mx_3\",\"claude-opus-5\",\"2026-11-02T09:05:00.000Z\",500,900,0,0,130000],[\"msg_mx_4\",\"claude-haiku-5-5\",\"2026-11-02T09:07:00.000Z\",2000,100,0,0,1000]]",
+      "kit": "[[\"msg_mx_1\",\"claude-opus-5\",\"2026-11-02T09:01:00.000Z\",20000,2000,0,0,50000],[\"msg_mx_2\",\"claude-sonnet-5\",\"2026-11-02T09:03:00.000Z\",9000,1200,4000,0,60000],[\"msg_mx_3\",\"claude-opus-5\",\"2026-11-02T09:05:00.000Z\",500,900,0,0,130000],[\"msg_mx_4\",\"claude-haiku-5-5\",\"2026-11-02T09:07:00.000Z\",2000,100,0,0,1000]]"
+    },
+    {
+      "area": "fold",
+      "case": "corpus reap-tail/atReap",
+      "item": {
+        "id": "reap-tail/atReap",
+        "sha256": "c9fae74c8fdbcaa68b10801089881e3dcd418a0a1d834ec99eebf49a049cc70a"
+      },
+      "sd": "[[\"msg_rt_1\",\"claude-sonnet-5\",\"2026-11-02T09:01:00.000Z\",4000,500,0,0,10000],[\"msg_rt_2\",\"claude-sonnet-5\",\"2026-11-02T09:03:00.000Z\",1800,220,0,0,14000],[\"msg_rt_3\",\"claude-sonnet-5\",\"2026-11-02T09:05:00.000Z\",1900,130,0,0,15000]]",
+      "kit": "[[\"msg_rt_1\",\"claude-sonnet-5\",\"2026-11-02T09:01:00.000Z\",4000,500,0,0,10000],[\"msg_rt_2\",\"claude-sonnet-5\",\"2026-11-02T09:03:00.000Z\",1800,220,0,0,14000],[\"msg_rt_3\",\"claude-sonnet-5\",\"2026-11-02T09:05:00.000Z\",1900,130,0,0,15000]]"
+    },
+    {
+      "area": "fold",
+      "case": "corpus reap-tail/atStop",
+      "item": {
+        "id": "reap-tail/atStop",
+        "sha256": "6d240de4e769912117310886fb2d6faacddfdea438175a760eb0e8b6a4a49376"
+      },
+      "sd": "[[\"msg_rt_1\",\"claude-sonnet-5\",\"2026-11-02T09:01:00.000Z\",4000,500,0,0,10000],[\"msg_rt_2\",\"claude-sonnet-5\",\"2026-11-02T09:03:00.000Z\",1800,220,0,0,14000]]",
+      "kit": "[[\"msg_rt_1\",\"claude-sonnet-5\",\"2026-11-02T09:01:00.000Z\",4000,500,0,0,10000],[\"msg_rt_2\",\"claude-sonnet-5\",\"2026-11-02T09:03:00.000Z\",1800,220,0,0,14000]]"
+    },
+    {
+      "area": "fold",
+      "case": "corpus resumed-across-deploy/earlier",
+      "item": {
+        "id": "resumed-across-deploy/earlier",
+        "sha256": "3dfaadc20d6a2daed67c371f77c4f603d5d0ff663dc2caa8dcfdcc9c7461df35"
+      },
+      "sd": "[[\"msg_rd_1\",\"claude-sonnet-5\",\"2026-11-02T09:01:00.000Z\",3000,350,0,0,6000],[\"msg_rd_2\",\"claude-sonnet-5\",\"2026-11-02T09:03:00.000Z\",2200,240,1500,0,8000]]",
+      "kit": "[[\"msg_rd_1\",\"claude-sonnet-5\",\"2026-11-02T09:01:00.000Z\",3000,350,0,0,6000],[\"msg_rd_2\",\"claude-sonnet-5\",\"2026-11-02T09:03:00.000Z\",2200,240,1500,0,8000]]"
+    },
+    {
+      "area": "fold",
+      "case": "corpus resumed-across-deploy/later",
+      "item": {
+        "id": "resumed-across-deploy/later",
+        "sha256": "e6c08e5dfc16bfda2046713db499076e5256a1c081cbfab1fede4090d807bafe"
+      },
+      "sd": "[[\"msg_rd_1\",\"claude-sonnet-5\",\"2026-11-02T09:01:00.000Z\",3000,350,0,0,6000],[\"msg_rd_2\",\"claude-sonnet-5\",\"2026-11-02T09:03:00.000Z\",2200,240,1500,0,8000],[\"msg_rd_3\",\"claude-sonnet-5\",\"2026-11-02T09:11:00.000Z\",1200,420,0,0,15000],[\"msg_rd_4\",\"claude-sonnet-5\",\"2026-11-02T09:13:00.000Z\",900,200,0,0,16000]]",
+      "kit": "[[\"msg_rd_1\",\"claude-sonnet-5\",\"2026-11-02T09:01:00.000Z\",3000,350,0,0,6000],[\"msg_rd_2\",\"claude-sonnet-5\",\"2026-11-02T09:03:00.000Z\",2200,240,1500,0,8000],[\"msg_rd_3\",\"claude-sonnet-5\",\"2026-11-02T09:11:00.000Z\",1200,420,0,0,15000],[\"msg_rd_4\",\"claude-sonnet-5\",\"2026-11-02T09:13:00.000Z\",900,200,0,0,16000]]"
+    },
+    {
+      "area": "fold",
+      "case": "corpus synthetic-tail/final",
+      "item": {
+        "id": "synthetic-tail/final",
+        "sha256": "3335c93cfc9dc3de73fea46ce39a3bc6b16ca98cdcb81119524c400b5193d800"
+      },
+      "sd": "[[\"msg_sy_1\",\"claude-sonnet-5\",\"2026-11-02T09:01:00.000Z\",3000,300,0,0,15000],[\"msg_sy_2\",\"claude-sonnet-5\",\"2026-11-02T09:05:00.000Z\",1500,250,0,0,16000]]",
+      "kit": "[[\"msg_sy_1\",\"claude-sonnet-5\",\"2026-11-02T09:01:00.000Z\",3000,300,0,0,15000],[\"msg_sy_2\",\"claude-sonnet-5\",\"2026-11-02T09:05:00.000Z\",1500,250,0,0,16000]]"
+    },
+    {
+      "area": "fold",
+      "case": "inline 1: a real line, then a <synthetic> line, under one id",
+      "item": {
+        "lines": [
+          {
+            "type": "assistant",
+            "timestamp": "2026-11-02T09:00:00.000Z",
+            "message": {
+              "id": "msg_1s",
+              "model": "claude-sonnet-5",
+              "role": "assistant",
+              "usage": {
+                "input_tokens": 100,
+                "output_tokens": 10,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0
+              }
+            }
+          },
+          {
+            "type": "assistant",
+            "timestamp": "2026-11-02T09:00:01.000Z",
+            "message": {
+              "id": "msg_1s",
+              "model": "<synthetic>",
+              "role": "assistant",
+              "usage": {
+                "input_tokens": 250,
+                "output_tokens": 40,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 1000
+              }
+            }
+          }
+        ]
+      },
+      "sd": "[[\"msg_1s\",\"claude-sonnet-5\",\"2026-11-02T09:00:00.000Z\",100,10,0,0,0]]",
+      "kit": "[[\"msg_1s\",\"claude-sonnet-5\",\"2026-11-02T09:00:00.000Z\",100,10,0,0,0]]"
+    },
+    {
+      "area": "fold",
+      "case": "inline 2: two models under one id",
+      "item": {
+        "lines": [
+          {
+            "type": "assistant",
+            "timestamp": "2026-11-02T09:00:00.000Z",
+            "message": {
+              "id": "msg_2m",
+              "model": "claude-sonnet-5",
+              "role": "assistant",
+              "usage": {
+                "input_tokens": 100,
+                "output_tokens": 10,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0
+              }
+            }
+          },
+          {
+            "type": "assistant",
+            "timestamp": "2026-11-02T09:00:01.000Z",
+            "message": {
+              "id": "msg_2m",
+              "model": "claude-haiku-5-5",
+              "role": "assistant",
+              "usage": {
+                "input_tokens": 120,
+                "output_tokens": 30,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0
+              }
+            }
+          }
+        ]
+      },
+      "sd": "[[\"msg_2m\",\"claude-sonnet-5\",\"2026-11-02T09:00:00.000Z\",120,30,0,0,0]]",
+      "kit": "[[\"msg_2m\",\"claude-sonnet-5\",\"2026-11-02T09:00:00.000Z\",120,30,0,0,0]]"
+    },
+    {
+      "area": "fold",
+      "case": "inline 3: a first line with no model, then a line with one",
+      "item": {
+        "lines": [
+          {
+            "type": "assistant",
+            "timestamp": "2026-11-02T09:00:00.000Z",
+            "message": {
+              "id": "msg_3n",
+              "role": "assistant",
+              "usage": {
+                "input_tokens": 100,
+                "output_tokens": 10,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0
+              }
+            }
+          },
+          {
+            "type": "assistant",
+            "timestamp": "2026-11-02T09:00:01.000Z",
+            "message": {
+              "id": "msg_3n",
+              "model": "claude-sonnet-5",
+              "role": "assistant",
+              "usage": {
+                "input_tokens": 100,
+                "output_tokens": 12,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0
+              }
+            }
+          }
+        ]
+      },
+      "sd": "[[\"msg_3n\",null,\"2026-11-02T09:00:00.000Z\",100,12,0,0,0]]",
+      "kit": "[[\"msg_3n\",null,\"2026-11-02T09:00:00.000Z\",100,12,0,0,0]]"
+    },
+    {
+      "area": "fold",
+      "case": "inline 4: the requestId fallback beside an all-zero request",
+      "item": {
+        "lines": [
+          {
+            "type": "assistant",
+            "requestId": "req_4f",
+            "timestamp": "2026-11-02T09:00:00.000Z",
+            "message": {
+              "role": "assistant",
+              "model": "claude-sonnet-5",
+              "usage": {
+                "input_tokens": 50,
+                "output_tokens": 5,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0
+              }
+            }
+          },
+          {
+            "type": "assistant",
+            "timestamp": "2026-11-02T09:00:01.000Z",
+            "message": {
+              "id": "msg_4z",
+              "model": "claude-sonnet-5",
+              "role": "assistant",
+              "usage": {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0
+              }
+            }
+          }
+        ]
+      },
+      "sd": "[[\"req_4f\",\"claude-sonnet-5\",\"2026-11-02T09:00:00.000Z\",50,5,0,0,0]]",
+      "kit": "[[\"req_4f\",\"claude-sonnet-5\",\"2026-11-02T09:00:00.000Z\",50,5,0,0,0]]"
+    },
+    {
+      "area": "fold",
+      "case": "corner: a first line with model \"\"",
+      "item": {
+        "lines": [
+          {
+            "type": "assistant",
+            "timestamp": "2026-11-02T09:00:00.000Z",
+            "message": {
+              "id": "msg_ca",
+              "model": "",
+              "role": "assistant",
+              "usage": {
+                "input_tokens": 100,
+                "output_tokens": 10,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0
+              }
+            }
+          },
+          {
+            "type": "assistant",
+            "timestamp": "2026-11-02T09:00:01.000Z",
+            "message": {
+              "id": "msg_ca",
+              "model": "claude-sonnet-5",
+              "role": "assistant",
+              "usage": {
+                "input_tokens": 100,
+                "output_tokens": 12,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0
+              }
+            }
+          }
+        ]
+      },
+      "sd": "[[\"msg_ca\",\"\",\"2026-11-02T09:00:00.000Z\",100,12,0,0,0]]",
+      "kit": "[[\"msg_ca\",null,\"2026-11-02T09:00:00.000Z\",100,12,0,0,0]]",
+      "difference": "SD keeps the first line's model \"\" and posts it. The kit reads a model only when it is a non-empty string, so its record has no model. Harbour's intake stores \"\" as a string, so the two differ on the wire."
+    },
+    {
+      "area": "fold",
+      "case": "corner: a first line with timestamp \"\"",
+      "item": {
+        "lines": [
+          {
+            "type": "assistant",
+            "timestamp": "",
+            "message": {
+              "id": "msg_cb",
+              "model": "claude-sonnet-5",
+              "role": "assistant",
+              "usage": {
+                "input_tokens": 100,
+                "output_tokens": 10,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0
+              }
+            }
+          },
+          {
+            "type": "assistant",
+            "timestamp": "2026-11-02T09:00:01.000Z",
+            "message": {
+              "id": "msg_cb",
+              "model": "claude-sonnet-5",
+              "role": "assistant",
+              "usage": {
+                "input_tokens": 100,
+                "output_tokens": 12,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0
+              }
+            }
+          }
+        ]
+      },
+      "sd": "[[\"msg_cb\",\"claude-sonnet-5\",\"\",100,12,0,0,0]]",
+      "kit": "[[\"msg_cb\",\"claude-sonnet-5\",null,100,12,0,0,0]]",
+      "difference": "SD copies the first line's timestamp \"\" raw and posts it. The kit takes at only when it is non-empty, so its record has none. Harbour's intake rejects an empty at (\"at is not a valid time\"), so the two differ on the wire. Named as a leftover for Simple Dispatcher, not fixed here."
     }
   ]
 }

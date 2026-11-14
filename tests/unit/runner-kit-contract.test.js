@@ -11,6 +11,9 @@
  * (test/runner-contract.test.js there).
  *
  * The table is a test fixture: the kit never loads it at runtime.
+ *
+ * LIN-4475: the `sd` cells of the session, report and fold rows were verified against Simple Dispatcher's own
+ * contract test at SD commit f98e44256a21ea03b02f77f97b9771c6fc42010a (branch feat/lin-4476-session-fold-drivers).
  */
 process.env.NODE_ENV = 'test';
 
@@ -25,6 +28,9 @@ import {
   haltAction,
   haltSweep,
   preConfirmDecision,
+  resolveFollowUp,
+  transcriptRequestRecords,
+  TRANSCRIPT_TOKEN_FIELDS,
   resolveRepo,
   capFeedbackMessage,
   runCommand,
@@ -33,6 +39,7 @@ import {
   SESSION_TARGETS
 } from '../../lib/runner-kit/runner.mjs';
 import { prUrlOfFeedback } from '../../lib/dispatch-wake.js';
+import { LIN4197_CASES } from '../fixtures/cost-replay/corpus.js';
 import http from 'node:http';
 import { credentialStore, exchangeBootstrap, startBroker, BROKER_HOST } from '../../lib/runner-kit/broker.mjs';
 import { SESSION_TARGETS as HARBOUR_SESSION_TARGETS } from '../../lib/dispatch-targets.js';
@@ -45,7 +52,7 @@ const TABLE = JSON.parse(fs.readFileSync(CONTRACT_PATH, 'utf8'));
 // LIN-4384: the sha256 of contract.json's own bytes. simple-dispatcher pins the same value
 // (FIXTURE_SHA256 beside LV_COMMIT in test/runner-contract.test.js), so an edit here that is not
 // re-copied there would go unnoticed on this side without this tripwire.
-const CONTRACT_SHA256 = '602ab014062857bfba3e9aa543088472c3ba5dbc7cb0673da909e67ed727eb40';
+const CONTRACT_SHA256 = '871ca615f627a02611957489f3abc83498f1dca64af07259800a174148ba23a2';
 
 const OWNER = 'acct-owner-1111';
 const NOW = Date.parse('2026-10-18T12:00:00.000Z');
@@ -54,7 +61,22 @@ const GONE = '99999999-9999-4999-8999-999999999999';
 const ITEM_ID = '55555555-5555-4555-8555-555555555555';
 const ROOT_DIR = '/work/root';
 
+// The take-driven tests and the halt-text rows keep this running ledger (setup() writes it too).
 const ledger = { items: { [LIVE]: { itemId: LIVE, agentId: 'agent-live', rootItemId: LIVE, state: 'running' } } };
+
+// LIN-4475: the contract's session vocabulary, and the kit ledger state each value stands for
+// (`none` has no row). The retired `live` is not a key, so a row that still says it throws.
+const SESSION_LEDGER_STATE = { running: 'running', finished: 'done', stopped: 'stopped', none: null };
+
+/** The ledger a follow-up row is judged against: the row's own session, and nothing else. */
+function sessionLedger(session) {
+  if (!Object.prototype.hasOwnProperty.call(SESSION_LEDGER_STATE, session)) {
+    throw new Error(`unknown session value "${session}" in contract.json: the vocabulary is ${Object.keys(SESSION_LEDGER_STATE).join(' | ')}`);
+  }
+  const state = SESSION_LEDGER_STATE[session];
+  if (!state) return { items: {} };
+  return { items: { [LIVE]: { itemId: LIVE, agentId: `agent-${session}`, rootItemId: LIVE, state } } };
+}
 
 function itemFor(d) {
   const it = {
@@ -64,12 +86,15 @@ function itemFor(d) {
   if (d.target !== undefined) it.target = d.target;
   if (d.repo !== undefined) it.repo = d.repo;
   if (d.route === 'abort') Object.assign(it, { abort: true, abortTo: LIVE, prompt: null });
-  if (d.route === 'follow-up') it.followUpTo = d.session === 'live' ? LIVE : GONE;
+  if (d.route === 'follow-up') {
+    sessionLedger(d.session); // throws on `live` and on any value outside the vocabulary
+    it.followUpTo = d.session === 'none' ? GONE : LIVE;
+  }
   return it;
 }
 
-const ctxFor = (halt) => ({
-  ownerAccountId: OWNER, halt, ledger, wakeRoot: null, otherConsumerLastSeenAt: null, now: NOW,
+const ctxFor = (halt, useLedger = ledger) => ({
+  ownerAccountId: OWNER, halt, ledger: useLedger, wakeRoot: null, otherConsumerLastSeenAt: null, now: NOW,
   tokenExpiresAt: new Date(NOW + 20 * 3600_000).toISOString()
 });
 
@@ -77,9 +102,12 @@ const ctxFor = (halt) => ({
 // stays queued; `failed` is taken and closed with [failed]; `claimed` is run.
 function kitOutcome(row) {
   const it = itemFor(row.item);
-  const pre = preConfirmDecision(it, ctxFor(row.halt));
+  // LIN-4475: a follow-up is judged against its own session's ledger; every other row keeps the running ledger.
+  const useLedger = row.item.route === 'follow-up' ? sessionLedger(row.item.session) : ledger;
+  const pre = preConfirmDecision(it, ctxFor(row.halt, useLedger));
   if (pre.decision !== 'take') return 'left';
-  if (row.item.route === 'follow-up' && row.item.session === 'none') return 'failed';
+  // A follow-up the kit cannot continue is closed with [failed] (resolveFollowUp's reject), not claimed.
+  if (row.item.route === 'follow-up') return resolveFollowUp(it, useLedger).action === 'reject' ? 'failed' : 'claimed';
   return 'claimed';
 }
 
@@ -270,9 +298,32 @@ function kitFor(row) {
       return kitExchangeOutcome(row);
     case 'forward':
       return kitForwardOutcome(row);
+    case 'fold':
+      return kitFoldOutcome(row);
     default:
       throw new Error(`unknown area ${row.area}`);
   }
+}
+
+// LIN-4475 (W8): the transcript fold, as one deterministic text per side. The records come in first-seen
+// order and each renders as [requestId, model, at, the five token fields]; an absent value renders null,
+// and "" stays "". Harness, agent, effort and the skipped counts are not rendered (the area note says so).
+const FOLD_FIELDS = ['requestId', 'model', 'at', ...TRANSCRIPT_TOKEN_FIELDS];
+const renderFold = (records) => JSON.stringify(records.map((r) => FOLD_FIELDS.map((f) => (r[f] === undefined ? null : r[f]))));
+
+// A corpus row names `<case>/<phase>` and the file's sha256. The file is read from the one existing
+// copy (tests/fixtures/runner-kit/transcript-corpus, no second set), and its bytes are checked before
+// they fold. The check is the pin: a changed byte fails here, not silently.
+const CORPUS_DIR = path.join(ROOT, 'tests', 'fixtures', 'runner-kit', 'transcript-corpus');
+function corpusLines(id, sha256, dir = CORPUS_DIR) {
+  const bytes = fs.readFileSync(path.join(dir, `${id.replace('/', '--')}.jsonl`));
+  const got = crypto.createHash('sha256').update(bytes).digest('hex');
+  if (got !== sha256) throw new Error(`${id}: the corpus file's sha256 is ${got}, the row pins ${sha256}`);
+  return bytes.toString('utf8').split('\n');
+}
+function kitFoldOutcome(row) {
+  const lines = row.item.lines ? row.item.lines.map((o) => JSON.stringify(o)) : corpusLines(row.item.id, row.item.sha256);
+  return renderFold(transcriptRequestRecords(lines, { agent: 'a1b2c3d4' }).records);
 }
 
 // LIN-4384: what each area's rows carry besides `area`, `case`, `item` and `sd`. `inputs` are
@@ -296,7 +347,9 @@ const AREA_SHAPES = {
   // simple-dispatcher's harbour-token-mcp-server.js each keep their own constants (the kit loads
   // no fixture at runtime) and are pinned against these rows.
   exchange: { inputs: [], columns: ['kit'] },
-  forward: { inputs: [], columns: ['kit'] }
+  forward: { inputs: [], columns: ['kit'] },
+  // LIN-4475 (W8): the transcript fold. Inputs none; the kit's rendered records are the one column.
+  fold: { inputs: [], columns: ['kit'] }
 };
 const COLUMNS = ['kit', 'harbour'];
 
@@ -352,15 +405,35 @@ describe('contract table shape', () => {
     // LIN-4378: a final exchange 429 reaches whoever asked for the exchange: the runner at the kit's
     // `start`, the agent's first request in SD.
     assert.ok(TABLE.rows.some((r) => r.area === 'forward' && /refused 429/.test(r.case) && r.kit !== r.sd));
+    // LIN-4475: an http-scheme DONE: line is read by SD as https and by Harbour not at all.
+    assert.ok(TABLE.rows.some((r) => r.area === 'report' && /http URL and a #x fragment/.test(r.case) && r.harbour !== r.sd));
+    // LIN-4475 (W8): the two fold corners are the declared differences: a first line whose model or timestamp is "".
+    assert.ok(TABLE.rows.some((r) => r.area === 'fold' && /first line with model ""/.test(r.case) && r.kit !== r.sd));
+    assert.ok(TABLE.rows.some((r) => r.area === 'fold' && /first line with timestamp ""/.test(r.case) && r.kit !== r.sd));
   });
 
   // LIN-4384: the cases both repos must read the same way, each in both areas.
-  test('report has the seven reported-DONE: cases, and sentinel the same messages', () => {
+  // LIN-4475 replaces the exact count with a check by name: the seven stay, each with harbour === sd
+  // and a sentinel twin on the same message. New report rows may differ from sd only with a difference
+  // (checkRowShape), so the count is no longer the census.
+  test('report keeps the seven LIN-4384 cases by name: each has harbour === sd and a sentinel twin', () => {
+    const SEVEN = [
+      'one DONE: line naming one PR',
+      'two PRs on one DONE: line: the first PR named on it',
+      'an indented DONE: line still counts',
+      'two DONE: lines: the PR on the newest line',
+      'a DONE: inside a DECISION block, then a real DONE: line: the real (newest) line\'s PR',
+      'a DONE: only inside a DECISION block: its PR, not one mentioned before it',
+      'the session\'s own PR on its DONE: line beats a PR it mentioned more often (LIN-4375)'
+    ];
     const report = TABLE.rows.filter((r) => r.area === 'report');
     const sentinel = TABLE.rows.filter((r) => r.area === 'sentinel');
-    assert.equal(report.length, 7);
-    assert.deepEqual(sentinel.map((r) => r.item.message), report.map((r) => r.item.message));
-    assert.ok(report.every((r) => r.harbour === r.sd), 'the PR readers agree on every report row');
+    for (const name of SEVEN) {
+      const row = report.find((r) => r.case === name);
+      assert.ok(row, `no report row named "${name}"`);
+      assert.equal(row.harbour, row.sd, `${name}: the PR readers agree`);
+      assert.ok(sentinel.some((s) => s.item.message === row.item.message), `${name}: no sentinel twin on the same message`);
+    }
   });
 
   // LIN-3650: adding a mode to HALT_MODES fails here until the table says what each side does with it.
@@ -436,6 +509,91 @@ describe('Harbour follows the contract table (LIN-4384)', () => {
   }
 });
 
+// LIN-4475 witnesses, written before the change. W-1: each session value has an unhalted follow-up
+// row on the halt lifecycle (the `repo` row is a repo-gate fixture, not a lifecycle outcome, so it
+// does not count). W-2: the driver refuses the retired `live` and any value outside the vocabulary.
+// W-3: the two new report rows (http scheme; a DONE: line after U+2028) are present.
+describe('LIN-4475 witnesses (session vocabulary and report rows)', () => {
+  const reportRowLike = (re) => TABLE.rows.find((r) => r.area === 'report' && re.test(r.case));
+
+  // The census runs over the driver's own vocabulary (SESSION_LEDGER_STATE), so a value the table
+  // never names cannot pass by being absent from the rows. The second test is the reverse: a value a
+  // follow-up row names must be in the vocabulary.
+  test('W-1: every session value has an unhalted follow-up row on the halt lifecycle', () => {
+    for (const session of Object.keys(SESSION_LEDGER_STATE)) {
+      assert.ok(
+        TABLE.rows.some((r) => r.area === 'halt' && r.item?.route === 'follow-up' && r.item.session === session && r.halt === null),
+        `no unhalted halt follow-up row for session "${session}"`
+      );
+    }
+  });
+
+  test('W-1: every session a follow-up row names is in the vocabulary', () => {
+    for (const r of TABLE.rows.filter((x) => x.item?.route === 'follow-up')) {
+      assert.ok(Object.hasOwn(SESSION_LEDGER_STATE, r.item.session), `${r.area}: ${r.case} names "${r.item.session}"`);
+    }
+  });
+
+  test('W-2: the driver throws on the retired `live` and on any value outside the vocabulary', () => {
+    for (const session of ['live', 'lost', 'bogus']) {
+      assert.throws(() => kitFor({ area: 'halt', case: 'w2', halt: null, item: { route: 'follow-up', session } }), /session/, session);
+    }
+  });
+
+  test('W-3: an http-scheme DONE: line has a row: SD canonical https, Harbour none, with a difference', () => {
+    const row = reportRowLike(/http URL and a #x fragment/);
+    assert.ok(row, 'no report row for the http-scheme case');
+    assert.equal(row.sd, 'https://github.com/JKershaw/LinearViewer/pull/101');
+    assert.equal(row.harbour, null);
+    assert.ok(typeof row.difference === 'string' && row.difference.length > 0);
+  });
+
+  test('W-3: a DONE: line after U+2028 has a row where both readers give the PR', () => {
+    const row = reportRowLike(/after U\+2028/);
+    assert.ok(row, 'no report row for the U+2028 case');
+    assert.equal(row.sd, 'https://github.com/JKershaw/LinearViewer/pull/101');
+    assert.equal(row.harbour, row.sd);
+  });
+});
+
+// LIN-4475 (W-5): the corpus rows pin the bytes they fold. A one-byte change in a temp copy must fail the
+// row's sha256 check; the repository's own copy is never written.
+describe('LIN-4475 witness W-5: a corpus row pins its bytes', () => {
+  test('a one-byte change to a corpus file in a temp copy fails its sha256 check', () => {
+    const row = TABLE.rows.find((r) => r.area === 'fold' && r.case === 'corpus mixed-model/final');
+    assert.ok(row, 'no corpus row for mixed-model/final');
+    const dir = fs.mkdtempSync(path.join(fs.existsSync('/tmp') ? '/tmp' : os.tmpdir(), 'rkc-tamper-'));
+    try {
+      const original = fs.readFileSync(path.join(CORPUS_DIR, 'mixed-model--final.jsonl'));
+      const tampered = Buffer.from(original);
+      const at = tampered.findIndex((b) => b >= 0x31 && b <= 0x38); // a digit 1-8: XOR 1 keeps it a digit
+      tampered[at] ^= 0x01;
+      fs.writeFileSync(path.join(dir, 'mixed-model--final.jsonl'), tampered);
+      assert.equal(tampered.length, original.length);
+      assert.equal([...tampered].filter((b, i) => b !== original[i]).length, 1, 'exactly one byte differs');
+      assert.throws(() => corpusLines(row.item.id, row.item.sha256, dir), /sha256/, 'the tampered copy must not fold');
+      // The same call on the untouched file passes, so the throw above is the byte change alone.
+      assert.ok(corpusLines(row.item.id, row.item.sha256).length > 1);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+// The fold corpus rows' `sd` records are the same per-request records `LIN4197_CASES[...].records` pins
+// (tests/fixtures/cost-replay/corpus.js, checked by lin-4202-runner-kit-records.test.js). This ties the two
+// copies, so a change to the fold rule cannot be made in one and not the other.
+describe('LIN-4475: the fold corpus rows equal the LIN-4197 corpus records', () => {
+  test('each corpus row\'s sd is renderFold of LIN4197_CASES[id].records', () => {
+    const rows = TABLE.rows.filter((r) => r.area === 'fold' && r.item.id);
+    assert.ok(rows.length > 0, 'no fold corpus rows');
+    for (const row of rows) {
+      assert.ok(Object.hasOwn(LIN4197_CASES, row.item.id), `${row.case}: no LIN4197_CASES entry for ${row.item.id}`);
+      assert.equal(row.sd, renderFold(LIN4197_CASES[row.item.id].records), row.case);
+    }
+  });
+});
+
 describe('targets', () => {
   test('the kit\'s target list is Harbour\'s SESSION_TARGETS (copied in: the kit is self-contained)', () => {
     assert.deepEqual([...SESSION_TARGETS], [...HARBOUR_SESSION_TARGETS]);
@@ -487,8 +645,10 @@ describe('repo is checked on the fresh route only (take)', () => {
     assert.ok(!posts.some((m) => /Unknown repo/.test(m)));
   });
 
-  test('a follow-up carrying an unknown repo is continued, not refused', async () => {
-    const taken = { ...itemFor({ route: 'follow-up', session: 'live' }), repo: 'no-such-repo-dir' };
+  // LIN-4475: this take-driven test keeps setup()'s running ledger (its own session is `running`), so the
+  // ledger it reads is the one setup() writes; a `finished` row would need a done ledger setup() does not write.
+  test('a follow-up carrying an unknown repo is continued (its session is running), not refused', async () => {
+    const taken = { ...itemFor({ route: 'follow-up', session: 'running' }), repo: 'no-such-repo-dir' };
     const { out, posts } = await run(taken, ROOT);
     assert.equal(out.handoff?.mode, 'continue', JSON.stringify(out));
     assert.ok(!posts.some((m) => /Unknown repo/.test(m)));

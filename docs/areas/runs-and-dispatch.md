@@ -74,26 +74,20 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 
 ## Waiting
 
-- `lib/dispatch-wake.js`: `reportedPrUrlOf` and SD's `sessionPrs` pick a PR by one order, linked
-  only by a comment; changing one moves a PR link. (Drift & Coherence Review, 10 Nov;
-  `docs/reviews/drift-coherence-review-2026-11-10.md`.)
 - `lib/dispatch-leftover-hook.js`: a death between `claimHeldWake` and the enqueue, or a failed
   release write, leaves the wake held. No sweep: a lease sees no re-report, a sweep scans
   history, and clearing stamps reopens LIN-4375's double queue. (LIN-4377.)
 - `lib/dispatch-store.js`: `addFeedback` takes one `wakeHook`; a second held-wake feature
   first needs composable hooks. (Operator, LIN-4377.)
-- `lib/runner-kit/contract.json`: the row-shape rule is written twice (`checkRowShape`;
-  SD's `columnProblems`); `CONTRACT_SHA256` pins the bytes, not the rule. (Operator, LIN-4377.)
-- `lib/runner-kit/contract.json`: no row pins a follow-up to a finished, unhalted session
-  (rows cover pause and stop), though the leftover step resumes its build that way
-  (`lib/dispatch-leftover.js`). (Seams & Tangles, 10 Nov.;
-  `docs/reviews/seams-tangles-review-2026-11-10-run11.md`.)
-- `lib/session-summary.js`: do stored run paragraphs keep pre-cutover figures? (Survey
-  tally: LIN-4201.)
+- `lib/run-paragraph-hook.js`: stored run paragraphs are retained as written, and the cutover to request records
+  does not regenerate them. The gate key (`inputHash`, `gateFacts` in `lib/run-paragraph.js`) covers the title and
+  the ended loops only, so cost, usage and tier cannot move it: a stored `final` paragraph stays a cache hit when only
+  those change, and a newly ended loop still regenerates it. Nothing is labelled pre-cutover, because a stored
+  paragraph carries no figure: the hook writes its text, the model that wrote it, the gate key and `final`, and the
+  prompt forbids a price or a model id. The witness is `tests/unit/run-paragraph-hook.test.js` (the W-6 cases,
+  LIN-4475). (Survey tally: LIN-4201; answered in LIN-4475.)
 - `lib/wake-shadow.js`: one wake policy, from the LIN-3257 classifier this shadow records.
   (Survey tally: LIN-3257.)
-- `lib/runner-kit/runner.mjs`: the per-message transcript fold is here and in SD; one shared
-  fold would turn a transcript into requests. (Survey tally: LIN-4203, LIN-4195.)
 - `lib/run-live-wait.js`: a read, not a claim: two different-kind calls racing on
   one ticket both pass; claim compare-and-set, like `claimHeldWake` (LIN-4392). (Moved from the LLM & prompts note by LIN-4459.)
 - `lib/run-live-wait.js`: the run-outcome words have two homes. `QUEUED`/`RUNNING` live here (they moved
@@ -172,3 +166,17 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   that list by hand. One display word per kind changes visible labels on the run page and settings
   (`lib/render-session.js`, `lib/render-settings.js`), so it is a product call. (LIN-4469 blind
   read.)
+- `lib/run-ledger.js`: Harbour's `PR_URL_RE` in this file, which feeds every run's PR attribution (`prUrlsIn` and
+  `extractPrUrls`), reads an `https://github.com/<owner>/<repo>/pull/<n>` URL only, while simple-dispatcher's
+  `sessionPrs`, which reads the session's `DONE:` line in the other repository, also reads an `http://` one and returns
+  the canonical https URL. So a run whose `DONE:` line carries an http PR link reports its PR in SD and none in
+  Harbour. Harbour already has a second reader that disagrees with `PR_URL_RE` about http: `isPullRequestUrl` in
+  `lib/milestone-funnel.js` accepts `http://` (pinned in `tests/unit/milestone-funnel.test.js`) and feeds the "PR opened"
+  step of the per-person milestone funnel, reading the `url` of a run's `[evidence]` feedback entries, not its `DONE:`
+  line. The runner-kit contract (`lib/runner-kit/contract.json`, area `report`, the case "a DONE: line with an http URL
+  and a #x fragment") records the SD/Harbour split as a declared difference and decides neither side. Which reader is
+  right, and whether Harbour's PR reading should widen to http, is a design call: widening `PR_URL_RE` changes which PRs
+  a task owns, and narrowing SD changes the other repository. The divergence was found by reading the contract row and
+  the readers, not from a recorded run; it was not checked against recorded runs, so how often an http PR link occurs
+  is not known. When it is decided, change the reader and the row's cells together, then re-copy the contract into SD.
+  (LIN-4475 blind read.)
