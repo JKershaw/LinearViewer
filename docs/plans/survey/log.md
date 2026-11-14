@@ -4027,3 +4027,7 @@ John's direction:
 - **Being in the loop is minor:** "If I need to click ok a few times, but all the work lands clean and right, that's a great place to be in."
 - **Tangles:** "if everything is in its right place, no tangles. And, likely, much much simpler. Nothing fights its shape."
 - **My correction:** the readiness reading is whether work lands clean and right, not how often John clicks. My survey role is scaffolding too; its removal point is when Harbour takes ordinary work and finishes it without me in the middle.
+- **~11:50 UTC: John:** "Yes to the essay. And you can review. I'll read when it's published in the library."
+  - The A17 essay (A17b) becomes reasoned with Fable, written by Opus. A20 is agreed as read back, my additions included.
+  - Both get my reviewer before merge; John reads them in the Library.
+  - Text in `asks.md`. A17b is filed once LIN-4480 merges; A20 once all three papers merge.

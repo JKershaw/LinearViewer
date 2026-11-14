@@ -396,3 +396,37 @@ Follow wherever the record leads, and draw on what is known outside Harbour too.
 **What John wants.** A paper to the papers standard, grounded in the record and written by Opus, for a later discussion and the notes work that follows it. John skips reading the paper; an independent reviewer sent by the driving agent reads it before merge, and what it finds is fixed first.
 
 **Questions:** settle research questions yourself.
+
+### A17b. Essay drawn from the A17 paper (14 Nov)
+
+**Agreed with John on 13 Nov** (the essay is a second ticket after the paper merges). **Setup changed on 14 Nov** ("Yes to the essay"): reasoned and designed with Fable, written by Opus, in place of Fable alone. File it once LIN-4480 has merged. Reviewer subagent before merge; John reads it once it's published in the Library.
+
+**Repository:** JKershaw/LinearViewer (Harbour).
+
+**What John wants** (13 Nov): "a visual essay drawn from the paper, interesting and easy to read", from the merged paper on parallel lanes (LIN-4480). Reasoned and designed with Fable, written by Opus.
+
+**Questions:** settle research and writing questions yourself.
+
+### A20. Essay: how do the kinds of information around a codebase relate, move, and need to be held? (14 Nov)
+
+**Agreed with John on 14 Nov** (read back; "Yes to the essay. And you can review. I'll read when it's published in the library."). File it once LIN-4478, LIN-4479 and LIN-4480 have merged. Reviewer subagent before merge.
+
+**Repository:** JKershaw/LinearViewer (Harbour).
+
+**What this is for.** John, 14 Nov:
+- "code, comments, docs, notes, papers, tasks, logs... All different kinds and shapes of information across many dimensions and perspectives. Currently, somewhat limited in kind and harness."
+- "At a high level, how do these (and others) relate, move, and need to be held in a shape. Where is there overlap (eg tasks, comments, code, in a venn diagram, would show rich overlapping concepts)."
+- "Perhaps if these were correctly established and used, a lot of issues evaporate. Some may simply not be necessary."
+- "if everything is in its right place, no tangles. And, likely, much much simpler. Nothing fights its shape."
+
+**The question.** Fairly open-ended: how do these kinds of information, and others, relate, move, and need to be held? Where do they overlap, and what might turn out to be unnecessary?
+
+**Who makes it.** Reasoned and designed with Fable, written by Opus.
+
+**Notes.**
+- It needn't land on a scheme; exploration, tensions and open questions are welcome.
+- Draw widely, inside and outside Harbour.
+- The Harbour papers, including LIN-4478, LIN-4479 and LIN-4480, are there as perspectives, not the frame.
+- The form is open.
+
+**Questions:** settle research and writing questions yourself.
