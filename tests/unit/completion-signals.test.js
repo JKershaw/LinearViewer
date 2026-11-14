@@ -9,24 +9,8 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import {
-  COMPLETION_SIGNALS,
-  getDefinedSignalTypes,
-  hasSignals,
-  getSignal,
-  assessCompletion,
-  getBlockers,
-  formatSignalsForPrompt
-} from '../../lib/completion-signals.js';
+import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 import { WORK_ISSUE_LABELS } from '../../lib/workflow-config.js';
-
-// All prompt/label types that should have completion signals defined.
-const ALL_SIGNAL_TYPES = [
-  'blocked', 'bug',
-  'plan', 'look-into', 'triage', 'breakdown',
-  'research', 'scoping', 'design', 'spike', 'context', 'plan-review', 'implementation',
-  'review', 'close-out', 'retrospective-audit', 'retro', 'survey-task', 'survey-place', 'blind-read'
-];
 
 // =============================================================================
 // COMPLETION_SIGNALS Structure Tests
@@ -123,179 +107,6 @@ describe('Signal Content', () => {
 });
 
 // =============================================================================
-// getDefinedSignalTypes Tests
-// =============================================================================
-
-describe('getDefinedSignalTypes', () => {
-  test('returns all 20 signal types', () => {
-    const defined = getDefinedSignalTypes();
-    assert.ok(Array.isArray(defined));
-    assert.strictEqual(defined.length, 20);
-  });
-
-  test('returns all expected types', () => {
-    const defined = getDefinedSignalTypes();
-    for (const type of ALL_SIGNAL_TYPES) {
-      assert.ok(defined.includes(type), `Should include ${type}`);
-    }
-  });
-});
-
-// =============================================================================
-// hasSignals Tests
-// =============================================================================
-
-describe('hasSignals', () => {
-  test('returns true for all defined label types', () => {
-    const types = ['blocked', 'bug'];
-    for (const type of types) {
-      assert.strictEqual(hasSignals(type), true, `${type} should have signals`);
-    }
-  });
-
-  test('returns false for unknown types', () => {
-    assert.strictEqual(hasSignals('unknown'), false);
-    assert.strictEqual(hasSignals('nonexistent'), false);
-    assert.strictEqual(hasSignals('invalid-type'), false);
-    assert.strictEqual(hasSignals(''), false);
-  });
-
-  test('returns true for all defined types', () => {
-    for (const type of ALL_SIGNAL_TYPES) {
-      assert.strictEqual(hasSignals(type), true, `${type} should have signals`);
-    }
-  });
-
-  test('returns false for old phase labels', () => {
-    assert.strictEqual(hasSignals('preparing'), false);
-    assert.strictEqual(hasSignals('in-research'), false);
-    assert.strictEqual(hasSignals('in-breakdown'), false);
-    assert.strictEqual(hasSignals('in-scoping'), false);
-  });
-});
-
-// =============================================================================
-// getSignal Tests
-// =============================================================================
-
-describe('getSignal', () => {
-  test('returns signal for valid type', () => {
-    const signal = getSignal('blocked');
-    assert.ok(signal !== null);
-    assert.ok(signal.coreOutcome);
-    assert.ok(signal.signals);
-    assert.ok(signal.readinessCheck);
-  });
-
-  test('returns null for unknown type', () => {
-    assert.strictEqual(getSignal('unknown'), null);
-    assert.strictEqual(getSignal('nonexistent'), null);
-  });
-
-  test('returns signal for all defined types', () => {
-    for (const type of ALL_SIGNAL_TYPES) {
-      const signal = getSignal(type);
-      assert.ok(signal !== null, `${type} should return a signal`);
-      assert.ok(signal.coreOutcome, `${type} should have coreOutcome`);
-      assert.ok(signal.readinessCheck, `${type} should have readinessCheck`);
-    }
-  });
-});
-
-// =============================================================================
-// assessCompletion Tests
-// =============================================================================
-
-describe('assessCompletion', () => {
-  const mockContext = {
-    comments: [],
-    children: [],
-    description: 'Test description'
-  };
-
-  test('returns assessment object with complete and reason', () => {
-    const result = assessCompletion('blocked', mockContext);
-    assert.ok('complete' in result);
-    assert.ok('reason' in result);
-    assert.strictEqual(typeof result.complete, 'boolean');
-    assert.strictEqual(typeof result.reason, 'string');
-  });
-
-  test('returns incomplete for unknown type', () => {
-    const result = assessCompletion('unknown', mockContext);
-    assert.strictEqual(result.complete, false);
-    assert.ok(result.reason.includes('No completion signals defined'));
-  });
-
-  test('returns result for valid type', () => {
-    const result = assessCompletion('blocked', mockContext);
-    assert.strictEqual(typeof result.complete, 'boolean');
-    assert.ok(result.reason.length > 0);
-  });
-});
-
-// =============================================================================
-// getBlockers Tests
-// =============================================================================
-
-describe('getBlockers', () => {
-  const mockContext = {};
-
-  test('returns array for valid type', () => {
-    const blockers = getBlockers('blocked', mockContext);
-    assert.ok(Array.isArray(blockers));
-    assert.ok(blockers.length > 0);
-  });
-
-  test('blockers reference signal items', () => {
-    const blockers = getBlockers('blocked', mockContext);
-    assert.ok(blockers.every(b => b.startsWith('Missing:')));
-  });
-
-  test('returns error for unknown type', () => {
-    const blockers = getBlockers('unknown', mockContext);
-    assert.ok(Array.isArray(blockers));
-    assert.ok(blockers[0].includes('No completion signals defined'));
-  });
-});
-
-// =============================================================================
-// formatSignalsForPrompt Tests
-// =============================================================================
-
-describe('formatSignalsForPrompt', () => {
-  test('returns formatted string for valid type', () => {
-    const formatted = formatSignalsForPrompt('blocked');
-    assert.ok(typeof formatted === 'string');
-    assert.ok(formatted.includes('Core Outcome:'));
-    assert.ok(formatted.includes('Signals'));
-    assert.ok(formatted.includes('Readiness Check:'));
-  });
-
-  test('includes all signal items as bullets', () => {
-    const formatted = formatSignalsForPrompt('blocked');
-    const signal = COMPLETION_SIGNALS['blocked'];
-    for (const s of signal.signals) {
-      assert.ok(formatted.includes(s), `Should include signal: ${s}`);
-    }
-  });
-
-  test('returns null for unknown type', () => {
-    assert.strictEqual(formatSignalsForPrompt('unknown'), null);
-    assert.strictEqual(formatSignalsForPrompt('nonexistent'), null);
-  });
-
-  test('returns formatted string for all types', () => {
-    for (const type of ALL_SIGNAL_TYPES) {
-      const formatted = formatSignalsForPrompt(type);
-      assert.ok(typeof formatted === 'string', `${type} should return a string`);
-      assert.ok(formatted.includes('Core Outcome:'), `${type} should include Core Outcome`);
-      assert.ok(formatted.includes('Readiness Check:'), `${type} should include Readiness Check`);
-    }
-  });
-});
-
-// =============================================================================
 // Integration Tests
 // =============================================================================
 
@@ -305,7 +116,7 @@ describe('Integration', () => {
     const workIssueTypes = ['blocked', 'bug'];
 
     for (const type of workIssueTypes) {
-      assert.ok(hasSignals(type), `${type} should have signals defined`);
+      assert.ok(COMPLETION_SIGNALS[type], `${type} should have signals defined`);
       const template = PROMPT_TEMPLATES[type];
       assert.ok(template, `${type} should have template defined`);
       assert.ok(

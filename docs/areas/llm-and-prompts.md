@@ -70,6 +70,7 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   ceilings and the change log; its byte counts are the real-context witness the budget's caps are not (LIN-4469).
 - The blind-read scan in `tests/unit/stage-kind-tables.test.js` reads `git ls-files`: a new file is not
   scanned until it is committed, so a local pass before the first commit proves nothing about it (LIN-4467).
+- `lib/prompts/area-registry-path.js` imports nothing (`tests/unit/area-map-placement.test.js`); leaves import it (LIN-4470).
 
 ## Waiting
 
@@ -88,9 +89,9 @@ kept are counted apart in LIN-4470's PR and measurement (`docs/areas/README.md`:
   it as the next move for this file. Owner: this area, which needs a ticket to take it. (Area reads CG/CH.; `canReason`
   left this entry in LIN-4470: it had test callers only.)
 - `lib/periodicals.js`: `docs/areas/` is spelled in 19 lines across 11 code files (`lib/`, `routes/`, `public/`,
-  `server.js`, `scripts/`), recounted at this base by `grep`. Two leaves now spell the directory only once each:
-  `NOTES_DIR` and `REGISTRY_FILE` (`lib/prompts/area-note-format.js`), and `REGISTRY_PATH` derives from them
-  (`lib/prompts/area-registry-path.js`, LIN-4470). The prose spellings remain, mostly prompt text that names the registry
+  `server.js`, `scripts/`), recounted at this base by `grep`. The leaves spell the directory and the registry's file
+  name once each: `NOTES_DIR` and `REGISTRY_FILE` in `lib/prompts/area-registry-path.js`, which derives `REGISTRY_PATH`
+  from them and which `lib/prompts/area-note-format.js` re-exports (LIN-4470). The prose spellings remain, mostly prompt text that names the registry
   for a reader. Moving the notes means editing them. Blocker: a move of the notes directory itself, which no ticket asks
   for. (Drift & Coherence Review, 10 and 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
 - `lib/periodicals.js`: two sizes of move: a byte ceiling for Periodical prompts (+18.8% in the window, 185,952 to

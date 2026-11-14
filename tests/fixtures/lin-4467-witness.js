@@ -106,7 +106,7 @@ export function shown(value) {
 /** The shown text as an array of lines, so each line of a table is one line of the fixture's diff (LIN-4470). */
 const lines = (value) => shown(value).split('\n');
 
-/** Captures every hash the witness pins. Async-free and network-free. */
+/** Captures what the witness pins: render hashes, table text, and hashes of the labels, contracts and step words. Async-free and network-free. */
 export async function captureWitness() {
   const { PROMPT_TEMPLATES, generatePrompt } = await import('../../lib/prompt-templates.js');
   const { STAGE_LEADS } = await import('../../lib/prompt-template-defs.js');

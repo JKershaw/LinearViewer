@@ -1,8 +1,9 @@
 /**
  * LIN-4470 (piece 6 of LIN-4448): the area notes' two leaves each have one spelling.
  *
- * 1. The registry's path is derived from the notes directory and the registry's file name, which area-note-format.js
- *    spells once (REGISTRY_PATH used to be a second copy of `docs/areas/areas.json`; NOT_NOTES a third).
+ * 1. The registry's path is derived from the notes directory and the registry's file name, which area-registry-path.js
+ *    spells once and area-note-format.js re-exports (REGISTRY_PATH used to be a second copy of `docs/areas/areas.json`;
+ *    NOT_NOTES a third).
  * 2. The cited-path rule is one predicate (isCitedPath, citedPaths in lib/prompts/area-note-format.js). The notes guard
  *    and the retirement-line checker read it with different extension lists, and that difference is the argument, not
  *    two rules. The table below is the behaviour each caller had before this change, captured at HEAD, so the change is
