@@ -1,0 +1,2 @@
+survey cites a PR | landing: [] | lookFirstOff: "has a PR" | lookFirstStep: null
+survey cites no PR | landing: [] | lookFirstOff: null | lookFirstStep: {"step":"survey-place","why":"the look-first sequence: no size of the move is recorded and survey-task has been attempted, so survey-place is next; code sends each step once, whatever an earlier step said."}

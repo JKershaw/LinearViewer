@@ -70,3 +70,9 @@
   `lib/prompts/blind-read-words.js` is for the blind read), or the gate asking the provider for a comment tail
   without naming the feature, would remove the edge. The other side is LLM & prompts' `lib/periodicals.js`.
   (Seams & Tangles, 14 Nov.; `docs/reviews/seams-tangles-review-2026-11-14-run13.md`.)
+- `lib/providers/jira/as-asked-region.js`: for a block edited in Jira, the reader takes the first end paragraph after the
+  heading, matched as plain text whatever its marks. If the person's words hold a plain copy of the end sentence, the
+  words are cut short there. The Lesson that calls the looser reader safe rests on `descriptionRoundTrip` refusing such a
+  block at filing, which does not cover an edit made in Jira afterwards. Matching `splitAsAsked`'s end-line rule (marks
+  included), or taking the last end paragraph, would close it. (Drift & Coherence Review, 14 Nov.;
+  `docs/reviews/drift-coherence-review-2026-11-14.md`.)

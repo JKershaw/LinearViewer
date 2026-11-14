@@ -185,3 +185,13 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   LLM & prompts; `lib/run-closeout-state.js` and `lib/pipeline-churn.js` also import
   `lib/prompts/blind-read-words.js`. Waiting on a design choice: whether display labels belong on the stage
   record or in Runs. Not scheduled; no ticket takes it. (LIN-4448 blind read.)
+- `lib/run-closeout-state.js`: its header says the Done rule is bounded here, in one place, but `setDone` in
+  `closeOutDecision` has no stop-at term: the stop-at-PR bound is applied by the check route
+  (`routes/workspace-api-run-evidence.js`), so the route's JSON can carry `setDone: true` for a task nothing set Done
+  (no client reads it today). Inside the decision the person-acted rule is spelled twice: `doneWithoutHarbour` feeds
+  `followsPerson`, and `routesRead` writes its own variant inline. `followsPerson` and `waitsOn` have no production
+  reader; `blindReadStep` reads `routesRead` alone. A change to the rule in one expression leaves the published fact
+  disagreeing with the read routed. (Drift & Coherence Review, 14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)
+- `lib/dispatch-feedback-kinds.js`: its header says the runner prompt renders the kinds through the store's re-export and
+  that the store imports the table. The store does neither (its own comment says so) and `lib/prompts/runner-kickoff.js`
+  imports the leaf. A header fix. (Drift & Coherence Review, 14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)

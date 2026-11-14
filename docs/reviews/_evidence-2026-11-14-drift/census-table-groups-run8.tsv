@@ -1,0 +1,318 @@
+rank	id	detector	decision	areas/files/sites	status
+26	G0026	record	literal record repeated verbatim {Cache-Control="no-cache", Connection="keep-alive", Content-Type="text/event-stream"}	2/5/7	unchanged
+27	G0027	set+discrim	string set {'aborted', 'done', 'failed', 'skipped'} as array/Set/or-chain/table-keys/if-chain [LOOP_TERMINAL_MARKERS, MARKER_TO_AGENT_STATE, TERMINAL_MARKER_TO_STATUS]	2/8/10	unchanged
+29	G0029	cmp	repeated comparison status == 'queued'	2/5/6	unchanged
+33	G0033	cmp	repeated comparison marker == 'pending'	1/5/11	unchanged
+43	G0043	contract	text contract heading: what ci did not prove	2/5/8	unchanged
+44	G0044	clone	tiny rule copied as a helper clear(), 5 copies of 1-4 statements	2/5/5	unchanged
+48	G0048	cmp	repeated comparison disposition == 'resumable'	2/4/8	unchanged
+49	G0049	record	record assembled from the same sources {id=ID.id, title=ID.title, labels=LogicalExpression.map()}	2/3/3	unchanged
+53	G0053	contract	text contract marker: [db-indexes]	2/2/9	unchanged
+54	G0054	clone	near-duplicate function clear() (also: clearHistory), ~7 statements, fuzzy	1/4/4	unchanged
+55	G0055	cmp	repeated comparison state == 'record'	2/3/3	unchanged
+56	G0056	contract	text contract marker: [dispatch]	2/3/4	unchanged
+57	G0057	cmp	repeated comparison provider == 'github'	2/2/3	unchanged
+58	G0058	cmp	repeated comparison provider == 'github-projects'	2/2/2	unchanged
+60	G0060	record	literal record repeated verbatim {effort=null, harness=null, model=null}	2/2/2	unchanged
+61	G0061	const	named constant TOKEN_REFRESH_BUFFER_MS=300000	2/2/2	unchanged
+62	G0062	cmp	repeated comparison rawTeam == 'all'	2/2/2	unchanged
+63	G0063	set	string set {'LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'} as array [OAUTH_ENV_VARS, oauthEnvVars]	2/2/2	unchanged
+64	G0064	cmp	repeated comparison getAttribute() == 'true'	1/4/7	unchanged
+65	G0065	contract	text contract marker: [ci-wake-sweep]	2/2/5	unchanged
+66	G0066	contract	text contract marker: [liveness-alarm-sweep]	2/2/2	unchanged
+67	G0067	cmp	repeated comparison kind == 'more-of-parent'	2/2/3	unchanged
+68	G0068	cmp	repeated comparison kind == 'search'	2/2/2	unchanged
+69	G0069	record	record assembled from the same sources {urlKey=ID.urlKey, workspaceId=ID.id, accountId=ID.session.accountId}	2/2/2	unchanged
+70	G0070	cmp	repeated comparison kind == 'capture'	2/2/2	unchanged
+71	G0071	cmp	repeated comparison urlKey == 'test-workspace'	2/2/6	unchanged
+72	G0072	record	record assembled from the same sources {githubEnabled=getProvider().entryCta.isConfigured(), jiraEnabled=getProvider().entryCta.isConfigured(), emailEnabled=isEmailSignInAvailable(), freeTierEnabled=isFreeTierOffered()}	2/2/2	unchanged
+73	G0073	cmp	repeated comparison via == 'proxy'	2/2/3	unchanged
+74	G0074	cmp	repeated comparison finishReason == 'length'	2/5/7	unchanged
+77	G0077	cmp	repeated comparison target == 'web'	2/4/5	unchanged
+78	G0078	const	named constant CONTEXT_FETCH_TIMEOUT_MS=45000	2/2/2	unchanged
+80	G0080	set+discrim	string set {'github', 'github-projects'} as Set/array/or-chain [REMINT_KINDS, INSTALLATION_KEYED_PROVIDERS, ID.provider]	2/6/6	unchanged
+81	G0081	cmp	repeated comparison subscription == 'none'	1/3/3	unchanged
+82	G0082	contract	text contract marker: [aborted]	2/3/9	unchanged
+84	G0084	clone	tiny rule copied as a helper bump() (also: touchAndEvict, noteCredential), 3 copies of 1-4 statements	2/3/3	unchanged
+85	G0085	cmp	repeated comparison source == 'free'	2/3/3	unchanged
+86	G0086	const	named constant DANGEROUS_CHARS_REGEX=/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/	2/4/4	unchanged
+87	G0087	const	named constant MAX_NAME_LENGTH=1000	2/4/4	unchanged
+88	G0088	cmp	repeated comparison kind == 'decision'	1/4/6	unchanged
+94	G0094	cmp	repeated comparison mode == 'add-source'	2/6/28	unchanged
+95	G0095	clone	tiny rule copied as a helper onEvent() (also: (anonymous)), 5 copies of 1-4 statements	2/4/5	unchanged
+96	G0096	clone	tiny rule copied as a helper buildPromptFilename(), 3 copies of 1-4 statements	2/3/3	unchanged
+99	G0099	clone	near-duplicate function (anonymous)() (also: relayDispatchRefusal), ~10 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+102	G0102	clone	tiny rule copied as a helper (anonymous)(), 3 copies of 1-4 statements	2/3/3	unchanged
+103	G0103	cmp	repeated comparison toLowerCase() == 'bug'	2/3/3	unchanged
+106	G0106	contract	text contract heading: workflow	1/3/15	unchanged
+107	G0107	clone	near-duplicate function clear(), ~7 statements, structurally identical	2/8/8	unchanged
+108	G0108	cmp	repeated comparison phase == 'proposed'	2/4/5	unchanged
+109	G0109	clone	tiny rule copied as a helper (anonymous)(), 5 copies of 1-4 statements	1/3/5	unchanged
+110	G0110	discrim	string set {'1', 'true'} as or-chain [ID.query.cachedOnly, ID.query.noDescend, ID.query.diff]	2/3/6	unchanged
+113	G0113	cmp	repeated comparison kind == 'close-out'	2/4/4	unchanged
+114	G0114	cmp	repeated comparison kind == 'periodical'	2/3/3	unchanged
+115	G0115	cmp	repeated comparison name == 'list_pending_decisions'	2/3/3	unchanged
+118	G0118	cmp	repeated comparison state == 'closed'	2/5/5	unchanged
+120	G0120	set+discrim	string set {'done', 'failed'} as or-chain/table-keys [ID.terminalStatus, PILL_GLYPHS]	2/3/3	unchanged
+122	G0122	cmp	repeated comparison tagName == 'SELECT'	1/3/3	unchanged
+124	G0124	clone	tiny rule copied as a helper enqueueGuard() (also: haltRefusal), 3 copies of 1-4 statements	1/3/3	unchanged
+125	G0125	cmp	repeated comparison kind == 'recap'	2/2/3	unchanged
+126	G0126	cmp	repeated comparison id == '__periodicals__'	2/4/5	unchanged
+129	G0129	cmp	repeated comparison value == 'true'	2/3/3	unchanged
+132	G0132	cmp	repeated comparison section == 'prompt'	2/2/2	unchanged
+133	G0133	cmp	repeated comparison section == 'reasoning'	2/2/2	unchanged
+134	G0134	contract	text contract marker: [pending]	2/2/4	unchanged
+135	G0135	record	record assembled from the same sources {urlKey=ID.urlKey, identifier=ID.identifier, source=ID.source}	1/3/3	unchanged
+136	G0136	clone	tiny rule copied as a helper header() (also: setupNoticeHtml), 3 copies of 1-4 statements	1/3/3	unchanged
+139	G0139	set	string set {'backlog', 'done', 'failed', 'in-progress', 'todo'} as table-keys [STATE_GLYPHS, STATUS_PILL_GLYPHS]	2/3/3	unchanged
+140	G0140	cmp	repeated comparison section == 'recent-activity'	2/3/5	unchanged
+141	G0141	cmp	repeated comparison agentState == 'queued'	2/3/4	unchanged
+148	G0148	cmp	repeated comparison kind == 'bootstrap'	2/3/9	unchanged
+149	G0149	record	record assembled from the same sources {urlKey=ID.urlKey, workspaceId=ID.id, ownerAccountId=ID.session.accountId}	2/3/3	unchanged
+152	G0152	const	named constant HOUR_MS=3600000	2/4/4	unchanged
+160	G0160	cmp	repeated comparison phase == 'error'	2/3/3	unchanged
+161	G0161	set+discrim	string set {'complete', 'error'} as Set/or-chain [LOOP_TERMINAL_AGENT_STATES, TERMINAL_AGENT_STATES, ID.agentState]	2/3/4	unchanged
+166	G0166	const	named constant COMPANION_INSTANCE_PREFIX="companion:v1:"	2/3/3	unchanged
+167	G0167	clone	tiny rule copied as a helper msSince() (also: (anonymous)), 3 copies of 1-4 statements	2/3/3	unchanged
+168	G0168	cmp	repeated comparison protocol == 'https:'	2/2/2	unchanged
+170	G0170	clone	tiny rule copied as a helper (anonymous)(), 5 copies of 1-4 statements	1/3/5	unchanged
+174	G0174	record	record assembled from the same sources {runs=ID.runs, priced=ID.priced, unpriced=ID.unpriced, noTelemetry=ID.noTelemetry, spendUsd=ID.spendUsd, +1}	2/2/2	unchanged
+177	G0177	set+discrim	string set {'http:', 'https:'} as array/or-chain [[...].includes, ID.protocol]	2/4/4	unchanged
+178	G0178	clone	tiny rule copied as a helper constructor(), 6 copies of 1-4 statements	2/6/6	unchanged
+179	G0179	const	named constant POLL_MS=5000	1/3/3	unchanged
+180	G0180	cmp	repeated comparison kind == 'brief'	2/3/4	unchanged
+182	G0182	clone	tiny rule copied as a helper (anonymous)(), 6 copies of 1-4 statements	1/4/6	unchanged
+183	G0183	clone	tiny rule copied as a helper ui(), 4 copies of 1-4 statements	1/4/4	unchanged
+184	G0184	record	record assembled from the same sources {urlKey=ID.proxyUrlKey, createdBy=ID.proxyCreatedBy, clientSignal=ID.signal}	2/2/2	unchanged
+185	G0185	cmp	repeated comparison code == 'OUTPUT_TRUNCATED'	2/3/3	unchanged
+186	G0186	cmp	repeated comparison status == 'aborted'	1/3/11	unchanged
+187	G0187	cmp	repeated comparison turnKind == 'boot'	2/3/18	unchanged
+188	G0188	contract	text contract marker: [working]	2/3/3	unchanged
+189	G0189	cmp	repeated comparison source == 'live'	1/3/4	unchanged
+191	G0191	clone	near-duplicate function groupLoopsByLineage() (also: runsByLineage), ~10 statements, structurally identical	2/2/2	unchanged
+192	G0192	cmp	repeated comparison state == 'unknown'	2/3/5	unchanged
+195	G0195	cmp	repeated comparison disposition == 'gone'	2/2/5	unchanged
+196	G0196	clone	near-duplicate function relativeTime() (also: renderDeployInfo), ~22 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+197	G0197	cmp	repeated comparison kind == 'decision-answer'	2/3/3	grown
+199	G0199	record	literal record repeated verbatim {label="__ai__", name=null, why="Generate the next prompt for this task"}	2/2/2	unchanged
+200	G0200	clone	near-duplicate function firstPromptLine() (also: toStackHeadline), ~6 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+201	G0201	cmp	repeated comparison rung == 'run-task'	2/2/2	unchanged
+202	G0202	set	string set {'done', 'next-step', 'pr'} as array	2/2/2	unchanged
+203	G0203	discrim	string set {'done', 'pr'} as or-chain [ID.filledRung, ID()]	2/2/3	unchanged
+204	G0204	set	string set {'canceled', 'completed', 'duplicate'} as array [TERMINAL_TYPES]	2/2/2	unchanged
+206	G0206	clone	tiny rule copied as a helper (anonymous)(), 3 copies of 1-4 statements	1/3/3	unchanged
+208	G0208	clone	near-duplicate function computeFitZoom(), ~11 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+212	G0212	clone	near-duplicate function (anonymous)(), ~7 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+213	G0213	clone	near-duplicate function clampTimelineWindow() (also: clampWindow), ~12 statements, fuzzy	2/2/2	unchanged
+214	G0214	clone	near-duplicate function computeTimelineFit(), ~10 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+215	G0215	clone	near-duplicate function computeTimelineZoom(), ~15 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+216	G0216	clone	near-duplicate function renderChip(), ~8 statements, fuzzy	2/2/2	unchanged
+217	G0217	clone	near-duplicate function renderSegmentBar(), ~17 statements, fuzzy	2/2/2	unchanged
+218	G0218	clone	near-duplicate function renderStatusPill(), ~18 statements, fuzzy	2/2/2	unchanged
+219	G0219	clone	near-duplicate function renderSurface(), ~11 statements, fuzzy	2/2/2	unchanged
+220	G0220	clone	near-duplicate function renderTag(), ~11 statements, fuzzy	2/2/2	unchanged
+221	G0221	record	record assembled from the same sources {remaining=ID.remaining, limit=ID.limit}	2/2/3	unchanged
+223	G0223	clone	tiny rule copied as a helper (anonymous)(), 4 copies of 1-4 statements	2/3/4	unchanged
+224	G0224	cmp	repeated comparison status == 'skipped'	2/3/3	unchanged
+225	G0225	discrim	string set {'closed', 'multiple-prs', 'no-pr', 'not-ready'} as or-chain [ID.status]	2/3/3	unchanged
+226	G0226	clone	tiny rule copied as a helper buildBriefMessages() (also: buildRoadmapGapMessages, buildRoadmapProductMessages, buildEditorMessages, buildRecapMessages), 8 copies of 1-4 statements	2/8/8	unchanged
+228	G0228	cmp	repeated comparison mergedBy == 'close-out'	2/2/2	unchanged
+230	G0230	contract	text contract marker: [usage]	1/3/4	unchanged
+231	G0231	const	named constant MAX_IDENTIFIER_LENGTH=100	2/2/2	unchanged
+232	G0232	cmp	repeated comparison readyState == 'loading'	1/3/3	shrunk
+233	G0233	cmp	repeated comparison state == 'open'	2/4/5	shrunk
+239	G0239	cmp	repeated comparison status == 'priced'	2/2/3	unchanged
+240	G0240	cmp	repeated comparison status == 'proposed'	2/2/2	unchanged
+241	G0241	set	string set {'cdn.linear.app', 'linear.app', 'uploads.linear.app'} as Set [LINEAR_IMAGE_HOSTS, allowedHosts]	2/2/2	unchanged
+242	G0242	set+discrim	string set {'home-up-next', 'in-progress', 'project', 'recent-activity'} as or-chain/array [KNOWN_SECTIONS]	2/2/2	unchanged
+244	G0244	cmp	repeated comparison reason == 'free-tier'	2/2/3	unchanged
+245	G0245	discrim	string set {'comment', 'description'} as ternary-chain/or-chain [ID.where]	2/2/2	unchanged
+247	G0247	discrim	string set {'answered', 'dismissed'} as or-chain [ID.outcome]	2/4/7	unchanged
+248	G0248	cmp	repeated comparison built == 'unknown'	2/2/2	unchanged
+249	G0249	cmp	repeated comparison format == 'md'	2/2/2	unchanged
+250	G0250	cmp	repeated comparison tierOf() == 'deferred'	2/2/3	unchanged
+251	G0251	set	string set {'High', 'Low', 'Medium', 'No priority', 'Urgent'} as array [PRIORITY_NAMES, PRIORITY_OPTION_LABELS]	2/2/2	unchanged
+252	G0252	const	named constant ARCHIVE_PAGE_SIZE=30	2/2/2	unchanged
+253	G0253	const	named constant STALE_AFTER_MS=86400000	2/2/2	unchanged
+254	G0254	clone	near-duplicate function (anonymous)(), ~6 statements, fuzzy	2/2/2	unchanged
+255	G0255	cmp	repeated comparison by == 'close-out'	2/2/2	unchanged
+256	G0256	cmp	repeated comparison pageMode == 'backlog'	2/2/2	unchanged
+257	G0257	cmp	repeated comparison view == 'sessions'	2/2/2	unchanged
+259	G0259	cmp	repeated comparison openRouterSource == 'free'	2/3/3	unchanged
+260	G0260	record	record assembled from the same sources {promptMeta=ID.promptMeta, defaultPromptKeys=ID.defaultPromptKeys, morePromptKeys=ID.morePromptKeys, customPrompts=ID.customPrompts, hasAI=ID.hasAI, +5}	2/2/2	unchanged
+261	G0261	cmp	repeated comparison singleUse == 'true'	2/2/2	unchanged
+262	G0262	clone	tiny rule copied as a helper countFor() (also: lookupsFor), 3 copies of 1-4 statements	2/3/3	unchanged
+263	G0263	cmp	repeated comparison view == 'digest'	2/2/2	unchanged
+266	G0266	record	literal record repeated verbatim {lastCensusSnapshot=null, lastCensusStateHash=null, lastTurnAt=null, notes="", reservationId=null, turnReservedUntil=n...}	2/2/2	unchanged
+267	G0267	cmp	repeated comparison turnKind == 'auto-wake'	2/2/5	unchanged
+275	G0275	clone	tiny rule copied as a helper isId() (also: shortString, (anonymous), isSafeSingleQuotedLiteral, isSafeDoubleQuotedLiteral), 6 copies of 1-4 statements	1/4/6	unchanged
+279	G0279	cmp	repeated comparison viewer == 'owner'	2/2/3	unchanged
+280	G0280	cmp	repeated comparison verdict == 'approve'	1/3/3	unchanged
+281	G0281	record	literal record repeated verbatim {effort="none", harness="none", model="none"}	2/2/2	unchanged
+282	G0282	cmp	repeated comparison category == 'upstream'	2/2/2	unchanged
+283	G0283	discrim	string set {'gone', 'resumable', 'task-bound'} as or-chain	2/2/2	unchanged
+284	G0284	clone	near-duplicate function constructor(), ~5 statements, fuzzy	1/3/3	unchanged
+287	G0287	cmp	repeated comparison state == 'none'	2/2/2	unchanged
+288	G0288	clone	near-duplicate function deleteByConnection() (also: deleteUserPreferences, deleteWorkspacePreferences), ~8 statements, structurally identical	1/3/3	unchanged
+289	G0289	cmp	repeated comparison state == 'dead'	2/2/3	unchanged
+292	G0292	cmp	repeated comparison tier == 'not reported'	2/2/2	unchanged
+295	G0295	clone	near-duplicate function listForWorkspaces() (also: listUnansweredForWorkspaces), ~7 statements, fuzzy	1/3/3	unchanged
+296	G0296	cmp	repeated comparison deriveTerminalStatus() == 'done'	1/3/3	unchanged
+297	G0297	cmp	repeated comparison outcome == 'dismissed'	2/3/4	unchanged
+300	G0300	cmp	repeated comparison kind == 'decision-withdrawal-reversed'	2/2/2	new
+308	G0308	cmp	repeated comparison mode == 'new'	1/3/5	unchanged
+309	G0309	contract	text contract marker: [as-asked]	2/2/10	unchanged
+310	G0310	cmp	repeated comparison status == 'fulfilled'	2/4/6	unchanged
+312	G0312	cmp	repeated comparison kind == 'backlog'	2/2/2	unchanged
+314	G0314	clone	near-duplicate function cleanup(), ~8 statements, fuzzy	1/3/3	unchanged
+315	G0315	set	string set {'blocked', 'queued', 'resolved', 'silent', 'terminal', 'unknown', +1} as array [CENSUS_LANE_KEYS, LANE_KEYS]	2/3/3	unchanged
+316	G0316	clone	tiny rule copied as a helper resolveCanonicalDegraded() (also: resolveCanonicalOrMiss, canonical), 3 copies of 1-4 statements	1/3/3	unchanged
+327	G0327	cmp	repeated comparison state == 'reached'	2/2/2	unchanged
+329	G0329	set	string set {'acting', 'deciding', 'orienting', 'reporting', 'watching'} as array [PROXY_PHASES, PHASE_NAMES]	2/2/2	unchanged
+330	G0330	set	string set {'dispatch', 'record', 'resume'} as Set/table-keys [ON_ANSWER_EFFECTS, EFFECT_CAPTIONS]	2/2/2	unchanged
+334	G0334	discrim	string set {'indeterminate', 'mid-turn'} as or-chain [ID.disposition]	2/2/2	unchanged
+337	G0337	set	string set {'fable', 'haiku', 'opus', 'sonnet'} as array [CLAUDE_MAPPABLE_MODEL_FAMILIES]	2/2/3	unchanged
+338	G0338	contract	text contract heading: adversarial second-read	2/2/2	unchanged
+339	G0339	clone	near-duplicate function get(), ~7 statements, fuzzy	2/6/6	unchanged
+340	G0340	record	literal record repeated verbatim {_id=0, createdAt=1, createdBy=1, urlKey=1, workspaceId=1}	2/2/2	unchanged
+342	G0342	cmp	repeated comparison haltMode == 'pause'	2/2/2	unchanged
+343	G0343	cmp	repeated comparison haltMode == 'stop'	2/2/2	unchanged
+348	G0348	cmp	repeated comparison kind == 'review'	2/2/2	unchanged
+349	G0349	cmp	repeated comparison name == 'linear'	2/2/2	shrunk
+350	G0350	cmp	repeated comparison name == 'send_follow_up'	2/2/3	unchanged
+353	G0353	cmp	repeated comparison role == 'owner'	2/3/4	unchanged
+355	G0355	cmp	repeated comparison variant == 'standard'	2/2/2	unchanged
+356	G0356	cmp	repeated comparison kind == 'plan'	2/3/3	unchanged
+357	G0357	cmp	repeated comparison role == 'user'	2/3/6	unchanged
+358	G0358	cmp	repeated comparison type == 'heading'	2/3/3	grown
+360	G0360	cmp	repeated comparison kind == 'blind-read'	2/2/2	unchanged
+362	G0362	clone	tiny rule copied as a helper clampText(), 3 copies of 1-4 statements	2/3/3	unchanged
+364	G0364	const	named constant MAX_REASON_LENGTH=500	2/2/2	unchanged
+370	G0370	contract	text contract heading: workspace api access (auto-appended)	2/2/2	unchanged
+371	G0371	const	named constant DAY_MS=86400000	2/2/2	unchanged
+374	G0374	cmp	repeated comparison message == 'reverseOutcome: row is not self-resolved'	2/2/2	unchanged
+377	G0377	set	string set {'inside', 'outside', 'total', 'unknown'} as array/table-keys [[...].every, SCOPE_MARK]	2/2/2	unchanged
+378	G0378	clone	near-duplicate function _pruneToCapacity(), ~6 statements, fuzzy	2/5/5	unchanged
+379	G0379	cmp	repeated comparison kind == 'leftover'	1/3/3	unchanged
+381	G0381	set	string set {'/common-actions.css', '/escalation-kpis.css', '/style.css'} as array [stylesheets]	1/3/3	unchanged
+386	G0386	cmp	repeated comparison code == 'ERR_FR_TOO_MANY_REDIRECTS'	2/2/2	unchanged
+388	G0388	cmp	repeated comparison message == 'unexpected redirect'	2/2/2	unchanged
+390	G0390	cmp	repeated comparison completeness == 'complete'	1/3/7	unchanged
+392	G0392	const	named constant LANE_KEYS=[blocked,queued,resolved,silent,terminal,unknown,working]	2/2/2	unchanged
+394	G0394	clone	near-duplicate function peakToolCount() (also: toolPeakOf), ~9 statements, fuzzy	2/2/2	unchanged
+395	G0395	set	string set {'autopilot', 'save', 'triage'} as table-keys/Set [SENDING_STATUS, DONE_SUFFIX, FEEDBACK_ACTIONS]	2/2/3	unchanged
+396	G0396	contract	text contract marker: [credential-adopted]	2/2/3	unchanged
+397	G0397	clone	near-duplicate function generateBrief() (also: generateFeedbackTitle, generateRecap, generateRunSummary, generateSessionSummary), ~7 statements, fuzzy	2/5/5	unchanged
+399	G0399	clone	near-duplicate function listEvents() (also: listTraces), ~9 statements, fuzzy	2/2/2	unchanged
+400	G0400	record	record assembled from the same sources {urlKey=ID.urlKey, prUrl=ID.prUrl, headSha=ID.headSha, by=ID.by}	2/2/3	unchanged
+403	G0403	cmp	repeated comparison stage == 'blind-read'	2/2/2	unchanged
+407	G0407	cmp	repeated comparison s == 'complete'	2/2/2	unchanged
+409	G0409	record	literal record repeated verbatim {_id=0, createdAt=1, createdBy=1, urlKey=1}	2/2/2	unchanged
+414	G0414	set+discrim	string set {'dark', 'light'} as array/or-chain [VALID_THEMES, ID.session.theme]	2/2/2	unchanged
+415	G0415	cmp	repeated comparison trim() == '---'	1/5/5	unchanged
+416	G0416	const	named constant TIMELINE_WINDOW_MS=86400000	2/2/2	unchanged
+420	G0420	clone	tiny rule copied as a helper getAccount() (also: getById, getWorkspace, getWorkspaceByUrlKey), 4 copies of 1-4 statements	2/3/4	unchanged
+421	G0421	const	named constant DEFAULT_HUMAN_NICK="John"	2/2/2	unchanged
+422	G0422	cmp	repeated comparison type == 'backlog'	2/2/3	unchanged
+423	G0423	set	string set {'first go', 'firstGo'} as array	2/2/2	unchanged
+424	G0424	set	string set {'login', 'signed up'} as array	2/2/2	unchanged
+425	G0425	set	string set {'merge clicked', 'mergeClicked'} as array	2/2/2	unchanged
+426	G0426	set	string set {'pr opened', 'prOpened'} as array	2/2/2	unchanged
+427	G0427	clone	near-duplicate function delete(), ~7 statements, fuzzy	2/5/5	unchanged
+428	G0428	clone	tiny rule copied as a helper get(), 5 copies of 1-4 statements	2/5/5	unchanged
+429	G0429	clone	near-duplicate function briefUrl() (also: recapUrl, scanUrl), ~6 statements, fuzzy	1/3/3	unchanged
+430	G0430	cmp	repeated comparison field == 'harness'	2/3/3	unchanged
+431	G0431	discrim	string set {'fresh', 'stale'} as if-chain [ID.status]	1/3/4	unchanged
+439	G0439	cmp	repeated comparison provider == 'email'	2/2/2	unchanged
+440	G0440	cmp	repeated comparison source == 'model'	2/2/2	unchanged
+441	G0441	cmp	repeated comparison source == 'workspace'	2/2/2	unchanged
+443	G0443	set+discrim	string set {'jira', 'linear'} as Set/or-chain [REFRESH_TOKEN_KINDS]	2/2/2	unchanged
+445	G0445	cmp	repeated comparison filter == 'set'	2/2/2	unchanged
+446	G0446	cmp	repeated comparison mode == 'resume'	2/2/3	unchanged
+449	G0449	clone	tiny rule copied as a helper (anonymous)(), 3 copies of 1-4 statements	2/3/3	unchanged
+450	G0450	clone	near-duplicate function formatFossilThreshold() (also: formatStaleThreshold), ~10 statements, structurally identical	2/2/2	unchanged
+452	G0452	clone	near-duplicate function list() (also: listByWorkspace), ~9 statements, fuzzy	2/4/4	unchanged
+453	G0453	contract	text contract marker: [string]	2/3/4	unchanged
+454	G0454	clone	tiny rule copied as a helper fetchBriefStatus() (also: fetchContext, fetchRecapStatus), 3 copies of 1-4 statements	1/3/3	unchanged
+455	G0455	record	record assembled from the same sources {id=ID._id, by=ID.by, prUrl=ID.prUrl, headSha=ID.headSha}	2/2/2	unchanged
+456	G0456	cmp	repeated comparison act == 'copy'	2/2/3	unchanged
+458	G0458	cmp	repeated comparison scope == 'job'	2/2/3	unchanged
+460	G0460	clone	near-duplicate function revokeByCreator() (also: revokeByOwner), ~9 statements, fuzzy	2/2/2	unchanged
+463	G0463	cmp	repeated comparison stateType == 'completed'	2/3/3	unchanged
+464	G0464	clone	tiny rule copied as a helper sweepStale() (also: sweep, pruneTombstones), 3 copies of 1-4 statements	2/3/3	unchanged
+465	G0465	clone	near-duplicate function get(), ~9 statements, structurally identical	2/4/4	unchanged
+466	G0466	clone	near-duplicate function orderByDependency(), ~59 statements, same vocabulary (dialect copy or close variant)	2/4/4	unchanged
+467	G0467	clone	tiny rule copied as a helper delete(), 4 copies of 1-4 statements	2/4/4	unchanged
+468	G0468	clone	tiny rule copied as a helper put(), 4 copies of 1-4 statements	2/4/4	unchanged
+469	G0469	clone	tiny rule copied as a helper put(), 4 copies of 1-4 statements	2/4/4	unchanged
+470	G0470	clone	near-duplicate function canonicalOf() (also: canonicalise), ~12 statements, structurally identical	2/2/2	unchanged
+471	G0471	record	record assembled from the same sources {id=ID.id, name=ID.name, key=ID.key}	2/2/2	new
+475	G0475	clone	near-duplicate function (anonymous)() (also: graphql, request), ~15 statements, same vocabulary (dialect copy or close variant)	1/3/3	unchanged
+476	G0476	clone	tiny rule copied as a helper (anonymous)() (also: isActive), 3 copies of 1-4 statements	2/3/3	unchanged
+477	G0477	clone	tiny rule copied as a helper _docsSorted() (also: _docsFor), 3 copies of 1-4 statements	1/3/3	unchanged
+481	G0481	cmp	repeated comparison scope == 'default'	2/2/2	unchanged
+482	G0482	set	string set {'preset-save', 'undo'} as array [[...].includes]	2/2/3	unchanged
+483	G0483	const	named constant DUPLICATE_KEY_CODE=11000	2/2/2	unchanged
+484	G0484	const	named constant FORMER_MEMBER="former member"	2/2/2	unchanged
+485	G0485	clone	near-duplicate function clusterSiblingsInLane() (also: computeShipReachableIds, pullItemAndDescendants, promoteDependencyBlockers), ~33 statements, same vocabulary (dialect copy or close variant)	2/3/7	unchanged
+486	G0486	cmp	repeated comparison field == 'model'	2/3/3	unchanged
+487	G0487	clone	tiny rule copied as a helper createDashboardDrilldownRoutes() (also: createDashboardEffortRoutes, createDashboardKpisRoutes), 3 copies of 1-4 statements	1/3/3	unchanged
+488	G0488	clone	tiny rule copied as a helper union(), 3 copies of 1-4 statements	2/3/3	unchanged
+490	G0490	set	string set {'halt', 'modelRoutingProxyWrites', 'periodicals'} as table-keys/array [SETTING_NAME, SETTINGS]	2/2/2	unchanged
+491	G0491	set	string set {'none', 'pause', 'stop', 'unknown'} as table-keys [HALT_VALUE, HALT_WORDS]	2/2/2	unchanged
+492	G0492	clone	tiny rule copied as a helper deleteAll(), 4 copies of 1-4 statements	2/4/4	unchanged
+493	G0493	clone	near-duplicate function buildPassagePlannerKickoff() (also: buildPassageRunnerKickoff, buildWorkerLaneKickoff), ~11 statements, structurally identical	1/3/3	unchanged
+497	G0497	const	named constant PROJECTION_RISK_TYPES=Set[overdue,unestimated-critical,velocity-declining]	2/2/2	unchanged
+501	G0501	set	string set {'overdue', 'unestimated-critical', 'velocity-declining'} as Set [PROJECTION_RISK_TYPES]	2/2/2	unchanged
+502	G0502	contract	text contract marker: [credential-rejected]	2/2/2	unchanged
+503	G0503	const	named constant REPO_RE=/^[A-Za-z0-9._-]{1,100}$/	2/2/2	unchanged
+504	G0504	clone	near-duplicate function assignLanes(), ~32 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+505	G0505	clone	near-duplicate function assignSegments(), ~21 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+506	G0506	clone	near-duplicate function buildChainLabel(), ~10 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+507	G0507	clone	near-duplicate function cohereSubtaskGroups(), ~39 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+508	G0508	clone	near-duplicate function computeCrossLaneColumns(), ~108 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+509	G0509	clone	near-duplicate function groupByAssignee() (also: groupByProject), ~10 statements, same vocabulary (dialect copy or close variant)	2/2/4	unchanged
+510	G0510	clone	near-duplicate function groupByStatus(), ~12 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+512	G0512	clone	near-duplicate function mergeLabels(), ~6 statements, fuzzy	2/2/2	unchanged
+513	G0513	clone	near-duplicate function mergeLanes(), ~9 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+517	G0517	cmp	repeated comparison grouping == 'dependency'	2/2/4	unchanged
+518	G0518	cmp	repeated comparison op == 'updateIssue'	2/2/2	new
+519	G0519	cmp	repeated comparison rawKey == 'duplicate'	2/2/2	unchanged
+522	G0522	set	string set {'/library.css', '/style.css'} as array [stylesheets]	2/2/2	unchanged
+523	G0523	discrim	string set {'assignee', 'dependency', 'project', 'status'} as switch	2/2/2	unchanged
+524	G0524	discrim	string set {'dependency', 'project'} as or-chain	2/2/2	unchanged
+525	G0525	discrim	string set {'implicit', 'label', 'state'} as switch [ID.type]	2/2/2	unchanged
+527	G0527	cmp	repeated comparison tone == 'bad'	1/3/3	unchanged
+528	G0528	clone	tiny rule copied as a helper toRecord(), 3 copies of 1-4 statements	2/3/3	unchanged
+535	G0535	set	string set {'digest', 'gap', 'northStarReading', 'product', 'technical', 'trajectory'} as array/table-keys [NARRATIVE_LAYERS, collected, NARRATIVE_FIELD_TO_LAYER]	2/2/5	unchanged
+537	G0537	discrim	string set {'resumed', 'wake'} as or-chain [ID.role]	2/2/2	unchanged
+543	G0543	cmp	repeated comparison orientation == 'vertical'	2/2/6	unchanged
+547	G0547	set	string set {'orchestration', 'resumed', 'wake', 'work'} as table-keys/array [DISPATCH_ROLE_WORD]	2/2/2	unchanged
+548	G0548	record	literal record repeated verbatim {AFT="aft", DRIFT="drift", FORWARD="forward", PORT="port", SHIP="ship", STARBOARD="starboard"}	2/2/2	unchanged
+549	G0549	const	named constant MAX_CUSTOM_PRESETS=20	2/2/2	unchanged
+550	G0550	const	named constant MAX_PRESET_NAME_LENGTH=50	2/2/2	unchanged
+551	G0551	clone	near-duplicate function (anonymous)(), ~7 statements, fuzzy	2/2/2	unchanged
+552	G0552	clone	near-duplicate function bearingToAngle(), ~8 statements, structurally identical	2/2/2	unchanged
+553	G0553	clone	near-duplicate function buildSegments(), ~59 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+554	G0554	clone	near-duplicate function cardMatchesHeading(), ~13 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+555	G0555	clone	near-duplicate function clusterSubtaskSiblings(), ~35 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+556	G0556	clone	near-duplicate function computePosition(), ~11 statements, fuzzy	2/2/2	unchanged
+557	G0557	clone	near-duplicate function hash32(), ~11 statements, fuzzy	2/2/2	unchanged
+558	G0558	clone	near-duplicate function layoutIndex(), ~30 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+559	G0559	clone	near-duplicate function list(), ~7 statements, structurally identical	2/2/2	unchanged
+560	G0560	clone	near-duplicate function orientationLayout(), ~57 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+561	G0561	clone	near-duplicate function pickAngle(), ~10 statements, fuzzy	2/2/2	unchanged
+562	G0562	clone	near-duplicate function placeDriftBucket(), ~22 statements, fuzzy	2/2/2	unchanged
+563	G0563	clone	near-duplicate function placeSegmentBucket(), ~44 statements, same vocabulary (dialect copy or close variant)	2/2/2	unchanged
+564	G0564	clone	near-duplicate function pushProjectSegments() (also: pushProjectSegs), ~8 statements, fuzzy	2/2/2	unchanged
+566	G0566	record	record assembled from the same sources {label=ID[].name, projectName=ID[].name, cards=ID[].group}	2/2/2	unchanged
+568	G0568	cmp	repeated comparison kind == 'label'	2/2/3	unchanged
+569	G0569	cmp	repeated comparison kind == 'project'	2/2/3	unchanged
+570	G0570	cmp	repeated comparison projectSector == 'port'	2/2/2	unchanged
+571	G0571	cmp	repeated comparison projectSector == 'starboard'	2/2/2	unchanged
+572	G0572	cmp	repeated comparison sector == 'drift'	2/2/2	unchanged
+573	G0573	cmp	repeated comparison sector == 'ship'	2/2/2	unchanged
+574	G0574	cmp	repeated comparison stateType == 'unstarted'	2/2/2	unchanged
+576	G0576	discrim	string set {'E', 'W'} as or-chain	2/2/2	unchanged
+577	G0577	record	record assembled from the same sources {access_token=ID.access_token, refresh_token=ID.refresh_token, expires_in=ID.expires_in}	2/2/2	unchanged
+578	G0578	cmp	repeated comparison error == 'invalid_grant'	2/2/2	unchanged
