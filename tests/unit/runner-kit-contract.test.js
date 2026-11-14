@@ -71,7 +71,7 @@ const SESSION_LEDGER_STATE = { running: 'running', finished: 'done', stopped: 's
 /** The ledger a follow-up row is judged against: the row's own session, and nothing else. */
 function sessionLedger(session) {
   if (!Object.prototype.hasOwnProperty.call(SESSION_LEDGER_STATE, session)) {
-    throw new Error(`unknown session value "${session}" in contract.json: the vocabulary is running | finished | stopped | none`);
+    throw new Error(`unknown session value "${session}" in contract.json: the vocabulary is ${Object.keys(SESSION_LEDGER_STATE).join(' | ')}`);
   }
   const state = SESSION_LEDGER_STATE[session];
   if (!state) return { items: {} };
