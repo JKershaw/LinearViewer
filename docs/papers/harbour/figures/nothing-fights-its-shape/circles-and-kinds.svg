@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="514" viewBox="0 0 960 514" font-family="Inter, system-ui, sans-serif" font-size="12" role="img" aria-label="Left: three overlapping circles labelled ticket and thread, code comment, and code. A reason, a description and a to-do sit where ticket and code comment overlap; a rule sits where code comment and code overlap; what is wanted and what happened sit in the ticket alone, and what is so in the code alone. Right: a grid with the kinds of thing said down the side, in three groups (what was, what is, what is to be) plus the description, and the places they are written across the top: code, test, commit, code comment, ticket, its thread, note, doc, prompt, log. Every kind but one has a mark in several places; test, commit and log carry one or two kinds, code comment four, while thread, note and doc carry five or six. A drawing, not data."><style data-figure-theme="1">@media (prefers-color-scheme: dark){rect[fill="#fff"]:not([fill-opacity]),rect[fill="#ffffff"]:not([fill-opacity]),rect[fill="white"]:not([fill-opacity]){fill:#16181d}[stroke="#fff"],[stroke="#ffffff"],[stroke="white"]{stroke:#16181d}circle[fill="#fff"]:not([fill-opacity]),circle[fill="#ffffff"]:not([fill-opacity]),circle[fill="white"]:not([fill-opacity]){fill:#16181d}path[fill="#fff"]:not([fill-opacity]),path[fill="#ffffff"]:not([fill-opacity]),path[fill="white"]:not([fill-opacity]){fill:#16181d}polygon[fill="#fff"]:not([fill-opacity]),polygon[fill="#ffffff"]:not([fill-opacity]),polygon[fill="white"]:not([fill-opacity]){fill:#16181d}ellipse[fill="#fff"]:not([fill-opacity]),ellipse[fill="#ffffff"]:not([fill-opacity]),ellipse[fill="white"]:not([fill-opacity]){fill:#16181d}text[fill="#111827"]:not([data-on-fill]),text[fill="#1f2937"]:not([data-on-fill]),text[fill="#333"]:not([data-on-fill]),text[fill="#1f2328"]:not([data-on-fill]),text[fill="#555"]:not([data-on-fill]),text[fill="#475569"]:not([data-on-fill]){fill:#e6e6e6}[stroke="#111827"],[stroke="#1f2937"],[stroke="#333"],[stroke="#1f2328"],[stroke="#555"],[stroke="#475569"]{stroke:#e6e6e6}text[fill="#6b7280"]:not([data-on-fill]),text[fill="#666"]:not([data-on-fill]),text[fill="#667085"]:not([data-on-fill]),text[fill="#888"]:not([data-on-fill]),text[fill="#6e7781"]:not([data-on-fill]),text[fill="#999"]:not([data-on-fill]),text[fill="#aaa"]:not([data-on-fill]),text[fill="#bbb"]:not([data-on-fill]),text[fill="#9ca3af"]:not([data-on-fill]),text[fill="#94a3b8"]:not([data-on-fill]){fill:#9aa0a6}[stroke="#6b7280"],[stroke="#666"],[stroke="#667085"],[stroke="#888"],[stroke="#6e7781"],[stroke="#999"],[stroke="#aaa"],[stroke="#bbb"],[stroke="#9ca3af"],[stroke="#94a3b8"]{stroke:#9aa0a6}[stroke="#e5e7eb"],[stroke="#eee"],[stroke="#d1d5db"],[stroke="#f0f0f0"],[stroke="#cbd5e1"],[stroke="#d9d9d9"]{stroke:#2c313a}[fill="#f3f4f6"],[fill="#f9fafb"]{fill:#1f222a}rect[fill="#f0f0f0"],rect[fill="#d1d5db"],rect[fill="#e5e7eb"],rect[fill="#eee"]{fill:#2c313a}text:not([fill]):not([class]):not([data-on-fill]){fill:#e6e6e6}rect[fill="#1f2937"],circle[fill="#1f2937"],path[fill="#1f2937"]{fill:#4b5563}rect[fill="#3b1f5e"],circle[fill="#3b1f5e"],path[fill="#3b1f5e"]{fill:#553185}svg .t,svg .h{fill:#e6e6e6}svg .a,svg .s{fill:#9aa0a6}svg .f{fill:#1f222a;stroke:#2c313a}svg .g{stroke:#2c313a}rect[fill="#dbeafe"]{fill:#1d2d44}rect[fill="#93c5fd"]{fill:#2a5a9a}rect[fill="#fff7ed"]{fill:#2a2118}}</style><rect x="0" y="0" width="960" height="514" fill="#fff"/>
+<text x="20" y="30" font-size="14" font-weight="600" fill="#111827">Named for where it is written</text>
+<circle cx="130" cy="170" r="95" fill="#2a78d6" fill-opacity="0.07" stroke="#2a78d6" stroke-width="1.4"/>
+<circle cx="230" cy="170" r="95" fill="#2a78d6" fill-opacity="0.07" stroke="#2a78d6" stroke-width="1.4"/>
+<circle cx="180" cy="255" r="95" fill="#2a78d6" fill-opacity="0.07" stroke="#2a78d6" stroke-width="1.4"/>
+<text x="20" y="70" font-size="13" font-weight="600" fill="#111827">ticket and thread</text>
+<text x="240" y="70" font-size="13" font-weight="600" fill="#111827">code comment</text>
+<text x="180" y="372" font-size="13" font-weight="600" text-anchor="middle" fill="#111827">code</text>
+<text x="180" y="127" font-size="11" text-anchor="middle" fill="#111827">a reason</text>
+<text x="180" y="141" font-size="11" text-anchor="middle" fill="#111827">a description</text>
+<text x="180" y="155" font-size="11" text-anchor="middle" fill="#111827">a to-do</text>
+<text x="228" y="229" font-size="11" text-anchor="middle" fill="#111827">a rule</text>
+<text x="82" y="150" font-size="11" text-anchor="middle" fill="#111827">what is wanted</text>
+<text x="82" y="166" font-size="11" text-anchor="middle" fill="#111827">what happened</text>
+<text x="180" y="318" font-size="11" text-anchor="middle" fill="#111827">what is so</text>
+<text x="20" y="412" font-size="12" fill="#6b7280">Open the circles and the same few things sit in</text>
+<text x="20" y="430" font-size="12" fill="#6b7280">two at once. The overlap is the contents, not the edges.</text>
+<text x="400" y="30" font-size="14" font-weight="600" fill="#111827">Sorted by what is said</text>
+<text x="609.5" y="100" font-size="11.5" transform="rotate(-45 609.5 100)" fill="#111827">code</text>
+<text x="644.5" y="100" font-size="11.5" transform="rotate(-45 644.5 100)" fill="#111827">test</text>
+<text x="679.5" y="100" font-size="11.5" transform="rotate(-45 679.5 100)" fill="#111827">commit</text>
+<text x="714.5" y="100" font-size="11.5" transform="rotate(-45 714.5 100)" fill="#111827">code comment</text>
+<text x="749.5" y="100" font-size="11.5" transform="rotate(-45 749.5 100)" fill="#111827">ticket</text>
+<text x="784.5" y="100" font-size="11.5" transform="rotate(-45 784.5 100)" fill="#111827">its thread</text>
+<text x="819.5" y="100" font-size="11.5" transform="rotate(-45 819.5 100)" fill="#111827">note</text>
+<text x="854.5" y="100" font-size="11.5" transform="rotate(-45 854.5 100)" fill="#111827">doc</text>
+<text x="889.5" y="100" font-size="11.5" transform="rotate(-45 889.5 100)" fill="#111827">prompt</text>
+<text x="924.5" y="100" font-size="11.5" transform="rotate(-45 924.5 100)" fill="#111827">log</text>
+<line x1="400" y1="108" x2="946" y2="108" stroke="#9ca3af" stroke-width="1"/>
+<text x="400" y="123" font-size="10.5" fill="#6b7280">WHAT WAS</text>
+<text x="400" y="150" font-size="12.5" fill="#111827">What happened</text>
+<line x1="610.5" y1="146" x2="616.5" y2="146" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="645.5" y1="146" x2="651.5" y2="146" stroke="#e5e7eb" stroke-width="2"/>
+<circle cx="683.5" cy="146" r="6" fill="#2a78d6"/>
+<line x1="715.5" y1="146" x2="721.5" y2="146" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="750.5" y1="146" x2="756.5" y2="146" stroke="#e5e7eb" stroke-width="2"/>
+<circle cx="788.5" cy="146" r="6" fill="#2a78d6"/>
+<line x1="820.5" y1="146" x2="826.5" y2="146" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="855.5" y1="146" x2="861.5" y2="146" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="890.5" y1="146" x2="896.5" y2="146" stroke="#e5e7eb" stroke-width="2"/>
+<circle cx="928.5" cy="146" r="6" fill="#2a78d6"/>
+<line x1="400" y1="162" x2="946" y2="162" stroke="#e5e7eb" stroke-width="1"/>
+<text x="400" y="182" font-size="12.5" fill="#111827">Why</text>
+<line x1="610.5" y1="178" x2="616.5" y2="178" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="645.5" y1="178" x2="651.5" y2="178" stroke="#e5e7eb" stroke-width="2"/>
+<circle cx="683.5" cy="178" r="6" fill="#2a78d6"/>
+<circle cx="718.5" cy="178" r="6" fill="#2a78d6"/>
+<line x1="750.5" y1="178" x2="756.5" y2="178" stroke="#e5e7eb" stroke-width="2"/>
+<circle cx="788.5" cy="178" r="6" fill="#2a78d6"/>
+<circle cx="823.5" cy="178" r="6" fill="#2a78d6"/>
+<circle cx="858.5" cy="178" r="6" fill="#2a78d6"/>
+<line x1="890.5" y1="178" x2="896.5" y2="178" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="925.5" y1="178" x2="931.5" y2="178" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="400" y1="194" x2="946" y2="194" stroke="#e5e7eb" stroke-width="1"/>
+<text x="400" y="214" font-size="12.5" fill="#111827">What was found</text>
+<line x1="610.5" y1="210" x2="616.5" y2="210" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="645.5" y1="210" x2="651.5" y2="210" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="680.5" y1="210" x2="686.5" y2="210" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="715.5" y1="210" x2="721.5" y2="210" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="750.5" y1="210" x2="756.5" y2="210" stroke="#e5e7eb" stroke-width="2"/>
+<circle cx="788.5" cy="210" r="6" fill="#2a78d6"/>
+<circle cx="823.5" cy="210" r="6" fill="#2a78d6"/>
+<circle cx="858.5" cy="210" r="6" fill="#2a78d6"/>
+<line x1="890.5" y1="210" x2="896.5" y2="210" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="925.5" y1="210" x2="931.5" y2="210" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="400" y1="226" x2="946" y2="226" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="400" y1="226" x2="946" y2="226" stroke="#9ca3af" stroke-width="1"/>
+<text x="400" y="241" font-size="10.5" fill="#6b7280">WHAT IS</text>
+<text x="400" y="268" font-size="12.5" fill="#111827">What is so</text>
+<circle cx="613.5" cy="264" r="6" fill="#2a78d6"/>
+<line x1="645.5" y1="264" x2="651.5" y2="264" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="680.5" y1="264" x2="686.5" y2="264" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="715.5" y1="264" x2="721.5" y2="264" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="750.5" y1="264" x2="756.5" y2="264" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="785.5" y1="264" x2="791.5" y2="264" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="820.5" y1="264" x2="826.5" y2="264" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="855.5" y1="264" x2="861.5" y2="264" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="890.5" y1="264" x2="896.5" y2="264" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="925.5" y1="264" x2="931.5" y2="264" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="400" y1="280" x2="946" y2="280" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="400" y1="280" x2="946" y2="280" stroke="#9ca3af" stroke-width="1"/>
+<text x="400" y="295" font-size="10.5" fill="#6b7280">WHAT IS TO BE</text>
+<text x="400" y="322" font-size="12.5" fill="#111827">What is wanted</text>
+<line x1="610.5" y1="318" x2="616.5" y2="318" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="645.5" y1="318" x2="651.5" y2="318" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="680.5" y1="318" x2="686.5" y2="318" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="715.5" y1="318" x2="721.5" y2="318" stroke="#e5e7eb" stroke-width="2"/>
+<circle cx="753.5" cy="318" r="6" fill="#2a78d6"/>
+<circle cx="788.5" cy="318" r="6" fill="#2a78d6"/>
+<line x1="820.5" y1="318" x2="826.5" y2="318" stroke="#e5e7eb" stroke-width="2"/>
+<circle cx="858.5" cy="318" r="6" fill="#2a78d6"/>
+<circle cx="893.5" cy="318" r="6" fill="#2a78d6"/>
+<line x1="925.5" y1="318" x2="931.5" y2="318" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="400" y1="334" x2="946" y2="334" stroke="#e5e7eb" stroke-width="1"/>
+<text x="400" y="354" font-size="12.5" fill="#111827">What must hold</text>
+<circle cx="613.5" cy="350" r="6" fill="#2a78d6"/>
+<circle cx="648.5" cy="350" r="6" fill="#2a78d6"/>
+<line x1="680.5" y1="350" x2="686.5" y2="350" stroke="#e5e7eb" stroke-width="2"/>
+<circle cx="718.5" cy="350" r="6" fill="#2a78d6"/>
+<line x1="750.5" y1="350" x2="756.5" y2="350" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="785.5" y1="350" x2="791.5" y2="350" stroke="#e5e7eb" stroke-width="2"/>
+<circle cx="823.5" cy="350" r="6" fill="#2a78d6"/>
+<circle cx="858.5" cy="350" r="6" fill="#2a78d6"/>
+<circle cx="893.5" cy="350" r="6" fill="#2a78d6"/>
+<line x1="925.5" y1="350" x2="931.5" y2="350" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="400" y1="366" x2="946" y2="366" stroke="#e5e7eb" stroke-width="1"/>
+<text x="400" y="386" font-size="12.5" fill="#111827">What remains to do</text>
+<line x1="610.5" y1="382" x2="616.5" y2="382" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="645.5" y1="382" x2="651.5" y2="382" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="680.5" y1="382" x2="686.5" y2="382" stroke="#e5e7eb" stroke-width="2"/>
+<circle cx="718.5" cy="382" r="6" fill="#2a78d6"/>
+<circle cx="753.5" cy="382" r="6" fill="#2a78d6"/>
+<circle cx="788.5" cy="382" r="6" fill="#2a78d6"/>
+<circle cx="823.5" cy="382" r="6" fill="#2a78d6"/>
+<circle cx="858.5" cy="382" r="6" fill="#2a78d6"/>
+<line x1="890.5" y1="382" x2="896.5" y2="382" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="925.5" y1="382" x2="931.5" y2="382" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="400" y1="398" x2="946" y2="398" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="400" y1="398" x2="946" y2="398" stroke="#9ca3af" stroke-width="1"/>
+<text x="400" y="413" font-size="10.5" fill="#6b7280">AND THE COPY</text>
+<text x="400" y="440" font-size="12.5" fill="#111827">A description of what is so</text>
+<line x1="610.5" y1="436" x2="616.5" y2="436" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="645.5" y1="436" x2="651.5" y2="436" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="680.5" y1="436" x2="686.5" y2="436" stroke="#e5e7eb" stroke-width="2"/>
+<circle cx="718.5" cy="436" r="6" fill="#eb6834"/>
+<circle cx="753.5" cy="436" r="6" fill="#eb6834"/>
+<circle cx="788.5" cy="436" r="6" fill="#eb6834"/>
+<circle cx="823.5" cy="436" r="6" fill="#eb6834"/>
+<circle cx="858.5" cy="436" r="6" fill="#eb6834"/>
+<circle cx="893.5" cy="436" r="6" fill="#eb6834"/>
+<line x1="925.5" y1="436" x2="931.5" y2="436" stroke="#e5e7eb" stroke-width="2"/>
+<line x1="400" y1="452" x2="946" y2="452" stroke="#e5e7eb" stroke-width="1"/>
+<text x="400" y="478" font-size="12" fill="#6b7280">A test, a commit or a log, named for what it holds, carries one or two kinds.</text>
+<text x="400" y="496" font-size="12" fill="#6b7280">A thread, a note or a doc, named for how it is written, carries five or six; a code comment, four.</text>
+</svg>
