@@ -166,13 +166,17 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   that list by hand. One display word per kind changes visible labels on the run page and settings
   (`lib/render-session.js`, `lib/render-settings.js`), so it is a product call. (LIN-4469 blind
   read.)
-- `lib/run-ledger.js`: Harbour's `PR_URL_RE` reads an `https://github.com/<owner>/<repo>/pull/<n>` URL only, while
-  simple-dispatcher's `sessionPrs`, which reads the session's `DONE:` line in the other repository, also reads an
-  `http://` one and returns the canonical https URL. A run whose `DONE:` line carries an http PR link therefore
-  reports its PR in SD and none in Harbour. The runner-kit contract (`lib/runner-kit/contract.json`, area `report`, the
-  case "a DONE: line with an http URL and a #x fragment") records the split as a declared difference and decides
-  neither side. Which reader is right, and whether Harbour's PR reading should widen to http, is a design call:
-  `PR_URL_RE` feeds every run's PR attribution (`prUrlsIn` and `extractPrUrls`), so widening it changes which PRs a task
-  owns, and narrowing SD changes the other repository. Nothing breaks today: no real run with an http PR link is
-  recorded. When it is decided, change the reader and the row's cells together, then re-copy the contract into SD.
+- `lib/run-ledger.js`: Harbour's `PR_URL_RE` in this file, which feeds every run's PR attribution (`prUrlsIn` and
+  `extractPrUrls`), reads an `https://github.com/<owner>/<repo>/pull/<n>` URL only, while simple-dispatcher's
+  `sessionPrs`, which reads the session's `DONE:` line in the other repository, also reads an `http://` one and returns
+  the canonical https URL. So a run whose `DONE:` line carries an http PR link reports its PR in SD and none in
+  Harbour. Harbour already has a second reader that disagrees with `PR_URL_RE` about http: `isPullRequestUrl` in
+  `lib/milestone-funnel.js` accepts `http://` (pinned in `tests/unit/milestone-funnel.test.js`) and feeds the "PR opened"
+  step of the per-person milestone funnel, reading the `url` of a run's `[evidence]` feedback entries, not its `DONE:`
+  line. The runner-kit contract (`lib/runner-kit/contract.json`, area `report`, the case "a DONE: line with an http URL
+  and a #x fragment") records the SD/Harbour split as a declared difference and decides neither side. Which reader is
+  right, and whether Harbour's PR reading should widen to http, is a design call: widening `PR_URL_RE` changes which PRs
+  a task owns, and narrowing SD changes the other repository. The divergence was found by reading the contract row and
+  the readers, not from a recorded run; it was not checked against recorded runs, so how often an http PR link occurs
+  is not known. When it is decided, change the reader and the row's cells together, then re-copy the contract into SD.
   (LIN-4475 blind read.)
