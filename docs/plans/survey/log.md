@@ -3977,3 +3977,7 @@ John's direction:
   4. **Next round:** the notes spike first, on one real area (Runs & dispatch, 18 KB). Versions: John's TS idea, the "each kind to where it can't drift" version, and possibly a near-nothing version. A fresh agent does a real small task with each; then iterate. The spike is scaffolding: the losing versions are deleted, and the winner replaces the old notes. Then other fixes, real work, and bigger deliberate tidies.
 - **~11:55: no note on the Periodicals.** John: "I have no opinion, but I'd be tempted not to amend anything and just let it run as normal." They'll be minted plain once LIN-4470 lands.
 - **John on papers:** "Worth a paper or two to explore the deeper ideas we've discussed? Might be nice to get a grounded, deeper view for our later discussions." Two drafts (A18, A19) read back to him before filing.
+- **~12:15: A18 and A19 filed and sent.** John: "Agreed, and opus is right for these. Happy for them to be more open ended as questions." I loosened the sub-questions into "threads that may be worth pulling, not a list to answer", and added no Done-when.
+  - **LIN-4478:** why steering text keeps growing and what has made it shrink. Dispatch `f46de243`, custom, Opus high.
+  - **LIN-4479:** what agents need to know beyond the code and where each kind should live. Dispatch `4e6a7c7a`, custom, Opus high.
+  - Text in `asks.md`. My reviewer subagent reads each before merge.

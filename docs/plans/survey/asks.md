@@ -346,3 +346,53 @@ The code carries the same question in several places:
 **Done when** the paper is merged after that independent review, with every claim reachable from its evidence.
 
 **Questions:** settle research and engineering questions yourself; only John's calls go to him as rulings.
+
+### A18. Paper: why does the text that steers Harbour's agents keep growing, and what has ever made it shrink? (14 Nov)
+
+**Agreed with John on 14 Nov** ("Agreed, and opus is right for these. Happy for them to be more open ended as questions."). Filed as **LIN-4478**; one Opus writer, custom dispatch `f46de243`. Reviewer subagent before merge.
+
+**Repository:** JKershaw/LinearViewer (Harbour).
+
+**What this is for.** John, 14 Nov:
+- "How do we get out of Groundhog Day?"
+- On rulings and text: "that whole thing is a smell."
+- "We do want to keep making progress and extra scaffolding and temporary structures are fine. We just need to plan their removal."
+- Earlier: "a drift would be adding a rule, where the correct fix is going back to the bigger picture."
+
+**The question.** Why does the text that steers Harbour's agents keep growing, and what has ever made it shrink? By that text John means ticket text and "As asked", Done-whens, rulings, prompts inside and outside the size limits, the runner contract, the kickoff, the area notes, CLAUDE.md and the docs.
+
+The question is open. Some threads that may be worth pulling, not a list to answer:
+- how that text has grown, and why it keeps growing while people keep trying to cut it;
+- when it has shrunk, and what was different then;
+- what would make temporary structure easy to remove once its job is done.
+
+Follow wherever the record leads, and draw on what is known outside Harbour too.
+
+**What John wants.** A paper to the papers standard, grounded in the record and written by Opus, for a later discussion. John skips reading the paper; an independent reviewer sent by the driving agent reads it before merge, and what it finds is fixed first.
+
+**Questions:** settle research questions yourself.
+
+### A19. Paper: what do agents need to know about a codebase beyond the code, and where should each kind of knowledge live? (14 Nov)
+
+**Agreed with John on 14 Nov.** Filed as **LIN-4479**; one Opus writer, custom dispatch `4e6a7c7a`. Reviewer subagent before merge.
+
+**Repository:** JKershaw/LinearViewer (Harbour).
+
+**What this is for.** John, 14 Nov:
+- "If code is getting 'cleaner' whilst a secret backlog grows, something is afoot and the note about the types of information I think is important."
+- "We simply can't have the notes becoming worse code, functionally."
+- "Perhaps simple text is the wrong format as they need to cross reference and stay up to date."
+- His idea: "simply saving the notes as TS, so they get checks, and can have a reliable, duplicate free, easy to use data structure."
+
+**The question.** What do agents need to know about a codebase beyond the code, and where should each kind of knowledge live?
+
+The question is open. Some threads that may be worth pulling, not a list to answer:
+- what jobs the area notes (`docs/areas/`) actually do, and what kinds of knowledge they hold;
+- for each kind, where it could live so that it stays true, has no second copy, and is easy for agents to use;
+- how the options compare, John's idea among them.
+
+Follow wherever the record leads, and draw on what is known outside Harbour too.
+
+**What John wants.** A paper to the papers standard, grounded in the record and written by Opus, for a later discussion and the notes work that follows it. John skips reading the paper; an independent reviewer sent by the driving agent reads it before merge, and what it finds is fixed first.
+
+**Questions:** settle research questions yourself.
