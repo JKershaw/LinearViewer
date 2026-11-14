@@ -147,7 +147,7 @@ describe('library catalog', () => {
     for (const doc of [...catalog.papers, ...catalog.listed]) {
       assert.equal(doc.summary, before[doc.slug], `${doc.slug}: summary unchanged`);
     }
-    assert.equal(catalog.essays.length, 15, 'fifteen essays (LIN-4485 adds nothing-fights-its-shape)');
+    assert.equal(catalog.essays.length, 16, 'sixteen essays (LIN-4485 adds nothing-fights-its-shape, LIN-4484 adds notes-across-the-border)');
     for (const doc of catalog.essays) {
       assert.notEqual(doc.summary, before[doc.slug], `${doc.slug}: no longer the italic subtitle`);
     }

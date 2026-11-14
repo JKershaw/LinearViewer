@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="520" viewBox="0 0 960 520" font-family="Inter, system-ui, sans-serif" font-size="12" role="img" aria-label="A note card with five numbered parts, and beside it what each part is for and how much of it the lanes already did on 13 November. One: signed, with a heading Harbour recognises. Two: pinned where the reader is working. Three: a default if nobody answers, and a deadline the reader can meet. Four: a bell, sent to the other lane's driver. Five: a receipt, where agreed points at the other side's own words. A drawing, not data."><style data-figure-theme="1">@media (prefers-color-scheme: dark){rect[fill="#fff"]:not([fill-opacity]),rect[fill="#ffffff"]:not([fill-opacity]),rect[fill="white"]:not([fill-opacity]){fill:#16181d}[stroke="#fff"],[stroke="#ffffff"],[stroke="white"]{stroke:#16181d}circle[fill="#fff"]:not([fill-opacity]),circle[fill="#ffffff"]:not([fill-opacity]),circle[fill="white"]:not([fill-opacity]){fill:#16181d}path[fill="#fff"]:not([fill-opacity]),path[fill="#ffffff"]:not([fill-opacity]),path[fill="white"]:not([fill-opacity]){fill:#16181d}polygon[fill="#fff"]:not([fill-opacity]),polygon[fill="#ffffff"]:not([fill-opacity]),polygon[fill="white"]:not([fill-opacity]){fill:#16181d}ellipse[fill="#fff"]:not([fill-opacity]),ellipse[fill="#ffffff"]:not([fill-opacity]),ellipse[fill="white"]:not([fill-opacity]){fill:#16181d}text[fill="#111827"]:not([data-on-fill]),text[fill="#1f2937"]:not([data-on-fill]),text[fill="#333"]:not([data-on-fill]),text[fill="#1f2328"]:not([data-on-fill]),text[fill="#555"]:not([data-on-fill]),text[fill="#475569"]:not([data-on-fill]){fill:#e6e6e6}[stroke="#111827"],[stroke="#1f2937"],[stroke="#333"],[stroke="#1f2328"],[stroke="#555"],[stroke="#475569"]{stroke:#e6e6e6}text[fill="#6b7280"]:not([data-on-fill]),text[fill="#666"]:not([data-on-fill]),text[fill="#667085"]:not([data-on-fill]),text[fill="#888"]:not([data-on-fill]),text[fill="#6e7781"]:not([data-on-fill]),text[fill="#999"]:not([data-on-fill]),text[fill="#aaa"]:not([data-on-fill]),text[fill="#bbb"]:not([data-on-fill]),text[fill="#9ca3af"]:not([data-on-fill]),text[fill="#94a3b8"]:not([data-on-fill]){fill:#9aa0a6}[stroke="#6b7280"],[stroke="#666"],[stroke="#667085"],[stroke="#888"],[stroke="#6e7781"],[stroke="#999"],[stroke="#aaa"],[stroke="#bbb"],[stroke="#9ca3af"],[stroke="#94a3b8"]{stroke:#9aa0a6}[stroke="#e5e7eb"],[stroke="#eee"],[stroke="#d1d5db"],[stroke="#f0f0f0"],[stroke="#cbd5e1"],[stroke="#d9d9d9"]{stroke:#2c313a}[fill="#f3f4f6"],[fill="#f9fafb"]{fill:#1f222a}rect[fill="#f0f0f0"],rect[fill="#d1d5db"],rect[fill="#e5e7eb"],rect[fill="#eee"]{fill:#2c313a}text:not([fill]):not([class]):not([data-on-fill]){fill:#e6e6e6}rect[fill="#1f2937"],circle[fill="#1f2937"],path[fill="#1f2937"]{fill:#4b5563}rect[fill="#3b1f5e"],circle[fill="#3b1f5e"],path[fill="#3b1f5e"]{fill:#553185}svg .t,svg .h{fill:#e6e6e6}svg .a,svg .s{fill:#9aa0a6}svg .f{fill:#1f222a;stroke:#2c313a}svg .g{stroke:#2c313a}rect[fill="#dbeafe"]{fill:#1d2d44}rect[fill="#93c5fd"]{fill:#2a5a9a}rect[fill="#fff7ed"]{fill:#2a2118}}</style><rect x="0" y="0" width="960" height="520" fill="#fff"/>
+<text x="20" y="28" font-size="14" fill="#111827" font-weight="600">A note that gets read</text>
+<text x="20" y="46" font-size="11.5" fill="#6b7280">Five small habits. The lanes had part of three of them already.</text>
+<rect x="30" y="70" width="400" height="376" rx="6" fill="#fff7ed" stroke="#eb6834" stroke-width="1.4"/>
+<circle cx="230" cy="72" r="7" fill="#eb6834"/>
+<circle cx="54" cy="106" r="10" fill="#1f2937"/><text x="54" y="110" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">1</text>
+<text x="76" y="110" font-size="12.5" fill="#111827" font-weight="600">From the Runs lane, for the Prompts lane</text>
+<circle cx="54" cy="140" r="10" fill="#1f2937"/><text x="54" y="144" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">2</text>
+<text x="76" y="144" font-size="12" fill="#111827">Pinned on the ticket you are working on now</text>
+<line x1="46" y1="162" x2="414" y2="162" stroke="#eb6834" stroke-width="1" stroke-opacity="0.45"/>
+<text x="76" y="188" font-size="12" fill="#111827">We would like the rule that sorts comments</text><text x="76" y="205" font-size="12" fill="#111827">to live on our side.</text><text x="76" y="222" font-size="12" fill="#111827">If you would rather keep it, it stays with</text><text x="76" y="239" font-size="12" fill="#111827">you and we borrow it. One copy either way.</text>
+<line x1="46" y1="258" x2="414" y2="258" stroke="#eb6834" stroke-width="1" stroke-opacity="0.45"/>
+<circle cx="54" cy="282" r="10" fill="#1f2937"/><text x="54" y="286" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">3</text>
+<text x="76" y="286" font-size="12" fill="#111827">If we hear nothing once your next step has</text><text x="76" y="303" font-size="12" fill="#111827">run, we go ahead with the first option.</text>
+<line x1="46" y1="320" x2="414" y2="320" stroke="#eb6834" stroke-width="1" stroke-opacity="0.45"/>
+<circle cx="54" cy="344" r="10" fill="#1f2937"/><text x="54" y="348" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">4</text>
+<text x="76" y="348" font-size="12" fill="#111827">Also sent to your driver, so it reaches you</text>
+<line x1="30" y1="374" x2="430" y2="374" stroke="#eb6834" stroke-width="1.4" stroke-dasharray="5 5"/>
+<circle cx="54" cy="404" r="10" fill="#1f2937"/><text x="54" y="408" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">5</text>
+<text x="76" y="400" font-size="12" fill="#111827">Receipt: &quot;agreed&quot; means their words,</text><text x="76" y="417" font-size="12" fill="#111827">on their ticket, and says where</text>
+<text x="30" y="466" font-size="11" fill="#6b7280">The wording is made up for the drawing, after the first note of 13 November.</text>
+<circle cx="480" cy="88" r="10" fill="#1f2937"/><text x="480" y="92" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">1</text>
+<text x="500" y="93" font-size="13" fill="#111827" font-weight="600">Signed</text>
+<text x="500" y="110" font-size="11.5" fill="#111827">A heading Harbour recognises, so a lane's note is</text>
+<text x="500" y="125" font-size="11.5" fill="#111827">never taken for the person's word.</text>
+<text x="500" y="142" font-size="11.5" fill="#6b7280">◐  Ten of the eleven had a heading. Harbour has no kind for a note between lanes.</text>
+<circle cx="480" cy="164" r="10" fill="#1f2937"/><text x="480" y="168" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">2</text>
+<text x="500" y="169" font-size="13" fill="#111827" font-weight="600">Pinned where the reader is</text>
+<text x="500" y="186" font-size="11.5" fill="#111827">On the ticket the other lane is working on now,</text>
+<text x="500" y="201" font-size="11.5" fill="#111827">not the one at its front door.</text>
+<text x="500" y="218" font-size="11.5" fill="#6b7280">◐  The first note was. Three later ones were not.</text>
+<circle cx="480" cy="240" r="10" fill="#1f2937"/><text x="480" y="244" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">3</text>
+<text x="500" y="245" font-size="13" fill="#111827" font-weight="600">A default, and a deadline the reader can meet</text>
+<text x="500" y="262" font-size="11.5" fill="#111827">Silence means the default, once the other lane's</text>
+<text x="500" y="277" font-size="11.5" fill="#111827">next step has had its chance to object.</text>
+<text x="500" y="294" font-size="11.5" fill="#6b7280">◐  Three of the five asks said what silence would mean. The deadline was loose.</text>
+<circle cx="480" cy="316" r="10" fill="#1f2937"/><text x="480" y="320" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">4</text>
+<text x="500" y="321" font-size="13" fill="#111827" font-weight="600">A bell</text>
+<text x="500" y="338" font-size="11.5" fill="#111827">The driver passes the note to the other lane's</text>
+<text x="500" y="353" font-size="11.5" fill="#111827">driver, which can be reached while it works.</text>
+<text x="500" y="370" font-size="11.5" fill="#6b7280">○  The drivers had the permission, and not each other's address.</text>
+<circle cx="480" cy="392" r="10" fill="#1f2937"/><text x="480" y="396" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">5</text>
+<text x="500" y="397" font-size="13" fill="#111827" font-weight="600">A receipt</text>
+<text x="500" y="414" font-size="11.5" fill="#111827">Every &quot;agreed&quot; points at the other side's own</text>
+<text x="500" y="429" font-size="11.5" fill="#111827">words; nothing changes on its side unannounced.</text>
+<text x="500" y="446" font-size="11.5" fill="#6b7280">○  Nothing checked this.</text>
+<text x="20" y="506" font-size="12" fill="#6b7280">A drawing, not data.   ◐ partly there on 13 November   ○ not there yet</text>
+</svg>

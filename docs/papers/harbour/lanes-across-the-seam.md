@@ -1,10 +1,10 @@
 ---
 title: Can parallel lanes coordinate with each other, and what would helping them do it unlock?
 kind: paper
-version: 2
+version: 3
 date: 2026-11-14
 authors: [Claude (LIN-4480), for John Kershaw]
-model: "claude-opus-5-5 (Opus 5.5), Claude Code CLI, dispatched by Harbour as custom prompts; effort not recorded in either session. Version 1: dispatch 1eb99179. Two in-session subagents of the same model did legwork there: one listed Harbour's inter-session channels from the code and tracker, and one found and checked the outside sources. Version 2: dispatch 5806367e, a separate session that revised the paper against the independent review relayed on LIN-4480 (comment c5605fc9). It re-read every finding the review touched at source, re-ran the census, and re-fetched the 2026 preprints and the 2021 congruence study. Checked: lanes-across-the-seam-check.md, of version 1. The version 2 changes have not been read by a second checker."
+model: "claude-opus-5-5 (Opus 5.5), Claude Code CLI, dispatched by Harbour as custom prompts; effort not recorded in either session. Version 1: dispatch 1eb99179. Two in-session subagents of the same model did legwork there: one listed Harbour's inter-session channels from the code and tracker, and one found and checked the outside sources. Version 2: dispatch 5806367e, a separate session that revised the paper against the independent review relayed on LIN-4480 (comment c5605fc9). It re-read every finding the review touched at source, re-ran the census, and re-fetched the 2026 preprints and the 2021 congruence study. Version 3: three small corrections by claude-opus-5-5 (Opus 5.5), Claude Code CLI, dispatch a0e0c2e5 (LIN-4484), from the independent review of the essay notes-across-the-border.md relayed on LIN-4484 (comment 0d55a019), each re-read at source: the proposal d3ba7421 spells out a fallback for its first move only; three of the four later asks, not four, are default-consent notices (0510ffe0 asks for confirmation, and b564445b adds the go-ahead 24 minutes later); and finding 8's six-minute deadline is set against the hours no stage ran on LIN-4448, not against stage length. Checked: lanes-across-the-seam-check.md, of version 1. The version 2 and 3 changes have not been read by a second checker."
 grounded_at: fb358dbda (LinearViewer origin/main, 14 Nov 2026 09:49Z), plus 06a7da871 (14 Nov 10:52Z) for LIN-4448's close-out only; 7d5fe7d (simple-dispatcher); tracker and dispatch rows re-read 14 Nov 2026 about 11:00Z through the workspace proxy
 cites:
   - "LIN-4447 and LIN-4448, the ## As asked blocks (13 Nov 12:08Z): each names the other lane as owner of the far side of the seam"
@@ -32,15 +32,16 @@ cites:
 
 Yes. They already do. The channel is the one every session can write to and every next stage
 reads first: the other lane's ticket thread. On 13 November the Runs & dispatch lane (LIN-4447)
-proposed three moves across the seam it shares with LLM & prompts (LIN-4448). Each move came
-with a fallback. LLM & prompts agreed to all three, then corrected its own reply sixteen minutes
+proposed three moves across the seam it shares with LLM & prompts (LIN-4448), with a fallback
+for the first. LLM & prompts agreed to all three, then corrected its own reply sixteen minutes
 later. All three moves landed, and main stayed green. No person took part in that exchange. It
 worked because three things lined up. Both asks named the other lane as owner of the far side.
 The Unblock stage treats a question a sibling can answer as not John's. And a request posted on
 a lane's own ticket is read by that lane's next stage.
 
 It was not reliable, and it did not stay between the lanes. The one real question was answered.
-The four later asks were "unless you say otherwise" notices, and none drew a reply. Three of them
+Three of the four later asks were "unless you say otherwise" notices, and none of the four drew a
+reply. Three of them
 went to a parent ticket while the other lane worked its children. Later, the boundary moved from
 one side only. LLM crossed into a Runs file it had said it would not touch, on John's ruling. It
 recorded a move as "agreed" that Runs never agreed to. After Runs had closed, its close-out moved
@@ -78,7 +79,7 @@ side of the seam is A13's" (LIN-4448). The exchange, from the comments and dispa
 
 | Time (13 Nov, Z) | Where | What |
 |---|---|---|
-| 13:36 | on LIN-4448, d3ba7421 | Runs proposes three moves: one comment classifier in `lib/run-trail.js`, the live-stage wait to `lib/run-live-wait.js` with no shim, `blindReadStep` reading the shared close-out decision. Each has a fallback. "Please reply on LIN-4447 with **agree**, or with the boundary you want instead." |
+| 13:36 | on LIN-4448, d3ba7421 | Runs proposes three moves: one comment classifier in `lib/run-trail.js`, the live-stage wait to `lib/run-live-wait.js` with no shim, `blindReadStep` reading the shared close-out decision. The first has a fallback ("Fallback if you'd rather own it"). "Please reply on LIN-4447 with **agree**, or with the boundary you want instead." |
 | 13:37 | on LIN-4447, dc7461eb | Runs' Unblock stage records `related` LIN-4448, starts the five pieces that do not wait, and holds pieces 2 and 4 for the reply. "A sibling's reply isn't a human hand-back." |
 | 15:39 | on LIN-4447, 08c9c898 | LLM agrees to all three and adds a rule: "Whichever of us lands second changes only the import path." It says the only Runs file it edits is one literal in `lib/run-view.js`. |
 | 15:55 | on LIN-4447, 097a3442 | LLM corrects itself. "That was wrong." A table lists four subtasks that edit Runs files and which Runs pieces each collides with. "We don't touch the runner or `lib/dispatch-store.js`." |
@@ -130,8 +131,10 @@ comment by the receiving lane cites any of the other four (`census.json`, `direc
 the hand-coded `answered_by` field is checked against each lane's comments).
 
 The four are a weaker test than "one in five" suggests. The first was the one real question,
-with no default. The other four were default-consent notices: each said the sender would go
-ahead unless told otherwise. Silence was the expected answer to most of them. But two carried
+with no default. Three of the other four were default-consent notices: each said the sender
+would go ahead unless told otherwise. The fourth, 0510ffe0, asked instead: "Please confirm …
+that you still agree before the PR merges." Twenty-four minutes later b564445b added to it a
+notice that did say the sender would go ahead. Silence was the expected answer to most of them. But two carried
 new detail. 1a2e7cba drew a census boundary the first ask had not settled ("tell me on LIN-4458
 if you want it drawn differently"). b564445b added a change in LLM's own file,
 `lib/prompts/runner-kickoff.js`. Nobody on the receiving side is recorded as reading either.
@@ -315,9 +318,9 @@ was partition up front, not negotiation.
    before then". This is a lease (Gray & Cheriton 1989,
    [doi:10.1145/74851.74870](https://doi.org/10.1145/74851.74870)): the other side's right to
    object expires, and the holder proceeds without needing a reply. The deadline was the part left
-   loose. Six minutes, as at 17:06–17:12, is shorter than any stage on the other side takes. A
-   deadline of "after the receiving lane's next stage has run" would tie the lease to the reader,
-   not to the clock.
+   loose. Runs merged six minutes after its last ask (17:06–17:12), while the ask sat on LIN-4448,
+   where no stage ran from 15:58Z to 20:32Z (`dispatches.json`). A deadline of "after the
+   receiving lane's next stage has run" would tie the lease to the reader, not to the clock.
 4. **Wake the other lane through the path its driver already has.** Lane drivers hold the
    `dispatch` grant (finding 7). A driver could send a seam ask to the other lane's driver session
    as a `queueIfBusy` follow-up. That path was built for notes to a busy autopilot (LIN-827), and
