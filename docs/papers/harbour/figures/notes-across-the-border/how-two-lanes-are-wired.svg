@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560" font-family="Inter, system-ui, sans-serif" font-size="12" role="img" aria-label="Two lanes side by side with a border between them. In each lane a driver agent and its step agents exchange live messages, up and down, and questions go up to the person. Across the border there is only a note left on the other lane's ticket, read when that lane's next agent starts, and the shared code, tested at every merge. The two drivers could message each other but neither knows the other's address. A drawing, not data."><style data-figure-theme="1">@media (prefers-color-scheme: dark){rect[fill="#fff"]:not([fill-opacity]),rect[fill="#ffffff"]:not([fill-opacity]),rect[fill="white"]:not([fill-opacity]){fill:#16181d}[stroke="#fff"],[stroke="#ffffff"],[stroke="white"]{stroke:#16181d}circle[fill="#fff"]:not([fill-opacity]),circle[fill="#ffffff"]:not([fill-opacity]),circle[fill="white"]:not([fill-opacity]){fill:#16181d}path[fill="#fff"]:not([fill-opacity]),path[fill="#ffffff"]:not([fill-opacity]),path[fill="white"]:not([fill-opacity]){fill:#16181d}polygon[fill="#fff"]:not([fill-opacity]),polygon[fill="#ffffff"]:not([fill-opacity]),polygon[fill="white"]:not([fill-opacity]){fill:#16181d}ellipse[fill="#fff"]:not([fill-opacity]),ellipse[fill="#ffffff"]:not([fill-opacity]),ellipse[fill="white"]:not([fill-opacity]){fill:#16181d}text[fill="#111827"]:not([data-on-fill]),text[fill="#1f2937"]:not([data-on-fill]),text[fill="#333"]:not([data-on-fill]),text[fill="#1f2328"]:not([data-on-fill]),text[fill="#555"]:not([data-on-fill]),text[fill="#475569"]:not([data-on-fill]){fill:#e6e6e6}[stroke="#111827"],[stroke="#1f2937"],[stroke="#333"],[stroke="#1f2328"],[stroke="#555"],[stroke="#475569"]{stroke:#e6e6e6}text[fill="#6b7280"]:not([data-on-fill]),text[fill="#666"]:not([data-on-fill]),text[fill="#667085"]:not([data-on-fill]),text[fill="#888"]:not([data-on-fill]),text[fill="#6e7781"]:not([data-on-fill]),text[fill="#999"]:not([data-on-fill]),text[fill="#aaa"]:not([data-on-fill]),text[fill="#bbb"]:not([data-on-fill]),text[fill="#9ca3af"]:not([data-on-fill]),text[fill="#94a3b8"]:not([data-on-fill]){fill:#9aa0a6}[stroke="#6b7280"],[stroke="#666"],[stroke="#667085"],[stroke="#888"],[stroke="#6e7781"],[stroke="#999"],[stroke="#aaa"],[stroke="#bbb"],[stroke="#9ca3af"],[stroke="#94a3b8"]{stroke:#9aa0a6}[stroke="#e5e7eb"],[stroke="#eee"],[stroke="#d1d5db"],[stroke="#f0f0f0"],[stroke="#cbd5e1"],[stroke="#d9d9d9"]{stroke:#2c313a}[fill="#f3f4f6"],[fill="#f9fafb"]{fill:#1f222a}rect[fill="#f0f0f0"],rect[fill="#d1d5db"],rect[fill="#e5e7eb"],rect[fill="#eee"]{fill:#2c313a}text:not([fill]):not([class]):not([data-on-fill]){fill:#e6e6e6}rect[fill="#1f2937"],circle[fill="#1f2937"],path[fill="#1f2937"]{fill:#4b5563}rect[fill="#3b1f5e"],circle[fill="#3b1f5e"],path[fill="#3b1f5e"]{fill:#553185}svg .t,svg .h{fill:#e6e6e6}svg .a,svg .s{fill:#9aa0a6}svg .f{fill:#1f222a;stroke:#2c313a}svg .g{stroke:#2c313a}rect[fill="#dbeafe"]{fill:#1d2d44}rect[fill="#93c5fd"]{fill:#2a5a9a}rect[fill="#fff7ed"]{fill:#2a2118}}</style><rect x="0" y="0" width="960" height="560" fill="#fff"/>
+<defs><marker id="w-blue" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" fill="#2a78d6"/></marker><marker id="w-orange" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" fill="#eb6834"/></marker><marker id="w-grey" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" fill="#6b7280"/></marker></defs>
+<text x="20" y="28" font-size="14" fill="#111827" font-weight="600">Two lanes, side by side: what can reach whom</text>
+<rect x="340" y="48" width="280" height="50" rx="8" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.4"/>
+<text x="480" y="69" font-size="13" fill="#111827" font-weight="600" text-anchor="middle">John</text>
+<text x="480" y="87" font-size="11.5" fill="#6b7280" text-anchor="middle">settles what only a person can decide</text>
+<rect x="30" y="128" width="360" height="318" rx="10" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.4"/>
+<text x="48" y="154" font-size="13.5" fill="#111827" font-weight="600">Runs lane</text>
+<text x="48" y="172" font-size="11.5" fill="#6b7280">the code that starts agent runs and tracks them</text>
+<rect x="70" y="190" width="280" height="50" rx="8" fill="#dbeafe" stroke="#2a78d6" stroke-width="1.4"/>
+<text x="84" y="211" font-size="12.5" fill="#111827" font-weight="600">Driver agent</text>
+<text x="84" y="229" font-size="11.5" fill="#6b7280">hands out the steps, one at a time</text>
+<rect x="70" y="280" width="280" height="50" rx="8" fill="#dbeafe" stroke="#2a78d6" stroke-width="1.4"/>
+<text x="84" y="301" font-size="12.5" fill="#111827" font-weight="600">Step agents</text>
+<text x="84" y="319" font-size="11.5" fill="#6b7280">look, plan, build, review; each starts fresh</text>
+<rect x="70" y="370" width="280" height="50" rx="8" fill="#fff7ed" stroke="#eb6834" stroke-width="1.4"/>
+<text x="84" y="391" font-size="12.5" fill="#111827" font-weight="600">The lane's tickets</text>
+<text x="84" y="409" font-size="11.5" fill="#6b7280">every agent reads the notes here first</text>
+<line x1="210" y1="244" x2="210" y2="276" stroke="#2a78d6" stroke-width="2" marker-start="url(#w-blue)" marker-end="url(#w-blue)"/>
+<text x="222" y="264" font-size="11" fill="#6b7280">live messages</text>
+<line x1="210" y1="334" x2="210" y2="366" stroke="#6b7280" stroke-width="1.4" marker-start="url(#w-grey)" marker-end="url(#w-grey)"/>
+<text x="222" y="354" font-size="11" fill="#6b7280">reads, then writes</text>
+<rect x="570" y="128" width="360" height="318" rx="10" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.4"/>
+<text x="588" y="154" font-size="13.5" fill="#111827" font-weight="600">Prompts lane</text>
+<text x="588" y="172" font-size="11.5" fill="#6b7280">the code that writes each agent's instructions</text>
+<rect x="610" y="190" width="280" height="50" rx="8" fill="#dbeafe" stroke="#2a78d6" stroke-width="1.4"/>
+<text x="624" y="211" font-size="12.5" fill="#111827" font-weight="600">Driver agent</text>
+<text x="624" y="229" font-size="11.5" fill="#6b7280">hands out the steps, one at a time</text>
+<rect x="610" y="280" width="280" height="50" rx="8" fill="#dbeafe" stroke="#2a78d6" stroke-width="1.4"/>
+<text x="624" y="301" font-size="12.5" fill="#111827" font-weight="600">Step agents</text>
+<text x="624" y="319" font-size="11.5" fill="#6b7280">look, plan, build, review; each starts fresh</text>
+<rect x="610" y="370" width="280" height="50" rx="8" fill="#fff7ed" stroke="#eb6834" stroke-width="1.4"/>
+<text x="624" y="391" font-size="12.5" fill="#111827" font-weight="600">The lane's tickets</text>
+<text x="624" y="409" font-size="11.5" fill="#6b7280">every agent reads the notes here first</text>
+<line x1="750" y1="244" x2="750" y2="276" stroke="#2a78d6" stroke-width="2" marker-start="url(#w-blue)" marker-end="url(#w-blue)"/>
+<text x="762" y="264" font-size="11" fill="#6b7280">live messages</text>
+<line x1="750" y1="334" x2="750" y2="366" stroke="#6b7280" stroke-width="1.4" marker-start="url(#w-grey)" marker-end="url(#w-grey)"/>
+<text x="762" y="354" font-size="11" fill="#6b7280">reads, then writes</text>
+<path d="M336 73 L210 73 L210 124" fill="none" stroke="#6b7280" stroke-width="1.6" marker-start="url(#w-grey)" marker-end="url(#w-grey)"/>
+<path d="M624 73 L750 73 L750 124" fill="none" stroke="#6b7280" stroke-width="1.6" marker-start="url(#w-grey)" marker-end="url(#w-grey)"/>
+<text x="198" y="104" font-size="11" fill="#6b7280" text-anchor="end">questions up, rulings down</text>
+<text x="762" y="104" font-size="11" fill="#6b7280">questions up, rulings down</text>
+<line x1="480" y1="122" x2="480" y2="452" stroke="#9ca3af" stroke-width="1.6" stroke-dasharray="3 6"/>
+<rect x="432" y="126" width="96" height="20" fill="#fff"/>
+<text x="480" y="140" font-size="11.5" fill="#111827" font-weight="600" text-anchor="middle">the border</text>
+<line x1="354" y1="215" x2="606" y2="215" stroke="#9ca3af" stroke-width="1.6" stroke-dasharray="2 5"/>
+<rect x="408" y="165" width="144" height="40" fill="#fff"/>
+<text x="480" y="179" font-size="10.5" fill="#6b7280" text-anchor="middle">could send, never has:</text><text x="480" y="192" font-size="10.5" fill="#6b7280" text-anchor="middle">neither knows the other's</text><text x="480" y="205" font-size="10.5" fill="#6b7280" text-anchor="middle">address</text>
+<path d="M354 305 L462 305 L462 395 L604 395" fill="none" stroke="#eb6834" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#w-orange)"/>
+<rect x="470" y="313" width="96" height="62" fill="#fff"/>
+<text x="474" y="327" font-size="10.5" fill="#111827">the one way</text><text x="474" y="340" font-size="10.5" fill="#111827">across: a note</text><text x="474" y="353" font-size="10.5" fill="#111827">left to be found</text><text x="474" y="366" font-size="10.5" fill="#111827">(either direction)</text>
+<rect x="30" y="470" width="900" height="40" rx="8" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.4"/>
+<text x="480" y="495" font-size="12.5" fill="#111827" font-weight="600" text-anchor="middle">The shared code: every change, from either lane, is tested when it merges</text>
+<text x="20" y="530" font-size="11" fill="#6b7280">A drawing, not data. Blue: messages that reach an agent while it works. All of them run up and down, inside one lane.</text>
+<text x="20" y="546" font-size="11" fill="#6b7280">Orange dashed: the only way across, a note that waits on the other lane's ticket until that lane's next agent starts.</text>
+</svg>

@@ -109,6 +109,14 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   bodies and plan descriptions since the lanes began, and count how many cite a comment id on that ticket written by the other
   side. Count close-outs that edit another lane's `areas.json` entry or note, and how many post on that lane's ticket. If either
   miss rate is not small, the leftover guard or review could check it. (Claude, 2026-11-14, LIN-4480, for John)
+- **Is a seam ask sent from one lane's driver to the other's read sooner than a comment left on the ticket?**
+  `harbour/notes-across-the-border.md`, the essay drawn from `harbour/lanes-across-the-seam.md` (whose Next raised this without
+  filing it), found that every message able to reach a running session runs up and down one lane, that both lanes' drivers held
+  the `dispatch` grant on 13 November but not each other's session ids, and that three asks sat on a parent ticket where no
+  stage ran between 15:58Z and 20:32Z. On the next pair of lanes sharing a seam, give each driver the other's session id at
+  kickoff and send each seam ask two ways: as a comment on the ticket the other lane is working, and as a `queueIfBusy`
+  follow-up to its driver. Record which copy is acted on first, the time from ask to first read, and the tokens the extra
+  delivery costs, against asks sent by comment alone. (Claude, 2026-11-14, LIN-4484, for John)
 - **Which declared twins have ever been paid for?** Half answered: version 2's M3 found three sibling fixes in 165
   subset edits of the named decisions, while 42 sibling escapes sit on decisions the census never named, so the
   question is now about the unnamed ones. For each of the 33 twins in `coherence-as-it-grows-codes.json`, read
