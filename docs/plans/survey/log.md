@@ -3923,3 +3923,35 @@ The notes subagent was given John's words only, not ours or the last agent's. It
 - **Confidence:** about 80% on the diagnosis, about 60% on the shape of Waiting.
 
 The steering-layer history agent is still running.
+
+## 14 Nov, about 11:00 — LIN-4447 Done; history and shape of the steering text
+
+- **LIN-4447 closed at 09:02** on the code, with the area read recorded as inconclusive. The first lane is finished. LIN-4470 has resumed after the cut.
+
+The history subagent read main back to January. Key citations spot-checked: the cut rule (`lib/prompts/stage-kinds.js:27`), "six to one" (`docs/papers/harbour/how-process-changes-land.md:22`), the preamble at 54.7 KB, instructions at 140.1 KB, notes at 100.8 KB.
+
+- **Pattern:** "a failure gets a sentence, and the sentence gets a guard that keeps it."
+  - Process changes that add outnumber those that remove by about 6:1.
+  - Only 8 of 24 review and close-out rules ever changed code (`which-rules-pay.md`).
+  - The recommendation from the six-to-one paper itself became a new rule ("every change names what it retires").
+- **Limits move text, they don't remove it.** The limited prompts fell to 396 KB. Outside the limits:
+  - proxy preamble 25.6 → 54.7 KB;
+  - proxy instructions 112.9 → 140.1 KB;
+  - runner contract 15.9 → 46.4 KB (since 1 Nov);
+  - kickoff 59 KB;
+  - notes 0 → 101 KB;
+  - `docs/architecture` 152 → 410 KB;
+  - `CLAUDE.md` at 11,952 of 12,000 bytes.
+- **Counter-example:** text shrinks when code takes the job. The routing prompt went 106.9 → 10.1 KB (LIN-3300/3304); LIN-4468/4469 also cut prompt text.
+- **Shape:**
+  - Code seals any filed text as "the person's words".
+  - The cut rule makes any shortfall a ruling.
+  - Only John answers rulings, and a `record` effect parks the lane.
+  - Five writers feed the notes, Lessons bind seven prompts, and Waiting has a quota.
+  - The "settle engineering questions yourself" line exists only in ticket bodies; no code grants it.
+- **Five contradictions:**
+  1. Principle 0 vs the cut rule.
+  2. The fail-closed first-dispatch seal vs proxy creates that seal agent text.
+  3. Waiting "context, not scope" vs the LIN-4414 quota.
+  4. "Keep moving" vs rulings that park the lane.
+  5. "Worth or done is the human's" vs measurement Done-whens (mine, in A13).
