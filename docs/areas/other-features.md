@@ -11,10 +11,13 @@ Area notes for `other-features` in the registry. Format and rules: README.md.
 
 ## Waiting
 
-- `lib/stage-writes.js`: its header says `lib/prompts/stage-intent.js` keeps the reading-pass text and that
-  every prompt template declares `writes`; since LIN-4467 the text and `writes` are on each kind's record
-  (`lib/prompts/stage-kinds.js`), and stage-intent.js and the template are views. A two-path comment fix.
-  (LIN-4467 leftovers.)
+- `lib/stage-writes.js`: it has grown from a vocabulary leaf into the proxy's write-allowance policy
+  (`STAGE_WRITE_OPS`, `ALLOWED_OPS`, `stageWriteAllows`, `sameTicketKey`, `stampMintOptions`), which agent-api
+  enforces (`lib/stage-write-gate.js`, `routes/proxy-writes.js`), yet the registry still files it under this
+  catch-all. `STAGE_WRITE_OPS` also hand-lists the `SPEC` keys and route operation names; only the route census
+  test keeps them in step. Waiting on a decision: which area owns the policy, and whether the `writes`
+  vocabulary (read by prompts and the preamble) splits from the enforcement table. Not scheduled; no ticket
+  takes it. (LIN-4448 blind read.)
 - `lib/home-view.js`: split it (over 600 lines), and separate `upNextOf`'s eligibility
   from its ranking, so both lists filter one candidate model. The module threads `shown`,
   `waiting`, `linked` and `onHome` through every placement. (Survey tally: LIN-4151,
