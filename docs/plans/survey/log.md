@@ -3981,3 +3981,7 @@ John's direction:
   - **LIN-4478:** why steering text keeps growing and what has made it shrink. Dispatch `f46de243`, custom, Opus high.
   - **LIN-4479:** what agents need to know beyond the code and where each kind should live. Dispatch `4e6a7c7a`, custom, Opus high.
   - Text in `asks.md`. My reviewer subagent reads each before merge.
+- **~12:30: A17 and the Fable essay go before the discussion.**
+  - John: "I figured it's useful to have for the discussion, and there's no rush at the moment so we can get everything we want, that's going to be helpful, landed."
+  - So: send A17 when LIN-4470 lands. Once A17 is reviewed and merged, send the essay to Fable; Harbour accepts `fable`, though its id points to an older Fable version (noted, not changed).
+  - The pause point is now when the LLM lane is closed and the Periodicals, A17, A18, A19 and the essay have landed.
