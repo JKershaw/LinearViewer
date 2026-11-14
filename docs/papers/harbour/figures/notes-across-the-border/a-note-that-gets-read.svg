@@ -33,7 +33,7 @@
 <text x="500" y="245" font-size="13" fill="#111827" font-weight="600">A default, and a deadline the reader can meet</text>
 <text x="500" y="262" font-size="11.5" fill="#111827">Silence means the default, once the other lane's</text>
 <text x="500" y="277" font-size="11.5" fill="#111827">next step has had its chance to object.</text>
-<text x="500" y="294" font-size="11.5" fill="#6b7280">◐  Four of the five asks said what silence would mean. One deadline: six minutes.</text>
+<text x="500" y="294" font-size="11.5" fill="#6b7280">◐  Three of the five asks said what silence would mean. The deadline was loose.</text>
 <circle cx="480" cy="316" r="10" fill="#1f2937"/><text x="480" y="320" font-size="11" fill="#fff" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">4</text>
 <text x="500" y="321" font-size="13" fill="#111827" font-weight="600">A bell</text>
 <text x="500" y="338" font-size="11.5" fill="#111827">The driver passes the note to the other lane's</text>

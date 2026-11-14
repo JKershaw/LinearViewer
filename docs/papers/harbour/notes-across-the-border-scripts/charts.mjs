@@ -1,4 +1,4 @@
-// Generates the five figures for docs/papers/harbour/notes-across-the-border.md (version 1, LIN-4484).
+// Generates the five figures for docs/papers/harbour/notes-across-the-border.md (version 2, LIN-4484).
 //   figure 1 how two lanes are wired (drawing), figure 2 eleven notes (data), figure 3 four lanes (data),
 //   figure 4 a note that gets read (drawing), figure 5 line or network (drawing).
 //   node docs/papers/harbour/notes-across-the-border-scripts/charts.mjs docs/papers/harbour/figures/notes-across-the-border && npm run figures:theme
@@ -9,6 +9,7 @@
 //                 shared_files_by_lane_pair, files_changed, files_changed_by_more_than_one_lane
 //   prs.json      the merge time of the change that went ahead on its fallback (#2432)
 //   issues/LIN-4447.json  when the Runs lane closed (completedAt)
+//   issues/LIN-4468.json  John's ruling on the border at 22:00 (comment 24e376c1)
 // One event sits outside that folder: the Prompts lane's last step (PR #2457, commit 06a7da871, 14 Nov 10:52Z),
 // read from `git show 06a7da871` (docs/areas/areas.json and docs/areas/runs-and-dispatch.md).
 // Every value plotted is asserted below; a changed input fails the script instead of drawing a different claim.
@@ -63,6 +64,9 @@ assert.equal(fallbackMerge.mergedAt.slice(0, 16), '2026-11-13T17:12', 'the Runs 
 assert.equal(fallbackMerge.lane, RUNS);
 const runsClosed = read('issues/LIN-4447.json').completedAt;
 assert.equal(runsClosed.slice(0, 16), '2026-11-14T09:02', 'the Runs lane closed at 09:02 on 14 November');
+const ruling = read('issues/LIN-4468.json').comments.find(c => c.id.startsWith('24e376c1'));
+assert.ok(ruling.body.startsWith('Allow the store change'), "John's ruling on the border: 'Allow the store change'");
+assert.equal(ruling.createdAt.slice(0, 16), '2026-11-13T22:00', 'John ruled at 22:00 on 13 November');
 
 assert.equal(census.merged_prs, 29);
 assert.deepEqual(census.merged_prs_by_lane, { [FRONT]: 6, [JIRA]: 4, [PROMPTS]: 7, [RUNS]: 12 });
@@ -160,6 +164,7 @@ function notesFigure() {
     ...notes.slice(0, 6).map((n, i) => ({ n, num: `${i + 1}` })),
     { event: 'runs', time: '17:12', label: 'Runs goes ahead, on the fallback it had stated' },
     ...notes.slice(6, 8).map((n, i) => ({ n, num: `${i + 7}` })),
+    { event: 'prompts', time: ruling.createdAt.slice(11, 16), label: 'John rules: “Allow the store change”', out: 'the one ruling by a person', outFill: INK },
     { day: '14 November' },
     { event: 'runs', time: runsClosed.slice(11, 16), label: 'The Runs lane closes', close: true },
     { n: notes[8], num: '9–11', triple: true, label: ['Three reports', 'posted to a lane that had closed'] },
@@ -167,7 +172,7 @@ function notesFigure() {
   ];
   const H = TOP + rows.length * ROW + 78;
   const COLOR = { taken: BLUE, unanswered: ORANGE, unasked: GREY };
-  const o = [svgOpen(W, H, 'Eleven notes between the Runs lane and the Prompts lane on 13 and 14 November, in time order. The first three, a proposal, an agreement and a correction, were answered or taken up. Four later notes that asked for an answer have no reply on record. One heads-up asked for none. Three reports were posted after the Runs lane had closed.')];
+  const o = [svgOpen(W, H, 'Eleven notes between the Runs lane and the Prompts lane on 13 and 14 November, in time order. The first three, a proposal, an agreement and a correction, were answered or taken up. Four later notes that asked for an answer have no reply on record. One heads-up asked for none. John ruled on the border at 22:00. Three reports were posted after the Runs lane had closed.')];
   o.push(`<defs>${marker('n-taken', BLUE)}${marker('n-unanswered', ORANGE)}${marker('n-unasked', GREY)}</defs>`);
   o.push(text(20, 28, 'Eleven notes across the border', { size: 14, weight: 600 }));
   o.push(text(20, 46, 'Every note one lane wrote to the other, 13 and 14 November, in order. Times are UTC.', { size: 11.5, fill: MUTED }));
@@ -198,10 +203,10 @@ function notesFigure() {
       o.push(`<rect x="${x - 6}" y="${y - 6}" width="12" height="12" rx="2" fill="${MARK}"/>`);
       if (r.event === 'runs') o.push(text(x + 16, y + 4, r.label, { size: 12, weight: 600 }));
       else {
-        o.push(`<rect x="${xL - 30}" y="${y - 11}" width="${xR - xL + 14}" height="22" fill="#fff"/>`);
+        o.push(`<rect x="${xL + 8}" y="${y - 11}" width="${xR - xL - 24}" height="22" fill="#fff"/>`);
         o.push(text(x - 16, y + 4, r.label, { size: 12, weight: 600, anchor: 'end' }));
       }
-      if (r.out) o.push(text(xOut, y + 4, r.out, { size: 11.5, fill: ORANGE, weight: 600 }));
+      if (r.out) o.push(text(xOut, y + 4, r.out, { size: 11.5, fill: r.outFill || ORANGE, weight: 600 }));
       return;
     }
     const k = kind(r.n), c = COLOR[k];
@@ -233,7 +238,7 @@ function notesFigure() {
   key(20, BLUE, 'answered, or built on by the lane it was sent to');
   key(350, ORANGE, 'asked for an answer; none on record');
   key(620, GREY, 'asked for none; no sign it was read', true);
-  o.push(text(20, H - 16, 'Square marks are events, not notes. Source: lanes-across-the-seam-evidence/census.json (directed_messages), prs.json, issues/LIN-4447.json; commit 06a7da871.', { size: 11, fill: MUTED }));
+  o.push(text(20, H - 16, 'Squares are events. Source: lanes-across-the-seam-evidence/census.json (directed_messages), prs.json, issues/LIN-4447.json and LIN-4468.json; commit 06a7da871.', { size: 11, fill: MUTED }));
   o.push('</svg>');
   return o.join('\n') + '\n';
 }
@@ -321,7 +326,7 @@ function noteFigure() {
   const habits = [
     ['◐', 'Signed', 'A heading Harbour recognises, so a lane\'s note is', 'never taken for the person\'s word.', 'Ten of the eleven had a heading. Harbour has no kind for a note between lanes.'],
     ['◐', 'Pinned where the reader is', 'On the ticket the other lane is working on now,', 'not the one at its front door.', 'The first note was. Three later ones were not.'],
-    ['◐', 'A default, and a deadline the reader can meet', 'Silence means the default, once the other lane\'s', 'next step has had its chance to object.', 'Four of the five asks said what silence would mean. One deadline: six minutes.'],
+    ['◐', 'A default, and a deadline the reader can meet', 'Silence means the default, once the other lane\'s', 'next step has had its chance to object.', 'Three of the five asks said what silence would mean. The deadline was loose.'],
     ['○', 'A bell', 'The driver passes the note to the other lane\'s', 'driver, which can be reached while it works.', 'The drivers had the permission, and not each other\'s address.'],
     ['○', 'A receipt', 'Every "agreed" points at the other side\'s own', 'words; nothing changes on its side unannounced.', 'Nothing checked this.'],
   ];
