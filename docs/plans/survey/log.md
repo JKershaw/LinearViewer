@@ -3995,3 +3995,6 @@ John's direction:
   - Stability `9e403ed9`.
 - **A17 filed as LIN-4480** (agreed text from `asks.md`) and sent to one Opus writer: custom dispatch `1eb99179`, effort high. Reviewer subagent before merge; then the essay goes to Fable.
 - **10:01 UTC: ruling `lin4448-done-whenever`.** LIN-4448's last Done-when (the blind read beats the control) is not met: D = −0.3, no detectable difference. Options: close, continue (a new scoped ticket), or remeasure. The run recommended close. I suggested **close**, as with LIN-4447. This is the same false escalation from the same gate, the one I put into the lane's Done-when.
+- **~10:54 UTC: LIN-4448 Done.** John applied `close`. Close-out merged as `06a7da871` (PR #2457: blind-read fixes, plus three Waiting entries). **Both tidy lanes are finished.**
+- **Papers are up for review:** A18 PR #2451 (CI green), A19 PR #2452, A17 PR #2453. Three independent reviewer subagents were sent, one per paper (claims against evidence, papers standard, reasoning, privacy, index).
+- **Periodicals in progress:** LIN-4481 (Drift, PR #2455, in review), LIN-4482 (Seams, blind read "same"), LIN-4483 (Stability, PR #2456, in review).
