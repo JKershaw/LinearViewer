@@ -1,0 +1,866 @@
+{
+ "grounded_at": {
+  "LinearViewer": "a886fb506",
+  "simple-dispatcher": "7d5fe7d94"
+ },
+ "entries": [
+  {
+   "id": "LV:agent-api:W2",
+   "claims": [
+    {
+     "claim": "The rate-limit rule (60/min per token; 429 wait Retry-After) is restated in ~eight places",
+     "verdict": "true",
+     "evidence": "git grep '60.*min' a886fb506: proxy-instructions.js 361,1143,1253,1309; autopilot-kickoff.js:658; flight-companion-kickoff.js:124; docs/autopilot-kickoff.md:233; agent-api.md:56 = 8 (7 say 'per token'). 'About eight' holds."
+    },
+    {
+     "claim": "The limiter keys on the proven credential, else the IP (routes/proxy.js)",
+     "verdict": "true",
+     "evidence": "routes/proxy.js:247-250 proxyLimiterKey: provenCredentials.has(hash) ? credential:hash : ipKeyGenerator(req.ip)."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "1"
+  },
+  {
+   "id": "LV:agent-api:W6",
+   "claims": [
+    {
+     "claim": "The catalog (lib/proxy-instructions.js) omits the `leftover` row kind and the DONE-wake hold",
+     "verdict": "true",
+     "evidence": "grep -n leftover proxy-instructions.js: only the leftover-answer comment rules (849,861); no leftover row kind or wake hold; line 989 mentions only a 'wake' row."
+    },
+    {
+     "claim": "The kind contract 'prompt-template keys plus custom' misses 23 DISPATCH_KINDS",
+     "verdict": "false",
+     "evidence": "node import lib/prompt-templates.js: DISPATCH_KINDS has 24 (20 templates + custom + 3); the contract misses only 3: autopilot, defer, periodical."
+    },
+    {
+     "claim": "It also misses the ROW_ONLY_KINDS (lib/dispatch-fields.js)",
+     "verdict": "true",
+     "evidence": "dispatch-fields.js:188 ROW_ONLY_KINDS = ['wake','leftover']; neither is a template key or custom (proxy-instructions.js:909)."
+    }
+   ],
+   "entry": "some-false",
+   "checker": "1"
+  },
+  {
+   "id": "LV:agent-api:W11",
+   "claims": [
+    {
+     "claim": "About 16 production sites compare a credential to 'test-token' inline",
+     "verdict": "false",
+     "evidence": "git grep \"'test-token'\" in server.js lib routes public: inline comparisons only routes/test.js:60, should-mock-ai.js:30 (the helper), key-state-holders.js:50 via MOCK_ACCESS_TOKEN. About 3, not 16."
+    },
+    {
+     "claim": "routes/proxy-compute.js has 7 inline sites, server.js 3",
+     "verdict": "false",
+     "evidence": "proxy-compute.js has 0 inline 'test-token'; its 7 sites (268,326,389,1092,1227,1353,1487) call isHermeticTestToken. server.js's 3 sites (1788,3186,4041) also call the helper."
+    },
+    {
+     "claim": "isHermeticTestToken is imported by only two production modules",
+     "verdict": "false",
+     "evidence": "git grep isHermeticTestToken: imported by 11 production modules (server.js, dispatch-entrance, dispatch-factory, proxy-compute, task-chat, workspace-api, -audit, -issue-read, -issue-write, -prompts, -steps)."
+    }
+   ],
+   "entry": "some-false",
+   "checker": "1"
+  },
+  {
+   "id": "LV:front-end-browser:L4",
+   "claims": [
+    {
+     "claim": "Shared modules are served only through the SHARED_MODULES allow-list, one route per file",
+     "verdict": "true",
+     "evidence": "lib/vendor-assets.js:47-50,71-82: router.get per listed url; files not on the list are not served."
+    },
+    {
+     "claim": "lib/time-words.js is the second shared module",
+     "verdict": "true",
+     "evidence": "SHARED_MODULES = {'/lib/cost-format.js', '/lib/time-words.js'}: two entries, time-words second."
+    },
+    {
+     "claim": "The server and the task page both import it; the page's own copies were removed",
+     "verdict": "true",
+     "evidence": "public/task-page.js:39 and lib/task-page-loader.js etc. import it; no fmtDuration/relativeAgo definition left in public/task-page.js (only live-console.js has its own fmtDuration)."
+    },
+    {
+     "claim": "public/ is flat, with no nested .js files",
+     "verdict": "true",
+     "evidence": "git ls-tree -r a886fb506 public | grep '/.*/.*\\.js$' gives nothing."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "1"
+  },
+  {
+   "id": "LV:front-end-browser:L8",
+   "claims": [
+    {
+     "claim": "runClassic exempts exactly two IIFE siblings: chart-helpers.js and close-out.js",
+     "verdict": "true",
+     "evidence": "tests/unit/classic-loader-census.test.js:120 RUN_CLASSIC_SIBLINGS = ['chart-helpers.js','close-out.js']."
+    },
+    {
+     "claim": "importWorld installs no stub fetch, setInterval or clipboard; real timers unless `timers` is passed",
+     "verdict": "true",
+     "evidence": "tests/unit/helpers/import-world.js: no fetch/clipboard/setInterval stubs; setTimeout collected only when timers given (lines 69-81)."
+    },
+    {
+     "claim": "The census is a ratchet that may only fall",
+     "verdict": "true",
+     "evidence": "classic-loader-census.test.js header: a new classic suite fails, and a listed suite that no longer loads classic fails until the list is lowered."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "1"
+  },
+  {
+   "id": "LV:front-end-browser:W7",
+   "claims": [
+    {
+     "claim": "public/observation.js is about 5,000 lines",
+     "verdict": "true",
+     "evidence": "git show a886fb506:public/observation.js | wc -l = 5,028."
+    },
+    {
+     "claim": "1,985 of its 4,679 non-blank lines are comments (lines starting *, //, /*)",
+     "verdict": "false",
+     "evidence": "Same method now gives 1,995 of 4,686 (grep -cE '^\\s*(\\*|//|/\\*)'; awk NF). 1,985/4,679 is the count before 6348e5781 (LIN-4463 piece 4)."
+    },
+    {
+     "claim": "Converting it to a module did not change its size",
+     "verdict": "true",
+     "evidence": "Non-blank lines 4,679 at 6348e5781^ vs 4,686 now (+7), so the size is essentially unchanged."
+    },
+    {
+     "claim": "It has 105 seams",
+     "verdict": "false",
+     "evidence": "The export {…} block (line 4881) has 108 names (102 without its 6 constants); the old module.exports had 107. No rule found gives 105."
+    }
+   ],
+   "entry": "some-false",
+   "checker": "1"
+  },
+  {
+   "id": "LV:front-end-pages:L1",
+   "claims": [
+    {
+     "claim": "Settings › Models renders 86 unnamed controls",
+     "verdict": "unclear",
+     "evidence": "Runtime count that depends on the number of rows/presets. lib/render-settings.js still leaves harness select, effort input and preset-name input unnamed (model select has aria-label); review: 42+42+2."
+    }
+   ],
+   "entry": "unclear",
+   "checker": "1"
+  },
+  {
+   "id": "LV:front-end-pages:W2",
+   "claims": [
+    {
+     "claim": "The Jira site picker overflows 390px by 52px and 320px by 122px; select right edge at 442px",
+     "verdict": "unclear",
+     "evidence": "Rendered-layout measurement (review 8 Nov); cannot be settled statically. renderJiraSiteSelectPage at lib/render-pages.js:444 still renders select#jira-site-select."
+    }
+   ],
+   "entry": "unclear",
+   "checker": "1"
+  },
+  {
+   "id": "LV:front-end-pages:W11",
+   "claims": [
+    {
+     "claim": "getCreateTaskUrl is overridden on Linear, GitHub, Local and Jira (four overrides)",
+     "verdict": "true",
+     "evidence": "git grep getCreateTaskUrl lib/providers: overrides at linear:2411, github:460, local:592, jira:1590; github-projects none; base throws (interface.js:467)."
+    },
+    {
+     "claim": "The external deep-link branch has no in-tree provider",
+     "verdict": "true",
+     "evidence": "render.js:532-536: ui.inlineCreate wins; all four write providers implement createIssue, so inlineCreate is true; github-projects has write false."
+    },
+    {
+     "claim": "GitHub Projects has no create affordance",
+     "verdict": "true",
+     "evidence": "lib/providers/github-projects/index.js:17 'getCreateTaskUrl NOT overridden'; no createIssue method."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "1"
+  },
+  {
+   "id": "LV:llm-and-prompts:L13",
+   "claims": [
+    {
+     "claim": "The rule (close-out merges and sets Done) is retyped in five files; only a test links them",
+     "verdict": "true",
+     "evidence": "Pinned phrases (tests/unit/lin-4390-periodical-hand-off.test.js) live in periodicals.js, prompt-template-defs.js, proxy-preamble.js, proxy-instructions.js, autopilot-kickoff.js = 5. No code links them, only that test."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "1"
+  },
+  {
+   "id": "LV:llm-and-prompts:W1",
+   "claims": [
+    {
+     "claim": "Four hand-built renders (dispatch-entrance.js, proxy-compute.js twice, workspace-api-prompts.js) plus recommendation-input make five sites a new field must reach",
+     "verdict": "true",
+     "evidence": "git grep 'generatePrompt(': dispatch-entrance.js:1591, proxy-compute.js:338,492, workspace-api-prompts.js:260 build context themselves; recommendation-input.js:36-38 is the fifth projection."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "1"
+  },
+  {
+   "id": "LV:llm-and-prompts:W8",
+   "claims": [
+    {
+     "claim": "`docs/areas/` is spelled in 26 lines across 11 code files",
+     "verdict": "false",
+     "evidence": "git grep -F 'docs/areas' over lib routes public server.js scripts excluding .md: 20 lines in 12 files (19 in 11 without the test). With scripts' .md: 29 in 14."
+    },
+    {
+     "claim": "The spellings span lib/, routes/, public/, server.js, scripts/",
+     "verdict": "false",
+     "evidence": "Same grep: hits only in lib/ and scripts/; routes/, public/ and server.js contain none."
+    },
+    {
+     "claim": "Two leaves spell the directory, REGISTRY_PATH and NOTES_DIR, neither derived from the other",
+     "verdict": "true",
+     "evidence": "area-registry-path.js:6 'docs/areas/areas.json'; area-note-format.js:8 NOTES_DIR = 'docs/areas'; both literals."
+    }
+   ],
+   "entry": "some-false",
+   "checker": "1"
+  },
+  {
+   "id": "LV:other-features:W2",
+   "claims": [
+    {
+     "claim": "lib/home-view.js is over 600 lines",
+     "verdict": "true",
+     "evidence": "git show a886fb506:lib/home-view.js | wc -l = 636."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "1"
+  },
+  {
+   "id": "LV:providers:L1",
+   "claims": [
+    {
+     "claim": "readDescription/holdAsAsked (as-asked-region.js) are the only code that knows the ADF region and harbour.asAsked property",
+     "verdict": "true",
+     "evidence": "Region constants live only in as-asked-region.js; jira/index.js only passes the imported AS_ASKED_PROPERTY into readDescription and property writes. Others mention it only in comments."
+    },
+    {
+     "claim": "Every provider-side getIssue passes AS_ASKED_READ",
+     "verdict": "false",
+     "evidence": "git grep '.getIssue(' lib/providers/jira | grep -v AS_ASKED_READ: index.js:1329 (_epicCreateField) calls client.getIssue(String(epicId)) without it. The other 15 pass it."
+    },
+    {
+     "claim": "tests/unit/jira-as-asked-region.test.js fails on a direct adfToMarkdown description read",
+     "verdict": "true",
+     "evidence": "Test at line 293 scans jira/index.js for adfToMarkdown( calls other than comment bodies. It scans only index.js, not other files."
+    }
+   ],
+   "entry": "some-false",
+   "checker": "1"
+  },
+  {
+   "id": "LV:reports-and-operator-tools:W7",
+   "claims": [
+    {
+     "claim": "Three survey scripts use their own trailing-(#N) squash test, so the rule is spelled four ways",
+     "verdict": "true",
+     "evidence": "stability-measures-core.mjs:176 SQUASH_PR; survey-growth-git.mjs:90; survey-halving-git.mjs:55; survey-tests-friction-git.mjs:172,181 = 4 files."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "1"
+  },
+  {
+   "id": "LV:runs-and-dispatch:L20",
+   "claims": [
+    {
+     "claim": "lib/cost-read-calls.js holds readCalls, appCallsOf and callsSurfaceOf as pure readers over docs",
+     "verdict": "true",
+     "evidence": "Exports at lines 31,74,91, each (docs = []) with no store access; only import is callTelemetryOf."
+    },
+    {
+     "claim": "appCallsOf([]) is the one empty shape",
+     "verdict": "true",
+     "evidence": "git grep: empty calls built only as appCallsOf([]) (cost-read.js:691, proxy-compute.js:713); no hand-built {calls:0,...} literal elsewhere."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "1"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W18",
+   "claims": [
+    {
+     "claim": "Changing buildRunEvidence's signature touches about 25 call sites",
+     "verdict": "true",
+     "evidence": "git grep -c 'buildRunEvidence(': 26 callers (run-evidence.test.js 15, lin-4437 6, lin-4458 2, golden 1, routes/dashboard.js 1, readRunEvidence 1)."
+    },
+    {
+     "claim": "resolveRunPrRef is read by the routes/dashboard.js pr-state route; ci-wake-sweep matches every cited PR",
+     "verdict": "true",
+     "evidence": "dashboard.js:502 resolveRunPrRef(model); ci-wake-sweep.js:39,337 uses extractPrUrls(comments)."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "1"
+  },
+  {
+   "id": "LV:web-routes:W3",
+   "claims": [
+    {
+     "claim": "No test fails with the timeline fragment's mask removed (0 of 84)",
+     "verdict": "unclear",
+     "evidence": "Needs a mutation run, which can't be done in a read-only checkout. 'Mask' (withoutSpend vs maskSecretsInHtml) and the 84 population are unstated. Tests do call withoutSpend (task-timeline*.test.js)."
+    }
+   ],
+   "entry": "unclear",
+   "checker": "1"
+  },
+  {
+   "id": "LV:wiring:W2",
+   "claims": [
+    {
+     "claim": "The app-wide JSON and urlencoded parsers keep the default inflate: true",
+     "verdict": "true",
+     "evidence": "server.js:1237 express.urlencoded({extended:false}), 1241 express.json({limit:'250kb'}); no inflate option anywhere."
+    },
+    {
+     "claim": "No first-party client sends compressed request bodies",
+     "verdict": "true",
+     "evidence": "git grep -iE 'content-encoding|gzip|CompressionStream' in LV public/lib/routes and SD 7d5fe7d94: no client sets a request Content-Encoding."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "1"
+  },
+  {
+   "id": "SD:state-and-config:W1",
+   "claims": [
+    {
+     "claim": "About 130 process.env reads in config.js",
+     "verdict": "true",
+     "evidence": "git show 7d5fe7d94:config.js | grep -o process.env | wc -l = 136 (133 outside comments)."
+    },
+    {
+     "claim": "8 of the 11 SD_* flags in config.js default on",
+     "verdict": "true",
+     "evidence": "11 envFlag('SD_…') calls (lines 831-1382); 8 have true and 3 false (TOOL_ACTIVITY, OPENCODE_TELEMETRY, RESOURCE)."
+    },
+    {
+     "claim": "Nothing lists the flags",
+     "verdict": "true",
+     "evidence": "git grep for a flag registry (FLAGS=, FLAG_NAMES, SD_FLAGS) finds nothing; env-flag.js only parses."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "1"
+  },
+  {
+   "id": "SD:stop-hook-and-relay:L4",
+   "claims": [
+    {
+     "claim": "Every sentinel line rule is sentinelLine in transcript.js; hook.js has no sentinel regex; a test fails if one returns",
+     "verdict": "true",
+     "evidence": "transcript.js:323-346 (DONE_LINE/doneLineRest + FAILED, PENDING-*, PENDING, BLOCKED); no such regex in hook.js; test/lin-4474-sentinel-family.test.js:72 guards it."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "1"
+  },
+  {
+   "id": "SD:stop-hook-and-relay:W4",
+   "claims": [
+    {
+     "claim": "runner-contract.test.js checks the fixture against FIXTURE_SHA256; report/sentinel rows pin transcript-based readers, fold rows request-usage.js",
+     "verdict": "true",
+     "evidence": "test/runner-contract.test.js:58,69; pinReport via links.js (built on transcript.js), pinSentinel uses latestAssistantText, pinFold requires ../request-usage (522-523)."
+    },
+    {
+     "claim": "Since columnProblems was retired, nothing in this repo checks a row's shape",
+     "verdict": "true",
+     "evidence": "git grep columnProblems/checkRowShape 7d5fe7d94: only comments/docs; test:31 says the only row-shape check is LinearViewer's."
+    },
+    {
+     "claim": "W-4 finds row 'abort row under an unknown halt mode' by name and reserializes with JSON.stringify(table,null,2)+'\\n'",
+     "verdict": "true",
+     "evidence": "test/runner-contract.test.js:209 findIndex by case name; :214 serialize = JSON.stringify(table, null, 2) + newline."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "1"
+  },
+  {
+   "id": "LV:agent-api:W3",
+   "claims": [
+    {
+     "claim": "GET /issues (the list) returns no createdAt",
+     "verdict": "true",
+     "evidence": "lib/providers/linear/index.js API_ISSUES_QUERY and API_ISSUES_QUERY_ALL select no createdAt (only the detail fragment API_ISSUE_FIELDS does); routes/proxy-reads.js /api/proxy/issues maps nodes through flattenIssue."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "LV:agent-api:W7",
+   "claims": [
+    {
+     "claim": "docs/proxy-integration.md lacks the seven model-routing routes the code serves",
+     "verdict": "true",
+     "evidence": "routes/proxy-model-routing.js registers 3 GET + 4 POST under /api/proxy/model-routing; grep 'model-routing' docs/proxy-integration.md finds 0."
+    },
+    {
+     "claim": "the guide lacks POST runner/usage/:id",
+     "verdict": "true",
+     "evidence": "routes/proxy-runner.js USAGE_ROUTE; grep -c 'runner/usage' docs/proxy-integration.md = 0."
+    },
+    {
+     "claim": "the kit's contract has no row for POST runner/usage/:id",
+     "verdict": "true",
+     "evidence": "grep 'runner/usage' lib/runner-kit/contract.json: no match (its 'usage' keys are unrelated fields)."
+    },
+    {
+     "claim": "the catalog lacks three snapshot and prompt routes",
+     "verdict": "true",
+     "evidence": "routes/proxy-compute.js serves /issues/:id/snapshots, /snapshots/diff, /issues/:id/prompt/:templateKey (+alias); none appears in lib/proxy-instructions.js; other prompt routes are listed."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "LV:auth-accounts-and-workspaces:W2",
+   "claims": [
+    {
+     "claim": "NODE_ENV==='production' is the only production signal for seven controls",
+     "verdict": "true",
+     "evidence": "git grep \"NODE_ENV === 'production'\": session-options.js (secret refusal, session cookie), user-preferences.js:504 theme cookie, server.js:1209 trust proxy, :1216 301, response-headers.js HSTS, email-transport.js:83 console refusal = 7."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "LV:front-end-browser:L5",
+   "claims": [
+    {
+     "claim": "public/cost-format-global.js is the only module that writes a global for classic scripts",
+     "verdict": "true",
+     "evidence": "Scanned every public/*.js with import/export for window./globalThis. assignments: only cost-format-global.js:13 window.CostFormat."
+    },
+    {
+     "claim": "its names, one emitter and classic readers are inventoried in tests/unit/bridge-inventory.test.js",
+     "verdict": "true",
+     "evidence": "Test pins BRIDGED=['CostFormat'], one emitter (the shim), CONSUMERS={'/prompt-section.js'}."
+    },
+    {
+     "claim": "a page that is a module imports the formatter directly and reads no bridge",
+     "verdict": "true",
+     "evidence": "flight-companion.js, observation.js, workspace-kpis.js import ../lib/cost-format.js; task-page.js reads none; only classic prompt-section.js reads window.CostFormat."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "LV:front-end-browser:W3",
+   "claims": [
+    {
+     "claim": "postBrief/errorText in brief.js is identical to postRecap/errorText in recap.js",
+     "verdict": "true",
+     "evidence": "public/brief.js:46-64 vs public/recap.js:43-61: same code apart from the brief/recap names."
+    },
+    {
+     "claim": "the statusCode-in-200-body check is written four times (brief, recap, scan, observation)",
+     "verdict": "true",
+     "evidence": "Counting files: 4. Counting sites: 5 (scan.js has two, lines 406 and 435). git grep statusCode public."
+    },
+    {
+     "claim": "scan.js, recap.js, brief.js are not modules; observation.js is",
+     "verdict": "true",
+     "evidence": "grep '^(import|export) ' counts: brief 0, recap 0, scan 0, observation 3."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "LV:front-end-browser:W12",
+   "claims": [
+    {
+     "claim": "the mount decision is spread over eight if (mounted) { } blocks",
+     "verdict": "true",
+     "evidence": "grep -n 'if (mounted)' public/flight-companion.js: 8 hits (lines 171,244,684,851,913,1990,2039,2178)."
+    },
+    {
+     "claim": "chatHistory, cadence, seenIdentifiers, PILL_GLYPHS, modelActiveIdx, resumeAnchorMs, keepStopped are declared inside those blocks",
+     "verdict": "true",
+     "evidence": "var declarations at lines 172,174,249,685,852,2060,2061, all inside if (mounted) blocks."
+    },
+    {
+     "claim": "a 2,200-line file",
+     "verdict": "true",
+     "evidence": "wc -l: 2,204 lines."
+    },
+    {
+     "claim": "nothing fails if the wrapper is forgotten, except under the omitMounts test",
+     "verdict": "true",
+     "evidence": "omitMounts is used once: tests/unit/flight-companion-client.test.js:4512 (loadClient option). No other missing-mount check found."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "LV:front-end-pages:W1",
+   "claims": [
+    {
+     "claim": "Settings › Models has 42 unnamed select.harness-select",
+     "verdict": "false",
+     "evidence": "Rendered renderSettingsPage(area 'models'): 22 with no presets, 44 with one saved preset (1+21 kind rows per preset block). No preset count gives 42. They are dispatch kind rows, not JOBS rows (39)."
+    },
+    {
+     "claim": "42 unnamed input.dispatch-effort-input (one per job row)",
+     "verdict": "false",
+     "evidence": "Same render: 22 (no presets) or 44 (one preset). DISPATCH_DEFAULT_KINDS has 21 entries; one per dispatch row."
+    },
+    {
+     "claim": "2 unnamed input.dispatch-preset-name-input",
+     "verdict": "true",
+     "evidence": "With one saved preset: 2 (lib/render-settings.js:313 and :350), neither with a label or aria-label."
+    },
+    {
+     "claim": "the other seven areas have none",
+     "verdict": "true",
+     "evidence": "lib/settings-areas.js AREAS has 8 areas; rendering each, only models has these controls or selects without aria-label/id."
+    }
+   ],
+   "entry": "some-false",
+   "checker": "2"
+  },
+  {
+   "id": "LV:front-end-pages:W4",
+   "claims": [
+    {
+     "claim": "every Library document renders two <h1>, 117 of 117",
+     "verdict": "true",
+     "evidence": "loadLibrary('docs') gives 117 docs; renderLibraryDoc for each: 117 with exactly 2 <h1> (shell 'Harbour' via renderPageHeader plus the document title)."
+    },
+    {
+     "claim": "the index renders one",
+     "verdict": "true",
+     "evidence": "renderLibraryIndex(catalog): 1 <h1>."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "LV:front-end-pages:W13",
+   "claims": [
+    {
+     "claim": "view-nav header says roadmap/dispatch/proxy are flag-gated, but proxy is always pushed",
+     "verdict": "true",
+     "evidence": "lib/components/view-nav.js:13 comment vs line 88 links.push proxy, unconditional."
+    },
+    {
+     "claim": "the header omits live-console's roadmap-tier slot",
+     "verdict": "true",
+     "evidence": "Header tier list (lines 11-18) has no live-console; code pushes it at line 81."
+    },
+    {
+     "claim": "header says 'the six in EXPERIMENTAL_VIEWS' where feature-defaults lists seven",
+     "verdict": "true",
+     "evidence": "view-nav.js:15 'the six'; lib/feature-defaults.js:132-140 has 7 entries."
+    },
+    {
+     "claim": "footer.js near line 89 says model name is filled from /api/recommend/status; client reads workspace-scoped path",
+     "verdict": "true",
+     "evidence": "footer.js:89 comment; public/app.js:2297 fetches /workspace/${urlKey}/api/recommend/status."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "LV:llm-and-prompts:L20",
+   "claims": [
+    {
+     "claim": "the witness holds a sha256 for all 40 real-context renders, fresh and fix round",
+     "verdict": "true",
+     "evidence": "tests/fixtures/lin-4467-witness.json renders has 40 keys (<kind>:fresh / <kind>:fix, 20 template kinds), each with sha256."
+    },
+    {
+     "claim": "it regenerates with node tests/fixtures/lin-4467-witness.js --write",
+     "verdict": "true",
+     "evidence": "lin-4467-witness.js:11 and :138 handle --write."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "LV:llm-and-prompts:W4",
+   "claims": [
+    {
+     "claim": "19 of JOBS' 39 rows are not template kinds",
+     "verdict": "true",
+     "evidence": "node: lib/llm-jobs.js JOBS length 39; 19 ids not in PROMPT_TEMPLATES (20 keys)."
+    },
+    {
+     "claim": "the route and writes pins are the one check not read back from the record",
+     "verdict": "true",
+     "evidence": "tests/unit/lin-4253-stage-traits.test.js header: 'The pin table is the one non-circular check'; PINNED is hand-typed."
+    },
+    {
+     "claim": "six non-template labels and two orchestration step words in lib/run-view.js",
+     "verdict": "true",
+     "evidence": "STAGE_LABELS adds leftover, autopilot, wake, periodical, custom, defer (6); STEP_KIND_WORDS hand-writes autopilot, wake (2)."
+    },
+    {
+     "claim": "VIRTUAL_PROMPTS (lib/workflow-config.js) is gone",
+     "verdict": "true",
+     "evidence": "git grep VIRTUAL_PROMPTS in lib/routes/server.js/public/tests/scripts: only a change-log line in scripts/prompt-template-change-log.md."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "LV:llm-and-prompts:W9",
+   "claims": [
+    {
+     "claim": "Periodical prompts have no ceiling, only a sha256 tripwire",
+     "verdict": "true",
+     "evidence": "tests/unit/lin-4313-periodical-prompt-bytes.test.js pins sha256 only; prompt-size-budget.test.js has no periodical caps."
+    },
+    {
+     "claim": "docs/reviews/ has 109 top-level reports",
+     "verdict": "false",
+     "evidence": "git ls-tree a886fb506 docs/reviews/: 118 top-level .md files (101 named *-review-<date>); 9 subdirectories. No rule found gives 109."
+    },
+    {
+     "claim": "docs/reviews/ is 88 MB",
+     "verdict": "true",
+     "evidence": "git ls-tree -r -l docs/reviews sums to 93.0 MB = 88.7 MiB (including subdirectories)."
+    }
+   ],
+   "entry": "some-false",
+   "checker": "2"
+  },
+  {
+   "id": "LV:platform-and-plumbing:L1",
+   "claims": [
+    {
+     "claim": "lib/vendor-assets.js serves the Chart.js bundle, which inlines @kurkle/color 0.3.2 while the lock installs 0.3.4",
+     "verdict": "true",
+     "evidence": "vendor-assets.js:43 '/chart.umd.min.js'; banner in node_modules/chart.js/dist/chart.umd.min.js '@kurkle/color v0.3.2'; package-lock.json @kurkle/color 0.3.4."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "LV:reports-and-operator-tools:W1",
+   "claims": [
+    {
+     "claim": "createProxyClient is the one proxy client in scripts/ that paces from the start and honours 429 Retry-After",
+     "verdict": "true",
+     "evidence": "stability-measures-tracker.mjs:39 paces then reads Retry-After. scripts/false-live-rows.js also honours Retry-After but does not pace up front, so the conjunction holds."
+    },
+    {
+     "claim": "the other 47 scripts that read the proxy pace by fixed sleeps",
+     "verdict": "false",
+     "evidence": "git grep api/proxy scripts: 42 .js/.mjs files (41 besides the tracker); 31 sleep at all, 11 do not, and false-live-rows.js uses Retry-After. Broader match (tokens/Bearer): 52 files, 33 with sleeps."
+    },
+    {
+     "claim": "pipeline-churn.mjs sleeps 1.1 s, and 5 s × attempt on a 429",
+     "verdict": "true",
+     "evidence": "scripts/pipeline-churn.mjs:72 sleep(1100); :73 sleep(5000 * (attempt + 1))."
+    }
+   ],
+   "entry": "some-false",
+   "checker": "2"
+  },
+  {
+   "id": "LV:runs-and-dispatch:L2",
+   "claims": [
+    {
+     "claim": "every queue exit other than a take archives through _archiveItem",
+     "verdict": "true",
+     "evidence": "lib/dispatch-store.js: removeItem and takeItem go via _archiveOrRestore, expiry via _archiveItem. Caveats: the take archives too; test-only clear() and no-history cleanup() delete without archiving."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W12",
+   "claims": [
+    {
+     "claim": "fmtWhen stays in lib/task-page-loader.js",
+     "verdict": "true",
+     "evidence": "task-page-loader.js:120 export function fmtWhen."
+    },
+    {
+     "claim": "lib/components/time.js and lib/render-task-timeline.js import it from the loader",
+     "verdict": "true",
+     "evidence": "time.js:13 and render-task-timeline.js:28 import { fmtWhen } from the loader."
+    },
+    {
+     "claim": "about five importers",
+     "verdict": "true",
+     "evidence": "Hedged count: 4 importers (time.js, render-task-timeline.js, render-task-page.js:70, tests/unit/task-page-loader.test.js). 'About five' tolerates 4."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "LV:runs-and-dispatch:W19",
+   "claims": [
+    {
+     "claim": "six exports that nothing under lib/, routes/ or server.js calls; only tests/unit/completion-signals.test.js",
+     "verdict": "true",
+     "evidence": "git grep each of the six names across lib routes server.js public scripts tests: only tests/unit/completion-signals.test.js; no internal calls."
+    },
+    {
+     "claim": "hasSignals's null branch is unreachable",
+     "verdict": "true",
+     "evidence": "COMPLETION_SIGNALS maps STAGE_KINDS records' signals; node: 20 entries, none null."
+    },
+    {
+     "claim": "the header still says 'simplified 3-label system'",
+     "verdict": "true",
+     "evidence": "lib/completion-signals.js:28."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "LV:wiring:W1",
+   "claims": [
+    {
+     "claim": "under NODE_ENV=test server.js seeds the catalog from tests/fixtures/openrouter-models-2026-11-08.json",
+     "verdict": "true",
+     "evidence": "server.js:1039 _seedCatalogFromBodyForTests(readFileSync(...2026-11-08.json)), in the test branch."
+    },
+    {
+     "claim": "scripts/replay-brief.mjs calls _resetCatalogCacheForTests",
+     "verdict": "true",
+     "evidence": "scripts/replay-brief.mjs:23 import, :46 call."
+    },
+    {
+     "claim": "two pinned catalogs are kept",
+     "verdict": "true",
+     "evidence": "tests/fixtures has openrouter-models-2026-11-07.json and -2026-11-08.json."
+    },
+    {
+     "claim": "openrouter-models-2026-11-07.json is read only by tests/unit/stream-chat-whole-or-loud.test.js",
+     "verdict": "true",
+     "evidence": "git grep 'models-2026-11-07': readFileSync only at stream-chat-whole-or-loud.test.js:45; lib/openrouter-catalog.js:82 is a comment."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "SD:launch-and-harnesses:W1",
+   "claims": [
+    {
+     "claim": "opencode-runner.js is 1,836 lines (at 07c88f7)",
+     "verdict": "true",
+     "evidence": "git show 07c88f7:opencode-runner.js | wc -l = 1836; also 1836 at 7d5fe7d94."
+    },
+    {
+     "claim": "server lifecycle, session turn, hold beats and usage/telemetry relays share one file",
+     "verdict": "true",
+     "evidence": "opencode-runner.js has pollUntilReady/killServer, runOpenCode, holdForOpenCodeFollowUp, relayRequestRecords in one file."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "SD:stop-hook-and-relay:L3",
+   "claims": [
+    {
+     "claim": "transcript.js holds the one DONE: line rule (doneLineRest)",
+     "verdict": "true",
+     "evidence": "Only DONE regex in non-test JS: transcript.js:323 DONE_LINE; hook.js (via sentinelLine) and links.js read doneLineRest."
+    },
+    {
+     "claim": "transcript.js holds the one tool call/result join (toolCallsWithResults)",
+     "verdict": "true",
+     "evidence": "transcript.js:364; read by walkToolActivity and links.js. heartbeat.js pendingTool tracks still-open calls by id, which transcript.js:362 marks as a different question."
+    },
+    {
+     "claim": "parseCompletionSentinel: first line wins; sessionPrs: newest wins",
+     "verdict": "true",
+     "evidence": "hook.js:697-705 returns the first matching line; links.js sessionPrs uses newestGroupsFirst."
+    },
+    {
+     "claim": "runner-contract.json has report and sentinel rows",
+     "verdict": "true",
+     "evidence": "test/fixtures/runner-contract.json rows: area 'report' 9, 'sentinel' 7."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "SD:stop-hook-and-relay:W3",
+   "claims": [
+    {
+     "claim": "line rules and kind strings are SENTINEL_LINES in transcript.js; SELF_CHECK_PROMPT and decideHookAction in hook.js",
+     "verdict": "true",
+     "evidence": "transcript.js:337; hook.js:625 and :1781."
+    },
+    {
+     "claim": "reapers.js calls SELF_CHECK_PROMPT the single source of truth for the format",
+     "verdict": "true",
+     "evidence": "reapers.js:1482-1483."
+    },
+    {
+     "claim": "sentinelLine has one reader (hook.js); doneLineRest is also read by links.js",
+     "verdict": "true",
+     "evidence": "git grep sentinelLine: hook.js only, outside transcript.js and tests; links.js:26 imports doneLineRest."
+    },
+    {
+     "claim": "nothing ties the kind list to the prompt or the router",
+     "verdict": "true",
+     "evidence": "No test iterates SENTINEL_LINES against SELF_CHECK_PROMPT or decideHookAction. hook-decision.test.js checks per-token prompt wording by hand."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  },
+  {
+   "id": "SD:test-harnesses:W2",
+   "claims": [
+    {
+     "claim": "park-read.test.js imports Harbour's lib/session-telemetry.js and lib/dispatch-terminal.js rather than using HTTP",
+     "verdict": "true",
+     "evidence": "test/system/park-read.test.js:44 import(HARBOUR_DIR/file), :59 and :67/:73; both files exist in LV at a886fb506."
+    },
+    {
+     "claim": "it is the (first and still only) system test that imports Harbour modules",
+     "verdict": "true",
+     "evidence": "git grep 'import(' test/system: no other system test imports a Harbour module; the others only name the files in comments."
+    }
+   ],
+   "entry": "all-true",
+   "checker": "2"
+  }
+ ]
+}
