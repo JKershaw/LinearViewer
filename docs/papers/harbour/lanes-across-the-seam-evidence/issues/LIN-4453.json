@@ -1,0 +1,154 @@
+{
+ "assignee": null,
+ "children": [],
+ "comments": [
+  {
+   "body": "## Survey open-0: LIN-4453 @ 4b5001ddf\n\nRead at `origin/main` 4b5001ddf, using `docs/areas/areas.json`, `routes/proxy-writes.js`, `lib/run-ledger.js` and the survey log's area-read precedent.\n\n**Why this is hard.** Running the reads is easy. Making this read something the last subtask can compare against is not.\n\n1. **A baseline with no diff has nothing to compare against.** Every earlier area read compared two states: the `blind-read` template, and Next 2 in `docs/plans/survey/place-ledger.md` (two passes per subject, criteria logged before reading). Piece 0 reads one state. If each report is a single scored pass and the after-read is another, LLM noise will probably be larger than the gap between Runs and the control. The rubric should fix the after-step now: compare BASE against the after-commit, in two passes per area, with the verdict criteria written before reading. Piece 0's reports then become the BASE half, recorded with the SHA and the exact file list.\n\n2. **The sampling rule has to hold while the files change.** Runs is 116 files and 2.29 MB under first-match. Raw match gives 117, because `lib/dispatch-tokens.js` goes to agent-api first. The plan adds files: `lib/run-trail.js` and `lib/run-live-wait.js` match `run-*` and join Runs. Piece 7's `lib/cost-read-calls.js` maps to **other-features** today, so it only joins once `areas.json` changes. Piece 4 deletes `recommendation-live-wait.js`, which is in LLM & prompts. A \"largest N\" rule picks `dispatch-store.js` (249 KB) and `dispatch-entrance.js` (123 KB) first, and the plan deliberately leaves those two mostly untouched, which dilutes any effect. An alphabetical or \"first N\" rule shifts as soon as files appear or disappear. I'd pick files by a stable hash of the path under a byte budget: unchanged files stay picked, and new files come in by the same rule. Record the `areas.json` SHA used.\n\n3. **Some of the copies being retired sit outside Runs.** The check route is in `routes/workspace-api-run-evidence.js` (web-routes). `blindReadStep`, `recommendation-facts.js` and the live wait are in llm-and-prompts. A read of Runs alone will see `closeOutDecision` arrive but won't see that the copies are gone. So \"Runs reads better\" measures only half the move. That's the deeper problem: the rule's footprint crosses area lines, and Seams already found moving files doesn't fix that. Say it in the rubric rather than letting the after-read overclaim.\n\n4. **The area notes skew the result.** Runs' note is 11.5 KB and holds 20 Waiting entries the pieces will delete. The control's note is 6.4 KB. A note-plus-code read improves just because entries disappear. Either score code and note separately, or record both now.\n\n5. **Trail hazard on LIN-4447.** `landingPrUrls` skips only blind reads and Survey reports. A `## Area read` comment counts like any other. LIN-4447 has no review yet, so the anchor is the start of the trail, and any full PR URL in an Area read joins the parent's landing. That includes the rubric's own PR. The final blind read and the close-out gate would then have to account for it. Tell readers to cite `path@sha`, not PR URLs, and link the rubric the same way. It's a small live instance of the classifier split piece 2 targets.\n\n6. **Readers and location.** There's no dispatch kind for an area read, and the `blind-read` template needs PRs. So the readers have to be run by hand, as subagents, with the precedent's exclusions (area plans, `docs/plans/`, `docs/reviews/`, `docs/papers/`, both tickets). \"Commit beside the reports\" has no single place, since the reports are comments. `docs/plans/survey/` is the precedent.\n\n**What I'd do first.** Write the sampling rule and run it at 4b5001ddf. Check the picked set against the plan's touched Runs files (`run-closeout-state`, `close-out-readiness`, `run-evidence`, `run-ledger`, `recent-runs`, `task-timeline`, `dispatch-leftover`, `dispatch-feedback-validation`, `dispatch-factory`, `close-out-merges`). If the sample barely overlaps them, the after-read can't see the work, so fix the rule before any reader runs. Then commit the rubric, file list and SHA, and only then dispatch the four passes.\n",
+   "createdAt": "2026-11-13T14:06:18.145Z",
+   "id": "81f86eeb-fc54-4eca-93df-3c399462fa9a",
+   "user": {
+    "name": "John \u201cSausage Roller\u201d Kershaw"
+   }
+  },
+  {
+   "body": "## Survey global: LIN-4453 @ 4b5001ddf\n\n**Where it lands.** In code, nowhere: this piece adds files to `docs/plans/survey/` and posts comments. But that corner of the place is busy. It holds a blind-read pilot that already retired itself into a pointer (`docs/plans/survey/blind-read-prompt.md` \u2192 the `blind-read` template and `lib/prompts/blind-read-words.js`), a 330 KB `log.md`, and frozen before/after kits under `experiments/`. The area being measured is getting heavier: `lib/dispatch-store.js` went from 2,308 lines (15 Sep) to 3,685 (1 Nov) to 4,530 (10 Nov). At 4b5001ddf, first-match gives Runs 116 files / 2.29 MB (20 Waiting entries, 4,269 B Lessons) and `front-end-pages` 92 / 1.13 MB (14, 1,024 B).\n\n**What the obvious way does.**\n- *A second copy of the reader's rules.* The blind-read template already sets the exclusions (area notes, `docs/plans/`, `docs/reviews/`, `docs/papers/`) and the verdict words. A prose rubric that restates them will drift. Cite them, and write down only what differs: one area at one SHA, and no diff.\n- *The control isn't sealed.* `lib/render-task-timeline.js`, `lib/render-run-evidence.js`, `lib/render-task-page.js` and `lib/render-session.js` belong to `front-end-pages` and import planned-change modules. A signature change in a piece edits the \"untouched\" area. List these four in the manifest so the after-read can say whether they moved.\n- *Sample coverage.* The ten planned files are small (4\u201331 KB). An equal-count path-hash sample of about 12 per area covers about one of them. Largest-first gets `dispatch-store` and `dispatch-entrance` instead. Either is fine if the report says it reads the area at large. A planned-files stratum would break symmetry with the control, which has no plan.\n- *No version to pin.* `areas.json` has no version field, so record its blob SHA.\n- *Nothing checks \"unchanged\".* No test or proxy check notices if the rubric is edited between the reads. Put its blob SHA in each `## Area read` comment, and have the after-read cite the same blob.\n- *Trail hazard (confirmed).* `landingPrUrls` (`lib/run-ledger.js`) skips only blind reads and Survey reports. A full PR URL in an area read joins LIN-4447's landing, so cite `path@sha`.\n\n**Better, at this task's cost.** One file, `docs/plans/survey/area-read.md`, holding three things: the rule; the manifests (SHA, `areas.json` blob, paths); and the rubric as a pointer plus the differences. Score code readability and note readability separately. Two passes per area, since a single reader per SHA mostly measures reader variance. Retires nothing; say so.\n\n**Better still, not this task's.**\n- (a) Make `landingPrUrls` allow-list the comment kinds that carry a landing, so the path@sha rule stops being prose. This is a Runs change for a later piece.\n- (b) Make the after-read a *paired* read: before SHA vs after SHA, the same manifest, the blind-read verdict words. That is the blind-read template given a manifest instead of PRs, not a new kind, and it avoids comparing two absolute scores by hand.\n- (c) The underlying symptom is `dispatch-store.js` growing by about 850 lines a fortnight. A baseline records that; it doesn't bend it.\n",
+   "createdAt": "2026-11-13T14:09:36.527Z",
+   "id": "e6cd5f58-7b27-49d7-bed9-4f984ae94ee4",
+   "user": {
+    "name": "John \u201cSausage Roller\u201d Kershaw"
+   }
+  },
+  {
+   "body": "## LIN-4453 summary: piece 0 baseline, PR open for review\n\n- **PR:** https://github.com/JKershaw/LinearViewer/pull/2422\n- **Commit (HEAD):** `7c3e9b59ef5340fd19964955d953e2a753d80128` on `feat/lin-4453-area-read-baseline`\n- **CI:** green on this head. Unit tests, Unit tests (proxy, clock +400d), E2E shards 1/4 to 4/4, Secret scan (source) and the `CI success` aggregator all report SUCCESS.\n- **Contamination check:** all four counted readers read only their own inputs file and used no other tool. The stray fifth reader was stopped; its output was not used.\n- **Baseline (base 4b5001ddf):** Runs & dispatch code 3.15 / note 3.25; control (front-end-pages) code 3.40 / note 3.00. Noise guards held.\n- **LIN-4447 comments:** overlap settled as an engineering call `e6ca12b3-e640-4c51-934e-152b8cbdf047`; Runs report `10a2fef6-52bf-4a43-aeb7-3b8a6487d162`; front-end report `9231ebc6-2d8b-4c38-99ba-691b83d8f81b`.\n\n**Gate:** the LIN-4447 gate (\"both reports and the committed rubric on LIN-4447 before any implementation piece merges\") is satisfied for the reports now. The rubric lands with this PR's merge, so **this PR must merge before any other piece's PR.** Merging is for review and close-out, not for this session.\n",
+   "createdAt": "2026-11-13T14:33:01.006Z",
+   "id": "e788ed01-8aec-4d2a-b348-96fbc64a21b2",
+   "user": {
+    "name": "John \u201cSausage Roller\u201d Kershaw"
+   }
+  },
+  {
+   "body": "### Leftovers\n- noted, Runs & dispatch's note: `lib/run-ledger.js`: `landingPrUrls` skips only blind reads and survey reports, so it does not know the `## Area read` comment kind this piece introduced. Only the kit's prose rule (cite `path@sha`, never a PR URL) keeps area reads out of LIN-4447's landing. The one comment classifier (LIN-4458) is the natural home.\nRetires: none, no waiting entry (no area the change touched has a Waiting entry: every changed path is under `docs/`, which `docs/areas/areas.json` does not claim, and piece 0 retires nothing by plan)\n\nPR: https://github.com/JKershaw/LinearViewer/pull/2422, head `8704e39eae96e563928eb85e2a03d7ffba3a2cb3`. CI green on that head: Unit tests, Unit tests (proxy), E2E 1/4 to 4/4, Secret scan and `CI success` all SUCCESS. No Lesson added: Runs Lessons stay 4,268 of 6,144 bytes, and the note now has 21 Waiting entries.\n",
+   "createdAt": "2026-11-13T14:42:45.148Z",
+   "id": "77d10d91-98cd-42e5-865e-a90874e3aef1",
+   "user": {
+    "name": "John \u201cSausage Roller\u201d Kershaw"
+   }
+  },
+  {
+   "body": "## Review \u2014 LIN-4453\n\nReviewed PR #2422 at head `8704e39eae96e563928eb85e2a03d7ffba3a2cb3` (4 commits on base `4b5001ddf`; `origin/main` has not moved since the ticket was filed, so nothing needed re-grounding).\n\nCI: green on `8704e39e`. Unit tests, Unit tests (proxy, clock +400d), E2E 1/4 to 4/4, Secret scan (source) and `CI success` all SUCCESS. The PR is docs only, so CI proves little beyond the area-notes guard. I re-checked the measurement claims myself (below).\n\n### What I checked independently\n- **Sample reproduces.** I extracted the kit's snippet from the PR and ran it at `4b5001ddf` for both areas. It gives exactly the 14 + 14 files in the kit and in both reports: Runs 115 in universe / 199,552 bytes, front-end 92 / 206,530 bytes.\n- **Pins are right.** `areas.json` `d13fca20\u2026`, Runs note `38107133\u2026` (11,540 B), front-end note `971d4bf6\u2026` (6,404 B), and the four tracked control files (`render-task-timeline` `1f26d930\u2026`, `render-run-evidence` `29ea01bd\u2026`, `render-task-page` `e5e1626c\u2026`, `render-session` `05fafa3d\u2026`) all match `git rev-parse 4b5001ddf:<path>`.\n- **The kit is frozen.** `area-read.md` (`cbec2d84\u2026`) and `area-read-reader-prompt.md` (`ef1c2ca9\u2026`) were each touched only in the first commit, `4a21feb1d`. The later commits add the reports, an addendum and a note entry, and leave both blobs alone. The departure in how inputs were delivered (a file path in place of pasted inputs) is recorded in `area-read-method-as-run.md` rather than made by editing the kit. That is the right call.\n- **The reports on LIN-4447 match the repo.** Comments `10a2fef6\u2026` and `9231ebc6\u2026` are byte-identical (ignoring whitespace) to `docs/plans/survey/area-read-reports/*-4b5001ddf.md`. Both are headed `## Area read: \u2026`, cite both blob SHAs, and contain no PR URL, so the `landingPrUrls` hazard is avoided. The same holds for the overlap call `e6ca12b3\u2026`.\n- **The scores add up.** Per pass: Runs A 3.25\u21923.3 / B 3.0; FE A 3.25\u21923.3 / B 3.5. The noise guard did not fire in either area (gaps 0.3 and 0.2). Code and note are scored in separate blocks, as both Surveys asked.\n- **Every Survey point is handled.** Hash-keyed sampling under a stable rule. The `areas.json` blob is recorded. The four control files that import planned-change modules are tracked. Notes are scored separately. Two passes per area. `path@sha` citations. \"Measures only part of the move\" is stated (Known limits 2). The verdict criteria were fixed before any reading.\n\n**Regression check.** The only non-new file is `docs/areas/runs-and-dispatch.md`. The PR adds one Waiting entry and edits no Lessons (4,268 of 6,144 B, per the guard). The last 5 commits to that note are additive too. Nothing is reverted or re-applied.\n\n**Gap analysis against `## As asked`, sentence by sentence.**\n- *Fresh agents read Runs and `front-end-pages` in the same window, from sampled files plus the note only.* Met. Four counted readers ran in one batch, and method \u00a74\u20135 records the contamination check.\n- *One sampling rule, the same count per area, plus the area note.* Met (N = 14, SHA-256 path key).\n- *A short rubric for readers.* Met (`area-read-reader-prompt.md`).\n- *Commit the rubric and rule beside the reports so the after-read reuses them unchanged.* Met in the PR, and blob-pinned. It lands on merge.\n- *Post each report on LIN-4447 headed `## Area read`, never `## Blind read`.* Met.\n- *Witness: both reports and the committed rubric are on LIN-4447 before any implementation piece merges.* Reports met. \"Committed rubric\" is met once this PR merges. No LIN-4447 piece PR is open or merged today. See ledger item 1.\n- *Retires nothing.* Met. The Leftovers `Retires:` line says none and gives the reason (every changed path is under unclaimed `docs/`).\n- *Binding constraints.* No code, no stored readiness, no provider reads, Lessons untouched and under the cap.\n\n**Isolated, or one of a class?** The one class instance is the comment-kind classifier gap: `landingPrUrls` does not know `## Area read`. It is **outside** this ticket. It belongs to LIN-4458's bounded class (one comment classifier, piece 2), and the diff already gives it its home as a Runs Waiting entry. It does not break anything today, because the prose rule holds and the posted reports carry no PR URL. Beyond that, this is an isolated measurement change.\n\n**Test quality.** No tests added or changed, which suits a docs-only measurement. There was no code path to mutation-check. The snippet re-run above stands in as the behavioural witness for the sampling rule.\n\n**Small fixes for close-out** (neither touches the frozen kit or prompt blobs):\n1. `docs/plans/survey/area-read-method-as-run.md` \u00a77: add a bullet fixing the rounding convention. *\"An area's combined score is the mean of the two readers' reported one-decimal means (Runs 3.3/3.0 \u2192 3.15; control 3.3/3.5 \u2192 3.40), not recomputed from K1\u2013K4 (which would give 3.125 and 3.375). The after-read uses the same convention.\"* The kit doesn't say which to use, and the after-read should not have to guess.\n2. `docs/areas/runs-and-dispatch.md`, the new Waiting entry: change \"An area-read kind in the one comment classifier would make that rule code.\" to \"An area-read kind in the one comment classifier (LIN-4458, piece 2) would make that rule code.\" This names where the entry is scheduled, which is the M2 gap both Runs readers scored.\n\n### What CI Did Not Prove\n- **Inside: gate ordering.** The witness needs this PR merged before any LIN-4447 implementation piece merges. *Before the merge:* close-out confirms no PR for LIN-4454\u2026LIN-4461 has merged to `main` (`gh pr list --state merged --search \"LIN-4454 OR LIN-4455 OR LIN-4456 OR LIN-4457 OR LIN-4458 OR LIN-4459 OR LIN-4460 OR LIN-4461\"` returns none). Wrong would be any hit.\n- **Inside: the kit lands unchanged.** The after-read verifies blobs `cbec2d848d63e18a0a0bdd6d5ed17307dcde6c26` and `ef1c2ca9173831f53ca32b60da1d805d27bf2159`. *After the deploy (post-merge):* `git rev-parse origin/main:docs/plans/survey/area-read.md` and `\u2026:docs/plans/survey/area-read-reader-prompt.md` must equal those two SHAs. A squash merge keeps the file contents, but check before LIN-4462 relies on it.\n- **Inside: reader isolation.** The baseline depends on the four counted readers having seen only their own `inputs.md`. The evidence is the transcript parse recorded in method \u00a75, which review cannot re-run, because the transcripts are session-local and the brief says not to repeat the reads. Accepted as recorded. A rerun to check it would cost a new baseline, so nothing short of that proves it further. Close-out has nothing to run; this is stated so the after-read does not read the baseline as independently audited.\n\n### Verdict\nApprove \u2014 conditional on close-out discharging the ledger\n\nClose-out should merge #2422 **before any other LIN-4447 piece**, after making the two small fixes above, which are optional in substance but cheap.\n",
+   "createdAt": "2026-11-13T14:45:45.140Z",
+   "id": "ae9692d9-7683-48f8-8780-dc37c1ce6ac8",
+   "user": {
+    "name": "John \u201cSausage Roller\u201d Kershaw"
+   }
+  },
+  {
+   "body": "## Blind read\nVerdict: same. The in-scope diff is empty: every path the change touches is in `docs/areas/runs-and-dispatch.md` or under `docs/plans/survey/`, both outside this read. So no code, test, how-to doc or `docs/areas/areas.json` differs between the two commits, and the change made nothing better or worse in the code.\n\nRead: https://github.com/JKershaw/LinearViewer/pull/2422 at `8704e39ea` against `4b5001ddf`.\n\n### Inside the area, fix-sized\nNone.\n\n### Inside the area, larger\nNone.\n\n### Outside the area\nNone.\n",
+   "createdAt": "2026-11-13T14:47:09.151Z",
+   "id": "64c1749f-0c79-4af0-9fd7-dbcfb20c4469",
+   "user": {
+    "name": "John \u201cSausage Roller\u201d Kershaw"
+   }
+  },
+  {
+   "body": "## Close-out \u2014 LIN-4453\n\n**Merged:** https://github.com/JKershaw/LinearViewer/pull/2422, squash commit `cfd152fa477d047c670a2ab59672b8cc79d8e17b` on `main`, pinned to head `54482c1e51033e45fbc25868ce400ef144aaac7c` (`--match-head-commit`). Docs only: the frozen area-read kit, two baseline reports at `4b5001ddf`, the method-as-run addendum and one Runs Waiting entry. It retires nothing, as planned.\n\n**How it meets what was asked:** per review's account (comment ae9692d9). Both `## Area read` reports are on LIN-4447 and the rubric is now on `main`, before any LIN-4454\u20134461 piece has merged. Baseline: Runs code 3.15 / note 3.25; front-end-pages code 3.40 / note 3.00.\n\n**Changes I made after the approval** (one commit, `54482c1e5`, each answering a review line under \"Small fixes for close-out\"):\n1. `docs/plans/survey/area-read-method-as-run.md` \u00a77: new bullet fixing the combined-score convention (mean of the two readers' reported one-decimal means: Runs 3.3/3.0 \u2192 3.15, control 3.3/3.5 \u2192 3.40; not recomputed from K1\u2013K4). Answers review fix 1.\n2. `docs/areas/runs-and-dispatch.md`, the new Waiting entry: now names \"LIN-4458, piece 2\" as the home for an area-read kind in the one comment classifier. Answers review fix 2.\nThe frozen kit and prompt blobs were not touched. No stale citations arose, and the blind read had no finds (all three sections \"None\").\n\n**Ledger:**\n- *Inside, gate ordering:* settled before merge. `gh pr list --state all` filtered on LIN-4454\u2026LIN-4461 returned no PR at all, and `origin/main` was still at `4b5001ddf` when I merged. (The suggested `--search` query also returns #948, \"LIN-1161\", a loose text match and unrelated.)\n- *Inside, kit lands unchanged:* settled after merge. `git rev-parse origin/main:docs/plans/survey/area-read.md` = `cbec2d848d63e18a0a0bdd6d5ed17307dcde6c26`, and `\u2026/area-read-reader-prompt.md` = `ef1c2ca9173831f53ca32b60da1d805d27bf2159`. Both match the frozen values.\n- *Inside, reader isolation:* accepted as recorded in method \u00a75, as review stated. The transcripts are session-local and rerunning would create a new baseline, so nothing was run. The after-read should not treat the baseline as independently audited.\n- *Outside, `landingPrUrls` does not know `## Area read`:* settled by its note commit (the Runs Waiting entry, now naming LIN-4458 piece 2). It breaks nothing today, so the consequence test files no ticket. No existing-ticket search was needed because LIN-4458 is the named home.\n\n**CI:** the docs-only change has CI, so the substitute did not apply. On the final head `54482c1e5`, Unit tests, Unit tests (proxy, clock +400d), E2E shards 1\u20134, Secret scan (source) and `CI success` all passed. I also ran `tests/unit/area-notes.test.js` locally (11/11 pass) before pushing.\n\n**Deploy / post-merge:** the change is documentation only and has nothing to deploy. The post-merge check (the two frozen blobs on `origin/main`) ran and passed, as above.\n\n**Housekeeping:** the pre-prune snapshot was verified in `/snapshots` (captured 14:55:18Z, carrying the full description). The description held no stage artifacts below `## Size of the move` (the plan lives on LIN-4447), so I kept that section verbatim and added an `## Implemented` stub. No related tickets needed closing or cancelling: LIN-4462 (the after-read) is unblocked and still to do, and the others are open pieces. No follow-up tickets were filed, since the gate sends none.\n",
+   "createdAt": "2026-11-13T14:55:46.800Z",
+   "id": "a5de393e-66f7-4081-b804-6c7c3ca764f8",
+   "user": {
+    "name": "John \u201cSausage Roller\u201d Kershaw"
+   }
+  },
+  {
+   "body": "## Autopilot run summary \u2014 LIN-4453 (stepper)\n\n**Outcome:** done and verified. PR https://github.com/JKershaw/LinearViewer/pull/2422 squash-merged as `cfd152fa477d047c670a2ab59672b8cc79d8e17b` (pinned to head `54482c1e51033e45fbc25868ce400ef144aaac7c`); LIN-4453 is Done.\n\n**Sequence (converging):** survey-task \u2192 survey-place \u2192 scoping (size: \"just the task\") \u2192 implementation in 3 warm beats on one session (1: ground + rubric/sampling rule; 2: four paired reader passes in one window; 3: contamination check, as-run addendum, push, PR, CI) \u2192 review (Approve, conditional) \u2192 blind-read (verdict \"same\", docs-only) \u2192 close-out (two review fixes, ledger settled, merge, Done).\n\n**Evidence I checked myself:**\n- PR merged; all 8 CI checks SUCCESS on the merged head, including `CI success`.\n- Frozen kit blobs on `main` unchanged: `area-read.md` `cbec2d84\u2026`, `area-read-reader-prompt.md` `ef1c2ca9\u2026`.\n- Merged files are docs only: the kit, method-as-run addendum, two baseline reports, one Runs Waiting entry. No existing test touched.\n- Both `## Area read` reports are on LIN-4447 (`10a2fef6\u2026`, `9231ebc6\u2026`), plus the overlap ruling `e6ca12b3\u2026`. The rubric landed on `main` before any other LIN-4447 piece merged.\n- Baseline at `4b5001ddf`: Runs code 3.15 / note 3.25; front-end-pages code 3.40 / note 3.00; noise guards held.\n\n**Judgment calls:**\n- The overlap limit (1 of 13 planned files sampled) was settled as an engineering call, not raised to John: the approved plan forbids a planned-files stratum.\n- Beat 2 launched a stray fifth reader and added one line to the reader prompt. I had beat 3 gate the PR on a transcript check of all four counted readers (all clean) and record the departures in an addendum instead of editing the frozen kit.\n- The engine put `blind-read` before `close-out`; I treated it as a gate, not a wrong verb, and did not override.\n\n**What's left:** nothing for this task. For LIN-4462 (after-read): repeat the kit and the as-run addendum identically. For LIN-4458: the comment classifier should learn the `## Area read` kind (noted in the Runs note).\n",
+   "createdAt": "2026-11-13T14:56:27.477Z",
+   "id": "4abf1846-5430-4669-859b-6eee9fd37097",
+   "user": {
+    "name": "John \u201cSausage Roller\u201d Kershaw"
+   }
+  }
+ ],
+ "completedAt": "2026-11-13T14:55:17.773Z",
+ "createdAt": "2026-11-13T14:01:55.347Z",
+ "cycle": null,
+ "description": "## As asked\n\n**Parent:** LIN-4447 (Runs & dispatch, left simpler). The parent's scope is its `## As asked` block. Its approved design and plan are the `## Design` and `## Implementation Plan` sections of the parent description, and the Design comment (6efb91fa) holds the full analysis. **Start from the parent's approved plan and follow it. Where the code shows it is wrong, change course and say so in a comment on LIN-4447.**\n**Repository:** JKershaw/LinearViewer. **Grounding commit:** `origin/main` 4b5001ddf. On 2026-11-13 at 14:00Z it was still HEAD, with nothing landed since the ticket was filed.\n\n## Piece 0: paired readability baseline (no code)\n\n**What:** fresh agents read Runs & dispatch and the untouched control area `front-end-pages` in the same window, using only each area's sampled files and its area note.\n\n**Approach (from the plan):**\n\n* Both areas are too large to read whole (about 2.3 MB across 117 files, and about 1.1 MB across 92). Write a rubric document that fixes **one sampling rule**: the same count of files per area, picked by one stated rule, plus the area note. Add a short rubric for the readers.\n* Commit the rubric and sampling rule to the repo beside the reports, so that the after-read (the last subtask) reuses them **unchanged**.\n* Post each report on LIN-4447 as a comment headed `## Area read`. **Never use** `## Blind read`**:** the proxy holds that heading to the PR blind-read shape and returns 422.\n\n**Witness / acceptance:** both reports and the committed rubric are on LIN-4447 **before any implementation piece merges**. This gates every other subtask.\n**Retires:** nothing (this is a measurement).\n\nSession fit: fits one session\nPlan-review due: no \u2014 covered by LIN-4447's approving plan-review (comment 12619798-1986-467f-b67c-8bed766a7813, rev 2)\n\n**Binding for every piece (from the parent's Constraints):** compute readiness from the trail on read and never store it. Add no GitHub or provider reads. In the same change, remove the Waiting entries this piece settles and any stale Lesson clause in `docs/areas/runs-and-dispatch.md`, and keep Lessons under 6,144 bytes. Say in the PR what this piece retires. Never recompute stored pre-cutover history, and never edit recorded prompt changelog text. The LLM & prompts side of the seam belongs to LIN-4448 (A14).\n\n*End of what was asked. Steps write below this line; nothing above it changes.*\n\n## Size of the move\n\n**Size:** just the task\n**Why:** Delivers the baseline as asked, frozen so the after-read compares like with like and scores code apart from the note; no Survey finding needs a code change for this measurement to work.\n**Cuts:** none\n**Decided by:** the standing policy\n\n## Implemented\n\nPiece 0 landed as JKershaw/LinearViewer PR #2422 (squash commit `cfd152fa4`): the frozen area-read kit, the two baseline reports at `4b5001ddf` (Runs code 3.15 / note 3.25; front-end-pages code 3.40 / note 3.00), the method-as-run addendum and one Runs Waiting entry. Implemented as the parent's plan approved, with one documented deviation (inputs delivered as a file path, recorded in the addendum). Full history is in the task snapshots and the comment trail.",
+ "dueDate": null,
+ "estimate": null,
+ "id": "06a05567-95ff-4c73-b423-5ea13d20b680",
+ "identifier": "LIN-4453",
+ "inverseRelations": [],
+ "labels": [],
+ "parent": {
+  "id": "39997758-01c5-4b02-8c23-bb1fb8ba8de5",
+  "identifier": "LIN-4447",
+  "title": "Runs & dispatch, left simpler: each rule written once, the area's waiting work settled, in pieces of varied size"
+ },
+ "priority": 0,
+ "priorityLabel": "No priority",
+ "priorityLevel": 0,
+ "project": null,
+ "relations": [
+  {
+   "id": "ee5a6e5d-0de5-4bfc-939e-ecee0db1b5b9",
+   "relatedIssue": {
+    "id": "7705a662-738b-41a9-b93b-811ba0bfc525",
+    "identifier": "LIN-4457",
+    "state": {
+     "name": "Done",
+     "type": "completed"
+    },
+    "title": "Runs & dispatch: cost-call reads into lib/cost-read-calls.js (piece 7)"
+   },
+   "type": "blocks"
+  },
+  {
+   "id": "ca261425-c741-4a48-aa6a-93c48941fcb0",
+   "relatedIssue": {
+    "id": "5dc91494-e755-4697-a100-bdc6271e8933",
+    "identifier": "LIN-4456",
+    "state": {
+     "name": "Done",
+     "type": "completed"
+    },
+    "title": "Runs & dispatch: hermetic test transport as a provider capability (piece 6)"
+   },
+   "type": "blocks"
+  },
+  {
+   "id": "d158ddba-8c38-419e-bfde-2369558014ae",
+   "relatedIssue": {
+    "id": "bbc84c2d-ec7d-4054-a149-3a2ce2bbbb00",
+    "identifier": "LIN-4455",
+    "state": {
+     "name": "Done",
+     "type": "completed"
+    },
+    "title": "Runs & dispatch: one declaration per restated constant, one FEEDBACK_KINDS table (piece 5)"
+   },
+   "type": "blocks"
+  },
+  {
+   "id": "6008d337-73e5-4dda-992b-14b28e0a1f4f",
+   "relatedIssue": {
+    "id": "6a5bfae3-48ba-4239-9f20-debfdebae75a",
+    "identifier": "LIN-4454",
+    "state": {
+     "name": "Done",
+     "type": "completed"
+    },
+    "title": "Runs & dispatch: model attribution from the cost fold (piece 3)"
+   },
+   "type": "blocks"
+  }
+ ],
+ "state": {
+  "name": "Done",
+  "type": "completed"
+ },
+ "team": {
+  "id": "7e6de730-3028-4ebc-af8a-a4de237a686d",
+  "name": "LinearViewer"
+ },
+ "teamId": "7e6de730-3028-4ebc-af8a-a4de237a686d",
+ "title": "Runs & dispatch: paired area reads before (baseline, piece 0)",
+ "trashed": null
+}
