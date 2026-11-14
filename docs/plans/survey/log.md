@@ -4054,3 +4054,9 @@ John's direction:
   - The survey session's subagents (fresh reads, history map, paper reviewers) never touch Harbour at all.
 - **12:49 UTC: A19 merged** (PR #2452, squash `5f6de1eb7`) after its writer merged main in (CI green at `9721d21f0`). The fix had finished at 12:08, but the watcher doesn't treat a writer's report as a hand-back, so I missed it for 40 minutes; I'm now polling the dispatch itself.
 - **A17's conflict fix sent** (`5cfcf4e8`).
+- **~12:58 UTC: A17 merged** (PR #2453, squash `993f618bc`, with `lanes-across-the-seam-check.md`). **All three papers are in.**
+- **Three essays filed and sent** to Fable sessions (custom, effort high; Fable reasons and designs, an Opus writer writes):
+  - **LIN-4484:** A17b, the lanes essay (`80c13f8c`);
+  - **LIN-4485:** A20, the shape of knowledge (`7a2d17e7`);
+  - **LIN-4486:** A21, every choice was right at the time (`88b3ea3b`).
+  - Each gets a reviewer subagent before merge; they merge one at a time because of the shared index.
