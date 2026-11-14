@@ -3836,3 +3836,10 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - **Measurement note:** the same failure as LIN-4463. A fixed hashed sample of the whole area mostly misses the files a lane changed. The area-wide read can't serve as a lane's gate; that's now shown in two lanes.
 - **Proxy note:** suggest-answer refuses a reason over 500 characters with a 400; the first attempt failed silently in my pipe. I retried with a shorter reason.
 - **Watcher:** the background job hit the 30-minute default once and was restarted with the long timeout. The container also restarted once at about 00:25; nothing was missed.
+
+### 05:00 UTC, 14 Nov: both active lanes wait on John; quiet since 02:28
+
+- **Landed:** LIN-4462 at 02:28 as `a886fb506` (PR #2449, Runs & dispatch's after-read records, docs only). All ten LIN-4447 pieces are merged; the lane's 02:33 status names one open ruling.
+- **LIN-4470 stalled on its ruling.** Its scoping said "the build can start on everything else", and the kickoff goal says to keep moving while a ruling waits. Even so, there's been no activity since the ruling was raised at 00:12. The ruling's effect is "record", so the lane parked rather than building the uncontested part. Same pattern as LIN-4463's hold on 13 Nov. I'm not steering it by hand.
+- **So overnight, both active lanes are idle on John's answers** (lin4447-area-read-inconclusive, lin4470-five-files-lesson). That costs nothing in budget but costs time. For the review: a ruling that cuts one clause shouldn't park the whole ticket.
+- The container restarted again at about 02:55; nothing was missed.
