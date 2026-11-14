@@ -16,6 +16,7 @@ import { badRequest, jsonError, notFound, serverError } from '../lib/errors.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { EMPTY_PROVIDER_CONTEXT } from '../lib/prompt-trace-store.js';
 import { generatePrompt, generateCustomPrompt, hasPrompt } from '../lib/prompt-templates.js';
+import { promptContextOf } from '../lib/prompts/prompt-context.js';
 import { buildPromptFilename } from '../lib/prompt-formatters.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { validateRunField } from '../lib/dispatch-fields.js';
@@ -237,12 +238,12 @@ export function createPromptsRoutes({ workspaceFromUrl, promptTraceStore, custom
         // always the workspace's active provider — same fix as /api/detail
         // (LIN-1903), same helper.
         const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, req.query.source);
-        const { issue: fetched, parent, siblings, project, children, comments, attachments } = await issueProvider.fetchIssueContext(issueCallScope, issueId);
-        issue = fetched;
+        const fetchedCtx = await issueProvider.fetchIssueContext(issueCallScope, issueId);
+        issue = fetchedCtx.issue;
         identifier = issue.identifier;
         // Forward `attachments` (LIN-776) so the in-app /prompt endpoint surfaces the
         // worker-facing Attachments section, matching the proxy /prompt route.
-        context = { parent, siblings, project, children, comments, attachments };
+        context = promptContextOf(fetchedCtx);
       }
 
       let result;

@@ -49,7 +49,8 @@ and the report path must exist in the same change.
 Cite files, never line numbers: lines move, and the docs anchor sweep reads this
 directory. A cited path is a backtick span holding a repo-relative path: it has a `/`
 in it, or it ends in a file extension such as `.js` or `.md`. Symbols, such as function
-names, have neither, so they are never read as paths.
+names, have neither, so they are never read as paths. In code this is one predicate, `isCitedPath` in
+`lib/prompts/area-note-format.js`.
 
 ## One home for each leftover
 
