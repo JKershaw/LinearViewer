@@ -3985,3 +3985,12 @@ John's direction:
   - John: "I figured it's useful to have for the discussion, and there's no rush at the moment so we can get everything we want, that's going to be helpful, landed."
   - So: send A17 when LIN-4470 lands. Once A17 is reviewed and merged, send the essay to Fable; Harbour accepts `fable`, though its id points to an older Fable version (noted, not changed).
   - The pause point is now when the LLM lane is closed and the Periodicals, A17, A18, A19 and the essay have landed.
+
+## 14 Nov, about 10:05 UTC — LIN-4470 merged; Periodicals and A17 sent
+
+- **LIN-4470 merged** (`fb358dbda`, PR #2450): settles the Waiting entries, one prompt context, one cited-path predicate. Its repeat read reported "the area does not beat the control on code". That's a reading now, not a gate. LIN-4448 is still In Progress for its close-out; watching for a ruling on the old gate.
+- **Periodicals minted plain** (`{autopilot:true}`, no note):
+  - Drift & Coherence `63402b3b`;
+  - Seams & Tangles `2dc85fb6`;
+  - Stability `9e403ed9`.
+- **A17 filed as LIN-4480** (agreed text from `asks.md`) and sent to one Opus writer: custom dispatch `1eb99179`, effort high. Reviewer subagent before merge; then the essay goes to Fable.
