@@ -41,6 +41,7 @@ import {
   SESSION_TARGETS
 } from '../../lib/runner-kit/runner.mjs';
 import { prUrlOfFeedback } from '../../lib/dispatch-wake.js';
+import { LIN4197_CASES } from '../fixtures/cost-replay/corpus.js';
 import http from 'node:http';
 import { credentialStore, exchangeBootstrap, startBroker, BROKER_HOST } from '../../lib/runner-kit/broker.mjs';
 import { SESSION_TARGETS as HARBOUR_SESSION_TARGETS } from '../../lib/dispatch-targets.js';
@@ -577,6 +578,20 @@ describe('LIN-4475 witness W-5: a corpus row pins its bytes', () => {
       assert.ok(corpusLines(row.item.id, row.item.sha256).length > 1);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+// The fold corpus rows' `sd` records are the same per-request records `LIN4197_CASES[...].records` pins
+// (tests/fixtures/cost-replay/corpus.js, checked by lin-4202-runner-kit-records.test.js). This ties the two
+// copies, so a change to the fold rule cannot be made in one and not the other.
+describe('LIN-4475: the fold corpus rows equal the LIN-4197 corpus records', () => {
+  test('each corpus row\'s sd is renderFold of LIN4197_CASES[id].records', () => {
+    const rows = TABLE.rows.filter((r) => r.area === 'fold' && r.item.id);
+    assert.ok(rows.length > 0, 'no fold corpus rows');
+    for (const row of rows) {
+      assert.ok(Object.hasOwn(LIN4197_CASES, row.item.id), `${row.case}: no LIN4197_CASES entry for ${row.item.id}`);
+      assert.equal(row.sd, renderFold(LIN4197_CASES[row.item.id].records), row.case);
     }
   });
 });
