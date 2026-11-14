@@ -179,3 +179,8 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   0399b2e2 it ran `claude-opus-5-5`, so a record can misname the model that ran. Cost is already priced from the model the
   worker reports. Waiting: make the record carry the model the worker reports, or update the routed id. (LIN-4396 review;
   moved here from LLM & prompts by LIN-4470, as agreed on LIN-4447.)
+- `lib/run-view.js`: `STAGE_LABELS` spreads the labels from `STAGE_KINDS` and `STEP_KIND_WORDS` hand-lists six
+  kinds to read back from it, so the run page's display words now live on the prompt record and Runs depends on
+  LLM & prompts; `lib/run-closeout-state.js` and `lib/pipeline-churn.js` also import
+  `lib/prompts/blind-read-words.js`. Waiting on a design choice: whether display labels belong on the stage
+  record or in Runs. Not scheduled; no ticket takes it. (LIN-4448 blind read.)
