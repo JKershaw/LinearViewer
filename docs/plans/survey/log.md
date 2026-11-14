@@ -4061,3 +4061,8 @@ John's direction:
   - **LIN-4486:** A21, every choice was right at the time (`88b3ea3b`).
   - Each gets a reviewer subagent before merge; they merge one at a time because of the shared index.
 - **John has read the three papers:** "they're all rather fascinating views, converging."
+
+## 14 Nov, about 13:30 UTC — Notes reread; A20 is up for review
+
+- **John, after a compaction:** "Reread the notes in chronological order, summarise our goals, plan, and methodology, then please continue." I reread the log in order: the wrap-ups, the summaries written for John, the start of each round, and the last three days in full; the dated entries in between were skimmed, since the log is about 600 KB. The summary went to John in chat.
+- **13:28 UTC: A20 (LIN-4485) finished**, as PR #2458 (`07f410402`), `docs/papers/harbour/nothing-fights-its-shape.md`. Its title is John's phrase. Fable reasoned and designed it; an Opus subagent wrote it. An independent reviewer subagent is reading it now. A17b (LIN-4484) and A21 (LIN-4486) are still being written.
