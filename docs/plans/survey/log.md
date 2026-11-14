@@ -3994,3 +3994,4 @@ John's direction:
   - Seams & Tangles `2dc85fb6`;
   - Stability `9e403ed9`.
 - **A17 filed as LIN-4480** (agreed text from `asks.md`) and sent to one Opus writer: custom dispatch `1eb99179`, effort high. Reviewer subagent before merge; then the essay goes to Fable.
+- **10:01 UTC: ruling `lin4448-done-whenever`.** LIN-4448's last Done-when (the blind read beats the control) is not met: D = −0.3, no detectable difference. Options: close, continue (a new scoped ticket), or remeasure. The run recommended close. I suggested **close**, as with LIN-4447. This is the same false escalation from the same gate, the one I put into the lane's Done-when.
