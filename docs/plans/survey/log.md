@@ -3868,3 +3868,10 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 5. **Hands off:** no hand-steering, no new tickets without John's go-ahead, ask before acting by hand on the loop.
 6. **Budget:** a reading each morning; stop starting new work at about 80%.
 7. **Review:** the Periodicals plus my after-read, then a discussion with John (notes first). Any change to Harbour goes in as one ask, read back.
+
+## 14 Nov, about 09:30 — John's answers on the method
+
+- **Notes:** useful, "but perhaps simple text is the wrong format as they need to cross reference and stay up to date." Format is open; it goes to the review discussion.
+- **Parrot:** "let's leave the parrot as is." Method point 2 no longer adds the "did John ask for this?" question to it.
+- **Measuring:** "I think we have better ways to measure? We're running Periodicals next so that's likely covered?" Method point 3 becomes: the Periodicals plus the curve, reported, never gating. No separate blind paired read, no file sample.
+- **Smaller loop fixes** (duplicate reads, LIN-4469 skipping look-first): "seems minor." Dropped.
