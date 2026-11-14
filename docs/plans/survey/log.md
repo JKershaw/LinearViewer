@@ -4018,3 +4018,12 @@ John's direction:
   - Suggestion: John's TS option is weighed narrowly; a data module under a census with checkable fields deserves its own row.
 - **11:02 UTC: Seams & Tangles run 13 merged** (LIN-4482, `0a1adcf9b`, PR #2454).
 - **11:11 UTC: Drift & Coherence run 8 merged** (LIN-4481, LV `f0d19bdf1`, SD `4dc83d1e5`). Stability (LIN-4483) is still in review.
+
+## 14 Nov, about 11:40 UTC — John on knowledge, shape and readiness
+
+- **The knowledge question:** "code, comments, docs, notes, papers, tasks, logs... All different kinds and shapes of information across many dimensions and perspectives. Currently, somewhat limited in kind and harness. At a high level, how do these (and others) relate, move, and need to be held in a shape. Where is there overlap (eg tasks, comments, code, in a venn diagram, would show rich overlapping concepts). Perhaps if these were correctly established and used, a lot of issues evaporate. Some may simply not he necessary."
+  - He suggested a second essay, fairly open-ended: "Written by opus, but designed/reasoned with by fable (possibly the better setup for the other essay- where do we want to use the big brain)."
+- **Readiness:** "I'm confident our new approach beats our old one. I'm less confident our scaffolding is now fit for purpose, or when we will be simply running work which opens Harbour for business without needing hand holding."
+- **Being in the loop is minor:** "If I need to click ok a few times, but all the work lands clean and right, that's a great place to be in."
+- **Tangles:** "if everything is in its right place, no tangles. And, likely, much much simpler. Nothing fights its shape."
+- **My correction:** the readiness reading is whether work lands clean and right, not how often John clicks. My survey role is scaffolding too; its removal point is when Harbour takes ordinary work and finishes it without me in the middle.
