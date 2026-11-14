@@ -4017,3 +4017,4 @@ John's direction:
   - Must-fix: the LIN-4400 claim fails on timing (the safety entries appeared 5.5 h after it finished); PR #2450 is called "open" though it merged first (Waiting is now 108, a counter-example to "growing backlog"); three wrong figures.
   - Suggestion: John's TS option is weighed narrowly; a data module under a census with checkable fields deserves its own row.
 - **11:02 UTC: Seams & Tangles run 13 merged** (LIN-4482, `0a1adcf9b`, PR #2454).
+- **11:11 UTC: Drift & Coherence run 8 merged** (LIN-4481, LV `f0d19bdf1`, SD `4dc83d1e5`). Stability (LIN-4483) is still in review.
