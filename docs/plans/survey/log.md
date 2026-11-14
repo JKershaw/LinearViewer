@@ -3875,3 +3875,27 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - **Parrot:** "let's leave the parrot as is." Method point 2 no longer adds the "did John ask for this?" question to it.
 - **Measuring:** "I think we have better ways to measure? We're running Periodicals next so that's likely covered?" Method point 3 becomes: the Periodicals plus the curve, reported, never gating. No separate blind paired read, no file sample.
 - **Smaller loop fixes** (duplicate reads, LIN-4469 skipping look-first): "seems minor." Dropped.
+
+## 14 Nov, about 10:00 — Fresh review of the rules problem (John asked for it)
+
+John asked for a subagent that was given the problem but not our solution. Its findings, with the key citations spot-checked on main `a886fb506`:
+
+- **One mechanism.** Text gets its authority from where it sits, and the only way out of it is John.
+  - "As asked" seals every filed description, including ones that planners, close-outs and the Survey drafted.
+  - Review takes "each sentence of the block in order, none skipped or cut short" (`lib/prompt-template-defs.js:787`), and only John can release a cut.
+- **My drafting made it worse.** A12–A15 say "Done when ... or John has ruled". A13 and A14 made the measurement a Done condition.
+- **The blind read is a close-out gate in code** (`CLOSE_OUT_REASONS`, `blind-read-missing`, LIN-4438).
+- **Notes:** five writers append and there's no exit for "not worth doing".
+  - LIN-4414 makes every build retire one Waiting entry, so Waiting works as a queue.
+  - Lessons mostly repeat census tests.
+  - README already says "Waiting entries are context, not scope", and A13 and A14 overrode that.
+- **Its direction:**
+  - review asks whether the work serves the ask, and close-outs say what was left out;
+  - measures report, never gate (remove the code gate too);
+  - Lessons become code or tests, or lapse;
+  - Waiting gets a "drop" exit, or is removed, and LIN-4414's rule is retired;
+  - rulings go ahead on the recommended answer unless they're John's calls.
+- **Framing:**
+  - Authorship isn't the main issue; how text is read is.
+  - The kit had no power to detect a change, so making it a gate guaranteed a ruling.
+  - The asks say "settle yourself" while the prompts say only John can agree a cut. Fix the conflict at the prompts.
