@@ -3965,3 +3965,13 @@ John's direction:
 - **A hidden backlog is a warning sign.** "If code is getting 'cleaner' whilst a secret backlog grows, something is afoot and the note about the types of information I think is important."
 - **His idea for the notes:** "simply saving the notes as TS, so they get checks, and can have a reliable, duplicate free, easy to use data structure."
 - **Asked for:** a recap of the goal, plan and progress, the core work to keep moving, and every issue found, ranked by increasing trouble.
+
+## 14 Nov, about 11:40 — The plan to the pause, agreed
+
+- **John on budget:** "I doubt the 'wait for Thursday' is true. It's just me keeping track of my budget."
+- **His plan:** hobble on to a natural pause point with a few adjustments, then discuss. "A simple change to the notes and a few process tweaks might help all we need to stay focussed." Next round: "the notes fix (whatever that may be - an agent doing a spike of a few versions, then iterating, might be great here), possibly other fixes, and then more real work and a few bigger intentional tidies."
+- **Agreed** ("Let's start then asap. That all looks good."):
+  1. **To the pause:** LIN-4470 finishes the LLM lane, and I merge it if it's held and doesn't need John. The Periodicals (Drift & Coherence, Seams & Tangles, Stability) start as soon as it lands. They report what grew alongside the code too (notes and steering text), as a reading.
+  2. **My adjustments, only in my own hands:** no Done-whens John didn't say; the loosest reasonable suggestion on rulings; no changes to Harbour before the discussion.
+  3. **Discussion:** the notes and the scaffolding together. For each temporary structure in the history map (the area-read kit, the Waiting quota, the blind-read gate and so on): stays, goes, or stays with a planned removal, in John's words.
+  4. **Next round:** the notes spike first, on one real area (Runs & dispatch, 18 KB). Versions: John's TS idea, the "each kind to where it can't drift" version, and possibly a near-nothing version. A fresh agent does a real small task with each; then iterate. The spike is scaffolding: the losing versions are deleted, and the winner replaces the old notes. Then other fixes, real work, and bigger deliberate tidies.
