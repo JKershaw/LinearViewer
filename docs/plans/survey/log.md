@@ -4047,3 +4047,8 @@ John's direction:
   - A19: the LIN-4400 claim now states the timing.
 - **A18 merged** (PR #2451, squash `8fe484929`).
 - **A19 (#2452) and A17 (#2453) conflict with main** in `docs/papers/README.md` and `tests/fixtures/library-doc-summaries.json`: each adds index rows. A19's writer was sent to merge main and keep both entries (`2b6cc880`); A17 goes after A19 merges, so it isn't resolved twice.
+- **For later (John: "one to look into later"): the Live Console shows little of today's work.**
+  - `custom` and `periodical` rows are orchestration kinds, not runs (`lib/run-view.js:112`).
+  - Lanes show only while running or waiting.
+  - `custom` writers post no stage summaries.
+  - The survey session's subagents (fresh reads, history map, paper reviewers) never touch Harbour at all.
