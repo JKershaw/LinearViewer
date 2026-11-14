@@ -149,3 +149,10 @@ kept are counted apart in LIN-4470's PR and measurement (`docs/areas/README.md`:
   remain (`GENERATE`, `BUCKET_OF_KIND`, `FIRST_PASS_KINDS`, `JOBS`, `SPINE` and others, each listed with a reason by
   `tests/unit/stage-kind-tables.test.js`), and each `catalogue.line` retypes the kind's display name. (Drift & Coherence
   Review, 14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)
+- `lib/prompts/prompt-context.js`: its header says every prompt surface that renders a stage from a fetched context hands
+  `generatePrompt` this one projection, so a new field reaches all of them from here. The routed and code-routed
+  recommendation (`composeRoutedRecommendation`, `lib/openrouter.js`) passes `prepareRecommendationInput`'s hand-built
+  superset instead (`lib/recommendation-input.js`, adding `focusedChild`, `runs` and `allRuns`), which a test pins to carry
+  every projected field. So a new field is still two edits, and a template that read `runs` would render differently on
+  recommend than on the pinned path. Correct the header, or derive the superset from the projection. (Drift & Coherence
+  Review, 14 Nov., second read; `docs/reviews/drift-coherence-review-2026-11-14.md`.)
