@@ -1,0 +1,32 @@
+{
+ "assignee": null,
+ "children": [],
+ "comments": [],
+ "completedAt": null,
+ "createdAt": "2026-11-13T17:46:28.988Z",
+ "cycle": null,
+ "description": "## As asked\n\n## What breaks\n\nTwo display-only losses in `markdownToAdf` (`lib/providers/jira/adf.js`), both visible on Jira's rendering:\n\n1. **A fenced code block that contains a blank line splits into fragments.** ```` ```js\\na\\n\\nb\\n``` ```` becomes ```` [codeBlock(\"a\"), paragraph(\"b\", hardBreak, \"```\")] ````: the block is cut in two and the closing fence shows as text.\n2. **An ordered list's start number is dropped.** `3. three` / `4. four` becomes an `orderedList` with no `attrs.order`, so Jira numbers it from 1. The renderer always numbers from 1 (`adf.js`, `orderedList` case).\n\nBoth reproduce on `main` at `5cf4f6aa2`:\n\n```\nnode --input-type=module -e 'import { markdownToAdf } from \"./lib/providers/jira/adf.js\"; console.log(markdownToAdf(\"```js\\na\\n\\nb\\n```\").content.map(n => n.type))'\n# [\"codeBlock\",\"paragraph\"]\n```\n\n## Why this is a ticket, not a Waiting entry\n\nIt breaks displayed content (`CONSEQUENCE_TEST`). The person's sealed words are not affected: the `harbour.asAsked` property holds them byte for byte, and the seal compares the same rendering on both sides, so the loss is in what Jira shows, not in what is kept (LIN-4450 Survey open-0).\n\n## Prior context\n\n* The `FENCE` comment in `lib/providers/jira/adf.js` (LIN-3557) defines the block matcher; the blank-line split is the matcher's deliberate degradation, not a fresh regression.\n* The header of `lib/providers/jira/as-asked-region.js` already lists \"a fence split on a blank line\" as a known loss.\n* Found while preparing the Jira live check (LIN-4452, under LIN-4445).\n\n## Done when\n\n* A fenced block with a blank line round-trips as one `codeBlock` with its full text.\n* An ordered list that starts at `n` keeps `attrs.order = n`, and renders from `n` on Jira.\n* Tests in the Jira ADF codec suite pin both, each seen failing first.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*",
+ "dueDate": null,
+ "estimate": null,
+ "id": "1f3218f6-e544-47a7-b4b0-f8e57a9843d2",
+ "identifier": "LIN-4473",
+ "inverseRelations": [],
+ "labels": [],
+ "parent": null,
+ "priority": 0,
+ "priorityLabel": "No priority",
+ "priorityLevel": 0,
+ "project": null,
+ "relations": [],
+ "state": {
+  "name": "Backlog",
+  "type": "backlog"
+ },
+ "team": {
+  "id": "7e6de730-3028-4ebc-af8a-a4de237a686d",
+  "name": "LinearViewer"
+ },
+ "teamId": "7e6de730-3028-4ebc-af8a-a4de237a686d",
+ "title": "Jira display: a fenced block with a blank line splits, and an ordered list loses its start number",
+ "trashed": null
+}

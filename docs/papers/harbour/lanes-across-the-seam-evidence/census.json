@@ -1,0 +1,1244 @@
+{
+ "comment_mentions_by_lane_pair": {
+  "Front end -> Jira": 3,
+  "Front end -> LLM & prompts": 6,
+  "Front end -> Runs & dispatch": 4,
+  "Jira -> Runs & dispatch": 1,
+  "LLM & prompts -> Front end": 10,
+  "LLM & prompts -> Jira": 7,
+  "LLM & prompts -> Runs & dispatch": 36,
+  "Runs & dispatch -> Front end": 11,
+  "Runs & dispatch -> Jira": 3,
+  "Runs & dispatch -> LLM & prompts": 27
+ },
+ "comments_naming_another_lane": 87,
+ "directed_messages": [
+  {
+   "answered_by": "08c9c898",
+   "asks_for_reply": true,
+   "at": "2026-11-13T13:36:44.276Z",
+   "cited_by_receiving_lane": [],
+   "cited_by_writing_lane": [],
+   "heading": "## From LIN-4447 (Runs & dispatch): three proposed seam moves, for your reply",
+   "id": "d3ba7421",
+   "posted_on": "LIN-4448",
+   "writer": "Runs & dispatch"
+  },
+  {
+   "answered_by": null,
+   "asks_for_reply": false,
+   "at": "2026-11-13T15:39:53.858Z",
+   "cited_by_receiving_lane": [
+    "LIN-4447:15a858eb",
+    "LIN-4447:44101230",
+    "LIN-4458:2df73ee9",
+    "LIN-4458:50135ba2",
+    "LIN-4459:9584b81c",
+    "LIN-4459:db296654"
+   ],
+   "cited_by_writing_lane": [
+    "LIN-4448:0510ffe0",
+    "LIN-4448:1a2e7cba",
+    "LIN-4448:b564445b"
+   ],
+   "heading": "## Reply from LIN-4448 (LLM & prompts): agree to all three seam moves",
+   "id": "08c9c898",
+   "posted_on": "LIN-4447",
+   "writer": "LLM & prompts"
+  },
+  {
+   "answered_by": null,
+   "asks_for_reply": false,
+   "at": "2026-11-13T15:55:15.496Z",
+   "cited_by_receiving_lane": [
+    "LIN-4447:15a858eb",
+    "LIN-4458:50135ba2",
+    "LIN-4459:db296654"
+   ],
+   "cited_by_writing_lane": [
+    "LIN-4448:4b22eb22"
+   ],
+   "heading": "## Correction from LIN-4448 (LLM & prompts): the full list of Runs files our pieces edit",
+   "id": "097a3442",
+   "posted_on": "LIN-4447",
+   "writer": "LLM & prompts"
+  },
+  {
+   "answered_by": null,
+   "asks_for_reply": true,
+   "at": "2026-11-13T16:42:08.689Z",
+   "cited_by_receiving_lane": [],
+   "cited_by_writing_lane": [
+    "LIN-4447:44101230",
+    "LIN-4458:2df73ee9",
+    "LIN-4458:50135ba2"
+   ],
+   "heading": "## From LIN-4458 (Runs piece 2): renewing the classifier-home ask, plus the census boundary",
+   "id": "1a2e7cba",
+   "posted_on": "LIN-4448",
+   "writer": "Runs & dispatch"
+  },
+  {
+   "answered_by": null,
+   "asks_for_reply": true,
+   "at": "2026-11-13T16:42:14.992Z",
+   "cited_by_receiving_lane": [],
+   "cited_by_writing_lane": [
+    "LIN-4447:15a858eb",
+    "LIN-4459:db296654"
+   ],
+   "heading": "## LIN-4459 (LIN-4447 piece 4): renewed ask on the live-stage wait move",
+   "id": "0510ffe0",
+   "posted_on": "LIN-4448",
+   "writer": "Runs & dispatch"
+  },
+  {
+   "answered_by": null,
+   "asks_for_reply": true,
+   "at": "2026-11-13T17:06:52.284Z",
+   "cited_by_receiving_lane": [],
+   "cited_by_writing_lane": [
+    "LIN-4447:15a858eb",
+    "LIN-4459:9584b81c"
+   ],
+   "heading": "## LIN-4459 (LIN-4447 piece 4): addition to the renewed ask \u2014 the runner-kickoff import and one retired LLM entry",
+   "id": "b564445b",
+   "posted_on": "LIN-4448",
+   "writer": "Runs & dispatch"
+  },
+  {
+   "answered_by": null,
+   "asks_for_reply": false,
+   "at": "2026-11-13T21:49:16.532Z",
+   "cited_by_receiving_lane": [],
+   "cited_by_writing_lane": [
+    "LIN-4467:00f3dcf8"
+   ],
+   "heading": "## Heads-up from LIN-4467 (LLM & prompts, piece 3): `COMPLETION_SIGNALS` becomes a view of the stage-kind record",
+   "id": "15de14a7",
+   "posted_on": "LIN-4447",
+   "writer": "LLM & prompts"
+  },
+  {
+   "answered_by": null,
+   "asks_for_reply": true,
+   "at": "2026-11-13T21:58:18.663Z",
+   "cited_by_receiving_lane": [],
+   "cited_by_writing_lane": [],
+   "heading": "Seam notice from LIN-4448 (autopilot): LIN-4468 (proxy write guard, PR #2443) will add one argument in `lib/dispatch-sto",
+   "id": "b555094d",
+   "posted_on": "LIN-4447",
+   "writer": "LLM & prompts"
+  },
+  {
+   "answered_by": null,
+   "asks_for_reply": false,
+   "at": "2026-11-14T09:17:46.869Z",
+   "cited_by_receiving_lane": [],
+   "cited_by_writing_lane": [],
+   "heading": "## Area read: LLM & prompts @ 49776653d",
+   "id": "3300ab65",
+   "posted_on": "LIN-4447",
+   "writer": "LLM & prompts"
+  },
+  {
+   "answered_by": null,
+   "asks_for_reply": false,
+   "at": "2026-11-14T09:17:47.165Z",
+   "cited_by_receiving_lane": [],
+   "cited_by_writing_lane": [],
+   "heading": "## Area read: Front end: server-rendered pages @ 49776653d",
+   "id": "36a9d8e0",
+   "posted_on": "LIN-4447",
+   "writer": "LLM & prompts"
+  },
+  {
+   "answered_by": null,
+   "asks_for_reply": false,
+   "at": "2026-11-14T09:17:47.420Z",
+   "cited_by_receiving_lane": [],
+   "cited_by_writing_lane": [],
+   "heading": "## Area read comparison: after @ 49776653d vs baseline @ e8e92d50a",
+   "id": "29848ba2",
+   "posted_on": "LIN-4447",
+   "writer": "LLM & prompts"
+  }
+ ],
+ "files_changed": 353,
+ "files_changed_by_more_than_one_lane": 48,
+ "lanes": {
+  "Front end": [
+   "LIN-4446",
+   "LIN-4463",
+   "LIN-4471",
+   "LIN-4472"
+  ],
+  "Jira": [
+   "LIN-4445",
+   "LIN-4450",
+   "LIN-4451",
+   "LIN-4452",
+   "LIN-4473"
+  ],
+  "LLM & prompts": [
+   "LIN-4448",
+   "LIN-4464",
+   "LIN-4465",
+   "LIN-4466",
+   "LIN-4467",
+   "LIN-4468",
+   "LIN-4469",
+   "LIN-4470"
+  ],
+  "Runs & dispatch": [
+   "LIN-4447",
+   "LIN-4453",
+   "LIN-4454",
+   "LIN-4455",
+   "LIN-4456",
+   "LIN-4457",
+   "LIN-4458",
+   "LIN-4459",
+   "LIN-4460",
+   "LIN-4461",
+   "LIN-4462",
+   "LIN-4474",
+   "LIN-4475",
+   "LIN-4476"
+  ]
+ },
+ "mention_rows": [
+  [
+   "2026-11-13T13:36:44.276Z",
+   "LIN-4448",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "d3ba7421"
+  ],
+  [
+   "2026-11-13T13:37:13.041Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "dc7461eb"
+  ],
+  [
+   "2026-11-13T13:46:36.011Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "e452fe3a"
+  ],
+  [
+   "2026-11-13T13:57:37.874Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "12619798"
+  ],
+  [
+   "2026-11-13T14:02:31.309Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "49b291c4"
+  ],
+  [
+   "2026-11-13T15:01:52.770Z",
+   "LIN-4457",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "fe611f7b"
+  ],
+  [
+   "2026-11-13T15:04:32.983Z",
+   "LIN-4457",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "6291095a"
+  ],
+  [
+   "2026-11-13T15:11:29.505Z",
+   "LIN-4446",
+   "Front end",
+   [
+    "Runs & dispatch"
+   ],
+   "1f349668"
+  ],
+  [
+   "2026-11-13T15:27:35.687Z",
+   "LIN-4457",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "8dd6bbee"
+  ],
+  [
+   "2026-11-13T15:27:47.246Z",
+   "LIN-4456",
+   "Runs & dispatch",
+   [
+    "Front end"
+   ],
+   "d7087277"
+  ],
+  [
+   "2026-11-13T15:28:36.542Z",
+   "LIN-4454",
+   "Runs & dispatch",
+   [
+    "Front end"
+   ],
+   "ab3ea591"
+  ],
+  [
+   "2026-11-13T15:33:03.580Z",
+   "LIN-4457",
+   "Runs & dispatch",
+   [
+    "Front end"
+   ],
+   "4ded07b7"
+  ],
+  [
+   "2026-11-13T15:34:58.141Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "9bfb9aa5"
+  ],
+  [
+   "2026-11-13T15:39:53.858Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "08c9c898"
+  ],
+  [
+   "2026-11-13T15:39:54.189Z",
+   "LIN-4448",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "6bc02d3f"
+  ],
+  [
+   "2026-11-13T15:49:32.648Z",
+   "LIN-4448",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "72406236"
+  ],
+  [
+   "2026-11-13T15:55:15.496Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "097a3442"
+  ],
+  [
+   "2026-11-13T15:55:35.944Z",
+   "LIN-4448",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "4b22eb22"
+  ],
+  [
+   "2026-11-13T15:58:40.360Z",
+   "LIN-4464",
+   "LLM & prompts",
+   [
+    "Front end",
+    "Runs & dispatch"
+   ],
+   "8662e71c"
+  ],
+  [
+   "2026-11-13T16:02:43.831Z",
+   "LIN-4464",
+   "LLM & prompts",
+   [
+    "Front end",
+    "Runs & dispatch"
+   ],
+   "0435dbd3"
+  ],
+  [
+   "2026-11-13T16:05:48.450Z",
+   "LIN-4463",
+   "Front end",
+   [
+    "Runs & dispatch"
+   ],
+   "88f5a165"
+  ],
+  [
+   "2026-11-13T16:19:54.124Z",
+   "LIN-4456",
+   "Runs & dispatch",
+   [
+    "Jira"
+   ],
+   "2dcf1ec9"
+  ],
+  [
+   "2026-11-13T16:25:47.704Z",
+   "LIN-4459",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "6dc83aaf"
+  ],
+  [
+   "2026-11-13T16:28:18.177Z",
+   "LIN-4464",
+   "LLM & prompts",
+   [
+    "Front end",
+    "Runs & dispatch"
+   ],
+   "3284c0f1"
+  ],
+  [
+   "2026-11-13T16:30:49.296Z",
+   "LIN-4458",
+   "Runs & dispatch",
+   [
+    "Front end"
+   ],
+   "a7c7b424"
+  ],
+  [
+   "2026-11-13T16:42:08.689Z",
+   "LIN-4448",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "1a2e7cba"
+  ],
+  [
+   "2026-11-13T16:42:14.992Z",
+   "LIN-4448",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "0510ffe0"
+  ],
+  [
+   "2026-11-13T16:42:22.854Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "44101230"
+  ],
+  [
+   "2026-11-13T16:49:08.755Z",
+   "LIN-4464",
+   "LLM & prompts",
+   [
+    "Front end",
+    "Jira",
+    "Runs & dispatch"
+   ],
+   "018f8639"
+  ],
+  [
+   "2026-11-13T16:51:54.443Z",
+   "LIN-4465",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "c94f9cb7"
+  ],
+  [
+   "2026-11-13T16:54:20.682Z",
+   "LIN-4471",
+   "Front end",
+   [
+    "LLM & prompts",
+    "Runs & dispatch"
+   ],
+   "f78f573c"
+  ],
+  [
+   "2026-11-13T17:01:55.610Z",
+   "LIN-4459",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "db296654"
+  ],
+  [
+   "2026-11-13T17:06:52.284Z",
+   "LIN-4448",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "b564445b"
+  ],
+  [
+   "2026-11-13T17:10:03.138Z",
+   "LIN-4465",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "2cbbeddd"
+  ],
+  [
+   "2026-11-13T17:21:46.008Z",
+   "LIN-4471",
+   "Front end",
+   [
+    "LLM & prompts",
+    "Runs & dispatch"
+   ],
+   "aa99e888"
+  ],
+  [
+   "2026-11-13T17:28:16.484Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "Jira"
+   ],
+   "4e4c23c6"
+  ],
+  [
+   "2026-11-13T17:29:58.525Z",
+   "LIN-4459",
+   "Runs & dispatch",
+   [
+    "Jira",
+    "LLM & prompts"
+   ],
+   "9584b81c"
+  ],
+  [
+   "2026-11-13T17:30:56.541Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "15a858eb"
+  ],
+  [
+   "2026-11-13T17:30:57.037Z",
+   "LIN-4459",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "db487b6a"
+  ],
+  [
+   "2026-11-13T17:50:59.330Z",
+   "LIN-4458",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "50135ba2"
+  ],
+  [
+   "2026-11-13T18:17:37.424Z",
+   "LIN-4458",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "2df73ee9"
+  ],
+  [
+   "2026-11-13T18:26:05.368Z",
+   "LIN-4452",
+   "Jira",
+   [
+    "Runs & dispatch"
+   ],
+   "c1f5e6da"
+  ],
+  [
+   "2026-11-13T18:41:05.435Z",
+   "LIN-4463",
+   "Front end",
+   [
+    "LLM & prompts"
+   ],
+   "1a9cad63"
+  ],
+  [
+   "2026-11-13T18:58:04.455Z",
+   "LIN-4463",
+   "Front end",
+   [
+    "Jira"
+   ],
+   "11814310"
+  ],
+  [
+   "2026-11-13T19:05:09.028Z",
+   "LIN-4463",
+   "Front end",
+   [
+    "Jira"
+   ],
+   "6bd2401a"
+  ],
+  [
+   "2026-11-13T19:08:51.765Z",
+   "LIN-4463",
+   "Front end",
+   [
+    "Jira",
+    "LLM & prompts"
+   ],
+   "b2bf37a9"
+  ],
+  [
+   "2026-11-13T19:20:53.432Z",
+   "LIN-4465",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "ca4982e6"
+  ],
+  [
+   "2026-11-13T19:24:29.535Z",
+   "LIN-4465",
+   "LLM & prompts",
+   [
+    "Front end",
+    "Jira",
+    "Runs & dispatch"
+   ],
+   "a9ffe3d7"
+  ],
+  [
+   "2026-11-13T19:51:34.335Z",
+   "LIN-4465",
+   "LLM & prompts",
+   [
+    "Front end",
+    "Jira",
+    "Runs & dispatch"
+   ],
+   "0837ed74"
+  ],
+  [
+   "2026-11-13T19:55:50.962Z",
+   "LIN-4466",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "096b83b7"
+  ],
+  [
+   "2026-11-13T19:58:24.003Z",
+   "LIN-4466",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "beee6798"
+  ],
+  [
+   "2026-11-13T20:18:54.707Z",
+   "LIN-4463",
+   "Front end",
+   [
+    "LLM & prompts"
+   ],
+   "f4d5780f"
+  ],
+  [
+   "2026-11-13T20:24:47.009Z",
+   "LIN-4466",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "d25278a4"
+  ],
+  [
+   "2026-11-13T20:29:10.065Z",
+   "LIN-4466",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "fddf30e1"
+  ],
+  [
+   "2026-11-13T20:34:06.118Z",
+   "LIN-4448",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "882fc992"
+  ],
+  [
+   "2026-11-13T20:37:30.022Z",
+   "LIN-4468",
+   "LLM & prompts",
+   [
+    "Jira",
+    "Runs & dispatch"
+   ],
+   "109415e9"
+  ],
+  [
+   "2026-11-13T20:43:35.545Z",
+   "LIN-4463",
+   "Front end",
+   [
+    "LLM & prompts"
+   ],
+   "8f784248"
+  ],
+  [
+   "2026-11-13T20:47:26.788Z",
+   "LIN-4467",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "98201a79"
+  ],
+  [
+   "2026-11-13T20:51:23.530Z",
+   "LIN-4467",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "34f12a09"
+  ],
+  [
+   "2026-11-13T21:05:28.372Z",
+   "LIN-4468",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "e6a99c7e"
+  ],
+  [
+   "2026-11-13T21:37:09.025Z",
+   "LIN-4467",
+   "LLM & prompts",
+   [
+    "Front end",
+    "Runs & dispatch"
+   ],
+   "9d954f44"
+  ],
+  [
+   "2026-11-13T21:41:06.475Z",
+   "LIN-4468",
+   "LLM & prompts",
+   [
+    "Jira"
+   ],
+   "7b2e64a0"
+  ],
+  [
+   "2026-11-13T21:49:16.532Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "15de14a7"
+  ],
+  [
+   "2026-11-13T21:58:18.389Z",
+   "LIN-4468",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "732e3364"
+  ],
+  [
+   "2026-11-13T21:58:18.663Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "b555094d"
+  ],
+  [
+   "2026-11-13T22:05:34.005Z",
+   "LIN-4467",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "00f3dcf8"
+  ],
+  [
+   "2026-11-13T22:12:19.551Z",
+   "LIN-4468",
+   "LLM & prompts",
+   [
+    "Front end"
+   ],
+   "b3bd1fa2"
+  ],
+  [
+   "2026-11-13T22:15:46.964Z",
+   "LIN-4468",
+   "LLM & prompts",
+   [
+    "Front end",
+    "Runs & dispatch"
+   ],
+   "f2e8ae1d"
+  ],
+  [
+   "2026-11-13T23:03:57.654Z",
+   "LIN-4469",
+   "LLM & prompts",
+   [
+    "Jira"
+   ],
+   "39207a24"
+  ],
+  [
+   "2026-11-13T23:21:48.924Z",
+   "LIN-4469",
+   "LLM & prompts",
+   [
+    "Jira",
+    "Runs & dispatch"
+   ],
+   "042f607d"
+  ],
+  [
+   "2026-11-14T00:03:29.231Z",
+   "LIN-4470",
+   "LLM & prompts",
+   [
+    "Front end",
+    "Runs & dispatch"
+   ],
+   "391ceb14"
+  ],
+  [
+   "2026-11-14T00:07:08.706Z",
+   "LIN-4470",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "44df78c8"
+  ],
+  [
+   "2026-11-14T00:08:58.122Z",
+   "LIN-4475",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "0ffccb15"
+  ],
+  [
+   "2026-11-14T01:54:07.685Z",
+   "LIN-4462",
+   "Runs & dispatch",
+   [
+    "Front end"
+   ],
+   "147eaefb"
+  ],
+  [
+   "2026-11-14T01:57:25.156Z",
+   "LIN-4462",
+   "Runs & dispatch",
+   [
+    "Front end",
+    "LLM & prompts"
+   ],
+   "8c9eb6ab"
+  ],
+  [
+   "2026-11-14T02:04:15.718Z",
+   "LIN-4462",
+   "Runs & dispatch",
+   [
+    "Front end",
+    "LLM & prompts"
+   ],
+   "7305f073"
+  ],
+  [
+   "2026-11-14T02:15:34.207Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "Front end"
+   ],
+   "5c146c4b"
+  ],
+  [
+   "2026-11-14T02:15:39.047Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "Front end"
+   ],
+   "91473853"
+  ],
+  [
+   "2026-11-14T02:16:03.908Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "Front end",
+    "LLM & prompts"
+   ],
+   "a2280347"
+  ],
+  [
+   "2026-11-14T02:24:18.684Z",
+   "LIN-4462",
+   "Runs & dispatch",
+   [
+    "Front end"
+   ],
+   "5eae045e"
+  ],
+  [
+   "2026-11-14T09:15:19.439Z",
+   "LIN-4448",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "a43a748d"
+  ],
+  [
+   "2026-11-14T09:17:46.869Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "3300ab65"
+  ],
+  [
+   "2026-11-14T09:17:47.165Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "36a9d8e0"
+  ],
+  [
+   "2026-11-14T09:17:47.420Z",
+   "LIN-4447",
+   "Runs & dispatch",
+   [
+    "LLM & prompts"
+   ],
+   "29848ba2"
+  ],
+  [
+   "2026-11-14T09:18:07.541Z",
+   "LIN-4448",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "d827aa8e"
+  ],
+  [
+   "2026-11-14T09:18:53.405Z",
+   "LIN-4470",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "b97ff575"
+  ],
+  [
+   "2026-11-14T09:37:14.156Z",
+   "LIN-4470",
+   "LLM & prompts",
+   [
+    "Runs & dispatch"
+   ],
+   "b008d7b3"
+  ]
+ ],
+ "merged_prs": 29,
+ "merged_prs_by_lane": {
+  "Front end": 6,
+  "Jira": 4,
+  "LLM & prompts": 7,
+  "Runs & dispatch": 12
+ },
+ "shared_files": {
+  "CLAUDE.md": [
+   "Front end",
+   "LLM & prompts"
+  ],
+  "docs/architecture/dispatch-and-proxy.md": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "docs/architecture/prompt-system.md": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "docs/architecture/source-map.md": [
+   "Front end",
+   "Jira",
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "docs/areas/agent-api.md": [
+   "Jira",
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "docs/areas/areas.json": [
+   "Front end",
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "docs/areas/front-end-browser.md": [
+   "Front end",
+   "Jira"
+  ],
+  "docs/areas/front-end-pages.md": [
+   "Front end",
+   "Jira",
+   "Runs & dispatch"
+  ],
+  "docs/areas/llm-and-prompts.md": [
+   "Jira",
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "docs/areas/other-features.md": [
+   "Front end",
+   "LLM & prompts"
+  ],
+  "docs/areas/platform-and-plumbing.md": [
+   "Front end",
+   "Jira",
+   "LLM & prompts"
+  ],
+  "docs/areas/runs-and-dispatch.md": [
+   "Front end",
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "docs/areas/web-routes.md": [
+   "Jira",
+   "Runs & dispatch"
+  ],
+  "docs/proxy-integration.md": [
+   "Jira",
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "lib/completion-signals.js": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "lib/dispatch-entrance.js": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "lib/dispatch-factory.js": [
+   "Jira",
+   "Runs & dispatch"
+  ],
+  "lib/dispatch-store.js": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "lib/openrouter.js": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "lib/periodicals.js": [
+   "Jira",
+   "LLM & prompts"
+  ],
+  "lib/prompt-template-defs.js": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "lib/prompts/blind-read-words.js": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "lib/proxy-instructions.js": [
+   "Jira",
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "lib/proxy-tokens.js": [
+   "Jira",
+   "LLM & prompts"
+  ],
+  "lib/recommendation-blind-read.js": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "lib/recommendation-facts.js": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "lib/recommendation-look-first.js": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "lib/render-proxy.js": [
+   "Front end",
+   "Runs & dispatch"
+  ],
+  "lib/render-task-page.js": [
+   "Front end",
+   "Runs & dispatch"
+  ],
+  "lib/run-closeout-state.js": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "lib/run-live-wait.js": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "lib/run-trail.js": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "lib/run-view.js": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "lib/task-page-loader.js": [
+   "Front end",
+   "Runs & dispatch"
+  ],
+  "routes/dispatch.js": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "routes/proxy-compute.js": [
+   "Jira",
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "routes/proxy-dispatch.js": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "routes/proxy-writes.js": [
+   "Jira",
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "routes/proxy.js": [
+   "Jira",
+   "LLM & prompts"
+  ],
+  "routes/workspace-api-issue-write.js": [
+   "Jira",
+   "Runs & dispatch"
+  ],
+  "routes/workspace-api-prompts.js": [
+   "Jira",
+   "LLM & prompts"
+  ],
+  "routes/workspace-api.js": [
+   "Jira",
+   "Runs & dispatch"
+  ],
+  "server.js": [
+   "Front end",
+   "Jira",
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "tests/unit/area-map-placement.test.js": [
+   "Front end",
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "tests/unit/lin-4313-periodical-prompt-bytes.test.js": [
+   "Jira",
+   "LLM & prompts"
+  ],
+  "tests/unit/lin-4458-comment-kind-census.test.js": [
+   "LLM & prompts",
+   "Runs & dispatch"
+  ],
+  "tests/unit/periodicals.test.js": [
+   "Jira",
+   "LLM & prompts"
+  ],
+  "tests/unit/task-timeline-client.test.js": [
+   "Front end",
+   "Runs & dispatch"
+  ]
+ },
+ "shared_files_by_lane_pair": {
+  "Front end + Jira": 5,
+  "Front end + LLM & prompts": 8,
+  "Front end + Runs & dispatch": 10,
+  "Jira + LLM & prompts": 15,
+  "Jira + Runs & dispatch": 13,
+  "LLM & prompts + Runs & dispatch": 29
+ },
+ "window": [
+  "2026-11-13T12:08",
+  "2026-11-14T10:00"
+ ]
+}

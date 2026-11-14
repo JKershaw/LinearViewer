@@ -1,0 +1,382 @@
+{
+ "LIN-4447": [
+  {
+   "id": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "kind": "autopilot",
+   "dispatchedAt": "2026-11-13T13:13:37.231Z",
+   "status": "done",
+   "sessionId": null,
+   "closedReason": "lineage-terminal"
+  },
+  {
+   "id": "afb04c55-9627-4741-8096-1ec01657ca35",
+   "kind": "survey-task",
+   "dispatchedAt": "2026-11-13T13:16:19.377Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": null
+  },
+  {
+   "id": "575a5271-c177-42b1-94ba-d7632adcfb84",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T13:19:29.460Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "06c7cf4c-fe92-4f9f-8273-bb9b0c221814",
+   "kind": "survey-place",
+   "dispatchedAt": "2026-11-13T13:20:01.121Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": null
+  },
+  {
+   "id": "dab4dee6-b392-493f-b22b-8011199d55f7",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T13:23:37.882Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "bcf23562-e727-401b-922c-b7f4dc085d3c",
+   "kind": "scoping",
+   "dispatchedAt": "2026-11-13T13:24:09.883Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": null
+  },
+  {
+   "id": "2570e2ff-8942-44c7-ba0e-910eb5ce5958",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T13:26:41.508Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "1fa7a869-36cc-4198-82ce-ae13c656fb29",
+   "kind": "design",
+   "dispatchedAt": "2026-11-13T13:27:20.150Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": null
+  },
+  {
+   "id": "42e4d871-12ac-433f-8756-1a913cf44002",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T13:32:56.203Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "31d2a914-9a65-4f29-8b41-0959dc90b8f1",
+   "kind": "blocked",
+   "dispatchedAt": "2026-11-13T13:33:51.683Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": null
+  },
+  {
+   "id": "03257de1-1166-463c-9d92-5b6817a14c69",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T13:37:30.640Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "9d8726a7-4a1e-4543-b99e-33ec3bae9a1b",
+   "kind": "plan",
+   "dispatchedAt": "2026-11-13T13:37:51.091Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": null
+  },
+  {
+   "id": "132c3764-edb0-4404-bc14-a9ca53a82483",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T13:41:38.117Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "69da43da-637d-4f80-abd2-8b4bb9354b47",
+   "kind": "plan-review",
+   "dispatchedAt": "2026-11-13T13:42:34.981Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": null
+  },
+  {
+   "id": "b85889c7-7052-48d5-b62f-0b48e136c90f",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T13:46:51.989Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "bdaea730-1518-430c-8184-f6e32ee9a689",
+   "kind": "plan",
+   "dispatchedAt": "2026-11-13T13:47:48.966Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": null
+  },
+  {
+   "id": "d5f3d08d-f875-4f8d-b75e-4c4ffbbff9ad",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T13:53:37.251Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "2af83008-b943-4b77-8422-2c143293cb2c",
+   "kind": "plan-review",
+   "dispatchedAt": "2026-11-13T13:54:42.236Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": null
+  },
+  {
+   "id": "229cb26f-36e7-4fe3-8a55-52435202ae13",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T13:57:54.631Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "00a4995f-cf4c-4194-953c-c35b40d380f9",
+   "kind": "breakdown",
+   "dispatchedAt": "2026-11-13T13:58:55.055Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": null
+  },
+  {
+   "id": "e25e1553-e328-4b1d-8eb7-c266b2424454",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T14:02:52.115Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "bb4f49a4-020f-4c70-b5f3-fccadd01e5ea",
+   "kind": "custom",
+   "dispatchedAt": "2026-11-13T15:33:37.811Z",
+   "status": "done",
+   "sessionId": null,
+   "closedReason": null
+  },
+  {
+   "id": "6980caf7-6f54-427c-a9b0-eefa07460ce9",
+   "kind": "custom",
+   "dispatchedAt": "2026-11-13T15:33:39.091Z",
+   "status": "done",
+   "sessionId": null,
+   "closedReason": null
+  },
+  {
+   "id": "024f15d5-1252-4504-84e0-2b361b37c36d",
+   "kind": "custom",
+   "dispatchedAt": "2026-11-13T15:33:41.799Z",
+   "status": "done",
+   "sessionId": null,
+   "closedReason": null
+  },
+  {
+   "id": "8116da7a-b655-4f40-97f5-77c524da21b3",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T15:35:04.481Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "8f5760ea-2313-44e4-8156-5be3b937cd0c",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T15:35:11.660Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "c88061af-a1fd-41ff-8b24-7163617d5dd7",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T15:35:42.389Z",
+   "status": "done",
+   "sessionId": "66ced645-0e59-4245-871a-d2ade97c5126",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "e973d5df-8815-4e70-abce-57cd65b284c3",
+   "kind": "custom",
+   "dispatchedAt": "2026-11-14T09:01:19.820Z",
+   "status": "done",
+   "sessionId": null,
+   "closedReason": null
+  }
+ ],
+ "LIN-4448": [
+  {
+   "id": "87882502-2f71-44fb-8e09-ccbd56e8a6ef",
+   "kind": "autopilot",
+   "dispatchedAt": "2026-11-13T13:13:37.944Z",
+   "status": "blocked",
+   "sessionId": null,
+   "closedReason": null
+  },
+  {
+   "id": "4cc41fad-001e-4760-83d0-6e5941d3542d",
+   "kind": "survey-task",
+   "dispatchedAt": "2026-11-13T13:16:38.053Z",
+   "status": "done",
+   "sessionId": "87882502-2f71-44fb-8e09-ccbd56e8a6ef",
+   "closedReason": null
+  },
+  {
+   "id": "b6dfbaa3-e1e9-4a04-b19b-2bc731ed0916",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T13:20:03.938Z",
+   "status": "closed",
+   "sessionId": "87882502-2f71-44fb-8e09-ccbd56e8a6ef",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "62082b14-edf3-4849-a29d-864474153328",
+   "kind": "survey-place",
+   "dispatchedAt": "2026-11-13T13:21:56.041Z",
+   "status": "done",
+   "sessionId": "87882502-2f71-44fb-8e09-ccbd56e8a6ef",
+   "closedReason": null
+  },
+  {
+   "id": "54fb219d-f3bd-4e9e-8290-f0f8132826d6",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T13:24:55.210Z",
+   "status": "closed",
+   "sessionId": "87882502-2f71-44fb-8e09-ccbd56e8a6ef",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "adacf8d5-12ac-4476-86b5-cd10a04d8ae1",
+   "kind": "scoping",
+   "dispatchedAt": "2026-11-13T13:25:35.520Z",
+   "status": "done",
+   "sessionId": "87882502-2f71-44fb-8e09-ccbd56e8a6ef",
+   "closedReason": "lineage-terminal"
+  },
+  {
+   "id": "96bfc353-7075-4e95-82e5-a46f509d3f9a",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T13:28:07.087Z",
+   "status": "closed",
+   "sessionId": "87882502-2f71-44fb-8e09-ccbd56e8a6ef",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "56407915-8659-4fe4-aa31-99f5f4d941ca",
+   "kind": "custom",
+   "dispatchedAt": "2026-11-13T15:33:40.160Z",
+   "status": "done",
+   "sessionId": null,
+   "closedReason": null
+  },
+  {
+   "id": "c2516e59-49eb-495c-8693-236ee9c98cea",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T15:34:36.592Z",
+   "status": "closed",
+   "sessionId": "87882502-2f71-44fb-8e09-ccbd56e8a6ef",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "8e1f52c8-c3f8-48f6-8912-f1c0f5f145b7",
+   "kind": "plan",
+   "dispatchedAt": "2026-11-13T15:35:24.276Z",
+   "status": "done",
+   "sessionId": "87882502-2f71-44fb-8e09-ccbd56e8a6ef",
+   "closedReason": null
+  },
+  {
+   "id": "abe27d8c-4f78-43d2-bf27-17ba8a63c4d0",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T15:40:09.079Z",
+   "status": "closed",
+   "sessionId": "87882502-2f71-44fb-8e09-ccbd56e8a6ef",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "007f38ce-0bc5-4788-a11a-ae0e1578acdb",
+   "kind": "plan-review",
+   "dispatchedAt": "2026-11-13T15:41:06.685Z",
+   "status": "done",
+   "sessionId": "87882502-2f71-44fb-8e09-ccbd56e8a6ef",
+   "closedReason": null
+  },
+  {
+   "id": "067cfd03-b690-46a8-bd5d-de8fb4e87a3b",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T15:49:51.798Z",
+   "status": "closed",
+   "sessionId": "87882502-2f71-44fb-8e09-ccbd56e8a6ef",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "2d65d300-e9e8-4384-b0fa-5eff5761c237",
+   "kind": "breakdown",
+   "dispatchedAt": "2026-11-13T15:51:03.601Z",
+   "status": "done",
+   "sessionId": "87882502-2f71-44fb-8e09-ccbd56e8a6ef",
+   "closedReason": null
+  },
+  {
+   "id": "1fca21fa-8b6e-4cb3-b1b1-3a0ee10c61f3",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T15:55:54.847Z",
+   "status": "closed",
+   "sessionId": "87882502-2f71-44fb-8e09-ccbd56e8a6ef",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "4061df13-42b1-4666-8bf0-71fdd6b17259",
+   "kind": "custom",
+   "dispatchedAt": "2026-11-13T15:57:43.919Z",
+   "status": "done",
+   "sessionId": null,
+   "closedReason": null
+  },
+  {
+   "id": "a4120515-269d-4836-b5ef-81b128ab392b",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T15:58:23.039Z",
+   "status": "closed",
+   "sessionId": "87882502-2f71-44fb-8e09-ccbd56e8a6ef",
+   "closedReason": "handed-on"
+  },
+  {
+   "id": "2e8edc69-9453-4c4a-b157-82701524b272",
+   "kind": "review",
+   "dispatchedAt": "2026-11-13T20:32:16.268Z",
+   "status": "done",
+   "sessionId": "87882502-2f71-44fb-8e09-ccbd56e8a6ef",
+   "closedReason": null
+  },
+  {
+   "id": "c4b436ec-f3f9-46e0-8610-c01ae373aa2e",
+   "kind": "wake",
+   "dispatchedAt": "2026-11-13T20:34:18.229Z",
+   "status": "closed",
+   "sessionId": "87882502-2f71-44fb-8e09-ccbd56e8a6ef",
+   "closedReason": "handed-on"
+  }
+ ]
+}
