@@ -3998,3 +3998,17 @@ John's direction:
 - **~10:54 UTC: LIN-4448 Done.** John applied `close`. Close-out merged as `06a7da871` (PR #2457: blind-read fixes, plus three Waiting entries). **Both tidy lanes are finished.**
 - **Papers are up for review:** A18 PR #2451 (CI green), A19 PR #2452, A17 PR #2453. Three independent reviewer subagents were sent, one per paper (claims against evidence, papers standard, reasoning, privacy, index).
 - **Periodicals in progress:** LIN-4481 (Drift, PR #2455, in review), LIN-4482 (Seams, blind read "same"), LIN-4483 (Stability, PR #2456, in review).
+- **~11:05 UTC: two paper reviews back, both "merge after fixes".** Each review was relayed as a comment on its ticket, and a custom Opus follow-up was sent to fix it on the same branch (no merge by the writer).
+  - **A17 (PR #2453, LIN-4480), follow-up `5806367e`.**
+    - Core story checked: the agreement, all three moves landed, the counts.
+    - Must-fix: a company name in an evidence file (redact).
+    - "No person took part" is contradicted: John's ruling `24e376c1` let LLM edit Runs' `dispatch-store.js` (#2443), reversing the agreed boundary.
+    - It stops before LIN-4448's close-out, which redrew the border (#2457).
+    - Unlandable citations.
+  - **A18 (PR #2451, LIN-4478), follow-up `bc6ce062`.**
+    - Main claims hold (about 6:1 bytes in to out; shrinking mostly when the described thing was deleted).
+    - Must-fix: "LIN-462" is really PR #462.
+    - "817 KB before October" is the 7 Sep week (796 KB is right).
+    - The cut-word regex is wider than described.
+    - The Finding 5 table rows are wrong.
+    - Suggestion: "growth moves next door" is barely shown by its own data.
