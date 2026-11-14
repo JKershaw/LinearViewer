@@ -17,24 +17,12 @@ import { join } from 'node:path';
 import { ROOT, loadAreas, areaOf } from './helpers/area-registry.js';
 // What a waiting entry is, and which files are not notes, is defined once in the product's leaf (LIN-4420): the
 // stability measure (scripts/stability-measures.mjs) counts the entries this guard checks, from the same definition.
-import { NOTES_DIR, NOT_NOTES, parseNote } from '../../lib/prompts/area-note-format.js';
+import { NOTES_DIR, NOT_NOTES, citedPaths, parseNote } from '../../lib/prompts/area-note-format.js';
 
 // About 6 KB (LIN-4347's plan leaves the builder to pick it): a note's Lessons are read before every change in its
 // area, so they must stay short enough to read in full. Since LIN-4414 it caps the `## Lessons` section only.
 export const NOTE_BYTE_CAP = 6144;
 const SECTIONS = new Set(['Lessons', 'Waiting']);
-const EXTENSIONS = 'js|mjs|cjs|json|md|css|html|txt|yml|yaml|toml|sh';
-// A repo-relative path in backticks: path characters only (a `:12` suffix stays in, so a line number fails check 2),
-// and either a `/` in it or a file extension. `/dispatch`, `^lib/` and `provider.name` are not paths.
-const PATH_SPAN = new RegExp(`^[\\w.:-]+(?:/[\\w.:-]+)*/?$`);
-const HAS_EXTENSION = new RegExp(`\\.(?:${EXTENSIONS})$`);
-
-/** Every backtick span in `text` that reads as a repo-relative path, in order. */
-export function citedPaths(text) {
-  return [...text.matchAll(/`([^`\s]+)`/g)].map((m) => m[1])
-    .filter((s) => PATH_SPAN.test(s) && (s.includes('/') || HAS_EXTENSION.test(s.replace(/(:\d+)+$/, ''))));
-}
-
 /** The bytes of a note's `## Lessons` section: from its heading to the next level-two heading or the end; 0 if none. */
 export function lessonsBytes(text) {
   const lines = text.split('\n');

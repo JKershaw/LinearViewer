@@ -1,5 +1,6 @@
 /**
- * LIN-4467 witness: what every stage kind renders, and what the per-kind tables say, captured as hashes.
+ * LIN-4467 witness: what every stage kind renders, and what the per-kind tables say. Renders are hashes; the tables are
+ * their text (LIN-4470), so a change to one shows in the fixture's diff.
  *
  * Captured at HEAD before the one-record refactor, and compared after it (tests/unit/lin-4467-stage-kind-witness.test.js).
  * Kept since as a permanent ratchet (LIN-4469): it is the identity pin on real-context renders, which the budget's
@@ -88,6 +89,23 @@ export function canonical(value) {
   return JSON.stringify(value === undefined ? '__undefined__' : value);
 }
 
+/**
+ * The same content as canonical(), one key per line, so the fixture's diff shows what changed in a table (LIN-4470).
+ * A hash only says that a table changed; the test names the table either way, but the fixture now holds the text.
+ */
+export function shown(value) {
+  const plain = (v) => {
+    if (typeof v === 'function') return `fn:${v.name}`;
+    if (Array.isArray(v)) return v.map(plain);
+    if (v && typeof v === 'object') return Object.fromEntries(Object.keys(v).sort().map(k => [k, plain(v[k])]));
+    return v === undefined ? '__undefined__' : v;
+  };
+  return JSON.stringify(plain(value), null, 2);
+}
+
+/** The shown text as an array of lines, so each line of a table is one line of the fixture's diff (LIN-4470). */
+const lines = (value) => shown(value).split('\n');
+
 /** Captures every hash the witness pins. Async-free and network-free. */
 export async function captureWitness() {
   const { PROMPT_TEMPLATES, generatePrompt } = await import('../../lib/prompt-templates.js');
@@ -109,16 +127,16 @@ export async function captureWitness() {
   }
 
   const tables = {
-    COMPLETION_SIGNALS: sha(canonical(COMPLETION_SIGNALS)),
-    STAGE_INTENT: sha(canonical(STAGE_INTENT)),
-    GROUNDING_BY_KIND: sha(canonical(GROUNDING_BY_KIND)),
-    STAGE_LEADS: sha(canonical(STAGE_LEADS)),
-    STAGE_LABELS: sha(canonical(STAGE_LABELS)),
-    TEMPLATE_TRAITS: sha(canonical(Object.fromEntries(kinds.map(k => {
+    COMPLETION_SIGNALS: lines(COMPLETION_SIGNALS),
+    STAGE_INTENT: lines(STAGE_INTENT),
+    GROUNDING_BY_KIND: lines(GROUNDING_BY_KIND),
+    STAGE_LEADS: lines(STAGE_LEADS),
+    STAGE_LABELS: lines(STAGE_LABELS),
+    TEMPLATE_TRAITS: lines(Object.fromEntries(kinds.map(k => {
       const t = PROMPT_TEMPLATES[k];
       return [k, { name: t.name, category: t.category, description: t.description, route: t.route, writes: t.writes }];
-    })))),
-    TEMPLATE_KEYS: sha(canonical(kinds))
+    }))),
+    TEMPLATE_KEYS: lines(kinds)
   };
   const labels = Object.fromEntries(kinds.map(k => [k, stageLabel(k)]));
   for (const k of ['leftover', 'autopilot', 'wake', 'periodical', 'custom', 'defer']) labels[`extra:${k}`] = stageLabel(k);

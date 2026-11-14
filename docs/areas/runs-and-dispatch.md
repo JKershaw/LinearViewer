@@ -180,3 +180,10 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   the readers, not from a recorded run; it was not checked against recorded runs, so how often an http PR link occurs
   is not known. When it is decided, change the reader and the row's cells together, then re-copy the contract into SD.
   (LIN-4475 blind read.)
+
+- `lib/dispatch-factory.js`: the record's `model` (`routing.model`) names the routed id ("anthropic/claude-opus-4.8" for
+  the `opus` route), but the claude-code harness runs a Claude id by its family token (`isModelRunnableOn` and
+  `CLAUDE_MAPPABLE_MODEL_FAMILIES`, `lib/model-routing-harnesses.js`), and on blind-read dispatches d9bdf6d8, cced07ee and
+  0399b2e2 it ran `claude-opus-5-5`, so a record can misname the model that ran. Cost is already priced from the model the
+  worker reports. Waiting: make the record carry the model the worker reports, or update the routed id. (LIN-4396 review;
+  moved here from LLM & prompts by LIN-4470, as agreed on LIN-4447.)

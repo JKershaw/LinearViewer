@@ -38,7 +38,7 @@ describe('LIN-4467 — every stage kind renders byte-identically, fresh and fix 
 describe('LIN-4467 — the per-kind tables serialise to the witnessed content', () => {
   for (const name of Object.keys(expected.tables)) {
     test(`${name} is unchanged`, () => {
-      assert.equal(actual.tables[name], expected.tables[name], `${name} changed`);
+      assert.deepEqual(actual.tables[name], expected.tables[name], `${name} changed (the fixture holds its text; see the diff)`);
     });
   }
   test('the stage labels, the step words and the stage contracts are unchanged', () => {
