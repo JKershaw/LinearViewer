@@ -1,5 +1,8 @@
 #!/bin/bash
-for h in $(git log --first-parent --reverse --format=%h -- docs/areas); do
+# LIN-4478: Waiting bullets, Lessons bytes and total bytes of the area notes (README aside) at
+# every first-parent commit up to REV that touched docs/areas/. Usage: bash area-notes.sh [rev=a886fb506] > area-notes.txt
+REV=${1:-a886fb506}
+for h in $(git log --first-parent --reverse --format=%h "$REV" -- docs/areas); do
   d=$(git log -1 --format=%cs $h)
   files=$(git ls-tree --name-only "${h}" docs/areas/ | grep -E '\.md$' | grep -v README)
   W=0; L=0; B=0

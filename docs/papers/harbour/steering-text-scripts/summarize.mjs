@@ -9,7 +9,11 @@ const weeks = JSON.parse(readFileSync(layersPath, 'utf8'));
 const commits = JSON.parse(readFileSync(commitsPath, 'utf8'));
 const CARRIED = ['stage prompts', 'runner contract and kickoffs', 'agent API text', 'CLAUDE.md', 'area notes'];
 const STEERING = [...CARRIED, 'architecture docs', 'other docs'];
-const CUT = /\b(trim|cut|shorten|simplif\w*|prune|slim|shrink|remov\w*|retir\w*|delet\w*|drop\w*|consolidat\w*|dedup\w*|fold\w*|one home|once|tidy|leaner|smaller|revert\w*|one path|one source|one owner|collapse\w*)\b/i;
+// The five cut words the paper names (cut, remove, simplify, fold, retire), and nothing else.
+// Version 1 used a 24-term pattern (also once, one home, one owner, tidy, consolidate, drop,
+// revert, ...); WIDE keeps it so both counts print (LIN-4478 review).
+const CUT = /\b(cut|remov\w*|simplif\w*|fold\w*|retir\w*)\b/i;
+const WIDE = /\b(trim|cut|shorten|simplif\w*|prune|slim|shrink|remov\w*|retir\w*|delet\w*|drop\w*|consolidat\w*|dedup\w*|fold\w*|one home|once|tidy|leaner|smaller|revert\w*|one path|one source|one owner|collapse\w*)\b/i;
 const kb = (b) => (b / 1024).toFixed(0);
 
 console.log('# Weekly steering and carried text (KB), and product code (KB)');
@@ -34,6 +38,8 @@ for (const [name, set] of [['steering', STEERING], ['carried', CARRIED]]) {
     const R = rows.filter((r) => r.day >= lo && r.day <= hi), C = R.filter((r) => CUT.test(r.subj));
     console.log(`  ${label}: cut-worded ${C.length} (${C.filter((r) => r.net > 0).length} grew, ${C.filter((r) => r.net < 0).length} shrank, net ${kb(C.reduce((a, r) => a + r.net, 0))} KB); other ${R.length - C.length} (net ${kb(R.filter((r) => !CUT.test(r.subj)).reduce((a, r) => a + r.net, 0))} KB)`);
   }
+  const W = rows.filter((r) => WIDE.test(r.subj));
+  console.log(`  version 1's 24-term pattern, all: ${W.length} (${W.filter((r) => r.net > 0).length} grew, ${W.filter((r) => r.net < 0).length} shrank, net ${kb(W.reduce((a, r) => a + r.net, 0))} KB)`);
   console.log(`  shrinks of 1 KB or more:`);
   for (const r of rows.filter((r) => r.net <= -1024).sort((a, b) => a.net - b.net)) {
     const other = (l) => kb(commits.find((c) => c.sha === r.sha).layers[l]?.net || 0);
