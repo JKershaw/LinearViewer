@@ -3854,3 +3854,17 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
   - *The parrot.* It checked batch 3 but looks only for drift from John's words and for "how". It never asks whether a requirement is one John asked for, and it tightened two Done-whens. Same blind spot as 7 Nov's "err larger".
   - *Overreaction.* I answered with four new rules. John: "We want all this looser, not tighter." The fix is removal: drop the gate, drop Waiting-settlement from Done, let lanes narrow agent-written text with a reason.
 - **Next:** John to answer lin4447 (now leaning accept) and lin4470 (cut); recap before he compacts.
+
+### About 09:10 UTC, 14 Nov: method from here, as given to John before his compaction
+
+1. **Role unchanged.** I drive the work and keep time, suggest answers on rulings (John answers), merge held PRs once CI is green and review is done (unless it's his call), log everything here, and message him only when needed.
+2. **Writing asks, briefs and kickoffs:** John's words, the facts and the what, with no how. Every requirement traces to something John said. Anything I'd add goes in as a suggestion, never as a Done-when. Prefer removing to adding. The parrot gains one question: "Did John ask for this? If not, cut it." Read back to John before filing.
+3. **Measuring:** report, never gate (CI and review still gate merges).
+   - Simplicity: blind paired reads of the changed code (before and after, unlabelled, fresh readers), with a comparison area read the same way.
+   - Beside it, the curve: net lines, deletions per addition, tickets per landing, and Waiting entries.
+   - What I'll look for is written down before reading, as a reading, not a lock.
+   - No fixed file sample. The area-wide read is a slow trend at most.
+4. **Rulings:** suggest the loosest reasonable answer, say plainly what it asks and what happens next, and note false escalations for the review.
+5. **Hands off:** no hand-steering, no new tickets without John's go-ahead, ask before acting by hand on the loop.
+6. **Budget:** a reading each morning; stop starting new work at about 80%.
+7. **Review:** the Periodicals plus my after-read, then a discussion with John (notes first). Any change to Harbour goes in as one ask, read back.
