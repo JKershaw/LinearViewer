@@ -4040,3 +4040,4 @@ John's direction:
 - **A21 agreed:** an essay arguing John's framing ("every choice was right at the time… it's fractal"), reading the record as evidence.
   - John: "You can include additional context from this session, so the momentum/direction/path of the idea is present." I added "How the idea arrived", seven steps in John's words.
   - Fable reasons, Opus writes; filed with A20 once the papers merge. Text in `asks.md`.
+- **Budget reading: 51%** (John, about midday 14 Nov; 45% this morning). John: "I suspect we'll use the rest of this week exploring all this."
