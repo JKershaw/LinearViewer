@@ -3843,3 +3843,14 @@ Both voices: the update clause comes in three grammatical forms woven into hand-
 - **LIN-4470 stalled on its ruling.** Its scoping said "the build can start on everything else", and the kickoff goal says to keep moving while a ruling waits. Even so, there's been no activity since the ruling was raised at 00:12. The ruling's effect is "record", so the lane parked rather than building the uncontested part. Same pattern as LIN-4463's hold on 13 Nov. I'm not steering it by hand.
 - **So overnight, both active lanes are idle on John's answers** (lin4447-area-read-inconclusive, lin4470-five-files-lesson). That costs nothing in budget but costs time. For the review: a ruling that cuts one clause shouldn't park the whole ticket.
 - The container restarted again at about 02:55; nothing was missed.
+
+### 08:15–09:00 UTC, 14 Nov: morning discussion with John
+
+- **Budget 45%** at about 08:15 (41% at 22:10; the lanes idled overnight). Costs so far: LIN-4447 $52.87, LIN-4463 $36.54, LIN-4448 $25.37, LIN-4445 $14.98.
+- **John's points, and what they showed:**
+  - *The area-read gate.* LIN-4447 stopped at its finish line on a figure John had already downgraded to monitoring on the front end. That direction never reached LIN-4447. I wrote the gate into A13/A14 (`asks.md`) as a Done-when; the cut rule then made it a lock only John could open.
+  - *The notes.* The area notes (from my round-one LIN-4347, 8 Nov) were meant to replace ticket-minting. They've become a second backlog: close-outs append Waiting entries, I wrote "settle the Waiting entries" into Done, and agent-written lines get treated as obligations. John: notes risk becoming "a second text version of the code structure" and "worse code, functionally". His candidate: notes are rewritten whole, consistent with and referencing each other. To think through in the review, not fix today.
+  - *The file limit.* The 14-file hashed sample was my design (LIN-4453's frozen kit), for fairness. Blind before/after already gives fairness; the sample hides the work. John: drop it.
+  - *The parrot.* It checked batch 3 but looks only for drift from John's words and for "how". It never asks whether a requirement is one John asked for, and it tightened two Done-whens. Same blind spot as 7 Nov's "err larger".
+  - *Overreaction.* I answered with four new rules. John: "We want all this looser, not tighter." The fix is removal: drop the gate, drop Waiting-settlement from Done, let lanes narrow agent-written text with a reason.
+- **Next:** John to answer lin4447 (now leaning accept) and lin4470 (cut); recap before he compacts.
