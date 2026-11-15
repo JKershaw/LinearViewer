@@ -1,5 +1,7 @@
 # What the picture expects to find in Lighthouse
 
+*Results: `picture.md` §9. Four held (2, 6, 8, 9), two half held (1, 5), one partly held (3), one broke (7), one not shown (4).*
+
 *Written 15 Nov, before anyone opened Lighthouse (`JKershaw/lighthouse`), and committed before the look, as `plan.md` step 5 asks. Each line comes from `picture.md`. A reader who has not seen the picture will trace one or two of Lighthouse's recent tasks, and then each line is marked as held or not.*
 
 **What I already know, and so cannot predict.** All of it comes from John's summary (words §8) [reported]:

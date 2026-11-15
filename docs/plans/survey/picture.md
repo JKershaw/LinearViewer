@@ -70,6 +70,8 @@ The traces sort best by **direction of travel**. This sorting was named after lo
 
 ## 5. What a task carries
 
+*Revised by the outside test (§9): Lighthouse, with no tickets, also carries a lot, so the cause is wider than the ticket.*
+
 - **Seven to nine fresh sessions.** In trace 1 each began by caching 63,000 to 97,000 tokens [checked]. That this is mostly the ask, the parent's plan and the thread so far is [my reading].
 - **A child's start-up reading.** Its ask, plus pointers to the parent's description (20,805 characters in trace 1), a design of 12,934 and a plan review of 6,851; then both surveys, which in trace 3 found the same faults "in almost the same words" [checked].
 - **What the ticket is used for.** It is at once the order, the plan's carrier, the stages' message bus, the archive and the place's memory. Its frozen top means it can't be kept true [my reading].
@@ -109,6 +111,28 @@ These are needs, not designs. Each comes from a trace above [my reading].
   The essays sort by kind of information. The traces sort better by direction of travel [my reading].
 - **Where the traces push back.** The essays' cure, "each kind should live where something keeps it true", was in effect what the area notes tried, and the notes are what leaked. In these traces the trouble comes less from a kind sitting in the wrong place than from rules that send things to places that have no end, beside sources that cannot change [my reading].
 
+## 9. The outside test: Lighthouse
+
+The expectations were committed before the look (`lighthouse-expectations.md`, `72f0001`). A reader who had not seen this picture then traced two Lighthouse tasks: LH044 weekly read 1 (15 Nov, a scheduled run) and LH004 (26 Sep, dispatched through a local Harbour). Its notes are in the session scratchpad, not this repository, as the plan says. Every fact below is [checked by the reader] unless marked.
+
+| # | Expectation | Result |
+|---|---|---|
+| 1 | Lists with no end grow; a checked list doesn't | **Half held.** `schedule/due.csv` went from 73 rows to 505, and no row was ever removed. `proposals.md` went from nothing to 91 KB, with "Declined, parked and expired: (none yet)". The dated log in `programme.md` is 83 KB. **But** the checked list grew too: `due.csv` is what the checker reads. Its rows close; they are never removed |
+| 2 | An editable source gets corrected in place | **Held, with a cost.** Task rows and checkpoints are corrected in place. Proposals append their corrections below wording that stays, the same pattern as Harbour. Ledgers (`runs.csv`, `costs.csv`) are overwritten, so earlier figures survive only in commit messages: no pile, but no history either |
+| 3 | Retellings drift | **Partly held.** One unreviewed observation was copied into six places within 20 minutes, and a later study claimed that commits were missing when they were present. Within these two tasks the copies had not yet drifted |
+| 4 | Checks out of reach are carried as text | **Not shown.** One owner-verification item, about the live kickoff, is carried. Nothing in these two tasks was repeated run after run |
+| 5 | Standing text makes the choices, with no collisions | **Half held.** Standing text does choose: "claim everything due, soonest deadline first", and "sonnet for research", which led to first-draft errors. **But** the one rule set collides with itself: `AGENTS.md:32` says "The open issues on the repository are the queue", while `:14` and `runner.md:80` make every promise a row in `due.csv` |
+| 6 | Nothing leaks across, unless runs overlap | **Held.** Runs do overlap: a Codex session ran across a scheduled run, and two dispatches ran together on 26 Sep. The blindness appeared: two overlapping sessions both allocated study LH051 |
+| 7 | A task carries little | **Broke.** Before a task, a run reads roughly 130 to 270 KB (`AGENTS.md` alone is 33 KB, up from 12 KB; the brief is 50 KB), plus harness context per subagent. On 26 Sep a subagent was handed `AGENTS.md` at 3.4 KB |
+| 8 | Information moved out of Harbour | **Held** (partly told by John's summary). The September Harbour store was git-ignored, and the repository keeps only exports. The subagent got only the ticket text, so its brief says "initiated by: unknown" |
+| 9 | Writing nobody checks | **Held.** An unreviewed observation reached the public site by two routes, despite "before any public line changes". The driver's fixes after the second review were "not re-reviewed", as with Harbour's close-out |
+
+**What this changes in the picture** [my reading]:
+- **Most of the picture holds outside Harbour's own code**, in a project of the same lineage that runs one agent at a time. As noted in the expectations, that is weaker evidence than unrelated code would give.
+- **§5, what a task carries, was wrong to blame the ticket alone.** Lighthouse has no tickets or parent plans, yet a run's starting reading grew about tenfold in seven weeks, as standing text and records piled up. The load comes from places with no end, not only from the ticket's shape.
+- **§3, collisions, was wrong to blame several rule-holders.** One rule set, grown by additions, contradicts itself.
+- **New:** correcting in place removes the pile beside a source, but loses the earlier value unless something keeps it.
+
 *Side effect of the tracing: three readers' brief and recap reads saved new task snapshots on LIN-4472 and LIN-4482 (`routes/proxy-compute.js:1373` saves one on such reads) [checked by readers]. The last two readers were told not to call those endpoints.*
 
-*Next: the expectations for Lighthouse, written before anyone opens it (`lighthouse-expectations.md`).*
+*Next, per the plan: John corrects this picture. Readings used, in sub-agent tokens: the six traces 236k, 307k, 271k, 242k and 288k (trace 1 was mine), and the Lighthouse trace 296k. The drift check on the plan used 107k. In dollars that is likely well under the plan's $100 [guess: the split between new and cached tokens is not reported].*
