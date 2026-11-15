@@ -1,6 +1,6 @@
 # John's words: the goal, the plan, what is decided, what is ruled out
 
-*Gathered 15 November 2026 from the survey record on `claude/cool-rubin-6acj5j` (commit `a2a3c56`), plus `docs/v1.md` and `docs/north-star-v4-proposal.md` on main (`6f6c5d2`). This is the source for `situation.md`. Change it only by adding.*
+*Gathered 15 November 2026 from the survey record on `claude/cool-rubin-6acj5j` (commit `a2a3c56`), plus `docs/v1.md` and `docs/north-star-v4-proposal.md` on main (`6f6c5d2`). This is the source for `situation.md`. Change it by adding; John may strike or correct anything.*
 
 **How to read it.**
 - A quote is copied exactly as the record keeps it, typos included. A script matched every quote against the cited line; the check is listed at the end.
@@ -84,7 +84,7 @@
 - "I feel like there's a missing piece, and that piece contains things like a system diagram so I can visually see and understand the hierarchy of modules, concepts, etc." — by 15 Nov 09:10, `log.md:4127`
 - "I'm a little surprised you've simply been 'yes, and'... I've been pushing you to reason and understand what we're doing, but... you're sort of going with whatever the most recent message says. It's why I keep pulling you back to the essays and docs. You're not simply enacting my ideas, you're ideally helping flesh them out, understand them, etc." — by 15 Nov 09:53, `log.md:4148`
 - "You've entirely lost the wood from the trees." — by 15 Nov 10:22, `log.md:4166`
-- The previous session's report, in its own words, of what happened after the pause note: he stopped a rewrite of the notes ("Jesus Christ no"), and the session reported his naming of the pattern as: "I've been making so many mistakes, let we wipe clean the detailed notes and replace them with my best guess" — by 15 Nov 11:32, `log.md:4227`. (The second quote is how the log reports his description of what the session was doing, not his own intention.)
+- After the pause note he stopped a rewrite of the notes, and the log reports his naming of the pattern as: "I've been making so many mistakes, let we wipe clean the detailed notes and replace them with my best guess" — by 15 Nov 11:32, `log.md:4227`. (This is how the log reports his description of what the session was doing, not his own intention.)
 
 ## 5. What he decided or agreed
 
@@ -123,12 +123,18 @@
 - Waiting for the budget reset: "I doubt the 'wait for Thursday' is true. It's just me keeping track of my budget." — 14 Nov, `log.md:3971`
 - Amending the Periodicals: "I have no opinion, but I'd be tempted not to amend anything and just let it run as normal." — 14 Nov, `log.md:3978`
 - Defining a leak sharply in order to count it: `log.md:4155` (section 3)
-- Rewriting or wiping the record: "Jesus Christ no" — by 15 Nov 11:32, `log.md:4227`
+- Rewriting or wiping the record: he stopped it — by 15 Nov 11:32, `log.md:4227`
 
 ## 7. Today, in this sitting (15 November)
 
 - The kickoff message sent today was drafted by the previous session in John's voice (`kickoff-next-session.md`), and he sent it as written. Its words are his request, not his own phrasing: "can a task finish with the codebase cleaner than it started, and can Harbour carry that loop itself?"; "Keep the record itself as it is"; "Think with me. I want my ideas tested and fleshed out against the essays and the record, and when the record disagrees with me I want to hear it, with the line."
 - His reply to my read-back, his own words: "Hello, and yes, that's right. It's all pulling in the same direction. I'd also like you to look deeper to more fully appreciate the big picture of Harbour. The theory is, if we "completed" and "tidied" all we have, we've reached an important milestone and can welcome strangers. In the meantime, we've plenty to work with, including many of my pet projects we can run through Harbour."
+- His corrections to the first draft of `situation.md`, his own words:
+  - On converging: "compared to how previous tasks built and made mess, we _are_ converging; if complete work makes no mess, and we can intentionally tidy, we converge."
+  - On the maths: "The maths has changed, but not the maths you thought; the difference between fixing one small function and rebuilding a complete layer, are almost equal for the human and only a modest multiplier on the token costs, and there's room to optimise."
+  - On the pace: "The "week or two" is my call, because with the right setup, we could rewrite the bulk in that time. The maths has changed, if you will, so think outside the traditional patterns and processes."
+  - On other projects: "I've already used Harbour elsewhere. It's just not part of _Harbour's_ record so we're somewhat blind to it. The bulk of my recent use has been Harbour so those examples will be relatively old. I assumed this wouldn't matter and fresh tasks, fresh projects, brings that semi outside user onboard."
+  - He found an exclamation quoted from the log embarrassing in notes on a codebase. It has been removed from both files.
 
 ---
 

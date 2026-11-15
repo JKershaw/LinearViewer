@@ -28,7 +28,7 @@
 - **What did read better:** deletions, a tidy done as its own task, a tidy-after as its own ticket (log:1951); the tidy that deleted every copy, not the one that stopped at 2 of about 30 (log:2072) [reported]
 - **The mess moved into text.** The area notes grew from 10.6 KB to 88.8 KB between 8 and 14 Nov (log:3909) [reported]. Stability Review run 6: "The product is settling; the process around it is costing more." (log:3563) [reported]. John: "If code is getting 'cleaner' whilst a secret backlog grows, something is afoot" (log:3965) [checked]
 - **The loop is not yet whole.** Parts of it live outside Harbour: in text on tickets, notes in the repo, the wording of prompts, and a supervising session doing things by hand (log:4175). This is the previous session's picture. John said "Your overall picture is improved." and corrected it (log:4170), then doubted the notes behind it (log:4227) [checked his words; the picture reported]
-- **The loop has only run on Harbour's own code** (and simple-dispatcher). John's outside-codebase experiment was proposed on 5 Nov and never run (log:2127) [reported]. The newest essay's own limit: "One codebase, one owner, a few weeks" (`every-choice-was-right-at-the-time.md:144`) [checked]
+- **Harbour's record covers only Harbour's own code** (and simple-dispatcher). John has used Harbour elsewhere, but that use is outside this record and mostly earlier (words §7) [checked]. The newest essay's own limit: "One codebase, one owner, a few weeks" (`every-choice-was-right-at-the-time.md:144`) [checked]
 - **v1's own gaps** still listed as open: the connect flow as one path (LIN-614), the run page (LIN-3349), credential-level stop at the PR (LIN-3417), publishing the free-tier number (LIN-1645), and the carried-over security Highs (v1:108-118). "no fresh-account run has happened yet" (v1:132) [reported: v1 as last edited, not re-checked against the tracker]
 - **Nothing is in flight.** Lanes are paused: LIN-4441, LIN-4445 (Jira live check), LIN-4463 (log:4220) [reported]
 - **Git is optional for a run.** Close-out handles a task with "no pull request found in this task's comments" (`lib/run-closeout-state.js:278`) [checked]
@@ -48,8 +48,9 @@
 - Both Surveys stay on code tasks: "we did find benefits from two. Happy to skip for periodicals though." (disc:321) [checked]
 - Cheap default models; no Opus at every stage (log:3604) [checked]
 - The weekly budget is "a fine somewhat informal limit" (log:3590). On pacing he asked whether racing and pacing are "kind of the same thing?" (log:3592) and doubted "the 'wait for Thursday'" (log:3971) [checked]
-- The record is not rewritten or wiped: "Jesus Christ no" (log:4227) [checked]
+- The record is not rewritten or wiped; he stopped an attempt (log:4227) [checked]
 - v1's gate is the dress rehearsal (v1:31; accepted 19 Sep, v1:141) [checked]
+- The pace is his call: "The "week or two" is my call" (words §7) [checked]
 
 ## 4. What is open
 
@@ -89,23 +90,32 @@ Two readers read fourteen essays and papers. I checked every quote below against
 - **Their own limits.** "The cure has not yet been turned on the loop itself." (`every-choice-was-right-at-the-time.md:131`). "The real payoff, later changes in the gathered areas landing smaller and cleaner, has not had time to show." (`theseus-method.md:181`). "We have done this once, on one codebase, over a few days" (`the-place-became-somebodys-job.md:105`) [checked wording]
 - **How this bears on his step 1** ("find where then loop is leaking, understand deeply why, and what it needs", log:4151). The essays already offer candidate answers: the seams between sessions, and text with no home and no end. They come from one codebase and their own authors' readings, so they are hypotheses for step 1 to test, not its answer [my reading]
 
-## 7. Where the record pushes back on the picture
+## 7. Testing the picture against the record
 
-- **The combined picture has support; the whole settling does not yet.** John never relied on ordinary tasks alone. His words: "if regular tasks are about the same, when combined with Periodicals we get the pull down" (log:3590). The record fits the parts:
-  - ordinary tickets read about like the baseline (`cleaner-than-it-started.md:44`)
-  - tidies done as their own task and finished moves read better (log:1951, log:2072)
-  What it has not shown is the whole converging: "Not converging yet." (8 Nov, log:3150), then "The product is settling; the process around it is costing more." (13 Nov, log:3563). [checked wording; findings reported]
-- **"knowing importantly the maths has changed"** (log:4080) is stronger than the cost paper, which says "Cost rises with size, slowly", and its data cannot tell a cheap-to-scale cost from a large fixed cost (`docs/papers/README.md:18`) [checked wording]
-- **"in a week or two have a well polished Harbour"** (log:4151). I found no measure in the record that sizes this. On 14 Nov the distance was given as "about 250" tickets, then "about 700" (log:4088) [reported]. That a week or two is optimistic is [guess]
-- **The pet projects supply evidence the record lacks.** Every result so far comes from one codebase (`every-choice-was-right-at-the-time.md:144`, log:2127) [checked wording]. So whichever point they come in at, they are the first test that is not partly circular [my reading]
+*Revised after John's corrections of 15 Nov (words §7).*
 
+- **Converging.** John: "compared to how previous tasks built and made mess, we _are_ converging; if complete work makes no mess, and we can intentionally tidy, we converge." (words §7). The record supports both halves:
+  - Before, an earlier paper found Harbour "only grows, and fastest at the gates" (`docs/papers/README.md:45`). By 13 Nov: "The product is settling" (log:3563).
+  - Ordinary tickets read about like the baseline (`cleaner-than-it-started.md:44`). Tidies done as their own task, and finished moves, read better (log:1951, log:2072).
+  [checked wording; findings reported]
+- **Where "no mess" does not yet hold.** The same review ends "the process around it is costing more" (log:3563). The notes grew from 10.6 KB to 88.8 KB in six days (log:3909) [reported]. John: "If code is getting 'cleaner' whilst a secret backlog grows, something is afoot" (log:3965) [checked]. So his condition holds for the code and fails, so far, in the text around it. That failure is the leak his step 1 is after [my reading]
+- **The maths.** John: fixing one small function and rebuilding a complete layer "are almost equal for the human and only a modest multiplier on the token costs, and there's room to optimise." (words §7). The record agrees:
+  - "Cost rises with size, slowly"; every leg's slope is below 1 (`docs/papers/README.md:18`)
+  - a 300+ line task costs "about 2.9 times" a 1–49 line one (log:4088)
+  - design-first rebuilds of 441 to 2,816 lines: "Most ran in 50–106 minutes" (`docs/papers/README.md:23`)
+  - the Theseus run touched people "at two points" (`docs/papers/README.md:108`)
+  [checked wording; measurements reported]
+- **One caution on rewriting the bulk.** The rebuilds improved the inside of files, "But decision location did not move" (`docs/papers/README.md:23`), and "A rebuild cannot fix the second kind, because it works on one place and the decision lives in many." (`theseus-method.md:50`) [checked wording]. The essays' order is to gather a scattered decision first, then rebuild it (`theseus-method.md:24`). So a fast rewrite holds up best if each piece is cut around where a decision lives, not around files [my reading]. The largest rebuild on record is 2,816 lines (`docs/papers/README.md:23`) [reported]
+- **The "week or two" is John's call**, a target and not a forecast: "with the right setup, we could rewrite the bulk in that time" (words §7) [checked]
+- **Other projects.** Harbour's record covers only Harbour's own code (and simple-dispatcher). John has used Harbour elsewhere, outside this record and mostly earlier (words §7). The record does hold one outside use: Harbour on Jira at work, "for a few weeks" (disc:447) [checked]. That the fortnight's loop changes have not yet run on other code is [my reading]. Fresh tasks on fresh projects bring the semi-outside user on board (words §7) [checked]
 ---
 
 ## Sources and checks
 
-- `my-words.md`: 118 quotes matched to their cited lines by script, none missed. The check covers the record only, not this sitting's words.
+- `my-words.md`: 116 quotes from the record matched to their cited lines by script, none missed. The check covers the record only, not this sitting's words.
 - This page: every quote is matched to its cited line by the same kind of script, against main's copies of `docs/` and `lib/` at `6f6c5d2`, except John's words from this sitting, which are recorded in `my-words.md` §7.
 - Essays and papers in §6 were read by two sub-agents. I opened and checked each quote used here; their summaries beyond those quotes are not relied on.
 - A fresh reader, given only `my-words.md`, checked the first draft for drift. It found twelve points and three omissions; all are corrected here.
+- John corrected the second draft on converging, the maths, the pace and other projects (words §7). §2, §3 and §7 carry his corrections.
 - Dates on 14–15 Nov come from `git blame` on `log.md` at `a2a3c56`.
 - Not opened by me: the area notes, Linear, the Stability Reviews, `place-ledger.md`, and the sub-agent files the pause note lists as relayed (log:4201).
