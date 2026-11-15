@@ -1,6 +1,6 @@
 # Plan: where the loop leaks, and why
 
-*Drafted 15 Nov for John to correct, then agree or not. Nothing has started. It plans the understanding half of step 1. Marks are as on `situation.md`; lines with no mark are proposals. `words §n` is a section of `my-words.md`.*
+*Drafted 15 Nov and agreed by John the same day: "Agreed." (words §8). Nothing has started yet. It plans the understanding half of step 1. Marks are as on `situation.md`; lines with no mark are proposals. `words §n` is a section of `my-words.md`.*
 
 ## The step
 
