@@ -138,6 +138,14 @@
   - On rebuilding: "Where the Theseus method rebuilds an area with a wall, the prior move is centralising decision points, through more regular refactoring. Nothing stops us using the classical tools of the trade."
   - On the leak: "Yes, that's the leak exactly. We had places for code and places for text, but when we apply the closing pieces, the notes squirted out as a necessity. One proposal is to give that a correct home. A bigger question is to look at all the information, and check it's in the best place. One smell; a task feels like it's carrying a lot. But, that might be getting ahead of ourselves."
 
+## 8. The plan sitting (15 November, later)
+
+*Copied from this sitting's messages; not in any file, so not checked by script. Whether John wrote the opening message himself or edited a draft is not recorded.*
+
+- The opening message: "This sitting has one job: turn the first step of my outline into a small plan I can agree. Nothing gets built here." "This sitting plans the understanding, not the building. It starts with where information lives." "Keep it small. It must say how the step is done, what it costs in money and in my time, and when it stops. It should say where my pet projects come in: the page keeps my three placements open, and the choice is mine." "Three things from my own words matter here. First, look before naming: "If we define it in the wrong way, we're back in groundhog day." Second, understand before designing, with no assumed implementation. Third, it has to hold for any project, not only Harbour's own code."
+- His reply to the read-back: "That reads spot on to me, please proceed."
+- His reply to the four ways in and the recommendation (trace a few Harbour tasks and one pet project; hold the notes spike): "Yes, write the plan. This is fantastic and we can likely spike this now; I can provide a proxy token to Harbour's workspace, and a link to a slightly unconventional project which currently uses Harbour."
+
 ---
 
 ## The check

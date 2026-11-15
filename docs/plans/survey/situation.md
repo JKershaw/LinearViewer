@@ -54,16 +54,16 @@
 
 ## 4. What is open
 
-- **The plan itself.** His outline: "We find where then loop is leaking, understand deeply why, and what it needs, then build that specific solution in a simple form. Once the engine doesn't leak, we try it on a bunch of smaller projects." (log:4151). Then: "Why would we continue when we don't yet _have a plan_?" (log:4165). Nothing yet says how the first step is done, what it costs or when it stops (log:4185) [checked]
+- **The plan itself.** His outline: "We find where then loop is leaking, understand deeply why, and what it needs, then build that specific solution in a simple form. Once the engine doesn't leak, we try it on a bunch of smaller projects." (log:4151). Then: "Why would we continue when we don't yet _have a plan_?" (log:4165) [checked]. A plan for the understanding half of step 1 is drafted in `plan.md`, not yet agreed: trace a few finished tasks, then test the picture on a project that isn't Harbour (words §8) [checked]
 - **Where the pet projects come in.** Three of his statements place them differently:
   - after the engine stops leaking: "Once the engine doesn't leak, we try it on a bunch of smaller projects" (log:4151)
   - as aids to the research: "Happy to provide good test projects." (log:4155)
   - in the meantime: "we've plenty to work with, including many of my pet projects" (words §7)
-  [checked]
+  [checked]. For step 1 he has since offered one, "a slightly unconventional project which currently uses Harbour", as the outside test (words §8) [checked]. The other two placements stay open.
 - **What completing and tidying "all we have" covers:** v1's gaps table, every surface, or the whole codebase to "A* quality" (v1:105-119, disc:550, log:4085). The scope is large: 13 areas, 585 source files, 212,226 lines of JavaScript (log:4200) [reported]. That the phrase needs settling is [my reading]
 - **The order of the doors.** D17 set two stretches, "until the switch" and "open the door" (disc:676). The switch passed on 13 Nov: "This all reads like we're past the gate" (log:3590). D1's door was "a small outside team on Jira" (disc:61). His latest words put pet projects first and "the big Jira project" after (log:4137, log:4151) [checked]. That "the big Jira project" is D1's outside team, and that the later order replaces D1's, are [my reading]
 - **v1's gate:** a fresh account or a fresh workspace, and eight steps or nine (v1:132, LIN-3808) [checked]
-- **The notes format.** His idea: "simply saving the notes as TS" (log:3966). A spike on three versions was agreed on 14 Nov (log:3973-3977). It has not run: it was back in a proposed order that evening (log:4110) [checked by search]
+- **The notes format.** His idea: "simply saving the notes as TS" (log:3966). A spike on three versions was agreed on 14 Nov (log:3973-3977). It has not run: it was back in a proposed order that evening (log:4110) [checked by search]. The draft plan holds it until the trace shows what it should test (`plan.md` §6)
 - **Where information lives.** John confirmed the leak: "when we apply the closing pieces, the notes squirted out as a necessity". He raised three questions at three sizes, and flagged that they may be ahead of ourselves (words §7) [checked]:
   - a correct home for the notes
   - whether all the information is in its best place
