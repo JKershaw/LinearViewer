@@ -152,6 +152,17 @@
 - On the recommendation to plan the build the same way, and on the sync being related to the leak: "I very much agree - the sync moves the task tracker shape out of the heart of Harbour, allowing us to create a better shape, fit for purpose. With the benefits of deterministic code and data structures. But, let's not get ahead of ourselves. Where are we in the overall process?"
 - On tracing Lighthouse as it stands and holding the fresh task: "Yes that's fine. We can arrange for a project, set up with Harbour, to run. We can get ourselves a useful test case, and I get a side project further developed."
 
+## 9. The build sitting (15 November, evening)
+
+*Copied from this sitting's messages; not in any file, so not checked by script.*
+
+- From the opening message: "I have read the picture and it stands with no corrections. This sitting takes it from what the loop needs to a first, small build plan I can agree. Nothing gets built or filed here." "My outline says to build "that specific solution in a simple form", so prefer the smallest thing that meets a need. The picture carries its own warning: the area notes were a cure of this kind, and they are what leaked. So for anything new, say what ends it and what it replaces." "On moving the tracker's shape out of the heart of Harbour, I said it allows "a better shape, fit for purpose. With the benefits of deterministic code and data structures. But, let's not get ahead of ourselves." Take it only as far as the needs call for." "It has to hold for any project. I have offered a side project set up with Harbour as a test case. "Nothing stops us using the classical tools of the trade", and the pace is my call."
+- His reply to the read-back: "Fantastic. Please proceed, and look out for larger patterns and repeating shapes."
+- On the costs in `shapes.md`: "These budgets seem surprisingly low, given our weekly spend is thousands. Was the price a consideration, and potentially a limit?"
+- Then: "I'm unsure we need to include budget in this discussion at all, at least at this stage. I'm unsure, my mental model was simply converting the communication problem into a code problem, covering every aspect. Does that make sense?"
+- Then: "But, exactly! Eg Wordpress and it's database allows unlimited shapes, without bloat. Computer science and the simple systems in Harbour can easily support this, with LLMs both in Harbour and running as agents as components in the system. Do you see what I'm pushing towards as a way to frame the shapes, and how we can cover all needs."
+- Then: "I actually meant more the data structure. But you're right: there's specific shapes of things holding and processing information. That describes the data layer we need, which carries the information, correctly."
+
 ---
 
 ## The check

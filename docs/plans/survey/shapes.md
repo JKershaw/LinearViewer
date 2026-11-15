@@ -1,6 +1,6 @@
 # Shapes: three ways the loop could meet its needs
 
-*Drafted 15 Nov for step 2 of the build sitting, from `picture.md`, the six traces and `my-words.md`. Marks are as on `situation.md`. Code facts are on main at `6f6c5d2`. Nothing here is built or filed. John chooses (§6).*
+*Drafted 15 Nov for step 2 of the build sitting, from `picture.md`, the six traces and `my-words.md`. Marks are as on `situation.md`. Code facts are on main at `6f6c5d2`. Nothing here is built or filed. John's choice and frame are in §6. At his word, cost is left out of the shapes; the build plan states it, as his step 3 asks.*
 
 ## 1. Shapes that repeat
 
@@ -51,11 +51,6 @@ The six needs sort cleanly:
 | 5. The reader sees everything written | The same small change in all three | The same | By construction, if the blind read stops excluding paths |
 | 6. Parallel work learns of each other | No | Yes | No: branches can't see each other until they merge |
 
-**On cost.**
-- **Where the figures come from.** They are my guesses, built from what tasks cost on record: $9–21 a task, and $142 for LIN-4448's whole lane [checked by readers]. They count build runs only. They leave out rework, the runs that measure the result, and the side project.
-- **Against the budget.** The week's budget was set at "$3,500 a week at list prices" (disc:63), and John calls it "a fine somewhat informal limit" (log:3590). Against that, even the largest shape costs under half a week. So price should not decide between the shapes. John's time, and the risk of building the wrong thing, matter more [my reading].
-- **Corrected.** My first draft gave lower figures and counted A's cheapness in its favour. That was the habit John named: "it's a recurring worry as soon as I mention price" (log:3604).
-
 ### A. Subtract: keep today's places, delete the routes into places with no end
 
 - **What it does.**
@@ -69,7 +64,6 @@ The six needs sort cleanly:
   - It leans on surveys finding things again. They do (trace 3: both found the same faults "in almost the same words"), but at a cost every time.
   - Checks that need John would vanish instead of being carried, which is worse than now.
   - It works by editing prose, the shape (§1.4) that grew the problem.
-- **What it costs.** Three or four small tasks: about $50–150, and an hour or two of John's reading [guess].
 - **What ends it.** It adds nothing, so nothing new needs an end.
 
 ### B. Harbour keeps the state and the hand-offs as data; the tracker shows them
@@ -98,7 +92,6 @@ The six needs sort cleanly:
   - **Hand-offs becoming a new list with no end.** So ends are checked by code, and closed hand-offs leave what later sessions read. Lighthouse's closed rows stayed in the file and still added to the load.
   - **Who gets which question stays a policy,** and the policy is John's. B puts each question in one place with one addressee; it doesn't choose the addressee.
   - **It is the biggest build** of the three.
-- **What it costs.** The whole shape: three to five lanes, about $500–1,500 [guess]. A first slice: one lane, about $150–400 [guess].
 - **What ends it.**
   - A hand-off ends when its addressee closes it, or when it is handed on explicitly at close.
   - The record ends with its task. Later tasks read only the hand-offs addressed to them.
@@ -116,7 +109,6 @@ The six needs sort cleanly:
   - **It needs git, where Harbour's runs don't** (`lib/run-closeout-state.js:278`, situation §2).
   - **It puts Harbour's files in the person's own repository,** where "Harbour is a passenger" (log:3609).
   - **A failing check hands off to whoever runs next,** without naming anyone.
-- **What it costs.** A checker, the file formats, the PR flow and converting the notes: two or three lanes, about $300–800 [guess].
 - **What ends it.** The checker. The scaffolding ends once the notes are converted.
 
 ## 4. The traces and Lighthouse, walked through
@@ -168,6 +160,37 @@ B helps Lighthouse only if it runs on Harbour again.
 
 **The first slice** belongs to the next step. My lean is hand-offs first, because three of the six needs involve them (2, 3 and 6) and the evidence for pull is strongest. The plan as state would come second [my reading].
 
-## 6. John's choice
+## 6. John's choice: a data layer that carries the information
 
-*Not yet made.*
+*Recorded 15 Nov from this sitting's messages (words §9). John has not yet read this section.*
+
+**His words:**
+- "my mental model was simply converting the communication problem into a code problem, covering every aspect."
+- "Eg Wordpress and it's database allows unlimited shapes, without bloat. Computer science and the simple systems in Harbour can easily support this, with LLMs both in Harbour and running as agents as components in the system."
+- "I actually meant more the data structure. But you're right: there's specific shapes of things holding and processing information. That describes the data layer we need, which carries the information, correctly."
+- On cost: "I'm unsure we need to include budget in this discussion at all, at least at this stage."
+
+**What I take it to mean** [my reading, for John to correct]:
+- **One general data structure.** WordPress keeps every kind of content in a few tables: one for items of any type, one for their fields, one for the links between them. A new shape is added as data, not as a new table, place or prompt line.
+- **Specific shapes declared on it.** Some shapes hold information: a plan, a finding, a check, a question and its decision, an ask. Others process it: Harbour's code, and LLMs both inside Harbour and running as agents.
+- **The communication becomes code.** Who wrote a record, who it is for, its version and its end are held as data and acted on by code. What is inside a record stays the models' writing.
+- **It is B from §3 in its general form.** A has no store at all. C is the same structure with git as its database and nothing running on it.
+
+**The six needs as shapes on it** [my reading: a first sketch, not a design]:
+
+| Need | Shape | Its end | Whom it reaches | Prompt text it replaces |
+|---|---|---|---|---|
+| 1 | `plan`, with earlier versions kept | Its task closes | The tasks reading it | "say so in a comment on the parent"; the prune |
+| 2 | `finding` | done / declined | Its addressee: this task, the area's next task, a lane, or John | The leftover routing, the Waiting lists, "to the person" |
+| 3 | `check` | done / declined | John | "record it as not run … then close" |
+| 4 | `question`, then `decision` | answered / withdrawn | One decider, chosen by a setting John controls (D6, disc:290) | Rulings keyed by session; "settle it yourself" in a ticket body |
+| 5 | None: what the reader sees is drawn from everything the task wrote | — | — | The reader's list of excluded paths |
+| 6 | `ask`, plus who is working on what | answered / declined | The lane it is for | The parent as switchboard |
+
+Summaries and counts are drawn from the records rather than retold. A new need adds a shape, not a new place.
+
+**Two guards, taken from WordPress** [my reading]:
+- **Declared shapes with checked fields.** Untyped extra fields sprawl. This is John's "so they get checks" (log:3966), and what Harbour's tidies keep reaching for: "each collection declared once with all its facts" (`broad-options.md:21`).
+- **No shape without its end and its addressee.** WordPress keeps every revision by default (from memory, not checked here), which is the same pile with no end. "If a thing's end is written when it is made, nothing has to be hunted down later" (`nothing-fights-its-shape.md:109`).
+
+**Next:** the first slice, in `build-plan.md`.
