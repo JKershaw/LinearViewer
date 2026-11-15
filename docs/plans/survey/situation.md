@@ -64,6 +64,15 @@
 - **The order of the doors.** D17 set two stretches, "until the switch" and "open the door" (disc:676). The switch passed on 13 Nov: "This all reads like we're past the gate" (log:3590). D1's door was "a small outside team on Jira" (disc:61). His latest words put pet projects first and "the big Jira project" after (log:4137, log:4151) [checked]. That "the big Jira project" is D1's outside team, and that the later order replaces D1's, are [my reading]
 - **v1's gate:** a fresh account or a fresh workspace, and eight steps or nine (v1:132, LIN-3808) [checked]
 - **The notes format.** His idea: "simply saving the notes as TS" (log:3966). A spike on three versions was agreed on 14 Nov (log:3973-3977). It has not run: it was back in a proposed order that evening (log:4110) [checked by search]
+- **Where information lives.** John confirmed the leak: "when we apply the closing pieces, the notes squirted out as a necessity". He raised three questions at three sizes, and flagged that they may be ahead of ourselves (words §7) [checked]:
+  - a correct home for the notes
+  - whether all the information is in its best place
+  - "a task feels like it's carrying a lot"
+  The record has met each before:
+  - his own 14 Nov question on how information should "relate, move, and need to be held in a shape" (log:4024)
+  - the TS-notes idea and the unrun notes spike (log:3966, log:3977, log:4110)
+  - the 2 Nov essay's finding that the ticket "conflates three things: the record of the job, the plans, and the place's memory." It reports that John named "the ticket as the source of truth" as the one decision he would reopen (`tasks-are-tasks.md:25`)
+  [checked wording; the essay's report of John not checked against the log]
 - **Harbour owning the tasks, with trackers as a sync** (log:4141-4142). On the doc: "Update the doc, we're still refining the idea" (log:4146). Then, on that idea: "appealing because the site is slow, but that's unrelated to moving the remaining parts of the loop into Harbour" (log:4151) [checked]
 - **Who sets the size of a move, in practice.** Decided: "It's *my* call." (log:1234). But since 7 Nov size has gone ahead on a standing "err larger" (log:2747), which one essay reads as "the choice to take a larger move goes ahead under a standing policy, "err larger", with no ruling" (`every-choice-was-right-at-the-time.md:108`) [checked wording]. Whether that still matches what he wants is [my reading: open]
 - **John's calls still waiting:** seven safety findings and LIN-4416; LIN-4210 (log:4221) [reported]

@@ -136,6 +136,7 @@
   - On other projects: "I've already used Harbour elsewhere. It's just not part of _Harbour's_ record so we're somewhat blind to it. The bulk of my recent use has been Harbour so those examples will be relatively old. I assumed this wouldn't matter and fresh tasks, fresh projects, brings that semi outside user onboard."
   - He found an exclamation quoted from the log embarrassing in notes on a codebase. It has been removed from both files.
   - On rebuilding: "Where the Theseus method rebuilds an area with a wall, the prior move is centralising decision points, through more regular refactoring. Nothing stops us using the classical tools of the trade."
+  - On the leak: "Yes, that's the leak exactly. We had places for code and places for text, but when we apply the closing pieces, the notes squirted out as a necessity. One proposal is to give that a correct home. A bigger question is to look at all the information, and check it's in the best place. One smell; a task feels like it's carrying a lot. But, that might be getting ahead of ourselves."
 
 ---
 
