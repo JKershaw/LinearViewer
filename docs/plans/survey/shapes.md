@@ -51,6 +51,11 @@ The six needs sort cleanly:
 | 5. The reader sees everything written | The same small change in all three | The same | By construction, if the blind read stops excluding paths |
 | 6. Parallel work learns of each other | No | Yes | No: branches can't see each other until they merge |
 
+**On cost.**
+- **Where the figures come from.** They are my guesses, built from what tasks cost on record: $9–21 a task, and $142 for LIN-4448's whole lane [checked by readers]. They count build runs only. They leave out rework, the runs that measure the result, and the side project.
+- **Against the budget.** The week's budget was set at "$3,500 a week at list prices" (disc:63), and John calls it "a fine somewhat informal limit" (log:3590). Against that, even the largest shape costs under half a week. So price should not decide between the shapes. John's time, and the risk of building the wrong thing, matter more [my reading].
+- **Corrected.** My first draft gave lower figures and counted A's cheapness in its favour. That was the habit John named: "it's a recurring worry as soon as I mention price" (log:3604).
+
 ### A. Subtract: keep today's places, delete the routes into places with no end
 
 - **What it does.**
@@ -64,7 +69,7 @@ The six needs sort cleanly:
   - It leans on surveys finding things again. They do (trace 3: both found the same faults "in almost the same words"), but at a cost every time.
   - Checks that need John would vanish instead of being carried, which is worse than now.
   - It works by editing prose, the shape (§1.4) that grew the problem.
-- **What it costs.** Three or four small tasks: about $50–100 and an hour or two of John's reading [guess].
+- **What it costs.** Three or four small tasks: about $50–150, and an hour or two of John's reading [guess].
 - **What ends it.** It adds nothing, so nothing new needs an end.
 
 ### B. Harbour keeps the state and the hand-offs as data; the tracker shows them
@@ -93,7 +98,7 @@ The six needs sort cleanly:
   - **Hand-offs becoming a new list with no end.** So ends are checked by code, and closed hand-offs leave what later sessions read. Lighthouse's closed rows stayed in the file and still added to the load.
   - **Who gets which question stays a policy,** and the policy is John's. B puts each question in one place with one addressee; it doesn't choose the addressee.
   - **It is the biggest build** of the three.
-- **What it costs.** The whole shape: a few lanes, a few hundred dollars [guess]. A first slice: one lane-sized piece, $100–250 [guess]. For scale, LIN-4448's lane came to $142 and a task to $9–21 [checked by readers].
+- **What it costs.** The whole shape: three to five lanes, about $500–1,500 [guess]. A first slice: one lane, about $150–400 [guess].
 - **What ends it.**
   - A hand-off ends when its addressee closes it, or when it is handed on explicitly at close.
   - The record ends with its task. Later tasks read only the hand-offs addressed to them.
@@ -111,7 +116,7 @@ The six needs sort cleanly:
   - **It needs git, where Harbour's runs don't** (`lib/run-closeout-state.js:278`, situation §2).
   - **It puts Harbour's files in the person's own repository,** where "Harbour is a passenger" (log:3609).
   - **A failing check hands off to whoever runs next,** without naming anyone.
-- **What it costs.** A checker, the file formats and the PR flow: about $100–200 [guess].
+- **What it costs.** A checker, the file formats, the PR flow and converting the notes: two or three lanes, about $300–800 [guess].
 - **What ends it.** The checker. The scaffolding ends once the notes are converted.
 
 ## 4. The traces and Lighthouse, walked through
