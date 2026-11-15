@@ -148,6 +148,7 @@
 - On the plan as corrected after the fresh reader's check: "Agreed. Next, I'll share the proxy, and the project."
 - The outside project: "The project is Lighthouse; https://lighthouse.harbour.cat/". He added a summary for context. It reads as written by a session on that project for him (it ends "it doesn't by itself establish whether you explicitly requested every part of it"), so its claims are reported, not his own words. In short: Harbour drove work there on 25–26 Sep; on 26 Sep "A commit explicitly made Harbour optional and moved the default procedure into AGENTS.md", and hosted Harbour was connected to its GitHub backlog; from 30 Oct "Lighthouse gained its own dated task table, checker and scheduled-run instructions. That repository-based procedure became the daily operating path".
 - Then, his own words: "Harbour was effectively used to jump start Lighthouse, which adopted many of its key ideas, in a simpler form."
+- On the picture (`picture.md`), with no corrections: "This reads great to me, and it all feels very tangible. How should we proceed?"
 - On tracing Lighthouse as it stands and holding the fresh task: "Yes that's fine. We can arrange for a project, set up with Harbour, to run. We can get ourselves a useful test case, and I get a side project further developed."
 
 ---

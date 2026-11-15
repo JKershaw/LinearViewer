@@ -1,6 +1,6 @@
 # The picture: where information lives in the loop, and where it leaks
 
-*Drawn 15 Nov from six traces of finished Harbour tasks (`trace-2026-11-15/`), as `plan.md` step 4 asks. For John to correct. Marks are as on `situation.md`. Line numbers are on main at `6f6c5d2` unless a trace gives another commit. Nothing here is a design.*
+*Drawn 15 Nov from six traces of finished Harbour tasks (`trace-2026-11-15/`), as `plan.md` step 4 asks. Read by John on 15 Nov, with no corrections: "This reads great to me, and it all feels very tangible." (words §8). Marks are as on `situation.md`. Line numbers are on main at `6f6c5d2` unless a trace gives another commit. Nothing here is a design.*
 
 **What was traced.** LIN-4450 (an ordinary task, traced by me), LIN-4455 (a tidy under autopilot), LIN-4472 (a front-end lane piece), LIN-4482 (a Seams & Tangles run), LIN-4474 (a piece built in simple-dispatcher) and LIN-4448 (a lane's parent). Each was 13–14 Nov, ran 7–9 sessions, and cost $9–21 [checked, cost records].
 

@@ -54,7 +54,7 @@
 
 ## 4. What is open
 
-- **The plan itself.** His outline: "We find where then loop is leaking, understand deeply why, and what it needs, then build that specific solution in a simple form. Once the engine doesn't leak, we try it on a bunch of smaller projects." (log:4151). Then: "Why would we continue when we don't yet _have a plan_?" (log:4165) [checked]. A plan for the understanding half of step 1 is in `plan.md`, agreed by John on 15 Nov: trace a few finished tasks, then test the picture on a project that isn't Harbour (words §8) [checked]. It has run: six traces, `picture.md`, and the Lighthouse test (§9 there). The picture awaits John's correction
+- **The plan itself.** His outline: "We find where then loop is leaking, understand deeply why, and what it needs, then build that specific solution in a simple form. Once the engine doesn't leak, we try it on a bunch of smaller projects." (log:4151). Then: "Why would we continue when we don't yet _have a plan_?" (log:4165) [checked]. A plan for the understanding half of step 1 is in `plan.md`, agreed by John on 15 Nov: trace a few finished tasks, then test the picture on a project that isn't Harbour (words §8) [checked]. It has run: six traces, `picture.md`, and the Lighthouse test (§9 there). John read the picture and made no corrections (words §8). The build half of step 1 has no plan yet
 - **Where the pet projects come in.** Three of his statements place them differently:
   - after the engine stops leaking: "Once the engine doesn't leak, we try it on a bunch of smaller projects" (log:4151)
   - as aids to the research: "Happy to provide good test projects." (log:4155)
