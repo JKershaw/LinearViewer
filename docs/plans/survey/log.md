@@ -4164,3 +4164,60 @@ John's direction:
 - **John: "Ok, I don't know how to proceed thats not going to waste money. I want out this loooooop!"** My answer: stop planning. This session has been the loop today (six versions of a plan, a doc rebuilt four times, a dozen sub-agents). One step, costing three ordinary tasks and his time: take one small project of his, in the setup he already uses, run three real tasks through Harbour, and write down in his own words what annoys him as it happens. Then fix the top item as an ordinary task, and repeat. The doc and its ruling tables can wait; nothing in them needs marking first. No more sub-agents or documents from me until he brings that list.
 - **John: "Why would we continue when we don't yet _have a plan_? We have ideas for a plan, we have notes on a possible plan, and we have countless mistakes from reading the plan with the most powerful ai I can afford. Please elaborate when you reply so I understand if your guessing, or if you've checked and are relaying facts and your correct interpretation."** He is right that my "run three tasks and see" was a judgement call, not a checked recommendation, and that it skipped the missing piece: his own four steps (find where the loop leaks; understand why and what it needs; build that in a simple form; then small projects and Jira) are an outline, and nothing yet says how the first step is done, what it costs or when it stops. My reply sorts what I have told him today into four groups: checked by me in the code or by my own scripts; relayed from sub-agents and not opened by me; my interpretation; and guesses. From here every claim I make to him carries which of those it is.
 - **John: "You've entirely lost the wood from the trees."** He is right. I answered his last several messages one sentence at a time (definitions, rulings, labels on my own claims, offers to write another plan) and stopped holding the whole. The whole, as I gave it back: Harbour turns a person's intent into finished, proven work and should leave the code better each time. The loop that does this is not yet whole: parts of it still live outside Harbour, in text on tickets, in notes, in the wording of prompts, and in a supervising session doing things by hand. What went wrong this fortnight went wrong in those outside parts, and today's conversation was the same failure at full size: a plan held by hand, in prose, and lost every few messages. So there is one job, making the loop whole inside Harbour so it runs the same way every time on any project; and the rest (Harbour tidying itself as it works, his small projects, polish, Jira) follows from running it. Much of what the loop needs is already in the fortnight's essays and papers, read as one picture and checked against projects that are not Harbour.
+
+## 15 Nov, end of day — State at the pause (read this first)
+
+John: "Yes, but chances are a human like me will control Harbour via an agent like you. Your overall picture is improved. I'd suggest updating notes, then I compact, and we continue discussion". This entry is the state to pick up from.
+
+### The picture John accepted, with his correction
+
+- **What Harbour is for.** It turns a person's intent into finished, proven work, and should leave the code a little better each time. Run long enough, that settles a codebase, Harbour's own included.
+- **Where it is.** The loop works but is not whole. Parts of it still live outside Harbour: in text on tickets, in notes in the repository, in the wording of prompts, and in a supervising session doing things by hand. What went wrong this fortnight went wrong in those outside parts.
+- **The one job.** Make the loop whole inside Harbour, so it runs the same way every time, on any project.
+- **Who drives it (John's correction).** "a human like me will control Harbour via an agent like you". The agent stays, as the person's way in. What goes is an agent holding the loop together by hand. I had said "with nobody like me in the middle", which was wrong.
+- **Everything else follows from running it:** Harbour tidies itself as it works, John points it at small projects and polishes what he feels, then the Jira project.
+
+### The plan, in John's words and mine
+
+- John: "We find where then loop is leaking, understand deeply why, and what it needs, then build that specific solution in a simple form. Once the engine doesn't leak, we try it on a bunch of smaller projects. We polish as we go, and in a week or two have a well polished Harbour, ready for the big Jira project."
+- As three steps: (1) understand what the loop needs to be whole; (2) build that, simply, in Harbour; (3) run it, on Harbour, on his small projects, then Jira.
+- **Step 1 is next and is mine:** read the fortnight's essays and papers as one picture of what the loop needs, myself, not through sub-agents, and check it against projects that are not Harbour. John has offered test projects.
+- **This is an outline, not yet a plan.** John: "Why would we continue when we don't yet _have a plan_?" Nothing yet says how step 1 is done, what it costs or where it stops. No spending on building until that exists.
+
+### How John wants this done (the lessons of today)
+
+- **Reason from the essays, papers and north star, and hold the whole.** He said I had been "yes, and", "going with whatever the most recent message says", and later that I had "entirely lost the wood from the trees". He wants his ideas fleshed out, tested and pushed back on with reasons, not enacted.
+- **Do not define a thing sharply in order to count it.** "Isn't that the entire problem, that we had tight definitions in things like periodicals which meant we didn't see the leaks? If we define it in the wrong way, we're back in groundhog day." Look first, name after.
+- **Research and understand before any implementation.** "You're also jumping to assumed implementation where I suggested we first research and understand what's needed."
+- **Keep it universal.** Not shaped by Harbour's own repository.
+- **Say how I know.** "Please elaborate when you reply so I understand if your guessing, or if you've checked and are relaying facts and your correct interpretation." Mark each claim as checked by me, relayed from a sub-agent, my interpretation, or a guess. Read the code myself before relaying anything alarming, and say what it means for a user.
+- **Do not hand him questions that are not his.** I listed five "open questions" out of habit; none was his to answer.
+- **Do not send him round planning loops.** "I want out this loooooop!" Six versions of a plan and a doc rebuilt five times in one day was the loop.
+- Still in force from before: looser, not tighter; no new rules; fixes remove things; measures report and never gate; no pacing of the budget; no big backlog sort; asks avoid the "how"; only John rules.
+
+### What was checked today, and what I got wrong
+
+- **Checked by me:** the system map's numbers (13 areas, 585 source files, 212,226 lines of JavaScript, 72 import links between areas; runs import prompts 60 times and back 39; web routes import runs 95 and prompts 92; the agent API 50 and 48; `server.js` imports 207 modules). 570 of 585 source files open with a comment saying what the file is for, and `docs/architecture/source-map.md` has a line per module. Git is optional: `closeOutDecision` handles no pull request and marks an unreadable one "not checked"; only a missing blind read or a pull request changed after review refuses anything. A local project's tasks (`local-issues`) and owner (`account-workspaces`) are in the database; what is missing is restoring an account's workspaces at sign-in, a known limit in the README. Nothing receives webhooks.
+- **Relayed from sub-agents and not opened by me:** the list of what the loop writes and where (`writeup/4-local-first.md`, section B), including about ten stage facts read back from ticket text by pattern and 13 kinds of typed entry on a run's row; that a GitHub connection can only be made by adding GitHub as a tracker (marked inferred); that the agent's single-issue reads exist on Linear and the local store only; that a workspace is not tied to a repository.
+- **Wrong, and corrected:** "nothing says what a part is for"; "a local-only project needs nothing built"; "a local-only project cannot prove a merge" and "a local workspace lives in the browser" as blockers; "nobody like me in the middle"; the claim that John's attention is the limit; the 100 to 130 landings figure.
+
+### Set aside, not decided
+
+- Harbour owning the tasks with trackers as a sync, and removing the Jira and GitHub trackers. John: idea two "is appealing because the site is slow, but that's unrelated".
+- My working definition of a leak and its four kinds; records that end when a run does; stage facts as typed entries on the run; a countable test for "does not leak".
+- The site being slow, as a separate matter.
+
+### Where things are kept
+
+- **The doc:** *Harbour: the course, and what needs your ruling*, https://claude.ai/artifact/74Yy6aE8WXur4YDaJQt4t8. Its top section, "Where this stands at the end of 15 November", is current. Everything below it is earlier working, partly superseded, and none of its rulings needs marking yet.
+- **The chart:** *Harbour System Map*, https://claude.ai/artifact/GwuQ5g3ab5P9hhvhE8rjuQ (version 2). John: "I like it!"
+- **Earlier pages:** *Land on the Horizon* (https://claude.ai/artifact/5WYRkCnes1ShZQSyK5RszY, version 3), *Toward Settled*, *Plotting the Course*.
+- **Scratchpad working files** (not in the repository): `writeup/1-how-ideas-developed.md`, `2-areas-and-path.md`, `3-definition-and-rulings.md`, `4-local-first.md`; reviews `writeup/review/A-facts.md`, `B-reader.md`, `C-ideas.md`; the chart's scripts in `map/`; the first course's readings in `course/`.
+- **The essays to read for step 1** (on main, `docs/papers/harbour/`): `nothing-fights-its-shape.md`, `every-choice-was-right-at-the-time.md`, `notes-across-the-border.md`, `cleaner-than-it-started.md`, `tasks-are-tasks.md`, and the papers `between-the-sessions.md`, `what-hides-between-sessions.md`, `steering-text.md`, `beyond-the-code.md`, `where-judgement-happens.md`, `what-should-an-agent-leave-behind.md`, `what-supervisors-do.md`, `theseus-method.md`.
+
+### Standing items
+
+- Lanes are paused and nothing is in flight: LIN-4441 (open for its re-measure), LIN-4445 (Jira live check outstanding), LIN-4463 (front end, paused). No watcher is running. Main was at `6f6c5d2e2` when last checked.
+- Seven safety findings from the 10 Nov Security Review exist only in area notes; whether they go into LIN-4416 is still John's to say. LIN-4210 still waits on him.
+- My Harbour token expires 15 Nov 15:48 UTC.
+- Budget week resets Thursday 19 Nov 07:00 UTC; John is not pacing it.
