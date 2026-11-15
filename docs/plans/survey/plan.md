@@ -34,6 +34,7 @@
    - Before anyone looks at the outside project, I write a few plain sentences on what the picture expects to find there.
    - A reader who hasn't seen the picture traces one or two of the project's tasks in the same way, and each expectation is marked as held or not.
    - If the project's finished tasks predate the closing pieces, John can choose one fresh small task instead.
+   - **Chosen 15 Nov** (words §8): the project is Lighthouse, which "adopted many of its key ideas, in a simpler form". Its Harbour-run tasks predate the closing pieces, so its recent repository-run work is traced as it stands. A project set up with Harbour will run later as a further test case, arranged with John.
 6. **John corrects the picture.**
 
 ## Pet projects
