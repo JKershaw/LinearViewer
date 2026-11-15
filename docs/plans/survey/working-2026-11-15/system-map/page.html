@@ -1,0 +1,586 @@
+<title>Harbour System Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=JetBrains+Mono:wght@400;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
+<style>
+/* Layout: a working chart, same paper as Toward Settled and Land on the Horizon.
+   Harbour's areas are soundings on the water; everything outside Harbour is drawn as land.
+   One wide chart with switchable views, then two smaller drawings. */
+:root {
+  --paper: #F2F6F4;
+  --card: #FFFFFF;
+  --shoal: #D5E7EE;
+  --land: #EDE0BE;
+  --contour: #B39B5E;
+  --ink: #0F2434;
+  --muted: #536977;
+  --rule: #A8BCC6;
+  --magenta: #AE1879;
+  --sea: #1877AD;
+  --warm: #B5651D;
+  --still: #8A9AA3;
+  --display: "Bricolage Grotesque", "Avenir Next Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "Newsreader", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #09151E; --card: #0F1F2B; --shoal: #11293A; --land: #2A2617; --contour: #7C6A3D;
+    --ink: #DCE8EE; --muted: #93A9B6; --rule: #2E4757; --magenta: #F06DBE;
+    --sea: #4398CC; --warm: #C58430; --still: #6F828D; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #09151E; --card: #0F1F2B; --shoal: #11293A; --land: #2A2617; --contour: #7C6A3D;
+  --ink: #DCE8EE; --muted: #93A9B6; --rule: #2E4757; --magenta: #F06DBE;
+  --sea: #4398CC; --warm: #C58430; --still: #6F828D; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink);
+  font-family: var(--body); font-size: 1.0625rem; line-height: 1.55;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+.page {
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 3rem;
+}
+.col { max-width: 40rem; margin-inline: auto; }
+.wide { max-width: 64rem; margin-inline: auto; }
+p { margin: 0 0 1rem; }
+h1, h2, h3, h4 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.3rem, 9vw, 3.6rem); font-weight: 800; line-height: .96; letter-spacing: -0.03em; }
+h2 { font-size: clamp(1.6rem, 6vw, 2.2rem); font-weight: 800; line-height: 1.05; letter-spacing: -0.02em; margin-bottom: .8rem; }
+h3 { font-size: 1.15rem; font-weight: 600; line-height: 1.2; margin: 0 0 .5rem; }
+h4 { font-size: 1rem; font-weight: 600; line-height: 1.25; margin: 0 0 .3rem; }
+.eyebrow { font-family: var(--mono); font-size: .72rem; letter-spacing: .13em; text-transform: uppercase; color: var(--magenta); margin-bottom: .7rem; display: block; }
+.lede { font-size: 1.15rem; line-height: 1.5; }
+.small { font-size: .9rem; color: var(--muted); }
+.mono { font-family: var(--mono); font-size: .82em; }
+section { padding-block: 2.6rem .6rem; }
+.divider { border: 0; border-top: 1px solid var(--rule); margin: 0; }
+header.top { padding-block: 2.2rem .4rem; }
+.facts { display: flex; flex-wrap: wrap; gap: .4rem 1.6rem; margin-top: 1.1rem; font-family: var(--mono); font-size: .8rem; color: var(--muted); }
+.facts b { font-family: var(--display); font-size: 1.5rem; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; margin-right: .35rem; font-variant-numeric: tabular-nums; }
+
+/* ---------- controls ---------- */
+.lenses { display: flex; flex-wrap: wrap; gap: .4rem; margin: 1rem 0 .7rem; }
+.lenses button, .steps button, .clear {
+  font-family: var(--mono); font-size: .76rem; letter-spacing: .02em;
+  padding: .42rem .7rem; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--rule); background: var(--card); color: var(--ink);
+}
+.lenses button[aria-pressed="true"], .steps button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.lenses button:focus-visible, .steps button:focus-visible, .clear:focus-visible { outline: 2px solid var(--magenta); outline-offset: 2px; }
+.steps { display: flex; flex-wrap: wrap; gap: .3rem; margin: 0 0 .7rem; }
+.steps button { padding: .3rem .6rem; min-width: 2.2rem; }
+.caption { font-size: .96rem; min-height: 3.1rem; margin: 0 0 .6rem; }
+.caption ol { margin: .4rem 0 0; padding-left: 1.3rem; }
+.caption li { margin-bottom: .2rem; }
+
+/* ---------- chart ---------- */
+.scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 39px, color-mix(in srgb, var(--rule) 26%, transparent) 39px 40px),
+    repeating-linear-gradient(90deg, transparent 0 39px, color-mix(in srgb, var(--rule) 26%, transparent) 39px 40px),
+    var(--paper); }
+.scroll svg { display: block; width: 100%; min-width: 820px; height: auto; }
+svg text { font-family: var(--mono); fill: var(--ink); }
+svg .nm { font-family: var(--display); font-weight: 600; font-size: 15px; }
+svg .st { font-size: 11px; fill: var(--muted); }
+svg .an { font-size: 10.5px; fill: var(--ink); }
+svg .band { font-size: 10px; letter-spacing: .12em; fill: var(--muted); text-transform: uppercase; }
+.node rect.b { fill: var(--card); stroke: var(--rule); stroke-width: 1.2; }
+.node.outside rect.b { fill: var(--land); stroke: var(--contour); }
+.node.aside rect.b { stroke-dasharray: 5 4; }
+.node.area { cursor: pointer; }
+.node.area:focus { outline: none; }
+.node.area:focus-visible rect.b { stroke: var(--ink); stroke-width: 2.6; }
+.node.hot rect.b { stroke: var(--magenta); stroke-width: 2.2; }
+.node.sel rect.b { stroke: var(--magenta); stroke-width: 3; }
+.node.dim { opacity: .3; }
+.barbg { fill: color-mix(in srgb, var(--rule) 45%, transparent); }
+.bar { fill: var(--sea); }
+.pin { fill: var(--magenta); }
+.pint { fill: var(--card); font-size: 10px; font-weight: 600; }
+.edge { fill: none; stroke-width: 1.4; }
+.edge.flow { stroke: var(--still); stroke-dasharray: 4 4; }
+.edge.out { stroke: var(--sea); }
+.edge.in { stroke: var(--warm); }
+.edge.knot { stroke: var(--magenta); }
+.elab { font-size: 10.5px; font-weight: 600; paint-order: stroke; stroke: var(--paper); stroke-width: 4px; stroke-linejoin: round; }
+.elab.out { fill: var(--sea); } .elab.in { fill: var(--warm); } .elab.knot { fill: var(--magenta); }
+
+/* ---------- detail ---------- */
+.detail { margin-top: 1rem; background: var(--card); border: 1px solid var(--rule); border-radius: 6px; padding: 1.1rem 1.1rem .6rem; }
+.detail .head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .4rem 1rem; }
+.detail .purpose { border-left: 2px solid var(--magenta); padding-left: .8rem; margin: .7rem 0 1rem; font-size: .98rem; }
+.nums { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: .6rem 1rem; margin: 0 0 1rem; }
+.nums div { min-width: 0; font-family: var(--mono); font-size: .72rem; color: var(--muted); }
+.nums b { display: block; font-family: var(--display); font-size: 1.35rem; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: .4rem 1.6rem; }
+.cols > div { min-width: 0; }
+.rows { list-style: none; margin: 0 0 1rem; padding: 0; font-family: var(--mono); font-size: .76rem; }
+.rows li { display: grid; grid-template-columns: minmax(0, 1fr) 3.6rem; gap: .5rem; align-items: center; padding: .16rem 0; }
+.rows .nmx { overflow-wrap: anywhere; position: relative; padding: .1rem .3rem; z-index: 0; }
+.rows .nmx i { position: absolute; left: 0; top: 0; bottom: 0; z-index: -1; border-radius: 2px; background: color-mix(in srgb, var(--sea) 20%, transparent); }
+.rows.in .nmx i { background: color-mix(in srgb, var(--warm) 24%, transparent); }
+.rows .v { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.files { list-style: none; margin: 0 0 1.1rem; padding: 0; }
+.files li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .1rem .8rem; padding: .4rem 0; border-top: 1px solid color-mix(in srgb, var(--rule) 50%, transparent); }
+.files .fn { font-family: var(--mono); font-size: .8rem; overflow-wrap: anywhere; }
+.files .v { font-family: var(--mono); font-size: .74rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.files .say { grid-column: 1 / -1; font-size: .93rem; line-height: 1.4; color: var(--muted); }
+.tag { display: inline-block; font-family: var(--mono); font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: .35rem; }
+.key { display: flex; flex-wrap: wrap; gap: .3rem 1.1rem; font-family: var(--mono); font-size: .72rem; color: var(--muted); margin: .6rem 0 0; }
+.key span::before { content: ""; display: inline-block; width: 1.3rem; height: 0; border-top: 2px solid var(--still); vertical-align: middle; margin-right: .4rem; }
+.key .k-out::before { border-color: var(--sea); } .key .k-in::before { border-color: var(--warm); } .key .k-flow::before { border-top-style: dashed; }
+.key .k-land::before { border: 1px solid var(--contour); background: var(--land); height: .7rem; width: 1rem; }
+
+/* ---------- task flow ---------- */
+.flow rect.s { fill: var(--card); stroke: var(--rule); stroke-width: 1.2; }
+.flow rect.asked { stroke: var(--magenta); stroke-dasharray: 5 3; stroke-width: 1.6; }
+.flow rect.span { fill: var(--shoal); stroke: none; }
+.flow rect.outsider { fill: var(--land); stroke: var(--contour); }
+.flow .lane { font-family: var(--display); font-weight: 600; font-size: 14px; }
+.flow .t { font-size: 12px; }
+.flow .u { font-size: 10px; fill: var(--muted); }
+.flow line.sep { stroke: var(--rule); stroke-width: 1; }
+.flow .arr { stroke: var(--still); stroke-width: 1.4; fill: none; }
+.flow circle.n { fill: var(--magenta); }
+.flow text.nn { fill: var(--card); font-size: 10px; font-weight: 600; }
+
+/* ---------- what holds what ---------- */
+.holds { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1rem; margin-top: 1rem; }
+.holds > div { min-width: 0; }
+.bx { border: 1px solid var(--rule); border-radius: 5px; background: color-mix(in srgb, var(--card) 70%, transparent); padding: .5rem .6rem .55rem; margin-top: .45rem; }
+.bx > b { font-family: var(--display); font-weight: 600; font-size: .98rem; }
+.bx > span { display: block; font-size: .86rem; color: var(--muted); line-height: 1.35; }
+.bx.missing { border: 1.5px dashed var(--magenta); background: transparent; }
+.bx.missing > b { color: var(--magenta); }
+.colhead { font-family: var(--mono); font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+ul.plain { margin: 0 0 1rem; padding-left: 1.15rem; }
+ul.plain li { margin-bottom: .45rem; }
+a { color: var(--sea); }
+</style>
+
+<div class="page">
+
+<header class="top wide">
+  <span class="eyebrow">Harbour &middot; read from the code on main, 14 November 2026</span>
+  <h1>The system, on one chart</h1>
+  <p class="lede col" style="margin: 1rem 0 0; max-width: 44rem;">What Harbour is made of, what leans on what, and where a new person's work goes. Every number here was counted from the code, and each file's description is quoted from the comment at the top of that file.</p>
+  <div class="facts">
+    <span><b>13</b>areas</span>
+    <span><b>585</b>source files</span>
+    <span><b>212,226</b>lines of JavaScript</span>
+    <span><b>72</b>import links between areas</span>
+    <span><b>13</b>steps on a new person's route</span>
+  </div>
+</header>
+
+<section class="wide" aria-labelledby="h-map">
+  <h2 id="h-map">The areas, and what leans on what</h2>
+  <p class="col" style="margin-inline: 0; max-width: 46rem;">Read it top to bottom: people and runners come in at the top, through two doors, into a core of two large areas, which stand on the foundations along the bottom. Pick a view to change what each area shows, or select an area to see its files and its imports.</p>
+
+  <div class="lenses" role="group" aria-label="Views of the chart">
+    <button type="button" id="lens-size" data-lens="size" aria-pressed="true">Size</button>
+    <button type="button" id="lens-route" data-lens="route" aria-pressed="false">The route</button>
+    <button type="button" id="lens-traffic" data-lens="traffic" aria-pressed="false">Where work went</button>
+    <button type="button" id="lens-waiting" data-lens="waiting" aria-pressed="false">What is waiting</button>
+    <button type="button" id="lens-knots" data-lens="knots" aria-pressed="false">The knots</button>
+    <button type="button" id="lens-choices" data-lens="choices" aria-pressed="false">Standing choices</button>
+  </div>
+  <div class="steps" id="steps" role="group" aria-label="Steps of the route" hidden></div>
+  <div class="caption" id="caption" aria-live="polite"></div>
+
+  <div class="scroll">
+    <svg id="map" viewBox="0 0 1000 638" role="group" aria-label="Chart of Harbour's thirteen areas and what they depend on">
+      <defs>
+        <marker id="m-flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill: var(--still)"/></marker>
+        <marker id="m-out" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill: var(--sea)"/></marker>
+        <marker id="m-in" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill: var(--warm)"/></marker>
+        <marker id="m-knot" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill: var(--magenta)"/></marker>
+      </defs>
+      <text class="band" x="60" y="80">Faces</text>
+      <text class="band" x="340" y="80">The file that starts everything</text>
+      <text class="band" x="60" y="190">Pages and the two doors</text>
+      <text class="band" x="60" y="320">The core</text>
+      <text class="band" x="60" y="446">Foundations, and the area that measures the rest</text>
+      <text class="band" x="60" y="564">Outside Harbour</text>
+      <g id="edges"></g>
+      <g id="nodes"></g>
+      <g id="labels"></g>
+    </svg>
+  </div>
+  <div class="key">
+    <span class="k-flow">how requests and work flow</span>
+    <span class="k-out">the selected area imports from</span>
+    <span class="k-in">imports the selected area</span>
+    <span class="k-land">outside Harbour</span>
+  </div>
+
+  <div class="detail" id="detail" aria-live="polite"></div>
+</section>
+
+<hr class="divider">
+
+<section class="wide" aria-labelledby="h-flow">
+  <h2 id="h-flow">How one task moves</h2>
+  <p class="col" style="margin-inline: 0; max-width: 46rem;">Each box in the third row is a fresh agent session that reads the ticket, does one stage and leaves. Harbour chooses the next stage each time. The numbered steps are the ones Ruling 3 of the plan asks you about.</p>
+  <div class="scroll">
+    <svg class="flow" viewBox="0 0 1250 420" role="img" aria-label="A task moves from the person's ask through look-first, deciding, build, review, blind read and close-out, with Harbour choosing each stage and the person ruling when asked.">
+      <defs><marker id="m-f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" style="fill: var(--still)"/></marker></defs>
+      <line class="sep" x1="0" y1="92" x2="1250" y2="92"/><line class="sep" x1="0" y1="168" x2="1250" y2="168"/><line class="sep" x1="0" y1="322" x2="1250" y2="322"/>
+      <text class="lane" x="12" y="50">You</text>
+      <text class="lane" x="12" y="134">Harbour</text>
+      <text class="lane" x="12" y="236">Runner</text><text class="lane" x="12" y="254">and agent</text>
+      <text class="lane" x="12" y="366">Outside</text><text class="lane" x="12" y="384">readers</text>
+
+      <rect class="s asked" x="100" y="24" width="170" height="50" rx="4"/><text class="t" x="112" y="45">Write the ask and Go</text><text class="u" x="112" y="62">sealed as you wrote it</text>
+      <rect class="span" x="290" y="24" width="940" height="50" rx="4"/><text class="t" x="304" y="45">Rule when a question reaches you</text><text class="u" x="304" y="62">and stop the run at any time</text>
+
+      <rect class="span" x="100" y="106" width="170" height="48" rx="4"/><text class="t" x="112" y="127">Queues the task</text><text class="u" x="112" y="143">for a runner to take</text>
+      <rect class="span" x="280" y="106" width="700" height="48" rx="4"/><text class="t" x="294" y="127">Chooses each next stage from the stages' own descriptions</text><text class="u" x="294" y="143">and assembles that stage's prompt in code · 21 kinds of stage exist</text>
+      <rect class="span" x="1000" y="106" width="230" height="48" rx="4"/><text class="t" x="1012" y="127">Reads the evidence</text><text class="u" x="1012" y="143">CI, pull request, merge</text>
+
+      <text class="u" x="280" y="186">LOOK FIRST</text>
+      <rect class="s asked" x="280" y="194" width="150" height="34" rx="4"/><text class="t" x="290" y="216">Survey: the task</text>
+      <rect class="s asked" x="280" y="234" width="150" height="34" rx="4"/><text class="t" x="290" y="256">Survey: the place</text>
+      <rect class="s" x="280" y="274" width="150" height="34" rx="4"/><text class="t" x="290" y="296">Size of the move</text>
+
+      <text class="u" x="460" y="186">DECIDE (OPEN WORK)</text>
+      <rect class="s asked" x="460" y="194" width="150" height="34" rx="4"/><text class="t" x="470" y="216">Research</text>
+      <rect class="s asked" x="460" y="234" width="150" height="34" rx="4"/><text class="t" x="470" y="256">Plan</text>
+      <rect class="s asked" x="460" y="274" width="150" height="34" rx="4"/><text class="t" x="470" y="296">Plan review, again</text>
+
+      <text class="u" x="640" y="186">MAKE</text>
+      <rect class="s" x="640" y="194" width="100" height="114" rx="4"/><text class="t" x="652" y="256">Build</text>
+
+      <text class="u" x="770" y="186">CHECK</text>
+      <rect class="s" x="770" y="194" width="210" height="74" rx="4"/><text class="t" x="782" y="216">Review, by a fresh reader</text><text class="u" x="782" y="234">class check · requirements check</text><text class="u" x="782" y="250">runs the result · mutation check</text>
+      <rect class="s asked" x="770" y="274" width="210" height="34" rx="4"/><text class="t" x="782" y="296">Blind read before merge</text>
+
+      <text class="u" x="1010" y="186">FINISH</text>
+      <rect class="s" x="1010" y="194" width="220" height="74" rx="4"/><text class="t" x="1022" y="216">Close-out</text><text class="u" x="1022" y="234">merge · check it live</text><text class="u" x="1022" y="250">what was left · follow-ups</text>
+      <rect class="s asked" x="1010" y="274" width="220" height="34" rx="4"/><text class="t" x="1022" y="296">Tidy-after (if copies left)</text>
+
+      <path class="arr" d="M270 49H284" marker-end="url(#m-f)"/>
+      <path class="arr" d="M185 74V102" marker-end="url(#m-f)"/>
+      <path class="arr" d="M185 154V251H274" marker-end="url(#m-f)"/>
+      <path class="arr" d="M430 251H454" marker-end="url(#m-f)"/>
+      <path class="arr" d="M610 251H634" marker-end="url(#m-f)"/>
+      <path class="arr" d="M740 251H764" marker-end="url(#m-f)"/>
+      <path class="arr" d="M980 231H1004" marker-end="url(#m-f)"/>
+
+      <rect class="outsider" x="1010" y="340" width="220" height="56" rx="4"/><text class="t" x="1022" y="362">Periodicals</text><text class="u" x="1022" y="380">read the code afterwards and report</text>
+      <rect class="outsider" x="640" y="340" width="340" height="56" rx="4"/><text class="t" x="652" y="362">For a rebuild: a replay built beforehand</text><text class="u" x="652" y="380">compares old and new behaviour</text>
+
+      <g>
+        <circle class="n" cx="430" cy="194" r="9"/><text class="nn" x="430" y="197.5" text-anchor="middle">7</text>
+        <circle class="n" cx="610" cy="194" r="9"/><text class="nn" x="610" y="197.5" text-anchor="middle">6</text>
+        <circle class="n" cx="610" cy="234" r="9"/><text class="nn" x="610" y="237.5" text-anchor="middle">2</text>
+        <circle class="n" cx="610" cy="274" r="9"/><text class="nn" x="610" y="277.5" text-anchor="middle">3</text>
+        <circle class="n" cx="980" cy="194" r="9"/><text class="nn" x="980" y="197.5" text-anchor="middle">4</text>
+        <circle class="n" cx="980" cy="274" r="9"/><text class="nn" x="980" y="277.5" text-anchor="middle">8</text>
+        <circle class="n" cx="1230" cy="194" r="9"/><text class="nn" x="1230" y="197.5" text-anchor="middle">5</text>
+        <circle class="n" cx="1230" cy="274" r="9"/><text class="nn" x="1230" y="277.5" text-anchor="middle">1</text>
+        <circle class="n" cx="270" cy="24" r="9"/><text class="nn" x="270" y="27.5" text-anchor="middle">9</text>
+      </g>
+    </svg>
+  </div>
+  <p class="small" style="margin-top: .7rem;">Numbers are the rows of Ruling 3: 1 tidy-after, 2 a plan and one plan review, 3 further plan reviews, 4 the mutation check, 5 close-out filing follow-ups, 6 the research session, 7 the two Surveys, 8 the blind read, 9 the cut rule and the seal on the ask. Row 10, my own supervising session, sits outside this picture: it starts runs and relays by hand.</p>
+</section>
+
+<hr class="divider">
+
+<section class="wide" aria-labelledby="h-holds">
+  <h2 id="h-holds">What holds what</h2>
+  <p class="col" style="margin-inline: 0; max-width: 46rem;">Harbour keeps three kinds of thing: the job, the place, and the people and keys. The job is held as data. The place is held as text: a comment at the top of each file, a source map in the docs, and the area notes. Your idea of holding the place as data, on a par with tasks and code, would change the middle column.</p>
+  <div class="holds">
+    <div>
+      <span class="colhead">The job</span>
+      <div class="bx"><b>Workspace</b><span>one person's or team's corner of Harbour</span>
+        <div class="bx"><b>Project</b>
+          <div class="bx"><b>Issue</b><span>the task, with its ask sealed as written</span>
+            <div class="bx"><b>Run</b><span>one issue's passage through the stages</span>
+              <div class="bx"><b>Dispatch</b><span>one prompt, queued for a runner</span></div>
+              <div class="bx"><b>Session</b><span>one agent sitting, doing one stage</span></div>
+              <div class="bx"><b>Ruling</b><span>a question waiting on a person</span></div>
+              <div class="bx"><b>Evidence</b><span>pull request, CI, merge, the live check</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <span class="colhead">The place</span>
+      <div class="bx"><b>Repository</b><span>the code a workspace works on</span>
+        <div class="bx"><b>Area</b><span>13 in Harbour's own code, named in one list</span>
+          <div class="bx"><b>Files</b><span>matched to an area by path; 570 of 585 open with a comment saying what the file is for</span></div>
+          <div class="bx"><b>Source map</b><span>one line for each module, kept by hand in the docs</span></div>
+          <div class="bx"><b>Notes</b><span>lessons and waiting work, in prose</span></div>
+        </div>
+        <div class="bx"><b>Periodicals</b><span>outside readings of the whole place</span></div>
+      </div>
+    </div>
+    <div>
+      <span class="colhead">The people and the keys</span>
+      <div class="bx"><b>Account</b><span>signs in with Linear, Jira, GitHub or email</span>
+        <div class="bx"><b>Membership</b><span>owner or member of a workspace</span></div>
+      </div>
+      <div class="bx"><b>Connections</b><span>the tracker a workspace reads, and the GitHub App that lets it read pull requests</span></div>
+      <div class="bx"><b>Runner</b><span>simple-dispatcher, or the kit inside Claude Code, holding a token that says what it may do</span></div>
+      <div class="bx"><b>Model key</b><span>yours, or the free tier</span></div>
+    </div>
+  </div>
+  <p class="small" style="margin-top: 1rem;">This drawing is my reading of the names in the code and the docs. Tell me where it is wrong.</p>
+</section>
+
+<hr class="divider">
+
+<section class="col" aria-labelledby="h-limits">
+  <h2 id="h-limits">What this chart cannot tell you</h2>
+  <ul class="plain">
+    <li><b>Whether a part's purpose is still the right one.</b> Each file says what it is for, and the chart quotes it. The chart cannot say whether that is still what you want. The one-line summary of each area is mine.</li>
+    <li><b>What is used.</b> Nothing in the repository records which features people use.</li>
+    <li><b>The exact share of an area on the route.</b> Those splits are by filename and could be off by thousands of lines.</li>
+    <li><b>Every dependency.</b> Import counts are static imports between source files. Browser scripts are loaded by script tags, so they show no imports at all.</li>
+    <li><b>The tests.</b> Line counts leave them out. Unit-test lines appear in each area's detail.</li>
+  </ul>
+  <p class="small">The plan this chart belongs to is <a href="https://claude.ai/artifact/74Yy6aE8WXur4YDaJQt4t8">Harbour: the course, and what needs your ruling</a>.</p>
+</section>
+
+</div>
+
+<script>
+(function () {
+  var D = __DATA__;
+  var NS = 'http://www.w3.org/2000/svg';
+  var OUT = {
+    person: { short: 'A person, in a browser', sub: 'you today; a new person in the rehearsal', box: [60, 14, 250, 46] },
+    runner: { short: 'A runner, with its coding agent', sub: 'simple-dispatcher, or the kit in Claude Code', box: [650, 14, 290, 46] },
+    db: { short: 'Database', sub: 'holds every store', box: [60, 574, 190, 48] },
+    gh: { short: 'GitHub', sub: 'pull requests, CI', box: [555, 574, 150, 48] },
+    trackers: { short: 'Trackers', sub: 'Linear, Jira, GitHub, Projects, local', box: [270, 574, 270, 48] },
+    models: { short: 'Model provider', sub: 'called by Prompts and models', box: [720, 574, 220, 48] }
+  };
+  var FLOW = [['person', 'front-end-browser'], ['front-end-browser', 'web-routes'], ['web-routes', 'front-end-pages'], ['runner', 'agent-api'],
+    ['web-routes', 'runs-and-dispatch'], ['agent-api', 'runs-and-dispatch'], ['runs-and-dispatch', 'llm-and-prompts'], ['providers', 'trackers']];
+  var KNOTS = [['runs-and-dispatch', 'llm-and-prompts'], ['llm-and-prompts', 'runs-and-dispatch'], ['web-routes', 'runs-and-dispatch'],
+    ['web-routes', 'llm-and-prompts'], ['agent-api', 'runs-and-dispatch'], ['agent-api', 'llm-and-prompts']];
+  var CAP = {
+    size: 'Each bar is an area’s lines of JavaScript against the largest area. Tests are not counted. The two core areas hold a third of the code between them.',
+    traffic: 'Commits that touched each area from 7 to 14 November. Work went to the core and the agent door. Sign-in, the providers and the plumbing saw little, so work passing through will not clean them.',
+    waiting: 'Known defects, copies and clean-ups written in each area’s notes: 118 in all. Runs and dispatch holds the most.',
+    route: 'Areas outlined in magenta are on the route a new person takes, from the landing page to a proven merge. Pick a step to see which areas it runs through.',
+    knots: 'Three things the outside readings keep finding. Runs and Prompts import each other. Both doors reach into both of them, so a new feature is wired twice. And <span class="mono">server.js</span> imports 207 modules.',
+    choices: 'Where the five standing choices in Ruling 2 of the plan sit in the code.'
+  };
+  var state = { lens: 'size', sel: null, step: null };
+  var svgE = document.getElementById('edges'), svgN = document.getElementById('nodes'), svgL = document.getElementById('labels');
+  var els = {};
+
+  function fmt(n) { return Number(n).toLocaleString('en-GB'); }
+  function el(tag, attrs, text) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function box(id) { return (D.areas[id] || OUT[id]).box; }
+  function centre(b) { return [b[0] + b[2] / 2, b[1] + b[3] / 2]; }
+  function clip(b, tx, ty) {
+    var c = centre(b), dx = tx - c[0], dy = ty - c[1];
+    if (!dx && !dy) return c;
+    var sx = dx ? (b[2] / 2) / Math.abs(dx) : Infinity, sy = dy ? (b[3] / 2) / Math.abs(dy) : Infinity, s = Math.min(sx, sy);
+    return [c[0] + dx * s, c[1] + dy * s];
+  }
+  function drawEdge(a, b, cls, label, off, at) {
+    var ba = box(a), bb = box(b), ca = centre(ba), cb = centre(bb);
+    var dx = cb[0] - ca[0], dy = cb[1] - ca[1], len = Math.sqrt(dx * dx + dy * dy) || 1;
+    var ox = -dy / len * (off || 0), oy = dx / len * (off || 0);
+    var p1 = clip(ba, cb[0], cb[1]), p2 = clip(bb, ca[0], ca[1]);
+    svgE.appendChild(el('line', { 'class': 'edge ' + cls, x1: p1[0] + ox, y1: p1[1] + oy, x2: p2[0] + ox, y2: p2[1] + oy, 'marker-end': 'url(#m-' + cls + ')' }));
+    if (label != null) {
+      var t = at == null ? 0.5 : at;
+      svgL.appendChild(el('text', { 'class': 'elab ' + cls, x: p1[0] + (p2[0] - p1[0]) * t + ox * 2.2, y: p1[1] + (p2[1] - p1[1]) * t + oy * 2.2 + 3.5, 'text-anchor': 'middle' }, label));
+    }
+  }
+  function metric(a) {
+    if (state.lens === 'size') return [a.lines, 45825, fmt(a.lines) + ' lines'];
+    if (state.lens === 'traffic') return [a.c7, 56, a.c7 + (a.c7 === 1 ? ' commit' : ' commits')];
+    if (state.lens === 'waiting') return [a.w, 24, a.w + ' waiting'];
+    return null;
+  }
+  function buildNodes() {
+    Object.keys(OUT).forEach(function (id) {
+      var o = OUT[id], b = o.box, g = el('g', { 'class': 'node outside' });
+      g.appendChild(el('rect', { 'class': 'b', x: b[0], y: b[1], width: b[2], height: b[3], rx: 4 }));
+      g.appendChild(el('text', { 'class': 'nm', x: b[0] + 10, y: b[1] + 19 }, o.short));
+      g.appendChild(el('text', { 'class': 'st', x: b[0] + 10, y: b[1] + 35 }, o.sub));
+      svgN.appendChild(g);
+    });
+    Object.keys(D.areas).forEach(function (id) {
+      var a = D.areas[id], b = a.box;
+      var g = el('g', { 'class': 'node area' + (id === 'reports-and-operator-tools' ? ' aside' : ''), tabindex: 0, role: 'button', 'aria-label': a.short + ', ' + fmt(a.lines) + ' lines' });
+      g.appendChild(el('rect', { 'class': 'b', x: b[0], y: b[1], width: b[2], height: b[3], rx: 4 }));
+      var thin = b[3] < 40;
+      g.appendChild(el('text', { 'class': 'nm', x: b[0] + 10, y: b[1] + (thin ? 20 : 22) }, a.short));
+      var an = el('g', { 'class': 'ann' });
+      g.appendChild(an);
+      g.addEventListener('click', function () { select(id); });
+      g.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); select(id); } });
+      svgN.appendChild(g);
+      els[id] = { g: g, an: an, thin: thin };
+    });
+  }
+  function annotate() {
+    var stepAreas = state.step != null ? D.steps[state.step][1] : null;
+    Object.keys(D.areas).forEach(function (id) {
+      var a = D.areas[id], b = a.box, e = els[id];
+      while (e.an.firstChild) e.an.removeChild(e.an.firstChild);
+      var m = metric(a), x = b[0] + 10, w = b[2] - 20;
+      if (e.thin) {
+        var txt = m ? m[2] : (state.lens === 'route' ? 'on the route: all' : (state.lens === 'knots' ? 'imports 207 modules' : fmt(a.lines) + ' lines'));
+        e.an.appendChild(el('text', { 'class': 'st', x: b[0] + 110, y: b[1] + 20 }, txt + ' · mounts every route and starts the scheduled jobs'));
+      } else if (m) {
+        e.an.appendChild(el('text', { 'class': 'st', x: x, y: b[1] + 40 }, m[2]));
+        e.an.appendChild(el('rect', { 'class': 'barbg', x: x, y: b[1] + b[3] - 18, width: w, height: 7, rx: 2 }));
+        if (m[0] > 0) e.an.appendChild(el('rect', { 'class': 'bar', x: x, y: b[1] + b[3] - 18, width: Math.max(2, w * m[0] / m[1]), height: 7, rx: 2 }));
+      } else if (state.lens === 'route') {
+        e.an.appendChild(el('text', { 'class': 'st', x: x, y: b[1] + 40 }, 'on the route:'));
+        e.an.appendChild(el('text', { 'class': 'an', x: x, y: b[1] + 56 }, a.route.toLowerCase()));
+      } else {
+        e.an.appendChild(el('text', { 'class': 'st', x: x, y: b[1] + 40 }, fmt(a.lines) + ' lines'));
+        if (state.lens === 'knots' && id === 'wiring') e.an.appendChild(el('text', { 'class': 'an', x: x, y: b[1] + 56 }, 'imports 207 modules'));
+      }
+      if (state.lens === 'choices') {
+        var n = 0;
+        D.choices.forEach(function (c, i) {
+          if (c[2].indexOf(id) < 0) return;
+          var px = b[0] + b[2] - 16 - n * 24, py = b[1] + (e.thin ? 15 : 16);
+          e.an.appendChild(el('rect', { 'class': 'pin', x: px - 9, y: py - 9, width: 18, height: 18, rx: 3, transform: 'rotate(45 ' + px + ' ' + py + ')' }));
+          e.an.appendChild(el('text', { 'class': 'pint', x: px, y: py + 3.5, 'text-anchor': 'middle' }, String(i + 1)));
+          n++;
+        });
+      }
+      var hot = false, dim = false;
+      if (state.sel) {
+        dim = id !== state.sel && !(D.edges[state.sel + '>' + id] || D.edges[id + '>' + state.sel]);
+      } else if (state.lens === 'route') {
+        if (stepAreas) { hot = stepAreas.indexOf(id) >= 0; dim = !hot; }
+        else { hot = id !== 'reports-and-operator-tools'; }
+      } else if (state.lens === 'choices') {
+        hot = D.choices.some(function (c) { return c[2].indexOf(id) >= 0; }); dim = !hot;
+      } else if (state.lens === 'knots') {
+        hot = ['runs-and-dispatch', 'llm-and-prompts', 'web-routes', 'agent-api', 'wiring'].indexOf(id) >= 0; dim = !hot;
+      }
+      e.g.classList.toggle('hot', hot);
+      e.g.classList.toggle('dim', dim);
+      e.g.classList.toggle('sel', id === state.sel);
+      e.g.setAttribute('aria-pressed', id === state.sel ? 'true' : 'false');
+    });
+  }
+  function drawEdges() {
+    while (svgE.firstChild) svgE.removeChild(svgE.firstChild);
+    while (svgL.firstChild) svgL.removeChild(svgL.firstChild);
+    if (state.sel) {
+      var s = state.sel;
+      Object.keys(D.edges).forEach(function (k) {
+        var p = k.split('>'), n = D.edges[k];
+        if (p[0] !== s && p[1] !== s) return;
+        var other = p[0] === s ? p[1] : p[0], both = D.edges[s + '>' + other] && D.edges[other + '>' + s];
+        if (p[0] === s) drawEdge(s, other, 'out', n >= 8 ? String(n) : null, both ? 6 : 0, 0.7);
+        else drawEdge(other, s, 'in', n >= 8 ? String(n) : null, both ? 6 : 0, 0.3);
+      });
+      return;
+    }
+    if (state.lens === 'knots') {
+      KNOTS.forEach(function (k) {
+        var both = D.edges[k[0] + '>' + k[1]] && D.edges[k[1] + '>' + k[0]];
+        drawEdge(k[0], k[1], 'knot', String(D.edges[k[0] + '>' + k[1]] || 0), both ? 7 : 0, both ? 0.5 : 0.28);
+      });
+      return;
+    }
+    FLOW.forEach(function (f) { drawEdge(f[0], f[1], 'flow', null, 0); });
+  }
+  function caption() {
+    var c = document.getElementById('caption'), h = CAP[state.lens];
+    if (state.lens === 'route' && state.step != null) h = '<b>Step ' + (state.step + 1) + '.</b> ' + D.steps[state.step][0] + '.';
+    if (state.lens === 'choices') {
+      h += '<ol>' + D.choices.map(function (c) { return '<li><b>' + c[0] + '.</b> ' + c[1] + '</li>'; }).join('') + '</ol>';
+    }
+    c.innerHTML = h;
+  }
+  function bars(list, max, cls) {
+    if (!list.length) return '<p class="small">None.</p>';
+    return '<ul class="rows ' + cls + '">' + list.map(function (r) {
+      return '<li><span class="nmx"><i style="width:' + Math.max(2, Math.round(100 * r[1] / max)) + '%"></i>' + r[0] + '</span><span class="v">' + fmt(r[1]) + '</span></li>';
+    }).join('') + '</ul>';
+  }
+  function files(list) {
+    return '<ul class="files">' + list.map(function (r) {
+      return '<li><span class="fn">' + r[0] + '</span><span class="v">' + fmt(r[1]) + ' lines</span><span class="say">' + (r[2] ? esc(r[2]) : 'No opening comment.') + '</span></li>';
+    }).join('') + '</ul>';
+  }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function detail() {
+    var d = document.getElementById('detail');
+    if (!state.sel) {
+      d.innerHTML = '<h3>Select an area on the chart</h3><p class="small" style="margin-bottom:.6rem">You will see what its code does, its largest files in their own words, what it imports and what imports it, which steps of the route run through it, and which standing choices sit in it.</p>';
+      return;
+    }
+    var id = state.sel, a = D.areas[id], outs = [], ins = [];
+    Object.keys(D.edges).forEach(function (k) {
+      var p = k.split('>');
+      if (p[0] === id) outs.push([D.areas[p[1]].short, D.edges[k]]);
+      if (p[1] === id) ins.push([D.areas[p[0]].short, D.edges[k]]);
+    });
+    outs.sort(function (x, y) { return y[1] - x[1]; }); ins.sort(function (x, y) { return y[1] - x[1]; });
+    var mx = Math.max(1, outs.length ? outs[0][1] : 0, ins.length ? ins[0][1] : 0);
+    var st = []; D.steps.forEach(function (s, i) { if (s[1].indexOf(id) >= 0) st.push(i + 1); });
+    var ch = D.choices.filter(function (c) { return c[2].indexOf(id) >= 0; });
+    d.innerHTML =
+      '<div class="head"><h3>' + a.short + '</h3><button type="button" class="clear" id="clear">Clear selection</button></div>' +
+      '<p style="margin:.3rem 0 0">' + a.does + '</p>' +
+            '<div class="nums">' +
+        '<div><b>' + fmt(a.lines) + '</b>lines in ' + a.files + (a.files === 1 ? ' file' : ' files') + '</div>' +
+        '<div><b>' + fmt(a.tests) + '</b>lines of unit tests</div>' +
+        '<div><b>' + a.c7 + '</b>commits, 7–14 Nov</div>' +
+        '<div><b>' + a.w + '</b>entries waiting in its notes</div>' +
+        '<div><b>' + a.imp + '</b>outside files import it</div>' +
+      '</div>' +
+      '<span class="tag">Largest files, each in its own words</span>' + files(a.top) +
+      '<div class="cols">' +
+        '<div><span class="tag">It imports from</span>' + bars(outs.slice(0, 6), mx, '') +
+          '<span class="tag">Imported by</span>' + bars(ins.slice(0, 6), mx, 'in') + (a.impNote ? '<p class="small">' + a.impNote + '</p>' : '') + '</div>' +
+        '<div><span class="tag">On the route</span><p style="font-size:.96rem">' + a.route + '.' + (st.length ? ' Steps ' + st.join(', ') + '.' : '') + '</p>' +
+          '<span class="tag">Standing choices here</span>' + (ch.length ? '<ul class="plain" style="font-size:.96rem">' + ch.map(function (c) { return '<li>' + c[0] + '</li>'; }).join('') + '</ul>' : '<p class="small">None of the five.</p>') + '</div>' +
+      '</div>';
+    document.getElementById('clear').addEventListener('click', function () { select(null); });
+  }
+  function render() {
+    annotate(); drawEdges(); caption(); detail();
+    document.querySelectorAll('.lenses button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.lens === state.lens ? 'true' : 'false'); });
+    var sb = document.getElementById('steps'); sb.hidden = state.lens !== 'route';
+    sb.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', Number(b.dataset.step) === state.step ? 'true' : 'false'); });
+  }
+  function select(id) { state.sel = (id && state.sel === id) ? null : id; render(); }
+
+  buildNodes();
+  var sb = document.getElementById('steps');
+  D.steps.forEach(function (s, i) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.id = 'step-' + (i + 1); b.dataset.step = i; b.textContent = String(i + 1); b.setAttribute('aria-label', 'Step ' + (i + 1) + ': ' + s[0]); b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', function () { state.step = state.step === i ? null : i; state.sel = null; render(); });
+    sb.appendChild(b);
+  });
+  document.querySelectorAll('.lenses button').forEach(function (b) {
+    b.addEventListener('click', function () { state.lens = b.dataset.lens; state.sel = null; if (state.lens !== 'route') state.step = null; render(); });
+  });
+  render();
+})();
+</script>
