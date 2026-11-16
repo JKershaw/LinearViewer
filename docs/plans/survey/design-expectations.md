@@ -45,3 +45,37 @@
 - **The surprises:**
   - **Rows that don't fit for other reasons: partly.** Three groups were not predicted: measured values (8 parts), the place (3 parts, but every "for the area's future" finding needs it), and run records as a group of their own.
   - **The shapes taking nearly everything cleanly: did not happen.** 83 of 220 rows fit cleanly in every part.
+
+## 2. Before the inventory of what Harbour already has
+
+*Written 16 Nov, before reading code for `existing.md`. All I have looked at so far is the names of files under `lib/` and the lines the traces cite.*
+
+**What I expect to exist as data that code acts on:**
+- `who is working`: dispatch rows and lineages.
+- run records: cost rows.
+- `question` / `decision`: the rulings, but keyed by the asking session's loop.
+- task: the local workspace's issues.
+- setting: model routing and some settings.
+- area: `areas.json`, read by code.
+- versions: the task snapshots, but only of the ticket's text.
+
+**What I expect to exist only as prose, with no data behind it:**
+- `plan`: lives in a ticket description.
+- `finding`: Waiting entries and comments.
+- `check`: "not run" lines.
+- `ask`: comments on a parent.
+- lesson: the notes' Lessons.
+- verdict: read by regex or by a prompt, not stored as data.
+
+**The four needs that are not shapes:**
+- Waking and the read view exist as general mechanisms: wakes, the brief and the recap, prompt assembly.
+- Need 5 is a list of paths in a prompt.
+- Nothing notices duplicates.
+
+**Which choice each belongs to** [guess]:
+- General: waking, the brief, the stores, dispatch and cost rows, rulings, settings.
+- Tied to the ticket as carrier: snapshots (of ticket text), the prune, every comment-based route, the notes.
+
+**What would surprise me:**
+- A data store for findings or checks.
+- Or a read view that is already built from records rather than ticket text.

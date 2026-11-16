@@ -46,6 +46,19 @@
   - The mapping stays at the level of shapes. Where anything is stored belongs to the avenues.
   - John may read the mapping before the avenues are chosen, but it isn't a gate. I'd go on unless he wants to.
 
+### 1b. What Harbour already has
+
+*Added 16 Nov after the mapping, at John's agreement (words §10).*
+
+- **Why.** John on the mapping: "The needs which aren't shapes feel close to what we already have." His agreement came with a caution: "we don't want to pull too much together or we'll inherit likely too much we don't want, and it distracts from the clean planning. But, we will likely make use of existing functionality." (words §10) [checked]
+- **What.** Each of the frame's six shapes, the mapping's seven candidates and its four needs that are not shapes. For each one:
+  - the code or store that does it today, with lines
+  - what is missing
+  - whether it belongs to the ticket-as-carrier choice or is general
+  - Lighthouse's equivalent
+- **How.** The same method as the mapping: expectations written first, and a check that every item is covered. I do it myself. It goes in `existing.md`.
+- **What it is not.** It is an inventory, not a plan to gather anything. The avenues are drawn clean first. Each then says what existing functionality it would use.
+
 ### 2. Avenues
 
 - **My view:** choose them after the mapping, since which differences matter depends on what has to be carried. The frame is fixed: one general structure with shapes declared on it, John's WordPress example (words §9). So every avenue is that, and they differ inside it.
@@ -100,11 +113,11 @@
 
 ## Where things live
 
-- **Files in this folder:** `mapping.md`, `avenues.md`, `design.md`, and `design-expectations.md`. Each expectations section is committed before its look.
+- **Files in this folder:** `mapping.md`, `existing.md`, `avenues.md`, `design.md`, and `design-expectations.md`. Each expectations section is committed before its look.
 - **Spikes** go in one dated working folder.
 - **The trace folder stays until the design is agreed,** since the mapping cites its rows. `plan.md` said it would go once the picture was agreed, and it is still on the branch [checked].
 - **What ends them.** Once John agrees the design:
-  - The mapping, the avenues, the expectations, the spikes and the traces leave the branch, as `plan.md` set for the traces. `design.md` cites the commit, and git keeps them.
+  - The mapping, the inventory, the avenues, the expectations, the spikes and the traces leave the branch, as `plan.md` set for the traces. `design.md` cites the commit, and git keeps them.
   - `design.md` stays until a build replaces it.
 - **Lighthouse's and the outside project's notes stay out of this repository,** as `plan.md` set for the pet project, unless John says otherwise.
 

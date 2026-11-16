@@ -178,6 +178,8 @@
 - His reply to the corrected design plan, and to the question of which project to use for the outside test: "Excellent. I have a few candidates for projects; Yap, Herd, Harbour OS. All on my GitHub. Harbour OS is backed by Linear."
 - On the lean (Yap into the mapping, Herd held back, Harbour OS left out): "Have a look at the private repo. This was the first project driven by Harbour, back when I copy pasted prompts by hand. It's a good, messy project. Happy to start with only Yap."
 - On the design plan as it then stood: "Great, I agree. Happy to do the mapping in this session."
+- After the mapping: "The needs which aren't shapes feel close to what we already have. How would you propose we proceed?"
+- On the proposal to look at what Harbour already has before the avenues: "Agreed, we don't want to pull too much together or we'll inherit likely too much we don't want, and it distracts from the clean planning. But, we will likely make use of existing functionality. And I agree, please proceed."
 
 ---
 
