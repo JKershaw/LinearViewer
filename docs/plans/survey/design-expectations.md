@@ -95,3 +95,19 @@
   - shelved rulings with a re-surface timer
   - 35 separate stores
 - **Caveat.** Every prediction held, which partly reflects that the traces had already cited much of this code. The expectations were less blind than §1's.
+
+## 3. Before walking the avenues through the traces
+
+*Written 16 Nov after drafting `avenues.md` §1–§3, before walking any moment. The moments are the ones `shapes.md` §4 used, plus one the mapping added: trace 3's LIN-4154, an open ticket no stage found (T3.37).*
+
+**Predictions:**
+- **A, B and D change the same moments.** D differs only where its extraction must spot something stated loosely: a departure from the plan (trace 3, the suite list) and the asks posted in prose (trace 6). I expect it to find the asks and to miss some departures.
+- **C leaves the cross-lane moments as they are today:** trace 6's unanswered asks, and Lighthouse's LH051. Branches don't see each other. C is weak on trace 3's browser checks: a file that nothing wakes.
+- **No avenue changes the near-deadlock** (trace 6) **or `AGENTS.md`'s growth** (Lighthouse).
+- **Close-out's unread edits** (trace 3) become visible in all four, but are read only if the design adds a reader after them. No avenue reads them by itself.
+- **LIN-4154** (trace 3) changes in A, B and D through an area: the next task touching that code receives it. In C it changes only if the run reads the area's files.
+- **The Lighthouse moments** change in A, B and D only if Lighthouse runs on Harbour. C is already Lighthouse's shape, so it changes them only where its checker is stricter than Lighthouse's.
+
+**What would count as an avenue failing:** a moment where it does worse than today. I predict none does. C equals today on the cross-lane moments.
+
+**What would surprise me:** a moment where all four are unchanged, other than the near-deadlock and `AGENTS.md`.
