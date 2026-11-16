@@ -163,6 +163,19 @@
 - Then: "But, exactly! Eg Wordpress and it's database allows unlimited shapes, without bloat. Computer science and the simple systems in Harbour can easily support this, with LLMs both in Harbour and running as agents as components in the system. Do you see what I'm pushing towards as a way to frame the shapes, and how we can cover all needs."
 - Then: "I actually meant more the data structure. But you're right: there's specific shapes of things holding and processing information. That describes the data layer we need, which carries the information, correctly."
 
+## 10. The design sitting (15–16 November)
+
+*Copied from this sitting's messages; not in any file, so not checked by script.*
+
+- From the opening message: "I have read shapes.md section 6. It reads fine, if lacking the details we're figuring out next." "The frame is a sketch, not a design. My outline says we build "that specific solution", and we do not have a specific solution yet. This sitting plans how we get one: mapping everything onto the frame, exploring different avenues, and verifying what the design becomes. Nothing is built into Harbour or filed."
+- On the three things the plan should cover: "Mapping. Everything the picture and the traces found, placed on the frame, with whatever does not fit listed plainly." "Avenues. More than one way the design could go, each explored far enough to learn from. Small throwaway spikes are welcome where they would teach more than paper." "Verifying. How we find out whether a design holds: the traces and Lighthouse walked through it, expectations written before looking, a reader who has not seen the design trying to break it, and a project that is not Harbour."
+- "Have a fresh reader, given only my-words.md, check the design plan for drift. Then I will read it, correct it, and agree it or not." "If I agree and the sitting is still short, begin with the mapping. Otherwise the mapping gets its own sitting."
+- "Think with me, and tell me with the line when the record disagrees with me."
+- "My three things from the last plan still hold. Look before naming. Understand before designing, with no assumed implementation: the frame is chosen, the design is not. And it has to hold for any project."
+- "I described this as "converting the communication problem into a code problem, covering every aspect". So the mapping should be complete, and I would rather see where the avenues differ than have a recommendation too early. What this step delivers is a design I have read and corrected, not a build plan."
+- "State cost in the plan and leave it out of the choosing. The pace is my call."
+- The read-back, in session wording. A design would have to show: everything found placed, as a shape, as something computed from shapes, or as outside the frame, with misfits listed; each shape stated so it can be checked (fields, writer, addressee, end, what code does at each change); each direction of travel in the picture as a path through it, and each of the picture's four causes answered; what each reader is given (each stage, Harbour's code, John, the tracker); what it replaces and what ends each new thing; and that it holds when the traces and Lighthouse are replayed on it, under a reader trying to break it, and on a project that isn't Harbour. The read-back also named things with no shape yet (the notes' Lessons, standing text, rules in code comments, the sealed ask) and the near-deadlock, which no shape changes. John: "Yes, exactly right. Please proceed."
+
 ---
 
 ## The check

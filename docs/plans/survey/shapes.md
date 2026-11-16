@@ -162,7 +162,7 @@ B helps Lighthouse only if it runs on Harbour again.
 
 ## 6. John's choice: a data layer that carries the information
 
-*Recorded 15 Nov from this sitting's messages (words §9). John has not yet read this section.*
+*Recorded 15 Nov from this sitting's messages (words §9). John read it the same evening (words §10).*
 
 **His words:**
 - "my mental model was simply converting the communication problem into a code problem, covering every aspect."
@@ -193,4 +193,4 @@ Summaries and counts are drawn from the records rather than retold. A new need a
 - **Declared shapes with checked fields.** Untyped extra fields sprawl. This is John's "so they get checks" (log:3966), and what Harbour's tidies keep reaching for: "each collection declared once with all its facts" (`broad-options.md:21`).
 - **No shape without its end and its addressee.** WordPress keeps every revision by default (from memory, not checked here), which is the same pile with no end. "If a thing's end is written when it is made, nothing has to be hunted down later" (`nothing-fights-its-shape.md:109`).
 
-**Next:** the first slice, in `build-plan.md`.
+**Next:** John read this section on 15 Nov: "It reads fine, if lacking the details we're figuring out next." and "The frame is a sketch, not a design." (words §10). So a design comes before any first slice, under `design-plan.md`.
