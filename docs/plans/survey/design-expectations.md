@@ -30,3 +30,18 @@
 **What would surprise me:**
 - Many rows that don't fit for reasons other than the ones above.
 - Or the five shapes taking nearly everything cleanly. That would suggest stretching, not fit.
+
+### Results, marked 16 Nov after the mapping (`mapping.md` §11 has the counts)
+
+- **What I expected to fit: partly held.**
+  - Stage outputs and retellings are the largest group: `finding` 74, `computed` 36 and `plan` 28 of 372 parts. That is 37% of parts, not "well over half".
+  - Many stage outputs landed as judgements, not `finding`s. I predicted that only as a stretch (item 7).
+- **The thirteen predicted misfits: all held.** Three held with a twist:
+  - **Item 3.** Rules in code comments grouped with the Lessons (lasting truths), not with standing text.
+  - **Item 5.** The near-deadlock was not alone. Three more engine items joined it: a review on a parent with no PR, surveys skipped, and an answer waking a finished session.
+  - **Item 7.** Judgements are the largest waiting group, at 27 parts, not a small stretch.
+- **"The shape list grows by two or three": broke.** Seven candidate groups emerged: task, verdict, lesson, setting, run record, measure, area.
+- **"Fewer than a tenth of the rows land outside the frame": held, with a caveat.** 11 of 220 rows (5%) are wholly outside. But 43 (20%) touch outside somewhere, mostly through the work product.
+- **The surprises:**
+  - **Rows that don't fit for other reasons: partly.** Three groups were not predicted: measured values (8 parts), the place (3 parts, but every "for the area's future" finding needs it), and run records as a group of their own.
+  - **The shapes taking nearly everything cleanly: did not happen.** 83 of 220 rows fit cleanly in every part.
