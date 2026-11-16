@@ -82,8 +82,14 @@
   - Every break is answered in the design or listed as open.
 - **A project that isn't Harbour.** John offered "a project, set up with Harbour" as a test case (words §8, §9). His candidates are Yap, Herd and Harbour OS, "All on my GitHub. Harbour OS is backed by Linear." (words §10) [checked]. A first look:
   - **They hold their work three ways.** Harbour OS uses Linear, as Harbour does. Herd's one feature branch is named for issue #20, so its work is likely GitHub issues [my reading]. Yap keeps an ordered `todo.md` ("Each item unblocks the next"), a small version of Lighthouse's file-kept work [checked].
-  - **None mentions Harbour in its code** [checked: Yap 52 files, Herd 20]. Harbour OS is the closest kin: Harbour dispatches sessions into it (`lib/harbour-spawn.js`) [checked]. Its public repository holds only an initial commit, and the working one is private and unread.
-  - **My lean** [my reading]: Yap's task goes into the mapping, because it has no tracker, a case the plan would otherwise only walk on paper. Herd's task is held back, because it is furthest from Harbour. Harbour OS teaches least about "any project", since it is on Linear and kin to Harbour. Which project goes where is John's choice.
+  - **Neither Yap nor Herd mentions Harbour in its code** [checked: Yap 52 files, Herd 20].
+  - **Harbour OS is `JKershaw/harbour-cat`.** The private `JKershaw/harbour-os` is a two-day npx-runner prototype from March (33 files) [checked]. John: "the first project driven by Harbour, back when I copy pasted prompts by hand. It's a good, messy project." (words §10). What I checked in `harbour-cat`:
+    - 970 files, and 117 Markdown files holding about 1 MB. Its `harbour-os/CLAUDE.md` alone is 36 KB.
+    - It cites 357 distinct `HAR-` tickets, which is its Linear.
+    - The last commit is 3 Jul 2026. 38 commits are by "Harbour User".
+    - Its own `CLAUDE.md` warns of two `docs/` trees and that "some prose docs still lag".
+    - It is kin to Harbour: Harbour dispatches sessions into it (`lib/harbour-spawn.js`).
+  - **Agreed order** (words §10): start with only Yap. Its task goes into the mapping. The held-back test project is chosen later, from Herd and Harbour OS. Harbour OS's finished tasks predate the closing pieces, so like Lighthouse it could be traced as it stands, or given a fresh task [my reading].
   - Two fresh small tasks run through Harbour as it is today. They need no design, so both can run early.
   - A reader who has seen neither the picture nor the design traces each one the way the six were traced.
   - The first trace goes into the mapping.
