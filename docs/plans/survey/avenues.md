@@ -297,4 +297,64 @@ Each moment is from its trace [checked by its reader]. Each cell says whether th
 
 ## 5. Spikes
 
-SPIKES_PLACEHOLDER
+### Spike 1: agents writing shapes, A against D
+
+*Run 16 Nov on Yap at `14f7e92`, item 18 (a CLI client). Expectations were committed first (`design-expectations.md` §4, `7459bf7`). The raw outputs are in the session scratchpad, as notes on an outside project. The shapes given were `avenues.md` §1's, cut to those a survey writes. Counts are [checked: by script over the outputs]; the readings are [my reading].*
+
+**What ran:**
+- **Arm A.** A fresh agent surveyed the task and wrote only records.
+- **Arm D.** A fresh agent surveyed it in prose: 141 lines, 17 KB. A second agent, given only that prose and the shapes, extracted the records.
+
+**What came out:**
+
+| | Arm A: the writer writes records | Arm D: a model extracts them from prose |
+|---|---|---|
+| Records | 44 (40 KB) | 71 (32 KB), more of them near-duplicates from splitting compound points |
+| `finding` | 19: build 13, scoping 2, review 1, two areas, one other task | 35: build 29, person 3, scoping 1, review 1, one area |
+| Addressees | Chosen by the writer | Inferred by the extractor in 34 of 71 records ("the survey almost never says who should act") |
+| `question` | 12: product 5, engineering 4, person-only 2, scope-cut 1 | 21: product 18, engineering 2, person-only 1 |
+| "If unanswered" | Stated by the writer: "requiring … `if_unanswered` made me say who acts and what happens by default" | "Not stated by the survey" in 17 of 21 |
+| `check` | 3: the hosted proxy's timeouts, installed Node versions, real terminals | 0: the prose mentions the hosting only in passing |
+| `lesson` | 5 | 10, eight of them the web UI's conventions |
+| Unplaced | 2: a priority ranking; things it could not verify | 1: the survey's provenance (its commit, which claims were run) |
+| Points lost | — | None found. Spot-checks of three points only the prose had all found them |
+
+**What it teaches:**
+- **Who writes the record matters most for addressees and deciders.** Prose rarely says who must act, or who decides. So D's extractor guessed addressees for half its records, and labelled 18 of 21 questions "product", which would route them all to John. On the frame, the addressee and the decider are what code acts on. So in D the extractor's guesses would decide where work goes.
+- **Writing in shapes sharpened the writing.** Arm A said that requiring an addressee and a default "made each record sharper". It also wrote three real checks for the owner, which the prose never named as such.
+- **Shapes absorbed more than I expected.** "How the code works today" became lessons in both arms, not unplaced background.
+- **Content is not lost by extraction.** Every point checked survived. D's risk is misrouting, not forgetting.
+- **Limits.**
+  - One run per arm. Arm A's and arm D's surveys each found a few points the other did not, which with one run cannot be put down to how they wrote.
+  - All three agents are one model family.
+  - The task is small and needs no out-of-reach systems.
+
+**What it adds to the catalogue** [my reading, from what the arms could not place]:
+- **An evidence field on every hand-off,** marking whether the point was run or only read. Both arms reached for it: one used `why`, the other left provenance unplaced.
+- **A "relates to" link beside "same as".** One subject (the package not running when installed) needed four records for four readers, and without links it reads as repetition.
+- **An `about` that can name the plan piece or task** where code does not exist yet.
+- **A priority across records, and an "unverified" state.** These are noted, not yet traced to a Harbour row.
+
+### Spike 2: replay, not run
+
+The replay (`design-plan.md` §2) would load one trace's pieces into each avenue's structure and ask it the questions the sessions had to rebuild. It has not run. The walkthrough above answered those questions on paper for 14 moments. What the replay would add is a measure of how much smaller each reader's starting text becomes. It can run in the next sitting if John wants that number before choosing.
+
+## 6. Where this stands
+
+- **Done in this step:**
+  - the catalogue (§1)
+  - four avenues (§2), compared on every axis, direction, cause, reader, kind of project and misfit (§3)
+  - walked through 14 moments (§4)
+  - one spike (§5)
+  - expectations committed before each look, and marked after (`design-expectations.md` §3–§4)
+- **For John:**
+  - the four catalogue choices (§1)
+  - which avenue, or which combination, or back to the avenues (`design-plan.md` §2)
+
+  The table in §3 is the side by side. It holds no recommendation. If John wants my reading, it comes after he has read the table.
+- **Then, under the plan:**
+  - Yap's Harbour-run task goes into the mapping.
+  - The chosen design is written in full and walked through every trace row.
+  - Two break readers attack it.
+  - The held-back project (Herd or Harbour OS) tests it.
+  - A drift check against John's words, then John corrects it.

@@ -142,3 +142,20 @@ The raw outputs stay in the session scratchpad, as notes on an outside project. 
 **What would surprise me:**
 - Arm A losing substantive points that D's prose has.
 - Or the extraction keeping every point with the right addressee.
+
+### Results, marked 16 Nov after the spike (`avenues.md` §5)
+
+- **Arm A fills the required fields: held.** All 44 records pass the field check.
+- **Arm A is weakest at addressees beyond the task: broke.** It addressed two areas and another task unprompted.
+- **Arm A writes fewer records: held.** 44 against D's 71.
+- **The extraction catches most points: held.** None of those I checked was lost.
+- **The extraction misaddresses at least one: held, more strongly than predicted.**
+  - It inferred addressees in 34 of 71 records.
+  - It labelled 18 of 21 questions "product".
+  - It found no default stated for 17 of 21 questions.
+- **The extraction merges repeats: held.** It also split compound points into near-duplicates.
+- **Both leave background unplaced: broke.** Background became lessons in both arms. What went unplaced was priority, uncertainty and provenance.
+- **Neither writes a check: broke for arm A,** which wrote three real checks. Arm D's prose named none.
+- **The surprises:**
+  - **Arm A losing points the prose had: partly.** Each arm had a few points the other lacked, and one run cannot say why.
+  - **The extraction keeping every point with the right addressee: did not happen.**
