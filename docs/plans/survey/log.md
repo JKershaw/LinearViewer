@@ -4230,3 +4230,25 @@ John: "Yes, but chances are a human like me will control Harbour via an agent li
 - **Where the notes are, for a fresh session:** this folder, `docs/plans/survey/`, on the branch `claude/cool-rubin-6acj5j`. Main's copy of the log stops at 5 Nov. The working files of 14 and 15 Nov are kept in `working-2026-11-15/` (readings, reviews, the first course's readings, the system map's scripts); the one file listing open safety findings in detail was left out. I have seen nothing written before 2 Nov.
 - **His next question:** what high-level method pulls all of this together without losing key information. My answer: keep his words as the source and never overwrite them; extract quotes with their sources before summarising anything; read in date order in parts, each part by a fresh reader producing the same small thing; assemble one short page in which every line points back to its source; have a fresh reader check that page against his words, and have him correct it; keep the page small by changing it, not appending to it; one thread at a time.
 - **A kickoff prompt for the next session**, drafted at John's request, is in `kickoff-next-session.md`. It is written in his voice for him to edit and send. It asks for one sitting that ends in two small files beside this log: `my-words.md` (his exact quotes with dates and sources) and `situation.md` (one page, every line sourced and marked as checked, reported, interpretation or guess), checked by a fresh reader against his words and then corrected by him.
+
+## 16 Nov — This session becomes the driver
+
+John: "I'd suggest we compact this session and it becomes a sort of driver for the other work. It let's you focus on the heart, and I'll facilitate and discuss." The model is back to Opus.
+
+**The role.** Short working sittings do the work, each started from a kickoff John sends and ending in files on their own branch. This session holds the whole: it reads what each sitting leaves, keeps the thread to John's outline, drafts the next kickoff with him, and says plainly when a step jumps ahead. It does not run the work itself.
+
+**Where the work now lives.** Branch `claude/peaceful-euler-thz7ct` (last read at `fff543172`), folder `docs/plans/survey/`. That branch is ahead of this one; read it there, do not copy it here. Its files, in the order they were made:
+- `situation.md`: the one-page situation, every line sourced and marked.
+- `my-words.md`: John's words with sources; sections 7 to 9 are from the 15 Nov sittings.
+- `plan.md`: the agreed plan for finding the leak. Delivered.
+- `picture.md`: where information lives, how it moves, why it leaks, six needs. Read by John with no corrections.
+- `shapes.md`: three shapes, then John's frame in §6: a data layer that carries the information, declared shapes on one general structure. John: "It reads fine, if lacking the details we're figuring out next."
+- `design-plan.md`: the agreed plan for getting from the frame to a design: map, explore avenues, verify.
+- `avenues.md`: one catalogue of 11 shapes and four avenues (A records in Harbour by checked calls; B an event log; C checked files in the repo; D prose turned into records by a model), walked through 14 moments, and a spike on Yap. No recommendation.
+- `design-expectations.md`: predictions committed before each look.
+
+**Where John's outline stands.** "We find where then loop is leaking, understand deeply why, and what it needs, then build that specific solution in a simple form. Once the engine doesn't leak, we try it on a bunch of smaller projects." Finding, why and needs are done. The specific solution is being designed: avenues are drafted and verified in part, and the choice is John's. Building comes only after a design he has read and corrected, under a plan of its own.
+
+**Waiting on John:** the four catalogue choices and the avenue in `avenues.md`; arranging Yap's real task through Harbour; and, outside this work, the seven safety findings and LIN-4416, LIN-4210, the paused lanes.
+
+**What I got wrong as driver on 15 Nov, so as not to repeat it:** I drafted a kickoff for "the first slice" because the last sitting's closing line said so. John: "This feels like jumping too far ahead? Surely mapping it all out and verifying what the design becomes is next". Check each next step against his outline and the agreed plan, not against the last sitting's suggestion.
