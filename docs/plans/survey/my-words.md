@@ -180,6 +180,7 @@
 - On the design plan as it then stood: "Great, I agree. Happy to do the mapping in this session."
 - After the mapping: "The needs which aren't shapes feel close to what we already have. How would you propose we proceed?"
 - On the proposal to look at what Harbour already has before the avenues: "Agreed, we don't want to pull too much together or we'll inherit likely too much we don't want, and it distracts from the clean planning. But, we will likely make use of existing functionality. And I agree, please proceed."
+- After the inventory (`existing.md`): "Fantastic, please proceed until you think a fresh session is warranted."
 
 ---
 
