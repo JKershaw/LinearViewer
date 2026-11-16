@@ -122,3 +122,23 @@
 - **The Lighthouse moments: held.**
 - **Not predicted.** Trace 3a, the correction never sent upward, changes only partly in every avenue. The frame does not force the plan's next version; that needs a rule.
 - **No avenue does worse than today: held.**
+
+## 4. Before the spike: agents writing shapes
+
+*Written 16 Nov, before any spike run.*
+
+**The spike.** It tests the axis that separates avenue A from avenue D: who writes the record. It runs on an outside project: Yap, at `14f7e92`, with its open item 18, a CLI client.
+- **Arm A.** A fresh agent surveys the task and writes only records, in the catalogue's shapes (`avenues.md` §1).
+- **Arm D.** A fresh agent surveys the same task in prose. A second agent, given only that prose and the same shapes, extracts the records.
+
+The raw outputs stay in the session scratchpad, as notes on an outside project. A summary goes in `avenues.md` §5.
+
+**Predictions:**
+- **Arm A** fills the required fields for nearly every record. It is weakest at addressees beyond the task, such as an area or "the person", and at `about` links. It writes fewer, more decisive records than D's prose holds.
+- **Arm D's extraction** catches most actionable points. It misses or misaddresses at least one hand-off, and merges points the prose repeats.
+- **Both** leave some content unplaced. The likeliest is the survey's description of how the code works today: background the next stage reads, but which is neither a finding nor clearly a lesson. That would be a gap in the catalogue.
+- **Neither arm** writes a `check`. A CLI client on a local server needs nothing out of reach.
+
+**What would surprise me:**
+- Arm A losing substantive points that D's prose has.
+- Or the extraction keeping every point with the right addressee.
