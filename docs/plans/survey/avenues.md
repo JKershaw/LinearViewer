@@ -255,7 +255,45 @@ C changes the tracker's single account in one respect: the writer of a file is g
 
 *Expectations first, in `design-expectations.md` §3, committed before this section was written.*
 
-WALKTHROUGH_PLACEHOLDER
+Each moment is from its trace [checked by its reader]. Each cell says whether the avenue changes what happened, and why [my reading].
+
+### Trace 3: LIN-4472, a lane piece
+
+| Moment | A | B | C | D |
+|---|---|---|---|---|
+| **a.** The brief's suite list and name search were wrong. Both surveys said so; the parent's plan was never corrected | **Partly.** The surveys' findings point at the plan piece. But the frame does not make the build write the plan's next version: that needs a rule that a finding about a plan piece cannot close as "built differently" without a new version. Without it, this rests on the agent, as today | **Partly**, for the same reason | **Partly.** The same, though review sees whether the plan file changed in the diff | **Partly, and weaker.** The extraction must also recognise "built five suites" as a departure |
+| **b.** Scoping asked John. The autopilot settled it 26 s later, the build went ahead, and John's answer came after, on another ticket. Four accounts | **Changes.** One question, with one decider from the setting for its kind. A second decider is refused. John's answer attaches to the question wherever he gives it | **Changes**, as A, by events | **Partly.** The checker catches two answers to one question, but only at the next CI run, after the build went ahead | **Partly.** The extracted records refuse the autopilot's call, but its comment still stands in prose, and a stage reading the ticket would act on it |
+| **c.** The Safari and Firefox checks were carried as "not run" through nine comments | **Changes.** One check on John's page, re-surfacing. The parent reads its state | **Changes**, as A | **Partly.** A file John sees only once it is merged and rendered | **Changes.** "What CI did not prove" is a clear heading to extract from |
+| **d.** Close-out's edits after approval went unread; the PR body went stale | **Partly.** The edits are visible to a reader of the task's records, but nobody reads after close-out unless the design adds a reader. A PR body rendered from records stays current | **Partly**, as A | **Partly.** In the diff, but still with no reader after close-out | **Partly**, as A |
+| **e.** LIN-4154, open in Backlog and largely settled by this work, was found by no stage (added from the mapping, T3.37) | **Changes, if** an area also surfaces open tasks about its paths, not only findings. The build touched those paths | **Changes, with the same if** | **Changes, if** the run's view includes the area's files | **Changes, as A** |
+
+### Trace 6: LIN-4448, a lane's parent
+
+| Moment | A | B | C | D |
+|---|---|---|---|---|
+| **a.** Three asks from LIN-4458 and LIN-4459 got no reply; that lane went ahead on silence | **Changes.** Each is a question whose decider is this lane. It sits open in the brief of the lane's autopilot, which was waking all night (67 wakes). The asking lane sees "open", not consent | **Changes**, as A | **Unchanged.** The asks sit on another lane's branch until it merges | **Changes.** "Please reply on LIN-4447" and "tell me on LIN-4458" are plain enough to extract |
+| **b.** Questions sat in rulings and answers on the parent. One was asked on the parent and answered on a child. A withdrawn ruling left a false line | **Changes.** Each question is anchored to its task. A withdrawal changes its state, and anything citing it is a link that shows the state | **Changes**, as A | **Changes, more slowly.** John's answers reach the files by commit | **Partly.** The records change, but the false line stays in the child's comment |
+| **c.** The Waiting count was copied as 26, 25, 23, 22 and 12 | **Changes.** Counted from open records, never copied | **Changes**, as A | **Changes.** Counted by the script | **Partly.** Counted, but agents still write counts in their prose |
+| **d.** The prune removed the plan that seven children point to | **Changes.** No prune | **Changes** | **Changes** | **Changes** |
+| **e.** The close nearly deadlocked on a stale review and a parked close-out | **Unchanged.** A verdict that goes stale when its subject moves leaves close-out still needing a new review, and the engine still refuses one while close-out is parked | **Unchanged** | **Unchanged** | **Unchanged** |
+
+### Lighthouse: no tickets, one agent per run
+
+| Moment | A | B | C | D |
+|---|---|---|---|---|
+| **a.** `proposals.md` grew to 91 KB, and nothing in it was declined | **Changes, if** Lighthouse runs on Harbour. Each proposal is a question to the keeper, re-surfacing until it ends | **The same** | **Partly.** The checker shows how many are open, but nothing brings them back to the keeper | **The same as A** |
+| **b.** One unreviewed observation was copied to six places in 20 minutes, and onto the public site | **Changes the copying, if** on Harbour: one record, linked. Publishing only what has passed a verdict is a further rule, not in the frame | **The same** | **Changes the copying:** one file, linked, and the site already builds from files. The same further rule is needed | **Partly.** The prose copies stay |
+| **c.** Two overlapping sessions both took LH051 | **Changes, if** on Harbour: ids allocated by the structure, and a second claim refused | **The same** | **Partly.** If ids come from a counter file, the clash shows as a merge conflict. Otherwise unchanged | **The same as A** |
+| **d.** `AGENTS.md` grew from 12 to 33 KB and contradicts itself | **Partly.** The choices in it that are settings ("claim everything due, soonest first", "sonnet for research") move out. The rest is unchanged | **The same** | **Partly**, if its settings move to a settings file | **The same as A** |
+
+### What the walkthrough adds
+
+- **The frame does not by itself send a correction upward** (trace 3a). Every avenue needs one more rule, in code: a finding about a plan piece cannot close as "built differently" without the plan's next version. This is a design rule, not a shape.
+- **D differs from A wherever prose stays readable** (3b, 6b, 6c, Lighthouse b). Stages and people can still act on the prose, so the records do not replace it at the source.
+- **C's weakness is all on one side.** It loses wherever information must move before a merge: 3b, 3c, 6a, Lighthouse c.
+- **The area needs to surface open tasks about its paths, not only findings** (3e).
+- **Two moments need rules beyond the frame in every avenue:** a reader after close-out (3d), and publishing only what has passed a verdict (Lighthouse b).
+- **No avenue does worse than today at any moment** [my reading].
 
 ## 5. Spikes
 

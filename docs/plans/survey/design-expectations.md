@@ -111,3 +111,14 @@
 **What would count as an avenue failing:** a moment where it does worse than today. I predict none does. C equals today on the cross-lane moments.
 
 **What would surprise me:** a moment where all four are unchanged, other than the near-deadlock and `AGENTS.md`.
+
+### Results, marked 16 Nov after the walkthrough (`avenues.md` §4)
+
+- **"A, B and D change the same moments": partly broke.** D is only partial wherever prose stays readable: 3b, 6b, 6c and Lighthouse b. Its asks (6a) and checks (3c) did extract as expected.
+- **"C leaves the cross-lane moments as they are": held** (6a). LH051 is partial if ids come from a counter file. C was weak on the browser checks, as expected.
+- **The near-deadlock unchanged: held. `AGENTS.md` unchanged: broke slightly.** Its settings would move out in every avenue.
+- **Close-out's unread edits: held.** They are visible, but nobody reads them unless a reader is added.
+- **LIN-4154: held**, with one condition found: the area must surface open tasks about its paths, not only findings.
+- **The Lighthouse moments: held.**
+- **Not predicted.** Trace 3a, the correction never sent upward, changes only partly in every avenue. The frame does not force the plan's next version; that needs a rule.
+- **No avenue does worse than today: held.**
