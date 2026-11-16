@@ -79,3 +79,19 @@
 **What would surprise me:**
 - A data store for findings or checks.
 - Or a read view that is already built from records rather than ticket text.
+
+### Results, marked 16 Nov after the inventory (`existing.md`)
+
+- **Data that code acts on: held.** Dispatch rows, cost rows, rulings, local issues, settings and model routing, `areas.json`, snapshots of ticket text. One correction: besides loop-keyed rulings, there is a task-keyed store for decisions a scan finds (`lib/task-decisions-store.js`).
+- **Prose only: held.** `plan`, `finding`, `check`, `ask`, lesson. The verdict is read from comment prose by a declared classifier and regexes, not stored.
+- **The four needs: held.** Waking and the read view are general mechanisms. Need 5 is a list of paths in a prompt. Nothing notices duplicates.
+- **Which choice each belongs to: held,** with the refinement in `existing.md`: most mechanisms are general, and only their input is the ticket.
+- **The surprises: neither happened outright.**
+  - There is no store for findings or checks. But the run proposal (Apply / Decline, no expiry) is the same pattern, used for one case.
+  - No read view is built from records. But the brief already aims to be the current plan plus its changelog, rebuilt from ticket text.
+- **Not predicted at all:**
+  - the comment classifier, which declares kinds over prose
+  - the local store's one collection of several kinds
+  - shelved rulings with a re-surface timer
+  - 35 separate stores
+- **Caveat.** Every prediction held, which partly reflects that the traces had already cited much of this code. The expectations were less blind than §1's.
