@@ -1,6 +1,6 @@
 # Plan: from the frame to a design
 
-*Drafted 16 Nov. Not yet agreed. It plans the step between the frame (`shapes.md` §6) and any build. Marks are as on `situation.md`; lines with no mark are proposals. `words §n` is a section of `my-words.md`.*
+*Drafted 16 Nov and agreed by John the same day: "Great, I agree. Happy to do the mapping in this session." (words §10). It plans the step between the frame (`shapes.md` §6) and any build. Marks are as on `situation.md`; lines with no mark are proposals. `words §n` is a section of `my-words.md`.*
 
 *A fresh reader, given only `my-words.md`, checked the first draft for drift. It found twelve points and five omissions, and this version carries the corrections, with two exceptions. The disc:484 caution stays, reworded, because John agreed it in the read-back. The open questions for the avenues stay too, now as the gaps that read-back named, with their options marked as examples.*
 
