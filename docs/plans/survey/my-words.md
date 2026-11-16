@@ -175,6 +175,7 @@
 - "I described this as "converting the communication problem into a code problem, covering every aspect". So the mapping should be complete, and I would rather see where the avenues differ than have a recommendation too early. What this step delivers is a design I have read and corrected, not a build plan."
 - "State cost in the plan and leave it out of the choosing. The pace is my call."
 - The read-back, in session wording. A design would have to show: everything found placed, as a shape, as something computed from shapes, or as outside the frame, with misfits listed; each shape stated so it can be checked (fields, writer, addressee, end, what code does at each change); each direction of travel in the picture as a path through it, and each of the picture's four causes answered; what each reader is given (each stage, Harbour's code, John, the tracker); what it replaces and what ends each new thing; and that it holds when the traces and Lighthouse are replayed on it, under a reader trying to break it, and on a project that isn't Harbour. The read-back also named things with no shape yet (the notes' Lessons, standing text, rules in code comments, the sealed ask) and the near-deadlock, which no shape changes. John: "Yes, exactly right. Please proceed."
+- His reply to the corrected design plan, and to the question of which project to use for the outside test: "Excellent. I have a few candidates for projects; Yap, Herd, Harbour OS. All on my GitHub. Harbour OS is backed by Linear."
 
 ---
 

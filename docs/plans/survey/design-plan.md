@@ -80,7 +80,10 @@
   - One attacks from the evidence: a piece with no home, a record with no end, a pile or a load that still grows, two components that can disagree, anything worse than today. Each break comes with its trace row.
   - One attacks from generality: a solo project, a team, no git, no tracker, a different tracker.
   - Every break is answered in the design or listed as open.
-- **A project that isn't Harbour.** John offered "a project, set up with Harbour" as a test case (words §8, §9) [checked]. Which project, and whether it is Lighthouse, is his to say. A project outside Harbour's lineage would test more.
+- **A project that isn't Harbour.** John offered "a project, set up with Harbour" as a test case (words §8, §9). His candidates are Yap, Herd and Harbour OS, "All on my GitHub. Harbour OS is backed by Linear." (words §10) [checked]. A first look:
+  - **They hold their work three ways.** Harbour OS uses Linear, as Harbour does. Herd's one feature branch is named for issue #20, so its work is likely GitHub issues [my reading]. Yap keeps an ordered `todo.md` ("Each item unblocks the next"), a small version of Lighthouse's file-kept work [checked].
+  - **None mentions Harbour in its code** [checked: Yap 52 files, Herd 20]. Harbour OS is the closest kin: Harbour dispatches sessions into it (`lib/harbour-spawn.js`) [checked]. Its public repository holds only an initial commit, and the working one is private and unread.
+  - **My lean** [my reading]: Yap's task goes into the mapping, because it has no tracker, a case the plan would otherwise only walk on paper. Herd's task is held back, because it is furthest from Harbour. Harbour OS teaches least about "any project", since it is on Linear and kin to Harbour. Which project goes where is John's choice.
   - Two fresh small tasks run through Harbour as it is today. They need no design, so both can run early.
   - A reader who has seen neither the picture nor the design traces each one the way the six were traced.
   - The first trace goes into the mapping.
