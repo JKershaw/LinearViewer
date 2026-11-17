@@ -1,0 +1,290 @@
+{
+ "next": 17,
+ "records": {
+  "area-1": [
+   {
+    "id": "area-1",
+    "kind": "area",
+    "state": "kept",
+    "fields": {
+     "name": "Front end: browser code",
+     "paths": [
+      "public/"
+     ]
+    },
+    "links": {},
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-08T02:29:09.000Z",
+    "by": "Harbour"
+   }
+  ],
+  "lesson-2": [
+   {
+    "id": "lesson-2",
+    "kind": "lesson",
+    "state": "holds",
+    "fields": {
+     "says": "A page script's second request keeps the poll's discipline: coalesce every reason into one fetch per window, and stop when the poll stops (hidden tab, 401, revoked link). `createTimelineRefresher` (`public/task-page.js`, LIN-4405) is the pattern; a running chip changes the poll's track about once a minute, so \"fetch when it changes\" alone repeats. Done reads once more first (`finish`): the poll that says done carries the last change, and stopping drops it.",
+     "paths": [
+      "public/task-page.js"
+     ],
+     "checked-at": "c205190fd"
+    },
+    "links": {},
+    "in": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-10T12:19:38.000Z",
+    "by": "Harbour"
+   }
+  ],
+  "lesson-3": [
+   {
+    "id": "lesson-3",
+    "kind": "lesson",
+    "state": "holds",
+    "fields": {
+     "says": "Task-page CSS is phone-first at `min-width: 600px` (only the listed breakpoints pass `tests/unit/ui-authorities.test.js`), with `--font-size-*` tokens and no new mono selector (`tests/unit/lin-4107-type-sizes.test.js`).",
+     "paths": [
+      "tests/unit/ui-authorities.test.js",
+      "tests/unit/lin-4107-type-sizes.test.js"
+     ],
+     "checked-at": "c205190fd"
+    },
+    "links": {},
+    "in": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-10T11:56:03.000Z",
+    "by": "Harbour"
+   }
+  ],
+  "lesson-4": [
+   {
+    "id": "lesson-4",
+    "kind": "lesson",
+    "state": "holds",
+    "fields": {
+     "says": "The no-build-step rule (`CLAUDE.md`) allows browser sharing, not only forbids it (LIN-4446). The browser may import natively, and the restated copies came from reading the rule as \"no sharing\" (`docs/papers/harbour/the-second-copy.md` §9–10). Limits: a shared module is a leaf (it imports nothing and names no browser or Node global, as `tests/unit/shared-modules.test.js` checks), served only through the explicit `SHARED_MODULES` allow-list in `lib/vendor-assets.js`, never by directory. Views and the `vm` test loaders stay classic until a module-capable client test loader exists. A consumer reads a shared global only from a handler or a callback that runs after DOMContentLoaded, never during script execution: Chart.js calls scale tick callbacks synchronously, which is why `public/workspace-kpis.js` builds on DOMContentLoaded. A slice retires the restated copy and its parity check in the same change, not later.",
+     "paths": [
+      "CLAUDE.md",
+      "docs/papers/harbour/the-second-copy.md",
+      "tests/unit/shared-modules.test.js",
+      "lib/vendor-assets.js",
+      "public/workspace-kpis.js"
+     ],
+     "checked-at": "c205190fd"
+    },
+    "links": {},
+    "in": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:22:55.000Z",
+    "by": "Harbour"
+   }
+  ],
+  "lesson-5": [
+   {
+    "id": "lesson-5",
+    "kind": "lesson",
+    "state": "holds",
+    "fields": {
+     "says": "A `{ module }` entry's place in a renderer's script list means nothing: a module runs after every classic script, wherever it is listed. A consumer is safe because of when it reads the global, not where the shim sits. To test that order in a `vm` seam, set `document.readyState = 'loading'` before the script runs and install the global after it; a seam with no `readyState` (`tests/unit/flight-companion-client.test.js`) starts the page at load, unlike the browser.",
+     "paths": [
+      "tests/unit/flight-companion-client.test.js"
+     ],
+     "checked-at": "c205190fd"
+    },
+    "links": {},
+    "in": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:22:55.000Z",
+    "by": "Harbour"
+   }
+  ],
+  "finding-6": [
+   {
+    "id": "finding-6",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`public/app.js`: Home's Running and Up next are refreshed by parsing a whole page with `DOMParser` (LIN-4243). Waiting on you is drawn as a server fragment by the page's own function (LIN-4242); doing the same for the other sections would mean the client never parses a whole page. (Survey tally: LIN-4243.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-08T02:29:09.000Z",
+    "by": "Harbour"
+   }
+  ],
+  "finding-7": [
+   {
+    "id": "finding-7",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`public/common.js`: `buildDispatchModelOptionDescriptors` repeats the merge rule of `buildModelOptions` (`lib/openrouter-catalog.js`). That module is not a leaf (it imports `lib/catalog-rate.js`), so it cannot be served as one shared file (LIN-4446). The lists are not copied (they come from `window.__HARNESS_MODELS__` and the catalog over the wire); only the rule is. The endpoint could send merged options instead. (LIN-4358.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:22:55.000Z",
+    "by": "Harbour"
+   }
+  ],
+  "finding-8": [
+   {
+    "id": "finding-8",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`public/brief.js`: its `postBrief`/`errorText` block is identical to `postRecap`/`errorText` in `public/recap.js`, and the check for a `statusCode` inside a keepalive 200 body is now written four times (also `public/scan.js` and `public/observation.js`). One shared reader in `public/common.js`. (Area reads CG/CH, 8 Nov, on LIN-4358.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-08T12:57:59.000Z",
+    "by": "Harbour"
+   }
+  ],
+  "finding-9": [
+   {
+    "id": "finding-9",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`public/common.js`: exported globals, and the \"client twins\" of `lib/task-page-href.js`, `lib/timeline-zoom.js`, `lib/ship-layout.js` and `lib/prompt-formatters.js`. The first two are leaves of the same shape as cost-format, the next candidates; the last two import other modules, so serving a single file will not do for them. Its `TERMINAL_TYPES` mirror of `lib/providers/models.js` (no imports) is another leaf candidate; its comment still says `public/` cannot import it. (LIN-4446 plan and leftovers.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:22:55.000Z",
+    "by": "Harbour"
+   }
+  ],
+  "finding-10": [
+   {
+    "id": "finding-10",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`public/cost-format-global.js`: the module-to-global bridge is specific to one module. `tests/unit/shared-modules.test.js` hard-codes the shim, the `'window.CostFormat'` string and the four consumers, and the DOMContentLoaded-only rule is restated in four files and witnessed per consumer, but no check covers a new consumer: a fifth trips only the hard-coded list, with no hint of the timing rule. A second shared module needs a second shim and guard. Needs a design call first: one shim per module, a general shim, or consumers that are modules. (LIN-4446 blind read.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:22:55.000Z",
+    "by": "Harbour"
+   }
+  ],
+  "finding-11": [
+   {
+    "id": "finding-11",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`public/ship.js` / `public/ship-biscuit.js`: still hand-synced copies (\"mirror of lib/ship-layout.js\", \"kept in lockstep with lib/render-ship-biscuit.js\"). Each lib side would first have to become an import-free leaf before it could join `SHARED_MODULES`. (LIN-4446 blind read.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:22:55.000Z",
+    "by": "Harbour"
+   }
+  ],
+  "finding-12": [
+   {
+    "id": "finding-12",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`public/prompt-section.js`: the browser files reach their suites through `tests/unit/helpers/client-world.js`, which loads them as classic scripts through `vm`. A module-capable client test loader is needed before any view becomes a module, since `lib/components/page.js` emits classic tags. (LIN-4446.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:22:55.000Z",
+    "by": "Harbour"
+   }
+  ],
+  "finding-13": [
+   {
+    "id": "finding-13",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`public/observation.js`: about 5,000 lines. By the counting method of LIN-4446 (lines starting with `*`, `//` or `/*`) 1,985 of its 4,679 non-blank lines are comments. Find out why it is this large before splitting it. An earlier survey used a different method, so its figure is not comparable. (LIN-4446 plan.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:22:55.000Z",
+    "by": "Harbour"
+   }
+  ],
+  "finding-14": [
+   {
+    "id": "finding-14",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`public/llms.txt`: its H11 names the unscoped `/api/recommend/status`, which is now only a legacy redirect (`routes/legacy-redirects.js`), and its view list omits `projects` and the flag-gated `live-console` (`lib/components/view-nav.js`). The browser guide is otherwise sound: its endpoints and selectors resolve. (Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-10T14:20:53.000Z",
+    "by": "Harbour"
+   }
+  ],
+  "finding-15": [
+   {
+    "id": "finding-15",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`public/prompt-section.js`: on a server with no AI (`aiState: \"unconfigured\"`, a self-host with no OpenRouter key) the run control still offers Next step. Pressing it gets a 503 from the recommend stream, and \"AI Recommend · generating…\" / \"Loading…\" spin with no message, while Run to PR works beside it. Offer only what the server can do, or say why it can't. (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-11T22:25:57.000Z",
+    "by": "Harbour"
+   }
+  ],
+  "task-16": [
+   {
+    "id": "task-16",
+    "kind": "task",
+    "state": "open",
+    "fields": {
+     "ref": "LIN-4463",
+     "asked": "**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** John: \"the UI issues trace back to one of my very first rules: no build step… it's the biggest target of the Theseus method… We don't need to tidy it all, but it's a perfect example where we can leave it better than we found it.\" The first slice (LIN-4446) served a pure server file to the browser at `/shared/` and retired the browser's copy. Its blind read found the cost: a bridge turns the shared file back into a global, with a load-timing rule that four files explain and nothing checks, and a second shared file would need a second bridge. On the direction, John: \"I feel there's a sensible engineering approach, that a skilled developer would take… Excellent, that sounds like a great solution.\" Today the browser area has 44 script files that share through globals, `public/common.js` is 3,309 lines and `public/observation.js` 5,019, over 100 unit test files load browser scripts as classic scripts, and the area's note holds 10 Waiting entries.\n\n**What we want.**\n\n* Pages become ES modules that import what they share, as browsers do natively. Still no build step and no framework.\n* Shared logic is imported, not restated: each converted view drops its copies.\n* A bridge back to a global is only a temporary ramp for pages not yet converted: one at most, and visibly shrinking.\n* The tests get simpler as views convert, not more elaborate.\n* Taken one view at a time, each piece finishing one move and naming what it retired. John on size: \"Happy for it to be whatever size is natural.\"\n* No view is retired unless John rules it. The side rail and the visual refresh (LIN-4342, LIN-4343) come after, on the cleaner code.\n\n**Done when**\n\n* the slice 1 bridge is gone, or the only one left and shrinking under a check;\n* the area's Waiting entries are settled, or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*",
+     "done-when": "* the slice 1 bridge is gone, or the only one left and shrinking under a check;\n* the area's Waiting entries are settled, or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.",
+     "paths": [
+      "public/"
+     ]
+    },
+    "links": {},
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:39:22.240Z",
+    "by": "John",
+    "via": "driving-session"
+   }
+  ]
+ },
+ "log": []
+}

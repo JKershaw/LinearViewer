@@ -1,5 +1,5 @@
 {
- "next": 72,
+ "next": 81,
  "records": {
   "area-1": [
    {
@@ -1720,6 +1720,208 @@
     "at": "2026-11-13T13:45:01.000Z",
     "by": "survey-task"
    }
+  ],
+  "run-72": [
+   {
+    "id": "run-72",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "survey-place",
+     "account": "Surveyed the place LIN-4450 lands at 4b5001ddf. The area is improving: `adf.js` quiet since its clean-room rebuild (LIN-3570), `lib/as-asked*.js` just tidied to one owner (LIN-4360/61/62); `jira/index.js` is long and history-heavy. Probed the witness shapes through the codec: no D1 trips, fixed points (empty fence not probed; see question-68). For the builder: keep the region module the only place that knows both stores (export `plainText`, render with `adfToMarkdown`, size function there); one read-with-words helper instead of eight `getIssue` edits; route `descriptionRoundTrip` through the same reader (question-67); the extra places that must learn; the `reason: 'provider'` branch left unwitnessed. For the area: live Jira-native tickets after the flip, and comment weight. Bulk search `properties` already in finding-70, not repeated. Closed nothing; nothing addressed to me."
+    },
+    "links": {},
+    "in": "task-60",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:47:56.000Z",
+    "by": "survey-place"
+   },
+   {
+    "id": "run-72",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "survey-place",
+     "account": "Surveyed the place LIN-4450 lands at 4b5001ddf. The area is improving: `adf.js` quiet since its clean-room rebuild (LIN-3570), `lib/as-asked*.js` just tidied to one owner (LIN-4360/61/62); `jira/index.js` is long and history-heavy. Probed the witness shapes through the codec: no D1 trips, fixed points (empty fence not probed; see question-68). For the builder: keep the region module the only place that knows both stores (export `plainText`, render with `adfToMarkdown`, size function there); one read-with-words helper instead of eight `getIssue` edits; route `descriptionRoundTrip` through the same reader (question-67); the extra places that must learn; the `reason: 'provider'` branch left unwitnessed. For the area: live Jira-native tickets after the flip, and comment weight. Bulk search `properties` already in finding-70, not repeated. Closed nothing; nothing addressed to me."
+    },
+    "links": {},
+    "in": "task-60",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T13:48:05.000Z",
+    "by": "survey-place",
+    "ended": {
+     "reason": "Survey global posted on LIN-4450 at 13:51:36; findings filed to implementation and area-1."
+    }
+   }
+  ],
+  "finding-73": [
+   {
+    "id": "finding-73",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Shape B keeps two stores of the words (the ADF region and `harbour.asAsked`, a digest choosing between them); it stays safe only while the region module is the one place that knows both. So don't grow a second ADF walker: the reader needs a paragraph's plain text, and `adf.js` already has `plainText` (~line 340, private at 4b5001ddf): export it, don't retype it (exporting keeps `adf.js` import-free). Render the region with `adfToMarkdown({type:'doc',content})`, not a new renderer. Put the one shared size function (finding-71) in the region module too."
+    },
+    "links": {
+     "about": [
+      "plan-54"
+     ]
+    },
+    "in": "task-60",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:47:57.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-74": [
+   {
+    "id": "finding-74",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`client.getIssue` has 8 call sites in `lib/providers/jira/index.js` at 4b5001ddf; four never read a description (703, 1018, 1076, and the pre-read at 1099). Rather than threading `properties` through each call (decision-63 carries review note 2 as 'every `getIssue` fetches the property'), write one read-with-words helper beside the region reader that fetches with `properties=harbour.asAsked` and maps through the reader; the description-reading sites (including the `updateIssue` and `updateIssueLabels` re-reads and the new `createIssue` re-read) call it. One place to get wrong instead of eight."
+    },
+    "links": {
+     "about": [
+      "decision-63",
+      "plan-54"
+     ]
+    },
+    "in": "task-60",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:47:58.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-75": [
+   {
+    "id": "finding-75",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "On question-67 (the node reader accepts more end lines than `hasMarkerLine` refuses): I reached the same seam independently. My recommendation: it is safe if `descriptionRoundTrip` runs through the same node reader, because the filing then reads non-kept and goes in unsealed with the existing log line, instead of silently splitting the words. Worth one witness: words containing the end sentence as a plain paragraph file unsealed, never sealed-and-truncated."
+    },
+    "links": {
+     "about": [
+      "question-67"
+     ]
+    },
+    "in": "task-60",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:47:59.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-76": [
+   {
+    "id": "finding-76",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "What has to learn beyond the three seal headers the done-when names (lines at 4b5001ddf): `lib/dispatch-factory.js:1008`; `docs/architecture/source-map.md:216` and `:82` (the new region module needs a mention); `tests/unit/as-asked-guard.test.js`, whose Jira block (345, 351) will fail, so it notices on its own; the docs won't. `docs/proxy-integration.md:2070` (agent-facing, says Jira files unsealed) is already in plan-55 item 10, task-61's retire list; if this task lands first, that line is wrong in between, so either retire it here or leave it to task-61 on purpose."
+    },
+    "links": {
+     "about": [
+      "plan-54",
+      "plan-55"
+     ]
+    },
+    "in": "task-60",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:48:00.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-77": [
+   {
+    "id": "finding-77",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "A branch left without a witness: `tests/unit/as-asked-create-seal.test.js:207-227` uses Jira's round trip as *the* provider that cannot hold the block. After the flip, `sealForFiling`'s `reason: 'provider'` branch has no subject in production or in tests. Witness it with a synthetic lossy round trip, or retire it on purpose and say so in the PR. Separately, `lib/as-asked.js`'s 'When the unsealed branches could go' note drops 'Jira today' but stays, because older tickets remain unsealed."
+    },
+    "links": {
+     "about": [
+      "plan-54"
+     ]
+    },
+    "in": "task-60",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:48:01.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-78": [
+   {
+    "id": "finding-78",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "D1 against Harbour-written blocks, scoped: on the plan's witness shapes (`* a`, `*em*`, `***x***`, `3.` lists, a fence with a blank line, `a\\n\\n\\n\\nb`, trailing spaces) `markdownToAdf`'s output never trips D1 and `adfToMarkdown∘markdownToAdf` reaches a fixed point at 4b5001ddf. My probe did not include the empty fence (opening ``` with the closing ``` on the next line) that question-68 shows does trip D1 and is not a fixed point, so 'D1 won't block Harbour-written blocks' holds for those shapes only, not in general."
+    },
+    "links": {
+     "about": [
+      "question-68"
+     ]
+    },
+    "in": "task-60",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:48:02.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-79": [
+   {
+    "id": "finding-79",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Beyond LIN-4450: once the seal flips, the first-dispatch seal writes back to live Jira-native tickets through `updateIssue`. D1 refuses any ticket holding a mention, emoji or panel (common on real sites) and logs it once per first dispatch; tickets that pass get their ADF normalised, and their sealed 'words' become the escaped rendering (`*em*`→`_em_`-style). That is the codec's lossiness showing, deeper than this task; plan-56 item 13's Waiting entry (widening the D1 writer vocabulary) is the nearest home."
+    },
+    "links": {
+     "about": [
+      "plan-56",
+      "check-69"
+     ]
+    },
+    "in": "task-60",
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:48:03.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-80": [
+   {
+    "id": "finding-80",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Comment weight: `lib/providers/jira/index.js` is 1,478 lines at 4b5001ddf, mostly history comments; its header and `docs/architecture/source-map.md`'s Jira paragraph carry more history than guidance. A trim is its own small task, not LIN-4450's."
+    },
+    "links": {},
+    "in": "task-60",
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:48:04.000Z",
+    "by": "survey-place"
+   }
   ]
  },
  "log": [
@@ -2198,6 +2400,79 @@
     "find",
     "--text",
     "D1",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:58.921Z",
+   "by": "survey-place",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-44",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:58.949Z",
+   "by": "survey-place",
+   "cmd": "get",
+   "args": [
+    "get",
+    "plan-55",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:58.979Z",
+   "by": "survey-place",
+   "cmd": "get",
+   "args": [
+    "get",
+    "plan-56",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:59.011Z",
+   "by": "survey-place",
+   "cmd": "get",
+   "args": [
+    "get",
+    "task-61",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:59.043Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "proxy-integration",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:18:35.575Z",
+   "by": "survey-place",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-70",
     "--by",
     "survey-place"
    ],
