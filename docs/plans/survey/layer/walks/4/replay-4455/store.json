@@ -1,5 +1,5 @@
 {
- "next": 66,
+ "next": 72,
  "records": {
   "area-1": [
    {
@@ -1250,7 +1250,280 @@
     "by": "breakdown",
     "at": "2026-11-13T14:02:31.309Z"
    }
+  ],
+  "run-66": [
+   {
+    "id": "run-66",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "survey-task",
+    "account": "pending",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T14:58:29.000Z"
+   },
+   {
+    "id": "run-66",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "survey-task",
+    "account": "Surveyed LIN-4455 at cfd152fa4 (origin/main one docs-only commit past the 4b5001ddf grounding in decision-61; LIN-4453 baseline). The piece is harder than import-instead-of-restate in five places: the release note cannot ride the per-request wakeHook (finding-67, do first); the FEEDBACK_KINDS home in dispatch-feedback-validation.js risks import cycles, so I asked the parent to allow a leaf module (question-68); findWakeEvent has no skip rule, so record a column and pin behaviour instead of filtering (finding-69); the runner prompt pins FEEDBACK_ENTRY_KINDS order and non-allowlisted kinds need rows (finding-70); NEVER_RAN needs a new home, likely dispatch-fields.js (finding-71). Order: release note, then the kinds leaf, constants last. Closed nothing; Waiting 2, 4, 11 stay open for implementation.",
+    "links": {},
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "survey-task",
+    "at": "2026-11-13T14:58:35.000Z",
+    "reason": "account written"
+   },
+   {
+    "id": "run-66",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "survey-task",
+    "account": "Surveyed LIN-4455 at cfd152fa4 (origin/main one docs-only commit past the 4b5001ddf grounding in decision-61; LIN-4453 baseline). The piece is harder than import-instead-of-restate in five places: the release note cannot ride the per-request wakeHook (finding-67, do first); the FEEDBACK_KINDS home in dispatch-feedback-validation.js risks import cycles, so I asked the parent to allow a leaf module (question-68); findWakeEvent has no skip rule, so record a column and pin behaviour instead of filtering (finding-69); the runner prompt pins FEEDBACK_ENTRY_KINDS order and non-allowlisted kinds need rows (finding-70); NEVER_RAN needs a new home, likely dispatch-fields.js (finding-71). Order: release note, then the kinds leaf, constants last. Closed nothing; Waiting 2, 4, 11 stay open for implementation.",
+    "links": {},
+    "state": "done",
+    "v": 3,
+    "op": "end",
+    "by": "survey-task",
+    "at": "2026-11-13T14:58:36.000Z",
+    "stateReason": "survey posted on LIN-4455",
+    "reason": "survey posted on LIN-4455"
+   }
+  ],
+  "finding-67": [
+   {
+    "id": "finding-67",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "implementation",
+    "says": "`wakeHook.releaseNote` cannot reach most held-wake releases. The hook is built per request (`leftoverStep.forRequest`, `routes/dispatch.js:1636`, `routes/proxy-runner.js:213`) and passed only into `addFeedback`; most releases go `_archiveItem` -> `_releaseIfHeld` (`lib/dispatch-store.js:1890`, `:1949`) from `removeItem`, `cleanup()` expiry and stopped-run cleanup, none of which holds a request or hook; only the `_applyWakeHook` re-release (`:3429`) does. Put the wording on `leftoverStep` and late-bind it into the store the way `setWakeCredentialProvisionerFactory` is (`server.js:1146`). Decide what an unbound store says: `lin-4373-leftover-step.test.js` asserts \"did not run\" five times. This is a second hook surface, the thing Waiting 5 (finding-22, one `wakeHook`) warns about, so shape it with that in mind. Do this first: it is the only part that changes the store shape, and it fixes what the rewritten lin-4377 witness counts (no `formatHeldWakeNote` import in the store).",
+    "links": {
+     "about": "finding-21",
+     "on": "task-60@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T14:58:30.000Z"
+   }
+  ],
+  "question-68": [
+   {
+    "id": "question-68",
+    "kind": "question",
+    "in": "task-60",
+    "to": "task-39",
+    "asks": "Plan piece 5 puts the one `FEEDBACK_KINDS` table in `lib/dispatch-feedback-validation.js`. That file imports `dispatch-validation.js`, which reaches `session-telemetry.js` (prompt-templates -> ... -> wall-clock-summary) and `dispatch-terminal.js` (dispatch-fields -> dispatch-wake); if those import the table and build Sets from it at load, load order decides whether they hit a TDZ error. May the table live in a new import-free leaf instead, with validation and the store importing it and the store still re-exporting `FEEDBACK_ENTRY_KINDS`?",
+    "options": [
+     "keep the plan: table in lib/dispatch-feedback-validation.js",
+     "new leaf module lib/dispatch-feedback-kinds.js with no imports"
+    ],
+    "recommended": "new leaf module lib/dispatch-feedback-kinds.js with no imports",
+    "if-unanswered": "implementation builds the leaf module (an engineering call) and the PR says it departs from plan-45 on the table home",
+    "links": {
+     "about": "plan-45",
+     "on": "plan-45@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T14:58:31.000Z"
+   }
+  ],
+  "finding-69": [
+   {
+    "id": "finding-69",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "implementation",
+    "says": "`findWakeEvent` has no skip rule to derive. It returns the last matching marker of any kind (`lib/dispatch-terminal.js:631`), and `lib/session-telemetry.js:82` calls it \"Deliberately NOT shared\". Deriving a filter would change the mint path (`lib/dispatch-store.js:3696`) and every reader of stored rows (task-page-loader, run-view, digest-feedback, run-loop-state), against \"never recompute pre-cutover history\". Record its role as a table column (\"every kind may carry a wake\") and pin that current behaviour matches it, rather than add a filter. The done-when says \"`findWakeEvent`'s skip rule derive from it\"; the PR should say it is met by the column, not a filter.",
+    "links": {
+     "about": "finding-28",
+     "on": "task-60@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T14:58:32.000Z"
+   }
+  ],
+  "finding-70": [
+   {
+    "id": "finding-70",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "implementation",
+    "says": "Prompt seam: `lib/prompts/runner-kickoff.js` (A14 / LIN-4448's side) renders `FEEDBACK_ENTRY_KINDS` into the runner prompt in its current order, checked by `runner-kickoff.test.js:191`; a derived list must keep that exact order, so add a test that `FEEDBACK_ENTRY_KINDS` keeps it. The table also needs rows for kinds deliberately not on the allowlist (`decision-answer`, `decision-withdrawal-reversed`; see `DECISION_LIFECYCLE_STAMP_KINDS`, `lib/session-telemetry.js:60`); without them a roles column quietly widens what the runner may post.",
+    "links": {
+     "about": "finding-28",
+     "on": "task-60@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T14:58:33.000Z"
+   }
+  ],
+  "finding-71": [
+   {
+    "id": "finding-71",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "implementation",
+    "says": "`NEVER_RAN` has no owner to import from: `'cancelled'`/`'expired'` is spelled at `lib/dispatch-leftover.js:29`, `lib/dispatch-store.js:1906` and `:1176`. Create one home where neither side learns \"leftover\" (`lin-4377-store-knows-no-leftover`); `lib/dispatch-fields.js` is already imported by both. The other two owners are safe import-free leaves: `HALT_MODES` (`lib/workspace-halt.js`), and `followUpTarget(t) == null` (`lib/dispatch-targets.js`), equivalent to `!RESUMABLE_TARGETS.has(t || 'cli')`. Constants last: they are mechanical. Lessons sit at about 4.3 KB of the 6,144-byte limit, so the area note has room.",
+    "links": {
+     "about": "finding-19",
+     "on": "task-60@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T14:58:34.000Z"
+   }
   ]
  },
- "log": []
+ "log": [
+  {
+   "at": "2026-11-17T14:44:42.428Z",
+   "by": "survey-task",
+   "q": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "survey-task"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:44:42.457Z",
+   "by": "survey-task",
+   "q": [
+    "find",
+    "--to",
+    "area-1",
+    "--state",
+    "open",
+    "--by",
+    "survey-task"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:44:49.025Z",
+   "by": "survey-task",
+   "q": [
+    "find",
+    "--kind",
+    "task",
+    "--by",
+    "survey-task"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:44:49.081Z",
+   "by": "survey-task",
+   "q": [
+    "find",
+    "--kind",
+    "area",
+    "--by",
+    "survey-task"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:44:49.123Z",
+   "by": "survey-task",
+   "q": [
+    "find",
+    "--text",
+    "FEEDBACK_KINDS",
+    "--by",
+    "survey-task"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:44:49.173Z",
+   "by": "survey-task",
+   "q": [
+    "find",
+    "--text",
+    "LIN-4448",
+    "--by",
+    "survey-task"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:44:49.217Z",
+   "by": "survey-task",
+   "q": [
+    "find",
+    "--text",
+    "A14",
+    "--by",
+    "survey-task"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:44:49.259Z",
+   "by": "survey-task",
+   "q": [
+    "find",
+    "--text",
+    "releaseNote",
+    "--by",
+    "survey-task"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:44:49.300Z",
+   "by": "survey-task",
+   "q": [
+    "find",
+    "--text",
+    "NEVER_RAN",
+    "--by",
+    "survey-task"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:44:49.338Z",
+   "by": "survey-task",
+   "q": [
+    "find",
+    "--text",
+    "findWakeEvent",
+    "--by",
+    "survey-task"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:45:09.112Z",
+   "by": "survey-task",
+   "q": [
+    "get",
+    "plan-45",
+    "--by",
+    "survey-task"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:45:09.146Z",
+   "by": "survey-task",
+   "q": [
+    "get",
+    "finding-22",
+    "--by",
+    "survey-task"
+   ]
+  }
+ ]
 }

@@ -1,0 +1,12 @@
+task-60 task v1 [open] by breakdown
+decision-61 decision v1 [stands] by breakdown
+decision-62 decision v1 [stands] by breakdown
+decision-63 decision v1 [stands] by breakdown
+decision-64 decision v1 [stands] by breakdown
+decision-65 decision v1 [stands] by breakdown
+run-66 run v3 [done] by survey-task
+finding-67 finding v1 [open] to implementation by survey-task
+question-68 question v1 [open] to task-39 by survey-task
+finding-69 finding v1 [open] to implementation by survey-task
+finding-70 finding v1 [open] to implementation by survey-task
+finding-71 finding v1 [open] to implementation by survey-task

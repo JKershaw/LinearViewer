@@ -1,0 +1,37 @@
+{
+ "next": 3,
+ "records": {
+  "area-1": [
+   {
+    "id": "area-1",
+    "kind": "area",
+    "name": "runs-dispatch",
+    "paths": [
+     "lib/dispatch"
+    ],
+    "links": {},
+    "state": "kept",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-2": [
+   {
+    "id": "finding-2",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Finding 1",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ]
+ },
+ "log": []
+}

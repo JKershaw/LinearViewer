@@ -1,0 +1,134 @@
+[
+ {
+  "at": "2026-11-17T14:44:42.428Z",
+  "by": "survey-task",
+  "q": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:44:42.457Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--to",
+   "area-1",
+   "--state",
+   "open",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:44:49.025Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--kind",
+   "task",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:44:49.081Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--kind",
+   "area",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:44:49.123Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "FEEDBACK_KINDS",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:44:49.173Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "LIN-4448",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:44:49.217Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "A14",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:44:49.259Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "releaseNote",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:44:49.300Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "NEVER_RAN",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:44:49.338Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "findWakeEvent",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:09.112Z",
+  "by": "survey-task",
+  "q": [
+   "get",
+   "plan-45",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:09.146Z",
+  "by": "survey-task",
+  "q": [
+   "get",
+   "finding-22",
+   "--by",
+   "survey-task"
+  ]
+ }
+]

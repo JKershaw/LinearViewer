@@ -1,0 +1,150 @@
+{
+ "next": 7,
+ "records": {
+  "area-1": [
+   {
+    "id": "area-1",
+    "kind": "area",
+    "name": "Runs & dispatch",
+    "paths": [
+     "lib/dispatch/"
+    ],
+    "links": {},
+    "state": "kept",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T16:00:00.000Z"
+   }
+  ],
+  "area-2": [
+   {
+    "id": "area-2",
+    "kind": "area",
+    "name": "LLM & prompts",
+    "paths": [
+     "lib/llm/"
+    ],
+    "links": {},
+    "state": "kept",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T16:00:00.000Z"
+   }
+  ],
+  "task-3": [
+   {
+    "id": "task-3",
+    "kind": "task",
+    "asked": "LIN-4447 Runs & dispatch lane",
+    "paths": [
+     "lib/dispatch/"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T16:00:00.000Z"
+   },
+   {
+    "id": "task-3",
+    "kind": "task",
+    "asked": "LIN-4447 Runs & dispatch lane",
+    "paths": [
+     "lib/dispatch/"
+    ],
+    "links": {
+     "about": "area-1"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "link",
+    "by": "Harbour",
+    "at": "2026-11-13T16:00:00.000Z"
+   }
+  ],
+  "task-4": [
+   {
+    "id": "task-4",
+    "kind": "task",
+    "asked": "LIN-4448 LLM & prompts lane",
+    "paths": [
+     "lib/llm/"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T16:00:00.000Z"
+   },
+   {
+    "id": "task-4",
+    "kind": "task",
+    "asked": "LIN-4448 LLM & prompts lane",
+    "paths": [
+     "lib/llm/"
+    ],
+    "links": {
+     "about": "area-2"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "link",
+    "by": "Harbour",
+    "at": "2026-11-13T16:00:00.000Z"
+   }
+  ],
+  "task-5": [
+   {
+    "id": "task-5",
+    "kind": "task",
+    "in": "task-3",
+    "asked": "LIN-4458 classifier home and run census",
+    "paths": [
+     "lib/dispatch/census/"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T16:00:00.000Z"
+   }
+  ],
+  "task-6": [
+   {
+    "id": "task-6",
+    "kind": "task",
+    "in": "task-3",
+    "asked": "LIN-4459 live-wait move",
+    "paths": [
+     "lib/dispatch/live-wait/"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T16:00:00.000Z"
+   }
+  ]
+ },
+ "log": [
+  {
+   "at": "2026-11-17T14:46:02.586Z",
+   "by": "implementation",
+   "q": [
+    "brief",
+    "implementation",
+    "--task",
+    "task-5",
+    "--as-of",
+    "2026-11-13T16:42:00Z",
+    "--text"
+   ]
+  }
+ ]
+}
