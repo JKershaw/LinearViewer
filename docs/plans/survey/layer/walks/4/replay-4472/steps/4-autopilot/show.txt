@@ -1,0 +1,22 @@
+task-28 task v2 [open] by survey-place
+decision-32 decision v2 [stands] by autopilot
+decision-33 decision v1 [stands] by breakdown
+decision-34 decision v1 [stands] by breakdown
+decision-35 decision v1 [stands] by breakdown
+decision-36 decision v1 [stands] by breakdown
+finding-50 finding v2 [open] to implementation by survey-place
+finding-51 finding v1 [open] to implementation by survey-task
+question-52 question v3 [handed-on] to implementation by scoping
+finding-53 finding v1 [open] to implementation by survey-task
+check-54 check v1 [open] to implementation by survey-task
+finding-55 finding v1 [open] to implementation by survey-task
+finding-56 finding v2 [open] to implementation by survey-place
+run-57 run v2 [done] by survey-task
+finding-58 finding v1 [open] to implementation by survey-place
+finding-59 finding v1 [open] to implementation by survey-place
+run-62 run v2 [done] by survey-place
+question-63 question v2 [answered] to John answered-by decision-66 by autopilot
+decision-64 decision v1 [stands] by scoping
+run-65 run v2 [done] by scoping
+decision-66 decision v1 [stands] by autopilot
+run-67 run v2 [done] by autopilot

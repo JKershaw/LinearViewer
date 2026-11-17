@@ -1,0 +1,28 @@
+task-60 task v1 [open] by breakdown
+decision-61 decision v1 [stands] by breakdown
+decision-62 decision v1 [stands] by breakdown
+decision-63 decision v1 [stands] by breakdown
+decision-64 decision v1 [stands] by breakdown
+decision-65 decision v1 [stands] by breakdown
+run-66 run v3 [done] by survey-task
+finding-67 finding v2 [done] to implementation by implementation
+question-68 question v2 [answered] to task-39 answered-by decision-81 by implementation
+finding-69 finding v2 [done] to implementation by implementation
+finding-70 finding v3 [done] to implementation by implementation
+finding-71 finding v3 [done] to implementation by implementation
+finding-72 finding v2 [handed-on] to task-39 by implementation
+finding-73 finding v2 [done] to implementation by implementation
+finding-74 finding v2 [handed-on] to implementation by implementation
+question-75 question v1 [open] to area-1 by survey-place
+run-76 run v2 [done] by survey-place
+decision-77 decision v1 [stands] by scoping
+run-78 run v2 [done] by scoping
+run-79 run v2 [done] by implementation
+change-80 change v1 [open] by implementation
+decision-81 decision v1 [stands] by implementation
+decision-82 decision v1 [stands] by implementation
+decision-83 decision v1 [stands] by implementation
+decision-84 decision v1 [stands] by implementation
+decision-86 decision v1 [stands] by implementation
+decision-87 decision v1 [stands] by implementation
+finding-88 finding v1 [open] to review by implementation

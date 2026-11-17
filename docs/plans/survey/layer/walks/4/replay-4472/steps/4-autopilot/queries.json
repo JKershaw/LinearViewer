@@ -1,0 +1,119 @@
+[
+ {
+  "at": "2026-11-17T14:49:53.538Z",
+  "by": "autopilot",
+  "q": [
+   "get",
+   "question-63",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:49:53.568Z",
+  "by": "autopilot",
+  "q": [
+   "get",
+   "decision-64",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:49:53.596Z",
+  "by": "autopilot",
+  "q": [
+   "get",
+   "decision-32",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:49:53.624Z",
+  "by": "autopilot",
+  "q": [
+   "find",
+   "--in",
+   "task-28",
+   "--kind",
+   "decision",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:49:53.655Z",
+  "by": "autopilot",
+  "q": [
+   "find",
+   "--text",
+   "served",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:50:07.597Z",
+  "by": "autopilot",
+  "q": [
+   "find",
+   "--kind",
+   "task",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:50:07.639Z",
+  "by": "autopilot",
+  "q": [
+   "find",
+   "--text",
+   "SHARED_MODULES",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:50:10.865Z",
+  "by": "autopilot",
+  "q": [
+   "get",
+   "finding-60",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:50:10.901Z",
+  "by": "autopilot",
+  "q": [
+   "get",
+   "decision-18",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:50:10.937Z",
+  "by": "autopilot",
+  "q": [
+   "get",
+   "question-52",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:50:21.884Z",
+  "by": "autopilot",
+  "q": [
+   "find",
+   "--text",
+   "\"decision-32@",
+   "--by",
+   "autopilot"
+  ]
+ }
+]

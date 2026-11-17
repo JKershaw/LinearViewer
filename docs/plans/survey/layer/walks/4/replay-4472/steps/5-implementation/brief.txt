@@ -1,0 +1,135 @@
+# Brief for implementation on task-28 as of 2026-11-13T17:33:15.944Z
+
+## 1. The person's words
+task-28: 
+task-1: **Repository:** JKershaw/LinearViewer (Harbour).
+
+**What this is for.** John: "the UI issues trace back to one of my very first rules: no build step… it's the biggest target of the Theseus method… We don't need to tidy it all, but it's a perfect example where we can leave it better than we found it." The first slice (LIN-4446) served a pure server file to the browser at `/shared/` and retired the browser's copy. Its blind read found the cost: a bridge turns the shared file back into a global, with a load-timing rule that four files explain and nothing checks, and a second shared file would need a second bridge. On the direction, John: "I feel there's a sensible engineering approach, that a skilled developer would take… Excellent, that sounds like a great solution." Today the browser area has 44 script files that share through globals, `public/common.js` is 3,309 lines and `public/observation.js` 5,019, over 100 unit test files load browser scripts as classic scripts, and the area's note holds 10 Waiting entries.
+
+**What we want.**
+
+* Pages become ES modules that import what they share, as browsers do natively. Still no build step and no framework.
+* Shared logic is imported, not restated: each converted view drops its copies.
+* A bridge back to a global is only a temporary ramp for pages not yet converted: one at most, and visibly shrinking.
+* The tests get simpler as views convert, not more elaborate.
+* Taken one view at a time, each piece finishing one move and naming what it retired. John on size: "Happy for it to be whatever size is natural."
+* No view is retired unless John rules it. The side rail and the visual refresh (LIN-4342, LIN-4343) come after, on the cleaner code.
+
+**Done when**
+
+* the slice 1 bridge is gone, or the only one left and shrinking under a check;
+* the area's Waiting entries are settled, or say why not;
+* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.
+
+**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.
+
+## 2. Its plan piece
+plan-10@2 plan (kept)
+  says: **Piece 2 — one real page, top down** (lands second)
+
+* Converts `public/task-page.js` to a module with named exports in place of its `module.exports` block; the renderer's `SCRIPTS` entry becomes `{ module: '/task-page.js' }` in `lib/render-task-page.js`. It is the last script in that list, so its DOMContentLoaded listener stays registered after `common.js`'s and the prompt run control's, as before.
+* Retires: the `typeof module` test seam in `task-page.js`; the `loadWorld`-plus-`window.module.exports` pattern in the task-page suites; any helper `task-page.js` restates that `common.js` already exposes (the builder searches the converted file for function names that equal a `common.js` global or a lib export, and either reads the global or imports; nothing is added to the bridge to make this work).
+* Adds the one test-support piece both pieces need if piece 1 has not already: a small import helper next to `tests/unit/helpers/client-world.js` that installs the fake DOM on `globalThis` and imports a public module fresh (a query-string cache-bust on the page module; the lib leaves stay cached, since they are pure). `loadWorld` is not touched, so the 64 classic suites keep running unchanged.
+* Settles the Waiting entry about a module-capable loader by showing the premise wrong, with the converted suites as the proof.
+
+Witnesses (from the plan's table; each fails before and passes after):
+
+| \# | Behaviour | Witness |
+| -- | -- | -- |
+| 8 | A converted view's tests are plain imports and simpler than before. | Piece 1: `tests/unit/workspace-kpis-cost-order.test.js` (vm + readyState dance + `loadCostFormat`) is replaced by witness 3; `tests/fixtures/browser-cost-format.js` loses one user. Piece 2: the suites that run `task-page.js` through `loadWorld(... module.exports)` (find them with `grep -ln "'task-page.js'" tests/unit/*.js` filtered to `loadWorld`; `task-page-client.test.js` is one) import its named exports instead. A census check, in the manner of `tests/unit/fake-dom-census.test.js`, counts suites that name a script in `loadWorld`'s `scripts` list; it records today's number and fails if it rises, so "tests get simpler" is a number, not a feeling. |
+| 9 | The converted task page behaves as before. | The golden render test (`tests/unit/render-task-page-golden.test.js`, `tests/fixtures/render-task-page-golden.json`) is updated *only* for the one script tag changing from classic to module; any other diff is a bug. Existing `task-page-*` and `lin-4405` timeline suites pass, migrated to imports. |
+| 10 | The old shapes are gone from what was converted. | `grep -n "module.exports\|typeof module" public/task-page.js public/workspace-kpis.js` returns nothing; no `/shared/` string remains in `lib/`, `public/`, `tests/`, `docs/areas/`, `CLAUDE.md`. |
+
+Where the behaviour lives (from the plan):
+
+* `module.exports` blocks in `public/`: eleven files; only `task-page.js` is touched here (piece 2). The other ten (`close-out.js`, `question-cards.js`, `home-placement.js`, `live-console.js`, `observation.js`, `ship.js`, `ship-biscuit.js`, `session.js`, `ship-journey.js`, `flight-companion.js`) each wait for their own view; `close-out.js` is shared by the task page and `session.js`, so it cannot convert with either alone. That is why it is named, not left out silently.
+
+Likeliest ways it breaks (from the plan):
+
+2. **Module semantics.** Modules are always strict, top-level `var` and function declarations are not globals, and `this` is undefined. `task-page.js` and `workspace-kpis.js` already say `'use strict'` and wrap everything in an IIFE; unwrapping it to export names is what could change a reference. Witness: the existing suites on the converted file, plus witness 9.
+3. **The test seam changes under the builder.** A module evaluates once per URL, so a second `import` in the same process returns the first instance's timers and listeners; and `world.run` probes of script-scope `let`s cannot work on a module. Witness: the import helper's own test (two fresh imports do not share state), and the rule that a probe either becomes an export or goes. Piece 2's census (witness 8) shows the loader count falling.
+
+Amended by plan review (comment 73a74028, notes for the builder, in its words):
+
+2. **The import helper needs more than "fake DOM on globalThis"; build it in piece 1.** `task-page.js` uses bare `setTimeout`/`clearTimeout`/`setInterval`/`document`, and `window.api`. The suites the plan migrates depend on `loadWorld`'s `timers` collector and its window stubs:
+   - `task-page-question.test.js:223` (`makePage`);
+   - `task-timeline-client.test.js:207`;
+   - `task-page-client.test.js:358/422/554`.
+
+   `task-page-client.test.js:423` also runs the real classic `close-out.js` in the same world. Piece 1 has the same need: witness 3 needs `window.HarbourCharts`, which the current test gets by running the real classic `chart-helpers.js`.
+
+   So the helper should take loadWorld's own `{ window, timers, globals }` options and install them on `globalThis`, with `window === globalThis` as loadWorld does. It should give one supported way to run a named classic sibling in that same realm (`vm.runInThisContext`), restore everything it replaced, and then import the page fresh. Its own test should cover both "two fresh imports share no state" and "globals are restored".
+
+   The `loadWorld` census (witness 8) can't see complexity moved into this helper. Keep the helper small enough that each migrated suite reads shorter than before, and say so in the piece's description.
+
+7. (part) Also update the source-map lines for `workspace-kpis.js`/`task-page.js` if they call them classic.
+
+8. (part) In piece 2, `lin-3975-task-run-control.test.js:586` and `no-page-wide-label-listener.test.js:247` read `task-page.js` source or the renderer's `SCRIPTS` as text; rerun them after removing the IIFE.
+  paths: public/task-page.js, lib/render-task-page.js, tests/unit/task-page-client.test.js, tests/unit/task-page-, tests/unit/lin-4405-, tests/unit/render-task-page-golden.test.js, tests/fixtures/render-task-page-golden.json, docs/areas/front-end-browser.md, tests/unit/task-page-question.test.js, tests/unit/task-timeline-client.test.js, tests/unit/lin-3975-task-run-control.test.js, tests/unit/no-page-wide-label-listener.test.js, docs/architecture/source-map.md
+  order: 2
+
+## 3. Addressed to it
+finding-50@2 finding (open) to implementation
+  says: Tests that read `task-page.js` as text depend on the IIFE's indentation. Unwrapping the IIFE moves every line out two spaces, and these tests slice the source at strings that include the indent: `lin-3975-task-run-control:588` (`'  function init(doc) {'`, and `'    function toggle(row) {'` near `:587`), `lin-3975-summary-and-time:59/162/263` (`'  function relativeWords(value) {'`), `lin-3975-chat-fold:142`. After dedenting, `indexOf` returns -1, so "rerun them" is not enough: rewrite them. Re-anchor them on names, not indentation; better, make `relativeWords` an export the twin test imports instead of a text slice. Only the first is in the plan's list (survey at 17faa83f4; confirmed by survey-place at 904719353).
+finding-51@1 finding (open) to implementation
+  says: Two more suites run `task-page.js` and are not in the plan's list: `lin-3975-proposal-refresh:232` (`loadWorld` + `module.exports`) and `lin-3975-task-run-links:213`, which calls `vm.runInNewContext` on the raw source and will throw a SyntaxError on the first `export`. Both must move to imports with the others (survey at 17faa83f4).
+finding-53@1 finding (open) to implementation on change-48@2
+  says: `importWorld` (piece 1, `import-world.js`) sets up less than `loadWorld`, and that works against "shorter". `loadWorld` provides a stub `fetch`, a sync `requestAnimationFrame`, `navigator.clipboard` and unref'd timers; `importWorld` uses Node's real global: without `timers` a poller's `setTimeout` is real, `navigator` is Node 25's own with no clipboard (share copy, `:397`), and every page test needs `restore()`. To keep suites short: most exports are pure (`pollDelay`, `cadenceStatus`, `createOpenMemory`, `formatElapsed`, `proposalsUrlOf`…). Keep the `typeof document` guard and a static import needs no world at all, which removes `exportsOf()` (`task-page-client:28`, `task-timeline-client:26`). Only the DOMContentLoaded suites need `importWorld`.
+check-54@1 check (open) to implementation
+  what: Run `tests/e2e/task-page.spec.js` and `tests/e2e/task-timeline.spec.js` against the converted page, or say that CI carries them.
+  why-person: No real browser exercises this page in the plan's witnesses. The golden diff (7 tags) and Node imports cannot show MIME, CSP or execution order, and the Done-when says the task page behaves as before.
+  how: Playwright run of the two specs after `SCRIPTS` switches to `{ module: '/task-page.js' }`; paste the output or cite the CI job.
+finding-55@1 finding (open) to implementation
+  says: Minor: the regex at `no-page-wide-label-listener:247` already tolerates `{ module }` entries, so it needs a rerun, not a change. Piece 1 already marked the module-capable-loader Waiting entry's premise wrong, so deleting it in this piece is just tidying.
+finding-56@2 finding (open) to implementation
+  says: First moves: 1. Add named exports beside the IIFE. 2. Move the five executing suites and the two parity tests to imports, green while the seam still exists. 3. Remove the IIFE and the seam in a whitespace-only commit, re-anchoring the text slicers on names. 4. Then `SCRIPTS`, the golden file, and the census (102 after piece 1). Expect the census to fall by about 2, not 5–7: only `task-page-client` and `task-timeline-client` leave the list (`close-out.js` is an exempt `runClassic` sibling). `task-page-question` (`:311`, `question-cards.js`), `lin-3975-proposal-refresh` (`:161`, `task-chat.js`), `lin-3975-task-run-links` and `lin-3975-summary-and-time` (`common.js` slices) still load other classic files, so they stay listed (survey-place at 904719353).
+finding-58@1 finding (open) to implementation
+  says: Moving `task-page.js` (the last entry in `SCRIPTS`) to a module changes timing, but harmlessly: a module runs after the classic scripts and before `DOMContentLoaded`, so the `:925` listener still registers after `common.js`'s and the run control's. Every cross-file read is `window.X` at call time and the file assigns no globals, so the conversion is mechanical. Expected golden diff: 7 identical tag lines, one per case; anything else is a bug (witness 9). Read at 904719353, with piece 1 merged.
+finding-59@1 finding (open) to implementation
+  says: Review note 7 (update the source-map lines that call `task-page.js` classic) probably needs no edit: `docs/architecture/source-map.md` describes the task page's routes and renderer, not `public/task-page.js`. Check it and say so in the PR instead of editing it for the sake of it (survey-place at 904719353).
+
+## 4. What stands about this task
+verdict-25@1 verdict (stands) on plan-10@2
+  of: plan-review
+  outcome: approve
+  reasoning: **Verdict:** Approve. The plan's premises check out against main, and it meets the ask; the notes below are corrections the builder can make without changing what the plan decides.
+
+**How it meets what was asked.** The ask says: "the slice 1 bridge is gone, or the only one left and shrinking under a check". The plan takes the second branch. `cost-format-global.js` stays the only bridge, with a bridge-inventory check, and drops from four consumers to three in piece 1. "One view at a time … whatever size is natural": the plan converts two views and lists the next ones in order. That is the ask's own grain, not a narrowing. "Waiting entries are settled, or say why not": all ten have a disposition. The brief's open question about Survey global ("retire cost-format-global.js at this task's cost") does not need John. The bridge has four classic consumers across six renderers, so converting one page entry cannot retire it, and the Done-when explicitly allows the "only one left and shrinking" outcome. The survey is advice, not a ruling.
+
+- `task-page.js` reads classic globals only behind `typeof`/truthiness guards and assigns no `window.*`. It is the last entry in `SCRIPTS`, and its only load-time effect is one `DOMContentLoaded` listener (`:925`). So it converts without adding to the bridge, and its listener order is unchanged.
+
+**Blocking findings:** none. Notes 2, the source-map line of note 7 and the piece-2 half of note 8 are folded into this version of piece 2.
+decision-32@2 decision (stands) on verdict-25@1
+  answer: Session fit: fits one session. It converts one page entry that is the last script of one renderer, plus migrating its suites. It adds no bridge entry. It now includes one served lib leaf (one file plus one allow-list entry) for duration and relative-time wording, per decision-66.
+  why: Breakdown table: One session. It converts one page entry, the last script of one renderer, adds nothing to the bridge, and migrates that page's suites onto piece 1's helper.
+decision-33@1 decision (stands) on verdict-25@1
+  answer: Plan-review due: no. Covered by LIN-4463's approving plan review (comment 73a74028-bbe9-4a4a-b502-8ed268a6bd08, rev 1).
+  why: The parent's plan review approved piece 2 (verdict on its amended version).
+decision-34@1 decision (stands) on verdict-25@1
+  answer: Blocked by LIN-4471 (piece 1). Merged and verified on its own after piece 1.
+  why: The plan: "Piece 2 is blocked by piece 1 (it uses the specifier rule, the flat check, the import helper if introduced there, and the corrected lesson)."
+decision-35@1 decision (stands) on verdict-25@1
+  answer: Plan review notes folded into this subtask. Into LIN-4472: the run-control and label-listener text pins.
+  why: I folded the review's eight builder notes into the subtask that each one affects.
+decision-36@1 decision (stands) on verdict-25@1
+  answer: The parent's approved plan is where this piece starts. Follow it. Where the code shows the plan is wrong, change course and say so in a comment on LIN-4463.
+  why: Grounding commits: plan read at `c205190fd` / main `5dcf5bcda`; review at `5dcf5bcda`; re-grounded by the breakdown at `e8e92d50a`, which touches none of the planned files.
+decision-64@1 decision (stands)
+  answer: Size: consolidate the decision this task touches. Cuts: none. Decided by the standing policy.
+  why: Converts the task page to a module with its suites as imports, and first gives the duration and relative-time wording one served home that server and page both import, so this view drops its two restated copies. The serving change this needs is put to John (question-63), with extract as the default if unanswered.
+  scope: task-28
+decision-66@1 decision (stands) on task-1@1
+  answer: Extract it first: LIN-4472 extracts one small served lib leaf for duration and relative-time wording (one file plus one `SHARED_MODULES` entry under `/lib/`), and the task page imports it and drops both restated copies (`formatElapsed` = `fmtDuration`, `relativeWords` = `relativeAgo`). Settled by autopilot as an engineering call, not escalated to John.
+  why: The ask says shared logic is "imported, not restated" and "each converted view drops its copies"; leaving the two copies would contradict it. The serving path (`/lib/`, the `SHARED_MODULES` allow-list and its checks) already exists from LIN-4471, so this adds one allow-listed leaf, not a new mechanism. No view is retired and no product, money or authority question is involved, so it is not John's call; the size record stays 'Cuts: none'. The Session-fit phrase 'no serving change' (decision-32) predates LIN-4471 landing and is superseded by this decision. If wrong: the leaf is one file plus one allow-list entry and is easy to inline back.
+  scope: task-28
+
+## 5. Its areas
+area-49 Front end: browser code (1 open addressed to it)
+
+## 6. Open runs of other tasks sharing a path
+(none)
+
+## 7. Index of what else is known
+(none)
+
+-- carries {"words":2,"piece":1,"addressed":8,"stands":8,"areas":1,"runs":0,"index":0}; 18318 bytes
