@@ -1,0 +1,97 @@
+[
+ {
+  "at": "2026-11-17T20:35:23.765Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": {
+   "to": "leftover",
+   "state": "open",
+   "by": "leftover",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:35:23.802Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": {
+   "kind": "lesson",
+   "text": "witness",
+   "by": "leftover",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:35:23.840Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": {
+   "kind": "run",
+   "in": "task-131",
+   "by": "leftover",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:35:23.884Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": {
+   "text": "lin-4467-witness",
+   "by": "leftover",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:35:34.097Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": {
+   "text": "simple-dispatcher",
+   "state": "open",
+   "by": "leftover",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:35:34.146Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": {
+   "kind": "lesson",
+   "area": "area-1",
+   "by": "leftover",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:35:34.200Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": {
+   "by": "leftover",
+   "pos": [
+    "area-1"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:35:34.266Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": {
+   "by": "leftover",
+   "pos": [
+    "change-142"
+   ]
+  },
+  "asOf": null
+ }
+]
