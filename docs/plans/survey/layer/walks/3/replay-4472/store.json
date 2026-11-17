@@ -1965,6 +1965,101 @@
    ]
   }
  },
- "queries": [],
+ "queries": [
+  {
+   "at": "2026-11-17T13:41:25.060Z",
+   "by": "survey-task",
+   "query": "show",
+   "args": {
+    "task": "task-28",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:41:25.090Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "to": "task-28"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:41:25.115Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "area": "area-49",
+    "state": "open"
+   },
+   "returned": 9
+  },
+  {
+   "at": "2026-11-17T13:41:30.760Z",
+   "by": "survey-task",
+   "query": "get",
+   "args": {
+    "id": "finding-56",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:41:30.792Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "text": "task-page"
+   },
+   "returned": 14
+  },
+  {
+   "at": "2026-11-17T13:41:30.828Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "text": "relativeAgo"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:41:30.861Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "text": "fmtDuration"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:41:30.895Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "text": "e2e"
+   },
+   "returned": 3
+  },
+  {
+   "at": "2026-11-17T13:41:30.929Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "text": "importWorld"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:41:30.962Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "area": "area-50",
+    "state": "open"
+   },
+   "returned": 11
+  }
+ ],
  "hits": []
 }

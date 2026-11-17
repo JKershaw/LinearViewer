@@ -2288,6 +2288,79 @@
     "asOf": null
    },
    "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:41:31.161Z",
+   "by": "scoping",
+   "query": "find",
+   "args": {
+    "kind": "setting"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:41:31.192Z",
+   "by": "scoping",
+   "query": "find",
+   "args": {
+    "kind": "decision"
+   },
+   "returned": 3
+  },
+  {
+   "at": "2026-11-17T13:41:31.223Z",
+   "by": "scoping",
+   "query": "find",
+   "args": {
+    "text": "fence"
+   },
+   "returned": 6
+  },
+  {
+   "at": "2026-11-17T13:41:31.254Z",
+   "by": "scoping",
+   "query": "find",
+   "args": {
+    "to": "scoping",
+    "text": "size"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:41:31.283Z",
+   "by": "scoping",
+   "query": "find",
+   "args": {
+    "to": "scoping"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:41:35.527Z",
+   "by": "scoping",
+   "query": "find",
+   "args": {
+    "text": "policy"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:41:35.559Z",
+   "by": "scoping",
+   "query": "find",
+   "args": {
+    "text": "tidy"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:41:35.588Z",
+   "by": "scoping",
+   "query": "find",
+   "args": {
+    "kind": "run"
+   },
+   "returned": 2
   }
  ],
  "hits": []
