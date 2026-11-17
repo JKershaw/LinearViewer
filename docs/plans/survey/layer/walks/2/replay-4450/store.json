@@ -1,14 +1,18 @@
 {
  "retro": false,
- "seq": 76,
+ "seq": 114,
  "count": {
   "area": 3,
   "lesson": 18,
-  "finding": 31,
+  "finding": 46,
   "task": 4,
-  "decision": 10,
+  "decision": 12,
   "plan": 3,
-  "verdict": 3
+  "verdict": 3,
+  "run": 4,
+  "question": 1,
+  "check": 1,
+  "change": 1
  },
  "records": {
   "area-1": [
@@ -1334,6 +1338,35 @@
      "order": 1
     },
     "note": "Plan review notes 2, 3, 6 (comment 61e84035-1df2-459f-8def-5afdc7001e64) amend this piece; breakdown carried them into its child's slice"
+   },
+   {
+    "id": "plan-1",
+    "kind": "plan",
+    "v": 3,
+    "seq": 100,
+    "at": "2026-11-13T14:07:01.000Z",
+    "by": "implementation",
+    "op": "revise",
+    "in": "task-1",
+    "state": "kept",
+    "links": [],
+    "fields": {
+     "says": "**Session 1: the seal (lands alone), as built in PR #2421.** Witnesses are unit tests against `fake-client.js`, in `tests/unit/jira-as-asked-region.test.js`.\n\n0. **Tidy first: empty fence.** An empty fenced code block in the words now renders as the bare fence (it used to render as a blank line between fences, which the writer split), and the D1 write gate accepts an empty fence. D1 is therefore changed, not unchanged. Witness: the empty-fence regression and a codec fixed point.\n1. **One region module, `lib/providers/jira/as-asked-region.js`**, is the only module that knows both the ADF region and the `harbour.asAsked = { v: 1, words, rendered }` property. It imports the spellings from `lib/as-asked.js`. `rendered` is a SHA-256 digest of the region's rendering (compared only, never shown).\n   * **End line by digest, not by position.** The reader takes the end-paragraph candidate whose region renders to the stored digest; the writer takes the candidate whose interior renders to the words. So words that hold the end sentence as plain or `_…_` text do not close the region early. `hasMarkerLine` and `splitAsAsked` are unchanged; Linear is unaffected.\n   * Region renders to the digest: serve exact `words`. Otherwise (edited in Jira): serve the rendering behind canonical markers. No end paragraph or no heading: no block. Property with no region: ignored.\n2. Comparison is on rendered content (digest), never ADF hashes (`localId` stays kept).\n3. All four description reads in `index.js` go through `readDescription`, and **every provider-side `client.getIssue` asks for the property**, including epic/parent and write re-reads. The fake returns only requested property keys, as Jira does. Bulk search stays display-only. Witness: a grep test that no description read bypasses the reader (comment bodies excepted).\n4. `updateIssue` writes the property in the same PUT whenever the description holds a block. Witness: byte equality across filing, later writes, `description/below` writes and human edits below the line.\n5. `descriptionRoundTrip` is a pure write-then-read through the same reader. It **throws** on a block it cannot hold (too large, or interior does not read back); `providerHoldsAsAsked` treats a throw as cannot-hold, so the seal is skipped with the existing log line. `lib/as-asked-seal.js` unchanged apart from headers. `sealForFiling`'s provider-skip branch is witnessed with a synthetic lossy round trip.\n6. **Size guard in UTF-8 bytes**: the serialized property (JSON escaping included) must be at most 32,768 bytes, the stricter reading of Atlassian's docs (bytes on some pages, characters on others). Over: seal skipped; oversized `updateIssue` returns 422 naming the size, no write.\n\n**Retires:** the \"Jira is skipped\" claims in `lib/as-asked-seal.js`, `lib/as-asked.js`, the `descriptionRoundTrip` comment, `lib/dispatch-factory.js` (\"Jira today\"), `docs/proxy-integration.md` (\"Jira files unsealed\"); the Jira \"cannot hold\" cases of the create-seal, dispatch-seal and guard tests now pin sealed and kept.\n\n**Not done here:** the live check on John's Jira (session 3, LIN-4452): whether the site keeps the digest across an ordinary editor save below the block.",
+     "paths": [
+      "lib/providers/jira/",
+      "lib/as-asked-seal.js",
+      "lib/as-asked.js",
+      "lib/dispatch-factory.js",
+      "docs/proxy-integration.md",
+      "tests/unit/jira-as-asked-region.test.js",
+      "tests/unit/as-asked-create-seal.test.js",
+      "tests/unit/as-asked-dispatch-seal.test.js",
+      "tests/unit/as-asked-readers.test.js",
+      "tests/unit/as-asked-guard.test.js"
+     ],
+     "order": 1
+    },
+    "note": "Built in PR #2421 (a98d042c6) with departures: end line chosen by digest not position (question-1); round trip throws rather than reporting non-kept; size limit enforced on UTF-8 bytes of the serialized property; empty fence fixed in the codec and D1 accepts it (finding-44), so D1 is no longer unchanged; every provider getIssue asks for the property; new module and retirements named."
    }
   ],
   "plan-2": [
@@ -1792,6 +1825,889 @@
      "answer": "Session fit: fits one session.",
      "why": "Session 3 needs a credential for John's site that no build session has by default; if it has no credential, it ends as an explicit handoff to John, not as a cut. Blocked by LIN-4451, in the plan's landing order."
     }
+   }
+  ],
+  "run-1": [
+   {
+    "id": "run-1",
+    "kind": "run",
+    "v": 1,
+    "seq": 77,
+    "at": "2026-11-13T13:47:23.000Z",
+    "by": "survey-task",
+    "op": "add",
+    "in": "task-2",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "stage": "survey-task",
+     "claims": "origin/main is still 4b5001ddf, so plan-1 line numbers hold (_toCanonicalIssue 484, fetchIssueContext 863/873, issueDescription 1049, descriptionRoundTrip 1064, updateIssue re-read 1267). Codec run at this commit on the plan witness inputs (sealAsAsked then markdownToAdf -> adfToMarkdown).",
+     "account": "Surveyed LIN-4450 (session 1, the seal) against HEAD before any code. Plan premises and line numbers hold. Found two engineering gaps the builder must settle up front (end-line rule mismatch between the markdown and node readers; empty fence breaks the D1/fixed-point claim), one risk the fake client cannot witness (digest stability under live Jira editor saves) which needs a live probe before code, and two small points (bulk vs single read divergence; property limit unit). Recommended the 15-minute live probe first; if the rendering does not hold, the digest must be over a normalised rendering, a design change to record on LIN-4445."
+    }
+   },
+   {
+    "id": "run-1",
+    "kind": "run",
+    "v": 2,
+    "seq": 83,
+    "at": "2026-11-13T13:47:29.000Z",
+    "by": "survey-task",
+    "op": "end",
+    "in": "task-2",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "stage": "survey-task",
+     "claims": "origin/main is still 4b5001ddf, so plan-1 line numbers hold (_toCanonicalIssue 484, fetchIssueContext 863/873, issueDescription 1049, descriptionRoundTrip 1064, updateIssue re-read 1267). Codec run at this commit on the plan witness inputs (sealAsAsked then markdownToAdf -> adfToMarkdown).",
+     "account": "Surveyed LIN-4450 (session 1, the seal) against HEAD before any code. Plan premises and line numbers hold. Found two engineering gaps the builder must settle up front (end-line rule mismatch between the markdown and node readers; empty fence breaks the D1/fixed-point claim), one risk the fake client cannot witness (digest stability under live Jira editor saves) which needs a live probe before code, and two small points (bulk vs single read divergence; property limit unit). Recommended the 15-minute live probe first; if the rendering does not hold, the digest must be over a normalised rendering, a design change to record on LIN-4445."
+    },
+    "note": "Survey posted; records filed",
+    "reason": "Survey posted; records filed"
+   }
+  ],
+  "question-1": [
+   {
+    "id": "question-1",
+    "kind": "question",
+    "v": 1,
+    "seq": 78,
+    "at": "2026-11-13T13:47:24.000Z",
+    "by": "survey-task",
+    "op": "add",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "asks": "The markdown rule and the planned node rule disagree on what is an end line. hasMarkerLine/splitAsAsked match only the exact *…* end sentence; the planned ADF reader matches any paragraph whose plain text is the end sentence, whatever its marks. Words containing that sentence plain or as _…_ get sealed (not a marker to sealForFiling), then the node reader closes the region early, the digest misses, and the tail is served as below-the-line, silently. A markdown-level checkAsAsked alone will not catch it; descriptionRoundTrip only does if it runs the same node reader. Which rule closes the gap?",
+     "options": [
+      "make hasMarkerLine also catch the plain-text / _…_ form, so such words are never sealed as-is",
+      "node rule takes the LAST matching paragraph before non-region content"
+     ],
+     "recommended": "decide before writing the reader, and have descriptionRoundTrip run the same node reader either way",
+     "if-unanswered": "the reader ships with a silent early-close on words that quote the end sentence"
+    }
+   },
+   {
+    "id": "question-1",
+    "kind": "question",
+    "v": 2,
+    "seq": 102,
+    "at": "2026-11-13T14:07:03.000Z",
+    "by": "implementation",
+    "op": "end",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "answered",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "asks": "The markdown rule and the planned node rule disagree on what is an end line. hasMarkerLine/splitAsAsked match only the exact *…* end sentence; the planned ADF reader matches any paragraph whose plain text is the end sentence, whatever its marks. Words containing that sentence plain or as _…_ get sealed (not a marker to sealForFiling), then the node reader closes the region early, the digest misses, and the tail is served as below-the-line, silently. A markdown-level checkAsAsked alone will not catch it; descriptionRoundTrip only does if it runs the same node reader. Which rule closes the gap?",
+     "options": [
+      "make hasMarkerLine also catch the plain-text / _…_ form, so such words are never sealed as-is",
+      "node rule takes the LAST matching paragraph before non-region content"
+     ],
+     "recommended": "decide before writing the reader, and have descriptionRoundTrip run the same node reader either way",
+     "if-unanswered": "the reader ships with a silent early-close on words that quote the end sentence"
+    },
+    "note": "Answered by the decision on end-line choice by digest (PR #2421).",
+    "reason": "Answered by the decision on end-line choice by digest (PR #2421)."
+   }
+  ],
+  "finding-32": [
+   {
+    "id": "finding-32",
+    "kind": "finding",
+    "v": 1,
+    "seq": 79,
+    "at": "2026-11-13T13:47:25.000Z",
+    "by": "survey-task",
+    "op": "add",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "The adf.js header claim that the D1 gate never flags what the writer emits is false. An empty fence (``` then ``` on the next line) makes markdownToAdf emit an empty codeBlock; adfHasUnrenderableContent refuses it, and rt(rt(x)) !== rt(x) (both checks false, observed at 4b5001ddf). Once Harbour writes the block itself, it would create a ticket whose description can never be written again: every later description/below write 422s on D1, which sees the whole document including the block. The planned fixed-point test fails on this input unless the codec is fixed or the input is excluded; pick one deliberately. The plan says D1 unchanged."
+    }
+   },
+   {
+    "id": "finding-32",
+    "kind": "finding",
+    "v": 2,
+    "seq": 105,
+    "at": "2026-11-13T14:07:06.000Z",
+    "by": "implementation",
+    "op": "end",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "The adf.js header claim that the D1 gate never flags what the writer emits is false. An empty fence (``` then ``` on the next line) makes markdownToAdf emit an empty codeBlock; adfHasUnrenderableContent refuses it, and rt(rt(x)) !== rt(x) (both checks false, observed at 4b5001ddf). Once Harbour writes the block itself, it would create a ticket whose description can never be written again: every later description/below write 422s on D1, which sees the whole document including the block. The planned fixed-point test fails on this input unless the codec is fixed or the input is excluded; pick one deliberately. The plan says D1 unchanged."
+    },
+    "note": "Codec fixed, not input excluded (PR #2421): empty fence renders as the bare fence, D1 accepts it, fixed-point test passes. The plan's 'D1 unchanged' is revised in plan-1 v3.",
+    "reason": "Codec fixed, not input excluded (PR #2421): empty fence renders as the bare fence, D1 accepts it, fixed-point test passes. The plan's 'D1 unchanged' is revised in plan-1 v3."
+   }
+  ],
+  "check-1": [
+   {
+    "id": "check-1",
+    "kind": "check",
+    "v": 1,
+    "seq": 80,
+    "at": "2026-11-13T13:47:26.000Z",
+    "by": "survey-task",
+    "op": "add",
+    "in": "task-2",
+    "to": "John",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "decision-2"
+     }
+    ],
+    "fields": {
+     "what": "15-minute live probe on a real Jira site before writing code: does adfToMarkdown(region) stay stable when someone edits below the block in Jira's own editor?",
+     "why-person": "Done-when is only proven on fake-client.js, which merges fields and stores whatever it is given. Shape B depends on a SHA-256 of adfToMarkdown(region) surviving Jira's ordinary saves. localId is handled (adfToMarkdown ignores attrs), but nothing shows the editor leaves alone trailing spaces before a hardBreak, how adjacent text nodes split, or empty paragraphs (LIN-2019 already drops these). If any shift, every sealed issue reads as human-edited and the words quietly become the rendering (*em* -> _em_, * a -> - a, ***x*** -> \\***x**\\*, all observed): the reformatting the seal exists to prevent. Needs a Jira credential, which build sessions lack by default (decision-3).",
+     "how": "1. PUT a sealed description holding the witness inputs with properties:[{key:harbour.asAsked,…}] in the same body (confirms edit accepts properties). 2. GET with ?properties=harbour.asAsked. 3. Edit a line below the block in Jira's editor and save. 4. GET again and diff adfToMarkdown(region). Holds: plan stands. Does not hold: the digest must be over a normalised rendering, a design change to record on LIN-4445."
+    }
+   }
+  ],
+  "finding-33": [
+   {
+    "id": "finding-33",
+    "kind": "finding",
+    "v": 1,
+    "seq": 81,
+    "at": "2026-11-13T13:47:27.000Z",
+    "by": "survey-task",
+    "op": "add",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "The bulk search path stays display-only, so one issue reads differently through search than through getIssue. Check that no cache or guard compares the two."
+    }
+   }
+  ],
+  "finding-34": [
+   {
+    "id": "finding-34",
+    "kind": "finding",
+    "v": 1,
+    "seq": 82,
+    "at": "2026-11-13T13:47:28.000Z",
+    "by": "survey-task",
+    "op": "add",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "Atlassian states the entity-property limit in bytes or characters depending on the page. JSON escaping inflates words, so the size guard must measure the serialized property string, not words.length."
+    }
+   },
+   {
+    "id": "finding-34",
+    "kind": "finding",
+    "v": 2,
+    "seq": 106,
+    "at": "2026-11-13T14:07:07.000Z",
+    "by": "implementation",
+    "op": "end",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "Atlassian states the entity-property limit in bytes or characters depending on the page. JSON escaping inflates words, so the size guard must measure the serialized property string, not words.length."
+    },
+    "note": "Size guard measures UTF-8 bytes of the serialized property, JSON escaping included, at most 32,768 (stricter reading). Witness: size boundary and escaping tests (PR #2421).",
+    "reason": "Size guard measures UTF-8 bytes of the serialized property, JSON escaping included, at most 32,768 (stricter reading). Witness: size boundary and escaping tests (PR #2421)."
+   }
+  ],
+  "run-2": [
+   {
+    "id": "run-2",
+    "kind": "run",
+    "v": 1,
+    "seq": 84,
+    "at": "2026-11-13T13:51:36.000Z",
+    "by": "survey-place",
+    "op": "add",
+    "in": "task-2",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "stage": "survey-place",
+     "account": "Surveyed the place at 4b5001ddf (lib/providers/jira/, adf.js, lib/as-asked*.js). Area is improving (as-asked tidied to one owner, LIN-4360/61/62; adf.js quiet since LIN-3570; index.js 1,478 lines, mostly history comments). Probed the witness shapes (* a, *em*, ***x***, 3. lists, fence with blank line, a\\n\\n\\n\\nb, trailing spaces): markdownToAdf never trips D1 and adfToMarkdown∘markdownToAdf reaches a fixed point on all, so D1 will not block Harbour-written blocks. Handed implementation six findings on what the obvious build does (plainText export, reader-vs-writer gap, getIssue scatter, retirements, unwitnessed provider branch, two stores of the words). Better at a cost this task can carry: export plainText, one read helper, size function in the region module, retire every listed claim, keep the provider branch witnessed. Three not-this-task finds sent to close-out for the jira area (its id is not in my brief). Took on no area finding: none of the 31 bears on the Jira seal."
+    }
+   },
+   {
+    "id": "run-2",
+    "kind": "run",
+    "v": 2,
+    "seq": 94,
+    "at": "2026-11-13T13:51:46.000Z",
+    "by": "survey-place",
+    "op": "end",
+    "in": "task-2",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "stage": "survey-place",
+     "account": "Surveyed the place at 4b5001ddf (lib/providers/jira/, adf.js, lib/as-asked*.js). Area is improving (as-asked tidied to one owner, LIN-4360/61/62; adf.js quiet since LIN-3570; index.js 1,478 lines, mostly history comments). Probed the witness shapes (* a, *em*, ***x***, 3. lists, fence with blank line, a\\n\\n\\n\\nb, trailing spaces): markdownToAdf never trips D1 and adfToMarkdown∘markdownToAdf reaches a fixed point on all, so D1 will not block Harbour-written blocks. Handed implementation six findings on what the obvious build does (plainText export, reader-vs-writer gap, getIssue scatter, retirements, unwitnessed provider branch, two stores of the words). Better at a cost this task can carry: export plainText, one read helper, size function in the region module, retire every listed claim, keep the provider branch witnessed. Three not-this-task finds sent to close-out for the jira area (its id is not in my brief). Took on no area finding: none of the 31 bears on the Jira seal."
+    },
+    "note": "survey written as records",
+    "reason": "survey written as records"
+   }
+  ],
+  "finding-35": [
+   {
+    "id": "finding-35",
+    "kind": "finding",
+    "v": 1,
+    "seq": 85,
+    "at": "2026-11-13T13:51:37.000Z",
+    "by": "survey-place",
+    "op": "add",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "Region reader, no second ADF walker: it needs a paragraph's plain text, and `lib/providers/jira/adf.js` already has `plainText` (~line 340), private. Export it rather than retype it, and render the region with `adfToMarkdown({type:\"doc\",content})`, not a new renderer."
+    }
+   }
+  ],
+  "finding-36": [
+   {
+    "id": "finding-36",
+    "kind": "finding",
+    "v": 1,
+    "seq": 86,
+    "at": "2026-11-13T13:51:38.000Z",
+    "by": "survey-place",
+    "op": "add",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "The reader accepts more than the writer refuses: ending the region at a paragraph whose plain text is the end sentence \"whatever its marks\" means a plain paragraph of that sentence inside the words ends the region early, and `hasMarkerLine` does not refuse it. Safe only if `descriptionRoundTrip` runs through the same reader, so such a filing reads non-kept and goes in unsealed. Add one witness for it."
+    }
+   },
+   {
+    "id": "finding-36",
+    "kind": "finding",
+    "v": 2,
+    "seq": 107,
+    "at": "2026-11-13T14:07:08.000Z",
+    "by": "implementation",
+    "op": "end",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "The reader accepts more than the writer refuses: ending the region at a paragraph whose plain text is the end sentence \"whatever its marks\" means a plain paragraph of that sentence inside the words ends the region early, and `hasMarkerLine` does not refuse it. Safe only if `descriptionRoundTrip` runs through the same reader, so such a filing reads non-kept and goes in unsealed. Add one witness for it."
+    },
+    "note": "Closed by end-line choice by digest (decision-12); descriptionRoundTrip runs the same reader. Reader tests cover words holding the end sentence plain or as _..._ (PR #2421).",
+    "reason": "Closed by end-line choice by digest (decision-12); descriptionRoundTrip runs the same reader. Reader tests cover words holding the end sentence plain or as _..._ (PR #2421)."
+   }
+  ],
+  "finding-37": [
+   {
+    "id": "finding-37",
+    "kind": "finding",
+    "v": 1,
+    "seq": 87,
+    "at": "2026-11-13T13:51:39.000Z",
+    "by": "survey-place",
+    "op": "add",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "Scatter: `lib/providers/jira/index.js` has 8 `client.getIssue` sites @4b5001ddf. Four never read a description (703, 1018, 1076, the pre-read at 1099). `fetchIssueFields` (818) feeds `_toCanonicalIssue` but is not in the plan's list. Write one read-with-words helper beside the reader instead of threading `properties` through each call (this also covers plan-review note 2's re-reads)."
+    }
+   },
+   {
+    "id": "finding-37",
+    "kind": "finding",
+    "v": 2,
+    "seq": 108,
+    "at": "2026-11-13T14:07:09.000Z",
+    "by": "implementation",
+    "op": "end",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "Scatter: `lib/providers/jira/index.js` has 8 `client.getIssue` sites @4b5001ddf. Four never read a description (703, 1018, 1076, the pre-read at 1099). `fetchIssueFields` (818) feeds `_toCanonicalIssue` but is not in the plan's list. Write one read-with-words helper beside the reader instead of threading `properties` through each call (this also covers plan-review note 2's re-reads)."
+    },
+    "note": "Every provider-side getIssue now asks for the property, including fetchIssueFields, epic/parent and write re-reads; fake returns only requested keys (PR #2421).",
+    "reason": "Every provider-side getIssue now asks for the property, including fetchIssueFields, epic/parent and write re-reads; fake returns only requested keys (PR #2421)."
+   }
+  ],
+  "finding-38": [
+   {
+    "id": "finding-38",
+    "kind": "finding",
+    "v": 1,
+    "seq": 88,
+    "at": "2026-11-13T13:51:40.000Z",
+    "by": "survey-place",
+    "op": "add",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "What has to learn, beyond the three headers the plan names (every change names what it retires): `dispatch-factory.js:1008`; `docs/proxy-integration.md:2070` (agent-facing, says Jira files unsealed); `docs/architecture/source-map.md:216` and `:82` (the new region module needs a mention); `tests/unit/as-asked-guard.test.js` Jira block (345, 351) will fail, so it notices; the docs will not."
+    }
+   }
+  ],
+  "finding-39": [
+   {
+    "id": "finding-39",
+    "kind": "finding",
+    "v": 1,
+    "seq": 89,
+    "at": "2026-11-13T13:51:41.000Z",
+    "by": "survey-place",
+    "op": "add",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "A branch left without a witness: `tests/unit/as-asked-create-seal.test.js:207-227` uses Jira's round trip as the provider that cannot hold the block. After the flip, `sealForFiling`'s `reason: \"provider\"` branch has no subject in production or tests. Witness it with a synthetic lossy round trip (recommended), or retire it on purpose. `lib/as-asked.js`'s \"When the unsealed branches could go\" drops \"Jira today\" but stays, because of older tickets."
+    }
+   },
+   {
+    "id": "finding-39",
+    "kind": "finding",
+    "v": 2,
+    "seq": 109,
+    "at": "2026-11-13T14:07:10.000Z",
+    "by": "implementation",
+    "op": "end",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "A branch left without a witness: `tests/unit/as-asked-create-seal.test.js:207-227` uses Jira's round trip as the provider that cannot hold the block. After the flip, `sealForFiling`'s `reason: \"provider\"` branch has no subject in production or tests. Witness it with a synthetic lossy round trip (recommended), or retire it on purpose. `lib/as-asked.js`'s \"When the unsealed branches could go\" drops \"Jira today\" but stays, because of older tickets."
+    },
+    "note": "sealForFiling's provider-skip branch is witnessed with a synthetic lossy round trip (PR #2421).",
+    "reason": "sealForFiling's provider-skip branch is witnessed with a synthetic lossy round trip (PR #2421)."
+   }
+  ],
+  "finding-40": [
+   {
+    "id": "finding-40",
+    "kind": "finding",
+    "v": 1,
+    "seq": 90,
+    "at": "2026-11-13T13:51:42.000Z",
+    "by": "survey-place",
+    "op": "add",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "decision-2"
+     }
+    ],
+    "fields": {
+     "says": "Two stores of the words (ADF region plus `harbour.asAsked`, a digest deciding between them) stay safe only while the region module is the one place that knows both. Put the one size function (plan-review note 3) in that module too, so `descriptionRoundTrip`, `updateIssue` and `createIssue` all reach it there."
+    }
+   },
+   {
+    "id": "finding-40",
+    "kind": "finding",
+    "v": 2,
+    "seq": 110,
+    "at": "2026-11-13T14:07:11.000Z",
+    "by": "implementation",
+    "op": "end",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "decision-2"
+     }
+    ],
+    "fields": {
+     "says": "Two stores of the words (ADF region plus `harbour.asAsked`, a digest deciding between them) stay safe only while the region module is the one place that knows both. Put the one size function (plan-review note 3) in that module too, so `descriptionRoundTrip`, `updateIssue` and `createIssue` all reach it there."
+    },
+    "note": "as-asked-region.js is the only module that knows both the ADF region and harbour.asAsked; descriptionRoundTrip, updateIssue and the size guard go through it (PR #2421).",
+    "reason": "as-asked-region.js is the only module that knows both the ADF region and harbour.asAsked; descriptionRoundTrip, updateIssue and the size guard go through it (PR #2421)."
+   }
+  ],
+  "finding-41": [
+   {
+    "id": "finding-41",
+    "kind": "finding",
+    "v": 1,
+    "seq": 91,
+    "at": "2026-11-13T13:51:43.000Z",
+    "by": "survey-place",
+    "op": "add",
+    "in": "task-2",
+    "to": "close-out",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "decision-2"
+     }
+    ],
+    "fields": {
+     "says": "Not this task's; for the area that owns `lib/providers/jira/` (its id is not in survey-place's brief). Live Jira-native tickets: the first-dispatch seal writes back through `updateIssue`. D1 refuses any ticket holding a mention, emoji or panel (common) and logs it once per first dispatch; tickets that pass get their ADF normalised and their \"words\" become the escaped rendering. That is the codec's lossiness, deeper than this task."
+    }
+   }
+  ],
+  "finding-42": [
+   {
+    "id": "finding-42",
+    "kind": "finding",
+    "v": 1,
+    "seq": 92,
+    "at": "2026-11-13T13:51:44.000Z",
+    "by": "survey-place",
+    "op": "add",
+    "in": "task-2",
+    "to": "close-out",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "Not this task's; for the area that owns `lib/providers/jira/`. The bulk search path could ask for `properties` (`POST /search/jql` accepts it), so the dashboard would show exact words instead of the converted block."
+    }
+   }
+  ],
+  "finding-43": [
+   {
+    "id": "finding-43",
+    "kind": "finding",
+    "v": 1,
+    "seq": 93,
+    "at": "2026-11-13T13:51:45.000Z",
+    "by": "survey-place",
+    "op": "add",
+    "in": "task-2",
+    "to": "close-out",
+    "state": "open",
+    "links": [],
+    "fields": {
+     "says": "Not this task's; for the area that owns `lib/providers/jira/`. Comment weight: `lib/providers/jira/index.js`'s header and `docs/architecture/source-map.md`'s jira paragraph carry more history than guidance."
+    }
+   }
+  ],
+  "decision-11": [
+   {
+    "id": "decision-11",
+    "kind": "decision",
+    "v": 1,
+    "seq": 95,
+    "at": "2026-11-13T13:55:20.000Z",
+    "by": "scoping",
+    "op": "add",
+    "in": "task-2",
+    "state": "stands",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "answer": "Size: a small tidy. Cuts: none.",
+     "why": "Jira holds the person's words byte-exact (plan-1 session 1, the seal), plus one tidy done first: an empty fenced code block in the words must no longer file a description that refuses every later write below the line, which is the write the seal exists to allow. Decided by: the standing policy; the system holds no setting record for that policy, so this decision rests on nothing it can link."
+    }
+   }
+  ],
+  "finding-44": [
+   {
+    "id": "finding-44",
+    "kind": "finding",
+    "v": 1,
+    "seq": 96,
+    "at": "2026-11-13T13:55:21.000Z",
+    "by": "scoping",
+    "op": "add",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "decision-11"
+     }
+    ],
+    "fields": {
+     "says": "Do this tidy first, before the seal: an empty fenced code block in the person's words currently files a Jira description that refuses every later write below the line. Fix it so such words file a description that still takes below-the-line writes; that write is what the seal exists to allow."
+    }
+   },
+   {
+    "id": "finding-44",
+    "kind": "finding",
+    "v": 2,
+    "seq": 104,
+    "at": "2026-11-13T14:07:05.000Z",
+    "by": "implementation",
+    "op": "end",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "decision-11"
+     }
+    ],
+    "fields": {
+     "says": "Do this tidy first, before the seal: an empty fenced code block in the person's words currently files a Jira description that refuses every later write below the line. Fix it so such words file a description that still takes below-the-line writes; that write is what the seal exists to allow."
+    },
+    "note": "Fixed first in PR #2421: an empty fence renders as the bare fence and the D1 gate accepts it, so such words file a description that still takes below-the-line writes. Witness: empty-fence regression test.",
+    "reason": "Fixed first in PR #2421: an empty fence renders as the bare fence and the D1 gate accepts it, so such words file a description that still takes below-the-line writes. Witness: empty-fence regression test."
+   }
+  ],
+  "run-3": [
+   {
+    "id": "run-3",
+    "kind": "run",
+    "v": 1,
+    "seq": 97,
+    "at": "2026-11-13T13:55:22.000Z",
+    "by": "scoping",
+    "op": "add",
+    "in": "task-2",
+    "state": "open",
+    "links": [],
+    "fields": {
+     "stage": "scoping",
+     "account": "Sized task-2 (LIN-4450, plan-1 session 1: Jira holds the words byte-exact) as a small tidy with no cuts, by the standing policy (decision-11). The tidy, done first: an empty fenced code block must stop filing a description that refuses later below-the-line writes (finding to implementation). The policy has no setting record, so decision-11 links on nothing; my brief carried no record of the empty-fence defect, only open finding ids, so I could not link it to its source."
+    }
+   },
+   {
+    "id": "run-3",
+    "kind": "run",
+    "v": 2,
+    "seq": 98,
+    "at": "2026-11-13T13:55:23.000Z",
+    "by": "scoping",
+    "op": "end",
+    "in": "task-2",
+    "state": "done",
+    "links": [],
+    "fields": {
+     "stage": "scoping",
+     "account": "Sized task-2 (LIN-4450, plan-1 session 1: Jira holds the words byte-exact) as a small tidy with no cuts, by the standing policy (decision-11). The tidy, done first: an empty fenced code block must stop filing a description that refuses later below-the-line writes (finding to implementation). The policy has no setting record, so decision-11 links on nothing; my brief carried no record of the empty-fence defect, only open finding ids, so I could not link it to its source."
+    },
+    "note": "Scoping finished: size set, tidy handed to implementation.",
+    "reason": "Scoping finished: size set, tidy handed to implementation."
+   }
+  ],
+  "change-1": [
+   {
+    "id": "change-1",
+    "kind": "change",
+    "v": 1,
+    "seq": 99,
+    "at": "2026-11-13T14:07:00.000Z",
+    "by": "implementation",
+    "op": "add",
+    "in": "task-2",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2421",
+     "head": "a98d042c6"
+    }
+   }
+  ],
+  "decision-12": [
+   {
+    "id": "decision-12",
+    "kind": "decision",
+    "v": 1,
+    "seq": 101,
+    "at": "2026-11-13T14:07:02.000Z",
+    "by": "implementation",
+    "op": "add",
+    "in": "task-2",
+    "state": "stands",
+    "links": [
+     {
+      "type": "answers",
+      "to": "question-1"
+     },
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "answer": "Neither offered option. The end line is chosen by digest, not by position: the reader takes the end-paragraph candidate whose region renders to the stored rendered digest; the writer takes the candidate whose interior renders to the words. hasMarkerLine and splitAsAsked stay unchanged, and descriptionRoundTrip runs the same reader.",
+     "why": "Making hasMarkerLine catch plain/_…_ forms would change Linear behaviour and refuse legitimate words; last-matching-paragraph still misreads a human edit that adds the sentence below. The digest already exists to tell kept from edited, so it can also pick the candidate, which removes the silent early close without touching the shared markdown rule. Witnessed in tests/unit/jira-as-asked-region.test.js (PR #2421)."
+    }
+   },
+   {
+    "id": "decision-12",
+    "kind": "decision",
+    "v": 2,
+    "seq": 103,
+    "at": "2026-11-13T14:07:04.000Z",
+    "by": "implementation",
+    "op": "revise",
+    "in": "task-2",
+    "state": "stands",
+    "links": [
+     {
+      "type": "answers",
+      "to": "question-1"
+     },
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "answer": "Neither offered option. The end line is chosen by digest, not by position: the reader takes the end-paragraph candidate whose region renders to the stored rendered digest; the writer takes the candidate whose interior renders to the words. hasMarkerLine and splitAsAsked stay unchanged, and descriptionRoundTrip runs the same reader.",
+     "why": "Leaving hasMarkerLine and splitAsAsked unchanged keeps Linear unaffected. The digest already tells kept from edited, so it can also pick the end candidate, which removes the silent early close. Witnessed in tests/unit/jira-as-asked-region.test.js (PR #2421)."
+    },
+    "note": "Remove reasoning about the second option that the build did not record."
+   }
+  ],
+  "finding-45": [
+   {
+    "id": "finding-45",
+    "kind": "finding",
+    "v": 1,
+    "seq": 111,
+    "at": "2026-11-13T14:07:12.000Z",
+    "by": "implementation",
+    "op": "add",
+    "in": "task-2",
+    "to": "John",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "says": "Not verified live: no credential for your Jira was available to this build. Nothing shows that your site keeps the stored ADF (so the rendered digest still matches) across an ordinary editor save below the block. If Jira normalises it, the reader falls back to the rendering and the words quietly become the converted text. The live check (session 3, LIN-4452) must be able to fail on exactly this."
+    }
+   }
+  ],
+  "finding-46": [
+   {
+    "id": "finding-46",
+    "kind": "finding",
+    "v": 1,
+    "seq": 112,
+    "at": "2026-11-13T14:07:13.000Z",
+    "by": "implementation",
+    "op": "add",
+    "in": "task-2",
+    "to": "John",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "says": "Consequence once PR #2421 merges: the first-dispatch seal starts sealing Jira-native tickets on live sites, including yours. The first dispatch adds an As asked heading and end line to the description and writes the harbour.asAsked property. A failed seal is logged and dispatch continues. Session 2 (LIN-4451) is blocked on this merge."
+    }
+   }
+  ],
+  "run-4": [
+   {
+    "id": "run-4",
+    "kind": "run",
+    "v": 1,
+    "seq": 113,
+    "at": "2026-11-13T14:07:14.000Z",
+    "by": "implementation",
+    "op": "add",
+    "in": "task-2",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "stage": "implementation",
+     "claims": [
+      "lib/providers/jira/",
+      "lib/as-asked-seal.js",
+      "lib/as-asked.js",
+      "lib/dispatch-factory.js",
+      "docs/proxy-integration.md",
+      "tests/unit/jira-as-asked-region.test.js",
+      "tests/unit/as-asked-create-seal.test.js",
+      "tests/unit/as-asked-dispatch-seal.test.js",
+      "tests/unit/as-asked-readers.test.js",
+      "tests/unit/as-asked-guard.test.js"
+     ],
+     "account": "Built plan-1 session 1 (shape B) as PR #2421, head a98d042c6. Tidy first: empty fence fixed in the codec, D1 accepts it. New lib/providers/jira/as-asked-region.js holds the one reader/writer; rendered is a SHA-256 digest; all description reads go through it and every provider getIssue asks for harbour.asAsked. Departures recorded in plan-1 v3: end line by digest (decision-12 answers question-1), round trip throws on an unholdable block, size limit in UTF-8 bytes of the serialized property. Verified: full unit suite 25,320 tests (one census failure fixed by a fixture entry; affected suites 874/874), CI green on the PR. Not verified: live check on John Jira (finding-45). Left open: finding-33 (no check of search vs getIssue recorded), finding-35 (plainText export / adfToMarkdown reuse not recorded), finding-38 (source-map.md mention not recorded)."
+    }
+   },
+   {
+    "id": "run-4",
+    "kind": "run",
+    "v": 2,
+    "seq": 114,
+    "at": "2026-11-13T14:07:15.000Z",
+    "by": "implementation",
+    "op": "end",
+    "in": "task-2",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "stage": "implementation",
+     "claims": [
+      "lib/providers/jira/",
+      "lib/as-asked-seal.js",
+      "lib/as-asked.js",
+      "lib/dispatch-factory.js",
+      "docs/proxy-integration.md",
+      "tests/unit/jira-as-asked-region.test.js",
+      "tests/unit/as-asked-create-seal.test.js",
+      "tests/unit/as-asked-dispatch-seal.test.js",
+      "tests/unit/as-asked-readers.test.js",
+      "tests/unit/as-asked-guard.test.js"
+     ],
+     "account": "Built plan-1 session 1 (shape B) as PR #2421, head a98d042c6. Tidy first: empty fence fixed in the codec, D1 accepts it. New lib/providers/jira/as-asked-region.js holds the one reader/writer; rendered is a SHA-256 digest; all description reads go through it and every provider getIssue asks for harbour.asAsked. Departures recorded in plan-1 v3: end line by digest (decision-12 answers question-1), round trip throws on an unholdable block, size limit in UTF-8 bytes of the serialized property. Verified: full unit suite 25,320 tests (one census failure fixed by a fixture entry; affected suites 874/874), CI green on the PR. Not verified: live check on John Jira (finding-45). Left open: finding-33 (no check of search vs getIssue recorded), finding-35 (plainText export / adfToMarkdown reuse not recorded), finding-38 (source-map.md mention not recorded)."
+    },
+    "note": "PR #2421 opened; departures, findings and handoffs recorded.",
+    "reason": "PR #2421 opened; departures, findings and handoffs recorded."
    }
   ]
  },
