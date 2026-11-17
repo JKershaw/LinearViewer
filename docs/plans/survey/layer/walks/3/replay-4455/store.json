@@ -3146,6 +3146,44 @@
     "text": "run-view"
    },
    "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:50:50.766Z",
+   "by": "blind-read",
+   "query": "get",
+   "args": {
+    "id": "question-77",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:50.804Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "to": "area-1",
+    "state": "open"
+   },
+   "returned": 20
+  },
+  {
+   "at": "2026-11-17T13:50:50.853Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "text": "stamp"
+   },
+   "returned": 10
+  },
+  {
+   "at": "2026-11-17T13:50:50.899Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "text": "4448"
+   },
+   "returned": 4
   }
  ],
  "hits": []

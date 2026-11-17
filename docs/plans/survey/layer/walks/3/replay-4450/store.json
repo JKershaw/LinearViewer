@@ -3755,6 +3755,16 @@
     "asOf": null
    },
    "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:54.299Z",
+   "by": "close-out",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
   }
  ],
  "hits": []

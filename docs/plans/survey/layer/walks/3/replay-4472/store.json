@@ -3424,6 +3424,34 @@
     "asOf": null
    },
    "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:57.360Z",
+   "by": "leftover",
+   "query": "find",
+   "args": {
+    "area": "area-49"
+   },
+   "returned": 22
+  },
+  {
+   "at": "2026-11-17T13:50:57.395Z",
+   "by": "leftover",
+   "query": "find",
+   "args": {
+    "area": "area-50"
+   },
+   "returned": 14
+  },
+  {
+   "at": "2026-11-17T13:50:57.446Z",
+   "by": "leftover",
+   "query": "get",
+   "args": {
+    "id": "change-97",
+    "asOf": null
+   },
+   "returned": 1
   }
  ],
  "hits": []
