@@ -1,0 +1,20 @@
+{
+  "task": { "fields": { "asked": "string", "done-when": "string", "paths": "list", "ref": "string" }, "start": "open", "ends": ["done", "declined"], "fixed": ["asked"] },
+  "plan": { "fields": { "says": "string", "paths": "list", "order": "number" }, "start": "kept", "ends": ["superseded"] },
+  "finding": { "fields": { "says": "string" }, "start": "open", "ends": ["done", "declined", "handed-on"], "handoff": true },
+  "check": { "fields": { "what": "string", "why-person": "string", "how": "string" }, "start": "open", "ends": ["done", "declined", "handed-on"], "handoff": true },
+  "question": { "fields": { "asks": "string", "options": "list", "recommended": "string", "if-unanswered": "string" }, "start": "open", "ends": ["answered", "withdrawn", "handed-on"], "handoff": true },
+  "decision": { "fields": { "answer": "string", "why": "string", "scope": "task-or-area" }, "start": "stands", "ends": ["superseded", "withdrawn"] },
+  "verdict": {
+    "fields": { "of": "string", "outcome": "string", "reasoning": "string" }, "start": "stands", "ends": ["superseded", "withdrawn"], "needs": ["on"],
+    "outcomes": {
+      "plan-review": ["approve", "approve-with-notes", "request-changes", "needs-discussion"],
+      "review": ["approve", "approve-with-notes", "request-changes", "needs-discussion"],
+      "blind-read": ["better", "same", "worse"]
+    }
+  },
+  "lesson": { "fields": { "says": "string", "paths": "list", "checked-at": "string" }, "start": "holds", "ends": ["superseded", "disproved"] },
+  "area": { "fields": { "name": "string", "paths": "list" }, "start": "kept", "ends": ["retired"] },
+  "change": { "fields": { "ref": "string", "head": "string" }, "start": "open", "ends": ["merged", "abandoned"] },
+  "run": { "fields": { "stage": "string", "claims": "list", "account": "string" }, "start": "open", "ends": ["done"] }
+}
