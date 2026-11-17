@@ -4508,6 +4508,155 @@
     "blind-read"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:27:49.710Z",
+   "by": "close-out",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:27:49.745Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-84",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:27:49.774Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-91",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:03.756Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "check-98",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:03.801Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "check-99",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:03.838Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "check-100",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:03.875Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "task-62",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:03.912Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "task-61",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:03.947Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-101",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:03.981Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "check-69",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:04.021Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--to",
+    "close-out",
+    "--state",
+    "open",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:04.053Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--in",
+    "task-62",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
   }
  ]
 }

@@ -1,5 +1,5 @@
 {
- "next": 33,
+ "next": 36,
  "records": {
   "area-1": [
    {
@@ -1615,6 +1615,75 @@
     "ended": {
      "reason": "plan written to the ticket and as plan-28; plan-review due"
     }
+   }
+  ],
+  "run-33": [
+   {
+    "id": "run-33",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "plan-review",
+     "account": "Reviewed plan-28@12 at HEAD 4b5001ddf (still origin/main). Verdict: request changes, one blocker. public/workspace-kpis.js draws the cost chart at top level; Chart.js 4.5.1 runs update() in its constructor and calls the y-axis ticks.callback, which reads window.CostFormat while the script first runs, before the deferred module shim. No witness in the plan sees it (the vm test returns early without Chart; the e2e never has priced cost). The rest checked sound: allow-list serving, CSP, the leaf purity of lib/cost-format.js, renderPage entries, golden update path, area-note Lessons room. Eight builder notes, not blocking: a sixth renderer, both list shapes, CLAUDE.md at its budget, stale consumer comments, comment-blind purity guard, 404 through the full app, a sync fixture, the counting method."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:23:46.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-34": [
+   {
+    "id": "finding-34",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Blocking for plan-28: `public/workspace-kpis.js` reads `window.CostFormat` while its script first runs, so the deferred module shim breaks its cost chart. Its IIFE calls `charts.draw(\"cost\", …)` at top level; `chart-helpers.js:112` runs `new Chart(canvas, config)` synchronously; Chart.js 4.5.1 (installed) calls `this.update()` in the constructor when the canvas is attached (`node_modules/chart.js/dist/chart.js:5696-5698`), which lays out scales and calls the y-axis `ticks.callback` = `window.CostFormat.formatUsd(Number(v))` (`workspace-kpis.js:138`). Order is chart → chart-helpers → [shim] → workspace-kpis → common → app, and a module runs only after parsing, so any workspace with priced cost gets a TypeError at load and no chart. The other three consumers are safe (flight-companion via DOMContentLoaded; observation via init on DOMContentLoaded `:4867`; prompt-section after the panelNumbers fetch). No plan witness sees it: the vm load returns early when `typeof Chart === \"undefined\"`, and `tests/e2e/workspace-kpis.spec.js:133-136` says priced lineages cannot be created via dispatch, so e2e always shows the empty note. Change: (1) name workspace-kpis.js as the one consumer that changes, running its IIFE body from a DOMContentLoaded listener (when it draws, not what: not a view rework); (2) restate the constraint as never read during script execution, including through a callback a library runs synchronously; (3) a real ordering witness: load it in loadWorld with a Chart stub that calls each scale ticks.callback in its constructor, `__WORKSPACE_KPI_DATA__` with nonzero cost.perDay, CostFormat absent: must not throw; then install the global, `fireDOMContentLoaded` (tests/unit/helpers/client-world.js), assert formatted tick labels. Fails at load today. Keep the Playwright check but do not count it as covering this."
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ],
+     "on": [
+      "plan-28@12",
+      "finding-16@3",
+      "finding-25@1"
+     ]
+    },
+    "in": "task-9",
+    "to": "design",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:23:47.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "verdict-35": [
+   {
+    "id": "verdict-35",
+    "kind": "verdict",
+    "state": "stands",
+    "fields": {
+     "of": "plan-review",
+     "outcome": "request-changes",
+     "reasoning": "One blocker: finding-34 (workspace-kpis.js reads window.CostFormat at load through Chart.js tick callbacks; no plan witness sees it). Once it is folded in (deferral, restated constraint, Chart-stub witness) the plan is ready to build; the builder notes can be handled during the build. Meets the ask: rule reading in the notes (step 1), one shared piece retiring public/cost-format.js and its parity test, names what it retires, stops for John (step 7). The only narrowing, no view reworked, is John’s size ruling (decision-26), not the plan. Checked sound at 4b5001ddf (= origin/main): vendor-assets.js is a frozen allow-list with statSync at boot, mounted just before express.static(public); CSP script-src self plus hashes admits a same-origin module, CSP and nosniff only on HTML; lib/cost-format.js has no imports (leaf, passes purity); renderPage emits <script src> per string entry (page.js:204) and the scripts.includes(\"/common.js\") check ignores object entries; golden updates via UPDATE_RENDER_TASK_PAGE_GOLDEN=1; area-note Lessons ~700 bytes, room; allow-list not directory is right; moving the parity file server-side half is right."
+    },
+    "links": {
+     "on": [
+      "plan-28@12",
+      "finding-34@1"
+     ],
+     "about": [
+      "plan-28"
+     ]
+    },
+    "in": "task-9",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:23:48.000Z",
+    "by": "plan-review"
    }
   ]
  },

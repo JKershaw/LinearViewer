@@ -1,0 +1,179 @@
+[
+ {
+  "at": "2026-11-17T15:26:32.117Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "get",
+   "change-84",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:32.148Z",
+  "by": "blind-read",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:32.177Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "area",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:36.798Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--path",
+   "routes/workspace-api-audit.js",
+   "--kind",
+   "area",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:36.829Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "web",
+   "--kind",
+   "area",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:36.860Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-70",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:36.891Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "get",
+   "verdict-96",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:36.927Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "search",
+   "--state",
+   "open",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:45.613Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-91",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:45.649Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "area",
+   "--path",
+   "routes/",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:45.684Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "area",
+   "--text",
+   "routes",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:45.724Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "verdict",
+   "--text",
+   "blind",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:45.755Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "isHermeticTestToken",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ }
+]

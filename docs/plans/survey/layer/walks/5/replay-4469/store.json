@@ -3432,6 +3432,19 @@
     "implementation"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:27:33.144Z",
+   "by": "implementation",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-131",
+    "--by",
+    "implementation"
+   ],
+   "asOf": null
   }
  ]
 }

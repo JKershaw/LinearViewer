@@ -1,0 +1,39 @@
+task-60 task v1 [open] by breakdown
+decision-63 decision v1 [stands] by undefined
+run-66 run v2 [done] by undefined
+question-67 question v3 [answered] to implementation answered-by decision-85 by undefined
+question-68 question v2 [answered] to implementation answered-by decision-81 by undefined
+check-69 check v2 [handed-on] to John by undefined
+finding-70 finding v2 [handed-on] to implementation by undefined
+finding-71 finding v2 [done] to implementation by undefined
+run-72 run v2 [done] by undefined
+finding-73 finding v2 [handed-on] to implementation by undefined
+finding-74 finding v2 [declined] to implementation by undefined
+finding-75 finding v2 [done] to implementation by undefined
+finding-76 finding v2 [done] to implementation by undefined
+finding-77 finding v2 [done] to implementation by undefined
+finding-78 finding v2 [done] to implementation by undefined
+finding-79 finding v1 [open] to area-1 by undefined
+finding-80 finding v1 [open] to area-1 by undefined
+decision-81 decision v1 [stands] by undefined
+run-82 run v2 [done] by undefined
+run-83 run v2 [done] by undefined
+change-84 change v2 [open] by undefined
+decision-85 decision v1 [stands] by undefined
+decision-86 decision v1 [stands] by undefined
+decision-87 decision v1 [stands] by undefined
+finding-88 finding v2 [handed-on] to task-61 by undefined
+finding-89 finding v2 [handed-on] to task-62 by undefined
+run-90 run v3 [done] by undefined
+verdict-96 verdict v1 [stands] by undefined
+finding-97 finding v1 [open] to close-out by undefined
+check-98 check v1 [open] to task-62 by undefined
+check-99 check v1 [open] to task-62 by undefined
+check-100 check v1 [open] to task-62 by undefined
+finding-101 finding v1 [open] to task-61 by undefined
+run-102 run v2 [done] by undefined
+run-103 run v2 [done] by undefined
+verdict-104 verdict v1 [stands] by undefined
+finding-105 finding v1 [open] to close-out by undefined
+finding-106 finding v1 [open] to close-out by undefined
+finding-107 finding v1 [open] to close-out by undefined
