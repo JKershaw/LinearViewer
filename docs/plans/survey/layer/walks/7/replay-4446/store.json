@@ -541,6 +541,65 @@
     "pos": []
    },
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:24:35.847Z",
+   "by": "survey-place",
+   "cmd": "get",
+   "args": {
+    "by": "survey-place",
+    "pos": [
+     "finding-15"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:24:35.879Z",
+   "by": "survey-place",
+   "cmd": "get",
+   "args": {
+    "by": "survey-place",
+    "pos": [
+     "check-13"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:24:35.911Z",
+   "by": "survey-place",
+   "cmd": "get",
+   "args": {
+    "by": "survey-place",
+    "pos": [
+     "area-1"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:24:35.952Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": {
+    "kind": "lesson",
+    "by": "survey-place",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:24:35.985Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": {
+    "kind": "run",
+    "state": "open",
+    "by": "survey-place",
+    "pos": []
+   },
+   "asOf": null
   }
  ]
 }
