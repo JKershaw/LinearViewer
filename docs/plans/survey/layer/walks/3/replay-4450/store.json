@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 105,
+ "next": 106,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -1575,6 +1575,32 @@
      "links": {
       "piece": "plan-54"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:40:13.000Z",
+     "by": "close-out",
+     "in": "task-53",
+     "state": "done",
+     "fields": {
+      "asked": "",
+      "done-when": "All of the above pass on `fake-client.js`. Jira's `descriptionRoundTrip` holds sealed words byte-exact, D1's rich-content guard is unchanged, and the PR names what it retires (the \"Jira skipped/unsealed\" seal claims in code headers). Note that once this lands, the first-dispatch seal begins sealing Jira-native tickets on live sites. That is expected: it is logged on failure, and dispatch continues.",
+      "paths": [
+       "lib/providers/jira/",
+       "lib/as-asked-seal.js",
+       "lib/as-asked.js",
+       "tests/unit/as-asked-create-seal.test.js",
+       "tests/unit/as-asked-dispatch-seal.test.js",
+       "tests/unit/as-asked-readers.test.js",
+       "tests/unit/jira-provider.test.js"
+      ]
+     },
+     "links": {
+      "piece": "plan-54"
+     },
+     "reason": "PR #2421 merged (2bf788b6d, head 26299c9b0) and deployed; Done-when met on fake-client.js per verdict-93 (round trip byte-exact, D1 rich-content guard unchanged, retirements named). Live checks check-95/96/97 stay with John under task-62 (LIN-4452); they are post-deploy and do not hold this close.",
+     "stateReason": "PR #2421 merged (2bf788b6d, head 26299c9b0) and deployed; Done-when met on fake-client.js per verdict-93 (round trip byte-exact, D1 rich-content guard unchanged, retirements named). Live checks check-95/96/97 stay with John under task-62 (LIN-4452); they are post-deploy and do not hold this close."
     }
    ]
   },
@@ -1873,6 +1899,27 @@
       "about": "plan-56",
       "on": "plan-54@2"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:40:06.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "John",
+     "state": "handed-on",
+     "fields": {
+      "what": "Before any session-1 code: does a sealed region's `adfToMarkdown` rendering survive an ordinary Jira editor save below the line, and does the edit endpoint accept `properties` in the body?",
+      "why-person": "Needs a live Jira site and credential; the session has none, and `fake-client.js` merges `fields` and stores whatever it is given, so it cannot show Jira's normalisation. Shape B's SHA-256 of the rendering is only safe if Jira leaves trailing spaces before hardBreaks, text-node splitting and empty paragraphs (LIN-2019 drops these) alone; `localId` is handled because `adfToMarkdown` ignores attrs. If they shift, every sealed issue reads as human-edited and the words turn into the rendering (`*em*`→`_em_`, `* a`→`- a`, `***x***`→`\\***x**\\*`, observed at 4b5001ddf).",
+      "how": "~15 min: 1) PUT a sealed description holding the plan's witness inputs with `properties:[{key:'harbour.asAsked',…}]` in the same body; 2) GET with `?properties=harbour.asAsked`; 3) edit a line below the block in Jira's editor and save; 4) GET again and diff `adfToMarkdown(region)`. Holds: plan stands as written. Doesn't: digest must be over a normalised rendering, a design change to record on LIN-4445 (task-53). Session 3 (plan-56 item 12) checks this only after the build."
+     },
+     "links": {
+      "about": "plan-56",
+      "on": "plan-54@2"
+     },
+     "reason": "Asked before session-1 code; the build went ahead without it (no credential). Its post-build form is check-96 (editor save keeps the digest, its first question) and check-95 (properties accepted on the edit PUT, its second question), both to John, owned by task-62 (LIN-4452).",
+     "stateReason": "Asked before session-1 code; the build went ahead without it (no credential). Its post-build form is check-96 (editor save keeps the digest, its first question) and check-95 (properties accepted on the edit PUT, its second question), both to John, owned by task-62 (LIN-4452).",
+     "takeover": "check-96"
     }
    ]
   },
@@ -2334,6 +2381,39 @@
      "links": {
       "about": "plan-54"
      }
+    },
+    {
+     "v": 2,
+     "op": "revise",
+     "at": "2026-11-13T15:40:00.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "ref": "https://github.com/JKershaw/LinearViewer/pull/2421 (branch feat/lin-4450-jira-as-asked-seal)",
+      "head": "26299c9b0c6ecb57edd029f49578282224f6d31e"
+     },
+     "links": {
+      "about": "plan-54"
+     },
+     "reason": "Close-out's fixes (commit 26299c9b0, after review and blind read at f9fa4a80c) moved the PR; this is the head CI passed on and the merge was pinned to. The record had still named a98d042c6 through two earlier moves."
+    },
+    {
+     "v": 3,
+     "op": "end",
+     "at": "2026-11-13T15:40:01.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "state": "merged",
+     "fields": {
+      "ref": "https://github.com/JKershaw/LinearViewer/pull/2421 (branch feat/lin-4450-jira-as-asked-seal)",
+      "head": "26299c9b0c6ecb57edd029f49578282224f6d31e"
+     },
+     "links": {
+      "about": "plan-54"
+     },
+     "reason": "PR #2421 squash-merged as 2bf788b6da71c82db6a1d84b361da98ef9cdedbb, pinned to head 26299c9b0; ci-success green on that head; deployed (harbour.cat footer shows 2bf788b6d at 15:39 UTC) and the Tests run on main for it green.",
+     "stateReason": "PR #2421 squash-merged as 2bf788b6da71c82db6a1d84b361da98ef9cdedbb, pinned to head 26299c9b0; ci-success green on that head; deployed (harbour.cat footer shows 2bf788b6d at 15:39 UTC) and the Tests run on main for it green."
     }
    ]
   },
@@ -2399,6 +2479,22 @@
      "links": {
       "on": "change-82@1"
      }
+    },
+    {
+     "v": 2,
+     "op": "revise",
+     "at": "2026-11-13T15:40:07.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "task-61",
+     "state": "open",
+     "fields": {
+      "says": "PR #2421 (LIN-4450) names its retirements but not two of finding-74's: `docs/architecture/source-map.md:216` (the Jira paragraph, which says Jira cannot hold the block) and `:82` (the new `lib/providers/jira/as-asked-region.js` needs a mention). Check whether the PR touched them; if not, they go stale on merge. Grounded at 4b5001ddf line numbers."
+     },
+     "links": {
+      "on": "change-82@1"
+     },
+     "reason": "Review (verdict-93) did not settle it and close-out did not check source-map.md :216 or :82 (it fixed only line 42's isTestToken citation), so after the merge it may be stale. PR #2421 is merged and task-60 closes; task-61 (LIN-4451, createIssue) is the next change to retire Jira 'cannot hold' claims, so it is the live owner. Check both lines at main 2bf788b6d."
     }
    ]
   },
@@ -2653,6 +2749,23 @@
      "links": {
       "on": "verdict-93@1"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:40:02.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "done",
+     "fields": {
+      "says": "Fix before merge (review of PR #2421 at `f9fa4a80c`): in `tests/unit/jira-as-asked-region.test.js`, test \"an oversized body is not sealed…\" (~line 262), capture `console.log` during the `sealForFiling` call and assert exactly one line equal to `[as-asked] seal skipped: provider jira cannot hold the block (test)`. The test already asserts filed unsealed and verbatim; this pins the plan's \"with the log line\" clause of the oversize witness."
+     },
+     "links": {
+      "on": "verdict-93@1"
+     },
+     "reason": "Fixed in commit 26299c9b0 (merged in PR #2421): the oversize test now captures console.log and asserts exactly one line, '[as-asked] seal skipped: provider jira cannot hold the block (test)'. Checked it bites: changing the logged wording turns it red; reverted.",
+     "stateReason": "Fixed in commit 26299c9b0 (merged in PR #2421): the oversize test now captures console.log and asserts exactly one line, '[as-asked] seal skipped: provider jira cannot hold the block (test)'. Checked it bites: changing the logged wording turns it red; reverted."
     }
    ]
   },
@@ -2676,6 +2789,24 @@
      "links": {
       "about": "check-69",
       "on": "change-82@1"
+     }
+    },
+    {
+     "v": 2,
+     "op": "link",
+     "at": "2026-11-13T15:40:08.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "what": "After PR #2421 deploys: does live Jira accept `properties: [{key:'harbour.asAsked', value}]` on `PUT /rest/api/3/issue/{key}` and return it as `properties['harbour.asAsked']` on `GET ?properties=harbour.asAsked`?",
+      "why-person": "Needs John's live Jira site and credential; no build session has one. `fake-client.js` is built to that shape but no test reaches Atlassian. This is the post-build form of check-69's second question, owned by task-62 (LIN-4452).",
+      "how": "One sealed `updateIssue` on John's site, then re-read. Right: the re-read's `properties['harbour.asAsked'].words` is byte-equal to the words written. Wrong: `properties` key absent (the PUT dropped it)."
+     },
+     "links": {
+      "about": "check-69",
+      "on": "change-82@3"
      }
     }
    ]
@@ -2701,6 +2832,24 @@
       "about": "check-69",
       "on": "change-82@1"
      }
+    },
+    {
+     "v": 2,
+     "op": "link",
+     "at": "2026-11-13T15:40:09.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "what": "After PR #2421 deploys: does live Jira's editor keep a sealed region's `adfToMarkdown` rendering (and so the stored digest) when someone edits and saves a line below the block?",
+      "why-person": "Needs John's live Jira site; the fake never normalises ADF, so it cannot show this (lesson-91). If Jira shifts the rendering, every sealed issue silently serves converted words (`*em*`→`_em_`). Post-build form of check-69's first question, owned by task-62 (LIN-4452), following plan-review note 1.",
+      "how": "File a lossy body (`* a`, `*em*`, trailing spaces, `3.`). In Jira's own editor edit one line below the block and save. Re-read. Right: words byte-equal to what was filed and the digest-match branch taken (`digest(region) === property.rendered`). Wrong: words equal `adfToMarkdown(markdownToAdf(words))`."
+     },
+     "links": {
+      "about": "check-69",
+      "on": "change-82@3"
+     }
     }
    ]
   },
@@ -2723,6 +2872,23 @@
      },
      "links": {
       "on": "change-82@1"
+     }
+    },
+    {
+     "v": 2,
+     "op": "link",
+     "at": "2026-11-13T15:40:10.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "what": "After PR #2421 deploys: does the first dispatch of a never-dispatched Jira-native ticket on John's site write the block through `updateIssue` and still enqueue?",
+      "why-person": "The consequence named in task-60's Done-when (first-dispatch seal starts sealing Jira-native tickets on live sites) can only be observed on John's live site.",
+      "how": "Dispatch one never-dispatched Jira-native ticket. Right is either outcome, with the dispatch row enqueued in both: the ticket shows the formatted block and no \"seal skipped\" line; or, for a ticket carrying mentions/emoji/panels, the existing D1 refusal line is logged. Wrong: dispatch not enqueued, or a block written with no property."
+     },
+     "links": {
+      "on": "change-82@3"
      }
     }
    ]
@@ -2801,6 +2967,23 @@
      "links": {
       "on": "change-82@1"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:40:03.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "done",
+     "fields": {
+      "says": "Fix before merge (blind read of PR #2421 at `f9fa4a80c`): `routes/workspace-api-audit.js` lines 35-36 still write `process.env.NODE_ENV === 'test' && (workspace.accessToken === 'test-token' || …)` inline; the sweep moved every sibling copy onto `isHermeticTestToken` and missed this one. Fix: `isHermeticTestToken(workspace.accessToken) || (process.env.NODE_ENV === 'test' && workspace.provider === 'local')`. It keeps its own predicate, as its comment asks; only the token half uses the helper."
+     },
+     "links": {
+      "on": "change-82@1"
+     },
+     "reason": "Fixed in commit 26299c9b0: routes/workspace-api-audit.js now reads isHermeticTestToken(workspace.accessToken) || (NODE_ENV==='test' && workspace.provider==='local'); same predicate as before, local-provider alternative kept.",
+     "stateReason": "Fixed in commit 26299c9b0: routes/workspace-api-audit.js now reads isHermeticTestToken(workspace.accessToken) || (NODE_ENV==='test' && workspace.provider==='local'); same predicate as before, local-provider alternative kept."
     }
    ]
   },
@@ -2822,6 +3005,23 @@
      "links": {
       "on": "change-82@1"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:40:04.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "done",
+     "fields": {
+      "says": "Fix before merge (blind read of PR #2421 at `f9fa4a80c`): `routes/workspace-api-steps.js`'s `isTestToken` is now a one-line second name for `isHermeticTestToken(workspace.accessToken)`. Have its callers (`routes/workspace-api-issue-read.js`, `routes/workspace-api-issue-write.js`, `routes/workspace-api-prompts.js`) import the helper directly and drop the alias."
+     },
+     "links": {
+      "on": "change-82@1"
+     },
+     "reason": "Fixed in commit 26299c9b0: isTestToken removed from routes/workspace-api-steps.js; workspace-api.js, -prompts.js, -issue-read.js, -issue-write.js and the steps file call isHermeticTestToken(workspace.accessToken) directly. The stale citations this made (steps-file header comments, docs/architecture/source-map.md line 42) fixed in the same commit.",
+     "stateReason": "Fixed in commit 26299c9b0: isTestToken removed from routes/workspace-api-steps.js; workspace-api.js, -prompts.js, -issue-read.js, -issue-write.js and the steps file call isHermeticTestToken(workspace.accessToken) directly. The stale citations this made (steps-file header comments, docs/architecture/source-map.md line 42) fixed in the same commit."
     }
    ]
   },
@@ -2843,6 +3043,23 @@
      "links": {
       "on": "change-82@1"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:40:05.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "done",
+     "fields": {
+      "says": "Fix before merge (blind read of PR #2421 at `f9fa4a80c`): in `tests/unit/jira-as-asked-region.test.js`, the test at ~line 291, \"no longer claim that Jira is skipped\", only checks that three phrases are missing from the comment headers of `lib/as-asked-seal.js` and `lib/as-asked.js`. It pins no behaviour; `tests/unit/as-asked-create-seal.test.js` already checks that Jira holds the block. Delete it."
+     },
+     "links": {
+      "on": "change-82@1"
+     },
+     "reason": "Fixed in commit 26299c9b0: the 'no longer claim that Jira is skipped' test is deleted; the behaviour stays covered by tests/unit/as-asked-create-seal.test.js. Full unit suite 25,319/25,319 locally (25,320 less this test).",
+     "stateReason": "Fixed in commit 26299c9b0: the 'no longer claim that Jira is skipped' test is deleted; the behaviour stays covered by tests/unit/as-asked-create-seal.test.js. Full unit suite 25,319/25,319 locally (25,320 less this test)."
     }
    ]
   },
@@ -2898,6 +3115,44 @@
      "links": {},
      "reason": "Blind read posted on LIN-4450",
      "stateReason": "Blind read posted on LIN-4450"
+    }
+   ]
+  },
+  "run-105": {
+   "id": "run-105",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:40:11.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "stage": "close-out",
+      "account": "Closed out LIN-4450. Made the named fixes after the approvals in commit 26299c9b0 (nobody re-reads these): review's oversize-test log assertion (finding-94, checked it bites), and blind read's three (finding-100 audit predicate onto isHermeticTestToken, finding-101 isTestToken alias removed with its stale citations in the steps-file headers and source-map.md line 42, finding-102 redundant test deleted). ci-success green on 26299c9b0; full unit suite 25,319/25,319 locally. Squash-merged PR #2421 as 2bf788b6d pinned to that head, deployed (harbour.cat footer 2bf788b6d at 15:39 UTC), Tests on main green. change-82 revised to the real head and ended merged; it had named a98d042c6 through two moves, so verdict-93 and verdict-99 rested on change-82@1 and the layer never showed them as resting on a moved PR; both said so only in prose. Not run (need John's live Jira and credential, which no build session has): live property PUT/GET (check-95), digest surviving an editor save (check-96), first Jira-native dispatch (check-97); left to John, owned by task-62 (LIN-4452), re-pinned on the merged change because 26299c9b0 touched no seal path; listed on PR #2421 too. They do not hold the close. Rollback: revert the squash commit; properties stay unread, no data loss. check-69 handed on to check-96. finding-85 (source-map.md :216/:82) re-addressed to task-61: neither review nor I checked it. Left as they are: finding-86 (task-61, now actionable), finding-103 (area-1, batch reads; home is docs/areas/providers.md Waiting). LIN-4451 unblocked; LIN-4452 and parent LIN-4445 stay open."
+     },
+     "links": {
+      "on": "change-82@3"
+     }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:40:12.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "state": "done",
+     "fields": {
+      "stage": "close-out",
+      "account": "Closed out LIN-4450. Made the named fixes after the approvals in commit 26299c9b0 (nobody re-reads these): review's oversize-test log assertion (finding-94, checked it bites), and blind read's three (finding-100 audit predicate onto isHermeticTestToken, finding-101 isTestToken alias removed with its stale citations in the steps-file headers and source-map.md line 42, finding-102 redundant test deleted). ci-success green on 26299c9b0; full unit suite 25,319/25,319 locally. Squash-merged PR #2421 as 2bf788b6d pinned to that head, deployed (harbour.cat footer 2bf788b6d at 15:39 UTC), Tests on main green. change-82 revised to the real head and ended merged; it had named a98d042c6 through two moves, so verdict-93 and verdict-99 rested on change-82@1 and the layer never showed them as resting on a moved PR; both said so only in prose. Not run (need John's live Jira and credential, which no build session has): live property PUT/GET (check-95), digest surviving an editor save (check-96), first Jira-native dispatch (check-97); left to John, owned by task-62 (LIN-4452), re-pinned on the merged change because 26299c9b0 touched no seal path; listed on PR #2421 too. They do not hold the close. Rollback: revert the squash commit; properties stay unread, no data loss. check-69 handed on to check-96. finding-85 (source-map.md :216/:82) re-addressed to task-61: neither review nor I checked it. Left as they are: finding-86 (task-61, now actionable), finding-103 (area-1, batch reads; home is docs/areas/providers.md Waiting). LIN-4451 unblocked; LIN-4452 and parent LIN-4445 stay open."
+     },
+     "links": {
+      "on": "change-82@3"
+     },
+     "reason": "Close-out finished; PR #2421 merged and deployed.",
+     "stateReason": "Close-out finished; PR #2421 merged and deployed."
     }
    ]
   }
@@ -3765,6 +4020,95 @@
     "asOf": null
    },
    "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:51:21.031Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "check-69",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:51:21.067Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "finding-85",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:51:21.106Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "finding-86",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:51:21.143Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "check-95",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:51:21.182Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "check-96",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:51:21.222Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "check-97",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:51:21.263Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "finding-103",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:51:21.301Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "finding-77",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:51:21.338Z",
+   "by": "close-out",
+   "query": "find",
+   "args": {
+    "kind": "task"
+   },
+   "returned": 4
   }
  ],
  "hits": []

@@ -1,0 +1,153 @@
+[
+ {
+  "at": "2026-11-17T13:50:36.369Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "kind": "area"
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:50:36.407Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "kind": "change"
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:50:36.442Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "text": "mayCarryWake"
+  },
+  "returned": 3
+ },
+ {
+  "at": "2026-11-17T13:50:36.483Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "text": "runner-kickoff"
+  },
+  "returned": 2
+ },
+ {
+  "at": "2026-11-17T13:50:42.603Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "kind": "task"
+  },
+  "returned": 3
+ },
+ {
+  "at": "2026-11-17T13:50:42.656Z",
+  "by": "blind-read",
+  "query": "get",
+  "args": {
+   "id": "finding-76",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:50:42.702Z",
+  "by": "blind-read",
+  "query": "get",
+  "args": {
+   "id": "finding-22",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:50:42.742Z",
+  "by": "blind-read",
+  "query": "get",
+  "args": {
+   "id": "finding-68",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:50:42.783Z",
+  "by": "blind-read",
+  "query": "get",
+  "args": {
+   "id": "finding-66",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:50:42.823Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "text": "run-view"
+  },
+  "returned": 2
+ },
+ {
+  "at": "2026-11-17T13:50:50.766Z",
+  "by": "blind-read",
+  "query": "get",
+  "args": {
+   "id": "question-77",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:50:50.804Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "to": "area-1",
+   "state": "open"
+  },
+  "returned": 20
+ },
+ {
+  "at": "2026-11-17T13:50:50.853Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "text": "stamp"
+  },
+  "returned": 10
+ },
+ {
+  "at": "2026-11-17T13:50:50.899Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "text": "4448"
+  },
+  "returned": 4
+ },
+ {
+  "at": "2026-11-17T13:51:05.047Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "to": "blind-read"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:51:05.081Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "to": "task-60",
+   "state": "open"
+  },
+  "returned": 0
+ }
+]

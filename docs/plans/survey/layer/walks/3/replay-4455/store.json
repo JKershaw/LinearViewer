@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 96,
+ "next": 103,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -2595,6 +2595,172 @@
      "stateReason": "Review written"
     }
    ]
+  },
+  "verdict-96": {
+   "id": "verdict-96",
+   "kind": "verdict",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:56:30.000Z",
+     "by": "blind-read",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "of": "blind-read",
+      "outcome": "better",
+      "reasoning": "Read cold: PR #2427 at c95b9f139 against c205190fd. Better. Scattered decisions get one owner each: the FEEDBACK_KINDS table in lib/dispatch-feedback-kinds.js replaces the runner allowlist, the parked-wait relays and four decision-stamp copies (session-telemetry, wall-clock-summary, run-view, digest-feedback); NEVER_RAN in lib/dispatch-terminal.js replaces seven cancelled/expired restatements; HALT_MODES and followUpTarget replace dispatch-leftover.js private copies; the store no longer picks the leftover wording. Census tests guard all of it. Worse, and smaller: the held-wake release wording now reaches the store by two channels, from a factory that mutates the store as it is built (dispatch-leftover-hook.js, dispatch-store.js); and a mayCarryWake column true for every row, which lastWakeEntry in lib/run-view.js contradicts. Two fix-sized items to close-out; two larger ones to area-1; one outside the area (llm-and-prompts)."
+     },
+     "links": {
+      "on": "change-82@2"
+     }
+    }
+   ]
+  },
+  "finding-97": {
+   "id": "finding-97",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:56:31.000Z",
+     "by": "blind-read",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "open",
+     "fields": {
+      "says": "Blind read of PR #2427 @ c95b9f139, fix-sized: floating comments left where constants were removed. `lib/run-view.js`: the block \"A waiting scan skips the decision-lifecycle stamp kinds…\" (above `lastWakeEntry`) sat on the deleted `DECISION_STAMP_KINDS`; it now heads nothing and repeats the `lastWakeEntry` docblock below it. Same in `lib/session-telemetry.js` (\"LIN-4240: `PARKED_WAIT_SKIPPED_KINDS`…\") and `lib/wall-clock-summary.js` (\"LIN-3037 (Surface 11)…\"). Fix: fold each into the docblock of the function that uses the set, or delete it."
+     },
+     "links": {
+      "on": "change-82@2",
+      "about": "verdict-96"
+     }
+    }
+   ]
+  },
+  "finding-98": {
+   "id": "finding-98",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:56:32.000Z",
+     "by": "blind-read",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "open",
+     "fields": {
+      "says": "Blind read of PR #2427 @ c95b9f139, fix-sized: `lib/dispatch-leftover-hook.js` calls `dispatchStore.setHeldWakeReleaseNote?.(releaseNote)` with optional chaining, though its `@param` lists `setHeldWakeReleaseNote` as a required store dependency. A store or stub without the method silently keeps the \"step holding this wake\" fallback wording instead of failing. Fix: call it without `?.` (and give any test stub the method), or say in the `@param` that it is optional."
+     },
+     "links": {
+      "on": "change-82@2",
+      "about": "verdict-96"
+     }
+    }
+   ]
+  },
+  "finding-99": {
+   "id": "finding-99",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:56:33.000Z",
+     "by": "blind-read",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Blind read of PR #2427 @ c95b9f139 (LIN-4455), larger: in `lib/dispatch-feedback-kinds.js`, `mayCarryWake` is true on every row and `feedbackKindMayCarryWake` returns true for unknown kinds, so the new check in `findWakeEvent` (`lib/dispatch-terminal.js`) can never skip anything, and the kinds-table test \"findWakeEvent finds a marker exactly when its kind may carry a wake\" never exercises the false branch. The column also contradicts another wake reader: `lastWakeEntry` in `lib/run-view.js` skips decision-stamp kinds as \"never a wake marker\", while the table says they may carry one. Two wake scans disagree about stamps, and the column that could own the answer only records today's `findWakeEvent` behaviour. Larger because removing the column, or making it true to both readers, means deciding whether `findWakeEvent` should skip stamps (as well as the relay kinds question-77 asks about), which changes wake minting, as the table's own docblock says."
+     },
+     "links": {
+      "on": "change-82@2",
+      "about": "question-77"
+     }
+    }
+   ]
+  },
+  "finding-100": {
+   "id": "finding-100",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:56:34.000Z",
+     "by": "blind-read",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Evidence for finding-76 (Waiting 5), from the blind read of PR #2427 @ c95b9f139: as built, the release wording reaches `lib/dispatch-store.js` two ways, the late-bound `setHeldWakeReleaseNote` and each request hook's `releaseNote`. In production both carry the same function from `createLeftoverStep` (`lib/dispatch-leftover-hook.js`), so `releaseHeldWake`'s `releaseNote` option, `_releaseNoteFor`'s precedence and `hook.releaseNote` are a second path to a value the store already holds; and building the step now mutates the store as a hidden side effect. Settle with finding-76's one held-wake policy, not as a fix."
+     },
+     "links": {
+      "on": "change-82@2",
+      "about": "finding-76"
+     }
+    }
+   ]
+  },
+  "finding-101": {
+   "id": "finding-101",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:56:35.000Z",
+     "by": "blind-read",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Across the seam with llm-and-prompts (A14 / LIN-4448, which has no record in the layer), from the blind read of PR #2427 @ c95b9f139: `lib/prompts/runner-kickoff.js` still imports `FEEDBACK_ENTRY_KINDS` from `../dispatch-store.js`, the only importer of the store's new re-export shim (`export { FEEDBACK_ENTRY_KINDS } from './dispatch-feedback-kinds.js'`); the kinds module's docblock calls this \"through the store's re-export\". Importing from the leaf (A14's side) would let the store drop the shim (this area's side) and keep the prompt module off the store's import graph. The runner prompt must stay byte-identical (check-70)."
+     },
+     "links": {
+      "on": "change-82@2",
+      "about": "finding-69"
+     }
+    }
+   ]
+  },
+  "run-102": {
+   "id": "run-102",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:56:36.000Z",
+     "by": "blind-read",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "stage": "blind-read",
+      "account": "Read PR #2427 cold at c95b9f139 against c205190fd and judged it better (verdict-96): one owner each for the feedback kinds, NEVER_RAN, HALT_MODES and followUpTarget, census-guarded; the store no longer picks leftover wording. Two fix-sized items to close-out before merge (floating comments finding-97; optional-chained setter finding-98). Larger items to area-1: mayCarryWake true everywhere and contradicted by run-view (finding-99, about question-77); the two release-wording channels (finding-100, evidence for finding-76, which I may not revise). The runner-kickoff shim import belongs across the seam with A14, which has no layer id, so it went to area-1 naming A14 (finding-101)."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:56:37.000Z",
+     "by": "blind-read",
+     "in": "task-60",
+     "state": "done",
+     "fields": {
+      "stage": "blind-read",
+      "account": "Read PR #2427 cold at c95b9f139 against c205190fd and judged it better (verdict-96): one owner each for the feedback kinds, NEVER_RAN, HALT_MODES and followUpTarget, census-guarded; the store no longer picks leftover wording. Two fix-sized items to close-out before merge (floating comments finding-97; optional-chained setter finding-98). Larger items to area-1: mayCarryWake true everywhere and contradicted by run-view (finding-99, about question-77); the two release-wording channels (finding-100, evidence for finding-76, which I may not revise). The runner-kickoff shim import belongs across the seam with A14, which has no layer id, so it went to area-1 naming A14 (finding-101)."
+     },
+     "links": {},
+     "reason": "Blind read written: verdict-96 and findings 97-101.",
+     "stateReason": "Blind read written: verdict-96 and findings 97-101."
+    }
+   ]
   }
  },
  "queries": [
@@ -3184,6 +3350,35 @@
     "text": "4448"
    },
    "returned": 4
+  },
+  {
+   "at": "2026-11-17T13:51:05.047Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "to": "blind-read"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:51:05.081Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "to": "task-60",
+    "state": "open"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:52:23.922Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
   }
  ],
  "hits": []

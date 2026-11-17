@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 104,
+ "next": 108,
  "records": {
   "task-1": {
    "id": "task-1",
@@ -1953,6 +1953,21 @@
       "says": "`lib/render-task-page.js`: the layout test's desktop check that both quiet offers (write a brief, write a recap) sit on one line is a one-shot `boundingBox` read after a reload; it fails first (10.25 px against 4) and passes on retry in 33 sampled green runs, so a real wrap would read as a flake. Wait for layout to settle or poll. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)"
      },
      "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T18:01:33.000Z",
+     "by": "leftover",
+     "in": "area-50",
+     "to": "area-50",
+     "state": "done",
+     "fields": {
+      "says": "`lib/render-task-page.js`: the layout test's desktop check that both quiet offers (write a brief, write a recap) sit on one line is a one-shot `boundingBox` read after a reload; it fails first (10.25 px against 4) and passes on retry in 33 sampled green runs, so a real wrap would read as a flake. Wait for layout to settle or poll. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)"
+     },
+     "links": {},
+     "reason": "Settled in PR #2436 (head ffa70b782): tests/e2e/task-page.spec.js now polls the quiet offers' offset with expect.poll instead of one boundingBox read after reload; 5/5 passes locally with retries off, and the Waiting entry is removed from docs/areas/front-end-pages.md.",
+     "stateReason": "Settled in PR #2436 (head ffa70b782): tests/e2e/task-page.spec.js now polls the quiet offers' offset with expect.poll instead of one boundingBox read after reload; 5/5 passes locally with retries off, and the Waiting entry is removed from docs/areas/front-end-pages.md."
     }
    ]
   },
@@ -2874,6 +2889,131 @@
      }
     }
    ]
+  },
+  "finding-104": {
+   "id": "finding-104",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T18:01:30.000Z",
+     "by": "leftover",
+     "in": "task-28",
+     "to": "review",
+     "state": "open",
+     "fields": {
+      "says": "PR #2436 head moved to `ffa70b7821e9859a403e043e1ea55d588b67ac73` after the leftover tidies, so review that head, not `a6492a984` (change-97 still names the old head; leftover may not revise it). The tidies: every server caller of `fmtDuration`/`relativeAgo` imports `lib/time-words.js`; the re-exports in `lib/render-run-steps.js` and `lib/task-page-loader.js` are gone; the identity test in `lin-4472-time-words.test.js` is now a guard (no `lib/`, `routes/` or `server.js` module but the leaf defines or re-exports either name), and re-adding one re-export as a mutation failed it. The `lib/time-words.js` header and `docs/architecture/source-map.md` (render-run-steps exports, time-words entry) no longer say the server re-exports. CI green on the new head: CI success, both unit jobs, E2E shards 1-4, secret scan."
+     },
+     "links": {
+      "about": "change-97"
+     }
+    }
+   ]
+  },
+  "finding-105": {
+   "id": "finding-105",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T18:01:31.000Z",
+     "by": "leftover",
+     "in": "area-49",
+     "to": "area-49",
+     "state": "open",
+     "fields": {
+      "says": "Adds to finding-99 (which leftover may not revise): of the three classic copies, `public/session.js` `formatElapsed` and `public/observation.js` `formatRuntime` restate `fmtDuration` (`lib/time-words.js`), but `public/live-console.js` `fmtDuration(s)` spells the rule a second way, with no hour rung. Converting live-console to import the leaf therefore changes what it prints for spans of an hour or more; say so when that view converts. (LIN-4472 leftovers.)"
+     },
+     "links": {
+      "about": "finding-99"
+     }
+    }
+   ]
+  },
+  "lesson-106": {
+   "id": "lesson-106",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T18:01:32.000Z",
+     "by": "leftover",
+     "in": "area-49",
+     "state": "holds",
+     "fields": {
+      "says": "`importWorld` (`tests/unit/helpers/import-world.js`) installs only the globals it is given, nothing more. Test a converted page's pure exports by a plain static import, with no world at all; drive a page's init (its DOMContentLoaded listener) through `tests/unit/helpers/task-page-world.js`, which builds the world the task page needs, rather than restating that setup in each suite (LIN-4472).",
+      "paths": [
+       "tests/unit/helpers/import-world.js",
+       "tests/unit/helpers/task-page-world.js"
+      ],
+      "checked-at": "ffa70b782"
+     },
+     "links": {
+      "about": "lesson-67"
+     }
+    }
+   ]
+  },
+  "run-107": {
+   "id": "run-107",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T18:01:34.000Z",
+     "by": "leftover",
+     "in": "task-28",
+     "state": "open",
+     "fields": {
+      "stage": "leftover",
+      "account": "Leftovers on PR #2436. Tidied now: server callers of fmtDuration/relativeAgo import lib/time-words.js directly, the two re-exports are gone, and the identity test is a guard (it failed when I re-added a re-export); the time-words header and source-map stopped saying the server re-exports. Head is now ffa70b782, CI green (finding-104 to review, since I may not revise change-97). Noted for area-49: the three classic copies stay in the Waiting entry (finding-99), with live-console spelling the rule without an hour rung (finding-105). Lesson-106: importWorld installs only what it is given; static-import pure exports, drive init through task-page-world.js. Retired area-50 finding-76: the task-page layout check now polls the offers offset, 5/5 locally with retries off.",
+      "claims": [
+       "lib/time-words.js",
+       "lib/render-run-steps.js",
+       "lib/task-page-loader.js",
+       "tests/unit/lin-4472-time-words.test.js",
+       "docs/architecture/source-map.md",
+       "docs/areas/front-end-browser.md",
+       "docs/areas/front-end-pages.md",
+       "tests/e2e/task-page.spec.js"
+      ]
+     },
+     "links": {
+      "on": "change-97@2"
+     }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T18:01:35.000Z",
+     "by": "leftover",
+     "in": "task-28",
+     "state": "done",
+     "fields": {
+      "stage": "leftover",
+      "account": "Leftovers on PR #2436. Tidied now: server callers of fmtDuration/relativeAgo import lib/time-words.js directly, the two re-exports are gone, and the identity test is a guard (it failed when I re-added a re-export); the time-words header and source-map stopped saying the server re-exports. Head is now ffa70b782, CI green (finding-104 to review, since I may not revise change-97). Noted for area-49: the three classic copies stay in the Waiting entry (finding-99), with live-console spelling the rule without an hour rung (finding-105). Lesson-106: importWorld installs only what it is given; static-import pure exports, drive init through task-page-world.js. Retired area-50 finding-76: the task-page layout check now polls the offers offset, 5/5 locally with retries off.",
+      "claims": [
+       "lib/time-words.js",
+       "lib/render-run-steps.js",
+       "lib/task-page-loader.js",
+       "tests/unit/lin-4472-time-words.test.js",
+       "docs/architecture/source-map.md",
+       "docs/areas/front-end-browser.md",
+       "docs/areas/front-end-pages.md",
+       "tests/e2e/task-page.spec.js"
+      ]
+     },
+     "links": {
+      "on": "change-97@2"
+     },
+     "reason": "Leftovers recorded.",
+     "stateReason": "Leftovers recorded."
+    }
+   ]
   }
  },
  "queries": [
@@ -3449,6 +3589,45 @@
    "query": "get",
    "args": {
     "id": "change-97",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:51:06.024Z",
+   "by": "leftover",
+   "query": "find",
+   "args": {
+    "to": "leftover",
+    "state": "open"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:51:06.065Z",
+   "by": "leftover",
+   "query": "find",
+   "args": {
+    "to": "task-28",
+    "state": "open"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:51:06.118Z",
+   "by": "leftover",
+   "query": "find",
+   "args": {
+    "text": "importWorld"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:52:13.543Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-28",
     "asOf": null
    },
    "returned": 1
