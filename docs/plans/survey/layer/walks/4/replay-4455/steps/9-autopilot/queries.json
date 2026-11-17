@@ -1,0 +1,105 @@
+[
+ {
+  "at": "2026-11-17T14:57:44.090Z",
+  "by": "autopilot",
+  "q": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:56.281Z",
+  "by": "autopilot",
+  "q": [
+   "get",
+   "finding-74",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:56.309Z",
+  "by": "autopilot",
+  "q": [
+   "find",
+   "--text",
+   "composable",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:58:01.896Z",
+  "by": "autopilot",
+  "q": [
+   "find",
+   "--to",
+   "autopilot",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:58:01.932Z",
+  "by": "autopilot",
+  "q": [
+   "find",
+   "--text",
+   "LIN-4458",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:58:01.973Z",
+  "by": "autopilot",
+  "q": [
+   "find",
+   "--kind",
+   "task",
+   "--text",
+   "LIN-4459",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:58:02.012Z",
+  "by": "autopilot",
+  "q": [
+   "find",
+   "--kind",
+   "run",
+   "--text",
+   "autopilot",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:58:06.833Z",
+  "by": "autopilot",
+  "q": [
+   "find",
+   "--kind",
+   "task",
+   "--in",
+   "task-39",
+   "--by",
+   "autopilot"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:58:06.873Z",
+  "by": "autopilot",
+  "q": [
+   "get",
+   "run-102",
+   "--by",
+   "autopilot"
+  ]
+ }
+]
