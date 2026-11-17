@@ -131,13 +131,11 @@ Ended records are left out. Each brief reports what it carries and its size in b
 
 ## 5. Walks
 
-Walks 1–4 are in `walks/1/`–`walks/4/`. What they established: everything that happened had a home; stages writing live address their own records well; retelling stops when stages can look things up; briefs stop growing with the ticket's history; and with only shape checked, corrections replace instead of piling and stale shows only the real signal [checked, results files].
+Walks 1–4 are in `walks/1/`–`walks/4/`. What they established: everything that happened had a home; stages replaying their real outputs addressed their own records well (no walk ran stages doing new work); retelling stops when stages can look things up; briefs stop growing with the ticket's history; and with only shape checked, corrections replace instead of piling and stale shows only the real signal [checked, results files].
 
-**Walk 6: the comparison, done fairly, and where tickets fail.** John: the design is settled once it is "simple enough to use, and working far better than the existing solutions", and "if it was a bad test, why didn't you just run a good test?" [checked, log "17 Nov"]. Walk 5's comparison read a store converted from the ticket against the ticket, at one moment in one task (`walks/5/results.md`).
-- **Same words, two forms:** walk 5's six stores carried onto this model, each run given the stage's own words as its account, so the store holds everything the ticket holds; the same six questions asked again of a store reader.
-- **Across a lane:** at the end of LIN-4459 and LIN-4469, questions about the lane and the area (what is open across the siblings, which asks went unanswered, which decisions were overridden, how many waiting entries stand): one reader with the child ticket, the parent ticket and the area notes as they stood; one with the brief and the store.
-- **Marked** against the full history by a third agent, as in walk 5.
-- **The question:** is everything that happened stored, addressed, ended or rightly open; could each stage find what it needed; and does a stage reading the store know its situation better than one reading the ticket?
+**Walk 6** carried walk 5's stores onto the round 6 model and showed stale is now quiet; its reading comparison measured reading, not whether the structure holds the data, and is set aside. No stage has yet written through round 6: a `to` on a decision or verdict, a verdict superseded, "needs-discussion", an area scope and blindness in queries are untested.
+
+- **The question:** is everything that happened stored, addressed, ended or rightly open; could each stage find what it needed?
 - **A break,** each with why: something with no home; a hand-off to no reader; a thing retold that should be one record; something a stage needed that neither its brief nor a query gave it; a write refused that was right, or accepted that was malformed.
 - **Listed, not scored** (John: "we don't need to worry too much about where the mistakes are coming from" if deterministic code or a full implementation will absorb them) [checked, log "17 Nov"]: the model's rough edges, and Harbour's standing rules, which live in its prompts and code.
 
@@ -150,5 +148,5 @@ Walks 1–4 are in `walks/1/`–`walks/4/`. What they established: everything th
 
 - John's words for this step: log, "17 Nov" (this branch).
 - The frame: `shapes` §6. The needs and causes: `picture` §6–7. The catalogue and the avenues: `avenues`. Everything placed: `mapping`. What Harbour already has: `existing`.
-- Traces: `trace-2026-11-15/` (peaceful-euler). Walks: `walks/1/`–`walks/5/`.
+- Traces: `trace-2026-11-15/` (peaceful-euler). Walks: `walks/1/`–`walks/6/`; an independent review of 2–17 Nov in `review-2026-11-17/`.
 - Papers: `steering-text.md`, `coherence-as-it-grows.md`, `between-the-sessions.md`, `nothing-fights-its-shape.md` (main).
