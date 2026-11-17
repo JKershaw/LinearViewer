@@ -1,5 +1,5 @@
 {
- "next": 67,
+ "next": 72,
  "records": {
   "area-1": [
    {
@@ -1581,6 +1581,141 @@
      "stage": "survey-task",
      "account": "# What this stage really wrote\n\n## Comment on LIN-4450 at 13:47:23\n\n## Survey open-0: LIN-4450 @ 4b5001ddf\n\n`origin/main` is still the grounding commit, so the plan's line numbers hold: `_toCanonicalIssue` is at 484, `fetchIssueContext` at 863/873, `issueDescription` at 1049, `descriptionRoundTrip` at 1064, and the `updateIssue` re-read at 1267. I ran the codec at this commit against the plan's own witness inputs (sealed, then `markdownToAdf` → `adfToMarkdown`). Three things I found:\n\n**1. The node rule and the markdown rule disagree about what counts as an end line.** `hasMarkerLine` and `splitAsAsked` only match the end sentence with its `*…*` exactly. The planned ADF reader matches \"a paragraph whose plain text is the end sentence, whatever its marks\". Suppose a person's words contain that sentence in plain text, or as `_…_`. `sealForFiling` seals them, because to it that isn't a marker. Then the node reader closes the region early, the digest misses, and the tail of the words is served as if it were below the line. Nobody is told. The pure `descriptionRoundTrip` will only catch this if it runs the **same** node reader. A markdown-level `checkAsAsked` alone won't. Either make `hasMarkerLine` catch the plain-text form too, or have the node rule take the **last** matching paragraph before non-region content. Decide which up front.\n\n**2. The codec's \"the D1 gate never flags what the writer emits\" claim is false.** The `adf.js` header says it, but an empty fence (words containing \"```\" then \"```\" on the next line) makes `markdownToAdf` emit an empty `codeBlock`. `adfHasUnrenderableContent` refuses that, and `rt(rt(x)) !== rt(x)` for it (I got `false` on both checks). Today that only affects that one ticket. Once Harbour writes the block itself, it becomes Harbour making a ticket whose description can never be written again: every later `description/below` hits 422 on D1. The planned fixed-point test will fail on this input unless the codec is fixed or the input is excluded. Pick one deliberately. The plan says \"D1 unchanged\", but D1 sees the whole document, the block included.\n\n**3. \"Done when\" only proves things on `fake-client.js`, and the real risk is live Jira.** Shape B relies on a SHA-256 of `adfToMarkdown(region)` staying stable across Jira's ordinary saves. The plan names one change Jira makes (`localId`), and `adfToMarkdown` ignores attrs, so that one is handled. Nothing shows that Jira's editor leaves alone the content that can change the rendering: trailing spaces before a hardBreak (a planned witness), how adjacent text nodes are split, or empty paragraphs (LIN-2019 already drops these). If any of those shift when someone edits *below* the line, every sealed issue reads as \"human-edited\". The words then quietly turn into the rendering (`*em*` → `_em_`, `* a` → `- a`, `***x***` → `\\***x**\\*`, all observed here). That is the exact reformatting the seal exists to prevent. The fake client just merges `fields` and stores whatever it's given, so it can't show this.\n\nSmaller points:\n- The bulk search path stays display-only. That means one issue reads differently through search than through `getIssue`, so check that no cache or guard compares the two.\n- Atlassian's property limit is in bytes or characters depending on which page you read. JSON escaping inflates `words`, so measure the serialized string.\n\n**What I'd do first:** a 15-minute live probe on a real Jira site, before writing any code:\n1. PUT a sealed description holding the witness inputs, with `properties: [{key:'harbour.asAsked', …}]` in the same body. This confirms the edit endpoint accepts `properties`.\n2. GET it with `?properties=harbour.asAsked`.\n3. Edit a line *below* the block in Jira's own editor and save.\n4. GET again and diff `adfToMarkdown(region)`.\n\nIf the rendering holds, the plan stands as written and items 1 and 2 above are a few lines and two tests. If it doesn't hold, the digest has to be taken over a normalised rendering. That is a design change, and the ticket says it should be recorded on LIN-4445.\n\n"
     }
+   },
+   {
+    "id": "run-66",
+    "kind": "run",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T13:45:01.296Z",
+    "by": "survey-task",
+    "in": "task-60",
+    "state": "done",
+    "ended": {
+     "reason": "Survey open-0 on LIN-4450 @ 4b5001ddf recorded: question-67, question-68, check-69, finding-70, finding-71"
+    },
+    "links": {},
+    "fields": {
+     "stage": "survey-task",
+     "account": "# What this stage really wrote\n\n## Comment on LIN-4450 at 13:47:23\n\n## Survey open-0: LIN-4450 @ 4b5001ddf\n\n`origin/main` is still the grounding commit, so the plan's line numbers hold: `_toCanonicalIssue` is at 484, `fetchIssueContext` at 863/873, `issueDescription` at 1049, `descriptionRoundTrip` at 1064, and the `updateIssue` re-read at 1267. I ran the codec at this commit against the plan's own witness inputs (sealed, then `markdownToAdf` → `adfToMarkdown`). Three things I found:\n\n**1. The node rule and the markdown rule disagree about what counts as an end line.** `hasMarkerLine` and `splitAsAsked` only match the end sentence with its `*…*` exactly. The planned ADF reader matches \"a paragraph whose plain text is the end sentence, whatever its marks\". Suppose a person's words contain that sentence in plain text, or as `_…_`. `sealForFiling` seals them, because to it that isn't a marker. Then the node reader closes the region early, the digest misses, and the tail of the words is served as if it were below the line. Nobody is told. The pure `descriptionRoundTrip` will only catch this if it runs the **same** node reader. A markdown-level `checkAsAsked` alone won't. Either make `hasMarkerLine` catch the plain-text form too, or have the node rule take the **last** matching paragraph before non-region content. Decide which up front.\n\n**2. The codec's \"the D1 gate never flags what the writer emits\" claim is false.** The `adf.js` header says it, but an empty fence (words containing \"```\" then \"```\" on the next line) makes `markdownToAdf` emit an empty `codeBlock`. `adfHasUnrenderableContent` refuses that, and `rt(rt(x)) !== rt(x)` for it (I got `false` on both checks). Today that only affects that one ticket. Once Harbour writes the block itself, it becomes Harbour making a ticket whose description can never be written again: every later `description/below` hits 422 on D1. The planned fixed-point test will fail on this input unless the codec is fixed or the input is excluded. Pick one deliberately. The plan says \"D1 unchanged\", but D1 sees the whole document, the block included.\n\n**3. \"Done when\" only proves things on `fake-client.js`, and the real risk is live Jira.** Shape B relies on a SHA-256 of `adfToMarkdown(region)` staying stable across Jira's ordinary saves. The plan names one change Jira makes (`localId`), and `adfToMarkdown` ignores attrs, so that one is handled. Nothing shows that Jira's editor leaves alone the content that can change the rendering: trailing spaces before a hardBreak (a planned witness), how adjacent text nodes are split, or empty paragraphs (LIN-2019 already drops these). If any of those shift when someone edits *below* the line, every sealed issue reads as \"human-edited\". The words then quietly turn into the rendering (`*em*` → `_em_`, `* a` → `- a`, `***x***` → `\\***x**\\*`, all observed here). That is the exact reformatting the seal exists to prevent. The fake client just merges `fields` and stores whatever it's given, so it can't show this.\n\nSmaller points:\n- The bulk search path stays display-only. That means one issue reads differently through search than through `getIssue`, so check that no cache or guard compares the two.\n- Atlassian's property limit is in bytes or characters depending on which page you read. JSON escaping inflates `words`, so measure the serialized string.\n\n**What I'd do first:** a 15-minute live probe on a real Jira site, before writing any code:\n1. PUT a sealed description holding the witness inputs, with `properties: [{key:'harbour.asAsked', …}]` in the same body. This confirms the edit endpoint accepts `properties`.\n2. GET it with `?properties=harbour.asAsked`.\n3. Edit a line *below* the block in Jira's own editor and save.\n4. GET again and diff `adfToMarkdown(region)`.\n\nIf the rendering holds, the plan stands as written and items 1 and 2 above are a few lines and two tests. If it doesn't hold, the digest has to be taken over a normalised rendering. That is a design change, and the ticket says it should be recorded on LIN-4445.\n\n"
+    }
+   }
+  ],
+  "question-67": [
+   {
+    "id": "question-67",
+    "kind": "question",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:44:56.296Z",
+    "by": "survey-task",
+    "in": "task-60",
+    "to": "implementation",
+    "state": "open",
+    "links": {
+     "about": [
+      "plan-54"
+     ]
+    },
+    "fields": {
+     "asks": "Which end-line rule wins? `hasMarkerLine`/`splitAsAsked` (lib/as-asked.js) match the end sentence only with its `*…*` exactly; plan-54 item 1's ADF reader matches a paragraph whose plain text is the end sentence, whatever its marks. If the person's words contain that sentence plain or as `_…_`, `sealForFiling` seals them, the node reader closes the region early, the digest misses, and the tail of the words is served as below-the-line, silently. Decide up front (Survey @ 4b5001ddf).",
+     "options": [
+      "Make `hasMarkerLine` also catch the plain-text and `_…_` forms (so such words are never sealed as-is)",
+      "Have the node rule take the LAST matching paragraph before non-region content"
+     ],
+     "if-unanswered": "Words holding the end sentence in another form lose their tail silently on Jira. Either way, Jira's pure `descriptionRoundTrip` must run the SAME node reader; a markdown-level `checkAsAsked` alone will not catch it."
+    }
+   }
+  ],
+  "question-68": [
+   {
+    "id": "question-68",
+    "kind": "question",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:44:57.296Z",
+    "by": "survey-task",
+    "in": "task-60",
+    "to": "implementation",
+    "state": "open",
+    "links": {
+     "about": [
+      "plan-54"
+     ]
+    },
+    "fields": {
+     "asks": "Fix the codec or exclude the input? The `lib/providers/jira/adf.js` header's claim that the D1 gate never flags what the writer emits is false: words holding an empty fence (\"```\" then \"```\" on the next line) make `markdownToAdf` emit an empty `codeBlock`, which `adfHasUnrenderableContent` refuses, and `rt(rt(x)) !== rt(x)` (both checks false, observed @ 4b5001ddf). Once Harbour writes the block itself, it would create a ticket whose description can never be written again (every later `description/below` 422s on D1, which sees the whole document, block included). The planned fixed-point test fails on this input.",
+     "options": [
+      "Fix the codec so an empty fence round-trips and passes D1 (and correct the adf.js header)",
+      "Exclude the input deliberately from the fixed-point test and refuse/unseal such words before writing"
+     ],
+     "if-unanswered": "Fixed-point test goes red on this input, or Harbour mints unwritable Jira tickets; \"D1 unchanged\" in done-when does not cover it."
+    }
+   }
+  ],
+  "check-69": [
+   {
+    "id": "check-69",
+    "kind": "check",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:44:58.296Z",
+    "by": "survey-task",
+    "in": "task-60",
+    "to": "implementation",
+    "state": "open",
+    "links": {
+     "about": [
+      "plan-54"
+     ]
+    },
+    "fields": {
+     "what": "Live probe, before writing code: does `adfToMarkdown(region)` (the thing the plan's SHA-256 digest is over) stay byte-stable when someone edits BELOW the block in Jira's own editor? done-when only proves things on `fake-client.js`, which merges `fields` and stores whatever it is given, so it cannot show this. `localId` is handled (adfToMarkdown ignores attrs); unproven: trailing spaces before a hardBreak, how adjacent text nodes are split, empty paragraphs (LIN-2019 already drops these).",
+     "why-person": "If the rendering shifts, every sealed issue reads as human-edited and the words quietly become the rendering (`*em*` → `_em_`, `* a` → `- a`, `***x***` → `\\***x**\\*`, all observed) — the exact reformatting the seal exists to prevent.",
+     "how": "~15 min on a real Jira site: 1. PUT a sealed description holding the witness inputs with `properties: [{key:'harbour.asAsked', …}]` in the same body (confirms the edit endpoint accepts `properties`). 2. GET with `?properties=harbour.asAsked`. 3. Edit a line below the block in Jira's editor and save. 4. GET again and diff `adfToMarkdown(region)`. Holds → plan stands as written. Doesn't hold → digest must be over a normalised rendering: a design change, to be recorded on LIN-4445 (task-53). Needs a Jira site credential; if the builder has none, this goes to John."
+    }
+   }
+  ],
+  "finding-70": [
+   {
+    "id": "finding-70",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:44:59.296Z",
+    "by": "survey-task",
+    "in": "task-60",
+    "to": "implementation",
+    "state": "open",
+    "links": {
+     "about": [
+      "plan-54"
+     ]
+    },
+    "fields": {
+     "says": "Bulk search stays display-only (plan-54 item 3), so one issue reads differently through `POST /search/jql` than through `getIssue`. Check that no cache or guard compares the two readings."
+    }
+   }
+  ],
+  "finding-71": [
+   {
+    "id": "finding-71",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:45:00.296Z",
+    "by": "survey-task",
+    "in": "task-60",
+    "to": "implementation",
+    "state": "open",
+    "links": {
+     "about": [
+      "plan-54"
+     ]
+    },
+    "fields": {
+     "says": "Size guard (plan-54 item 6, review note 3): Atlassian's entity-property limit reads as bytes on some pages, characters on others, and JSON escaping inflates `words`. The one shared size function should measure the serialized property string, not `words`."
+    }
    }
   ]
  },
@@ -1684,6 +1819,19 @@
     "kind": "question",
     "by": "survey-task",
     "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:25:22.573Z",
+   "by": "implementation",
+   "cmd": "brief",
+   "args": {
+    "task": "task-60",
+    "by": "survey-task",
+    "pos": [
+     "implementation"
+    ]
    },
    "asOf": null
   }

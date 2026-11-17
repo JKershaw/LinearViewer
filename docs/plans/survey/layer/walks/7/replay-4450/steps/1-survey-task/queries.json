@@ -1,0 +1,104 @@
+[
+ {
+  "at": "2026-11-17T20:24:32.228Z",
+  "by": "survey-task",
+  "cmd": "show",
+  "args": {
+   "task": "task-60",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:24:32.259Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "to": "survey-task",
+   "state": "open",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:24:32.292Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "text": "end line",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:24:32.323Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "text": "codeBlock",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:24:32.362Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "text": "live probe",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:24:32.391Z",
+  "by": "survey-task",
+  "cmd": "get",
+  "args": {
+   "by": "survey-task",
+   "pos": [
+    "task-53"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:24:44.247Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "kind": "run",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:24:44.281Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "kind": "finding",
+   "state": "open",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:24:44.326Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "kind": "question",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ }
+]

@@ -1,5 +1,5 @@
 {
- "next": 18,
+ "next": 26,
  "records": {
   "area-1": [
    {
@@ -255,6 +255,24 @@
      "why-person": "Cutting comments passes a raw line count without sharing anything: about 1,985 of `public/observation.js`'s 5,019 lines are comments (ticket history, retuning stories), and 1,456 of `public/common.js`'s 3,309.",
      "how": "Count logic lines and comment lines separately before and after; the why-so-large check on a view (68 commits on `observation.js`) does the same."
     }
+   },
+   {
+    "id": "check-13",
+    "kind": "check",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T13:15:10.217Z",
+    "by": "survey-place",
+    "reason": "survey-place recount: observation.js comment share was overstated",
+    "in": "task-9",
+    "to": "review",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "what": "A slice's 'lighter than before' is measured on logic, with commentary counted separately, and the slice shares rather than only trimming.",
+     "why-person": "Cutting comments passes a raw line count without sharing anything. Recounted by the place survey (13 Nov): `public/observation.js` has 1,006 comment lines out of 4,679 non-blank (not ~1,985 of 5,019), so it is mostly logic and trimming comments cannot be the slice; `public/common.js` has about 1,456 comment lines of 3,309.",
+     "how": "Count logic lines and comment lines separately before and after; the why-so-large check on a view (68 commits on `observation.js`) does the same."
+    }
    }
   ],
   "finding-14": [
@@ -342,6 +360,185 @@
     "fields": {
      "stage": "survey-task",
      "account": "# What this stage really wrote\n\n## Comment on LIN-4446 at 13:14:03\n\n## Survey open-0: LIN-4446 @ 4b5001ddf\n\n**Why this will be hard**\n\n1. **\"Allow the browser to import\" doesn't turn imports on.** `server.js:1228` serves only `public/`, so the server modules a browser file restates (`lib/cost-format.js` etc.) have no URL. Sharing needs a served place for pure modules that both `lib/` and the browser import, plus a rule for it (no Node built-ins, no DOM at load). Without the rule, someone will import a module that pulls in `node:fs`. CSP `script-src 'self'` already allows module scripts loaded from a file.\n\n2. **Every page is classic scripts talking through globals.** `lib/components/page.js` writes ordered `<script src>` tags, and files read `window.X` and top-level bindings from `common.js` (3,309 lines, on 29 pages). A classic script can't use static `import`. Making a view `type=\"module\"` makes it deferred, strict and module-scoped, so its globals vanish for later scripts. \"One view at a time\" is blocked until what views read from `common.js` is reachable another way.\n\n3. **The test harness assumes classic scripts.** 130 unit test files load `public/*.js` through `vm` (`tests/unit/helpers/client-world.js`, plus `runInNewContext` in the parity tests). None use `vm.SourceTextModule`. A browser file that gains an `import` line breaks all of them. That cost isn't in the ticket.\n\n4. **\"Lighter\" is easy to fake.** About 1,985 of `observation.js`'s 5,019 lines are comments (ticket history, retuning stories), and 1,456 of `common.js`'s 3,309. Cutting comments passes a line count without sharing anything. The why-so-large check (68 commits on `observation.js`) should count logic and commentary separately.\n\n5. **The ticket is a symptom, and the repo already says so.** `docs/papers/harbour/the-second-copy.md` §9–10 traces the copies to the no-build-step rule read as \"no sharing\". It shows that parity tests and helpers nobody was required to adopt kept the copies alive, and that only deleting the old copy ever finished a consolidation. A slice that adds a shared module and keeps the old copy or its parity test repeats that pattern.\n\n**What I'd do first**\n\nWrite the reading of the rule into `CLAUDE.md:43` and `docs/areas/front-end-browser.md`, then take **cost-format** as the first slice:\n- `lib/cost-format.js` (46 lines, no imports) becomes the one served shared module and stays importable by `lib/render-*.js`.\n- **Retire** `public/cost-format.js` (a self-declared \"restatement\") and `tests/unit/cost-format-parity.test.js`.\n- Its 4 consumers (`flight-companion`, `prompt-section`, `observation`, `workspace-kpis`) call `window.CostFormat` only inside handlers and render functions, never at load. A small module shim that sets `window.CostFormat` therefore runs early enough (module scripts run before `DOMContentLoaded`), and no view has to become a module yet.\n- Update `cost-read-census.test.js:85` and the vm suites that name `cost-format.js`.\n\nThis settles where shared modules are served, the purity rule and the test path on a pure function before any view is touched. View size and `common.js`'s globals stay out of the slice and go into the area note. John's read of the first slice should be scheduled as a real pause.\n\n"
+    }
+   }
+  ],
+  "run-18": [
+   {
+    "id": "run-18",
+    "kind": "run",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:15:09.217Z",
+    "by": "survey-place",
+    "in": "task-9",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "stage": "survey-place",
+     "account": "# What this stage really wrote\n\n## Comment on LIN-4446 at 13:18:12\n\n## Survey global: LIN-4446 @ 4b5001ddf\n\n**Where it lands.** `public/`: 79 files, 35,264 lines of JS, all classic scripts that share through `window.*` globals in the order `scripts: [...]` lists them in each `lib/render-*.js`. `common.js` (3,309 lines, 56 `window.` assignments) is the shared layer, and it already calls itself the \"client twin\" of `lib/task-page-href.js`, `lib/timeline-zoom.js`, `lib/ship-layout.js` and `lib/prompt-formatters.js`. `swim.js` copies `lib/swim-lanes.js`. Growth: 15.4k lines (1 Jul) → 29.1k (1 Oct) → 35.1k (9 Nov). That was about 1,200 lines a week in October and about 300 since 1 Nov. `observation.js` has held at about 5,000 since mid-October, with 1,006 comment lines out of 4,679 non-blank: mostly logic. The place has stopped getting worse but isn't getting better yet.\n\n**The weight sits in the tests.** 126 unit suites run `public/` scripts through `vm` (`tests/unit/helpers/client-world.js`, `loadWorld`). A file that becomes a module with static `import` no longer runs in them, so the test harness enforces \"no imports\" as much as the browser does. Converting a view to a module drags its whole suite family along. That is the big move John is warning about.\n\n**Done the obvious way** (cost-format as slice one):\n- *Serving.* A second `express.static('lib')` would expose all server source. The codebase already has the right home: `lib/vendor-assets.js` is a frozen URL→file allow-list that runs `statSync` at boot so a missing file fails the boot. Extend it for shared modules and there stays one way to serve files from outside `public/`.\n- *Transitive imports.* `lib/cost-format.js`, `task-page-href.js` and `timeline-zoom.js` have zero imports. `ship-layout`/`swim-lanes` import `providers/state-map.js`, and `prompt-formatters` imports six modules. Serving single files works only for leaf modules. Say so in the rule's note.\n- *What would have to learn about it:* `cost-read-census.test.js` `FORMAT_ALLOW` names `public/cost-format.js` (stale silently: nothing fails on an extra entry). The two renderers that list `/cost-format.js` (`render-flight-companion.js:400` and `render-observation.js:366`) need it too. So do the `vm` suites that load it (`flight-companion-client`, `lin-3833-run-control`, `observation-scan-due`, `cost-read`) and the doc comment in `lib/cost-format.js` that names its \"browser twin\". The CSP already admits same-origin modules.\n- *Ordering.* A module shim that sets `window.CostFormat` runs deferred, after the classic scripts. That is safe only while every consumer reads the global inside a handler, never at load. Pin that with a test, or a future eager read will break with no warning.\n\n**Better, at a cost this task can carry:** the rule's reading goes in `CLAUDE.md` *with* its limits: leaf modules only; served by allow-list, not by directory; `vm` loaders stay as they are until a view is converted. Then cost-format, retiring `public/cost-format.js` and `cost-format-parity.test.js` together. `task-page-href`/`timeline-zoom` are the next leaf twins of the same shape.\n\n**Better still, not this task's:** a module-capable client-test loader (`vm.SourceTextModule` or an equivalent) is what has to exist before any view becomes a module, and it is its own slice. After that come breaking up `common.js`'s globals and finding out why `observation.js` is as large as it is. The keepalive `statusCode` readers and `buildDispatchModelOptionDescriptors`, already in the area note, belong to that work.\n\n"
+    }
+   },
+   {
+    "id": "run-18",
+    "kind": "run",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T13:15:18.217Z",
+    "by": "survey-place",
+    "in": "task-9",
+    "state": "done",
+    "ended": {
+     "reason": "place survey written: 5 findings (4 design, 1 area), 2 checks, check-13 revised"
+    },
+    "links": {},
+    "fields": {
+     "stage": "survey-place",
+     "account": "# What this stage really wrote\n\n## Comment on LIN-4446 at 13:18:12\n\n## Survey global: LIN-4446 @ 4b5001ddf\n\n**Where it lands.** `public/`: 79 files, 35,264 lines of JS, all classic scripts that share through `window.*` globals in the order `scripts: [...]` lists them in each `lib/render-*.js`. `common.js` (3,309 lines, 56 `window.` assignments) is the shared layer, and it already calls itself the \"client twin\" of `lib/task-page-href.js`, `lib/timeline-zoom.js`, `lib/ship-layout.js` and `lib/prompt-formatters.js`. `swim.js` copies `lib/swim-lanes.js`. Growth: 15.4k lines (1 Jul) → 29.1k (1 Oct) → 35.1k (9 Nov). That was about 1,200 lines a week in October and about 300 since 1 Nov. `observation.js` has held at about 5,000 since mid-October, with 1,006 comment lines out of 4,679 non-blank: mostly logic. The place has stopped getting worse but isn't getting better yet.\n\n**The weight sits in the tests.** 126 unit suites run `public/` scripts through `vm` (`tests/unit/helpers/client-world.js`, `loadWorld`). A file that becomes a module with static `import` no longer runs in them, so the test harness enforces \"no imports\" as much as the browser does. Converting a view to a module drags its whole suite family along. That is the big move John is warning about.\n\n**Done the obvious way** (cost-format as slice one):\n- *Serving.* A second `express.static('lib')` would expose all server source. The codebase already has the right home: `lib/vendor-assets.js` is a frozen URL→file allow-list that runs `statSync` at boot so a missing file fails the boot. Extend it for shared modules and there stays one way to serve files from outside `public/`.\n- *Transitive imports.* `lib/cost-format.js`, `task-page-href.js` and `timeline-zoom.js` have zero imports. `ship-layout`/`swim-lanes` import `providers/state-map.js`, and `prompt-formatters` imports six modules. Serving single files works only for leaf modules. Say so in the rule's note.\n- *What would have to learn about it:* `cost-read-census.test.js` `FORMAT_ALLOW` names `public/cost-format.js` (stale silently: nothing fails on an extra entry). The two renderers that list `/cost-format.js` (`render-flight-companion.js:400` and `render-observation.js:366`) need it too. So do the `vm` suites that load it (`flight-companion-client`, `lin-3833-run-control`, `observation-scan-due`, `cost-read`) and the doc comment in `lib/cost-format.js` that names its \"browser twin\". The CSP already admits same-origin modules.\n- *Ordering.* A module shim that sets `window.CostFormat` runs deferred, after the classic scripts. That is safe only while every consumer reads the global inside a handler, never at load. Pin that with a test, or a future eager read will break with no warning.\n\n**Better, at a cost this task can carry:** the rule's reading goes in `CLAUDE.md` *with* its limits: leaf modules only; served by allow-list, not by directory; `vm` loaders stay as they are until a view is converted. Then cost-format, retiring `public/cost-format.js` and `cost-format-parity.test.js` together. `task-page-href`/`timeline-zoom` are the next leaf twins of the same shape.\n\n**Better still, not this task's:** a module-capable client-test loader (`vm.SourceTextModule` or an equivalent) is what has to exist before any view becomes a module, and it is its own slice. After that come breaking up `common.js`'s globals and finding out why `observation.js` is as large as it is. The keepalive `statusCode` readers and `buildDispatchModelOptionDescriptors`, already in the area note, belong to that work.\n\n"
+    }
+   }
+  ],
+  "finding-19": [
+   {
+    "id": "finding-19",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:15:11.217Z",
+    "by": "survey-place",
+    "in": "task-9",
+    "to": "design",
+    "state": "open",
+    "links": {
+     "about": [
+      "finding-10"
+     ]
+    },
+    "fields": {
+     "says": "Serve shared modules by allow-list, not by directory: a second `express.static('lib')` would expose all server source. `lib/vendor-assets.js` is already a frozen URL->file allow-list that `statSync`s each entry at boot (a missing file fails the boot); extend it for shared modules so there stays one way to serve files from outside `public/`. The CSP already admits same-origin modules."
+    }
+   }
+  ],
+  "finding-20": [
+   {
+    "id": "finding-20",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:15:12.217Z",
+    "by": "survey-place",
+    "in": "task-9",
+    "to": "design",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "says": "Serving single files works only for leaf modules, and the rule's note must say so. Of the `lib/` modules with browser twins, `cost-format.js`, `task-page-href.js` and `timeline-zoom.js` have zero imports; `ship-layout.js` and `swim-lanes.js` import `providers/state-map.js`, and `prompt-formatters.js` imports six modules. Twins today: `public/common.js` calls itself the client twin of `lib/task-page-href.js`, `lib/timeline-zoom.js`, `lib/ship-layout.js` and `lib/prompt-formatters.js`; `public/swim.js` copies `lib/swim-lanes.js`; `public/cost-format.js` restates `lib/cost-format.js`. After cost-format, `task-page-href` and `timeline-zoom` are the next leaf twins of the same shape."
+    }
+   }
+  ],
+  "finding-21": [
+   {
+    "id": "finding-21",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:15:13.217Z",
+    "by": "survey-place",
+    "in": "task-9",
+    "to": "design",
+    "state": "open",
+    "links": {
+     "about": [
+      "finding-15"
+     ]
+    },
+    "fields": {
+     "says": "What has to learn about a served `lib/cost-format.js` (the cost-format slice's touch list): `tests/unit/cost-read-census.test.js` `FORMAT_ALLOW` names `public/cost-format.js`; the two renderers that list `/cost-format.js` in `scripts` (`lib/render-flight-companion.js:400`, `lib/render-observation.js:366`); the vm suites that load it (`flight-companion-client`, `lin-3833-run-control`, `observation-scan-due`, `cost-read`); and the doc comment in `lib/cost-format.js` that names its 'browser twin'."
+    }
+   }
+  ],
+  "check-22": [
+   {
+    "id": "check-22",
+    "kind": "check",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:15:14.217Z",
+    "by": "survey-place",
+    "in": "task-9",
+    "to": "review",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "what": "Every consumer of `window.CostFormat` reads it inside a handler or render function, never at load, and a test pins that.",
+     "why-person": "A module shim that sets `window.CostFormat` runs deferred, after the classic scripts; it is safe only while no read is eager. Without a pinning test a future eager read breaks with no warning.",
+     "how": "Look for a test in the slice that fails if any `public/` file reads `CostFormat` at top level; confirm it fails on a planted eager read."
+    }
+   }
+  ],
+  "check-23": [
+   {
+    "id": "check-23",
+    "kind": "check",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:15:15.217Z",
+    "by": "survey-place",
+    "in": "task-9",
+    "to": "review",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "what": "`public/cost-format.js` is gone from `FORMAT_ALLOW` in `tests/unit/cost-read-census.test.js` when the file is retired.",
+     "why-person": "An extra allow-list entry goes stale silently: nothing fails, so only a reader will catch it.",
+     "how": "Read the census allow-list in the slice's diff."
+    }
+   }
+  ],
+  "finding-24": [
+   {
+    "id": "finding-24",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:15:16.217Z",
+    "by": "survey-place",
+    "in": "task-9",
+    "to": "design",
+    "state": "open",
+    "links": {
+     "about": [
+      "finding-15",
+      "finding-12",
+      "finding-10"
+     ]
+    },
+    "fields": {
+     "says": "Recommended shape the task can carry: write the rule's reading into `CLAUDE.md` with its limits (leaf modules only; served by allow-list, not by directory; the `vm` loaders stay as they are until a view is converted), then the cost-format slice, retiring `public/cost-format.js` and `tests/unit/cost-format-parity.test.js` together. Keeping the shim classic-compatible means the 126 suites that load `public/` through `tests/unit/helpers/client-world.js` (`loadWorld`) need no new loader for this slice; a module-capable loader is out of scope (see area-1)."
+    }
+   }
+  ],
+  "finding-25": [
+   {
+    "id": "finding-25",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:15:17.217Z",
+    "by": "survey-place",
+    "in": "area-1",
+    "to": "area-1",
+    "state": "open",
+    "links": {
+     "about": [
+      "finding-11",
+      "finding-5",
+      "finding-6",
+      "task-9"
+     ]
+    },
+    "fields": {
+     "says": "Before any `public/` view becomes a module, a module-capable client-test loader (`vm.SourceTextModule` or equivalent) has to exist, as its own slice: 126 unit suites run `public/` scripts through `vm` (`tests/unit/helpers/client-world.js`, `loadWorld`), so the harness enforces 'no imports' as much as the browser does and converting a view drags its whole suite family along. After it: breaking up `common.js`'s globals (finding-11) and finding out why `observation.js` is ~5,000 lines; the keepalive `statusCode` readers (finding-6) and `buildDispatchModelOptionDescriptors` (finding-5) belong to that work. Place census (9 Nov): 79 files, 35,264 JS lines; growth ~1,200 lines/week in October, ~300 since 1 Nov. Left out of LIN-4446 (place survey, 13 Nov)."
     }
    }
   ]
