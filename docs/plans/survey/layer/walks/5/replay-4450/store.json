@@ -1,5 +1,5 @@
 {
- "next": 66,
+ "next": 72,
  "records": {
   "area-1": [
    {
@@ -1565,6 +1565,161 @@
     "at": "2026-11-13T13:44:23.511Z",
     "by": "breakdown"
    }
+  ],
+  "run-66": [
+   {
+    "id": "run-66",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "survey-task",
+     "account": "Surveyed LIN-4450 at 4b5001ddf (origin/main still the grounding commit, so the plan's line numbers hold: _toCanonicalIssue 484, fetchIssueContext 863/873, issueDescription 1049, descriptionRoundTrip 1064, updateIssue re-read 1267). Ran the codec at that commit on the plan's own witness inputs (seal, markdownToAdf, adfToMarkdown). Found: the node rule and the markdown rule disagree on what an end line is (question to implementation); an empty fence makes the writer emit a codeBlock that D1 refuses and that is not a fixed point, so adf.js's header claim is false and 'D1 unchanged' needs a deliberate choice (question to implementation); the done-when proves nothing about live Jira, where the digest's stability across below-the-line edits is unshown, so I asked for a 15-minute live probe before code (check to John, who holds a site). Two smaller points for the builder: bulk vs getIssue reads differ; measure the serialized property for the size limit. Closed nothing; nothing was addressed to me."
+    },
+    "links": {},
+    "in": "task-60",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:44:56.000Z",
+    "by": "survey-task"
+   },
+   {
+    "id": "run-66",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "survey-task",
+     "account": "Surveyed LIN-4450 at 4b5001ddf (origin/main still the grounding commit, so the plan's line numbers hold: _toCanonicalIssue 484, fetchIssueContext 863/873, issueDescription 1049, descriptionRoundTrip 1064, updateIssue re-read 1267). Ran the codec at that commit on the plan's own witness inputs (seal, markdownToAdf, adfToMarkdown). Found: the node rule and the markdown rule disagree on what an end line is (question to implementation); an empty fence makes the writer emit a codeBlock that D1 refuses and that is not a fixed point, so adf.js's header claim is false and 'D1 unchanged' needs a deliberate choice (question to implementation); the done-when proves nothing about live Jira, where the digest's stability across below-the-line edits is unshown, so I asked for a 15-minute live probe before code (check to John, who holds a site). Two smaller points for the builder: bulk vs getIssue reads differ; measure the serialized property for the size limit. Closed nothing; nothing was addressed to me."
+    },
+    "links": {},
+    "in": "task-60",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T13:45:02.000Z",
+    "by": "survey-task",
+    "ended": {
+     "reason": "Survey posted on LIN-4450 at 13:47:23; findings filed as question-67, question-68, check-69, finding-70, finding-71."
+    }
+   }
+  ],
+  "question-67": [
+   {
+    "id": "question-67",
+    "kind": "question",
+    "state": "open",
+    "fields": {
+     "asks": "Which end-line rule wins? `hasMarkerLine` and `splitAsAsked` match the end sentence only as exactly `*…*`; plan-54 item 1's node reader matches any paragraph whose plain text is the end sentence, whatever its marks. If the person's words contain that sentence plain or as `_…_`, `sealForFiling` seals them (not a marker to it), the node reader closes the region early, the digest misses, and the tail of the words is served as if below the line, silently. A markdown-level `checkAsAsked` alone won't catch it; the pure `descriptionRoundTrip` only will if it runs the same node reader.",
+     "options": [
+      "Widen `hasMarkerLine` (lib/as-asked.js) to catch the plain-text and `_…_` forms too, so such words are refused before sealing",
+      "Node rule takes the last matching paragraph before non-region content"
+     ],
+     "if-unanswered": "Words containing the end sentence in another mark are sealed, then served truncated with the tail treated as below the line; nobody is told."
+    },
+    "links": {
+     "about": [
+      "plan-54"
+     ]
+    },
+    "in": "task-60",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:44:57.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "question-68": [
+   {
+    "id": "question-68",
+    "kind": "question",
+    "state": "open",
+    "fields": {
+     "asks": "Fix the codec or exclude the empty fence from the fixed-point witness? The `adf.js` header's claim that the D1 gate never flags what the writer emits is false: words holding an opening ``` with a closing ``` on the next line make `markdownToAdf` emit an empty `codeBlock`; `adfHasUnrenderableContent` refuses it and `rt(rt(x)) !== rt(x)` (both checks false at 4b5001ddf). Today that touches one ticket; once Harbour writes the block itself, it makes a ticket whose description can never be written again (every later `description/below` 422s on D1, which sees the whole document, block included). The planned fixed-point test fails on this input either way.",
+     "options": [
+      "Fix `markdownToAdf` so an empty fence round-trips and D1 accepts it (retire the false header claim)",
+      "Exclude the input deliberately and name the exclusion and the false claim in the PR"
+     ],
+     "if-unanswered": "The fixed-point test fails on this input, or Harbour starts filing Jira descriptions that D1 then blocks from every later write."
+    },
+    "links": {
+     "about": [
+      "plan-54"
+     ]
+    },
+    "in": "task-60",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:44:58.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "check-69": [
+   {
+    "id": "check-69",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "A 15-minute live probe on a real Jira site before LIN-4450 writes code: does `adfToMarkdown(region)` (and so its SHA-256 digest) survive Jira's ordinary saves when someone edits below the line? The done-when proves only on `fake-client.js`, which merges `fields` and stores what it is given, so it cannot show this. `localId` is handled (adfToMarkdown ignores attrs); unshown are trailing spaces before a hardBreak, how adjacent text nodes are split, and empty paragraphs (LIN-2019 already drops these). If any shift, every sealed issue reads as human-edited and the words quietly become the rendering (`*em*`→`_em_`, `* a`→`- a`, `***x***`→`\\***x**\\*`, all observed at 4b5001ddf): the reformatting the seal exists to prevent.",
+     "why-person": "It needs a credential for a live Jira site, which no build session has by default (decision-65); John's site is the one in real use. Doing it now, not in LIN-4452 after LIN-4451, decides whether the digest design stands before it is built.",
+     "how": "1. PUT a sealed description holding the witness inputs, with `properties: [{key:'harbour.asAsked', …}]` in the same body (confirms the edit endpoint accepts `properties`). 2. GET with `?properties=harbour.asAsked`. 3. Edit a line below the block in Jira's own editor and save. 4. GET again and diff `adfToMarkdown(region)`. If it holds, plan-54 stands as written. If not, the digest must be taken over a normalised rendering: a design change, to be recorded on LIN-4445 (task-53)."
+    },
+    "links": {
+     "about": [
+      "plan-54",
+      "plan-56",
+      "task-62"
+     ]
+    },
+    "in": "task-60",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:44:59.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-70": [
+   {
+    "id": "finding-70",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The bulk search path stays display-only, so one issue reads differently through search than through `getIssue` (converted words vs exact words). Check that no cache or guard compares the two reads; or take review note 2's option and pass `properties` on `POST /search/jql` too."
+    },
+    "links": {
+     "about": [
+      "plan-54"
+     ]
+    },
+    "in": "task-60",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:45:00.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-71": [
+   {
+    "id": "finding-71",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Atlassian's entity-property limit reads as bytes on some pages and characters on others, and JSON escaping inflates `words`. The one shared size function should measure the serialized property string, not `words.length`, and the witness should include an escape-heavy body near the limit."
+    },
+    "links": {
+     "about": [
+      "decision-63",
+      "plan-54"
+     ]
+    },
+    "in": "task-60",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:45:01.000Z",
+    "by": "survey-task"
+   }
   ]
  },
  "log": [
@@ -1836,6 +1991,215 @@
     "lesson",
     "--by",
     "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:09.582Z",
+   "by": "survey-task",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:09.618Z",
+   "by": "survey-task",
+   "cmd": "get",
+   "args": [
+    "get",
+    "check-69",
+    "--by",
+    "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:50.838Z",
+   "by": "survey-place",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:50.871Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--in",
+    "area-1",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:50.908Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "run",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:55.818Z",
+   "by": "survey-place",
+   "cmd": "get",
+   "args": [
+    "get",
+    "area-1",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:55.848Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--area",
+    "area-1",
+    "--kind",
+    "lesson",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:55.888Z",
+   "by": "survey-place",
+   "cmd": "get",
+   "args": [
+    "get",
+    "area-46",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:55.917Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--area",
+    "area-46",
+    "--kind",
+    "lesson",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:55.945Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "plainText",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:55.979Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "source-map",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:56.011Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "proxy-integration",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:56.048Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "getIssue",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:56.086Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "as-asked-guard",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:56.125Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "reason: 'provider'",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:17:56.167Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "D1",
+    "--by",
+    "survey-place"
    ],
    "asOf": null
   }

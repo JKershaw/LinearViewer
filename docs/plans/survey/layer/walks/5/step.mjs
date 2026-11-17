@@ -12,14 +12,14 @@ if (mode === 'before') {
   const b = JSON.parse(layer('brief', actor, '--task', task, ...(asOf ? ['--as-of', asOf] : [])));
   const t = layer('brief', actor, '--task', task, ...(asOf ? ['--as-of', asOf] : []), '--text');
   // the two brief calls above are the harness's, not the stage's: drop them from the query log
-  const st = JSON.parse(readFileSync(store, 'utf8')); st.log.splice(-2, 2); writeFileSync(store, JSON.stringify(st, null, 1));
+  const st = JSON.parse(readFileSync(store, 'utf8')); st.log = st.log.filter((x, i) => !(i >= st.log.length - 2 && x.by === actor && (x.cmd === 'brief' || (x.q || [])[0] === 'brief'))); writeFileSync(store, JSON.stringify(st, null, 1));
   writeFileSync(dir + 'brief.txt', t); writeFileSync(dir + 'brief.json', JSON.stringify(b, null, 1));
   console.log(actor, 'brief', b.bytes, 'bytes; carries', JSON.stringify(b.carries));
 } else {
   const s = JSON.parse(layer('show', '--task', task, '--by', 'Harbour'));
-  const st0 = JSON.parse(readFileSync(store, 'utf8')); st0.log.pop(); writeFileSync(store, JSON.stringify(st0, null, 1));
-  const lines = [s.task, ...s.records].map(r => `${r.id} ${r.kind} v${r.v} [${r.state}]${r.stale ? ' STALE' : ''}${r.to ? ' to ' + r.to : ''}${r.answered ? ' answered-by ' + r.answered.id : ''} by ${r.by}`);
-  writeFileSync(dir + 'show.txt', lines.join('\n') + '\n' + (s.overlap.length ? 'overlap: ' + JSON.stringify(s.overlap) + '\n' : ''));
+  const st0 = JSON.parse(readFileSync(store, 'utf8')); if (st0.log.at(-1)?.by === 'Harbour') st0.log.pop(); writeFileSync(store, JSON.stringify(st0, null, 1));
+  const lines = [s.task, ...s.records].map(r => `${r.id} ${r.kind} v${r.v} [${r.state}]${r.stale ? ' STALE(' + [].concat(r.stale).join('; ') + ')' : ''}${r.to ? ' to ' + r.to : ''}${r.answered ? ' answered-by ' + r.answered.id : ''} by ${r.by}`);
+  writeFileSync(dir + 'show.txt', lines.join('\n') + '\n' + ((s.overlap || []).length ? 'overlap: ' + JSON.stringify(s.overlap) + '\n' : ''));
   const st = JSON.parse(readFileSync(store, 'utf8'));
   const q = st.log.filter(x => x.by === actor);
   writeFileSync(dir + 'queries.json', JSON.stringify(q, null, 1));

@@ -1,0 +1,298 @@
+[
+ {
+  "at": "2026-11-17T15:16:08.379Z",
+  "by": "survey-task",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:08.417Z",
+  "by": "survey-task",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-53",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:08.449Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--state",
+   "open",
+   "--path",
+   "lib/providers/jira/",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:08.481Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "fake-client",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:14.509Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "finding",
+   "--state",
+   "open",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:14.547Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "question",
+   "--state",
+   "open",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:14.574Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "check",
+   "--state",
+   "open",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:14.606Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "run",
+   "--state",
+   "open",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:14.638Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "empty fence",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:14.671Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "codeBlock",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:14.704Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "live",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:14.739Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "end line",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:14.774Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "hasMarkerLine",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:14.810Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "normalis",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:14.845Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "digest",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:14.883Z",
+  "by": "survey-task",
+  "cmd": "get",
+  "args": [
+   "get",
+   "plan-56",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:18.985Z",
+  "by": "survey-task",
+  "cmd": "get",
+  "args": [
+   "get",
+   "decision-65",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:19.019Z",
+  "by": "survey-task",
+  "cmd": "get",
+  "args": [
+   "get",
+   "lesson-9",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:19.064Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "lesson",
+   "--text",
+   "adf",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:16:19.098Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--area",
+   "area-1",
+   "--kind",
+   "lesson",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:17:09.582Z",
+  "by": "survey-task",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:17:09.618Z",
+  "by": "survey-task",
+  "cmd": "get",
+  "args": [
+   "get",
+   "check-69",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ }
+]

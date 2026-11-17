@@ -1,0 +1,8 @@
+task-60 task v1 [open] by breakdown
+decision-63 decision v1 [stands] by undefined
+run-66 run v2 [done] by undefined
+question-67 question v1 [open] to implementation by undefined
+question-68 question v1 [open] to implementation by undefined
+check-69 check v1 [open] to John by undefined
+finding-70 finding v1 [open] to implementation by undefined
+finding-71 finding v1 [open] to implementation by undefined
