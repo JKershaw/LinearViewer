@@ -1,5 +1,5 @@
 {
- "next": 141,
+ "next": 139,
  "records": {
   "area-1": [
    {
@@ -2231,7 +2231,7 @@
     "kind": "plan",
     "state": "kept",
     "fields": {
-     "says": "Piece 1: One route list (piece 1).** `codeRouteOf` takes its order from `CODE_ROUTES`; `skipLiveWait` still skips the first entry only. *Witness:* the existing route tests (`lin-4392`, `lin-4438`, look-first) pass unchanged; a new test fails if a route is added to the list without a prompt-trace name, and pins `docs/architecture/prompt-system.md`, `docs/architecture/source-map.md` and the `blind-read` bullet in `public/llms.txt` against the list (order, count, and \"code sends it\"). The `llms.txt` line is wrong at HEAD (\"Sent by hand\"), so the test fails before and passes after. *Places:* `rg -n \"live-stage wait\" lib docs/architecture public CLAUDE.md` finds seven mentions in `lib/openrouter.js`, two in `lib/recommendation-live-wait.js`, one each in `lib/stage-router.js`, `lib/recommendation-blind-read.js`, `lib/recommendation-look-first.js`, `lib/dispatch-entrance.js`, `lib/recent-runs.js` (six), `CLAUDE.md`, `prompt-system.md` and three in `source-map.md`. Comments become a pointer to `CODE_ROUTES`; the three docs are pinned by the test. The builder runs that search again at the end and puts its output in the PR; reports under `docs/reviews/` are history and are left alone. *Retires:* the hand-ordered chain and the comment copies; the Waiting entry on the four routes. The `stage-router.js` header is a budgeted source (`STAGE_ROUTER_SOURCE_CEILING`): shortening it lowers the ceiling, which is allowed.",
+     "says": "Piece 1: **A. One route list (piece 1).** `codeRouteOf` takes its order from `CODE_ROUTES`; `skipLiveWait` still skips the first entry only. *Witness:* the existing route tests (`lin-4392`, `lin-4438`, look-first) pass unchanged; a new test fails if a route is added to the list without a prompt-trace name, and pins `docs/architecture/prompt-system.md`, `docs/architecture/source-map.md` and the `blind-read` bullet in `public/llms.txt` against the list (order, count, and \"code sends it\"). The `llms.txt` line is wrong at HEAD (\"Sent by hand\"), so the test fails before and passes after. *Places:* `rg -n \"live-stage wait\" lib docs/architecture public CLAUDE.md` finds seven mentions in `lib/openrouter.js`, two in `lib/recommendation-live-wait.js`, one each in `lib/stage-router.js`, `lib/recommendation-blind-read.js`, `lib/recommendation-look-first.js`, `lib/dispatch-entrance.js`, `lib/recent-runs.js` (six), `CLAUDE.md`, `prompt-system.md` and three in `source-map.md`. Comments become a pointer to `CODE_ROUTES`; the three docs are pinned by the test. The builder runs that search again at the end and puts its output in the PR; reports under `docs/reviews/` are history and are left alone. *Retires:* the hand-ordered chain and the comment copies; the Waiting entry on the four routes. The `stage-router.js` header is a budgeted source (`STAGE_ROUTER_SOURCE_CEILING`): shortening it lowers the ceiling, which is allowed.",
      "paths": [
       "lib/code-routes.js",
       "lib/openrouter.js",
@@ -2262,7 +2262,7 @@
     "kind": "plan",
     "state": "kept",
     "fields": {
-     "says": "Piece 2: The blind read's words have one home (piece 2).** Nothing outside `lib/prompts/blind-read-words.js` and the template registry types the kind `'blind-read'` in a predicate or the heading `## Blind read`. *Witness:* a source-scan test that fails on any other occurrence, with a short allow-list of table keys (each with a reason); it fails today at the places the Waiting entry names (`lib/recommendation-blind-read.js`, `lib/pipeline-churn.js`, `lib/run-view.js`, `lib/run-closeout-state.js`, `lib/workflow-config.js` `VIRTUAL_PROMPTS.BLIND_READ`, and `lib/completion-signals.js`, which types the heading three times). Rendered prompts must be byte-identical (the blind read's sentence is piloted; do not re-word it). `COMPLETED` redeclared in `recommendation-blind-read.js` is not touched here: it retires with LIN-4447's move 3. *Retires:* the leaf's untrue header claim becomes true; the second constant.",
+     "says": "Piece 2: **B. The blind read's words have one home (piece 2).** Nothing outside `lib/prompts/blind-read-words.js` and the template registry types the kind `'blind-read'` in a predicate or the heading `## Blind read`. *Witness:* a source-scan test that fails on any other occurrence, with a short allow-list of table keys (each with a reason); it fails today at the places the Waiting entry names (`lib/recommendation-blind-read.js`, `lib/pipeline-churn.js`, `lib/run-view.js`, `lib/run-closeout-state.js`, `lib/workflow-config.js` `VIRTUAL_PROMPTS.BLIND_READ`, and `lib/completion-signals.js`, which types the heading three times). Rendered prompts must be byte-identical (the blind read's sentence is piloted; do not re-word it). `COMPLETED` redeclared in `recommendation-blind-read.js` is not touched here: it retires with LIN-4447's move 3. *Retires:* the leaf's untrue header claim becomes true; the second constant.",
      "paths": [
       "lib/prompts/blind-read-words.js",
       "lib/recommendation-blind-read.js",
@@ -2288,7 +2288,7 @@
     "kind": "plan",
     "state": "kept",
     "fields": {
-     "says": "Piece 3: One record per stage kind (piece 3).** `PROMPT_TEMPLATES`, `STAGE_LEADS`'s traits, `COMPLETION_SIGNALS`, `GROUNDING_BY_KIND`, `STAGE_LABELS` and the `route`/`writes` pins become views of one record each. *Witness:* (i) render every kind, fresh and fix round, with real context (not the context-free budget fixture, LIN-4393), at HEAD and on the branch, byte-identical except where the piece says otherwise; (ii) `stage-kind-tables.test.js` and `lin-4253-stage-traits.test.js` shrink to the tables that stay, and a new kind added to the record but missing a field fails; (iii) the run-page goldens are unchanged (labels are the same strings). This piece edits only the `STAGE_LABELS` literal in `lib/run-view.js` (Runs' file): rebase on LIN-4447's pieces that touch it. *Retires:* those tables, the \"\\~fourteen parallel tables\" Waiting entry (rewritten to name the four that stay and why), and the `llms.txt` prompt catalogue's hand-copied bullets, which are generated from the record (its test then checks content, not just existence).",
+     "says": "Piece 3: **C. One record per stage kind (piece 3).** `PROMPT_TEMPLATES`, `STAGE_LEADS`'s traits, `COMPLETION_SIGNALS`, `GROUNDING_BY_KIND`, `STAGE_LABELS` and the `route`/`writes` pins become views of one record each. *Witness:* (i) render every kind, fresh and fix round, with real context (not the context-free budget fixture, LIN-4393), at HEAD and on the branch, byte-identical except where the piece says otherwise; (ii) `stage-kind-tables.test.js` and `lin-4253-stage-traits.test.js` shrink to the tables that stay, and a new kind added to the record but missing a field fails; (iii) the run-page goldens are unchanged (labels are the same strings). This piece edits only the `STAGE_LABELS` literal in `lib/run-view.js` (Runs' file): rebase on LIN-4447's pieces that touch it. *Retires:* those tables, the \"\\~fourteen parallel tables\" Waiting entry (rewritten to name the four that stay and why), and the `llms.txt` prompt catalogue's hand-copied bullets, which are generated from the record (its test then checks content, not just existence).",
      "paths": [
       "lib/prompt-template-defs.js",
       "lib/completion-signals.js",
@@ -2314,7 +2314,7 @@
     "kind": "plan",
     "state": "kept",
     "fields": {
-     "says": "Piece 4: A reading stage cannot write what it may not (piece 4).** With a stamped token: `none` is refused on every write mount; `one-comment` and `blind-comment` may POST one comment to the named ticket and nothing else (a second comment on the same ticket is allowed by the token; \"one\" stays the preamble's ask, because a count needs state the token does not carry, and the blind-read shape check already runs at write time); `ticket-fields` may change labels, priority, state, project and comment on the named ticket, with no description rewrite, no create, no relation write; `work` and an unstamped token behave as today. An unknown stamped value fails closed to `none`, not open. *Witnesses, each failing before:* a `none` token gets 403 from each write mount (comment, issue update, description, label, relation, create, dispatch, agent status); a `one-comment` token posts its comment and is refused a comment on another ticket, a description edit and a label add; a triage token is refused a description rewrite. *Every place:* a test that reads the router's registered write routes (POST/PATCH/PUT/DELETE) and fails on one that is not classified in the allowance table, so a route added later cannot bypass it. *Mint paths:* every caller of `attachProxyContext` / `provisionResumeCredential` (`lib/dispatch-entrance.js` twice, `routes/workspace-api-feedback.js` twice, `lib/follow-up-dispatch.js`, `lib/wake-credential.js`, `lib/chat-tools.js`, `routes/dispatch.js`) must pass its stage's `writes`; the test lists any that cannot name a stage as unlimited with the reason. A follow-up's token takes its own kind's `writes`, not its parent's. Preamble prose is unchanged in this piece: guard first, words after.",
+     "says": "Piece 4: **D. A reading stage cannot write what it may not (piece 4).** With a stamped token: `none` is refused on every write mount; `one-comment` and `blind-comment` may POST one comment to the named ticket and nothing else (a second comment on the same ticket is allowed by the token; \"one\" stays the preamble's ask, because a count needs state the token does not carry, and the blind-read shape check already runs at write time); `ticket-fields` may change labels, priority, state, project and comment on the named ticket, with no description rewrite, no create, no relation write; `work` and an unstamped token behave as today. An unknown stamped value fails closed to `none`, not open. *Witnesses, each failing before:* a `none` token gets 403 from each write mount (comment, issue update, description, label, relation, create, dispatch, agent status); a `one-comment` token posts its comment and is refused a comment on another ticket, a description edit and a label add; a triage token is refused a description rewrite. *Every place:* a test that reads the router's registered write routes (POST/PATCH/PUT/DELETE) and fails on one that is not classified in the allowance table, so a route added later cannot bypass it. *Mint paths:* every caller of `attachProxyContext` / `provisionResumeCredential` (`lib/dispatch-entrance.js` twice, `routes/workspace-api-feedback.js` twice, `lib/follow-up-dispatch.js`, `lib/wake-credential.js`, `lib/chat-tools.js`, `routes/dispatch.js`) must pass its stage's `writes`; the test lists any that cannot name a stage as unlimited with the reason. A follow-up's token takes its own kind's `writes`, not its parent's. Preamble prose is unchanged in this piece: guard first, words after.",
      "paths": [
       "lib/stage-writes.js",
       "routes/proxy.js",
@@ -2343,7 +2343,7 @@
     "kind": "plan",
     "state": "kept",
     "fields": {
-     "says": "Piece 5: Fewer rules as prompt lists (piece 5), only after D has landed.** With the guard in place, `ONE_COMMENT_MANDATE`, `NONE_MANDATE`, `BLIND_COMMENT_MANDATE` and `TICKET_FIELDS_MANDATE` shrink to what the stage is told about its token; the merge sentences stay (cut, ruled). In one batch, with one re-pin of the 13 Periodical hashes, router snapshots, `scripts/eval/meta-prompt.baseline.txt` and `FROZEN_TOTAL_BYTES` (lowered with reasons in `scripts/prompt-template-change-log.md`): the docs-only notes-PR rule, the \"search the repo for a committed tool\" rule (the four wordings settle on Stability's) and the first-match area lookup each become one constant in `lib/prompts/leftover-words.js` (the blind read's piloted sentence stays as piloted: re-piloting is a person's run; the entry says so). *Witness:* the rendered-bytes check shows a net fall; the existing prompt tests pass; a test that none of the retired phrases still appears in a second template. LIN-4350 stays its own ticket (it spans both repos and waits for this one's siblings): this piece takes only the folds the guard and the shared constants make safe, and records for LIN-4350 what it found.",
+     "says": "Piece 5: **E. Fewer rules as prompt lists (piece 5), only after D has landed.** With the guard in place, `ONE_COMMENT_MANDATE`, `NONE_MANDATE`, `BLIND_COMMENT_MANDATE` and `TICKET_FIELDS_MANDATE` shrink to what the stage is told about its token; the merge sentences stay (cut, ruled). In one batch, with one re-pin of the 13 Periodical hashes, router snapshots, `scripts/eval/meta-prompt.baseline.txt` and `FROZEN_TOTAL_BYTES` (lowered with reasons in `scripts/prompt-template-change-log.md`): the docs-only notes-PR rule, the \"search the repo for a committed tool\" rule (the four wordings settle on Stability's) and the first-match area lookup each become one constant in `lib/prompts/leftover-words.js` (the blind read's piloted sentence stays as piloted: re-piloting is a person's run; the entry says so). *Witness:* the rendered-bytes check shows a net fall; the existing prompt tests pass; a test that none of the retired phrases still appears in a second template. LIN-4350 stays its own ticket (it spans both repos and waits for this one's siblings): this piece takes only the folds the guard and the shared constants make safe, and records for LIN-4350 what it found.",
      "paths": [
       "lib/proxy-preamble.js",
       "lib/prompts/leftover-words.js",
@@ -2369,7 +2369,7 @@
     "kind": "plan",
     "state": "kept",
     "fields": {
-     "says": "Piece 6: The Waiting entries (each piece, then piece 6).** Every piece edits the entries it settles and cites them in its retirement line (the LIN-4414 rule). Piece 6 settles the rest by the table below and rewrites the Lessons the new structure replaces (the \"retyped in five files\" lesson, the table lesson). *Witness:* `tests/unit/area-notes.test.js` passes and the note's entry count falls from 25 (the ticket says 26; I count 25 bullets at HEAD, and the builder recounts at the start).",
+     "says": "Piece 6: **F. The Waiting entries (each piece, then piece 6).** Every piece edits the entries it settles and cites them in its retirement line (the LIN-4414 rule). Piece 6 settles the rest by the table below and rewrites the Lessons the new structure replaces (the \"retyped in five files\" lesson, the table lesson). *Witness:* `tests/unit/area-notes.test.js` passes and the note's entry count falls from 25 (the ticket says 26; I count 25 bullets at HEAD, and the builder recounts at the start).",
      "paths": [
       "docs/areas/llm-and-prompts.md",
       "tests/unit/area-notes.test.js"
@@ -2597,27 +2597,6 @@
     "op": "add",
     "at": "2026-11-13T15:54:40.600Z",
     "by": "breakdown"
-   },
-   {
-    "id": "task-127",
-    "kind": "task",
-    "state": "done",
-    "fields": {
-     "ref": "LIN-4465",
-     "done-when": "LLM & prompts: one ordered CODE_ROUTES list that codeRouteOf iterates (piece 1)",
-     "paths": []
-    },
-    "links": {
-     "piece": "plan-113"
-    },
-    "in": "task-108",
-    "v": 2,
-    "op": "end",
-    "at": "2026-11-13T19:44:59.000Z",
-    "by": "close-out",
-    "ended": {
-     "reason": "Piece 1: PR #2433 merged as e666c4b60. Time is the merge commit's."
-    }
    }
   ],
   "task-128": [
@@ -2638,27 +2617,6 @@
     "op": "add",
     "at": "2026-11-13T15:54:40.900Z",
     "by": "breakdown"
-   },
-   {
-    "id": "task-128",
-    "kind": "task",
-    "state": "done",
-    "fields": {
-     "ref": "LIN-4466",
-     "done-when": "LLM & prompts: blind read's kind and heading from one leaf (piece 2)",
-     "paths": []
-    },
-    "links": {
-     "piece": "plan-114"
-    },
-    "in": "task-108",
-    "v": 2,
-    "op": "end",
-    "at": "2026-11-13T20:42:28.000Z",
-    "by": "close-out",
-    "ended": {
-     "reason": "Piece 2: PR #2441 merged as dc12ca51b. Time is the merge commit's."
-    }
    }
   ],
   "task-129": [
@@ -2679,27 +2637,6 @@
     "op": "add",
     "at": "2026-11-13T15:54:41.200Z",
     "by": "breakdown"
-   },
-   {
-    "id": "task-129",
-    "kind": "task",
-    "state": "done",
-    "fields": {
-     "ref": "LIN-4467",
-     "done-when": "LLM & prompts: one record per stage kind, tables become views (piece 3)",
-     "paths": []
-    },
-    "links": {
-     "piece": "plan-115"
-    },
-    "in": "task-108",
-    "v": 2,
-    "op": "end",
-    "at": "2026-11-13T21:58:11.000Z",
-    "by": "close-out",
-    "ended": {
-     "reason": "Piece 3: PR #2444 merged as 8fea3869f. Time is the merge commit's."
-    }
    }
   ],
   "task-130": [
@@ -2720,27 +2657,6 @@
     "op": "add",
     "at": "2026-11-13T15:54:41.500Z",
     "by": "breakdown"
-   },
-   {
-    "id": "task-130",
-    "kind": "task",
-    "state": "done",
-    "fields": {
-     "ref": "LIN-4468",
-     "done-when": "LLM & prompts: proxy refuses writes outside the stage's allowance (piece 4)",
-     "paths": []
-    },
-    "links": {
-     "piece": "plan-116"
-    },
-    "in": "task-108",
-    "v": 2,
-    "op": "end",
-    "at": "2026-11-13T22:29:42.000Z",
-    "by": "close-out",
-    "ended": {
-     "reason": "Piece 4: PR #2443 merged as b937237a4. Time is the merge commit's."
-    }
    }
   ],
   "task-131": [
@@ -2924,45 +2840,6 @@
     "op": "add",
     "at": "2026-11-13T15:58:14.076Z",
     "by": "breakdown"
-   }
-  ],
-  "verdict-139": [
-   {
-    "id": "verdict-139",
-    "kind": "verdict",
-    "state": "stands",
-    "fields": {
-     "of": "review",
-     "outcome": "request-changes",
-     "reasoning": "Request Changes. The parent isn't ready to close: four of the seven pieces haven't started, and one is waiting for close-out. This is not a design problem. The approved plan stands, and the next action is to keep descending into the children. In order: `close-out` on LIN-4466 (already sent), then `implementation` on LIN-4468 (it can start now, independently), then LIN-4467 once #2441 merges, then LIN-4469, then LIN-4470. After that, run review on the parent again.\n\n### What CI Did Not Prove\n- **Inside** (bounded class: prompt-only limits; LIN-1273/LIN-1242 read-only scope). The proxy write guard does not exist yet. Settle it **before the parent closes** by landing LIN-4468, with tests showing a forbidden write returns 403 on real preamble endpoints. That includes triage's description PATCH under `ticket-fields`, and a comment POST to a ticket other than the stamped one under `one-comment`.\n- **Inside** (bounded class: stage-kind tables, docs drift row 154). `public/llms.txt` and `docs/architecture/prompt-system.md` still describe routes and stages independently of the code. Settle it **before the parent closes** through LIN-4467, by generating the catalogue from the record and keeping the real-context fresh and fix renders byte-identical.\n- **Inside** (bounded class: rules as prompt lists). There is no net reduction in rendered bytes yet. Settle it **before the parent closes** through LIN-4469, with the re-pin showing lower `FROZEN_TOTAL_BYTES` and the reasons recorded in `scripts/prompt-template-change-log.md`.\n- **Inside** (Waiting entries + the blind-read measurement in Done when). Settle it **before the parent closes** through LIN-4470. Every retained entry must name its blocker or owner. The repeat `llm-and-prompts` read must beat the `front-end-pages` control, with intervening changes to either sample accounted for.\n- **Inside** (piece 2). #2441 is not merged and still has one open ledger item on LIN-4466. Settle it through the close-out already dispatched to LIN-4466."
-    },
-    "links": {
-     "on": [
-      "task-108@2"
-     ]
-    },
-    "in": "task-108",
-    "v": 1,
-    "op": "add",
-    "at": "2026-11-13T20:34:06.118Z",
-    "by": "review"
-   }
-  ],
-  "decision-140": [
-   {
-    "id": "decision-140",
-    "kind": "decision",
-    "state": "stands",
-    "fields": {
-     "answer": "## Condition on LIN-4467's budget raise, for piece 5\n\nIt was accepted on one condition that falls on this piece: **LIN-4469 must show a net rendered-byte reduction and lower `FROZEN_TOTAL_BYTES` below 396575** (the figure the settlement named), with the reduction measured on rendered prompts, not on source moved out of measured files. John on the limit: \"That limit is to push against lists of rules. Worth knowing, but not hard and fast.\"",
-     "why": "LIN-4467 (PR https://github.com/JKershaw/LinearViewer/pull/2444) raises `FROZEN_TOTAL_BYTES` in `tests/unit/prompt-size-budget.test.js` from 378915 to 396884 (396575 at review, plus a net +309 at close-out for deriving the reading-pass lines). It is re-accounting, not growth: the text moved into the newly budgeted `lib/prompts/stage-kinds.js` from files the total did not cover, and all 80 rendered prompts are byte-identical.\n\nNamed monitor: `tests/unit/prompt-size-budget.test.js` fails on any growth past the ceiling. Only this piece landing can show the reduction.\n\nThe record's source ceiling (`lib/prompts/stage-kinds.js`, 43348) is part of what to lower if wording moves out of it. `lib/prompt-template-defs.js` and the budget test are shared with this piece; LIN-4467 lands first.\n"
-    },
-    "links": {},
-    "in": "task-131",
-    "v": 1,
-    "op": "add",
-    "at": "2026-11-13T21:49:17.132Z",
-    "by": "autopilot"
    }
   ]
  },

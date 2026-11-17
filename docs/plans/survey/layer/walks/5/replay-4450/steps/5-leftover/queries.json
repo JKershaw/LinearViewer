@@ -1,0 +1,172 @@
+[
+ {
+  "at": "2026-11-17T15:22:46.815Z",
+  "by": "leftover",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:22:46.864Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--to",
+   "area-1",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:22:46.906Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--area",
+   "area-2",
+   "--state",
+   "open",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:22:50.687Z",
+  "by": "leftover",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:23:03.216Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "should-mock-ai",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:23:03.252Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "isHermeticTestToken",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:23:03.286Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--in",
+   "area-1",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:23:03.319Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--in",
+   "area-2",
+   "--kind",
+   "lesson",
+   "--count",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:23:03.352Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "get",
+   "area-1",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:23:03.397Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "harbour.asAsked",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:23:09.855Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "get",
+   "change-84",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:23:09.890Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-70",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:23:09.920Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-22",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ }
+]

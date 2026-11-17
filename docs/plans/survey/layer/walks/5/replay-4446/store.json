@@ -1,5 +1,5 @@
 {
- "next": 27,
+ "next": 28,
  "records": {
   "area-1": [
    {
@@ -395,6 +395,29 @@
     "at": "2026-11-13T13:18:46.000Z",
     "by": "scoping",
     "reason": "scoping sized the move (decision-26) and needed nothing more from this; the slice's shape is for the plan"
+   },
+   {
+    "id": "finding-16",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "What to do first. (1) Write the reading of the rule (no build step, no framework; the browser may import natively) into `CLAUDE.md:43` and `docs/areas/front-end-browser.md`. (2) First slice: cost-format. `lib/cost-format.js` (46 lines, no imports) becomes the one served shared module and stays importable by `lib/render-*.js`. Retires `public/cost-format.js` (a self-declared \"restatement\") and `tests/unit/cost-format-parity.test.js`. Its 4 consumers (`flight-companion`, `prompt-section`, `observation`, `workspace-kpis`) call `window.CostFormat` only inside handlers and render functions, never at load, so a small module shim that sets `window.CostFormat` runs early enough (module scripts run before `DOMContentLoaded`) and no view has to become a module yet. Update `tests/unit/cost-read-census.test.js:85` and the vm suites that name `cost-format.js`. This settles where shared modules are served, the purity rule and the test path on a pure function before any view is touched; view size and `common.js` globals stay out (see the area finding)."
+    },
+    "links": {
+     "on": [
+      "finding-11@2",
+      "finding-12@1",
+      "finding-13@2",
+      "finding-15@1"
+     ]
+    },
+    "in": "task-9",
+    "to": "design",
+    "v": 3,
+    "op": "revise",
+    "at": "2026-11-13T13:18:54.000Z",
+    "by": "scoping",
+    "reason": "re-pin: finding-11/13 v2 only changed their addressee"
    }
   ],
   "check-17": [
@@ -687,6 +710,91 @@
     "op": "add",
     "at": "2026-11-13T13:18:45.000Z",
     "by": "scoping"
+   },
+   {
+    "id": "decision-26",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "scope": "task-9",
+     "answer": "Size: just the task. The rule's reading goes into the notes and one cost formatter is shared with the browser, retiring its restated copy (public/cost-format.js) and its parity check, then a pause for John. Cuts: none.",
+     "why": "Decided by a ruling: John ruled small in the ask (\"the size is John's call, and for this work it's small\"). No Survey finding must come first; common.js globals and view size are already kept out to the area (finding-12)."
+    },
+    "links": {
+     "on": [
+      "finding-16@2",
+      "finding-12@1"
+     ],
+     "about": [
+      "task-9"
+     ]
+    },
+    "in": "task-9",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T13:18:51.000Z",
+    "by": "scoping",
+    "reason": "finding-16 v2 only changed its addressee; same text"
+   },
+   {
+    "id": "decision-26",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "scope": "task-9",
+     "answer": "Size: just the task. The rule's reading goes into the notes and one cost formatter is shared with the browser, retiring its restated copy (public/cost-format.js) and its parity check, then a pause for John. Cuts: none.",
+     "why": "Decided by a ruling: John ruled small in the ask (\"the size is John's call, and for this work it's small\"). No Survey finding must come first; common.js globals and view size are already kept out to the area (finding-12)."
+    },
+    "links": {
+     "on": [
+      "finding-16@3",
+      "finding-12@1"
+     ],
+     "about": [
+      "task-9"
+     ]
+    },
+    "in": "task-9",
+    "v": 3,
+    "op": "revise",
+    "at": "2026-11-13T13:18:55.000Z",
+    "by": "scoping",
+    "reason": "re-pin: finding-16 v3 only re-pinned its links"
+   }
+  ],
+  "run-27": [
+   {
+    "id": "run-27",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "scoping",
+     "account": "Sized LIN-4446 as just the task, decided by a ruling: John said in the ask that the size is his call and small. The move is the rule's reading in the notes plus one shared cost formatter that retires public/cost-format.js and its parity check, then a pause for John (check-17). No cuts, and no Survey finding has to come first; common.js globals and view size are already with the area. Wrote the size into the ticket description. The five findings sent to me (11, 13, 16, 22, 23) shape the slice, not its size, so I passed them on to design unchanged."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:18:52.000Z",
+    "by": "scoping"
+   },
+   {
+    "id": "run-27",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "scoping",
+     "account": "Sized LIN-4446 as just the task, decided by a ruling: John said in the ask that the size is his call and small. The move is the rule's reading in the notes plus one shared cost formatter that retires public/cost-format.js and its parity check, then a pause for John (check-17). No cuts, and no Survey finding has to come first; common.js globals and view size are already with the area. Wrote the size into the ticket description. The five findings sent to me (11, 13, 16, 22, 23) shape the slice, not its size, so I passed them on to design unchanged."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T13:18:53.000Z",
+    "by": "scoping",
+    "ended": {
+     "reason": "size written to the ticket"
+    }
    }
   ]
  },
@@ -982,6 +1090,45 @@
   },
   {
    "at": "2026-11-17T15:24:02.425Z",
+   "by": "scoping",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-9",
+    "--by",
+    "scoping"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:09.564Z",
+   "by": "scoping",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-9",
+    "--by",
+    "scoping"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:12.014Z",
+   "by": "scoping",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-9",
+    "--by",
+    "scoping"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:19.157Z",
    "by": "scoping",
    "cmd": "show",
    "args": [
