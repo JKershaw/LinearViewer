@@ -1,5 +1,5 @@
 {
- "next": 77,
+ "next": 79,
  "records": {
   "area-1": [
    {
@@ -1529,6 +1529,54 @@
     "at": "2026-11-13T15:03:02.000Z",
     "stateReason": "survey posted on LIN-4455",
     "reason": "survey posted on LIN-4455"
+   }
+  ],
+  "decision-77": [
+   {
+    "id": "decision-77",
+    "kind": "decision",
+    "in": "task-60",
+    "scope": "task-60",
+    "links": {
+     "on": "plan-45@1"
+    },
+    "answer": "Size of the move: consolidate the decision this task touches. Deliver piece 5, and also make every reader of the never-ran statuses (all five `cancelled`/`expired` spellings, finding-71) and of the decision-stamp feedback kinds (`DECISION_LIFECYCLE_STAMP_KINDS`, finding-70) take them from the one owner. Cuts: none.",
+    "why": "Leaving those copies would keep the restated rules this piece retires. Decided by the standing policy.",
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "scoping",
+    "at": "2026-11-13T15:06:08.000Z"
+   }
+  ],
+  "run-78": [
+   {
+    "id": "run-78",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "scoping",
+    "account": "Scoped LIN-4455 as consolidate the decision this task touches (decision-77): piece 5 as planned, widened so all five never-ran spellings (finding-71) and the decision-stamp kinds (finding-70) read from one owner; no cuts, by the standing policy. Closed nothing: the survey findings and questions stay open for implementation and the parent.",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "scoping",
+    "at": "2026-11-13T15:06:09.000Z"
+   },
+   {
+    "id": "run-78",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "scoping",
+    "account": "Scoped LIN-4455 as consolidate the decision this task touches (decision-77): piece 5 as planned, widened so all five never-ran spellings (finding-71) and the decision-stamp kinds (finding-70) read from one owner; no cuts, by the standing policy. Closed nothing: the survey findings and questions stay open for implementation and the parent.",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "scoping",
+    "at": "2026-11-13T15:06:10.000Z",
+    "stateReason": "scope written to LIN-4455",
+    "reason": "scope written to LIN-4455"
    }
   ]
  },

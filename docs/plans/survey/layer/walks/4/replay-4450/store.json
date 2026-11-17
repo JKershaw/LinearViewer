@@ -1,5 +1,5 @@
 {
- "next": 81,
+ "next": 82,
  "records": {
   "area-1": [
    {
@@ -1728,6 +1728,25 @@
     "op": "add",
     "by": "survey-place",
     "at": "2026-11-13T13:48:05.000Z"
+   }
+  ],
+  "decision-81": [
+   {
+    "id": "decision-81",
+    "kind": "decision",
+    "in": "task-60",
+    "answer": "Size of the move: a small tidy. Jira holds the person's words byte-exact (plan-54 session 1, as broken down in decision-63), plus one tidy done first: an empty fenced code block in the words no longer files a description that refuses every later write below the line, which the seal exists to allow. Cuts: none.",
+    "why": "Decided by the standing policy: the move delivers the whole Done-when with no narrowing, and the one tidy (finding-67) is a precondition of the seal, not new scope, so no ruling from John is needed.",
+    "scope": "task-60",
+    "links": {
+     "about": "task-60",
+     "on": "plan-54@2"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "scoping",
+    "at": "2026-11-13T13:52:11.000Z"
    }
   ]
  },
