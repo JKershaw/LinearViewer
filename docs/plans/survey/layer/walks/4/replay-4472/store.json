@@ -1,5 +1,5 @@
 {
- "next": 66,
+ "next": 68,
  "records": {
   "task-1": [
    {
@@ -736,6 +736,22 @@
     "op": "add",
     "by": "breakdown",
     "at": "2026-11-13T16:05:48.000Z"
+   },
+   {
+    "id": "decision-32",
+    "kind": "decision",
+    "in": "task-28",
+    "answer": "Session fit: fits one session. It converts one page entry that is the last script of one renderer, plus migrating its suites. It adds no bridge entry. It now includes one served lib leaf (one file plus one allow-list entry) for duration and relative-time wording, per decision-66.",
+    "why": "Breakdown table: One session. It converts one page entry, the last script of one renderer, adds nothing to the bridge, and migrates that page's suites onto piece 1's helper.",
+    "links": {
+     "on": "verdict-25@1"
+    },
+    "state": "stands",
+    "v": 2,
+    "op": "revise",
+    "by": "autopilot",
+    "at": "2026-11-13T17:33:01.000Z",
+    "reason": "The 'no serving change' phrase predates LIN-4471 landing; superseded by decision-66 (extract the served leaf first)"
    }
   ],
   "decision-33": [
@@ -1310,6 +1326,24 @@
     "op": "add",
     "by": "survey-place",
     "at": "2026-11-13T17:26:51.000Z"
+   },
+   {
+    "id": "finding-60",
+    "kind": "finding",
+    "in": "area-49",
+    "to": "area-49",
+    "links": {
+     "about": "question-52@2"
+    },
+    "says": "Not this task's: one pure duration/relative-time leaf in `lib/`, served, so both client twins (`formatElapsed` = `fmtDuration` in `lib/render-run-steps.js`, `relativeWords` = `relativeAgo` in `lib/task-page-loader.js`) and their twin tests (`lin-3975-task-run-links:211`, `lin-3975-summary-and-time:57`) go away. Neither lib home is a leaf today, so it needs an extraction and a `SHARED_MODULES` entry (survey-place on LIN-4472 at 904719353).",
+    "state": "handed-on",
+    "v": 2,
+    "op": "end",
+    "by": "autopilot",
+    "at": "2026-11-13T17:33:02.000Z",
+    "stateReason": "Brought into this task: decision-66 has LIN-4472 extract the served duration/relative-time leaf first",
+    "into": "decision-66",
+    "reason": "Brought into this task: decision-66 has LIN-4472 extract the served duration/relative-time leaf first"
    }
   ],
   "finding-61": [
@@ -1378,6 +1412,29 @@
     "op": "add",
     "by": "scoping",
     "at": "2026-11-13T17:29:46.000Z"
+   },
+   {
+    "id": "question-63",
+    "kind": "question",
+    "in": "task-28",
+    "to": "John",
+    "asks": "LIN-4472's Session-fit line says 'no serving change'. Scoping recommends first extracting one small served lib leaf for duration and relative-time wording, so the task page drops its two restated copies (`formatElapsed` = `fmtDuration`, `relativeWords` = `relativeAgo`). Is that allowed? The answer is recorded on LIN-4463.",
+    "options": [
+     "extract: yes, extract the served leaf first, and the page drops both copies",
+     "leave: no, leave both copies, add a Waiting entry, and record it as a cut"
+    ],
+    "recommended": "extract",
+    "if-unanswered": "extract",
+    "links": {
+     "about": "decision-32@1"
+    },
+    "state": "answered",
+    "v": 2,
+    "op": "end",
+    "by": "autopilot",
+    "at": "2026-11-13T17:33:00.000Z",
+    "stateReason": "Settled by autopilot as an engineering call (decision-66): extract the served leaf first; the page drops both copies",
+    "reason": "Settled by autopilot as an engineering call (decision-66): extract the served leaf first; the page drops both copies"
    }
   ],
   "decision-64": [
@@ -1426,6 +1483,56 @@
     "at": "2026-11-13T17:29:50.000Z",
     "stateReason": "Size recorded and ruling raised",
     "reason": "Size recorded and ruling raised"
+   }
+  ],
+  "decision-66": [
+   {
+    "id": "decision-66",
+    "kind": "decision",
+    "in": "task-28",
+    "scope": "task-28",
+    "answer": "Extract it first: LIN-4472 extracts one small served lib leaf for duration and relative-time wording (one file plus one `SHARED_MODULES` entry under `/lib/`), and the task page imports it and drops both restated copies (`formatElapsed` = `fmtDuration`, `relativeWords` = `relativeAgo`). Settled by autopilot as an engineering call, not escalated to John.",
+    "why": "The ask says shared logic is \"imported, not restated\" and \"each converted view drops its copies\"; leaving the two copies would contradict it. The serving path (`/lib/`, the `SHARED_MODULES` allow-list and its checks) already exists from LIN-4471, so this adds one allow-listed leaf, not a new mechanism. No view is retired and no product, money or authority question is involved, so it is not John's call; the size record stays 'Cuts: none'. The Session-fit phrase 'no serving change' (decision-32) predates LIN-4471 landing and is superseded by this decision. If wrong: the leaf is one file plus one allow-list entry and is easy to inline back.",
+    "links": {
+     "answers": "question-63",
+     "on": "task-1@1",
+     "about": "decision-32@1"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "autopilot",
+    "at": "2026-11-13T17:32:59.000Z"
+   }
+  ],
+  "run-67": [
+   {
+    "id": "run-67",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "autopilot",
+    "account": "Scoping put one question to John (question-63): may LIN-4472 extract a small served lib leaf for duration and relative-time wording, despite Session fit saying no serving change? I judged it an engineering call, not a ruling (no view retired, no product, money or authority), and settled it: extract first (decision-66). The ask wants shared logic imported, not restated, and the /lib/ serving path from LIN-4471 already exists, so it is one file plus one allow-list entry and easy to undo. I ended the question answered, revised the Session-fit decision (decision-32) to drop the stale phrase, and handed the area finding that called this work not-this-task (finding-60) on into the decision. Posted on LIN-4463.",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "autopilot",
+    "at": "2026-11-13T17:33:03.000Z"
+   },
+   {
+    "id": "run-67",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "autopilot",
+    "account": "Scoping put one question to John (question-63): may LIN-4472 extract a small served lib leaf for duration and relative-time wording, despite Session fit saying no serving change? I judged it an engineering call, not a ruling (no view retired, no product, money or authority), and settled it: extract first (decision-66). The ask wants shared logic imported, not restated, and the /lib/ serving path from LIN-4471 already exists, so it is one file plus one allow-list entry and easy to undo. I ended the question answered, revised the Session-fit decision (decision-32) to drop the stale phrase, and handed the area finding that called this work not-this-task (finding-60) on into the decision. Posted on LIN-4463.",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "autopilot",
+    "at": "2026-11-13T17:33:04.000Z",
+    "stateReason": "Question settled and recorded",
+    "reason": "Question settled and recorded"
    }
   ]
  },
@@ -1834,6 +1941,123 @@
     "serving",
     "--by",
     "scoping"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:49:53.538Z",
+   "by": "autopilot",
+   "q": [
+    "get",
+    "question-63",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:49:53.568Z",
+   "by": "autopilot",
+   "q": [
+    "get",
+    "decision-64",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:49:53.596Z",
+   "by": "autopilot",
+   "q": [
+    "get",
+    "decision-32",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:49:53.624Z",
+   "by": "autopilot",
+   "q": [
+    "find",
+    "--in",
+    "task-28",
+    "--kind",
+    "decision",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:49:53.655Z",
+   "by": "autopilot",
+   "q": [
+    "find",
+    "--text",
+    "served",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:50:07.597Z",
+   "by": "autopilot",
+   "q": [
+    "find",
+    "--kind",
+    "task",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:50:07.639Z",
+   "by": "autopilot",
+   "q": [
+    "find",
+    "--text",
+    "SHARED_MODULES",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:50:10.865Z",
+   "by": "autopilot",
+   "q": [
+    "get",
+    "finding-60",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:50:10.901Z",
+   "by": "autopilot",
+   "q": [
+    "get",
+    "decision-18",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:50:10.937Z",
+   "by": "autopilot",
+   "q": [
+    "get",
+    "question-52",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:50:21.884Z",
+   "by": "autopilot",
+   "q": [
+    "find",
+    "--text",
+    "\"decision-32@",
+    "--by",
+    "autopilot"
    ]
   }
  ]
