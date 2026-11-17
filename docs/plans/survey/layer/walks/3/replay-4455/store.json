@@ -1,0 +1,1519 @@
+{
+ "retro": false,
+ "next": 66,
+ "records": {
+  "area-1": {
+   "id": "area-1",
+   "kind": "area",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "state": "kept",
+     "fields": {
+      "name": "Runs & dispatch",
+      "paths": [
+       "routes/dispatch.js",
+       "routes/live-console.js",
+       "routes/runner-kit.js",
+       "routes/runner-setup.js",
+       "lib/runner-kit/",
+       "lib/dispatch-",
+       "lib/pipeline-loops.js",
+       "lib/run-",
+       "lib/wake-",
+       "lib/digest-feedback.js",
+       "lib/lineage-closure.js",
+       "lib/loop-supersede.js",
+       "lib/follow-up-dispatch.js",
+       "lib/ci-wake-sweep.js",
+       "lib/follow-on-ratio.js",
+       "lib/observation-",
+       "lib/observer-",
+       "lib/liveness-",
+       "lib/completion-signals.js",
+       "lib/agent-status-store.js",
+       "lib/unanswered-decisions.js",
+       "lib/task-decisions-store.js",
+       "lib/shelved-rulings-store.js",
+       "lib/dismissal-suggestions-store.js",
+       "lib/close-out-events-store.js",
+       "lib/ticket-close-closer.js",
+       "lib/plan-review-round-trips.js",
+       "lib/pipeline-churn.js",
+       "lib/poll-halt.js",
+       "lib/workspace-halt.js",
+       "lib/queue-config.js",
+       "lib/session-summary",
+       "lib/session-telemetry.js",
+       "lib/session-materializer-precompute.js",
+       "lib/sessions-feed-cache.js",
+       "lib/sessions-view.js",
+       "lib/recent-runs.js",
+       "lib/task-run-facts.js",
+       "lib/close-out-readiness.js",
+       "lib/close-out-merges.js",
+       "lib/task-cost-read.js",
+       "lib/task-timeline.js",
+       "lib/session-roles.js",
+       "lib/terminal-marked-task-cost.js",
+       "lib/transcript-spend.js",
+       "lib/weekly-budget.js",
+       "lib/wall-clock-summary.js",
+       "lib/harbour-spawn.js",
+       "lib/runner-owner-gate.js",
+       "lib/consumer-poll-warning.js",
+       "lib/consumer-heartbeat",
+       "lib/effort-readout.js",
+       "lib/escalation-kpis.js",
+       "lib/task-stack.js",
+       "lib/task-page-loader.js",
+       "lib/task-mode-store.js",
+       "lib/task-snapshot-store.js",
+       "lib/task-done-cache.js",
+       "lib/live-console.js",
+       "lib/periodical-runs.js",
+       "lib/periodical-report-gate.js",
+       "lib/refresh-on-resolve-gate.js",
+       "lib/superseded-selection.js",
+       "lib/owner-mint-refusals.js",
+       "lib/request-usage-",
+       "lib/cost-read.js",
+       "lib/row-usage.js",
+       "lib/lineage-membership.js",
+       "scripts/pipeline-churn.mjs"
+      ]
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-2": {
+   "id": "lesson-2",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "A run-row field that is always present with a default is one entry in `RUN_FIELDS` (`lib/dispatch-fields.js`). A sparse field stays a conditional spread in `addItem` and `_archiveItem`, so other rows keep their key sets byte-identical. Six fields were once dropped on one hop of four.",
+      "paths": [
+       "lib/dispatch-fields.js"
+      ],
+      "checked-at": "cfd152fa4"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-3": {
+   "id": "lesson-3",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "Every exit from the queue except a take archives through `_archiveItem` (`lib/dispatch-store.js`); a new exit must archive through it too.",
+      "paths": [
+       "lib/dispatch-store.js"
+      ],
+      "checked-at": "cfd152fa4"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-4": {
+   "id": "lesson-4",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "The wake path is `_planWake` (decide) then `_deliverWake` (deliver) in `lib/dispatch-store.js`, shared by `addFeedback` and the held-wake release (LIN-4373). Its guards (LIN-1059, 1165, 1357, 2297, 4080, 4166) run in an order that matters: change the pair whole, keep the wake suites passing, and update the two census pins (`lin-3134-declared-mint-census`, `lin-4080-addItem-census`) if the write moves.",
+      "paths": [
+       "lib/dispatch-store.js"
+      ],
+      "checked-at": "cfd152fa4"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-5": {
+   "id": "lesson-5",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "\"This run's PR\" is the session's own report: `prUrlOfFeedback` (`lib/dispatch-wake.js`) takes a PR on a report line before the `[done]` `url`, which older runners filled by mention count (LIN-4375).",
+      "paths": [
+       "lib/dispatch-wake.js"
+      ],
+      "checked-at": "cfd152fa4"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-6": {
+   "id": "lesson-6",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "Two `[done]` posts can reach a decide-then-enqueue at once, so \"no row yet\" is no guard: claim first, compare-and-set on the row (`claimHeldWake`). LIN-4373 relied on the read and queued two leftover rows (LIN-4375).",
+      "paths": [],
+      "checked-at": "cfd152fa4"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-7": {
+   "id": "lesson-7",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "A claim whose holder skips is released on every path out (`releaseHeldWakeClaim`). A stamp left by a skip held the re-report forever (LIN-4375 review).",
+      "paths": [],
+      "checked-at": "cfd152fa4"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-8": {
+   "id": "lesson-8",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "Any session can park `[pending]` on CI and finish on a ci-wake `custom` row (`lib/ci-wake-sweep.js`). A rule keyed on the producing kind misses that ending: read the lineage (`heldWakeHolderOf`, `resolveFollowUpRoot`). LIN-4373 covered eligibility, not the held wake's terminals.",
+      "paths": [
+       "lib/ci-wake-sweep.js"
+      ],
+      "checked-at": "cfd152fa4"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-9": {
+   "id": "lesson-9",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "Row-only kinds stay out of `DISPATCH_KINDS` (`lib/prompt-templates.js`) and sit in `ROW_ONLY_KINDS` (`lib/dispatch-fields.js`); kind-keyed maps are tested against both. A new bucket can pull a kind into the round-trip walk, which `OFF_SPINE_KINDS` stops (LIN-4376).",
+      "paths": [
+       "lib/prompt-templates.js",
+       "lib/dispatch-fields.js"
+      ],
+      "checked-at": "cfd152fa4"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-10": {
+   "id": "lesson-10",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "The store knows no leftovers (LIN-4383). It holds a parent wake by `heldWakeFor` (LIN-4373), released by the holder's terminal or `_archiveItem` under the build's guard key, so it wakes once. Leftover wording lives in `lib/dispatch-leftover-hook.js`; a new held-wake feature brings a hook (`lin-4377-store-knows-no-leftover` counts the word).",
+      "paths": [
+       "lib/dispatch-store.js",
+       "lib/dispatch-leftover-hook.js"
+      ],
+      "checked-at": "cfd152fa4"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-11": {
+   "id": "lesson-11",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "Price a pulled extra like any piece: a cost read that rode along with LIN-4201 landed alone as LIN-4226.",
+      "paths": [],
+      "checked-at": "cfd152fa4"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-12": {
+   "id": "lesson-12",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "A task timeline lane is running from the page's open session ids (`isOpenState`), never the cost row; a lineage's own `incomplete`, not the shared `lineagesTruncated`, decides \"not complete\" (LIN-4405, `lib/task-timeline.js`).",
+      "paths": [
+       "lib/task-timeline.js"
+      ],
+      "checked-at": "cfd152fa4"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-13": {
+   "id": "lesson-13",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "A test that dispatches a close-out passes a `closeOut` seam (`resolveProvider`): the readiness guard reads comments for every close-out since LIN-4438, and without the seam it reaches the real provider and fails open, a pass the hermetic watcher catches only in CI.",
+      "paths": [],
+      "checked-at": "cfd152fa4"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-14": {
+   "id": "lesson-14",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "Close-out readiness has five lanes: the route (`codeRouteOf`), the stop-at state, the task page's box (`buildRunEvidence`) and both guard lanes (`closeOutNotReady`). A readiness rule goes in `closeOutWaitsOn` (`lib/run-closeout-state.js`) and gets a row in the shared-trail table (`lin-4438-blind-read-gate`); gating one lane let the page offer a press the guard refused (LIN-4438).",
+      "paths": [
+       "lib/run-closeout-state.js"
+      ],
+      "checked-at": "cfd152fa4"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-15": {
+   "id": "lesson-15",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "A reader that classifies by kind routes `custom` before `bucketOf`: `BUCKET_OF_KIND` maps `custom` to orchestration, and `bucketOf` falls back to orchestration silently, so check membership (`lib/wall-clock-summary.js`). `dispatchesOf` turns a missing kind into `custom` (`lib/cost-read.js`): confirm a custom kind from its own row before trusting it (LIN-4426).",
+      "paths": [
+       "lib/wall-clock-summary.js",
+       "lib/cost-read.js"
+      ],
+      "checked-at": "cfd152fa4"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-16": {
+   "id": "lesson-16",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "A full PR URL's repository and number come from `prOf` beside `prUrlsIn` (`lib/run-ledger.js`), for the task page and measure 1 alike; compare repositories case-blind, as GitHub does (LIN-4439).",
+      "paths": [
+       "lib/run-ledger.js"
+      ],
+      "checked-at": "cfd152fa4"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-17": {
+   "id": "lesson-17",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "A per-dispatch figure (its model, cost or completeness) is the fold's answer, carried through `lib/cost-read.js`; a reader never re-ranks `byModel` itself. `dispatchModelOf` in `lib/task-timeline.js` did, and a lane can now name two models. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)",
+      "paths": [
+       "lib/cost-read.js",
+       "lib/task-timeline.js"
+      ],
+      "checked-at": "cfd152fa4"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-18": {
+   "id": "finding-18",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 1: `lib/dispatch-wake.js`: `reportedPrUrlOf` and SD's `sessionPrs` pick a PR by one order, linked only by a comment; changing one moves a PR link. (Drift & Coherence Review, 10 Nov; `docs/reviews/drift-coherence-review-2026-11-10.md`.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-19": {
+   "id": "finding-19",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 2: `lib/dispatch-leftover.js`: restates the follow-up target, halt modes and `NEVER_RAN` (also in `_releaseIfHeld`) beside their homes (`lib/workspace-halt.js`, `HALT_MODES`); a new halt mode would not stop a leftover. (Drift & Coherence Review, 10 Nov; `docs/reviews/drift-coherence-review-2026-11-10.md`.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-20": {
+   "id": "finding-20",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 3: `lib/dispatch-leftover-hook.js`: a death between `claimHeldWake` and the enqueue, or a failed release write, leaves the wake held. No sweep: a lease sees no re-report, a sweep scans history, and clearing stamps reopens LIN-4375's double queue. (LIN-4377.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-21": {
+   "id": "finding-21",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 4: `lib/dispatch-store.js`: `releaseHeldWake` prepends `formatHeldWakeNote({status})`, so release picks leftover wording; `lin-4377` counts the spelling, not the dependency. (Operator, LIN-4377.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-22": {
+   "id": "finding-22",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 5: `lib/dispatch-store.js`: `addFeedback` takes one `wakeHook`; a second held-wake feature first needs composable hooks. (Operator, LIN-4377.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-23": {
+   "id": "finding-23",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 6: `lib/runner-kit/contract.json`: the row-shape rule is written twice (`checkRowShape`; SD's `columnProblems`); `CONTRACT_SHA256` pins the bytes, not the rule. (Operator, LIN-4377.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-24": {
+   "id": "finding-24",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 7: `lib/runner-kit/contract.json`: no row pins a follow-up to a finished, unhalted session (rows cover pause and stop), though the leftover step resumes its build that way (`lib/dispatch-leftover.js`). (Seams & Tangles, 10 Nov.; `docs/reviews/seams-tangles-review-2026-11-10-run11.md`.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-25": {
+   "id": "finding-25",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 8: `lib/dispatch-factory.js`: tests `provider.name === 'linear'` beside `isHermeticTestToken` for a test-only transport. (LIN-4347.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-26": {
+   "id": "finding-26",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 9: `lib/cost-read.js`: split out `readCalls` and `callsSurfaceOf`; settle whether instance-wide reads sit beside workspace-keyed stores. (Survey tally: LIN-4201.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-27": {
+   "id": "finding-27",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 10: `lib/session-summary.js`: do stored run paragraphs keep pre-cutover figures? (Survey tally: LIN-4201.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-28": {
+   "id": "finding-28",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 11: `lib/dispatch-feedback-validation.js`: feedback kinds lack one declaration with their role: `PARKED_WAIT_SKIPPED_KINDS` (`lib/session-telemetry.js`), `FEEDBACK_ENTRY_KINDS`, `findWakeEvent`'s skip rule. (Survey tally: LIN-4240, 4239, 4233.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-29": {
+   "id": "finding-29",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 12: `lib/wake-shadow.js`: one wake policy, from the LIN-3257 classifier this shadow records. (Survey tally: LIN-3257.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-30": {
+   "id": "finding-30",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 13: `lib/runner-kit/runner.mjs`: the per-message transcript fold is here and in SD; one shared fold would turn a transcript into requests. (Survey tally: LIN-4203, LIN-4195.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-31": {
+   "id": "finding-31",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 14: `lib/recent-runs.js`: `runFact` reads only the row's feedback: a stage parked `[pending]` whose lineage ends `[blocked]` or `[skipped]` reads `running` and holds the live-stage wait until aborted. (LIN-4392.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-32": {
+   "id": "finding-32",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 15: `lib/run-ledger.js`: `landingPrUrls` counts every full PR URL after its anchor, so it disagrees with the other landing readers in two cases the shared-trail table pins as chosen, not designed (`tests/unit/lin-4438-blind-read-gate.test.js` rows 14 and 15): an audit report that re-cites a merged landing PR puts it in the notes PR's landing (`auditAfterLandingCloseOut` in `lib/recommendation-facts.js` treats only the new PR as the notes PR), and a foreign PR cited before the first review joins a first landing. Each costs a read that must name an extra PR. One comment classifier and one landing reader would make both follow from one rule. A third case is not pinned: an agent's own note (first line `autopilot`, `plan posted`, `plan revised`, or `revision N`) that cites a new PR after review joins `landingPrUrls` but not `isLandingEvidence` (`lib/recommendation-facts.js`), so `blindReadStep` offers a blind read naming a PR the approved review never covered, where a plain note sends it back to review (reproduced at e2d4659c4; Seams & Tangles, 13 Nov.; `docs/reviews/seams-tangles-review-2026-11-13-run12.md`, §3.0a). (LIN-4438; Survey global on LIN-4438.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-33": {
+   "id": "finding-33",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T14:55:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 16 (added in cfd152fa4 by LIN-4453's leftover; not among the plan's 20): `lib/run-ledger.js`: `landingPrUrls` skips only blind reads and survey reports, so a comment headed `## Area read` that names a full PR URL would join the ticket's landing. Only the prose rule in `docs/plans/survey/area-read.md` (cite `path@sha`, never a PR URL) keeps the LIN-4447 area reads out today. An area-read kind in the one comment classifier (LIN-4458, piece 2) would make that rule code. (Leftover of LIN-4453; Survey global on LIN-4453.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-34": {
+   "id": "finding-34",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 17 (the plan's Waiting 16): `lib/run-closeout-state.js`: `deriveCloseOutState` works from two PR lists: `prs` (`extractPrUrls`, every PR ever cited) drives the PR-shape reasons (multiple-prs, partial, merged) and `landingPrs` (`landingPrUrls`) drives the blind-read gate, so the box can count PRs the gate ignores and the other way round (pinned in `tests/unit/lin-4438-blind-read-gate.test.js` rows 14 and 15). Which reader answers \"this task's PRs\" spans the box, the guard and the route. (Blind read on LIN-4439.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-35": {
+   "id": "finding-35",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 18 (the plan's Waiting 17): `lib/close-out-readiness.js`: in the stop-at lane `deriveCloseOutState` lets merged and partial outrank the gate, then `closeOutNotReady` asks `closeOutWaitsOn` again to override it, so the box state is not the guard's whole answer and the precedence lives in two files. Carrying the gate's answer in the state changes the box model the renderers read. (Blind read on LIN-4439.) `ladderNotReady` asks the gate a third time, so the box and the guard order the same reasons two ways and the next close-out reason must be placed in both; one order is a decision about what the box shows versus what the guard refuses. (Blind read on LIN-4396.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-36": {
+   "id": "finding-36",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 19 (the plan's Waiting 18): `lib/run-closeout-state.js`: the close-out reasons are bare string literals: `'blind-read-missing'` is spelled here and again in `REFUSED_REASONS` (`lib/close-out-readiness.js`, beside `'head-moved'`), and `closeOutNotReadyRefusal` builds its error by capitalising `state.message`. A reasons constant (like `CLOSE_OUT_STATUS`) covering every reason, used by the box, the guard and the render, would give them one vocabulary. (Blind read on LIN-4396.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-37": {
+   "id": "finding-37",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 20 (the plan's Waiting 19): `lib/task-timeline.js`: `dispatchModelOf` picks a dispatch's model by its own rule (`costUsd`, null as -1, then request count), while the home, `foldRequestUsage` (`lib/request-usage-fold.js`), ranks by priced dollars, then latest use, and names the latest model when nothing is priced. `modelRowOf` (`lib/cost-read.js`) drops `pricedUsd`, so the lane label (`session.model`, the fold's answer) and the rows inside it can name different models whenever any request is unpriced. The fix is for `dispatchesOf` to carry the fold's `last.model`; a change to the dominant-model rule otherwise leaves the timeline behind. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-38": {
+   "id": "finding-38",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "Harbour",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 21 (the plan's Waiting 20): `lib/run-closeout-state.js`: `closeOutSetsDone` never asks `closeOutWaitsOn`, so the owner's check (`routes/workspace-api-run-evidence.js`) sets a stop-at-PR task Done when its landing PR is merged and approved with no blind read, while the close-out guard (`lib/close-out-readiness.js`) refuses the same trail as `blind-read-missing`, and `blindReadStep` (`lib/recommendation-blind-read.js`) then routes a read to the Done ticket (it stands aside on a completed ticket only after a close-out). The entries above name the box/guard precedence split; this is its Done path. Whether a person's own check may pass the gate is a decision; the shared-trail test runs with `byPersonCheck: false`, so it never reaches this path. (Drift & Coherence Review, 13 Nov., second read; `docs/reviews/drift-coherence-review-2026-11-13.md`.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "task-39": {
+   "id": "task-39",
+   "kind": "task",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:08:12.387Z",
+     "by": "John",
+     "via": "driving-session",
+     "state": "open",
+     "fields": {
+      "asked": "**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** John: \"we've not been applying quite the right force to bend the curve… now want to run both real work, and some real tidies.\" The Drift & Coherence and Seams & Tangles reviews of 13 Nov found this area carrying rules written in two places that disagree. Batch 1 added several of them:\n\n* Harbour can mark a task Done on a person's check before its blind read, while another check refuses that same task, and a read is then sent to a ticket that's already Done (Drift run 7, `close-out-gate-precedence-split`). John's ruling: \"if I choose to do something, Harbour is a passenger. This reflects that for many real projects, they're unlikely to be exclusively changed via Harbour.\"\n* Two pieces of code decide which PRs belong to a task, and they disagree about agent notes, so a blind read can be offered over a PR no review covered (Seams run 12, §3.0a).\n* The task timeline decides which model a dispatch used by its own rule, separate from the one the cost figures use (Drift, row 150).\n* The check that makes a stage wait while another is live is a runs rule, but it lives with the prompts (Seams, P-LW1).\n\nThe area's note holds 20 Waiting entries, and `lib/dispatch-store.js` is 4,530 lines. Seams also tried moving files between areas three ways, and none made the tangle smaller.\n\n**What we want.**\n\n* Each rule in the area has one home, and the copies are gone.\n* When a person acts, Harbour follows, and that rule is written once.\n* The area's Waiting entries are settled, or each says why it can't be yet.\n* Each piece finishes one move and names what it retired. John: \"I'd be happy to run a small variety, erring larger, to see\", so piece sizes vary, leaning larger.\n* The LLM & prompts side of the seam is A14's.\n\n**Done when**\n\n* the cases above are settled, or John has ruled they can wait;\n* the area's Waiting entries are settled or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*",
+      "done-when": "* the cases above are settled, or John has ruled they can wait;\n* the area's Waiting entries are settled or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.",
+      "paths": [
+       "lib/dispatch-store.js"
+      ]
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "revise",
+     "at": "2026-11-13T13:40:00.000Z",
+     "by": "Harbour",
+     "via": "design",
+     "state": "open",
+     "fields": {
+      "asked": "**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** John: \"we've not been applying quite the right force to bend the curve… now want to run both real work, and some real tidies.\" The Drift & Coherence and Seams & Tangles reviews of 13 Nov found this area carrying rules written in two places that disagree. Batch 1 added several of them:\n\n* Harbour can mark a task Done on a person's check before its blind read, while another check refuses that same task, and a read is then sent to a ticket that's already Done (Drift run 7, `close-out-gate-precedence-split`). John's ruling: \"if I choose to do something, Harbour is a passenger. This reflects that for many real projects, they're unlikely to be exclusively changed via Harbour.\"\n* Two pieces of code decide which PRs belong to a task, and they disagree about agent notes, so a blind read can be offered over a PR no review covered (Seams run 12, §3.0a).\n* The task timeline decides which model a dispatch used by its own rule, separate from the one the cost figures use (Drift, row 150).\n* The check that makes a stage wait while another is live is a runs rule, but it lives with the prompts (Seams, P-LW1).\n\nThe area's note holds 20 Waiting entries, and `lib/dispatch-store.js` is 4,530 lines. Seams also tried moving files between areas three ways, and none made the tangle smaller.\n\n**What we want.**\n\n* Each rule in the area has one home, and the copies are gone.\n* When a person acts, Harbour follows, and that rule is written once.\n* The area's Waiting entries are settled, or each says why it can't be yet.\n* Each piece finishes one move and names what it retired. John: \"I'd be happy to run a small variety, erring larger, to see\", so piece sizes vary, leaning larger.\n* The LLM & prompts side of the seam is A14's.\n\n**Done when**\n\n* the cases above are settled, or John has ruled they can wait;\n* the area's Waiting entries are settled or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*",
+      "done-when": "* the cases above are settled, or John has ruled they can wait;\n* the area's Waiting entries are settled or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.",
+      "paths": [
+       "docs/areas/areas.json",
+       "docs/areas/llm-and-prompts.md",
+       "docs/areas/runs-and-dispatch.md",
+       "lib/close-out-merges.js",
+       "lib/close-out-readiness.js",
+       "lib/cost-read-calls.js",
+       "lib/cost-read.js",
+       "lib/dispatch-factory.js",
+       "lib/dispatch-feedback-validation.js",
+       "lib/dispatch-leftover.js",
+       "lib/dispatch-store.js",
+       "lib/dispatch-wake.js",
+       "lib/recent-runs.js",
+       "lib/recommendation-blind-read.js",
+       "lib/recommendation-facts.js",
+       "lib/recommendation-live-wait.js",
+       "lib/run-closeout-state.js",
+       "lib/run-evidence.js",
+       "lib/run-ledger.js",
+       "lib/run-live-wait.js",
+       "lib/run-trail.js",
+       "lib/runner-kit/",
+       "lib/session-summary.js",
+       "lib/task-timeline.js",
+       "routes/test.js",
+       "routes/workspace-api-run-evidence.js",
+       "scripts/stability-measures-blind.mjs",
+       "tests/fixtures/hermetic-linear.js"
+      ]
+     },
+     "links": {},
+     "reason": "The Implementation Plan names the files each piece changes (plan rev 1)."
+    }
+   ]
+  },
+  "plan-40": {
+   "id": "plan-40",
+   "kind": "plan",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:40:00.000Z",
+     "by": "design",
+     "in": "task-39",
+     "state": "kept",
+     "fields": {
+      "says": "Piece 0: paired readability baseline (no code). Fresh agents read Runs & dispatch and the untouched control `front-end-pages` in one window, by a committed sampling rule and short rubric; each report posted as `## Area read`. Witness: both reports and the rubric are on the ticket before any piece merges. Retires nothing (a measurement). Repeated after the last piece.",
+      "paths": [],
+      "order": 1
+     },
+     "links": {}
+    }
+   ]
+  },
+  "plan-41": {
+   "id": "plan-41",
+   "kind": "plan",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:40:00.000Z",
+     "by": "design",
+     "in": "task-39",
+     "state": "kept",
+     "fields": {
+      "says": "Piece 1 (larger): one close-out decision. `closeOutDecision({ trail, prStatuses, stopAt, runnerReady, actor })` and `CLOSE_OUT_REASONS` in `lib/run-closeout-state.js`, answering `{ status, reason, refuses, setDone, waitsOn, followsPerson }`; the box, both guard lanes, the check route, `blindReadStep` and `run-evidence` render or enforce it. Settles Waiting 17, 18, 20 (plan numbering). Waits on R1.",
+      "paths": [
+       "lib/run-closeout-state.js",
+       "lib/close-out-readiness.js",
+       "routes/workspace-api-run-evidence.js",
+       "lib/recommendation-blind-read.js",
+       "lib/run-evidence.js",
+       "lib/close-out-merges.js"
+      ],
+      "order": 4
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "revise",
+     "at": "2026-11-13T13:53:21.272Z",
+     "by": "design",
+     "in": "task-39",
+     "state": "kept",
+     "fields": {
+      "says": "Piece 1 (larger): one close-out decision. `closeOutDecision({ trail, prStatuses, stopAt, runnerReady, actor, ticketState })` and `CLOSE_OUT_REASONS` in `lib/run-closeout-state.js`, answering `{ status, reason, refuses, setDone, waitsOn, routesRead, followsPerson }`. Enforcement uses only the trail and URL-keyed PR statuses (gate stands aside only when every landing PR reads merged; missing or unreadable means not known merged, the gate holds); `ticketState` feeds only the advice `routesRead`, asked by `blindReadStep`. No new GitHub or provider read. Settles Waiting 17, 18, 20 (plan numbering). Merge held on R1 and the recommend-path ruling.",
+      "paths": [
+       "lib/run-closeout-state.js",
+       "lib/close-out-readiness.js",
+       "routes/workspace-api-run-evidence.js",
+       "lib/recommendation-blind-read.js",
+       "lib/run-evidence.js",
+       "lib/close-out-merges.js"
+      ],
+      "order": 4
+     },
+     "links": {},
+     "reason": "Answers plan-review B1 (comment e452fe3a): per-surface inputs named, unknown means not known merged, ticket state only for advice."
+    }
+   ]
+  },
+  "plan-42": {
+   "id": "plan-42",
+   "kind": "plan",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:40:00.000Z",
+     "by": "design",
+     "in": "task-39",
+     "state": "kept",
+     "fields": {
+      "says": "Piece 2 (larger): one trail pass. `lib/run-trail.js` holds the one comment classifier `commentKindOf` and `readTrail(comments)`; the landing is the PRs first cited after the anchor. Settles Waiting 15 (row 15 kept as a why-not) and 16 (plan numbering). Ask LIN-4448 first.",
+      "paths": [
+       "lib/run-trail.js",
+       "lib/run-ledger.js",
+       "lib/recommendation-facts.js",
+       "lib/run-evidence.js",
+       "scripts/stability-measures-blind.mjs"
+      ],
+      "order": 3
+     },
+     "links": {}
+    }
+   ]
+  },
+  "plan-43": {
+   "id": "plan-43",
+   "kind": "plan",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:40:00.000Z",
+     "by": "design",
+     "in": "task-39",
+     "state": "kept",
+     "fields": {
+      "says": "Piece 3 (small): model attribution. `dispatchesOf` in `lib/cost-read.js` carries the fold's `last.model`; retires `dispatchModelOf`. Settles Waiting 19 (plan numbering).",
+      "paths": [
+       "lib/cost-read.js",
+       "lib/task-timeline.js"
+      ],
+      "order": 2
+     },
+     "links": {}
+    }
+   ]
+  },
+  "plan-44": {
+   "id": "plan-44",
+   "kind": "plan",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:40:00.000Z",
+     "by": "design",
+     "in": "task-39",
+     "state": "kept",
+     "fields": {
+      "says": "Piece 4 (medium): the live-stage wait gets a Runs home in `lib/run-live-wait.js` (`liveWaitOf`, `liveWaitRefusal`, `STAGE_IN_FLIGHT_CODE`, `newestLiveRun`, `isLiveRun`), `lib/recommendation-live-wait.js` deleted, and `isLiveRun` reads the lineage's terminal. Settles Waiting 14. Ask LIN-4448 first.",
+      "paths": [
+       "lib/run-live-wait.js",
+       "lib/recommendation-live-wait.js",
+       "lib/recent-runs.js"
+      ],
+      "order": 3
+     },
+     "links": {}
+    }
+   ]
+  },
+  "plan-45": {
+   "id": "plan-45",
+   "kind": "plan",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:40:00.000Z",
+     "by": "design",
+     "in": "task-39",
+     "state": "kept",
+     "fields": {
+      "says": "Piece 5 (medium): one declaration for each restated constant. `lib/dispatch-leftover.js` and `_releaseIfHeld` import halt modes, `NEVER_RAN` and the follow-up target from their owners; `wakeHook.releaseNote` supplies the release wording so the store no longer calls `formatHeldWakeNote`; one `FEEDBACK_KINDS` table in `lib/dispatch-feedback-validation.js` carries each kind's roles, and `PARKED_WAIT_SKIPPED_KINDS`, `FEEDBACK_ENTRY_KINDS` and `findWakeEvent`'s skip rule derive from it. *Retires:* the restated constants and the three hand-written kind sets. *Settles Waiting:* 2, 4, 11. *Witness:* a test that iterates `HALT_MODES` and shows every one stops a leftover (so a newly added mode is caught), and `lin-4377` counting the import, not the spelling.",
+      "paths": [
+       "lib/dispatch-leftover.js",
+       "lib/dispatch-store.js",
+       "lib/dispatch-feedback-validation.js"
+      ],
+      "order": 2
+     },
+     "links": {}
+    }
+   ]
+  },
+  "plan-46": {
+   "id": "plan-46",
+   "kind": "plan",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:40:00.000Z",
+     "by": "design",
+     "in": "task-39",
+     "state": "kept",
+     "fields": {
+      "says": "Piece 6 (small): hermetic transport. A provider declares `testTransport` where its transport is swapped; the factory skips access when `provider.testTransport && isHermeticTestToken(token)`. Settles Waiting 8.",
+      "paths": [
+       "lib/dispatch-factory.js",
+       "routes/test.js",
+       "tests/fixtures/hermetic-linear.js"
+      ],
+      "order": 2
+     },
+     "links": {}
+    }
+   ]
+  },
+  "plan-47": {
+   "id": "plan-47",
+   "kind": "plan",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:40:00.000Z",
+     "by": "design",
+     "in": "task-39",
+     "state": "kept",
+     "fields": {
+      "says": "Piece 7 (small): cost-call reads. `readCalls` and `callsSurfaceOf` move to `lib/cost-read-calls.js`, with a Runs pattern in `areas.json`. Settles Waiting 9.",
+      "paths": [
+       "lib/cost-read.js",
+       "lib/cost-read-calls.js",
+       "docs/areas/areas.json"
+      ],
+      "order": 2
+     },
+     "links": {}
+    }
+   ]
+  },
+  "plan-48": {
+   "id": "plan-48",
+   "kind": "plan",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:40:00.000Z",
+     "by": "design",
+     "in": "task-39",
+     "state": "kept",
+     "fields": {
+      "says": "Piece 8 (later, cross-repository): simple-dispatcher. Waiting 1, 6, 7 and 13 get one owner and a drift check per rule (in `lib/runner-kit/contract.json` as data, or a golden test); planned in detail at its own start, after 1 to 7. Waiting 10 written as an engineering call.",
+      "paths": [
+       "lib/runner-kit/",
+       "lib/dispatch-wake.js",
+       "lib/session-summary.js"
+      ],
+      "order": 5
+     },
+     "links": {}
+    }
+   ]
+  },
+  "verdict-49": {
+   "id": "verdict-49",
+   "kind": "verdict",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:46:36.011Z",
+     "by": "plan-review",
+     "in": "task-39",
+     "state": "stands",
+     "fields": {
+      "of": "plan-review",
+      "outcome": "request-changes",
+      "reasoning": "Request Changes (comment e452fe3a). B1: closeOutDecision's inputs (the ticket's state, whether the landing is merged) are not held by two to four of its six surfaces, and the plan does not say where each gets them or what the decision answers when one is unknown; built as written the surfaces split on an outside merge. Pieces 3, 6 and 7 hold as written; pieces 0, 3, 5, 6 and 7 don't depend on B1."
+     },
+     "links": {
+      "on": "plan-41@1"
+     }
+    }
+   ]
+  },
+  "verdict-50": {
+   "id": "verdict-50",
+   "kind": "verdict",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:57:37.874Z",
+     "by": "plan-review",
+     "in": "task-39",
+     "state": "stands",
+     "fields": {
+      "of": "plan-review",
+      "outcome": "approve",
+      "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 0 and its repeat cover \"reads better ... by more than an untouched area\"."
+     },
+     "links": {
+      "on": "plan-40@1"
+     }
+    }
+   ]
+  },
+  "verdict-51": {
+   "id": "verdict-51",
+   "kind": "verdict",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:57:37.874Z",
+     "by": "plan-review",
+     "in": "task-39",
+     "state": "stands",
+     "fields": {
+      "of": "plan-review",
+      "outcome": "approve",
+      "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 1: enforcement reads only facts each surface has; unknown means the gate holds. Builder notes 1-4 and 6 concern it (ruling wording, the loosening property, the unmerged-PR set, readTrail fields, press-route order)."
+     },
+     "links": {
+      "on": "plan-41@2"
+     }
+    }
+   ]
+  },
+  "verdict-52": {
+   "id": "verdict-52",
+   "kind": "verdict",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:57:37.874Z",
+     "by": "plan-review",
+     "in": "task-39",
+     "state": "stands",
+     "fields": {
+      "of": "plan-review",
+      "outcome": "approve",
+      "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 2: no note this round beyond its seam with piece 1 (readTrail supplies closeOutAfterReview/workAfterReview)."
+     },
+     "links": {
+      "on": "plan-42@1"
+     }
+    }
+   ]
+  },
+  "verdict-53": {
+   "id": "verdict-53",
+   "kind": "verdict",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:57:37.874Z",
+     "by": "plan-review",
+     "in": "task-39",
+     "state": "stands",
+     "fields": {
+      "of": "plan-review",
+      "outcome": "approve",
+      "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 3 holds as last time."
+     },
+     "links": {
+      "on": "plan-43@1"
+     }
+    }
+   ]
+  },
+  "verdict-54": {
+   "id": "verdict-54",
+   "kind": "verdict",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:57:37.874Z",
+     "by": "plan-review",
+     "in": "task-39",
+     "state": "stands",
+     "fields": {
+      "of": "plan-review",
+      "outcome": "approve",
+      "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 4: builder note 5, hand runFact the lineage before it is filtered."
+     },
+     "links": {
+      "on": "plan-44@1"
+     }
+    }
+   ]
+  },
+  "verdict-55": {
+   "id": "verdict-55",
+   "kind": "verdict",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:57:37.874Z",
+     "by": "plan-review",
+     "in": "task-39",
+     "state": "stands",
+     "fields": {
+      "of": "plan-review",
+      "outcome": "approve",
+      "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 5: no note in either round; round 1 said it does not depend on B1. Settles Waiting 2, 4, 11."
+     },
+     "links": {
+      "on": "plan-45@1"
+     }
+    }
+   ]
+  },
+  "verdict-56": {
+   "id": "verdict-56",
+   "kind": "verdict",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:57:37.874Z",
+     "by": "plan-review",
+     "in": "task-39",
+     "state": "stands",
+     "fields": {
+      "of": "plan-review",
+      "outcome": "approve",
+      "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 6 holds; its capability approach matches dispatch-factory.js:925-934."
+     },
+     "links": {
+      "on": "plan-46@1"
+     }
+    }
+   ]
+  },
+  "verdict-57": {
+   "id": "verdict-57",
+   "kind": "verdict",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:57:37.874Z",
+     "by": "plan-review",
+     "in": "task-39",
+     "state": "stands",
+     "fields": {
+      "of": "plan-review",
+      "outcome": "approve",
+      "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 7 holds as last time."
+     },
+     "links": {
+      "on": "plan-47@1"
+     }
+    }
+   ]
+  },
+  "verdict-58": {
+   "id": "verdict-58",
+   "kind": "verdict",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:57:37.874Z",
+     "by": "plan-review",
+     "in": "task-39",
+     "state": "stands",
+     "fields": {
+      "of": "plan-review",
+      "outcome": "approve",
+      "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 8 keeps simple-dispatcher in scope, matching lin4447-sd-scope."
+     },
+     "links": {
+      "on": "plan-48@1"
+     }
+    }
+   ]
+  },
+  "task-59": {
+   "id": "task-59",
+   "kind": "task",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T14:01:50.000Z",
+     "by": "breakdown",
+     "in": "task-39",
+     "state": "open",
+     "fields": {
+      "asked": "",
+      "done-when": "LIN-4453 (piece 0, paired area reads before): both `## Area read` reports (Runs & dispatch and the control `front-end-pages`) and the committed rubric are on LIN-4447 before any implementation piece merges. Retires nothing (a measurement).",
+      "paths": []
+     },
+     "links": {
+      "piece": "plan-40"
+     }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T14:56:00.000Z",
+     "by": "Harbour",
+     "in": "task-39",
+     "state": "done",
+     "fields": {
+      "asked": "",
+      "done-when": "LIN-4453 (piece 0, paired area reads before): both `## Area read` reports (Runs & dispatch and the control `front-end-pages`) and the committed rubric are on LIN-4447 before any implementation piece merges. Retires nothing (a measurement).",
+      "paths": []
+     },
+     "links": {
+      "piece": "plan-40"
+     },
+     "reason": "Piece 0 baseline recorded: both ## Area read reports and the rubric on LIN-4447 (14:24Z); baseline commit cfd152fa4 on origin/main. Completion time approximate.",
+     "stateReason": "Piece 0 baseline recorded: both ## Area read reports and the rubric on LIN-4447 (14:24Z); baseline commit cfd152fa4 on origin/main. Completion time approximate."
+    }
+   ]
+  },
+  "task-60": {
+   "id": "task-60",
+   "kind": "task",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T14:01:56.140Z",
+     "by": "breakdown",
+     "in": "task-39",
+     "state": "open",
+     "fields": {
+      "asked": "",
+      "done-when": "LIN-4455 (piece 5): `lib/dispatch-leftover.js` and `_releaseIfHeld` / `releaseHeldWake` in `lib/dispatch-store.js` import halt modes, `NEVER_RAN` and the follow-up target from their owners instead of restating them; `wakeHook.releaseNote` supplies the release wording, so the store no longer calls `formatHeldWakeNote` and stops owning that wording; one `FEEDBACK_KINDS` table in `lib/dispatch-feedback-validation.js` carries each kind's roles, and `PARKED_WAIT_SKIPPED_KINDS`, `FEEDBACK_ENTRY_KINDS` and `findWakeEvent`'s skip rule derive from it. Retires the restated constants, the store's ownership of the release wording and the three hand-written kind sets; settles Waiting 2, 4, 11, removed from `docs/areas/runs-and-dispatch.md` in the same change with Lessons under 6,144 bytes; the PR says what it retires. Witness: a test that iterates `HALT_MODES` and shows every mode stops a leftover, and the `lin-4377` test counting the import, not the spelling. Binding: no stored readiness, no GitHub or provider reads, never recompute pre-cutover history, the LLM & prompts side is LIN-4448's.",
+      "paths": [
+       "lib/dispatch-leftover.js",
+       "lib/dispatch-store.js",
+       "lib/dispatch-feedback-validation.js",
+       "docs/areas/runs-and-dispatch.md"
+      ]
+     },
+     "links": {
+      "piece": "plan-45"
+     }
+    }
+   ]
+  },
+  "decision-61": {
+   "id": "decision-61",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T14:02:31.309Z",
+     "by": "breakdown",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "answer": "Grounding commit origin/main 4b5001ddf; the plan needs no re-planning, and LIN-4455 carries piece 5's slice as approved, naming `releaseHeldWake` beside `_releaseIfHeld` in `lib/dispatch-store.js`.",
+      "why": "Staleness check at breakdown: origin/main still 4b5001ddf, git log 4b5001ddf..origin/main empty, nothing under lib, routes, tests, scripts or docs/areas changed since filing; spot checks hold (dispatch-store.js still 4,530 lines)."
+     },
+     "links": {
+      "on": "verdict-55@1"
+     }
+    }
+   ]
+  },
+  "decision-62": {
+   "id": "decision-62",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T14:02:31.309Z",
+     "by": "breakdown",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "answer": "Session fit: one session (medium). Plan-review due: no, covered by LIN-4447's approving plan-review (comment 12619798, rev 2).",
+      "why": "The approved plan sizes piece 5 medium and lists it among pieces that run alone; the parent's plan review approved it."
+     },
+     "links": {
+      "on": "verdict-55@1"
+     }
+    }
+   ]
+  },
+  "decision-63": {
+   "id": "decision-63",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T14:02:31.309Z",
+     "by": "breakdown",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "answer": "LIN-4455 is blocked by LIN-4453 (piece 0), in order step 2 beside LIN-4454, LIN-4456 and LIN-4457.",
+      "why": "The graph follows the plan's landing order, 0 then 3/5/6/7 then 2/4 then 1 then 8 then 0, literally; no implementation PR merges before piece 0's reports and rubric are on the ticket."
+     },
+     "links": {
+      "on": "verdict-55@1",
+      "about": "task-59"
+     }
+    }
+   ]
+  },
+  "decision-64": {
+   "id": "decision-64",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T14:02:31.309Z",
+     "by": "breakdown",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "answer": "LIN-4455 blocks LIN-4458 (piece 2) and LIN-4459 (piece 4).",
+      "why": "2 and 4 wait on all of 3/5/6/7: the plan orders them that way, and the work overlaps (piece 4's lineage helpers live in dispatch-store.js, which piece 5 edits)."
+     },
+     "links": {
+      "on": "verdict-55@1"
+     }
+    }
+   ]
+  },
+  "decision-65": {
+   "id": "decision-65",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T14:02:31.309Z",
+     "by": "breakdown",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "answer": "Waiting 2, 4 and 11 are LIN-4455's to settle.",
+      "why": "Waiting accounting unchanged from the plan."
+     },
+     "links": {
+      "on": "verdict-55@1"
+     }
+    }
+   ]
+  }
+ },
+ "queries": [],
+ "hits": []
+}

@@ -1,0 +1,139 @@
+[
+ {
+  "at": "2026-11-17T13:37:19.760Z",
+  "by": "survey-task",
+  "query": "show",
+  "args": {
+   "task": "task-60",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:37:19.790Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "to": "task-60"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:37:19.826Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "text": "end line"
+  },
+  "returned": 2
+ },
+ {
+  "at": "2026-11-17T13:37:19.854Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "text": "codeBlock"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:37:19.881Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "text": "fence"
+  },
+  "returned": 2
+ },
+ {
+  "at": "2026-11-17T13:37:19.908Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "text": "live"
+  },
+  "returned": 13
+ },
+ {
+  "at": "2026-11-17T13:37:19.937Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "text": "digest"
+  },
+  "returned": 3
+ },
+ {
+  "at": "2026-11-17T13:37:19.964Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "text": "normalis"
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:37:19.990Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "text": "property limit"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:37:20.021Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "text": "probe"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:37:24.764Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "to": "area-1"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:37:24.805Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "text": "D1"
+  },
+  "returned": 2
+ },
+ {
+  "at": "2026-11-17T13:37:24.850Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "text": "empty"
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:37:24.884Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "text": "search"
+  },
+  "returned": 4
+ },
+ {
+  "at": "2026-11-17T13:37:24.918Z",
+  "by": "survey-task",
+  "query": "get",
+  "args": {
+   "id": "plan-56",
+   "asOf": null
+  },
+  "returned": 1
+ }
+]

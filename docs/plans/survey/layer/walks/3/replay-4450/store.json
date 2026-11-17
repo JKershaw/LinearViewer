@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 66,
+ "next": 73,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -1671,8 +1671,337 @@
      }
     }
    ]
+  },
+  "finding-66": {
+   "id": "finding-66",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:47:23.000Z",
+     "by": "survey-task",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "Grounded at 4b5001ddf (origin/main unchanged; plan line numbers hold). The node rule and the markdown rule disagree on what counts as an end line. `hasMarkerLine`/`splitAsAsked` match only the end sentence wrapped exactly in `*…*`; plan item 1's ADF reader matches a paragraph whose plain text is the end sentence, whatever its marks. Words that contain that sentence plain or as `_…_` are sealed by `sealForFiling` (not a marker to it), then the node reader closes the region early, the digest misses, and the tail is served as below-the-line, silently. A markdown-level `checkAsAsked` won't catch it; the pure `descriptionRoundTrip` only will if it runs the same node reader. Decide up front: make `hasMarkerLine` catch the plain-text form too, or have the node rule take the LAST matching paragraph before non-region content. Add the witness."
+     },
+     "links": {
+      "on": "plan-54@2"
+     }
+    }
+   ]
+  },
+  "finding-67": {
+   "id": "finding-67",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:47:24.000Z",
+     "by": "survey-task",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "`lib/providers/jira/adf.js` header claims the D1 gate never flags what the writer emits: false at 4b5001ddf. An empty fence (\"```\" then \"```\" on the next line) makes `markdownToAdf` emit an empty `codeBlock`; `adfHasUnrenderableContent` refuses it and `rt(rt(x)) !== rt(x)` (both observed). Once Harbour writes descriptions itself, such a ticket can never be written again: every later `description/below` 422s on D1 (D1 sees the whole document, block included). (Survey of LIN-4450.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-68": {
+   "id": "finding-68",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:47:25.000Z",
+     "by": "survey-task",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "The planned fixed-point/round-trip test will fail on an empty fence: the codec emits an empty `codeBlock` that D1 refuses (see the area-1 finding on `adf.js`'s false header claim). \"D1 unchanged\" does not protect the block, since D1 sees the whole document. Pick deliberately: fix the codec (and the header) or exclude the input with its reason recorded."
+     },
+     "links": {
+      "on": "plan-54@2"
+     }
+    },
+    {
+     "v": 2,
+     "op": "link",
+     "at": "2026-11-13T13:47:29.000Z",
+     "by": "survey-task",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "The planned fixed-point/round-trip test will fail on an empty fence: the codec emits an empty `codeBlock` that D1 refuses (see the area-1 finding on `adf.js`'s false header claim). \"D1 unchanged\" does not protect the block, since D1 sees the whole document. Pick deliberately: fix the codec (and the header) or exclude the input with its reason recorded."
+     },
+     "links": {
+      "on": "plan-54@2",
+      "about": "finding-67"
+     }
+    }
+   ]
+  },
+  "check-69": {
+   "id": "check-69",
+   "kind": "check",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:47:26.000Z",
+     "by": "survey-task",
+     "in": "task-60",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "what": "Before any session-1 code: does a sealed region's `adfToMarkdown` rendering survive an ordinary Jira editor save below the line, and does the edit endpoint accept `properties` in the body?",
+      "why-person": "Needs a live Jira site and credential; the session has none, and `fake-client.js` merges `fields` and stores whatever it is given, so it cannot show Jira's normalisation. Shape B's SHA-256 of the rendering is only safe if Jira leaves trailing spaces before hardBreaks, text-node splitting and empty paragraphs (LIN-2019 drops these) alone; `localId` is handled because `adfToMarkdown` ignores attrs. If they shift, every sealed issue reads as human-edited and the words turn into the rendering (`*em*`→`_em_`, `* a`→`- a`, `***x***`→`\\***x**\\*`, observed at 4b5001ddf).",
+      "how": "~15 min: 1) PUT a sealed description holding the plan's witness inputs with `properties:[{key:'harbour.asAsked',…}]` in the same body; 2) GET with `?properties=harbour.asAsked`; 3) edit a line below the block in Jira's editor and save; 4) GET again and diff `adfToMarkdown(region)`. Holds: plan stands as written. Doesn't: digest must be over a normalised rendering, a design change to record on LIN-4445 (task-53). Session 3 (plan-56 item 12) checks this only after the build."
+     },
+     "links": {
+      "about": "plan-56",
+      "on": "plan-54@2"
+     }
+    }
+   ]
+  },
+  "finding-70": {
+   "id": "finding-70",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:47:27.000Z",
+     "by": "survey-task",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "The bulk search path stays display-only, so one issue reads differently through search than through `getIssue`. Check that no cache or guard compares the two."
+     },
+     "links": {
+      "on": "plan-54@2"
+     }
+    }
+   ]
+  },
+  "finding-71": {
+   "id": "finding-71",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:47:28.000Z",
+     "by": "survey-task",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "Size guard: Atlassian's entity-property limit reads as bytes or characters depending on the page. JSON escaping inflates `words`, so measure the serialized property string in the one shared size function, not the raw text."
+     },
+     "links": {
+      "on": "plan-54@2"
+     }
+    }
+   ]
+  },
+  "run-72": {
+   "id": "run-72",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:47:30.000Z",
+     "by": "survey-task",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "stage": "survey-task",
+      "account": "Surveyed LIN-4450 at 4b5001ddf (origin/main unchanged, so plan-54's line numbers hold: _toCanonicalIssue 484, fetchIssueContext 863/873, issueDescription 1049, descriptionRoundTrip 1064, updateIssue re-read 1267). Ran the codec against the plan's witness inputs (seal, markdownToAdf, adfToMarkdown). Three findings: the ADF node rule and hasMarkerLine/splitAsAsked disagree on end lines (finding-66, task-60); adf.js's 'D1 never flags writer output' claim is false for an empty fence (finding-67, area-1) so the fixed-point test needs a deliberate fix-or-exclude (finding-68, task-60); and Done-when proves nothing on live Jira, where the rendering digest may not survive ordinary saves, so a 15-minute live probe should come before code (check-69, John; session 3 checks it only after the build). Smaller: search vs getIssue divergence (finding-70), measure the serialized property for the size limit (finding-71). Nothing addressed to me to close."
+     },
+     "links": {
+      "on": "plan-54@2"
+     }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T13:47:31.000Z",
+     "by": "survey-task",
+     "in": "task-60",
+     "state": "done",
+     "fields": {
+      "stage": "survey-task",
+      "account": "Surveyed LIN-4450 at 4b5001ddf (origin/main unchanged, so plan-54's line numbers hold: _toCanonicalIssue 484, fetchIssueContext 863/873, issueDescription 1049, descriptionRoundTrip 1064, updateIssue re-read 1267). Ran the codec against the plan's witness inputs (seal, markdownToAdf, adfToMarkdown). Three findings: the ADF node rule and hasMarkerLine/splitAsAsked disagree on end lines (finding-66, task-60); adf.js's 'D1 never flags writer output' claim is false for an empty fence (finding-67, area-1) so the fixed-point test needs a deliberate fix-or-exclude (finding-68, task-60); and Done-when proves nothing on live Jira, where the rendering digest may not survive ordinary saves, so a 15-minute live probe should come before code (check-69, John; session 3 checks it only after the build). Smaller: search vs getIssue divergence (finding-70), measure the serialized property for the size limit (finding-71). Nothing addressed to me to close."
+     },
+     "links": {
+      "on": "plan-54@2"
+     },
+     "reason": "survey posted",
+     "stateReason": "survey posted"
+    }
+   ]
   }
  },
- "queries": [],
+ "queries": [
+  {
+   "at": "2026-11-17T13:37:19.760Z",
+   "by": "survey-task",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:37:19.790Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "to": "task-60"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:37:19.826Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "text": "end line"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:37:19.854Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "text": "codeBlock"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:37:19.881Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "text": "fence"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:37:19.908Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "text": "live"
+   },
+   "returned": 13
+  },
+  {
+   "at": "2026-11-17T13:37:19.937Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "text": "digest"
+   },
+   "returned": 3
+  },
+  {
+   "at": "2026-11-17T13:37:19.964Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "text": "normalis"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:37:19.990Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "text": "property limit"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:37:20.021Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "text": "probe"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:37:24.764Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "to": "area-1"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:37:24.805Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "text": "D1"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:37:24.850Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "text": "empty"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:37:24.884Z",
+   "by": "survey-task",
+   "query": "find",
+   "args": {
+    "text": "search"
+   },
+   "returned": 4
+  },
+  {
+   "at": "2026-11-17T13:37:24.918Z",
+   "by": "survey-task",
+   "query": "get",
+   "args": {
+    "id": "plan-56",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:38:33.110Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
+  }
+ ],
  "hits": []
 }
