@@ -1,0 +1,107 @@
+{
+  "task": "task-21",
+  "records": [
+    {
+      "id": "task-21",
+      "kind": "task",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-23T08:03:54.000Z",
+      "by": "john",
+      "state": "done",
+      "ended": {
+        "reason": "its only change (PR #19) merged"
+      },
+      "links": {},
+      "fields": {
+        "paths": [
+          "src/web/styles.css"
+        ]
+      }
+    },
+    {
+      "id": "run-22",
+      "kind": "run",
+      "v": 3,
+      "op": "end",
+      "at": "2026-04-23T08:03:02.000Z",
+      "by": "claude-2mB8v",
+      "in": "task-21",
+      "state": "done",
+      "ended": {
+        "reason": "last commit of this session (7184a34)"
+      },
+      "links": {},
+      "fields": {
+        "stage": "implement",
+        "claims": [
+          "src/web/styles.css"
+        ],
+        "account": "Tidy up the mobile top bar\n\nDrop the borders and backgrounds from the \"here\" and \"leave\" buttons on\nmobile and trim the header padding, so the top bar takes less vertical\nspace. Tap targets are preserved via button padding.\n\n---\n\nAlign mobile send button height with the input\n\nDropped the textarea's vertical padding so its intrinsic height no\nlonger exceeds the 44px min-height, leaving the send button and input\nat the same height."
+      }
+    },
+    {
+      "id": "change-23",
+      "kind": "change",
+      "v": 5,
+      "op": "end",
+      "at": "2026-04-23T08:03:54.000Z",
+      "by": "john",
+      "in": "task-21",
+      "state": "merged",
+      "ended": {
+        "reason": "merged into main as 456f01c, \"Merge pull request #19 … Claude/mobile topbar cleanup 2m b8v\""
+      },
+      "links": {
+        "about": [
+          "change-9",
+          "change-15"
+        ]
+      },
+      "fields": {
+        "ref": "PR #19 (branch claude/mobile-topbar-cleanup-2mB8v)",
+        "head": "7184a34"
+      }
+    },
+    {
+      "id": "decision-24",
+      "kind": "decision",
+      "v": 2,
+      "op": "revise",
+      "at": "2026-04-23T08:03:02.000Z",
+      "by": "claude-2mB8v",
+      "reason": "7184a34: textarea padding 0.7rem -> 0.5rem",
+      "in": "task-21",
+      "state": "stands",
+      "links": {},
+      "fields": {
+        "scope": "area-2",
+        "answer": "In the mobile breakpoint, the header buttons (#leave-btn, #who-toggle) drop border, background and min-height; their tap target is kept by padding 0.5rem 0.5rem. Header padding trimmed to 0.3rem 0.5rem (+ safe-area-inset-top). The join and send buttons keep min-height: 44px. The say textarea keeps min-height: 44px with padding 0.5rem 0.75rem, small enough that min-height wins over the intrinsic size, so textarea and send button line up.",
+        "why": "So the top bar takes less vertical space. Tap targets are preserved via button padding."
+      }
+    },
+    {
+      "id": "finding-25",
+      "kind": "finding",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-23T08:03:02.000Z",
+      "by": "claude-2mB8v",
+      "in": "task-21",
+      "to": "task-21",
+      "state": "done",
+      "ended": {
+        "reason": "fixed by 7184a34: textarea padding 0.5rem 0.75rem"
+      },
+      "links": {
+        "about": [
+          "change-9"
+        ]
+      },
+      "fields": {
+        "says": "On mobile the say textarea's vertical padding (0.7rem, from PR #13) makes its intrinsic height exceed the 44px min-height, so the send button and the input are not the same height."
+      }
+    }
+  ],
+  "overlap": []
+}

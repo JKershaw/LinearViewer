@@ -1,0 +1,25 @@
+{
+  "task": "task-5",
+  "records": [
+    {
+      "id": "task-5",
+      "kind": "task",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-22T20:33:00.000Z",
+      "by": "yap-docs",
+      "state": "done",
+      "ended": {
+        "reason": "struck through in todo.md at 7d29890 (v0.1.0 shipped)"
+      },
+      "links": {},
+      "fields": {
+        "asked": "todo.md item 5. Build the minimal web UI. Single HTML file, plain JS with `@ts-check` + JSDoc. Nick + channel + password landing form, message list, input box, who-panel. Polls the HTTP API every 2s. Cookie persists the nick across refresh.",
+        "paths": [
+          "src/web"
+        ]
+      }
+    }
+  ],
+  "overlap": []
+}

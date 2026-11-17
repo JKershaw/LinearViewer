@@ -1,0 +1,91 @@
+{
+  "task": "task-7",
+  "records": [
+    {
+      "id": "task-7",
+      "kind": "task",
+      "v": 3,
+      "op": "end",
+      "at": "2026-04-22T20:53:44.000Z",
+      "by": "john",
+      "state": "done",
+      "ended": {
+        "reason": "its only change (PR #13) merged"
+      },
+      "links": {
+        "about": [
+          "task-6"
+        ]
+      },
+      "fields": {
+        "paths": [
+          "src/web/app.js",
+          "src/web/index.html",
+          "src/web/styles.css"
+        ]
+      }
+    },
+    {
+      "id": "run-8",
+      "kind": "run",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-22T20:52:07.000Z",
+      "by": "claude-pgLc6",
+      "in": "task-7",
+      "state": "done",
+      "ended": {
+        "reason": "last thread commit of this session (0538d1c); the same branch later carried ba31a8e (PR #14), outside the thread"
+      },
+      "links": {},
+      "fields": {
+        "stage": "implement",
+        "claims": [
+          "src/web/app.js",
+          "src/web/index.html",
+          "src/web/styles.css"
+        ],
+        "account": "Improve mobile UX: auto-grow textarea, safe areas, touch targets, font hierarchy\n\n- Replace single-line input with auto-growing textarea (Enter sends, Shift+Enter newlines)\n- Add viewport-fit=cover + env(safe-area-inset-*) padding for iPhone notch/home bar\n- Fix iOS Safari auto-zoom by enforcing 16px font-size on inputs in mobile breakpoint\n- Use 100dvh to handle virtual keyboard layout changes\n- Set min-height: 44px on buttons for comfortable touch targets\n- Switch message text (.msg) to system sans-serif for a friendlier reading experience\n  while keeping monospace for nicks, timestamps, and chrome\n- Add enterkeyhint=\"send\", autocorrect, autocapitalize, spellcheck to textarea\n- Add align-items: flex-end to say-form so button stays bottom-aligned as textarea grows\n\nhttps://claude.ai/code/session_01NHYy6dvJAsuWFDXQaYLtjd"
+      }
+    },
+    {
+      "id": "change-9",
+      "kind": "change",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-22T20:53:44.000Z",
+      "by": "john",
+      "in": "task-7",
+      "state": "merged",
+      "ended": {
+        "reason": "merged into main as 0046799, \"Merge pull request #13 … Improve mobile UX with textarea input and safe area support\""
+      },
+      "links": {},
+      "fields": {
+        "ref": "PR #13 (branch claude/add-chat-connection-pgLc6)",
+        "head": "0538d1c"
+      }
+    },
+    {
+      "id": "decision-10",
+      "kind": "decision",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-23T07:52:59.000Z",
+      "by": "claude-2mB8v",
+      "in": "task-7",
+      "state": "superseded",
+      "ended": {
+        "reason": "fa2bad4 removes min-height 44px from #leave-btn (and from #who-toggle, set in PR #16); header tap targets now come from padding",
+        "into": "decision-24"
+      },
+      "links": {},
+      "fields": {
+        "scope": "area-2",
+        "answer": "In the mobile breakpoint, #leave-btn, the join button and the send button get min-height: 44px; the say textarea gets min-height: 44px with padding 0.7rem 0.75rem.",
+        "why": "Comfortable touch targets."
+      }
+    }
+  ],
+  "overlap": []
+}

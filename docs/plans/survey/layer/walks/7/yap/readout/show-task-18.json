@@ -1,0 +1,67 @@
+{
+  "task": "task-18",
+  "records": [
+    {
+      "id": "task-18",
+      "kind": "task",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-23T07:48:50.000Z",
+      "by": "john",
+      "state": "done",
+      "ended": {
+        "reason": "its only change (PR #17) merged"
+      },
+      "links": {},
+      "fields": {
+        "paths": [
+          "src/web/index.html"
+        ]
+      }
+    },
+    {
+      "id": "run-19",
+      "kind": "run",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-23T07:48:31.000Z",
+      "by": "claude-7xpoy",
+      "in": "task-18",
+      "state": "done",
+      "ended": {
+        "reason": "only commit of this session (06b4711)"
+      },
+      "links": {},
+      "fields": {
+        "stage": "implement",
+        "claims": [
+          "src/web/index.html"
+        ],
+        "account": "Keep chat header visible when mobile keyboard opens\n\nAdd interactive-widget=resizes-content to the viewport meta so Chromium\nmobile browsers shrink the layout viewport (and 100dvh) when the virtual\nkeyboard appears. The flex column then recomputes instead of the page\nscrolling up to reveal the focused textarea, which was pushing the\nchannel header off the top of the screen."
+      }
+    },
+    {
+      "id": "change-20",
+      "kind": "change",
+      "v": 3,
+      "op": "end",
+      "at": "2026-04-23T07:48:50.000Z",
+      "by": "john",
+      "in": "task-18",
+      "state": "merged",
+      "ended": {
+        "reason": "merged into main as c9cbf83, 19 s after the commit, \"Merge pull request #17 … Add interactive-widget viewport meta tag for better mobile UX\""
+      },
+      "links": {
+        "about": [
+          "lesson-11"
+        ]
+      },
+      "fields": {
+        "ref": "PR #17 (branch claude/fix-mobile-keyboard-overlap-7xpoy)",
+        "head": "06b4711"
+      }
+    }
+  ],
+  "overlap": []
+}

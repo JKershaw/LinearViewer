@@ -1,0 +1,174 @@
+[
+ {
+  "at": "2026-11-17T20:23:00.362Z",
+  "by": "survey-task",
+  "cmd": "show",
+  "args": {
+   "task": "task-9",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:23:00.394Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "area": "area-1",
+   "state": "open",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:23:00.435Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "to": "survey-task",
+   "state": "open",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:23:00.474Z",
+  "by": "survey-task",
+  "cmd": "get",
+  "args": {
+   "by": "survey-task",
+   "pos": [
+    "area-1"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:23:04.130Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "text": "cost-format",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:23:04.168Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "text": "parity",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:23:04.202Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "text": "second-copy",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:23:04.236Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "text": "common.js",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:23:04.269Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "text": "observation.js",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:23:04.305Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "text": "build step",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:23:04.342Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "text": "client-world",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:23:04.381Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "text": "module",
+   "by": "survey-task",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:23:04.413Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "kind": "decision",
+   "by": "survey-task",
+   "count": true,
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:23:04.458Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "kind": "run",
+   "by": "survey-task",
+   "count": true,
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:23:59.537Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": {
+   "in": "task-9",
+   "state": "open",
+   "by": "survey-task",
+   "count": true,
+   "pos": []
+  },
+  "asOf": null
+ }
+]

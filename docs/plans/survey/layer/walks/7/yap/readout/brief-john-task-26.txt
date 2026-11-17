@@ -1,0 +1,34 @@
+# Task task-26
+done-when: 
+paths: src/web/app.js, src/web/styles.css
+## Plan
+## Addressed to you
+## What stands
+decision-24 decision v2 [stands] by claude-2mB8v
+  scope: area-2
+  answer: In the mobile breakpoint, the header buttons (#leave-btn, #who-toggle) drop border, background and min-height; their tap target is kept by padding 0.5rem 0.5rem. Header padding trimmed to 0.3rem 0.5rem (+ safe-area-inset-top). The join and send buttons keep min-height: 44px. The say textarea keeps min-height: 44px with padding 0.5rem 0.75rem, small enough that min-height wins over the intrinsic size, so textarea and send button line up.
+  why: So the top bar takes less vertical space. Tap targets are preserved via button padding.
+  rests on: -
+## Areas
+area-2 web client styles: 0 open
+area-3 web client script: 0 open
+## Open runs sharing paths
+## Index
+lesson-12 lesson to -: iOS Safari auto-zooms on input focus unless the input font-size is >= 16px; the mobile breakpoint enforces 16px on #join-form input and #say-form textarea.
+lesson-29 lesson to -: 100dvh is not reliable for keyboard layout: on Safari and some Chromium states the dvh value is not always recomputed after the virtual keyboard retracts, leaving a blank strip under the input row. visualViewport fires resize on every keyboard show/hide, URL-bar show/hide and orientation change, so body height is driven from visualViewport.height via --app-height (fallback 100dvh, then 100%).
+## Previous stage
+run-27 by claude-WiOoe:
+Fix stale dvh after mobile keyboard dismisses
+
+Sizing body with 100dvh leaves a blank strip under the input row on
+Safari and some Chromium states: after the virtual keyboard retracts,
+the browser doesn't always recompute the dvh value, so the page stays
+sized to "viewport minus keyboard" while the actual visible viewport is
+full-height again.
+
+Drive the body height from visualViewport.height via a CSS custom
+property. visualViewport fires a resize event on every keyboard
+show/hide, URL-bar show/hide, and orientation change, so the layout
+tracks the actually-visible area reliably.
+
+https://claude.ai/code/session_0162VbmbQuRzSmC4CN6Witsq

@@ -1,0 +1,105 @@
+{
+  "task": "task-13",
+  "records": [
+    {
+      "id": "task-13",
+      "kind": "task",
+      "v": 3,
+      "op": "end",
+      "at": "2026-04-23T07:44:50.000Z",
+      "by": "john",
+      "state": "done",
+      "ended": {
+        "reason": "its only change (PR #16) merged"
+      },
+      "links": {
+        "about": [
+          "task-5"
+        ]
+      },
+      "fields": {
+        "paths": [
+          "src/web/app.js",
+          "src/web/index.html",
+          "src/web/styles.css",
+          "test/e2e/screenshots.spec.ts"
+        ]
+      }
+    },
+    {
+      "id": "run-14",
+      "kind": "run",
+      "v": 3,
+      "op": "end",
+      "at": "2026-04-23T07:42:44.000Z",
+      "by": "claude-fTjhR",
+      "in": "task-13",
+      "state": "done",
+      "ended": {
+        "reason": "last commit of this session (3aa81b5)"
+      },
+      "links": {},
+      "fields": {
+        "stage": "implement",
+        "claims": [
+          "src/web/app.js",
+          "src/web/index.html",
+          "src/web/styles.css",
+          "test/e2e/screenshots.spec.ts"
+        ],
+        "account": "Show who's here on mobile via a slide-in drawer\n\nThe mobile media query hid #who-panel entirely, so phone users had no\nway to see channel members. Add a \"here\" button to the chat header that\ntoggles the existing panel as a right-edge drawer on mobile; desktop\nkeeps the always-visible sidebar. Escape closes the drawer.\n\nhttps://claude.ai/code/session_01Kvg7m5hacw7tYqUVSv52R6\n\n---\n\nAdd e2e screenshots for the mobile who drawer\n\nCaptures the new \"N here\" header button in its resting state and the\nslide-in drawer fully open, at the phone viewport, so the new UI can be\neyeballed alongside the rest of the screenshot set.\n\nhttps://claude.ai/code/session_01Kvg7m5hacw7tYqUVSv52R6"
+      }
+    },
+    {
+      "id": "change-15",
+      "kind": "change",
+      "v": 3,
+      "op": "end",
+      "at": "2026-04-23T07:44:50.000Z",
+      "by": "john",
+      "in": "task-13",
+      "state": "merged",
+      "ended": {
+        "reason": "merged into main as 3ebd17d, \"Merge pull request #16 … Add mobile who-panel drawer with toggle button\""
+      },
+      "links": {},
+      "fields": {
+        "ref": "PR #16 (branch claude/fix-mobile-channel-members-fTjhR)",
+        "head": "3aa81b5"
+      }
+    },
+    {
+      "id": "decision-16",
+      "kind": "decision",
+      "v": 1,
+      "op": "add",
+      "at": "2026-04-23T07:32:13.000Z",
+      "by": "claude-fTjhR",
+      "in": "task-13",
+      "state": "stands",
+      "links": {},
+      "fields": {
+        "answer": "On mobile, #who-panel becomes a right-edge slide-in drawer inside .chat-body, toggled by an \"N here\" header button (#who-toggle, min-height 44px, aria-expanded); Escape closes it. Desktop keeps the always-visible sidebar.",
+        "why": "The mobile media query hid #who-panel entirely, so phone users had no way to see channel members."
+      }
+    },
+    {
+      "id": "check-17",
+      "kind": "check",
+      "v": 1,
+      "op": "add",
+      "at": "2026-04-23T07:42:44.000Z",
+      "by": "claude-fTjhR",
+      "in": "task-13",
+      "to": "john",
+      "state": "open",
+      "links": {},
+      "fields": {
+        "what": "Eyeball the mobile who-drawer screenshots: 10-chat-mobile-who-closed.png (resting \"N here\" button) and 11-chat-mobile-who-open.png (drawer fully open), 390x844 dark.",
+        "why-person": "so the new UI can be eyeballed alongside the rest of the screenshot set",
+        "how": "Run test/e2e/screenshots.spec.ts, test \"screenshot: mobile who-drawer (closed and open)\"; open the two PNGs in SHOT_DIR. No images are committed."
+      }
+    }
+  ],
+  "overlap": []
+}

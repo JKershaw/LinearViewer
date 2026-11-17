@@ -1,0 +1,22 @@
+{
+  "task": "task-6",
+  "records": [
+    {
+      "id": "task-6",
+      "kind": "task",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-22T20:33:00.000Z",
+      "by": "yap-docs",
+      "state": "done",
+      "ended": {
+        "reason": "struck through in todo.md at 7d29890 (v0.1.0 shipped)"
+      },
+      "links": {},
+      "fields": {
+        "asked": "todo.md item 9. Polish to shippable. `@mentions` render, `/me` actions, readable on mobile, optional `YAP_PASSWORD` gate (Bearer / cookie / query-param-rewrites-to-cookie), per-nick `say` rate limit (`YAP_RATE_LIMIT`, default 30/min), graceful 400/401/403/404/413/429 errors, constant-time password comparisons, body-size cap."
+      }
+    }
+  ],
+  "overlap": []
+}
