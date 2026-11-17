@@ -1672,6 +1672,60 @@
     "design"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:27:02.079Z",
+   "by": "design",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "plan",
+    "--by",
+    "design"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:27:02.111Z",
+   "by": "design",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "decision",
+    "--state",
+    "stands",
+    "--by",
+    "design"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:27:02.141Z",
+   "by": "design",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--to",
+    "review",
+    "--by",
+    "design"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:27:02.177Z",
+   "by": "design",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "workspace-kpis",
+    "--by",
+    "design"
+   ],
+   "asOf": null
   }
  ]
 }

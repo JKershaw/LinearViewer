@@ -1,0 +1,115 @@
+[
+ {
+  "at": "2026-11-17T15:26:35.976Z",
+  "by": "breakdown",
+  "cmd": "get",
+  "args": [
+   "get",
+   "question-83",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:36.007Z",
+  "by": "breakdown",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:36.040Z",
+  "by": "breakdown",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-78",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:40.465Z",
+  "by": "breakdown",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "task",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:40.496Z",
+  "by": "breakdown",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "look-into",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:40.526Z",
+  "by": "breakdown",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "LIN-4469",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:40.556Z",
+  "by": "breakdown",
+  "cmd": "get",
+  "args": [
+   "get",
+   "decision-82",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:44.841Z",
+  "by": "breakdown",
+  "cmd": "get",
+  "args": [
+   "get",
+   "verdict-75",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:44.885Z",
+  "by": "breakdown",
+  "cmd": "get",
+  "args": [
+   "get",
+   "decision-90",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ }
+]

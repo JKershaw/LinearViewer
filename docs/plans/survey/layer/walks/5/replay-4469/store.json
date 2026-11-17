@@ -1,5 +1,5 @@
 {
- "next": 141,
+ "next": 146,
  "records": {
   "area-1": [
    {
@@ -514,6 +514,21 @@
     "op": "add",
     "at": "2026-11-13T22:29:42.000Z",
     "by": "Harbour"
+   },
+   {
+    "id": "finding-24",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/prompts/stage-kinds.js`: `CUT` writes the closing contract's token order (`DECISION:` before `BLOCKED:`) into a scope line beside `ASK`; LIN-4469 kept it as is. The naming half is settled: the plan-review and review verdicts (`lib/completion-signals.js`) now say \"cut\", not \"narrowing\" (LIN-4469, PR #2447). (John, 8 Nov.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T22:39:22.000Z",
+    "by": "implementation",
+    "reason": "LIN-4469 folded 'narrowing' into 'cut'; only the token order in CUT's scope line remains"
    }
   ],
   "finding-25": [
@@ -722,6 +737,23 @@
     "op": "add",
     "at": "2026-11-13T22:29:42.000Z",
     "by": "Harbour"
+   },
+   {
+    "id": "finding-37",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "`lib/prompt-template-defs.js` (retrospective-audit Reporting) and `lib/periodicals.js` (`areaNotesRoutes`) each state the docs-only notes-PR rule in their own words; one shared constant in `lib/prompts/leftover-words.js` would make it one, at the cost of re-pinning the 13 Periodical prompt hashes. (LIN-4432.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T22:39:25.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "LIN-4469 (PR #2447) made the docs-only notes-PR rule one constant, NOTES_PR in lib/prompts/leftover-words.js, used by retrospective-audit and the Periodical readings; the 13 Periodical hashes re-pinned"
+    }
    }
   ],
   "finding-38": [
@@ -738,6 +770,21 @@
     "op": "add",
     "at": "2026-11-13T22:29:42.000Z",
     "by": "Harbour"
+   },
+   {
+    "id": "finding-38",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/prompts/leftover-words.js`: the first-match area lookup is now one constant, `areaLookup`, used by the Periodical readings and retrospective-audit (LIN-4469). Still spelled apart: the blind-read prompt's own sentence (`lib/prompt-template-defs.js`, the `blind-read` template), kept as piloted (LIN-4437), and `docs/areas/README.md`'s prose (\"take the first area with a pattern that matches its path\"). Folding the blind-read sentence needs it re-piloted, which is a person's run, not a build's. (LIN-4436 leftovers.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T22:39:23.000Z",
+    "by": "implementation",
+    "reason": "LIN-4469 made areaLookup one constant; the piloted blind-read sentence stays until a person re-pilots it"
    }
   ],
   "finding-39": [
@@ -770,6 +817,21 @@
     "op": "add",
     "at": "2026-11-13T22:29:42.000Z",
     "by": "Harbour"
+   },
+   {
+    "id": "finding-40",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/periodicals.js`: the four spellings of \"search the repo for a committed tool\" settled on Stability's, in one helper `committedSearch` (LIN-4469). What stays is the policy, worded per template: Stability's run bullet says \"introducing no tooling beyond what the repo commits\", Recent Headwinds and Drift & Coherence \"introducing no new tooling\", Code Quality \"introduce no new tooling\", and Seams & Tangles allows committed tools in its own bullets. LIN-4469 kept these on purpose (a policy, not a spelling). No `periodicalBullet` helper owns it; deciding it is one rule re-pins every template that states it. (LIN-4424 blind read.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T22:39:24.000Z",
+    "by": "implementation",
+    "reason": "LIN-4469 folded the four spellings; the per-template tooling policy remains"
    }
   ],
   "finding-41": [
@@ -2963,6 +3025,160 @@
     "op": "add",
     "at": "2026-11-13T21:49:17.132Z",
     "by": "autopilot"
+   }
+  ],
+  "run-141": [
+   {
+    "id": "run-141",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "implementation",
+     "claims": [
+      "lib/proxy-preamble.js",
+      "lib/prompts/leftover-words.js",
+      "lib/periodicals.js",
+      "lib/prompt-template-defs.js",
+      "lib/completion-signals.js",
+      "lib/prompt-formatters.js",
+      "lib/prompts/stage-kinds.js",
+      "tests/unit/prompt-size-budget.test.js",
+      "tests/unit/lin-4469-prompt-folds.test.js",
+      "scripts/prompt-template-change-log.md",
+      "docs/areas/llm-and-prompts.md"
+     ],
+     "account": "Implemented piece 5 on PR #2447 (commit 3533f37c2, CI green). The four mandates in lib/proxy-preamble.js drop the tracker clauses the guard refuses; the code, branch and PR prohibitions and the merge sentences stay in words (no code backstop; merge cut by ruling), named in the change log. Look-into's 'unless the person asks' exception retired per John's ruling (decision-137/138). areaLookup and NOTES_PR became shared constants in lib/prompts/leftover-words.js; the four committed-tool spellings settled on Stability's (committedSearch, lib/periodicals.js); 'narrowing' became 'cut' in the plan-review and review verdicts. One re-pin: 13 Periodical hashes, LIN-4467 witness, nine template ceilings, two source ceilings; FROZEN_TOTAL_BYTES 396884 -> 396559, under decision-140's 396575. The meta-prompt baseline and router snapshots did not change, so were not re-pinned. New test lin-4469-prompt-folds.test.js, mutation-checked. Rendered prompts carrying a folded rule fall (-204 in all); 11 kinds are byte-identical, so 'a net fall across every kind' is not met: raised to John as ruling lin-4469-cuts, with the unfolded read-only template clauses. Kept on purpose: blind read's piloted area sentence, the committed-tool policy wording, CUT's token order. Findings posted to LIN-4350 as a comment. LIN-4469 moved to In Progress."
+    },
+    "links": {},
+    "in": "task-131",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:39:20.000Z",
+    "by": "implementation"
+   },
+   {
+    "id": "run-141",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "implementation",
+     "claims": [
+      "lib/proxy-preamble.js",
+      "lib/prompts/leftover-words.js",
+      "lib/periodicals.js",
+      "lib/prompt-template-defs.js",
+      "lib/completion-signals.js",
+      "lib/prompt-formatters.js",
+      "lib/prompts/stage-kinds.js",
+      "tests/unit/prompt-size-budget.test.js",
+      "tests/unit/lin-4469-prompt-folds.test.js",
+      "scripts/prompt-template-change-log.md",
+      "docs/areas/llm-and-prompts.md"
+     ],
+     "account": "Implemented piece 5 on PR #2447 (commit 3533f37c2, CI green). The four mandates in lib/proxy-preamble.js drop the tracker clauses the guard refuses; the code, branch and PR prohibitions and the merge sentences stay in words (no code backstop; merge cut by ruling), named in the change log. Look-into's 'unless the person asks' exception retired per John's ruling (decision-137/138). areaLookup and NOTES_PR became shared constants in lib/prompts/leftover-words.js; the four committed-tool spellings settled on Stability's (committedSearch, lib/periodicals.js); 'narrowing' became 'cut' in the plan-review and review verdicts. One re-pin: 13 Periodical hashes, LIN-4467 witness, nine template ceilings, two source ceilings; FROZEN_TOTAL_BYTES 396884 -> 396559, under decision-140's 396575. The meta-prompt baseline and router snapshots did not change, so were not re-pinned. New test lin-4469-prompt-folds.test.js, mutation-checked. Rendered prompts carrying a folded rule fall (-204 in all); 11 kinds are byte-identical, so 'a net fall across every kind' is not met: raised to John as ruling lin-4469-cuts, with the unfolded read-only template clauses. Kept on purpose: blind read's piloted area sentence, the committed-tool policy wording, CUT's token order. Findings posted to LIN-4350 as a comment. LIN-4469 moved to In Progress."
+    },
+    "links": {},
+    "in": "task-131",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T22:39:30.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "Piece 5 implemented on PR #2447, CI green; held on John's ruling lin-4469-cuts (question)"
+    }
+   }
+  ],
+  "change-142": [
+   {
+    "id": "change-142",
+    "kind": "change",
+    "state": "open",
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2447",
+     "head": "3533f37c2"
+    },
+    "links": {
+     "on": [
+      "plan-117@1",
+      "verdict-124@1",
+      "decision-138@1",
+      "decision-140@1"
+     ]
+    },
+    "in": "task-131",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:39:26.000Z",
+    "by": "implementation"
+   }
+  ],
+  "finding-143": [
+   {
+    "id": "finding-143",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/prompt-template-defs.js` lines 975, 994 and 1065 restate the guarded tracker clause in the read-only templates (survey-task, survey-place, blind-read). They sit outside the four mandates LIN-4469 names, so they were not folded. Recommendation: shrink them to the code, branch and PR words, as the mandates now do. Waits on John's ruling lin-4469-cuts."
+    },
+    "links": {},
+    "in": "task-131",
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:39:27.000Z",
+    "by": "implementation"
+   }
+  ],
+  "question-144": [
+   {
+    "id": "question-144",
+    "kind": "question",
+    "state": "open",
+    "fields": {
+     "asks": "LIN-4469 PR #2447: accept two cuts to the ask? (1) 'A net fall across every kind' is not met for 11 kinds (blocked, breakdown, close-out, look-into, triage, context, survey-task, survey-place, blind-read, retro, retrospective-audit): they render none of the folded text, so they are byte-identical; the kinds that carry a folded rule fall (bug, design, implementation, plan, research, scoping, spike -24 each; review -30; plan-review -6). (2) The guarded tracker clause in the survey-task, survey-place and blind-read templates (finding-143) is left unfolded.",
+     "options": [
+      "accept: net fall on rendered prompts that carry folded rules; 11 kinds byte-identical",
+      "fold: fold the guarded clause in the survey-task, survey-place and blind-read templates too"
+     ],
+     "recommended": "accept",
+     "if-unanswered": "hold; on answer, resume and record on LIN-4469"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-143"
+     ]
+    },
+    "in": "task-131",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:39:28.000Z",
+    "by": "implementation"
+   }
+  ],
+  "finding-145": [
+   {
+    "id": "finding-145",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "PR #2447 against the plan, for review to check: (a) decision-140's condition: FROZEN_TOTAL_BYTES 396884 -> 396559 (equal to the ceilings' sum, below 396575); rendered template ceilings -204; source ceilings prompt-template-defs.js -70, prompt-formatters.js +24, stage-kinds.js -12. (b) Departures from plan-117: the meta-prompt baseline and router snapshots were not re-pinned because they did not change; the committed-tool helper `committedSearch` lives in `lib/periodicals.js`, not `lib/prompts/leftover-words.js`. (c) Witness: `tests/unit/lin-4469-prompt-folds.test.js` checks retired spellings appear in no rendered prompt and the guarded clauses are absent from every preamble; a mutation check saw it fail with the retired clause restored. CI success green."
+    },
+    "links": {
+     "about": [
+      "change-142"
+     ],
+     "on": [
+      "decision-140@1"
+     ]
+    },
+    "in": "task-131",
+    "to": "review",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:39:29.000Z",
+    "by": "implementation"
    }
   ]
  },

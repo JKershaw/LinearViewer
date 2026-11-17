@@ -1,5 +1,5 @@
 {
- "next": 93,
+ "next": 94,
  "records": {
   "area-1": [
    {
@@ -2044,6 +2044,41 @@
     "at": "2026-11-13T15:58:17.000Z",
     "by": "breakdown"
    }
+  ],
+  "run-93": [
+   {
+    "id": "run-93",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "breakdown",
+     "account": "Resumed on John's ruling (decision-90, answering question-83: retire look-into's \"unless the person asks\" exception). Applied it to the two children it touches: LIN-4468 (look-into stays none, merge hold lifted; finding-91) and LIN-4469 (drop the clause, log the retirement; finding-92), posted as a comment on LIN-4448. The ruling does not change LIN-4464 (this task): piece 0 stays order 1, blocked by nothing, and decision-79/80/81 stand. No open rulings remain on this breakdown; landing order unchanged. LIN-4468 and LIN-4469 have no task records in this store, so both findings sit in task-60, about plan-68 and plan-69."
+    },
+    "links": {},
+    "in": "task-78",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:58:18.000Z",
+    "by": "breakdown"
+   },
+   {
+    "id": "run-93",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "breakdown",
+     "account": "Resumed on John's ruling (decision-90, answering question-83: retire look-into's \"unless the person asks\" exception). Applied it to the two children it touches: LIN-4468 (look-into stays none, merge hold lifted; finding-91) and LIN-4469 (drop the clause, log the retirement; finding-92), posted as a comment on LIN-4448. The ruling does not change LIN-4464 (this task): piece 0 stays order 1, blocked by nothing, and decision-79/80/81 stand. No open rulings remain on this breakdown; landing order unchanged. LIN-4468 and LIN-4469 have no task records in this store, so both findings sit in task-60, about plan-68 and plan-69."
+    },
+    "links": {},
+    "in": "task-78",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:58:19.000Z",
+    "by": "breakdown",
+    "ended": {
+     "reason": "Ruling applied to LIN-4468 and LIN-4469; nothing left open from it."
+    }
+   }
   ]
  },
  "log": [
@@ -2564,6 +2599,19 @@
     "decision-90",
     "--by",
     "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:27:30.655Z",
+   "by": "survey-place",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-78",
+    "--by",
+    "survey-place"
    ],
    "asOf": null
   }
