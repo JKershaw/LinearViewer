@@ -1,0 +1,185 @@
+[
+ {
+  "at": "2026-11-17T15:38:59.012Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "get",
+   "change-143",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:38:59.050Z",
+  "by": "blind-read",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-113",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:04.116Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "get",
+   "verdict-162",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:04.146Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "WAITING_ON_A_PERSON",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:04.183Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "end time",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:04.228Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "outcome words",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:04.264Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "session-run-transcript",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:04.301Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "dated by",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:04.339Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "verdict",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:09.313Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--area",
+   "area-1",
+   "--state",
+   "open",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:09.359Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "verdict",
+   "--text",
+   "blind",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:14.336Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-139",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:14.364Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "verdict",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:14.399Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--to",
+   "area-1",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ }
+]

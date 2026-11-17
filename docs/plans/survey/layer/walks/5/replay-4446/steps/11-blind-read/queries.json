@@ -1,0 +1,145 @@
+[
+ {
+  "at": "2026-11-17T15:39:27.609Z",
+  "by": "blind-read",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-9",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:27.647Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "area",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:27.677Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "verdict",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:44.093Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "get",
+   "change-53",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:44.133Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "ship",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:44.169Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "biscuit",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:44.214Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "cost-format-global",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:44.252Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "browser copy",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:44.296Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "consumer",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:47.041Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-19",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:39:47.081Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--to",
+   "area-1",
+   "--state",
+   "open",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ }
+]

@@ -1,0 +1,428 @@
+{
+ "actor": "autopilot",
+ "asOf": "2026-11-13T23:17:16.781Z",
+ "task": {
+  "id": "task-131",
+  "ref": "LIN-4469",
+  "done-when": "Piece 5 of LIN-4448's plan (behaviour **E**). **Fewer rules restated as lists in prompt text.** This lands only after piece 3 (records) and piece 4 (proxy guard).\n\n**Approach**\n\n* Shrink only the **tracker-write clauses the guard now refuses**, in `ONE_COMMENT_MANDATE`, `NONE_MANDATE`, `BLIND_COMMENT_MANDATE` and `TICKET_FIELDS_MANDATE` (`lib/proxy-preamble.js`), down to what the stage is told about its token.\n* **Keep these in words** (review note 1): the code, branch and PR prohibitions, which have no code backstop because the runner's GitHub credential is outside the proxy, and the merge sentences (cut by ruling). Name them as kept, with the reason, in the change-log entry.\n* Look-into's \"unless the person asks\" clause is dropped only if John has ruled to retire it (the DECISION on LIN-4448, asked on piece 4). Otherwise it is reworded to match `one-comment`.\n* Each of these becomes one constant in `lib/prompts/leftover-words.js`: the docs-only notes-PR rule, the committed-tool wording (\"search the repo for a committed tool\"; the four wordings settle on **Stability's**), and the first-match area lookup. Also the retirement-line wording in this repository's docs (simple-dispatcher's copy stays named, and is its owner's).\n* Fold `CUT` and \"narrowing\" (`lib/prompts/stage-intent.js` / `lib/completion-signals.js`) into one vocabulary. If piece 3's record already settled it, say so.\n* The blind read's piloted sentence stays as piloted. Re-piloting is a person's run, and the Waiting entry says so.\n* **Re-pin once, together:** the 13 Periodical hashes, the router snapshots, `scripts/eval/meta-prompt.baseline.txt` and a lowered `FROZEN_TOTAL_BYTES`, with reasons in `scripts/prompt-template-change-log.md`.\n\n**Testing (witnesses)**\n\n* Real-context rendered bytes show a net fall across every kind, fresh and fix round.\n* The existing prompt tests pass.\n* A new test fails if a retired duplicate phrase appears in more than one template.\n\n**LIN-4350:** report what this piece found to LIN-4350 in a comment. Don't absorb that ticket: it spans two repos.\n\n**Collisions:** `lib/prompt-template-defs.js` and the budget test, after piece 3.\n\n**Retires:** the Waiting entries for the docs-only notes-PR rule, the committed-tool wording, the first-match lookup, `CUT` vs \"narrowing\", and the retirement line's restatement in this repo's docs. Also the tracker clauses in the four mandates.\n\n---\n\n**Parent:** LIN-4448 (LLM & prompts, left simpler). The full approved plan is the parent's description, section `## Implementation Plan`, and its amendments are in the parent's comment `### Plan Review Verdict` (72406236-9316-4004-98ee-70d8fba0cb09). The parent's `## As asked` block sets the scope.\n\nSession fit: fits one session\n\nPlan-review due: no — covered by LIN-4448's approving plan-review (comment 72406236-9316-4004-98ee-70d8fba0cb09, rev 1)\n\n**Grounding commits:** the plan was written at `JKershaw/LinearViewer` main `2bf788b6d` (surveys at `4b5001ddf`) and reviewed at `c205190fd`. The breakdown re-checked at `5dcf5bcda`. The only change since is LIN-4457 (#2424), and the one plan file it touches is the cost-read entry in `docs/architecture/source-map.md`.\n\n**Starting point:** the parent's approved plan. Follow it. Where the code shows it is wrong, change course, and say so in a comment on LIN-4448.\n\n**Every PR names what it retires** (the LIN-4414 rule). It edits the Waiting entries in `docs/areas/llm-and-prompts.md` that it settles. It respects that note's Lessons and leaves `docs/reviews/` reports unchanged.",
+  "paths": [
+   "lib/proxy-preamble.js",
+   "lib/prompts/leftover-words.js",
+   "lib/prompts/stage-intent.js",
+   "lib/completion-signals.js",
+   "lib/prompt-template-defs.js",
+   "tests/unit/prompt-size-budget.test.js",
+   "scripts/eval/meta-prompt.baseline.txt",
+   "scripts/prompt-template-change-log.md",
+   "docs/areas/llm-and-prompts.md"
+  ]
+ },
+ "asked": [
+  {
+   "id": "task-108",
+   "asked": "**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** The tightest tangle in Harbour is between LLM & prompts and Runs & dispatch: the links between the two areas grew from 32 one way and 50 the other to 38 and 55 over batch 1 (Seams run 12). On this side:\n\n* the list of routes that code settles without asking a model is copied about nine times, and `docs/architecture/prompt-system.md` and `public/llms.txt` already describe it wrongly (Drift, row 154);\n* the blind read's name and heading are retyped outside the file that defines them (Drift, row 151);\n* batch 1 added rules to the prompts as text (the frozen prompt total rose about 21,000 bytes, to 378,915). John on that limit: \"That limit is to push against lists if rules. Worth knowing, but not hard and fast.\";\n* LIN-4350 asks to fold the rules together into plainer, more general instructions.\n\nThe safety pass (A5, LIN-4400) found two themes here: merge and read-only limits that exist only in prompt text (LIN-1242, LIN-1273, LIN-3417), and tokens inside prompt text (LIN-1372, LIN-1395, LIN-1408). Both are part of A12 (LIN-4416). The area's note holds 26 Waiting entries.\n\n**What we want.**\n\n* Each rule has one home; the copies are gone, and the docs say what the code does.\n* A limit that matters is held in code, not only in a prompt's words.\n* Fewer rules are restated as lists in prompt text.\n* The area's Waiting entries are settled, or each says why it can't be yet.\n* Each piece finishes one move and names what it retired; piece sizes vary, leaning larger.\n* The Runs & dispatch side of the seam is A13's.\n\n**Done when**\n\n* the cases above are settled, or John has ruled they can wait;\n* the safety tickets named above are closed in code for that reason, or John has ruled they can wait;\n* the area's Waiting entries are settled or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*"
+  }
+ ],
+ "piece": {
+  "id": "plan-117",
+  "kind": "plan",
+  "state": "kept",
+  "fields": {
+   "says": "Piece 5: **E. Fewer rules as prompt lists (piece 5), only after D has landed.** With the guard in place, `ONE_COMMENT_MANDATE`, `NONE_MANDATE`, `BLIND_COMMENT_MANDATE` and `TICKET_FIELDS_MANDATE` shrink to what the stage is told about its token; the merge sentences stay (cut, ruled). In one batch, with one re-pin of the 13 Periodical hashes, router snapshots, `scripts/eval/meta-prompt.baseline.txt` and `FROZEN_TOTAL_BYTES` (lowered with reasons in `scripts/prompt-template-change-log.md`): the docs-only notes-PR rule, the \"search the repo for a committed tool\" rule (the four wordings settle on Stability's) and the first-match area lookup each become one constant in `lib/prompts/leftover-words.js` (the blind read's piloted sentence stays as piloted: re-piloting is a person's run; the entry says so). *Witness:* the rendered-bytes check shows a net fall; the existing prompt tests pass; a test that none of the retired phrases still appears in a second template. LIN-4350 stays its own ticket (it spans both repos and waits for this one's siblings): this piece takes only the folds the guard and the shared constants make safe, and records for LIN-4350 what it found.",
+   "paths": [
+    "lib/proxy-preamble.js",
+    "lib/prompts/leftover-words.js",
+    "lib/prompt-template-defs.js",
+    "lib/periodicals.js",
+    "tests/unit/prompt-size-budget.test.js",
+    "scripts/eval/meta-prompt.baseline.txt",
+    "scripts/prompt-template-change-log.md"
+   ],
+   "order": 4
+  },
+  "links": {},
+  "in": "task-108",
+  "v": 1,
+  "op": "add",
+  "at": "2026-11-13T15:39:54.189Z",
+  "by": "design"
+ },
+ "replaced": [],
+ "addressed": [],
+ "stands": [
+  {
+   "id": "decision-109",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "scope": "task-108",
+    "answer": "**Size:** rebuild the area",
+    "why": "**Why:** Rebuilds the area around one definition per stage kind, from which routes, write limits, labels and docs derive, and has the proxy refuse writes a stage may not make; otherwise copies return and read-only stays words.\n**Cuts:**\n\n* \"the safety tickets named above are closed in code\": the merge limit (LIN-3417) stays with simple-dispatcher.\n* \"the safety tickets named above are closed in code\": the token tickets (LIN-1372, LIN-1395, LIN-1408) stay with the harness.\n  **Decided by:** a ruling"
+   },
+   "links": {},
+   "in": "task-108",
+   "v": 2,
+   "op": "revise",
+   "at": "2026-11-13T15:34:51.926Z",
+   "by": "scoping",
+   "reason": "Decided by: a ruling (John's answer to lin4448-safety-cuts)."
+  },
+  {
+   "id": "decision-111",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "scope": "task-108",
+    "answer": "Agree both cuts: they wait for A12 and simple-dispatcher; LIN-4448 closes only the read-only limit, through the proxy's write guard",
+    "why": "Ruling lin4448-safety-cuts, recorded via Harbour."
+   },
+   "links": {
+    "answers": "question-110"
+   },
+   "in": "task-108",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:33:39.997Z",
+   "by": "John",
+   "via": "Harbour"
+  },
+  {
+   "id": "verdict-124",
+   "kind": "verdict",
+   "state": "stands",
+   "fields": {
+    "of": "plan-review",
+    "outcome": "approve",
+    "reasoning": "Approve (comment 72406236). The causes it names are the real causes, the proxy guard reaches every dispatched agent's writes, and each gap below can be fixed without changing what the plan decides.\n\n1. **Piece 5: keep the git-side limits in words.** The proxy guard holds tracker writes only. \"Do not change code, branches, pull requests\" in `ONE_COMMENT_MANDATE`, `BLIND_COMMENT_MANDATE`, `NONE_MANDATE` and `TICKET_FIELDS_MANDATE` has no code backstop: the runner's GitHub credential is outside the proxy, and that half sits with simple-dispatcher like merge. Shrink only the tracker clauses the token now refuses. Keep the code, branch and PR prohibitions, as you keep the merge sentences, and name them in the change log entry as kept, with the reason.\n\n10. **Piece 4 makes look-into's \"post nothing to Linear unless the person asks\" untrue.** A `none` token refuses every write, and the token cannot know a person asked. Dropping that allowance is a \"what to retire\" call, so ask John as a ruling on piece 4's PR. My recommendation is to retire it: look-into reports in its session, and a person can post the comment themselves. Then piece 5 drops the clause."
+   },
+   "links": {
+    "on": [
+     "plan-117@1"
+    ]
+   },
+   "in": "task-108",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:49:32.648Z",
+   "by": "plan-review"
+  },
+  {
+   "id": "decision-132",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "Grounding commit origin/main `5dcf5bcda`; the plan stands, so no re-plan was needed.",
+    "why": "`origin/main` is `5dcf5bcda`. Since the plan's `2bf788b6d` and the review's `c205190fd`, only LIN-4457 (#2424) and LIN-4454 landed. The only plan file they touch is the cost-read entry in `docs/architecture/source-map.md`. The anchors still hold: `codeRouteOf` is at `lib/openrouter.js:2108`, `requireWriteScope` is at `routes/proxy.js:609`, and there are 25 Waiting entries. The plan stands, so no re-plan was needed."
+   },
+   "links": {
+    "on": [
+     "verdict-124@1"
+    ]
+   },
+   "in": "task-131",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:55:35.944Z",
+   "by": "breakdown"
+  },
+  {
+   "id": "decision-133",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "Session fit: fits one session. Plan-review due: no — covered by LIN-4448's approving plan-review (comment 72406236-9316-4004-98ee-70d8fba0cb09, rev 1)",
+    "why": "| 4 | LIN-4469 | 5: prompt folds, one re-pin | 4467, 4468 | one session: one batch, one re-pin |"
+   },
+   "links": {
+    "on": [
+     "verdict-124@1"
+    ]
+   },
+   "in": "task-131",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:55:35.944Z",
+   "by": "breakdown"
+  },
+  {
+   "id": "decision-134",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "LIN-4469 is blocked by LIN-4467 (piece 3) and LIN-4468 (piece 4).",
+    "why": "The baseline goes first and alone, so that nothing changes the area before it is read. 1, 2 and 4 then run in parallel: their files mostly don't overlap, and the shared ones (`recommendation-blind-read.js`, `dispatch-entrance.js`) rebase. 3 needs 1 and 2. 5 needs 3 and 4: the guard comes before the words, and both 3 and 5 touch `prompt-template-defs.js` and the budget test. 6 comes last, and 5 covers the rest transitively."
+   },
+   "links": {
+    "on": [
+     "verdict-124@1"
+    ],
+    "about": [
+     "task-129",
+     "task-130"
+    ]
+   },
+   "in": "task-131",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:55:35.944Z",
+   "by": "breakdown"
+  },
+  {
+   "id": "decision-135",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "LIN-4469 blocks LIN-4470 (piece 6).",
+    "why": "The baseline goes first and alone, so that nothing changes the area before it is read. 1, 2 and 4 then run in parallel: their files mostly don't overlap, and the shared ones (`recommendation-blind-read.js`, `dispatch-entrance.js`) rebase. 3 needs 1 and 2. 5 needs 3 and 4: the guard comes before the words, and both 3 and 5 touch `prompt-template-defs.js` and the budget test. 6 comes last, and 5 covers the rest transitively."
+   },
+   "links": {
+    "on": [
+     "verdict-124@1"
+    ]
+   },
+   "in": "task-131",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:55:35.944Z",
+   "by": "breakdown"
+  },
+  {
+   "id": "decision-137",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "scope": "task-108",
+    "answer": "Retire it: look-into reports in its session and a person posts the comment if they want it",
+    "why": "Ruling lin4448-lookinto-none, recorded via Harbour."
+   },
+   "links": {
+    "answers": "question-136"
+   },
+   "in": "task-108",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:57:43.409Z",
+   "by": "John",
+   "via": "Harbour"
+  },
+  {
+   "id": "decision-138",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "**Ruling answered (John, 13 Nov, LIN-4448 comment bdcd3128):** retire look-into's \"post nothing to Linear unless the person asks\" exception.",
+    "why": "This piece **drops that clause** from look-into's prompt; the `one-comment` rewording option in the section above no longer applies. Record the retirement, citing the ruling, in `scripts/prompt-template-change-log.md` and in the PR's retirement line."
+   },
+   "links": {
+    "on": [
+     "decision-137@1"
+    ]
+   },
+   "in": "task-131",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:58:14.076Z",
+   "by": "breakdown"
+  },
+  {
+   "id": "decision-140",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "## Condition on LIN-4467's budget raise, for piece 5\n\nIt was accepted on one condition that falls on this piece: **LIN-4469 must show a net rendered-byte reduction and lower `FROZEN_TOTAL_BYTES` below 396575** (the figure the settlement named), with the reduction measured on rendered prompts, not on source moved out of measured files. John on the limit: \"That limit is to push against lists of rules. Worth knowing, but not hard and fast.\"",
+    "why": "LIN-4467 (PR https://github.com/JKershaw/LinearViewer/pull/2444) raises `FROZEN_TOTAL_BYTES` in `tests/unit/prompt-size-budget.test.js` from 378915 to 396884 (396575 at review, plus a net +309 at close-out for deriving the reading-pass lines). It is re-accounting, not growth: the text moved into the newly budgeted `lib/prompts/stage-kinds.js` from files the total did not cover, and all 80 rendered prompts are byte-identical.\n\nNamed monitor: `tests/unit/prompt-size-budget.test.js` fails on any growth past the ceiling. Only this piece landing can show the reduction.\n\nThe record's source ceiling (`lib/prompts/stage-kinds.js`, 43348) is part of what to lower if wording moves out of it. `lib/prompt-template-defs.js` and the budget test are shared with this piece; LIN-4467 lands first.\n"
+   },
+   "links": {},
+   "in": "task-131",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T21:49:17.132Z",
+   "by": "autopilot"
+  },
+  {
+   "id": "decision-157",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "scope": "task-131",
+    "answer": "fold: shrink the clauses at ~268/975/994/1065 to the code, branch and PR words too; back to implementation, re-pin ceilings and a lower FROZEN_TOTAL_BYTES",
+    "why": "Ruling lin-4469-cuts, recorded via Harbour. Comment on LIN-4469 (62f57ef4): \"Fold the guarded clause in survey-task, survey-place and blind-read templates too.\" The comment names three templates; the option chosen also covers triage ~268."
+   },
+   "links": {
+    "answers": "question-144",
+    "on": [
+     "question-144@2"
+    ],
+    "about": [
+     "change-142",
+     "finding-143"
+    ]
+   },
+   "in": "task-131",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T23:03:15.000Z",
+   "by": "John",
+   "via": "Harbour"
+  },
+  {
+   "id": "decision-160",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "Next build step on PR #2447: (a) the fold decision-157 rules: shrink the tracker-write clauses in `lib/prompt-template-defs.js` ~975 (survey-task), ~994 (survey-place), ~1065 (blind-read) and ~268 (triage: its scope rule stays, its write clauses go) to the code, branch and PR words, which stay because nothing backs them in code; re-pin the ceilings and `FROZEN_TOTAL_BYTES` once more, lower (finding-143); (b) review's Fixes 1 to 5 (finding-149 to finding-153); (c) a `### Leftovers` answer with a `Retires:` line naming an entry the diff removes (finding-154); (d) the corrected figure (4 work kinds identical, not 11) in the PR's decision text, the change-log row and the LIN-4350 comment (finding-150). Merge waits on question-159 only.",
+    "why": "Same idiom as the class this ticket bounds (tracker-write prose the guard now refuses); under John's standing rule (LIN-2825, amended by LIN-3006) an item of the same class is inside whether or not the plan listed it. The ask's \"shrink only\" is read as: touch only what the guard backs. Builder and reviewer both recommend it, and John ruled fold. Posted on LIN-4469 (comment fab0cf08)."
+   },
+   "links": {
+    "on": [
+     "decision-157@1"
+    ],
+    "about": [
+     "change-142",
+     "finding-143",
+     "finding-149",
+     "finding-150",
+     "finding-151",
+     "finding-152",
+     "finding-153",
+     "finding-154",
+     "question-159"
+    ]
+   },
+   "in": "task-131",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T23:05:08.000Z",
+   "by": "autopilot"
+  },
+  {
+   "id": "decision-163",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "scope": "task-131",
+    "answer": "Keep the one-record refactor witness (`tests/fixtures/lin-4467-witness.js`) in the suite as a ratchet; do not retire it or fold it into the budget test.",
+    "why": "It is the identity pin on real-context renders, which the budget test caps over a context-free fixture are not (lesson-6). A test-suite decision, not John's call. Recorded as a Lesson in docs/areas/llm-and-prompts.md and its Waiting entry removed; named in the Retires: line of the ### Leftovers comment on LIN-4469 (a2efc9a8)."
+   },
+   "links": {
+    "about": [
+     "finding-26",
+     "change-142"
+    ]
+   },
+   "in": "task-131",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T23:16:14.000Z",
+   "by": "leftover"
+  }
+ ],
+ "areas": [
+  {
+   "id": "area-1",
+   "name": "LLM & prompts",
+   "open": 22
+  },
+  {
+   "id": "area-65",
+   "name": "Runs & dispatch",
+   "open": 22
+  }
+ ],
+ "runs": [],
+ "index": [
+  {
+   "id": "lesson-2",
+   "kind": "lesson",
+   "line": "Prompt size is frozen (`tests/unit/prompt-size-budget.test.js`): text grows only with its ticket and reason beside the ceiling and `FROZEN_TOTAL_BYTES`; old reasons go to \"Ceiling history\" in `scripts/prompt-template-change-log.md`."
+  },
+  {
+   "id": "lesson-6",
+   "kind": "lesson",
+   "line": "`lib/prompt-template-defs.js` and the budget test change in almost every merge: rebase, then re-measure. Its fixture passes no context (the empty-context branch), so dropping one can raise a ceiling while real renders shrink (LIN-4393)."
+  },
+  {
+   "id": "lesson-10",
+   "kind": "lesson",
+   "line": "`lib/prompt-template-defs.js` cannot import what imports `lib/prompt-templates.js` (a cycle): shared words live in an import-free leaf, as `lib/prompts/leftover-words.js` (LIN-4376) and `lib/prompts/autopilot-precedence.js` (never restate a rank; LIN-4382)."
+  },
+  {
+   "id": "lesson-12",
+   "kind": "lesson",
+   "line": "A stage lead's first sentence is the selector's purpose line: changing it means new router snapshots, `scripts/eval/meta-prompt.baseline.txt` and routing ceiling (LIN-4369)."
+  },
+  {
+   "id": "lesson-53",
+   "kind": "lesson",
+   "line": "A token minted for a stage carries its `writes` and ticket, or has a reason not to. Pass both into the mint helpers (`lib/proxy-preamble.js`), or read them from the row (`lib/item-stage-stamp.js`). A wake, immediate or held, takes the stamp of the session it resumes, the parent, not the row that reported (`stampForWakeParent`; a held release gets the producing build's id from the store). A mint with neither is unrestricted, which is right only for a person's or a `custom` mint, listed with its reason in `tests/unit/dispatch-entrance-mint-sweep.test.js`. The refire broker minted unrestricted tokens for read-only rows because its mint was a bare `createToken`, which no helper-name search finds (LIN-4468)."
+  },
+  {
+   "id": "change-142",
+   "kind": "change",
+   "line": "https://github.com/JKershaw/LinearViewer/pull/2447"
+  },
+  {
+   "id": "finding-147",
+   "kind": "finding",
+   "to": "area-1",
+   "line": "Look-first did not run on LIN-4469 (piece 5 of LIN-4448): at 22:39Z recommend-and-dispatch sent `implementation` directly (dispatch b86c4a78). The ticket held only `## As asked` and `## Current`, with no size record, plan, PR or earlier run; on pieces 0 to 4 the look-first sequence (survey-task, survey-place, scoping; `lib/recommendation-look-first.js`) did run. Raw material for the look-first rule: a child piece whose plan is approved at the parent skipped the look, where its siblings did not. Not overridden: the plan is approved and review has caught real gaps on every earlier piece."
+  },
+  {
+   "id": "check-148",
+   "kind": "check",
+   "to": "review",
+   "line": "Watch piece 5 (PR #2447) for an undersized or oversized move: it went to implementation without survey-task, survey-place or scoping, unlike pieces 0 to 4."
+  },
+  {
+   "id": "finding-153",
+   "kind": "finding",
+   "to": "close-out",
+   "line": "Fix 5 remainder: on merge, revise lesson-10 \"import-free leaf\" to \"a leaf that imports only leaves (`area-registry-path.js`)\". The import move is done at 05b592742 (it is at the top of `lib/prompts/leftover-words.js`) and the docs Lesson in `docs/areas/llm-and-prompts.md` is already updated; only the store lesson goes stale."
+  },
+  {
+   "id": "check-155",
+   "kind": "check",
+   "to": "John",
+   "line": "After deploy, confirm restricted dispatches carry a stamped token so the shrunk mandates are backed: a look-into token comment POST gets 403 from the stage gate; a triage token description PATCH gets 403."
+  },
+  {
+   "id": "question-159",
+   "kind": "question",
+   "to": "John",
+   "line": "LIN-4469 asks for a net rendered-byte fall across every kind. Measured on PR #2447 head 05b592742, real-context renders with proxy preambles fall 827520 -> 825330 bytes (-2190), with two exceptions: four work kinds (blocked, breakdown, close-out, retrospective-audit) carry none of the folded text and stay byte-identical, and seams-tangles rises +24 from the committed-tool wording (Stability's spelling, now shared). Accept both as meeting the ask? (Ruling lin-4469-witness; the fold itself is decision-157.)"
+  },
+  {
+   "id": "run-165",
+   "kind": "run",
+   "line": "review"
+  },
+  {
+   "id": "finding-166",
+   "kind": "finding",
+   "to": "close-out",
+   "line": "Fix 1, before the merge: in `lib/periodicals.js` `generateSeamsTanglesPrompt`, first runReview bullet, drop the hand-typed `(no path is written here)` so it reads \"Find both by searching the repo for them, read how the tool is run\" (main's words). It folds nothing (it is not rendered through `committedSearch`, and main never had it) and is why seams-tangles and its autopilot form rise +24 (+26 parenthesis, +28 `committedSearch`, -30 `NOTES_PR`). Without it seams-tangles falls -2 and the total is 827520 -> 825278 (-2242). Then: re-pin both seams-tangles hashes in `tests/unit/lin-4313-periodical-prompt-bytes.test.js:94`; update the LIN-4469 change-log row (`scripts/prompt-template-change-log.md:635`) to the new figures, drop the \"Up\" clause, and make the ruling sentence \"four `work` kinds unchanged; `lin-4469-witness` withdrawn as moot\"; update the PR body's Measured and DECISION sections. `periodicals.js` is in no budgeted source ceiling, so FROZEN_TOTAL_BYTES is unaffected."
+  },
+  {
+   "id": "finding-167",
+   "kind": "finding",
+   "to": "close-out",
+   "line": "Fix 2: in `tests/unit/prompt-size-budget.test.js:146`, delete the stray fragment \"(396821 -> 396571), the rest was unused headroom. \" from the FROZEN_TOTAL_BYTES comment. It follows \"...(396821 -> 396559), the rest was unused headroom.\" and matches no figure."
+  },
+  {
+   "id": "check-168",
+   "kind": "check",
+   "to": "close-out",
+   "line": "Before the merge, after Fix 1 (finding-166): re-run a base-vs-head real-context render (base b937237a4): every stage kind in fresh and fix mode, each with its own writes preamble, and all 13 Periodicals in plain and autopilot form."
+  }
+ ],
+ "carries": {
+  "asked": 1,
+  "piece": 1,
+  "addressed": 0,
+  "stands": 13,
+  "areas": 2,
+  "runs": 0,
+  "index": 15
+ },
+ "bytes": 22090
+}

@@ -1,5 +1,5 @@
 {
- "next": 64,
+ "next": 68,
  "records": {
   "area-1": [
    {
@@ -3050,6 +3050,24 @@
     "op": "add",
     "at": "2026-11-13T15:12:07.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "run-62",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "blind-read",
+     "account": "Blind read of PR #2423 at 1de016f52 against 4b5001ddf: better. The USD formatter has one owner again (lib/cost-format.js served as-is at /shared/cost-format.js through a file-by-file SHARED_MODULES allow-list; the hand copy and its parity test deleted; guards for leaf purity, boot failure and 404s). Worse: the module-to-global shim brings back a global and a DOMContentLoaded-only timing rule that only per-consumer tests and four restating comments carry. Two fix-sized wording leftovers sent to close-out; two larger items (a general way for classic pages to take shared modules; the hand-synced ship twins) left to the area. Nothing outside the area."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:12:13.000Z",
+    "by": "blind-read",
+    "ended": {
+     "reason": "blind read recorded: verdict-63 better; findings 64-67"
+    }
    }
   ],
   "verdict-63": [
@@ -3074,6 +3092,92 @@
     "v": 1,
     "op": "add",
     "at": "2026-11-13T15:12:08.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-64": [
+   {
+    "id": "finding-64",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "tests/unit/cost-format-consumers.test.js (concerns public/flight-companion.js): the test title \"formatCost gives the browser copy's words\" and its comment \"The browser copy's fine mode\" name the browser copy PR #2423 deleted. Reword them to \"the shared formatter's words\". Fix-sized, before merge."
+    },
+    "links": {
+     "about": [
+      "change-53"
+     ]
+    },
+    "in": "task-9",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:12:09.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-65": [
+   {
+    "id": "finding-65",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "tests/unit/cost-format.test.js (concerns lib/cost-format.js): a new file, but its header says \"The browser-copy parity comparison it used to carry is retired\"; it never carried that comparison. It also keeps export const TABLE, which nothing imports, left over from the deleted parity test. Drop the sentence and the export. Fix-sized, before merge."
+    },
+    "links": {
+     "about": [
+      "change-53",
+      "finding-48"
+     ]
+    },
+    "in": "task-9",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:12:10.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-66": [
+   {
+    "id": "finding-66",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "public/cost-format-global.js: the module-to-global bridge is specific to one module. The guard in tests/unit/shared-modules.test.js hard-codes the SHIM constant, the window.CostFormat string and the list of four consumers. The DOMContentLoaded-only rule is restated in public/flight-companion.js, public/observation.js, public/prompt-section.js and public/workspace-kpis.js and witnessed per consumer, but no check covers a new consumer: a fifth trips only the hard-coded list, with no hint about the timing rule, and a second shared module would need a second shim and a second guard. Larger than a fix: needs a design decision on how classic pages take shared modules (one shim per module, a general shim, or consumers becoming modules). (Blind read of PR #2423 @ 1de016f52.)"
+    },
+    "links": {
+     "about": [
+      "change-53",
+      "lesson-54"
+     ]
+    },
+    "in": "area-1",
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:12:11.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-67": [
+   {
+    "id": "finding-67",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "public/ship.js and public/ship-biscuit.js are still synced by hand, each saying so: public/ship.js \"mirror of lib/ship-layout.js\", public/ship-biscuit.js \"Kept in lockstep with lib/render-ship-biscuit.js\". PR #2423 built a way to share code, but each lib side must first become an import-free leaf before it can join SHARED_MODULES, so this is larger than a slice fix. (Blind read of PR #2423 @ 1de016f52.)"
+    },
+    "links": {
+     "about": [
+      "finding-19"
+     ]
+    },
+    "in": "area-1",
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:12:12.000Z",
     "by": "blind-read"
    }
   ]
@@ -4557,6 +4661,68 @@
     "open",
     "--by",
     "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:40:50.213Z",
+   "by": "close-out",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-9",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:40:55.466Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-53",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:40:55.513Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--in",
+    "area-1",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:40:55.550Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "run-62",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:40:55.587Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "run-59",
+    "--by",
+    "close-out"
    ],
    "asOf": null
   }

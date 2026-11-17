@@ -1,5 +1,5 @@
 {
- "next": 169,
+ "next": 170,
  "records": {
   "area-1": [
    {
@@ -4430,6 +4430,38 @@
     "at": "2026-11-13T23:17:14.000Z",
     "by": "review"
    }
+  ],
+  "verdict-169": [
+   {
+    "id": "verdict-169",
+    "kind": "verdict",
+    "state": "stands",
+    "fields": {
+     "of": "review",
+     "outcome": "approve-with-notes",
+     "reasoning": "Approve, conditional on close-out discharging the ledger (re-review of PR #2447 at 05b592742, comment 042f607d). CI green; 13 local prompt suites, 1493 pass. Independent render, base vs head: 827520 -> 825330 (-2190) reproduced; 56 of 72 renders fall. Every As asked sentence is met: the four mandates shrink to the token (`lib/proxy-preamble.js:185-197`) and the fold covers triage, survey-task, survey-place and blind-read, with the dropped triage allowance held by `lib/stage-writes.js:73,82`; code, branch, PR and merge words kept and named in the change log; look-into exception retired (bdcd3128); NOTES_PR, areaLookup, committedSearch (in periodicals.js, recorded on LIN-4448 8933968d), RETIRES_LABEL/RETIRES_NONE pointers in docs; CUT/narrowing folded to cut; FROZEN_TOTAL_BYTES 396884 -> 396064, below decision-140s 396575 (re-pin in three steps on one PR, not treated as a cut; router snapshots and meta-prompt baseline unchanged since no stage lead changed); new test red on four mutations; LIN-4350 report corrected (25b09538); Retires: line names a removed entry. The one miss: seams-tangles +24 meets the witness under no reading (finding-166, check-168). Fix 2 (finding-167) is a stray comment. Stale comment ec59bd26 is superseded by later ones. The class (guarded tracker-write prose) is fully handled. After deploy, check-155 stays with John."
+    },
+    "links": {
+     "on": [
+      "change-142@2",
+      "plan-117@1",
+      "decision-157@1",
+      "decision-140@1"
+     ],
+     "about": [
+      "task-131",
+      "finding-166",
+      "finding-167",
+      "check-168",
+      "check-155"
+     ]
+    },
+    "in": "task-131",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:17:20.000Z",
+    "by": "review"
+   }
   ]
  },
  "log": [
@@ -5710,6 +5742,85 @@
     "run-156",
     "--by",
     "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:40:21.747Z",
+   "by": "review",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-131",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:40:24.414Z",
+   "by": "review",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-131",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:40:24.447Z",
+   "by": "review",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-131",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:41:07.506Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "question-159",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:41:07.541Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--in",
+    "task-131",
+    "--state",
+    "open",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:41:15.767Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "lin-4469-witness",
+    "--by",
+    "autopilot"
    ],
    "asOf": null
   }
