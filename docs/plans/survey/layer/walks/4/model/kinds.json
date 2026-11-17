@@ -1,0 +1,23 @@
+{
+  "kinds": {
+    "task":     { "fields": { "asked": "string", "done-when": "string", "paths": "strings" }, "start": "open", "ends": ["done", "declined"] },
+    "plan":     { "fields": { "says": "string", "paths": "strings", "order": "number" }, "start": "kept", "ends": ["superseded"] },
+    "finding":  { "fields": { "says": "string" }, "to": true, "start": "open", "ends": ["done", "declined", "handed-on"] },
+    "check":    { "fields": { "what": "string", "why-person": "string", "how": "string" }, "to": true, "start": "open", "ends": ["done", "declined", "handed-on"] },
+    "question": { "fields": { "asks": "string", "options": "strings", "recommended": "string", "if-unanswered": "string" }, "to": true, "start": "open", "ends": ["answered", "withdrawn", "handed-on"] },
+    "decision": { "fields": { "answer": "string", "why": "string", "scope": "task" }, "start": "stands", "ends": ["superseded", "withdrawn"] },
+    "verdict":  { "fields": { "of": "string", "outcome": "string", "reasoning": "string" }, "requires": ["on"], "start": "stands", "ends": ["withdrawn"] },
+    "lesson":   { "fields": { "says": "string", "paths": "strings", "checked-at": "string" }, "start": "holds", "ends": ["superseded", "disproved"] },
+    "area":     { "fields": { "name": "string", "paths": "strings" }, "start": "kept", "ends": ["retired"] },
+    "change":   { "fields": { "ref": "string", "head": "string" }, "start": "open", "ends": ["merged", "abandoned"] },
+    "run":      { "fields": { "stage": "string", "claims": "strings", "account": "string" }, "start": "open", "ends": ["done"] }
+  },
+  "outcomes": {
+    "plan-review": ["approve", "approve-with-notes", "request-changes"],
+    "review": ["approve", "approve-with-notes", "request-changes"],
+    "blind-read": ["better", "same", "worse"]
+  },
+  "links": { "about": null, "on": null, "answers": ["decision", "question"], "piece": ["task", "plan"], "same-as": null },
+  "takeover": ["handed-on", "superseded"],
+  "staleIf": ["superseded", "withdrawn", "abandoned"]
+}
