@@ -1,5 +1,5 @@
 {
- "next": 65,
+ "next": 68,
  "records": {
   "area-1": [
    {
@@ -2364,6 +2364,78 @@
      "account": "# What this stage really wrote\n\n## Comment on LIN-4446 at 15:06:53\n\n### Leftovers\n- tidied: test comments that said the formatter loads before the page script (`tests/unit/lin-3833-run-control.test.js`, `tests/unit/flight-companion-client.test.js`) now say what each seam does; `loadChatUI` drops a formatter install chat.js never reads.\n- tidied: `server.js`'s mount comment now names the `/shared/*` modules as well as the vendor libraries.\n- tidied: the shim guard in `tests/unit/shared-modules.test.js` no longer asserts list position (a module runs after every classic script wherever it is listed).\n- tidied: the purity rule is now spelled one way, as the guard enforces it (imports nothing, names no browser or Node global), in `lib/vendor-assets.js`, `lib/cost-format.js`, and the front-end-browser and other-features notes.\n- tidied: the front-end-browser Waiting entry on `buildDispatchModelOptionDescriptors` gave \"no build step\" as its reason; now it says `lib/openrouter-catalog.js` is not a leaf.\n- noted, front-end-browser: the `TERMINAL_TYPES` mirror in `public/common.js` of `lib/providers/models.js` (a leaf) still says `public/` cannot import it; folded into the `public/common.js` twins entry.\n- noted, platform-and-plumbing: `lib/vendor-assets.js` and `createVendorAssetsRouter` are now named for less than they serve; a rename touches the mount string `tests/unit/vendor-assets.test.js` pins.\n- Lesson added (front-end-browser): a `{ module }` entry's list position means nothing; test the order in a `vm` seam with `readyState = 'loading'`.\nRetires: `docs/areas/front-end-pages.md` \"`lib/render-swipe.js`: the viewport meta is `user-scalable=no`\" (the swipe page now takes the shared viewport, with a test that failed before the fix)\n\nPR: https://github.com/JKershaw/LinearViewer/pull/2423, head `1de016f523f46a006c20a4e89717157422b3207b`, CI green.\n"
     }
    }
+  ],
+  "verdict-65": [
+   {
+    "id": "verdict-65",
+    "kind": "verdict",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:07:28.510Z",
+    "by": "review",
+    "in": "task-9",
+    "to": "close-out",
+    "state": "stands",
+    "links": {
+     "on": [
+      "change-57@2"
+     ],
+     "about": [
+      "plan-28",
+      "check-16"
+     ]
+    },
+    "fields": {
+     "of": "review",
+     "outcome": "approve-with-notes",
+     "reasoning": "Judges PR #2423 at head 1de016f5 (24de9abc9 slice + 1de016f52 leftovers) against origin/main cfd152fa4; no main commit since 12:08:10Z touches the diff; MERGEABLE; CI green on 1de016f. Diff matches plan-28 place for place; the one addition, the swipe viewport fix, is the leftover-step retirement docs/areas/README.md requires (LIN-4414), named by its Retires: line, so no ruling needed. Reviewer ran 13 focused suites at 1de016f (461/461) and eight mutations, each reverted: M1 workspace-kpis wrap reverted, M2 shim dropped from render-task-page SCRIPTS, M3 shim as classic string, M4-M6 eager CostFormat reads in observation/prompt-section/flight-companion, M7 node:fs import in lib/cost-format.js, M8 express.static('lib') -- each turned its witness red. Real Chromium + Chart.js 4.5.1 behind the real CSP on a priced workspace: head draws $0.00..$1.40 ticks with no errors; main's workspace-kpis.js throws reading formatUsd. Approve conditional on close-out: fix the stale PR body (finding below) and get John's read (check-16) before Done; non-Chromium is a named-rollback gap. Lighter: 34-line IIFE becomes a 12-line shim (3 code lines); total lines rise only through tests, as declared."
+    }
+   }
+  ],
+  "finding-66": [
+   {
+    "id": "finding-66",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:07:29.510Z",
+    "by": "review",
+    "in": "task-9",
+    "to": "close-out",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-57",
+      "verdict-65"
+     ]
+    },
+    "fields": {
+     "says": "PR #2423's body is stale after 1de016f52; fix before merge. Under 'What changed' add: \"Leftover-step retirement (LIN-4414): the swipe page now takes the shared default viewport (lib/render-swipe.js drops user-scalable=no; witness tests/unit/render-swipe.test.js), retiring the docs/areas/front-end-pages.md Waiting entry `lib/render-swipe.js`: the viewport meta is `user-scalable=no`.\" Replace 'Total: 30 files, +747 / -280' with what `gh pr view 2423 --json additions,deletions,changedFiles` gives on the merged head (35 files at 1de016f). In 'Not covered' replace 'The serving tests were not run against HEAD' with 'Reviewer's mutation (serving lib/ as a directory) turns the spawned-server 404 witness red.'"
+    }
+   }
+  ],
+  "finding-67": [
+   {
+    "id": "finding-67",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:07:30.510Z",
+    "by": "review",
+    "in": "task-9",
+    "to": "close-out",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-57",
+      "verdict-65",
+      "check-16"
+     ]
+    },
+    "fields": {
+     "says": "Not proved by CI or review, before closing LIN-4446: (1) John's read of the first slice's result (check-16) comes after deploy and before Done: ask him to read the LIN-4446 review comment and #2423's body, record his read as a comment on LIN-4446, dispatch no next slice until then; it is not a merge condition. (2) Only Chromium ran (CI e2e and the reviewer's check); Safari/Firefox not run, module scripts and same-origin import are baseline there. Named rollback: revert the PR's merge commit on main; no data shape, migration or third-party consumer changes, and public/cost-format.js comes back with the revert."
+    }
+   }
   ]
  },
  "log": [
@@ -3813,6 +3885,139 @@
     "pos": [
      "finding-30@1"
     ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:38:36.641Z",
+   "by": "review",
+   "cmd": "find",
+   "args": {
+    "kind": "verdict",
+    "in": "task-9",
+    "by": "review",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:38:36.688Z",
+   "by": "review",
+   "cmd": "find",
+   "args": {
+    "to": "review",
+    "state": "open",
+    "by": "review",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:38:36.741Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "change-57"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:38:36.796Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "finding-52"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:38:36.842Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "finding-53"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:38:36.882Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "finding-54"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:38:36.926Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "finding-55"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:38:36.971Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "check-16"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:38:41.686Z",
+   "by": "review",
+   "cmd": "find",
+   "args": {
+    "kind": "question",
+    "in": "task-9",
+    "by": "review",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:38:41.735Z",
+   "by": "review",
+   "cmd": "find",
+   "args": {
+    "in": "task-9",
+    "to": "close-out",
+    "by": "review",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:38:41.779Z",
+   "by": "review",
+   "cmd": "find",
+   "args": {
+    "kind": "run",
+    "in": "task-9",
+    "state": "open",
+    "by": "review",
+    "pos": []
    },
    "asOf": null
   }

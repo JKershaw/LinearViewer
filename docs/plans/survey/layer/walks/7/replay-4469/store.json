@@ -244,6 +244,28 @@
      ],
      "checked-at": "b937237a4"
     }
+   },
+   {
+    "id": "lesson-10",
+    "kind": "lesson",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T23:17:19.416Z",
+    "by": "review",
+    "reason": "the area note's Lesson was updated on PR #2447 (finding-157); checked in re-review at 05b592742",
+    "in": "area-1",
+    "state": "holds",
+    "links": {},
+    "fields": {
+     "says": "`lib/prompt-template-defs.js` cannot import what imports `lib/prompt-templates.js` (a cycle): shared words live in a leaf that imports only leaves, as `lib/prompts/leftover-words.js` (LIN-4376; it imports only the import-free `area-registry-path.js`, LIN-4469) and `lib/prompts/autopilot-precedence.js` (never restate a rank; LIN-4382).",
+     "paths": [
+      "lib/prompt-template-defs.js",
+      "lib/prompt-templates.js",
+      "lib/prompts/leftover-words.js",
+      "lib/prompts/autopilot-precedence.js"
+     ],
+     "checked-at": "05b592742"
+    }
    }
   ],
   "lesson-11": [
@@ -3204,6 +3226,27 @@
      "ref": "https://github.com/JKershaw/LinearViewer/pull/2447 (branch feat/lin-4469-prompt-folds)",
      "head": "877f32cb4"
     }
+   },
+   {
+    "id": "change-142",
+    "kind": "change",
+    "v": 5,
+    "op": "revise",
+    "at": "2026-11-13T23:17:23.416Z",
+    "by": "review",
+    "reason": "re-reviewed at 05b592742: approve-with-notes (verdict-173); close-out applies Fixes 1-2 and the before-merge render (check-176)",
+    "in": "task-131",
+    "to": "close-out",
+    "state": "open",
+    "links": {
+     "about": [
+      "plan-117"
+     ]
+    },
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2447 (branch feat/lin-4469-prompt-folds)",
+     "head": "877f32cb4"
+    }
    }
   ],
   "decision-143": [
@@ -4250,6 +4293,37 @@
      "recommended": "accept",
      "if-unanswered": "The cut stays unagreed: the build fixes continue, but PR #2447 does not merge (on answer: resume, record on LIN-4469)"
     }
+   },
+   {
+    "id": "question-162",
+    "kind": "question",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T23:17:22.416Z",
+    "by": "review",
+    "in": "task-131",
+    "to": "John",
+    "state": "withdrawn",
+    "ended": {
+     "reason": "ruling lin-4469-witness was withdrawn as moot at 23:17Z on Linear, not answered (seen in re-review 042f607d): a kind that carries no folded text cannot fall; seams-tangles +24 now goes to Fix 1 (finding-174)"
+    },
+    "links": {
+     "about": [
+      "question-147",
+      "decision-160",
+      "decision-140",
+      "change-142"
+     ]
+    },
+    "fields": {
+     "asks": "Ruling lin-4469-witness (raised on LIN-4448, record on LIN-4469): LIN-4469 asks for a net rendered-byte fall across every kind. Four work kinds (blocked, breakdown, close-out, retrospective-audit) carry none of the folded text, so they stay byte-identical in real context; the other kinds fall (none -74: look-into, retro; one-comment -23: context, survey-task, survey-place; blind-comment -24: blind-read; ticket-fields -67: triage). At head 05b592742 real-context renders fall 827520 -> 825330 bytes (-2190) overall, but the Periodical `seams-tangles` rises +24 from the settled committed-tool wording (Stability's). Accept that as meeting the ask?",
+     "options": [
+      "accept: the witness holds for every kind that carries folded text; the four work kinds cannot fall",
+      "require: a fall for all four; fold more text out of those kinds' prompts"
+     ],
+     "recommended": "accept",
+     "if-unanswered": "The cut stays unagreed: the build fixes continue, but PR #2447 does not merge (on answer: resume, record on LIN-4469)"
+    }
    }
   ],
   "finding-163": [
@@ -4437,6 +4511,30 @@
     "fields": {
      "says": "PR #2447 carries two accounts of this pass. The resumed first implementation (custom ac074b22, comment ec59bd26 on LIN-4469) reports `FROZEN_TOTAL_BYTES` 396559 -> 396419 and says eight kinds (blocked, breakdown, close-out, look-into, triage, context, retro, retrospective-audit) remain byte-identical; this dispatch (comments a8749d0b, 8933968d) reports 396064 at head 05b592742 and only the four `work` kinds byte-identical, plus seams-tangles +24. The second is the measured one. Check that the PR's DECISION section, the change-log row and the LIN-4350 reply carry the corrected figures (finding-154 is still open: none of those texts is in this pass's material)."
     }
+   },
+   {
+    "id": "finding-167",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:17:20.416Z",
+    "by": "review",
+    "in": "task-131",
+    "to": "review",
+    "state": "done",
+    "ended": {
+     "reason": "re-review: ec59bd26 (eight kinds, 396419) is stale and superseded; a8749d0b, LIN-4448 note 8933968d, the PR body and the change log all carry the four work kinds and 396064; nothing more to correct beyond Fix 1's figure updates (finding-174)"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-154",
+      "decision-166"
+     ]
+    },
+    "fields": {
+     "says": "PR #2447 carries two accounts of this pass. The resumed first implementation (custom ac074b22, comment ec59bd26 on LIN-4469) reports `FROZEN_TOTAL_BYTES` 396559 -> 396419 and says eight kinds (blocked, breakdown, close-out, look-into, triage, context, retro, retrospective-audit) remain byte-identical; this dispatch (comments a8749d0b, 8933968d) reports 396064 at head 05b592742 and only the four `work` kinds byte-identical, plus seams-tangles +24. The second is the measured one. Check that the PR's DECISION section, the change-log row and the LIN-4350 reply carry the corrected figures (finding-154 is still open: none of those texts is in this pass's material)."
+    }
    }
   ],
   "finding-168": [
@@ -4450,6 +4548,30 @@
     "in": "task-131",
     "to": "review",
     "state": "open",
+    "links": {
+     "about": [
+      "change-142",
+      "finding-38",
+      "decision-143"
+     ]
+    },
+    "fields": {
+     "says": "Commit 04bb47598 changed the blind read's read-only line and its piloted fixture by one line (the guarded tracker clause dropped); the pilot was not re-run. The piloted area sentence is a different line and stays as piloted (finding-38). Say whether the read-only line change needs a re-pilot; if it does, that is a person's run."
+    }
+   },
+   {
+    "id": "finding-168",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:17:21.416Z",
+    "by": "review",
+    "in": "task-131",
+    "to": "review",
+    "state": "done",
+    "ended": {
+     "reason": "re-review: the piloted area sentence stays as piloted and is pinned by the test; the read-only line and its fixture changed under John's fold ruling (decision-160), no re-pilot is claimed, and review asks for none"
+    },
     "links": {
      "about": [
       "change-142",
@@ -4556,6 +4678,24 @@
     "by": "review",
     "in": "task-131",
     "state": "open",
+    "links": {},
+    "fields": {
+     "stage": "review",
+     "account": "# What this stage really wrote\n\nDescription: unchanged.\n\n## Comment on LIN-4469 at 23:21:48 (id 042f607d)\n\n## Review — LIN-4469\n\nRe-review of PR https://github.com/JKershaw/LinearViewer/pull/2447 at head `05b592742` (branch `feat/lin-4469-prompt-folds`, base `b937237a4` = origin/main). Since the first review (39207a24, at `3533f37c2`), two commits landed: `04bb47598` (survey and blind-read folds, on the `lin-4469-cuts` = fold ruling) and `05b592742` (triage fold, docs pointers, test gap, re-pin). Since the ticket was created, nothing on main touches its files beyond LIN-4467 and LIN-4468, and the branch already includes both.\n\nCI: green on `05b592742`: Unit tests, Unit tests (proxy, clock +400d), E2E 1–4/4, Secret scan, CI success. Locally, I ran 13 prompt/preamble suites (lin-4469, prompt-size-budget, prompt-templates, lin-4313, lin-4467 ×2, periodicals, lin-4248, completion-signals, lin-4437, lin-4468, proxy-preamble, lin-3134): 1493 pass, 0 fail.\n\n### Independent measurement\nI wrote my own render script and ran it against base and head. It covers every stage kind in fresh and fix mode, each with its own `writes` preamble, and all 13 Periodicals in plain and autopilot form. I reproduced **827520 → 825330 (−2190)** exactly. Of 72 renders, 56 fall. The renders that do not fall:\n- The four `work` kinds (blocked, breakdown, close-out, retrospective-audit), ±0. They carry no folded text. `NOTES_PR` is byte-equal to retrospective-audit's old words.\n- Stability, Recent Headwinds and Integration Surface Maturity, ±0. They carry no folded text.\n- **`seams-tangles` and its autopilot form, +24.** I traced the cause:\n  - Its first runReview bullet gains a hand-typed `(no path is written here)`: \"searching the repo for them,\" becomes \"searching the repo for them (no path is written here),\". That adds **+26**, and it folds nothing: the parenthesis is not rendered through `committedSearch`, and main never had it there.\n  - The second bullet's `committedSearch` adds +28.\n  - `NOTES_PR` removes −30.\n  - I probed dropping only the hand-typed parenthesis: `seams-tangles` then goes to **−2**, and the total to **−2242**.\n\n### The As asked block, sentence by sentence\n- **Shrink only the tracker-write clauses the guard refuses in the four mandates.** Met. `lib/proxy-preamble.js:185-197`.\n  - The engineering settlement (fab0cf08) extended the class to the guarded template prose, and John's `fold` covers survey-task, survey-place and blind-read. Triage `:268` keeps its scope rule.\n  - I checked the dropped triage allowance (\"You may change only labels, priority, state, and project\") against `lib/stage-writes.js:73,82`. `TICKET_FIELDS_UPDATE` holds `stateId`/`projectId`/`priority`, with labels via add/removeLabel, so the guard holds it.\n- **Keep the code, branch and PR prohibitions and the merge sentences in words, and name them as kept, with the reason, in the change log.** Met. The change-log row (`scripts/prompt-template-change-log.md:635`) gives the reason, and the new test pins the words in all four mandates.\n- **Look-into's \"unless the person asks\".** Met. It is retired under John's ruling `bdcd3128`, and nothing in `lib/` still says it.\n- **One constant each, in `leftover-words.js`.**\n  - Notes-PR: ✔ `NOTES_PR`.\n  - First-match: ✔ `areaLookup`.\n  - Committed-tool: `committedSearch`, in `lib/periodicals.js`. The deviation is recorded on LIN-4448 (8933968d). The Seams first-bullet parenthesis is a hand copy of its clause (Fix 1).\n  - Retirement-line docs: ✔ `docs/areas/README.md:72-74` and `docs/architecture/dispatch-and-proxy.md:127` now point to `RETIRES_LABEL`/`RETIRES_NONE`. The refusal table in `docs/proxy-integration.md` stays, and simple-dispatcher's copy stays named (Waiting entry `llm-and-prompts.md:154`).\n- **Fold CUT and \"narrowing\".** Met. `stage-kinds.js:358,419` and the review/plan-review verdicts now say \"cut\". The token order stays named in the Waiting entry.\n- **The blind read's piloted sentence stays as piloted.** Met. The area sentence is pinned by the test. The read-only line and its fixture changed under the `fold` ruling, and no re-pilot is claimed.\n- **Re-pin once, together.** Met.\n  - That covers the 13 Periodical hashes, the witness, the ceilings and `FROZEN_TOTAL_BYTES` 396884 → **396064**. That is below the 396575 condition (a77d9b51) and equals the ceilings' sum.\n  - The router snapshots and meta-prompt baseline pass unchanged, because no stage lead changed.\n  - The re-pin was done in three steps on one PR, not as one, and the change log records each step. I don't treat this as a cut.\n- **Witness: a net rendered fall across every kind, fresh and fix.**\n  - **The aggregate is met** (−2190, reproduced).\n  - **The four `work` kinds:** `lin-4469-witness` was **withdrawn** as moot at 23:17Z, not answered. Its stated reason is the same one John's `lin-4469-cuts` answer was proposed on: a kind that carries no folded text cannot fall. The rules say a withdrawn row is not re-raised. These kinds do not rise, and \"net\" reads as net across the kinds, so I read the sentence as met for them. John can say otherwise on the PR.\n  - **`seams-tangles` +24 does not meet the sentence under any reading.** It carries folded text and rises. The rise comes from a self-inflicted, avoidable addition, which Fix 1 removes. No ruling covers it.\n- **Existing prompt tests pass.** Met: CI, plus my local run.\n- **A new test fails if a retired duplicate phrase appears in more than one template.** Met. I mutation-checked it and reverted every mutation:\n  - (A) Restoring triage's description and subtask clause in `prompt-template-defs.js:268`: **red**.\n  - (B) Restoring \"tickets or Linear state\" in survey-task only: **red**.\n  - (C) Restoring \"do not rewrite its description, do not create tickets or subtasks\" in `TICKET_FIELDS_MANDATE`: **red**.\n  - (D) Restoring \"is a narrowing\" in review only: **red**.\n  - The first review's M3 (the old change-coupling spelling) is now on `RETIRED`. The builder reports it as red.\n- **Report to LIN-4350.** Met, and corrected: 25b09538 replaces \"eleven unchanged\" with the four `work` kinds and −2190.\n- **Retires.**\n  - The `### Leftovers` answer (bbc2b1c7) has `Retires:` naming the docs-only notes-PR entry. The diff removes that entry from `docs/areas/llm-and-prompts.md` ✔.\n  - The other claimed retirements are each removed or rewritten to their remainder: CUT/narrowing, first-match, committed-tool and the retirement-line docs.\n  - The tracker clauses in the four mandates are gone.\n\n**Stale comment, superseded:** ec59bd26 says \"eight kinds … byte-identical\" and quotes 396419. Both are wrong at this head. The later a8749d0b, the LIN-4448 note 8933968d, the PR body and the change log all give the four `work` kinds and 396064. Nothing more to correct beyond Fix 1's updates.\n\n### Regression check\n`git log -30` on the touched files shows LIN-4468, LIN-4467, LIN-4466, LIN-4458, LIN-4451, LIN-4424 and LIN-4396. LIN-4424's Stability sentence renders byte-identical, and its hash is unchanged. Nothing reverted is re-applied.\n\n### Isolated, or one of a class?\nThe class is guarded tracker-write prose. All of it is now handled: the four mandates, plus triage, survey-task, survey-place and blind-read. I found no remaining \"tickets or Linear/tracker state\", \"post nothing\", \"unless asked\" or \"narrowing\" in `lib/`, `public/llms.txt` or `docs/architecture/` (the other \"narrowing\" hits are unrelated code comments). `stage-kinds.js:534,559` (the Survey completion criteria) are criteria, not instructions. The first review marked them outside, and I leave them there. A second class, the committed-tool clause typed by hand, has one inside instance (Fix 1).\n\n### Area notes (`docs/areas/llm-and-prompts.md`)\n- The Lesson \"check real rows reach a server guard before prompt text bypasses it\" (LIN-4349) is the basis for ledger item 2.\n- The Lesson \"a leaf that imports only leaves\" (LIN-4376) is updated, and the leaf's import is at the module top ✔.\n\n### Fixes for close-out\n1. **`lib/periodicals.js`, `generateSeamsTanglesPrompt`, first runReview bullet:** change \"Find both by searching the repo for them (no path is written here), read how the tool is run\" to \"Find both by searching the repo for them, read how the tool is run\" (main's words). Then:\n   - Re-pin both `seams-tangles` hashes in `tests/unit/lin-4313-periodical-prompt-bytes.test.js:94`.\n   - Update the LIN-4469 change-log row (`scripts/prompt-template-change-log.md:635`). The new figures: 827520 → 825278 (−2242); `seams-tangles` falls −2; the \"Up\" clause goes, and the ruling sentence becomes \"four `work` kinds unchanged; `lin-4469-witness` withdrawn as moot\".\n   - Update the PR body's Measured and DECISION sections to match.\n   - `periodicals.js` is not in a budgeted source ceiling, so `FROZEN_TOTAL_BYTES` is unaffected.\n2. **`tests/unit/prompt-size-budget.test.js:146`:** delete the stray fragment \"(396821 -> 396571), the rest was unused headroom. \" in the `FROZEN_TOTAL_BYTES` comment. It sits after \"…(396821 -> 396559), the rest was unused headroom.\" and matches no figure.\n\n### What CI Did Not Prove\n- **Inside** (the witness sentence). `seams-tangles` rises +24 in real context. **Before the merge:** close-out applies Fix 1 and re-runs a base-vs-head render, as above.\n  - **Right:** every render that carries folded text falls, `seams-tangles` shows −2, and the total is −2242.\n  - **Wrong:** any non-`work` stage kind or Periodical with folded text at ≥0.\n- **Inside** (the mandate shrink depends on the guard actually refusing; LIN-4349 Lesson). CI tests `lib/stage-writes.js` in isolation. It cannot show that live restricted dispatches carry a stamped stage token, and LIN-4468 notes that a missing row mints stage-less, which means unrestricted. **After the deploy:**\n  - Dispatch a look-into: a comment POST with its token must return **403** (`none`).\n  - Dispatch a triage: a description PATCH must return **403** (`ticket-fields`).\n  - The distinguishing precondition: the token was minted from a dispatch whose stage row exists. A 2xx means a guarded clause is gone from the prompt with no backstop.\n  - **Rollback:** revert PR #2447's merge commit, which restores the words. No data shape changes, so it is reversible.\n\n### Verdict\nApprove — conditional on close-out discharging the ledger\n"
+    }
+   },
+   {
+    "id": "run-172",
+    "kind": "run",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:17:24.416Z",
+    "by": "review",
+    "in": "task-131",
+    "state": "done",
+    "ended": {
+     "reason": "Re-reviewed PR #2447 at 05b592742: approve-with-notes; Fixes 1-2 and the before-merge render to close-out"
+    },
     "links": {},
     "fields": {
      "stage": "review",
@@ -5766,6 +5906,42 @@
     "state": "open",
     "by": "review",
     "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:38:23.513Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "change-142@5"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:38:23.551Z",
+   "by": "review",
+   "cmd": "find",
+   "args": {
+    "to": "review",
+    "state": "open",
+    "by": "review",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:38:23.599Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "verdict-173"
+    ]
    },
    "asOf": null
   }
