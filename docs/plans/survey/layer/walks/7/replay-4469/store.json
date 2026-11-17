@@ -1,5 +1,5 @@
 {
- "next": 161,
+ "next": 165,
  "records": {
   "area-1": [
    {
@@ -3271,6 +3271,29 @@
     "fields": {
      "says": "`lib/prompt-template-defs.js` lines 975, 994 and 1065 restate the guarded tracker clause in the read-only templates (survey-task, survey-place, blind-read), and line 268 (triage) does too: \"do not rewrite the task’s description … do not create follow-up tasks or subtasks\" is exactly what `ticket-fields` now refuses (part of that line is a scope rule, \"Triage preserves scope\"). Lower value: `lib/prompts/stage-kinds.js:534,559` (Survey criteria, \"no … ticket or Linear state changed\") are completion criteria, not instructions. All sit outside the four mandates piece 5 names. Recommendation: shrink them to the code, branch and PR words, as the mandates now do (awaits John’s ruling lin-4469-cuts, question-147). If answered \"accept\", they become a Waiting entry in `docs/areas/llm-and-prompts.md`."
     }
+   },
+   {
+    "id": "finding-146",
+    "kind": "finding",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T23:05:06.316Z",
+    "by": "autopilot",
+    "in": "task-131",
+    "to": "task-131",
+    "state": "handed-on",
+    "ended": {
+     "reason": "fold of ~268/975/994/1065 settled by autopilot (triage included) and sent to implementation",
+     "into": "decision-161"
+    },
+    "links": {
+     "about": [
+      "change-142"
+     ]
+    },
+    "fields": {
+     "says": "`lib/prompt-template-defs.js` lines 975, 994 and 1065 restate the guarded tracker clause in the read-only templates (survey-task, survey-place, blind-read), and line 268 (triage) does too: \"do not rewrite the task’s description … do not create follow-up tasks or subtasks\" is exactly what `ticket-fields` now refuses (part of that line is a scope rule, \"Triage preserves scope\"). Lower value: `lib/prompts/stage-kinds.js:534,559` (Survey criteria, \"no … ticket or Linear state changed\") are completion criteria, not instructions. All sit outside the four mandates piece 5 names. Recommendation: shrink them to the code, branch and PR words, as the mandates now do (awaits John’s ruling lin-4469-cuts, question-147). If answered \"accept\", they become a Waiting entry in `docs/areas/llm-and-prompts.md`."
+    }
    }
   ],
   "question-147": [
@@ -3518,6 +3541,27 @@
     "fields": {
      "says": "Fix 1 (retirement-line docs; settle before the merge). PR #2447 claims the retirement line’s restatement in this repo’s docs retired, but edits neither file. In `docs/areas/README.md:72-77` replace \"That line has three forms, spelled in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`): the settled entry’s … why it is larger than a fix.\" with \"Its forms are spelled once, in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`).\" In `docs/architecture/dispatch-and-proxy.md:127` replace the three spelled forms with \"carries exactly one `Retires:` line, in one of the forms `lib/prompts/leftover-words.js` spells\". Keep `docs/proxy-integration.md`’s refusal table (API contract). Then make the Waiting entry true (finding-42): drop it, or keep only the simple-dispatcher half. Check: neither file spells \"no waiting entry\" or \"nothing fix-sized\" any more."
     }
+   },
+   {
+    "id": "finding-153",
+    "kind": "finding",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T23:05:08.316Z",
+    "by": "autopilot",
+    "reason": "autopilot sends review's Fixes 1-5 to the next build step, with the fold (decision-161)",
+    "in": "task-131",
+    "to": "implementation",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-142",
+      "finding-42"
+     ]
+    },
+    "fields": {
+     "says": "Fix 1 (retirement-line docs; settle before the merge). PR #2447 claims the retirement line’s restatement in this repo’s docs retired, but edits neither file. In `docs/areas/README.md:72-77` replace \"That line has three forms, spelled in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`): the settled entry’s … why it is larger than a fix.\" with \"Its forms are spelled once, in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`).\" In `docs/architecture/dispatch-and-proxy.md:127` replace the three spelled forms with \"carries exactly one `Retires:` line, in one of the forms `lib/prompts/leftover-words.js` spells\". Keep `docs/proxy-integration.md`’s refusal table (API contract). Then make the Waiting entry true (finding-42): drop it, or keep only the simple-dispatcher half. Check: neither file spells \"no waiting entry\" or \"nothing fix-sized\" any more."
+    }
    }
   ],
   "finding-154": [
@@ -3530,6 +3574,27 @@
     "by": "review",
     "in": "task-131",
     "to": "close-out",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-142",
+      "question-147"
+     ]
+    },
+    "fields": {
+     "says": "Fix 2: correct the \"eleven unchanged\" figure in the PR’s DECISION 1, the change-log row (if it repeats it) and with a reply on LIN-4350 (comment eeb740b0 repeats it). In real context it is the four `work` kinds; per-writes deltas: none -74, one-comment -23, blind-comment -24, ticket-fields -67."
+    }
+   },
+   {
+    "id": "finding-154",
+    "kind": "finding",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T23:05:09.316Z",
+    "by": "autopilot",
+    "reason": "autopilot sends review's Fixes 1-5 to the next build step, with the fold (decision-161)",
+    "in": "task-131",
+    "to": "implementation",
     "state": "open",
     "links": {
      "about": [
@@ -3562,6 +3627,27 @@
     "fields": {
      "says": "Fix 3: post one line on LIN-4448 recording that the committed-tool clause lives in `lib/periodicals.js` (`committedSearch`), not the leaf `lib/prompts/leftover-words.js`, and why: all four call sites are Periodical bullets. The ask said to record a change of course there."
     }
+   },
+   {
+    "id": "finding-155",
+    "kind": "finding",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T23:05:10.316Z",
+    "by": "autopilot",
+    "reason": "autopilot sends review's Fixes 1-5 to the next build step, with the fold (decision-161)",
+    "in": "task-131",
+    "to": "implementation",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-142",
+      "finding-40"
+     ]
+    },
+    "fields": {
+     "says": "Fix 3: post one line on LIN-4448 recording that the committed-tool clause lives in `lib/periodicals.js` (`committedSearch`), not the leaf `lib/prompts/leftover-words.js`, and why: all four call sites are Periodical bullets. The ask said to record a change of course there."
+    }
    }
   ],
   "finding-156": [
@@ -3583,6 +3669,26 @@
     "fields": {
      "says": "Fix 4: add the old change-coupling spelling `search the repo for a committed change-coupling tool (it reads` to `RETIRED` in `tests/unit/lin-4469-prompt-folds.test.js`. Mutation M3 (restoring it) stays green in the new test; only the lin-4313 hash pin catches it. Check: restoring that spelling turns the new test red."
     }
+   },
+   {
+    "id": "finding-156",
+    "kind": "finding",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T23:05:11.316Z",
+    "by": "autopilot",
+    "reason": "autopilot sends review's Fixes 1-5 to the next build step, with the fold (decision-161)",
+    "in": "task-131",
+    "to": "implementation",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-142"
+     ]
+    },
+    "fields": {
+     "says": "Fix 4: add the old change-coupling spelling `search the repo for a committed change-coupling tool (it reads` to `RETIRED` in `tests/unit/lin-4469-prompt-folds.test.js`. Mutation M3 (restoring it) stays green in the new test; only the lin-4313 hash pin catches it. Check: restoring that spelling turns the new test red."
+    }
    }
   ],
   "finding-157": [
@@ -3595,6 +3701,27 @@
     "by": "review",
     "in": "task-131",
     "to": "close-out",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-142",
+      "lesson-10"
+     ]
+    },
+    "fields": {
+     "says": "Fix 5: move the import in `lib/prompts/leftover-words.js` (mid-file, line 37) to the top of the module, and update the area Lesson’s \"import-free leaf\" to \"a leaf that imports only leaves (`area-registry-path.js`)\": the leaf now imports `area-registry-path.js`, which is itself import-free."
+    }
+   },
+   {
+    "id": "finding-157",
+    "kind": "finding",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T23:05:12.316Z",
+    "by": "autopilot",
+    "reason": "autopilot sends review's Fixes 1-5 to the next build step, with the fold (decision-161)",
+    "in": "task-131",
+    "to": "implementation",
     "state": "open",
     "links": {
      "about": [
@@ -3679,6 +3806,101 @@
      "scope": "task-131",
      "answer": "Ruling lin-4469-cuts answered (John, 13 Nov 23:03:14, via Harbour; LIN-4469 comment 62f57ef4): option `fold`. \"Fold the guarded clause in survey-task, survey-place and blind-read templates too.\"",
      "why": "John chose `fold`, the option review recommended (question-147 v2: back to implementation, re-pinned ceilings, lower FROZEN_TOTAL_BYTES; the four `work` kinds accepted as unable to fall). The comment text is the v1 wording of the option and names only survey-task, survey-place and blind-read (~975/994/1065); the v2 `fold` option also lists triage (~268). The ruling does not say whether triage is left out on purpose."
+    }
+   }
+  ],
+  "decision-161": [
+   {
+    "id": "decision-161",
+    "kind": "decision",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:05:05.316Z",
+    "by": "autopilot",
+    "in": "task-131",
+    "to": "implementation",
+    "state": "stands",
+    "links": {
+     "about": [
+      "finding-146",
+      "change-142",
+      "decision-160",
+      "verdict-152"
+     ]
+    },
+    "fields": {
+     "scope": "task-131",
+     "answer": "Engineering settlement (autopilot, LIN-4469 comment fab0cf08): fold the tracker-write clauses in the four sibling places too: `lib/prompt-template-defs.js` ~975 (survey-task), ~994 (survey-place), ~1065 (blind-read) and ~268 (triage: its scope rule \"Triage preserves scope\" stays, its write clauses go). The code, branch and PR prohibitions stay in words (no backstop), as in the four mandates. Triage is inside.",
+     "why": "Same idiom as the class this ticket bounds (tracker-write prose the guard now refuses); under John's standing rule (LIN-2825, amended by LIN-3006) an item of the same class is inside whether or not the plan listed it. The ask's \"shrink only\" is read as: touch only what the guard backs. Builder and reviewer both recommend it. Settles the triage gap decision-160 left open (its comment named only 975/994/1065). Written as if ruling lin-4469-cuts were still open; John had answered it `fold` 50s earlier (decision-160), so this agrees with the ruling. Next build step: (a) this fold, with ceilings and FROZEN_TOTAL_BYTES re-pinned once more and a lower total; (b) review's Fixes 1-5 (finding-153..157); (c) a `### Leftovers` answer with a `Retires:` line naming an entry the diff removes; (d) the corrected figures (finding-154). Merge waits on the witness ruling (lin-4469-witness)."
+    }
+   }
+  ],
+  "question-162": [
+   {
+    "id": "question-162",
+    "kind": "question",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:05:07.316Z",
+    "by": "autopilot",
+    "in": "task-131",
+    "to": "John",
+    "state": "open",
+    "links": {
+     "about": [
+      "question-147",
+      "decision-160",
+      "decision-140",
+      "change-142"
+     ]
+    },
+    "fields": {
+     "asks": "Ruling lin-4469-witness (raised on LIN-4448, record on LIN-4469): LIN-4469 asks for a net rendered-byte fall across every kind. Four work kinds (blocked, breakdown, close-out, retrospective-audit) carry none of the folded text, so they stay byte-identical in real context; the other kinds fall (none -74: look-into, retro; one-comment -23: context, survey-task, survey-place; blind-comment -24: blind-read; ticket-fields -67: triage). Accept that as meeting the ask?",
+     "options": [
+      "accept: the witness holds for every kind that carries folded text; the four work kinds cannot fall",
+      "require: a fall for all four; fold more text out of those kinds' prompts"
+     ],
+     "recommended": "accept",
+     "if-unanswered": "The cut stays unagreed: the build fixes continue, but PR #2447 does not merge (on answer: resume, record on LIN-4469)"
+    }
+   }
+  ],
+  "finding-163": [
+   {
+    "id": "finding-163",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:05:13.316Z",
+    "by": "autopilot",
+    "in": "task-131",
+    "to": "implementation",
+    "state": "open",
+    "links": {
+     "about": [
+      "check-159",
+      "change-142"
+     ]
+    },
+    "fields": {
+     "says": "Next build step (c): post a builder `### Leftovers` answer on LIN-4469 with a `Retires:` line naming an entry the diff removes (settle before the merge), so the gate-format check (check-159) has something to check."
+    }
+   }
+  ],
+  "run-164": [
+   {
+    "id": "run-164",
+    "kind": "run",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:05:14.316Z",
+    "by": "autopilot",
+    "in": "task-131",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "stage": "autopilot",
+     "account": "# What this stage really wrote\n\nWritten in the autopilot's wake 1df3249b (dispatched 23:04:17.401). The ruling's `raisedAt` is null in the material; the comment below says it was raised by 23:05:04.\n\n## Comment on LIN-4469 at 23:05:04 (id fab0cf08)\n\n### Engineering settlement for LIN-4469, and a corrected ruling (autopilot)\n\nThe review (Needs Discussion) found that the open ruling `lin-4469-cuts` states a wrong fact: it says 11 kinds are byte-identical. Measured in real context (preamble included), only the four `work` kinds (blocked, breakdown, close-out, retrospective-audit) are identical; look-into and retro fall 74, context, survey-task and survey-place 23, blind-read 24, triage 67. The ruling is replaced by a one-question version with the corrected figures (`lin-4469-witness`).\n\n**Settled here (engineering, no ruling needed): fold the tracker-write clauses in the four sibling places.** `lib/prompt-template-defs.js` lines 975 (survey-task), 994 (survey-place), 1065 (blind-read) and 268 (triage; its scope rule stays, its write clauses go). They are the same idiom as the class this ticket bounds, tracker-write prose the guard now refuses, and under John's standing rule (LIN-2825, amended by LIN-3006) an item of the same class is inside whether or not the plan listed it. The ask's \"shrink only\" is read as: touch only what the guard backs. So the code, branch and PR prohibitions stay in words (no backstop), as in the four mandates. Both the builder and the reviewer recommend this.\n\n**For the next build step:** (a) the fold above, with ceilings and `FROZEN_TOTAL_BYTES` re-pinned once more and a lower total; (b) the review's Fixes 1 to 5; (c) a `### Leftovers` answer with a `Retires:` line naming an entry the diff removes; (d) the corrected figures in the PR's decision text, the change-log row and the LIN-4350 comment.\n\n**Still John's:** only the witness sentence, \"a net fall across every kind\", which cannot hold for the four `work` kinds because they carry none of the folded text. Merge waits on that answer.\n\n## Ruling raised on LIN-4448 (lin-4469-witness, to John, on_answer resume, record_on LIN-4469)\n\n```json\n{\n \"decision_id\": \"lin-4469-witness\",\n \"question\": \"LIN-4469 asks for a net rendered-byte fall across every kind. Four work kinds (blocked, breakdown, close-out, retrospective-audit) carry none of the folded text, so they stay byte-identical in real context; the other kinds fall. Accept that as meeting the ask?\",\n \"options\": [\n  {\n   \"id\": \"accept\",\n   \"label\": \"Accept: the witness holds for every kind that carries folded text; the four work kinds cannot fall\"\n  },\n  {\n   \"id\": \"require\",\n   \"label\": \"Require a fall for all four: fold more text out of those kinds' prompts\"\n  }\n ],\n \"recommended\": \"accept\",\n \"free_text\": true,\n \"if_unanswered\": {\n  \"summary\": \"The cut stays unagreed: the build fixes continue, but PR #2447 does not merge\"\n },\n \"on_answer\": {\n  \"effect\": \"resume\",\n  \"record_on\": \"LIN-4469\"\n }\n}\n```\n"
     }
    }
   ]
@@ -4351,6 +4573,30 @@
    "args": {
     "in": "task-131",
     "kind": "question",
+    "by": "autopilot",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:31:36.684Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": {
+    "by": "autopilot",
+    "pos": [
+     "finding-153"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:31:36.724Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": {
+    "in": "task-131",
+    "state": "open",
     "by": "autopilot",
     "pos": []
    },

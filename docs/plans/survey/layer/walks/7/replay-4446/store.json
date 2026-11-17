@@ -1,5 +1,5 @@
 {
- "next": 46,
+ "next": 48,
  "records": {
   "area-1": [
    {
@@ -880,6 +880,47 @@
      ],
      "says": "Implementation plan, LIN-4446 first slice (re-grounded at HEAD 4b5001ddf; no commits since 12:08 on any path below). Fits one session. plan-review due: yes (touches what the server publishes and the cost census; sets the pattern later slices copy).\n\nDone: (1) the reading of 'no build step' (browser may import natively; shared modules are leaf modules, served by allow-list, never by directory; classic views and vm loaders stay until a module-capable client test loader exists) is in CLAUDE.md and as a Lessons entry in docs/areas/front-end-browser.md, with its reason (the copies came from reading the rule as 'no sharing'); (2) lib/cost-format.js is the only formatUsd: public/cost-format.js and tests/unit/cost-format-parity.test.js are gone and the PR names them retired; (3) the PR gives lightening numbers on logic with comments counted apart, and says total lines may not fall (new guards are tests); (4) the builder stops; no second slice before John reads the result.\n\nSteps:\n1. Docs first (as above; Lessons stays under 6144 bytes; check whether a test pins CLAUDE.md text).\n2. Serve: second frozen map SHARED_MODULES in lib/vendor-assets.js ('/shared/cost-format.js' -> lib/cost-format.js), statSync at boot like VENDOR_ASSETS (left untouched: vendor-assets.test.js pins its three URLs); a rootDir option for tests; mount stays just before express.static('public') in server.js.\n3. Shim + emission: public/cost-format-global.js (module; imports formatUsd from /shared/cost-format.js, sets window.CostFormat). lib/components/page.js accepts a scripts entry {module:'/x.js'} -> <script type=module src>; strings stay classic. Replace '/cost-format.js' in all FIVE renderers: render-flight-companion, render-observation, render-swipe, render-task-page, render-workspace-kpis. Regenerate the task-page golden by the repo's path; diff shows only the script tag. The four consumers (flight-companion.js:428, observation.js:3992, prompt-section.js:1506, workspace-kpis.js:134,138) read the global inside functions: unchanged.\n4. Retire public/cost-format.js and the parity test; move the parity file's server-side assertions (input table, unknown never a dollar figure, complete zero is $0.00, all of sumWords) unchanged into tests/unit/cost-format.test.js.\n5. Tests: tests/fixtures/browser-cost-format.js keeps loadCostFormat(sandbox) but sets window.CostFormat from the real lib file; observation-scan-due switches to it; cost-read-census FORMAT_ALLOW drops public/cost-format.js (plus header and message text); lib/cost-format.js header says it is served at /shared/cost-format.js and must stay a leaf; source-map.md lines updated (run the anchor resolver).\n6. Area note Waiting entries: common.js twins; module-capable loader; why observation.js is ~5,000 lines, stating the comment-counting method.\n7. Report and stop.\n\nWitnesses (fail before, pass after): /shared/cost-format.js 200, JS MIME, exact bytes; other /shared/* and /lib/cost-format.js 404; router over empty root throws; purity test on every SHARED_MODULES file (no import, no node:/bare specifier, no top-level window|document|process|require) with a synthetic bad module; each consumer loads in vm with window.CostFormat absent without throwing, then produces the same strings; every lib/ scripts list naming a CostFormat consumer also lists the shim as {module}; renderPage emits module vs classic tags; one Playwright check (cheapest spec carrying the shim) that window.CostFormat.formatUsd(0.004) is '<$0.01' with no console or CSP errors; retirement (files absent, no public/ in FORMAT_ALLOW, census still fails a hand-made $...toFixed). Run the named suites and the full unit run. Completeness check: grep -rIn 'cost-format\\|CostFormat' outside docs/reviews|papers|plans before and after."
     }
+   },
+   {
+    "id": "plan-28",
+    "kind": "plan",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T14:28:32.620Z",
+    "by": "design",
+    "reason": "Revised in answer to verdict-45 (request-changes): finding-36 folded in (workspace-kpis DOMContentLoaded deferral, restated ordering rule, Chart-stub witness); builder notes finding-37..44 folded in; plan-review due moves to no",
+    "in": "task-9",
+    "to": "implementation",
+    "state": "kept",
+    "links": {},
+    "fields": {
+     "order": 1,
+     "paths": [
+      "CLAUDE.md",
+      "docs/areas/front-end-browser.md",
+      "lib/vendor-assets.js",
+      "server.js",
+      "lib/components/page.js",
+      "lib/cost-format.js",
+      "public/cost-format.js",
+      "public/cost-format-global.js",
+      "public/workspace-kpis.js",
+      "public/flight-companion.js",
+      "public/observation.js",
+      "public/prompt-section.js",
+      "lib/render.js",
+      "lib/render-flight-companion.js",
+      "lib/render-observation.js",
+      "lib/render-swipe.js",
+      "lib/render-task-page.js",
+      "lib/render-workspace-kpis.js",
+      "tests/unit/",
+      "tests/fixtures/browser-cost-format.js",
+      "tests/fixtures/render-task-page-golden.json",
+      "docs/architecture/source-map.md"
+     ],
+     "says": "Implementation plan, LIN-4446 first slice, revised after plan-review's Request Changes (verdict-45; HEAD 4b5001ddf still origin/main; git log since 12:08 empty on every path). Fits one session. plan-review due: no (the review found the pattern sound and said ready to build once finding-36 was folded in, which it now is).\n\nDone: (1) the reading of 'no build step' (browser may import natively, with limits) is in CLAUDE.md and docs/areas/front-end-browser.md; (2) lib/cost-format.js is the only formatUsd and the browser runs those bytes; public/cost-format.js and tests/unit/cost-format-parity.test.js are gone and the PR names them retired; (3) the PR gives lightening numbers (34-line browser IIFE vs a few-line shim), comment edits counted apart, and says total lines may rise (new guards are tests); (4) the builder stops; no second slice before John reads the result. Cuts: none (no view rework is John's size ruling, decision-26).\n\nOrdering rule (answers finding-36): no consumer may read window.CostFormat during script execution, including through a callback a library runs synchronously. flight-companion, observation and prompt-section already comply; public/workspace-kpis.js does not (Chart.js constructor runs ticks.callback at load), so its IIFE body runs from a DOMContentLoaded listener (decision-46).\n\nSteps:\n1. Docs first. CLAUDE.md is 110/110 lines, 11,950/12,000 bytes (claude-md-line-budget.test.js): rewrite line 43 'Keep it minimal - no frameworks, no build step' in place to a short reading plus a pointer to the area note; if over, trim elsewhere in the same commit and say what went. Area note Lessons entry (under 6,144 bytes): leaf modules only; served by allow-list, never by directory; classic views and vm loaders stay until a module-capable client test loader exists; never read a shared global during script execution; the copies came from reading the rule as 'no sharing'.\n2. Serve: SHARED_MODULES in lib/vendor-assets.js ('/shared/cost-format.js' -> lib/cost-format.js), statSync at boot, rootDir option; VENDOR_ASSETS unchanged; mount just before express.static('public'); JS MIME.\n3. Shim + emission: public/cost-format-global.js (module, sets window.CostFormat = {formatUsd}); page.js accepts {module:'/x.js'} -> <script type=module src>; replace '/cost-format.js' in SIX renderers: lib/render.js:384, render-flight-companion:400, render-observation:366, render-swipe:149, render-task-page:82 (const SCRIPTS), render-workspace-kpis:226; regenerate the golden with UPDATE_RENDER_TASK_PAGE_GOLDEN=1, diff only the script tag.\n4. Wrap public/workspace-kpis.js IIFE body in DOMContentLoaded (early-return guards inside); header comment says why.\n5. Retire public/cost-format.js and the parity test; move its server-side assertions (input table, unknown never a dollar figure, complete zero is $0.00, all of sumWords) unchanged into tests/unit/cost-format.test.js.\n6. Witnesses below; fixture tests/fixtures/browser-cost-format.js keeps sync loadCostFormat(sandbox) but statically imports formatUsd and assigns sandbox.window.CostFormat; drop COST_FORMAT_SRC; observation-scan-due.test.js:59 switches to loadCostFormat; census FORMAT_ALLOW (line 85), header (14-15) and message drop public/cost-format.js; consumer comments (flight-companion.js:419-426, observation.js:3975-3976,3989, prompt-section.js:1505) point at the shim, drop 'no module graph' reasoning, counted as comment edits; lib/cost-format.js:12 says served at /shared/cost-format.js, must stay a leaf; source-map.md:149 and vendor-assets line (run the anchor resolver).\n7. Area note Waiting entries: (a) public/common.js globals and its client twins (task-page-href, timeline-zoom leaf next slices; ship-layout, prompt-formatters import others); (b) tests/unit/helpers/client-world.js module-capable loader first; (c) public/observation.js ~5,000 lines: method = lines starting *, // or /* gives 1,985 of 4,679 non-blank; the global survey's 1,006 used a different method, not set side by side.\n8. Report and stop.\n\nWitnesses (fail before, pass after): /shared/cost-format.js 200, JS type, exact bytes; unknown /shared/* and /lib/cost-format.js a real 404 through the full server.js app; router over empty rootDir throws; purity on every SHARED_MODULES file with comments stripped (no import, node:/bare specifier, top-level window|document|process|require), synthetic bad module; ordering: workspace-kpis.js in loadWorld with a Chart stub calling each scale's ticks.callback in its constructor, nonzero cost.perDay, CostFormat absent -> no throw; then set it, fireDOMContentLoaded (client-world.js:58), tick labels formatted (fails at load today); other three consumers load with global absent, then same strings; page-has-shim guard parsing scripts: [...] and const SCRIPTS = [...], catches a seventh; renderPage module vs classic tags; retirement (files absent, no public/ in FORMAT_ALLOW, census still rejects a hand-made $...toFixed); one Playwright check, formatUsd(0.004) === '<$0.01', no console/CSP errors, NOT counted for the Chart.js ordering (e2e cost canvas is always the empty note). Run lin-3833-run-control, flight-companion-client, observation-scan-due, cost-read, cost-read-census, vendor-assets, render-pages, claude-md-line-budget, anchor resolver, new tests, full unit run. Completeness: grep -rIn 'cost-format\\|CostFormat' outside docs/reviews|papers|plans, before and after, read every hit."
+    }
    }
   ],
   "decision-29": [
@@ -1135,6 +1176,30 @@
     "fields": {
      "says": "Blocking (plan-review, plan-28 v1): `public/workspace-kpis.js` reads `window.CostFormat` while its script first runs, so the deferred module shim breaks it, and no witness in the plan sees it. Its IIFE calls `charts.draw('cost', …)` at top level; `chart-helpers.js:112` calls `new Chart(canvas, config)` synchronously; Chart.js 4.5.1 calls `this.update()` in the constructor when the canvas is attached (`node_modules/chart.js/dist/chart.js:5696-5698`), which runs the y-axis `ticks.callback` = `window.CostFormat.formatUsd(Number(v))` (`workspace-kpis.js:138`). Script order there is chart → chart-helpers → [shim] → workspace-kpis → common → app; a module runs only after parsing, so any workspace with priced cost gets a TypeError at load and no cost chart. The other three consumers are safe (flight-companion via DOMContentLoaded; observation via `init` on DOMContentLoaded `:4867`; prompt-section after the `panelNumbers` fetch). Missed by: the vm ordering test (`workspace-kpis.js` returns early when `typeof Chart === 'undefined'`) and the Playwright check (`tests/e2e/workspace-kpis.spec.js:133-136`: priced lineages cannot be created via the dispatch API, so the cost canvas is always the empty note). Must change: (1) name `workspace-kpis.js` as the one consumer that changes — run its IIFE body from a `DOMContentLoaded` listener (when it draws, not what; not a view rework); (2) restate the constraint as never read during script execution, including through a callback a library runs synchronously; (3) a real witness: load it in `loadWorld` with a `Chart` stub that calls each scale's `ticks.callback` in its constructor, seed `__WORKSPACE_KPI_DATA__` with nonzero `cost.perDay`, `window.CostFormat` absent — load must not throw; then set the global, `fireDOMContentLoaded` (`tests/unit/helpers/client-world.js`), assert tick labels formatted. Fails at load on today's code. Keep the Playwright check but do not count it as covering this."
     }
+   },
+   {
+    "id": "finding-36",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:28:33.620Z",
+    "by": "design",
+    "in": "task-9",
+    "to": "design",
+    "state": "done",
+    "ended": {
+     "reason": "Folded into plan-28 v2: workspace-kpis.js DOMContentLoaded deferral (decision-46), restated ordering rule, Chart-stub witness; Playwright not counted for it"
+    },
+    "links": {
+     "about": [
+      "plan-28",
+      "check-22",
+      "decision-29"
+     ]
+    },
+    "fields": {
+     "says": "Blocking (plan-review, plan-28 v1): `public/workspace-kpis.js` reads `window.CostFormat` while its script first runs, so the deferred module shim breaks it, and no witness in the plan sees it. Its IIFE calls `charts.draw('cost', …)` at top level; `chart-helpers.js:112` calls `new Chart(canvas, config)` synchronously; Chart.js 4.5.1 calls `this.update()` in the constructor when the canvas is attached (`node_modules/chart.js/dist/chart.js:5696-5698`), which runs the y-axis `ticks.callback` = `window.CostFormat.formatUsd(Number(v))` (`workspace-kpis.js:138`). Script order there is chart → chart-helpers → [shim] → workspace-kpis → common → app; a module runs only after parsing, so any workspace with priced cost gets a TypeError at load and no cost chart. The other three consumers are safe (flight-companion via DOMContentLoaded; observation via `init` on DOMContentLoaded `:4867`; prompt-section after the `panelNumbers` fetch). Missed by: the vm ordering test (`workspace-kpis.js` returns early when `typeof Chart === 'undefined'`) and the Playwright check (`tests/e2e/workspace-kpis.spec.js:133-136`: priced lineages cannot be created via the dispatch API, so the cost canvas is always the empty note). Must change: (1) name `workspace-kpis.js` as the one consumer that changes — run its IIFE body from a `DOMContentLoaded` listener (when it draws, not what; not a view rework); (2) restate the constraint as never read during script execution, including through a callback a library runs synchronously; (3) a real witness: load it in `loadWorld` with a `Chart` stub that calls each scale's `ticks.callback` in its constructor, seed `__WORKSPACE_KPI_DATA__` with nonzero `cost.perDay`, `window.CostFormat` absent — load must not throw; then set the global, `fireDOMContentLoaded` (`tests/unit/helpers/client-world.js`), assert tick labels formatted. Fails at load on today's code. Keep the Playwright check but do not count it as covering this."
+    }
    }
   ],
   "finding-37": [
@@ -1148,6 +1213,30 @@
     "in": "task-9",
     "to": "implementation",
     "state": "open",
+    "links": {
+     "about": [
+      "plan-28",
+      "check-33"
+     ]
+    },
+    "fields": {
+     "says": "Plan-review note for the builder (not blocking): There are six renderers listing `/cost-format.js`, not five: `lib/render.js:384` lists `/cost-format.js` and `/prompt-section.js` (Home, backlog and landing, the busiest page). Add it to step 3's list; the repeat search and page-has-shim guard would flag it, but nobody should have to discover it."
+    }
+   },
+   {
+    "id": "finding-37",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:28:34.620Z",
+    "by": "design",
+    "in": "task-9",
+    "to": "implementation",
+    "state": "handed-on",
+    "ended": {
+     "reason": "Builder note folded into plan-28 v2 by design",
+     "into": "plan-28"
+    },
     "links": {
      "about": [
       "plan-28",
@@ -1179,6 +1268,30 @@
     "fields": {
      "says": "Plan-review note for the builder (not blocking): The page-has-shim guard must read both list shapes: `lib/render-task-page.js:82` declares `const SCRIPTS = [...]`, not `scripts: [...]`. Parse both or the guard misses the task page."
     }
+   },
+   {
+    "id": "finding-38",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:28:35.620Z",
+    "by": "design",
+    "in": "task-9",
+    "to": "implementation",
+    "state": "handed-on",
+    "ended": {
+     "reason": "Builder note folded into plan-28 v2 by design",
+     "into": "plan-28"
+    },
+    "links": {
+     "about": [
+      "plan-28",
+      "check-33"
+     ]
+    },
+    "fields": {
+     "says": "Plan-review note for the builder (not blocking): The page-has-shim guard must read both list shapes: `lib/render-task-page.js:82` declares `const SCRIPTS = [...]`, not `scripts: [...]`. Parse both or the guard misses the task page."
+    }
    }
   ],
   "finding-39": [
@@ -1192,6 +1305,29 @@
     "in": "task-9",
     "to": "implementation",
     "state": "open",
+    "links": {
+     "about": [
+      "plan-28"
+     ]
+    },
+    "fields": {
+     "says": "Plan-review note for the builder (not blocking): CLAUDE.md is full: 110 of 110 lines, 11,950 of 12,000 bytes, enforced by `tests/unit/claude-md-line-budget.test.js`. Step 1's added sentence won't fit: change the existing 'Keep it minimal - no frameworks, no build step' line in place to a short reading plus a pointer to `docs/areas/front-end-browser.md`, and put the limits in the area note's Lessons. If that still goes over, trim elsewhere in the same commit and say what was cut."
+    }
+   },
+   {
+    "id": "finding-39",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:28:36.620Z",
+    "by": "design",
+    "in": "task-9",
+    "to": "implementation",
+    "state": "handed-on",
+    "ended": {
+     "reason": "Builder note folded into plan-28 v2 by design",
+     "into": "plan-28"
+    },
     "links": {
      "about": [
       "plan-28"
@@ -1222,6 +1358,30 @@
     "fields": {
      "says": "Plan-review note for the builder (not blocking): Consumer comments go stale though the plan says 'no change to them': `public/flight-companion.js:419-426` ('restated here rather than imported … no module graph to lib/', names `public/cost-format.js`), `public/observation.js:3975-3976, 3989` (same), `public/prompt-section.js:1505` (names `public/cost-format.js`). Point them at the shim and drop the 'no module graph' reasoning where it misleads. Count these edits as comments, not removed logic."
     }
+   },
+   {
+    "id": "finding-40",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:28:37.620Z",
+    "by": "design",
+    "in": "task-9",
+    "to": "implementation",
+    "state": "handed-on",
+    "ended": {
+     "reason": "Builder note folded into plan-28 v2 by design",
+     "into": "plan-28"
+    },
+    "links": {
+     "about": [
+      "plan-28",
+      "check-13"
+     ]
+    },
+    "fields": {
+     "says": "Plan-review note for the builder (not blocking): Consumer comments go stale though the plan says 'no change to them': `public/flight-companion.js:419-426` ('restated here rather than imported … no module graph to lib/', names `public/cost-format.js`), `public/observation.js:3975-3976, 3989` (same), `public/prompt-section.js:1505` (names `public/cost-format.js`). Point them at the shim and drop the 'no module graph' reasoning where it misleads. Count these edits as comments, not removed logic."
+    }
    }
   ],
   "finding-41": [
@@ -1235,6 +1395,29 @@
     "in": "task-9",
     "to": "implementation",
     "state": "open",
+    "links": {
+     "about": [
+      "plan-28"
+     ]
+    },
+    "fields": {
+     "says": "Plan-review note for the builder (not blocking): The purity guard must not trip on comments: the new `lib/cost-format.js` header will mention the browser. Look for top-level `window|document|process|require` in code, not comment text; prove it with the synthetic bad module."
+    }
+   },
+   {
+    "id": "finding-41",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:28:38.620Z",
+    "by": "design",
+    "in": "task-9",
+    "to": "implementation",
+    "state": "handed-on",
+    "ended": {
+     "reason": "Builder note folded into plan-28 v2 by design",
+     "into": "plan-28"
+    },
     "links": {
      "about": [
       "plan-28"
@@ -1264,6 +1447,29 @@
     "fields": {
      "says": "Plan-review note for the builder (not blocking): 404 for other `/shared/` paths: unknown `/shared/*` and `/lib/cost-format.js` fall through to `express.static('public')` and then the app's routes. Assert a real 404 through the full `server.js` app, not just the bare router, so a catch-all can't turn it into a 200 HTML page."
     }
+   },
+   {
+    "id": "finding-42",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:28:39.620Z",
+    "by": "design",
+    "in": "task-9",
+    "to": "implementation",
+    "state": "handed-on",
+    "ended": {
+     "reason": "Builder note folded into plan-28 v2 by design",
+     "into": "plan-28"
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ]
+    },
+    "fields": {
+     "says": "Plan-review note for the builder (not blocking): 404 for other `/shared/` paths: unknown `/shared/*` and `/lib/cost-format.js` fall through to `express.static('public')` and then the app's routes. Assert a real 404 through the full `server.js` app, not just the bare router, so a catch-all can't turn it into a 200 HTML page."
+    }
    }
   ],
   "finding-43": [
@@ -1285,6 +1491,29 @@
     "fields": {
      "says": "Plan-review note for the builder (not blocking): The fixture works across vm contexts: `loadCostFormat(sandbox)` can stay synchronous — import `formatUsd` statically at the top of `tests/fixtures/browser-cost-format.js` and assign `sandbox.window.CostFormat = { formatUsd }` (plain strings out, safe to share). `COST_FORMAT_SRC` has no other importers, so it can go."
     }
+   },
+   {
+    "id": "finding-43",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:28:40.620Z",
+    "by": "design",
+    "in": "task-9",
+    "to": "implementation",
+    "state": "handed-on",
+    "ended": {
+     "reason": "Builder note folded into plan-28 v2 by design",
+     "into": "plan-28"
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ]
+    },
+    "fields": {
+     "says": "Plan-review note for the builder (not blocking): The fixture works across vm contexts: `loadCostFormat(sandbox)` can stay synchronous — import `formatUsd` statically at the top of `tests/fixtures/browser-cost-format.js` and assign `sandbox.window.CostFormat = { formatUsd }` (plain strings out, safe to share). `COST_FORMAT_SRC` has no other importers, so it can go."
+    }
    }
   ],
   "finding-44": [
@@ -1298,6 +1527,30 @@
     "in": "task-9",
     "to": "implementation",
     "state": "open",
+    "links": {
+     "about": [
+      "plan-28",
+      "check-13"
+     ]
+    },
+    "fields": {
+     "says": "Plan-review note for the builder (not blocking): `public/observation.js` comment counts in the Waiting entry: keep the plan's stated method (lines starting `*`, `//` or `/*`, out of non-blank lines) and say the other survey's 1,006 used a different method, rather than setting the two figures side by side."
+    }
+   },
+   {
+    "id": "finding-44",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:28:41.620Z",
+    "by": "design",
+    "in": "task-9",
+    "to": "implementation",
+    "state": "handed-on",
+    "ended": {
+     "reason": "Builder note folded into plan-28 v2 by design",
+     "into": "plan-28"
+    },
     "links": {
      "about": [
       "plan-28",
@@ -1332,6 +1585,66 @@
      "of": "plan-review",
      "outcome": "request-changes",
      "reasoning": "Judges plan-28 v1, reviewed at HEAD 4b5001ddf (still origin/main). The plan meets what was asked: the rule's reading into the notes (step 1), one shared formatter retiring public/cost-format.js and its parity test, every change names what it retires, a stop for John (step 7); the only narrowing (no view reworked) is John's size ruling (decision-26), not the plan's. Sound: the SHARED_MODULES allow-list with statSync at boot, mounted just before express.static('public'); CSP script-src 'self' plus hashes admits a same-origin module (CSP and nosniff only on HTML); lib/cost-format.js has no imports (leaf); renderPage emits <script src> per string (lib/components/page.js:204) and the scripts.includes('/common.js') check is unaffected by object entries; the golden updates with UPDATE_RENDER_TASK_PAGE_GOLDEN=1; area Lessons ~700 bytes; moving the parity file's server-side assertions is right. One blocking finding (finding-36): workspace-kpis.js reads the formatter at load through Chart.js's synchronous ticks.callback. Once that is folded in (deferral, restated constraint, Chart-stub witness) the plan is ready to build; the eight non-blocking notes (finding-37..44) go to the builder and can be handled during the build."
+    }
+   }
+  ],
+  "decision-46": [
+   {
+    "id": "decision-46",
+    "kind": "decision",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:28:31.620Z",
+    "by": "design",
+    "in": "task-9",
+    "state": "stands",
+    "links": {
+     "about": [
+      "finding-36",
+      "plan-28",
+      "check-22",
+      "decision-29"
+     ]
+    },
+    "fields": {
+     "scope": "task-9",
+     "answer": "public/workspace-kpis.js runs its IIFE body from a DOMContentLoaded listener, so its Chart.js ticks.callback reads window.CostFormat only after the deferred module shim has run. It changes when the page draws, not what; not a view rework. The ordering rule becomes: no consumer reads window.CostFormat during script execution, including through a callback a library runs synchronously.",
+     "why": "Engineering choice settled by design, answering plan-review finding-36 (verified in source: charts.draw at the top of the IIFE, chart-helpers draw does new Chart synchronously, ticks.callback at workspace-kpis.js:138). Fix at the cause. Set aside: callbacks tolerating an absent formatter (wrong ticks, silently); making the shim a classic script (impossible: the import is the point)."
+    }
+   }
+  ],
+  "run-47": [
+   {
+    "id": "run-47",
+    "kind": "run",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:28:42.620Z",
+    "by": "design",
+    "in": "task-9",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "stage": "design",
+     "account": "# What this stage really wrote\n\n## LIN-4446 description's `## Implementation Plan` section, rewritten by 14:31 (snapshot of 14:31:22; it replaces the whole section of step 4, everything above it unchanged)\n\n## Implementation Plan\n\n**Plan status.** Revised after the Plan Review Verdict (Request Changes, 1 blocking finding, 8 builder notes) at HEAD `4b5001ddf`, which is still `origin/main`. Re-grounded: `git log --since=2026-11-13T12:08:10Z` over every path named below is empty. I re-read the review's blocking claim in the source: `public/workspace-kpis.js` calls `charts.draw('cost', …)` at the top of its IIFE, `public/chart-helpers.js` `draw` does `new Chart(canvas, …)` synchronously, and the y-axis `ticks.callback` is `window.CostFormat.formatUsd(Number(v))` (`public/workspace-kpis.js:138`). The finding is correct. Area notes read: `docs/areas/README.md`, `docs/areas/front-end-browser.md` (2,734 bytes in all; Lessons well under the 6,144 cap).\n\n### What this is for, and what done looks like\n\nThe ask: browser code that shares rather than restates, no build step, taken in small slices, the reading of the rule written into the project's notes, then a pause for John. John ruled the size: just the task, one cost formatter shared, no cuts (the size record above). Done is the ticket's Done-when:\n\n1. The reading of \"no build step\" (the browser may import natively, with its limits) is in `CLAUDE.md` and `docs/areas/front-end-browser.md`.\n2. `lib/cost-format.js` is the only implementation of `formatUsd`; the browser runs those same bytes. `public/cost-format.js` and `tests/unit/cost-format-parity.test.js` are gone and the PR names them as retired.\n3. The PR says in numbers what got lighter (the 34-line browser IIFE replaced by a shim of a few lines), counts comment edits apart from logic, and says plainly that total repo lines may rise because the new guards are tests.\n4. The builder then **stops**. No second slice starts before John has read the result.\n\nCuts to the `## As asked` block: **none**. Reworking a view \"after finding out why it got so large\" is not delivered here; that is John's size ruling (this slice touches no view's structure), not a cut by this plan. It goes to the area note as Waiting.\n\n### Which way, and why\n\n* **Serve the shared module through the existing allow-list**: in `lib/vendor-assets.js`, a second frozen map `SHARED_MODULES` (URL → repo file; first entry `/shared/cost-format.js` → `lib/cost-format.js`), validated with `statSync` at boot, with a `rootDir` option beside `nodeModulesDir` so a test can point it at an empty directory. The router factory may be shared; `VENDOR_ASSETS` stays a separate, unchanged map because `tests/unit/vendor-assets.test.js` pins exactly its three URLs. The mount stays immediately before `express.static('public')`. Set aside: a second `express.static('lib')` (publishes all server source); moving the file into `public/` (server renderers would import from the web root).\n* **Bridge to classic scripts with a deferred module shim**, `public/cost-format-global.js`: imports `formatUsd` from `/shared/cost-format.js`, sets `window.CostFormat = { formatUsd }`. No view becomes a module; `common.js` and the `vm` loaders are untouched. Set aside: converting a consumer to a module (needs a module-capable client test loader, its own slice); keeping `public/cost-format.js` as a wrapper (a file whose name claims to be the formatter).\n* `lib/components/page.js` learns one thing: a `scripts` entry may be `{ module: '/x.js' }`, emitted as `<script type=\"module\" src>`; strings stay classic. Explicit beats sniffing a filename. The shim takes the place of `/cost-format.js` in each list.\n* **The ordering rule, restated (this answers the blocking finding):** a module shim runs after parsing, so **no consumer may read** `window.CostFormat` **during script execution, including through a callback a library runs synchronously.** Three consumers satisfy this as they are (`public/flight-companion.js` reaches the formatter from its `DOMContentLoaded` handler; `public/observation.js` from `init` on `DOMContentLoaded`; `public/prompt-section.js` after a fetch). `public/workspace-kpis.js` does not: Chart.js's constructor lays out the scales and calls `ticks.callback` while the script first runs. **Fix at the cause:** run that file's IIFE body from a `DOMContentLoaded` listener (module scripts run before it). This changes when the page draws, not what it draws, and is not a view rework. Set aside: making the callbacks tolerate an absent formatter (would draw wrong ticks, silently), and making the shim a classic script (impossible: the import is the point).\n* **Retirement is integral:** the restated formatter and its parity test go in the same PR as the sharing (the failed-consolidation pattern in `docs/papers/harbour/the-second-copy.md` §9–10).\n* Shared modules are **leaves**: no imports, no Node built-ins, no DOM at load.\n\n### Where the behaviour lives (every place, in scope)\n\n\"The browser has its own formatUsd, and pages load it as `/cost-format.js`\" lives here. How I know I have them all: `grep -rIn \"cost-format\\|CostFormat\" . --exclude-dir=node_modules --exclude-dir=.git`, ignoring dated records under `docs/reviews|papers|plans`; run again after building and read every hit. Checked at HEAD, the list below is every hit.\n\n* **Six renderers list** `/cost-format.js` (the brief named two): `lib/render.js:384`, `lib/render-flight-companion.js:400`, `lib/render-observation.js:366`, `lib/render-swipe.js:149`, `lib/render-task-page.js:82` (declared as `const SCRIPTS`, not `scripts: [...]`), `lib/render-workspace-kpis.js:226`. All six get the shim entry.\n* **Consumers of** `window.CostFormat`**:** `public/flight-companion.js:428`, `public/observation.js:3992`, `public/prompt-section.js:1506`, `public/workspace-kpis.js:134,138`. Only `workspace-kpis.js` changes in behaviour (above). The other three change **comments only**: `flight-companion.js:419-426` and `observation.js:3975-3976,3989` say \"restated here / no module graph to lib/\" and name `public/cost-format.js`; `prompt-section.js:1505` names it. Point them at the shim and drop the misleading reasoning; count these as comment edits.\n* **Golden:** `tests/fixtures/render-task-page-golden.json` embeds the script tags. Regenerate with `UPDATE_RENDER_TASK_PAGE_GOLDEN=1`; read the diff, which must be only the script-tag change.\n* **Test seams:** `tests/fixtures/browser-cost-format.js` keeps `loadCostFormat(sandbox)` (synchronous) but statically imports `formatUsd` from `lib/cost-format.js` and assigns `sandbox.window.CostFormat = { formatUsd }` (plain strings cross the vm boundary safely); drop `COST_FORMAT_SRC` (no other importer). `lin-3833-run-control` and `flight-companion-client` then need no change. `tests/unit/observation-scan-due.test.js:59` lists `'cost-format.js'` in `loadWorld` scripts: switch to `loadCostFormat`. `tests/unit/cost-read.test.js` imports only the lib file: confirm it needs nothing.\n* **Census:** `tests/unit/cost-read-census.test.js` `FORMAT_ALLOW` (line 85), its header (lines 14-15) and the failure-message text name `public/cost-format.js`; remove them. Nothing fails on a stale extra entry, so check by eye.\n* **Comments and docs naming the twin:** `lib/cost-format.js:12` (\"The browser twin is…\") becomes one line saying it is also served at `/shared/cost-format.js` and so must stay a leaf; `docs/architecture/source-map.md:149` and its `lib/vendor-assets.js` line gain the shared route (run `tests/unit/docs-architecture-anchor-resolver.test.js`).\n* **Not places:** `tests/unit/cost-format-parity.test.js`'s server-side assertions are not restating (step 5).\n* **Cannot be found by reading the code:** a page added later that reads `window.CostFormat`. The page-has-shim guard below catches it.\n\n### Steps, in order\n\n1. **Docs first.** `CLAUDE.md` is at 110/110 lines and 11,950/12,000 bytes (`tests/unit/claude-md-line-budget.test.js`). Rewrite line 43, \"Keep it minimal - no frameworks, no build step\", in place to a short reading (the browser may import natively; shared modules are leaves served by allow-list) plus a pointer to `docs/areas/front-end-browser.md` for the limits. If it goes over 12,000 bytes, trim elsewhere in the same commit and say in the PR which text went. Put the limits and the reason in a new Lessons entry in the area note: leaf modules only; served by allow-list, never by directory; classic-script views and `vm` loaders stay until a module-capable client test loader exists; consumers never read a shared global during script execution; the copies came from reading the rule as \"no sharing\". Keep Lessons under 6,144 bytes.\n2. **Serve it.** `SHARED_MODULES`, `rootDir`, mount (see Which way). The route sends `.js` with a JavaScript MIME type; the test asserts it.\n3. **Shim and page emission.** `public/cost-format-global.js`; `page.js` module entries; the six renderer lists; the golden.\n4. **Fix workspace-KPI initialization.** Wrap the IIFE body of `public/workspace-kpis.js` so it runs on `DOMContentLoaded`; keep its early-return guards inside. Update its header comment to say why.\n5. **Retire.** Delete `public/cost-format.js` and `tests/unit/cost-format-parity.test.js`. Move the parity file's server-side half unchanged (input table, \"unknown never a dollar figure\", \"complete zero is $0.00\", all of `sumWords`) into `tests/unit/cost-format.test.js`; drop only the comparison against the browser copy. Deleting those would loosen a guard.\n6. **Tests that make the new shape safe** (witnesses below), then the fixture, census and `observation-scan-due` updates, the consumer comment edits, and the doc/comment updates above.\n7. **Area note Waiting entries** (each starts with a `public/`, `lib/` or `tests/` path, no line numbers): (a) `public/common.js`: the globals it exports and its self-declared \"client twins\" of `lib/task-page-href.js`, `lib/timeline-zoom.js`, `lib/ship-layout.js`, `lib/prompt-formatters.js` (the first two are leaf, same-shape next slices; the last two import other modules, so single-file serving will not do); (b) `tests/unit/helpers/client-world.js`: a module-capable client-test loader is needed before any view becomes a module (cite `lib/components/page.js`'s classic emission); (c) `public/observation.js`: find out why it is about 5,000 lines. State the counting method: lines starting with `*`, `//` or `/*`, which gives 1,985 comment lines among 4,679 non-blank lines (I reproduced this). Say the global survey's 1,006 used a different method; do not set the two figures side by side. Existing keepalive `statusCode` and `buildDispatchModelOptionDescriptors` entries stay untouched.\n8. **Report and stop.** The PR names the retirements (files and line counts), reports the 34-line IIFE against the shim, counts comment edits separately, says total lines may rise, notes any CLAUDE.md text trimmed, and says the next slice waits for John.\n\n### Witnesses (each fails before, passes after)\n\n* **Shape served:** `/shared/cost-format.js` returns 200, a JavaScript content type and exactly the bytes of `lib/cost-format.js`. Unknown `/shared/*` and `/lib/cost-format.js` return a real 404 **through the full** `server.js` **app**, not just the router, so a catch-all cannot turn them into a 200 HTML page. Fails before: route absent.\n* **Boot fails on a missing file:** a router built with `rootDir` over an empty directory throws.\n* **Purity (tries what the guard is for):** every file in `SHARED_MODULES` has no `import`, no `node:` or bare-specifier reference, and no top-level `window|document|process|require`, checked against code with comments stripped, not comment text (the new header mentions the browser). A synthetic bad module must be named, as `cost-read-census.test.js` does for its rules.\n* **Ordering, the real one (fails at load today):** load `public/workspace-kpis.js` in `loadWorld` with `window.CostFormat` absent, `window.__WORKSPACE_KPI_DATA__` seeded with nonzero `cost.perDay`, and a `Chart` stub whose constructor synchronously calls each scale's `ticks.callback` (as Chart.js does). Loading must not throw. Then install the formatter, call `fireDOMContentLoaded` (`tests/unit/helpers/client-world.js:58`) and assert the tick labels are formatted. Note the file returns early when `typeof Chart === 'undefined'`, so a test without the stub proves nothing. The three other consumers get the lighter version: load with the global absent, no throw, then set it and run the cost path for the same strings as before.\n* **Every page that needs the shim has it:** for each `public/*.js` that mentions `window.CostFormat`, every `lib/` file whose script list names it must also list the shim as `{ module: … }`. The parser handles both `scripts: [...]` and `const SCRIPTS = [...]`. It catches today's six and a seventh added later.\n* **Page emission:** `renderPage` emits `<script type=\"module\" src>` for a module entry and `<script src>` for a string; the task-page golden shows it.\n* **Retirement:** `public/cost-format.js` and the parity test are absent; `FORMAT_ALLOW` has no `public/` entry; the census cases still reject a hand-made `$…toFixed` in a synthetic new `public/` file.\n* **Real browser (a** `vm` **cannot prove module order, MIME or CSP):** one Playwright check on the cheapest existing spec whose page carries the shim, asserting `window.CostFormat.formatUsd(0.004)` is `<$0.01` with no console errors and no CSP violations (`lib/security-headers.js` `script-src 'self'` should admit a same-origin module; this confirms it). **It does not cover the Chart.js ordering fix:** `tests/e2e/workspace-kpis.spec.js:133-136` says priced lineages cannot be created through the app's API, so the cost canvas is always swapped for the empty note. The unit test above is the witness for that.\n* Run `lin-3833-run-control`, `flight-companion-client`, `observation-scan-due`, `cost-read`, `cost-read-census`, `vendor-assets`, `render-pages`, `claude-md-line-budget`, the docs anchor resolver, the new tests, and the full unit run.\n\n### Likeliest ways this breaks\n\n1. **A page without the shim, or a read of the global during script execution.** Works until the first cost, then throws. Covered by the page-has-shim guard and the ordering tests (the Chart-stub test for the one known case).\n2. **The module script is refused or never runs** (MIME, CSP, import URL off the allow-list), so `window.CostFormat` never exists and nothing is loud until a cost is drawn. Covered by the MIME/404 tests and the real-browser check.\n3. **A silent loosening or stale guard:** the parity file's server-side assertions dropped; the golden, `FORMAT_ALLOW` or `CLAUDE.md` budget going stale or over. Covered by step 5's move, the retirement witness, the golden diff read and the budget test.\n\n### Session fit and review\n\n`fits one session`: one shared piece, a handful of files, one wrapped initializer and one real-browser check; I can name nothing one session would lose track of.\nplan-review due: no\nReason: the plan was already reviewed once; that review found the pattern (allow-list serving, purity rule, shim) sound and said the plan is ready to build once the workspace-KPI deferral, the restated ordering rule and the Chart-stub witness were folded in, which they now are.\n\n### Revision note\n\nRevised in answer to the Plan Review Verdict (Request Changes). Finding 1 (blocking, `workspace-kpis.js` reads the formatter during load): agreed, verified in source; fixed by the `DOMContentLoaded` deferral (step 4), the restated ordering rule, and the Chart-stub witness; the Playwright check is explicitly not counted as covering it. Builder notes: 1 (sixth renderer `lib/render.js`) in the list and step 3; 2 (`const SCRIPTS`) in the guard; 3 (CLAUDE.md budget) in step 1, edit in place with limits in the area note; 4 (stale consumer comments) in the places list, counted as comments; 5 (purity guard ignores comments) in the purity witness; 6 (404 through the full app) in the shape witness; 7 (fixture imports statically) in test seams; 8 (observation counting method) in step 7. The review's other points (serving boundary, CSP, moving not deleting the parity assertions) are accepted as written. The `plan-review due` line moves from yes to no for the reason given.\n"
+    }
+   },
+   {
+    "id": "run-47",
+    "kind": "run",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:28:43.620Z",
+    "by": "design",
+    "in": "task-9",
+    "state": "done",
+    "ended": {
+     "reason": "Plan revised (plan-28 v2) in answer to verdict-45"
+    },
+    "links": {},
+    "fields": {
+     "stage": "design",
+     "account": "# What this stage really wrote\n\n## LIN-4446 description's `## Implementation Plan` section, rewritten by 14:31 (snapshot of 14:31:22; it replaces the whole section of step 4, everything above it unchanged)\n\n## Implementation Plan\n\n**Plan status.** Revised after the Plan Review Verdict (Request Changes, 1 blocking finding, 8 builder notes) at HEAD `4b5001ddf`, which is still `origin/main`. Re-grounded: `git log --since=2026-11-13T12:08:10Z` over every path named below is empty. I re-read the review's blocking claim in the source: `public/workspace-kpis.js` calls `charts.draw('cost', …)` at the top of its IIFE, `public/chart-helpers.js` `draw` does `new Chart(canvas, …)` synchronously, and the y-axis `ticks.callback` is `window.CostFormat.formatUsd(Number(v))` (`public/workspace-kpis.js:138`). The finding is correct. Area notes read: `docs/areas/README.md`, `docs/areas/front-end-browser.md` (2,734 bytes in all; Lessons well under the 6,144 cap).\n\n### What this is for, and what done looks like\n\nThe ask: browser code that shares rather than restates, no build step, taken in small slices, the reading of the rule written into the project's notes, then a pause for John. John ruled the size: just the task, one cost formatter shared, no cuts (the size record above). Done is the ticket's Done-when:\n\n1. The reading of \"no build step\" (the browser may import natively, with its limits) is in `CLAUDE.md` and `docs/areas/front-end-browser.md`.\n2. `lib/cost-format.js` is the only implementation of `formatUsd`; the browser runs those same bytes. `public/cost-format.js` and `tests/unit/cost-format-parity.test.js` are gone and the PR names them as retired.\n3. The PR says in numbers what got lighter (the 34-line browser IIFE replaced by a shim of a few lines), counts comment edits apart from logic, and says plainly that total repo lines may rise because the new guards are tests.\n4. The builder then **stops**. No second slice starts before John has read the result.\n\nCuts to the `## As asked` block: **none**. Reworking a view \"after finding out why it got so large\" is not delivered here; that is John's size ruling (this slice touches no view's structure), not a cut by this plan. It goes to the area note as Waiting.\n\n### Which way, and why\n\n* **Serve the shared module through the existing allow-list**: in `lib/vendor-assets.js`, a second frozen map `SHARED_MODULES` (URL → repo file; first entry `/shared/cost-format.js` → `lib/cost-format.js`), validated with `statSync` at boot, with a `rootDir` option beside `nodeModulesDir` so a test can point it at an empty directory. The router factory may be shared; `VENDOR_ASSETS` stays a separate, unchanged map because `tests/unit/vendor-assets.test.js` pins exactly its three URLs. The mount stays immediately before `express.static('public')`. Set aside: a second `express.static('lib')` (publishes all server source); moving the file into `public/` (server renderers would import from the web root).\n* **Bridge to classic scripts with a deferred module shim**, `public/cost-format-global.js`: imports `formatUsd` from `/shared/cost-format.js`, sets `window.CostFormat = { formatUsd }`. No view becomes a module; `common.js` and the `vm` loaders are untouched. Set aside: converting a consumer to a module (needs a module-capable client test loader, its own slice); keeping `public/cost-format.js` as a wrapper (a file whose name claims to be the formatter).\n* `lib/components/page.js` learns one thing: a `scripts` entry may be `{ module: '/x.js' }`, emitted as `<script type=\"module\" src>`; strings stay classic. Explicit beats sniffing a filename. The shim takes the place of `/cost-format.js` in each list.\n* **The ordering rule, restated (this answers the blocking finding):** a module shim runs after parsing, so **no consumer may read** `window.CostFormat` **during script execution, including through a callback a library runs synchronously.** Three consumers satisfy this as they are (`public/flight-companion.js` reaches the formatter from its `DOMContentLoaded` handler; `public/observation.js` from `init` on `DOMContentLoaded`; `public/prompt-section.js` after a fetch). `public/workspace-kpis.js` does not: Chart.js's constructor lays out the scales and calls `ticks.callback` while the script first runs. **Fix at the cause:** run that file's IIFE body from a `DOMContentLoaded` listener (module scripts run before it). This changes when the page draws, not what it draws, and is not a view rework. Set aside: making the callbacks tolerate an absent formatter (would draw wrong ticks, silently), and making the shim a classic script (impossible: the import is the point).\n* **Retirement is integral:** the restated formatter and its parity test go in the same PR as the sharing (the failed-consolidation pattern in `docs/papers/harbour/the-second-copy.md` §9–10).\n* Shared modules are **leaves**: no imports, no Node built-ins, no DOM at load.\n\n### Where the behaviour lives (every place, in scope)\n\n\"The browser has its own formatUsd, and pages load it as `/cost-format.js`\" lives here. How I know I have them all: `grep -rIn \"cost-format\\|CostFormat\" . --exclude-dir=node_modules --exclude-dir=.git`, ignoring dated records under `docs/reviews|papers|plans`; run again after building and read every hit. Checked at HEAD, the list below is every hit.\n\n* **Six renderers list** `/cost-format.js` (the brief named two): `lib/render.js:384`, `lib/render-flight-companion.js:400`, `lib/render-observation.js:366`, `lib/render-swipe.js:149`, `lib/render-task-page.js:82` (declared as `const SCRIPTS`, not `scripts: [...]`), `lib/render-workspace-kpis.js:226`. All six get the shim entry.\n* **Consumers of** `window.CostFormat`**:** `public/flight-companion.js:428`, `public/observation.js:3992`, `public/prompt-section.js:1506`, `public/workspace-kpis.js:134,138`. Only `workspace-kpis.js` changes in behaviour (above). The other three change **comments only**: `flight-companion.js:419-426` and `observation.js:3975-3976,3989` say \"restated here / no module graph to lib/\" and name `public/cost-format.js`; `prompt-section.js:1505` names it. Point them at the shim and drop the misleading reasoning; count these as comment edits.\n* **Golden:** `tests/fixtures/render-task-page-golden.json` embeds the script tags. Regenerate with `UPDATE_RENDER_TASK_PAGE_GOLDEN=1`; read the diff, which must be only the script-tag change.\n* **Test seams:** `tests/fixtures/browser-cost-format.js` keeps `loadCostFormat(sandbox)` (synchronous) but statically imports `formatUsd` from `lib/cost-format.js` and assigns `sandbox.window.CostFormat = { formatUsd }` (plain strings cross the vm boundary safely); drop `COST_FORMAT_SRC` (no other importer). `lin-3833-run-control` and `flight-companion-client` then need no change. `tests/unit/observation-scan-due.test.js:59` lists `'cost-format.js'` in `loadWorld` scripts: switch to `loadCostFormat`. `tests/unit/cost-read.test.js` imports only the lib file: confirm it needs nothing.\n* **Census:** `tests/unit/cost-read-census.test.js` `FORMAT_ALLOW` (line 85), its header (lines 14-15) and the failure-message text name `public/cost-format.js`; remove them. Nothing fails on a stale extra entry, so check by eye.\n* **Comments and docs naming the twin:** `lib/cost-format.js:12` (\"The browser twin is…\") becomes one line saying it is also served at `/shared/cost-format.js` and so must stay a leaf; `docs/architecture/source-map.md:149` and its `lib/vendor-assets.js` line gain the shared route (run `tests/unit/docs-architecture-anchor-resolver.test.js`).\n* **Not places:** `tests/unit/cost-format-parity.test.js`'s server-side assertions are not restating (step 5).\n* **Cannot be found by reading the code:** a page added later that reads `window.CostFormat`. The page-has-shim guard below catches it.\n\n### Steps, in order\n\n1. **Docs first.** `CLAUDE.md` is at 110/110 lines and 11,950/12,000 bytes (`tests/unit/claude-md-line-budget.test.js`). Rewrite line 43, \"Keep it minimal - no frameworks, no build step\", in place to a short reading (the browser may import natively; shared modules are leaves served by allow-list) plus a pointer to `docs/areas/front-end-browser.md` for the limits. If it goes over 12,000 bytes, trim elsewhere in the same commit and say in the PR which text went. Put the limits and the reason in a new Lessons entry in the area note: leaf modules only; served by allow-list, never by directory; classic-script views and `vm` loaders stay until a module-capable client test loader exists; consumers never read a shared global during script execution; the copies came from reading the rule as \"no sharing\". Keep Lessons under 6,144 bytes.\n2. **Serve it.** `SHARED_MODULES`, `rootDir`, mount (see Which way). The route sends `.js` with a JavaScript MIME type; the test asserts it.\n3. **Shim and page emission.** `public/cost-format-global.js`; `page.js` module entries; the six renderer lists; the golden.\n4. **Fix workspace-KPI initialization.** Wrap the IIFE body of `public/workspace-kpis.js` so it runs on `DOMContentLoaded`; keep its early-return guards inside. Update its header comment to say why.\n5. **Retire.** Delete `public/cost-format.js` and `tests/unit/cost-format-parity.test.js`. Move the parity file's server-side half unchanged (input table, \"unknown never a dollar figure\", \"complete zero is $0.00\", all of `sumWords`) into `tests/unit/cost-format.test.js`; drop only the comparison against the browser copy. Deleting those would loosen a guard.\n6. **Tests that make the new shape safe** (witnesses below), then the fixture, census and `observation-scan-due` updates, the consumer comment edits, and the doc/comment updates above.\n7. **Area note Waiting entries** (each starts with a `public/`, `lib/` or `tests/` path, no line numbers): (a) `public/common.js`: the globals it exports and its self-declared \"client twins\" of `lib/task-page-href.js`, `lib/timeline-zoom.js`, `lib/ship-layout.js`, `lib/prompt-formatters.js` (the first two are leaf, same-shape next slices; the last two import other modules, so single-file serving will not do); (b) `tests/unit/helpers/client-world.js`: a module-capable client-test loader is needed before any view becomes a module (cite `lib/components/page.js`'s classic emission); (c) `public/observation.js`: find out why it is about 5,000 lines. State the counting method: lines starting with `*`, `//` or `/*`, which gives 1,985 comment lines among 4,679 non-blank lines (I reproduced this). Say the global survey's 1,006 used a different method; do not set the two figures side by side. Existing keepalive `statusCode` and `buildDispatchModelOptionDescriptors` entries stay untouched.\n8. **Report and stop.** The PR names the retirements (files and line counts), reports the 34-line IIFE against the shim, counts comment edits separately, says total lines may rise, notes any CLAUDE.md text trimmed, and says the next slice waits for John.\n\n### Witnesses (each fails before, passes after)\n\n* **Shape served:** `/shared/cost-format.js` returns 200, a JavaScript content type and exactly the bytes of `lib/cost-format.js`. Unknown `/shared/*` and `/lib/cost-format.js` return a real 404 **through the full** `server.js` **app**, not just the router, so a catch-all cannot turn them into a 200 HTML page. Fails before: route absent.\n* **Boot fails on a missing file:** a router built with `rootDir` over an empty directory throws.\n* **Purity (tries what the guard is for):** every file in `SHARED_MODULES` has no `import`, no `node:` or bare-specifier reference, and no top-level `window|document|process|require`, checked against code with comments stripped, not comment text (the new header mentions the browser). A synthetic bad module must be named, as `cost-read-census.test.js` does for its rules.\n* **Ordering, the real one (fails at load today):** load `public/workspace-kpis.js` in `loadWorld` with `window.CostFormat` absent, `window.__WORKSPACE_KPI_DATA__` seeded with nonzero `cost.perDay`, and a `Chart` stub whose constructor synchronously calls each scale's `ticks.callback` (as Chart.js does). Loading must not throw. Then install the formatter, call `fireDOMContentLoaded` (`tests/unit/helpers/client-world.js:58`) and assert the tick labels are formatted. Note the file returns early when `typeof Chart === 'undefined'`, so a test without the stub proves nothing. The three other consumers get the lighter version: load with the global absent, no throw, then set it and run the cost path for the same strings as before.\n* **Every page that needs the shim has it:** for each `public/*.js` that mentions `window.CostFormat`, every `lib/` file whose script list names it must also list the shim as `{ module: … }`. The parser handles both `scripts: [...]` and `const SCRIPTS = [...]`. It catches today's six and a seventh added later.\n* **Page emission:** `renderPage` emits `<script type=\"module\" src>` for a module entry and `<script src>` for a string; the task-page golden shows it.\n* **Retirement:** `public/cost-format.js` and the parity test are absent; `FORMAT_ALLOW` has no `public/` entry; the census cases still reject a hand-made `$…toFixed` in a synthetic new `public/` file.\n* **Real browser (a** `vm` **cannot prove module order, MIME or CSP):** one Playwright check on the cheapest existing spec whose page carries the shim, asserting `window.CostFormat.formatUsd(0.004)` is `<$0.01` with no console errors and no CSP violations (`lib/security-headers.js` `script-src 'self'` should admit a same-origin module; this confirms it). **It does not cover the Chart.js ordering fix:** `tests/e2e/workspace-kpis.spec.js:133-136` says priced lineages cannot be created through the app's API, so the cost canvas is always swapped for the empty note. The unit test above is the witness for that.\n* Run `lin-3833-run-control`, `flight-companion-client`, `observation-scan-due`, `cost-read`, `cost-read-census`, `vendor-assets`, `render-pages`, `claude-md-line-budget`, the docs anchor resolver, the new tests, and the full unit run.\n\n### Likeliest ways this breaks\n\n1. **A page without the shim, or a read of the global during script execution.** Works until the first cost, then throws. Covered by the page-has-shim guard and the ordering tests (the Chart-stub test for the one known case).\n2. **The module script is refused or never runs** (MIME, CSP, import URL off the allow-list), so `window.CostFormat` never exists and nothing is loud until a cost is drawn. Covered by the MIME/404 tests and the real-browser check.\n3. **A silent loosening or stale guard:** the parity file's server-side assertions dropped; the golden, `FORMAT_ALLOW` or `CLAUDE.md` budget going stale or over. Covered by step 5's move, the retirement witness, the golden diff read and the budget test.\n\n### Session fit and review\n\n`fits one session`: one shared piece, a handful of files, one wrapped initializer and one real-browser check; I can name nothing one session would lose track of.\nplan-review due: no\nReason: the plan was already reviewed once; that review found the pattern (allow-list serving, purity rule, shim) sound and said the plan is ready to build once the workspace-KPI deferral, the restated ordering rule and the Chart-stub witness were folded in, which they now are.\n\n### Revision note\n\nRevised in answer to the Plan Review Verdict (Request Changes). Finding 1 (blocking, `workspace-kpis.js` reads the formatter during load): agreed, verified in source; fixed by the `DOMContentLoaded` deferral (step 4), the restated ordering rule, and the Chart-stub witness; the Playwright check is explicitly not counted as covering it. Builder notes: 1 (sixth renderer `lib/render.js`) in the list and step 3; 2 (`const SCRIPTS`) in the guard; 3 (CLAUDE.md budget) in step 1, edit in place with limits in the area note; 4 (stale consumer comments) in the places list, counted as comments; 5 (purity guard ignores comments) in the purity witness; 6 (404 through the full app) in the shape witness; 7 (fixture imports statically) in test seams; 8 (observation counting method) in step 7. The review's other points (serving boundary, CSP, moving not deleting the parity assertions) are accepted as written. The `plan-review due` line moves from yes to no for the reason given.\n"
     }
    }
   ]
@@ -1999,6 +2312,90 @@
     "by": "plan-review",
     "pos": [
      "design"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:31:23.825Z",
+   "by": "design",
+   "cmd": "find",
+   "args": {
+    "to": "design",
+    "state": "open",
+    "by": "design",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:31:23.860Z",
+   "by": "design",
+   "cmd": "find",
+   "args": {
+    "to": "area-1",
+    "state": "open",
+    "by": "design",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:31:23.895Z",
+   "by": "design",
+   "cmd": "get",
+   "args": {
+    "by": "design",
+    "pos": [
+     "plan-28"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:31:28.349Z",
+   "by": "design",
+   "cmd": "find",
+   "args": {
+    "in": "task-9",
+    "state": "open",
+    "by": "design",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:31:28.404Z",
+   "by": "design",
+   "cmd": "find",
+   "args": {
+    "kind": "run",
+    "in": "task-9",
+    "by": "design",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:32:16.623Z",
+   "by": "design",
+   "cmd": "find",
+   "args": {
+    "to": "design",
+    "state": "open",
+    "by": "design",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:32:16.661Z",
+   "by": "design",
+   "cmd": "get",
+   "args": {
+    "by": "design",
+    "pos": [
+     "verdict-45"
     ]
    },
    "asOf": null
