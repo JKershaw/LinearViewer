@@ -1,0 +1,15 @@
+{
+  "stages": {
+    "design":         { "writes": ["plan", "verdict", "decision", "task", "finding", "question"], "limits": { "task": "child" } },
+    "plan-review":    { "writes": ["plan", "verdict", "decision", "task", "finding", "question"], "limits": { "task": "child" } },
+    "breakdown":      { "writes": ["plan", "verdict", "decision", "task", "finding", "question"], "limits": { "task": "child" } },
+    "survey-task":    { "writes": ["finding", "question", "check"] },
+    "survey-place":   { "writes": ["finding", "question", "check", "lesson"], "role": "place" },
+    "scoping":        { "writes": ["decision", "finding"] },
+    "implementation": { "writes": ["plan", "decision", "finding", "change"], "limits": { "plan": "piece" } },
+    "review":         { "writes": ["verdict", "finding", "check"] },
+    "blind-read":     { "writes": ["verdict", "finding", "check"] },
+    "close-out":      { "writes": ["change", "finding", "check"], "role": "closes" }
+  },
+  "every": { "writes": ["run"] }
+}

@@ -1,0 +1,79 @@
+{
+  "task": {
+    "fields": ["asked", "done-when", "paths"], "fixed": ["asked"],
+    "start": "open", "ends": ["done", "declined"],
+    "in": ["task", "area"], "inOptional": true,
+    "links": { "about": "*", "piece": ["plan"], "same-as": "*" }
+  },
+  "plan": {
+    "fields": ["says", "paths", "order"],
+    "start": "kept", "ends": ["superseded"],
+    "in": ["task"],
+    "links": { "about": "*", "same-as": "*" }
+  },
+  "finding": {
+    "fields": ["says"], "handoff": true,
+    "start": "open", "ends": ["done", "declined", "handed-on"],
+    "in": ["task", "area"],
+    "links": { "about": "*", "same-as": "*" }
+  },
+  "check": {
+    "fields": ["what", "why-person", "how"], "handoff": true,
+    "start": "open", "ends": ["done", "declined", "handed-on"],
+    "in": ["task", "area"],
+    "links": { "about": "*", "same-as": "*" }
+  },
+  "question": {
+    "fields": ["asks", "options", "recommended", "if-unanswered"], "handoff": true,
+    "start": "open", "ends": ["answered", "withdrawn", "handed-on"],
+    "in": ["task", "area"],
+    "links": { "about": "*", "same-as": "*" }
+  },
+  "decision": {
+    "fields": ["answer", "why"],
+    "start": "stands", "ends": ["superseded", "withdrawn"],
+    "in": ["task", "area"],
+    "links": { "about": "*", "on": ["verdict", "setting"], "answers": ["question"], "same-as": "*" }
+  },
+  "verdict": {
+    "fields": ["of", "outcome", "reasoning"],
+    "outcomes": {
+      "plan-review": ["approve", "approve-with-notes", "request-changes"],
+      "review": ["approve", "approve-with-notes", "request-changes"],
+      "blind-read": ["better", "same", "worse"]
+    },
+    "start": "stands", "ends": ["withdrawn"],
+    "in": ["task", "area"],
+    "links": { "about": "*", "on": ["plan", "change"], "same-as": "*" }
+  },
+  "lesson": {
+    "fields": ["says", "paths", "checked-at"],
+    "start": "holds", "ends": ["superseded", "disproved"],
+    "in": ["area"],
+    "links": { "about": "*", "same-as": "*" }
+  },
+  "area": {
+    "fields": ["name", "paths"],
+    "start": "kept", "ends": ["retired"],
+    "in": [], "inOptional": true,
+    "links": { "about": "*", "same-as": "*" }
+  },
+  "change": {
+    "fields": ["ref", "head"],
+    "start": "open", "ends": ["merged", "abandoned"],
+    "in": ["task", "area"],
+    "links": { "about": "*", "same-as": "*" }
+  },
+  "run": {
+    "fields": ["stage", "claims", "account"],
+    "start": "open", "ends": ["done"],
+    "in": ["task"],
+    "links": { "about": "*", "same-as": "*" }
+  },
+  "setting": {
+    "fields": ["key", "value", "scope"],
+    "start": "stands", "ends": ["replaced"],
+    "in": ["task", "area"], "inOptional": true,
+    "links": { "about": "*", "same-as": "*" }
+  }
+}
