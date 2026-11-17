@@ -1,0 +1,107 @@
+[
+ {
+  "at": "2026-11-17T15:35:46.670Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "change-143",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:46.698Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-150",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:46.726Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-147",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:46.759Z",
+  "by": "autopilot",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-113",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:57.284Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "6,144",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:57.321Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "LIN-4458",
+   "--state",
+   "open",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:57.354Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "FEEDBACK_ENTRY_KINDS",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:57.388Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "rebase",
+   "--state",
+   "open",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ }
+]

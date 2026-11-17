@@ -1,0 +1,150 @@
+[
+ {
+  "at": "2026-11-17T15:35:13.299Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "get",
+   "change-103",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:13.328Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "area",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:13.356Z",
+  "by": "blind-read",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-78",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:25.772Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "task",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:25.811Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "dispatch-store",
+   "--count",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:25.846Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "A13",
+   "--count",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:25.877Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "Runs",
+   "--count",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:25.917Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "dispatch-feedback-kinds",
+   "--count",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:25.962Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "NEVER_RAN",
+   "--count",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:25.998Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "followUpTarget",
+   "--count",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:26.029Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "verdict",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ }
+]

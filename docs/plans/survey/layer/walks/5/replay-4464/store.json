@@ -1,5 +1,5 @@
 {
- "next": 117,
+ "next": 124,
  "records": {
   "area-1": [
    {
@@ -3096,6 +3096,185 @@
     "v": 1,
     "op": "add",
     "at": "2026-11-13T16:28:54.000Z",
+    "by": "blind-read"
+   },
+   {
+    "id": "run-116",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "blind-read",
+     "claims": [],
+     "account": "Blind read of #2430 at head 444b58246, diffed against 0092d8d9e (main when read): verdict worse. The diff I read simplified the held-wake release in lib/dispatch-store.js and dropped an always-true filter in lib/dispatch-terminal.js, but deleted the one-owner declarations (lib/dispatch-feedback-kinds.js, NEVER_RAN) and copied their values into about ten runs-and-dispatch and agent-api files with nothing checking them. Two fix-sized items to close-out; three larger ownership items and one outside-area copy to John, since runs-and-dispatch (A13) has no area or task here. Note: review records #2430 as 3 docs files on e8e92d50a; the code I read is not in that set, so my compare base may have put main-only commits in reverse into the diff."
+    },
+    "links": {},
+    "in": "task-78",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:29:02.000Z",
+    "by": "blind-read",
+    "ended": {
+     "reason": "Blind read posted on LIN-4464; verdict and six findings recorded"
+    }
+   }
+  ],
+  "finding-117": [
+   {
+    "id": "finding-117",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Blind read of #2430 (head `444b58246` vs `0092d8d9e`), fix-sized, runs-and-dispatch: `lib/dispatch-leftover.js` restates two rules that already have an owner. `RESUMABLE_TARGETS = new Set(['cli','web'])` with `doc.target || 'cli'` repeats `followUpTarget` (`lib/dispatch-targets.js`, the one follow-up target rule, LIN-3672); `halt?.mode === 'pause' || halt?.mode === 'stop'` repeats `HALT_MODES` (`lib/workspace-halt.js`). Fix: import `followUpTarget` and `HALT_MODES` again and drop the local copies; two lines in one file, no behaviour change."
+    },
+    "links": {
+     "on": [
+      "change-103@2"
+     ]
+    },
+    "in": "task-78",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:28:55.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-118": [
+   {
+    "id": "finding-118",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Blind read of #2430, fix-sized, runs-and-dispatch (concerns `lib/digest-feedback.js`): `lib/run-view.js` now carries its own copy of the three stamp kinds (`DECISION_STAMP_KINDS`), which is not in `tests/unit/decision-lifecycle-stamp-drift.test.js`'s `sites` list, and the docblock count (\"4 literal copies across 5 call sites\") leaves it out, so it can drift with no alarm. Fix: add `lib/run-view.js` to `sites` and update the count. Tidy-up: in `lib/run-view.js` the \"A wake marker is a leading prefix…\" comment sits alone between the set and `lastWakeEntry`'s docblock; fold it back into that docblock."
+    },
+    "links": {
+     "on": [
+      "change-103@2"
+     ]
+    },
+    "in": "task-78",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:28:56.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-119": [
+   {
+    "id": "finding-119",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Blind read of #2430, larger, runs-and-dispatch: `releaseHeldWake` in `lib/dispatch-store.js` calls `formatHeldWakeNote({ status })`, which returns \"The leftover step did not run…\" (`lib/dispatch-wake.js:331`), so the store that `tests/unit/lin-4377-store-knows-no-leftover.test.js` says \"knows no leftovers\" speaks the leftover wording again. That test's docblock still claims the wake wording lives in the injected hook, but the test only counts the word \"leftover\", and the dependency check that witnessed the claim was deleted. Larger: someone must decide who owns the release wording, the design this change took out (`setHeldWakeReleaseNote`, `_releaseNoteFor`, `UNBOUND_HELD_WAKE_RELEASE_NOTE` removed)."
+    },
+    "links": {
+     "on": [
+      "change-103@2"
+     ]
+    },
+    "in": "task-78",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:28:57.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-120": [
+   {
+    "id": "finding-120",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Blind read of #2430, larger, runs-and-dispatch: \"a row that never ran\" (`cancelled`/`expired`) is written out separately at each site: `lib/dispatch-store.js` (twice, lines 1176 and 1906), `lib/dispatch-leftover.js` (private `NEVER_RAN`, line 29), `lib/dispatch-terminal.js`, `lib/observer-sweep.js`, `lib/task-page-loader.js`, `lib/plan-review-round-trips.js`, `routes/dispatch.js`. A third archive-without-running status would need every site found by hand. Larger: needs one owner chosen and imported across areas (agent-api copy in a separate finding)."
+    },
+    "links": {
+     "on": [
+      "change-103@2"
+     ]
+    },
+    "in": "task-78",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:28:58.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-121": [
+   {
+    "id": "finding-121",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Blind read of #2430, larger, runs-and-dispatch: the feedback-entry kinds have no single declaration again (`lib/dispatch-feedback-kinds.js` and its test deleted): the runner allowlist is in `lib/dispatch-store.js`, the relay kinds in `lib/session-telemetry.js` (`PARKED_WAIT_SKIPPED_KINDS`), the stamp kinds in four lib copies (`lib/digest-feedback.js`, `lib/wall-clock-summary.js`, `lib/run-view.js`, …). A new kind no longer has to say what its roles are. `lib/dispatch-feedback-validation.js` now imports the whole run store to read one array. Larger: giving the kinds a home is a design decision."
+    },
+    "links": {
+     "on": [
+      "change-103@2"
+     ]
+    },
+    "in": "task-78",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:28:59.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-122": [
+   {
+    "id": "finding-122",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Blind read of #2430, outside the area (agent-api): `routes/proxy-dispatch.js` has `['queued', 'cancelled', 'expired'].includes(statusFilter)`, another inline copy of the never-ran statuses; it must stay in step with the runs-and-dispatch sites (finding-120)."
+    },
+    "links": {
+     "on": [
+      "change-103@2"
+     ],
+     "about": [
+      "finding-120"
+     ]
+    },
+    "in": "task-78",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:29:00.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "verdict-123": [
+   {
+    "id": "verdict-123",
+    "kind": "verdict",
+    "state": "stands",
+    "fields": {
+     "of": "blind-read",
+     "outcome": "worse",
+     "reasoning": "Read #2430 at `444b58246` against `0092d8d9e` (blind-read comment on LIN-4464, 16:31). It simplifies the held-wake release in `lib/dispatch-store.js` (`setHeldWakeReleaseNote`, `_releaseNoteFor`, `UNBOUND_HELD_WAKE_RELEASE_NOTE` gone: one wording path instead of two) and drops the always-true `mayCarryWake` filter from `findWakeEvent` (`lib/dispatch-terminal.js`). Against that, it deletes the one-owner declarations `lib/dispatch-feedback-kinds.js` and `NEVER_RAN` and copies their values back into about ten files across runs-and-dispatch and agent-api, with nothing checking they stay in step; the store also takes back the leftover wording through `formatHeldWakeNote`. Fix-sized: finding-117, finding-118. Larger: finding-119, finding-120, finding-121. Outside: finding-122."
+    },
+    "links": {
+     "on": [
+      "change-103@2"
+     ],
+     "about": [
+      "task-78",
+      "finding-117",
+      "finding-118",
+      "finding-119",
+      "finding-120",
+      "finding-121",
+      "finding-122"
+     ]
+    },
+    "in": "task-78",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:29:01.000Z",
     "by": "blind-read"
    }
   ]

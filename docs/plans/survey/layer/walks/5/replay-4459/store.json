@@ -1,5 +1,5 @@
 {
- "next": 151,
+ "next": 155,
  "records": {
   "area-1": [
    {
@@ -4049,6 +4049,134 @@
     "at": "2026-11-13T16:48:26.000Z",
     "by": "leftover"
    }
+  ],
+  "question-151": [
+   {
+    "id": "question-151",
+    "kind": "question",
+    "state": "open",
+    "fields": {
+     "asks": "PR #2432 (head 7424cfb8f) also removes the `FEEDBACK_ENTRY_KINDS` re-export from `lib/dispatch-store.js` (LIN-4455 left it \"for existing importers\"), repoints 8 imports, and changes an existing assertion in `tests/unit/lin-4455-feedback-kinds-table.test.js` from \"the store re-exports it\" to \"the store does not\". The PR body does not name this as something the piece retires, and it is outside the ticket's Approach list. Is it inside the bounded class (a shim of the same idiom), or a change an existing test should not absorb silently?",
+     "options": [
+      "inside the bounded class: keep it, and the PR body names it as retired",
+      "outside the piece: split it out, or restore the LIN-4455 assertion"
+     ],
+     "if-unanswered": "Review judges the PR as it stands, with the re-export removal unnamed in the PR body."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "finding-150",
+      "finding-81"
+     ],
+     "on": [
+      "change-143@2"
+     ]
+    },
+    "in": "task-113",
+    "to": "review",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:57:38.000Z",
+    "by": "autopilot"
+   }
+  ],
+  "finding-152": [
+   {
+    "id": "finding-152",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Still to confirm on PR #2432: Lessons in `docs/areas/runs-and-dispatch.md` under 6,144 bytes after the change (done-when; 5,195 bytes at 0092d8d9e before it, per decision-124). Not checked by the autopilot cross-check."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "task-113"
+     ],
+     "on": [
+      "decision-124@1"
+     ]
+    },
+    "in": "task-113",
+    "to": "review",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:57:39.000Z",
+    "by": "autopilot"
+   }
+  ],
+  "finding-153": [
+   {
+    "id": "finding-153",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "PR #2432 must rebase onto main if LIN-4458 (piece 2) merges first; both are order step 3 and overlap (decision-116)."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "task-112"
+     ],
+     "on": [
+      "decision-116@1"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:57:40.000Z",
+    "by": "autopilot"
+   }
+  ],
+  "run-154": [
+   {
+    "id": "run-154",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "autopilot",
+     "account": "Cross-checked the implementation step on PR #2432 at head 7424cfb: open and mergeable, all 8 CI checks passed (Unit, Unit proxy clock +400d, E2E 1-4, Secret scan, CI success); W1/W2 in lin-4392 reported failing before and passing after. Did not decide scope: asked review whether removing the FEEDBACK_ENTRY_KINDS re-export and flipping the lin-4455 assertion belongs in this piece (question-151), left the Lessons budget for review to confirm (finding-152) and the rebase on LIN-4458 to implementation (finding-153). Nothing posted on LIN-4447 or LIN-4448; the LIN-4459 description is unchanged."
+    },
+    "links": {
+     "on": [
+      "change-143@2",
+      "finding-150@1",
+      "finding-147@1"
+     ]
+    },
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:57:41.000Z",
+    "by": "autopilot"
+   },
+   {
+    "id": "run-154",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "autopilot",
+     "account": "Cross-checked the implementation step on PR #2432 at head 7424cfb: open and mergeable, all 8 CI checks passed (Unit, Unit proxy clock +400d, E2E 1-4, Secret scan, CI success); W1/W2 in lin-4392 reported failing before and passing after. Did not decide scope: asked review whether removing the FEEDBACK_ENTRY_KINDS re-export and flipping the lin-4455 assertion belongs in this piece (question-151), left the Lessons budget for review to confirm (finding-152) and the rebase on LIN-4458 to implementation (finding-153). Nothing posted on LIN-4447 or LIN-4448; the LIN-4459 description is unchanged."
+    },
+    "links": {
+     "on": [
+      "change-143@2",
+      "finding-150@1",
+      "finding-147@1"
+     ]
+    },
+    "in": "task-113",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:57:42.000Z",
+    "by": "autopilot",
+    "ended": {
+     "reason": "cross-check written; review dispatched next"
+    }
+   }
   ]
  },
  "log": [
@@ -4720,6 +4848,244 @@
     "lesson",
     "--by",
     "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:46.670Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-143",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:46.698Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-150",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:46.726Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-147",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:46.759Z",
+   "by": "autopilot",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-113",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:57.284Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "6,144",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:57.321Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "LIN-4458",
+    "--state",
+    "open",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:57.354Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "FEEDBACK_ENTRY_KINDS",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:57.388Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "rebase",
+    "--state",
+    "open",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:36:50.585Z",
+   "by": "review",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-113",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:36:50.621Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-143",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:36:50.653Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--to",
+    "review",
+    "--state",
+    "open",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:36:56.404Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-81",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:36:56.439Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "question-148",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:36:56.473Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-28",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:36:56.507Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "run-154",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:36:56.541Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--to",
+    "close-out",
+    "--state",
+    "open",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:36:56.575Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--to",
+    "task-83",
+    "--state",
+    "open",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:36:56.608Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "verdict",
+    "--in",
+    "task-113",
+    "--by",
+    "review"
    ],
    "asOf": null
   }

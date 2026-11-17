@@ -1,5 +1,5 @@
 {
- "next": 161,
+ "next": 162,
  "records": {
   "area-1": [
    {
@@ -864,6 +864,21 @@
     "op": "add",
     "at": "2026-11-13T22:29:42.000Z",
     "by": "Harbour"
+   },
+   {
+    "id": "finding-42",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/prompts/leftover-words.js`: the retirement line's forms are spelled once (`RETIRES_LABEL`, `RETIRES_NONE`), and this repo's `docs/areas/README.md` and `docs/architecture/dispatch-and-proxy.md` now point there (LIN-4469, PR #2447). Still restated by hand: simple-dispatcher's README and its docs/areas/README.md, which also say a waiting entry leaves when \"a follow-up is filed for it\", where this repo says only when the consequence test sends it to a ticket. A cross-repo seam; simple-dispatcher's side is its owner's, named here, not edited. (Drift & Coherence Review, 13 Nov.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T23:05:22.000Z",
+    "by": "implementation",
+    "reason": "LIN-4469 second pass (05b592742) retired this repo's half: the two docs now point to leftover-words.js. Only the simple-dispatcher half stays waiting (finding-149)."
    }
   ],
   "finding-43": [
@@ -3110,6 +3125,29 @@
     "op": "add",
     "at": "2026-11-13T22:39:26.000Z",
     "by": "implementation"
+   },
+   {
+    "id": "change-142",
+    "kind": "change",
+    "state": "open",
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2447",
+     "head": "05b592742"
+    },
+    "links": {
+     "on": [
+      "plan-117@1",
+      "verdict-124@1",
+      "decision-138@1",
+      "decision-140@1"
+     ]
+    },
+    "in": "task-131",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T23:05:18.000Z",
+    "by": "implementation",
+    "reason": "Second implementation pass on PR #2447: triage fold, review Fixes 1, 3, 4, re-pin (FROZEN_TOTAL_BYTES 396064); with 04bb47598 from the resumed first pass. CI green on the head (run 43525065043)."
    }
   ],
   "finding-143": [
@@ -3183,6 +3221,28 @@
     "by": "John",
     "via": "Harbour",
     "reason": "John ruled fold (decision-157): implementation shrinks these clauses, as the finding says on fold"
+   },
+   {
+    "id": "finding-143",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "`lib/prompt-template-defs.js` restates tracker clauses the proxy write guard (LIN-4468) now refuses outside the four mandates LIN-4469 names: survey-task ~975, survey-place ~994, blind-read ~1065 (\"Do not change code, branches, pull requests, tickets or Linear/tracker state\") and triage ~268 (\"do not rewrite the task description ... do not create follow-up tasks or subtasks\", which ticket-fields refuses; the scope rule there stays). Lower value: `lib/prompts/stage-kinds.js` 534/559 survey completion criteria. Recommendation: shrink them to the code, branch and PR words; that moves those renders and ceilings. Waits on question-144: on fold, implementation does it; on accept, it becomes a Waiting entry (LIN-4469)."
+    },
+    "links": {
+     "about": [
+      "question-144"
+     ]
+    },
+    "in": "task-131",
+    "to": "implementation",
+    "v": 5,
+    "op": "end",
+    "at": "2026-11-13T23:05:26.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "Folded per decision-157 on PR #2447: triage ~268 drops the description-rewrite and subtask clauses, keeping its scope rule and 'findings stay observations' (05b592742, this pass); survey-task, survey-place and the blind read drop 'tickets or Linear/tracker state', keeping 'code, branches or pull requests' (04bb47598, the resumed first pass, custom ac074b22). Ceilings and FROZEN_TOTAL_BYTES re-pinned lower (396064). The lower-value lib/prompts/stage-kinds.js 534/559 survey criteria were outside the ruling and not touched."
+    }
    }
   ],
   "question-144": [
@@ -3421,6 +3481,52 @@
     "op": "add",
     "at": "2026-11-13T22:59:41.000Z",
     "by": "review"
+   },
+   {
+    "id": "finding-149",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Fix 1, settle before the merge: the retirement line restatement in this repo docs is claimed retired (PR Retires, rewritten Waiting entry) but not edited. In `docs/areas/README.md:72-77` replace the three-forms prose with \"Its forms are spelled once, in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`).\" In `docs/architecture/dispatch-and-proxy.md:127` replace the listed forms with \"carries exactly one `Retires:` line, in one of the forms `lib/prompts/leftover-words.js` spells\". Keep `docs/proxy-integration.md` refusal table (API contract). Then make the Waiting entry true: drop it or keep only the simple-dispatcher half. Check: neither doc spells \"no waiting entry\" or \"nothing fix-sized\"."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-42"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:05:20.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "Fixed on PR #2447 (05b592742): docs/areas/README.md and docs/architecture/dispatch-and-proxy.md now point to RETIRES_LABEL / RETIRES_NONE in lib/prompts/leftover-words.js instead of listing the forms; docs/proxy-integration.md refusal table kept (API contract); the Waiting entry (finding-42) cut to the simple-dispatcher half."
+    }
+   },
+   {
+    "id": "finding-149",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Fix 1, settle before the merge: the retirement line restatement in this repo docs is claimed retired (PR Retires, rewritten Waiting entry) but not edited. In `docs/areas/README.md:72-77` replace the three-forms prose with \"Its forms are spelled once, in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`).\" In `docs/architecture/dispatch-and-proxy.md:127` replace the listed forms with \"carries exactly one `Retires:` line, in one of the forms `lib/prompts/leftover-words.js` spells\". Keep `docs/proxy-integration.md` refusal table (API contract). Then make the Waiting entry true: drop it or keep only the simple-dispatcher half. Check: neither doc spells \"no waiting entry\" or \"nothing fix-sized\"."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-42"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T23:05:21.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "Fixed on PR #2447 (05b592742): docs/areas/README.md and docs/architecture/dispatch-and-proxy.md now point to RETIRES_LABEL / RETIRES_NONE in lib/prompts/leftover-words.js instead of listing the forms; the Waiting entry (finding-42) now names only simple-dispatcher's copy. (Corrects the previous end reason, which claimed docs/proxy-integration.md was checked; this pass did not report on it.)"
+    }
    }
   ],
   "finding-150": [
@@ -3443,6 +3549,29 @@
     "op": "add",
     "at": "2026-11-13T22:59:42.000Z",
     "by": "review"
+   },
+   {
+    "id": "finding-150",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Fix 2: correct the \"eleven unchanged\" figure in the PR DECISION 1, the change-log row if it repeats it, and a reply on LIN-4350 (comment eeb740b0 repeats it). In real context only 4 work kinds are byte-identical; per-writes preamble deltas are in question-144 v2."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "question-144"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:05:25.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "Corrected to four work kinds byte-identical (blocked, breakdown, close-out, retrospective-audit) on LIN-4448 (comment 8933968d), LIN-4469 (a8749d0b) and the PR's DECISION section; LIN-4350 corrected in a reply (comment 25b09538). The change-log row was not separately reported."
+    }
    }
   ],
   "finding-151": [
@@ -3466,6 +3595,30 @@
     "op": "add",
     "at": "2026-11-13T22:59:43.000Z",
     "by": "review"
+   },
+   {
+    "id": "finding-151",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Fix 3: post one line on LIN-4448 recording the change of course the ask requires: the committed-tool clause lives in `lib/periodicals.js` (`committedSearch`, line 14), not `lib/prompts/leftover-words.js`, because all four call sites are Periodical bullets. Defensible, but unrecorded."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "plan-117",
+      "finding-40"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:05:23.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "Recorded on LIN-4448 (comment 8933968d): committedSearch lives in lib/periodicals.js, not lib/prompts/leftover-words.js, because every call site is a Periodical bullet; Stability's wording is the one spelling."
+    }
    }
   ],
   "finding-152": [
@@ -3487,6 +3640,28 @@
     "op": "add",
     "at": "2026-11-13T22:59:44.000Z",
     "by": "review"
+   },
+   {
+    "id": "finding-152",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Fix 4: the new witness misses one retired spelling. Restoring the old change-coupling wording (mutation M3) stays green in `tests/unit/lin-4469-prompt-folds.test.js`; only the lin-4313 hash pin catches it. Add `search the repo for a committed change-coupling tool (it reads` to `RETIRED`; check: restoring it turns the new test red. (M1, M2, M4, M5 went red as they should.)"
+    },
+    "links": {
+     "about": [
+      "change-142"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:05:24.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "PR #2447 (05b592742): tests/unit/lin-4469-prompt-folds.test.js RETIRED list gains the old committed change-coupling spelling; mutation-checked (restoring it turns the test red)."
+    }
    }
   ],
   "finding-153": [
@@ -3530,6 +3705,28 @@
     "op": "add",
     "at": "2026-11-13T22:59:46.000Z",
     "by": "review"
+   },
+   {
+    "id": "finding-154",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "No builder `### Leftovers` answer with a `Retires:` line is on LIN-4469, so the gate-format check has nothing to check against. Settle before the merge: post it, with a `Retires:` line naming an entry this diff removes."
+    },
+    "links": {
+     "about": [
+      "change-142"
+     ]
+    },
+    "in": "task-131",
+    "to": "leftover",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:05:19.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "Builder ### Leftovers posted on LIN-4469 (comment bbc2b1c7) with a Retires: line naming the docs-only notes-PR entry (finding-37), which PR #2447 removes from docs/areas/llm-and-prompts.md; both statements now render NOTES_PR."
+    }
    }
   ],
   "check-155": [
@@ -3702,6 +3899,36 @@
     "op": "add",
     "at": "2026-11-13T23:05:07.000Z",
     "by": "autopilot"
+   },
+   {
+    "id": "question-159",
+    "kind": "question",
+    "state": "open",
+    "fields": {
+     "asks": "LIN-4469 asks for a net rendered-byte fall across every kind. Measured on PR #2447 head 05b592742, real-context renders with proxy preambles fall 827520 -> 825330 bytes (-2190), with two exceptions: four work kinds (blocked, breakdown, close-out, retrospective-audit) carry none of the folded text and stay byte-identical, and seams-tangles rises +24 from the committed-tool wording (Stability's spelling, now shared). Accept both as meeting the ask? (Ruling lin-4469-witness; the fold itself is decision-157.)",
+     "options": [
+      "accept: the witness holds for every kind that carries folded text; the four work kinds cannot fall, and the +24 is the one shared spelling",
+      "require: a fall for all of them; fold more text out of those kinds' prompts"
+     ],
+     "recommended": "accept",
+     "if-unanswered": "The cut stays unagreed: the build fixes continue, but PR #2447 does not merge"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "question-144"
+     ],
+     "on": [
+      "decision-157@1"
+     ]
+    },
+    "in": "task-131",
+    "to": "John",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T23:05:27.000Z",
+    "by": "implementation",
+    "reason": "Implementation's measurement on 05b592742 adds the seams-tangles +24 exception and the net figure; the question said the other kinds all fall."
    }
   ],
   "decision-160": [
@@ -3734,6 +3961,77 @@
     "op": "add",
     "at": "2026-11-13T23:05:08.000Z",
     "by": "autopilot"
+   }
+  ],
+  "run-161": [
+   {
+    "id": "run-161",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "implementation",
+     "claims": [
+      "lib/prompt-template-defs.js",
+      "docs/areas/README.md",
+      "docs/architecture/dispatch-and-proxy.md",
+      "docs/areas/llm-and-prompts.md",
+      "tests/unit/lin-4469-prompt-folds.test.js",
+      "tests/unit/prompt-size-budget.test.js"
+     ],
+     "account": "Second implementation pass on PR #2447 after review, head 05b592742, CI green (run 43525065043). Folded triage's guard-refused clauses (description rewrite, follow-up tasks/subtasks), keeping its scope rule; the resumed first pass (custom ac074b22, alongside me) folded survey-task, survey-place and the blind read in 04bb47598. Review fixes: the retirement-line forms in docs/areas/README.md and docs/architecture/dispatch-and-proxy.md now point to leftover-words.js (Waiting entry cut to simple-dispatcher's half); the old committed change-coupling spelling is on the RETIRED list, mutation-checked; the committedSearch deviation recorded on LIN-4448; the eleven-kinds figure corrected to four. Posted the ### Leftovers answer with a Retires: line (notes-PR rule, NOTES_PR). Re-pinned FROZEN_TOTAL_BYTES to 396064, the ceilings' sum (396884 on main). Real-context renders fall 827520 -> 825330 (-2190); the four work kinds are identical and seams-tangles is +24, both on John's ruling lin-4469-witness, which gates merge. Not done: Fix 5 (move the area-registry-path import to the top of leftover-words.js). Not verified: the post-deploy 403 checks (check-155). Rollback: revert the PR's merge commit."
+    },
+    "links": {
+     "on": [
+      "decision-160@1",
+      "decision-157@1"
+     ],
+     "about": [
+      "change-142",
+      "question-159",
+      "check-155"
+     ]
+    },
+    "in": "task-131",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:05:28.000Z",
+    "by": "implementation"
+   },
+   {
+    "id": "run-161",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "implementation",
+     "claims": [
+      "lib/prompt-template-defs.js",
+      "docs/areas/README.md",
+      "docs/architecture/dispatch-and-proxy.md",
+      "docs/areas/llm-and-prompts.md",
+      "tests/unit/lin-4469-prompt-folds.test.js",
+      "tests/unit/prompt-size-budget.test.js"
+     ],
+     "account": "Second implementation pass on PR #2447 after review, head 05b592742, CI green (run 43525065043). Folded triage's guard-refused clauses (description rewrite, follow-up tasks/subtasks), keeping its scope rule; the resumed first pass (custom ac074b22, alongside me) folded survey-task, survey-place and the blind read in 04bb47598. Review fixes: the retirement-line forms in docs/areas/README.md and docs/architecture/dispatch-and-proxy.md now point to leftover-words.js (Waiting entry cut to simple-dispatcher's half); the old committed change-coupling spelling is on the RETIRED list, mutation-checked; the committedSearch deviation recorded on LIN-4448; the eleven-kinds figure corrected to four. Posted the ### Leftovers answer with a Retires: line (notes-PR rule, NOTES_PR). Re-pinned FROZEN_TOTAL_BYTES to 396064, the ceilings' sum (396884 on main). Real-context renders fall 827520 -> 825330 (-2190); the four work kinds are identical and seams-tangles is +24, both on John's ruling lin-4469-witness, which gates merge. Not done: Fix 5 (move the area-registry-path import to the top of leftover-words.js). Not verified: the post-deploy 403 checks (check-155). Rollback: revert the PR's merge commit."
+    },
+    "links": {
+     "on": [
+      "decision-160@1",
+      "decision-157@1"
+     ],
+     "about": [
+      "change-142",
+      "question-159",
+      "check-155"
+     ]
+    },
+    "in": "task-131",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:05:29.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "Fold and review Fixes 1-4 on PR #2447 (05b592742), CI green; merge waits on John's ruling lin-4469-witness (question-159); Fix 5 (finding-153) still open"
+    }
    }
   ]
  },

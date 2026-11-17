@@ -1,5 +1,5 @@
 {
- "next": 56,
+ "next": 59,
  "records": {
   "area-1": [
    {
@@ -92,6 +92,22 @@
     "op": "add",
     "at": "2026-11-13T12:01:48.004Z",
     "by": "Harbour"
+   },
+   {
+    "id": "finding-5",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`public/common.js`: `buildDispatchModelOptionDescriptors` repeats the merge rule of `buildModelOptions` (`lib/openrouter-catalog.js`), because `lib/openrouter-catalog.js` is not a leaf and so cannot be served as a shared module (no build step is no longer the reason; the browser may import leaves). The lists are not copied (they come from `window.__HARNESS_MODELS__` and the catalog over the wire); only the rule is. The endpoint could send merged options instead. (LIN-4358.)"
+    },
+    "links": {},
+    "in": "area-1",
+    "to": "area-1",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T14:56:30.000Z",
+    "by": "leftover",
+    "reason": "the area note Waiting entry gave no build step as the reason; after LIN-4446 slice 1 the reason is that the source is not a leaf"
    }
   ],
   "finding-6": [
@@ -2546,6 +2562,32 @@
     "op": "add",
     "at": "2026-11-13T14:31:13.000Z",
     "by": "plan-review"
+   },
+   {
+    "id": "finding-49",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "One live hit missing from plan-28 places: docs/areas/other-features.md:14, the Waiting entry saying lib/cost-format.js is still in the catch-all. Still true, but once the file is served add a few words (also served as /shared/cost-format.js, so a leaf) so the next reader does not move it without seeing that constraint. The other new grep hits are server-side import ... from ./cost-format.js lines in lib/*: not places, no change."
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ],
+     "on": [
+      "plan-28@13",
+      "finding-24@4"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:56:32.000Z",
+    "by": "leftover",
+    "ended": {
+     "reason": "docs/areas/other-features.md entry on lib/cost-format.js names the /shared/cost-format.js serving and the leaf rule; leftover re-spelled it to match the purity guard (PR #2423 @ 1de016f52)"
+    }
    }
   ],
   "finding-50": [
@@ -2664,6 +2706,28 @@
     "op": "add",
     "at": "2026-11-13T14:36:51.000Z",
     "by": "implementation"
+   },
+   {
+    "id": "change-53",
+    "kind": "change",
+    "state": "open",
+    "fields": {
+     "ref": "PR #2423 (JKershaw/LinearViewer, branch feat/lin-4446-shared-cost-format): LIN-4446 slice 1. Shares lib/cost-format.js with the browser as /shared/cost-format.js through a 12-line module shim; retires public/cost-format.js (34 lines) and tests/unit/cost-format-parity.test.js; public/workspace-kpis.js now builds on DOMContentLoaded; rule reading in CLAUDE.md and docs/areas/front-end-browser.md Lessons. No view reworked or retired.",
+     "head": "1de016f523f46a006c20a4e89717157422b3207b"
+    },
+    "links": {
+     "on": [
+      "plan-28@13",
+      "verdict-44@1",
+      "decision-26@3"
+     ]
+    },
+    "in": "task-9",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T14:56:27.000Z",
+    "by": "leftover",
+    "reason": "leftover tidy commits pushed to PR #2423; CI green at the new head"
    }
   ],
   "lesson-54": [
@@ -2694,6 +2758,35 @@
     "op": "add",
     "at": "2026-11-13T14:36:52.000Z",
     "by": "implementation"
+   },
+   {
+    "id": "lesson-54",
+    "kind": "lesson",
+    "state": "holds",
+    "fields": {
+     "says": "No build step, no framework, still; the browser may import as browsers do natively. Limits: shared modules are leaves (imports nothing, names no browser or Node global, as the purity guard enforces); served one file at a time through the lib/vendor-assets.js allow-list, never a directory; classic views and the vm test loaders stay until a module-capable client test loader exists; a deferred module shim sets its global after classic scripts run, so no script may read a shared global during script execution, including through a callback a library runs synchronously (Chart.js ticks). The copies came from reading the rule as no sharing. (In docs/areas/front-end-browser.md Lessons, PR #2423.)",
+     "paths": [
+      "CLAUDE.md",
+      "docs/areas/front-end-browser.md",
+      "lib/vendor-assets.js",
+      "lib/cost-format.js"
+     ],
+     "checked-at": "1de016f52 (PR #2423, unmerged)"
+    },
+    "links": {
+     "on": [
+      "change-53@2",
+      "finding-11@3",
+      "finding-23@3",
+      "finding-34@2"
+     ]
+    },
+    "in": "area-1",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T14:56:28.000Z",
+    "by": "leftover",
+    "reason": "purity rule spelled one way, as the guard enforces it, in the note and code; re-checked at the new head"
    }
   ],
   "finding-55": [
@@ -2718,6 +2811,92 @@
     "op": "add",
     "at": "2026-11-13T14:36:53.000Z",
     "by": "implementation"
+   }
+  ],
+  "run-56": [
+   {
+    "id": "run-56",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "leftover",
+     "account": "Leftover pass on PR #2423 (LIN-4446 slice 1), new head 1de016f52, CI green; comment on LIN-4446 at 15:06. Tidied what the slice left stale: test comments in lin-3833-run-control and flight-companion-client that said the formatter loads before the page script now say what each seam does, and loadChatUI drops a formatter install chat.js never reads; server.js mount comment names the /shared/* modules; the shim guard in tests/unit/shared-modules.test.js no longer asserts list position; the purity rule is spelled one way, as the guard enforces it (imports nothing, names no browser or Node global), in lib/vendor-assets.js, lib/cost-format.js and the front-end-browser and other-features notes; the buildDispatchModelOptionDescriptors Waiting entry now gives lib/openrouter-catalog.js not being a leaf as its reason, not no build step. Noted: TERMINAL_TYPES mirror in public/common.js (front-end-browser twins entry); vendor-assets naming (platform-and-plumbing). Lesson added: a { module } entry list position means nothing. Retires the front-end-pages entry on lib/render-swipe.js user-scalable=no (swipe now takes the shared viewport, with a test that failed before the fix). No view reworked or retired; next slice still waits for John (check-17)."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:56:26.000Z",
+    "by": "leftover"
+   },
+   {
+    "id": "run-56",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "leftover",
+     "account": "Leftover pass on PR #2423 (LIN-4446 slice 1), new head 1de016f52, CI green; comment on LIN-4446 at 15:06. Tidied what the slice left stale: test comments in lin-3833-run-control and flight-companion-client that said the formatter loads before the page script now say what each seam does, and loadChatUI drops a formatter install chat.js never reads; server.js mount comment names the /shared/* modules; the shim guard in tests/unit/shared-modules.test.js no longer asserts list position; the purity rule is spelled one way, as the guard enforces it (imports nothing, names no browser or Node global), in lib/vendor-assets.js, lib/cost-format.js and the front-end-browser and other-features notes; the buildDispatchModelOptionDescriptors Waiting entry now gives lib/openrouter-catalog.js not being a leaf as its reason, not no build step. Noted: TERMINAL_TYPES mirror in public/common.js (front-end-browser twins entry); vendor-assets naming (platform-and-plumbing). Lesson added: a { module } entry list position means nothing. Retires the front-end-pages entry on lib/render-swipe.js user-scalable=no (swipe now takes the shared viewport, with a test that failed before the fix). No view reworked or retired; next slice still waits for John (check-17)."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:56:33.000Z",
+    "by": "leftover",
+    "ended": {
+     "reason": "leftover tidies pushed to PR #2423 (1de016f52, CI green); next slice waits for John (check-17)"
+    }
+   }
+  ],
+  "lesson-57": [
+   {
+    "id": "lesson-57",
+    "kind": "lesson",
+    "state": "holds",
+    "fields": {
+     "says": "A { module } entry in a lib/components/page.js scripts list runs after every classic script wherever it is listed, so its list position means nothing; do not assert position in a guard. Test the order in a vm seam with document.readyState = \"loading\" (tests/unit/helpers/client-world.js) instead.",
+     "paths": [
+      "lib/components/page.js",
+      "tests/unit/shared-modules.test.js",
+      "tests/unit/helpers/client-world.js",
+      "docs/areas/front-end-browser.md"
+     ],
+     "checked-at": "1de016f52 (PR #2423, unmerged)"
+    },
+    "links": {
+     "on": [
+      "change-53@2"
+     ],
+     "about": [
+      "lesson-54"
+     ]
+    },
+    "in": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:56:29.000Z",
+    "by": "leftover"
+   }
+  ],
+  "finding-58": [
+   {
+    "id": "finding-58",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`public/common.js`: its `TERMINAL_TYPES` mirror of `lib/providers/models.js` still says `public/` cannot import it, but `lib/providers/models.js` is a leaf, so it could be shared like `lib/cost-format.js`. Folded into the front-end-browser note Waiting entry on the `public/common.js` client twins (beside task-page-href, timeline-zoom). A later slice, not this one."
+    },
+    "links": {
+     "about": [
+      "finding-19"
+     ]
+    },
+    "in": "area-1",
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:56:31.000Z",
+    "by": "leftover"
    }
   ]
  },
@@ -3821,6 +4000,110 @@
    "args": [
     "get",
     "finding-19",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:53.665Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "user-scalable",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:53.701Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "TERMINAL_TYPES",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:53.740Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "twin",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:53.778Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "vendor-assets",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:53.813Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "platform",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:53.848Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "front-end-pages",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:53.881Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "readyState",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:53.914Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "viewport",
     "--by",
     "leftover"
    ],
