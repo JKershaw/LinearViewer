@@ -1,5 +1,5 @@
 {
- "next": 45,
+ "next": 53,
  "records": {
   "area-1": [
    {
@@ -1460,6 +1460,28 @@
     "op": "add",
     "at": "2026-11-13T15:51:33.000Z",
     "by": "design"
+   },
+   {
+    "id": "check-42",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "The browser witness for piece 1 (MIME, CSP, `/lib/` path and module order) is a REWRITTEN `tests/e2e/workspace-kpis.spec.js` check, not a rerun: the existing one (`:211-227`) asserts `window.CostFormat.formatUsd(0.004)` on the KPI page and never looks at the cost axis, so once piece 1 drops the bridge from that page it fails with a TypeError. The new check asserts: `/lib/cost-format.js` loads 200 with a JavaScript MIME type (`page.waitForResponse`); no `pageerror` and no CSP refusal; the cost chart's y-axis formats with the shared formatter, e.g. `Chart.getChart(document.getElementById('chart-cost')).options.scales.y.ticks.callback(0.004) === '<$0.01'`. If Playwright cannot run in the building session, write it anyway, say so and leave it to CI. Do not mark it passed.",
+     "why-person": "Module order and CSP are runtime behaviour; a unit import under Node does not exercise them, and an inspection-only pass is how a runtime claim ships unwitnessed.",
+     "how": "Write the check, run `npx playwright test tests/e2e/workspace-kpis.spec.js` and paste the result, or record the waiver with the CI run that will carry it. It is the only real-browser proof of a page module importing `../lib/`."
+    },
+    "links": {
+     "about": [
+      "plan-39"
+     ]
+    },
+    "in": "task-16",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T15:56:48.000Z",
+    "by": "plan-review",
+    "reason": "plan review: the existing spec asserts window.CostFormat, not the cost axis, and fails once piece 1 drops the bridge; rewrite, not rerun"
    }
   ],
   "finding-43": [
@@ -1508,6 +1530,195 @@
     "op": "add",
     "at": "2026-11-13T15:56:47.000Z",
     "by": "plan-review"
+   }
+  ],
+  "finding-45": [
+   {
+    "id": "finding-45",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Build the import helper in piece 1, and it needs more than \"fake DOM on globalThis\" (decision-38). `task-page.js` uses bare `setTimeout`/`clearTimeout`/`setInterval`/`document` and `window.api`; the suites piece 2 migrates depend on `loadWorld`'s `timers` collector and window stubs (`task-page-question.test.js:223` `makePage`, `task-timeline-client.test.js:207`, `task-page-client.test.js:358/422/554`), and `task-page-client.test.js:423` runs the real classic `close-out.js` in the same world. Piece 1 has the same need: witness 3 needs `window.HarbourCharts`, which today comes from running the real classic `chart-helpers.js`. So the helper takes loadWorld's own `{ window, timers, globals }` options and installs them on `globalThis` with `window === globalThis`, gives one supported way to run a named classic sibling in that realm (`vm.runInThisContext`), restores everything it replaced, then imports the page fresh. Its own test covers \"two fresh imports share no state\" and \"globals are restored\". The `loadWorld` census cannot see complexity moved into the helper: keep it small enough that each migrated suite reads shorter than before, and say so in the piece description."
+    },
+    "links": {
+     "about": [
+      "plan-39",
+      "plan-40",
+      "decision-38"
+     ]
+    },
+    "in": "task-16",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:56:49.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-46": [
+   {
+    "id": "finding-46",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Witness 6's timing predicate is wrong for two of the three remaining bridge consumers. `observation.js` and `prompt-section.js` never branch on `readyState`; their registered witnesses (`observation-scan-due.test.js`, `lin-3833-run-control.test.js`) prove the timing rule by loading the script first and installing the global afterwards, never setting `document.readyState = 'loading'`. Only `cost-format-consumers.test.js` (flight-companion) does. Use a predicate all three meet: the witness file loads the consumer and only then calls `loadCostFormat` from `tests/fixtures/browser-cost-format.js`."
+    },
+    "links": {
+     "about": [
+      "plan-39",
+      "decision-37"
+     ]
+    },
+    "in": "task-16",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:56:50.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-47": [
+   {
+    "id": "finding-47",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Keep the renderer-coverage half of the current shim guard. `tests/unit/shared-modules.test.js:179-194` asserts that every script list naming a bridge consumer also lists the bridge as a module. The new inventory check replaces the hard-coded strings, not this assertion: piece 1 legitimately removes the bridge from `render-workspace-kpis.js`, and this is what catches an accidental removal from `render.js` and the other renderers."
+    },
+    "links": {
+     "about": [
+      "plan-39",
+      "decision-37"
+     ]
+    },
+    "in": "task-16",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:56:51.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-48": [
+   {
+    "id": "finding-48",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Bridge discovery in the inventory check: scan the whole module, not just its top level, and match bare reads. A `window.X =` inside a function in a converted module is just as much a bridge. On readers: `window` is the global object, so a classic file can read bare `CostFormat` as well as `window.CostFormat`."
+    },
+    "links": {
+     "about": [
+      "plan-39",
+      "decision-37"
+     ]
+    },
+    "in": "task-16",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:56:52.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-49": [
+   {
+    "id": "finding-49",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Witness 7 conflicts with a Waiting entry in another area note. `docs/areas/other-features.md`'s first Waiting entry cites `lib/cost-format.js` as its first path, so `area-notes.test.js` check 3 fails once the file moves to a front-end area. Moving it settles that entry (\"still in the catch-all\"): delete it and name it in what piece 1 retires. Read the `area-map-placement.test.js` pins first, as the plan says."
+    },
+    "links": {
+     "about": [
+      "plan-39"
+     ]
+    },
+    "in": "task-16",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:56:53.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-50": [
+   {
+    "id": "finding-50",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`/shared/` references reach further than piece 1 lists. Besides the allow-list, the bridge and its test: the comment in `lib/cost-format.js:12`; `tests/unit/cost-read-census.test.js:15` and `cost-format.test.js:3`; `tests/fixtures/browser-cost-format.js:3`; `docs/areas/other-features.md:17` and `docs/areas/platform-and-plumbing.md:18`; `docs/architecture/source-map.md:151,347`. The last is outside witness 10's grep scope, so widen it from `docs/areas/` to `docs/`. Also update the source-map lines for `workspace-kpis.js`/`task-page.js` if they call them classic."
+    },
+    "links": {
+     "about": [
+      "plan-39"
+     ]
+    },
+    "in": "task-16",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:56:54.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-51": [
+   {
+    "id": "finding-51",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Pins that will move. `render-workspace-kpis.test.js:154` pins `/workspace-kpis.js` before `/common.js` by index: if the entry moves, update the pin to say what is true, that a module's position in the list does not matter (lesson-5). `shared-modules.test.js:238` (`/lib/cost-format.js` is 404) flips to the 200 case. In piece 2, `lin-3975-task-run-control.test.js:586` and `no-page-wide-label-listener.test.js:247` read `task-page.js` source or the renderer's `SCRIPTS` as text; rerun them after removing the IIFE."
+    },
+    "links": {
+     "about": [
+      "plan-39",
+      "plan-40",
+      "lesson-5"
+     ]
+    },
+    "in": "task-16",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:56:55.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "run-52": [
+   {
+    "id": "run-52",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "plan-review",
+     "account": "Reviewed plan-39 and plan-40 against main at 5dcf5bcda and approved with notes, no blockers (verdict-44). The premises hold and the plan meets the ask: one bridge, shrinking under a check; two views is the ask's grain; all ten Waiting entries disposed; retiring the bridge now needs no John ruling. Corrected check-42 (the e2e spec asserts window.CostFormat, so it must be rewritten, not rerun) and left seven builder notes to implementation (finding-45..51): the import helper's real scope, witness 6's timing predicate, keeping the renderer-coverage assertion, whole-module bridge discovery, the other-features.md Waiting entry witness 7 breaks, the wider /shared/ references, and pins that will move."
+    },
+    "links": {},
+    "in": "task-16",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:56:56.000Z",
+    "by": "plan-review"
+   },
+   {
+    "id": "run-52",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "plan-review",
+     "account": "Reviewed plan-39 and plan-40 against main at 5dcf5bcda and approved with notes, no blockers (verdict-44). The premises hold and the plan meets the ask: one bridge, shrinking under a check; two views is the ask's grain; all ten Waiting entries disposed; retiring the bridge now needs no John ruling. Corrected check-42 (the e2e spec asserts window.CostFormat, so it must be rewritten, not rerun) and left seven builder notes to implementation (finding-45..51): the import helper's real scope, witness 6's timing predicate, keeping the renderer-coverage assertion, whole-module bridge discovery, the other-features.md Waiting entry witness 7 breaks, the wider /shared/ references, and pins that will move."
+    },
+    "links": {},
+    "in": "task-16",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:56:57.000Z",
+    "by": "plan-review",
+    "ended": {
+     "reason": "verdict, check revision and builder notes written"
+    }
    }
   ]
  },
@@ -2574,6 +2785,121 @@
     "finding-10",
     "--by",
     "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:30:49.463Z",
+   "by": "breakdown",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-16",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:30:56.021Z",
+   "by": "breakdown",
+   "cmd": "get",
+   "args": [
+    "get",
+    "plan-40",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:30:56.058Z",
+   "by": "breakdown",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-29",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:30:56.103Z",
+   "by": "breakdown",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--to",
+    "breakdown",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:30:56.143Z",
+   "by": "breakdown",
+   "cmd": "get",
+   "args": [
+    "get",
+    "check-42",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:31:00.501Z",
+   "by": "breakdown",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-43",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:31:00.536Z",
+   "by": "breakdown",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "task",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:31:00.572Z",
+   "by": "breakdown",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "LIN-4471",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:31:00.612Z",
+   "by": "breakdown",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "run",
+    "--state",
+    "open",
+    "--by",
+    "breakdown"
    ],
    "asOf": null
   }
