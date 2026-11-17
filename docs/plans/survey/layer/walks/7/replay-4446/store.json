@@ -1,5 +1,5 @@
 {
- "next": 27,
+ "next": 28,
  "records": {
   "area-1": [
    {
@@ -565,6 +565,41 @@
      "scope": "task-9"
     }
    }
+  ],
+  "run-27": [
+   {
+    "id": "run-27",
+    "kind": "run",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:18:45.775Z",
+    "by": "scoping",
+    "in": "task-9",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "stage": "scoping",
+     "account": "# What this stage really wrote\n\n## Added to LIN-4446 description by 13:22 (diff between the snapshots of 13:19:00 and 13:22:43)\n\n## Size of the move\n\n**Size:** just the task\n**Why:** The rule's reading goes into the notes and one cost formatter is shared with the browser, retiring its restated copy and parity check, then a pause for John; John ruled small, and no Survey finding must come first.\n**Cuts:** none\n**Decided by:** a ruling\n"
+    }
+   },
+   {
+    "id": "run-27",
+    "kind": "run",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T13:18:46.775Z",
+    "by": "scoping",
+    "in": "task-9",
+    "state": "done",
+    "ended": {
+     "reason": "scoping recorded: size just the task, decision-26"
+    },
+    "links": {},
+    "fields": {
+     "stage": "scoping",
+     "account": "# What this stage really wrote\n\n## Added to LIN-4446 description by 13:22 (diff between the snapshots of 13:19:00 and 13:22:43)\n\n## Size of the move\n\n**Size:** just the task\n**Why:** The rule's reading goes into the notes and one cost formatter is shared with the browser, retiring its restated copy and parity check, then a pause for John; John ruled small, and no Survey finding must come first.\n**Cuts:** none\n**Decided by:** a ruling\n"
+    }
+   }
   ]
  },
  "log": [
@@ -887,6 +922,99 @@
     "area": "area-1",
     "state": "open",
     "by": "scoping",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:27:00.042Z",
+   "by": "design",
+   "cmd": "show",
+   "args": {
+    "task": "task-9",
+    "by": "design",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:27:00.078Z",
+   "by": "design",
+   "cmd": "find",
+   "args": {
+    "area": "area-1",
+    "state": "open",
+    "by": "design",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:27:03.287Z",
+   "by": "design",
+   "cmd": "get",
+   "args": {
+    "by": "design",
+    "pos": [
+     "finding-11"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:27:03.324Z",
+   "by": "design",
+   "cmd": "get",
+   "args": {
+    "by": "design",
+    "pos": [
+     "finding-25"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:27:03.360Z",
+   "by": "design",
+   "cmd": "get",
+   "args": {
+    "by": "design",
+    "pos": [
+     "finding-5"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:27:03.402Z",
+   "by": "design",
+   "cmd": "get",
+   "args": {
+    "by": "design",
+    "pos": [
+     "finding-6"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:27:03.435Z",
+   "by": "design",
+   "cmd": "find",
+   "args": {
+    "kind": "plan",
+    "by": "design",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:27:03.465Z",
+   "by": "design",
+   "cmd": "find",
+   "args": {
+    "kind": "area",
+    "by": "design",
     "pos": []
    },
    "asOf": null

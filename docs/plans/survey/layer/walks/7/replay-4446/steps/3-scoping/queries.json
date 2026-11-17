@@ -1,0 +1,71 @@
+[
+ {
+  "at": "2026-11-17T20:26:10.561Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": {
+   "to": "scoping",
+   "state": "open",
+   "by": "scoping",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:10.592Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": {
+   "kind": "question",
+   "by": "scoping",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:10.620Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": {
+   "kind": "decision",
+   "by": "scoping",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:10.654Z",
+  "by": "scoping",
+  "cmd": "show",
+  "args": {
+   "task": "task-9",
+   "by": "scoping",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:17.712Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": {
+   "kind": "run",
+   "in": "task-9",
+   "by": "scoping",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:17.746Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": {
+   "area": "area-1",
+   "state": "open",
+   "by": "scoping",
+   "pos": []
+  },
+  "asOf": null
+ }
+]

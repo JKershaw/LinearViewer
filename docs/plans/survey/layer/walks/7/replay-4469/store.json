@@ -1,5 +1,5 @@
 {
- "next": 148,
+ "next": 151,
  "records": {
   "area-1": [
    {
@@ -3237,6 +3237,86 @@
      "if-unanswered": "hold (ruling lin-4469-cuts; on answer, resume and record on LIN-4469)"
     }
    }
+  ],
+  "finding-148": [
+   {
+    "id": "finding-148",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:39:48.874Z",
+    "by": "autopilot",
+    "in": "task-131",
+    "to": "area-1",
+    "state": "open",
+    "links": {
+     "about": [
+      "task-131",
+      "plan-117"
+     ]
+    },
+    "fields": {
+     "says": "Look-first skipped on piece 5: at 22:39Z recommend-and-dispatch on LIN-4469 sent `implementation` directly (dispatch b86c4a78). The ticket had only `## As asked` and `## Current`, with no size record, plan, PR or earlier run, so the look-first sequence (survey-task, survey-place, scoping; `lib/recommendation-look-first.js`) that ran on pieces 0 to 4 did not run. Not overridden or aborted: the plan is approved at the parent (verdict-124) and review has caught real gaps on every earlier piece. Raw material for the look-first rule (autopilot note on LIN-4448, comment cea38032)."
+    }
+   }
+  ],
+  "check-149": [
+   {
+    "id": "check-149",
+    "kind": "check",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:39:49.874Z",
+    "by": "autopilot",
+    "in": "task-131",
+    "to": "review",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-142",
+      "finding-148"
+     ]
+    },
+    "fields": {
+     "what": "Watch piece 5's review for an undersized or oversized move.",
+     "how": "Piece 5 went straight to implementation without the look-first sequence (survey-task, survey-place, scoping), so no stage sized the move before it was built (finding-148). In reviewing PR #2447, say whether the move was the right size for one piece."
+    }
+   }
+  ],
+  "run-150": [
+   {
+    "id": "run-150",
+    "kind": "run",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:39:50.874Z",
+    "by": "autopilot",
+    "in": "task-131",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "stage": "autopilot",
+     "account": "# What this stage really wrote\n\n## Comment on LIN-4448 (the parent) at 22:39:47 (id cea38032)\n\nAutopilot note: at 22:39Z recommend-and-dispatch on LIN-4469 (piece 5) sent `implementation` directly (dispatch b86c4a78). The ticket has only `## As asked` and `## Current`, with no size record, plan, PR or earlier run, so the look-first sequence (survey-task, survey-place, scoping) that ran on pieces 0 to 4 did not run. I did not override or abort: piece 5's plan is approved at the parent and review has caught real gaps on every earlier piece. Recorded as raw material for the look-first rule. Watch piece 5's review for an undersized or oversized move.\n"
+    }
+   },
+   {
+    "id": "run-150",
+    "kind": "run",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T22:39:51.874Z",
+    "by": "autopilot",
+    "in": "task-131",
+    "state": "done",
+    "ended": {
+     "reason": "Autopilot note on LIN-4448 recorded as finding-148 (to area-1) and check-149 (to review)"
+    },
+    "links": {},
+    "fields": {
+     "stage": "autopilot",
+     "account": "# What this stage really wrote\n\n## Comment on LIN-4448 (the parent) at 22:39:47 (id cea38032)\n\nAutopilot note: at 22:39Z recommend-and-dispatch on LIN-4469 (piece 5) sent `implementation` directly (dispatch b86c4a78). The ticket has only `## As asked` and `## Current`, with no size record, plan, PR or earlier run, so the look-first sequence (survey-task, survey-place, scoping) that ran on pieces 0 to 4 did not run. I did not override or abort: piece 5's plan is approved at the parent and review has caught real gaps on every earlier piece. Recorded as raw material for the look-first rule. Watch piece 5's review for an undersized or oversized move.\n"
+    }
+   }
   ]
  },
  "log": [
@@ -3464,6 +3544,110 @@
     "pos": [
      "review"
     ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:26:30.645Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": {
+    "text": "look-first",
+    "by": "autopilot",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:26:30.684Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": {
+    "to": "autopilot",
+    "state": "open",
+    "by": "autopilot",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:26:30.719Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": {
+    "text": "undersized",
+    "by": "autopilot",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:26:30.757Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": {
+    "kind": "task",
+    "by": "autopilot",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:26:39.033Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": {
+    "kind": "area",
+    "by": "autopilot",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:26:39.070Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": {
+    "path": "lib/recommendation-look-first.js",
+    "state": "open",
+    "by": "autopilot",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:26:39.111Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": {
+    "kind": "task",
+    "in": "task-108",
+    "by": "autopilot",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:26:39.144Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": {
+    "kind": "run",
+    "in": "task-131",
+    "by": "autopilot",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:27:01.004Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": {
+    "kind": "run",
+    "in": "task-131",
+    "by": "autopilot",
+    "pos": []
    },
    "asOf": null
   }
