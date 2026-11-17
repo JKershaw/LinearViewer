@@ -1,0 +1,214 @@
+[
+ {
+  "at": "2026-11-17T20:25:22.573Z",
+  "by": "implementation",
+  "cmd": "brief",
+  "args": {
+   "task": "task-60",
+   "by": "survey-task",
+   "pos": [
+    "implementation"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:28:33.761Z",
+  "by": "implementation",
+  "cmd": "find",
+  "args": {
+   "kind": "task",
+   "by": "implementation",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:28:33.803Z",
+  "by": "implementation",
+  "cmd": "find",
+  "args": {
+   "kind": "change",
+   "by": "implementation",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:28:33.839Z",
+  "by": "implementation",
+  "cmd": "find",
+  "args": {
+   "kind": "run",
+   "by": "implementation",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:28:36.982Z",
+  "by": "implementation",
+  "cmd": "get",
+  "args": {
+   "by": "implementation",
+   "pos": [
+    "task-53"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:28:37.027Z",
+  "by": "implementation",
+  "cmd": "get",
+  "args": {
+   "by": "implementation",
+   "pos": [
+    "task-60"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:28:37.068Z",
+  "by": "implementation",
+  "cmd": "get",
+  "args": {
+   "by": "implementation",
+   "pos": [
+    "task-61"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:28:37.113Z",
+  "by": "implementation",
+  "cmd": "get",
+  "args": {
+   "by": "implementation",
+   "pos": [
+    "task-62"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:28:37.155Z",
+  "by": "implementation",
+  "cmd": "get",
+  "args": {
+   "by": "implementation",
+   "pos": [
+    "run-66"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:28:37.190Z",
+  "by": "implementation",
+  "cmd": "get",
+  "args": {
+   "by": "implementation",
+   "pos": [
+    "run-81"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:28:41.791Z",
+  "by": "implementation",
+  "cmd": "find",
+  "args": {
+   "state": "open",
+   "by": "implementation",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:28:41.833Z",
+  "by": "implementation",
+  "cmd": "find",
+  "args": {
+   "to": "implementation",
+   "by": "implementation",
+   "count": true,
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:28:41.866Z",
+  "by": "implementation",
+  "cmd": "find",
+  "args": {
+   "kind": "plan",
+   "by": "implementation",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:28:44.593Z",
+  "by": "implementation",
+  "cmd": "get",
+  "args": {
+   "by": "implementation",
+   "pos": [
+    "finding-78"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:28:44.641Z",
+  "by": "implementation",
+  "cmd": "get",
+  "args": {
+   "by": "implementation",
+   "pos": [
+    "finding-79"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:28:44.682Z",
+  "by": "implementation",
+  "cmd": "get",
+  "args": {
+   "by": "implementation",
+   "pos": [
+    "finding-80"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:19.425Z",
+  "by": "implementation",
+  "cmd": "get",
+  "args": {
+   "by": "implementation",
+   "pos": [
+    "decision-82"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:58.904Z",
+  "by": "implementation",
+  "cmd": "find",
+  "args": {
+   "in": "task-60",
+   "state": "open",
+   "by": "implementation",
+   "pos": []
+  },
+  "asOf": null
+ }
+]

@@ -1,0 +1,26 @@
+undefined undefined vundefined [undefined] by undefined
+task-60 task v1 [open] by breakdown
+decision-63 decision v1 [stands] by breakdown
+run-66 run v2 [done] by survey-task
+question-67 question v2 [answered] to implementation answered-by decision-85 by implementation
+question-68 question v2 [answered] to implementation answered-by decision-82 by implementation
+check-69 check v2 [handed-on] to implementation by implementation
+finding-70 finding v2 [open] to review by implementation
+finding-71 finding v2 [done] to implementation by implementation
+finding-72 finding v2 [done] to implementation by implementation
+finding-73 finding v2 [done] to implementation by implementation
+finding-74 finding v2 [open] to review by implementation
+finding-75 finding v2 [handed-on] to implementation by implementation
+finding-76 finding v2 [done] to implementation by implementation
+finding-77 finding v2 [done] to implementation by implementation
+run-81 run v2 [done] by survey-place
+decision-82 decision v1 [stands] by scoping
+run-83 run v2 [done] by scoping
+change-84 change v1 [open] to review by implementation
+decision-85 decision v1 [stands] by implementation
+decision-86 decision v1 [stands] by implementation
+decision-87 decision v1 [stands] by implementation
+decision-88 decision v1 [stands] by implementation
+decision-89 decision v1 [stands] by implementation
+finding-91 finding v1 [open] to review by implementation
+run-93 run v2 [done] by implementation

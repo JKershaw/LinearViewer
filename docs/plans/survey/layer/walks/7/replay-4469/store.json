@@ -1,5 +1,5 @@
 {
- "next": 160,
+ "next": 161,
  "records": {
   "area-1": [
    {
@@ -3328,6 +3328,36 @@
      "recommended": "Fold (review’s recommendation; implementation had recommended Accept on the 11-kind figure): it is small and is the parent’s aim.",
      "if-unanswered": "hold (ruling lin-4469-cuts; on answer, resume and record on LIN-4469)"
     }
+   },
+   {
+    "id": "question-147",
+    "kind": "question",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T23:03:16.769Z",
+    "by": "John",
+    "in": "task-131",
+    "to": "John",
+    "state": "answered",
+    "ended": {
+     "reason": "ruling lin-4469-cuts answered by John: option fold (decision-160)"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-146",
+      "decision-140"
+     ]
+    },
+    "fields": {
+     "asks": "LIN-4469 PR #2447: accept two cuts to the ask? (1) \"A net fall across every kind\": in real context (the proxy preamble is part of the dispatched prompt) look-into, retro, context, survey-task, survey-place, blind-read and triage do fall (none -74, one-comment -23, blind-comment -24, ticket-fields -67); only blocked, breakdown, close-out and retrospective-audit (all `work`) are byte-identical, because they carry none of the folded text. (2) The guarded tracker clause is left unfolded in the survey-task, survey-place and blind-read templates (`lib/prompt-template-defs.js` ~975/994/1065) and in triage (~268: \"do not rewrite the task’s description … do not create follow-up tasks or subtasks\", which `ticket-fields` now refuses).",
+     "options": [
+      "Fold: shrink the guarded clauses at ~268/975/994/1065 to the code, branch and PR words too (back to implementation, re-pinned ceilings, lower FROZEN_TOTAL_BYTES); accept the four work kinds as unable to fall",
+      "Accept: leave them; close-out makes Fixes 1-5 and a Waiting entry in docs/areas/llm-and-prompts.md names the unfolded clauses"
+     ],
+     "recommended": "Fold (review’s recommendation; implementation had recommended Accept on the 11-kind figure): it is small and is the parent’s aim.",
+     "if-unanswered": "hold (ruling lin-4469-cuts; on answer, resume and record on LIN-4469)"
+    }
    }
   ],
   "finding-148": [
@@ -3621,6 +3651,34 @@
     "fields": {
      "what": "No builder `### Leftovers` answer with a `Retires:` line is on LIN-4469, so the gate-format check has nothing to check against (settle before the merge).",
      "how": "Post the leftover answer; its `Retires:` line must name a Waiting entry the diff removes or rewrites (notes-PR, committed-tool, first-match or CUT; not the retirement line until Fix 1 lands)."
+    }
+   }
+  ],
+  "decision-160": [
+   {
+    "id": "decision-160",
+    "kind": "decision",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:03:15.769Z",
+    "by": "John",
+    "in": "task-131",
+    "to": "implementation",
+    "state": "stands",
+    "links": {
+     "answers": "question-147",
+     "on": [
+      "question-147@2"
+     ],
+     "about": [
+      "finding-146",
+      "change-142"
+     ]
+    },
+    "fields": {
+     "scope": "task-131",
+     "answer": "Ruling lin-4469-cuts answered (John, 13 Nov 23:03:14, via Harbour; LIN-4469 comment 62f57ef4): option `fold`. \"Fold the guarded clause in survey-task, survey-place and blind-read templates too.\"",
+     "why": "John chose `fold`, the option review recommended (question-147 v2: back to implementation, re-pinned ceilings, lower FROZEN_TOTAL_BYTES; the four `work` kinds accepted as unable to fall). The comment text is the v1 wording of the option and names only survey-task, survey-place and blind-read (~975/994/1065); the v2 `fold` option also lists triage (~268). The ruling does not say whether triage is left out on purpose."
     }
    }
   ]
@@ -4167,6 +4225,98 @@
     "state": "open",
     "by": "review",
     "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:29:46.443Z",
+   "by": "John",
+   "cmd": "find",
+   "args": {
+    "to": "John",
+    "state": "open",
+    "by": "John",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:29:46.480Z",
+   "by": "John",
+   "cmd": "find",
+   "args": {
+    "kind": "question",
+    "by": "John",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:29:46.517Z",
+   "by": "John",
+   "cmd": "find",
+   "args": {
+    "text": "cuts",
+    "by": "John",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:29:46.549Z",
+   "by": "John",
+   "cmd": "find",
+   "args": {
+    "text": "fold",
+    "by": "John",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:29:49.414Z",
+   "by": "John",
+   "cmd": "get",
+   "args": {
+    "by": "John",
+    "pos": [
+     "question-147"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:29:49.451Z",
+   "by": "John",
+   "cmd": "find",
+   "args": {
+    "to": "John",
+    "state": "open",
+    "by": "John",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:29:57.152Z",
+   "by": "John",
+   "cmd": "show",
+   "args": {
+    "task": "task-131",
+    "by": "John",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:30:13.308Z",
+   "by": "John",
+   "cmd": "get",
+   "args": {
+    "by": "John",
+    "pos": [
+     "question-147"
+    ]
    },
    "asOf": null
   }
