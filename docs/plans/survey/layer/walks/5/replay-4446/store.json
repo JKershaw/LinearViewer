@@ -1,5 +1,5 @@
 {
- "next": 62,
+ "next": 64,
  "records": {
   "area-1": [
    {
@@ -3033,6 +3033,48 @@
     "op": "add",
     "at": "2026-11-13T15:07:32.000Z",
     "by": "review"
+   }
+  ],
+  "run-62": [
+   {
+    "id": "run-62",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "blind-read",
+     "account": "Blind read of PR #2423 at 1de016f52 against 4b5001ddf: better. The USD formatter has one owner again (lib/cost-format.js served as-is at /shared/cost-format.js through a file-by-file SHARED_MODULES allow-list; the hand copy and its parity test deleted; guards for leaf purity, boot failure and 404s). Worse: the module-to-global shim brings back a global and a DOMContentLoaded-only timing rule that only per-consumer tests and four restating comments carry. Two fix-sized wording leftovers sent to close-out; two larger items (a general way for classic pages to take shared modules; the hand-synced ship twins) left to the area. Nothing outside the area."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:12:07.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "verdict-63": [
+   {
+    "id": "verdict-63",
+    "kind": "verdict",
+    "state": "stands",
+    "fields": {
+     "of": "blind-read",
+     "outcome": "better",
+     "reasoning": "Read PR #2423 at 1de016f52 against 4b5001ddf. Better: the USD formatter has one owner again. lib/cost-format.js is served as-is at /shared/cost-format.js through a separate, file-by-file SHARED_MODULES allow-list in lib/vendor-assets.js, so the hand-copied public/cost-format.js and its parity test are deleted, with guards for leaf purity, boot failure and the 404s. Worse: public/cost-format-global.js turns the formatter back into a global, which brings in a timing rule nothing checks generally: each classic consumer may read window.CostFormat only after DOMContentLoaded. Four files now explain that rule in comments, and public/workspace-kpis.js had to move its whole build into a listener."
+    },
+    "links": {
+     "on": [
+      "change-53@2"
+     ],
+     "about": [
+      "change-53"
+     ]
+    },
+    "in": "task-9",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:12:08.000Z",
+    "by": "blind-read"
    }
   ]
  },

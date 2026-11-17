@@ -1,5 +1,5 @@
 {
- "next": 165,
+ "next": 169,
  "records": {
   "area-1": [
    {
@@ -3724,6 +3724,27 @@
     "op": "add",
     "at": "2026-11-13T22:59:45.000Z",
     "by": "review"
+   },
+   {
+    "id": "finding-153",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Fix 5 remainder: on merge, revise lesson-10 \"import-free leaf\" to \"a leaf that imports only leaves (`area-registry-path.js`)\". The import move is done at 05b592742 (it is at the top of `lib/prompts/leftover-words.js`) and the docs Lesson in `docs/areas/llm-and-prompts.md` is already updated; only the store lesson goes stale."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "lesson-10"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T23:17:16.000Z",
+    "by": "review",
+    "reason": "Re-review at 05b592742: the import is at the module top and the docs Lesson is updated; only the lesson-10 revision on merge remains."
    }
   ],
   "finding-154": [
@@ -3794,6 +3815,32 @@
     "op": "add",
     "at": "2026-11-13T22:59:47.000Z",
     "by": "review"
+   },
+   {
+    "id": "check-155",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "After deploy, confirm restricted dispatches carry a stamped token so the shrunk mandates are backed: a look-into token comment POST gets 403 from the stage gate; a triage token description PATCH gets 403.",
+     "why-person": "Needs a real dispatch on the deployed proxy; LIN-4468 notes a missing row mints stage-less (unrestricted), and CI cannot show what live rows carry.",
+     "how": "Dispatch a look-into and a triage after deploy and try each write with its token: the look-into comment POST must return 403 (none), the triage description PATCH 403 (ticket-fields). Distinguishing precondition: the token was minted from a dispatch whose stage row exists. A 2xx means a guarded clause is gone from the prompt with no backstop. Rollback: revert the PR #2447 merge commit, which restores the words; no data shape changes, so it is reversible."
+    },
+    "links": {
+     "about": [
+      "change-142"
+     ],
+     "on": [
+      "lesson-13@1",
+      "lesson-53@1"
+     ]
+    },
+    "in": "task-131",
+    "to": "John",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T23:17:15.000Z",
+    "by": "review",
+    "reason": "Re-review at 05b592742 adds the precondition that tells a real pass from an unrestricted mint, and the expected writes kind for each 403."
    }
   ],
   "run-156": [
@@ -3969,6 +4016,38 @@
     "at": "2026-11-13T23:05:27.000Z",
     "by": "implementation",
     "reason": "Implementation's measurement on 05b592742 adds the seams-tangles +24 exception and the net figure; the question said the other kinds all fall."
+   },
+   {
+    "id": "question-159",
+    "kind": "question",
+    "state": "withdrawn",
+    "fields": {
+     "asks": "LIN-4469 asks for a net rendered-byte fall across every kind. Measured on PR #2447 head 05b592742, real-context renders with proxy preambles fall 827520 -> 825330 bytes (-2190), with two exceptions: four work kinds (blocked, breakdown, close-out, retrospective-audit) carry none of the folded text and stay byte-identical, and seams-tangles rises +24 from the committed-tool wording (Stability's spelling, now shared). Accept both as meeting the ask? (Ruling lin-4469-witness; the fold itself is decision-157.)",
+     "options": [
+      "accept: the witness holds for every kind that carries folded text; the four work kinds cannot fall, and the +24 is the one shared spelling",
+      "require: a fall for all of them; fold more text out of those kinds' prompts"
+     ],
+     "recommended": "accept",
+     "if-unanswered": "The cut stays unagreed: the build fixes continue, but PR #2447 does not merge"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "question-144"
+     ],
+     "on": [
+      "decision-157@1"
+     ]
+    },
+    "in": "task-131",
+    "to": "John",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T23:17:17.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "Ruling lin-4469-witness was withdrawn as moot at 23:17Z on LIN-4469, not answered (the withdrawal was not in the store): a kind that carries no folded text cannot fall, the reason decision-157 was proposed on. Review reads net as net across kinds, so the four work kinds meet it. The seams-tangles +24 half is not a ruling: it is a self-inflicted addition, and finding-166 (Fix 1) removes it."
+    }
    }
   ],
   "decision-160": [
@@ -4249,6 +4328,107 @@
     "op": "add",
     "at": "2026-11-13T23:16:15.000Z",
     "by": "leftover"
+   }
+  ],
+  "run-165": [
+   {
+    "id": "run-165",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "review",
+     "account": "Re-reviewed PR #2447 at 05b592742 (two commits since my first review at 3533f37c2: the fold under decision-157, then triage fold, docs pointers, test gap, re-pin). CI green; 13 local prompt suites, 1493 pass. My own render script reproduced 827520 -> 825330 (-2190): 56 of 72 renders fall, the four work kinds and three Periodicals carry no folded text and stay equal, and seams-tangles rises +24 because of a hand-typed parenthesis that folds nothing; dropping it gives -2 and -2242. Every As asked sentence is met except that one. The new test went red on four mutations. FROZEN_TOTAL_BYTES 396064 meets decision-140. Verdict: approve-with-notes, conditional on close-out applying Fix 1 (seams parenthesis) and Fix 2 (stray budget comment) and re-measuring; the post-deploy 403 check stays with John. question-159 ended withdrawn: its ruling was withdrawn as moot at 23:17Z. I left check-148 open: I compared the PR to the ask but did not judge the move size."
+    },
+    "links": {},
+    "in": "task-131",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:17:11.000Z",
+    "by": "review"
+   },
+   {
+    "id": "run-165",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "review",
+     "account": "Re-reviewed PR #2447 at 05b592742 (two commits since my first review at 3533f37c2: the fold under decision-157, then triage fold, docs pointers, test gap, re-pin). CI green; 13 local prompt suites, 1493 pass. My own render script reproduced 827520 -> 825330 (-2190): 56 of 72 renders fall, the four work kinds and three Periodicals carry no folded text and stay equal, and seams-tangles rises +24 because of a hand-typed parenthesis that folds nothing; dropping it gives -2 and -2242. Every As asked sentence is met except that one. The new test went red on four mutations. FROZEN_TOTAL_BYTES 396064 meets decision-140. Verdict: approve-with-notes, conditional on close-out applying Fix 1 (seams parenthesis) and Fix 2 (stray budget comment) and re-measuring; the post-deploy 403 check stays with John. question-159 ended withdrawn: its ruling was withdrawn as moot at 23:17Z. I left check-148 open: I compared the PR to the ask but did not judge the move size."
+    },
+    "links": {},
+    "in": "task-131",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:17:19.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "re-review posted (approve, conditional on close-out), records written"
+    }
+   }
+  ],
+  "finding-166": [
+   {
+    "id": "finding-166",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Fix 1, before the merge: in `lib/periodicals.js` `generateSeamsTanglesPrompt`, first runReview bullet, drop the hand-typed `(no path is written here)` so it reads \"Find both by searching the repo for them, read how the tool is run\" (main's words). It folds nothing (it is not rendered through `committedSearch`, and main never had it) and is why seams-tangles and its autopilot form rise +24 (+26 parenthesis, +28 `committedSearch`, -30 `NOTES_PR`). Without it seams-tangles falls -2 and the total is 827520 -> 825278 (-2242). Then: re-pin both seams-tangles hashes in `tests/unit/lin-4313-periodical-prompt-bytes.test.js:94`; update the LIN-4469 change-log row (`scripts/prompt-template-change-log.md:635`) to the new figures, drop the \"Up\" clause, and make the ruling sentence \"four `work` kinds unchanged; `lin-4469-witness` withdrawn as moot\"; update the PR body's Measured and DECISION sections. `periodicals.js` is in no budgeted source ceiling, so FROZEN_TOTAL_BYTES is unaffected."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "question-159"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:17:12.000Z",
+    "by": "review"
+   }
+  ],
+  "finding-167": [
+   {
+    "id": "finding-167",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Fix 2: in `tests/unit/prompt-size-budget.test.js:146`, delete the stray fragment \"(396821 -> 396571), the rest was unused headroom. \" from the FROZEN_TOTAL_BYTES comment. It follows \"...(396821 -> 396559), the rest was unused headroom.\" and matches no figure."
+    },
+    "links": {
+     "about": [
+      "change-142"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:17:13.000Z",
+    "by": "review"
+   }
+  ],
+  "check-168": [
+   {
+    "id": "check-168",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "Before the merge, after Fix 1 (finding-166): re-run a base-vs-head real-context render (base b937237a4): every stage kind in fresh and fix mode, each with its own writes preamble, and all 13 Periodicals in plain and autopilot form.",
+     "how": "Right: every render that carries folded text falls, seams-tangles shows -2, and the total is 827520 -> 825278 (-2242). Wrong: any non-work stage kind or Periodical that carries folded text at >= 0. The four work kinds and Stability, Recent Headwinds and Integration Surface Maturity stay equal: they carry no folded text."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-166"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:17:14.000Z",
+    "by": "review"
    }
   ]
  },
