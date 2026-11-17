@@ -3379,6 +3379,36 @@
     "asOf": null
    },
    "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:52:36.657Z",
+   "by": "leftover",
+   "query": "get",
+   "args": {
+    "id": "lesson-10",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:52:36.688Z",
+   "by": "leftover",
+   "query": "get",
+   "args": {
+    "id": "finding-88",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:52:36.720Z",
+   "by": "leftover",
+   "query": "find",
+   "args": {
+    "area": "area-1",
+    "state": "open"
+   },
+   "returned": 23
   }
  ],
  "hits": []
