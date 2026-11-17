@@ -1,0 +1,177 @@
+[
+ {
+  "at": "2026-11-17T13:52:31.427Z",
+  "by": "review",
+  "query": "get",
+  "args": {
+   "id": "change-97",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:31.462Z",
+  "by": "review",
+  "query": "get",
+  "args": {
+   "id": "finding-100",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:31.500Z",
+  "by": "review",
+  "query": "get",
+  "args": {
+   "id": "finding-101",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:31.534Z",
+  "by": "review",
+  "query": "get",
+  "args": {
+   "id": "finding-104",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:31.567Z",
+  "by": "review",
+  "query": "get",
+  "args": {
+   "id": "question-84",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:36.943Z",
+  "by": "review",
+  "query": "find",
+  "args": {
+   "text": "formatRuntime"
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:36.975Z",
+  "by": "review",
+  "query": "find",
+  "args": {
+   "kind": "check",
+   "state": "open"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:52:37.011Z",
+  "by": "review",
+  "query": "find",
+  "args": {
+   "to": "close-out"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:52:37.049Z",
+  "by": "review",
+  "query": "find",
+  "args": {
+   "text": "Safari"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:52:43.107Z",
+  "by": "review",
+  "query": "get",
+  "args": {
+   "id": "finding-99",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:43.145Z",
+  "by": "review",
+  "query": "find",
+  "args": {
+   "kind": "check"
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:43.205Z",
+  "by": "review",
+  "query": "find",
+  "args": {
+   "kind": "run"
+  },
+  "returned": 5
+ },
+ {
+  "at": "2026-11-17T13:52:47.573Z",
+  "by": "review",
+  "query": "get",
+  "args": {
+   "id": "check-86",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:53:39.699Z",
+  "by": "review",
+  "query": "get",
+  "args": {
+   "id": "finding-100",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:53:39.759Z",
+  "by": "review",
+  "query": "get",
+  "args": {
+   "id": "finding-101",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:53:39.803Z",
+  "by": "review",
+  "query": "get",
+  "args": {
+   "id": "finding-104",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:53:39.854Z",
+  "by": "review",
+  "query": "get",
+  "args": {
+   "id": "run-108",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:53:39.895Z",
+  "by": "review",
+  "query": "get",
+  "args": {
+   "id": "change-97",
+   "asOf": null
+  },
+  "returned": 1
+ }
+]

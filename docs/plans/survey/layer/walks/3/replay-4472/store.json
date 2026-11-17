@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 108,
+ "next": 115,
  "records": {
   "task-1": {
    "id": "task-1",
@@ -2777,6 +2777,24 @@
       "about": "plan-10"
      },
      "reason": "Corrected: summary-and-time was shortened (372 to 369); only run-control and chat-fold were re-anchored without shortening."
+    },
+    {
+     "v": 3,
+     "op": "end",
+     "at": "2026-11-13T18:07:23.000Z",
+     "by": "review",
+     "in": "task-28",
+     "to": "review",
+     "state": "handed-on",
+     "fields": {
+      "says": "PR #2436 does not fully meet plan-10's \"each migrated suite reads shorter\": most migrated suites are shorter by 3-7 lines (`lin-3975-summary-and-time` among them), but `lin-3975-task-run-links` grew by 4 (its replacement clock test), and `lin-3975-task-run-control` and `lin-3975-chat-fold` were only re-anchored on names, not shortened. The added complexity is `tests/unit/helpers/task-page-world.js` (36 lines, shared by three suites), which the census cannot see. Judge whether this meets the ask; the PR has the per-suite before/after table."
+     },
+     "links": {
+      "about": "plan-10"
+     },
+     "reason": "Judged in verdict-114: met only in part. run-control and chat-fold were re-anchored, not migrated, so they do not count; the one real shortfall (run-links 228 to 232) is carried by finding-109, which makes it 218.",
+     "stateReason": "Judged in verdict-114: met only in part. run-control and chat-fold were re-anchored, not migrated, so they do not count; the one real shortfall (run-links 228 to 232) is carried by finding-109, which makes it 218.",
+     "takeover": "finding-109"
     }
    ]
   },
@@ -2798,6 +2816,23 @@
      "links": {
       "about": "decision-98"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T18:07:24.000Z",
+     "by": "review",
+     "in": "task-28",
+     "to": "review",
+     "state": "done",
+     "fields": {
+      "says": "Behaviour change in PR #2436: the page's old `formatElapsed(Infinity)` returned `\"Infinityh\"`; the shared `fmtDuration(Infinity)` returns `null`. I checked the old function in git; no page path passes a non-finite span (`tickClocks` skips unparsed starts; `Date.now()` minus a parsed start is finite). Pinned by `tests/unit/lin-4472-time-words.test.js`. Also `shareTime(doc, value, now)` gained an optional `now` (default `new Date()`, as `relativeAgo` uses)."
+     },
+     "links": {
+      "about": "decision-98"
+     },
+     "reason": "Checked: the Infinityh-to-null edge cannot occur on a page path (unparsed starts are skipped), pinned by lin-4472-time-words; the shareTime mutation turned it red. Accepted in verdict-114.",
+     "stateReason": "Checked: the Infinityh-to-null edge cannot occur on a page path (unparsed starts are skipped), pinned by lin-4472-time-words; the shareTime mutation turned it red. Accepted in verdict-114."
     }
    ]
   },
@@ -2908,6 +2943,23 @@
      "links": {
       "about": "change-97"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T18:07:25.000Z",
+     "by": "review",
+     "in": "task-28",
+     "to": "review",
+     "state": "done",
+     "fields": {
+      "says": "PR #2436 head moved to `ffa70b7821e9859a403e043e1ea55d588b67ac73` after the leftover tidies, so review that head, not `a6492a984` (change-97 still names the old head; leftover may not revise it). The tidies: every server caller of `fmtDuration`/`relativeAgo` imports `lib/time-words.js`; the re-exports in `lib/render-run-steps.js` and `lib/task-page-loader.js` are gone; the identity test in `lin-4472-time-words.test.js` is now a guard (no `lib/`, `routes/` or `server.js` module but the leaf defines or re-exports either name), and re-adding one re-export as a mutation failed it. The `lib/time-words.js` header and `docs/architecture/source-map.md` (render-run-steps exports, time-words entry) no longer say the server re-exports. CI green on the new head: CI success, both unit jobs, E2E shards 1-4, secret scan."
+     },
+     "links": {
+      "about": "change-97"
+     },
+     "reason": "Reviewed head ffa70b782, not a6492a984: re-exports gone, guard confirmed by mutation, CI green. Review may not revise change-97's head either (refused, rule 6); verdict-114 names the reviewed head.",
+     "stateReason": "Reviewed head ffa70b782, not a6492a984: re-exports gone, guard confirmed by mutation, CI green. Review may not revise change-97's head either (refused, rule 6); verdict-114 names the reviewed head."
     }
    ]
   },
@@ -3012,6 +3064,172 @@
      },
      "reason": "Leftovers recorded.",
      "stateReason": "Leftovers recorded."
+    }
+   ]
+  },
+  "run-108": {
+   "id": "run-108",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T18:07:16.000Z",
+     "by": "review",
+     "in": "task-28",
+     "state": "open",
+     "fields": {
+      "stage": "review",
+      "account": "Reviewed PR #2436 at head ffa70b782 (merge base main 5cf4f6aa2, CI green on that head) against LIN-4472 and plan-10 piece 2, sentence by sentence. Diffed task-page.js ignoring whitespace, word-diffed the golden (7 type=module only), confirmed lib/time-words.js is the old server functions byte for byte and every server caller imports it, ran 30 targeted suites (557 pass), and ran nine mutations, each turning its claimed test red, including a real-browser one (broken import fails the e2e task-page spec). Regression log and caching (no-store HTML, ETag on the module) clean. Sibling copies are already carried on area-49. Approve with notes: three fixes for close-out (F1 run-links shorter, F2 stale PR body, F3 nits) and two live checks for John after the deploy."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T18:07:26.000Z",
+     "by": "review",
+     "in": "task-28",
+     "state": "done",
+     "fields": {
+      "stage": "review",
+      "account": "Reviewed PR #2436 at head ffa70b782 (merge base main 5cf4f6aa2, CI green on that head) against LIN-4472 and plan-10 piece 2, sentence by sentence. Diffed task-page.js ignoring whitespace, word-diffed the golden (7 type=module only), confirmed lib/time-words.js is the old server functions byte for byte and every server caller imports it, ran 30 targeted suites (557 pass), and ran nine mutations, each turning its claimed test red, including a real-browser one (broken import fails the e2e task-page spec). Regression log and caching (no-store HTML, ETag on the module) clean. Sibling copies are already carried on area-49. Approve with notes: three fixes for close-out (F1 run-links shorter, F2 stale PR body, F3 nits) and two live checks for John after the deploy."
+     },
+     "links": {},
+     "reason": "Review written: verdict-114, findings 109-111 to close-out, checks 112-113 to John.",
+     "stateReason": "Review written: verdict-114, findings 109-111 to close-out, checks 112-113 to John."
+    }
+   ]
+  },
+  "finding-109": {
+   "id": "finding-109",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T18:07:17.000Z",
+     "by": "review",
+     "in": "task-28",
+     "to": "close-out",
+     "state": "open",
+     "fields": {
+      "says": "F1. `tests/unit/lin-3975-task-run-links.test.js` must read shorter (plan-10: each migrated suite reads shorter; it grew 228 to 232). Move the test `the page's running clock paints fmtDuration's words for every span it can show` (currently `:211-221`) into `tests/unit/lin-4472-time-words.test.js`, inside its `describe`, and change that file's import to `import { shareTime, tickClocks } from '../../public/task-page.js';`. In run-links, delete the now-unused imports of `createFakeDom` and `tickClocks`, and change the header bullet at `:10` to say the server's running suffix is fmtDuration's words and the page's clock is pinned in `lin-4472-time-words.test.js`. Tried in review: run-links becomes 218 lines (base 228), both suites pass (24/24), and the moved test still fails when `tickClocks` stops calling `fmtDuration`. Make before merge; re-check CI on the new head."
+     },
+     "links": {
+      "about": "change-97"
+     }
+    }
+   ]
+  },
+  "finding-110": {
+   "id": "finding-110",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T18:07:18.000Z",
+     "by": "review",
+     "in": "task-28",
+     "to": "close-out",
+     "state": "open",
+     "fields": {
+      "says": "F2. PR #2436 body is stale since `ffa70b782`. Its What-changed bullet says `render-run-steps.js` and `task-page-loader.js` \"re-export them, so no caller changed\". Change it to say every server caller imports `lib/time-words.js` and a guard in `lin-4472-time-words.test.js` forbids re-exports. After F1, update the run-links row in the shorter-suites table. Make before merge."
+     },
+     "links": {
+      "about": "change-97"
+     }
+    }
+   ]
+  },
+  "finding-111": {
+   "id": "finding-111",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T18:07:19.000Z",
+     "by": "review",
+     "in": "task-28",
+     "to": "close-out",
+     "state": "open",
+     "fields": {
+      "says": "F3. Nits in `tests/unit/task-page-client.test.js`: remove the unused `(t)` parameter on `a guest share state URL reports gone`, and the extra blank line left just after the imports where `load()` was removed. Make before merge."
+     },
+     "links": {
+      "about": "change-97"
+     }
+    }
+   ]
+  },
+  "check-112": {
+   "id": "check-112",
+   "kind": "check",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T18:07:20.000Z",
+     "by": "review",
+     "in": "task-28",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "what": "After the deploy, the task page behaves as before in browsers other than Chromium: a module script at the root importing ../lib/time-words.js loads under script-src 'self'.",
+      "why-person": "CI Playwright runs Chromium only (no projects in playwright.config.js); Safari and Firefox on a live owner session are on your own devices.",
+      "how": "Open a live owner task page with a running stage in Safari and in Firefox. Right if /task-page.js and /lib/time-words.js both return 200 with a JavaScript MIME type, the console shows no error or CSP refusal, the stage clock reads `in progress · Xm` and ticks, and the share list shows \"N minutes ago\". Wrong if the clock stays at its server text and the console shows a module or MIME error. Rollback: revert the squash commit of #2436 (nothing persisted, no third-party consumer, fully reversible)."
+     },
+     "links": {
+      "about": "change-97"
+     }
+    }
+   ]
+  },
+  "check-113": {
+   "id": "check-113",
+   "kind": "check",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T18:07:21.000Z",
+     "by": "review",
+     "in": "task-28",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "what": "Acceptance: merged and verified on its own after piece 1, on the deployed site.",
+      "why-person": "Needs the deployed site with a live owner session and a real guest share token.",
+      "how": "On the deployed site, load one owner task page and one guest share page (/t/<token>). Right if the poll repaints the header without a reload and there is no pageerror. Rollback: revert the squash commit of #2436."
+     },
+     "links": {
+      "about": "plan-10"
+     }
+    }
+   ]
+  },
+  "verdict-114": {
+   "id": "verdict-114",
+   "kind": "verdict",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T18:07:22.000Z",
+     "by": "review",
+     "in": "task-28",
+     "state": "stands",
+     "fields": {
+      "of": "review",
+      "outcome": "approve-with-notes",
+      "reasoning": "Approve, conditional on close-out discharging the ledger. Reviewed PR #2436 at head ffa70b7821e9 (not change-97's recorded a6492a984; see finding-104), merge base main 5cf4f6aa2, CI green on that head. Every sentence of plan-10 piece 2 is met: IIFE and typeof-module seam gone, named exports, SCRIPTS entry `{ module: '/task-page.js' }`, one listener still last, no window writes (bridge-inventory: only cost-format-global.js writes), golden diff exactly 7 type=module, five suites migrated with close-out.js run through runClassic, module-capable-loader Waiting entry deleted, census 102 to 100. The served leaf follows John's ruling (decision-103), which supersedes decision-32's no-serving-change line; lib/time-words.js is the old server functions byte for byte and every server caller imports it. The fmtDuration(Infinity) edge (finding-101) cannot occur on any page path and is pinned. 30 targeted suites 557 pass; nine mutations each turned their claimed test red, including a broken import failing the e2e task-page spec. Only part met: each migrated suite reads shorter (finding-100): run-links grew 228 to 232; run-control and chat-fold were re-anchored, not migrated, so do not count. Fixes before merge: finding-109 (F1), finding-110 (F2), finding-111 (F3); re-check CI on the new head. After deploy: John's two live checks. Sibling copies (session.js, observation.js, live-console.js) stay outside, already on area-49 (finding-99, finding-105); gapWords and describeSpan are deliberately different wordings, not copies."
+     },
+     "links": {
+      "on": "change-97@2",
+      "about": "plan-10"
+     }
     }
    ]
   }
@@ -3753,6 +3971,66 @@
    "query": "get",
    "args": {
     "id": "check-86",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:53:39.699Z",
+   "by": "review",
+   "query": "get",
+   "args": {
+    "id": "finding-100",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:53:39.759Z",
+   "by": "review",
+   "query": "get",
+   "args": {
+    "id": "finding-101",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:53:39.803Z",
+   "by": "review",
+   "query": "get",
+   "args": {
+    "id": "finding-104",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:53:39.854Z",
+   "by": "review",
+   "query": "get",
+   "args": {
+    "id": "run-108",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:53:39.895Z",
+   "by": "review",
+   "query": "get",
+   "args": {
+    "id": "change-97",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:53:58.544Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-28",
     "asOf": null
    },
    "returned": 1

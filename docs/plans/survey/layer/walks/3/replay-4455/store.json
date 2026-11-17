@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 103,
+ "next": 107,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -2397,6 +2397,24 @@
       "on": "change-82@1",
       "about": "lesson-10"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T16:02:05.000Z",
+     "by": "leftover",
+     "in": "task-60",
+     "to": "leftover",
+     "state": "done",
+     "fields": {
+      "says": "PR #2427 rewrote the area Lessons in `docs/areas/runs-and-dispatch.md` (4,794 bytes); the layer's lessons lag and implementation may not write them. (1) Revise lesson-10: `lin-4377-store-knows-no-leftover` no longer only counts the word; it adds an AST check that the store neither imports nor names `formatHeldWakeNote`, and the leftover wording is late-bound into the store by `createLeftoverStep` (`setHeldWakeReleaseNote`). (2) Add the new Lesson: feedback-kind roles live in one table, `lib/dispatch-feedback-kinds.js` (imports nothing); kind sets derive from it, and constants (`NEVER_RAN` in `lib/dispatch-terminal.js`, `HALT_MODES`, `followUpTarget`) are imported from their owners, never restated; `lin-4455-feedback-kinds-table` and `lin-4455-constants-owners` census hand-written copies."
+     },
+     "links": {
+      "on": "change-82@1",
+      "about": "lesson-10"
+     },
+     "reason": "Both parts written: lesson-105 restates lesson-10 for PR #2427 (late-bound wording, AST check), and lesson-104 adds the feedback-kinds table and constants-owners lesson. The layer refused leftover revising or ending lesson-10 itself; finding-106 asks area-1 to end it.",
+     "stateReason": "Both parts written: lesson-105 restates lesson-10 for PR #2427 (late-bound wording, AST check), and lesson-104 adds the feedback-kinds table and constants-owners lesson. The layer refused leftover revising or ending lesson-10 itself; finding-106 asks area-1 to end it."
     }
    ]
   },
@@ -2759,6 +2777,100 @@
      "links": {},
      "reason": "Blind read written: verdict-96 and findings 97-101.",
      "stateReason": "Blind read written: verdict-96 and findings 97-101."
+    }
+   ]
+  },
+  "run-103": {
+   "id": "run-103",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T16:02:00.000Z",
+     "by": "leftover",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "stage": "leftover",
+      "account": "Posted ### Leftovers on LIN-4455 (16:02:31). Retires: dispatch-leftover.js restating the follow-up target, halt modes and NEVER_RAN. Waiting 2, 4, 11 settled and removed from the area note by PR #2427 (finding-19/21/28 were already ended done by an earlier stage; not re-ended). Left on purpose and written into area notes on the PR branch: mayCarryWake true on every row vs lastWakeEntry skipping stamps, a new Waiting entry in runs-and-dispatch (finding-99 carries it); the two held-wake release channels, already Waiting 5 (finding-22, finding-76, finding-100), named in the setter docblock; runner-kickoff importing FEEDBACK_ENTRY_KINDS via the store re-export, a Waiting entry in llm-and-prompts (finding-101; no layer id for that area); browser stamp-kind copies stay, pinned by the drift test (finding-89). Brought the layer lessons up to the PR (finding-88): revised lesson-10, added the feedback-kinds/constants-owners lesson. Told close-out the Leftovers comment landed (finding-93)."
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-104": {
+   "id": "lesson-104",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T16:02:02.000Z",
+     "by": "leftover",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "Feedback-kind roles live in one table, `FEEDBACK_KINDS` in `lib/dispatch-feedback-kinds.js`, which imports nothing; `FEEDBACK_ENTRY_KINDS`, `PARKED_WAIT_SKIPPED_KINDS` and `DECISION_LIFECYCLE_STAMP_KINDS` derive from it. Shared dispatch constants are imported from their owners, never restated: `NEVER_RAN` (cancelled/expired) from `lib/dispatch-terminal.js`, `HALT_MODES`, and `followUpTarget`. `lin-4455-feedback-kinds-table` and `lin-4455-constants-owners` census hand-written copies; the browser copies of the stamp kinds in `public/` stay and the drift test pins them to the table (LIN-4455, PR #2427).",
+      "paths": [
+       "lib/dispatch-feedback-kinds.js",
+       "lib/dispatch-terminal.js",
+       "lib/dispatch-leftover.js"
+      ],
+      "checked-at": "c95b9f139"
+     },
+     "links": {
+      "on": "change-82@2",
+      "about": "finding-88"
+     }
+    }
+   ]
+  },
+  "lesson-105": {
+   "id": "lesson-105",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T16:02:03.000Z",
+     "by": "leftover",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "The store knows no leftovers (LIN-4383). It holds a parent wake by `heldWakeFor` (LIN-4373), released by the holder's terminal or `_archiveItem` under the build's guard key, so it wakes once. The release wording is owned by `createLeftoverStep` (`lib/dispatch-leftover-hook.js`), which late-binds it into the store (`setHeldWakeReleaseNote`) and also passes it on the request hook (`wakeHook.releaseNote`); an unbound store says a default line that names no feature. A new held-wake feature brings a hook; `lin-4377-store-knows-no-leftover` checks by AST that the store neither imports nor names `formatHeldWakeNote` (LIN-4455, PR #2427).",
+      "paths": [
+       "lib/dispatch-store.js",
+       "lib/dispatch-leftover-hook.js"
+      ],
+      "checked-at": "c95b9f139"
+     },
+     "links": {
+      "on": "change-82@2",
+      "about": "lesson-10"
+     }
+    }
+   ]
+  },
+  "finding-106": {
+   "id": "finding-106",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T16:02:04.000Z",
+     "by": "leftover",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "lesson-10 is out of date after PR #2427 and the layer refused leftover's revise and end (rule 6): it still says `lin-4377-store-knows-no-leftover` counts the word and that leftover wording lives only in the hook. lesson-105 carries the corrected lesson (wording late-bound by `createLeftoverStep` via `setHeldWakeReleaseNote`; AST check on `formatHeldWakeNote`). End lesson-10 superseded, handing on to lesson-105, once PR #2427 merges."
+     },
+     "links": {
+      "on": "lesson-105@1",
+      "about": "lesson-10"
+     }
     }
    ]
   }
@@ -3663,6 +3775,16 @@
    "query": "get",
    "args": {
     "id": "lesson-12",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:54:04.038Z",
+   "by": "leftover",
+   "query": "get",
+   "args": {
+    "id": "finding-99",
     "asOf": null
    },
    "returned": 1
