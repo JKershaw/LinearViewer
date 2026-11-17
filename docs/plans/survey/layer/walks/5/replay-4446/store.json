@@ -3688,6 +3688,143 @@
     "area-1"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:25.262Z",
+   "by": "leftover",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-9",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:25.307Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--in",
+    "area-1",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:25.349Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "area",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:29.885Z",
+   "by": "leftover",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-9",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:29.937Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--in",
+    "area-1",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:34.406Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-53",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:34.442Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-5",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:34.478Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": [
+    "get",
+    "lesson-54",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:34.513Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-55",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:34.554Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": [
+    "get",
+    "run-52",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:34.592Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-19",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
   }
  ]
 }

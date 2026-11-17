@@ -1,5 +1,5 @@
 {
- "next": 116,
+ "next": 117,
  "records": {
   "area-1": [
    {
@@ -3080,6 +3080,24 @@
     "at": "2026-11-13T16:26:05.000Z",
     "by": "review"
    }
+  ],
+  "run-116": [
+   {
+    "id": "run-116",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "blind-read",
+     "claims": [],
+     "account": "Blind read of #2430 at head 444b58246, diffed against 0092d8d9e (main when read): verdict worse. The diff I read simplified the held-wake release in lib/dispatch-store.js and dropped an always-true filter in lib/dispatch-terminal.js, but deleted the one-owner declarations (lib/dispatch-feedback-kinds.js, NEVER_RAN) and copied their values into about ten runs-and-dispatch and agent-api files with nothing checking them. Two fix-sized items to close-out; three larger ownership items and one outside-area copy to John, since runs-and-dispatch (A13) has no area or task here. Note: review records #2430 as 3 docs files on e8e92d50a; the code I read is not in that set, so my compare base may have put main-only commits in reverse into the diff."
+    },
+    "links": {},
+    "in": "task-78",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:28:54.000Z",
+    "by": "blind-read"
+   }
   ]
  },
  "log": [
@@ -4062,6 +4080,154 @@
     "finding-109",
     "--by",
     "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:13.299Z",
+   "by": "blind-read",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-103",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:13.328Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "area",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:13.356Z",
+   "by": "blind-read",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-78",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:25.772Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "task",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:25.811Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "dispatch-store",
+    "--count",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:25.846Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "A13",
+    "--count",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:25.877Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "Runs",
+    "--count",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:25.917Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "dispatch-feedback-kinds",
+    "--count",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:25.962Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "NEVER_RAN",
+    "--count",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:25.998Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "followUpTarget",
+    "--count",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:35:26.029Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "verdict",
+    "--by",
+    "blind-read"
    ],
    "asOf": null
   }
