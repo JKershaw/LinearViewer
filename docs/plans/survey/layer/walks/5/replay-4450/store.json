@@ -1,5 +1,5 @@
 {
- "next": 81,
+ "next": 83,
  "records": {
   "area-1": [
    {
@@ -1651,6 +1651,33 @@
     "op": "add",
     "at": "2026-11-13T13:44:58.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "question-68",
+    "kind": "question",
+    "state": "answered",
+    "fields": {
+     "asks": "Fix the codec or exclude the empty fence from the fixed-point witness? The `adf.js` header's claim that the D1 gate never flags what the writer emits is false: words holding an opening ``` with a closing ``` on the next line make `markdownToAdf` emit an empty `codeBlock`; `adfHasUnrenderableContent` refuses it and `rt(rt(x)) !== rt(x)` (both checks false at 4b5001ddf). Today that touches one ticket; once Harbour writes the block itself, it makes a ticket whose description can never be written again (every later `description/below` 422s on D1, which sees the whole document, block included). The planned fixed-point test fails on this input either way.",
+     "options": [
+      "Fix `markdownToAdf` so an empty fence round-trips and D1 accepts it (retire the false header claim)",
+      "Exclude the input deliberately and name the exclusion and the false claim in the PR"
+     ],
+     "if-unanswered": "The fixed-point test fails on this input, or Harbour starts filing Jira descriptions that D1 then blocks from every later write."
+    },
+    "links": {
+     "about": [
+      "plan-54"
+     ]
+    },
+    "in": "task-60",
+    "to": "implementation",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T13:52:12.000Z",
+    "by": "scoping",
+    "ended": {
+     "reason": "decision-81 (scoping) settles it: fix the codec as a tidy done first, not exclude the empty fence"
+    }
    }
   ],
   "check-69": [
@@ -1921,6 +1948,68 @@
     "op": "add",
     "at": "2026-11-13T13:48:04.000Z",
     "by": "survey-place"
+   }
+  ],
+  "decision-81": [
+   {
+    "id": "decision-81",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "Size of the move: a small tidy. Jira holds the person's words byte-exact, plus one tidy done first: an empty fenced code block in the words no longer files a description that refuses every later write below the line, which the seal exists to allow. Cuts: none. Decided by: the standing policy.",
+     "why": "The seal (plan-54 items 1-6 with review notes 2, 3, 6) fits one session as breakdown sized it; question-68 shows the empty fence makes markdownToAdf emit a codeBlock D1 refuses, so once Harbour writes the block, that ticket could never be written below the line again. Fixing the codec first (not excluding the input) keeps the seal's purpose intact. Recorded in the LIN-4450 description under ## Size of the move.",
+     "scope": "task-60"
+    },
+    "links": {
+     "answers": "question-68",
+     "on": [
+      "plan-54@2",
+      "decision-63@1"
+     ],
+     "about": [
+      "task-60"
+     ]
+    },
+    "in": "task-60",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:52:11.000Z",
+    "by": "scoping"
+   }
+  ],
+  "run-82": [
+   {
+    "id": "run-82",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "scoping",
+     "account": "Sized LIN-4450 as a small tidy, no cuts, by the standing policy: the Jira seal per plan-54 session 1 as breakdown scoped it, plus one tidy first from question-68, so an empty fenced code block no longer files a description D1 refuses on every later below-the-line write. That settles question-68 (fix the codec, not exclude the input). Wrote the Size of the move section into the ticket description. Left open: question-67, check-69 (live probe, John), findings 70-80."
+    },
+    "links": {},
+    "in": "task-60",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:52:13.000Z",
+    "by": "scoping"
+   },
+   {
+    "id": "run-82",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "scoping",
+     "account": "Sized LIN-4450 as a small tidy, no cuts, by the standing policy: the Jira seal per plan-54 session 1 as breakdown scoped it, plus one tidy first from question-68, so an empty fenced code block no longer files a description D1 refuses on every later below-the-line write. That settles question-68 (fix the codec, not exclude the input). Wrote the Size of the move section into the ticket description. Left open: question-67, check-69 (live probe, John), findings 70-80."
+    },
+    "links": {},
+    "in": "task-60",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T13:52:14.000Z",
+    "by": "scoping",
+    "ended": {
+     "reason": "sizing written to the ticket and the store"
+    }
    }
   ]
  },
@@ -2612,6 +2701,71 @@
     "run",
     "--by",
     "scoping"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:19:53.389Z",
+   "by": "scoping",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-21",
+    "--by",
+    "scoping"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:20:07.524Z",
+   "by": "scoping",
+   "cmd": "get",
+   "args": [
+    "get",
+    "question-68",
+    "--by",
+    "scoping"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:20:51.593Z",
+   "by": "implementation",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "implementation"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:20:51.631Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "change",
+    "--by",
+    "implementation"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:20:51.668Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "check",
+    "--state",
+    "open",
+    "--by",
+    "implementation"
    ],
    "asOf": null
   }

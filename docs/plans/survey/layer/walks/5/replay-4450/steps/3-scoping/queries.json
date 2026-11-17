@@ -1,0 +1,163 @@
+[
+ {
+  "at": "2026-11-17T15:19:39.065Z",
+  "by": "scoping",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:19:39.095Z",
+  "by": "scoping",
+  "cmd": "get",
+  "args": [
+   "get",
+   "question-68",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:19:39.121Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "decision",
+   "--in",
+   "task-60",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:19:39.150Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "size",
+   "--kind",
+   "decision",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:19:43.581Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "policy",
+   "--count",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:19:43.616Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "tidy",
+   "--count",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:19:43.657Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "size of the move",
+   "--count",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:19:43.691Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "small tidy",
+   "--count",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:19:43.731Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "policy",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:19:43.774Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "run",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:19:53.389Z",
+  "by": "scoping",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-21",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:07.524Z",
+  "by": "scoping",
+  "cmd": "get",
+  "args": [
+   "get",
+   "question-68",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ }
+]

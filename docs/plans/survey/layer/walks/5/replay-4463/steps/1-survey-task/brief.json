@@ -1,0 +1,52 @@
+{
+ "actor": "survey-task",
+ "asOf": "2026-11-13T15:42:12.265Z",
+ "task": {
+  "id": "task-16",
+  "ref": "LIN-4463",
+  "done-when": "* the slice 1 bridge is gone, or the only one left and shrinking under a check;\n* the area's Waiting entries are settled, or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.",
+  "paths": [
+   "public/"
+  ]
+ },
+ "asked": [
+  {
+   "id": "task-16",
+   "asked": "**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** John: \"the UI issues trace back to one of my very first rules: no build step… it's the biggest target of the Theseus method… We don't need to tidy it all, but it's a perfect example where we can leave it better than we found it.\" The first slice (LIN-4446) served a pure server file to the browser at `/shared/` and retired the browser's copy. Its blind read found the cost: a bridge turns the shared file back into a global, with a load-timing rule that four files explain and nothing checks, and a second shared file would need a second bridge. On the direction, John: \"I feel there's a sensible engineering approach, that a skilled developer would take… Excellent, that sounds like a great solution.\" Today the browser area has 44 script files that share through globals, `public/common.js` is 3,309 lines and `public/observation.js` 5,019, over 100 unit test files load browser scripts as classic scripts, and the area's note holds 10 Waiting entries.\n\n**What we want.**\n\n* Pages become ES modules that import what they share, as browsers do natively. Still no build step and no framework.\n* Shared logic is imported, not restated: each converted view drops its copies.\n* A bridge back to a global is only a temporary ramp for pages not yet converted: one at most, and visibly shrinking.\n* The tests get simpler as views convert, not more elaborate.\n* Taken one view at a time, each piece finishing one move and naming what it retired. John on size: \"Happy for it to be whatever size is natural.\"\n* No view is retired unless John rules it. The side rail and the visual refresh (LIN-4342, LIN-4343) come after, on the cleaner code.\n\n**Done when**\n\n* the slice 1 bridge is gone, or the only one left and shrinking under a check;\n* the area's Waiting entries are settled, or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*"
+  }
+ ],
+ "piece": null,
+ "replaced": [],
+ "addressed": [],
+ "stands": [],
+ "areas": [
+  {
+   "id": "area-1",
+   "name": "Front end: browser code",
+   "open": 10
+  }
+ ],
+ "runs": [],
+ "index": [
+  {
+   "id": "lesson-2",
+   "kind": "lesson",
+   "line": "A page script's second request keeps the poll's discipline: coalesce every reason into one fetch per window, and stop when the poll stops (hidden tab, 401, revoked link). `createTimelineRefresher` (`public/task-page.js`, LIN-4405) is the pattern; a running chip changes the poll's track about once a minute, so \"fetch when it changes\" alone repeats. Done reads once more first (`finish`): the poll that says done carries the last change, and stopping drops it."
+  },
+  {
+   "id": "lesson-4",
+   "kind": "lesson",
+   "line": "The no-build-step rule (`CLAUDE.md`) allows browser sharing, not only forbids it (LIN-4446). The browser may import natively, and the restated copies came from reading the rule as \"no sharing\" (`docs/papers/harbour/the-second-copy.md` §9–10). Limits: a shared module is a leaf (it imports nothing and names no browser or Node global, as `tests/unit/shared-modules.test.js` checks), served only through the explicit `SHARED_MODULES` allow-list in `lib/vendor-assets.js`, never by directory. Views and the `vm` test loaders stay classic until a module-capable client test loader exists. A consumer reads a shared global only from a handler or a callback that runs after DOMContentLoaded, never during script execution: Chart.js calls scale tick callbacks synchronously, which is why `public/workspace-kpis.js` builds on DOMContentLoaded. A slice retires the restated copy and its parity check in the same change, not later."
+  }
+ ],
+ "carries": {
+  "asked": 1,
+  "piece": 0,
+  "addressed": 0,
+  "stands": 0,
+  "areas": 1,
+  "runs": 0,
+  "index": 2
+ },
+ "bytes": 4254
+}
