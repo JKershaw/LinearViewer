@@ -1,5 +1,5 @@
 {
- "next": 56,
+ "next": 61,
  "records": {
   "area-1": [
    {
@@ -1782,6 +1782,30 @@
     "fields": {
      "says": "Plan-review note for the builder (not blocking, verdict-49): The 'full server.js app' 404 witness needs a real server. server.js calls app.listen on import (line 4674) and exports no app, so a unit test cannot import it, and a hand-built router stack like vendor-assets.test.js:91 is not the full app. Either put the two 404 assertions (/shared/nope.js, /lib/cost-format.js) in the Playwright check, which runs the real server, or spawn server.js as tests/unit/lin-619-session-secret.test.js:159 does."
     }
+   },
+   {
+    "id": "finding-50",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:36:51.788Z",
+    "by": "implementation",
+    "in": "task-9",
+    "to": "implementation",
+    "state": "done",
+    "ended": {
+     "reason": "Applied: the 404s for /shared/nope.js and /lib/cost-format.js were checked against the real server and pass (PR #2423, change-57)"
+    },
+    "links": {
+     "about": [
+      "plan-28",
+      "finding-42",
+      "check-32"
+     ]
+    },
+    "fields": {
+     "says": "Plan-review note for the builder (not blocking, verdict-49): The 'full server.js app' 404 witness needs a real server. server.js calls app.listen on import (line 4674) and exports no app, so a unit test cannot import it, and a hand-built router stack like vendor-assets.test.js:91 is not the full app. Either put the two 404 assertions (/shared/nope.js, /lib/cost-format.js) in the Playwright check, which runs the real server, or spawn server.js as tests/unit/lin-619-session-secret.test.js:159 does."
+    }
    }
   ],
   "finding-51": [
@@ -1795,6 +1819,30 @@
     "in": "task-9",
     "to": "implementation",
     "state": "open",
+    "links": {
+     "about": [
+      "plan-28",
+      "check-22",
+      "decision-46"
+     ]
+    },
+    "fields": {
+     "says": "Plan-review note for the builder (not blocking, verdict-49): Make the KPI Chart-stub test fail for the right reason. charts.draw returns null before new Chart when there is no #chart-cost element (public/chart-helpers.js:103-104), the same trap as the typeof Chart guard. Put a <canvas id=\"chart-cost\"> in the fake document; seed the whole daily shape the IIFE walks first (days, dispatches, autopilotRuns, agentActions, done, doneTotal, runsByKind); stub getComputedStyle or HarbourCharts (chart-helpers.js:18 calls getComputedStyle at load). When checking it fails on today's code, assert the error is the CostFormat TypeError, not a hole in the seed."
+    }
+   },
+   {
+    "id": "finding-51",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:36:52.788Z",
+    "by": "implementation",
+    "in": "task-9",
+    "to": "implementation",
+    "state": "done",
+    "ended": {
+     "reason": "Applied: the KPI ordering witness fails on the old code with the formatter TypeError and passes after (PR #2423, change-57)"
+    },
     "links": {
      "about": [
       "plan-28",
@@ -1827,6 +1875,30 @@
     "fields": {
      "says": "Plan-review note for the builder (not blocking, verdict-49): State the real reason public/prompt-section.js is safe. 'After a fetch' is no guarantee: a fetch started during parsing can resolve before a two-file module graph loads. The guarantee is that every PromptSection.init caller runs at DOMContentLoaded or later: task-page.js:926 (DOMContentLoaded); app.js:2321 init() on DOMContentLoaded, Home's mounts after user-triggered fetches via bindHomeFolds; swipe.js:857 when the user opens the prompts section. Use that reason in the corrected comment at prompt-section.js:1505, and drive that consumer's lighter test through init and a resolved decision-panel fetch."
     }
+   },
+   {
+    "id": "finding-52",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:36:56.788Z",
+    "by": "implementation",
+    "in": "task-9",
+    "to": "implementation",
+    "state": "handed-on",
+    "ended": {
+     "reason": "Not reported in the implementation output; review checks it in PR #2423",
+     "into": "check-59"
+    },
+    "links": {
+     "about": [
+      "plan-28",
+      "check-22"
+     ]
+    },
+    "fields": {
+     "says": "Plan-review note for the builder (not blocking, verdict-49): State the real reason public/prompt-section.js is safe. 'After a fetch' is no guarantee: a fetch started during parsing can resolve before a two-file module graph loads. The guarantee is that every PromptSection.init caller runs at DOMContentLoaded or later: task-page.js:926 (DOMContentLoaded); app.js:2321 init() on DOMContentLoaded, Home's mounts after user-triggered fetches via bindHomeFolds; swipe.js:857 when the user opens the prompts section. Use that reason in the corrected comment at prompt-section.js:1505, and drive that consumer's lighter test through init and a resolved decision-panel fetch."
+    }
    }
   ],
   "finding-53": [
@@ -1840,6 +1912,30 @@
     "in": "task-9",
     "to": "implementation",
     "state": "open",
+    "links": {
+     "about": [
+      "plan-28",
+      "check-31"
+     ]
+    },
+    "fields": {
+     "says": "Plan-review note for the builder (not blocking, verdict-49): tests/unit/cost-format.test.js does not exist yet; step 5 'moves' assertions into it, so create it. The parity file's export const TABLE has no importers, so deleting it strands nothing."
+    }
+   },
+   {
+    "id": "finding-53",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:36:57.788Z",
+    "by": "implementation",
+    "in": "task-9",
+    "to": "implementation",
+    "state": "handed-on",
+    "ended": {
+     "reason": "Not reported in the implementation output; review checks it in PR #2423",
+     "into": "check-59"
+    },
     "links": {
      "about": [
       "plan-28",
@@ -1870,6 +1966,29 @@
     "fields": {
      "says": "Plan-review note for the builder (not blocking, verdict-49): One live hit is missing from the places list: docs/areas/other-features.md:14, the Waiting entry saying lib/cost-format.js is still in the catch-all. It stays true, but once the file is served to the browser add a few words ('also served as /shared/cost-format.js, so a leaf') so the next reader does not move it without seeing that constraint. The other new hits (server-side import ... from './cost-format.js' in lib/*) are not places and need no change."
     }
+   },
+   {
+    "id": "finding-54",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:36:58.788Z",
+    "by": "implementation",
+    "in": "task-9",
+    "to": "implementation",
+    "state": "handed-on",
+    "ended": {
+     "reason": "Not reported in the implementation output; review checks it in PR #2423",
+     "into": "check-59"
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ]
+    },
+    "fields": {
+     "says": "Plan-review note for the builder (not blocking, verdict-49): One live hit is missing from the places list: docs/areas/other-features.md:14, the Waiting entry saying lib/cost-format.js is still in the catch-all. It stays true, but once the file is served to the browser add a few words ('also served as /shared/cost-format.js, so a leaf') so the next reader does not move it without seeing that constraint. The other new hits (server-side import ... from './cost-format.js' in lib/*) are not places and need no change."
+    }
    }
   ],
   "finding-55": [
@@ -1891,6 +2010,191 @@
     },
     "fields": {
      "says": "Plan-review note for the builder (not blocking, verdict-49): CLAUDE.md will need trimming: it has 50 bytes spare, and any reading plus a pointer to docs/areas/front-end-browser.md is longer than the 46 bytes of today's 'Keep it minimal - no frameworks, no build step'. Expect step 1's trim clause to apply, and name the cut text in the PR as planned."
+    }
+   },
+   {
+    "id": "finding-55",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:36:59.788Z",
+    "by": "implementation",
+    "in": "task-9",
+    "to": "implementation",
+    "state": "handed-on",
+    "ended": {
+     "reason": "Not reported in the implementation output; review checks it in PR #2423",
+     "into": "check-59"
+    },
+    "links": {
+     "about": [
+      "plan-28",
+      "finding-39"
+     ]
+    },
+    "fields": {
+     "says": "Plan-review note for the builder (not blocking, verdict-49): CLAUDE.md will need trimming: it has 50 bytes spare, and any reading plus a pointer to docs/areas/front-end-browser.md is longer than the 46 bytes of today's 'Keep it minimal - no frameworks, no build step'. Expect step 1's trim clause to apply, and name the cut text in the PR as planned."
+    }
+   }
+  ],
+  "run-56": [
+   {
+    "id": "run-56",
+    "kind": "run",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:36:49.788Z",
+    "by": "implementation",
+    "in": "task-9",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "stage": "implementation",
+     "account": "# What this stage really wrote\n\n## Comment on LIN-4446 at 14:56:08\n\n## Implementation: LIN-4446, slice 1 (cost formatter), PR ready for review\n\nPR: https://github.com/JKershaw/LinearViewer/pull/2423 (branch `feat/lin-4446-shared-cost-format`, commit `24de9abc9`)\n\n- The reading of the no-build-step rule is in `CLAUDE.md` and the front-end-browser area note (Lessons).\n- `lib/cost-format.js` is the one formatter, served as `/shared/cost-format.js`. `public/cost-format.js` (34 lines) and its parity test are retired; the browser copy is now a 12-line module shim.\n- `public/workspace-kpis.js` builds on DOMContentLoaded so the chart's tick callback never reads the formatter during script load.\n- Evidence: the KPI ordering witness fails on the old code with the formatter TypeError; mutation checks, a real-browser check and the real-server 404s pass. Full unit suite 25,300 tests, 0 failures. CI green (unit, proxy, E2E shards, secret scan).\n- No view is reworked or retired. Per the plan, the next slice waits for John's read of this one.\n\nRaised for John: the PR describes what was cut (nothing) and the gaps (serving tests not run against HEAD; chart ordering not covered by e2e).\n"
+    }
+   },
+   {
+    "id": "run-56",
+    "kind": "run",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:37:01.788Z",
+    "by": "implementation",
+    "in": "task-9",
+    "state": "done",
+    "ended": {
+     "reason": "Slice 1 built and PR #2423 opened; stopped for John's read"
+    },
+    "links": {},
+    "fields": {
+     "stage": "implementation",
+     "account": "# What this stage really wrote\n\n## Comment on LIN-4446 at 14:56:08\n\n## Implementation: LIN-4446, slice 1 (cost formatter), PR ready for review\n\nPR: https://github.com/JKershaw/LinearViewer/pull/2423 (branch `feat/lin-4446-shared-cost-format`, commit `24de9abc9`)\n\n- The reading of the no-build-step rule is in `CLAUDE.md` and the front-end-browser area note (Lessons).\n- `lib/cost-format.js` is the one formatter, served as `/shared/cost-format.js`. `public/cost-format.js` (34 lines) and its parity test are retired; the browser copy is now a 12-line module shim.\n- `public/workspace-kpis.js` builds on DOMContentLoaded so the chart's tick callback never reads the formatter during script load.\n- Evidence: the KPI ordering witness fails on the old code with the formatter TypeError; mutation checks, a real-browser check and the real-server 404s pass. Full unit suite 25,300 tests, 0 failures. CI green (unit, proxy, E2E shards, secret scan).\n- No view is reworked or retired. Per the plan, the next slice waits for John's read of this one.\n\nRaised for John: the PR describes what was cut (nothing) and the gaps (serving tests not run against HEAD; chart ordering not covered by e2e).\n"
+    }
+   }
+  ],
+  "change-57": [
+   {
+    "id": "change-57",
+    "kind": "change",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:36:50.788Z",
+    "by": "implementation",
+    "in": "task-9",
+    "to": "review",
+    "state": "open",
+    "links": {
+     "about": [
+      "plan-28"
+     ]
+    },
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2423",
+     "head": "24de9abc9"
+    }
+   }
+  ],
+  "finding-58": [
+   {
+    "id": "finding-58",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:36:53.788Z",
+    "by": "implementation",
+    "in": "task-9",
+    "to": "review",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-57",
+      "check-22",
+      "check-32"
+     ]
+    },
+    "fields": {
+     "says": "Gaps in PR #2423's evidence, stated in the PR for John: (1) the serving tests (/shared/cost-format.js 200 with exact bytes, unknown /shared/* 404, router purity) were not run against HEAD 24de9abc9; (2) the Chart.js ordering in public/workspace-kpis.js is covered only by the unit witness, not by e2e (the e2e cost canvas always shows the empty note). Run (1) at HEAD before approving; (2) is a recorded waiver."
+    }
+   },
+   {
+    "id": "finding-58",
+    "kind": "finding",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T14:36:54.788Z",
+    "by": "implementation",
+    "reason": "the output names only serving tests, not which; the list is plan-28's",
+    "in": "task-9",
+    "to": "review",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-57",
+      "check-22",
+      "check-32"
+     ]
+    },
+    "fields": {
+     "says": "Gaps in PR #2423's evidence, stated in the PR for John: (1) the serving tests were not run against HEAD 24de9abc9 (the PR does not list which; plan-28's serving witnesses are /shared/cost-format.js 200 with exact bytes, unknown /shared/* 404, empty-rootDir throw, module purity); (2) the Chart.js ordering in public/workspace-kpis.js is not covered by e2e, only by the unit witness. Run (1) at HEAD before approving; (2) is a recorded waiver."
+    }
+   }
+  ],
+  "check-59": [
+   {
+    "id": "check-59",
+    "kind": "check",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:36:55.788Z",
+    "by": "implementation",
+    "in": "task-9",
+    "to": "review",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-57",
+      "finding-52",
+      "finding-53",
+      "finding-54",
+      "finding-55",
+      "check-31"
+     ]
+    },
+    "fields": {
+     "what": "PR #2423 applies plan-review's builder notes that the implementation output does not report on: finding-52 (prompt-section.js:1505 comment gives the real reason: every PromptSection.init caller runs at DOMContentLoaded or later; its test drives init and a resolved decision-panel fetch); finding-53 (tests/unit/cost-format.test.js created, carrying the parity file's server-side assertions); finding-54 (docs/areas/other-features.md:14 says lib/cost-format.js is also served as /shared/cost-format.js, so a leaf); finding-55 (CLAUDE.md trimmed to fit, cut text named in the PR).",
+     "why-person": "The output reports only the 404s and the KPI witness among these notes; the others are not stated done, so a reader must look.",
+     "how": "Read the PR diff and description at 24de9abc9 for each of the four."
+    }
+   }
+  ],
+  "lesson-60": [
+   {
+    "id": "lesson-60",
+    "kind": "lesson",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:37:00.788Z",
+    "by": "implementation",
+    "in": "area-1",
+    "state": "holds",
+    "links": {
+     "about": [
+      "task-9",
+      "change-57",
+      "decision-29",
+      "decision-46"
+     ]
+    },
+    "fields": {
+     "says": "No build step is read as allowing the browser to import natively, with limits: share leaf modules only, served by an allow-list (SHARED_MODULES in lib/vendor-assets.js), never by directory; classic views and vm loaders stay until a module-capable client test loader exists; never read a shared global during script execution, including through a callback a library runs synchronously. The restated copies came from reading the rule as no sharing. Written in CLAUDE.md and docs/areas/front-end-browser.md (Lessons) by LIN-4446 slice 1.",
+     "paths": [
+      "CLAUDE.md",
+      "docs/areas/front-end-browser.md",
+      "public/",
+      "lib/vendor-assets.js",
+      "lib/components/page.js"
+     ],
+     "checked-at": "24de9abc9"
     }
    }
   ]
@@ -2955,6 +3259,148 @@
     "pos": [
      "check-22"
     ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:53.270Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": {
+    "to": "implementation",
+    "state": "open",
+    "by": "implementation",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:53.322Z",
+   "by": "implementation",
+   "cmd": "show",
+   "args": {
+    "task": "task-9",
+    "by": "implementation",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:35:15.734Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": {
+    "area": "area-1",
+    "state": "open",
+    "by": "implementation",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:35:15.777Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": {
+    "kind": "lesson",
+    "by": "implementation",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:35:15.831Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": {
+    "kind": "change",
+    "by": "implementation",
+    "count": true,
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:35:20.290Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": {
+    "by": "implementation",
+    "pos": [
+     "finding-4"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:35:20.324Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": {
+    "area": "area-1",
+    "state": "open",
+    "by": "implementation",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:35:20.376Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": {
+    "kind": "lesson",
+    "by": "implementation",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:35:33.422Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": {
+    "by": "implementation",
+    "pos": [
+     "finding-11"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:35:33.479Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": {
+    "by": "implementation",
+    "pos": [
+     "finding-30"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:35:33.525Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": {
+    "by": "implementation",
+    "pos": [
+     "check-16"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:36:03.551Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": {
+    "to": "implementation",
+    "state": "open",
+    "count": true,
+    "by": "implementation",
+    "pos": []
    },
    "asOf": null
   }

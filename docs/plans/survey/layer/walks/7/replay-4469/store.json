@@ -1,5 +1,5 @@
 {
- "next": 169,
+ "next": 172,
  "records": {
   "area-1": [
    {
@@ -557,6 +557,23 @@
     "by": "Harbour",
     "to": "area-1",
     "state": "open",
+    "links": {},
+    "fields": {
+     "says": "`lib/prompts/stage-kinds.js`: the one-record refactor's witness (`tests/fixtures/lin-4467-witness.js`) stays in the suite as a permanent test. It pins a sha256 for all 40 renders and for each table, so a later wording change in any stage must regenerate `tests/fixtures/lin-4467-witness.json` as well as move the byte ceilings and the change log; and its fix-round mode differs from fresh for `implementation` only. Decide whether to retire it once piece 5 (LIN-4469) has re-pinned, fold it into `tests/unit/prompt-size-budget.test.js`, or keep it as a ratchet: a decision about the test suite, not a fix. (LIN-4467 blind read.)"
+    }
+   },
+   {
+    "id": "finding-26",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:16:15.117Z",
+    "by": "leftover",
+    "to": "area-1",
+    "state": "done",
+    "ended": {
+     "reason": "Decided: keep the witness as a ratchet (decision-170), recorded as lesson; Waiting entry removed on PR #2447 (leftover answer a2efc9a8)"
+    },
     "links": {},
     "fields": {
      "says": "`lib/prompts/stage-kinds.js`: the one-record refactor's witness (`tests/fixtures/lin-4467-witness.js`) stays in the suite as a permanent test. It pins a sha256 for all 40 renders and for each table, so a later wording change in any stage must regenerate `tests/fixtures/lin-4467-witness.json` as well as move the byte ceilings and the change log; and its fix-round mode differs from fresh for `implementation` only. Decide whether to retire it once piece 5 (LIN-4469) has re-pinned, fold it into `tests/unit/prompt-size-budget.test.js`, or keep it as a ratchet: a decision about the test suite, not a fix. (LIN-4467 blind read.)"
@@ -3166,6 +3183,27 @@
      "ref": "https://github.com/JKershaw/LinearViewer/pull/2447 (branch feat/lin-4469-prompt-folds)",
      "head": "05b592742"
     }
+   },
+   {
+    "id": "change-142",
+    "kind": "change",
+    "v": 4,
+    "op": "revise",
+    "at": "2026-11-13T23:16:12.117Z",
+    "by": "leftover",
+    "reason": "leftover tidies pushed (leftover-words.js and lin-4467-witness.js headers); CI green on 877f32cb4",
+    "in": "task-131",
+    "to": "task-131",
+    "state": "open",
+    "links": {
+     "about": [
+      "plan-117"
+     ]
+    },
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2447 (branch feat/lin-4469-prompt-folds)",
+     "head": "877f32cb4"
+    }
    }
   ],
   "decision-143": [
@@ -3982,6 +4020,29 @@
      "what": "No builder `### Leftovers` answer with a `Retires:` line is on LIN-4469, so the gate-format check has nothing to check against (settle before the merge).",
      "how": "Post the leftover answer; its `Retires:` line must name a Waiting entry the diff removes or rewrites (notes-PR, committed-tool, first-match or CUT; not the retirement line until Fix 1 lands)."
     }
+   },
+   {
+    "id": "check-159",
+    "kind": "check",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:16:16.117Z",
+    "by": "leftover",
+    "in": "task-131",
+    "to": "leftover",
+    "state": "done",
+    "ended": {
+     "reason": "Leftover answers with a Retires: line are on LIN-4469: bbc2b1c7 names the notes-PR entry (NOTES_PR), a2efc9a8 names the lin-4467 witness entry"
+    },
+    "links": {
+     "about": [
+      "change-142"
+     ]
+    },
+    "fields": {
+     "what": "No builder `### Leftovers` answer with a `Retires:` line is on LIN-4469, so the gate-format check has nothing to check against (settle before the merge).",
+     "how": "Post the leftover answer; its `Retires:` line must name a Waiting entry the diff removes or rewrites (notes-PR, committed-tool, first-match or CUT; not the retirement line until Fix 1 lands)."
+    }
    }
   ],
   "decision-160": [
@@ -4304,6 +4365,90 @@
     },
     "fields": {
      "says": "Commit 04bb47598 changed the blind read's read-only line and its piloted fixture by one line (the guarded tracker clause dropped); the pilot was not re-run. The piloted area sentence is a different line and stays as piloted (finding-38). Say whether the read-only line change needs a re-pilot; if it does, that is a person's run."
+    }
+   }
+  ],
+  "run-169": [
+   {
+    "id": "run-169",
+    "kind": "run",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:16:11.117Z",
+    "by": "leftover",
+    "in": "task-131",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "stage": "leftover",
+     "account": "# What this stage really wrote\n\nThe leftover follow-up (6274bf6e) of this step's build c66a3141, dispatched 23:16:10.117, last request 23:24:53. Its comment landed at 23:24:42, during the blind read's window.\n\n## Comment on LIN-4469 at 23:24:42 (id a2efc9a8)\n\n### Leftovers\nPR: https://github.com/JKershaw/LinearViewer/pull/2447, head `877f32cb4`. CI is green on that head (Unit tests, proxy unit tests, E2E shards 1–4, secret scan, `ci-success`).\n\n- Tidied: the header of `lib/prompts/leftover-words.js` said \"Three constants\" and named three. It now names all of them: the heading and the retirement-line words, plus this PR's `areaLookup` and `NOTES_PR`.\n- Tidied: the header of `tests/fixtures/lin-4467-witness.js` described the witness as a one-off check for the refactor. It now says the witness is kept as a ratchet (LIN-4469).\n- Noted, already in a note: simple-dispatcher's README and its `docs/areas/README.md` still restate the retirement-line forms. That repo's owner decides; it stays named in the llm-and-prompts Waiting entry and is not edited here.\n- Nothing else: `docs/plans/survey/*` and `docs/prompt-pipeline/stage-descriptions/*` still quote the old read-only and triage wording, but they are dated design records, like `docs/reviews/`, not descriptions of the current code.\n- For close-out: none. No find breaks behaviour, blocks work or touches safety.\n\nRetires: `lib/prompts/stage-kinds.js`: the one-record refactor's witness (`tests/fixtures/lin-4467-witness.js`) stays in the suite as a permanent test. Decided: keep it as a ratchet. It is the identity pin on real-context renders, which the budget's caps over a context-free fixture are not. Recorded as a Lesson in `docs/areas/llm-and-prompts.md`, and the entry is removed.\n"
+    }
+   },
+   {
+    "id": "run-169",
+    "kind": "run",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:16:17.117Z",
+    "by": "leftover",
+    "in": "task-131",
+    "state": "done",
+    "ended": {
+     "reason": "Leftover answer posted (a2efc9a8) at head 877f32cb4; two header tidies; witness entry retired; nothing for close-out"
+    },
+    "links": {},
+    "fields": {
+     "stage": "leftover",
+     "account": "# What this stage really wrote\n\nThe leftover follow-up (6274bf6e) of this step's build c66a3141, dispatched 23:16:10.117, last request 23:24:53. Its comment landed at 23:24:42, during the blind read's window.\n\n## Comment on LIN-4469 at 23:24:42 (id a2efc9a8)\n\n### Leftovers\nPR: https://github.com/JKershaw/LinearViewer/pull/2447, head `877f32cb4`. CI is green on that head (Unit tests, proxy unit tests, E2E shards 1–4, secret scan, `ci-success`).\n\n- Tidied: the header of `lib/prompts/leftover-words.js` said \"Three constants\" and named three. It now names all of them: the heading and the retirement-line words, plus this PR's `areaLookup` and `NOTES_PR`.\n- Tidied: the header of `tests/fixtures/lin-4467-witness.js` described the witness as a one-off check for the refactor. It now says the witness is kept as a ratchet (LIN-4469).\n- Noted, already in a note: simple-dispatcher's README and its `docs/areas/README.md` still restate the retirement-line forms. That repo's owner decides; it stays named in the llm-and-prompts Waiting entry and is not edited here.\n- Nothing else: `docs/plans/survey/*` and `docs/prompt-pipeline/stage-descriptions/*` still quote the old read-only and triage wording, but they are dated design records, like `docs/reviews/`, not descriptions of the current code.\n- For close-out: none. No find breaks behaviour, blocks work or touches safety.\n\nRetires: `lib/prompts/stage-kinds.js`: the one-record refactor's witness (`tests/fixtures/lin-4467-witness.js`) stays in the suite as a permanent test. Decided: keep it as a ratchet. It is the identity pin on real-context renders, which the budget's caps over a context-free fixture are not. Recorded as a Lesson in `docs/areas/llm-and-prompts.md`, and the entry is removed.\n"
+    }
+   }
+  ],
+  "decision-170": [
+   {
+    "id": "decision-170",
+    "kind": "decision",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:16:13.117Z",
+    "by": "leftover",
+    "in": "task-131",
+    "state": "stands",
+    "links": {
+     "about": [
+      "finding-26",
+      "change-142"
+     ]
+    },
+    "fields": {
+     "scope": "area-1",
+     "answer": "Keep the one-record refactor witness (`tests/fixtures/lin-4467-witness.js`) in the suite as a permanent ratchet; do not retire it or fold it into the budget test.",
+     "why": "It is the identity pin on real-context renders, which the budget caps over a context-free fixture are not (LIN-4469 leftover answer, comment a2efc9a8; its header now says it is kept as a ratchet). Recorded as a Lesson in `docs/areas/llm-and-prompts.md`; the Waiting entry is removed."
+    }
+   }
+  ],
+  "lesson-171": [
+   {
+    "id": "lesson-171",
+    "kind": "lesson",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:16:14.117Z",
+    "by": "leftover",
+    "in": "area-1",
+    "state": "holds",
+    "links": {
+     "about": [
+      "decision-170"
+     ]
+    },
+    "fields": {
+     "says": "`tests/fixtures/lin-4467-witness.js` is a permanent ratchet, not a one-off: it pins a sha256 for every real-context render and table, so any stage wording change regenerates `tests/fixtures/lin-4467-witness.json` alongside the byte ceilings and the change log. The budget caps run over a context-free fixture and cannot stand in for it (LIN-4469).",
+     "paths": [
+      "tests/fixtures/lin-4467-witness.js",
+      "tests/fixtures/lin-4467-witness.json",
+      "lib/prompts/stage-kinds.js",
+      "lib/prompt-template-defs.js"
+     ]
     }
    }
   ]
@@ -5217,6 +5362,101 @@
     "state": "open",
     "by": "implementation",
     "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:35:23.765Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "to": "leftover",
+    "state": "open",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:35:23.802Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "kind": "lesson",
+    "text": "witness",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:35:23.840Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "kind": "run",
+    "in": "task-131",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:35:23.884Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "text": "lin-4467-witness",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:35:34.097Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "text": "simple-dispatcher",
+    "state": "open",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:35:34.146Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "kind": "lesson",
+    "area": "area-1",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:35:34.200Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": {
+    "by": "leftover",
+    "pos": [
+     "area-1"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:35:34.266Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": {
+    "by": "leftover",
+    "pos": [
+     "change-142"
+    ]
    },
    "asOf": null
   }
