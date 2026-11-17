@@ -1,5 +1,5 @@
 {
- "next": 155,
+ "next": 163,
  "records": {
   "area-1": [
    {
@@ -3358,6 +3358,28 @@
     "at": "2026-11-13T16:26:33.000Z",
     "by": "survey-place",
     "reason": "survey-place: adds line refs and the two ways out (comment 1999d0b1)"
+   },
+   {
+    "id": "finding-130",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Moving `isLiveRun` to `lib/run-live-wait.js` creates an import cycle: `formatRecentRuns` (`lib/recent-runs.js:139`) uses it, and `run-live-wait.js` would import `QUEUED`/`RUNNING` from `lib/recent-runs.js`. `lib/recommendation-blind-read.js:47` also imports it from `recent-runs.js`. Two ways out: `QUEUED`/`RUNNING` move with it, or `isLiveRun` stays in `recent-runs.js` (which then departs from done-when and should be said on the PR)."
+    },
+    "links": {
+     "about": [
+      "plan-91"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T16:58:31.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "Verified in PR #2432: QUEUED/RUNNING move with isLiveRun; run-live-wait.js imports nothing from recent-runs.js, so no cycle."
+    }
    }
   ],
   "finding-131": [
@@ -3444,6 +3466,29 @@
     "at": "2026-11-13T16:26:34.000Z",
     "by": "survey-place",
     "reason": "survey-place: replaces the guessed meaning with a census that can pass (comment 1999d0b1)"
+   },
+   {
+    "id": "finding-132",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "The census says \"four names\" but lists five, and importers must spell the names they import, so as written it cannot pass. A useful census checks that each name is *defined* only in `lib/run-live-wait.js`, and that `recommendation-live-wait` appears nowhere in code or tests. `scripts/prompt-template-change-log.md:188` names the old path and is recorded changelog text that may not be edited (binding): limit the census to `lib/`, `routes/`, `tests/` and `docs/areas/`."
+    },
+    "links": {
+     "about": [
+      "plan-91",
+      "task-113"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T16:58:32.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "Verified in PR #2432: the census checks each name is defined only in lib/run-live-wait.js and the old path is gone; scripts/prompt-template-change-log.md untouched."
+    }
    }
   ],
   "finding-133": [
@@ -3678,6 +3723,29 @@
     "op": "add",
     "at": "2026-11-13T16:26:35.000Z",
     "by": "survey-place"
+   },
+   {
+    "id": "finding-138",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Prose naming the old module fails silently when it moves (tests and imports fail loudly): `docs/architecture/source-map.md:225`, `docs/architecture/prompt-system.md`, `agent-api.md:52`, `docs/areas/llm-and-prompts.md:84-86,154`, and the docblocks at `lib/openrouter.js:2066` and `lib/dispatch-entrance.js:1726`. Update them in the same change; leave `scripts/prompt-template-change-log.md` as it is."
+    },
+    "links": {
+     "about": [
+      "finding-131",
+      "plan-91"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:58:33.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "Verified in PR #2432: recommendation-live-wait appears nowhere in lib/, routes/, tests/, scripts/ or docs/ outside historical docs/plans and docs/reviews; changelog untouched."
+    }
    }
   ],
   "finding-139": [
@@ -3963,6 +4031,29 @@
     "op": "add",
     "at": "2026-11-13T16:33:26.000Z",
     "by": "implementation"
+   },
+   {
+    "id": "finding-147",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "PR #2432 (e9a3cb324) consequences to check, not changed in scope: selector lines and look-first's \"newest run waiting on a person\" off-switch now see the lineage's end; a parked blind read whose lineage ends counts as an ended read; a stage ended by its lineage is dated by its park, because the wire row does not carry the lineage's end time. Witness: W1 and W2 in the live-wait tests failed before the change (`running`) and pass after; the three live-wait files (126 tests) and 65 related files (2073 tests) pass locally; CI run 43465308840 green on e9a3cb324 (unit, unit proxy +400d, E2E 1-4, secret scan, ci-success)."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "decision-145"
+     ]
+    },
+    "in": "task-113",
+    "to": "review",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:58:29.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "Checked: every reader of the wait (liveWaitOf, look-first off-switch, blind read endedReadsSince, selector lines) goes through loadRecentRuns, so all get the fix and the PR lists that reach; no other row-only park reader found. Mutation checks (drop withLineage, delete the parked branch, drop blocked from PARKED_LINEAGE_ENDS, remove the park guard) each turned a witness or control red. CI green on 7424cfb8f."
+    }
    }
   ],
   "question-148": [
@@ -4048,6 +4139,54 @@
     "op": "add",
     "at": "2026-11-13T16:48:26.000Z",
     "by": "leftover"
+   },
+   {
+    "id": "finding-150",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "PR #2432 leftover tidies, now at head 7424cfb8f (CI green: unit, unit proxy, E2E 1-4, secret scan, ci-success): `PARKED_LINEAGE_ENDS` (`lib/recent-runs.js`) is built from `LINEAGE_TERMINAL_STATUSES` (`lib/dispatch-lineage-status.js`) plus `blocked` instead of restating the words; `stageRuns`' docblock names the parked case; the `withLineage` comments in `lib/dispatch-store.js` name `loadRecentRuns` as a second caller; the new live-wait witnesses no longer reuse the file's W1/W2 names and are listed in its header. Also retires the LLM-note entry on `lib/prompts/runner-kickoff.js` importing `FEEDBACK_ENTRY_KINDS` from the store (finding-81): the prompt imports the leaf, the store drops its re-export. That edits a prompt module on LIN-4448's side without asking them; check the runner prompt bytes and kind order are unchanged."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "finding-81",
+      "finding-147"
+     ]
+    },
+    "in": "task-113",
+    "to": "review",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:58:30.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "Tidies checked at 7424cfb8f; runner prompt bytes and kind order unchanged (runner-kickoff.test.js, lin-4455 table test pass). Scope ruled in null; PR-body naming is null; telling LIN-4448 is check-156."
+    }
+   },
+   {
+    "id": "finding-150",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "PR #2432 leftover tidies, now at head 7424cfb8f (CI green: unit, unit proxy, E2E 1-4, secret scan, ci-success): `PARKED_LINEAGE_ENDS` (`lib/recent-runs.js`) is built from `LINEAGE_TERMINAL_STATUSES` (`lib/dispatch-lineage-status.js`) plus `blocked` instead of restating the words; `stageRuns`' docblock names the parked case; the `withLineage` comments in `lib/dispatch-store.js` name `loadRecentRuns` as a second caller; the new live-wait witnesses no longer reuse the file's W1/W2 names and are listed in its header. Also retires the LLM-note entry on `lib/prompts/runner-kickoff.js` importing `FEEDBACK_ENTRY_KINDS` from the store (finding-81): the prompt imports the leaf, the store drops its re-export. That edits a prompt module on LIN-4448's side without asking them; check the runner prompt bytes and kind order are unchanged."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "finding-81",
+      "finding-147"
+     ]
+    },
+    "in": "task-113",
+    "to": "review",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T16:58:39.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "Tidies checked at 7424cfb8f; runner prompt bytes and kind order unchanged (runner-kickoff.test.js, lin-4455 table test pass). Scope ruled in decision-160; PR-body naming is finding-161; telling LIN-4448 is check-156. Re-ended to correct ids missing from the first reason."
+    }
    }
   ],
   "question-151": [
@@ -4079,6 +4218,70 @@
     "op": "add",
     "at": "2026-11-13T16:57:38.000Z",
     "by": "autopilot"
+   },
+   {
+    "id": "question-151",
+    "kind": "question",
+    "state": "answered",
+    "fields": {
+     "asks": "PR #2432 (head 7424cfb8f) also removes the `FEEDBACK_ENTRY_KINDS` re-export from `lib/dispatch-store.js` (LIN-4455 left it \"for existing importers\"), repoints 8 imports, and changes an existing assertion in `tests/unit/lin-4455-feedback-kinds-table.test.js` from \"the store re-exports it\" to \"the store does not\". The PR body does not name this as something the piece retires, and it is outside the ticket's Approach list. Is it inside the bounded class (a shim of the same idiom), or a change an existing test should not absorb silently?",
+     "options": [
+      "inside the bounded class: keep it, and the PR body names it as retired",
+      "outside the piece: split it out, or restore the LIN-4455 assertion"
+     ],
+     "if-unanswered": "Review judges the PR as it stands, with the re-export removal unnamed in the PR body."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "finding-150",
+      "finding-81"
+     ],
+     "on": [
+      "change-143@2"
+     ]
+    },
+    "in": "task-113",
+    "to": "review",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:58:21.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "Ruled inside the bounded class (null); the PR body must name it (close-out fix)."
+    }
+   },
+   {
+    "id": "question-151",
+    "kind": "question",
+    "state": "answered",
+    "fields": {
+     "asks": "PR #2432 (head 7424cfb8f) also removes the `FEEDBACK_ENTRY_KINDS` re-export from `lib/dispatch-store.js` (LIN-4455 left it \"for existing importers\"), repoints 8 imports, and changes an existing assertion in `tests/unit/lin-4455-feedback-kinds-table.test.js` from \"the store re-exports it\" to \"the store does not\". The PR body does not name this as something the piece retires, and it is outside the ticket's Approach list. Is it inside the bounded class (a shim of the same idiom), or a change an existing test should not absorb silently?",
+     "options": [
+      "inside the bounded class: keep it, and the PR body names it as retired",
+      "outside the piece: split it out, or restore the LIN-4455 assertion"
+     ],
+     "if-unanswered": "Review judges the PR as it stands, with the re-export removal unnamed in the PR body."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "finding-150",
+      "finding-81"
+     ],
+     "on": [
+      "change-143@2"
+     ]
+    },
+    "in": "task-113",
+    "to": "review",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T16:58:37.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "Ruled inside the bounded class (decision-160); the PR body must name it (close-out fix). Re-ended: the first end's reason named no decision because the decision write was refused."
+    }
    }
   ],
   "finding-152": [
@@ -4104,6 +4307,32 @@
     "op": "add",
     "at": "2026-11-13T16:57:39.000Z",
     "by": "autopilot"
+   },
+   {
+    "id": "finding-152",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Still to confirm on PR #2432: Lessons in `docs/areas/runs-and-dispatch.md` under 6,144 bytes after the change (done-when; 5,195 bytes at 0092d8d9e before it, per decision-124). Not checked by the autopilot cross-check."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "task-113"
+     ],
+     "on": [
+      "decision-124@1"
+     ]
+    },
+    "in": "task-113",
+    "to": "review",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:58:28.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "Checked at head 7424cfb8f: Lessons in docs/areas/runs-and-dispatch.md is 5,389 B (under 6,144); the LLM note's Lessons is 3,950 B."
+    }
    }
   ],
   "finding-153": [
@@ -4129,6 +4358,33 @@
     "op": "add",
     "at": "2026-11-13T16:57:40.000Z",
     "by": "autopilot"
+   },
+   {
+    "id": "finding-153",
+    "kind": "finding",
+    "state": "handed-on",
+    "fields": {
+     "says": "PR #2432 must rebase onto main if LIN-4458 (piece 2) merges first; both are order step 3 and overlap (decision-116)."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "task-112"
+     ],
+     "on": [
+      "decision-116@1"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:58:25.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "Carried by the review ledger's pre-merge rebase check, which also covers LIN-4465.",
+     "into": "check-157"
+    }
    }
   ],
   "run-154": [
@@ -4176,6 +4432,233 @@
     "ended": {
      "reason": "cross-check written; review dispatched next"
     }
+   }
+  ],
+  "run-155": [
+   {
+    "id": "run-155",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "review",
+     "account": "Reviewed PR #2432 at head 7424cfb8f (base 0092d8d9e, 5 docs-only commits behind origin/main 2aab32bf0, mergeable). CI green (run 43466823788, 8 checks); re-ran 333 related unit tests on the head and on a local merge with origin/main, 333/333 both. Read done-when sentence by sentence: all met, the lineage helpers by the recorded departure (decision-145), which I agree with after checking production follow-ups inherit rootItemId (lib/dispatch-factory.js:724); the renewed LIN-4448 ask only in part. Four mutation checks each turned the witnesses red. Ruled the FEEDBACK_ENTRY_KINDS re-export removal inside the bounded class (question-151). Verdict approve with notes: one PR-body fix and four ledger items for close-out. Nothing posted on LIN-4447 or LIN-4448; LIN-4459 description unchanged."
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:58:19.000Z",
+    "by": "review"
+   },
+   {
+    "id": "run-155",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "review",
+     "account": "Reviewed PR #2432 at head 7424cfb8f (base 0092d8d9e, 5 docs-only commits behind origin/main 2aab32bf0, mergeable). CI green (run 43466823788, 8 checks); re-ran 333 related unit tests on the head and on a local merge with origin/main, 333/333 both. Read done-when sentence by sentence: all met, the lineage helpers by the recorded departure (decision-145), which I agree with after checking production follow-ups inherit rootItemId (lib/dispatch-factory.js:724); the renewed LIN-4448 ask only in part. Four mutation checks each turned the witnesses red. Ruled the FEEDBACK_ENTRY_KINDS re-export removal inside the bounded class (question-151). Verdict approve with notes: one PR-body fix and four ledger items for close-out. Nothing posted on LIN-4447 or LIN-4448; LIN-4459 description unchanged."
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:58:35.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "Review written (null)."
+    }
+   },
+   {
+    "id": "run-155",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "review",
+     "account": "Reviewed PR #2432 at head 7424cfb8f (base 0092d8d9e, 5 docs-only commits behind origin/main 2aab32bf0, mergeable). CI green (run 43466823788, 8 checks); re-ran 333 related unit tests on the head and on a local merge with origin/main, 333/333 both. Read done-when sentence by sentence: all met, the lineage helpers by the recorded departure (decision-145), which I agree with after checking production follow-ups inherit rootItemId (lib/dispatch-factory.js:724); the renewed LIN-4448 ask only in part. Four mutation checks each turned the witnesses red. Ruled the FEEDBACK_ENTRY_KINDS re-export removal inside the bounded class (question-151). Verdict approve with notes: one PR-body fix and four ledger items for close-out. Nothing posted on LIN-4447 or LIN-4448; LIN-4459 description unchanged."
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T16:58:41.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "Review written (verdict-162). Re-ended after the verdict write, first refused, went in."
+    }
+   }
+  ],
+  "check-156": [
+   {
+    "id": "check-156",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "Before merge: LIN-4448 has not answered the renewed ask (question-148, comment 0510ffe0, posted after the build), and that ask does not mention the `runner-kickoff.js` import change or the LLM-note entry it retires. Post that addition on LIN-4448; then either a LIN-4448 reply confirms, or record that 08c9c898 (\"agree… no shim… whichever of us lands second changes only the import path\", decision-119) already covers the move and that the runner-kickoff change touches only an import path, prompt bytes unchanged (`runner-kickoff.test.js`).",
+     "why-person": "Needs LIN-4448's reply, or a recorded judgement that the standing agreement covers it; CI cannot give either.",
+     "how": "Comment on LIN-4448; read its reply or record the fallback on LIN-4459."
+    },
+    "links": {
+     "about": [
+      "question-148",
+      "decision-119",
+      "change-143"
+     ]
+    },
+    "in": "task-113",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:58:23.000Z",
+    "by": "review"
+   }
+  ],
+  "check-157": [
+   {
+    "id": "check-157",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "Before merge: CI ran on base 0092d8d9e. If LIN-4458 (piece 2) or LIN-4465 (edits comments in `lib/recent-runs.js`, per decision-119) lands first, PR #2432 must rebase. Require CI green on the exact commit merged, with lin-4392's LIN-4459 describe block green. A local merge with origin/main 2aab32bf0 passed 333/333.",
+     "why-person": "Depends on merge order, which is only known at merge time.",
+     "how": "Read the CI run on the merge commit's head SHA."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "finding-153"
+     ]
+    },
+    "in": "task-113",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:58:24.000Z",
+    "by": "review"
+   }
+  ],
+  "check-158": [
+   {
+    "id": "check-158",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "Cost of the behaviour change: every recommendation read (`codeRouteOf`, hit by autopilot and recommend-and-dispatch) now pays one batched `_lineageOf` read plus the stale-row self-heal writes of `recomputeLineageRows`. Same reads/writes the proxy list and Dispatch history already do, but CI does not measure latency or write volume. Monitor: the `console.error` \"Lineage recompute lost its compare-and-set …\" in `lib/dispatch-lineage-status.js`, with recommendation latency on the proxy route. Rollback: revert the PR #2432 merge commit (no schema change; heal writes are the derivation the list already persists).",
+     "why-person": "Only production traffic shows contention.",
+     "how": "Watch production logs and proxy-route latency after deploy; revert the merge commit if contention appears."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "decision-145"
+     ]
+    },
+    "in": "task-113",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:58:26.000Z",
+    "by": "review"
+   }
+  ],
+  "check-159": [
+   {
+    "id": "check-159",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "After deploy: the witnesses build rows through the real store but set `rootItemId` by hand; production inheritance was confirmed by reading `lib/dispatch-factory.js:724` only. Find one ticket with a stage parked `[pending]` whose ci-wake `custom` or held-wake follow-up has since posted `[blocked]`/`[skipped]`; `GET /api/proxy/recommendation/<id>` must no longer answer \"wait\" naming that stage. If none exists yet, record \"not yet observed\", not discharged.",
+     "why-person": "Needs live production data, which no test here reads.",
+     "how": "GET /api/proxy/recommendation/<id> on a matching ticket after deploy."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "decision-144",
+      "decision-145"
+     ]
+    },
+    "in": "task-113",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:58:27.000Z",
+    "by": "review"
+   }
+  ],
+  "decision-160": [
+   {
+    "id": "decision-160",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "Inside the bounded class: keep the FEEDBACK_ENTRY_KINDS re-export removal, and the PR body names it as retired.",
+     "why": "The parent asks that each rule have one home and the copies go; the re-export is the same idiom this ticket bans for its own module (\"no re-export or shim\"). The Waiting entry it retires (finding-81) was written by LIN-4455's own blind read, asking for this drop on condition the runner prompt bytes and kind order do not change; runner-kickoff.test.js and the lin-4455 table test pass. No importer of the store re-export remains in this repo or in simple-dispatcher. The flipped lin-4455 assertion pinned the then-current compatibility state, not a requirement."
+    },
+    "links": {
+     "answers": "question-151",
+     "on": [
+      "change-143@2"
+     ],
+     "about": [
+      "finding-81",
+      "finding-150"
+     ]
+    },
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:58:36.000Z",
+    "by": "review"
+   }
+  ],
+  "finding-161": [
+   {
+    "id": "finding-161",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Fix before merge, PR #2432 body `## Retires`: add a bullet: \"The store's `FEEDBACK_ENTRY_KINDS` re-export (`lib/dispatch-store.js`). `lib/prompts/runner-kickoff.js` and the tests import it from the leaf `lib/dispatch-feedback-kinds.js`; the `tests/unit/lin-4455-feedback-kinds-table.test.js` assertion now pins that the store does not re-export it. This settles the LLM & prompts Waiting entry from LIN-4455's blind read.\""
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "decision-160",
+      "finding-81"
+     ]
+    },
+    "in": "task-113",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:58:38.000Z",
+    "by": "review"
+   }
+  ],
+  "verdict-162": [
+   {
+    "id": "verdict-162",
+    "kind": "verdict",
+    "state": "stands",
+    "fields": {
+     "of": "review",
+     "outcome": "approve-with-notes",
+     "reasoning": "Approve, conditional on close-out discharging the ledger (LIN-4459 comment db296654). Done-when met sentence by sentence at head 7424cfb8f: five names in lib/run-live-wait.js with no cycle; old module deleted, no shim, importers and three test importers moved; runFact (lib/recent-runs.js:76-79) takes the lineage word only for a parked row with no terminal of its own; lineage helpers replaced by the recorded departure, which I agree with; compare-and-set note moved unchanged; Waiting entries gone; census and area-map-placement green; Lessons 5,389 B. Ask-LIN-4448-again met only in part. Regression check: LIN-4370's WAITING_ON_A_PERSON and LIN-3364's closed-stamp time intact. Class: all wait readers go through loadRecentRuns; liveOnAnchor (lib/live-anchor.js) reads a different shape, outside, no ticket. Fix: finding-161. Ledger: check-156, check-157, check-158, check-159."
+    },
+    "links": {
+     "on": [
+      "change-143@2",
+      "decision-145@1",
+      "decision-160@1"
+     ],
+     "about": [
+      "task-113"
+     ]
+    },
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:58:40.000Z",
+    "by": "review"
    }
   ]
  },
@@ -5084,6 +5567,30 @@
     "verdict",
     "--in",
     "task-113",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:38:04.784Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "question-151",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:38:04.816Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "verdict-162",
     "--by",
     "review"
    ],

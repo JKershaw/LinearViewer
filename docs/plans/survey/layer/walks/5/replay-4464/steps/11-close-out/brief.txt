@@ -1,0 +1,158 @@
+brief for close-out on task-78 as of 2026-11-13T16:32:21.249Z
+1. task task-78 (ref LIN-4464)
+  done-when: LIN-4464 (piece 0, baseline area read): two reports are committed, `llm-and-prompts` and the control `front-end-pages`, both read at one recorded base commit at or after `5dcf5bcda` (so PR #2424's (LIN-4457) two `aria-label`s in `lib/render-proxy.js`, in the control's 14-file sample, sit inside the baseline), made with the LIN-4453 kit (`docs/plans/survey/area-read.md`) and its frozen reader prompt, unchanged, PR #2422 as the model; the kit's fixed table (pinned to `4b5001ddf` and LIN-4447's areas) is not reused. The contamination notes and the open PRs that touch either sample (at breakdown #2427, LIN-4455, and #2426, LIN-4456) are recorded in both reports, with the area's hash sample at the base, which should include `lib/openrouter.js`, `lib/prompt-template-defs.js` and `lib/recommendation-live-wait.js` (pieces 1, 3 and 5 change them). Nothing from pieces 1-6 has landed before it merges. Testing: the kit's own checks; docs-only PR. Retires no Waiting entry; fills the missing-baseline gap the plan names. Binding: follow the parent's approved plan, and where the code shows it wrong change course and say so on LIN-4448; the PR names what it retires, edits the Waiting entries in `docs/areas/llm-and-prompts.md` it settles, respects that note's Lessons and leaves `docs/reviews/` unchanged.
+  paths: docs/plans/survey/area-read.md, docs/plans/survey/area-read-reports/, docs/areas/llm-and-prompts.md, lib/openrouter.js, lib/prompt-template-defs.js, lib/recommendation-live-wait.js, lib/render-proxy.js
+  asked (task-60):
+**Repository:** JKershaw/LinearViewer (Harbour).
+
+**What this is for.** The tightest tangle in Harbour is between LLM & prompts and Runs & dispatch: the links between the two areas grew from 32 one way and 50 the other to 38 and 55 over batch 1 (Seams run 12). On this side:
+
+* the list of routes that code settles without asking a model is copied about nine times, and `docs/architecture/prompt-system.md` and `public/llms.txt` already describe it wrongly (Drift, row 154);
+* the blind read's name and heading are retyped outside the file that defines them (Drift, row 151);
+* batch 1 added rules to the prompts as text (the frozen prompt total rose about 21,000 bytes, to 378,915). John on that limit: "That limit is to push against lists if rules. Worth knowing, but not hard and fast.";
+* LIN-4350 asks to fold the rules together into plainer, more general instructions.
+
+The safety pass (A5, LIN-4400) found two themes here: merge and read-only limits that exist only in prompt text (LIN-1242, LIN-1273, LIN-3417), and tokens inside prompt text (LIN-1372, LIN-1395, LIN-1408). Both are part of A12 (LIN-4416). The area's note holds 26 Waiting entries.
+
+**What we want.**
+
+* Each rule has one home; the copies are gone, and the docs say what the code does.
+* A limit that matters is held in code, not only in a prompt's words.
+* Fewer rules are restated as lists in prompt text.
+* The area's Waiting entries are settled, or each says why it can't be yet.
+* Each piece finishes one move and names what it retired; piece sizes vary, leaning larger.
+* The Runs & dispatch side of the seam is A13's.
+
+**Done when**
+
+* the cases above are settled, or John has ruled they can wait;
+* the safety tickets named above are closed in code for that reason, or John has ruled they can wait;
+* the area's Waiting entries are settled or say why not;
+* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.
+
+**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.
+
+*End of what was asked. Steps write below this line; nothing above it changes.*
+2. plan piece:
+  plan-64@1 plan by design in task-60
+    says: Piece 0: baseline area read, first and alone, before anything lands. The LIN-4453 kit (`docs/plans/survey/area-read.md`, same frozen reader prompt) run on `llm-and-prompts` and on the control area `front-end-pages`; this area has no baseline yet (LIN-4453 recorded Runs and the control only). Repeated after the last piece (piece 6), to measure "reads better in a blind read ... by more than an untouched area".
+    paths: []
+    order: 1
+3. addressed to you:
+  finding-112@1 finding by review to close-out in task-78
+    says: Fix 1 before merge (acceptance sentence 8, contamination notes in both reports): in `docs/plans/survey/area-read-reports/llm-and-prompts-e8e92d50a.md`, section `## Control and contamination`, bullet "Control moved.", name the moves: `lib/render-proxy.js` (#2424, LIN-4457), `lib/render-swipe.js` and `lib/render-task-page.js` (#2423, LIN-4446), and the control note `971d4bf6c` -> `ae9c007e1` (12 Waiting entries, down from 14). Keep the pointer to the addendum. The LLM report now only says the control moved.
+    about: change-103
+  finding-113@1 finding by review to close-out in task-78
+    says: Fix 2 before merge: the "when checked" statements in both reports and the addendum (sections 1, 3, 4) are stale. Since then #2427 (LIN-4455, merge `192e1f81f`) and #2428 (LIN-4456, `0092d8d9e`) merged. Leave the "when checked" wording; add one dated "At merge" line to addendum section 3 and the same line to the `Open PRs` bullet in the LLM report: #2427 has merged, so the LLM note on main is blob `eb976276d` (+5 lines) while the baseline stays `b6b4c726d` (the after-read reports that as note movement); #2428 touched neither note nor any sampled file; no sampled file changed between `e8e92d50a` and the merge commit. Re-check those facts at the moment of merging.
+    about: change-103, finding-105
+  check-114@1 check by review to close-out in task-78
+    what: Pre-merge: nothing from pieces 1-6 (LIN-4465..4470) on main, none of the 28 sampled paths changed since `e8e92d50a`, the open-PR record still true, `ci-success` green on the final commit.
+    why-person: CI cannot see main moving after review; acceptance sentence 9 (nothing from pieces 1-6 lands before this merges) and the open-PR record must hold at the moment of merge, so close-out runs it then.
+    how: `git log origin/main --oneline -E --grep="LIN-44(6[5-9]|70)"` is empty; `git diff --name-only e8e92d50a origin/main` meets none of the 28 sampled paths; `gh pr list --state open` with each PR file list checked against the 28 paths and both notes. Either git check non-empty: the baseline is no longer before; stop and raise it on LIN-4448.
+    about: change-103
+  finding-117@1 finding by blind-read to close-out in task-78
+    says: Blind read of #2430 (head `444b58246` vs `0092d8d9e`), fix-sized, runs-and-dispatch: `lib/dispatch-leftover.js` restates two rules that already have an owner. `RESUMABLE_TARGETS = new Set(['cli','web'])` with `doc.target || 'cli'` repeats `followUpTarget` (`lib/dispatch-targets.js`, the one follow-up target rule, LIN-3672); `halt?.mode === 'pause' || halt?.mode === 'stop'` repeats `HALT_MODES` (`lib/workspace-halt.js`). Fix: import `followUpTarget` and `HALT_MODES` again and drop the local copies; two lines in one file, no behaviour change.
+    on: change-103@2
+  finding-118@1 finding by blind-read to close-out in task-78
+    says: Blind read of #2430, fix-sized, runs-and-dispatch (concerns `lib/digest-feedback.js`): `lib/run-view.js` now carries its own copy of the three stamp kinds (`DECISION_STAMP_KINDS`), which is not in `tests/unit/decision-lifecycle-stamp-drift.test.js`'s `sites` list, and the docblock count ("4 literal copies across 5 call sites") leaves it out, so it can drift with no alarm. Fix: add `lib/run-view.js` to `sites` and update the count. Tidy-up: in `lib/run-view.js` the "A wake marker is a leading prefix…" comment sits alone between the set and `lastWakeEntry`'s docblock; fold it back into that docblock.
+    on: change-103@2
+  finding-124@1 finding by autopilot to close-out in task-78
+    says: Do not apply finding-117 or finding-118 to #2430: they are not fixes to this PR. The blind read (verdict-123) diffed head `444b58246` against `0092d8d9e`, a main commit (16:19) after the branch point `e8e92d50a` (15:59); against it the branch is diverged, behind by 10, so main-only work showed up as removals. Against its own base #2430 is ahead 2, behind 0: 3 files, +358/-0, all under `docs/plans/survey/`. The lib/ edits proposed (`lib/dispatch-leftover.js`, `lib/run-view.js`, the stamp drift test) would make a docs-only baseline touch code and move what it measures; close them as not this PR's. finding-112, finding-113 and check-114 still stand.
+    about: verdict-123, finding-117, finding-118, change-103
+4. what stands:
+  decision-61@2 decision by scoping in task-60
+    answer: **Size:** rebuild the area
+**Why:** Rebuilds the area around one definition per stage kind, from which routes, write limits, labels and docs derive, and has the proxy refuse writes a stage may not make; otherwise copies return and read-only stays words.
+**Cuts:**
+
+* "the safety tickets named above are closed in code": the merge limit (LIN-3417) stays with simple-dispatcher.
+* "the safety tickets named above are closed in code": the token tickets (LIN-1372, LIN-1395, LIN-1408) stay with the harness.
+  **Decided by:** a ruling
+    why: Scoping's size record (## Size of the move in LIN-4448's description); the cuts wait on the ruling lin4448-safety-cuts.
+    scope: task-60
+  decision-63@1 decision by John in task-60
+    answer: Agree both cuts: they wait for A12 and simple-dispatcher; LIN-4448 closes only the read-only limit, through the proxy's write guard
+    why: — Ruling recorded via Harbour
+    scope: task-60
+    answers: question-62
+  verdict-71@1 verdict by plan-review in task-60
+    of: plan-review
+    outcome: approve
+    reasoning: Approve (comment 72406236, rev 1). The causes it names are the real causes, the proxy guard reaches every dispatched agent's writes, and each gap can be fixed without changing what the plan decides; checked at `c205190fd`; 25 Waiting entries, not the ask's 26. Piece 0: the measurement can move: the kit's hash sample for `llm-and-prompts` at HEAD includes `lib/openrouter.js`, `lib/prompt-template-defs.js` and `lib/recommendation-live-wait.js`. Note 12: the control is not quite untouched: open PR #2424 (LIN-4457) adds two `aria-label`s to `lib/render-proxy.js`, in the control's 14-file sample. Record it in both area reads, and check open PRs against the control's sample again before the repeat read. Take this area's baseline and a fresh control read at one base commit, recorded in each report. The kit's fixed table is pinned to `4b5001ddf` and LIN-4447's areas.
+    on: plan-64@1
+  decision-79@1 decision by breakdown in task-78
+    answer: Grounding commits: the plan was written at `JKershaw/LinearViewer` main `2bf788b6d` (surveys at `4b5001ddf`) and reviewed at `c205190fd`; the breakdown re-checked at `5dcf5bcda`. The plan stands; no re-plan.
+    why: Staleness check at breakdown: since `2bf788b6d` and `c205190fd` only LIN-4457 (#2424) and LIN-4454 landed, and the one plan file they touch is the cost-read entry in `docs/architecture/source-map.md`; `codeRouteOf` is still at `lib/openrouter.js:2108`, `requireWriteScope` at `routes/proxy.js:609`, and there are 25 Waiting entries.
+    on: verdict-71@1
+  decision-80@1 decision by breakdown in task-78
+    answer: Session fit: fits one session. Plan-review due: no — covered by LIN-4448's approving plan-review (comment 72406236-9316-4004-98ee-70d8fba0cb09, rev 1).
+    why: One session: a docs-only measurement, like LIN-4453's piece 0 (breakdown table).
+    on: verdict-71@1
+  decision-81@1 decision by breakdown in task-78
+    answer: LIN-4464 is order 1, blocked by nothing; it blocks LIN-4465 (piece 1), LIN-4466 (piece 2) and LIN-4468 (piece 4).
+    why: The baseline goes first and alone, so that nothing changes the area before it is read.
+    on: verdict-71@1
+  decision-90@1 decision by John in task-60
+    answer: Retire it: look-into reports in its session and a person posts the comment if they want it
+    why: John chose the recommended option, retire, on LIN-4448 (ruling lin4448-lookinto-none). — Ruling recorded via Harbour
+    scope: task-60
+    answers: question-83
+  decision-99@1 decision by scoping in task-78 [STALE: on finding-97@1, now @2]
+    answer: **Size:** just the task
+**Why:** Delivers the paired baseline the ask names, both areas at one recorded commit with the frozen kit; no Survey finding binds, since recording the kit's misfits beside it is the ask's own shape and a reusable kit is separate work.
+**Cuts:** none
+**Decided by:** the standing policy
+    why: Scoping's size record (## Size of the move in LIN-4464's description).
+    scope: task-78
+    on: plan-64@1, finding-95@1, finding-97@1
+  decision-100@1 decision by implementation in task-78
+    answer: Base fixed at `e8e92d50a` (origin/main, the #2426/LIN-4456 merge) so both area reads share one commit.
+    why: The done-when asks one recorded base at or after `5dcf5bcda`; nothing from pieces 1-6 is on main at it.
+    scope: task-78
+    on: finding-85@2
+  decision-101@1 decision by implementation in task-78
+    answer: `{AREA}` in the reader prompt is filled with the `areas.json` names; nothing else in the frozen reader prompt (blob `ef1c2ca91`) changed.
+    why: The kit (blob `cbec2d848`) stays unedited for its blob pin; the area name is the only parameter the read needed.
+    scope: task-78
+    on: finding-85@2
+  decision-102@1 decision by implementation in task-78
+    answer: N kept at 14 despite the 1.84x byte imbalance (380,459 B vs 206,545 B); the gap is recorded as a known limit in both reports.
+    why: N is frozen with the kit; changing it would break comparability with the after-read.
+    scope: task-78
+    on: finding-86@2
+  decision-110@1 decision by leftover in task-78
+    scope: task-78
+    answer: No lesson added to either area note, and no Waiting entry retired by #2430.
+    why: `docs/areas/llm-and-prompts.md` is the baseline's measured note (blob `b6b4c726d`) and `docs/areas/front-end-pages.md` the control's, so an edit to either moves the note blob the reports pin. The PR touches only unmapped `docs/plans/survey/` files; the done-when says this piece retires no Waiting entry; settling an LLM & prompts entry would land piece 1-6 work before the baseline merges, and settling a front-end-pages entry would move the control.
+    on: finding-85@3, decision-100@1
+    about: change-103
+  verdict-115@1 verdict by review in task-78
+    of: review
+    outcome: approve-with-notes
+    reasoning: Approve, conditional on close-out making finding-112 and finding-113 and running check-114 (review comment on LIN-4464, 16:28). PR #2430 head `444b58246` on `e8e92d50a`, 3 new docs files under `docs/plans/survey/`; CI green (CI success plus all seven jobs), MERGEABLE. Re-checked myself: kit `cbec2d848` and reader prompt `ef1c2ca91` unchanged at base and main; kit snippet re-run at `e8e92d50a` matches both reports path for path and byte for byte (LLM 91 files, 14 picked, 380,459 B, with `lib/openrouter.js`, `lib/prompt-template-defs.js`, `lib/recommendation-live-wait.js` at ranks 1, 5, 8; control 92 files, 14 picked, 206,545 B); note blobs `b6b4c726d` / `ae9c007e1`, `areas.json` `1dc2ba701`, control-movement table correct; no piece 1-6 commit on main and no sampled file changed since base; no rulings on LIN-4464. Done-when met sentence by sentence except contamination notes in the LLM report (met in part, finding-112). Not proven by CI, discharged as recorded: reader transcripts are not committed (as #2422, the reports are the record); readers may have loaded CLAUDE.md before their first tool call (affects before and after alike). The method spread across three files is a class outside this ticket (finding-97, already with task-60); otherwise isolated. Docs-only, so the evidence is reproducibility, which I re-ran. Next action: close-out.
+    on: change-103@2, decision-110@1
+    about: task-78, finding-112, finding-113, check-114, finding-97
+  verdict-123@1 verdict by blind-read in task-78
+    of: blind-read
+    outcome: worse
+    reasoning: Read #2430 at `444b58246` against `0092d8d9e` (blind-read comment on LIN-4464, 16:31). It simplifies the held-wake release in `lib/dispatch-store.js` (`setHeldWakeReleaseNote`, `_releaseNoteFor`, `UNBOUND_HELD_WAKE_RELEASE_NOTE` gone: one wording path instead of two) and drops the always-true `mayCarryWake` filter from `findWakeEvent` (`lib/dispatch-terminal.js`). Against that, it deletes the one-owner declarations `lib/dispatch-feedback-kinds.js` and `NEVER_RAN` and copies their values back into about ten files across runs-and-dispatch and agent-api, with nothing checking they stay in step; the store also takes back the leftover wording through `formatHeldWakeNote`. Fix-sized: finding-117, finding-118. Larger: finding-119, finding-120, finding-121. Outside: finding-122.
+    on: change-103@2
+    about: task-78, finding-117, finding-118, finding-119, finding-120, finding-121, finding-122
+5. areas:
+  area-1 LLM & prompts (25 open)
+  area-44 Front end: server-rendered pages (12 open)
+6. open runs sharing paths:
+  none
+7. index:
+  lesson-6 lesson: `lib/prompt-template-defs.js` and the budget test change in almost every merge: rebase, then re-measure. Its fixture passes no context (the empty-context branch), so dropping one can raise a ceiling while real renders shrink (LIN-4393).
+  lesson-8 lesson: `lib/prompt-template-defs.js` cannot import what imports `lib/prompt-templates.js` (a cycle): shared words live in an import-free leaf, as `lib/prompts/leftover-words.js` (LIN-4376) and `lib/prompts/autopilot-precedence.js` (never restate a rank; LIN-4382).
+  finding-97 finding to task-60: Not this task's: the area-read kit is a one-off that now needs a per-read addendum each use (Runs, then LLM; the piece-6 repeat read would need a third). After #2430 the method is spelled across three files: the frozen kit `docs/plans/survey/area-read.md`, `docs/plans/survey/area-read-method-as-run.md` and `docs/plans/survey/area-read-adoption-e8e92d50a.md`. They are unmapped `docs/plans/` files with no code file to cite, so no area note can hold this. Better: a parameterised kit under a new name, with base, area, N and salt as inputs and a per-read Known limits section; keep `area-read.md` frozen for its blob pin. Also add an area-read kind to the comment classifier (LIN-4458), so `landingPrUrls` skips area-read comments as it does blind reads and survey reports.
+  change-103 change: #2430
+  finding-104 finding to task-60: Baseline area read at `e8e92d50a` (frozen kit `cbec2d848`, reader prompt `ef1c2ca91`, two fresh passes per area): LLM & prompts code 3.3 (3.3 / 3.3), note 3.25 (3.0 / 3.5); control Front end: server-rendered pages code 3.3 (3.3 / 3.3), note 3.5 (3.5 / 3.5). Noise guard fired on neither. Reports: `docs/plans/survey/area-read-reports/{llm-and-prompts,front-end-pages}-e8e92d50a.md`; adoption record `docs/plans/survey/area-read-adoption-e8e92d50a.md`. These are the before-scores for the piece-6 repeat read; control files `render-proxy`, `render-swipe`, `render-task-page` moved since `4b5001ddf` and are flagged there for the after-read. Retires no Waiting entry; fills the missing-baseline gap.
+  finding-105 finding to task-60: Before the piece-6 repeat read, check open PRs against both samples and notes again: when #2430 went up, fourteen PRs were open (survey-place counted twelve at `e8e92d50a`) and none touches a sampled file. #2427 (LIN-4455) has since merged (`192e1f81f`), adding 5 lines to `docs/areas/llm-and-prompts.md`: the LLM note on main is now blob `eb976276d` while the baseline stays `b6b4c726d`. That movement is outside this work; the after-read must report it as note movement not caused by pieces 1-6. #2428 (LIN-4456, `0092d8d9e`) touched neither note nor any sampled file.
+  finding-119 finding to John: Blind read of #2430, larger, runs-and-dispatch: `releaseHeldWake` in `lib/dispatch-store.js` calls `formatHeldWakeNote({ status })`, which returns "The leftover step did not run…" (`lib/dispatch-wake.js:331`), so the store that `tests/unit/lin-4377-store-knows-no-leftover.test.js` says "knows no leftovers" speaks the leftover wording again. That test's docblock still claims the wake wording lives in the injected hook, but the test only counts the word "leftover", and the dependency check that witnessed the claim was deleted. Larger: someone must decide who owns the release wording, the design this change took out (`setHeldWakeReleaseNote`, `_releaseNoteFor`, `UNBOUND_HELD_WAKE_RELEASE_NOTE` removed).
+  finding-120 finding to John: Blind read of #2430, larger, runs-and-dispatch: "a row that never ran" (`cancelled`/`expired`) is written out separately at each site: `lib/dispatch-store.js` (twice, lines 1176 and 1906), `lib/dispatch-leftover.js` (private `NEVER_RAN`, line 29), `lib/dispatch-terminal.js`, `lib/observer-sweep.js`, `lib/task-page-loader.js`, `lib/plan-review-round-trips.js`, `routes/dispatch.js`. A third archive-without-running status would need every site found by hand. Larger: needs one owner chosen and imported across areas (agent-api copy in a separate finding).
+  finding-121 finding to John: Blind read of #2430, larger, runs-and-dispatch: the feedback-entry kinds have no single declaration again (`lib/dispatch-feedback-kinds.js` and its test deleted): the runner allowlist is in `lib/dispatch-store.js`, the relay kinds in `lib/session-telemetry.js` (`PARKED_WAIT_SKIPPED_KINDS`), the stamp kinds in four lib copies (`lib/digest-feedback.js`, `lib/wall-clock-summary.js`, `lib/run-view.js`, …). A new kind no longer has to say what its roles are. `lib/dispatch-feedback-validation.js` now imports the whole run store to read one array. Larger: giving the kinds a home is a design decision.
+  finding-122 finding to John: Blind read of #2430, outside the area (agent-api): `routes/proxy-dispatch.js` has `['queued', 'cancelled', 'expired'].includes(statusFilter)`, another inline copy of the never-ran statuses; it must stay in step with the runs-and-dispatch sites (finding-120).
+  finding-125 finding to John: The blind read's "worse" (verdict-123) does not measure #2430: it compared head `444b58246` with `0092d8d9e`, after the branch point `e8e92d50a`, so the lib/ deletions it lists (`lib/dispatch-feedback-kinds.js`, `NEVER_RAN`, the store's held-wake wording) are work merged to main after this branch, not removed by it. #2430 is 3 docs files, +358/-0, under `docs/plans/survey/`. finding-119 to finding-122 therefore describe that main work read in reverse, not this PR; whether any of them holds on main was not checked. Measurement note only: the review's verdict (verdict-115) and ledger stand as written.
+-- carries {"asked":1,"piece":1,"addressed":6,"stands":14,"areas":2,"runs":0,"index":11}; 22872 bytes

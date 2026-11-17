@@ -1,0 +1,69 @@
+[
+ {
+  "at": "2026-11-17T15:37:11.836Z",
+  "by": "autopilot",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-78",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:11.866Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "0092d8d9e",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:27.561Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "verdict-123",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:27.600Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "change-103",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:27.636Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--in",
+   "task-78",
+   "--kind",
+   "run",
+   "--state",
+   "open",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ }
+]

@@ -1,5 +1,5 @@
 {
- "next": 124,
+ "next": 127,
  "records": {
   "area-1": [
    {
@@ -3277,6 +3277,91 @@
     "at": "2026-11-13T16:29:01.000Z",
     "by": "blind-read"
    }
+  ],
+  "finding-124": [
+   {
+    "id": "finding-124",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Do not apply finding-117 or finding-118 to #2430: they are not fixes to this PR. The blind read (verdict-123) diffed head `444b58246` against `0092d8d9e`, a main commit (16:19) after the branch point `e8e92d50a` (15:59); against it the branch is diverged, behind by 10, so main-only work showed up as removals. Against its own base #2430 is ahead 2, behind 0: 3 files, +358/-0, all under `docs/plans/survey/`. The lib/ edits proposed (`lib/dispatch-leftover.js`, `lib/run-view.js`, the stamp drift test) would make a docs-only baseline touch code and move what it measures; close them as not this PR's. finding-112, finding-113 and check-114 still stand."
+    },
+    "links": {
+     "about": [
+      "verdict-123",
+      "finding-117",
+      "finding-118",
+      "change-103"
+     ]
+    },
+    "in": "task-78",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:32:13.000Z",
+    "by": "autopilot"
+   }
+  ],
+  "finding-125": [
+   {
+    "id": "finding-125",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The blind read's \"worse\" (verdict-123) does not measure #2430: it compared head `444b58246` with `0092d8d9e`, after the branch point `e8e92d50a`, so the lib/ deletions it lists (`lib/dispatch-feedback-kinds.js`, `NEVER_RAN`, the store's held-wake wording) are work merged to main after this branch, not removed by it. #2430 is 3 docs files, +358/-0, under `docs/plans/survey/`. finding-119 to finding-122 therefore describe that main work read in reverse, not this PR; whether any of them holds on main was not checked. Measurement note only: the review's verdict (verdict-115) and ledger stand as written."
+    },
+    "links": {
+     "about": [
+      "verdict-123",
+      "finding-119",
+      "finding-120",
+      "finding-121",
+      "finding-122",
+      "change-103"
+     ]
+    },
+    "in": "task-78",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:32:14.000Z",
+    "by": "autopilot"
+   }
+  ],
+  "run-126": [
+   {
+    "id": "run-126",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "autopilot",
+     "account": "Checked the blind read against PR #2430 itself. The PR is 3 docs files under docs/plans/survey/, +358/-0, ahead 2 and behind 0 on its base e8e92d50a. The blind read diffed against 0092d8d9e, a later main commit the branch is 10 behind, so the lib/ changes it judged are main work after the branch, not this PR. Posted a measurement note on LIN-4464: the worse verdict does not measure this change, its code fixes are not fixes to this PR, and the piece stays docs-only so it does not move what it measures. The review verdict and ledger stand. Told close-out not to apply finding-117/118 (finding-124) and John that finding-119..122 are not about #2430 (finding-125)."
+    },
+    "links": {},
+    "in": "task-78",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:32:15.000Z",
+    "by": "autopilot"
+   },
+   {
+    "id": "run-126",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "autopilot",
+     "account": "Checked the blind read against PR #2430 itself. The PR is 3 docs files under docs/plans/survey/, +358/-0, ahead 2 and behind 0 on its base e8e92d50a. The blind read diffed against 0092d8d9e, a later main commit the branch is 10 behind, so the lib/ changes it judged are main work after the branch, not this PR. Posted a measurement note on LIN-4464: the worse verdict does not measure this change, its code fixes are not fixes to this PR, and the piece stays docs-only so it does not move what it measures. The review verdict and ledger stand. Told close-out not to apply finding-117/118 (finding-124) and John that finding-119..122 are not about #2430 (finding-125)."
+    },
+    "links": {},
+    "in": "task-78",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:32:16.000Z",
+    "by": "autopilot",
+    "ended": {
+     "reason": "measurement note posted on LIN-4464; findings 124 and 125 written"
+    }
+   }
   ]
  },
  "log": [
@@ -4407,6 +4492,73 @@
     "verdict",
     "--by",
     "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:37:11.836Z",
+   "by": "autopilot",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-78",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:37:11.866Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "0092d8d9e",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:37:27.561Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "verdict-123",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:37:27.600Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-103",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:37:27.636Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--in",
+    "task-78",
+    "--kind",
+    "run",
+    "--state",
+    "open",
+    "--by",
+    "autopilot"
    ],
    "asOf": null
   }
