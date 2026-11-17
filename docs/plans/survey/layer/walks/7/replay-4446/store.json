@@ -1,5 +1,5 @@
 {
- "next": 61,
+ "next": 65,
  "records": {
   "area-1": [
    {
@@ -1006,6 +1006,27 @@
     },
     "fields": {
      "says": "`public/common.js` calls itself the client twin of `lib/task-page-href.js`, `lib/timeline-zoom.js`, `lib/ship-layout.js` and `lib/prompt-formatters.js`; `public/swim.js` copies `lib/swim-lanes.js`. `task-page-href` and `timeline-zoom` have no imports, so they are next slices of the cost-format shape (one `SHARED_MODULES` entry each, retire the copy and its parity test). `ship-layout`, `swim-lanes` (import `providers/state-map.js`) and `prompt-formatters` (six imports) cannot be served as single files. Left out of LIN-4446's first slice (design, 13 Nov)."
+    }
+   },
+   {
+    "id": "finding-30",
+    "kind": "finding",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T14:56:28.021Z",
+    "by": "leftover",
+    "reason": "folded in the TERMINAL_TYPES mirror, as the front-end-browser note's common.js twins entry now does",
+    "in": "area-1",
+    "to": "area-1",
+    "state": "open",
+    "links": {
+     "about": [
+      "finding-20",
+      "task-9"
+     ]
+    },
+    "fields": {
+     "says": "`public/common.js` calls itself the client twin of `lib/task-page-href.js`, `lib/timeline-zoom.js`, `lib/ship-layout.js` and `lib/prompt-formatters.js`; `public/swim.js` copies `lib/swim-lanes.js`. `task-page-href` and `timeline-zoom` have no imports, so they are next slices of the cost-format shape (one `SHARED_MODULES` entry each, retire the copy and its parity test). `ship-layout`, `swim-lanes` (import `providers/state-map.js`) and `prompt-formatters` (six imports) cannot be served as single files. Left out of LIN-4446's first slice (design, 13 Nov). Also: `public/common.js` mirrors `TERMINAL_TYPES` from `lib/providers/models.js`, which is a leaf, and its comment still says `public/` cannot import it; another candidate of the same shape (noted by LIN-4446 leftover, 13 Nov)."
     }
    }
   ],
@@ -2232,6 +2253,115 @@
       "lib/components/page.js"
      ],
      "checked-at": "24de9abc9"
+    }
+   }
+  ],
+  "finding-61": [
+   {
+    "id": "finding-61",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:56:29.021Z",
+    "by": "leftover",
+    "to": "Harbour",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-57",
+      "decision-29"
+     ]
+    },
+    "fields": {
+     "says": "`lib/vendor-assets.js` and `createVendorAssetsRouter` are now named for less than they serve: since LIN-4446 slice 1 they also serve the `/shared/*` modules (`SHARED_MODULES`). A rename touches the mount string that `tests/unit/vendor-assets.test.js` pins. Written into the platform-and-plumbing area note (LIN-4446 leftover, 13 Nov); that area has no record in this store, so this is addressed to Harbour to file."
+    }
+   }
+  ],
+  "lesson-62": [
+   {
+    "id": "lesson-62",
+    "kind": "lesson",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:56:30.021Z",
+    "by": "leftover",
+    "in": "area-1",
+    "state": "holds",
+    "links": {
+     "about": [
+      "lesson-60",
+      "change-57",
+      "decision-46"
+     ]
+    },
+    "fields": {
+     "says": "A `{ module: ... }` entry's position in a page's scripts list means nothing: a module script is deferred and runs after every classic script wherever it is listed. So a guard must not assert list position; test the order in a `vm` seam with `document.readyState = 'loading'` instead. Added to docs/areas/front-end-browser.md (Lessons) by LIN-4446 leftover.",
+     "paths": [
+      "public/",
+      "lib/components/page.js",
+      "docs/areas/front-end-browser.md",
+      "tests/unit/shared-modules.test.js"
+     ],
+     "checked-at": "1de016f523f46a006c20a4e89717157422b3207b"
+    }
+   }
+  ],
+  "check-63": [
+   {
+    "id": "check-63",
+    "kind": "check",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:56:31.021Z",
+    "by": "leftover",
+    "in": "task-9",
+    "to": "review",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-57",
+      "check-33"
+     ]
+    },
+    "fields": {
+     "what": "PR #2423's leftover commits (head 1de016f5) change behaviour in two places beyond comments: the swipe page (`lib/render-swipe.js`) now takes the shared viewport instead of `user-scalable=no`, retiring that front-end-pages note entry; and the shim guard in `tests/unit/shared-modules.test.js` no longer asserts list position. Confirm the swipe test failed before its fix and passes after, and that the guard still fails on a renderer missing the shim (check-33).",
+     "why-person": "These rode in after the implementation report; a reviewer judging 24de9abc9 would miss them, and pinch-zoom on swipe is a visible change on a page outside the cost-format slice.",
+     "how": "Diff 24de9abc9..1de016f5; run the swipe viewport test with the fix reverted, and remove the shim from one renderer to see the guard fail."
+    }
+   }
+  ],
+  "run-64": [
+   {
+    "id": "run-64",
+    "kind": "run",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:56:32.021Z",
+    "by": "leftover",
+    "in": "task-9",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "stage": "leftover",
+     "account": "# What this stage really wrote\n\n## Comment on LIN-4446 at 15:06:53\n\n### Leftovers\n- tidied: test comments that said the formatter loads before the page script (`tests/unit/lin-3833-run-control.test.js`, `tests/unit/flight-companion-client.test.js`) now say what each seam does; `loadChatUI` drops a formatter install chat.js never reads.\n- tidied: `server.js`'s mount comment now names the `/shared/*` modules as well as the vendor libraries.\n- tidied: the shim guard in `tests/unit/shared-modules.test.js` no longer asserts list position (a module runs after every classic script wherever it is listed).\n- tidied: the purity rule is now spelled one way, as the guard enforces it (imports nothing, names no browser or Node global), in `lib/vendor-assets.js`, `lib/cost-format.js`, and the front-end-browser and other-features notes.\n- tidied: the front-end-browser Waiting entry on `buildDispatchModelOptionDescriptors` gave \"no build step\" as its reason; now it says `lib/openrouter-catalog.js` is not a leaf.\n- noted, front-end-browser: the `TERMINAL_TYPES` mirror in `public/common.js` of `lib/providers/models.js` (a leaf) still says `public/` cannot import it; folded into the `public/common.js` twins entry.\n- noted, platform-and-plumbing: `lib/vendor-assets.js` and `createVendorAssetsRouter` are now named for less than they serve; a rename touches the mount string `tests/unit/vendor-assets.test.js` pins.\n- Lesson added (front-end-browser): a `{ module }` entry's list position means nothing; test the order in a `vm` seam with `readyState = 'loading'`.\nRetires: `docs/areas/front-end-pages.md` \"`lib/render-swipe.js`: the viewport meta is `user-scalable=no`\" (the swipe page now takes the shared viewport, with a test that failed before the fix)\n\nPR: https://github.com/JKershaw/LinearViewer/pull/2423, head `1de016f523f46a006c20a4e89717157422b3207b`, CI green.\n"
+    }
+   },
+   {
+    "id": "run-64",
+    "kind": "run",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:56:33.021Z",
+    "by": "leftover",
+    "in": "task-9",
+    "state": "done",
+    "ended": {
+     "reason": "leftovers tidied and noted; PR #2423 at 1de016f5"
+    },
+    "links": {},
+    "fields": {
+     "stage": "leftover",
+     "account": "# What this stage really wrote\n\n## Comment on LIN-4446 at 15:06:53\n\n### Leftovers\n- tidied: test comments that said the formatter loads before the page script (`tests/unit/lin-3833-run-control.test.js`, `tests/unit/flight-companion-client.test.js`) now say what each seam does; `loadChatUI` drops a formatter install chat.js never reads.\n- tidied: `server.js`'s mount comment now names the `/shared/*` modules as well as the vendor libraries.\n- tidied: the shim guard in `tests/unit/shared-modules.test.js` no longer asserts list position (a module runs after every classic script wherever it is listed).\n- tidied: the purity rule is now spelled one way, as the guard enforces it (imports nothing, names no browser or Node global), in `lib/vendor-assets.js`, `lib/cost-format.js`, and the front-end-browser and other-features notes.\n- tidied: the front-end-browser Waiting entry on `buildDispatchModelOptionDescriptors` gave \"no build step\" as its reason; now it says `lib/openrouter-catalog.js` is not a leaf.\n- noted, front-end-browser: the `TERMINAL_TYPES` mirror in `public/common.js` of `lib/providers/models.js` (a leaf) still says `public/` cannot import it; folded into the `public/common.js` twins entry.\n- noted, platform-and-plumbing: `lib/vendor-assets.js` and `createVendorAssetsRouter` are now named for less than they serve; a rename touches the mount string `tests/unit/vendor-assets.test.js` pins.\n- Lesson added (front-end-browser): a `{ module }` entry's list position means nothing; test the order in a `vm` seam with `readyState = 'loading'`.\nRetires: `docs/areas/front-end-pages.md` \"`lib/render-swipe.js`: the viewport meta is `user-scalable=no`\" (the swipe page now takes the shared viewport, with a test that failed before the fix)\n\nPR: https://github.com/JKershaw/LinearViewer/pull/2423, head `1de016f523f46a006c20a4e89717157422b3207b`, CI green.\n"
     }
    }
   ]
