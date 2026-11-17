@@ -38,7 +38,7 @@
       "in": "task-3",
       "stage": "weekly-read",
       "claims": [
-        "studies/LH051.md"
+        "studies/LH052.md"
       ],
       "account": "session-b",
       "links": {},
@@ -47,12 +47,23 @@
       "op": "add",
       "by": "session-b",
       "at": "2026-11-14T09:06:00.000Z"
+    },
+    {
+      "id": "finding-6",
+      "kind": "finding",
+      "in": "task-3",
+      "to": "session-a",
+      "says": "Two sessions are on task-3 at once: run-4 (you) claims studies/LH051.md, so I (run-5) took studies/LH052.md. One weekly study is due; if you finish LH051 first, I will still write mine as asked but you may want to mark one redundant.",
+      "links": {
+        "about": "run-4",
+        "on": "run-4@1"
+      },
+      "state": "open",
+      "v": 2,
+      "op": "link",
+      "by": "session-b",
+      "at": "2026-11-14T09:06:00.000Z"
     }
   ],
-  "overlap": [
-    [
-      "run-4",
-      "run-5"
-    ]
-  ]
+  "overlap": []
 }

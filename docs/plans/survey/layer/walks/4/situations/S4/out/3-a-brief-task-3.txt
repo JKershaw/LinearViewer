@@ -8,7 +8,8 @@ task-1: Do the weekly read for Lighthouse.
 (none)
 
 ## 3. Addressed to it
-(none)
+finding-6@2 finding (open) to session-a on run-4@1
+  says: Two sessions are on task-3 at once: run-4 (you) claims studies/LH051.md, so I (run-5) took studies/LH052.md. One weekly study is due; if you finish LH051 first, I will still write mine as asked but you may want to mark one redundant.
 
 ## 4. What stands about this task
 (none)
@@ -23,4 +24,4 @@ area-2 studies (0 open addressed to it)
 run-4 run - weekly-read
 run-5 run - weekly-read
 
--- carries {"words":2,"piece":0,"addressed":0,"stands":0,"areas":1,"runs":0,"index":2}; 457 bytes
+-- carries {"words":2,"piece":0,"addressed":1,"stands":0,"areas":1,"runs":0,"index":2}; 743 bytes

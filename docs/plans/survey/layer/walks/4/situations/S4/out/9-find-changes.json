@@ -1,13 +1,15 @@
 [
   {
-    "id": "change-6",
+    "id": "change-7",
     "kind": "change",
     "in": "task-3",
     "ref": "studies/LH051.md",
-    "head": "LH051 by session-a (09:40)",
-    "links": {},
+    "head": "LH051 written by session-a",
+    "links": {
+      "about": "run-4"
+    },
     "state": "merged",
-    "v": 2,
+    "v": 3,
     "op": "end",
     "by": "session-a",
     "at": "2026-11-14T09:41:00.000Z",
@@ -15,18 +17,20 @@
     "reason": "study written to studies/LH051.md"
   },
   {
-    "id": "change-7",
+    "id": "change-8",
     "kind": "change",
     "in": "task-3",
-    "ref": "studies/LH051.md",
-    "head": "LH051 by session-b (09:45)",
-    "links": {},
+    "ref": "studies/LH052.md",
+    "head": "LH052 written by session-b",
+    "links": {
+      "about": "run-5"
+    },
     "state": "merged",
-    "v": 2,
+    "v": 3,
     "op": "end",
     "by": "session-b",
     "at": "2026-11-14T09:46:00.000Z",
-    "stateReason": "study written to studies/LH051.md",
-    "reason": "study written to studies/LH051.md"
+    "stateReason": "study written to studies/LH052.md",
+    "reason": "study written to studies/LH052.md"
   }
 ]

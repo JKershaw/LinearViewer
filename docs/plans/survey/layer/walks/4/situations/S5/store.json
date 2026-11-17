@@ -1,0 +1,978 @@
+{
+ "next": 25,
+ "records": {
+  "area-1": [
+   {
+    "id": "area-1",
+    "kind": "area",
+    "name": "Lighthouse",
+    "paths": [
+     "src/",
+     "docs/",
+     "build/"
+    ],
+    "links": {},
+    "state": "kept",
+    "v": 1,
+    "op": "add",
+    "by": "Lighthouse",
+    "at": "2026-11-13T12:00:00.000Z"
+   }
+  ],
+  "task-2": [
+   {
+    "id": "task-2",
+    "kind": "task",
+    "in": "area-1",
+    "asked": "Daily run 14 Nov: survey Lighthouse and propose changes to the keeper (John).",
+    "done-when": "Proposals filed to John.",
+    "paths": [
+     "src/",
+     "docs/",
+     "build/"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Lighthouse",
+    "at": "2026-11-14T09:00:00.000Z"
+   },
+   {
+    "id": "task-2",
+    "kind": "task",
+    "in": "area-1",
+    "asked": "Daily run 14 Nov: survey Lighthouse and propose changes to the keeper (John).",
+    "done-when": "Proposals filed to John.",
+    "paths": [
+     "src/",
+     "docs/",
+     "build/"
+    ],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-14T09:10:00.000Z",
+    "stateReason": "proposals filed to John",
+    "reason": "proposals filed to John"
+   }
+  ],
+  "run-3": [
+   {
+    "id": "run-3",
+    "kind": "run",
+    "in": "task-2",
+    "stage": "run",
+    "claims": [],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-14T09:01:00.000Z"
+   },
+   {
+    "id": "run-3",
+    "kind": "run",
+    "in": "task-2",
+    "stage": "run",
+    "claims": [],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-14T09:10:00.000Z",
+    "stateReason": "proposals filed",
+    "reason": "proposals filed"
+   }
+  ],
+  "question-4": [
+   {
+    "id": "question-4",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Cache the dependency install step in the build so repeat builds skip it.",
+    "options": [
+     "adopt",
+     "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+     "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-14T09:02:00.000Z"
+   }
+  ],
+  "question-5": [
+   {
+    "id": "question-5",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Add a link checker to the docs build that fails on broken internal links.",
+    "options": [
+     "adopt",
+     "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+     "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-14T09:03:00.000Z"
+   }
+  ],
+  "task-6": [
+   {
+    "id": "task-6",
+    "kind": "task",
+    "in": "area-1",
+    "asked": "Daily run 15 Nov: survey Lighthouse and propose changes to the keeper (John).",
+    "done-when": "Proposals filed to John.",
+    "paths": [
+     "src/",
+     "docs/",
+     "build/"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Lighthouse",
+    "at": "2026-11-15T09:00:00.000Z"
+   },
+   {
+    "id": "task-6",
+    "kind": "task",
+    "in": "area-1",
+    "asked": "Daily run 15 Nov: survey Lighthouse and propose changes to the keeper (John).",
+    "done-when": "Proposals filed to John.",
+    "paths": [
+     "src/",
+     "docs/",
+     "build/"
+    ],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-15T09:10:00.000Z",
+    "stateReason": "proposals filed to John",
+    "reason": "proposals filed to John"
+   }
+  ],
+  "run-7": [
+   {
+    "id": "run-7",
+    "kind": "run",
+    "in": "task-6",
+    "stage": "run",
+    "claims": [],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-15T09:01:00.000Z"
+   },
+   {
+    "id": "run-7",
+    "kind": "run",
+    "in": "task-6",
+    "stage": "run",
+    "claims": [],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-15T09:10:00.000Z",
+    "stateReason": "proposals filed",
+    "reason": "proposals filed"
+   }
+  ],
+  "question-8": [
+   {
+    "id": "question-8",
+    "kind": "question",
+    "in": "task-6",
+    "to": "John",
+    "asks": "Split build/config.yml into one file per section.",
+    "options": [
+     "adopt",
+     "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-20, withdraw it: the change is not made.",
+    "links": {
+     "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-15T09:02:00.000Z"
+   }
+  ],
+  "question-9": [
+   {
+    "id": "question-9",
+    "kind": "question",
+    "in": "task-6",
+    "to": "John",
+    "asks": "Reuse one dependency cache across all build jobs, not per job.",
+    "options": [
+     "adopt",
+     "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-4, which it restates.)",
+    "links": {
+     "about": "area-1",
+     "same-as": "question-4"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-15T09:03:00.000Z"
+   }
+  ],
+  "task-10": [
+   {
+    "id": "task-10",
+    "kind": "task",
+    "in": "area-1",
+    "asked": "Daily run 16 Nov: survey Lighthouse and propose changes to the keeper (John).",
+    "done-when": "Proposals filed to John.",
+    "paths": [
+     "src/",
+     "docs/",
+     "build/"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Lighthouse",
+    "at": "2026-11-16T09:00:00.000Z"
+   },
+   {
+    "id": "task-10",
+    "kind": "task",
+    "in": "area-1",
+    "asked": "Daily run 16 Nov: survey Lighthouse and propose changes to the keeper (John).",
+    "done-when": "Proposals filed to John.",
+    "paths": [
+     "src/",
+     "docs/",
+     "build/"
+    ],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-16T09:10:00.000Z",
+    "stateReason": "proposals filed to John",
+    "reason": "proposals filed to John"
+   }
+  ],
+  "run-11": [
+   {
+    "id": "run-11",
+    "kind": "run",
+    "in": "task-10",
+    "stage": "run",
+    "claims": [],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-16T09:01:00.000Z"
+   },
+   {
+    "id": "run-11",
+    "kind": "run",
+    "in": "task-10",
+    "stage": "run",
+    "claims": [],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-16T09:10:00.000Z",
+    "stateReason": "proposals filed",
+    "reason": "proposals filed"
+   }
+  ],
+  "question-12": [
+   {
+    "id": "question-12",
+    "kind": "question",
+    "in": "task-10",
+    "to": "John",
+    "asks": "Pin the toolchain version in one place (build/toolchain) and read it everywhere.",
+    "options": [
+     "adopt",
+     "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-21, withdraw it: the change is not made.",
+    "links": {
+     "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-16T09:02:00.000Z"
+   }
+  ],
+  "question-13": [
+   {
+    "id": "question-13",
+    "kind": "question",
+    "in": "task-10",
+    "to": "John",
+    "asks": "Check docs links, external ones included, on a weekly schedule.",
+    "options": [
+     "adopt",
+     "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-5, which it restates.)",
+    "links": {
+     "about": "area-1",
+     "same-as": "question-5"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-16T09:03:00.000Z"
+   },
+   {
+    "id": "question-13",
+    "kind": "question",
+    "in": "task-10",
+    "to": "John",
+    "asks": "Check docs links, external ones included, on a weekly schedule.",
+    "options": [
+     "adopt",
+     "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-5, which it restates.)",
+    "links": {
+     "about": "area-1",
+     "same-as": "question-5"
+    },
+    "state": "withdrawn",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-19T09:02:00.000Z",
+    "stateReason": "lapsed: no answer from John by 2026-11-19 (its if-unanswered)",
+    "reason": "lapsed: no answer from John by 2026-11-19 (its if-unanswered)"
+   }
+  ],
+  "task-14": [
+   {
+    "id": "task-14",
+    "kind": "task",
+    "in": "area-1",
+    "asked": "Daily run 17 Nov: survey Lighthouse and propose changes to the keeper (John).",
+    "done-when": "Proposals filed to John.",
+    "paths": [
+     "src/",
+     "docs/",
+     "build/"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Lighthouse",
+    "at": "2026-11-17T09:00:00.000Z"
+   },
+   {
+    "id": "task-14",
+    "kind": "task",
+    "in": "area-1",
+    "asked": "Daily run 17 Nov: survey Lighthouse and propose changes to the keeper (John).",
+    "done-when": "Proposals filed to John.",
+    "paths": [
+     "src/",
+     "docs/",
+     "build/"
+    ],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-17T09:10:00.000Z",
+    "stateReason": "proposals filed to John",
+    "reason": "proposals filed to John"
+   }
+  ],
+  "run-15": [
+   {
+    "id": "run-15",
+    "kind": "run",
+    "in": "task-14",
+    "stage": "run",
+    "claims": [],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-17T09:01:00.000Z"
+   },
+   {
+    "id": "run-15",
+    "kind": "run",
+    "in": "task-14",
+    "stage": "run",
+    "claims": [],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-17T09:10:00.000Z",
+    "stateReason": "proposals filed",
+    "reason": "proposals filed"
+   }
+  ],
+  "question-16": [
+   {
+    "id": "question-16",
+    "kind": "question",
+    "in": "task-14",
+    "to": "John",
+    "asks": "Delete the unused legacy export script src/export-legacy.sh.",
+    "options": [
+     "adopt",
+     "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-22, withdraw it: the change is not made.",
+    "links": {
+     "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-17T09:02:00.000Z"
+   }
+  ],
+  "question-17": [
+   {
+    "id": "question-17",
+    "kind": "question",
+    "in": "task-14",
+    "to": "John",
+    "asks": "Move each config section to its own file and load them with one small loader.",
+    "options": [
+     "adopt",
+     "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-20, withdraw it: the change is not made. (Keeps the date of question-8, which it restates.)",
+    "links": {
+     "about": "area-1",
+     "same-as": "question-8"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-17T09:03:00.000Z"
+   }
+  ],
+  "task-18": [
+   {
+    "id": "task-18",
+    "kind": "task",
+    "in": "area-1",
+    "asked": "Daily run 18 Nov: survey Lighthouse and propose changes to the keeper (John).",
+    "done-when": "Proposals filed to John.",
+    "paths": [
+     "src/",
+     "docs/",
+     "build/"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Lighthouse",
+    "at": "2026-11-18T09:00:00.000Z"
+   },
+   {
+    "id": "task-18",
+    "kind": "task",
+    "in": "area-1",
+    "asked": "Daily run 18 Nov: survey Lighthouse and propose changes to the keeper (John).",
+    "done-when": "Proposals filed to John.",
+    "paths": [
+     "src/",
+     "docs/",
+     "build/"
+    ],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-18T09:10:00.000Z",
+    "stateReason": "proposals filed to John",
+    "reason": "proposals filed to John"
+   }
+  ],
+  "run-19": [
+   {
+    "id": "run-19",
+    "kind": "run",
+    "in": "task-18",
+    "stage": "run",
+    "claims": [],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-18T09:01:00.000Z"
+   },
+   {
+    "id": "run-19",
+    "kind": "run",
+    "in": "task-18",
+    "stage": "run",
+    "claims": [],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-18T09:10:00.000Z",
+    "stateReason": "proposals filed",
+    "reason": "proposals filed"
+   }
+  ],
+  "question-20": [
+   {
+    "id": "question-20",
+    "kind": "question",
+    "in": "task-18",
+    "to": "John",
+    "asks": "Add a smoke test that runs the release script in dry-run mode.",
+    "options": [
+     "adopt",
+     "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-23, withdraw it: the change is not made.",
+    "links": {
+     "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-18T09:02:00.000Z"
+   }
+  ],
+  "question-21": [
+   {
+    "id": "question-21",
+    "kind": "question",
+    "in": "task-18",
+    "to": "John",
+    "asks": "Key the shared dependency cache on the lockfile hash.",
+    "options": [
+     "adopt",
+     "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-9, which it restates.)",
+    "links": {
+     "about": "area-1",
+     "same-as": "question-9"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-18T09:03:00.000Z"
+   },
+   {
+    "id": "question-21",
+    "kind": "question",
+    "in": "task-18",
+    "to": "John",
+    "asks": "Key the shared dependency cache on the lockfile hash.",
+    "options": [
+     "adopt",
+     "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-9, which it restates.)",
+    "links": {
+     "about": "area-1",
+     "same-as": "question-9"
+    },
+    "state": "withdrawn",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-19T09:02:00.000Z",
+    "stateReason": "lapsed: no answer from John by 2026-11-19 (its if-unanswered)",
+    "reason": "lapsed: no answer from John by 2026-11-19 (its if-unanswered)"
+   }
+  ],
+  "task-22": [
+   {
+    "id": "task-22",
+    "kind": "task",
+    "in": "area-1",
+    "asked": "Daily run 19 Nov: survey Lighthouse and propose changes to the keeper (John).",
+    "done-when": "Proposals filed to John.",
+    "paths": [
+     "src/",
+     "docs/",
+     "build/"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Lighthouse",
+    "at": "2026-11-19T09:00:00.000Z"
+   },
+   {
+    "id": "task-22",
+    "kind": "task",
+    "in": "area-1",
+    "asked": "Daily run 19 Nov: survey Lighthouse and propose changes to the keeper (John).",
+    "done-when": "Proposals filed to John.",
+    "paths": [
+     "src/",
+     "docs/",
+     "build/"
+    ],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-19T09:10:00.000Z",
+    "stateReason": "proposals filed to John",
+    "reason": "proposals filed to John"
+   }
+  ],
+  "run-23": [
+   {
+    "id": "run-23",
+    "kind": "run",
+    "in": "task-22",
+    "stage": "run",
+    "claims": [],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-19T09:01:00.000Z"
+   },
+   {
+    "id": "run-23",
+    "kind": "run",
+    "in": "task-22",
+    "stage": "run",
+    "claims": [],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-19T09:10:00.000Z",
+    "stateReason": "proposals filed",
+    "reason": "proposals filed"
+   }
+  ],
+  "question-24": [
+   {
+    "id": "question-24",
+    "kind": "question",
+    "in": "task-22",
+    "to": "John",
+    "asks": "Add a CONTRIBUTING note on how to run the build locally.",
+    "options": [
+     "adopt",
+     "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-24, withdraw it: the change is not made.",
+    "links": {
+     "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-19T09:03:00.000Z"
+   }
+  ]
+ },
+ "log": [
+  {
+   "at": "2026-11-17T14:47:53.642Z",
+   "by": "run",
+   "q": [
+    "brief",
+    "run",
+    "--task",
+    "task-2",
+    "--as-of",
+    "2026-11-14T09:00:30Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:53.674Z",
+   "by": "run",
+   "q": [
+    "find",
+    "--to",
+    "John",
+    "--state",
+    "open",
+    "--as-of",
+    "2026-11-14T09:00:30Z",
+    "--by",
+    "run"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:53.929Z",
+   "by": "run",
+   "q": [
+    "brief",
+    "run",
+    "--task",
+    "task-6",
+    "--as-of",
+    "2026-11-15T09:00:30Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:53.964Z",
+   "by": "run",
+   "q": [
+    "find",
+    "--to",
+    "John",
+    "--state",
+    "open",
+    "--as-of",
+    "2026-11-15T09:00:30Z",
+    "--by",
+    "run"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:54.271Z",
+   "by": "run",
+   "q": [
+    "brief",
+    "run",
+    "--task",
+    "task-10",
+    "--as-of",
+    "2026-11-16T09:00:30Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:54.312Z",
+   "by": "run",
+   "q": [
+    "find",
+    "--to",
+    "John",
+    "--state",
+    "open",
+    "--as-of",
+    "2026-11-16T09:00:30Z",
+    "--by",
+    "run"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:54.615Z",
+   "by": "run",
+   "q": [
+    "brief",
+    "run",
+    "--task",
+    "task-14",
+    "--as-of",
+    "2026-11-17T09:00:30Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:54.642Z",
+   "by": "run",
+   "q": [
+    "find",
+    "--to",
+    "John",
+    "--state",
+    "open",
+    "--as-of",
+    "2026-11-17T09:00:30Z",
+    "--by",
+    "run"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:54.910Z",
+   "by": "run",
+   "q": [
+    "brief",
+    "run",
+    "--task",
+    "task-18",
+    "--as-of",
+    "2026-11-18T09:00:30Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:54.937Z",
+   "by": "run",
+   "q": [
+    "find",
+    "--to",
+    "John",
+    "--state",
+    "open",
+    "--as-of",
+    "2026-11-18T09:00:30Z",
+    "--by",
+    "run"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:55.167Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--to",
+    "John",
+    "--state",
+    "open",
+    "--as-of",
+    "2026-11-18T20:00:00Z",
+    "--by",
+    "John"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:55.229Z",
+   "by": "run",
+   "q": [
+    "brief",
+    "run",
+    "--task",
+    "task-22",
+    "--as-of",
+    "2026-11-19T09:00:30Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:55.260Z",
+   "by": "run",
+   "q": [
+    "find",
+    "--to",
+    "John",
+    "--state",
+    "open",
+    "--as-of",
+    "2026-11-19T09:00:30Z",
+    "--by",
+    "run"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:55.493Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--to",
+    "John",
+    "--state",
+    "open",
+    "--as-of",
+    "2026-11-19T12:00:00Z",
+    "--by",
+    "John"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:55.521Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--to",
+    "John",
+    "--as-of",
+    "2026-11-19T12:00:00Z",
+    "--count",
+    "--by",
+    "John"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:55.550Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--to",
+    "John",
+    "--state",
+    "open",
+    "--as-of",
+    "2026-11-19T12:00:00Z",
+    "--count",
+    "--by",
+    "John"
+   ]
+  }
+ ]
+}

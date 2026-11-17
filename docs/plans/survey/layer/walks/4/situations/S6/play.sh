@@ -68,3 +68,23 @@ L add run '{"in":"task-3","stage":"review","claims":[]}' --by review --at $T
 L add verdict '{"in":"task-3","of":"review","outcome":"request-changes","reasoning":"Head sha256:afcc54e0dee8 (118 words) is right for phones and under 400 words (lesson-2), and the three items are in place. But none of the three facts is filled: 12 [TBC] markers, waiting on question-5. Fails done-when; must not be sent as is. Only the [TBC] text should change.","links":{"on":"change-9@1"}}' --by review --at $T
 L add finding '{"in":"task-3","to":"implementation","says":"When question-5 is answered, fill the [TBC] markers from the answer and save a new head; change nothing else. Review then judges the new head.","links":{"on":"change-9@1","about":"question-5"}}' --by review --at $T
 L end run-10 done "verdict written" --by review --at $T
+
+echo '## 4. close-out (15:00)'
+T=${D}T15:00:00Z
+L brief close-out --task task-3 --as-of $T --text
+L find --to close-out --state open --by close-out --as-of $T
+L get question-6 --by close-out --as-of $T   # no send channel answered
+# Verdict request-changes on the only head, question-5/-6 open: close-out does not send.
+L add run '{"in":"task-3","stage":"close-out","claims":[]}' --by close-out --at $T
+L end run-13 done "not sent: verdict-11 requests changes on change-9@1; question-5 (facts) and question-6 (channel) unanswered" --by close-out --at $T
+
+echo '## probe (not part of the scene): what a send would have written, on a copy'
+cp store.json probe.json
+P() { node ../../model/layer.mjs --store probe.json "$@"; echo; }
+P end change-9 sent "emailed to members" --by close-out --at ${D}T15:05:00Z
+P end change-9 merged "emailed to members" --by close-out --at ${D}T15:05:00Z | grep -E 'refused|"state"'
+P end task-3 done "sent" --by close-out --at ${D}T15:05:00Z | grep -E 'refused|"state"'
+cp store.json probe.json
+P revise change-9 '{"head":"sha256:filled000000"}' --reason "facts filled" --by implementation --at ${D}T15:10:00Z | grep -E 'refused|"head"'
+P brief close-out --task task-3 --as-of ${D}T15:20:00Z --text | sed -n '/## 4/,/## 5/p'
+rm -f probe.json

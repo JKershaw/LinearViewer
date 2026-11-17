@@ -1,0 +1,111 @@
+{
+  "task": {
+    "id": "task-3",
+    "kind": "task",
+    "in": "task-1",
+    "asked": "Write the next study.",
+    "done-when": "The next study is written under studies/.",
+    "paths": [
+      "studies/"
+    ],
+    "links": {},
+    "state": "done",
+    "v": 3,
+    "op": "end",
+    "by": "session-b",
+    "at": "2026-11-14T09:46:00.000Z",
+    "stateReason": "LH052 written (change-8)",
+    "reason": "LH052 written (change-8)"
+  },
+  "records": [
+    {
+      "id": "run-4",
+      "kind": "run",
+      "in": "task-3",
+      "stage": "weekly-read",
+      "claims": [
+        "studies/LH051.md"
+      ],
+      "account": "session-a",
+      "links": {},
+      "state": "done",
+      "v": 2,
+      "op": "end",
+      "by": "session-a",
+      "at": "2026-11-14T09:41:00.000Z",
+      "stateReason": "study LH051 written",
+      "reason": "study LH051 written"
+    },
+    {
+      "id": "run-5",
+      "kind": "run",
+      "in": "task-3",
+      "stage": "weekly-read",
+      "claims": [
+        "studies/LH052.md"
+      ],
+      "account": "session-b",
+      "links": {},
+      "state": "done",
+      "v": 2,
+      "op": "end",
+      "by": "session-b",
+      "at": "2026-11-14T09:46:00.000Z",
+      "stateReason": "study LH052 written",
+      "reason": "study LH052 written"
+    },
+    {
+      "id": "finding-6",
+      "kind": "finding",
+      "in": "task-3",
+      "to": "session-a",
+      "says": "Two sessions are on task-3 at once: run-4 (you) claims studies/LH051.md, so I (run-5) took studies/LH052.md. One weekly study is due; if you finish LH051 first, I will still write mine as asked but you may want to mark one redundant.",
+      "links": {
+        "about": "run-4",
+        "on": "run-4@1"
+      },
+      "state": "done",
+      "v": 3,
+      "op": "end",
+      "by": "session-a",
+      "at": "2026-11-14T09:41:00.000Z",
+      "stateReason": "read; LH051 written, LH052 is B's",
+      "reason": "read; LH051 written, LH052 is B's"
+    },
+    {
+      "id": "change-7",
+      "kind": "change",
+      "in": "task-3",
+      "ref": "studies/LH051.md",
+      "head": "LH051 written by session-a",
+      "links": {
+        "about": "run-4"
+      },
+      "state": "merged",
+      "v": 3,
+      "op": "end",
+      "by": "session-a",
+      "at": "2026-11-14T09:41:00.000Z",
+      "stateReason": "study written to studies/LH051.md",
+      "reason": "study written to studies/LH051.md"
+    },
+    {
+      "id": "change-8",
+      "kind": "change",
+      "in": "task-3",
+      "ref": "studies/LH052.md",
+      "head": "LH052 written by session-b",
+      "links": {
+        "about": "run-5"
+      },
+      "state": "merged",
+      "v": 3,
+      "op": "end",
+      "by": "session-b",
+      "at": "2026-11-14T09:46:00.000Z",
+      "stateReason": "study written to studies/LH052.md",
+      "reason": "study written to studies/LH052.md"
+    }
+  ],
+  "overlap": []
+}

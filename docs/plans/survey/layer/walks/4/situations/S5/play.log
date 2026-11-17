@@ -1,0 +1,2002 @@
+### seed 13 Nov
+$ layer add area {"name":"Lighthouse","paths":["src/","docs/","build/"]} --by Lighthouse --at 2026-11-13T12:00:00Z
+{
+  "id": "area-1",
+  "kind": "area",
+  "name": "Lighthouse",
+  "paths": [
+    "src/",
+    "docs/",
+    "build/"
+  ],
+  "links": {},
+  "state": "kept",
+  "v": 1,
+  "op": "add",
+  "by": "Lighthouse",
+  "at": "2026-11-13T12:00:00.000Z"
+}
+### run on 14 Nov
+$ layer add task {"in":"area-1","asked":"Daily run 14 Nov: survey Lighthouse and propose changes to the keeper (John).","done-when":"Proposals filed to John.","paths":["src/","docs/","build/"]} --by Lighthouse --at 2026-11-14T09:00:00Z
+{
+  "id": "task-2",
+  "kind": "task",
+  "in": "area-1",
+  "asked": "Daily run 14 Nov: survey Lighthouse and propose changes to the keeper (John).",
+  "done-when": "Proposals filed to John.",
+  "paths": [
+    "src/",
+    "docs/",
+    "build/"
+  ],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "Lighthouse",
+  "at": "2026-11-14T09:00:00.000Z"
+}
+$ layer brief run --task task-2 --as-of 2026-11-14T09:00:30Z --text
+# Brief for run on task-2 as of 2026-11-14T09:00:30.000Z
+
+## 1. The person's words
+task-2: Daily run 14 Nov: survey Lighthouse and propose changes to the keeper (John).
+
+## 2. Its plan piece
+(none)
+
+## 3. Addressed to it
+(none)
+
+## 4. What stands about this task
+(none)
+
+## 5. Its areas
+area-1 Lighthouse (0 open addressed to it)
+
+## 6. Open runs of other tasks sharing a path
+(none)
+
+## 7. Index of what else is known
+(none)
+
+-- carries {"words":1,"piece":0,"addressed":0,"stands":0,"areas":1,"runs":0,"index":0}; 426 bytes
+
+$ layer find --to John --state open --as-of 2026-11-14T09:00:30Z --by run
+[]
+
+$ layer add run {"in":"task-2","stage":"run","claims":[]} --by run --at 2026-11-14T09:01:00Z
+{
+  "id": "run-3",
+  "kind": "run",
+  "in": "task-2",
+  "stage": "run",
+  "claims": [],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "run",
+  "at": "2026-11-14T09:01:00.000Z"
+}
+$ layer add question {"in":"task-2","to":"John","asks":"Cache the dependency install step in the build so repeat builds skip it.","options":["adopt","decline"],"recommended":"adopt","if-unanswered":"If John has not answered by 2026-11-19, withdraw it: the change is not made.","links":{"about":"area-1"}} --by run --at 2026-11-14T09:02:00Z
+{
+  "id": "question-4",
+  "kind": "question",
+  "in": "task-2",
+  "to": "John",
+  "asks": "Cache the dependency install step in the build so repeat builds skip it.",
+  "options": [
+    "adopt",
+    "decline"
+  ],
+  "recommended": "adopt",
+  "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+  "links": {
+    "about": "area-1"
+  },
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "run",
+  "at": "2026-11-14T09:02:00.000Z"
+}
+$ layer add question {"in":"task-2","to":"John","asks":"Add a link checker to the docs build that fails on broken internal links.","options":["adopt","decline"],"recommended":"adopt","if-unanswered":"If John has not answered by 2026-11-19, withdraw it: the change is not made.","links":{"about":"area-1"}} --by run --at 2026-11-14T09:03:00Z
+{
+  "id": "question-5",
+  "kind": "question",
+  "in": "task-2",
+  "to": "John",
+  "asks": "Add a link checker to the docs build that fails on broken internal links.",
+  "options": [
+    "adopt",
+    "decline"
+  ],
+  "recommended": "adopt",
+  "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+  "links": {
+    "about": "area-1"
+  },
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "run",
+  "at": "2026-11-14T09:03:00.000Z"
+}
+$ layer end run-3 done proposals filed --by run --at 2026-11-14T09:10:00Z
+{
+  "id": "run-3",
+  "kind": "run",
+  "in": "task-2",
+  "stage": "run",
+  "claims": [],
+  "links": {},
+  "state": "done",
+  "v": 2,
+  "op": "end",
+  "by": "run",
+  "at": "2026-11-14T09:10:00.000Z",
+  "stateReason": "proposals filed",
+  "reason": "proposals filed"
+}
+$ layer end task-2 done proposals filed to John --by run --at 2026-11-14T09:10:00Z
+{
+  "id": "task-2",
+  "kind": "task",
+  "in": "area-1",
+  "asked": "Daily run 14 Nov: survey Lighthouse and propose changes to the keeper (John).",
+  "done-when": "Proposals filed to John.",
+  "paths": [
+    "src/",
+    "docs/",
+    "build/"
+  ],
+  "links": {},
+  "state": "done",
+  "v": 2,
+  "op": "end",
+  "by": "run",
+  "at": "2026-11-14T09:10:00.000Z",
+  "stateReason": "proposals filed to John",
+  "reason": "proposals filed to John"
+}
+### run on 15 Nov
+$ layer add task {"in":"area-1","asked":"Daily run 15 Nov: survey Lighthouse and propose changes to the keeper (John).","done-when":"Proposals filed to John.","paths":["src/","docs/","build/"]} --by Lighthouse --at 2026-11-15T09:00:00Z
+{
+  "id": "task-6",
+  "kind": "task",
+  "in": "area-1",
+  "asked": "Daily run 15 Nov: survey Lighthouse and propose changes to the keeper (John).",
+  "done-when": "Proposals filed to John.",
+  "paths": [
+    "src/",
+    "docs/",
+    "build/"
+  ],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "Lighthouse",
+  "at": "2026-11-15T09:00:00.000Z"
+}
+$ layer brief run --task task-6 --as-of 2026-11-15T09:00:30Z --text
+# Brief for run on task-6 as of 2026-11-15T09:00:30.000Z
+
+## 1. The person's words
+task-6: Daily run 15 Nov: survey Lighthouse and propose changes to the keeper (John).
+
+## 2. Its plan piece
+(none)
+
+## 3. Addressed to it
+(none)
+
+## 4. What stands about this task
+(none)
+
+## 5. Its areas
+area-1 Lighthouse (0 open addressed to it)
+
+## 6. Open runs of other tasks sharing a path
+(none)
+
+## 7. Index of what else is known
+(none)
+
+-- carries {"words":1,"piece":0,"addressed":0,"stands":0,"areas":1,"runs":0,"index":0}; 426 bytes
+
+$ layer find --to John --state open --as-of 2026-11-15T09:00:30Z --by run
+[
+  {
+    "id": "question-4",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Cache the dependency install step in the build so repeat builds skip it.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-14T09:02:00.000Z"
+  },
+  {
+    "id": "question-5",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Add a link checker to the docs build that fails on broken internal links.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-14T09:03:00.000Z"
+  }
+]
+
+$ layer add run {"in":"task-6","stage":"run","claims":[]} --by run --at 2026-11-15T09:01:00Z
+{
+  "id": "run-7",
+  "kind": "run",
+  "in": "task-6",
+  "stage": "run",
+  "claims": [],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "run",
+  "at": "2026-11-15T09:01:00.000Z"
+}
+$ layer add question {"in":"task-6","to":"John","asks":"Split build/config.yml into one file per section.","options":["adopt","decline"],"recommended":"adopt","if-unanswered":"If John has not answered by 2026-11-20, withdraw it: the change is not made.","links":{"about":"area-1"}} --by run --at 2026-11-15T09:02:00Z
+{
+  "id": "question-8",
+  "kind": "question",
+  "in": "task-6",
+  "to": "John",
+  "asks": "Split build/config.yml into one file per section.",
+  "options": [
+    "adopt",
+    "decline"
+  ],
+  "recommended": "adopt",
+  "if-unanswered": "If John has not answered by 2026-11-20, withdraw it: the change is not made.",
+  "links": {
+    "about": "area-1"
+  },
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "run",
+  "at": "2026-11-15T09:02:00.000Z"
+}
+$ layer add question {"in":"task-6","to":"John","asks":"Reuse one dependency cache across all build jobs, not per job.","options":["adopt","decline"],"recommended":"adopt","if-unanswered":"If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-4, which it restates.)","links":{"about":"area-1","same-as":"question-4"}} --by run --at 2026-11-15T09:03:00Z
+{
+  "id": "question-9",
+  "kind": "question",
+  "in": "task-6",
+  "to": "John",
+  "asks": "Reuse one dependency cache across all build jobs, not per job.",
+  "options": [
+    "adopt",
+    "decline"
+  ],
+  "recommended": "adopt",
+  "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-4, which it restates.)",
+  "links": {
+    "about": "area-1",
+    "same-as": "question-4"
+  },
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "run",
+  "at": "2026-11-15T09:03:00.000Z"
+}
+$ layer end question-4 handed-on restated with a refinement as question-9 --into question-9 --by run --at 2026-11-15T09:4:00Z
+{
+  "usage": "bad time: 2026-11-15T09:4:00Z"
+}
+$ layer end run-7 done proposals filed --by run --at 2026-11-15T09:10:00Z
+{
+  "id": "run-7",
+  "kind": "run",
+  "in": "task-6",
+  "stage": "run",
+  "claims": [],
+  "links": {},
+  "state": "done",
+  "v": 2,
+  "op": "end",
+  "by": "run",
+  "at": "2026-11-15T09:10:00.000Z",
+  "stateReason": "proposals filed",
+  "reason": "proposals filed"
+}
+$ layer end task-6 done proposals filed to John --by run --at 2026-11-15T09:10:00Z
+{
+  "id": "task-6",
+  "kind": "task",
+  "in": "area-1",
+  "asked": "Daily run 15 Nov: survey Lighthouse and propose changes to the keeper (John).",
+  "done-when": "Proposals filed to John.",
+  "paths": [
+    "src/",
+    "docs/",
+    "build/"
+  ],
+  "links": {},
+  "state": "done",
+  "v": 2,
+  "op": "end",
+  "by": "run",
+  "at": "2026-11-15T09:10:00.000Z",
+  "stateReason": "proposals filed to John",
+  "reason": "proposals filed to John"
+}
+### run on 16 Nov
+$ layer add task {"in":"area-1","asked":"Daily run 16 Nov: survey Lighthouse and propose changes to the keeper (John).","done-when":"Proposals filed to John.","paths":["src/","docs/","build/"]} --by Lighthouse --at 2026-11-16T09:00:00Z
+{
+  "id": "task-10",
+  "kind": "task",
+  "in": "area-1",
+  "asked": "Daily run 16 Nov: survey Lighthouse and propose changes to the keeper (John).",
+  "done-when": "Proposals filed to John.",
+  "paths": [
+    "src/",
+    "docs/",
+    "build/"
+  ],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "Lighthouse",
+  "at": "2026-11-16T09:00:00.000Z"
+}
+$ layer brief run --task task-10 --as-of 2026-11-16T09:00:30Z --text
+# Brief for run on task-10 as of 2026-11-16T09:00:30.000Z
+
+## 1. The person's words
+task-10: Daily run 16 Nov: survey Lighthouse and propose changes to the keeper (John).
+
+## 2. Its plan piece
+(none)
+
+## 3. Addressed to it
+(none)
+
+## 4. What stands about this task
+(none)
+
+## 5. Its areas
+area-1 Lighthouse (0 open addressed to it)
+
+## 6. Open runs of other tasks sharing a path
+(none)
+
+## 7. Index of what else is known
+(none)
+
+-- carries {"words":1,"piece":0,"addressed":0,"stands":0,"areas":1,"runs":0,"index":0}; 428 bytes
+
+$ layer find --to John --state open --as-of 2026-11-16T09:00:30Z --by run
+[
+  {
+    "id": "question-4",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Cache the dependency install step in the build so repeat builds skip it.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-14T09:02:00.000Z"
+  },
+  {
+    "id": "question-5",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Add a link checker to the docs build that fails on broken internal links.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-14T09:03:00.000Z"
+  },
+  {
+    "id": "question-8",
+    "kind": "question",
+    "in": "task-6",
+    "to": "John",
+    "asks": "Split build/config.yml into one file per section.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-20, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-15T09:02:00.000Z"
+  },
+  {
+    "id": "question-9",
+    "kind": "question",
+    "in": "task-6",
+    "to": "John",
+    "asks": "Reuse one dependency cache across all build jobs, not per job.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-4, which it restates.)",
+    "links": {
+      "about": "area-1",
+      "same-as": "question-4"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-15T09:03:00.000Z"
+  }
+]
+
+$ layer add run {"in":"task-10","stage":"run","claims":[]} --by run --at 2026-11-16T09:01:00Z
+{
+  "id": "run-11",
+  "kind": "run",
+  "in": "task-10",
+  "stage": "run",
+  "claims": [],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "run",
+  "at": "2026-11-16T09:01:00.000Z"
+}
+$ layer add question {"in":"task-10","to":"John","asks":"Pin the toolchain version in one place (build/toolchain) and read it everywhere.","options":["adopt","decline"],"recommended":"adopt","if-unanswered":"If John has not answered by 2026-11-21, withdraw it: the change is not made.","links":{"about":"area-1"}} --by run --at 2026-11-16T09:02:00Z
+{
+  "id": "question-12",
+  "kind": "question",
+  "in": "task-10",
+  "to": "John",
+  "asks": "Pin the toolchain version in one place (build/toolchain) and read it everywhere.",
+  "options": [
+    "adopt",
+    "decline"
+  ],
+  "recommended": "adopt",
+  "if-unanswered": "If John has not answered by 2026-11-21, withdraw it: the change is not made.",
+  "links": {
+    "about": "area-1"
+  },
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "run",
+  "at": "2026-11-16T09:02:00.000Z"
+}
+$ layer add question {"in":"task-10","to":"John","asks":"Check docs links, external ones included, on a weekly schedule.","options":["adopt","decline"],"recommended":"adopt","if-unanswered":"If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-5, which it restates.)","links":{"about":"area-1","same-as":"question-5"}} --by run --at 2026-11-16T09:03:00Z
+{
+  "id": "question-13",
+  "kind": "question",
+  "in": "task-10",
+  "to": "John",
+  "asks": "Check docs links, external ones included, on a weekly schedule.",
+  "options": [
+    "adopt",
+    "decline"
+  ],
+  "recommended": "adopt",
+  "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-5, which it restates.)",
+  "links": {
+    "about": "area-1",
+    "same-as": "question-5"
+  },
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "run",
+  "at": "2026-11-16T09:03:00.000Z"
+}
+$ layer end question-5 handed-on restated with a refinement as question-13 --into question-13 --by run --at 2026-11-16T09:4:00Z
+{
+  "usage": "bad time: 2026-11-16T09:4:00Z"
+}
+$ layer end run-11 done proposals filed --by run --at 2026-11-16T09:10:00Z
+{
+  "id": "run-11",
+  "kind": "run",
+  "in": "task-10",
+  "stage": "run",
+  "claims": [],
+  "links": {},
+  "state": "done",
+  "v": 2,
+  "op": "end",
+  "by": "run",
+  "at": "2026-11-16T09:10:00.000Z",
+  "stateReason": "proposals filed",
+  "reason": "proposals filed"
+}
+$ layer end task-10 done proposals filed to John --by run --at 2026-11-16T09:10:00Z
+{
+  "id": "task-10",
+  "kind": "task",
+  "in": "area-1",
+  "asked": "Daily run 16 Nov: survey Lighthouse and propose changes to the keeper (John).",
+  "done-when": "Proposals filed to John.",
+  "paths": [
+    "src/",
+    "docs/",
+    "build/"
+  ],
+  "links": {},
+  "state": "done",
+  "v": 2,
+  "op": "end",
+  "by": "run",
+  "at": "2026-11-16T09:10:00.000Z",
+  "stateReason": "proposals filed to John",
+  "reason": "proposals filed to John"
+}
+### run on 17 Nov
+$ layer add task {"in":"area-1","asked":"Daily run 17 Nov: survey Lighthouse and propose changes to the keeper (John).","done-when":"Proposals filed to John.","paths":["src/","docs/","build/"]} --by Lighthouse --at 2026-11-17T09:00:00Z
+{
+  "id": "task-14",
+  "kind": "task",
+  "in": "area-1",
+  "asked": "Daily run 17 Nov: survey Lighthouse and propose changes to the keeper (John).",
+  "done-when": "Proposals filed to John.",
+  "paths": [
+    "src/",
+    "docs/",
+    "build/"
+  ],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "Lighthouse",
+  "at": "2026-11-17T09:00:00.000Z"
+}
+$ layer brief run --task task-14 --as-of 2026-11-17T09:00:30Z --text
+# Brief for run on task-14 as of 2026-11-17T09:00:30.000Z
+
+## 1. The person's words
+task-14: Daily run 17 Nov: survey Lighthouse and propose changes to the keeper (John).
+
+## 2. Its plan piece
+(none)
+
+## 3. Addressed to it
+(none)
+
+## 4. What stands about this task
+(none)
+
+## 5. Its areas
+area-1 Lighthouse (0 open addressed to it)
+
+## 6. Open runs of other tasks sharing a path
+(none)
+
+## 7. Index of what else is known
+(none)
+
+-- carries {"words":1,"piece":0,"addressed":0,"stands":0,"areas":1,"runs":0,"index":0}; 428 bytes
+
+$ layer find --to John --state open --as-of 2026-11-17T09:00:30Z --by run
+[
+  {
+    "id": "question-4",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Cache the dependency install step in the build so repeat builds skip it.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-14T09:02:00.000Z"
+  },
+  {
+    "id": "question-5",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Add a link checker to the docs build that fails on broken internal links.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-14T09:03:00.000Z"
+  },
+  {
+    "id": "question-8",
+    "kind": "question",
+    "in": "task-6",
+    "to": "John",
+    "asks": "Split build/config.yml into one file per section.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-20, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-15T09:02:00.000Z"
+  },
+  {
+    "id": "question-9",
+    "kind": "question",
+    "in": "task-6",
+    "to": "John",
+    "asks": "Reuse one dependency cache across all build jobs, not per job.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-4, which it restates.)",
+    "links": {
+      "about": "area-1",
+      "same-as": "question-4"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-15T09:03:00.000Z"
+  },
+  {
+    "id": "question-12",
+    "kind": "question",
+    "in": "task-10",
+    "to": "John",
+    "asks": "Pin the toolchain version in one place (build/toolchain) and read it everywhere.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-21, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-16T09:02:00.000Z"
+  },
+  {
+    "id": "question-13",
+    "kind": "question",
+    "in": "task-10",
+    "to": "John",
+    "asks": "Check docs links, external ones included, on a weekly schedule.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-5, which it restates.)",
+    "links": {
+      "about": "area-1",
+      "same-as": "question-5"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-16T09:03:00.000Z"
+  }
+]
+
+$ layer add run {"in":"task-14","stage":"run","claims":[]} --by run --at 2026-11-17T09:01:00Z
+{
+  "id": "run-15",
+  "kind": "run",
+  "in": "task-14",
+  "stage": "run",
+  "claims": [],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "run",
+  "at": "2026-11-17T09:01:00.000Z"
+}
+$ layer add question {"in":"task-14","to":"John","asks":"Delete the unused legacy export script src/export-legacy.sh.","options":["adopt","decline"],"recommended":"adopt","if-unanswered":"If John has not answered by 2026-11-22, withdraw it: the change is not made.","links":{"about":"area-1"}} --by run --at 2026-11-17T09:02:00Z
+{
+  "id": "question-16",
+  "kind": "question",
+  "in": "task-14",
+  "to": "John",
+  "asks": "Delete the unused legacy export script src/export-legacy.sh.",
+  "options": [
+    "adopt",
+    "decline"
+  ],
+  "recommended": "adopt",
+  "if-unanswered": "If John has not answered by 2026-11-22, withdraw it: the change is not made.",
+  "links": {
+    "about": "area-1"
+  },
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "run",
+  "at": "2026-11-17T09:02:00.000Z"
+}
+$ layer add question {"in":"task-14","to":"John","asks":"Move each config section to its own file and load them with one small loader.","options":["adopt","decline"],"recommended":"adopt","if-unanswered":"If John has not answered by 2026-11-20, withdraw it: the change is not made. (Keeps the date of question-8, which it restates.)","links":{"about":"area-1","same-as":"question-8"}} --by run --at 2026-11-17T09:03:00Z
+{
+  "id": "question-17",
+  "kind": "question",
+  "in": "task-14",
+  "to": "John",
+  "asks": "Move each config section to its own file and load them with one small loader.",
+  "options": [
+    "adopt",
+    "decline"
+  ],
+  "recommended": "adopt",
+  "if-unanswered": "If John has not answered by 2026-11-20, withdraw it: the change is not made. (Keeps the date of question-8, which it restates.)",
+  "links": {
+    "about": "area-1",
+    "same-as": "question-8"
+  },
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "run",
+  "at": "2026-11-17T09:03:00.000Z"
+}
+$ layer end question-8 handed-on restated with a refinement as question-17 --into question-17 --by run --at 2026-11-17T09:4:00Z
+{
+  "usage": "bad time: 2026-11-17T09:4:00Z"
+}
+$ layer end run-15 done proposals filed --by run --at 2026-11-17T09:10:00Z
+{
+  "id": "run-15",
+  "kind": "run",
+  "in": "task-14",
+  "stage": "run",
+  "claims": [],
+  "links": {},
+  "state": "done",
+  "v": 2,
+  "op": "end",
+  "by": "run",
+  "at": "2026-11-17T09:10:00.000Z",
+  "stateReason": "proposals filed",
+  "reason": "proposals filed"
+}
+$ layer end task-14 done proposals filed to John --by run --at 2026-11-17T09:10:00Z
+{
+  "id": "task-14",
+  "kind": "task",
+  "in": "area-1",
+  "asked": "Daily run 17 Nov: survey Lighthouse and propose changes to the keeper (John).",
+  "done-when": "Proposals filed to John.",
+  "paths": [
+    "src/",
+    "docs/",
+    "build/"
+  ],
+  "links": {},
+  "state": "done",
+  "v": 2,
+  "op": "end",
+  "by": "run",
+  "at": "2026-11-17T09:10:00.000Z",
+  "stateReason": "proposals filed to John",
+  "reason": "proposals filed to John"
+}
+### run on 18 Nov
+$ layer add task {"in":"area-1","asked":"Daily run 18 Nov: survey Lighthouse and propose changes to the keeper (John).","done-when":"Proposals filed to John.","paths":["src/","docs/","build/"]} --by Lighthouse --at 2026-11-18T09:00:00Z
+{
+  "id": "task-18",
+  "kind": "task",
+  "in": "area-1",
+  "asked": "Daily run 18 Nov: survey Lighthouse and propose changes to the keeper (John).",
+  "done-when": "Proposals filed to John.",
+  "paths": [
+    "src/",
+    "docs/",
+    "build/"
+  ],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "Lighthouse",
+  "at": "2026-11-18T09:00:00.000Z"
+}
+$ layer brief run --task task-18 --as-of 2026-11-18T09:00:30Z --text
+# Brief for run on task-18 as of 2026-11-18T09:00:30.000Z
+
+## 1. The person's words
+task-18: Daily run 18 Nov: survey Lighthouse and propose changes to the keeper (John).
+
+## 2. Its plan piece
+(none)
+
+## 3. Addressed to it
+(none)
+
+## 4. What stands about this task
+(none)
+
+## 5. Its areas
+area-1 Lighthouse (0 open addressed to it)
+
+## 6. Open runs of other tasks sharing a path
+(none)
+
+## 7. Index of what else is known
+(none)
+
+-- carries {"words":1,"piece":0,"addressed":0,"stands":0,"areas":1,"runs":0,"index":0}; 428 bytes
+
+$ layer find --to John --state open --as-of 2026-11-18T09:00:30Z --by run
+[
+  {
+    "id": "question-4",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Cache the dependency install step in the build so repeat builds skip it.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-14T09:02:00.000Z"
+  },
+  {
+    "id": "question-5",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Add a link checker to the docs build that fails on broken internal links.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-14T09:03:00.000Z"
+  },
+  {
+    "id": "question-8",
+    "kind": "question",
+    "in": "task-6",
+    "to": "John",
+    "asks": "Split build/config.yml into one file per section.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-20, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-15T09:02:00.000Z"
+  },
+  {
+    "id": "question-9",
+    "kind": "question",
+    "in": "task-6",
+    "to": "John",
+    "asks": "Reuse one dependency cache across all build jobs, not per job.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-4, which it restates.)",
+    "links": {
+      "about": "area-1",
+      "same-as": "question-4"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-15T09:03:00.000Z"
+  },
+  {
+    "id": "question-12",
+    "kind": "question",
+    "in": "task-10",
+    "to": "John",
+    "asks": "Pin the toolchain version in one place (build/toolchain) and read it everywhere.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-21, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-16T09:02:00.000Z"
+  },
+  {
+    "id": "question-13",
+    "kind": "question",
+    "in": "task-10",
+    "to": "John",
+    "asks": "Check docs links, external ones included, on a weekly schedule.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-5, which it restates.)",
+    "links": {
+      "about": "area-1",
+      "same-as": "question-5"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-16T09:03:00.000Z"
+  },
+  {
+    "id": "question-16",
+    "kind": "question",
+    "in": "task-14",
+    "to": "John",
+    "asks": "Delete the unused legacy export script src/export-legacy.sh.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-22, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-17T09:02:00.000Z"
+  },
+  {
+    "id": "question-17",
+    "kind": "question",
+    "in": "task-14",
+    "to": "John",
+    "asks": "Move each config section to its own file and load them with one small loader.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-20, withdraw it: the change is not made. (Keeps the date of question-8, which it restates.)",
+    "links": {
+      "about": "area-1",
+      "same-as": "question-8"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-17T09:03:00.000Z"
+  }
+]
+
+$ layer add run {"in":"task-18","stage":"run","claims":[]} --by run --at 2026-11-18T09:01:00Z
+{
+  "id": "run-19",
+  "kind": "run",
+  "in": "task-18",
+  "stage": "run",
+  "claims": [],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "run",
+  "at": "2026-11-18T09:01:00.000Z"
+}
+$ layer add question {"in":"task-18","to":"John","asks":"Add a smoke test that runs the release script in dry-run mode.","options":["adopt","decline"],"recommended":"adopt","if-unanswered":"If John has not answered by 2026-11-23, withdraw it: the change is not made.","links":{"about":"area-1"}} --by run --at 2026-11-18T09:02:00Z
+{
+  "id": "question-20",
+  "kind": "question",
+  "in": "task-18",
+  "to": "John",
+  "asks": "Add a smoke test that runs the release script in dry-run mode.",
+  "options": [
+    "adopt",
+    "decline"
+  ],
+  "recommended": "adopt",
+  "if-unanswered": "If John has not answered by 2026-11-23, withdraw it: the change is not made.",
+  "links": {
+    "about": "area-1"
+  },
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "run",
+  "at": "2026-11-18T09:02:00.000Z"
+}
+$ layer add question {"in":"task-18","to":"John","asks":"Key the shared dependency cache on the lockfile hash.","options":["adopt","decline"],"recommended":"adopt","if-unanswered":"If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-9, which it restates.)","links":{"about":"area-1","same-as":"question-9"}} --by run --at 2026-11-18T09:03:00Z
+{
+  "id": "question-21",
+  "kind": "question",
+  "in": "task-18",
+  "to": "John",
+  "asks": "Key the shared dependency cache on the lockfile hash.",
+  "options": [
+    "adopt",
+    "decline"
+  ],
+  "recommended": "adopt",
+  "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-9, which it restates.)",
+  "links": {
+    "about": "area-1",
+    "same-as": "question-9"
+  },
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "run",
+  "at": "2026-11-18T09:03:00.000Z"
+}
+$ layer end question-9 handed-on restated with a refinement as question-21 --into question-21 --by run --at 2026-11-18T09:4:00Z
+{
+  "usage": "bad time: 2026-11-18T09:4:00Z"
+}
+$ layer end run-19 done proposals filed --by run --at 2026-11-18T09:10:00Z
+{
+  "id": "run-19",
+  "kind": "run",
+  "in": "task-18",
+  "stage": "run",
+  "claims": [],
+  "links": {},
+  "state": "done",
+  "v": 2,
+  "op": "end",
+  "by": "run",
+  "at": "2026-11-18T09:10:00.000Z",
+  "stateReason": "proposals filed",
+  "reason": "proposals filed"
+}
+$ layer end task-18 done proposals filed to John --by run --at 2026-11-18T09:10:00Z
+{
+  "id": "task-18",
+  "kind": "task",
+  "in": "area-1",
+  "asked": "Daily run 18 Nov: survey Lighthouse and propose changes to the keeper (John).",
+  "done-when": "Proposals filed to John.",
+  "paths": [
+    "src/",
+    "docs/",
+    "build/"
+  ],
+  "links": {},
+  "state": "done",
+  "v": 2,
+  "op": "end",
+  "by": "run",
+  "at": "2026-11-18T09:10:00.000Z",
+  "stateReason": "proposals filed to John",
+  "reason": "proposals filed to John"
+}
+### John, 18 Nov evening
+$ layer find --to John --state open --as-of 2026-11-18T20:00:00Z --by John
+[
+  {
+    "id": "question-4",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Cache the dependency install step in the build so repeat builds skip it.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-14T09:02:00.000Z"
+  },
+  {
+    "id": "question-5",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Add a link checker to the docs build that fails on broken internal links.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-14T09:03:00.000Z"
+  },
+  {
+    "id": "question-8",
+    "kind": "question",
+    "in": "task-6",
+    "to": "John",
+    "asks": "Split build/config.yml into one file per section.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-20, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-15T09:02:00.000Z"
+  },
+  {
+    "id": "question-9",
+    "kind": "question",
+    "in": "task-6",
+    "to": "John",
+    "asks": "Reuse one dependency cache across all build jobs, not per job.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-4, which it restates.)",
+    "links": {
+      "about": "area-1",
+      "same-as": "question-4"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-15T09:03:00.000Z"
+  },
+  {
+    "id": "question-12",
+    "kind": "question",
+    "in": "task-10",
+    "to": "John",
+    "asks": "Pin the toolchain version in one place (build/toolchain) and read it everywhere.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-21, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-16T09:02:00.000Z"
+  },
+  {
+    "id": "question-13",
+    "kind": "question",
+    "in": "task-10",
+    "to": "John",
+    "asks": "Check docs links, external ones included, on a weekly schedule.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-5, which it restates.)",
+    "links": {
+      "about": "area-1",
+      "same-as": "question-5"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-16T09:03:00.000Z"
+  },
+  {
+    "id": "question-16",
+    "kind": "question",
+    "in": "task-14",
+    "to": "John",
+    "asks": "Delete the unused legacy export script src/export-legacy.sh.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-22, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-17T09:02:00.000Z"
+  },
+  {
+    "id": "question-17",
+    "kind": "question",
+    "in": "task-14",
+    "to": "John",
+    "asks": "Move each config section to its own file and load them with one small loader.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-20, withdraw it: the change is not made. (Keeps the date of question-8, which it restates.)",
+    "links": {
+      "about": "area-1",
+      "same-as": "question-8"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-17T09:03:00.000Z"
+  },
+  {
+    "id": "question-20",
+    "kind": "question",
+    "in": "task-18",
+    "to": "John",
+    "asks": "Add a smoke test that runs the release script in dry-run mode.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-23, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-18T09:02:00.000Z"
+  },
+  {
+    "id": "question-21",
+    "kind": "question",
+    "in": "task-18",
+    "to": "John",
+    "asks": "Key the shared dependency cache on the lockfile hash.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-9, which it restates.)",
+    "links": {
+      "about": "area-1",
+      "same-as": "question-9"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-18T09:03:00.000Z"
+  }
+]
+
+### run on 19 Nov
+$ layer add task {"in":"area-1","asked":"Daily run 19 Nov: survey Lighthouse and propose changes to the keeper (John).","done-when":"Proposals filed to John.","paths":["src/","docs/","build/"]} --by Lighthouse --at 2026-11-19T09:00:00Z
+{
+  "id": "task-22",
+  "kind": "task",
+  "in": "area-1",
+  "asked": "Daily run 19 Nov: survey Lighthouse and propose changes to the keeper (John).",
+  "done-when": "Proposals filed to John.",
+  "paths": [
+    "src/",
+    "docs/",
+    "build/"
+  ],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "Lighthouse",
+  "at": "2026-11-19T09:00:00.000Z"
+}
+$ layer brief run --task task-22 --as-of 2026-11-19T09:00:30Z --text
+# Brief for run on task-22 as of 2026-11-19T09:00:30.000Z
+
+## 1. The person's words
+task-22: Daily run 19 Nov: survey Lighthouse and propose changes to the keeper (John).
+
+## 2. Its plan piece
+(none)
+
+## 3. Addressed to it
+(none)
+
+## 4. What stands about this task
+(none)
+
+## 5. Its areas
+area-1 Lighthouse (0 open addressed to it)
+
+## 6. Open runs of other tasks sharing a path
+(none)
+
+## 7. Index of what else is known
+(none)
+
+-- carries {"words":1,"piece":0,"addressed":0,"stands":0,"areas":1,"runs":0,"index":0}; 428 bytes
+
+$ layer find --to John --state open --as-of 2026-11-19T09:00:30Z --by run
+[
+  {
+    "id": "question-4",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Cache the dependency install step in the build so repeat builds skip it.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-14T09:02:00.000Z"
+  },
+  {
+    "id": "question-5",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Add a link checker to the docs build that fails on broken internal links.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-14T09:03:00.000Z"
+  },
+  {
+    "id": "question-8",
+    "kind": "question",
+    "in": "task-6",
+    "to": "John",
+    "asks": "Split build/config.yml into one file per section.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-20, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-15T09:02:00.000Z"
+  },
+  {
+    "id": "question-9",
+    "kind": "question",
+    "in": "task-6",
+    "to": "John",
+    "asks": "Reuse one dependency cache across all build jobs, not per job.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-4, which it restates.)",
+    "links": {
+      "about": "area-1",
+      "same-as": "question-4"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-15T09:03:00.000Z"
+  },
+  {
+    "id": "question-12",
+    "kind": "question",
+    "in": "task-10",
+    "to": "John",
+    "asks": "Pin the toolchain version in one place (build/toolchain) and read it everywhere.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-21, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-16T09:02:00.000Z"
+  },
+  {
+    "id": "question-13",
+    "kind": "question",
+    "in": "task-10",
+    "to": "John",
+    "asks": "Check docs links, external ones included, on a weekly schedule.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-5, which it restates.)",
+    "links": {
+      "about": "area-1",
+      "same-as": "question-5"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-16T09:03:00.000Z"
+  },
+  {
+    "id": "question-16",
+    "kind": "question",
+    "in": "task-14",
+    "to": "John",
+    "asks": "Delete the unused legacy export script src/export-legacy.sh.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-22, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-17T09:02:00.000Z"
+  },
+  {
+    "id": "question-17",
+    "kind": "question",
+    "in": "task-14",
+    "to": "John",
+    "asks": "Move each config section to its own file and load them with one small loader.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-20, withdraw it: the change is not made. (Keeps the date of question-8, which it restates.)",
+    "links": {
+      "about": "area-1",
+      "same-as": "question-8"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-17T09:03:00.000Z"
+  },
+  {
+    "id": "question-20",
+    "kind": "question",
+    "in": "task-18",
+    "to": "John",
+    "asks": "Add a smoke test that runs the release script in dry-run mode.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-23, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-18T09:02:00.000Z"
+  },
+  {
+    "id": "question-21",
+    "kind": "question",
+    "in": "task-18",
+    "to": "John",
+    "asks": "Key the shared dependency cache on the lockfile hash.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-9, which it restates.)",
+    "links": {
+      "about": "area-1",
+      "same-as": "question-9"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-18T09:03:00.000Z"
+  }
+]
+
+$ layer add run {"in":"task-22","stage":"run","claims":[]} --by run --at 2026-11-19T09:01:00Z
+{
+  "id": "run-23",
+  "kind": "run",
+  "in": "task-22",
+  "stage": "run",
+  "claims": [],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "run",
+  "at": "2026-11-19T09:01:00.000Z"
+}
+$ layer end question-13 withdrawn lapsed: no answer from John by 2026-11-19 (its if-unanswered) --by run --at 2026-11-19T09:02:00Z
+{
+  "id": "question-13",
+  "kind": "question",
+  "in": "task-10",
+  "to": "John",
+  "asks": "Check docs links, external ones included, on a weekly schedule.",
+  "options": [
+    "adopt",
+    "decline"
+  ],
+  "recommended": "adopt",
+  "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-5, which it restates.)",
+  "links": {
+    "about": "area-1",
+    "same-as": "question-5"
+  },
+  "state": "withdrawn",
+  "v": 2,
+  "op": "end",
+  "by": "run",
+  "at": "2026-11-19T09:02:00.000Z",
+  "stateReason": "lapsed: no answer from John by 2026-11-19 (its if-unanswered)",
+  "reason": "lapsed: no answer from John by 2026-11-19 (its if-unanswered)"
+}
+$ layer end question-21 withdrawn lapsed: no answer from John by 2026-11-19 (its if-unanswered) --by run --at 2026-11-19T09:02:00Z
+{
+  "id": "question-21",
+  "kind": "question",
+  "in": "task-18",
+  "to": "John",
+  "asks": "Key the shared dependency cache on the lockfile hash.",
+  "options": [
+    "adopt",
+    "decline"
+  ],
+  "recommended": "adopt",
+  "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-9, which it restates.)",
+  "links": {
+    "about": "area-1",
+    "same-as": "question-9"
+  },
+  "state": "withdrawn",
+  "v": 2,
+  "op": "end",
+  "by": "run",
+  "at": "2026-11-19T09:02:00.000Z",
+  "stateReason": "lapsed: no answer from John by 2026-11-19 (its if-unanswered)",
+  "reason": "lapsed: no answer from John by 2026-11-19 (its if-unanswered)"
+}
+$ layer add question {"in":"task-22","to":"John","asks":"Add a CONTRIBUTING note on how to run the build locally.","options":["adopt","decline"],"recommended":"adopt","if-unanswered":"If John has not answered by 2026-11-24, withdraw it: the change is not made.","links":{"about":"area-1"}} --by run --at 2026-11-19T09:03:00Z
+{
+  "id": "question-24",
+  "kind": "question",
+  "in": "task-22",
+  "to": "John",
+  "asks": "Add a CONTRIBUTING note on how to run the build locally.",
+  "options": [
+    "adopt",
+    "decline"
+  ],
+  "recommended": "adopt",
+  "if-unanswered": "If John has not answered by 2026-11-24, withdraw it: the change is not made.",
+  "links": {
+    "about": "area-1"
+  },
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "run",
+  "at": "2026-11-19T09:03:00.000Z"
+}
+$ layer end run-23 done proposals filed --by run --at 2026-11-19T09:10:00Z
+{
+  "id": "run-23",
+  "kind": "run",
+  "in": "task-22",
+  "stage": "run",
+  "claims": [],
+  "links": {},
+  "state": "done",
+  "v": 2,
+  "op": "end",
+  "by": "run",
+  "at": "2026-11-19T09:10:00.000Z",
+  "stateReason": "proposals filed",
+  "reason": "proposals filed"
+}
+$ layer end task-22 done proposals filed to John --by run --at 2026-11-19T09:10:00Z
+{
+  "id": "task-22",
+  "kind": "task",
+  "in": "area-1",
+  "asked": "Daily run 19 Nov: survey Lighthouse and propose changes to the keeper (John).",
+  "done-when": "Proposals filed to John.",
+  "paths": [
+    "src/",
+    "docs/",
+    "build/"
+  ],
+  "links": {},
+  "state": "done",
+  "v": 2,
+  "op": "end",
+  "by": "run",
+  "at": "2026-11-19T09:10:00.000Z",
+  "stateReason": "proposals filed to John",
+  "reason": "proposals filed to John"
+}
+### after
+$ layer find --to John --state open --as-of 2026-11-19T12:00:00Z --by John
+[
+  {
+    "id": "question-4",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Cache the dependency install step in the build so repeat builds skip it.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-14T09:02:00.000Z"
+  },
+  {
+    "id": "question-5",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Add a link checker to the docs build that fails on broken internal links.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-14T09:03:00.000Z"
+  },
+  {
+    "id": "question-8",
+    "kind": "question",
+    "in": "task-6",
+    "to": "John",
+    "asks": "Split build/config.yml into one file per section.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-20, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-15T09:02:00.000Z"
+  },
+  {
+    "id": "question-9",
+    "kind": "question",
+    "in": "task-6",
+    "to": "John",
+    "asks": "Reuse one dependency cache across all build jobs, not per job.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-4, which it restates.)",
+    "links": {
+      "about": "area-1",
+      "same-as": "question-4"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-15T09:03:00.000Z"
+  },
+  {
+    "id": "question-12",
+    "kind": "question",
+    "in": "task-10",
+    "to": "John",
+    "asks": "Pin the toolchain version in one place (build/toolchain) and read it everywhere.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-21, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-16T09:02:00.000Z"
+  },
+  {
+    "id": "question-16",
+    "kind": "question",
+    "in": "task-14",
+    "to": "John",
+    "asks": "Delete the unused legacy export script src/export-legacy.sh.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-22, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-17T09:02:00.000Z"
+  },
+  {
+    "id": "question-17",
+    "kind": "question",
+    "in": "task-14",
+    "to": "John",
+    "asks": "Move each config section to its own file and load them with one small loader.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-20, withdraw it: the change is not made. (Keeps the date of question-8, which it restates.)",
+    "links": {
+      "about": "area-1",
+      "same-as": "question-8"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-17T09:03:00.000Z"
+  },
+  {
+    "id": "question-20",
+    "kind": "question",
+    "in": "task-18",
+    "to": "John",
+    "asks": "Add a smoke test that runs the release script in dry-run mode.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-23, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-18T09:02:00.000Z"
+  },
+  {
+    "id": "question-24",
+    "kind": "question",
+    "in": "task-22",
+    "to": "John",
+    "asks": "Add a CONTRIBUTING note on how to run the build locally.",
+    "options": [
+      "adopt",
+      "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-24, withdraw it: the change is not made.",
+    "links": {
+      "about": "area-1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "run",
+    "at": "2026-11-19T09:03:00.000Z"
+  }
+]
+
+$ layer find --to John --as-of 2026-11-19T12:00:00Z --count --by John
+{
+  "count": 11
+}
+
+$ layer find --to John --state open --as-of 2026-11-19T12:00:00Z --count --by John
+{
+  "count": 9
+}
+
+ids: area=area-1 P1=question-4 P2=question-5 P3=question-8 P4=question-9 P5=question-12 P6=question-13 P7=question-16 P8=question-17 P9=question-20 P10=question-21 P11=question-24
+no refusals

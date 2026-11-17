@@ -1,5 +1,5 @@
 {
- "next": 58,
+ "next": 60,
  "records": {
   "task-1": [
    {
@@ -1009,6 +1009,22 @@
     "op": "add",
     "by": "survey-task",
     "at": "2026-11-13T17:22:40.000Z"
+   },
+   {
+    "id": "finding-50",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "implementation",
+    "links": {
+     "about": "plan-10@2"
+    },
+    "says": "Tests that read `task-page.js` as text depend on the IIFE's indentation. Unwrapping the IIFE moves every line out two spaces, and these tests slice the source at strings that include the indent: `lin-3975-task-run-control:588` (`'  function init(doc) {'`, and `'    function toggle(row) {'` near `:587`), `lin-3975-summary-and-time:59/162/263` (`'  function relativeWords(value) {'`), `lin-3975-chat-fold:142`. After dedenting, `indexOf` returns -1, so \"rerun them\" is not enough: rewrite them. Re-anchor them on names, not indentation; better, make `relativeWords` an export the twin test imports instead of a text slice. Only the first is in the plan's list (survey at 17faa83f4; confirmed by survey-place at 904719353).",
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "survey-place",
+    "at": "2026-11-13T17:26:47.000Z",
+    "reason": "survey-place at 904719353 confirms, adds the toggle marker and the export-not-slice fix"
    }
   ],
   "finding-51": [
@@ -1050,6 +1066,29 @@
     "op": "add",
     "by": "survey-task",
     "at": "2026-11-13T17:22:42.000Z"
+   },
+   {
+    "id": "question-52",
+    "kind": "question",
+    "in": "task-28",
+    "to": "implementation",
+    "links": {
+     "about": "decision-32@1"
+    },
+    "asks": "The plan's duplicate-helper search (function names equal to a `common.js` global or a lib export) finds nothing in `task-page.js`, but there are two real duplicates: `relativeWords` (`:366`) is `relativeAgo` (`lib/task-page-loader.js:614`) line for line, and `formatElapsed` (`:302`) is pinned by a parity test to `fmtDuration` (`lib/render-run-steps.js:258`). Neither lib file is a leaf (22 and 4 imports), so importing either means extracting a leaf, adding a `SHARED_MODULES` entry and an `areas.json` owner: a serving change, which Session fit (decision-32) rules out. Which way? Decide up front and record it on LIN-4463.",
+    "options": [
+     "export both from task-page.js, turn the parity tests into plain imports, and name the leaf extraction as the next piece",
+     "extract the leaves now (a serving change, outside this piece's session fit)",
+     "leave them as they are, unnamed"
+    ],
+    "recommended": "Export both, turn the parity tests into plain imports, and name the extraction as the next piece. In the PR, say the duplicates were found and left alone (never 'no duplicates'), and add a Waiting line in `docs/areas/front-end-browser.md` next to the `ship.js` \"lib side must become a leaf\" entry.",
+    "if-unanswered": "The duplicates stay and the piece's 'names what it retired' misses them.",
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "survey-place",
+    "at": "2026-11-13T17:26:46.000Z",
+    "reason": "survey-place at 904719353 agrees and adds how to record it: PR wording and a Waiting line"
    }
   ],
   "finding-53": [
@@ -1116,6 +1155,20 @@
     "op": "add",
     "by": "survey-task",
     "at": "2026-11-13T17:22:46.000Z"
+   },
+   {
+    "id": "finding-56",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "implementation",
+    "says": "First moves: 1. Add named exports beside the IIFE. 2. Move the five executing suites and the two parity tests to imports, green while the seam still exists. 3. Remove the IIFE and the seam in a whitespace-only commit, re-anchoring the text slicers on names. 4. Then `SCRIPTS`, the golden file, and the census (102 after piece 1). Expect the census to fall by about 2, not 5–7: only `task-page-client` and `task-timeline-client` leave the list (`close-out.js` is an exempt `runClassic` sibling). `task-page-question` (`:311`, `question-cards.js`), `lin-3975-proposal-refresh` (`:161`, `task-chat.js`), `lin-3975-task-run-links` and `lin-3975-summary-and-time` (`common.js` slices) still load other classic files, so they stay listed (survey-place at 904719353).",
+    "links": {},
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "survey-place",
+    "at": "2026-11-13T17:26:45.000Z",
+    "reason": "Census forecast corrected: survey-place at 904719353 counted which migrated suites still load other classic files"
    }
   ],
   "run-57": [
@@ -1146,6 +1199,40 @@
     "at": "2026-11-13T17:22:48.000Z",
     "stateReason": "Survey posted on LIN-4472 at 17:25:51",
     "reason": "Survey posted on LIN-4472 at 17:25:51"
+   }
+  ],
+  "finding-58": [
+   {
+    "id": "finding-58",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "implementation",
+    "links": {
+     "about": "plan-10@2"
+    },
+    "says": "Moving `task-page.js` (the last entry in `SCRIPTS`) to a module changes timing, but harmlessly: a module runs after the classic scripts and before `DOMContentLoaded`, so the `:925` listener still registers after `common.js`'s and the run control's. Every cross-file read is `window.X` at call time and the file assigns no globals, so the conversion is mechanical. Expected golden diff: 7 identical tag lines, one per case; anything else is a bug (witness 9). Read at 904719353, with piece 1 merged.",
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-place",
+    "at": "2026-11-13T17:26:48.000Z"
+   }
+  ],
+  "finding-59": [
+   {
+    "id": "finding-59",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "implementation",
+    "links": {
+     "about": "plan-10@2"
+    },
+    "says": "Review note 7 (update the source-map lines that call `task-page.js` classic) probably needs no edit: `docs/architecture/source-map.md` describes the task page's routes and renderer, not `public/task-page.js`. Check it and say so in the PR instead of editing it for the sake of it (survey-place at 904719353).",
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-place",
+    "at": "2026-11-13T17:26:49.000Z"
    }
   ]
  },
@@ -1482,6 +1569,29 @@
     "find",
     "--text",
     "census",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:38.704Z",
+   "by": "survey-place",
+   "q": [
+    "get",
+    "question-52",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:38.733Z",
+   "by": "survey-place",
+   "q": [
+    "find",
+    "--text",
+    "ship.js",
+    "--state",
+    "open",
     "--by",
     "survey-place"
    ]

@@ -1,0 +1,72 @@
+{
+  "id": "task-3",
+  "kind": "task",
+  "in": "task-1",
+  "asked": "Write the next study.",
+  "done-when": "The next study is written under studies/.",
+  "paths": [
+    "studies/"
+  ],
+  "links": {},
+  "state": "done",
+  "v": 3,
+  "op": "end",
+  "by": "session-b",
+  "at": "2026-11-14T09:46:00.000Z",
+  "stateReason": "LH052 written (change-8)",
+  "reason": "LH052 written (change-8)",
+  "versions": [
+    {
+      "id": "task-3",
+      "kind": "task",
+      "in": "task-1",
+      "asked": "Write the next study.",
+      "done-when": "The next study is written under studies/.",
+      "paths": [
+        "studies/"
+      ],
+      "links": {},
+      "state": "open",
+      "v": 1,
+      "op": "add",
+      "by": "Lighthouse",
+      "at": "2026-11-14T08:00:00.000Z"
+    },
+    {
+      "id": "task-3",
+      "kind": "task",
+      "in": "task-1",
+      "asked": "Write the next study.",
+      "done-when": "The next study is written under studies/.",
+      "paths": [
+        "studies/"
+      ],
+      "links": {},
+      "state": "done",
+      "v": 2,
+      "op": "end",
+      "by": "session-a",
+      "at": "2026-11-14T09:41:00.000Z",
+      "stateReason": "LH051 written (change-7); run-5 still writing LH052",
+      "reason": "LH051 written (change-7); run-5 still writing LH052"
+    },
+    {
+      "id": "task-3",
+      "kind": "task",
+      "in": "task-1",
+      "asked": "Write the next study.",
+      "done-when": "The next study is written under studies/.",
+      "paths": [
+        "studies/"
+      ],
+      "links": {},
+      "state": "done",
+      "v": 3,
+      "op": "end",
+      "by": "session-b",
+      "at": "2026-11-14T09:46:00.000Z",
+      "stateReason": "LH052 written (change-8)",
+      "reason": "LH052 written (change-8)"
+    }
+  ]
+}

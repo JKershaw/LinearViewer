@@ -1,5 +1,5 @@
 {
- "next": 8,
+ "next": 9,
  "records": {
   "task-1": [
    {
@@ -63,8 +63,8 @@
     "op": "end",
     "by": "session-a",
     "at": "2026-11-14T09:41:00.000Z",
-    "stateReason": "LH051 written",
-    "reason": "LH051 written"
+    "stateReason": "LH051 written (change-7); run-5 still writing LH052",
+    "reason": "LH051 written (change-7); run-5 still writing LH052"
    },
    {
     "id": "task-3",
@@ -81,8 +81,8 @@
     "op": "end",
     "by": "session-b",
     "at": "2026-11-14T09:46:00.000Z",
-    "stateReason": "LH051 written",
-    "reason": "LH051 written"
+    "stateReason": "LH052 written (change-8)",
+    "reason": "LH052 written (change-8)"
    }
   ],
   "run-4": [
@@ -117,8 +117,8 @@
     "op": "end",
     "by": "session-a",
     "at": "2026-11-14T09:41:00.000Z",
-    "stateReason": "study written",
-    "reason": "study written"
+    "stateReason": "study LH051 written",
+    "reason": "study LH051 written"
    }
   ],
   "run-5": [
@@ -128,7 +128,7 @@
     "in": "task-3",
     "stage": "weekly-read",
     "claims": [
-     "studies/LH051.md"
+     "studies/LH052.md"
     ],
     "account": "session-b",
     "links": {},
@@ -144,7 +144,7 @@
     "in": "task-3",
     "stage": "weekly-read",
     "claims": [
-     "studies/LH051.md"
+     "studies/LH052.md"
     ],
     "account": "session-b",
     "links": {},
@@ -153,38 +153,59 @@
     "op": "end",
     "by": "session-b",
     "at": "2026-11-14T09:46:00.000Z",
-    "stateReason": "study written",
-    "reason": "study written"
+    "stateReason": "study LH052 written",
+    "reason": "study LH052 written"
    }
   ],
-  "change-6": [
+  "finding-6": [
    {
-    "id": "change-6",
-    "kind": "change",
+    "id": "finding-6",
+    "kind": "finding",
     "in": "task-3",
-    "ref": "studies/LH051.md",
-    "head": "LH051 by session-a (09:40)",
-    "links": {},
+    "to": "session-a",
+    "says": "Two sessions are on task-3 at once: run-4 (you) claims studies/LH051.md, so I (run-5) took studies/LH052.md. One weekly study is due; if you finish LH051 first, I will still write mine as asked but you may want to mark one redundant.",
+    "links": {
+     "about": "run-4"
+    },
     "state": "open",
     "v": 1,
     "op": "add",
-    "by": "session-a",
-    "at": "2026-11-14T09:40:00.000Z"
+    "by": "session-b",
+    "at": "2026-11-14T09:06:00.000Z"
    },
    {
-    "id": "change-6",
-    "kind": "change",
+    "id": "finding-6",
+    "kind": "finding",
     "in": "task-3",
-    "ref": "studies/LH051.md",
-    "head": "LH051 by session-a (09:40)",
-    "links": {},
-    "state": "merged",
+    "to": "session-a",
+    "says": "Two sessions are on task-3 at once: run-4 (you) claims studies/LH051.md, so I (run-5) took studies/LH052.md. One weekly study is due; if you finish LH051 first, I will still write mine as asked but you may want to mark one redundant.",
+    "links": {
+     "about": "run-4",
+     "on": "run-4@1"
+    },
+    "state": "open",
     "v": 2,
+    "op": "link",
+    "by": "session-b",
+    "at": "2026-11-14T09:06:00.000Z"
+   },
+   {
+    "id": "finding-6",
+    "kind": "finding",
+    "in": "task-3",
+    "to": "session-a",
+    "says": "Two sessions are on task-3 at once: run-4 (you) claims studies/LH051.md, so I (run-5) took studies/LH052.md. One weekly study is due; if you finish LH051 first, I will still write mine as asked but you may want to mark one redundant.",
+    "links": {
+     "about": "run-4",
+     "on": "run-4@1"
+    },
+    "state": "done",
+    "v": 3,
     "op": "end",
     "by": "session-a",
     "at": "2026-11-14T09:41:00.000Z",
-    "stateReason": "study written to studies/LH051.md",
-    "reason": "study written to studies/LH051.md"
+    "stateReason": "read; LH051 written, LH052 is B's",
+    "reason": "read; LH051 written, LH052 is B's"
    }
   ],
   "change-7": [
@@ -193,7 +214,54 @@
     "kind": "change",
     "in": "task-3",
     "ref": "studies/LH051.md",
-    "head": "LH051 by session-b (09:45)",
+    "head": "LH051 written by session-a",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "session-a",
+    "at": "2026-11-14T09:40:00.000Z"
+   },
+   {
+    "id": "change-7",
+    "kind": "change",
+    "in": "task-3",
+    "ref": "studies/LH051.md",
+    "head": "LH051 written by session-a",
+    "links": {
+     "about": "run-4"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "link",
+    "by": "session-a",
+    "at": "2026-11-14T09:40:00.000Z"
+   },
+   {
+    "id": "change-7",
+    "kind": "change",
+    "in": "task-3",
+    "ref": "studies/LH051.md",
+    "head": "LH051 written by session-a",
+    "links": {
+     "about": "run-4"
+    },
+    "state": "merged",
+    "v": 3,
+    "op": "end",
+    "by": "session-a",
+    "at": "2026-11-14T09:41:00.000Z",
+    "stateReason": "study written to studies/LH051.md",
+    "reason": "study written to studies/LH051.md"
+   }
+  ],
+  "change-8": [
+   {
+    "id": "change-8",
+    "kind": "change",
+    "in": "task-3",
+    "ref": "studies/LH052.md",
+    "head": "LH052 written by session-b",
     "links": {},
     "state": "open",
     "v": 1,
@@ -202,25 +270,42 @@
     "at": "2026-11-14T09:45:00.000Z"
    },
    {
-    "id": "change-7",
+    "id": "change-8",
     "kind": "change",
     "in": "task-3",
-    "ref": "studies/LH051.md",
-    "head": "LH051 by session-b (09:45)",
-    "links": {},
-    "state": "merged",
+    "ref": "studies/LH052.md",
+    "head": "LH052 written by session-b",
+    "links": {
+     "about": "run-5"
+    },
+    "state": "open",
     "v": 2,
+    "op": "link",
+    "by": "session-b",
+    "at": "2026-11-14T09:45:00.000Z"
+   },
+   {
+    "id": "change-8",
+    "kind": "change",
+    "in": "task-3",
+    "ref": "studies/LH052.md",
+    "head": "LH052 written by session-b",
+    "links": {
+     "about": "run-5"
+    },
+    "state": "merged",
+    "v": 3,
     "op": "end",
     "by": "session-b",
     "at": "2026-11-14T09:46:00.000Z",
-    "stateReason": "study written to studies/LH051.md",
-    "reason": "study written to studies/LH051.md"
+    "stateReason": "study written to studies/LH052.md",
+    "reason": "study written to studies/LH052.md"
    }
   ]
  },
  "log": [
   {
-   "at": "2026-11-17T14:46:59.219Z",
+   "at": "2026-11-17T14:47:54.679Z",
    "by": "session-a",
    "q": [
     "brief",
@@ -233,7 +318,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:46:59.249Z",
+   "at": "2026-11-17T14:47:54.711Z",
    "by": "session-a",
    "q": [
     "brief",
@@ -246,7 +331,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:46:59.314Z",
+   "at": "2026-11-17T14:47:54.768Z",
    "by": "session-b",
    "q": [
     "brief",
@@ -259,7 +344,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:46:59.342Z",
+   "at": "2026-11-17T14:47:54.796Z",
    "by": "session-b",
    "q": [
     "brief",
@@ -272,7 +357,19 @@
    ]
   },
   {
-   "at": "2026-11-17T14:46:59.401Z",
+   "at": "2026-11-17T14:47:54.824Z",
+   "by": "session-b",
+   "q": [
+    "get",
+    "run-4",
+    "--by",
+    "session-b",
+    "--as-of",
+    "2026-11-14T09:05:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:54.934Z",
    "by": "session-a",
    "q": [
     "brief",
@@ -285,7 +382,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:46:59.556Z",
+   "at": "2026-11-17T14:47:55.131Z",
    "by": "session-b",
    "q": [
     "brief",
@@ -298,41 +395,50 @@
    ]
   },
   {
-   "at": "2026-11-17T14:46:59.723Z",
-   "by": "session-b",
+   "at": "2026-11-17T14:47:55.307Z",
+   "by": "Lighthouse",
    "q": [
     "show",
     "--task",
     "task-3",
     "--by",
-    "session-b",
+    "Lighthouse",
     "--as-of",
     "2026-11-14T09:30:00Z"
    ]
   },
   {
-   "at": "2026-11-17T14:46:59.754Z",
-   "by": "session-b",
+   "at": "2026-11-17T14:47:55.337Z",
+   "by": "Lighthouse",
    "q": [
-    "find",
-    "--kind",
-    "change",
-    "--text",
-    "LH051",
+    "show",
+    "--task",
+    "task-3",
     "--by",
-    "session-b"
+    "Lighthouse"
    ]
   },
   {
-   "at": "2026-11-17T14:47:32.285Z",
-   "by": "session-b",
+   "at": "2026-11-17T14:47:55.368Z",
+   "by": "Lighthouse",
+   "q": [
+    "find",
+    "--in",
+    "task-3",
+    "--kind",
+    "change",
+    "--by",
+    "Lighthouse"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:55.397Z",
+   "by": "Lighthouse",
    "q": [
     "get",
-    "run-4",
+    "task-3",
     "--by",
-    "session-b",
-    "--as-of",
-    "2026-11-14T09:05:00Z"
+    "Lighthouse"
    ]
   }
  ]

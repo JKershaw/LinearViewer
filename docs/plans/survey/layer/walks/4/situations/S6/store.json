@@ -1,5 +1,5 @@
 {
- "next": 13,
+ "next": 14,
  "records": {
   "area-1": [
    {
@@ -291,11 +291,41 @@
     "by": "review",
     "at": "2026-11-13T13:00:00.000Z"
    }
+  ],
+  "run-13": [
+   {
+    "id": "run-13",
+    "kind": "run",
+    "in": "task-3",
+    "stage": "close-out",
+    "claims": [],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "close-out",
+    "at": "2026-11-13T15:00:00.000Z"
+   },
+   {
+    "id": "run-13",
+    "kind": "run",
+    "in": "task-3",
+    "stage": "close-out",
+    "claims": [],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T15:00:00.000Z",
+    "stateReason": "not sent: verdict-11 requests changes on change-9@1; question-5 (facts) and question-6 (channel) unanswered",
+    "reason": "not sent: verdict-11 requests changes on change-9@1; question-5 (facts) and question-6 (channel) unanswered"
+   }
   ]
  },
  "log": [
   {
-   "at": "2026-11-17T14:47:28.998Z",
+   "at": "2026-11-17T14:47:46.585Z",
    "by": "survey-task",
    "q": [
     "brief",
@@ -308,7 +338,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:29.031Z",
+   "at": "2026-11-17T14:47:46.626Z",
    "by": "survey-task",
    "q": [
     "find",
@@ -321,7 +351,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:29.309Z",
+   "at": "2026-11-17T14:47:46.848Z",
    "by": "implementation",
    "q": [
     "brief",
@@ -334,7 +364,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:29.341Z",
+   "at": "2026-11-17T14:47:46.876Z",
    "by": "implementation",
    "q": [
     "get",
@@ -346,7 +376,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:29.373Z",
+   "at": "2026-11-17T14:47:46.904Z",
    "by": "implementation",
    "q": [
     "get",
@@ -358,7 +388,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:29.564Z",
+   "at": "2026-11-17T14:47:47.058Z",
    "by": "review",
    "q": [
     "brief",
@@ -371,7 +401,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:29.600Z",
+   "at": "2026-11-17T14:47:47.090Z",
    "by": "review",
    "q": [
     "get",
@@ -383,7 +413,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:29.631Z",
+   "at": "2026-11-17T14:47:47.122Z",
    "by": "review",
    "q": [
     "get",
@@ -395,7 +425,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:29.800Z",
+   "at": "2026-11-17T14:47:47.276Z",
    "by": "close-out",
    "q": [
     "brief",
@@ -408,7 +438,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:29.840Z",
+   "at": "2026-11-17T14:47:47.311Z",
    "by": "close-out",
    "q": [
     "find",
@@ -420,6 +450,32 @@
     "close-out",
     "--as-of",
     "2026-11-13T15:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:47.343Z",
+   "by": "close-out",
+   "q": [
+    "get",
+    "question-6",
+    "--by",
+    "close-out",
+    "--as-of",
+    "2026-11-13T15:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:55.335Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--to",
+    "John",
+    "--state",
+    "open",
+    "--count",
+    "--by",
+    "John"
    ]
   }
  ]

@@ -1,0 +1,168 @@
+[
+ {
+  "at": "2026-11-17T14:46:23.825Z",
+  "by": "survey-place",
+  "q": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "survey-place"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:46:33.797Z",
+  "by": "survey-place",
+  "q": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "survey-place"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:46:39.276Z",
+  "by": "survey-place",
+  "q": [
+   "find",
+   "--text",
+   "source-map",
+   "--by",
+   "survey-place"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:46:39.309Z",
+  "by": "survey-place",
+  "q": [
+   "find",
+   "--text",
+   "proxy-integration",
+   "--by",
+   "survey-place"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:46:39.343Z",
+  "by": "survey-place",
+  "q": [
+   "find",
+   "--text",
+   "plainText",
+   "--by",
+   "survey-place"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:46:39.380Z",
+  "by": "survey-place",
+  "q": [
+   "find",
+   "--text",
+   "getIssue",
+   "--by",
+   "survey-place"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:46:39.416Z",
+  "by": "survey-place",
+  "q": [
+   "find",
+   "--text",
+   "dispatch-factory",
+   "--by",
+   "survey-place"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:46:39.451Z",
+  "by": "survey-place",
+  "q": [
+   "find",
+   "--text",
+   "comment weight",
+   "--by",
+   "survey-place"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:46:39.499Z",
+  "by": "survey-place",
+  "q": [
+   "find",
+   "--text",
+   "as-asked-guard",
+   "--by",
+   "survey-place"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:46:39.534Z",
+  "by": "survey-place",
+  "q": [
+   "find",
+   "--text",
+   "reason: 'provider'",
+   "--by",
+   "survey-place"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:46:39.570Z",
+  "by": "survey-place",
+  "q": [
+   "find",
+   "--text",
+   "search/jql",
+   "--by",
+   "survey-place"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:46:39.608Z",
+  "by": "survey-place",
+  "q": [
+   "find",
+   "--text",
+   "Jira-native",
+   "--by",
+   "survey-place"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:46:44.732Z",
+  "by": "survey-place",
+  "q": [
+   "find",
+   "--kind",
+   "area",
+   "--by",
+   "survey-place"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:46:44.779Z",
+  "by": "survey-place",
+  "q": [
+   "find",
+   "--to",
+   "area-1",
+   "--by",
+   "survey-place",
+   "--count"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:46:44.814Z",
+  "by": "survey-place",
+  "q": [
+   "find",
+   "--in",
+   "area-1",
+   "--by",
+   "survey-place"
+  ]
+ }
+]
