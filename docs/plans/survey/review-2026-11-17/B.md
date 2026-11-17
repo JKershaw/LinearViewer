@@ -1,6 +1,6 @@
 # Part B: log.md lines 1886–3369 (5–12 Nov)
 
-`log:N` is `docs/plans/survey/log.md` line N. **[C]** means I checked the claim against the file or commit named. **[R]** means it's my reading of the log.
+`log:N` is `docs/plans/survey/log.md` line N. **[C]**: I checked it against the file or commit named. Unmarked: my reading of the log.
 
 ## 1. John's aims
 
@@ -9,7 +9,7 @@
   - The Survey is "the research step". He asked what would "move the needle", for example tasks done *before* the main one (log:1933).
   - The human decides the size of each move, and big moves go early (log:2026).
   - A small-budget ticket should go through "without making additional mess"; standing we can measure matters more than economics (log:2119).
-  - The decisive line: "does the task actually leave the codebase cleaner? … happy to pay a premium". The "after inside the lineage" was parked (log:2186–2188).
+  - The decisive line: "does the task actually leave the codebase cleaner? … happy to pay a premium" (log:2186).
 - **6 Nov:**
   - Integration waits until after the write-up, and the authority grant is a human call (log:2393). The paper comes first, then the essay (log:2395).
   - "Let's not undersell that this actually works." His hypothesis: larger standalone tidies from the Periodicals (log:2430).
@@ -48,8 +48,8 @@
    - a limiter.
 9. The review, then D1–D21 (log:3152–3244).
 10. 10–11 Nov (log:3245–3368):
-    - asks A1–A6 and A10–A12 filed;
-    - the baselines;
+    - asks A1–A6, A10–A12 filed;
+    - baselines;
     - the A5 backlog pass;
     - five code tasks merged;
     - tail Periodicals.
