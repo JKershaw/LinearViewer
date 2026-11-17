@@ -1,0 +1,28 @@
+task-60 task v1 [open] by breakdown
+decision-61 decision v1 [stands] STALE by breakdown
+decision-62 decision v1 [stands] STALE by breakdown
+decision-63 decision v1 [stands] STALE by breakdown
+decision-64 decision v1 [stands] STALE by breakdown
+decision-65 decision v1 [stands] STALE by breakdown
+finding-66 finding v2 [done] STALE to task-60 by implementation
+question-67 question v2 [answered] STALE to design by layer
+finding-68 finding v2 [done] to task-60 by implementation
+finding-69 finding v2 [done] STALE to task-60 by implementation
+check-70 check v3 [done] STALE to task-60 by implementation
+finding-71 finding v3 [done] STALE to task-60 by implementation
+run-72 run v2 [done] by survey-task
+finding-73 finding v1 [open] STALE to design by survey-place
+finding-74 finding v2 [done] STALE to task-60 by implementation
+finding-75 finding v2 [handed-on] STALE to task-60 by implementation
+run-78 run v2 [done] STALE by survey-place
+decision-79 decision v1 [stands] STALE by scoping
+run-80 run v2 [done] by scoping
+run-81 run v2 [done] by implementation
+change-82 change v2 [open] by implementation
+decision-83 decision v1 [stands] STALE by implementation
+decision-84 decision v1 [stands] STALE by implementation
+decision-85 decision v1 [stands] STALE by implementation
+decision-86 decision v1 [stands] by implementation
+decision-87 decision v1 [stands] STALE by implementation
+finding-88 finding v1 [open] to leftover by implementation
+finding-89 finding v1 [open] to review by implementation

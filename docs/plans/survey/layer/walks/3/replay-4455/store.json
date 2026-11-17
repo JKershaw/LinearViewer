@@ -2770,6 +2770,16 @@
     "state": "open"
    },
    "returned": 26
+  },
+  {
+   "at": "2026-11-17T13:48:58.573Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
   }
  ],
  "hits": []

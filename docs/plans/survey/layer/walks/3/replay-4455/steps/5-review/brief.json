@@ -1,0 +1,340 @@
+{
+ "stage": "review",
+ "task": "task-60",
+ "asOf": "2026-11-13T15:48:47.313Z",
+ "words": [
+  {
+   "task": "task-60",
+   "asked": ""
+  },
+  {
+   "task": "task-39",
+   "asked": "**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** John: \"we've not been applying quite the right force to bend the curve… now want to run both real work, and some real tidies.\" The Drift & Coherence and Seams & Tangles reviews of 13 Nov found this area carrying rules written in two places that disagree. Batch 1 added several of them:\n\n* Harbour can mark a task Done on a person's check before its blind read, while another check refuses that same task, and a read is then sent to a ticket that's already Done (Drift run 7, `close-out-gate-precedence-split`). John's ruling: \"if I choose to do something, Harbour is a passenger. This reflects that for many real projects, they're unlikely to be exclusively changed via Harbour.\"\n* Two pieces of code decide which PRs belong to a task, and they disagree about agent notes, so a blind read can be offered over a PR no review covered (Seams run 12, §3.0a).\n* The task timeline decides which model a dispatch used by its own rule, separate from the one the cost figures use (Drift, row 150).\n* The check that makes a stage wait while another is live is a runs rule, but it lives with the prompts (Seams, P-LW1).\n\nThe area's note holds 20 Waiting entries, and `lib/dispatch-store.js` is 4,530 lines. Seams also tried moving files between areas three ways, and none made the tangle smaller.\n\n**What we want.**\n\n* Each rule in the area has one home, and the copies are gone.\n* When a person acts, Harbour follows, and that rule is written once.\n* The area's Waiting entries are settled, or each says why it can't be yet.\n* Each piece finishes one move and names what it retired. John: \"I'd be happy to run a small variety, erring larger, to see\", so piece sizes vary, leaning larger.\n* The LLM & prompts side of the seam is A14's.\n\n**Done when**\n\n* the cases above are settled, or John has ruled they can wait;\n* the area's Waiting entries are settled or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*"
+  }
+ ],
+ "piece": {
+  "id": "plan-45",
+  "kind": "plan",
+  "v": 2,
+  "op": "revise",
+  "at": "2026-11-13T15:41:01.000Z",
+  "by": "implementation",
+  "in": "task-39",
+  "state": "kept",
+  "fields": {
+   "says": "Piece 5 (medium), as built in PR #2427: one declaration for each restated constant. `NEVER_RAN` (cancelled/expired) has one home, `lib/dispatch-terminal.js` (no owner existed; `dispatch-fields` would have made a cycle), and all seven spellings import it; `TERMINAL_HISTORY_STATUSES` and `NO_ATTEMPT_STATUSES` are built from it. `lib/dispatch-leftover.js` takes halt modes from `HALT_MODES` and the follow-up target from `followUpTarget`. `createLeftoverStep` owns the release wording and late-binds it into the store (`setHeldWakeReleaseNote`) for the requestless releases through `_archiveItem` -> `_releaseIfHeld`; the `_applyWakeHook` re-release uses `wakeHook.releaseNote`; an unbound store says a default line that names no feature. The store no longer imports or calls `formatHeldWakeNote`. One `FEEDBACK_KINDS` table in a new import-free leaf, `lib/dispatch-feedback-kinds.js` (not `dispatch-feedback-validation.js`, which sits in import cycles), carries each kind's roles; `FEEDBACK_ENTRY_KINDS` (still re-exported by the store, runner prompt byte-identical), `PARKED_WAIT_SKIPPED_KINDS` and `DECISION_LIFECYCLE_STAMP_KINDS` derive from it; `findWakeEvent` is met by a `mayCarryWake` column, true for every kind, not a filter. *Retires:* the restated constants, the store's ownership of the release wording, the runner allowlist, the parked-wait set and the four `lib/` copies of the stamp set. *Settles Waiting:* 2, 4, 11. *Witness:* `lin-4455-kinds-and-constants-characterization` iterates `HALT_MODES`; `lin-4377-store-knows-no-leftover` adds an AST check that the store neither imports nor names `formatHeldWakeNote`.",
+   "paths": [
+    "lib/dispatch-leftover.js",
+    "lib/dispatch-store.js",
+    "lib/dispatch-feedback-kinds.js",
+    "lib/dispatch-feedback-validation.js",
+    "lib/dispatch-terminal.js",
+    "docs/areas/runs-and-dispatch.md"
+   ],
+   "order": 2
+  },
+  "links": {},
+  "reason": "The build departed from v1 in four ways (leaf kinds module, NEVER_RAN home, late-bound wording, a column not a filter for findWakeEvent) and widened per decision-79; v1 named homes and paths that are no longer true. Recorded on LIN-4447 comments 055a6035 and 2f488272.",
+  "stale": false
+ },
+ "addressed": [
+  {
+   "id": "finding-89",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:41:10.000Z",
+   "by": "implementation",
+   "in": "task-60",
+   "to": "review",
+   "state": "open",
+   "fields": {
+    "says": "PR #2427, what the tests cover only partly: (a) one existing test re-pointed, `tests/unit/decision-lifecycle-stamp-drift.test.js`: its copy-sync assertions now check against the table (trio still against the exact literal; `lib/` readers must import the set and spell no stamp literal; \"declared once\" = zero literals in `session-telemetry.js`); no assertion dropped. (b) The browser copies of the stamp kinds in `public/dispatch.js` and `public/session.js` stay (browser scripts cannot import `lib/`); the drift test pins both to the table. (c) The remint refusal in `routes/dispatch.js` now asks `NEVER_RAN`, but every refusal there returns the same 403 and the next check refuses such a row as `not-taker`, so only the log reason differs; only the census covers it. (d) The intentional one-mode sites (the store's stopped-run gate, `lib/runner-kit/runner.mjs`) are unchanged and exempt from the census. (e) Behaviour edge: decision-87."
+   },
+   "links": {
+    "on": "change-82@1"
+   },
+   "stale": false
+  }
+ ],
+ "stands": [
+  {
+   "id": "verdict-55",
+   "kind": "verdict",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T13:57:37.874Z",
+   "by": "plan-review",
+   "in": "task-39",
+   "state": "stands",
+   "fields": {
+    "of": "plan-review",
+    "outcome": "approve",
+    "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 5: no note in either round; round 1 said it does not depend on B1. Settles Waiting 2, 4, 11."
+   },
+   "links": {
+    "on": "plan-45@1"
+   },
+   "stale": true
+  },
+  {
+   "id": "decision-61",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T14:02:31.309Z",
+   "by": "breakdown",
+   "in": "task-60",
+   "state": "stands",
+   "fields": {
+    "answer": "Grounding commit origin/main 4b5001ddf; the plan needs no re-planning, and LIN-4455 carries piece 5's slice as approved, naming `releaseHeldWake` beside `_releaseIfHeld` in `lib/dispatch-store.js`.",
+    "why": "Staleness check at breakdown: origin/main still 4b5001ddf, git log 4b5001ddf..origin/main empty, nothing under lib, routes, tests, scripts or docs/areas changed since filing; spot checks hold (dispatch-store.js still 4,530 lines)."
+   },
+   "links": {
+    "on": "verdict-55@1"
+   },
+   "stale": true
+  },
+  {
+   "id": "decision-62",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T14:02:31.309Z",
+   "by": "breakdown",
+   "in": "task-60",
+   "state": "stands",
+   "fields": {
+    "answer": "Session fit: one session (medium). Plan-review due: no, covered by LIN-4447's approving plan-review (comment 12619798, rev 2).",
+    "why": "The approved plan sizes piece 5 medium and lists it among pieces that run alone; the parent's plan review approved it."
+   },
+   "links": {
+    "on": "verdict-55@1"
+   },
+   "stale": true
+  },
+  {
+   "id": "decision-63",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T14:02:31.309Z",
+   "by": "breakdown",
+   "in": "task-60",
+   "state": "stands",
+   "fields": {
+    "answer": "LIN-4455 is blocked by LIN-4453 (piece 0), in order step 2 beside LIN-4454, LIN-4456 and LIN-4457.",
+    "why": "The graph follows the plan's landing order, 0 then 3/5/6/7 then 2/4 then 1 then 8 then 0, literally; no implementation PR merges before piece 0's reports and rubric are on the ticket."
+   },
+   "links": {
+    "on": "verdict-55@1",
+    "about": "task-59"
+   },
+   "stale": true
+  },
+  {
+   "id": "decision-64",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T14:02:31.309Z",
+   "by": "breakdown",
+   "in": "task-60",
+   "state": "stands",
+   "fields": {
+    "answer": "LIN-4455 blocks LIN-4458 (piece 2) and LIN-4459 (piece 4).",
+    "why": "2 and 4 wait on all of 3/5/6/7: the plan orders them that way, and the work overlaps (piece 4's lineage helpers live in dispatch-store.js, which piece 5 edits)."
+   },
+   "links": {
+    "on": "verdict-55@1"
+   },
+   "stale": true
+  },
+  {
+   "id": "decision-65",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T14:02:31.309Z",
+   "by": "breakdown",
+   "in": "task-60",
+   "state": "stands",
+   "fields": {
+    "answer": "Waiting 2, 4 and 11 are LIN-4455's to settle.",
+    "why": "Waiting accounting unchanged from the plan."
+   },
+   "links": {
+    "on": "verdict-55@1"
+   },
+   "stale": true
+  },
+  {
+   "id": "decision-79",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:08:30.000Z",
+   "by": "scoping",
+   "in": "task-60",
+   "state": "stands",
+   "fields": {
+    "answer": "Size of the move: consolidate the decision this task touches. Cuts: none. Deliver piece 5, and also make every reader of the never-ran statuses (all five `NEVER_RAN` spellings, finding-71) and of the decision-stamp feedback kinds (`DECISION_LIFECYCLE_STAMP_KINDS`, finding-74) take them from the one owner, beyond the two consumers and three kind sets the plan names.",
+    "why": "Leaving those copies would keep the restated rules this piece retires, and Waiting 2 and 11 would be only partly settled. Rests on finding-71 and finding-74 (the layer takes one `on`; finding-74 is linked `about`). Decided by the standing policy (size by the decision touched), not by John."
+   },
+   "links": {
+    "on": "finding-71@2",
+    "about": "finding-74"
+   },
+   "stale": true
+  },
+  {
+   "id": "decision-83",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:41:04.000Z",
+   "by": "implementation",
+   "in": "task-60",
+   "state": "stands",
+   "fields": {
+    "answer": "`FEEDBACK_KINDS` lives in a new leaf module, `lib/dispatch-feedback-kinds.js`, that imports nothing; validation, the store and the telemetry readers import it, and the store keeps re-exporting `FEEDBACK_ENTRY_KINDS`, so `lib/prompts/` is untouched and the rendered runner prompt is byte-identical.",
+    "why": "An engineering call, taken under question-67's if-unanswered: `dispatch-feedback-validation.js` already imports its kind list from the store and sits in import cycles with telemetry and the terminal reader (finding-73), so homing the table there would make the store and validation import each other. A test checks the leaf imports nothing."
+   },
+   "links": {
+    "on": "finding-73@1",
+    "answers": "question-67"
+   },
+   "stale": true
+  },
+  {
+   "id": "decision-84",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:41:05.000Z",
+   "by": "implementation",
+   "in": "task-60",
+   "state": "stands",
+   "fields": {
+    "answer": "`NEVER_RAN` (cancelled/expired) is homed in `lib/dispatch-terminal.js`, not `lib/dispatch-fields.js`; all seven spellings now import it (`dispatch-leftover`, the store's `_releaseIfHeld` and `listHistoryLineageRows`, `observer-sweep`, `task-page-loader`, `routes/dispatch.js`, `routes/proxy-dispatch.js`), and `TERMINAL_HISTORY_STATUSES` and `NO_ATTEMPT_STATUSES` are built from it.",
+    "why": "`dispatch-terminal` already held both statuses in `TERMINAL_HISTORY_STATUSES`, every consumer already imported it, and it imports only leaves; `dispatch-fields` imports `dispatch-wake`, which imports `dispatch-terminal`, so finding-71's suggested home would have left the terminal set a copy or made a cycle. The survey counted five spellings; the build found seven."
+   },
+   "links": {
+    "on": "finding-71@2",
+    "about": "decision-79"
+   },
+   "stale": true
+  },
+  {
+   "id": "decision-85",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:41:06.000Z",
+   "by": "implementation",
+   "in": "task-60",
+   "state": "stands",
+   "fields": {
+    "answer": "The release wording is owned by `createLeftoverStep`, which binds it into its store once when built in server.js (`setHeldWakeReleaseNote`, the `setWakeCredentialProvisionerFactory` pattern); the `_applyWakeHook` re-release uses `wakeHook.releaseNote`; an unbound store, or a wording that throws, says `The step holding this wake did not run (its row was <status>). The build's own outcome follows.`, which names no feature.",
+    "why": "finding-66: cancel, expiry and the stopped-run cleanup release through `_archiveItem` -> `_releaseIfHeld` with no request and so no hook. The default keeps lin-4373's \"did not run\" assertions unchanged and keeps \"leftover\" out of the store's code. It leaves two held-wake surfaces, which Waiting 5 (finding-22, finding-76) is to unify; the setter's docblock names it."
+   },
+   "links": {
+    "on": "finding-66@1",
+    "about": "finding-76"
+   },
+   "stale": true
+  },
+  {
+   "id": "decision-86",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:41:07.000Z",
+   "by": "implementation",
+   "in": "task-60",
+   "state": "stands",
+   "fields": {
+    "answer": "`findWakeEvent` is met by a `mayCarryWake` column in `FEEDBACK_KINDS`, true for every kind, with unknown kinds passing, not by a derived filter; its behaviour and the stored rows it reads are unchanged.",
+    "why": "finding-68: it had no skip rule to derive; adding a filter would change wake minting and every reader of stored rows, against the binding never to recompute pre-cutover history."
+   },
+   "links": {
+    "on": "finding-68@1"
+   },
+   "stale": false
+  },
+  {
+   "id": "decision-87",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:41:08.000Z",
+   "by": "implementation",
+   "in": "task-60",
+   "state": "stands",
+   "fields": {
+    "answer": "A follow-up target of `0` or `false` is no longer resumable: it is refused like any unknown target.",
+    "why": "`RESUMABLE_TARGETS.has(doc.target || 'cli')` treated falsy non-string targets as `cli`; `followUpTarget` fails closed on anything unknown everywhere else. finding-71's equivalence covered null, empty string, unknown values and the four targets, not `0`/`false`. The PR names this edge."
+   },
+   "links": {
+    "on": "finding-71@2"
+   },
+   "stale": true
+  }
+ ],
+ "areas": [
+  {
+   "id": "area-1",
+   "name": "Runs & dispatch"
+  }
+ ],
+ "index": [
+  {
+   "id": "lesson-3",
+   "kind": "lesson",
+   "to": null,
+   "says": "Every exit from the queue except a take archives through `_archiveItem` (`lib/dispatch-store.js`); a new exit must archive through it too."
+  },
+  {
+   "id": "lesson-4",
+   "kind": "lesson",
+   "to": null,
+   "says": "The wake path is `_planWake` (decide) then `_deliverWake` (deliver) in `lib/dispatch-store.js`, shared by `addFeedback` and the held-wake release (LIN-4373). Its guards (LIN-1059, 1165, 1357, 2297, 4080, 4166) run in an order that matters: change the pair whole, keep the wake suites passing, and update the two census pins (`lin-3134-declared-mint-census`, `lin-4080-addItem-census`) if the write moves."
+  },
+  {
+   "id": "lesson-10",
+   "kind": "lesson",
+   "to": null,
+   "says": "The store knows no leftovers (LIN-4383). It holds a parent wake by `heldWakeFor` (LIN-4373), released by the holder's terminal or `_archiveItem` under the build's guard key, so it wakes once. Leftover wording lives in `lib/dispatch-leftover-hook.js`; a new held-wake feature brings a hook (`lin-4377-store-knows-no-leftover` counts the word)."
+  },
+  {
+   "id": "finding-73",
+   "kind": "finding",
+   "to": "design",
+   "says": "Place survey @ cfd152fa4, for question-67: the cycle is nearer than the load-order chain it names. `lib/dispatch-feedback-validation.js:13` already imports its kind list (`FEEDBACK_ENTRY_KINDS`) from `lib/dispatch-store.js`, so the dependency points the wrong way; if the store then imports a table from validation, the two import each other. Recommend the leaf: `lib/dispatch-feedback-kinds.js`, importing nothing, read by validation, the store and `lib/session-telemetry.js`, with the store keeping its `FEEDBACK_ENTRY_KINDS` re-export so callers do not move."
+  },
+  {
+   "id": "change-82",
+   "kind": "change",
+   "to": null,
+   "says": "https://github.com/JKershaw/LinearViewer/pull/2427"
+  },
+  {
+   "id": "finding-88",
+   "kind": "finding",
+   "to": "leftover",
+   "says": "PR #2427 rewrote the area Lessons in `docs/areas/runs-and-dispatch.md` (4,794 bytes); the layer's lessons lag and implementation may not write them. (1) Revise lesson-10: `lin-4377-store-knows-no-leftover` no longer only counts the word; it adds an AST check that the store neither imports nor names `formatHeldWakeNote`, and the leftover wording is late-bound into the store by `createLeftoverStep` (`setHeldWakeReleaseNote`). (2) Add the new Lesson: feedback-kind roles live in one table, `lib/dispatch-feedback-kinds.js` (imports nothing); kind sets derive from it, and constants (`NEVER_RAN` in `lib/dispatch-terminal.js`, `HALT_MODES`, `followUpTarget`) are imported from their owners, never restated; `lin-4455-feedback-kinds-table` and `lin-4455-constants-owners` census hand-written copies."
+  }
+ ],
+ "carries": {
+  "words": 2,
+  "piece": 1,
+  "addressed": 1,
+  "stands": 12,
+  "areas": 1,
+  "index": 6
+ },
+ "size": {
+  "jsonBytes": 16560,
+  "textBytes": 14982
+ }
+}

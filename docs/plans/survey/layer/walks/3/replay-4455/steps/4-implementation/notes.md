@@ -12,6 +12,6 @@
 
 **Relied on, from neither brief nor query:** the build itself: seven `NEVER_RAN` spellings (the survey had five), the `dispatch-fields → dispatch-wake → dispatch-terminal` cycle, `setHeldWakeReleaseNote` and its default wording, the `0`/`false` edge, the re-pointed drift test, the browser stamp copies, the remint refusal's identical 403, the LIN-4447 comment ids, CI, and the prompt `cmp`.
 
-**Brief carried, unneeded:** the person's words (task-39), decisions 61–65 (breakdown sequencing and staleness), lesson-3, lesson-4.
+**Brief carried, unneeded:** task-39's words, decisions 61–65 (breakdown sequencing/staleness), lesson-3, lesson-4.
 
 **Couldn't place:** the new area Lesson (I may not write lessons). Nothing in the layer could be merged at my time.

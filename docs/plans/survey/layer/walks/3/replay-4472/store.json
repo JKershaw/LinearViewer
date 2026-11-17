@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 102,
+ "next": 103,
  "records": {
   "task-1": {
    "id": "task-1",
@@ -438,6 +438,41 @@
      },
      "links": {},
      "reason": "Build departed from v2: a served leaf replaced the name search (decision-98), the suite list grew to the executing and text-slicing suites v2 missed (finding-82), a shared page-world helper was added, the census fell by 2, and one suite grew; this says what is now true."
+    },
+    {
+     "v": 4,
+     "op": "revise",
+     "at": "2026-11-13T17:44:21.000Z",
+     "by": "implementation",
+     "in": "task-1",
+     "state": "kept",
+     "fields": {
+      "says": "**Piece 2 — one real page, top down** (as built, PR #2436)\n\n* `public/task-page.js` is an ES module: the IIFE and the `typeof module` / `module.exports` seam are gone, and the page exports its pure rules and render helpers by name. The renderer's last `SCRIPTS` entry in `lib/render-task-page.js` is `{ module: '/task-page.js' }`. Its one DOMContentLoaded listener still registers last; it writes no `window.*`, so nothing is added to the bridge. Golden diff: the seven script tags only, to `type=\"module\"`.\n* Duplicates: the plan's name-equality search finds only a coincidence (`init`). The real copies were `formatElapsed` (= `fmtDuration`) and `relativeWords` (= `relativeAgo`). They now have one home, the served leaf `lib/time-words.js` (`SHARED_MODULES` entry, owner front-end-pages); the page imports it, and server callers import it directly instead of via `render-run-steps.js` / `task-page-loader.js` re-exports. This is a serving change the plan did not have (decision-98, resting on question-84's if-unanswered course). The classic copies in `session.js`, `observation.js`, `live-console.js` stay, listed in the area's Waiting entry.\n* Tests: piece 1 already built `import-world.js`. Pure exports are plain static imports with no world; the DOMContentLoaded suites share a new 36-line `tests/unit/helpers/task-page-world.js`. Migrated: `task-page-client`, `task-timeline-client`, `task-page-question` (`makePage`), `lin-3975-proposal-refresh` (URL helper), `lin-3975-task-run-links` (its vm run). Re-anchored on names, not migrated: `lin-3975-summary-and-time`, `lin-3975-task-run-control`, `lin-3975-chat-fold`; the `relativeWords` probe became a test of the exported `shareTime(doc, value, now)`.\n* Census: 102 → 100 (only `task-page-client` and `task-timeline-client` leave; the others still load another classic file).\n* Docs: the module-capable-loader Waiting entry is deleted (piece 1 had shown its premise wrong); `source-map.md` calls `task-page.js` a module and gains a `time-words.js` entry.\n* Behaviour change: `fmtDuration(Infinity)` is `null` where the page printed `Infinityh`; no page path passes a non-finite span. Pinned by `lin-4472-time-words.test.js`.\n* Shortfall against \"each migrated suite reads shorter\": most are shorter by a few lines; `lin-3975-task-run-links` grew by 4 (its replacement clock test), and `lin-3975-task-run-control` and `lin-3975-chat-fold` were only re-anchored, so are unchanged in length.\n\nWitnesses run: each migrated suite green after conversion; mutation of `fmtDuration` failed `lin-4472-time-words` and `lin-3975-task-run-links`, then passed restored; `grep module.exports|typeof module public/task-page.js` empty; `tests/e2e/task-page.spec.js` + `task-timeline.spec.js` 18 passed locally; 175 targeted suites green (5,539 + 122 tests); full unit suite left to CI.",
+      "paths": [
+       "public/task-page.js",
+       "lib/render-task-page.js",
+       "lib/time-words.js",
+       "lib/render-run-steps.js",
+       "lib/task-page-loader.js",
+       "lib/vendor-assets.js",
+       "tests/unit/helpers/task-page-world.js",
+       "tests/unit/lin-4472-time-words.test.js",
+       "tests/unit/task-page-client.test.js",
+       "tests/unit/task-page-question.test.js",
+       "tests/unit/task-timeline-client.test.js",
+       "tests/unit/task-page-",
+       "tests/unit/lin-3975-",
+       "tests/unit/classic-loader-census.test.js",
+       "tests/unit/render-task-page-golden.test.js",
+       "tests/fixtures/render-task-page-golden.json",
+       "tests/unit/no-page-wide-label-listener.test.js",
+       "docs/areas/front-end-browser.md",
+       "docs/architecture/source-map.md"
+      ],
+      "order": 2
+     },
+     "links": {},
+     "reason": "Corrected the shortfall line: summary-and-time was shortened; only run-control and chat-fold were re-anchored without shortening."
     }
    ]
   },
@@ -2687,6 +2722,22 @@
      "links": {
       "about": "plan-10"
      }
+    },
+    {
+     "v": 2,
+     "op": "revise",
+     "at": "2026-11-13T17:44:20.000Z",
+     "by": "implementation",
+     "in": "task-28",
+     "to": "review",
+     "state": "open",
+     "fields": {
+      "says": "PR #2436 does not fully meet plan-10's \"each migrated suite reads shorter\": most migrated suites are shorter by 3-7 lines (`lin-3975-summary-and-time` among them), but `lin-3975-task-run-links` grew by 4 (its replacement clock test), and `lin-3975-task-run-control` and `lin-3975-chat-fold` were only re-anchored on names, not shortened. The added complexity is `tests/unit/helpers/task-page-world.js` (36 lines, shared by three suites), which the census cannot see. Judge whether this meets the ask; the PR has the per-suite before/after table."
+     },
+     "links": {
+      "about": "plan-10"
+     },
+     "reason": "Corrected: summary-and-time was shortened (372 to 369); only run-control and chat-fold were re-anchored without shortening."
     }
    ]
   },
@@ -2708,6 +2759,74 @@
      "links": {
       "about": "decision-98"
      }
+    }
+   ]
+  },
+  "run-102": {
+   "id": "run-102",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:44:18.000Z",
+     "by": "implementation",
+     "in": "task-28",
+     "state": "open",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "public/task-page.js",
+       "lib/render-task-page.js",
+       "lib/time-words.js",
+       "lib/render-run-steps.js",
+       "lib/task-page-loader.js",
+       "lib/vendor-assets.js",
+       "tests/unit/helpers/task-page-world.js",
+       "tests/unit/lin-4472-time-words.test.js",
+       "tests/unit/task-page-",
+       "tests/unit/task-timeline-client.test.js",
+       "tests/unit/lin-3975-",
+       "tests/unit/classic-loader-census.test.js",
+       "tests/fixtures/render-task-page-golden.json",
+       "docs/areas/front-end-browser.md",
+       "docs/architecture/source-map.md"
+      ],
+      "account": "Built LIN-4472 and opened PR #2436 (change-97, head a6492a984). task-page.js is an ES module with named exports; the golden diff is the seven script tags. question-84 was still waiting on John, so I took its if-unanswered course and extracted lib/time-words.js as the one served home of fmtDuration/relativeAgo, recorded on LIN-4463 (decision-98), leaving the question open; the layer would not let me end decision-32, so decision-98 says it supersedes it. Suites import the module (static imports for pure exports, a shared task-page-world.js for init); the text slicers are re-anchored on names; census 102 -> 100. Revised plan-10 to v3 for what changed. Closed the survey findings and check-86 (e2e 18 passed locally). Left for review: the reads-shorter shortfall (finding-100) and the Infinity edge (finding-101); for area-49: the remaining classic copies (finding-99). finding-92 stays open."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T17:44:19.000Z",
+     "by": "implementation",
+     "in": "task-28",
+     "state": "done",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "public/task-page.js",
+       "lib/render-task-page.js",
+       "lib/time-words.js",
+       "lib/render-run-steps.js",
+       "lib/task-page-loader.js",
+       "lib/vendor-assets.js",
+       "tests/unit/helpers/task-page-world.js",
+       "tests/unit/lin-4472-time-words.test.js",
+       "tests/unit/task-page-",
+       "tests/unit/task-timeline-client.test.js",
+       "tests/unit/lin-3975-",
+       "tests/unit/classic-loader-census.test.js",
+       "tests/fixtures/render-task-page-golden.json",
+       "docs/areas/front-end-browser.md",
+       "docs/architecture/source-map.md"
+      ],
+      "account": "Built LIN-4472 and opened PR #2436 (change-97, head a6492a984). task-page.js is an ES module with named exports; the golden diff is the seven script tags. question-84 was still waiting on John, so I took its if-unanswered course and extracted lib/time-words.js as the one served home of fmtDuration/relativeAgo, recorded on LIN-4463 (decision-98), leaving the question open; the layer would not let me end decision-32, so decision-98 says it supersedes it. Suites import the module (static imports for pure exports, a shared task-page-world.js for init); the text slicers are re-anchored on names; census 102 -> 100. Revised plan-10 to v3 for what changed. Closed the survey findings and check-86 (e2e 18 passed locally). Left for review: the reads-shorter shortfall (finding-100) and the Infinity edge (finding-101); for area-49: the remaining classic copies (finding-99). finding-92 stays open."
+     },
+     "links": {},
+     "reason": "PR #2436 opened; records written",
+     "stateReason": "PR #2436 opened; records written"
     }
    ]
   }
@@ -3167,6 +3286,16 @@
    "query": "get",
    "args": {
     "id": "change-97",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:49:06.804Z",
+   "by": "implementation",
+   "query": "get",
+   "args": {
+    "id": "plan-10",
     "asOf": null
    },
    "returned": 1
