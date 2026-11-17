@@ -14,7 +14,7 @@
 ## 2. What has been established
 
 - The Survey named real problems before the work, and caught out-of-date tickets.
-- The preparation tasks it recommended added code: about +1,500/−700 lines across four of them, and the catch-all area grew.
+- The preparation tasks it recommended added code: roughly +1,500/−700 lines across four of them, and the catch-all area grew.
 - Blind readers scored the loop's results level with ordinary work (+0.37 against +0.38 and +0.50); the session's own scores were the outlier (`place-ledger.md:98-124`).
 - The 13 Nov gate found 80% of what landed was process work. Blind reads came out 7 better, 7 mixed and 2 worse (`gate-2026-11-13.md:15-20`). The tidy lanes after it never read better.
 - **The data-layer walks.** Everything on a task found a place. Stages that wrote their own hand-offs addressed them. Repetition stopped once stages could look things up, and what each stage starts from stopped growing. Filling in a finished task afterwards cannot test routing: 20 of 22 recipients had to be guessed. Rules about who may write got in the way and were removed.
@@ -22,7 +22,7 @@
 ## 3. What has not been established
 
 - **Your first question,** whether an ordinary task leaves the code cleaner, has never been answered. The write-up's own headline says "not shown".
-- Several tallies were reported beyond the records: "10 better, 0 worse", "14 of 14", "4 of 4 resolved", "no instrument says worse". `course-2026-11-14.md:8-11` still carries retracted claims.
+- Tallies were reported beyond the records: "10 better, 0 worse", "14 of 14", "4 of 4 resolved", "no instrument says worse". `course-2026-11-14.md:8-11` still carries retracted claims.
 - **No stage has written into the model while doing work.** Every walk replayed outputs already produced, so `layer/design.md:134` ("stages writing live address their own records well") is wrong. Round 6's fixes (a recipient on any record) have never been written through.
 - No project other than Harbour has been walked, and no reader has tried to break the design. Your agreed design plan required both.
 - "The store caught things the ticket hides" is false: the real stages had already said so on the ticket. Walk 6's "three fresh readers" reused walk 5's ticket answers. I confirmed the files are identical. The walk 3 newsletter that "went out with placeholders" was a scene acted by one agent.
