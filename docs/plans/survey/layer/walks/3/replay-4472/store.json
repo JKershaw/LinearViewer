@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 116,
+ "next": 121,
  "records": {
   "task-1": {
    "id": "task-1",
@@ -3254,6 +3254,124 @@
      }
     }
    ]
+  },
+  "finding-116": {
+   "id": "finding-116",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T18:10:46.000Z",
+     "by": "blind-read",
+     "in": "task-28",
+     "to": "close-out",
+     "state": "open",
+     "fields": {
+      "says": "Blind read B1. `public/task-page.js` lines 903-904, the comment on the export block: it says the page \"starts from DOMContentLoaded, below\", but that listener is above it; and \"nothing here reads or writes a global\", but `init` reads `window.api`, `window.BriefSection`, `window.CloseOut`, `window.PromptSection`, `window.initLocalTimes` and others. Fix: say \"above\", and \"the module writes no global\". Make before merge."
+     },
+     "links": {
+      "about": "change-97"
+     }
+    }
+   ]
+  },
+  "finding-117": {
+   "id": "finding-117",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T18:10:47.000Z",
+     "by": "blind-read",
+     "in": "task-28",
+     "to": "close-out",
+     "state": "open",
+     "fields": {
+      "says": "Blind read B2. `lib/time-words.js` header (lines 10-11) and its `docs/architecture/source-map.md` entry say the words exist \"once\" and that \"a second copy has nowhere to hide\". The guard in `tests/unit/lin-4472-time-words.test.js` walks only `lib/`, `routes/` and `server.js`, so the classic copies under `public/` (finding-99, finding-105) pass it. Fix: narrow both texts to \"every server caller\", or add `public/` to the walk and list the known copies as exceptions. Make before merge."
+     },
+     "links": {
+      "about": "finding-99"
+     }
+    }
+   ]
+  },
+  "finding-118": {
+   "id": "finding-118",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T18:10:48.000Z",
+     "by": "blind-read",
+     "in": "task-28",
+     "to": "close-out",
+     "state": "open",
+     "fields": {
+      "says": "Blind read B3. `tests/unit/lin-3975-summary-and-time.test.js`, the test \"share list's words are the server's relativeAgo words\": it now compares `shareTime`'s text with `relativeAgo`, which `shareTime` itself calls, so it no longer checks two copies against each other, and `tests/unit/lin-4472-time-words.test.js` already has the same `shareTime` test. Fix: drop one of the two, or retitle it as a wiring check. Make before merge."
+     },
+     "links": {
+      "about": "change-97"
+     }
+    }
+   ]
+  },
+  "finding-119": {
+   "id": "finding-119",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T18:10:49.000Z",
+     "by": "blind-read",
+     "in": "area-50",
+     "to": "area-50",
+     "state": "open",
+     "fields": {
+      "says": "Larger, not LIN-4472's (blind read). `fmtWhen`, the third moment formatter, stays in `lib/task-page-loader.js` (runs-and-dispatch). So `lib/components/time.js` and `lib/render-task-timeline.js` still import a page-formatting helper from a runs-and-dispatch module, the same tangle LIN-4472 removed for `relativeAgo`. Moving it into `lib/time-words.js` is a decision about whether that leaf also owns absolute UTC stamps, and it touches about five importers."
+     },
+     "links": {
+      "about": "change-97"
+     }
+    }
+   ]
+  },
+  "run-120": {
+   "id": "run-120",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T18:10:50.000Z",
+     "by": "blind-read",
+     "in": "task-28",
+     "state": "open",
+     "fields": {
+      "stage": "blind-read",
+      "account": "Read PR #2436 cold at ffa70b782 against 5cf4f6aa2 and judged it better (verdict-115, on change-97): one owner for the duration and relative-time words, the task page a real module, the source-slicing parity tests gone. Three fix-sized items to close-out before merge (finding-116 wrong export-block comment, finding-117 the leaf's 'once' claim overreaches its server-only guard, finding-118 a summary-and-time test that now checks a function against itself). fmtWhen left in the runs-and-dispatch loader goes to area-50 (finding-119). The session.js/observation.js copies were already on area-49 (finding-99, finding-105), so I cited them rather than writing them again. Nothing outside the area."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T18:10:51.000Z",
+     "by": "blind-read",
+     "in": "task-28",
+     "state": "done",
+     "fields": {
+      "stage": "blind-read",
+      "account": "Read PR #2436 cold at ffa70b782 against 5cf4f6aa2 and judged it better (verdict-115, on change-97): one owner for the duration and relative-time words, the task page a real module, the source-slicing parity tests gone. Three fix-sized items to close-out before merge (finding-116 wrong export-block comment, finding-117 the leaf's 'once' claim overreaches its server-only guard, finding-118 a summary-and-time test that now checks a function against itself). fmtWhen left in the runs-and-dispatch loader goes to area-50 (finding-119). The session.js/observation.js copies were already on area-49 (finding-99, finding-105), so I cited them rather than writing them again. Nothing outside the area."
+     },
+     "links": {},
+     "reason": "blind read posted on LIN-4472",
+     "stateReason": "blind read posted on LIN-4472"
+    }
+   ]
   }
  },
  "queries": [
@@ -4167,6 +4285,16 @@
     "kind": "verdict"
    },
    "returned": 3
+  },
+  {
+   "at": "2026-11-17T13:55:02.447Z",
+   "by": "blind-read",
+   "query": "get",
+   "args": {
+    "id": "run-120",
+    "asOf": null
+   },
+   "returned": 1
   }
  ],
  "hits": []

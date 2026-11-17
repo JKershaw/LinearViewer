@@ -3849,6 +3849,46 @@
     "asOf": null
    },
    "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:54:56.748Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "change-82",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:54:56.788Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "check-94",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:54:56.820Z",
+   "by": "close-out",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:55:00.503Z",
+   "by": "close-out",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
   }
  ],
  "hits": []
