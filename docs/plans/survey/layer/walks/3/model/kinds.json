@@ -1,0 +1,43 @@
+{
+  "kinds": {
+    "task": { "start": "open", "ends": ["done", "declined"],
+      "fields": { "asked": { "type": "text", "fixed": true, "emptyInChild": true }, "done-when": "text", "paths": "paths" } },
+    "plan": { "start": "kept", "ends": ["superseded"],
+      "fields": { "says": "text", "paths": "paths", "order": "any" } },
+    "finding": { "start": "open", "ends": ["done", "declined", "handed-on"], "handoff": true,
+      "fields": { "says": "text" } },
+    "check": { "start": "open", "ends": ["done", "declined", "handed-on"], "handoff": true,
+      "fields": { "what": "text", "why-person": "text", "how": "text" } },
+    "question": { "start": "open", "ends": ["answered", "withdrawn", "handed-on"], "handoff": true,
+      "fields": { "asks": "text", "options": "list", "recommended": "text", "if-unanswered": "text" } },
+    "decision": { "start": "stands", "ends": ["superseded", "withdrawn"],
+      "fields": { "answer": "text", "why": "text" } },
+    "verdict": { "start": "stands", "ends": ["withdrawn"],
+      "fields": { "of": { "enum": ["plan-review", "review", "blind-read"] }, "outcome": { "outcomeOf": "of" }, "reasoning": "text" } },
+    "lesson": { "start": "holds", "ends": ["superseded", "disproved"],
+      "fields": { "says": "text", "paths": "paths", "checked-at": "text" } },
+    "area": { "start": "kept", "ends": ["retired"],
+      "fields": { "name": "text", "paths": "paths" } },
+    "change": { "start": "open", "ends": ["merged", "abandoned"],
+      "fields": { "ref": "text", "head": "text" } },
+    "run": { "start": "open", "ends": ["done"],
+      "fields": { "stage": "text", "claims": "paths", "account": "text" } },
+    "setting": { "start": "stands", "ends": ["replaced"],
+      "fields": { "key": "text", "value": "any", "scope": "text" } }
+  },
+  "outcomes": {
+    "plan-review": ["approve", "approve-with-notes", "request-changes"],
+    "review": ["approve", "approve-with-notes", "request-changes"],
+    "blind-read": ["better", "same", "worse"]
+  },
+  "links": {
+    "about": {},
+    "on": { "pinned": true },
+    "answers": { "from": ["decision"], "to": ["question"], "ends": "answered" },
+    "piece": { "from": ["task"], "to": ["plan"] },
+    "same-as": {}
+  },
+  "places": ["task", "area"],
+  "takeover": ["handed-on", "superseded"],
+  "moves": ["superseded", "withdrawn", "abandoned"]
+}

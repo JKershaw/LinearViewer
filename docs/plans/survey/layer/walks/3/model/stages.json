@@ -1,0 +1,13 @@
+{
+  "design":         { "writes": ["plan", "verdict", "decision", "task", "finding", "question", "run"] },
+  "plan-review":    { "writes": ["plan", "verdict", "decision", "task", "finding", "question", "run"] },
+  "breakdown":      { "writes": ["plan", "verdict", "decision", "task", "finding", "question", "run"] },
+  "survey-task":    { "writes": ["finding", "question", "check", "run"] },
+  "survey-place":   { "writes": ["finding", "question", "check", "lesson", "run"], "role": "place" },
+  "scoping":        { "writes": ["decision", "finding", "run"] },
+  "implementation": { "writes": ["plan", "decision", "finding", "check", "change", "run"], "role": "piece" },
+  "leftover":       { "writes": ["finding", "lesson", "change", "run"] },
+  "review":         { "writes": ["verdict", "finding", "check", "run"] },
+  "blind-read":     { "writes": ["verdict", "finding", "check", "run"] },
+  "close-out":      { "writes": ["change", "finding", "check", "run"], "role": "closes" }
+}
