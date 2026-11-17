@@ -1,0 +1,131 @@
+[
+ {
+  "at": "2026-11-17T14:54:03.217Z",
+  "by": "leftover",
+  "q": [
+   "show",
+   "--task",
+   "task-28",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:03.251Z",
+  "by": "leftover",
+  "q": [
+   "find",
+   "--to",
+   "area-49",
+   "--state",
+   "open",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:08.554Z",
+  "by": "leftover",
+  "q": [
+   "show",
+   "--task",
+   "task-28",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:08.588Z",
+  "by": "leftover",
+  "q": [
+   "find",
+   "--kind",
+   "area",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:14.742Z",
+  "by": "leftover",
+  "q": [
+   "get",
+   "decision-70",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:14.785Z",
+  "by": "leftover",
+  "q": [
+   "get",
+   "change-69",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:14.823Z",
+  "by": "leftover",
+  "q": [
+   "get",
+   "run-68",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:14.858Z",
+  "by": "leftover",
+  "q": [
+   "find",
+   "--text",
+   "quiet offer",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:14.894Z",
+  "by": "leftover",
+  "q": [
+   "find",
+   "--kind",
+   "lesson",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:14.928Z",
+  "by": "leftover",
+  "q": [
+   "find",
+   "--text",
+   "importWorld",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:36.212Z",
+  "by": "leftover",
+  "q": [
+   "get",
+   "finding-53",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:36.247Z",
+  "by": "leftover",
+  "q": [
+   "get",
+   "finding-73",
+   "--by",
+   "leftover"
+  ]
+ }
+]

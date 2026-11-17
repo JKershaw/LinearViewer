@@ -1,5 +1,5 @@
 {
- "next": 103,
+ "next": 109,
  "records": {
   "area-1": [
    {
@@ -1924,6 +1924,24 @@
     "by": "leftover",
     "at": "2026-11-13T14:14:14.000Z",
     "reason": "Leftovers confirmed the divergence after PR 2421, named the two bulk reads, and noted it in docs/areas/providers.md Waiting"
+   },
+   {
+    "id": "finding-79",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Not LIN-4450 work: the Jira bulk reads in `lib/providers/jira/index.js` (`fetchProjects`, and `fetchIssueContext`'s children through `searchAllIssues`) do not ask for `harbour.asAsked`. A sealed block therefore shows its converted rendering on the dashboard and in a parent's children, while single-issue reads serve the exact words. `POST /rest/api/3/search/jql` accepts `properties`, so asking for it there would make the bulk path exact too. No guard or cache compares the two reads today. Held as a Waiting entry in `docs/areas/providers.md` (PR 2421).",
+    "links": {
+     "about": "finding-69"
+    },
+    "state": "handed-on",
+    "v": 3,
+    "op": "end",
+    "by": "blind-read",
+    "at": "2026-11-13T15:18:52.000Z",
+    "stateReason": "Blind read confirmed the split at f9fa4a80c; the choice it leaves is now carried as a question with options",
+    "into": "question-107",
+    "reason": "Blind read confirmed the split at f9fa4a80c; the choice it leaves is now carried as a question with options"
    }
   ],
   "finding-80": [
@@ -2516,6 +2534,127 @@
     "at": "2026-11-13T15:12:33.000Z",
     "stateReason": "Review posted",
     "reason": "Review posted"
+   }
+  ],
+  "verdict-103": [
+   {
+    "id": "verdict-103",
+    "kind": "verdict",
+    "in": "task-60",
+    "of": "blind-read",
+    "outcome": "better",
+    "links": {
+     "on": "change-85@2"
+    },
+    "reasoning": "Better. Read PR 2421 at f9fa4a80c against 4b5001ddf, blind. It gives Jira's description read and write a single owner (lib/providers/jira/as-asked-region.js: readDescription/holdAsAsked), and descriptionRoundTrip now runs that same pair, so the seal decision and the write can't disagree. It also folds ten inline copies of the test-token predicate onto isHermeticTestToken (routes/proxy-compute.js, server.js, routes/task-chat.js, routes/workspace-api-steps.js). Worse side: a Jira issue's description now depends on which read produced it; the batch path in lib/providers/jira/index.js serves the converted words, the single-issue reads the exact ones (carried as a question to Providers). Three fix-sized items to close-out; nothing outside the area.",
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T15:18:47.000Z"
+   }
+  ],
+  "finding-104": [
+   {
+    "id": "finding-104",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "close-out",
+    "links": {
+     "about": "change-85"
+    },
+    "says": "`routes/workspace-api-audit.js` lines 35-36 still write `process.env.NODE_ENV === 'test' && (workspace.accessToken === 'test-token' || …)` inline. PR 2421's sweep moved every sibling copy onto `isHermeticTestToken` and missed this one. Fix: `isHermeticTestToken(workspace.accessToken) || (process.env.NODE_ENV === 'test' && workspace.provider === 'local')`. It keeps its own predicate, as its comment asks; only the token half uses the helper. (Blind read at f9fa4a80c.)",
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T15:18:48.000Z"
+   }
+  ],
+  "finding-105": [
+   {
+    "id": "finding-105",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "close-out",
+    "links": {
+     "about": "change-85"
+    },
+    "says": "`routes/workspace-api-steps.js`: `isTestToken` is now a one-line second name for `isHermeticTestToken(workspace.accessToken)`. Fix: have its callers (`routes/workspace-api-issue-read.js`, `routes/workspace-api-issue-write.js`, `routes/workspace-api-prompts.js`) import the helper directly and drop the alias. (Blind read at f9fa4a80c.)",
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T15:18:49.000Z"
+   }
+  ],
+  "finding-106": [
+   {
+    "id": "finding-106",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "close-out",
+    "links": {
+     "about": "change-85"
+    },
+    "says": "`tests/unit/jira-as-asked-region.test.js` line ~291, \"no longer claim that Jira is skipped\", only checks that three phrases are missing from two comment headers (`lib/as-asked-seal.js`, `lib/as-asked.js`). It says nothing about behaviour; `as-asked-create-seal.test.js` already checks that Jira holds the block. Fix: delete it. (Blind read at f9fa4a80c.)",
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T15:18:50.000Z"
+   }
+  ],
+  "question-107": [
+   {
+    "id": "question-107",
+    "kind": "question",
+    "in": "area-1",
+    "to": "area-1",
+    "links": {
+     "about": "finding-79"
+    },
+    "asks": "After PR 2421 (f9fa4a80c), one Jira issue's `description` depends on which read produced it. `client.searchIssues` never asks for `harbour.asAsked`, so issues that `fetchProjects`/`fetchIssues` (`lib/providers/jira/index.js` ~769) and `fetchIssueContext`'s `children` (~897) build through `_toCanonicalIssue` carry the ADF rendering behind canonical markers, while `fetchIssueFields`, `fetchIssueContext().issue` and `issueDescription` return the exact property words. `tests/unit/jira-as-asked-region.test.js:166` pins the split. Closing it is a choice, not a fix: which one?",
+    "options": [
+     "Every dashboard batch asks `POST /search/jql` for `harbour.asAsked` (up to 32 KB per issue in the response)",
+     "Document batch descriptions as display-only, not carrying the exact words, and keep the test that pins the split"
+    ],
+    "if-unanswered": "The split stays as built: display-only bulk reads, exact single-issue reads; safe only while no cache or guard compares the two.",
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T15:18:51.000Z"
+   }
+  ],
+  "run-108": [
+   {
+    "id": "run-108",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "blind-read",
+    "account": "Blind-read PR 2421 at f9fa4a80c against 4b5001ddf; verdict better (verdict-103). One owner for Jira descriptions, and the test-token sweep. Three fix-sized items to close-out: the missed inline predicate in routes/workspace-api-audit.js (finding-104), the isTestToken alias (finding-105), a test that only checks comment text (finding-106). The larger one, bulk vs single-issue description reads, was already finding-79; I handed it on into question-107, a question to Providers with the two ways to close it. Nothing outside the area. Posted as the Blind read comment on LIN-4450.",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T15:18:53.000Z"
+   },
+   {
+    "id": "run-108",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "blind-read",
+    "account": "Blind-read PR 2421 at f9fa4a80c against 4b5001ddf; verdict better (verdict-103). One owner for Jira descriptions, and the test-token sweep. Three fix-sized items to close-out: the missed inline predicate in routes/workspace-api-audit.js (finding-104), the isTestToken alias (finding-105), a test that only checks comment text (finding-106). The larger one, bulk vs single-issue description reads, was already finding-79; I handed it on into question-107, a question to Providers with the two ways to close it. Nothing outside the area. Posted as the Blind read comment on LIN-4450.",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "blind-read",
+    "at": "2026-11-13T15:18:54.000Z",
+    "stateReason": "Blind read comment posted on LIN-4450",
+    "reason": "Blind read comment posted on LIN-4450"
    }
   ]
  },

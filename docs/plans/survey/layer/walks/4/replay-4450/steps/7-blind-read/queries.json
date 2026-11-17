@@ -1,0 +1,163 @@
+[
+ {
+  "at": "2026-11-17T14:54:13.025Z",
+  "by": "blind-read",
+  "q": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:13.067Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "isHermeticTestToken",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:13.100Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "searchIssues",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:19.045Z",
+  "by": "blind-read",
+  "q": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:19.109Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--kind",
+   "area",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:27.292Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "bulk",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:27.342Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "search/jql",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:27.385Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "workspace-api-audit",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:27.423Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "isTestToken",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:27.475Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "line 291",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:27.518Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "no longer claim",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:27.556Z",
+  "by": "blind-read",
+  "q": [
+   "get",
+   "finding-69",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:27.591Z",
+  "by": "blind-read",
+  "q": [
+   "get",
+   "finding-89",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:33.258Z",
+  "by": "blind-read",
+  "q": [
+   "get",
+   "finding-79",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:33.298Z",
+  "by": "blind-read",
+  "q": [
+   "get",
+   "change-85",
+   "--by",
+   "blind-read"
+  ]
+ }
+]

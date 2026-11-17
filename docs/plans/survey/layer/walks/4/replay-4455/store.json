@@ -1,5 +1,5 @@
 {
- "next": 101,
+ "next": 102,
  "records": {
   "area-1": [
    {
@@ -2282,6 +2282,22 @@
     "op": "add",
     "by": "blind-read",
     "at": "2026-11-13T15:54:37.000Z"
+   },
+   {
+    "id": "finding-99",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "area-1",
+    "says": "Larger, runs-and-dispatch: `mayCarryWake` in `lib/dispatch-feedback-kinds.js` is true on every row and `feedbackKindMayCarryWake` returns true for unknown kinds, so the new check in `findWakeEvent` (`lib/dispatch-terminal.js`) can never skip anything, and the kinds-table test \"findWakeEvent finds a marker exactly when its kind may carry a wake\" never exercises the false branch. The column also contradicts another wake reader: `lastWakeEntry` in `lib/run-view.js` skips decision-stamp kinds as \"never a wake marker\", while the table says they may carry one. Two wake scans disagree about stamps, and the column that could own the answer only records today's `findWakeEvent` behaviour (decision-84). Removing the column, or making it true to both readers, means deciding whether `findWakeEvent` should skip stamps (as well as the relay kinds question-75 asks about), which changes wake minting. Left on purpose by LIN-4455: written as a new Waiting entry in `docs/areas/runs-and-dispatch.md` on the PR #2427 branch.",
+    "links": {
+     "about": "question-75"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "leftover",
+    "at": "2026-11-13T15:57:11.000Z",
+    "reason": "leftover: left on purpose, now a Waiting entry in the area note on the PR branch"
    }
   ],
   "finding-100": [
@@ -2299,6 +2315,56 @@
     "op": "add",
     "by": "blind-read",
     "at": "2026-11-13T15:54:39.000Z"
+   },
+   {
+    "id": "finding-100",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "task-39",
+    "says": "Outside the area (llm-and-prompts, A14 / LIN-4448 side): `lib/prompts/runner-kickoff.js` still imports `FEEDBACK_ENTRY_KINDS` from `../dispatch-store.js`, the only importer of the store's new re-export shim (`export { FEEDBACK_ENTRY_KINDS } from './dispatch-feedback-kinds.js'`); the kinds module's docblock describes this as \"through the store's re-export\". Importing from the leaf would let the store drop the shim and keep the prompt module off the store's import graph. Breaks nothing; left on purpose by LIN-4455 and written as a Waiting entry in `docs/areas/llm-and-prompts.md` on the PR #2427 branch.",
+    "links": {
+     "about": "decision-81"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "leftover",
+    "at": "2026-11-13T15:57:12.000Z",
+    "reason": "leftover: left on purpose, now a Waiting entry in the llm-and-prompts area note on the PR branch"
+   }
+  ],
+  "run-101": [
+   {
+    "id": "run-101",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "leftover",
+    "account": "Posted ### Leftovers on LIN-4455 (16:02:31). Retires: the restated follow-up target, halt modes and NEVER_RAN in lib/dispatch-leftover.js and _releaseIfHeld. Waiting 2, 4 and 11 settled and removed from docs/areas/runs-and-dispatch.md by PR #2427 (finding-19, -21, -28 already handed on to change-80). Left on purpose, each written into an area note on the PR branch: mayCarryWake true on every row against lastWakeEntry skipping stamps (new Waiting entry in runs-and-dispatch.md, finding-99); the two held-wake policy channels (already Waiting 5, finding-22; the setter docblock names it); runner-kickoff.js importing FEEDBACK_ENTRY_KINDS through the store re-export (Waiting entry in llm-and-prompts.md, finding-100); browser stamp copies (decision-87). Did not act on finding-97 or finding-98.",
+    "links": {
+     "about": "check-93"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "leftover",
+    "at": "2026-11-13T15:57:10.000Z"
+   },
+   {
+    "id": "run-101",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "leftover",
+    "account": "Posted ### Leftovers on LIN-4455 (16:02:31). Retires: the restated follow-up target, halt modes and NEVER_RAN in lib/dispatch-leftover.js and _releaseIfHeld. Waiting 2, 4 and 11 settled and removed from docs/areas/runs-and-dispatch.md by PR #2427 (finding-19, -21, -28 already handed on to change-80). Left on purpose, each written into an area note on the PR branch: mayCarryWake true on every row against lastWakeEntry skipping stamps (new Waiting entry in runs-and-dispatch.md, finding-99); the two held-wake policy channels (already Waiting 5, finding-22; the setter docblock names it); runner-kickoff.js importing FEEDBACK_ENTRY_KINDS through the store re-export (Waiting entry in llm-and-prompts.md, finding-100); browser stamp copies (decision-87). Did not act on finding-97 or finding-98.",
+    "links": {
+     "about": "check-93"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "leftover",
+    "at": "2026-11-13T15:57:13.000Z",
+    "stateReason": "Leftovers comment posted on LIN-4455 at 16:02:31",
+    "reason": "Leftovers comment posted on LIN-4455 at 16:02:31"
    }
   ]
  },
@@ -3317,6 +3383,166 @@
     "task",
     "--by",
     "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:54:57.545Z",
+   "by": "leftover",
+   "q": [
+    "find",
+    "--kind",
+    "area",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:54:57.586Z",
+   "by": "leftover",
+   "q": [
+    "find",
+    "--text",
+    "wakeHook",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:54:57.617Z",
+   "by": "leftover",
+   "q": [
+    "find",
+    "--to",
+    "leftover",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:54:57.647Z",
+   "by": "leftover",
+   "q": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:04.499Z",
+   "by": "leftover",
+   "q": [
+    "find",
+    "--text",
+    "Waiting 2:",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:04.534Z",
+   "by": "leftover",
+   "q": [
+    "find",
+    "--text",
+    "Waiting 4:",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:04.570Z",
+   "by": "leftover",
+   "q": [
+    "find",
+    "--text",
+    "Waiting 11:",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:04.607Z",
+   "by": "leftover",
+   "q": [
+    "find",
+    "--text",
+    "LIN-4448",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:04.640Z",
+   "by": "leftover",
+   "q": [
+    "find",
+    "--text",
+    "mayCarryWake",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:04.676Z",
+   "by": "leftover",
+   "q": [
+    "find",
+    "--text",
+    "Waiting entry",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:13.510Z",
+   "by": "leftover",
+   "q": [
+    "get",
+    "finding-19",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:13.550Z",
+   "by": "leftover",
+   "q": [
+    "get",
+    "finding-21",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:13.612Z",
+   "by": "leftover",
+   "q": [
+    "get",
+    "finding-28",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:23.348Z",
+   "by": "leftover",
+   "q": [
+    "get",
+    "finding-99",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:23.393Z",
+   "by": "leftover",
+   "q": [
+    "get",
+    "finding-100",
+    "--by",
+    "leftover"
    ]
   }
  ]

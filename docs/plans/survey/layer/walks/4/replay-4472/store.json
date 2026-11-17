@@ -1,5 +1,5 @@
 {
- "next": 77,
+ "next": 79,
  "records": {
   "task-1": [
    {
@@ -1745,6 +1745,20 @@
     "op": "add",
     "by": "implementation",
     "at": "2026-11-13T17:33:18.000Z"
+   },
+   {
+    "id": "change-69",
+    "kind": "change",
+    "in": "task-28",
+    "ref": "PR #2436 (closes LIN-4472, piece 2 of LIN-4463)",
+    "links": {},
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "leftover",
+    "at": "2026-11-13T17:50:42.000Z",
+    "head": "ffa70b7821e9859a403e043e1ea55d588b67ac73",
+    "reason": "Head after leftover commits (import paths, comments, e2e poll); CI green on it: CI success, both unit jobs, E2E shards 1-4, secret scan"
    }
   ],
   "decision-70": [
@@ -1814,6 +1828,22 @@
     "op": "add",
     "by": "implementation",
     "at": "2026-11-13T17:33:22.000Z"
+   },
+   {
+    "id": "finding-73",
+    "kind": "finding",
+    "in": "area-49",
+    "to": "area-49",
+    "says": "Not this task's: classic browser copies of `fmtDuration`/`relativeAgo` remain beside the new owner `lib/time-words.js`: `public/session.js` `formatElapsed` and `public/observation.js` `formatRuntime` restate `fmtDuration`, and `public/live-console.js` `fmtDuration(s)` spells the rule a second way (no hour rung). They sit outside the `lin-4472-time-words` guard (which scans only server code) and are listed in the browser area's Waiting entry; each retires when its view converts and imports `/lib/time-words.js` (LIN-4472, PR #2436).",
+    "links": {
+     "about": "decision-66@1"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "leftover",
+    "at": "2026-11-13T17:50:43.000Z",
+    "reason": "Leftover named each copy and its difference (live-console has no hour rung) in the Waiting entry"
    }
   ],
   "finding-74": [
@@ -1879,6 +1909,72 @@
     "op": "add",
     "by": "leftover",
     "at": "2026-11-13T17:50:41.000Z"
+   },
+   {
+    "id": "run-76",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "leftover",
+    "claims": [
+     "lib/time-words.js",
+     "lib/render-run-steps.js",
+     "lib/task-page-loader.js",
+     "tests/unit/lin-4472-time-words.test.js",
+     "docs/architecture/source-map.md",
+     "docs/areas/front-end-browser.md",
+     "docs/areas/front-end-pages.md",
+     "tests/e2e/task-page.spec.js"
+    ],
+    "account": "Leftovers on LIN-4472 (PR #2436). Tidied the old import paths: every server caller of fmtDuration/relativeAgo imports lib/time-words.js, the re-exports in render-run-steps.js and task-page-loader.js are gone, and the identity test is now a guard over lib/, routes/, server.js (decision-70); re-adding one re-export as a mutation made the guard fail. Fixed comments the change made untrue (time-words.js header, source-map.md). Noted the three classic browser copies in the browser area Waiting entry (finding-73, revised with the names). Added the importWorld lesson to the browser area note. Retired the front-end-pages Waiting entry on the layout test desktop check of the quiet offers: task-page.spec.js now polls the offset; 5/5 locally with retries off. CI green on head ffa70b78.",
+    "links": {
+     "on": "decision-70@1"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "leftover",
+    "at": "2026-11-13T17:50:46.000Z",
+    "stateReason": "Leftovers posted on LIN-4472 at 18:01:32; PR #2436 head ffa70b78, CI green",
+    "reason": "Leftovers posted on LIN-4472 at 18:01:32; PR #2436 head ffa70b78, CI green"
+   }
+  ],
+  "lesson-77": [
+   {
+    "id": "lesson-77",
+    "kind": "lesson",
+    "in": "area-49",
+    "says": "`importWorld` installs only what it is given: no stub fetch, rAF, clipboard or unref'd timers unless passed. Test a page module's pure exports by a static import with no world, and drive a page's init through `tests/unit/helpers/task-page-world.js`, which supplies the page's stub defaults and a fresh instance per test.",
+    "paths": [
+     "tests/unit/helpers/import-world.js",
+     "tests/unit/helpers/task-page-world.js",
+     "docs/areas/front-end-browser.md"
+    ],
+    "checked-at": "ffa70b7821e9859a403e043e1ea55d588b67ac73",
+    "links": {
+     "about": "finding-53@2"
+    },
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "leftover",
+    "at": "2026-11-13T17:50:44.000Z"
+   }
+  ],
+  "finding-78": [
+   {
+    "id": "finding-78",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "review",
+    "says": "Outside the task's paths: the leftover pass retires the `docs/areas/front-end-pages.md` Waiting entry \"`lib/render-task-page.js`: the layout test's desktop check that both quiet offers…\". `tests/e2e/task-page.spec.js` now polls the offers' offset (`expect.poll`) instead of reading it once; 5/5 passes locally with retries off, and E2E shards 1-4 are green on head ffa70b78. Also corrected comments the change made untrue: the `lib/time-words.js` header and `docs/architecture/source-map.md` (render-run-steps exports, time-words entry) no longer say the server re-exports.",
+    "links": {
+     "about": "change-69@2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "leftover",
+    "at": "2026-11-13T17:50:45.000Z"
    }
   ]
  },
