@@ -1,5 +1,5 @@
 {
- "next": 68,
+ "next": 69,
  "records": {
   "area-1": [
    {
@@ -361,6 +361,26 @@
     "in": "task-9",
     "to": "review",
     "state": "open",
+    "links": {},
+    "fields": {
+     "what": "A slice's 'lighter than before' is measured on logic, with commentary counted separately, and the slice shares rather than only trimming.",
+     "why-person": "Cutting comments passes a raw line count without sharing anything. The count depends on the method: `public/observation.js` has 4,679 non-blank lines, of which the place survey counted 1,006 as comments and design reproduced 1,985 counting every `*`, `//` and `/*` line (13 Nov); `public/common.js` has about 1,456 comment lines of 3,309. Any count must state its method.",
+     "how": "Count logic lines and comment lines separately before and after, by a stated method; the why-so-large check on a view (68 commits on `observation.js`) does the same."
+    }
+   },
+   {
+    "id": "check-13",
+    "kind": "check",
+    "v": 4,
+    "op": "end",
+    "at": "2026-11-13T15:07:31.510Z",
+    "by": "review",
+    "in": "task-9",
+    "to": "review",
+    "state": "done",
+    "ended": {
+     "reason": "Review read the counts: the 34-line browser IIFE becomes a 12-line shim with 3 code lines; the workspace-kpis wrap is 6 logic lines with -w; total lines rise only through tests, as the PR declares; the slice shares (lib/cost-format.js is the only formatUsd, browser imports its bytes)"
+    },
     "links": {},
     "fields": {
      "what": "A slice's 'lighter than before' is measured on logic, with commentary counted separately, and the slice shares rather than only trimming.",
@@ -732,6 +752,31 @@
      "why-person": "A module shim that sets `window.CostFormat` runs deferred, after the classic scripts; it is safe only while no read is eager. Without a pinning test a future eager read breaks with no warning.",
      "how": "Look for a test in the slice that fails if any `public/` file reads `CostFormat` at load; confirm it fails on a planted eager read. For `workspace-kpis.js`: a `loadWorld` test with a `Chart` stub that calls each scale's `ticks.callback` in its constructor, nonzero `cost.perDay`, global absent — must not throw; then set the global, `fireDOMContentLoaded`, tick labels formatted. It must have failed at load before the deferral."
     }
+   },
+   {
+    "id": "check-22",
+    "kind": "check",
+    "v": 4,
+    "op": "end",
+    "at": "2026-11-13T15:07:32.510Z",
+    "by": "review",
+    "in": "task-9",
+    "to": "review",
+    "state": "done",
+    "ended": {
+     "reason": "Witnessed by review at 1de016f: M1 (workspace-kpis.js reverted to main) turns workspace-kpis-cost-order red 0/2 at the tick callback; M4-M6 (eager reads planted in observation, prompt-section, flight-companion) turn observation-scan-due, lin-3833-run-control, cost-format-consumers red; real Chromium + Chart.js 4.5.1 + CSP: head draws ticks, main's file throws on formatUsd"
+    },
+    "links": {
+     "about": [
+      "finding-51",
+      "finding-52"
+     ]
+    },
+    "fields": {
+     "what": "Every consumer of `window.CostFormat` reads it only after script execution (inside a handler, at DOMContentLoaded or later; a fetch started during parsing is not enough), never while its script first runs, including through a callback a library runs synchronously (Chart.js `ticks.callback` in `public/workspace-kpis.js`), and a test pins that.",
+     "why-person": "A module shim that sets `window.CostFormat` runs deferred, after the classic scripts; it is safe only while no read is eager. Without a pinning test a future eager read breaks with no warning.",
+     "how": "Look for a test in the slice that fails if any `public/` file reads `CostFormat` at load; confirm it fails on a planted eager read. For `workspace-kpis.js`: a `loadWorld` test with a `Chart` stub that calls each scale's `ticks.callback` in its constructor, nonzero `cost.perDay`, global absent — must not throw; then set the global, `fireDOMContentLoaded`, tick labels formatted. It must have failed at load before the deferral."
+    }
    }
   ],
   "check-23": [
@@ -745,6 +790,26 @@
     "in": "task-9",
     "to": "review",
     "state": "open",
+    "links": {},
+    "fields": {
+     "what": "`public/cost-format.js` is gone from `FORMAT_ALLOW` in `tests/unit/cost-read-census.test.js` when the file is retired.",
+     "why-person": "An extra allow-list entry goes stale silently: nothing fails, so only a reader will catch it.",
+     "how": "Read the census allow-list in the slice's diff."
+    }
+   },
+   {
+    "id": "check-23",
+    "kind": "check",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:07:33.510Z",
+    "by": "review",
+    "in": "task-9",
+    "to": "review",
+    "state": "done",
+    "ended": {
+     "reason": "Review read the diff: public/cost-format.js is gone from FORMAT_ALLOW; the census runs with lib/cost-format.js as its only formatter file"
+    },
     "links": {},
     "fields": {
      "what": "`public/cost-format.js` is gone from `FORMAT_ALLOW` in `tests/unit/cost-read-census.test.js` when the file is retired.",
@@ -1051,6 +1116,30 @@
      "why-person": "The parity file holds the only direct tests of `lib/cost-format.js`; a retirement that deletes it whole passes every suite and silently drops the never-$0.00-for-unknown rule.",
      "how": "Diff the deleted parity file against the new test file; each server-side case must reappear."
     }
+   },
+   {
+    "id": "check-31",
+    "kind": "check",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:07:34.510Z",
+    "by": "review",
+    "in": "task-9",
+    "to": "review",
+    "state": "done",
+    "ended": {
+     "reason": "Review checked line by line: the parity file's table, unknown->null, zero->$0.00 and all of sumWords reappear in tests/unit/cost-format.test.js; only the browser comparison is dropped"
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ]
+    },
+    "fields": {
+     "what": "Deleting `tests/unit/cost-format-parity.test.js` loosens no guard: its server-side assertions (the input table, unknown is never a dollar figure, complete zero is $0.00, all of `sumWords`) are in `tests/unit/cost-format.test.js` unchanged; only the comparison against the browser copy is dropped.",
+     "why-person": "The parity file holds the only direct tests of `lib/cost-format.js`; a retirement that deletes it whole passes every suite and silently drops the never-$0.00-for-unknown rule.",
+     "how": "Diff the deleted parity file against the new test file; each server-side case must reappear."
+    }
    }
   ],
   "check-32": [
@@ -1098,6 +1187,31 @@
      "why-person": "A vm test cannot prove module order, MIME type or the CSP (`lib/security-headers.js`); if the module is refused nothing is loud until a cost is drawn. It does not cover the workspace-KPIs cost chart: in e2e that canvas is always the empty note (`tests/e2e/workspace-kpis.spec.js:133-136`), so the load-time read there is check-22's to witness.",
      "how": "Look for one Playwright check on the cheapest existing spec whose page carries the shim (workspace KPIs or flight companion), and its run output."
     }
+   },
+   {
+    "id": "check-32",
+    "kind": "check",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T15:07:35.510Z",
+    "by": "review",
+    "in": "task-9",
+    "to": "review",
+    "state": "done",
+    "ended": {
+     "reason": "One Playwright check in tests/e2e/workspace-kpis.spec.js asserts the global, green in CI E2E shards on 1de016f; review also ran real Chromium behind the real CSP: window.CostFormat is an object, no page, console or CSP errors"
+    },
+    "links": {
+     "about": [
+      "plan-28",
+      "decision-29"
+     ]
+    },
+    "fields": {
+     "what": "In a real browser, a page carrying the shim has `window.CostFormat.formatUsd(0.004)` equal to `<$0.01`, with no console errors and no CSP violations.",
+     "why-person": "A vm test cannot prove module order, MIME type or the CSP (`lib/security-headers.js`); if the module is refused nothing is loud until a cost is drawn. It does not cover the workspace-KPIs cost chart: in e2e that canvas is always the empty note (`tests/e2e/workspace-kpis.spec.js:133-136`), so the load-time read there is check-22's to witness.",
+     "how": "Look for one Playwright check on the cheapest existing spec whose page carries the shim (workspace KPIs or flight companion), and its run output."
+    }
    }
   ],
   "check-33": [
@@ -1133,6 +1247,30 @@
     "in": "task-9",
     "to": "review",
     "state": "open",
+    "links": {
+     "about": [
+      "plan-28"
+     ]
+    },
+    "fields": {
+     "what": "Every `lib/` scripts list that names a `public/` file reading `window.CostFormat` also lists the shim as `{ module: ... }`: today six renderers (render.js, flight-companion, observation, swipe, task-page, workspace-kpis), and a test fails on a seventh that lacks it.",
+     "why-person": "The surveys named two renderers; swipe and task-page reach `CostFormat` through `prompt-section.js`. A missing shim 404s nothing visible and throws only on the first cost.",
+     "how": "Read the page-has-shim test; confirm it parses both list shapes (`scripts: [...]` and `const SCRIPTS = [...]`, as in `lib/render-task-page.js:82`), fails with the shim removed from one renderer, and that the completeness grep returns only the intended names."
+    }
+   },
+   {
+    "id": "check-33",
+    "kind": "check",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T15:07:36.510Z",
+    "by": "review",
+    "in": "task-9",
+    "to": "review",
+    "state": "done",
+    "ended": {
+     "reason": "Witnessed by review: M2 (shim dropped from render-task-page const SCRIPTS) and M3 (shim as classic string in render.js) turn the shim guard red; the completeness grep shows only the shim, four consumers, tests, notes and server-side imports, no /cost-format.js entry left"
+    },
     "links": {
      "about": [
       "plan-28"
@@ -2150,6 +2288,27 @@
      "ref": "https://github.com/JKershaw/LinearViewer/pull/2423",
      "head": "1de016f523f46a006c20a4e89717157422b3207b"
     }
+   },
+   {
+    "id": "change-57",
+    "kind": "change",
+    "v": 3,
+    "op": "revise",
+    "at": "2026-11-13T15:07:40.510Z",
+    "by": "review",
+    "reason": "Reviewed at 1de016f, approve-with-notes (verdict-65); close-out fixes the PR body and merges",
+    "in": "task-9",
+    "to": "close-out",
+    "state": "open",
+    "links": {
+     "about": [
+      "plan-28"
+     ]
+    },
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2423",
+     "head": "1de016f523f46a006c20a4e89717157422b3207b"
+    }
    }
   ],
   "finding-58": [
@@ -2195,6 +2354,30 @@
     "fields": {
      "says": "Gaps in PR #2423's evidence, stated in the PR for John: (1) the serving tests were not run against HEAD 24de9abc9 (the PR does not list which; plan-28's serving witnesses are /shared/cost-format.js 200 with exact bytes, unknown /shared/* 404, empty-rootDir throw, module purity); (2) the Chart.js ordering in public/workspace-kpis.js is not covered by e2e, only by the unit witness. Run (1) at HEAD before approving; (2) is a recorded waiver."
     }
+   },
+   {
+    "id": "finding-58",
+    "kind": "finding",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T15:07:37.510Z",
+    "by": "review",
+    "in": "task-9",
+    "to": "review",
+    "state": "done",
+    "ended": {
+     "reason": "(1) Review ran the serving tests at 1de016f (shared-modules, vendor-assets) and M7/M8 turned the purity and spawned-server 404 witnesses red; (2) the Chart.js ordering was discharged in a real browser by review. The PR body's stale wording is finding-66"
+    },
+    "links": {
+     "about": [
+      "change-57",
+      "check-22",
+      "check-32"
+     ]
+    },
+    "fields": {
+     "says": "Gaps in PR #2423's evidence, stated in the PR for John: (1) the serving tests were not run against HEAD 24de9abc9 (the PR does not list which; plan-28's serving witnesses are /shared/cost-format.js 200 with exact bytes, unknown /shared/* 404, empty-rootDir throw, module purity); (2) the Chart.js ordering in public/workspace-kpis.js is not covered by e2e, only by the unit witness. Run (1) at HEAD before approving; (2) is a recorded waiver."
+    }
    }
   ],
   "check-59": [
@@ -2208,6 +2391,35 @@
     "in": "task-9",
     "to": "review",
     "state": "open",
+    "links": {
+     "about": [
+      "change-57",
+      "finding-52",
+      "finding-53",
+      "finding-54",
+      "finding-55",
+      "check-31"
+     ]
+    },
+    "fields": {
+     "what": "PR #2423 applies plan-review's builder notes that the implementation output does not report on: finding-52 (prompt-section.js:1505 comment gives the real reason: every PromptSection.init caller runs at DOMContentLoaded or later; its test drives init and a resolved decision-panel fetch); finding-53 (tests/unit/cost-format.test.js created, carrying the parity file's server-side assertions); finding-54 (docs/areas/other-features.md:14 says lib/cost-format.js is also served as /shared/cost-format.js, so a leaf); finding-55 (CLAUDE.md trimmed to fit, cut text named in the PR).",
+     "why-person": "The output reports only the 404s and the KPI witness among these notes; the others are not stated done, so a reader must look.",
+     "how": "Read the PR diff and description at 24de9abc9 for each of the four."
+    }
+   },
+   {
+    "id": "check-59",
+    "kind": "check",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:07:38.510Z",
+    "by": "review",
+    "in": "task-9",
+    "to": "review",
+    "state": "done",
+    "ended": {
+     "reason": "Review read PR #2423 for each: finding-53 cost-format.test.js carries the parity assertions; finding-54 docs/areas/other-features.md updated (plan-review note 5); finding-55 CLAUDE.md at 110 lines / 11,916 bytes with trimmed text named in the PR; finding-52 prompt-section safety pinned by M5 (eager read turns lin-3833-run-control red)"
+    },
     "links": {
      "about": [
       "change-57",
@@ -2328,6 +2540,29 @@
      "why-person": "These rode in after the implementation report; a reviewer judging 24de9abc9 would miss them, and pinch-zoom on swipe is a visible change on a page outside the cost-format slice.",
      "how": "Diff 24de9abc9..1de016f5; run the swipe viewport test with the fix reverted, and remove the shim from one renderer to see the guard fail."
     }
+   },
+   {
+    "id": "check-63",
+    "kind": "check",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T15:07:39.510Z",
+    "by": "review",
+    "reason": "Review witnessed the guard half (M2) and judged the swipe fix a sanctioned leftover retirement; the swipe test's fail-before was not re-run by review",
+    "in": "task-9",
+    "to": "close-out",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-57",
+      "check-33"
+     ]
+    },
+    "fields": {
+     "what": "The swipe viewport test in tests/unit/render-swipe.test.js (lib/render-swipe.js drops user-scalable=no) fails with the fix reverted and passes with it. The guard half of this check (shim guard still fails on a renderer missing the shim) was witnessed by review (M2).",
+     "why-person": "These rode in after the implementation report; a reviewer judging 24de9abc9 would miss them, and pinch-zoom on swipe is a visible change on a page outside the cost-format slice.",
+     "how": "Revert the render-swipe.js viewport change locally, run tests/unit/render-swipe.test.js, see it fail; restore, see it pass; paste the output on LIN-4446. Review ran the suite green at 1de016f but did not watch it fail."
+    }
    }
   ],
   "run-64": [
@@ -2434,6 +2669,41 @@
     },
     "fields": {
      "says": "Not proved by CI or review, before closing LIN-4446: (1) John's read of the first slice's result (check-16) comes after deploy and before Done: ask him to read the LIN-4446 review comment and #2423's body, record his read as a comment on LIN-4446, dispatch no next slice until then; it is not a merge condition. (2) Only Chromium ran (CI e2e and the reviewer's check); Safari/Firefox not run, module scripts and same-origin import are baseline there. Named rollback: revert the PR's merge commit on main; no data shape, migration or third-party consumer changes, and public/cost-format.js comes back with the revert."
+    }
+   }
+  ],
+  "run-68": [
+   {
+    "id": "run-68",
+    "kind": "run",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:07:41.510Z",
+    "by": "review",
+    "in": "task-9",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "stage": "review",
+     "account": "# What this stage really wrote\n\n## Comment on LIN-4446 at 15:11:29\n\n## Review — LIN-4446\n\nReviewed PR [#2423](https://github.com/JKershaw/LinearViewer/pull/2423) at head `1de016f523f46a006c20a4e89717157422b3207b` (two commits: `24de9abc9` the slice, `1de016f52` the leftovers), against `origin/main` `cfd152fa4`.\n\nCI: green on `1de016f` (Unit tests, Unit tests (proxy, clock +400d), E2E shards 1–4, Secret scan, CI success).\n\n**Staleness.** `git log --since=2026-11-13T12:08:10Z origin/main -- <every file in the diff>` is empty. The one commit on main since the plan's base (`cfd152fa4`, LIN-4453) is docs-only and touches no file here. PR is MERGEABLE.\n\n**Scope vs plan.** The diff matches the plan's places one for one: six renderer lists, `page.js` `{ module }` entries, the `SHARED_MODULES` allow-list with `rootDir`, the shim, the `workspace-kpis.js` DOMContentLoaded wrap (6 logic lines with `-w`), retirement of `public/cost-format.js` and the parity test with its server-side half moved to `tests/unit/cost-format.test.js` (table, unknown→null, zero→$0.00, all of `sumWords`: checked line by line), the census `FORMAT_ALLOW`, fixture, `observation-scan-due` updates, and the consumer comment edits. It also covers plan-review note 5 (`docs/areas/other-features.md`). There is one addition beyond the plan: the swipe viewport fix (`lib/render-swipe.js` drops `user-scalable=no`, plus a test in `tests/unit/render-swipe.test.js`). That fix is the builder's leftover-step retirement, which `docs/areas/README.md` \"One home for each leftover\" (LIN-4414) requires. The `Retires:` line names the `docs/areas/front-end-pages.md` Waiting entry, and the diff removes it. That answers the brief's open question: it is a sanctioned retirement, not an overrun, and needs no ruling. The PR body does not mention it, though (fix 1 below).\n\n**Regression check.** `git log -6` on `public/workspace-kpis.js`, `lib/render-swipe.js`, `lib/vendor-assets.js`, `lib/components/page.js` and `public/cost-format.js` shows no reverted or re-fixed behaviour. LIN-4179 (#2263) created the formatter, its census and parity test. Its guarantees (one formatter, unknown never `$0.00`, no hand-made `$…toFixed`) are intact: the census still runs with `lib/cost-format.js` as its only formatter file. LIN-3787's vendor router keeps `VENDOR_ASSETS` unchanged (pinned by `tests/unit/shared-modules.test.js` and `vendor-assets.test.js`), and it is still mounted just before `express.static('public')`.\n\n**Tests I ran myself (at `1de016f`).** 13 focused suites: `workspace-kpis-cost-order`, `shared-modules`, `cost-format`, `cost-format-consumers`, `lin-3833-run-control`, `flight-companion-client`, `observation-scan-due`, `cost-read`, `cost-read-census`, `vendor-assets`, `render-swipe`, `claude-md-line-budget`, `render-workspace-kpis`. 461/461 pass. I did not re-run the full 25,300 suite; CI ran it on this head.\n\n**Mutation checks (LIN-2274).** Each one was reverted afterwards, and the tree is clean.\n- M1: `public/workspace-kpis.js` reverted to main (no DOMContentLoaded wrap). `workspace-kpis-cost-order` goes red, 0/2, at the tick callback `window.CostFormat.formatUsd`.\n- M2: shim dropped from `lib/render-task-page.js`'s `const SCRIPTS`. The shim guard goes red: \"lists a consumer without the module shim\".\n- M3: shim listed as a classic string in `lib/render.js`. The shim guard goes red.\n- M4: `observation.js` reads `window.CostFormat` at top level. `observation-scan-due` goes red, 51/51.\n- M5: `prompt-section.js` reads it at the top of its IIFE. `lin-3833-run-control` goes red, 45/46.\n- M6: `flight-companion.js` reads it at the top of its IIFE. `cost-format-consumers` goes red, 2/2.\n- M7: `import fs from 'node:fs'` added to `lib/cost-format.js`. The purity test goes red.\n- M8: `app.use('/lib', express.static('lib'))` added to `server.js`. The real-server test goes red: \"/lib/cost-format.js should be a real 404, got 200\". This also settles the PR's \"serving tests not run against HEAD\" gap: the spawned-server witness distinguishes right from wrong.\n\n**Real browser, the one claim CI could not reach.** The e2e workspace cannot create priced lineages, so CI never draws the cost chart. I rendered `renderWorkspaceKpisPage` with priced `cost.perDay` (`pricedCount: 2`) and served it behind the real `securityHeaders()` CSP, the vendor/shared router and `public/` static. I loaded it in Playwright Chromium with real Chart.js 4.5.1.\n- Head: `window.CostFormat` is an object, and `Chart.getChart(#chart-cost).scales.y.ticks` are `$0.00 … $1.40`. No page errors, no console errors, no CSP refusal.\n- Same page with main's `workspace-kpis.js` swapped in: `pageerror: Cannot read properties of undefined (reading 'formatUsd')`, and every tick label is null.\n\nSo the ordering fix works in a real browser with the real library and CSP, and the old code fails there. Script: `kpi-browser-check.mjs` in the reviewer's scratchpad. It can be re-run with `node kpi-browser-check.mjs [alt-workspace-kpis.js]` from the repo root.\n\n**Test level.** Right for the change. The page emission and serving guards are unit tests with a real spawned server. Ordering has a vm witness with a synchronous Chart stub, plus the browser check above. Module/MIME/CSP has one e2e test (`tests/e2e/workspace-kpis.spec.js`). The e2e asserts only the global, not the chart, and the PR says so.\n\n**Isolated, or one of a class?** The class is \"browser file restates server logic because the rule was read as no sharing\". Siblings exist: the `public/common.js` client twins of `lib/task-page-href.js`, `lib/timeline-zoom.js`, `lib/ship-layout.js` and `lib/prompt-formatters.js`; the `TERMINAL_TYPES` mirror; `buildDispatchModelOptionDescriptors`; the keepalive `statusCode` reader. All are **outside** this ticket's bounded class. John's size ruling bounds it to \"one cost formatter shared\", and the As-asked block makes the next slice wait for John's read. None of this deliverable depends on them. Their home is already written as Waiting entries in `docs/areas/front-end-browser.md` (LIN-4446 plan and leftovers), so nothing more needs filing. A repeat `grep cost-format|CostFormat` (excluding dated records) shows only the shim, the four consumers, tests, notes, and server-side `import … from './cost-format.js'` lines. No `/cost-format.js` script entry and no reference to the retired file remains. No other `user-scalable`/`maximum-scale` viewport exists in `lib/`, `public/`, `routes/` or `server.js`.\n\n**Checklist.** No security exposure. `lib/` is served file by file through a frozen allow-list, and a missing or non-file entry fails boot. A spawned-server test proves `/lib/*` and unknown `/shared/*` return 404, and same-origin modules pass CSP. Error handling: `renderPage` throws on a malformed script entry. Style matches the codebase. Performance: one extra small module request per page with `max-age=0`+ETag, as for the vendor files. `CLAUDE.md` is 110 lines / 11,916 bytes, and the trimmed text is named in the PR.\n\n### Fixes for close-out (on the PR branch / PR body, before merge)\n1. **PR body is stale after `1de016f52`.** Under \"What changed\", add: \"Leftover-step retirement (LIN-4414): the swipe page now takes the shared default viewport (`lib/render-swipe.js` drops `user-scalable=no`; witness `tests/unit/render-swipe.test.js`), retiring the `docs/areas/front-end-pages.md` Waiting entry `lib/render-swipe.js`: the viewport meta is `user-scalable=no`.\" Update \"Total: 30 files, +747 / −280\" to the figures `gh pr view 2423 --json additions,deletions,changedFiles` gives on the merged head (35 files at `1de016f`). In \"Not covered\", replace \"The serving tests were not run against `HEAD`\" with \"Reviewer's mutation (serving `lib/` as a directory) turns the spawned-server 404 witness red.\"\n\n### What CI Did Not Prove\n- **inside**: the cost chart's DOMContentLoaded deferral works with real Chart.js, the module shim and CSP on a priced workspace (the claim this change depends on; e2e cannot price a lineage). **Discharged before merge** by the reviewer's real-browser check above. Head draws `$` ticks with no errors; main's `workspace-kpis.js` throws the `formatUsd` TypeError.\n- **inside**: \"John has read the first slice's result before the next starts\" (Done-when, human only). **Settled after the deploy / before the ticket closes:** close-out asks John to read the PR's result (the comment on this ticket plus #2423's body). It records his read as a comment on LIN-4446 before marking Done. No next slice is dispatched until then. This is not a merge condition: merging is what \"the first slice has landed\" asks for.\n- **inside**: the shim and formatter behave the same in non-Chromium browsers (Safari, Firefox). Only Chromium ran, in CI e2e and in my check, and module scripts plus a same-origin import are baseline in both. **Named rollback:** revert the PR's merge commit on main. That is fully reversible: no data shape, migration or third-party consumer changes, and `public/cost-format.js` comes back with the revert.\n\n### Verdict\nApprove — conditional on close-out discharging the ledger\n\nHow the work meets what was asked, sentence by sentence:\n- \"Browser code that shares rather than restates\": `lib/cost-format.js` is the only `formatUsd`. The browser imports those same bytes from `/shared/cost-format.js`, and the restated IIFE is deleted.\n- \"There's still no build step and no framework … read as allowing the browser to import … and that reading goes into the project's own notes\": no build step, no framework, native `<script type=\"module\">`. The reading is in `CLAUDE.md:43` and the Lessons section of `docs/areas/front-end-browser.md`.\n- \"Taken in small slices, one view or one shared piece at a time\": exactly one shared piece.\n- \"Each view is reworked only after finding out why it got so large, and comes out lighter\": no view is reworked. That is a narrowing agreed by John's recorded size ruling (\"just the task\"), not by the plan. The `observation.js` size question is a Waiting entry.\n- \"Anything bigger that a slice spots is left out of it and goes into the area's note\": common.js twins, a module-capable test loader, observation.js size and the vendor-assets name are all Waiting entries, none built.\n- \"The side rail and the visual refresh come after\": untouched.\n- \"No view is retired unless John rules it\": no view is retired.\n- \"Every change names what it retires\": the PR names `public/cost-format.js` (34 lines) and `tests/unit/cost-format-parity.test.js` (74 lines). The leftover commit names the swipe Waiting entry; fix 1 puts it in the PR body.\n- \"Done when … the reading is in the notes\" is met. \"The first slice has landed, sharing rather than restating, lighter than before and naming what it retired\" is met at merge: the 34-line IIFE becomes a 12-line shim (3 lines of code), and total lines rise only through tests, as declared. \"John has read the first slice's result before the next starts\" is ledger item 2.\n\n"
+    }
+   },
+   {
+    "id": "run-68",
+    "kind": "run",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:07:42.510Z",
+    "by": "review",
+    "in": "task-9",
+    "state": "done",
+    "ended": {
+     "reason": "Review recorded"
+    },
+    "links": {},
+    "fields": {
+     "stage": "review",
+     "account": "# What this stage really wrote\n\n## Comment on LIN-4446 at 15:11:29\n\n## Review — LIN-4446\n\nReviewed PR [#2423](https://github.com/JKershaw/LinearViewer/pull/2423) at head `1de016f523f46a006c20a4e89717157422b3207b` (two commits: `24de9abc9` the slice, `1de016f52` the leftovers), against `origin/main` `cfd152fa4`.\n\nCI: green on `1de016f` (Unit tests, Unit tests (proxy, clock +400d), E2E shards 1–4, Secret scan, CI success).\n\n**Staleness.** `git log --since=2026-11-13T12:08:10Z origin/main -- <every file in the diff>` is empty. The one commit on main since the plan's base (`cfd152fa4`, LIN-4453) is docs-only and touches no file here. PR is MERGEABLE.\n\n**Scope vs plan.** The diff matches the plan's places one for one: six renderer lists, `page.js` `{ module }` entries, the `SHARED_MODULES` allow-list with `rootDir`, the shim, the `workspace-kpis.js` DOMContentLoaded wrap (6 logic lines with `-w`), retirement of `public/cost-format.js` and the parity test with its server-side half moved to `tests/unit/cost-format.test.js` (table, unknown→null, zero→$0.00, all of `sumWords`: checked line by line), the census `FORMAT_ALLOW`, fixture, `observation-scan-due` updates, and the consumer comment edits. It also covers plan-review note 5 (`docs/areas/other-features.md`). There is one addition beyond the plan: the swipe viewport fix (`lib/render-swipe.js` drops `user-scalable=no`, plus a test in `tests/unit/render-swipe.test.js`). That fix is the builder's leftover-step retirement, which `docs/areas/README.md` \"One home for each leftover\" (LIN-4414) requires. The `Retires:` line names the `docs/areas/front-end-pages.md` Waiting entry, and the diff removes it. That answers the brief's open question: it is a sanctioned retirement, not an overrun, and needs no ruling. The PR body does not mention it, though (fix 1 below).\n\n**Regression check.** `git log -6` on `public/workspace-kpis.js`, `lib/render-swipe.js`, `lib/vendor-assets.js`, `lib/components/page.js` and `public/cost-format.js` shows no reverted or re-fixed behaviour. LIN-4179 (#2263) created the formatter, its census and parity test. Its guarantees (one formatter, unknown never `$0.00`, no hand-made `$…toFixed`) are intact: the census still runs with `lib/cost-format.js` as its only formatter file. LIN-3787's vendor router keeps `VENDOR_ASSETS` unchanged (pinned by `tests/unit/shared-modules.test.js` and `vendor-assets.test.js`), and it is still mounted just before `express.static('public')`.\n\n**Tests I ran myself (at `1de016f`).** 13 focused suites: `workspace-kpis-cost-order`, `shared-modules`, `cost-format`, `cost-format-consumers`, `lin-3833-run-control`, `flight-companion-client`, `observation-scan-due`, `cost-read`, `cost-read-census`, `vendor-assets`, `render-swipe`, `claude-md-line-budget`, `render-workspace-kpis`. 461/461 pass. I did not re-run the full 25,300 suite; CI ran it on this head.\n\n**Mutation checks (LIN-2274).** Each one was reverted afterwards, and the tree is clean.\n- M1: `public/workspace-kpis.js` reverted to main (no DOMContentLoaded wrap). `workspace-kpis-cost-order` goes red, 0/2, at the tick callback `window.CostFormat.formatUsd`.\n- M2: shim dropped from `lib/render-task-page.js`'s `const SCRIPTS`. The shim guard goes red: \"lists a consumer without the module shim\".\n- M3: shim listed as a classic string in `lib/render.js`. The shim guard goes red.\n- M4: `observation.js` reads `window.CostFormat` at top level. `observation-scan-due` goes red, 51/51.\n- M5: `prompt-section.js` reads it at the top of its IIFE. `lin-3833-run-control` goes red, 45/46.\n- M6: `flight-companion.js` reads it at the top of its IIFE. `cost-format-consumers` goes red, 2/2.\n- M7: `import fs from 'node:fs'` added to `lib/cost-format.js`. The purity test goes red.\n- M8: `app.use('/lib', express.static('lib'))` added to `server.js`. The real-server test goes red: \"/lib/cost-format.js should be a real 404, got 200\". This also settles the PR's \"serving tests not run against HEAD\" gap: the spawned-server witness distinguishes right from wrong.\n\n**Real browser, the one claim CI could not reach.** The e2e workspace cannot create priced lineages, so CI never draws the cost chart. I rendered `renderWorkspaceKpisPage` with priced `cost.perDay` (`pricedCount: 2`) and served it behind the real `securityHeaders()` CSP, the vendor/shared router and `public/` static. I loaded it in Playwright Chromium with real Chart.js 4.5.1.\n- Head: `window.CostFormat` is an object, and `Chart.getChart(#chart-cost).scales.y.ticks` are `$0.00 … $1.40`. No page errors, no console errors, no CSP refusal.\n- Same page with main's `workspace-kpis.js` swapped in: `pageerror: Cannot read properties of undefined (reading 'formatUsd')`, and every tick label is null.\n\nSo the ordering fix works in a real browser with the real library and CSP, and the old code fails there. Script: `kpi-browser-check.mjs` in the reviewer's scratchpad. It can be re-run with `node kpi-browser-check.mjs [alt-workspace-kpis.js]` from the repo root.\n\n**Test level.** Right for the change. The page emission and serving guards are unit tests with a real spawned server. Ordering has a vm witness with a synchronous Chart stub, plus the browser check above. Module/MIME/CSP has one e2e test (`tests/e2e/workspace-kpis.spec.js`). The e2e asserts only the global, not the chart, and the PR says so.\n\n**Isolated, or one of a class?** The class is \"browser file restates server logic because the rule was read as no sharing\". Siblings exist: the `public/common.js` client twins of `lib/task-page-href.js`, `lib/timeline-zoom.js`, `lib/ship-layout.js` and `lib/prompt-formatters.js`; the `TERMINAL_TYPES` mirror; `buildDispatchModelOptionDescriptors`; the keepalive `statusCode` reader. All are **outside** this ticket's bounded class. John's size ruling bounds it to \"one cost formatter shared\", and the As-asked block makes the next slice wait for John's read. None of this deliverable depends on them. Their home is already written as Waiting entries in `docs/areas/front-end-browser.md` (LIN-4446 plan and leftovers), so nothing more needs filing. A repeat `grep cost-format|CostFormat` (excluding dated records) shows only the shim, the four consumers, tests, notes, and server-side `import … from './cost-format.js'` lines. No `/cost-format.js` script entry and no reference to the retired file remains. No other `user-scalable`/`maximum-scale` viewport exists in `lib/`, `public/`, `routes/` or `server.js`.\n\n**Checklist.** No security exposure. `lib/` is served file by file through a frozen allow-list, and a missing or non-file entry fails boot. A spawned-server test proves `/lib/*` and unknown `/shared/*` return 404, and same-origin modules pass CSP. Error handling: `renderPage` throws on a malformed script entry. Style matches the codebase. Performance: one extra small module request per page with `max-age=0`+ETag, as for the vendor files. `CLAUDE.md` is 110 lines / 11,916 bytes, and the trimmed text is named in the PR.\n\n### Fixes for close-out (on the PR branch / PR body, before merge)\n1. **PR body is stale after `1de016f52`.** Under \"What changed\", add: \"Leftover-step retirement (LIN-4414): the swipe page now takes the shared default viewport (`lib/render-swipe.js` drops `user-scalable=no`; witness `tests/unit/render-swipe.test.js`), retiring the `docs/areas/front-end-pages.md` Waiting entry `lib/render-swipe.js`: the viewport meta is `user-scalable=no`.\" Update \"Total: 30 files, +747 / −280\" to the figures `gh pr view 2423 --json additions,deletions,changedFiles` gives on the merged head (35 files at `1de016f`). In \"Not covered\", replace \"The serving tests were not run against `HEAD`\" with \"Reviewer's mutation (serving `lib/` as a directory) turns the spawned-server 404 witness red.\"\n\n### What CI Did Not Prove\n- **inside**: the cost chart's DOMContentLoaded deferral works with real Chart.js, the module shim and CSP on a priced workspace (the claim this change depends on; e2e cannot price a lineage). **Discharged before merge** by the reviewer's real-browser check above. Head draws `$` ticks with no errors; main's `workspace-kpis.js` throws the `formatUsd` TypeError.\n- **inside**: \"John has read the first slice's result before the next starts\" (Done-when, human only). **Settled after the deploy / before the ticket closes:** close-out asks John to read the PR's result (the comment on this ticket plus #2423's body). It records his read as a comment on LIN-4446 before marking Done. No next slice is dispatched until then. This is not a merge condition: merging is what \"the first slice has landed\" asks for.\n- **inside**: the shim and formatter behave the same in non-Chromium browsers (Safari, Firefox). Only Chromium ran, in CI e2e and in my check, and module scripts plus a same-origin import are baseline in both. **Named rollback:** revert the PR's merge commit on main. That is fully reversible: no data shape, migration or third-party consumer changes, and `public/cost-format.js` comes back with the revert.\n\n### Verdict\nApprove — conditional on close-out discharging the ledger\n\nHow the work meets what was asked, sentence by sentence:\n- \"Browser code that shares rather than restates\": `lib/cost-format.js` is the only `formatUsd`. The browser imports those same bytes from `/shared/cost-format.js`, and the restated IIFE is deleted.\n- \"There's still no build step and no framework … read as allowing the browser to import … and that reading goes into the project's own notes\": no build step, no framework, native `<script type=\"module\">`. The reading is in `CLAUDE.md:43` and the Lessons section of `docs/areas/front-end-browser.md`.\n- \"Taken in small slices, one view or one shared piece at a time\": exactly one shared piece.\n- \"Each view is reworked only after finding out why it got so large, and comes out lighter\": no view is reworked. That is a narrowing agreed by John's recorded size ruling (\"just the task\"), not by the plan. The `observation.js` size question is a Waiting entry.\n- \"Anything bigger that a slice spots is left out of it and goes into the area's note\": common.js twins, a module-capable test loader, observation.js size and the vendor-assets name are all Waiting entries, none built.\n- \"The side rail and the visual refresh come after\": untouched.\n- \"No view is retired unless John rules it\": no view is retired.\n- \"Every change names what it retires\": the PR names `public/cost-format.js` (34 lines) and `tests/unit/cost-format-parity.test.js` (74 lines). The leftover commit names the swipe Waiting entry; fix 1 puts it in the PR body.\n- \"Done when … the reading is in the notes\" is met. \"The first slice has landed, sharing rather than restating, lighter than before and naming what it retired\" is met at merge: the 34-line IIFE becomes a 12-line shim (3 lines of code), and total lines rise only through tests, as declared. \"John has read the first slice's result before the next starts\" is ledger item 2.\n\n"
     }
    }
   ]
@@ -4015,6 +4285,18 @@
    "args": {
     "kind": "run",
     "in": "task-9",
+    "state": "open",
+    "by": "review",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:39:29.683Z",
+   "by": "review",
+   "cmd": "find",
+   "args": {
+    "to": "review",
     "state": "open",
     "by": "review",
     "pos": []

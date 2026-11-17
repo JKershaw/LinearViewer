@@ -1,5 +1,5 @@
 {
- "next": 177,
+ "next": 179,
  "records": {
   "area-1": [
    {
@@ -4792,6 +4792,66 @@
      "how": "Right: every render that carries folded text falls, `seams-tangles` shows -2, and the total is 827520 -> 825278 (-2242); the four `work` kinds and Stability, Recent Headwinds, Integration Surface Maturity stay ±0. Wrong: any non-`work` stage kind or Periodical with folded text at >= 0."
     }
    }
+  ],
+  "run-177": [
+   {
+    "id": "run-177",
+    "kind": "run",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:17:25.416Z",
+    "by": "autopilot",
+    "in": "task-131",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "stage": "autopilot",
+     "account": "# What this stage really wrote\n\nWritten in the autopilot's wake ad1b1a6d (dispatched 23:16:15.732).\n\n## Ruling lin-4469-witness withdrawn at 23:17:16\n\nReason: Moot: John answered lin-4469-cuts with fold, and the net fall for kinds carrying no folded text needs no ruling. The folds are built and CI is green.\n"
+    }
+   },
+   {
+    "id": "run-177",
+    "kind": "run",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:17:27.416Z",
+    "by": "autopilot",
+    "in": "task-131",
+    "state": "done",
+    "ended": {
+     "reason": "ruling lin-4469-witness withdrawn as moot; recorded as decision-178 (question-162 already ended withdrawn by review)"
+    },
+    "links": {},
+    "fields": {
+     "stage": "autopilot",
+     "account": "# What this stage really wrote\n\nWritten in the autopilot's wake ad1b1a6d (dispatched 23:16:15.732).\n\n## Ruling lin-4469-witness withdrawn at 23:17:16\n\nReason: Moot: John answered lin-4469-cuts with fold, and the net fall for kinds carrying no folded text needs no ruling. The folds are built and CI is green.\n"
+    }
+   }
+  ],
+  "decision-178": [
+   {
+    "id": "decision-178",
+    "kind": "decision",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:17:26.416Z",
+    "by": "autopilot",
+    "in": "task-131",
+    "state": "stands",
+    "links": {
+     "about": [
+      "question-162",
+      "decision-161",
+      "decision-160",
+      "decision-166"
+     ]
+    },
+    "fields": {
+     "scope": "task-131",
+     "answer": "Ruling lin-4469-witness withdrawn by the autopilot at 23:17:16 (wake ad1b1a6d), not answered: \"Moot: John answered lin-4469-cuts with fold, and the net fall for kinds carrying no folded text needs no ruling. The folds are built and CI is green.\" The four `work` kinds staying byte-identical needs no fall; merge no longer waits on John for this.",
+     "why": "The autopilot's own withdrawal reason (question-162 was ended withdrawn by review at 23:17:22 from the Linear row). Replaces decision-161's closing line \"Merge waits on the witness ruling (lin-4469-witness)\" and decision-166's \"which gates merge\". The reason does not mention seams-tangles +24; that rise is carried by finding-174 / check-176 (close-out, before the merge)."
+    }
+   }
   ]
  },
  "log": [
@@ -5942,6 +6002,29 @@
     "pos": [
      "verdict-173"
     ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:39:16.594Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": {
+    "text": "lin-4469-witness",
+    "by": "autopilot",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:39:16.631Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": {
+    "to": "autopilot",
+    "state": "open",
+    "by": "autopilot",
+    "pos": []
    },
    "asOf": null
   }

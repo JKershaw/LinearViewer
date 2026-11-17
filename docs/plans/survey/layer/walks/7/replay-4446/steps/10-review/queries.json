@@ -1,0 +1,147 @@
+[
+ {
+  "at": "2026-11-17T20:38:36.641Z",
+  "by": "review",
+  "cmd": "find",
+  "args": {
+   "kind": "verdict",
+   "in": "task-9",
+   "by": "review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:38:36.688Z",
+  "by": "review",
+  "cmd": "find",
+  "args": {
+   "to": "review",
+   "state": "open",
+   "by": "review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:38:36.741Z",
+  "by": "review",
+  "cmd": "get",
+  "args": {
+   "by": "review",
+   "pos": [
+    "change-57"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:38:36.796Z",
+  "by": "review",
+  "cmd": "get",
+  "args": {
+   "by": "review",
+   "pos": [
+    "finding-52"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:38:36.842Z",
+  "by": "review",
+  "cmd": "get",
+  "args": {
+   "by": "review",
+   "pos": [
+    "finding-53"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:38:36.882Z",
+  "by": "review",
+  "cmd": "get",
+  "args": {
+   "by": "review",
+   "pos": [
+    "finding-54"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:38:36.926Z",
+  "by": "review",
+  "cmd": "get",
+  "args": {
+   "by": "review",
+   "pos": [
+    "finding-55"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:38:36.971Z",
+  "by": "review",
+  "cmd": "get",
+  "args": {
+   "by": "review",
+   "pos": [
+    "check-16"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:38:41.686Z",
+  "by": "review",
+  "cmd": "find",
+  "args": {
+   "kind": "question",
+   "in": "task-9",
+   "by": "review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:38:41.735Z",
+  "by": "review",
+  "cmd": "find",
+  "args": {
+   "in": "task-9",
+   "to": "close-out",
+   "by": "review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:38:41.779Z",
+  "by": "review",
+  "cmd": "find",
+  "args": {
+   "kind": "run",
+   "in": "task-9",
+   "state": "open",
+   "by": "review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:39:29.683Z",
+  "by": "review",
+  "cmd": "find",
+  "args": {
+   "to": "review",
+   "state": "open",
+   "by": "review",
+   "pos": []
+  },
+  "asOf": null
+ }
+]
