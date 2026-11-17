@@ -1,0 +1,37 @@
+task-28 task v1 [open] by breakdown
+decision-32 decision v1 [stands] STALE by breakdown
+decision-33 decision v1 [stands] STALE by breakdown
+decision-34 decision v1 [stands] STALE by breakdown
+decision-35 decision v1 [stands] STALE by breakdown
+decision-36 decision v1 [stands] STALE by breakdown
+finding-82 finding v2 [done] to task-28 by implementation
+question-84 question v3 [answered] STALE to John by layer
+finding-85 finding v2 [done] to task-28 by implementation
+check-86 check v2 [done] to task-28 by implementation
+finding-87 finding v3 [done] to task-28 by implementation
+run-88 run v2 [done] by survey-task
+finding-89 finding v2 [done] to task-28 by implementation
+finding-90 finding v2 [done] to task-28 by implementation
+run-94 run v2 [done] by survey-place
+decision-95 decision v1 [stands] STALE by scoping
+run-96 run v2 [done] by scoping
+change-97 change v2 [open] by implementation
+decision-98 decision v3 [stands] STALE by implementation
+finding-100 finding v3 [handed-on] to review by review
+finding-101 finding v2 [done] to review by review
+run-102 run v2 [done] by implementation
+decision-103 decision v1 [stands] by John
+finding-104 finding v2 [done] to review by review
+run-107 run v2 [done] by leftover
+run-108 run v2 [done] by review
+finding-109 finding v1 [open] to close-out by review
+finding-110 finding v1 [open] to close-out by review
+finding-111 finding v1 [open] to close-out by review
+check-112 check v1 [open] to John by review
+check-113 check v1 [open] to John by review
+verdict-114 verdict v1 [stands] by review
+verdict-115 verdict v1 [stands] by blind-read
+finding-116 finding v1 [open] to close-out by blind-read
+finding-117 finding v1 [open] to close-out by blind-read
+finding-118 finding v1 [open] to close-out by blind-read
+run-120 run v2 [done] by blind-read

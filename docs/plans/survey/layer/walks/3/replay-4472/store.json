@@ -4295,6 +4295,26 @@
     "asOf": null
    },
    "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:55:21.572Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-28",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:55:37.386Z",
+   "by": "close-out",
+   "query": "show",
+   "args": {
+    "task": "task-28",
+    "asOf": null
+   },
+   "returned": 1
   }
  ],
  "hits": []

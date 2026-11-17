@@ -1,0 +1,123 @@
+[
+ {
+  "at": "2026-11-17T13:54:12.241Z",
+  "by": "blind-read",
+  "query": "get",
+  "args": {
+   "id": "change-97",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:54:12.276Z",
+  "by": "blind-read",
+  "query": "get",
+  "args": {
+   "id": "finding-99",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:54:12.307Z",
+  "by": "blind-read",
+  "query": "get",
+  "args": {
+   "id": "finding-105",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:54:17.572Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "text": "fmtWhen"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:54:17.616Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "text": "nothing here reads"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:54:17.657Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "text": "summary-and-time"
+  },
+  "returned": 7
+ },
+ {
+  "at": "2026-11-17T13:54:17.711Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "text": "once"
+  },
+  "returned": 5
+ },
+ {
+  "at": "2026-11-17T13:54:17.759Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "text": "time.js"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:54:17.807Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "kind": "area"
+  },
+  "returned": 2
+ },
+ {
+  "at": "2026-11-17T13:54:22.287Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "kind": "area"
+  },
+  "returned": 2
+ },
+ {
+  "at": "2026-11-17T13:54:22.323Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "path": "lib/task-page-loader.js"
+  },
+  "returned": 3
+ },
+ {
+  "at": "2026-11-17T13:54:22.360Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "kind": "verdict"
+  },
+  "returned": 3
+ },
+ {
+  "at": "2026-11-17T13:55:02.447Z",
+  "by": "blind-read",
+  "query": "get",
+  "args": {
+   "id": "run-120",
+   "asOf": null
+  },
+  "returned": 1
+ }
+]

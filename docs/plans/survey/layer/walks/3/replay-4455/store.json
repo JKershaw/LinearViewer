@@ -2267,6 +2267,39 @@
      "links": {
       "on": "plan-45@2"
      }
+    },
+    {
+     "v": 3,
+     "op": "revise",
+     "at": "2026-11-13T16:16:30.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "ref": "https://github.com/JKershaw/LinearViewer/pull/2427",
+      "head": "f78b61898"
+     },
+     "links": {
+      "on": "plan-45@2"
+     },
+     "reason": "Close-out moved the PR head past c95b9f139: e52a8b273 merges origin/main 5dcf5bcda (clean) and makes the review and blind-read fixes (docblock sentence, folded floating comments, setHeldWakeReleaseNote called without ?.); f78b61898 adds the blind read's larger and outside finds as Waiting entries. Neither changes behaviour."
+    },
+    {
+     "v": 4,
+     "op": "end",
+     "at": "2026-11-13T16:16:31.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "state": "merged",
+     "fields": {
+      "ref": "https://github.com/JKershaw/LinearViewer/pull/2427",
+      "head": "f78b61898"
+     },
+     "links": {
+      "on": "plan-45@2"
+     },
+     "reason": "Merged PR #2427 as 192e1f81f, pinned to head f78b61898 with --match-head-commit; ci-success green on f78b61898 (run 43458642312, 8/8). Deploy landed: the harbour.cat footer shows 192e1f81f.",
+     "stateReason": "Merged PR #2427 as 192e1f81f, pinned to head f78b61898 with --match-head-commit; ci-success green on f78b61898 (run 43458642312, 8/8). Deploy landed: the harbour.cat footer shows 192e1f81f."
     }
    ]
   },
@@ -3886,6 +3919,66 @@
    "query": "show",
    "args": {
     "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:55:06.814Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "finding-99",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:55:06.855Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "finding-100",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:55:06.899Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "finding-101",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:55:06.944Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "finding-73",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:55:06.988Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "finding-76",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:55:07.030Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "finding-22",
     "asOf": null
    },
    "returned": 1
