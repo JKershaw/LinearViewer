@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 82,
+ "next": 89,
  "records": {
   "task-1": {
    "id": "task-1",
@@ -1963,6 +1963,173 @@
      "links": {}
     }
    ]
+  },
+  "finding-82": {
+   "id": "finding-82",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:25:51.000Z",
+     "by": "survey-task",
+     "in": "task-28",
+     "to": "task-28",
+     "state": "open",
+     "fields": {
+      "says": "Survey @ 17faa83f4 (piece 1, #2431, merged: `import-world.js`, census 102, Waiting entry rewritten). Suites the plan does not list will break when the IIFE is removed. (a) Text slicers anchored on the IIFE's two-space indent: `lin-3975-task-run-control:588` (`'  function init(doc) {'`), `lin-3975-summary-and-time:59/162/263`, `lin-3975-chat-fold:142`; unwrapping moves every line out two spaces. Re-anchor them on names. (b) Two more suites execute the file: `lin-3975-proposal-refresh:232` (`loadWorld` + `module.exports`) and `lin-3975-task-run-links:213`, which runs the raw source with `vm.runInNewContext` and will throw a SyntaxError on the first `export`. Both must move to imports with the other executing suites."
+     },
+     "links": {
+      "about": "plan-10"
+     }
+    }
+   ]
+  },
+  "finding-83": {
+   "id": "finding-83",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:25:52.000Z",
+     "by": "survey-task",
+     "in": "area-49",
+     "to": "area-49",
+     "state": "open",
+     "fields": {
+      "says": "`public/task-page.js` restates two lib helpers under other names, so the plan's name-equality search (function name = a `common.js` global or a lib export) finds nothing: `relativeWords` (`:366`) is `relativeAgo` (`lib/task-page-loader.js:614`) line for line, and `formatElapsed` (`:302`) is pinned by a parity test to `fmtDuration` (`lib/render-run-steps.js:258`). Neither lib file is a leaf (22 and 4 imports), so importing either needs a leaf extracted, a `SHARED_MODULES` entry and an `areas.json` owner: a serving change. (LIN-4472 survey @ 17faa83f4.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "question-84": {
+   "id": "question-84",
+   "kind": "question",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:25:53.000Z",
+     "by": "survey-task",
+     "in": "task-28",
+     "to": "task-28",
+     "state": "open",
+     "fields": {
+      "asks": "Plan-10 says piece 2 retires any helper `task-page.js` restates. The only real duplicates (finding-83: `relativeWords`/`relativeAgo`, `formatElapsed`/`fmtDuration`) live in non-leaf lib files, and importing them is a serving change that the session-fit decision (decision-32) rules out. Which way does this piece go? Decide before the first commit and record it on LIN-4463 (plan deviation, per decision-36).",
+      "options": [
+       "Export both from task-page.js, turn the parity tests into plain imports, and name the leaf extraction as the next piece",
+       "Extract the leaves and add SHARED_MODULES entries in this piece (breaks session fit)",
+       "Leave the duplicates unnamed"
+      ],
+      "recommended": "Export both from task-page.js, turn the parity tests into plain imports, and name the leaf extraction as the next piece.",
+      "if-unanswered": "The builder takes the recommended option and says so on LIN-4463."
+     },
+     "links": {
+      "on": "decision-32@1",
+      "about": "finding-83"
+     }
+    }
+   ]
+  },
+  "finding-85": {
+   "id": "finding-85",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:25:54.000Z",
+     "by": "survey-task",
+     "in": "task-28",
+     "to": "task-28",
+     "state": "open",
+     "fields": {
+      "says": "`importWorld` (`tests/unit/helpers/import-world.js`) sets up less than `loadWorld`, which works against plan-10's \"each migrated suite reads shorter\". `loadWorld` gives a stub `fetch`, a sync `requestAnimationFrame`, `navigator.clipboard` and unref'd timers; `importWorld` uses Node's real globals: without `timers` a poller's `setTimeout` is real, `navigator` is Node 25's own with no clipboard (share copy, `task-page.js:397`), and every page test needs `restore()`. Way to keep suites short: most exports are pure (`pollDelay`, `cadenceStatus`, `createOpenMemory`, `formatElapsed`, `proposalsUrlOf`…). Keep the `typeof document` guard and a static import needs no world at all, which removes `exportsOf()` (`task-page-client:28`, `task-timeline-client:26`). Only the DOMContentLoaded suites need `importWorld`."
+     },
+     "links": {
+      "about": "lesson-67"
+     }
+    }
+   ]
+  },
+  "check-86": {
+   "id": "check-86",
+   "kind": "check",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:25:55.000Z",
+     "by": "survey-task",
+     "in": "task-28",
+     "to": "task-28",
+     "state": "open",
+     "fields": {
+      "what": "The converted task page loads and runs in a real browser: module MIME type, CSP, and execution order after the classic scripts.",
+      "how": "Run `tests/e2e/task-page.spec.js` and `tests/e2e/task-timeline.spec.js` against the branch, or cite the CI e2e job that ran them on the PR head. The golden diff (7 tags) and Node imports cannot show any of these."
+     },
+     "links": {
+      "about": "plan-10"
+     }
+    }
+   ]
+  },
+  "finding-87": {
+   "id": "finding-87",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:25:56.000Z",
+     "by": "survey-task",
+     "in": "task-28",
+     "to": "task-28",
+     "state": "open",
+     "fields": {
+      "says": "Minor, from the survey: the regex at `no-page-wide-label-listener:247` already tolerates `{ module }` entries, so plan review note 8's rerun there is low risk. Piece 1 already marked the module-capable-loader Waiting entry's premise wrong (finding-56), so deleting it here is tidying, not proof. Census expectation: 102 should fall by 5–7, depending on whether `task-page-question` still loads `question-cards.js` classically."
+     },
+     "links": {
+      "about": "finding-56"
+     }
+    }
+   ]
+  },
+  "run-88": {
+   "id": "run-88",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:25:57.000Z",
+     "by": "survey-task",
+     "in": "task-28",
+     "state": "open",
+     "fields": {
+      "stage": "survey-task",
+      "account": "Surveyed LIN-4472 at 17faa83f4, after piece 1 (#2431) merged. The conversion itself is easy; the difficulty is in four places: text-slicing and executing suites the plan does not list (finding-82), duplicates the plan's name search misses and that need a serving change to import (finding-83, question-84), importWorld giving less than loadWorld (finding-85), and no real browser exercising the page (check-86). First moves: 1. add named exports beside the IIFE; 2. move the five executing suites and the two parity tests to imports, green while the seam still exists; 3. remove the IIFE and the seam in a whitespace-only commit, re-anchoring the text slicers on names; 4. then SCRIPTS, the golden file and the census (expect 102 to fall by 5–7)."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T17:25:58.000Z",
+     "by": "survey-task",
+     "in": "task-28",
+     "state": "done",
+     "fields": {
+      "stage": "survey-task",
+      "account": "Surveyed LIN-4472 at 17faa83f4, after piece 1 (#2431) merged. The conversion itself is easy; the difficulty is in four places: text-slicing and executing suites the plan does not list (finding-82), duplicates the plan's name search misses and that need a serving change to import (finding-83, question-84), importWorld giving less than loadWorld (finding-85), and no real browser exercising the page (check-86). First moves: 1. add named exports beside the IIFE; 2. move the five executing suites and the two parity tests to imports, green while the seam still exists; 3. remove the IIFE and the seam in a whitespace-only commit, re-anchoring the text slicers on names; 4. then SCRIPTS, the golden file and the census (expect 102 to fall by 5–7)."
+     },
+     "links": {},
+     "reason": "survey posted",
+     "stateReason": "survey posted"
+    }
+   ]
   }
  },
  "queries": [
@@ -2059,6 +2226,16 @@
     "state": "open"
    },
    "returned": 11
+  },
+  {
+   "at": "2026-11-17T13:41:45.378Z",
+   "by": "survey-task",
+   "query": "get",
+   "args": {
+    "id": "decision-15",
+    "asOf": null
+   },
+   "returned": 1
   }
  ],
  "hits": []

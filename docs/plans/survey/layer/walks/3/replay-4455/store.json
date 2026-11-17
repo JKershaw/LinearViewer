@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 66,
+ "next": 73,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -1510,6 +1510,178 @@
      "links": {
       "on": "verdict-55@1"
      }
+    }
+   ]
+  },
+  "finding-66": {
+   "id": "finding-66",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:02:16.000Z",
+     "by": "survey-task",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "Survey @ cfd152fa4: `wakeHook.releaseNote` cannot reach most releases. The hook is built per request (`leftoverStep.forRequest`, `routes/dispatch.js:1636`, `routes/proxy-runner.js:213`) and only passed into `addFeedback`; most releases come through `_archiveItem` -> `_releaseIfHeld` (`lib/dispatch-store.js:1890`, `:1949`) from `removeItem`, `cleanup()` expiry and the stopped-run cleanup, none of which has a request or hook. Only the `_applyWakeHook` re-release (`:3429`) holds one. So put the wording on `leftoverStep` and late-bind it into the store, as `setWakeCredentialProvisionerFactory` already is (`server.js:1146`), and decide what an unbound store says (`lin-4373-leftover-step.test.js` asserts \"did not run\" five times). This is the second hook surface Waiting 5 (one `wakeHook`) warns about; shape it with that in mind. Do this first: it is the only part that changes the store shape, and it decides what the rewritten lin-4377 witness counts (no `formatHeldWakeNote` import in the store)."
+     },
+     "links": {
+      "on": "plan-45@1",
+      "about": "finding-21"
+     }
+    }
+   ]
+  },
+  "question-67": {
+   "id": "question-67",
+   "kind": "question",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:02:17.000Z",
+     "by": "survey-task",
+     "in": "task-60",
+     "to": "design",
+     "state": "open",
+     "fields": {
+      "asks": "Plan piece 5 puts one `FEEDBACK_KINDS` table in `lib/dispatch-feedback-validation.js`. That file imports `dispatch-validation.js`, which reaches `session-telemetry.js` (via prompt-templates -> ... -> wall-clock-summary) and `dispatch-terminal.js` (via dispatch-fields -> dispatch-wake). If those import the table and build Sets from it at load, load order decides whether they hit a TDZ error. May the table live in a new import-free leaf module instead (e.g. `lib/dispatch-feedback-kinds.js`), imported by validation and the store, with the store still re-exporting `FEEDBACK_ENTRY_KINDS`?",
+      "options": [
+       "leaf module `lib/dispatch-feedback-kinds.js`",
+       "keep it in `lib/dispatch-feedback-validation.js` and break the cycles another way"
+      ],
+      "recommended": "leaf module `lib/dispatch-feedback-kinds.js`",
+      "if-unanswered": "Implementation builds the leaf module (an engineering call) and the PR names the departure from plan piece 5 and comments on LIN-4447."
+     },
+     "links": {
+      "on": "plan-45@1",
+      "about": "finding-28"
+     }
+    }
+   ]
+  },
+  "finding-68": {
+   "id": "finding-68",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:02:18.000Z",
+     "by": "survey-task",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "`findWakeEvent` has no skip rule to derive: it returns the last matching marker of any kind (`lib/dispatch-terminal.js:631`), and `lib/session-telemetry.js:82` calls it \"Deliberately NOT shared\". Deriving a filter would change the mint path (`lib/dispatch-store.js:3696`) and every reader of stored rows (task-page-loader, run-view, digest-feedback, run-loop-state), against the binding \"never recompute pre-cutover history\". Recommend: give the table a wake-role column (\"every kind may carry a wake\") and pin that current behaviour matches it, rather than adding a filter; the PR says this is how the done-when clause on `findWakeEvent` is met."
+     },
+     "links": {
+      "on": "task-60@1",
+      "about": "finding-28"
+     }
+    }
+   ]
+  },
+  "finding-69": {
+   "id": "finding-69",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:02:19.000Z",
+     "by": "survey-task",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "Prompt seam (LLM & prompts side is LIN-4448s): `lib/prompts/runner-kickoff.js` renders `FEEDBACK_ENTRY_KINDS` into the runner prompt in its current order, checked by `runner-kickoff.test.js:191`; a derived list must keep that exact order. The table also needs rows for kinds deliberately off the allowlist (`decision-answer`, `decision-withdrawal-reversed`; see `DECISION_LIFECYCLE_STAMP_KINDS`, `lib/session-telemetry.js:60`); without them a roles column quietly widens what the runner may post."
+     },
+     "links": {
+      "on": "plan-45@1",
+      "about": "finding-28"
+     }
+    }
+   ]
+  },
+  "check-70": {
+   "id": "check-70",
+   "kind": "check",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:02:20.000Z",
+     "by": "survey-task",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "what": "After deriving from the kinds table, `FEEDBACK_ENTRY_KINDS` equals today's list in the same order, and the runner allowlist does not gain `decision-answer` or `decision-withdrawal-reversed`.",
+      "how": "A unit test pinning the exact order and membership of `FEEDBACK_ENTRY_KINDS`, alongside `runner-kickoff.test.js:191`; it fails if a row is reordered or a non-allowlist kind is admitted."
+     },
+     "links": {
+      "on": "plan-45@1"
+     }
+    }
+   ]
+  },
+  "finding-71": {
+   "id": "finding-71",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:02:21.000Z",
+     "by": "survey-task",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "`NEVER_RAN` has nothing to import from: `cancelled`/`expired` is spelled out at `lib/dispatch-leftover.js:29`, `lib/dispatch-store.js:1906` and `:1176`. One home must be created where neither side learns \"leftover\" (`lin-4377-store-knows-no-leftover`); `lib/dispatch-fields.js` is already imported by both. The other two owners are safe import-free leaves: `HALT_MODES` (`lib/workspace-halt.js`), and `followUpTarget(t) == null` (`lib/dispatch-targets.js`), equivalent to `!RESUMABLE_TARGETS.has(t || \"cli\")`. These are mechanical; do them last."
+     },
+     "links": {
+      "on": "plan-45@1",
+      "about": "finding-19"
+     }
+    }
+   ]
+  },
+  "run-72": {
+   "id": "run-72",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:02:22.000Z",
+     "by": "survey-task",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "stage": "survey-task",
+      "account": "Surveyed LIN-4455 at cfd152fa4 (origin/main one docs-only commit past the 4b5001ddf grounding in decision-61; no code drift). Piece 5 is harder than import-instead-of-restate in five places: the release note cannot ride the per-request wakeHook (finding-66, late-bind on leftoverStep); the kinds table in dispatch-feedback-validation.js risks import cycles, so I asked design for a leaf module (question-67); findWakeEvent has no skip rule and deriving one would recompute stored history (finding-68); the runner prompt pins FEEDBACK_ENTRY_KINDS order and the allowlist excludes two kinds (finding-69, check-70); NEVER_RAN needs a new home, likely dispatch-fields.js (finding-71). Order: release note first, then the leaf kinds module with an order test, constants last. Lessons sit at about 4.3 KB of the 6,144-byte limit, room for the Waiting 2/4/11 removals. Waiting findings 19, 21, 28 stay open for implementation."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:02:23.000Z",
+     "by": "survey-task",
+     "in": "task-60",
+     "state": "done",
+     "fields": {
+      "stage": "survey-task",
+      "account": "Surveyed LIN-4455 at cfd152fa4 (origin/main one docs-only commit past the 4b5001ddf grounding in decision-61; no code drift). Piece 5 is harder than import-instead-of-restate in five places: the release note cannot ride the per-request wakeHook (finding-66, late-bind on leftoverStep); the kinds table in dispatch-feedback-validation.js risks import cycles, so I asked design for a leaf module (question-67); findWakeEvent has no skip rule and deriving one would recompute stored history (finding-68); the runner prompt pins FEEDBACK_ENTRY_KINDS order and the allowlist excludes two kinds (finding-69, check-70); NEVER_RAN needs a new home, likely dispatch-fields.js (finding-71). Order: release note first, then the leaf kinds module with an order test, constants last. Lessons sit at about 4.3 KB of the 6,144-byte limit, room for the Waiting 2/4/11 removals. Waiting findings 19, 21, 28 stay open for implementation."
+     },
+     "links": {},
+     "reason": "survey posted on LIN-4455",
+     "stateReason": "survey posted on LIN-4455"
     }
    ]
   }

@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 80,
+ "next": 82,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -1760,6 +1760,25 @@
       "on": "plan-54@2",
       "about": "finding-67"
      }
+    },
+    {
+     "v": 3,
+     "op": "end",
+     "at": "2026-11-13T13:55:23.000Z",
+     "by": "scoping",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "handed-on",
+     "fields": {
+      "says": "The planned fixed-point/round-trip test will fail on an empty fence: the codec emits an empty `codeBlock` that D1 refuses (see the area-1 finding on `adf.js`'s false header claim). \"D1 unchanged\" does not protect the block, since D1 sees the whole document. Pick deliberately: fix the codec (and the header) or exclude the input with its reason recorded."
+     },
+     "links": {
+      "on": "plan-54@2",
+      "about": "finding-67"
+     },
+     "reason": "Picked: fix the codec (not exclude the input). decision-80 makes it the tidy done first; the build does the fix.",
+     "stateReason": "Picked: fix the codec (not exclude the input). decision-80 makes it the tidy done first; the build does the fix.",
+     "takeover": "decision-80"
     }
    ]
   },
@@ -2036,6 +2055,107 @@
      },
      "reason": "survey posted",
      "stateReason": "survey posted"
+    }
+   ]
+  },
+  "decision-80": {
+   "id": "decision-80",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:55:20.000Z",
+     "by": "scoping",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "answer": "Size of the move: a small tidy. Jira holds the person's words byte-exact (decision-63's slice, unchanged), plus one tidy done first: fix the codec so an empty fenced code block in the words no longer files a description that D1 refuses, so every later write below the line, which the seal exists to allow, still works. The fix-or-exclude choice in finding-68 is taken as fix the codec; adf.js's false header claim (finding-67) is retired with it. Cuts: none. Decided by: the standing policy.",
+      "why": "Excluding the input would leave a Harbour-written Jira ticket that can never be written below the line again; fixing the codec is small and lands in the same pure module the seal already touches. Nothing in the Done-when is narrowed, so no cut and no ruling is needed."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "link",
+     "at": "2026-11-13T13:55:21.000Z",
+     "by": "scoping",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "answer": "Size of the move: a small tidy. Jira holds the person's words byte-exact (decision-63's slice, unchanged), plus one tidy done first: fix the codec so an empty fenced code block in the words no longer files a description that D1 refuses, so every later write below the line, which the seal exists to allow, still works. The fix-or-exclude choice in finding-68 is taken as fix the codec; adf.js's false header claim (finding-67) is retired with it. Cuts: none. Decided by: the standing policy.",
+      "why": "Excluding the input would leave a Harbour-written Jira ticket that can never be written below the line again; fixing the codec is small and lands in the same pure module the seal already touches. Nothing in the Done-when is narrowed, so no cut and no ruling is needed."
+     },
+     "links": {
+      "on": "finding-68@2"
+     }
+    },
+    {
+     "v": 3,
+     "op": "link",
+     "at": "2026-11-13T13:55:22.000Z",
+     "by": "scoping",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "answer": "Size of the move: a small tidy. Jira holds the person's words byte-exact (decision-63's slice, unchanged), plus one tidy done first: fix the codec so an empty fenced code block in the words no longer files a description that D1 refuses, so every later write below the line, which the seal exists to allow, still works. The fix-or-exclude choice in finding-68 is taken as fix the codec; adf.js's false header claim (finding-67) is retired with it. Cuts: none. Decided by: the standing policy.",
+      "why": "Excluding the input would leave a Harbour-written Jira ticket that can never be written below the line again; fixing the codec is small and lands in the same pure module the seal already touches. Nothing in the Done-when is narrowed, so no cut and no ruling is needed."
+     },
+     "links": {
+      "on": "finding-68@2",
+      "about": "decision-63"
+     }
+    }
+   ]
+  },
+  "run-81": {
+   "id": "run-81",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:55:24.000Z",
+     "by": "scoping",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "stage": "scoping",
+      "account": "Set the size of the move for LIN-4450 before the build: a small tidy, cuts none, decided by the standing policy (decision-80). The move is decision-63's slice as planned (Jira holds the words byte-exact in harbour.asAsked); the tidy, done first, is the empty-fence codec fix, which answers finding-68's fix-or-exclude as fix (handed on to decision-80) and retires adf.js's header claim (finding-67, left open for the build to close). Wrote the size section into the LIN-4450 description. Left open for the build: finding-66 (end-line rule), 67, 70, 71, 73, 74, 75. check-69 is John's, not mine."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "link",
+     "at": "2026-11-13T13:55:25.000Z",
+     "by": "scoping",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "stage": "scoping",
+      "account": "Set the size of the move for LIN-4450 before the build: a small tidy, cuts none, decided by the standing policy (decision-80). The move is decision-63's slice as planned (Jira holds the words byte-exact in harbour.asAsked); the tidy, done first, is the empty-fence codec fix, which answers finding-68's fix-or-exclude as fix (handed on to decision-80) and retires adf.js's header claim (finding-67, left open for the build to close). Wrote the size section into the LIN-4450 description. Left open for the build: finding-66 (end-line rule), 67, 70, 71, 73, 74, 75. check-69 is John's, not mine."
+     },
+     "links": {
+      "on": "decision-80@3"
+     }
+    },
+    {
+     "v": 3,
+     "op": "end",
+     "at": "2026-11-13T13:55:26.000Z",
+     "by": "scoping",
+     "in": "task-60",
+     "state": "done",
+     "fields": {
+      "stage": "scoping",
+      "account": "Set the size of the move for LIN-4450 before the build: a small tidy, cuts none, decided by the standing policy (decision-80). The move is decision-63's slice as planned (Jira holds the words byte-exact in harbour.asAsked); the tidy, done first, is the empty-fence codec fix, which answers finding-68's fix-or-exclude as fix (handed on to decision-80) and retires adf.js's header claim (finding-67, left open for the build to close). Wrote the size section into the LIN-4450 description. Left open for the build: finding-66 (end-line rule), 67, 70, 71, 73, 74, 75. check-69 is John's, not mine."
+     },
+     "links": {
+      "on": "decision-80@3"
+     },
+     "reason": "size of the move set in the description",
+     "stateReason": "size of the move set in the description"
     }
    ]
   }
@@ -2361,6 +2481,16 @@
     "kind": "run"
    },
    "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:42:21.191Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
   }
  ],
  "hits": []
