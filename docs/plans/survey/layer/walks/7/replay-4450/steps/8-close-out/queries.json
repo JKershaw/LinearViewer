@@ -1,0 +1,287 @@
+[
+ {
+  "at": "2026-11-17T20:36:04.233Z",
+  "by": "close-out",
+  "cmd": "show",
+  "args": {
+   "task": "task-60",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:08.236Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "change-84"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:08.277Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "finding-91"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:08.318Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "finding-75"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:08.360Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "check-69"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:08.396Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "finding-99"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:08.435Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "task-60"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:08.472Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": {
+   "text": "79",
+   "kind": "finding",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:08.506Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": {
+   "text": "LIN-4452",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:13.465Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "check-90"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:13.515Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "finding-79"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:13.565Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "task-61"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:13.616Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "task-62"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:13.664Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "decision-65"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:13.703Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "finding-22"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:13.750Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": {
+   "state": "open",
+   "to": "task-62",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:13.797Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": {
+   "state": "open",
+   "to": "task-61",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:23.679Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "finding-92"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:23.717Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "check-102"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:23.762Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "check-103"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:23.803Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "task-61"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:23.844Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": {
+   "text": "source-map",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:36:26.441Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "finding-80"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:37:00.305Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": {
+   "to": "close-out",
+   "state": "open",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ }
+]

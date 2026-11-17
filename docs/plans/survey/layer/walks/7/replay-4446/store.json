@@ -92,6 +92,22 @@
     "fields": {
      "says": "`public/common.js`: `buildDispatchModelOptionDescriptors` repeats the merge rule of `buildModelOptions` (`lib/openrouter-catalog.js`), since the browser has no build step. The lists are not copied (they come from `window.__HARNESS_MODELS__` and the catalog over the wire); only the rule is. The endpoint could send merged options instead. (LIN-4358.)"
     }
+   },
+   {
+    "id": "finding-5",
+    "kind": "finding",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T14:56:27.021Z",
+    "by": "leftover",
+    "reason": "the front-end-browser Waiting entry's reason corrected by LIN-4446 leftover: not a leaf, rather than no build step",
+    "in": "area-1",
+    "to": "area-1",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "says": "`public/common.js`: `buildDispatchModelOptionDescriptors` repeats the merge rule of `buildModelOptions` (`lib/openrouter-catalog.js`). The reason is not the no-build-step rule (the browser may now import leaf modules natively, lesson-60) but that `lib/openrouter-catalog.js` is not a leaf, so it cannot be served as a single `SHARED_MODULES` file. The lists are not copied (they come from `window.__HARNESS_MODELS__` and the catalog over the wire); only the rule is. The endpoint could send merged options instead. (LIN-4358.)"
+    }
    }
   ],
   "finding-6": [
@@ -2092,6 +2108,27 @@
      "ref": "https://github.com/JKershaw/LinearViewer/pull/2423",
      "head": "24de9abc9"
     }
+   },
+   {
+    "id": "change-57",
+    "kind": "change",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T14:56:26.021Z",
+    "by": "leftover",
+    "reason": "leftover tidies pushed to PR #2423; CI green at the new head",
+    "in": "task-9",
+    "to": "review",
+    "state": "open",
+    "links": {
+     "about": [
+      "plan-28"
+     ]
+    },
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2423",
+     "head": "1de016f523f46a006c20a4e89717157422b3207b"
+    }
    }
   ],
   "finding-58": [
@@ -3401,6 +3438,251 @@
     "count": true,
     "by": "implementation",
     "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:36:45.338Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "kind": "area",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:36:45.378Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "to": "area-1",
+    "state": "open",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:36:45.411Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": {
+    "by": "leftover",
+    "pos": [
+     "change-57"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:02.243Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "to": "leftover",
+    "state": "open",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:02.274Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "to": "implementation",
+    "state": "open",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:02.317Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "to": "design",
+    "state": "open",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:02.355Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "to": "scoping",
+    "state": "open",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:02.398Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "to": "plan-review",
+    "state": "open",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:02.443Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "to": "survey-task",
+    "state": "open",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:02.479Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "to": "survey-place",
+    "state": "open",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:02.515Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "text": "user-scalable",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:02.551Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "text": "TERMINAL_TYPES",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:02.585Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "text": "vendor-assets",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:02.623Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "text": "platform",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:02.660Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "text": "list position",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:02.695Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "text": "openrouter-catalog",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:07.309Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": {
+    "by": "leftover",
+    "pos": [
+     "lesson-60@1"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:07.350Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": {
+    "by": "leftover",
+    "pos": [
+     "check-33@1"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:07.383Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": {
+    "by": "leftover",
+    "pos": [
+     "finding-30@1"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:07.414Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "kind": "run",
+    "in": "task-9",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:24.749Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": {
+    "by": "leftover",
+    "pos": [
+     "finding-30@1"
+    ]
    },
    "asOf": null
   }

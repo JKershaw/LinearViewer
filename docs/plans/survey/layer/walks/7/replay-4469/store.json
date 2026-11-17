@@ -5459,6 +5459,90 @@
     ]
    },
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:36:47.582Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "change-142"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:36:47.618Z",
+   "by": "review",
+   "cmd": "find",
+   "args": {
+    "to": "review",
+    "state": "open",
+    "by": "review",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:36:55.478Z",
+   "by": "review",
+   "cmd": "show",
+   "args": {
+    "task": "task-131",
+    "by": "review",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:23.707Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "lesson-10"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:23.767Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "check-158"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:23.813Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "question-162"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:37:23.851Z",
+   "by": "review",
+   "cmd": "find",
+   "args": {
+    "kind": "finding",
+    "text": "seams",
+    "by": "review",
+    "count": true,
+    "pos": []
+   },
+   "asOf": null
   }
  ]
 }
