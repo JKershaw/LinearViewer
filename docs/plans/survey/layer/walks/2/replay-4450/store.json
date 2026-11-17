@@ -1,15 +1,15 @@
 {
  "retro": false,
- "seq": 131,
+ "seq": 138,
  "count": {
   "area": 4,
   "lesson": 22,
-  "finding": 48,
+  "finding": 52,
   "task": 4,
   "decision": 12,
   "plan": 3,
-  "verdict": 4,
-  "run": 6,
+  "verdict": 5,
+  "run": 7,
   "question": 1,
   "check": 4,
   "change": 1
@@ -3124,6 +3124,159 @@
     },
     "note": "Review written: verdict-4, finding-48, check-2..4.",
     "reason": "Review written: verdict-4, finding-48, check-2..4."
+   }
+  ],
+  "run-7": [
+   {
+    "id": "run-7",
+    "kind": "run",
+    "v": 1,
+    "seq": 132,
+    "at": "2026-11-13T15:21:22.000Z",
+    "by": "blind-read",
+    "op": "add",
+    "in": "task-2",
+    "state": "open",
+    "links": [],
+    "fields": {
+     "stage": "blind-read",
+     "account": "Read PR #2421 at f9fa4a80c against 4b5001ddf cold. Better: Jira description read/write has one owner (as-asked-region.js readDescription/holdAsAsked; descriptionRoundTrip runs the same pair, so seal decision and write cannot disagree), and ten inline test-token predicates fold onto isHermeticTestToken. Worse side: a Jira issue description now depends on which read produced it (batch serves converted words, single reads serve exact). Three fix-sized items to close-out, one larger item for the providers area (sent to place: brief gave no area id)."
+    }
+   },
+   {
+    "id": "run-7",
+    "kind": "run",
+    "v": 2,
+    "seq": 138,
+    "at": "2026-11-13T15:21:28.000Z",
+    "by": "blind-read",
+    "op": "end",
+    "in": "task-2",
+    "state": "done",
+    "links": [],
+    "fields": {
+     "stage": "blind-read",
+     "account": "Read PR #2421 at f9fa4a80c against 4b5001ddf cold. Better: Jira description read/write has one owner (as-asked-region.js readDescription/holdAsAsked; descriptionRoundTrip runs the same pair, so seal decision and write cannot disagree), and ten inline test-token predicates fold onto isHermeticTestToken. Worse side: a Jira issue description now depends on which read produced it (batch serves converted words, single reads serve exact). Three fix-sized items to close-out, one larger item for the providers area (sent to place: brief gave no area id)."
+    },
+    "note": "Blind read written: verdict-5, findings 49-52.",
+    "reason": "Blind read written: verdict-5, findings 49-52."
+   }
+  ],
+  "verdict-5": [
+   {
+    "id": "verdict-5",
+    "kind": "verdict",
+    "v": 1,
+    "seq": 133,
+    "at": "2026-11-13T15:21:23.000Z",
+    "by": "blind-read",
+    "op": "add",
+    "in": "task-2",
+    "state": "stands",
+    "links": [
+     {
+      "type": "on",
+      "to": "change-1",
+      "v": 2
+     }
+    ],
+    "fields": {
+     "of": "blind-read",
+     "outcome": "better",
+     "reasoning": "Jira description read and write get a single owner (lib/providers/jira/as-asked-region.js: readDescription/holdAsAsked), and descriptionRoundTrip runs that same pair, so the seal decision and the write cannot disagree. Ten inline copies of the test-token predicate fold onto isHermeticTestToken (routes/proxy-compute.js, server.js, routes/task-chat.js, routes/workspace-api-steps.js). Worse side: a Jira issue description now depends on which read produced it (batch path serves converted words, single-issue reads serve the exact ones). Read: PR #2421 at f9fa4a80c against 4b5001ddf."
+    }
+   }
+  ],
+  "finding-49": [
+   {
+    "id": "finding-49",
+    "kind": "finding",
+    "v": 1,
+    "seq": 134,
+    "at": "2026-11-13T15:21:24.000Z",
+    "by": "blind-read",
+    "op": "add",
+    "in": "task-2",
+    "to": "close-out",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "says": "routes/workspace-api-audit.js lines 35-36 still write process.env.NODE_ENV === 'test' && (workspace.accessToken === 'test-token' || ...) inline; the sweep moved every sibling copy onto isHermeticTestToken and missed this one. Fix: isHermeticTestToken(workspace.accessToken) || (process.env.NODE_ENV === 'test' && workspace.provider === 'local'). It keeps its own predicate, as its comment asks. (web-routes area)"
+    }
+   }
+  ],
+  "finding-50": [
+   {
+    "id": "finding-50",
+    "kind": "finding",
+    "v": 1,
+    "seq": 135,
+    "at": "2026-11-13T15:21:25.000Z",
+    "by": "blind-read",
+    "op": "add",
+    "in": "task-2",
+    "to": "close-out",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "says": "routes/workspace-api-steps.js: isTestToken is now a one-line second name for isHermeticTestToken(workspace.accessToken). Fix: have its callers (workspace-api-issue-read.js, workspace-api-issue-write.js, workspace-api-prompts.js) import the helper directly and drop the alias. (web-routes area)"
+    }
+   }
+  ],
+  "finding-51": [
+   {
+    "id": "finding-51",
+    "kind": "finding",
+    "v": 1,
+    "seq": 136,
+    "at": "2026-11-13T15:21:26.000Z",
+    "by": "blind-read",
+    "op": "add",
+    "in": "task-2",
+    "to": "close-out",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "says": "tests/unit/jira-as-asked-region.test.js line 291, \"no longer claim that Jira is skipped\", only checks that three phrases are missing from two comment headers (lib/as-asked-seal.js, lib/as-asked.js); it says nothing about behaviour, and as-asked-create-seal.test.js already checks that Jira holds the block. Fix: delete it."
+    }
+   }
+  ],
+  "finding-52": [
+   {
+    "id": "finding-52",
+    "kind": "finding",
+    "v": 1,
+    "seq": 137,
+    "at": "2026-11-13T15:21:27.000Z",
+    "by": "blind-read",
+    "op": "add",
+    "in": "task-2",
+    "to": "place",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "For the providers area (no area id in the blind-read brief). lib/providers/jira/index.js: client.searchIssues never asks for harbour.asAsked, so issues built through _toCanonicalIssue by fetchProjects/fetchIssues (~line 769) and fetchIssueContext children (~line 897) carry the ADF rendering behind canonical markers, while fetchIssueFields, fetchIssueContext().issue and issueDescription return the exact property words for the same issue. jira-as-asked-region.test.js:166 pins the split. plan-1 chose bulk search display-only, so this is by design, but it is not written anywhere a caller would see it. Larger than a fix because closing it is a choice: every dashboard batch asks /search/jql for properties (up to 32 KB per issue), or batch descriptions are documented as not carrying the exact words."
+    }
    }
   ]
  },
