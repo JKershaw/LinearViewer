@@ -1,5 +1,5 @@
 {
- "next": 91,
+ "next": 93,
  "records": {
   "area-1": [
    {
@@ -1996,6 +1996,54 @@
     "by": "John",
     "via": "Harbour"
    }
+  ],
+  "finding-91": [
+   {
+    "id": "finding-91",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "LIN-4468 (piece 4, proxy write guard): John retired look-into's exception (decision-90), so look-into stays `none` with no carve-out: the guard refuses every write from a look-into token, including a comment \"when the person asks\". The merge hold that question-83 put on LIN-4468 (\"can be built but not merged\") is lifted. Written under `## Current` on LIN-4468."
+    },
+    "links": {
+     "about": [
+      "plan-68"
+     ],
+     "on": [
+      "decision-90@1"
+     ]
+    },
+    "in": "task-60",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:58:16.000Z",
+    "by": "breakdown"
+   }
+  ],
+  "finding-92": [
+   {
+    "id": "finding-92",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "LIN-4469 (piece 5, prompt folds): following John's ruling (decision-90), drop look-into's \"unless the person asks\" clause from its prompt text (look-into reports in its session; a person posts the comment if they want it), and record the retirement in `scripts/prompt-template-change-log.md`. Written under `## Current` on LIN-4469."
+    },
+    "links": {
+     "about": [
+      "plan-69"
+     ],
+     "on": [
+      "decision-90@1"
+     ]
+    },
+    "in": "task-60",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:58:17.000Z",
+    "by": "breakdown"
+   }
   ]
  },
  "log": [
@@ -2403,6 +2451,119 @@
     "4468",
     "--by",
     "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:35.976Z",
+   "by": "breakdown",
+   "cmd": "get",
+   "args": [
+    "get",
+    "question-83",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:36.007Z",
+   "by": "breakdown",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:36.040Z",
+   "by": "breakdown",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-78",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:40.465Z",
+   "by": "breakdown",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "task",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:40.496Z",
+   "by": "breakdown",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "look-into",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:40.526Z",
+   "by": "breakdown",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "LIN-4469",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:40.556Z",
+   "by": "breakdown",
+   "cmd": "get",
+   "args": [
+    "get",
+    "decision-82",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:44.841Z",
+   "by": "breakdown",
+   "cmd": "get",
+   "args": [
+    "get",
+    "verdict-75",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:44.885Z",
+   "by": "breakdown",
+   "cmd": "get",
+   "args": [
+    "get",
+    "decision-90",
+    "--by",
+    "breakdown"
    ],
    "asOf": null
   }

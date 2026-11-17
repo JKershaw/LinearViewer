@@ -1,0 +1,187 @@
+[
+ {
+  "at": "2026-11-17T15:25:33.061Z",
+  "by": "John",
+  "cmd": "get",
+  "args": [
+   "get",
+   "question-83",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:25:33.089Z",
+  "by": "John",
+  "cmd": "get",
+  "args": [
+   "get",
+   "task-60",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:25:33.120Z",
+  "by": "John",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:25:33.150Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "decision",
+   "--text",
+   "retire",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:25:33.177Z",
+  "by": "John",
+  "cmd": "get",
+  "args": [
+   "get",
+   "task-78",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:25:36.332Z",
+  "by": "John",
+  "cmd": "get",
+  "args": [
+   "get",
+   "task-60",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:25:36.371Z",
+  "by": "John",
+  "cmd": "get",
+  "args": [
+   "get",
+   "task-78",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:25:36.397Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "decision",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:25:41.140Z",
+  "by": "John",
+  "cmd": "get",
+  "args": [
+   "get",
+   "question-62",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:25:41.176Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "decision",
+   "--text",
+   "look-into",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:25:49.327Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--to",
+   "John",
+   "--state",
+   "open",
+   "--by",
+   "John",
+   "--count"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:25:49.362Z",
+  "by": "John",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:25:56.053Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "task",
+   "--text",
+   "LIN-4468",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:25:59.977Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "4468",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ }
+]

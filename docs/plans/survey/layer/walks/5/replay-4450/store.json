@@ -1,5 +1,5 @@
 {
- "next": 103,
+ "next": 105,
  "records": {
   "area-1": [
    {
@@ -2987,6 +2987,48 @@
      "reason": "review comment posted on LIN-4450 at 15:18:12; verdict-96 recorded"
     }
    }
+  ],
+  "run-103": [
+   {
+    "id": "run-103",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "blind-read",
+     "account": "Read PR #2421 (change-84) at f9fa4a80c against 4b5001ddf without the PR body or history. Verdict better: Jira description read and write now have one owner (as-asked-region.js readDescription/holdAsAsked, and descriptionRoundTrip runs the same pair, so seal decision and write cannot disagree), and ten inline test-token predicates fold onto isHermeticTestToken. Worse side: a Jira issue description now depends on which read produced it (batch serves converted words, single-issue reads the exact ones). Three fix-sized findings to close-out; the batch split was already homed as finding-91, which I revised with what I added. Nothing outside the area."
+    },
+    "links": {},
+    "in": "task-60",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:18:47.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "verdict-104": [
+   {
+    "id": "verdict-104",
+    "kind": "verdict",
+    "state": "stands",
+    "fields": {
+     "of": "blind-read",
+     "outcome": "better",
+     "reasoning": "It gives Jira description read and write a single owner (lib/providers/jira/as-asked-region.js: readDescription/holdAsAsked, and descriptionRoundTrip now runs that same pair, so the seal decision and the write cannot disagree). It also folds ten inline copies of the test-token predicate onto isHermeticTestToken (routes/proxy-compute.js, server.js, routes/task-chat.js, routes/workspace-api-steps.js). On the worse side, a Jira issue description now depends on which read produced it: the batch path in lib/providers/jira/index.js serves the converted words and the single-issue reads serve the exact ones (finding-91). Read: PR #2421 at f9fa4a80c against 4b5001ddf."
+    },
+    "links": {
+     "on": [
+      "change-84@2"
+     ],
+     "about": [
+      "task-60"
+     ]
+    },
+    "in": "task-60",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:18:48.000Z",
+    "by": "blind-read"
+   }
   ]
  },
  "log": [
@@ -4186,6 +4228,183 @@
     "verdict",
     "--by",
     "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:32.117Z",
+   "by": "blind-read",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-84",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:32.148Z",
+   "by": "blind-read",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:32.177Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "area",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:36.798Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--path",
+    "routes/workspace-api-audit.js",
+    "--kind",
+    "area",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:36.829Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "web",
+    "--kind",
+    "area",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:36.860Z",
+   "by": "blind-read",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-70",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:36.891Z",
+   "by": "blind-read",
+   "cmd": "get",
+   "args": [
+    "get",
+    "verdict-96",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:36.927Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "search",
+    "--state",
+    "open",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:45.613Z",
+   "by": "blind-read",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-91",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:45.649Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "area",
+    "--path",
+    "routes/",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:45.684Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "area",
+    "--text",
+    "routes",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:45.724Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "verdict",
+    "--text",
+    "blind",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:26:45.755Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "isHermeticTestToken",
+    "--by",
+    "blind-read"
    ],
    "asOf": null
   }
