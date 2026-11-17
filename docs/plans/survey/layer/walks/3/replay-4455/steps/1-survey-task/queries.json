@@ -1,0 +1,103 @@
+[
+ {
+  "at": "2026-11-17T13:41:26.441Z",
+  "by": "survey-task",
+  "query": "show",
+  "args": {
+   "task": "task-60",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:41:26.468Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "to": "task-60"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:41:26.494Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "area": "area-1",
+   "state": "open"
+  },
+  "returned": 21
+ },
+ {
+  "at": "2026-11-17T13:41:31.489Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "text": "4448"
+  },
+  "returned": 3
+ },
+ {
+  "at": "2026-11-17T13:41:31.527Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "text": "FEEDBACK"
+  },
+  "returned": 9
+ },
+ {
+  "at": "2026-11-17T13:41:31.563Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "text": "wakeHook"
+  },
+  "returned": 3
+ },
+ {
+  "at": "2026-11-17T13:41:31.599Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "text": "NEVER_RAN"
+  },
+  "returned": 3
+ },
+ {
+  "at": "2026-11-17T13:41:31.633Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "text": "A14"
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:41:31.667Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "kind": "task"
+  },
+  "returned": 3
+ },
+ {
+  "at": "2026-11-17T13:41:35.082Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "kind": "area"
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:41:35.116Z",
+  "by": "survey-task",
+  "query": "find",
+  "args": {
+   "path": "lib/prompts/runner-kickoff.js"
+  },
+  "returned": 0
+ }
+]

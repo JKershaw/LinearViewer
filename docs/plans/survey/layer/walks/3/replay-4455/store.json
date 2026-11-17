@@ -1787,6 +1787,16 @@
     "path": "lib/prompts/runner-kickoff.js"
    },
    "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:42:43.367Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
   }
  ],
  "hits": []

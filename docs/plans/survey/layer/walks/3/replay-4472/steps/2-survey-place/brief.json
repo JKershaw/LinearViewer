@@ -1,0 +1,646 @@
+{
+ "stage": "survey-place",
+ "task": "task-28",
+ "asOf": "2026-11-13T17:26:43.216Z",
+ "words": [
+  {
+   "task": "task-28",
+   "asked": ""
+  },
+  {
+   "task": "task-1",
+   "asked": "**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** John: \"the UI issues trace back to one of my very first rules: no build step… it's the biggest target of the Theseus method… We don't need to tidy it all, but it's a perfect example where we can leave it better than we found it.\" The first slice (LIN-4446) served a pure server file to the browser at `/shared/` and retired the browser's copy. Its blind read found the cost: a bridge turns the shared file back into a global, with a load-timing rule that four files explain and nothing checks, and a second shared file would need a second bridge. On the direction, John: \"I feel there's a sensible engineering approach, that a skilled developer would take… Excellent, that sounds like a great solution.\" Today the browser area has 44 script files that share through globals, `public/common.js` is 3,309 lines and `public/observation.js` 5,019, over 100 unit test files load browser scripts as classic scripts, and the area's note holds 10 Waiting entries.\n\n**What we want.**\n\n* Pages become ES modules that import what they share, as browsers do natively. Still no build step and no framework.\n* Shared logic is imported, not restated: each converted view drops its copies.\n* A bridge back to a global is only a temporary ramp for pages not yet converted: one at most, and visibly shrinking.\n* The tests get simpler as views convert, not more elaborate.\n* Taken one view at a time, each piece finishing one move and naming what it retired. John on size: \"Happy for it to be whatever size is natural.\"\n* No view is retired unless John rules it. The side rail and the visual refresh (LIN-4342, LIN-4343) come after, on the cleaner code.\n\n**Done when**\n\n* the slice 1 bridge is gone, or the only one left and shrinking under a check;\n* the area's Waiting entries are settled, or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings."
+  }
+ ],
+ "piece": {
+  "id": "plan-10",
+  "kind": "plan",
+  "v": 2,
+  "op": "revise",
+  "at": "2026-11-13T16:02:45.000Z",
+  "by": "design",
+  "in": "task-1",
+  "state": "kept",
+  "fields": {
+   "says": "**Piece 2 — one real page, top down** (lands second)\n\n* Converts `public/task-page.js` to a module with named exports in place of its `module.exports` block; the renderer's `SCRIPTS` entry becomes `{ module: '/task-page.js' }` in `lib/render-task-page.js`. It is the last script in that list, so its DOMContentLoaded listener stays registered after `common.js`'s and the prompt run control's, as before.\n* Retires: the `typeof module` test seam in `task-page.js`; the `loadWorld`-plus-`window.module.exports` pattern in the task-page suites; any helper `task-page.js` restates that `common.js` already exposes (the builder searches the converted file for function names that equal a `common.js` global or a lib export, and either reads the global or imports; nothing is added to the bridge to make this work).\n* Adds the one test-support piece both pieces need if piece 1 has not already: a small import helper next to `tests/unit/helpers/client-world.js` that installs the fake DOM on `globalThis` and imports a public module fresh (a query-string cache-bust on the page module; the lib leaves stay cached, since they are pure). `loadWorld` is not touched, so the 64 classic suites keep running unchanged.\n* Settles the Waiting entry about a module-capable loader by showing the premise wrong, with the converted suites as the proof.\n\nWitnesses (from the plan's table; each fails before and passes after):\n\n| \\# | Behaviour | Witness |\n| -- | -- | -- |\n| 8 | A converted view's tests are plain imports and simpler than before. | Piece 1: `tests/unit/workspace-kpis-cost-order.test.js` (vm + readyState dance + `loadCostFormat`) is replaced by witness 3; `tests/fixtures/browser-cost-format.js` loses one user. Piece 2: the suites that run `task-page.js` through `loadWorld(... module.exports)` (find them with `grep -ln \"'task-page.js'\" tests/unit/*.js` filtered to `loadWorld`; `task-page-client.test.js` is one) import its named exports instead. A census check, in the manner of `tests/unit/fake-dom-census.test.js`, counts suites that name a script in `loadWorld`'s `scripts` list; it records today's number and fails if it rises, so \"tests get simpler\" is a number, not a feeling. |\n| 9 | The converted task page behaves as before. | The golden render test (`tests/unit/render-task-page-golden.test.js`, `tests/fixtures/render-task-page-golden.json`) is updated *only* for the one script tag changing from classic to module; any other diff is a bug. Existing `task-page-*` and `lin-4405` timeline suites pass, migrated to imports. |\n| 10 | The old shapes are gone from what was converted. | `grep -n \"module.exports\\|typeof module\" public/task-page.js public/workspace-kpis.js` returns nothing; no `/shared/` string remains in `lib/`, `public/`, `tests/`, `docs/areas/`, `CLAUDE.md`. |\n\nWhere the behaviour lives (from the plan):\n\n* `module.exports` blocks in `public/`: eleven files; only `task-page.js` is touched here (piece 2). The other ten (`close-out.js`, `question-cards.js`, `home-placement.js`, `live-console.js`, `observation.js`, `ship.js`, `ship-biscuit.js`, `session.js`, `ship-journey.js`, `flight-companion.js`) each wait for their own view; `close-out.js` is shared by the task page and `session.js`, so it cannot convert with either alone. That is why it is named, not left out silently.\n\nLikeliest ways it breaks (from the plan):\n\n2. **Module semantics.** Modules are always strict, top-level `var` and function declarations are not globals, and `this` is undefined. `task-page.js` and `workspace-kpis.js` already say `'use strict'` and wrap everything in an IIFE; unwrapping it to export names is what could change a reference. Witness: the existing suites on the converted file, plus witness 9.\n3. **The test seam changes under the builder.** A module evaluates once per URL, so a second `import` in the same process returns the first instance's timers and listeners; and `world.run` probes of script-scope `let`s cannot work on a module. Witness: the import helper's own test (two fresh imports do not share state), and the rule that a probe either becomes an export or goes. Piece 2's census (witness 8) shows the loader count falling.\n\nAmended by plan review (comment 73a74028, notes for the builder, in its words):\n\n2. **The import helper needs more than \"fake DOM on globalThis\"; build it in piece 1.** `task-page.js` uses bare `setTimeout`/`clearTimeout`/`setInterval`/`document`, and `window.api`. The suites the plan migrates depend on `loadWorld`'s `timers` collector and its window stubs:\n   - `task-page-question.test.js:223` (`makePage`);\n   - `task-timeline-client.test.js:207`;\n   - `task-page-client.test.js:358/422/554`.\n\n   `task-page-client.test.js:423` also runs the real classic `close-out.js` in the same world. Piece 1 has the same need: witness 3 needs `window.HarbourCharts`, which the current test gets by running the real classic `chart-helpers.js`.\n\n   So the helper should take loadWorld's own `{ window, timers, globals }` options and install them on `globalThis`, with `window === globalThis` as loadWorld does. It should give one supported way to run a named classic sibling in that same realm (`vm.runInThisContext`), restore everything it replaced, and then import the page fresh. Its own test should cover both \"two fresh imports share no state\" and \"globals are restored\".\n\n   The `loadWorld` census (witness 8) can't see complexity moved into this helper. Keep the helper small enough that each migrated suite reads shorter than before, and say so in the piece's description.\n\n7. (part) Also update the source-map lines for `workspace-kpis.js`/`task-page.js` if they call them classic.\n\n8. (part) In piece 2, `lin-3975-task-run-control.test.js:586` and `no-page-wide-label-listener.test.js:247` read `task-page.js` source or the renderer's `SCRIPTS` as text; rerun them after removing the IIFE.",
+   "paths": [
+    "public/task-page.js",
+    "lib/render-task-page.js",
+    "tests/unit/task-page-client.test.js",
+    "tests/unit/task-page-",
+    "tests/unit/lin-4405-",
+    "tests/unit/render-task-page-golden.test.js",
+    "tests/fixtures/render-task-page-golden.json",
+    "docs/areas/front-end-browser.md",
+    "tests/unit/task-page-question.test.js",
+    "tests/unit/task-timeline-client.test.js",
+    "tests/unit/lin-3975-task-run-control.test.js",
+    "tests/unit/no-page-wide-label-listener.test.js",
+    "docs/architecture/source-map.md"
+   ],
+   "order": 2
+  },
+  "links": {},
+  "reason": "Plan review (comment 73a74028, 16:02 UTC): note 2 moves the import helper into piece 1 and sets what the task-page suites need from it; the source-map line of note 7 and the piece-2 half of note 8 (text pins) correct piece 2 (the breakdown folded them into LIN-4472). Plan-review's notes; written --by design because rule 6 refused the revise --by plan-review.",
+  "stale": false
+ },
+ "addressed": [
+  {
+   "id": "finding-82",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:25:51.000Z",
+   "by": "survey-task",
+   "in": "task-28",
+   "to": "task-28",
+   "state": "open",
+   "fields": {
+    "says": "Survey @ 17faa83f4 (piece 1, #2431, merged: `import-world.js`, census 102, Waiting entry rewritten). Suites the plan does not list will break when the IIFE is removed. (a) Text slicers anchored on the IIFE's two-space indent: `lin-3975-task-run-control:588` (`'  function init(doc) {'`), `lin-3975-summary-and-time:59/162/263`, `lin-3975-chat-fold:142`; unwrapping moves every line out two spaces. Re-anchor them on names. (b) Two more suites execute the file: `lin-3975-proposal-refresh:232` (`loadWorld` + `module.exports`) and `lin-3975-task-run-links:213`, which runs the raw source with `vm.runInNewContext` and will throw a SyntaxError on the first `export`. Both must move to imports with the other executing suites."
+   },
+   "links": {
+    "about": "plan-10"
+   },
+   "stale": false
+  },
+  {
+   "id": "question-84",
+   "kind": "question",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:25:53.000Z",
+   "by": "survey-task",
+   "in": "task-28",
+   "to": "task-28",
+   "state": "open",
+   "fields": {
+    "asks": "Plan-10 says piece 2 retires any helper `task-page.js` restates. The only real duplicates (finding-83: `relativeWords`/`relativeAgo`, `formatElapsed`/`fmtDuration`) live in non-leaf lib files, and importing them is a serving change that the session-fit decision (decision-32) rules out. Which way does this piece go? Decide before the first commit and record it on LIN-4463 (plan deviation, per decision-36).",
+    "options": [
+     "Export both from task-page.js, turn the parity tests into plain imports, and name the leaf extraction as the next piece",
+     "Extract the leaves and add SHARED_MODULES entries in this piece (breaks session fit)",
+     "Leave the duplicates unnamed"
+    ],
+    "recommended": "Export both from task-page.js, turn the parity tests into plain imports, and name the leaf extraction as the next piece.",
+    "if-unanswered": "The builder takes the recommended option and says so on LIN-4463."
+   },
+   "links": {
+    "on": "decision-32@1",
+    "about": "finding-83"
+   },
+   "stale": false
+  },
+  {
+   "id": "finding-85",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:25:54.000Z",
+   "by": "survey-task",
+   "in": "task-28",
+   "to": "task-28",
+   "state": "open",
+   "fields": {
+    "says": "`importWorld` (`tests/unit/helpers/import-world.js`) sets up less than `loadWorld`, which works against plan-10's \"each migrated suite reads shorter\". `loadWorld` gives a stub `fetch`, a sync `requestAnimationFrame`, `navigator.clipboard` and unref'd timers; `importWorld` uses Node's real globals: without `timers` a poller's `setTimeout` is real, `navigator` is Node 25's own with no clipboard (share copy, `task-page.js:397`), and every page test needs `restore()`. Way to keep suites short: most exports are pure (`pollDelay`, `cadenceStatus`, `createOpenMemory`, `formatElapsed`, `proposalsUrlOf`…). Keep the `typeof document` guard and a static import needs no world at all, which removes `exportsOf()` (`task-page-client:28`, `task-timeline-client:26`). Only the DOMContentLoaded suites need `importWorld`."
+   },
+   "links": {
+    "about": "lesson-67"
+   },
+   "stale": false
+  },
+  {
+   "id": "check-86",
+   "kind": "check",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:25:55.000Z",
+   "by": "survey-task",
+   "in": "task-28",
+   "to": "task-28",
+   "state": "open",
+   "fields": {
+    "what": "The converted task page loads and runs in a real browser: module MIME type, CSP, and execution order after the classic scripts.",
+    "how": "Run `tests/e2e/task-page.spec.js` and `tests/e2e/task-timeline.spec.js` against the branch, or cite the CI e2e job that ran them on the PR head. The golden diff (7 tags) and Node imports cannot show any of these."
+   },
+   "links": {
+    "about": "plan-10"
+   },
+   "stale": false
+  },
+  {
+   "id": "finding-87",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:25:56.000Z",
+   "by": "survey-task",
+   "in": "task-28",
+   "to": "task-28",
+   "state": "open",
+   "fields": {
+    "says": "Minor, from the survey: the regex at `no-page-wide-label-listener:247` already tolerates `{ module }` entries, so plan review note 8's rerun there is low risk. Piece 1 already marked the module-capable-loader Waiting entry's premise wrong (finding-56), so deleting it here is tidying, not proof. Census expectation: 102 should fall by 5–7, depending on whether `task-page-question` still loads `question-cards.js` classically."
+   },
+   "links": {
+    "about": "finding-56"
+   },
+   "stale": false
+  }
+ ],
+ "stands": [
+  {
+   "id": "verdict-25",
+   "kind": "verdict",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:02:45.000Z",
+   "by": "plan-review",
+   "in": "task-1",
+   "state": "stands",
+   "fields": {
+    "of": "plan-review",
+    "outcome": "approve",
+    "reasoning": "**Verdict:** Approve. The plan's premises check out against main, and it meets the ask; the notes below are corrections the builder can make without changing what the plan decides.\n\n**How it meets what was asked.** The ask says: \"the slice 1 bridge is gone, or the only one left and shrinking under a check\". The plan takes the second branch. `cost-format-global.js` stays the only bridge, with a bridge-inventory check, and drops from four consumers to three in piece 1. \"One view at a time … whatever size is natural\": the plan converts two views and lists the next ones in order. That is the ask's own grain, not a narrowing. \"Waiting entries are settled, or say why not\": all ten have a disposition. The brief's open question about Survey global (\"retire cost-format-global.js at this task's cost\") does not need John. The bridge has four classic consumers across six renderers, so converting one page entry cannot retire it, and the Done-when explicitly allows the \"only one left and shrinking\" outcome. The survey is advice, not a ruling.\n\n- `task-page.js` reads classic globals only behind `typeof`/truthiness guards and assigns no `window.*`. It is the last entry in `SCRIPTS`, and its only load-time effect is one `DOMContentLoaded` listener (`:925`). So it converts without adding to the bridge, and its listener order is unchanged.\n\n**Blocking findings:** none. Notes 2, the source-map line of note 7 and the piece-2 half of note 8 are folded into this version of piece 2."
+   },
+   "links": {
+    "on": "plan-10@2"
+   },
+   "stale": false
+  },
+  {
+   "id": "decision-32",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:05:48.000Z",
+   "by": "breakdown",
+   "in": "task-28",
+   "state": "stands",
+   "fields": {
+    "answer": "Session fit: fits one session. It converts one page entry that is the last script of one renderer, plus migrating its suites. It adds no bridge entry and no serving change.",
+    "why": "Breakdown table: One session. It converts one page entry, the last script of one renderer, adds nothing to the bridge, and migrates that page's suites onto piece 1's helper."
+   },
+   "links": {
+    "on": "verdict-25@1"
+   },
+   "stale": false
+  },
+  {
+   "id": "decision-33",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:05:48.000Z",
+   "by": "breakdown",
+   "in": "task-28",
+   "state": "stands",
+   "fields": {
+    "answer": "Plan-review due: no. Covered by LIN-4463's approving plan review (comment 73a74028-bbe9-4a4a-b502-8ed268a6bd08, rev 1).",
+    "why": "The parent's plan review approved piece 2 (verdict on its amended version)."
+   },
+   "links": {
+    "on": "verdict-25@1"
+   },
+   "stale": false
+  },
+  {
+   "id": "decision-34",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:05:48.000Z",
+   "by": "breakdown",
+   "in": "task-28",
+   "state": "stands",
+   "fields": {
+    "answer": "Blocked by LIN-4471 (piece 1). Merged and verified on its own after piece 1.",
+    "why": "The plan: \"Piece 2 is blocked by piece 1 (it uses the specifier rule, the flat check, the import helper if introduced there, and the corrected lesson).\""
+   },
+   "links": {
+    "on": "verdict-25@1"
+   },
+   "stale": false
+  },
+  {
+   "id": "decision-35",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:05:48.000Z",
+   "by": "breakdown",
+   "in": "task-28",
+   "state": "stands",
+   "fields": {
+    "answer": "Plan review notes folded into this subtask. Into LIN-4472: the run-control and label-listener text pins.",
+    "why": "I folded the review's eight builder notes into the subtask that each one affects."
+   },
+   "links": {
+    "on": "verdict-25@1"
+   },
+   "stale": false
+  },
+  {
+   "id": "decision-36",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:05:48.000Z",
+   "by": "breakdown",
+   "in": "task-28",
+   "state": "stands",
+   "fields": {
+    "answer": "The parent's approved plan is where this piece starts. Follow it. Where the code shows the plan is wrong, change course and say so in a comment on LIN-4463.",
+    "why": "Grounding commits: plan read at `c205190fd` / main `5dcf5bcda`; review at `5dcf5bcda`; re-grounded by the breakdown at `e8e92d50a`, which touches none of the planned files."
+   },
+   "links": {
+    "on": "verdict-25@1"
+   },
+   "stale": false
+  }
+ ],
+ "areas": [
+  {
+   "id": "area-49",
+   "name": "Front end: browser code"
+  },
+  {
+   "id": "area-50",
+   "name": "Front end: server-rendered pages"
+  }
+ ],
+ "areaFindings": [
+  {
+   "id": "finding-51",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-49",
+   "to": "area-49",
+   "state": "open",
+   "fields": {
+    "says": "`public/app.js`: Home's Running and Up next are refreshed by parsing a whole page with `DOMParser` (LIN-4243). Waiting on you is drawn as a server fragment by the page's own function (LIN-4242); doing the same for the other sections would mean the client never parses a whole page. (Survey tally: LIN-4243.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-52",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-49",
+   "to": "area-49",
+   "state": "open",
+   "fields": {
+    "says": "`public/common.js`: `buildDispatchModelOptionDescriptors` repeats the merge rule of `buildModelOptions` (`lib/openrouter-catalog.js`). That module is not a leaf (it imports `lib/catalog-rate.js`), so it cannot be served as one shared file (LIN-4446). The lists are not copied (they come from `window.__HARNESS_MODELS__` and the catalog over the wire); only the rule is. The endpoint could send merged options instead. (LIN-4358.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-53",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-49",
+   "to": "area-49",
+   "state": "open",
+   "fields": {
+    "says": "`public/brief.js`: its `postBrief`/`errorText` block is identical to `postRecap`/`errorText` in `public/recap.js`, and the check for a `statusCode` inside a keepalive 200 body is now written four times (also `public/scan.js` and `public/observation.js`). One shared reader in `public/common.js`. (Area reads CG/CH, 8 Nov, on LIN-4358.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-54",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-49",
+   "to": "area-49",
+   "state": "open",
+   "fields": {
+    "says": "`public/common.js`: exported globals, and the \"client twins\" of `lib/task-page-href.js`, `lib/timeline-zoom.js`, `lib/ship-layout.js` and `lib/prompt-formatters.js`. The first two are leaves of the same shape as cost-format, the next candidates; the last two import other modules, so serving a single file will not do for them. Its `TERMINAL_STATE_TYPES` mirror of `lib/providers/models.js` (no imports) is another leaf twin, and it retires when its last classic consumer converts (LIN-4471 corrected its comment to say so). (LIN-4446 plan and leftovers.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-55",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-49",
+   "to": "area-49",
+   "state": "open",
+   "fields": {
+    "says": "`public/ship.js` / `public/ship-biscuit.js`: still hand-synced copies (\"mirror of lib/ship-layout.js\", \"kept in lockstep with lib/render-ship-biscuit.js\"). Each lib side would first have to become an import-free leaf before it could join `SHARED_MODULES`. (LIN-4446 blind read.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-56",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-49",
+   "to": "area-49",
+   "state": "open",
+   "fields": {
+    "says": "`public/prompt-section.js`: the browser files reach their suites through `tests/unit/helpers/client-world.js`, which loads them as classic scripts through `vm`. The premise that a module-capable client loader is needed before a view can become a module is shown wrong by `tests/unit/workspace-kpis-module.test.js` (LIN-4471): a page module is tested by plain `import` over `tests/unit/helpers/import-world.js`. The remaining classic suites are counted by `tests/unit/classic-loader-census.test.js`. (LIN-4446; LIN-4471.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-57",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-49",
+   "to": "area-49",
+   "state": "open",
+   "fields": {
+    "says": "`public/observation.js`: about 5,000 lines. By the counting method of LIN-4446 (lines starting with `*`, `//` or `/*`) 1,985 of its 4,679 non-blank lines are comments. Find out why it is this large before splitting it. An earlier survey used a different method, so its figure is not comparable. (LIN-4446 plan.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-58",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-49",
+   "to": "area-49",
+   "state": "open",
+   "fields": {
+    "says": "`public/llms.txt`: its H11 names the unscoped `/api/recommend/status`, which is now only a legacy redirect (`routes/legacy-redirects.js`), and its view list omits `projects` and the flag-gated `live-console` (`lib/components/view-nav.js`). The browser guide is otherwise sound: its endpoints and selectors resolve. (Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-59",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-49",
+   "to": "area-49",
+   "state": "open",
+   "fields": {
+    "says": "`public/prompt-section.js`: on a server with no AI (`aiState: \"unconfigured\"`, a self-host with no OpenRouter key) the run control still offers Next step. Pressing it gets a 503 from the recommend stream, and \"AI Recommend · generating…\" / \"Loading…\" spin with no message, while Run to PR works beside it. Offer only what the server can do, or say why it can't. (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-68",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-50",
+   "to": "area-50",
+   "state": "open",
+   "fields": {
+    "says": "`lib/render-settings.js`: Settings › Models has 42 unnamed `select.harness-select`, 42 unnamed `input.dispatch-effort-input` (one per job row) and 2 unnamed `input.dispatch-preset-name-input` (WCAG 4.1.2). The other seven areas have none. Lighthouse on Settings ran on the sources area and missed this. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-69",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-50",
+   "to": "area-50",
+   "state": "open",
+   "fields": {
+    "says": "`lib/render-pages.js`: the Jira site picker, `renderJiraSiteSelectPage`, overflows a 390px viewport by 52px and a 320px one by 122px. The native `select#jira-site-select` has its right edge at 442px. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-70",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-50",
+   "to": "area-50",
+   "state": "open",
+   "fields": {
+    "says": "`lib/components/halt-controls.js`: in the `buttons` presentation (Dispatch) Pause, Stop and Resume compute to the same style, and the tone the component declares (red for Pause and Stop) is not applied. Stop stops running sessions. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-71",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-50",
+   "to": "area-50",
+   "state": "open",
+   "fields": {
+    "says": "`lib/render-library.js`: every Library document renders two `<h1>` (the shell \"Harbour\" and the document title), 117 of 117. The index renders one. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-72",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-50",
+   "to": "area-50",
+   "state": "open",
+   "fields": {
+    "says": "`lib/render-styleguide.js`: in dark theme the swatch captions under `.sg-value` show light-theme values (`#ffffff` for `--bg`, `#1a1a1a` for `--fg`) beside dark swatches. LIN-3957 and LIN-3960 are open on this page and do not cover it. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-73",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-50",
+   "to": "area-50",
+   "state": "open",
+   "fields": {
+    "says": "`lib/mask-secrets-in-html.js`: on a Jira workspace `/t/` masks text after `lib/providers/jira/adf.js` has escaped every `_` to `\\_`, so underscore-bearing shapes (Resend, Harbour, Linear, GitHub, env-style) reach a guest unmasked; OpenRouter, Mongo, Atlassian and PEM still match. Strip CommonMark backslash escapes, with a position map, before matching. A seam: providers has no note. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-74",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-50",
+   "to": "area-50",
+   "state": "open",
+   "fields": {
+    "says": "`lib/components/navbar.js`: the workspace switcher's `+ Jira` goes to Jira OAuth `mode=new` (a new sign-in), and on a server with no Jira OAuth env it is not shown at all, although the Jira API-token path (no server config) works there. That path is only reachable from Settings › Sources inside a workspace, so a Jira team without OAuth consent has to find \"make a workspace, then Settings\" alone. (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-75",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-50",
+   "to": "area-50",
+   "state": "open",
+   "fields": {
+    "says": "`lib/render-runner-setup.js`: the runner page defines itself as working \"with no Simple Dispatcher\" and makes the two exclusive per workspace, but no page a newcomer reads says what Simple Dispatcher is or when a team would want it (an always-on host), and its queue token lives on the Dispatch page. A seam with the simple-dispatcher repo, whose README never names this page. (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-76",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-50",
+   "to": "area-50",
+   "state": "open",
+   "fields": {
+    "says": "`lib/render-task-page.js`: the layout test's desktop check that both quiet offers (write a brief, write a recap) sit on one line is a one-shot `boundingBox` read after a reload; it fails first (10.25 px against 4) and passes on retry in 33 sampled green runs, so a real wrap would read as a flake. Wait for layout to settle or poll. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-77",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-50",
+   "to": "area-50",
+   "state": "open",
+   "fields": {
+    "says": "`lib/render-session.js`: the run page's `session-run-chat` link is missing on the first attempt and present on retry in 10 sampled green runs (no ticket); whether the link renders late or the seed lands late is unknown. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-78",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:22:00.000Z",
+   "by": "Harbour",
+   "in": "area-50",
+   "to": "area-50",
+   "state": "open",
+   "fields": {
+    "says": "`lib/render-task-timeline.js`: picks a tick's bare style by restating the model's tick rule (`lib/task-timeline.js`: wake, resumed, or no records), and the legend's \"woken or resumed\" restates it again, though its header says it derives nothing. If the model ticks another role, the renderer styles it wrongly and the legend goes stale; the tick could carry its style. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)"
+   },
+   "links": {},
+   "stale": false
+  },
+  {
+   "id": "finding-83",
+   "kind": "finding",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T17:25:52.000Z",
+   "by": "survey-task",
+   "in": "area-49",
+   "to": "area-49",
+   "state": "open",
+   "fields": {
+    "says": "`public/task-page.js` restates two lib helpers under other names, so the plan's name-equality search (function name = a `common.js` global or a lib export) finds nothing: `relativeWords` (`:366`) is `relativeAgo` (`lib/task-page-loader.js:614`) line for line, and `formatElapsed` (`:302`) is pinned by a parity test to `fmtDuration` (`lib/render-run-steps.js:258`). Neither lib file is a leaf (22 and 4 imports), so importing either needs a leaf extracted, a `SHARED_MODULES` entry and an `areas.json` owner: a serving change. (LIN-4472 survey @ 17faa83f4.)"
+   },
+   "links": {},
+   "stale": false
+  }
+ ],
+ "index": [
+  {
+   "id": "lesson-60",
+   "kind": "lesson",
+   "to": null,
+   "says": "A page script's second request keeps the poll's discipline: coalesce every reason into one fetch per window, and stop when the poll stops (hidden tab, 401, revoked link). `createTimelineRefresher` (`public/task-page.js`, LIN-4405) is the pattern; a running chip changes the poll's track about once a minute, so \"fetch when it changes\" alone repeats. Done reads once more first (`finish`): the poll that says done carries the last change, and stopping drops it."
+  },
+  {
+   "id": "lesson-63",
+   "kind": "lesson",
+   "to": null,
+   "says": "Shared leaves: a shared module is a leaf (it imports nothing and names no browser or Node global, `tests/unit/shared-modules.test.js`), served only through the explicit `SHARED_MODULES` allow-list in `lib/vendor-assets.js`, one route per file under the served /lib/ namespace, never by directory (a lib file not on the list is a 404). A page imports one with a relative specifier that starts with ../lib/ (quoted in the code). That resolves to the same file in the browser and in Node only because `public/` is served at the URL root and stays flat, with no nested .js files (`tests/unit/front-end-import-layout.test.js`). Do not move `public/` under a prefix or add a subdirectory."
+  },
+  {
+   "id": "lesson-66",
+   "kind": "lesson",
+   "to": null,
+   "says": "A `{ module }` entry's place in a renderer's script list means nothing: a module runs after every classic script, wherever it is listed. A bridge reader is safe because of when it reads the global, not where the shim sits."
+  },
+  {
+   "id": "lesson-67",
+   "kind": "lesson",
+   "to": null,
+   "says": "A converted page is tested by plain `import` over the fake DOM (`tests/unit/helpers/import-world.js`), not by `loadWorld`. Each import is a fresh module instance, and the world puts every global back when it is restored. The classic-loader census (`tests/unit/classic-loader-census.test.js`) is a ratchet on the suites that still load classic scripts: it may only fall. A suite that runs a classic file through `runClassic` counts, except `public/chart-helpers.js` and `public/close-out.js`, the two IIFE siblings a module page may read."
+  }
+ ],
+ "carries": {
+  "words": 2,
+  "piece": 1,
+  "addressed": 5,
+  "stands": 6,
+  "areas": 2,
+  "areaFindings": 21,
+  "index": 4
+ },
+ "size": {
+  "jsonBytes": 32482,
+  "textBytes": 28379
+ }
+}
