@@ -1331,6 +1331,56 @@
     "scoping"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:49.383Z",
+   "by": "design",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-16",
+    "--by",
+    "design"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:53.826Z",
+   "by": "design",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--in",
+    "area-1",
+    "--by",
+    "design"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:53.864Z",
+   "by": "design",
+   "cmd": "get",
+   "args": [
+    "get",
+    "area-1",
+    "--by",
+    "design"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:53.899Z",
+   "by": "design",
+   "cmd": "get",
+   "args": [
+    "get",
+    "check-32",
+    "--by",
+    "design"
+   ],
+   "asOf": null
   }
  ]
 }

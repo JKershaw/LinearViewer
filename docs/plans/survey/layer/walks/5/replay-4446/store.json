@@ -1,5 +1,5 @@
 {
- "next": 28,
+ "next": 29,
  "records": {
   "area-1": [
    {
@@ -663,6 +663,26 @@
     "op": "add",
     "at": "2026-11-13T13:15:16.000Z",
     "by": "survey-place"
+   },
+   {
+    "id": "finding-24",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "What has to learn about the cost-format move: `tests/unit/cost-read-census.test.js` `FORMAT_ALLOW` names `public/cost-format.js`, plus its header comment and failure-message text, and goes stale silently (nothing fails on an extra entry), so remove them by hand; five renderers list `/cost-format.js`, not two: `lib/render-flight-companion.js`, `lib/render-observation.js`, `lib/render-swipe.js`, `lib/render-task-page.js`, `lib/render-workspace-kpis.js` (swipe and task-page load `prompt-section.js`, which reads `window.CostFormat`; left out, those pages 404 the script and throw on the first cost); `tests/fixtures/render-task-page-golden.json` embeds the script tags (regenerate, read the diff); `tests/fixtures/browser-cost-format.js` reads `public/cost-format.js` for `lin-3833-run-control` and `flight-companion-client` (keep its name and `loadCostFormat(sandbox)`, back it with the real lib file, and those suites don't change); `observation-scan-due.test.js` lists `'cost-format.js'` in `loadWorld` (switch to `loadCostFormat`); `cost-read.test.js` imports only the lib file (confirm it needs nothing); the doc comment in `lib/cost-format.js` that names its \"browser twin\"; `docs/architecture/source-map.md` (run the docs anchor resolver). Find them all again after building with `grep -rIn \"cost-format\\|CostFormat\"` outside node_modules, .git and dated docs. (Survey place @ 4b5001ddf; renderers, golden and fixture added by design's grep.)"
+    },
+    "links": {
+     "about": [
+      "finding-16"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T13:23:07.000Z",
+    "by": "design",
+    "reason": "design's grep: five renderers list /cost-format.js, not two; adds the golden, the fixture seam and the doc places"
    }
   ],
   "finding-25": [
@@ -795,6 +815,45 @@
     "ended": {
      "reason": "size written to the ticket"
     }
+   }
+  ],
+  "plan-28": [
+   {
+    "id": "plan-28",
+    "kind": "plan",
+    "state": "kept",
+    "fields": {
+     "order": 1,
+     "paths": [
+      "CLAUDE.md",
+      "docs/areas/front-end-browser.md",
+      "lib/vendor-assets.js",
+      "server.js",
+      "lib/cost-format.js",
+      "public/cost-format.js",
+      "public/cost-format-global.js",
+      "lib/components/page.js",
+      "lib/render-flight-companion.js",
+      "lib/render-observation.js",
+      "lib/render-swipe.js",
+      "lib/render-task-page.js",
+      "lib/render-workspace-kpis.js",
+      "tests/fixtures/render-task-page-golden.json",
+      "tests/fixtures/browser-cost-format.js",
+      "tests/unit/cost-format-parity.test.js",
+      "tests/unit/cost-format.test.js",
+      "tests/unit/cost-read-census.test.js",
+      "tests/unit/observation-scan-due.test.js",
+      "docs/architecture/source-map.md"
+     ],
+     "says": "Share lib/cost-format.js with the browser, retire its restated copy, then stop for John. Re-grounded at 4b5001ddf: no commits since 12:08 on any named path. Fits one session; plan-review due.\n\nWhich way. (a) Serve through the allow-list: a second frozen map SHARED_MODULES in lib/vendor-assets.js (/shared/cost-format.js -> lib/cost-format.js), statSync at boot, with a rootDir option for tests; VENDOR_ASSETS untouched (vendor-assets.test.js pins its three URLs); mount stays just before express.static('public'). Set aside: express.static('lib') (publishes all server source); moving the file into public/ (lib/render-*.js would import from the web root). (b) Bridge with a deferred module shim public/cost-format-global.js that imports formatUsd and sets window.CostFormat; no view becomes a module, common.js and the vm loaders untouched. Set aside: converting a consumer (needs a module-capable test loader); keeping public/cost-format.js as a wrapper. (c) lib/components/page.js: a scripts entry may be {module:'/x.js'}, emitted as <script type=\"module\" src>; strings stay classic. (d) Retirement in the same PR (the-second-copy.md s9-10).\n\nSteps. 1 Docs first: the rule's reading and its limits (browser may import natively; leaf modules only, no imports, no Node built-ins, no DOM at load; served by allow-list never by directory; classic views and vm loaders stay until a module-capable loader exists) in CLAUDE.md and as a Lesson in docs/areas/front-end-browser.md (Lessons 815 of 6144 bytes). 2 Serve it. 3 Shim, page.js module entries, the five renderer lists, regenerate the task-page golden. 4 Delete public/cost-format.js and cost-format-parity.test.js, moving its server-side half (the input table, unknown never a dollar figure, complete zero is $0.00, sumWords) unchanged into tests/unit/cost-format.test.js. 5 Witnesses, then census, fixture seam, observation-scan-due. 6 Area note Waiting entries: common.js globals and its client twins; a module-capable client test loader; why observation.js is ~5,000 lines, with the counting method stated. 7 PR names what is shared and retired, lightening in numbers with comments counted apart (total lines may not fall: the guards are tests), and the next slice waits for John.\n\nWitnesses (fail before, pass after): /shared/cost-format.js 200, JavaScript type, exact bytes; other /shared/ paths and /lib/cost-format.js 404; boot throws over an empty root; purity test over SHARED_MODULES with a synthetic bad module that must be named; each consumer loads in vm with window.CostFormat absent, then cost paths give the same strings; every lib/ scripts list naming a window.CostFormat consumer also lists the shim as {module}; renderPage emits module vs classic tags; one Playwright check (workspace KPIs or flight companion): formatUsd(0.004) is <$0.01, no console errors, no CSP violation (lib/security-headers.js); retirement: both files gone, FORMAT_ALLOW has no public/ entry, census still fails a hand-made $...toFixed in public/. Run the named suites and the full unit run.\n\nLikeliest breaks: a page without the shim or an eager read (throws on first cost); the module refused (MIME, CSP, URL not allowed) so CostFormat never exists, silently; a silent loosening when the parity file goes, or a stale golden or FORMAT_ALLOW.\n\nCuts to the ask: none. Reworking a view is not delivered: John's size ruling, not a cut; it goes to the area note as Waiting."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:23:06.000Z",
+    "by": "design"
    }
   ]
  },

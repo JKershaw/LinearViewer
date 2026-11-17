@@ -1,5 +1,5 @@
 {
- "next": 90,
+ "next": 91,
  "records": {
   "area-1": [
    {
@@ -1807,6 +1807,31 @@
     "op": "add",
     "at": "2026-11-13T15:55:54.652Z",
     "by": "breakdown"
+   },
+   {
+    "id": "question-83",
+    "kind": "question",
+    "state": "answered",
+    "fields": {
+     "asks": "Once the proxy refuses look-into's writes (LIN-4468), look-into can no longer post to Linear when a person asks. Should that exception be retired?",
+     "options": [
+      "Retire it: look-into reports in its session and a person posts the comment if they want it",
+      "Keep it: look-into is allowed one comment on its ticket instead of no writes"
+     ],
+     "recommended": "Retire it: look-into reports in its session and a person posts the comment if they want it",
+     "if-unanswered": "LIN-4468 can be built but not merged"
+    },
+    "links": {},
+    "in": "task-60",
+    "to": "John",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:57:45.000Z",
+    "by": "John",
+    "ended": {
+     "reason": "John chose retire, the recommended option (comment on LIN-4448); decision-90."
+    },
+    "via": "Harbour"
    }
   ],
   "run-84": [
@@ -1949,6 +1974,27 @@
     "op": "add",
     "at": "2026-11-13T15:56:37.000Z",
     "by": "survey-task"
+   }
+  ],
+  "decision-90": [
+   {
+    "id": "decision-90",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "Retire it: look-into reports in its session and a person posts the comment if they want it",
+     "why": "John chose the recommended option, retire, on LIN-4448 (ruling lin4448-lookinto-none). — Ruling recorded via Harbour",
+     "scope": "task-60"
+    },
+    "links": {
+     "answers": "question-83"
+    },
+    "in": "task-60",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:57:44.000Z",
+    "by": "John",
+    "via": "Harbour"
    }
   ]
  },
@@ -2172,6 +2218,178 @@
     "run-83",
     "--by",
     "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:33.061Z",
+   "by": "John",
+   "cmd": "get",
+   "args": [
+    "get",
+    "question-83",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:33.089Z",
+   "by": "John",
+   "cmd": "get",
+   "args": [
+    "get",
+    "task-60",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:33.120Z",
+   "by": "John",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:33.150Z",
+   "by": "John",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "decision",
+    "--text",
+    "retire",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:33.177Z",
+   "by": "John",
+   "cmd": "get",
+   "args": [
+    "get",
+    "task-78",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:36.332Z",
+   "by": "John",
+   "cmd": "get",
+   "args": [
+    "get",
+    "task-60",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:36.371Z",
+   "by": "John",
+   "cmd": "get",
+   "args": [
+    "get",
+    "task-78",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:36.397Z",
+   "by": "John",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "decision",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:41.140Z",
+   "by": "John",
+   "cmd": "get",
+   "args": [
+    "get",
+    "question-62",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:41.176Z",
+   "by": "John",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "decision",
+    "--text",
+    "look-into",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:49.327Z",
+   "by": "John",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--to",
+    "John",
+    "--state",
+    "open",
+    "--by",
+    "John",
+    "--count"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:49.362Z",
+   "by": "John",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:56.053Z",
+   "by": "John",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "task",
+    "--text",
+    "LIN-4468",
+    "--by",
+    "John"
    ],
    "asOf": null
   }
