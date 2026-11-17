@@ -48,3 +48,9 @@ For the lane points, the question writer writes six questions about the **lane a
 5. what John has decided for the lane that still holds;
 6. one question of your choice that a reader would get wrong if it misread the history.
 Readers and the grader work as above; Reader T's `ticket.md` also holds the area notes as committed then.
+
+## Reader H (walk 6)
+
+**Reader H (ticket plus facts):** read only `ticket-plus-facts.md`: the ticket (and its parent, and area notes where given) as it stood, followed by facts computed from the task's records at that moment (open items with who must act, judgements with whether they still rest on the current version, counts). Then answer `questions.md` into `answers-H.md` as above. Where the ticket and the facts disagree, say which you trust and why.
+
+The Grader, where `answers-H.md` exists, marks it too, as a third column.
