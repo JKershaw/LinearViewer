@@ -1,0 +1,1413 @@
+{
+ "next": 66,
+ "records": {
+  "area-1": [
+   {
+    "id": "area-1",
+    "kind": "area",
+    "name": "Providers (Linear, GitHub, Jira, local)",
+    "paths": [
+     "lib/providers/",
+     "lib/sample-data/",
+     "lib/linear.js",
+     "lib/linear-fetch.js",
+     "lib/local-store.js",
+     "lib/starter-seed.js",
+     "lib/issue-write-validation.js",
+     "lib/description-edit.js",
+     "lib/github-pr-files.js",
+     "lib/github-pr-status.js",
+     "lib/pr-state-copy.js",
+     "lib/pr-state-store.js",
+     "lib/attachment-upload.js",
+     "lib/task-attachments.js",
+     "lib/trashed-signal.js"
+    ],
+    "links": {},
+    "state": "kept",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.000Z"
+   }
+  ],
+  "area-2": [
+   {
+    "id": "area-2",
+    "kind": "area",
+    "name": "LLM & prompts",
+    "paths": [
+     "lib/prompts/",
+     "lib/as-asked.js",
+     "lib/size-of-move.js",
+     "lib/openrouter",
+     "lib/prompt-",
+     "lib/stage-router.js",
+     "lib/recommend",
+     "lib/recommendation-",
+     "lib/chat-",
+     "lib/agent-turn.js",
+     "lib/bash-tool.js",
+     "lib/llm-call-log.js",
+     "lib/llm-jobs.js",
+     "lib/model-routing",
+     "lib/model-pricing.js",
+     "lib/catalog-rate.js",
+     "lib/call-budget.js",
+     "lib/should-mock-ai.js",
+     "lib/brief",
+     "lib/recap",
+     "lib/collective-",
+     "lib/yap-client.js",
+     "lib/north-star-resolver.js",
+     "lib/scan.js",
+     "lib/scan-fingerprint.js",
+     "lib/audit.js",
+     "lib/roadmap.js",
+     "lib/context-graph.js",
+     "lib/library.js",
+     "lib/library-metadata.js",
+     "lib/custom-prompts-store.js",
+     "lib/saved-chat-store.js",
+     "lib/file-pointer.js",
+     "lib/feedback-title.js",
+     "lib/action-kind.js",
+     "lib/flight-companion-gate.js",
+     "lib/flight-companion-census-seed.js",
+     "lib/harbour-comments-store.js",
+     "lib/report-history-store.js",
+     "lib/ship-biscuit.js",
+     "lib/ship-biscuit-history-store.js",
+     "lib/periodicals.js"
+    ],
+    "links": {},
+    "state": "kept",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.001Z"
+   }
+  ],
+  "lesson-3": [
+   {
+    "id": "lesson-3",
+    "kind": "lesson",
+    "in": "area-2",
+    "says": "Prompt size is frozen (`tests/unit/prompt-size-budget.test.js`): text grows only with its ticket and reason beside the ceiling and `FROZEN_TOTAL_BYTES`; old reasons go to \"Ceiling history\" in `scripts/prompt-template-change-log.md`.",
+    "paths": [
+     "tests/unit/prompt-size-budget.test.js",
+     "scripts/prompt-template-change-log.md"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.002Z"
+   }
+  ],
+  "lesson-4": [
+   {
+    "id": "lesson-4",
+    "kind": "lesson",
+    "in": "area-2",
+    "says": "Grounding lists in `lib/prompt-formatters.js` are shared (`WORK` serves several stages, `GROUNDING_NOTES` unknown kinds): give one stage its own list (LIN-4371).",
+    "paths": [
+     "lib/prompt-formatters.js"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.003Z"
+   }
+  ],
+  "lesson-5": [
+   {
+    "id": "lesson-5",
+    "kind": "lesson",
+    "in": "area-2",
+    "says": "Keep scoping and both Survey renders byte-identical unless a ticket is about them (replays compare them, LIN-4369).",
+    "paths": [
+     "lib/prompts/",
+     "lib/as-asked.js",
+     "lib/size-of-move.js",
+     "lib/openrouter",
+     "lib/prompt-",
+     "lib/stage-router.js",
+     "lib/recommend",
+     "lib/recommendation-",
+     "lib/chat-",
+     "lib/agent-turn.js",
+     "lib/bash-tool.js",
+     "lib/llm-call-log.js",
+     "lib/llm-jobs.js",
+     "lib/model-routing",
+     "lib/model-pricing.js",
+     "lib/catalog-rate.js",
+     "lib/call-budget.js",
+     "lib/should-mock-ai.js",
+     "lib/brief",
+     "lib/recap",
+     "lib/collective-",
+     "lib/yap-client.js",
+     "lib/north-star-resolver.js",
+     "lib/scan.js",
+     "lib/scan-fingerprint.js",
+     "lib/audit.js",
+     "lib/roadmap.js",
+     "lib/context-graph.js",
+     "lib/library.js",
+     "lib/library-metadata.js",
+     "lib/custom-prompts-store.js",
+     "lib/saved-chat-store.js",
+     "lib/file-pointer.js",
+     "lib/feedback-title.js",
+     "lib/action-kind.js",
+     "lib/flight-companion-gate.js",
+     "lib/flight-companion-census-seed.js",
+     "lib/harbour-comments-store.js",
+     "lib/report-history-store.js",
+     "lib/ship-biscuit.js",
+     "lib/ship-biscuit-history-store.js",
+     "lib/periodicals.js"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.004Z"
+   }
+  ],
+  "lesson-6": [
+   {
+    "id": "lesson-6",
+    "kind": "lesson",
+    "in": "area-2",
+    "says": "The Surveys get no area notes pointer: survey-place reads no shape reports, which feed the notes. Scoping cites its pointer in its final message; both share `AREA_NOTES_WHERE` (LIN-4346).",
+    "paths": [
+     "lib/prompts/",
+     "lib/as-asked.js",
+     "lib/size-of-move.js",
+     "lib/openrouter",
+     "lib/prompt-",
+     "lib/stage-router.js",
+     "lib/recommend",
+     "lib/recommendation-",
+     "lib/chat-",
+     "lib/agent-turn.js",
+     "lib/bash-tool.js",
+     "lib/llm-call-log.js",
+     "lib/llm-jobs.js",
+     "lib/model-routing",
+     "lib/model-pricing.js",
+     "lib/catalog-rate.js",
+     "lib/call-budget.js",
+     "lib/should-mock-ai.js",
+     "lib/brief",
+     "lib/recap",
+     "lib/collective-",
+     "lib/yap-client.js",
+     "lib/north-star-resolver.js",
+     "lib/scan.js",
+     "lib/scan-fingerprint.js",
+     "lib/audit.js",
+     "lib/roadmap.js",
+     "lib/context-graph.js",
+     "lib/library.js",
+     "lib/library-metadata.js",
+     "lib/custom-prompts-store.js",
+     "lib/saved-chat-store.js",
+     "lib/file-pointer.js",
+     "lib/feedback-title.js",
+     "lib/action-kind.js",
+     "lib/flight-companion-gate.js",
+     "lib/flight-companion-census-seed.js",
+     "lib/harbour-comments-store.js",
+     "lib/report-history-store.js",
+     "lib/ship-biscuit.js",
+     "lib/ship-biscuit-history-store.js",
+     "lib/periodicals.js"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.005Z"
+   }
+  ],
+  "lesson-7": [
+   {
+    "id": "lesson-7",
+    "kind": "lesson",
+    "in": "area-2",
+    "says": "`lib/prompt-template-defs.js` and the budget test change in almost every merge: rebase, then re-measure. Its fixture passes no context (the empty-context branch), so dropping one can raise a ceiling while real renders shrink (LIN-4393).",
+    "paths": [
+     "lib/prompt-template-defs.js"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.006Z"
+   }
+  ],
+  "lesson-8": [
+   {
+    "id": "lesson-8",
+    "kind": "lesson",
+    "in": "area-2",
+    "says": "The `## As asked` block's words have one owner, `lib/as-asked.js`: import its spellings, never retype the heading or end line (LIN-4362).",
+    "paths": [
+     "lib/as-asked.js"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.007Z"
+   }
+  ],
+  "lesson-9": [
+   {
+    "id": "lesson-9",
+    "kind": "lesson",
+    "in": "area-2",
+    "says": "`lib/prompt-template-defs.js` cannot import what imports `lib/prompt-templates.js` (a cycle): shared words live in an import-free leaf, as `lib/prompts/leftover-words.js` (LIN-4376) and `lib/prompts/autopilot-precedence.js` (never restate a rank; LIN-4382).",
+    "paths": [
+     "lib/prompt-template-defs.js",
+     "lib/prompt-templates.js",
+     "lib/prompts/leftover-words.js",
+     "lib/prompts/autopilot-precedence.js"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.008Z"
+   }
+  ],
+  "lesson-10": [
+   {
+    "id": "lesson-10",
+    "kind": "lesson",
+    "in": "area-2",
+    "says": "Prompt words banning a kind of how do not hold it (LIN-4369's replay: closing one channel moved it to the next). Hold the shape in code or a test (`SIZE_RECORD_SHAPE`, `lib/size-of-move.js`, arm 3) or hold the reader's side (arm 4).",
+    "paths": [
+     "lib/size-of-move.js"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.009Z"
+   }
+  ],
+  "lesson-11": [
+   {
+    "id": "lesson-11",
+    "kind": "lesson",
+    "in": "area-2",
+    "says": "A stage lead's first sentence is the selector's purpose line: changing it means new router snapshots, `scripts/eval/meta-prompt.baseline.txt` and routing ceiling (LIN-4369).",
+    "paths": [
+     "scripts/eval/meta-prompt.baseline.txt"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.010Z"
+   }
+  ],
+  "lesson-12": [
+   {
+    "id": "lesson-12",
+    "kind": "lesson",
+    "in": "area-2",
+    "says": "`lib/prompts/autopilot-precedence.js`: check real rows reach a server guard before prompt text bypasses it (LIN-4349). A scoped run's Periodical is opt-in by goal: no tail, no flag (LIN-4415).",
+    "paths": [
+     "lib/prompts/autopilot-precedence.js"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.011Z"
+   }
+  ],
+  "lesson-13": [
+   {
+    "id": "lesson-13",
+    "kind": "lesson",
+    "in": "area-2",
+    "says": "`lib/periodicals.js`: close-out merges a Periodical's PR and sets Done as for any task; give no Periodical its own merge rule: notes are prompt input (LIN-4390). The rule is retyped in five files; only a test links them.",
+    "paths": [
+     "lib/periodicals.js"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.012Z"
+   }
+  ],
+  "lesson-14": [
+   {
+    "id": "lesson-14",
+    "kind": "lesson",
+    "in": "area-2",
+    "says": "Model facts come from the OpenRouter catalog: add no model list or rate (LIN-4358); tests seed `tests/unit/helpers/pinned-catalog.js`.",
+    "paths": [
+     "tests/unit/helpers/pinned-catalog.js"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.013Z"
+   }
+  ],
+  "lesson-15": [
+   {
+    "id": "lesson-15",
+    "kind": "lesson",
+    "in": "area-2",
+    "says": "`lib/library.js` takes a shelf doc's summary by position (`firstParagraphAfterTitle`): a paper that opens with a figure keeps its alt text under 12 words, or the alt text becomes the summary; a rewritten first paragraph re-pins `tests/fixtures/library-doc-summaries.json` (LIN-4428).",
+    "paths": [
+     "lib/library.js",
+     "tests/fixtures/library-doc-summaries.json"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.014Z"
+   }
+  ],
+  "lesson-16": [
+   {
+    "id": "lesson-16",
+    "kind": "lesson",
+    "in": "area-2",
+    "says": "A blind reader's limits are instructions, not access: with the repository checked out it can still see commit subjects (`git worktree add` prints the head's) and area notes. Both slipped, harmlessly, in the LIN-4436 pilot. Code hands a blind stage SHAs and PR URLs, never a PR body or commit log.",
+    "paths": [
+     "lib/prompts/",
+     "lib/as-asked.js",
+     "lib/size-of-move.js",
+     "lib/openrouter",
+     "lib/prompt-",
+     "lib/stage-router.js",
+     "lib/recommend",
+     "lib/recommendation-",
+     "lib/chat-",
+     "lib/agent-turn.js",
+     "lib/bash-tool.js",
+     "lib/llm-call-log.js",
+     "lib/llm-jobs.js",
+     "lib/model-routing",
+     "lib/model-pricing.js",
+     "lib/catalog-rate.js",
+     "lib/call-budget.js",
+     "lib/should-mock-ai.js",
+     "lib/brief",
+     "lib/recap",
+     "lib/collective-",
+     "lib/yap-client.js",
+     "lib/north-star-resolver.js",
+     "lib/scan.js",
+     "lib/scan-fingerprint.js",
+     "lib/audit.js",
+     "lib/roadmap.js",
+     "lib/context-graph.js",
+     "lib/library.js",
+     "lib/library-metadata.js",
+     "lib/custom-prompts-store.js",
+     "lib/saved-chat-store.js",
+     "lib/file-pointer.js",
+     "lib/feedback-title.js",
+     "lib/action-kind.js",
+     "lib/flight-companion-gate.js",
+     "lib/flight-companion-census-seed.js",
+     "lib/harbour-comments-store.js",
+     "lib/report-history-store.js",
+     "lib/ship-biscuit.js",
+     "lib/ship-biscuit-history-store.js",
+     "lib/periodicals.js"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.015Z"
+   }
+  ],
+  "lesson-17": [
+   {
+    "id": "lesson-17",
+    "kind": "lesson",
+    "in": "area-2",
+    "says": "`lib/periodicals.js`: Stability defers to a repo's committed declaration of its measures and names none (LIN-4424): change Harbour's measures in `docs/reviews/stability-measures/README.md` and its script, never in the shared template; a test links the bullet's list to that README.",
+    "paths": [
+     "lib/periodicals.js",
+     "docs/reviews/stability-measures/README.md"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.016Z"
+   }
+  ],
+  "lesson-18": [
+   {
+    "id": "lesson-18",
+    "kind": "lesson",
+    "in": "area-2",
+    "says": "A new stage kind is a row in every table `tests/unit/stage-kind-tables.test.js` reads: add it, or list it there as out with the reason. A kind in `SPINE` (`lib/run-view.js`) also moves the run page's \"n of N\", the session and task-page goldens (`UPDATE_RENDER_SESSION_GOLDEN=1`, `UPDATE_RENDER_TASK_PAGE_GOLDEN=1`) and the E2E count pins; read the golden diff before accepting it (LIN-4437).",
+    "paths": [
+     "tests/unit/stage-kind-tables.test.js",
+     "lib/run-view.js"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.017Z"
+   }
+  ],
+  "lesson-19": [
+   {
+    "id": "lesson-19",
+    "kind": "lesson",
+    "in": "area-2",
+    "says": "`formatCiGateCheck` (`lib/prompt-formatters.js`) renders in implementation, review and close-out: a rule for one stage gets its own formatter beside it. Prove the others unchanged by rendering every kind, fresh and fix round, at HEAD and on the branch, not by the budget test, whose ceilings are caps (LIN-4441).",
+    "paths": [
+     "lib/prompt-formatters.js"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.018Z"
+   }
+  ],
+  "finding-20": [
+   {
+    "id": "finding-20",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/recommendation-input.js`: the pinned-kind and in-app renders (`lib/dispatch-entrance.js`, `routes/proxy-compute.js` twice, `routes/workspace-api-prompts.js`) build context by hand: a new field must reach all five (LIN-4368 missed one; LIN-4393 leftovers.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.019Z"
+   }
+  ],
+  "finding-21": [
+   {
+    "id": "finding-21",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/size-of-move.js`: the built-in policy (`DECIDED_BY.policy`, err larger) may stand in for John's \"per task breakdown of options\"; its size words are unexplained. (John, LIN-4393.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.020Z"
+   }
+  ],
+  "finding-22": [
+   {
+    "id": "finding-22",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/should-mock-ai.js`: `isHermeticTestToken` is a third test-token check beside `isTestToken` (`routes/workspace-api-steps.js`) and inline `isTestMode` in `routes/proxy-compute.js` and `routes/task-chat.js`. (LIN-4347.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.021Z"
+   }
+  ],
+  "finding-23": [
+   {
+    "id": "finding-23",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/prompts/stage-intent.js`: `CUT` writes the closing contract's token order (`DECISION:` before `BLOCKED:`) into a scope line beside `ASK`. Its \"cut\" and the plan-review and review \"narrowing\" (`lib/completion-signals.js`) name one thing; no test links them. (John, 8 Nov.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.022Z"
+   }
+  ],
+  "finding-24": [
+   {
+    "id": "finding-24",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/prompt-template-defs.js`: a stage kind is a row in ~fourteen parallel tables (`GROUNDING_BY_KIND`, ceilings, completion signals, labels…): fold them into one definition. (Survey tally, LIN-4248.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.023Z"
+   }
+  ],
+  "finding-25": [
+   {
+    "id": "finding-25",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/call-budget.js`: the budget rule is untested live on anthropic/claude-haiku-5.5; before moving a call there, replay LIN-4352's snapshot through `scripts/replay-brief.mjs`: block [2] WHOLE, four sections, finishReason=stop, any retry's reasoning bound accepted. REFUSED: change the rule first. (John, LIN-4358.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.024Z"
+   }
+  ],
+  "finding-26": [
+   {
+    "id": "finding-26",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/call-budget.js`: split: `resolveReasoningBudget`/`isReasoningModel` stay in `lib/openrouter.js`; tool hops and the routing pair get the budget, not the retry; `canReason` has test callers only. (Area reads CG/CH.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.025Z"
+   }
+  ],
+  "finding-27": [
+   {
+    "id": "finding-27",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/openrouter.js`: `SUGGESTED_MODEL_IDS` and `DISPATCH_MODEL_SUGGESTIONS` (`lib/model-routing-harnesses.js`) repeat ids by hand, unchecked; the first is also the cold-catalog fallback. (Area reads CG/CH.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.026Z"
+   }
+  ],
+  "finding-28": [
+   {
+    "id": "finding-28",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/periodicals.js`: `docs/areas/` is spelled in 26 lines across 11 code files (`lib/`, `routes/`, `public/`, `server.js`, `scripts/`), up from 17 in 10 at the 10 Nov reading, and two leaves now spell the directory: `REGISTRY_PATH` (`lib/prompts/area-registry-path.js`) and `NOTES_DIR` (`lib/prompts/area-note-format.js`, LIN-4420), neither derived from the other. Moving the notes means editing both leaves and the prose. (Drift & Coherence Review, 10 Nov; `docs/reviews/drift-coherence-review-2026-11-10.md`; count, Documentation Review; recounted, Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.027Z"
+   }
+  ],
+  "finding-29": [
+   {
+    "id": "finding-29",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/recommendation-live-wait.js`: a read, not a claim: two different-kind calls racing on one ticket both pass; claim compare-and-set, like `claimHeldWake` (LIN-4392).",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.028Z"
+   }
+  ],
+  "finding-30": [
+   {
+    "id": "finding-30",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/recommendation-live-wait.js`: the live-stage refusal (`liveWaitRefusal`, 409 `STAGE_IN_FLIGHT`) is a Runs dispatch rule placed here by the `^lib/recommendation-` prefix. `lib/dispatch-entrance.js` (Runs) enforces it, `routes/workspace-api.js` (Web) imports it, `lib/proxy-instructions.js` (Agent API) takes its code, and the one run-state test it makes, `isLiveRun`, is in `lib/recent-runs.js` (Runs), so a change to what counts as live moves three areas. `lib/openrouter.js` (LLM) also routes on it, as the first code-settled route in `codeRouteOf`, so the wait is recommendation logic as well. A size of move: give the wait a Runs home. (Seams & Tangles, 13 Nov.; `docs/reviews/seams-tangles-review-2026-11-13-run12.md`.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.029Z"
+   }
+  ],
+  "finding-31": [
+   {
+    "id": "finding-31",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/periodicals.js`: two sizes of move: a ceiling for Periodical prompts (+18.8% in the window, 185,952 to 220,882 B; only a sha256 tripwire), and an index or series archive for `docs/reviews/` (109 top-level reports, 88 MB). (Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.030Z"
+   }
+  ],
+  "finding-32": [
+   {
+    "id": "finding-32",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/prompt-formatters.js`: eight stage kinds are told notes bind, yet `tests/unit/area-notes.test.js` checks shape only and close-out writes review-worded entries to main unreviewed: no content boundary on who adds a Lesson. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.031Z"
+   }
+  ],
+  "finding-33": [
+   {
+    "id": "finding-33",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/prompts/autopilot-kickoff.js`: a dispatch holder's `goal` is \"Goal from the human\" (ranked first), a periodical mint `note` \"the operator\" (`lib/periodicals.js`): attribute both to the minting token. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.032Z"
+   }
+  ],
+  "finding-34": [
+   {
+    "id": "finding-34",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/library.js`: summaries come from first-paragraph position, so an opening image's alt text can become the summary and every shelf rewrite churns `tests/fixtures/library-doc-summaries.json`; a `summary:` front-matter field would end both, but changes every doc's summary source. (Survey global, LIN-4428.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.033Z"
+   }
+  ],
+  "finding-35": [
+   {
+    "id": "finding-35",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/periodicals.js`: a reading's finding with no file in an area to cite goes to the closing comment, \"never in a ticket\", a live secret included, while `CONSEQUENCE_TEST` (`lib/prompts/leftover-words.js`) sends a find that touches safety to a ticket. The two rules in this area answer the live-secret case oppositely; having Periodicals render the gate needs John's ruling on that case first. (LIN-4401, LIN-4431.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.034Z"
+   }
+  ],
+  "finding-36": [
+   {
+    "id": "finding-36",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/prompts/leftover-words.js`: since `CONSEQUENCE_TEST` (LIN-4401), outside finds gather as Waiting entries in other areas' notes where tickets used to be filed. LIN-4414's one retirement per build drains only the areas a build touches, so rarely touched notes (other-features) will grow; their Waiting counts are the honest measure. (LIN-4431.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.035Z"
+   }
+  ],
+  "finding-37": [
+   {
+    "id": "finding-37",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/prompt-template-defs.js` (retrospective-audit Reporting) and `lib/periodicals.js` (`areaNotesRoutes`) each state the docs-only notes-PR rule in their own words; one shared constant in `lib/prompts/leftover-words.js` would make it one, at the cost of re-pinning the 13 Periodical prompt hashes. (LIN-4432.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.036Z"
+   }
+  ],
+  "finding-38": [
+   {
+    "id": "finding-38",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/prompts/leftover-words.js`: the first-match area lookup is spelled three ways: `CONSEQUENCE_TEST`'s \"first match wins\" parenthetical, `docs/areas/README.md` (\"take the first area with a pattern that matches its path\") and the blind-read prompt's own sentence (`lib/prompt-template-defs.js`, the `blind-read` template), which shipped as piloted (LIN-4437), so it was not retyped after the pilot. One constant in the leaf would make it one, at the cost of re-piloting that sentence. (LIN-4436 leftovers.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.037Z"
+   }
+  ],
+  "finding-39": [
+   {
+    "id": "finding-39",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/prompt-formatters.js`: `formatLocalTestRule` names this repo's runner command (`node scripts/run-unit-tests.mjs tests/unit/<files>`) in a template that also drives other repos, and `CLAUDE.md` spells the same rule; a repo-supplied test command would make the line right elsewhere and give it one spelling. (LIN-4441 leftovers.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.038Z"
+   }
+  ],
+  "finding-40": [
+   {
+    "id": "finding-40",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/periodicals.js`: \"search the repo for a committed tool (no path is written here) and run it\" is spelled four times: Drift & Coherence's census bullet, Seams & Tangles' two bullets and Stability's declaration bullet. One shared helper would make it one, at the cost of re-pinning those three templates' hashes. (LIN-4424 leftovers; Survey global.) The rule it answers, whether a review may run a tool the repo commits, is itself worded per template: Stability's run bullet says \"introducing no tooling beyond what the repo commits\", while Recent Headwinds (which reads the same rework and churn trajectory) and Drift & Coherence still say \"introducing no new tooling\", Code Quality says \"introduce no new tooling\", and Seams & Tangles allows committed tools in its own bullets. No `periodicalBullet` helper owns it; deciding it is one rule re-pins every template that states it. (LIN-4424 blind read.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.039Z"
+   }
+  ],
+  "finding-41": [
+   {
+    "id": "finding-41",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/model-routing-harnesses.js`: a dispatch record's `model` names the routed id (\"anthropic/claude-opus-4.8\" for the `opus` route), but the claude-code harness runs a Claude id by its family token (`isModelRunnableOn`, `CLAUDE_MAPPABLE_MODEL_FAMILIES`), and on blind-read dispatches d9bdf6d8, cced07ee and 0399b2e2 it ran `claude-opus-5-5`, so a record can misname the model that ran. Cost is already priced from the model the worker reports. Waiting: make the record carry the model the worker reports, or update the routed id. (LIN-4396 review.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.040Z"
+   }
+  ],
+  "finding-42": [
+   {
+    "id": "finding-42",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/prompts/blind-read-words.js`: its header says none retypes its words, but the kind is typed bare in `lib/recommendation-blind-read.js` (the run predicate and the dispatched step), `lib/pipeline-churn.js`, `lib/run-view.js` and `lib/run-closeout-state.js`, and has a second constant, `VIRTUAL_PROMPTS.BLIND_READ` (`lib/workflow-config.js`); `lib/completion-signals.js` types the heading (three times) and the verdict words instead of importing them. The route module does not import `BLIND_READ_KIND` at all, and `tests/unit/stage-kind-tables.test.js` checks presence, not these literals. LOW: a stored kind is rarely renamed; the leaf's claim is what is untrue. `lib/recommendation-blind-read.js` also redeclares `COMPLETED`. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.041Z"
+   }
+  ],
+  "finding-43": [
+   {
+    "id": "finding-43",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/openrouter.js`: the four routes code settles (the live-stage wait, the review loop bound, the blind read, the look-first sequence) are listed by hand in about nine places, no test pins any copy, and two are already wrong: `docs/architecture/prompt-system.md` says \"four routes\" and then restates three, without the blind read, and `public/llms.txt` says the blind read is \"Sent by hand\", where its description (`lib/prompt-template-defs.js`) says code sends it. The templates sync test checks that the catalogue bullet exists, not its words. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.042Z"
+   }
+  ],
+  "finding-44": [
+   {
+    "id": "finding-44",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/prompts/leftover-words.js`: the retirement line's words have one home and one checker (`lib/dispatch-leftover-answer.js`), but which entry to settle (the busiest touched area, else another) and the three forms are restated by hand in `docs/areas/README.md`, simple-dispatcher's docs/areas/README.md, `docs/proxy-integration.md` (with the refusal kinds) and `docs/architecture/dispatch-and-proxy.md`, and the verbatim guard reads only `lib/` and `routes/`. simple-dispatcher's README says a waiting entry also leaves when \"a follow-up is filed for it\", where this README says only when the consequence test sends it to a ticket. A cross-repo seam; simple-dispatcher's side is named here, not edited. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.043Z"
+   }
+  ],
+  "finding-45": [
+   {
+    "id": "finding-45",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/prompts/area-note-format.js`: the one reading of a waiting entry in code does not hold what a cited path is; that rule is in the guard (`tests/unit/area-notes.test.js`, a listed extension), in `lib/dispatch-leftover-answer.js` (any one to six characters, its comment calling it the guard's rule) and in simple-dispatcher's guard. A retirement line can name a path the guard would not read as one. Borderline. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.044Z"
+   }
+  ],
+  "area-46": [
+   {
+    "id": "area-46",
+    "kind": "area",
+    "name": "Other features",
+    "paths": [
+     "lib/"
+    ],
+    "links": {},
+    "state": "kept",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.045Z"
+   }
+  ],
+  "lesson-47": [
+   {
+    "id": "lesson-47",
+    "kind": "lesson",
+    "in": "area-46",
+    "says": "This area is the `^lib/` catch-all: a file lands here when no earlier pattern names it. A new production file belongs in its owning area, given a pattern in the same change, checked in `tests/unit/area-map-placement.test.js`. A file here is often homeless, not owned.",
+    "paths": [
+     "lib/",
+     "tests/unit/area-map-placement.test.js"
+    ],
+    "checked-at": "4b5001ddf",
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.046Z"
+   }
+  ],
+  "finding-48": [
+   {
+    "id": "finding-48",
+    "kind": "finding",
+    "in": "area-46",
+    "to": "area-46",
+    "says": "`lib/cost-format.js`: still in the catch-all, as is LIN-4203's `lib/usage-snapshot-intake.js`, while the rest of the cost code moved to Runs & dispatch (LIN-4201). (Survey tally: LIN-4176, LIN-4195, LIN-4201.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.047Z"
+   }
+  ],
+  "finding-49": [
+   {
+    "id": "finding-49",
+    "kind": "finding",
+    "in": "area-46",
+    "to": "area-46",
+    "says": "`lib/home-view.js`: split it (over 600 lines), and separate `upNextOf`'s eligibility from its ranking, so both lists filter one candidate model. The module threads `shown`, `waiting`, `linked` and `onHome` through every placement. (Survey tally: LIN-4151, LIN-4144.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.048Z"
+   }
+  ],
+  "finding-50": [
+   {
+    "id": "finding-50",
+    "kind": "finding",
+    "in": "area-46",
+    "to": "area-46",
+    "says": "`lib/home-view.js`: one ranking for \"what's next\" everywhere. `compareRank` here sits beside `orderIssuesForSwipe` in `lib/task-board-view.js`. (Survey tally: LIN-4151 and the 11-03 Drift review's three rankers.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.049Z"
+   }
+  ],
+  "finding-51": [
+   {
+    "id": "finding-51",
+    "kind": "finding",
+    "in": "area-46",
+    "to": "area-46",
+    "says": "`lib/key-state-holders.js`: per-key state is reset through this test-side registry; a per-workspace state container in production would let a reset drop the container instead. (Survey tally: LIN-4168.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.050Z"
+   }
+  ],
+  "finding-52": [
+   {
+    "id": "finding-52",
+    "kind": "finding",
+    "in": "area-46",
+    "to": "area-46",
+    "says": "`lib/as-asked-seal.js`: homeless by a deliberate pin in `tests/unit/area-map-placement.test.js`, so it sits in this catch-all. It opens the Agent API ↔ Other features pair (2/1, through `routes/proxy-writes.js` and `lib/proxy-graphql-errors.js`). Moving it to LLM & prompts closes the pair, but reverses the pin and moves this entry, so it is a size of move for the guide's owner, not a tidy. (Seams & Tangles, 8 Nov.; `docs/reviews/seams-tangles-review-2026-11-08-run10.md`.)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T12:01:48.051Z"
+   }
+  ],
+  "task-53": [
+   {
+    "id": "task-53",
+    "kind": "task",
+    "asked": "**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** The first outside test will be a small team on Jira who already use agents and are looking to have agents build their product. John has used Harbour on Jira for a few weeks: \"it's mostly fine except for the gaps that you've identified.\" The gaps:\n\n* Harbour can't create a Jira issue, so on Jira the loop can't file a task with the person's words sealed, mint a Periodical, or file what a task's last step files;\n* Jira can't yet hold the block that keeps the person's words exactly as asked.\n\n**What we want.** On a Jira-backed workspace, the loop does what it does on Linear: a task can be filed with the person's words sealed, a Periodical can be minted, and a task's last step can file what it files. It's checked on John's own Jira, which is already in real use.\n\n**Done when** on John's Jira a task filed through Harbour keeps the person's words sealed, a Periodical mints, and a task's last step can file.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.",
+    "done-when": "on John's Jira a task filed through Harbour keeps the person's words sealed, a Periodical mints, and a task's last step can file.",
+    "paths": [
+     "README.md",
+     "docs/areas/providers.md",
+     "docs/proxy-integration.md",
+     "lib/as-asked-seal.js",
+     "lib/as-asked.js",
+     "lib/periodicals.js",
+     "lib/prompts/leftover-words.js",
+     "lib/providers/jira/",
+     "lib/render.js",
+     "routes/proxy-writes.js",
+     "routes/workspace-api-feedback.js",
+     "routes/workspace-api-issue-write.js",
+     "tests/unit/as-asked-create-seal.test.js",
+     "tests/unit/as-asked-dispatch-seal.test.js",
+     "tests/unit/as-asked-readers.test.js",
+     "tests/unit/jira-provider.test.js",
+     "tests/unit/lin-4313-periodical-prompt-bytes.test.js",
+     "tests/unit/prompt-size-budget.test.js",
+     "tests/unit/providers.test.js",
+     "tests/unit/render-task-create.test.js",
+     "tests/unit/render.test.js",
+     "tests/unit/task-create-route.test.js"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "John",
+    "at": "2026-11-13T12:08:08.059Z",
+    "via": "driving-session"
+   }
+  ],
+  "plan-54": [
+   {
+    "id": "plan-54",
+    "kind": "plan",
+    "in": "task-53",
+    "says": "**Session 1: the seal (lands alone).** Witnesses are unit tests against `fake-client.js`.\n\n1. A pure region module beside the provider reads and writes the block. It imports `AS_ASKED_HEADING`, `AS_ASKED_END`, `splitAsAsked` and `sealAsAsked` from `lib/as-asked.js` and never retypes their spellings. `adf.js` stays import-free. The reader finds the region by nodes: an h2 whose text is the heading's text, then a paragraph whose plain text is the end sentence, regardless of marks. It applies the same position rule `splitAsAsked` applies.\n   * If the region's current rendering equals the stored `rendered`, it serves the exact `words`.\n   * If not, a human edited it in Jira, and it serves what the region renders now, behind canonical markers. The person's edit becomes the words, as on Linear.\n   * Without the end paragraph, or without the heading, there is no block. This matches Linear's behaviour for a deleted end marker.\n   * A property with no region is ignored.\n   * Witness: reader tests for kept, edited-in-Jira, edited-below-the-line, end line deleted, an end line re-marked by the editor (`_…_` or plain), `localId` attributes added to the ADF, and a stale property with no block.\n2. Comparison is on rendered content, never ADF hashes, because Jira adds attributes such as `localId` on ordinary saves. Witness: the `localId` case above stays `kept`.\n3. Every description read in `index.js` goes through the one reader. Single-issue reads (`fetchIssueFields`, context issue, parent, `issueDescription`) fetch with `properties=harbour.asAsked`. The bulk path does not: it is display only, and it shows the block with canonical markers and the converted words. `client.getIssue` gains the `properties` option and the fake honours it.\n   * Witness: a test fails if `adfToMarkdown` is applied to a description field anywhere in `index.js` outside the reader. The repeatable search is `grep -n adfToMarkdown lib/providers/jira/index.js`, where only comment bodies may remain.\n4. `updateIssue` writes the property in the same PUT whenever the new description holds a block, with `words` taken from `splitAsAsked` of what it was handed. A description with no block writes no property. `client.updateIssue` and the fake accept `properties`.\n   * Witness: byte equality of `words` after filing, after a later write of what was read, after a `description/below` write, and after a human edit below the line.\n5. `descriptionRoundTrip` becomes write-then-read, property included: `read(markdownToAdf(m), propertyFor(m))`. `providerHoldsAsAsked` then turns true for Jira with no change to `lib/as-asked-seal.js`, apart from its stale header.\n   * Witness: the Jira cases of `as-asked-create-seal`, `as-asked-dispatch-seal` and `as-asked-readers` flip from \"skipped\" to \"sealed and kept\". Include `* a` bullets, `*em*`, a fence with a blank line, and trailing spaces. These are the failures the Survey measured.\n6. **Size guard.** Jira limits an entity property value to about 32 KB (the builder confirms the exact number from Atlassian's docs). `words` plus `rendered` can exceed it on a long description. When the serialized property would be too large, `descriptionRoundTrip` reports a non-kept read-back, so the lane files unsealed with the existing log line and the person's text is never reformatted. `updateIssue` refuses a block that is too large with a 422 that names the size, before any write.\n   * Witness: an oversized body is filed unsealed with the log line; an oversized `updateIssue` writes nothing. This is the test that tries what the guard was there to stop.",
+    "paths": [
+     "lib/providers/jira/",
+     "lib/as-asked-seal.js",
+     "lib/as-asked.js",
+     "tests/unit/as-asked-create-seal.test.js",
+     "tests/unit/as-asked-dispatch-seal.test.js",
+     "tests/unit/as-asked-readers.test.js",
+     "tests/unit/jira-provider.test.js"
+    ],
+    "order": 1,
+    "links": {},
+    "state": "kept",
+    "v": 1,
+    "op": "add",
+    "by": "design",
+    "at": "2026-11-13T13:31:05.000Z"
+   },
+   {
+    "id": "plan-54",
+    "kind": "plan",
+    "in": "task-53",
+    "says": "**Session 1: the seal (lands alone).** Witnesses are unit tests against `fake-client.js`.\n\n1. A pure region module beside the provider reads and writes the block. It imports `AS_ASKED_HEADING`, `AS_ASKED_END`, `splitAsAsked` and `sealAsAsked` from `lib/as-asked.js` and never retypes their spellings. `adf.js` stays import-free. The reader finds the region by nodes: an h2 whose text is the heading's text, then a paragraph whose plain text is the end sentence, regardless of marks. It applies the same position rule `splitAsAsked` applies.\n   * If the region's current rendering equals the stored `rendered`, it serves the exact `words`.\n   * If not, a human edited it in Jira, and it serves what the region renders now, behind canonical markers. The person's edit becomes the words, as on Linear.\n   * Without the end paragraph, or without the heading, there is no block. This matches Linear's behaviour for a deleted end marker.\n   * A property with no region is ignored.\n   * Witness: reader tests for kept, edited-in-Jira, edited-below-the-line, end line deleted, an end line re-marked by the editor (`_…_` or plain), `localId` attributes added to the ADF, and a stale property with no block.\n2. Comparison is on rendered content, never ADF hashes, because Jira adds attributes such as `localId` on ordinary saves. Witness: the `localId` case above stays `kept`.\n3. Every description read in `index.js` goes through the one reader. Single-issue reads (`fetchIssueFields`, context issue, parent, `issueDescription`) fetch with `properties=harbour.asAsked`. The bulk path does not: it is display only, and it shows the block with canonical markers and the converted words. `client.getIssue` gains the `properties` option and the fake honours it.\n   * Witness: a test fails if `adfToMarkdown` is applied to a description field anywhere in `index.js` outside the reader. The repeatable search is `grep -n adfToMarkdown lib/providers/jira/index.js`, where only comment bodies may remain.\n4. `updateIssue` writes the property in the same PUT whenever the new description holds a block, with `words` taken from `splitAsAsked` of what it was handed. A description with no block writes no property. `client.updateIssue` and the fake accept `properties`.\n   * Witness: byte equality of `words` after filing, after a later write of what was read, after a `description/below` write, and after a human edit below the line.\n5. `descriptionRoundTrip` becomes write-then-read, property included: `read(markdownToAdf(m), propertyFor(m))`. `providerHoldsAsAsked` then turns true for Jira with no change to `lib/as-asked-seal.js`, apart from its stale header.\n   * Witness: the Jira cases of `as-asked-create-seal`, `as-asked-dispatch-seal` and `as-asked-readers` flip from \"skipped\" to \"sealed and kept\". Include `* a` bullets, `*em*`, a fence with a blank line, and trailing spaces. These are the failures the Survey measured.\n6. **Size guard.** Jira limits an entity property value to about 32 KB (the builder confirms the exact number from Atlassian's docs). `words` plus `rendered` can exceed it on a long description. When the serialized property would be too large, `descriptionRoundTrip` reports a non-kept read-back, so the lane files unsealed with the existing log line and the person's text is never reformatted. `updateIssue` refuses a block that is too large with a 422 that names the size, before any write.\n   * Witness: an oversized body is filed unsealed with the log line; an oversized `updateIssue` writes nothing. This is the test that tries what the guard was there to stop.\n\nPlan review notes for this piece (Plan Review Verdict, comment 61e84035, 13:40):\n\n2. **Every single-issue read needs the property, not just the four listed.** The plan's rule is \"single-issue reads fetch with `properties=harbour.asAsked`\". Other `getIssue` results are also mapped through `_toCanonicalIssue`: `updateIssue`'s confirmation re-read (`index.js:1267`), `updateIssueLabels`' re-read (`index.js:1110`), and the new `createIssue` re-read. Without the property they return converted words in the write response. The simplest rule that covers all of them: every provider-side `client.getIssue` asks for the property. Optionally, `POST /search/jql` also takes `properties`, which would make the bulk path exact too.\n\n3. **Store a digest of `rendered`, not the rendering itself.** `rendered` is only ever compared for equality, so a sha256 of it does the same job. Storing the full rendering roughly duplicates `words` and halves how much text fits. Atlassian documents the entity-property value limit as 32768 characters; confirm it, as the plan says. Put the size computation in one function that `descriptionRoundTrip`, `updateIssue` and `createIssue` all call, so the seal check and the 422 can never disagree.\n\n6. **Item 3's grep witness:** `adfToMarkdown` legitimately remains at `index.js:924` and `:1295` for comment bodies. Pin the test on description fields specifically, as the plan says, not on a raw count of matches.",
+    "paths": [
+     "lib/providers/jira/",
+     "lib/as-asked-seal.js",
+     "lib/as-asked.js",
+     "tests/unit/as-asked-create-seal.test.js",
+     "tests/unit/as-asked-dispatch-seal.test.js",
+     "tests/unit/as-asked-readers.test.js",
+     "tests/unit/jira-provider.test.js"
+    ],
+    "order": 1,
+    "links": {},
+    "state": "kept",
+    "v": 2,
+    "op": "revise",
+    "by": "plan-review",
+    "at": "2026-11-13T13:40:55.240Z",
+    "reason": "Plan Review Verdict (comment 61e84035) notes 2, 3, 6 change this piece; the breakdown carries them into the child's slice."
+   }
+  ],
+  "plan-55": [
+   {
+    "id": "plan-55",
+    "kind": "plan",
+    "in": "task-53",
+    "says": "**Session 2: creation.**\n\n 7. Client `createIssue` (`POST /rest/api/3/issue`, `fields` and `properties`) and `getCreateMeta` calls. Provider `createIssue` creates, then re-reads and returns the canonical issue, as `updateIssue` does. The property comes from `splitAsAsked` of the description given, because every lane has already sealed it. `createFields()` becomes `title`, `description`, `teamId`; `teamId` is resolved as a Jira project key. `apiWriteFields()` adds `projectId` and `parentId`, but not `stateId`: a transition after create is a second, non-atomic write. `projectId` is an epic: `parent` on team-managed projects, the Epic Link field through `_resolveEpicLinkFieldId` on company-managed ones. `parentId` selects a subtask type.\n    * Witness: provider tests against the fake for create, create with an epic, create with a parent, and create with a block (property present, re-read `kept`).\n 8. Issue type is chosen inside the provider, with no new setting, from createmeta. Prefer \"Task\", else the first standard non-subtask at hierarchy level 0; use a subtask type when there is a parent. A required field with no default, beyond summary, project, issuetype, description, reporter and parent, returns 422 naming the field and creates nothing. The result is cached briefly per site and project; the key includes the site so one tenant never reads another's.\n    * Witness: tests for Task preferred, no Task, subtask, a required custom field refused with its name, and the cache key including the site.\n 9. All three lanes work on the Jira fake end to end. The test files are `task-create-route`, the proxy create tests and the feedback-lane test; the Periodical mint is a proxy create with a project key as team. `inlineCreate` turns true by itself through `supports('createIssue')`, so `render.js` shows the in-app form instead of the deep link. `getCreateTaskUrl` stays overridden, because `ui.write` derives from it (`lib/providers/interface.js`), and removing it would hide \"+ Add task\".\n    * Witness: updated pins in `providers.test.js`, `jira-provider.test.js`, `render.test.js`, `render-task-create.test.js` and `task-create-route.test.js`.\n10. **Retires** (every change names what it retires):\n    * the deep-link create path on Jira\n    * `inlineCreate: false`\n    * the stale LIN-1557 comments in `index.js` (header, capability profile, `getCreateTaskUrl`, `ui`)\n    * the \"Jira is skipped today\" claims in the headers of `lib/as-asked-seal.js` and `lib/as-asked.js`, and in the `descriptionRoundTrip` comment\n    * README line 60 (\"creating new issues isn't supported yet\") and `docs/proxy-integration.md` (\"Jira files unsealed\", near line 2070)\n    * `CONSEQUENCE_TEST`'s \"where the provider cannot create tickets\" branch in `lib/prompts/leftover-words.js`\n    * the \"Linear task\" wording in `lib/periodicals.js` (251, 278), which becomes provider-neutral\n    * Repeatable search: `grep -rn \"LIN-1557\\|cannot create tickets\\|Jira.*unsealed\\|isn't supported yet\" lib routes docs README.md`. Any hit that remains is either retired or cited as still true.\n11. The prompt-text changes (10's last two items) are re-measured against `tests/unit/prompt-size-budget.test.js` and the Periodical hash in `tests/unit/lin-4313-periodical-prompt-bytes.test.js`. This ticket is named as the reason beside any ceiling it raises. Area lesson `llm-and-prompts` (LIN-4393): rebase first, then re-measure.",
+    "paths": [
+     "lib/providers/jira/",
+     "routes/proxy-writes.js",
+     "routes/workspace-api-issue-write.js",
+     "routes/workspace-api-feedback.js",
+     "lib/render.js",
+     "lib/as-asked-seal.js",
+     "lib/as-asked.js",
+     "lib/prompts/leftover-words.js",
+     "lib/periodicals.js",
+     "README.md",
+     "docs/proxy-integration.md",
+     "tests/unit/providers.test.js",
+     "tests/unit/jira-provider.test.js",
+     "tests/unit/render.test.js",
+     "tests/unit/render-task-create.test.js",
+     "tests/unit/task-create-route.test.js",
+     "tests/unit/prompt-size-budget.test.js",
+     "tests/unit/lin-4313-periodical-prompt-bytes.test.js"
+    ],
+    "order": 2,
+    "links": {},
+    "state": "kept",
+    "v": 1,
+    "op": "add",
+    "by": "design",
+    "at": "2026-11-13T13:31:06.000Z"
+   },
+   {
+    "id": "plan-55",
+    "kind": "plan",
+    "in": "task-53",
+    "says": "**Session 2: creation.**\n\n 7. Client `createIssue` (`POST /rest/api/3/issue`, `fields` and `properties`) and `getCreateMeta` calls. Provider `createIssue` creates, then re-reads and returns the canonical issue, as `updateIssue` does. The property comes from `splitAsAsked` of the description given, because every lane has already sealed it. `createFields()` becomes `title`, `description`, `teamId`; `teamId` is resolved as a Jira project key. `apiWriteFields()` adds `projectId` and `parentId`, but not `stateId`: a transition after create is a second, non-atomic write. `projectId` is an epic: `parent` on team-managed projects, the Epic Link field through `_resolveEpicLinkFieldId` on company-managed ones. `parentId` selects a subtask type.\n    * Witness: provider tests against the fake for create, create with an epic, create with a parent, and create with a block (property present, re-read `kept`).\n 8. Issue type is chosen inside the provider, with no new setting, from createmeta. Prefer \"Task\", else the first standard non-subtask at hierarchy level 0; use a subtask type when there is a parent. A required field with no default, beyond summary, project, issuetype, description, reporter and parent, returns 422 naming the field and creates nothing. The result is cached briefly per site and project; the key includes the site so one tenant never reads another's.\n    * Witness: tests for Task preferred, no Task, subtask, a required custom field refused with its name, and the cache key including the site.\n 9. All three lanes work on the Jira fake end to end. The test files are `task-create-route`, the proxy create tests and the feedback-lane test; the Periodical mint is a proxy create with a project key as team. `inlineCreate` turns true by itself through `supports('createIssue')`, so `render.js` shows the in-app form instead of the deep link. `getCreateTaskUrl` stays overridden, because `ui.write` derives from it (`lib/providers/interface.js`), and removing it would hide \"+ Add task\".\n    * Witness: updated pins in `providers.test.js`, `jira-provider.test.js`, `render.test.js`, `render-task-create.test.js` and `task-create-route.test.js`.\n10. **Retires** (every change names what it retires):\n    * the deep-link create path on Jira\n    * `inlineCreate: false`\n    * the stale LIN-1557 comments in `index.js` (header, capability profile, `getCreateTaskUrl`, `ui`)\n    * the \"Jira is skipped today\" claims in the headers of `lib/as-asked-seal.js` and `lib/as-asked.js`, and in the `descriptionRoundTrip` comment\n    * README line 60 (\"creating new issues isn't supported yet\") and `docs/proxy-integration.md` (\"Jira files unsealed\", near line 2070)\n    * `CONSEQUENCE_TEST`'s \"where the provider cannot create tickets\" branch in `lib/prompts/leftover-words.js`\n    * the \"Linear task\" wording in `lib/periodicals.js` (251, 278), which becomes provider-neutral\n    * Repeatable search: `grep -rn \"LIN-1557\\|cannot create tickets\\|Jira.*unsealed\\|isn't supported yet\" lib routes docs README.md`. Any hit that remains is either retired or cited as still true.\n11. The prompt-text changes (10's last two items) are re-measured against `tests/unit/prompt-size-budget.test.js` and the Periodical hash in `tests/unit/lin-4313-periodical-prompt-bytes.test.js`. This ticket is named as the reason beside any ceiling it raises. Area lesson `llm-and-prompts` (LIN-4393): rebase first, then re-measure.\n\nPlan review notes for this piece (Plan Review Verdict, comment 61e84035, 13:40):\n\n4. **The Periodical report gate never fires on Jira** (a parity gap this task makes reachable). Linear's `issueWriteGuard` returns `description` and the last 20 comments (LIN-694, `linear/index.js:1745`). Jira's (`jira/index.js:1016`) returns neither. So `refusedByPeriodicalGate` (`proxy-writes.js:547`) never applies, and a minted Periodical task can be moved to Done on Jira without report evidence. Minting itself works, so the Done-when is met either way. My recommendation: in session 2, add `description` (through the composed reader) and recent comments to Jira's `issueWriteGuard`, using the same `getIssue`. If the builder judges it out of scope, file a ticket instead: it is a guard that silently doesn't run.\n\n5. **`parentId` is not reachable through the lanes as planned.** Proxy create forwards `parentId` only when it is a UUID (`proxy-writes.js:451`, `present: isUuid`). A Jira id or key is silently skipped, and the child is filed top-level with a 201. The session lane doesn't forward `parentId` at all. The breakdown prompt (`prompt-template-defs.js:425`) tells agents to create subtasks with `parentId` and `stateId: \"Todo\"`. On Jira after this plan, `stateId` gets a loud 400, but the parent is silently lost. This isn't one of the three asked behaviours, so choose one:\n   - make the proxy refuse (400) a non-UUID `parentId` instead of dropping it;\n   - accept the provider's own id form when the provider declares `parentId`;\n   - or leave `parentId` out of `apiWriteFields()` here and record it as a follow-up.\n\n   Don't let item 8's subtask-type test stand as evidence that subtask filing works end to end. `docs/proxy-integration.md:2065` documents `parentId` as UUID-only.",
+    "paths": [
+     "lib/providers/jira/",
+     "routes/proxy-writes.js",
+     "routes/workspace-api-issue-write.js",
+     "routes/workspace-api-feedback.js",
+     "lib/render.js",
+     "lib/as-asked-seal.js",
+     "lib/as-asked.js",
+     "lib/prompts/leftover-words.js",
+     "lib/periodicals.js",
+     "README.md",
+     "docs/proxy-integration.md",
+     "tests/unit/providers.test.js",
+     "tests/unit/jira-provider.test.js",
+     "tests/unit/render.test.js",
+     "tests/unit/render-task-create.test.js",
+     "tests/unit/task-create-route.test.js",
+     "tests/unit/prompt-size-budget.test.js",
+     "tests/unit/lin-4313-periodical-prompt-bytes.test.js"
+    ],
+    "order": 2,
+    "links": {},
+    "state": "kept",
+    "v": 2,
+    "op": "revise",
+    "by": "plan-review",
+    "at": "2026-11-13T13:40:55.241Z",
+    "reason": "Plan Review Verdict (comment 61e84035) notes 4, 5 change this piece; the breakdown carries them into the child's slice."
+   }
+  ],
+  "plan-56": [
+   {
+    "id": "plan-56",
+    "kind": "plan",
+    "in": "task-53",
+    "says": "**Session 3: live check and leftovers.** This needs John's Jira credentials.\n\n12. On John's Jira: file one task through Harbour, mint one Periodical, perform one last-step filing. Re-read each from Jira and check `kept`. Write below the line once and re-check. Record the createmeta result and whether the site accepted `properties` in the create and edit bodies.\n    * If the site rejects `properties` in the body, switch to a separate `PUT /issue/{key}/properties/harbour.asAsked` straight after, and report a failure through the existing `PartialWriteError` envelope. This is still shape B.\n    * If createmeta shows a required custom field, that is a finding for a follow-up ticket, not a reason to guess a value.\n    * If the session has no credential for his site, park it as a handoff to John (what to run, what to paste back), not as done.\n13. File one ticket for the `markdownToAdf` bug where a fenced block containing a blank line splits into fragments. It breaks displayed content, so it is a ticket, not a Waiting entry. Create `docs/areas/providers.md` (the registry's `providers` slug has no note yet) with two Waiting entries, each citing `lib/providers/jira/adf.js` or the provider first: widening the D1 writer vocabulary (mentions, emoji, tables), and an explicit \"holds verbatim text\" provider capability in place of the Markdown comparison. One home each, per `CONSEQUENCE_TEST`.",
+    "paths": [
+     "lib/providers/jira/",
+     "docs/areas/providers.md"
+    ],
+    "order": 3,
+    "links": {},
+    "state": "kept",
+    "v": 1,
+    "op": "add",
+    "by": "design",
+    "at": "2026-11-13T13:31:07.000Z"
+   },
+   {
+    "id": "plan-56",
+    "kind": "plan",
+    "in": "task-53",
+    "says": "**Session 3: live check and leftovers.** This needs John's Jira credentials.\n\n12. On John's Jira: file one task through Harbour, mint one Periodical, perform one last-step filing. Re-read each from Jira and check `kept`. Write below the line once and re-check. Record the createmeta result and whether the site accepted `properties` in the create and edit bodies.\n    * If the site rejects `properties` in the body, switch to a separate `PUT /issue/{key}/properties/harbour.asAsked` straight after, and report a failure through the existing `PartialWriteError` envelope. This is still shape B.\n    * If createmeta shows a required custom field, that is a finding for a follow-up ticket, not a reason to guess a value.\n    * If the session has no credential for his site, park it as a handoff to John (what to run, what to paste back), not as done.\n13. File one ticket for the `markdownToAdf` bug where a fenced block containing a blank line splits into fragments. It breaks displayed content, so it is a ticket, not a Waiting entry. Create `docs/areas/providers.md` (the registry's `providers` slug has no note yet) with two Waiting entries, each citing `lib/providers/jira/adf.js` or the provider first: widening the D1 writer vocabulary (mentions, emoji, tables), and an explicit \"holds verbatim text\" provider capability in place of the Markdown comparison. One home each, per `CONSEQUENCE_TEST`.\n\nPlan review notes for this piece (Plan Review Verdict, comment 61e84035, 13:40):\n\n1. **Make the live check able to fail (session 3, item 12).** The \"kept\" check passes even if B's exact path never runs on real Jira. If Jira normalises the ADF it stores so that the region no longer renders to `rendered`, the reader serves the converted rendering instead of `words`. For a plain body like \"Please make the button blue.\" that is identical, so `checkAsAsked` still says `kept`. On John's site:\n   - file at least one body with lossy constructs: `* a` bullets, `*em*`, trailing spaces, and a list starting at `3.`;\n   - assert byte equality of the read-back `words` against what was filed, because `checkAsAsked` normalises escapes;\n   - record whether the reader took the `rendered`-match branch.\n\n   This is the one place the Done-when's \"keeps the person's words\" is actually proved.",
+    "paths": [
+     "lib/providers/jira/",
+     "docs/areas/providers.md"
+    ],
+    "order": 3,
+    "links": {},
+    "state": "kept",
+    "v": 2,
+    "op": "revise",
+    "by": "plan-review",
+    "at": "2026-11-13T13:40:55.242Z",
+    "reason": "Plan Review Verdict (comment 61e84035) notes 1 change this piece; the breakdown carries them into the child's slice."
+   }
+  ],
+  "verdict-57": [
+   {
+    "id": "verdict-57",
+    "kind": "verdict",
+    "in": "task-53",
+    "of": "plan-review",
+    "outcome": "approve",
+    "reasoning": "**Verdict:** Approve. The plan's premises check out at HEAD, it opens all three filing lanes with one provider method plus an honest round trip, and its safeguards hold. The notes below are corrections the builder can make without changing the plan's shape.\n\n**Against what was asked:** \"Done when on John's Jira a task filed through Harbour keeps the person's words sealed, a Periodical mints, and a task's last step can file.\" The plan delivers every clause with no narrowing. If the builder has no credential for John's site, session 3 is a handoff to John, not a cut.\n\n(Notes for the builder, none block, folded into this piece: 2, 3, 6.)",
+    "links": {
+     "on": "plan-54@2"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "plan-review",
+    "at": "2026-11-13T13:40:55.250Z"
+   }
+  ],
+  "verdict-58": [
+   {
+    "id": "verdict-58",
+    "kind": "verdict",
+    "in": "task-53",
+    "of": "plan-review",
+    "outcome": "approve",
+    "reasoning": "**Verdict:** Approve. The plan's premises check out at HEAD, it opens all three filing lanes with one provider method plus an honest round trip, and its safeguards hold. The notes below are corrections the builder can make without changing the plan's shape.\n\n**Against what was asked:** \"Done when on John's Jira a task filed through Harbour keeps the person's words sealed, a Periodical mints, and a task's last step can file.\" The plan delivers every clause with no narrowing. If the builder has no credential for John's site, session 3 is a handoff to John, not a cut.\n\n(Notes for the builder, none block, folded into this piece: 4, 5.)",
+    "links": {
+     "on": "plan-55@2"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "plan-review",
+    "at": "2026-11-13T13:40:55.251Z"
+   }
+  ],
+  "verdict-59": [
+   {
+    "id": "verdict-59",
+    "kind": "verdict",
+    "in": "task-53",
+    "of": "plan-review",
+    "outcome": "approve",
+    "reasoning": "**Verdict:** Approve. The plan's premises check out at HEAD, it opens all three filing lanes with one provider method plus an honest round trip, and its safeguards hold. The notes below are corrections the builder can make without changing the plan's shape.\n\n**Against what was asked:** \"Done when on John's Jira a task filed through Harbour keeps the person's words sealed, a Periodical mints, and a task's last step can file.\" The plan delivers every clause with no narrowing. If the builder has no credential for John's site, session 3 is a handoff to John, not a cut.\n\n(Notes for the builder, none block, folded into this piece: 1.)",
+    "links": {
+     "on": "plan-56@2"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "plan-review",
+    "at": "2026-11-13T13:40:55.252Z"
+   }
+  ],
+  "task-60": [
+   {
+    "id": "task-60",
+    "kind": "task",
+    "in": "task-53",
+    "asked": "",
+    "done-when": "All of the above pass on `fake-client.js`. Jira's `descriptionRoundTrip` holds sealed words byte-exact, D1's rich-content guard is unchanged, and the PR names what it retires (the \"Jira skipped/unsealed\" seal claims in code headers). Note that once this lands, the first-dispatch seal begins sealing Jira-native tickets on live sites. That is expected: it is logged on failure, and dispatch continues.",
+    "paths": [
+     "lib/providers/jira/",
+     "lib/as-asked-seal.js",
+     "lib/as-asked.js",
+     "tests/unit/as-asked-create-seal.test.js",
+     "tests/unit/as-asked-dispatch-seal.test.js",
+     "tests/unit/as-asked-readers.test.js",
+     "tests/unit/jira-provider.test.js"
+    ],
+    "links": {
+     "piece": "plan-54"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "breakdown",
+    "at": "2026-11-13T13:43:57.706Z"
+   }
+  ],
+  "task-61": [
+   {
+    "id": "task-61",
+    "kind": "task",
+    "in": "task-53",
+    "asked": "",
+    "done-when": "All three lanes work on the Jira fake end to end (task-create-route, the proxy create tests and the feedback-lane test; the Periodical mint is a proxy create with a project key as team), with the updated pins in providers.test.js, jira-provider.test.js, render.test.js, render-task-create.test.js and task-create-route.test.js. Any retire-search hit that remains is either retired or cited as still true, and the prompt-text changes are re-measured against tests/unit/prompt-size-budget.test.js and the Periodical hash. [From the parent plan, Session 2, items 9-11: the child ticket itself is not in this seed's reading list.]",
+    "paths": [
+     "lib/providers/jira/",
+     "routes/proxy-writes.js",
+     "routes/workspace-api-issue-write.js",
+     "routes/workspace-api-feedback.js",
+     "lib/render.js",
+     "lib/as-asked-seal.js",
+     "lib/as-asked.js",
+     "lib/prompts/leftover-words.js",
+     "lib/periodicals.js",
+     "README.md",
+     "docs/proxy-integration.md",
+     "tests/unit/providers.test.js",
+     "tests/unit/jira-provider.test.js",
+     "tests/unit/render.test.js",
+     "tests/unit/render-task-create.test.js",
+     "tests/unit/task-create-route.test.js",
+     "tests/unit/prompt-size-budget.test.js",
+     "tests/unit/lin-4313-periodical-prompt-bytes.test.js"
+    ],
+    "links": {
+     "piece": "plan-55"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "breakdown",
+    "at": "2026-11-13T13:43:58.000Z"
+   }
+  ],
+  "task-62": [
+   {
+    "id": "task-62",
+    "kind": "task",
+    "in": "task-53",
+    "asked": "",
+    "done-when": "Verified live on John's Jira: file one task, mint one Periodical and make one last-step filing, re-read each and check the block is kept, then write below the line once and re-check. If the session has no credential for his site, it is parked as a handoff to John (what to run, what to paste back), not as done. [From the parent's Design and Plan, Session 3, item 12: the child ticket itself is not in this seed's reading list.]",
+    "paths": [
+     "lib/providers/jira/",
+     "docs/areas/providers.md"
+    ],
+    "links": {
+     "piece": "plan-56"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "breakdown",
+    "at": "2026-11-13T13:43:59.000Z"
+   }
+  ],
+  "decision-63": [
+   {
+    "id": "decision-63",
+    "kind": "decision",
+    "in": "task-60",
+    "answer": "Breakdown row: | 1 | **LIN-4450** Jira seal: exact words in `harbour.asAsked`, formatted block in the description | Session 1, items 1–6, plus review notes 2 (every `getIssue` fetches the property), 3 (digest stored in `rendered`, one shared size function, 32,768-character limit) and 6 (comment bodies keep direct conversion) | — |\nPlan-review due: no. Covered by LIN-4445's approving plan-review (comment 61e84035-1df2-459f-8def-5afdc7001e64, rev 1). Session fit: fits one session. Blocked by: none. Grounding commit 4b5001ddf.",
+    "why": "Session 1 holds the region reader's edge cases and the property semantics across client, fake, the four reads and the writer, and it lands and verifies alone. (Breakdown comment 6ecab235, Session fit.)",
+    "links": {
+     "about": "plan-54",
+     "on": "verdict-57@1"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "breakdown",
+    "at": "2026-11-13T13:44:23.509Z"
+   }
+  ],
+  "decision-64": [
+   {
+    "id": "decision-64",
+    "kind": "decision",
+    "in": "task-61",
+    "answer": "Breakdown row: | 2 | **LIN-4451** Jira `createIssue`: open the proxy, session and feedback lanes; retire the deep-link create path | Session 2, items 7–11, plus review notes 4 (Periodical report gate: add description and comments to Jira's `issueWriteGuard`, recommended, or file a ticket) and 5 (`parentId`: pick native-id support, a 400 refusal, or omit it with a follow-up; don't advertise subtasks until resolved) | LIN-4450 |\nCovered by LIN-4445's approving plan-review (comment 61e84035, rev 1). Blocked by LIN-4450, in the plan's landing order.",
+    "why": "Session 2 holds createmeta, three lanes, the UI flip, and the retirements across docs and prompts with a budget re-measure. Each is blocked by the one before, in the plan's landing order. (Breakdown comment 6ecab235, Session fit.)",
+    "links": {
+     "about": "plan-55",
+     "on": "verdict-58@1"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "breakdown",
+    "at": "2026-11-13T13:44:23.510Z"
+   }
+  ],
+  "decision-65": [
+   {
+    "id": "decision-65",
+    "kind": "decision",
+    "in": "task-62",
+    "answer": "Breakdown row: | 3 | **LIN-4452** Live check on John's Jira: sealed filing, Periodical mint, last-step filing, and leftovers | Session 3, items 12–13, plus review note 1 (lossy-Markdown body, byte equality, record the digest-match branch) | LIN-4451 |\nCovered by LIN-4445's approving plan-review (comment 61e84035, rev 1). Blocked by LIN-4451. If 3 has no credential, it ends as an explicit handoff to John, not as a cut. No ruling is needed.",
+    "why": "Session 3 needs a credential for John's site that no build session has by default. (Breakdown comment 6ecab235, Session fit and Coverage.)",
+    "links": {
+     "about": "plan-56",
+     "on": "verdict-59@1"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "breakdown",
+    "at": "2026-11-13T13:44:23.511Z"
+   }
+  ]
+ },
+ "log": []
+}
