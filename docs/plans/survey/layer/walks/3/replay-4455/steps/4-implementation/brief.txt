@@ -1,0 +1,86 @@
+Brief for implementation on task-60 as of 2026-11-13T15:09:49.169Z
+1. The person's words
+  task-60: (empty)
+  task-39: "**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** John: \"we've not been applying quite the right force to bend the curve… now want to run both real work, and some real tidies.\" The Drift & Coherence and Seams & Tangles reviews of 13 Nov found this area carrying rules written in two places that disagree. Batch 1 added several of them:\n\n* Harbour can mark a task Done on a person's check before its blind read, while another check refuses that same task, and a read is then sent to a ticket that's already Done (Drift run 7, `close-out-gate-precedence-split`). John's ruling: \"if I choose to do something, Harbour is a passenger. This reflects that for many real projects, they're unlikely to be exclusively changed via Harbour.\"\n* Two pieces of code decide which PRs belong to a task, and they disagree about agent notes, so a blind read can be offered over a PR no review covered (Seams run 12, §3.0a).\n* The task timeline decides which model a dispatch used by its own rule, separate from the one the cost figures use (Drift, row 150).\n* The check that makes a stage wait while another is live is a runs rule, but it lives with the prompts (Seams, P-LW1).\n\nThe area's note holds 20 Waiting entries, and `lib/dispatch-store.js` is 4,530 lines. Seams also tried moving files between areas three ways, and none made the tangle smaller.\n\n**What we want.**\n\n* Each rule in the area has one home, and the copies are gone.\n* When a person acts, Harbour follows, and that rule is written once.\n* The area's Waiting entries are settled, or each says why it can't be yet.\n* Each piece finishes one move and names what it retired. John: \"I'd be happy to run a small variety, erring larger, to see\", so piece sizes vary, leaning larger.\n* The LLM & prompts side of the seam is A14's.\n\n**Done when**\n\n* the cases above are settled, or John has ruled they can wait;\n* the area's Waiting entries are settled or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*"
+2. Its plan piece
+  plan-45 plan v1 [kept] by design in task-39
+    says: Piece 5 (medium): one declaration for each restated constant. `lib/dispatch-leftover.js` and `_releaseIfHeld` import halt modes, `NEVER_RAN` and the follow-up target from their owners; `wakeHook.releaseNote` supplies the release wording so the store no longer calls `formatHeldWakeNote`; one `FEEDBACK_KINDS` table in `lib/dispatch-feedback-validation.js` carries each kind's roles, and `PARKED_WAIT_SKIPPED_KINDS`, `FEEDBACK_ENTRY_KINDS` and `findWakeEvent`'s skip rule derive from it. *Retires:* the restated constants and the three hand-written kind sets. *Settles Waiting:* 2, 4, 11. *Witness:* a test that iterates `HALT_MODES` and shows every one stops a leftover (so a newly added mode is caught), and `lin-4377` counting the import, not the spelling.
+    paths: ["lib/dispatch-leftover.js","lib/dispatch-store.js","lib/dispatch-feedback-validation.js"]
+    order: 2
+3. Addressed to it
+  finding-19 finding v2 [open] by survey-place to task-60
+    says: Waiting 2: `lib/dispatch-leftover.js`: restates the follow-up target, halt modes and `NEVER_RAN` (also in `_releaseIfHeld`) beside their homes (`lib/workspace-halt.js`, `HALT_MODES`); a new halt mode would not stop a leftover. (Drift & Coherence Review, 10 Nov; `docs/reviews/drift-coherence-review-2026-11-10.md`.)
+  finding-21 finding v2 [open] by survey-place to task-60
+    says: Waiting 4: `lib/dispatch-store.js`: `releaseHeldWake` prepends `formatHeldWakeNote({status})`, so release picks leftover wording; `lin-4377` counts the spelling, not the dependency. (Operator, LIN-4377.)
+  finding-28 finding v2 [open] by survey-place to task-60
+    says: Waiting 11: `lib/dispatch-feedback-validation.js`: feedback kinds lack one declaration with their role: `PARKED_WAIT_SKIPPED_KINDS` (`lib/session-telemetry.js`), `FEEDBACK_ENTRY_KINDS`, `findWakeEvent`'s skip rule. (Survey tally: LIN-4240, 4239, 4233.)
+  finding-66 finding v1 [open] by survey-task to task-60 in task-60
+    says: Survey @ cfd152fa4: `wakeHook.releaseNote` cannot reach most releases. The hook is built per request (`leftoverStep.forRequest`, `routes/dispatch.js:1636`, `routes/proxy-runner.js:213`) and only passed into `addFeedback`; most releases come through `_archiveItem` -> `_releaseIfHeld` (`lib/dispatch-store.js:1890`, `:1949`) from `removeItem`, `cleanup()` expiry and the stopped-run cleanup, none of which has a request or hook. Only the `_applyWakeHook` re-release (`:3429`) holds one. So put the wording on `leftoverStep` and late-bind it into the store, as `setWakeCredentialProvisionerFactory` already is (`server.js:1146`), and decide what an unbound store says (`lin-4373-leftover-step.test.js` asserts "did not run" five times). This is the second hook surface Waiting 5 (one `wakeHook`) warns about; shape it with that in mind. Do this first: it is the only part that changes the store shape, and it decides what the rewritten lin-4377 witness counts (no `formatHeldWakeNote` import in the store).
+    on -> plan-45@1
+    about -> finding-21
+  finding-68 finding v1 [open] by survey-task to task-60 in task-60
+    says: `findWakeEvent` has no skip rule to derive: it returns the last matching marker of any kind (`lib/dispatch-terminal.js:631`), and `lib/session-telemetry.js:82` calls it "Deliberately NOT shared". Deriving a filter would change the mint path (`lib/dispatch-store.js:3696`) and every reader of stored rows (task-page-loader, run-view, digest-feedback, run-loop-state), against the binding "never recompute pre-cutover history". Recommend: give the table a wake-role column ("every kind may carry a wake") and pin that current behaviour matches it, rather than adding a filter; the PR says this is how the done-when clause on `findWakeEvent` is met.
+    on -> task-60@1
+    about -> finding-28
+  finding-69 finding v1 [open] by survey-task to task-60 in task-60
+    says: Prompt seam (LLM & prompts side is LIN-4448s): `lib/prompts/runner-kickoff.js` renders `FEEDBACK_ENTRY_KINDS` into the runner prompt in its current order, checked by `runner-kickoff.test.js:191`; a derived list must keep that exact order. The table also needs rows for kinds deliberately off the allowlist (`decision-answer`, `decision-withdrawal-reversed`; see `DECISION_LIFECYCLE_STAMP_KINDS`, `lib/session-telemetry.js:60`); without them a roles column quietly widens what the runner may post.
+    on -> plan-45@1
+    about -> finding-28
+  check-70 check v2 [open] by survey-place to task-60 in task-60
+    what: After deriving from the kinds table, `FEEDBACK_ENTRY_KINDS` equals today's list in the same order, and the runner allowlist does not gain `decision-answer` or `decision-withdrawal-reversed`.
+    how: A unit test pinning `FEEDBACK_ENTRY_KINDS` against an exact literal list (order and membership), not against the derived value: `lib/prompts/runner-kickoff.js:61` renders the list into the runner prompt, and `runner-kickoff.test.js:191` compares against the same source, so a reorder changes prompt bytes and still passes there. It fails if a row is reordered or a non-allowlist kind is admitted.
+    on -> plan-45@1
+  finding-71 finding v2 [open] by survey-place to task-60 in task-60
+    says: `NEVER_RAN` has nothing to import from, and it is spelled five times, not three: `cancelled`/`expired` at `lib/dispatch-leftover.js:29`, `lib/dispatch-store.js:1906` (`_releaseIfHeld`) and `:1176`, plus `lib/observer-sweep.js:108` and `lib/task-page-loader.js:248`. Rewiring only the two consumers the plan names leaves three copies. One home must be created where neither side learns "leftover" (`lin-4377-store-knows-no-leftover`); `lib/dispatch-fields.js` is already imported by both. The other two owners are safe import-free leaves: `HALT_MODES` (`lib/workspace-halt.js`; the check becomes `HALT_MODES.includes`), and `followUpTarget(t) == null` (`lib/dispatch-targets.js`), which gives the same answer as `!RESUMABLE_TARGETS.has(t || "cli")` for null, empty string, unknown values and all four targets. `lib/dispatch-store.js:644` and `lib/runner-kit/runner.mjs` handle one halt mode on purpose; leave them. These are mechanical; do them last.
+    on -> plan-45@1
+    about -> finding-19
+  finding-74 finding v1 [open] by survey-place to task-60 in task-60
+    says: A fourth hand-written kind set the plan does not name: `DECISION_LIFECYCLE_STAMP_KINDS` (`lib/session-telemetry.js:60`) is another role set over feedback kinds, beside `PARKED_WAIT_SKIPPED_KINDS`, `FEEDBACK_ENTRY_KINDS` and the wake rule. Unless the `FEEDBACK_KINDS` table carries a stamp role and this set derives from it, it stays a copy after piece 5 and Waiting 11 is only partly settled. Cheap here: one more column and one more derived Set.
+    on -> plan-45@1
+    about -> finding-28
+  finding-75 finding v1 [open] by survey-place to task-60 in task-60
+    says: Wording to change with the code, since nothing fails if it goes stale: the area Lesson at `docs/areas/runs-and-dispatch.md:32` (lesson-10: `lin-4377-store-knows-no-leftover` "counts the word") and the docblocks at `lib/dispatch-store.js:3481` and `lib/dispatch-leftover.js:10`. Once the `lin-4377` witness forbids the `formatHeldWakeNote` import instead of counting the word, rewrite all three to say so (and revise lesson-10). The area Lessons are 4,269 bytes, so there is room.
+    on -> plan-45@1
+    about -> lesson-10
+4. What stands about this task
+  verdict-55 verdict v1 [stands] by plan-review in task-39
+    of: plan-review
+    outcome: approve
+    reasoning: Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 5: no note in either round; round 1 said it does not depend on B1. Settles Waiting 2, 4, 11.
+    on -> plan-45@1
+  decision-61 decision v1 [stands] by breakdown in task-60
+    answer: Grounding commit origin/main 4b5001ddf; the plan needs no re-planning, and LIN-4455 carries piece 5's slice as approved, naming `releaseHeldWake` beside `_releaseIfHeld` in `lib/dispatch-store.js`.
+    why: Staleness check at breakdown: origin/main still 4b5001ddf, git log 4b5001ddf..origin/main empty, nothing under lib, routes, tests, scripts or docs/areas changed since filing; spot checks hold (dispatch-store.js still 4,530 lines).
+    on -> verdict-55@1
+  decision-62 decision v1 [stands] by breakdown in task-60
+    answer: Session fit: one session (medium). Plan-review due: no, covered by LIN-4447's approving plan-review (comment 12619798, rev 2).
+    why: The approved plan sizes piece 5 medium and lists it among pieces that run alone; the parent's plan review approved it.
+    on -> verdict-55@1
+  decision-63 decision v1 [stands] by breakdown in task-60
+    answer: LIN-4455 is blocked by LIN-4453 (piece 0), in order step 2 beside LIN-4454, LIN-4456 and LIN-4457.
+    why: The graph follows the plan's landing order, 0 then 3/5/6/7 then 2/4 then 1 then 8 then 0, literally; no implementation PR merges before piece 0's reports and rubric are on the ticket.
+    on -> verdict-55@1
+    about -> task-59
+  decision-64 decision v1 [stands] by breakdown in task-60
+    answer: LIN-4455 blocks LIN-4458 (piece 2) and LIN-4459 (piece 4).
+    why: 2 and 4 wait on all of 3/5/6/7: the plan orders them that way, and the work overlaps (piece 4's lineage helpers live in dispatch-store.js, which piece 5 edits).
+    on -> verdict-55@1
+  decision-65 decision v1 [stands] by breakdown in task-60
+    answer: Waiting 2, 4 and 11 are LIN-4455's to settle.
+    why: Waiting accounting unchanged from the plan.
+    on -> verdict-55@1
+  decision-79 decision v1 [stands] by scoping in task-60
+    answer: Size of the move: consolidate the decision this task touches. Cuts: none. Deliver piece 5, and also make every reader of the never-ran statuses (all five `NEVER_RAN` spellings, finding-71) and of the decision-stamp feedback kinds (`DECISION_LIFECYCLE_STAMP_KINDS`, finding-74) take them from the one owner, beyond the two consumers and three kind sets the plan names.
+    why: Leaving those copies would keep the restated rules this piece retires, and Waiting 2 and 11 would be only partly settled. Rests on finding-71 and finding-74 (the layer takes one `on`; finding-74 is linked `about`). Decided by the standing policy (size by the decision touched), not by John.
+    on -> finding-71@2
+    about -> finding-74
+5. Its areas
+  area-1 Runs & dispatch
+7. Index of what else is known
+  lesson-3 lesson: Every exit from the queue except a take archives through `_archiveItem` (`lib/dispatch-store.js`); a new exit must archive through it too.
+  lesson-4 lesson: The wake path is `_planWake` (decide) then `_deliverWake` (deliver) in `lib/dispatch-store.js`, shared by `addFeedback` and the held-wake release (LIN-4373). Its guards (LIN-1059, 1165, 1357, 2297, 4080, 4166) run in an order that matters: change the pair whole, keep the wake suites passing, and update the two census pins (`lin-3134-declared-mint-census`, `lin-4080-addItem-census`) if the write moves.
+  lesson-10 lesson: The store knows no leftovers (LIN-4383). It holds a parent wake by `heldWakeFor` (LIN-4373), released by the holder's terminal or `_archiveItem` under the build's guard key, so it wakes once. Leftover wording lives in `lib/dispatch-leftover-hook.js`; a new held-wake feature brings a hook (`lin-4377-store-knows-no-leftover` counts the word).
+  question-67 question to design: Plan piece 5 puts one `FEEDBACK_KINDS` table in `lib/dispatch-feedback-validation.js`. That file imports `dispatch-validation.js`, which reaches `session-telemetry.js` (via prompt-templates -> ... -> wall-clock-summary) and `dispatch-terminal.js` (via dispatch-fields -> dispatch-wake). If those import the table and build Sets from it at load, load order decides whether they hit a TDZ error. May the table live in a new import-free leaf module instead (e.g. `lib/dispatch-feedback-kinds.js`), imported by validation and the store, with the store still re-exporting `FEEDBACK_ENTRY_KINDS`?
+  finding-73 finding to design: Place survey @ cfd152fa4, for question-67: the cycle is nearer than the load-order chain it names. `lib/dispatch-feedback-validation.js:13` already imports its kind list (`FEEDBACK_ENTRY_KINDS`) from `lib/dispatch-store.js`, so the dependency points the wrong way; if the store then imports a table from validation, the two import each other. Recommend the leaf: `lib/dispatch-feedback-kinds.js`, importing nothing, read by validation, the store and `lib/session-telemetry.js`, with the store keeping its `FEEDBACK_ENTRY_KINDS` re-export so callers do not move.
+Carries: words 2, piece 1, addressed 10, stands 7, areas 1, index 5
+Size: 18165 bytes as JSON, 15176 bytes as text

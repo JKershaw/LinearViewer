@@ -2654,6 +2654,16 @@
     "text": "size"
    },
    "returned": 4
+  },
+  {
+   "at": "2026-11-17T13:45:52.568Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-28",
+    "asOf": null
+   },
+   "returned": 1
   }
  ],
  "hits": []

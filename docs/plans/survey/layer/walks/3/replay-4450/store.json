@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 88,
+ "next": 93,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -655,6 +655,21 @@
       "says": "`lib/should-mock-ai.js`: `isHermeticTestToken` is a third test-token check beside `isTestToken` (`routes/workspace-api-steps.js`) and inline `isTestMode` in `routes/proxy-compute.js` and `routes/task-chat.js`. (LIN-4347.)"
      },
      "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:11:31.000Z",
+     "by": "leftover",
+     "in": "area-2",
+     "to": "area-2",
+     "state": "done",
+     "fields": {
+      "says": "`lib/should-mock-ai.js`: `isHermeticTestToken` is a third test-token check beside `isTestToken` (`routes/workspace-api-steps.js`) and inline `isTestMode` in `routes/proxy-compute.js` and `routes/task-chat.js`. (LIN-4347.)"
+     },
+     "links": {},
+     "reason": "Retired in LIN-4450 leftovers (PR #2421, head f9fa4a80c): the inline test-token checks in routes/proxy-compute.js, routes/task-chat.js, routes/workspace-api-steps.js and server.js now call isHermeticTestToken; the expression is identical, so behaviour is unchanged. Entry removed from docs/areas/llm-and-prompts.md.",
+     "stateReason": "Retired in LIN-4450 leftovers (PR #2421, head f9fa4a80c): the inline test-token checks in routes/proxy-compute.js, routes/task-chat.js, routes/workspace-api-steps.js and server.js now call isHermeticTestToken; the expression is identical, so behaviour is unchanged. Entry removed from docs/areas/llm-and-prompts.md."
     }
    ]
   },
@@ -1879,6 +1894,24 @@
      "links": {
       "on": "plan-54@2"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:11:32.000Z",
+     "by": "leftover",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "handed-on",
+     "fields": {
+      "says": "The bulk search path stays display-only, so one issue reads differently through search than through `getIssue`. Check that no cache or guard compares the two."
+     },
+     "links": {
+      "on": "plan-54@2"
+     },
+     "reason": "Checked at f9fa4a80c: no guard or cache compares the bulk read with getIssue today. The divergence itself (bulk reads fetchProjects and fetchIssueContext's children do not ask for harbour.asAsked) remains; finding-77 carries making the bulk path exact, now also a Waiting entry in docs/areas/providers.md.",
+     "stateReason": "Checked at f9fa4a80c: no guard or cache compares the bulk read with getIssue today. The divergence itself (bulk reads fetchProjects and fetchIssueContext's children do not ask for harbour.asAsked) remains; finding-77 carries making the bulk path exact, now also a Waiting entry in docs/areas/providers.md.",
+     "takeover": "finding-77"
     }
    ]
   },
@@ -2447,6 +2480,138 @@
      "stateReason": "PR #2421 opened; departures recorded on plan-54 v3"
     }
    ]
+  },
+  "lesson-88": {
+   "id": "lesson-88",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:11:33.000Z",
+     "by": "leftover",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "A Jira description has one reader and one writer: `readDescription` and `holdAsAsked` in `lib/providers/jira/as-asked-region.js`, the only code that knows both the ADF region and the `harbour.asAsked` entity property; every provider-side `getIssue` passes `AS_ASKED_READ`. The words live in two places, safe only while one module knows both. A new description read that calls `adfToMarkdown` directly serves converted words and breaks the seal silently; `tests/unit/jira-as-asked-region.test.js` fails on it. (LIN-4450.)",
+      "paths": [
+       "lib/providers/jira/as-asked-region.js",
+       "lib/providers/jira/index.js",
+       "tests/unit/jira-as-asked-region.test.js"
+      ],
+      "checked-at": "f9fa4a80c"
+     },
+     "links": {
+      "on": "lesson-8@1"
+     }
+    }
+   ]
+  },
+  "lesson-89": {
+   "id": "lesson-89",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:11:34.000Z",
+     "by": "leftover",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "Decide whether the sealed words are kept by comparing renderings, never ADF: Jira stamps `localId` and similar attributes on ordinary saves and `adfToMarkdown` ignores them, so a hash of the ADF would read every human save as an edit. (LIN-4450.)",
+      "paths": [
+       "lib/providers/jira/as-asked-region.js"
+      ],
+      "checked-at": "f9fa4a80c"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-90": {
+   "id": "lesson-90",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:11:35.000Z",
+     "by": "leftover",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "The Jira region reader accepts an end line whatever its marks, looser than `splitAsAsked`. It stays safe because `descriptionRoundTrip` runs the same reader the reads do, so a block the reader would misplace is refused at filing. Keep the seal check and the reads on one reader. (LIN-4450.)",
+      "paths": [
+       "lib/providers/jira/as-asked-region.js",
+       "lib/providers/jira/index.js",
+       "lib/as-asked-seal.js"
+      ],
+      "checked-at": "f9fa4a80c"
+     },
+     "links": {
+      "on": "decision-83@1"
+     }
+    }
+   ]
+  },
+  "lesson-91": {
+   "id": "lesson-91",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:11:36.000Z",
+     "by": "leftover",
+     "in": "area-1",
+     "state": "holds",
+     "fields": {
+      "says": "The Jira fake (`lib/providers/jira/fake-client.js`) proves only the provider's own logic: it stores whatever it is handed and never normalises ADF, so it cannot show whether live Jira keeps a region's rendering. A claim about live behaviour needs a live check. (LIN-4450; the live check is LIN-4452.)",
+      "paths": [
+       "lib/providers/jira/fake-client.js"
+      ],
+      "checked-at": "f9fa4a80c"
+     },
+     "links": {
+      "about": "check-69"
+     }
+    }
+   ]
+  },
+  "run-92": {
+   "id": "run-92",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:11:37.000Z",
+     "by": "leftover",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "stage": "leftover",
+      "account": "Leftovers for LIN-4450, pushed to PR #2421; new head f9fa4a80ca19503bebbf5abd81dc83d3e86296b6, CI green (one job rerun after a hosted-runner loss, no test failed). Tidied four comments the seal made untrue or incomplete: adf.js header (region module reaches the codec via a fourth export, plainText), index.js issueDescription comment (lane now goes through readDescription/holdAsAsked), fake-client.js seed-shape comment (_properties seed, properties read/write), as-asked.js Who uses what (names the Jira region module). Noted the bulk-read gap as the Waiting entry of a new docs/areas/providers.md, with four Lessons (lesson-88..91); checked finding-70 (no guard or cache compares bulk and single reads) and handed it on to finding-77. Retired llm-and-prompts finding-22: the inline test-token checks in routes/proxy-compute.js, routes/task-chat.js, routes/workspace-api-steps.js and server.js call isHermeticTestToken, behaviour unchanged. Could not revise change-82 head (refused, rule 6)."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:11:38.000Z",
+     "by": "leftover",
+     "in": "task-60",
+     "state": "done",
+     "fields": {
+      "stage": "leftover",
+      "account": "Leftovers for LIN-4450, pushed to PR #2421; new head f9fa4a80ca19503bebbf5abd81dc83d3e86296b6, CI green (one job rerun after a hosted-runner loss, no test failed). Tidied four comments the seal made untrue or incomplete: adf.js header (region module reaches the codec via a fourth export, plainText), index.js issueDescription comment (lane now goes through readDescription/holdAsAsked), fake-client.js seed-shape comment (_properties seed, properties read/write), as-asked.js Who uses what (names the Jira region module). Noted the bulk-read gap as the Waiting entry of a new docs/areas/providers.md, with four Lessons (lesson-88..91); checked finding-70 (no guard or cache compares bulk and single reads) and handed it on to finding-77. Retired llm-and-prompts finding-22: the inline test-token checks in routes/proxy-compute.js, routes/task-chat.js, routes/workspace-api-steps.js and server.js call isHermeticTestToken, behaviour unchanged. Could not revise change-82 head (refused, rule 6)."
+     },
+     "links": {},
+     "reason": "Leftovers posted on LIN-4450 and pushed to PR #2421",
+     "stateReason": "Leftovers posted on LIN-4450 and pushed to PR #2421"
+    }
+   ]
   }
  },
  "queries": [
@@ -2944,6 +3109,86 @@
     "area": "area-1"
    },
    "returned": 4
+  },
+  {
+   "at": "2026-11-17T13:45:51.011Z",
+   "by": "leftover",
+   "query": "get",
+   "args": {
+    "id": "finding-77",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:45:51.048Z",
+   "by": "leftover",
+   "query": "get",
+   "args": {
+    "id": "finding-22",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:45:51.088Z",
+   "by": "leftover",
+   "query": "get",
+   "args": {
+    "id": "finding-70",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:45:51.127Z",
+   "by": "leftover",
+   "query": "get",
+   "args": {
+    "id": "finding-76",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:45:51.173Z",
+   "by": "leftover",
+   "query": "get",
+   "args": {
+    "id": "finding-78",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:45:51.213Z",
+   "by": "leftover",
+   "query": "find",
+   "args": {
+    "kind": "lesson",
+    "area": "area-1"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:45:51.246Z",
+   "by": "leftover",
+   "query": "find",
+   "args": {
+    "kind": "lesson",
+    "text": "jira"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:45:51.288Z",
+   "by": "leftover",
+   "query": "find",
+   "args": {
+    "kind": "lesson",
+    "path": "lib/providers/"
+   },
+   "returned": 1
   }
  ],
  "hits": []

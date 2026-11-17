@@ -1,0 +1,40 @@
+[
+ {
+  "at": "2026-11-17T13:44:56.807Z",
+  "by": "scoping",
+  "query": "find",
+  "args": {
+   "kind": "setting"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:44:56.838Z",
+  "by": "scoping",
+  "query": "find",
+  "args": {
+   "kind": "question",
+   "state": "open"
+  },
+  "returned": 2
+ },
+ {
+  "at": "2026-11-17T13:45:00.938Z",
+  "by": "scoping",
+  "query": "show",
+  "args": {
+   "task": "task-60",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:45:00.969Z",
+  "by": "scoping",
+  "query": "find",
+  "args": {
+   "kind": "run"
+  },
+  "returned": 2
+ }
+]

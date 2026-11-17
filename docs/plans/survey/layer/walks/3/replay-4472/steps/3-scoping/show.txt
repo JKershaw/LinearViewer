@@ -1,0 +1,17 @@
+task-28 task v1 [open] by breakdown
+decision-32 decision v1 [stands] by breakdown
+decision-33 decision v1 [stands] by breakdown
+decision-34 decision v1 [stands] by breakdown
+decision-35 decision v1 [stands] by breakdown
+decision-36 decision v1 [stands] by breakdown
+finding-82 finding v1 [open] to task-28 by survey-task
+question-84 question v2 [open] to John by scoping
+finding-85 finding v1 [open] to task-28 by survey-task
+check-86 check v1 [open] to task-28 by survey-task
+finding-87 finding v2 [open] to task-28 by survey-place
+run-88 run v2 [done] by survey-task
+finding-89 finding v1 [open] to task-28 by survey-place
+finding-90 finding v1 [open] to task-28 by survey-place
+run-94 run v2 [done] by survey-place
+decision-95 decision v1 [stands] by scoping
+run-96 run v2 [done] by scoping
