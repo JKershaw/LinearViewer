@@ -3247,6 +3247,50 @@
      "ref": "https://github.com/JKershaw/LinearViewer/pull/2447 (branch feat/lin-4469-prompt-folds)",
      "head": "877f32cb4"
     }
+   },
+   {
+    "id": "change-142",
+    "kind": "change",
+    "v": 6,
+    "op": "revise",
+    "at": "2026-11-13T23:26:59.403Z",
+    "by": "close-out",
+    "reason": "final head before the merge: close-out fixes 534524f92, cc7792e58, 350410829; CI success green (run 43529474068)",
+    "in": "task-131",
+    "to": "close-out",
+    "state": "open",
+    "links": {
+     "about": [
+      "plan-117"
+     ]
+    },
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2447 (branch feat/lin-4469-prompt-folds)",
+     "head": "3504108297a13149fa8d6b8c5edfe98ad9333b5c"
+    }
+   },
+   {
+    "id": "change-142",
+    "kind": "change",
+    "v": 7,
+    "op": "end",
+    "at": "2026-11-13T23:27:00.403Z",
+    "by": "close-out",
+    "in": "task-131",
+    "to": "close-out",
+    "state": "merged",
+    "ended": {
+     "reason": "Squash-merged as ca77a891e (pinned --match-head-commit 3504108297a1); deployed (harbour.cat footer b937237a4 -> ca77a891e); Tests on main green (run 43530212559). Close-out comment eb4829c5."
+    },
+    "links": {
+     "about": [
+      "plan-117"
+     ]
+    },
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2447 (branch feat/lin-4469-prompt-folds)",
+     "head": "3504108297a13149fa8d6b8c5edfe98ad9333b5c"
+    }
    }
   ],
   "decision-143": [
@@ -4746,6 +4790,30 @@
     "fields": {
      "says": "Re-review Fix 1 (before the merge): in `lib/periodicals.js`, `generateSeamsTanglesPrompt`, first runReview bullet, change \"Find both by searching the repo for them (no path is written here), read how the tool is run\" back to main's \"Find both by searching the repo for them, read how the tool is run\". The hand-typed parenthesis adds +26 and folds nothing (not rendered through `committedSearch`); it is why `seams-tangles` rises +24. Then: re-pin both `seams-tangles` hashes in `tests/unit/lin-4313-periodical-prompt-bytes.test.js:94`; update the LIN-4469 change-log row (`scripts/prompt-template-change-log.md:635`) to 827520 -> 825278 (-2242), `seams-tangles` -2, drop the \"Up\" clause, and make the ruling sentence \"four `work` kinds unchanged; `lin-4469-witness` withdrawn as moot\"; update the PR body's Measured and DECISION sections to match. `periodicals.js` is in no budgeted source ceiling, so `FROZEN_TOTAL_BYTES` is unaffected."
     }
+   },
+   {
+    "id": "finding-174",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:27:01.403Z",
+    "by": "close-out",
+    "in": "task-131",
+    "to": "close-out",
+    "state": "done",
+    "ended": {
+     "reason": "Fixed in 534524f92: hand-typed parenthesis removed (main's words), both seams-tangles hashes re-pinned, change-log row and PR body say -2242, nothing rises, lin-4469-witness withdrawn as moot."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-40",
+      "decision-166"
+     ]
+    },
+    "fields": {
+     "says": "Re-review Fix 1 (before the merge): in `lib/periodicals.js`, `generateSeamsTanglesPrompt`, first runReview bullet, change \"Find both by searching the repo for them (no path is written here), read how the tool is run\" back to main's \"Find both by searching the repo for them, read how the tool is run\". The hand-typed parenthesis adds +26 and folds nothing (not rendered through `committedSearch`); it is why `seams-tangles` rises +24. Then: re-pin both `seams-tangles` hashes in `tests/unit/lin-4313-periodical-prompt-bytes.test.js:94`; update the LIN-4469 change-log row (`scripts/prompt-template-change-log.md:635`) to 827520 -> 825278 (-2242), `seams-tangles` -2, drop the \"Up\" clause, and make the ruling sentence \"four `work` kinds unchanged; `lin-4469-witness` withdrawn as moot\"; update the PR body's Measured and DECISION sections to match. `periodicals.js` is in no budgeted source ceiling, so `FROZEN_TOTAL_BYTES` is unaffected."
+    }
    }
   ],
   "finding-175": [
@@ -4767,6 +4835,28 @@
     "fields": {
      "says": "Re-review Fix 2: in `tests/unit/prompt-size-budget.test.js:146`, delete the stray fragment \"(396821 -> 396571), the rest was unused headroom. \" from the `FROZEN_TOTAL_BYTES` comment. It follows \"…(396821 -> 396559), the rest was unused headroom.\" and matches no figure."
     }
+   },
+   {
+    "id": "finding-175",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:27:02.403Z",
+    "by": "close-out",
+    "in": "task-131",
+    "to": "close-out",
+    "state": "done",
+    "ended": {
+     "reason": "Fixed in 534524f92: stray fragment deleted from the FROZEN_TOTAL_BYTES comment."
+    },
+    "links": {
+     "about": [
+      "change-142"
+     ]
+    },
+    "fields": {
+     "says": "Re-review Fix 2: in `tests/unit/prompt-size-budget.test.js:146`, delete the stray fragment \"(396821 -> 396571), the rest was unused headroom. \" from the `FROZEN_TOTAL_BYTES` comment. It follows \"…(396821 -> 396559), the rest was unused headroom.\" and matches no figure."
+    }
    }
   ],
   "check-176": [
@@ -4780,6 +4870,31 @@
     "in": "task-131",
     "to": "close-out",
     "state": "open",
+    "links": {
+     "about": [
+      "change-142",
+      "finding-174",
+      "decision-140"
+     ]
+    },
+    "fields": {
+     "what": "Before the merge, after applying Fix 1 (finding-174), re-run a base-vs-head real-context render of every stage kind (fresh and fix, each with its writes preamble) and all 13 Periodicals (plain and autopilot) to show the witness sentence now holds.",
+     "how": "Right: every render that carries folded text falls, `seams-tangles` shows -2, and the total is 827520 -> 825278 (-2242); the four `work` kinds and Stability, Recent Headwinds, Integration Surface Maturity stay ±0. Wrong: any non-`work` stage kind or Periodical with folded text at >= 0."
+    }
+   },
+   {
+    "id": "check-176",
+    "kind": "check",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:27:03.403Z",
+    "by": "close-out",
+    "in": "task-131",
+    "to": "close-out",
+    "state": "done",
+    "ended": {
+     "reason": "Run at b937237a4 and at the head over 72 renders (every stage kind fresh and fix with its writes preamble, Periodicals plain and autopilot): total -2242, both seams-tangles -2, 58 fall, 14 equal (four work kinds, Stability, Recent Headwinds, Integration Surface Maturity), nothing rises. Close-out comment eb4829c5."
+    },
     "links": {
      "about": [
       "change-142",
@@ -4873,6 +4988,29 @@
     "fields": {
      "says": "`tests/unit/lin-4469-prompt-folds.test.js`: the describe says the folded spellings \"appear in no rendered prompt\", but each test asserts `where.length <= 1`, so a retired phrase left in one template or Periodical still passes. None renders anywhere at `877f32cb4`, so assert `where.length === 0` and drop \"at most one\" from the test name. (Blind read, LIN-4469 comment d96c0849.)"
     }
+   },
+   {
+    "id": "finding-179",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:27:04.403Z",
+    "by": "close-out",
+    "in": "task-131",
+    "to": "close-out",
+    "state": "done",
+    "ended": {
+     "reason": "Fixed in 534524f92: each retired phrase asserted at zero occurrences; test name drops \"at most one\"."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "decision-144"
+     ]
+    },
+    "fields": {
+     "says": "`tests/unit/lin-4469-prompt-folds.test.js`: the describe says the folded spellings \"appear in no rendered prompt\", but each test asserts `where.length <= 1`, so a retired phrase left in one template or Periodical still passes. None renders anywhere at `877f32cb4`, so assert `where.length === 0` and drop \"at most one\" from the test name. (Blind read, LIN-4469 comment d96c0849.)"
+    }
    }
   ],
   "finding-180": [
@@ -4886,6 +5024,29 @@
     "in": "task-131",
     "to": "close-out",
     "state": "open",
+    "links": {
+     "about": [
+      "change-142",
+      "finding-40"
+     ]
+    },
+    "fields": {
+     "says": "`lib/periodicals.js`: `committedSearch` closes its own parenthesis, and Stability's bullet strips it again with `capitalised(committedSearch(...)).slice(0, -1)` to add \"; look beside …)\". One caller undoes the helper's output shape, so a change to the helper's wording silently breaks Stability. Fix: give `committedSearch` an optional tail (e.g. `(what, more = '')` -> `(no path is written here${more})`) and drop the slice. (Blind read, d96c0849.)"
+    }
+   },
+   {
+    "id": "finding-180",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:27:05.403Z",
+    "by": "close-out",
+    "in": "task-131",
+    "to": "close-out",
+    "state": "done",
+    "ended": {
+     "reason": "Fixed in 534524f92: committedSearch takes an optional more tail inside its parenthesis; Stability passes its look-beside tail; .slice(0, -1) gone; Stability hash unchanged."
+    },
     "links": {
      "about": [
       "change-142",
@@ -4917,6 +5078,29 @@
     "fields": {
      "says": "`tests/unit/lin-4313-periodical-prompt-bytes.test.js`: its LIN-4469 header says both Seams & Tangles bullets are built by `committedSearch`, but the first `runReview` bullet (`lib/periodicals.js` ~l.991) is hand-typed. Fix: correct the comment, or route that bullet through the helper and re-pin its hash. finding-174 restores main's hand-typed wording, which leaves the comment still wrong. (Blind read, d96c0849.)"
     }
+   },
+   {
+    "id": "finding-181",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:27:06.403Z",
+    "by": "close-out",
+    "in": "task-131",
+    "to": "close-out",
+    "state": "done",
+    "ended": {
+     "reason": "Fixed in 534524f92: the lin-4313 header now says only the second Seams & Tangles bullet and Stability use the helper."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-174"
+     ]
+    },
+    "fields": {
+     "says": "`tests/unit/lin-4313-periodical-prompt-bytes.test.js`: its LIN-4469 header says both Seams & Tangles bullets are built by `committedSearch`, but the first `runReview` bullet (`lib/periodicals.js` ~l.991) is hand-typed. Fix: correct the comment, or route that bullet through the helper and re-pin its hash. finding-174 restores main's hand-typed wording, which leaves the comment still wrong. (Blind read, d96c0849.)"
+    }
    }
   ],
   "finding-182": [
@@ -4939,6 +5123,29 @@
     "fields": {
      "says": "`docs/architecture/source-map.md` (unmapped; concerns `lib/prompts/leftover-words.js`): still calls `leftover-words.js` \"A leaf that imports nothing\" and doesn't list `areaLookup` or `NOTES_PR`; at `877f32cb4` it imports `area-registry-path.js` and exports both. Fix: update that one line. (Blind read, d96c0849.)"
     }
+   },
+   {
+    "id": "finding-182",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:27:07.403Z",
+    "by": "close-out",
+    "in": "task-131",
+    "to": "close-out",
+    "state": "done",
+    "ended": {
+     "reason": "Fixed in 534524f92: source-map says leftover-words.js exports NOTES_PR and areaLookup and imports lib/prompts/area-registry-path.js."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "decision-144"
+     ]
+    },
+    "fields": {
+     "says": "`docs/architecture/source-map.md` (unmapped; concerns `lib/prompts/leftover-words.js`): still calls `leftover-words.js` \"A leaf that imports nothing\" and doesn't list `areaLookup` or `NOTES_PR`; at `877f32cb4` it imports `area-registry-path.js` and exports both. Fix: update that one line. (Blind read, d96c0849.)"
+    }
    }
   ],
   "finding-183": [
@@ -4951,6 +5158,28 @@
     "by": "blind-read",
     "to": "area-1",
     "state": "open",
+    "links": {
+     "about": [
+      "task-129",
+      "lesson-19"
+     ]
+    },
+    "fields": {
+     "says": "`lib/prompts/stage-kinds.js`: five records declare `intent: null`, then a loop at the bottom of the module overwrites `record.intent` on the exported objects, so the literal read is not what the record holds and the header has to explain it. Fix: derive the reading-pass line in the `STAGE_INTENT` view (`lib/prompts/stage-intent.js`), or write it on each record, so records are not mutated after declaration. Fix-sized. (Blind read of #2444, LIN-4469 comment d96c0849.)"
+    }
+   },
+   {
+    "id": "finding-183",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:27:08.403Z",
+    "by": "close-out",
+    "to": "area-1",
+    "state": "done",
+    "ended": {
+     "reason": "Fixed by close-out in cc7792e58 (PR #2447): the six reading-pass records in lib/prompts/stage-kinds.js declare their intent line; the post-declaration loop is gone; 72 renders byte-identical; lin-4253-stage-traits test still ties the line to writes."
+    },
     "links": {
      "about": [
       "task-129",
@@ -6616,6 +6845,261 @@
     "state": "open",
     "by": "blind-read",
     "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:42:33.203Z",
+   "by": "close-out",
+   "cmd": "show",
+   "args": {
+    "task": "task-131",
+    "by": "close-out",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:42:37.272Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": {
+    "by": "close-out",
+    "pos": [
+     "finding-183"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:42:37.310Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": {
+    "by": "close-out",
+    "pos": [
+     "finding-184"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:42:37.345Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": {
+    "by": "close-out",
+    "pos": [
+     "finding-185"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:42:37.381Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": {
+    "by": "close-out",
+    "pos": [
+     "finding-186"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:42:37.420Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": {
+    "by": "close-out",
+    "pos": [
+     "change-142"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:42:37.456Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": {
+    "by": "close-out",
+    "pos": [
+     "check-149"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:42:37.490Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": {
+    "by": "close-out",
+    "pos": [
+     "check-158"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:42:37.530Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": {
+    "by": "close-out",
+    "pos": [
+     "finding-148"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:42:37.566Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": {
+    "by": "close-out",
+    "pos": [
+     "task-131"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:42:37.600Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": {
+    "to": "close-out",
+    "state": "open",
+    "by": "close-out",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:07.917Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": {
+    "text": "area-notes",
+    "by": "close-out",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:07.962Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": {
+    "text": "first path",
+    "by": "close-out",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:08.004Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": {
+    "text": "retirement-line",
+    "by": "close-out",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:08.048Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": {
+    "text": "retirement line",
+    "by": "close-out",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:08.103Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": {
+    "text": "completion criteria",
+    "by": "close-out",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:08.157Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": {
+    "text": "simple-dispatcher's",
+    "by": "close-out",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:08.212Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": {
+    "text": "dispatch grant",
+    "by": "close-out",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:08.257Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": {
+    "text": "3504108",
+    "by": "close-out",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:14.278Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": {
+    "by": "close-out",
+    "pos": [
+     "lesson-171"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:14.326Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": {
+    "by": "close-out",
+    "pos": [
+     "decision-166"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:14.369Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": {
+    "by": "close-out",
+    "pos": [
+     "area-65"
+    ]
    },
    "asOf": null
   }

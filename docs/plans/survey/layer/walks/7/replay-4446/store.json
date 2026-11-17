@@ -1,5 +1,5 @@
 {
- "next": 74,
+ "next": 76,
  "records": {
   "area-1": [
    {
@@ -477,6 +477,45 @@
      "what": "John reads the first slice's result before the next slice starts.",
      "why-person": "The done-when requires John's read, and John set the size of this work as small and his call; the pause should be scheduled as a real stop, not assumed.",
      "how": "After the first slice lands, John reads its result (what it shared, what it retired, how much lighter) and says go or adjust before any second slice is scoped."
+    }
+   },
+   {
+    "id": "check-16",
+    "kind": "check",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T15:15:04.200Z",
+    "by": "close-out",
+    "reason": "Slice 1 merged and deployed; close-out asked John for the read on LIN-4446 and left it open",
+    "in": "task-9",
+    "to": "John",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "what": "John reads the first slice's result before the next slice starts.",
+     "why-person": "The done-when requires John's read, and John set the size of this work as small and his call; the pause should be scheduled as a real stop, not assumed.",
+     "how": "Read the LIN-4446 close-out comment (15:31) and PR #2423 body (merged 92676b1, deployed): what it shared, what it retired (public/cost-format.js, 34 lines; tests/unit/cost-format-parity.test.js, 74 lines; swipe viewport Waiting entry), how much lighter. Record the read as a comment on LIN-4446, go or adjust. No next slice is dispatched until that comment exists."
+    }
+   },
+   {
+    "id": "check-16",
+    "kind": "check",
+    "v": 3,
+    "op": "link",
+    "at": "2026-11-13T15:15:05.200Z",
+    "by": "close-out",
+    "in": "task-9",
+    "to": "John",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-57"
+     ]
+    },
+    "fields": {
+     "what": "John reads the first slice's result before the next slice starts.",
+     "why-person": "The done-when requires John's read, and John set the size of this work as small and his call; the pause should be scheduled as a real stop, not assumed.",
+     "how": "Read the LIN-4446 close-out comment (15:31) and PR #2423 body (merged 92676b1, deployed): what it shared, what it retired (public/cost-format.js, 34 lines; tests/unit/cost-format-parity.test.js, 74 lines; swipe viewport Waiting entry), how much lighter. Record the read as a comment on LIN-4446, go or adjust. No next slice is dispatched until that comment exists."
     }
    }
   ],
@@ -1113,6 +1152,27 @@
     },
     "fields": {
      "says": "`public/common.js` calls itself the client twin of `lib/task-page-href.js`, `lib/timeline-zoom.js`, `lib/ship-layout.js` and `lib/prompt-formatters.js`; `public/swim.js` copies `lib/swim-lanes.js`. `task-page-href` and `timeline-zoom` have no imports, so they are next slices of the cost-format shape (one `SHARED_MODULES` entry each, retire the copy and its parity test). `ship-layout`, `swim-lanes` (import `providers/state-map.js`) and `prompt-formatters` (six imports) cannot be served as single files. Left out of LIN-4446's first slice (design, 13 Nov). Also: `public/common.js` mirrors `TERMINAL_TYPES` from `lib/providers/models.js`, which is a leaf, and its comment still says `public/` cannot import it; another candidate of the same shape (noted by LIN-4446 leftover, 13 Nov). Also hand-synced, each with a comment saying so: `public/ship.js` (\"mirror of lib/ship-layout.js\") and `public/ship-biscuit.js` (\"Kept in lockstep with lib/render-ship-biscuit.js\"); each lib side must first become an import-free leaf before it can join `SHARED_MODULES` (blind read, 13 Nov)."
+    }
+   },
+   {
+    "id": "finding-30",
+    "kind": "finding",
+    "v": 4,
+    "op": "revise",
+    "at": "2026-11-13T15:15:09.200Z",
+    "by": "close-out",
+    "reason": "close-out wrote the ship.js / ship-biscuit.js part into the area note's Waiting section",
+    "in": "area-1",
+    "to": "area-1",
+    "state": "open",
+    "links": {
+     "about": [
+      "finding-20",
+      "task-9"
+     ]
+    },
+    "fields": {
+     "says": "`public/common.js` calls itself the client twin of `lib/task-page-href.js`, `lib/timeline-zoom.js`, `lib/ship-layout.js` and `lib/prompt-formatters.js`; `public/swim.js` copies `lib/swim-lanes.js`. `task-page-href` and `timeline-zoom` have no imports, so they are next slices of the cost-format shape (one `SHARED_MODULES` entry each, retire the copy and its parity test). `ship-layout`, `swim-lanes` (import `providers/state-map.js`) and `prompt-formatters` (six imports) cannot be served as single files. Left out of LIN-4446's first slice (design, 13 Nov). Also: `public/common.js` mirrors `TERMINAL_TYPES` from `lib/providers/models.js`, which is a leaf, and its comment still says `public/` cannot import it; another candidate of the same shape (noted by LIN-4446 leftover, 13 Nov). Also hand-synced, each with a comment saying so: `public/ship.js` (\"mirror of lib/ship-layout.js\") and `public/ship-biscuit.js` (\"Kept in lockstep with lib/render-ship-biscuit.js\"); each lib side must first become an import-free leaf before it can join `SHARED_MODULES` (blind read, 13 Nov). The ship.js / ship-biscuit.js copies are now a ## Waiting entry in docs/areas/front-end-browser.md (LIN-4446 close-out, ad24a2102)."
     }
    }
   ],
@@ -2330,6 +2390,50 @@
      "ref": "https://github.com/JKershaw/LinearViewer/pull/2423",
      "head": "1de016f523f46a006c20a4e89717157422b3207b"
     }
+   },
+   {
+    "id": "change-57",
+    "kind": "change",
+    "v": 4,
+    "op": "revise",
+    "at": "2026-11-13T15:14:58.200Z",
+    "by": "close-out",
+    "reason": "close-out pushed ad24a2102 (blind-read fixes 1-2, two Waiting entries) after approval; merged pinned to this head",
+    "in": "task-9",
+    "to": "close-out",
+    "state": "open",
+    "links": {
+     "about": [
+      "plan-28"
+     ]
+    },
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2423",
+     "head": "ad24a2102f0aa0fac4ec5ccbbe5075d660b8b67b"
+    }
+   },
+   {
+    "id": "change-57",
+    "kind": "change",
+    "v": 5,
+    "op": "end",
+    "at": "2026-11-13T15:14:59.200Z",
+    "by": "close-out",
+    "in": "task-9",
+    "to": "close-out",
+    "state": "merged",
+    "ended": {
+     "reason": "Squash-merged as 92676b1febeb5407878d69b5e7a8f166a9371777 (--match-head-commit ad24a2102); CI green on ad24a2102; deployed, harbour.cat footer shows 92676b1; live /shared/cost-format.js byte-identical to lib/cost-format.js, /shared/nope.js, /lib/cost-format.js and /cost-format.js 404"
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ]
+    },
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2423",
+     "head": "ad24a2102f0aa0fac4ec5ccbbe5075d660b8b67b"
+    }
    }
   ],
   "finding-58": [
@@ -2584,6 +2688,29 @@
      "why-person": "These rode in after the implementation report; a reviewer judging 24de9abc9 would miss them, and pinch-zoom on swipe is a visible change on a page outside the cost-format slice.",
      "how": "Revert the render-swipe.js viewport change locally, run tests/unit/render-swipe.test.js, see it fail; restore, see it pass; paste the output on LIN-4446. Review ran the suite green at 1de016f but did not watch it fail."
     }
+   },
+   {
+    "id": "check-63",
+    "kind": "check",
+    "v": 3,
+    "op": "revise",
+    "at": "2026-11-13T15:15:03.200Z",
+    "by": "close-out",
+    "reason": "Close-out merged without running it: neither the close-out comment nor the ledger records the swipe viewport test watched failing with the fix reverted; still owed on LIN-4446",
+    "in": "task-9",
+    "to": "task-9",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-57",
+      "check-33"
+     ]
+    },
+    "fields": {
+     "what": "The swipe viewport test in tests/unit/render-swipe.test.js (lib/render-swipe.js drops user-scalable=no) fails with the fix reverted and passes with it. The guard half of this check (shim guard still fails on a renderer missing the shim) was witnessed by review (M2).",
+     "why-person": "These rode in after the implementation report; a reviewer judging 24de9abc9 would miss them, and pinch-zoom on swipe is a visible change on a page outside the cost-format slice.",
+     "how": "Revert the render-swipe.js viewport change locally, run tests/unit/render-swipe.test.js, see it fail; restore, see it pass; paste the output on LIN-4446. Review ran the suite green at 1de016f but did not watch it fail."
+    }
    }
   ],
   "run-64": [
@@ -2668,6 +2795,29 @@
     "fields": {
      "says": "PR #2423's body is stale after 1de016f52; fix before merge. Under 'What changed' add: \"Leftover-step retirement (LIN-4414): the swipe page now takes the shared default viewport (lib/render-swipe.js drops user-scalable=no; witness tests/unit/render-swipe.test.js), retiring the docs/areas/front-end-pages.md Waiting entry `lib/render-swipe.js`: the viewport meta is `user-scalable=no`.\" Replace 'Total: 30 files, +747 / -280' with what `gh pr view 2423 --json additions,deletions,changedFiles` gives on the merged head (35 files at 1de016f). In 'Not covered' replace 'The serving tests were not run against HEAD' with 'Reviewer's mutation (serving lib/ as a directory) turns the spawned-server 404 witness red.'"
     }
+   },
+   {
+    "id": "finding-66",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:15:02.200Z",
+    "by": "close-out",
+    "in": "task-9",
+    "to": "close-out",
+    "state": "done",
+    "ended": {
+     "reason": "PR #2423 body fixed before merge: names the swipe viewport retirement and its witness tests/unit/render-swipe.test.js; totals now 35 files, +790 / -287; the serving-tests gap replaced with the reviewer's mutation M8 evidence"
+    },
+    "links": {
+     "about": [
+      "change-57",
+      "verdict-65"
+     ]
+    },
+    "fields": {
+     "says": "PR #2423's body is stale after 1de016f52; fix before merge. Under 'What changed' add: \"Leftover-step retirement (LIN-4414): the swipe page now takes the shared default viewport (lib/render-swipe.js drops user-scalable=no; witness tests/unit/render-swipe.test.js), retiring the docs/areas/front-end-pages.md Waiting entry `lib/render-swipe.js`: the viewport meta is `user-scalable=no`.\" Replace 'Total: 30 files, +747 / -280' with what `gh pr view 2423 --json additions,deletions,changedFiles` gives on the merged head (35 files at 1de016f). In 'Not covered' replace 'The serving tests were not run against HEAD' with 'Reviewer's mutation (serving lib/ as a directory) turns the spawned-server 404 witness red.'"
+    }
    }
   ],
   "finding-67": [
@@ -2681,6 +2831,31 @@
     "in": "task-9",
     "to": "close-out",
     "state": "open",
+    "links": {
+     "about": [
+      "change-57",
+      "verdict-65",
+      "check-16"
+     ]
+    },
+    "fields": {
+     "says": "Not proved by CI or review, before closing LIN-4446: (1) John's read of the first slice's result (check-16) comes after deploy and before Done: ask him to read the LIN-4446 review comment and #2423's body, record his read as a comment on LIN-4446, dispatch no next slice until then; it is not a merge condition. (2) Only Chromium ran (CI e2e and the reviewer's check); Safari/Firefox not run, module scripts and same-origin import are baseline there. Named rollback: revert the PR's merge commit on main; no data shape, migration or third-party consumer changes, and public/cost-format.js comes back with the revert."
+    }
+   },
+   {
+    "id": "finding-67",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:15:07.200Z",
+    "by": "close-out",
+    "in": "task-9",
+    "to": "close-out",
+    "state": "handed-on",
+    "ended": {
+     "reason": "Part 1 (John's read before the next slice) now carried by check-16, asked on LIN-4446 by close-out (decision-74). Part 2 accepted as a gap in the close-out ledger: only Chromium ran (CI e2e and the reviewer's check); named rollback is reverting merge commit 92676b1fe, no migration or data-shape change.",
+     "into": "check-16"
+    },
     "links": {
      "about": [
       "change-57",
@@ -2769,6 +2944,28 @@
     "fields": {
      "says": "`tests/unit/cost-format-consumers.test.js` (concerns `public/flight-companion.js`): the test title (\"formatCost gives the browser copy's words\") and its comment (\"The browser copy's fine mode\") name the browser copy PR #2423 deleted. Reword them to \"the shared formatter's words\". Fix-sized, on the PR branch (blind read, 13 Nov)."
     }
+   },
+   {
+    "id": "finding-70",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:15:00.200Z",
+    "by": "close-out",
+    "in": "task-9",
+    "to": "close-out",
+    "state": "done",
+    "ended": {
+     "reason": "Fixed in ad24a2102: tests/unit/cost-format-consumers.test.js title and comment now say \"the shared formatter's words\""
+    },
+    "links": {
+     "about": [
+      "change-57"
+     ]
+    },
+    "fields": {
+     "says": "`tests/unit/cost-format-consumers.test.js` (concerns `public/flight-companion.js`): the test title (\"formatCost gives the browser copy's words\") and its comment (\"The browser copy's fine mode\") name the browser copy PR #2423 deleted. Reword them to \"the shared formatter's words\". Fix-sized, on the PR branch (blind read, 13 Nov)."
+    }
    }
   ],
   "finding-71": [
@@ -2782,6 +2979,28 @@
     "in": "task-9",
     "to": "close-out",
     "state": "open",
+    "links": {
+     "about": [
+      "change-57"
+     ]
+    },
+    "fields": {
+     "says": "`tests/unit/cost-format.test.js` (concerns `lib/cost-format.js`): a new file in PR #2423, but its header says \"The browser-copy parity comparison it used to carry is retired\"; it never carried that comparison. It also keeps `export const TABLE`, which nothing imports, left over from the deleted parity test. Drop the sentence and the `export`. Fix-sized, on the PR branch (blind read, 13 Nov)."
+    }
+   },
+   {
+    "id": "finding-71",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:15:01.200Z",
+    "by": "close-out",
+    "in": "task-9",
+    "to": "close-out",
+    "state": "done",
+    "ended": {
+     "reason": "Fixed in ad24a2102: tests/unit/cost-format.test.js drops the false parity sentence and the unused export on TABLE"
+    },
     "links": {
      "about": [
       "change-57"
@@ -2813,6 +3032,29 @@
     },
     "fields": {
      "says": "`public/cost-format-global.js`: the module-to-global bridge is specific to one module. The guard in `tests/unit/shared-modules.test.js` hard-codes the `SHIM` constant, the `'window.CostFormat'` string and the list of four consumers. The DOMContentLoaded-only rule is restated in `public/flight-companion.js`, `public/observation.js`, `public/prompt-section.js` and `public/workspace-kpis.js`, and per-consumer tests witness it, but no check covers a new consumer: a fifth trips only the hard-coded list, with no hint about the timing rule, and a second shared module would need a second shim and a second guard. Needs a design decision on how classic pages take shared modules: one shim per module, a general shim, or turning consumers into modules (blind read of LIN-4446 slice 1, 13 Nov)."
+    }
+   },
+   {
+    "id": "finding-72",
+    "kind": "finding",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T15:15:08.200Z",
+    "by": "close-out",
+    "reason": "close-out wrote it into the area note's Waiting section",
+    "in": "area-1",
+    "to": "area-1",
+    "state": "open",
+    "links": {
+     "about": [
+      "decision-29",
+      "decision-46",
+      "finding-25",
+      "change-57"
+     ]
+    },
+    "fields": {
+     "says": "`public/cost-format-global.js`: the module-to-global bridge is specific to one module. The guard in `tests/unit/shared-modules.test.js` hard-codes the `SHIM` constant, the `'window.CostFormat'` string and the list of four consumers. The DOMContentLoaded-only rule is restated in `public/flight-companion.js`, `public/observation.js`, `public/prompt-section.js` and `public/workspace-kpis.js`, and per-consumer tests witness it, but no check covers a new consumer: a fifth trips only the hard-coded list, with no hint about the timing rule, and a second shared module would need a second shim and a second guard. Needs a design decision on how classic pages take shared modules: one shim per module, a general shim, or turning consumers into modules (blind read of LIN-4446 slice 1, 13 Nov). Now a ## Waiting entry in docs/areas/front-end-browser.md (LIN-4446 close-out, ad24a2102)."
     }
    }
   ],
@@ -2848,6 +3090,66 @@
     "fields": {
      "stage": "blind-read",
      "account": "# What this stage really wrote\n\n## Comment on LIN-4446 at 15:14:31\n\n## Blind read\nVerdict: better. Better: the USD formatter has one owner again. `lib/cost-format.js` is served as-is at `/shared/cost-format.js` through a separate, file-by-file `SHARED_MODULES` allow-list in `lib/vendor-assets.js`, so the hand-copied `public/cost-format.js` and its parity test are deleted, with guards for leaf purity, boot failure and the 404s. Worse: `public/cost-format-global.js` turns the formatter back into a global, which brings in a timing rule that nothing checks generally: each classic consumer may read `window.CostFormat` only after DOMContentLoaded. Four files now explain that rule in comments, and `public/workspace-kpis.js` had to move its whole build into a listener.\n\nRead: https://github.com/JKershaw/LinearViewer/pull/2423 at `1de016f52` against `4b5001ddf`.\n\n### Inside the area, fix-sized\n- `tests/unit/cost-format-consumers.test.js` (front-end-browser, concerns `public/flight-companion.js`): the test title (\"formatCost gives the browser copy's words\") and its comment (\"The browser copy's fine mode\") name the browser copy this change deleted. Reword them to \"the shared formatter's words\".\n- `tests/unit/cost-format.test.js` (other-features, concerns `lib/cost-format.js`): this is a new file, but its header says \"The browser-copy parity comparison it used to carry is retired\". It never carried that comparison. It also keeps `export const TABLE`, which nothing imports; the export is left over from the deleted parity test. Drop the sentence and the `export`.\n\n### Inside the area, larger\n- `public/cost-format-global.js` (front-end-browser): the module-to-global bridge is specific to this one module. The guard in `tests/unit/shared-modules.test.js` hard-codes the `SHIM` constant, the `'window.CostFormat'` string and the list of four consumers. The DOMContentLoaded-only rule is restated in `public/flight-companion.js`, `public/observation.js`, `public/prompt-section.js` and `public/workspace-kpis.js`, and per-consumer tests witness it, but no check covers a new consumer. A fifth consumer trips only the hard-coded list, with no hint about the timing rule. A second shared module would need a second shim and a second guard. This is larger than a fix because it needs a design decision on how classic pages take shared modules: one shim per module, a general shim, or turning consumers into modules.\n- `public/ship.js` / `public/ship-biscuit.js` (front-end-browser): the change built a way to share code, but other browser copies in its area are still synced by hand, each with a comment saying so: `public/ship.js` (\"mirror of lib/ship-layout.js\") and `public/ship-biscuit.js` (\"Kept in lockstep with lib/render-ship-biscuit.js\"). This is larger because each lib side would first have to become an import-free leaf before it could join `SHARED_MODULES`.\n\n### Outside the area\nNone.\n\n"
+    }
+   }
+  ],
+  "decision-74": [
+   {
+    "id": "decision-74",
+    "kind": "decision",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:15:06.200Z",
+    "by": "close-out",
+    "in": "task-9",
+    "state": "stands",
+    "links": {
+     "about": [
+      "verdict-65",
+      "check-16",
+      "finding-67",
+      "change-57"
+     ]
+    },
+    "fields": {
+     "scope": "task-9",
+     "answer": "Close-out merged, deployed and closed LIN-4446 without John's read of the result. The read (check-16) stays open to John; no next slice is dispatched until his comment is on LIN-4446.",
+     "why": "The close-out rules say a post-deploy check close-out cannot run does not hold the close; John's read is human-only and does not gate merge or deploy. Departs from verdict-65, which asked for the read before Done. In this store task-9 stays open because its done-when names John's read."
+    }
+   }
+  ],
+  "run-75": [
+   {
+    "id": "run-75",
+    "kind": "run",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:15:10.200Z",
+    "by": "close-out",
+    "in": "task-9",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "stage": "close-out",
+     "account": "# What this stage really wrote\n\n## Comment on LIN-4446 at 15:31:20\n\n## Close-out — LIN-4446\n\n**Merged:** PR [#2423](https://github.com/JKershaw/LinearViewer/pull/2423), squash commit `92676b1febeb5407878d69b5e7a8f166a9371777`, pinned with `--match-head-commit ad24a2102f0aa0fac4ec5ccbbe5075d660b8b67b`. Deployed: the harbour.cat footer shows `92676b1`.\n\n**How it meets what was asked:** as the review's sentence-by-sentence account says. `lib/cost-format.js` is the one formatter, served unchanged at `/shared/cost-format.js` through the `SHARED_MODULES` allow-list. The reading of the no-build-step rule (browser may import natively) is in `CLAUDE.md` and `docs/areas/front-end-browser.md`. One shared piece was taken; no view was reworked or retired. The retired copy and its parity test are named in the PR (`public/cost-format.js`, 34 lines; `tests/unit/cost-format-parity.test.js`, 74 lines), as is the swipe viewport retirement.\n\n**Changes I made after approval** (commit `ad24a2102`, on the PR branch):\n- `tests/unit/cost-format-consumers.test.js`: title and comment now say \"the shared formatter's words\" (blind read, fix 1).\n- `tests/unit/cost-format.test.js`: removed the false \"parity comparison it used to carry\" sentence and the unused `export` on `TABLE` (blind read, fix 2).\n- `docs/areas/front-end-browser.md`: two `## Waiting` entries, for the module-to-global bridge's missing general timing guard and for the hand-synced `public/ship.js` / `public/ship-biscuit.js` copies (blind read, \"larger\" items).\n- PR body: names the swipe viewport retirement and its witness `tests/unit/render-swipe.test.js`; the totals now read 35 files, +790 / −287; the \"serving tests not run against HEAD\" gap is replaced with the reviewer's mutation M8 evidence (review fix 1).\n\n**Ledger:**\n- *Chart deferral with real Chart.js, shim and CSP (inside):* discharged pre-merge by the reviewer's Chromium check. Head draws `$` ticks with no errors; main's `workspace-kpis.js` throws. Not re-run live: it needs an authenticated workspace with priced lineages.\n- *Same behaviour outside Chromium (inside):* only Chromium ran. Named rollback is the review's: revert merge commit `92676b1fe`, with no migration or data-shape change.\n- *John's read of the result (inside, human-only):* **not run, and not recorded.** It is a read only John can do and does not gate the merge or deploy. Please read this comment and PR #2423's body, then record your read as a comment here. **No next slice should be dispatched until that comment exists.** The review asked for the read before Done; the close-out rules say a post-deploy check I cannot run does not hold the close, so I am closing and leaving this open for the operator.\n- Live verification after deploy: `/shared/cost-format.js` is byte-identical to `lib/cost-format.js` (200, `application/javascript`); `/shared/nope.js`, `/lib/cost-format.js` and `/cost-format.js` are 404; `/cost-format-global.js` is 200.\n\n**Larger and outside finds:** all are `## Waiting` entries in `docs/areas/front-end-browser.md` (the `common.js` twins, a module-capable test loader, the `observation.js` size, and the two added today). The blind read found nothing outside the area, so I filed no tickets. There are no related tickets to tidy: the ticket has no relations or children.\n\n**CI:** green on the exact merged head `ad24a2102`. That is Unit tests, Unit tests (proxy, clock +400d), E2E shards 1–4, Secret scan and CI success. Locally I ran the two edited suites, the area-note suites, `shared-modules` and the CLAUDE.md budget suite (all pass).\n\n\n## LIN-4446 description's `## Implementation Plan` section, rewritten after 15:31:25 (the last snapshot still has step 6's plan; this is the description as read 17 Nov, everything above the section unchanged; the close-out session's last request was 15:31:50)\n\n## Implementation Plan\n\nImplemented: slice 1 (one shared cost formatter) merged as PR [#2423](<https://github.com/JKershaw/LinearViewer/pull/2423>), commit `92676b1febeb5407878d69b5e7a8f166a9371777`, deployed. The plan was implemented as approved after its one revision, with one sanctioned addition: the swipe viewport fix, a leftover-step retirement named in the PR. The discharged plan, revision note, research and scoping text are preserved in the task snapshots and the comment trail.\n\n`fits one session`: one shared piece, a handful of files, one wrapped initializer and one real-browser check.\n\nplan-review due: no\n\n### Still open\n\nJohn's read of the slice's result is not recorded (see the close-out comment). No next slice starts until it is.\n"
+    }
+   },
+   {
+    "id": "run-75",
+    "kind": "run",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:15:11.200Z",
+    "by": "close-out",
+    "in": "task-9",
+    "state": "done",
+    "ended": {
+     "reason": "close-out recorded: PR #2423 merged 92676b1 and deployed; John's read left open (check-16)"
+    },
+    "links": {},
+    "fields": {
+     "stage": "close-out",
+     "account": "# What this stage really wrote\n\n## Comment on LIN-4446 at 15:31:20\n\n## Close-out — LIN-4446\n\n**Merged:** PR [#2423](https://github.com/JKershaw/LinearViewer/pull/2423), squash commit `92676b1febeb5407878d69b5e7a8f166a9371777`, pinned with `--match-head-commit ad24a2102f0aa0fac4ec5ccbbe5075d660b8b67b`. Deployed: the harbour.cat footer shows `92676b1`.\n\n**How it meets what was asked:** as the review's sentence-by-sentence account says. `lib/cost-format.js` is the one formatter, served unchanged at `/shared/cost-format.js` through the `SHARED_MODULES` allow-list. The reading of the no-build-step rule (browser may import natively) is in `CLAUDE.md` and `docs/areas/front-end-browser.md`. One shared piece was taken; no view was reworked or retired. The retired copy and its parity test are named in the PR (`public/cost-format.js`, 34 lines; `tests/unit/cost-format-parity.test.js`, 74 lines), as is the swipe viewport retirement.\n\n**Changes I made after approval** (commit `ad24a2102`, on the PR branch):\n- `tests/unit/cost-format-consumers.test.js`: title and comment now say \"the shared formatter's words\" (blind read, fix 1).\n- `tests/unit/cost-format.test.js`: removed the false \"parity comparison it used to carry\" sentence and the unused `export` on `TABLE` (blind read, fix 2).\n- `docs/areas/front-end-browser.md`: two `## Waiting` entries, for the module-to-global bridge's missing general timing guard and for the hand-synced `public/ship.js` / `public/ship-biscuit.js` copies (blind read, \"larger\" items).\n- PR body: names the swipe viewport retirement and its witness `tests/unit/render-swipe.test.js`; the totals now read 35 files, +790 / −287; the \"serving tests not run against HEAD\" gap is replaced with the reviewer's mutation M8 evidence (review fix 1).\n\n**Ledger:**\n- *Chart deferral with real Chart.js, shim and CSP (inside):* discharged pre-merge by the reviewer's Chromium check. Head draws `$` ticks with no errors; main's `workspace-kpis.js` throws. Not re-run live: it needs an authenticated workspace with priced lineages.\n- *Same behaviour outside Chromium (inside):* only Chromium ran. Named rollback is the review's: revert merge commit `92676b1fe`, with no migration or data-shape change.\n- *John's read of the result (inside, human-only):* **not run, and not recorded.** It is a read only John can do and does not gate the merge or deploy. Please read this comment and PR #2423's body, then record your read as a comment here. **No next slice should be dispatched until that comment exists.** The review asked for the read before Done; the close-out rules say a post-deploy check I cannot run does not hold the close, so I am closing and leaving this open for the operator.\n- Live verification after deploy: `/shared/cost-format.js` is byte-identical to `lib/cost-format.js` (200, `application/javascript`); `/shared/nope.js`, `/lib/cost-format.js` and `/cost-format.js` are 404; `/cost-format-global.js` is 200.\n\n**Larger and outside finds:** all are `## Waiting` entries in `docs/areas/front-end-browser.md` (the `common.js` twins, a module-capable test loader, the `observation.js` size, and the two added today). The blind read found nothing outside the area, so I filed no tickets. There are no related tickets to tidy: the ticket has no relations or children.\n\n**CI:** green on the exact merged head `ad24a2102`. That is Unit tests, Unit tests (proxy, clock +400d), E2E shards 1–4, Secret scan and CI success. Locally I ran the two edited suites, the area-note suites, `shared-modules` and the CLAUDE.md budget suite (all pass).\n\n\n## LIN-4446 description's `## Implementation Plan` section, rewritten after 15:31:25 (the last snapshot still has step 6's plan; this is the description as read 17 Nov, everything above the section unchanged; the close-out session's last request was 15:31:50)\n\n## Implementation Plan\n\nImplemented: slice 1 (one shared cost formatter) merged as PR [#2423](<https://github.com/JKershaw/LinearViewer/pull/2423>), commit `92676b1febeb5407878d69b5e7a8f166a9371777`, deployed. The plan was implemented as approved after its one revision, with one sanctioned addition: the swipe viewport fix, a leftover-step retirement named in the PR. The discharged plan, revision note, research and scoping text are preserved in the task snapshots and the comment trail.\n\n`fits one session`: one shared piece, a handful of files, one wrapped initializer and one real-browser check.\n\nplan-review due: no\n\n### Still open\n\nJohn's read of the slice's result is not recorded (see the close-out comment). No next slice starts until it is.\n"
     }
    }
   ]
@@ -4709,6 +5011,78 @@
     "pos": [
      "check-33"
     ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:42:57.245Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": {
+    "by": "close-out",
+    "pos": [
+     "finding-30"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:42:57.296Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": {
+    "by": "close-out",
+    "pos": [
+     "finding-72"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:04.576Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": {
+    "by": "close-out",
+    "pos": [
+     "finding-30"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:04.617Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": {
+    "by": "close-out",
+    "pos": [
+     "finding-72"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:08.676Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": {
+    "to": "close-out",
+    "state": "open",
+    "by": "close-out",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:08.721Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": {
+    "in": "task-9",
+    "state": "open",
+    "by": "close-out",
+    "pos": []
    },
    "asOf": null
   }
