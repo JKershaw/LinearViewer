@@ -3587,6 +3587,170 @@
     "pos": []
    },
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:32:26.357Z",
+   "by": "review",
+   "cmd": "find",
+   "args": {
+    "to": "review",
+    "state": "open",
+    "by": "review",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:32:26.399Z",
+   "by": "review",
+   "cmd": "show",
+   "args": {
+    "task": "task-60",
+    "by": "review",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:32:30.247Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "check-69"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:32:30.286Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "finding-75"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:32:30.322Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "finding-79"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:32:30.358Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "finding-22"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:32:30.396Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "change-84"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:32:30.433Z",
+   "by": "review",
+   "cmd": "find",
+   "args": {
+    "kind": "task",
+    "text": "LIN-445",
+    "by": "review",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:32:34.417Z",
+   "by": "review",
+   "cmd": "get",
+   "args": {
+    "by": "review",
+    "pos": [
+     "check-90"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:32:34.462Z",
+   "by": "review",
+   "cmd": "find",
+   "args": {
+    "in": "task-62",
+    "by": "review",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:32:34.502Z",
+   "by": "review",
+   "cmd": "find",
+   "args": {
+    "kind": "check",
+    "state": "open",
+    "by": "review",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:32:57.121Z",
+   "by": "review",
+   "cmd": "find",
+   "args": {
+    "kind": "verdict",
+    "by": "review",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:32:57.178Z",
+   "by": "review",
+   "cmd": "find",
+   "args": {
+    "to": "close-out",
+    "state": "open",
+    "by": "review",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:32:57.236Z",
+   "by": "review",
+   "cmd": "find",
+   "args": {
+    "text": "log line",
+    "by": "review",
+    "pos": []
+   },
+   "asOf": null
   }
  ]
 }

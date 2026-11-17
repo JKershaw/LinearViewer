@@ -1,0 +1,37 @@
+undefined undefined vundefined [undefined] by undefined
+task-9 task v2 [open] by design
+finding-10 finding v2 [handed-on] to design by design
+finding-12 finding v2 [handed-on] to design by design
+check-13 check v3 [open] to review by design
+finding-14 finding v2 [handed-on] to design by design
+finding-15 finding v2 [handed-on] to design by design
+check-16 check v1 [open] to John by survey-task
+run-17 run v2 [done] by survey-task
+run-18 run v2 [done] by survey-place
+finding-19 finding v2 [handed-on] to design by design
+finding-20 finding v2 [handed-on] to design by design
+finding-21 finding v3 [handed-on] to design by design
+check-22 check v2 [open] to review by plan-review
+check-23 check v1 [open] to review by survey-place
+finding-24 finding v2 [handed-on] to design by design
+decision-26 decision v1 [stands] by scoping
+run-27 run v2 [done] by scoping
+plan-28 plan v2 [kept] to implementation by design
+decision-29 decision v1 [stands] by design
+check-31 check v1 [open] to review by design
+check-32 check v2 [open] to review by plan-review
+check-33 check v2 [open] to review by plan-review
+run-34 run v2 [done] by design
+run-35 run v2 [done] by plan-review
+finding-36 finding v2 [done] to design by design
+finding-37 finding v2 [handed-on] to implementation by design
+finding-38 finding v2 [handed-on] to implementation by design
+finding-39 finding v2 [handed-on] to implementation by design
+finding-40 finding v2 [handed-on] to implementation by design
+finding-41 finding v2 [handed-on] to implementation by design
+finding-42 finding v2 [handed-on] to implementation by design
+finding-43 finding v2 [handed-on] to implementation by design
+finding-44 finding v2 [handed-on] to implementation by design
+verdict-45 verdict v1 [stands] STALE(on plan-28@1, now @2) to design by plan-review
+decision-46 decision v1 [stands] by design
+run-47 run v2 [done] by design
