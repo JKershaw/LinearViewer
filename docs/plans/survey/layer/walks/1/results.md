@@ -28,7 +28,7 @@
 | 2 | Kind counts | **Mostly held** | Plan 1 with 3 versions, 5 decisions, 3 verdicts as predicted. Surprises: 3 `question`s (predicted 0: the surveys' "decide which up front" became questions), 15 findings, 4 areas, 2 stub tasks |
 | 3 | R1 strains for want of `setting`; R2 clean; R12 overlaps `check`; R10 a finding ended | **Held** | "Decided by the standing policy" is a string; the child links to its plan piece; review's right/wrong conditions became the checks' fields; the retired Waiting entry is a finding ended done |
 | 4 | Bulk-path gap → one finding | **Held** [checked in store] | One finding, revised by leftover; blind read's item is a question shelved as the same thing. The fill counts it in four places on the tickets |
-| 5 | Live probe → 1–3 checks, not scattered | **Held in part** | It stayed in checks, but as four: the survey's probe ended "declined" when the truth was "superseded by" review's three, and no link joins them (break 2) |
+| 5 | Live probe → 1–3 checks, not scattered | **Held in part** | It stayed in checks, as four: review's checks 2 and 3 link back to the survey's probe as `same-as`, and the probe's end reason names them [checked in store]. But the probe had to end "declined" when the truth was "restated as" (break 2) |
 | 6 | Rule 1 doesn't hit at close-out | **Held** | The open checks are addressed to John and the operator, not the task. The question stands: should a task close over checks it raised? |
 | 7 | Rule 2 doesn't hit; departures on the plan | **Held** | Implementation's departures became plan v3 |
 | 8 | Rule 4 shows the after-approval fixes | **Failed** | The PR head did move after review and blind read (the store links three heads), and nothing went stale: the PR isn't a record (break 3). Rule 4 fired somewhere unexpected instead (break 4) |
@@ -44,7 +44,7 @@
 ## Breaks, each with why
 
 1. **A verdict is too thin.** It holds an outcome and what it's on. Review's gap analysis and rollback plan had nowhere to go, and "approve with notes", "approve, conditional on close-out" and "better, with a worse side" all became `pass`. *Why:* the design gives a verdict no body and no outcome set; the builder invented pass/fail.
-2. **A check can't be handed on.** *Why:* only `finding` has `handed-on` with a target. So the probe → post-deploy checks thread broke into unlinked records.
+2. **A check can't be handed on.** *Why:* only `finding` has `handed-on` with a target. The fill joined the probe to review's checks with `same-as` links and an end reason, but had to end the probe "declined", which says it was refused, not restated. (Corrected 17 Nov: I first wrote that no link joined them.)
 3. **A verdict on a PR head never goes stale.** *Why:* the PR isn't a record, so its heads have no versions. "Nobody re-reads these" stays invisible, the gap trace 1 named.
 4. **A new plan version stales the whole plan's approval.** Piece 1's departures (v3) staled plan review's approval of pieces 2 and 3 too, and the breakdown's decision, whose basis is that approval, keeps standing with nothing flagged. *Why:* pieces have no versions of their own, and a decision resting on a verdict isn't re-checked when the verdict goes stale.
 5. **The person's words never reach the child's stages.** *Why:* the brief takes only the task's own `asked`, and a child's is empty by the design's rule. Today the child at least points into the parent's text.
