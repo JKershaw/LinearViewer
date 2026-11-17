@@ -1,15 +1,15 @@
 {
  "retro": false,
- "seq": 138,
+ "seq": 156,
  "count": {
   "area": 4,
   "lesson": 22,
-  "finding": 52,
+  "finding": 54,
   "task": 4,
   "decision": 12,
   "plan": 3,
   "verdict": 5,
-  "run": 7,
+  "run": 8,
   "question": 1,
   "check": 4,
   "change": 1
@@ -1616,6 +1616,37 @@
       "tests/unit/as-asked-readers.test.js"
      ]
     }
+   },
+   {
+    "id": "task-2",
+    "kind": "task",
+    "v": 2,
+    "seq": 154,
+    "at": "2026-11-13T15:40:15.000Z",
+    "by": "close-out",
+    "op": "end",
+    "in": "task-1",
+    "state": "done",
+    "links": [
+     {
+      "type": "piece",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "asked": "",
+     "done-when": "All of the above pass on `fake-client.js`. Jira's `descriptionRoundTrip` holds sealed words byte-exact, D1's rich-content guard is unchanged, and the PR names what it retires (the \"Jira skipped/unsealed\" seal claims in code headers). Note that once this lands, the first-dispatch seal begins sealing Jira-native tickets on live sites. That is expected: it is logged on failure, and dispatch continues.",
+     "paths": [
+      "lib/providers/jira/",
+      "lib/as-asked-seal.js",
+      "lib/as-asked.js",
+      "tests/unit/as-asked-create-seal.test.js",
+      "tests/unit/as-asked-dispatch-seal.test.js",
+      "tests/unit/as-asked-readers.test.js"
+     ]
+    },
+    "note": "PR #2421 merged (2bf788b6d, head 26299c9b0) and deployed; Jira holds the person's words byte-exact via harbour.asAsked; close-out fixes landed; the three live checks are post-deploy, owned by LIN-4452 and addressed to John",
+    "reason": "PR #2421 merged (2bf788b6d, head 26299c9b0) and deployed; Jira holds the person's words byte-exact via harbour.asAsked; close-out fixes landed; the three live checks are post-deploy, owned by LIN-4452 and addressed to John"
    }
   ],
   "task-3": [
@@ -2002,6 +2033,32 @@
      "why-person": "Done-when is only proven on fake-client.js, which merges fields and stores whatever it is given. Shape B depends on a SHA-256 of adfToMarkdown(region) surviving Jira's ordinary saves. localId is handled (adfToMarkdown ignores attrs), but nothing shows the editor leaves alone trailing spaces before a hardBreak, how adjacent text nodes split, or empty paragraphs (LIN-2019 already drops these). If any shift, every sealed issue reads as human-edited and the words quietly become the rendering (*em* -> _em_, * a -> - a, ***x*** -> \\***x**\\*, all observed): the reformatting the seal exists to prevent. Needs a Jira credential, which build sessions lack by default (decision-3).",
      "how": "1. PUT a sealed description holding the witness inputs with properties:[{key:harbour.asAsked,…}] in the same body (confirms edit accepts properties). 2. GET with ?properties=harbour.asAsked. 3. Edit a line below the block in Jira's editor and save. 4. GET again and diff adfToMarkdown(region). Holds: plan stands. Does not hold: the digest must be over a normalised rendering, a design change to record on LIN-4445."
     }
+   },
+   {
+    "id": "check-1",
+    "kind": "check",
+    "v": 2,
+    "seq": 152,
+    "at": "2026-11-13T15:40:13.000Z",
+    "by": "close-out",
+    "op": "end",
+    "in": "task-2",
+    "to": "John",
+    "state": "handed-on",
+    "links": [
+     {
+      "type": "about",
+      "to": "decision-2"
+     }
+    ],
+    "fields": {
+     "what": "15-minute live probe on a real Jira site before writing code: does adfToMarkdown(region) stay stable when someone edits below the block in Jira's own editor?",
+     "why-person": "Done-when is only proven on fake-client.js, which merges fields and stores whatever it is given. Shape B depends on a SHA-256 of adfToMarkdown(region) surviving Jira's ordinary saves. localId is handled (adfToMarkdown ignores attrs), but nothing shows the editor leaves alone trailing spaces before a hardBreak, how adjacent text nodes split, or empty paragraphs (LIN-2019 already drops these). If any shift, every sealed issue reads as human-edited and the words quietly become the rendering (*em* -> _em_, * a -> - a, ***x*** -> \\***x**\\*, all observed): the reformatting the seal exists to prevent. Needs a Jira credential, which build sessions lack by default (decision-3).",
+     "how": "1. PUT a sealed description holding the witness inputs with properties:[{key:harbour.asAsked,…}] in the same body (confirms edit accepts properties). 2. GET with ?properties=harbour.asAsked. 3. Edit a line below the block in Jira's editor and save. 4. GET again and diff adfToMarkdown(region). Holds: plan stands. Does not hold: the digest must be over a normalised rendering, a design change to record on LIN-4445."
+    },
+    "note": "Pre-code probe never ran (no credential); the same question is check-3, now post-deploy on LIN-4452, with right/wrong conditions",
+    "reason": "Pre-code probe never ran (no credential); the same question is check-3, now post-deploy on LIN-4452, with right/wrong conditions",
+    "takeover": "check-3"
    }
   ],
   "finding-33": [
@@ -2163,6 +2220,29 @@
     "fields": {
      "says": "Region reader, no second ADF walker: it needs a paragraph's plain text, and `lib/providers/jira/adf.js` already has `plainText` (~line 340), private. Export it rather than retype it, and render the region with `adfToMarkdown({type:\"doc\",content})`, not a new renderer."
     }
+   },
+   {
+    "id": "finding-35",
+    "kind": "finding",
+    "v": 2,
+    "seq": 145,
+    "at": "2026-11-13T15:40:06.000Z",
+    "by": "close-out",
+    "op": "end",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "Region reader, no second ADF walker: it needs a paragraph's plain text, and `lib/providers/jira/adf.js` already has `plainText` (~line 340), private. Export it rather than retype it, and render the region with `adfToMarkdown({type:\"doc\",content})`, not a new renderer."
+    },
+    "note": "Built in PR #2421 (merged 2bf788b6d): review verdict-4 found the one region module met; it renders the region through adfToMarkdown (lesson-20). Taken on review's word, not re-read at close-out",
+    "reason": "Built in PR #2421 (merged 2bf788b6d): review verdict-4 found the one region module met; it renders the region through adfToMarkdown (lesson-20). Taken on review's word, not re-read at close-out"
    }
   ],
   "finding-36": [
@@ -2278,6 +2358,29 @@
     "fields": {
      "says": "What has to learn, beyond the three headers the plan names (every change names what it retires): `dispatch-factory.js:1008`; `docs/proxy-integration.md:2070` (agent-facing, says Jira files unsealed); `docs/architecture/source-map.md:216` and `:82` (the new region module needs a mention); `tests/unit/as-asked-guard.test.js` Jira block (345, 351) will fail, so it notices; the docs will not."
     }
+   },
+   {
+    "id": "finding-38",
+    "kind": "finding",
+    "v": 2,
+    "seq": 146,
+    "at": "2026-11-13T15:40:07.000Z",
+    "by": "close-out",
+    "op": "end",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "What has to learn, beyond the three headers the plan names (every change names what it retires): `dispatch-factory.js:1008`; `docs/proxy-integration.md:2070` (agent-facing, says Jira files unsealed); `docs/architecture/source-map.md:216` and `:82` (the new region module needs a mention); `tests/unit/as-asked-guard.test.js` Jira block (345, 351) will fail, so it notices; the docs will not."
+    },
+    "note": "Retirements landed in PR #2421 (merged 2bf788b6d): review verdict-4 found every plan item met incl. the named retirements and the guard tests now pinning sealed; taken on review's word, not re-read at close-out",
+    "reason": "Retirements landed in PR #2421 (merged 2bf788b6d): review verdict-4 found every plan item met incl. the named retirements and the guard tests now pinning sealed; taken on review's word, not re-read at close-out"
    }
   ],
   "finding-39": [
@@ -2393,6 +2496,30 @@
     "fields": {
      "says": "Not this task's; for the area that owns `lib/providers/jira/` (its id is not in survey-place's brief). Live Jira-native tickets: the first-dispatch seal writes back through `updateIssue`. D1 refuses any ticket holding a mention, emoji or panel (common) and logs it once per first dispatch; tickets that pass get their ADF normalised and their \"words\" become the escaped rendering. That is the codec's lossiness, deeper than this task."
     }
+   },
+   {
+    "id": "finding-41",
+    "kind": "finding",
+    "v": 2,
+    "seq": 149,
+    "at": "2026-11-13T15:40:10.000Z",
+    "by": "close-out",
+    "op": "end",
+    "in": "task-2",
+    "to": "close-out",
+    "state": "handed-on",
+    "links": [
+     {
+      "type": "about",
+      "to": "decision-2"
+     }
+    ],
+    "fields": {
+     "says": "Not this task's; for the area that owns `lib/providers/jira/` (its id is not in survey-place's brief). Live Jira-native tickets: the first-dispatch seal writes back through `updateIssue`. D1 refuses any ticket holding a mention, emoji or panel (common) and logs it once per first dispatch; tickets that pass get their ADF normalised and their \"words\" become the escaped rendering. That is the codec's lossiness, deeper than this task."
+    },
+    "note": "Not this task's; belongs to the providers area. Close-out cannot readdress, so finding-53 (to place, for routing) carries it",
+    "reason": "Not this task's; belongs to the providers area. Close-out cannot readdress, so finding-53 (to place, for routing) carries it",
+    "takeover": "finding-53"
    }
   ],
   "finding-42": [
@@ -2416,6 +2543,30 @@
     "fields": {
      "says": "Not this task's; for the area that owns `lib/providers/jira/`. The bulk search path could ask for `properties` (`POST /search/jql` accepts it), so the dashboard would show exact words instead of the converted block."
     }
+   },
+   {
+    "id": "finding-42",
+    "kind": "finding",
+    "v": 2,
+    "seq": 151,
+    "at": "2026-11-13T15:40:12.000Z",
+    "by": "close-out",
+    "op": "end",
+    "in": "task-2",
+    "to": "close-out",
+    "state": "handed-on",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "Not this task's; for the area that owns `lib/providers/jira/`. The bulk search path could ask for `properties` (`POST /search/jql` accepts it), so the dashboard would show exact words instead of the converted block."
+    },
+    "note": "Same subject as finding-52 (batch search never asks for harbour.asAsked), already to place for the providers area; also parked in docs/areas/providers.md ## Waiting (on main from this PR)",
+    "reason": "Same subject as finding-52 (batch search never asks for harbour.asAsked), already to place for the providers area; also parked in docs/areas/providers.md ## Waiting (on main from this PR)",
+    "takeover": "finding-52"
    }
   ],
   "finding-43": [
@@ -2434,6 +2585,25 @@
     "fields": {
      "says": "Not this task's; for the area that owns `lib/providers/jira/`. Comment weight: `lib/providers/jira/index.js`'s header and `docs/architecture/source-map.md`'s jira paragraph carry more history than guidance."
     }
+   },
+   {
+    "id": "finding-43",
+    "kind": "finding",
+    "v": 2,
+    "seq": 150,
+    "at": "2026-11-13T15:40:11.000Z",
+    "by": "close-out",
+    "op": "end",
+    "in": "task-2",
+    "to": "close-out",
+    "state": "handed-on",
+    "links": [],
+    "fields": {
+     "says": "Not this task's; for the area that owns `lib/providers/jira/`. Comment weight: `lib/providers/jira/index.js`'s header and `docs/architecture/source-map.md`'s jira paragraph carry more history than guidance."
+    },
+    "note": "Not this task's; belongs to the providers area. finding-54 (to place, for routing) carries it",
+    "reason": "Not this task's; belongs to the providers area. finding-54 (to place, for routing) carries it",
+    "takeover": "finding-54"
    }
   ],
   "decision-11": [
@@ -2584,6 +2754,51 @@
      "head": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6"
     },
     "note": "Leftovers commit moved the PR head; CI green on it."
+   },
+   {
+    "id": "change-1",
+    "kind": "change",
+    "v": 3,
+    "seq": 139,
+    "at": "2026-11-13T15:40:00.000Z",
+    "by": "close-out",
+    "op": "revise",
+    "in": "task-2",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2421",
+     "head": "26299c9b0c6ecb57edd029f49578282224f6d31e"
+    },
+    "note": "Close-out fixes (commit 26299c9b0) moved the PR head; CI ci-success green on it; merge pinned to this head"
+   },
+   {
+    "id": "change-1",
+    "kind": "change",
+    "v": 4,
+    "seq": 140,
+    "at": "2026-11-13T15:40:01.000Z",
+    "by": "close-out",
+    "op": "end",
+    "in": "task-2",
+    "state": "merged",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2421",
+     "head": "26299c9b0c6ecb57edd029f49578282224f6d31e"
+    },
+    "note": "Squash-merged as 2bf788b6da71c82db6a1d84b361da98ef9cdedbb pinned to head 26299c9b0; deployed (harbour.cat footer 2bf788b6d at 15:39 UTC); Tests on main green",
+    "reason": "Squash-merged as 2bf788b6da71c82db6a1d84b361da98ef9cdedbb pinned to head 26299c9b0; deployed (harbour.cat footer 2bf788b6d at 15:39 UTC); Tests on main green"
    }
   ],
   "decision-12": [
@@ -2660,6 +2875,30 @@
     "fields": {
      "says": "Not verified live: no credential for your Jira was available to this build. Nothing shows that your site keeps the stored ADF (so the rendered digest still matches) across an ordinary editor save below the block. If Jira normalises it, the reader falls back to the rendering and the words quietly become the converted text. The live check (session 3, LIN-4452) must be able to fail on exactly this."
     }
+   },
+   {
+    "id": "finding-45",
+    "kind": "finding",
+    "v": 2,
+    "seq": 153,
+    "at": "2026-11-13T15:40:14.000Z",
+    "by": "close-out",
+    "op": "end",
+    "in": "task-2",
+    "to": "John",
+    "state": "handed-on",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "says": "Not verified live: no credential for your Jira was available to this build. Nothing shows that your site keeps the stored ADF (so the rendered digest still matches) across an ordinary editor save below the block. If Jira normalises it, the reader falls back to the rendering and the words quietly become the converted text. The live check (session 3, LIN-4452) must be able to fail on exactly this."
+    },
+    "note": "Not run at close-out either (no credential). check-3 (to John, LIN-4452) is the live check that can fail on exactly this: words byte-equal and digest(region) === property.rendered after an editor save",
+    "reason": "Not run at close-out either (no credential). check-3 (to John, LIN-4452) is the live check that can fail on exactly this: words byte-equal and digest(region) === property.rendered after an editor save",
+    "takeover": "check-3"
    }
   ],
   "finding-46": [
@@ -2999,6 +3238,29 @@
     "fields": {
      "says": "Pin the log line in the oversize witness. tests/unit/jira-as-asked-region.test.js, test \"an oversized body is not sealed…\" (~line 262): capture console.log during the sealForFiling call and assert exactly one line equal to `[as-asked] seal skipped: provider jira cannot hold the block (test)`. Today it asserts filed unsealed and verbatim but not the log line the plan names."
     }
+   },
+   {
+    "id": "finding-48",
+    "kind": "finding",
+    "v": 2,
+    "seq": 141,
+    "at": "2026-11-13T15:40:02.000Z",
+    "by": "close-out",
+    "op": "end",
+    "in": "task-2",
+    "to": "close-out",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "says": "Pin the log line in the oversize witness. tests/unit/jira-as-asked-region.test.js, test \"an oversized body is not sealed…\" (~line 262): capture console.log during the sealForFiling call and assert exactly one line equal to `[as-asked] seal skipped: provider jira cannot hold the block (test)`. Today it asserts filed unsealed and verbatim but not the log line the plan names."
+    },
+    "note": "Fixed in 26299c9b0: oversize test captures console.log and asserts exactly one line '[as-asked] seal skipped: provider jira cannot hold the block (test)'; checked it bites (changed wording went red, reverted)",
+    "reason": "Fixed in 26299c9b0: oversize test captures console.log and asserts exactly one line '[as-asked] seal skipped: provider jira cannot hold the block (test)'; checked it bites (changed wording went red, reverted)"
    }
   ],
   "check-2": [
@@ -3208,6 +3470,29 @@
     "fields": {
      "says": "routes/workspace-api-audit.js lines 35-36 still write process.env.NODE_ENV === 'test' && (workspace.accessToken === 'test-token' || ...) inline; the sweep moved every sibling copy onto isHermeticTestToken and missed this one. Fix: isHermeticTestToken(workspace.accessToken) || (process.env.NODE_ENV === 'test' && workspace.provider === 'local'). It keeps its own predicate, as its comment asks. (web-routes area)"
     }
+   },
+   {
+    "id": "finding-49",
+    "kind": "finding",
+    "v": 2,
+    "seq": 142,
+    "at": "2026-11-13T15:40:03.000Z",
+    "by": "close-out",
+    "op": "end",
+    "in": "task-2",
+    "to": "close-out",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "says": "routes/workspace-api-audit.js lines 35-36 still write process.env.NODE_ENV === 'test' && (workspace.accessToken === 'test-token' || ...) inline; the sweep moved every sibling copy onto isHermeticTestToken and missed this one. Fix: isHermeticTestToken(workspace.accessToken) || (process.env.NODE_ENV === 'test' && workspace.provider === 'local'). It keeps its own predicate, as its comment asks. (web-routes area)"
+    },
+    "note": "Fixed in 26299c9b0: routes/workspace-api-audit.js now isHermeticTestToken(workspace.accessToken) || (NODE_ENV==='test' && provider==='local'); same predicate, local alternative kept",
+    "reason": "Fixed in 26299c9b0: routes/workspace-api-audit.js now isHermeticTestToken(workspace.accessToken) || (NODE_ENV==='test' && provider==='local'); same predicate, local alternative kept"
    }
   ],
   "finding-50": [
@@ -3231,6 +3516,29 @@
     "fields": {
      "says": "routes/workspace-api-steps.js: isTestToken is now a one-line second name for isHermeticTestToken(workspace.accessToken). Fix: have its callers (workspace-api-issue-read.js, workspace-api-issue-write.js, workspace-api-prompts.js) import the helper directly and drop the alias. (web-routes area)"
     }
+   },
+   {
+    "id": "finding-50",
+    "kind": "finding",
+    "v": 2,
+    "seq": 143,
+    "at": "2026-11-13T15:40:04.000Z",
+    "by": "close-out",
+    "op": "end",
+    "in": "task-2",
+    "to": "close-out",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "says": "routes/workspace-api-steps.js: isTestToken is now a one-line second name for isHermeticTestToken(workspace.accessToken). Fix: have its callers (workspace-api-issue-read.js, workspace-api-issue-write.js, workspace-api-prompts.js) import the helper directly and drop the alias. (web-routes area)"
+    },
+    "note": "Fixed in 26299c9b0: isTestToken alias removed; workspace-api.js, -prompts, -issue-read, -issue-write and steps call isHermeticTestToken directly; stale isTestToken citations in steps header and docs/architecture/source-map.md:42 fixed too",
+    "reason": "Fixed in 26299c9b0: isTestToken alias removed; workspace-api.js, -prompts, -issue-read, -issue-write and steps call isHermeticTestToken directly; stale isTestToken citations in steps header and docs/architecture/source-map.md:42 fixed too"
    }
   ],
   "finding-51": [
@@ -3254,6 +3562,29 @@
     "fields": {
      "says": "tests/unit/jira-as-asked-region.test.js line 291, \"no longer claim that Jira is skipped\", only checks that three phrases are missing from two comment headers (lib/as-asked-seal.js, lib/as-asked.js); it says nothing about behaviour, and as-asked-create-seal.test.js already checks that Jira holds the block. Fix: delete it."
     }
+   },
+   {
+    "id": "finding-51",
+    "kind": "finding",
+    "v": 2,
+    "seq": 144,
+    "at": "2026-11-13T15:40:05.000Z",
+    "by": "close-out",
+    "op": "end",
+    "in": "task-2",
+    "to": "close-out",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "says": "tests/unit/jira-as-asked-region.test.js line 291, \"no longer claim that Jira is skipped\", only checks that three phrases are missing from two comment headers (lib/as-asked-seal.js, lib/as-asked.js); it says nothing about behaviour, and as-asked-create-seal.test.js already checks that Jira holds the block. Fix: delete it."
+    },
+    "note": "Fixed in 26299c9b0: deleted 'no longer claim that Jira is skipped'; behaviour covered by as-asked-create-seal.test.js. Full unit suite 25,319/25,319 locally, ci-success green on 26299c9b0",
+    "reason": "Fixed in 26299c9b0: deleted 'no longer claim that Jira is skipped'; behaviour covered by as-asked-create-seal.test.js. Full unit suite 25,319/25,319 locally, ci-success green on 26299c9b0"
    }
   ],
   "finding-52": [
@@ -3277,6 +3608,98 @@
     "fields": {
      "says": "For the providers area (no area id in the blind-read brief). lib/providers/jira/index.js: client.searchIssues never asks for harbour.asAsked, so issues built through _toCanonicalIssue by fetchProjects/fetchIssues (~line 769) and fetchIssueContext children (~line 897) carry the ADF rendering behind canonical markers, while fetchIssueFields, fetchIssueContext().issue and issueDescription return the exact property words for the same issue. jira-as-asked-region.test.js:166 pins the split. plan-1 chose bulk search display-only, so this is by design, but it is not written anywhere a caller would see it. Larger than a fix because closing it is a choice: every dashboard batch asks /search/jql for properties (up to 32 KB per issue), or batch descriptions are documented as not carrying the exact words."
     }
+   }
+  ],
+  "finding-53": [
+   {
+    "id": "finding-53",
+    "kind": "finding",
+    "v": 1,
+    "seq": 147,
+    "at": "2026-11-13T15:40:08.000Z",
+    "by": "close-out",
+    "op": "add",
+    "in": "task-2",
+    "to": "place",
+    "state": "open",
+    "links": [
+     {
+      "type": "same-as",
+      "to": "finding-41"
+     }
+    ],
+    "fields": {
+     "says": "For the providers area (owns lib/providers/jira/; no area id in close-out brief), not LIN-4450. Now live since 2bf788b6d: the first-dispatch seal writes Jira-native tickets back through updateIssue. D1 refuses tickets holding a mention, emoji or panel (common) and logs once per first dispatch; tickets that pass get ADF normalised and their words become the escaped rendering. Codec lossiness, deeper than the seal. check-4 (LIN-4452) will show which branch John's tickets take."
+    }
+   }
+  ],
+  "finding-54": [
+   {
+    "id": "finding-54",
+    "kind": "finding",
+    "v": 1,
+    "seq": 148,
+    "at": "2026-11-13T15:40:09.000Z",
+    "by": "close-out",
+    "op": "add",
+    "in": "task-2",
+    "to": "place",
+    "state": "open",
+    "links": [
+     {
+      "type": "same-as",
+      "to": "finding-43"
+     }
+    ],
+    "fields": {
+     "says": "For the providers area (owns lib/providers/jira/), not LIN-4450. Comment weight: lib/providers/jira/index.js header and docs/architecture/source-map.md jira paragraph carry more history than guidance; trim to what a caller needs."
+    }
+   }
+  ],
+  "run-8": [
+   {
+    "id": "run-8",
+    "kind": "run",
+    "v": 1,
+    "seq": 155,
+    "at": "2026-11-13T15:40:16.000Z",
+    "by": "close-out",
+    "op": "add",
+    "in": "task-2",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "stage": "close-out",
+     "account": "Made review's named fix and the blind read's three inline fixes in commit 26299c9b0 (oversize test pins the seal-skipped log line, checked it bites; workspace-api-audit.js onto isHermeticTestToken; isTestToken alias dropped plus the stale citations it left in the steps header and source-map.md:42; redundant comment-phrase test deleted). These came after review's approval at f9fa4a80c and nobody re-reviewed them; verdict-4 now rests on an older head. ci-success green on 26299c9b0, unit suite 25,319/25,319 locally. Squash-merged as 2bf788b6d, deployed (harbour.cat footer, 15:39 UTC), Tests on main green. Ended findings 48-51 done (fixed) and 35/38 done on review's word. Not run: live property PUT/GET, digest across a Jira editor save, first dispatch of a Jira-native ticket: no credential for John's Jira. They stay open as check-2/3/4 to John, owned by LIN-4452; check-1 and finding-45 handed on to check-3. finding-46 stays open to John: sealing is now live on his site, LIN-4451 is unblocked. Area items for providers: 42 handed to finding-52, 41/43 to new findings 53/54, all to place since I cannot readdress. Rollback: revert the squash commit; written properties are ignored, no data loss. Task closed without refusal while those stayed open."
+    }
+   },
+   {
+    "id": "run-8",
+    "kind": "run",
+    "v": 2,
+    "seq": 156,
+    "at": "2026-11-13T15:40:17.000Z",
+    "by": "close-out",
+    "op": "end",
+    "in": "task-2",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "stage": "close-out",
+     "account": "Made review's named fix and the blind read's three inline fixes in commit 26299c9b0 (oversize test pins the seal-skipped log line, checked it bites; workspace-api-audit.js onto isHermeticTestToken; isTestToken alias dropped plus the stale citations it left in the steps header and source-map.md:42; redundant comment-phrase test deleted). These came after review's approval at f9fa4a80c and nobody re-reviewed them; verdict-4 now rests on an older head. ci-success green on 26299c9b0, unit suite 25,319/25,319 locally. Squash-merged as 2bf788b6d, deployed (harbour.cat footer, 15:39 UTC), Tests on main green. Ended findings 48-51 done (fixed) and 35/38 done on review's word. Not run: live property PUT/GET, digest across a Jira editor save, first dispatch of a Jira-native ticket: no credential for John's Jira. They stay open as check-2/3/4 to John, owned by LIN-4452; check-1 and finding-45 handed on to check-3. finding-46 stays open to John: sealing is now live on his site, LIN-4451 is unblocked. Area items for providers: 42 handed to finding-52, 41/43 to new findings 53/54, all to place since I cannot readdress. Rollback: revert the squash commit; written properties are ignored, no data loss. Task closed without refusal while those stayed open."
+    },
+    "note": "Close-out complete: merged, deployed, records ended or handed on, task closed",
+    "reason": "Close-out complete: merged, deployed, records ended or handed on, task closed"
    }
   ]
  },
