@@ -1,0 +1,147 @@
+[
+ {
+  "at": "2026-11-17T16:30:49.463Z",
+  "by": "breakdown",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-16",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T16:30:56.021Z",
+  "by": "breakdown",
+  "cmd": "get",
+  "args": [
+   "get",
+   "plan-40",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T16:30:56.058Z",
+  "by": "breakdown",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-29",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T16:30:56.103Z",
+  "by": "breakdown",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--to",
+   "breakdown",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T16:30:56.143Z",
+  "by": "breakdown",
+  "cmd": "get",
+  "args": [
+   "get",
+   "check-42",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T16:31:00.501Z",
+  "by": "breakdown",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-43",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T16:31:00.536Z",
+  "by": "breakdown",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "task",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T16:31:00.572Z",
+  "by": "breakdown",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "LIN-4471",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T16:31:00.612Z",
+  "by": "breakdown",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "run",
+   "--state",
+   "open",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T16:32:37.432Z",
+  "by": "breakdown",
+  "cmd": "brief",
+  "args": [
+   "brief",
+   "implementation",
+   "--task",
+   "task-54",
+   "--text",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T16:32:37.474Z",
+  "by": "breakdown",
+  "cmd": "brief",
+  "args": [
+   "brief",
+   "implementation",
+   "--task",
+   "task-55",
+   "--text",
+   "--by",
+   "breakdown"
+  ],
+  "asOf": null
+ }
+]

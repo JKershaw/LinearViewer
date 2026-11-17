@@ -1,5 +1,5 @@
 {
- "next": 53,
+ "next": 59,
  "records": {
   "area-1": [
    {
@@ -1154,6 +1154,29 @@
     "at": "2026-11-13T15:51:31.000Z",
     "by": "design",
     "reason": "design widens it to the imports themselves: flatness alone does not stop an import of an unlisted lib file or a stale /shared/ specifier"
+   },
+   {
+    "id": "check-32",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "`public/` stays flat and every relative import in it resolves: no script in a subdirectory, so `'../lib/…'` keeps resolving to `/lib/…` in the browser and in Node; and every `import` in a `public/*.js` is `./x.js` of an existing public file or `../lib/x.js` of a `SHARED_MODULES` value.",
+     "why-person": "The specifier scheme in decision-31 breaks silently if a view moves into a subfolder; nothing else would notice.",
+     "how": "A unit test (acorn, already a dependency) that lists `public/**/*.js` and fails on any path with a directory below `public/`, and parses each top-level file's imports. Synthetic failures: a nested `.js`, an import of an unlisted lib file, a bare specifier, an absolute `/shared/…` specifier. Lands in piece 1 (witness 5)."
+    },
+    "links": {
+     "about": [
+      "decision-31",
+      "plan-39"
+     ]
+    },
+    "in": "task-54",
+    "to": "implementation",
+    "v": 3,
+    "op": "revise",
+    "at": "2026-11-13T16:03:30.000Z",
+    "by": "breakdown",
+    "reason": "breakdown: piece 1 (LIN-4471) builds this check (plan witness 5); piece 2 then runs under it"
    }
   ],
   "decision-33": [
@@ -1437,6 +1460,28 @@
     "op": "add",
     "at": "2026-11-13T15:51:32.000Z",
     "by": "design"
+   },
+   {
+    "id": "check-41",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "Nothing under `/lib/` is served except the `SHARED_MODULES` files, and `/shared/` is gone: `/lib/vendor-assets.js`, `/lib/render.js`, `/lib/../server.js`, `/lib/%2e%2e/server.js`, `/lib/` and `/shared/cost-format.js` are real 404s, not the app shell with 200.",
+     "why-person": "Piece 1 moves a served-URL namespace next to the CSP serving path; a mistake in the allow-list leaks server source, so this witness needs a reader who is not the builder.",
+     "how": "Read witness 2 in `tests/unit/shared-modules.test.js` (express-stack and real-server blocks) and the route in `lib/vendor-assets.js`; confirm each case asserts status 404 and not a 200 shell."
+    },
+    "links": {
+     "about": [
+      "plan-39"
+     ]
+    },
+    "in": "task-54",
+    "to": "review",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:03:31.000Z",
+    "by": "breakdown",
+    "reason": "breakdown: the /lib/ and /shared/ serving it checks changes in piece 1 (LIN-4471)"
    }
   ],
   "check-42": [
@@ -1482,6 +1527,28 @@
     "at": "2026-11-13T15:56:48.000Z",
     "by": "plan-review",
     "reason": "plan review: the existing spec asserts window.CostFormat, not the cost axis, and fails once piece 1 drops the bridge; rewrite, not rerun"
+   },
+   {
+    "id": "check-42",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "The browser witness for piece 1 (MIME, CSP, `/lib/` path and module order) is a REWRITTEN `tests/e2e/workspace-kpis.spec.js` check, not a rerun: the existing one (`:211-227`) asserts `window.CostFormat.formatUsd(0.004)` on the KPI page and never looks at the cost axis, so once piece 1 drops the bridge from that page it fails with a TypeError. The new check asserts: `/lib/cost-format.js` loads 200 with a JavaScript MIME type (`page.waitForResponse`); no `pageerror` and no CSP refusal; the cost chart's y-axis formats with the shared formatter, e.g. `Chart.getChart(document.getElementById('chart-cost')).options.scales.y.ticks.callback(0.004) === '<$0.01'`. If Playwright cannot run in the building session, write it anyway, say so and leave it to CI. Do not mark it passed.",
+     "why-person": "Module order and CSP are runtime behaviour; a unit import under Node does not exercise them, and an inspection-only pass is how a runtime claim ships unwitnessed.",
+     "how": "Write the check, run `npx playwright test tests/e2e/workspace-kpis.spec.js` and paste the result, or record the waiver with the CI run that will carry it. It is the only real-browser proof of a page module importing `../lib/`."
+    },
+    "links": {
+     "about": [
+      "plan-39"
+     ]
+    },
+    "in": "task-54",
+    "to": "implementation",
+    "v": 3,
+    "op": "revise",
+    "at": "2026-11-13T16:03:21.000Z",
+    "by": "breakdown",
+    "reason": "breakdown: folded into piece 1's subtask (LIN-4471), the one it affects"
    }
   ],
   "finding-43": [
@@ -1553,6 +1620,28 @@
     "op": "add",
     "at": "2026-11-13T15:56:49.000Z",
     "by": "plan-review"
+   },
+   {
+    "id": "finding-45",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Build the import helper in piece 1, and it needs more than \"fake DOM on globalThis\" (decision-38). `task-page.js` uses bare `setTimeout`/`clearTimeout`/`setInterval`/`document` and `window.api`; the suites piece 2 migrates depend on `loadWorld`'s `timers` collector and window stubs (`task-page-question.test.js:223` `makePage`, `task-timeline-client.test.js:207`, `task-page-client.test.js:358/422/554`), and `task-page-client.test.js:423` runs the real classic `close-out.js` in the same world. Piece 1 has the same need: witness 3 needs `window.HarbourCharts`, which today comes from running the real classic `chart-helpers.js`. So the helper takes loadWorld's own `{ window, timers, globals }` options and installs them on `globalThis` with `window === globalThis`, gives one supported way to run a named classic sibling in that realm (`vm.runInThisContext`), restores everything it replaced, then imports the page fresh. Its own test covers \"two fresh imports share no state\" and \"globals are restored\". The `loadWorld` census cannot see complexity moved into the helper: keep it small enough that each migrated suite reads shorter than before, and say so in the piece description."
+    },
+    "links": {
+     "about": [
+      "plan-39",
+      "plan-40",
+      "decision-38"
+     ]
+    },
+    "in": "task-54",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:03:22.000Z",
+    "by": "breakdown",
+    "reason": "breakdown: folded into piece 1's subtask (LIN-4471), the one it affects"
    }
   ],
   "finding-46": [
@@ -1575,6 +1664,27 @@
     "op": "add",
     "at": "2026-11-13T15:56:50.000Z",
     "by": "plan-review"
+   },
+   {
+    "id": "finding-46",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Witness 6's timing predicate is wrong for two of the three remaining bridge consumers. `observation.js` and `prompt-section.js` never branch on `readyState`; their registered witnesses (`observation-scan-due.test.js`, `lin-3833-run-control.test.js`) prove the timing rule by loading the script first and installing the global afterwards, never setting `document.readyState = 'loading'`. Only `cost-format-consumers.test.js` (flight-companion) does. Use a predicate all three meet: the witness file loads the consumer and only then calls `loadCostFormat` from `tests/fixtures/browser-cost-format.js`."
+    },
+    "links": {
+     "about": [
+      "plan-39",
+      "decision-37"
+     ]
+    },
+    "in": "task-54",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:03:23.000Z",
+    "by": "breakdown",
+    "reason": "breakdown: folded into piece 1's subtask (LIN-4471), the one it affects"
    }
   ],
   "finding-47": [
@@ -1597,6 +1707,27 @@
     "op": "add",
     "at": "2026-11-13T15:56:51.000Z",
     "by": "plan-review"
+   },
+   {
+    "id": "finding-47",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Keep the renderer-coverage half of the current shim guard. `tests/unit/shared-modules.test.js:179-194` asserts that every script list naming a bridge consumer also lists the bridge as a module. The new inventory check replaces the hard-coded strings, not this assertion: piece 1 legitimately removes the bridge from `render-workspace-kpis.js`, and this is what catches an accidental removal from `render.js` and the other renderers."
+    },
+    "links": {
+     "about": [
+      "plan-39",
+      "decision-37"
+     ]
+    },
+    "in": "task-54",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:03:24.000Z",
+    "by": "breakdown",
+    "reason": "breakdown: folded into piece 1's subtask (LIN-4471), the one it affects"
    }
   ],
   "finding-48": [
@@ -1619,6 +1750,27 @@
     "op": "add",
     "at": "2026-11-13T15:56:52.000Z",
     "by": "plan-review"
+   },
+   {
+    "id": "finding-48",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Bridge discovery in the inventory check: scan the whole module, not just its top level, and match bare reads. A `window.X =` inside a function in a converted module is just as much a bridge. On readers: `window` is the global object, so a classic file can read bare `CostFormat` as well as `window.CostFormat`."
+    },
+    "links": {
+     "about": [
+      "plan-39",
+      "decision-37"
+     ]
+    },
+    "in": "task-54",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:03:25.000Z",
+    "by": "breakdown",
+    "reason": "breakdown: folded into piece 1's subtask (LIN-4471), the one it affects"
    }
   ],
   "finding-49": [
@@ -1640,6 +1792,26 @@
     "op": "add",
     "at": "2026-11-13T15:56:53.000Z",
     "by": "plan-review"
+   },
+   {
+    "id": "finding-49",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Witness 7 conflicts with a Waiting entry in another area note. `docs/areas/other-features.md`'s first Waiting entry cites `lib/cost-format.js` as its first path, so `area-notes.test.js` check 3 fails once the file moves to a front-end area. Moving it settles that entry (\"still in the catch-all\"): delete it and name it in what piece 1 retires. Read the `area-map-placement.test.js` pins first, as the plan says."
+    },
+    "links": {
+     "about": [
+      "plan-39"
+     ]
+    },
+    "in": "task-54",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:03:26.000Z",
+    "by": "breakdown",
+    "reason": "breakdown: folded into piece 1's subtask (LIN-4471), the one it affects"
    }
   ],
   "finding-50": [
@@ -1661,6 +1833,26 @@
     "op": "add",
     "at": "2026-11-13T15:56:54.000Z",
     "by": "plan-review"
+   },
+   {
+    "id": "finding-50",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`/shared/` references reach further than piece 1 lists. Besides the allow-list, the bridge and its test: the comment in `lib/cost-format.js:12`; `tests/unit/cost-read-census.test.js:15` and `cost-format.test.js:3`; `tests/fixtures/browser-cost-format.js:3`; `docs/areas/other-features.md:17` and `docs/areas/platform-and-plumbing.md:18`; `docs/architecture/source-map.md:151,347`. The last is outside witness 10's grep scope, so widen it from `docs/areas/` to `docs/`. Also update the source-map lines for `workspace-kpis.js`/`task-page.js` if they call them classic."
+    },
+    "links": {
+     "about": [
+      "plan-39"
+     ]
+    },
+    "in": "task-54",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:03:27.000Z",
+    "by": "breakdown",
+    "reason": "breakdown: folded into piece 1's subtask (LIN-4471), the one it affects"
    }
   ],
   "finding-51": [
@@ -1684,6 +1876,28 @@
     "op": "add",
     "at": "2026-11-13T15:56:55.000Z",
     "by": "plan-review"
+   },
+   {
+    "id": "finding-51",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Pins that will move in piece 1. `render-workspace-kpis.test.js:154` pins `/workspace-kpis.js` before `/common.js` by index: if the entry moves, update the pin to say what is true, that a module's position in the list does not matter (lesson-5). `shared-modules.test.js:238` (`/lib/cost-format.js` is 404) flips to the 200 case."
+    },
+    "links": {
+     "about": [
+      "plan-39",
+      "plan-40",
+      "lesson-5"
+     ]
+    },
+    "in": "task-54",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:03:28.000Z",
+    "by": "breakdown",
+    "reason": "breakdown: split by piece; the piece 2 pins (run-control, label-listener) now live in LIN-4472's finding"
    }
   ],
   "run-52": [
@@ -1719,6 +1933,194 @@
     "ended": {
      "reason": "verdict, check revision and builder notes written"
     }
+   }
+  ],
+  "run-53": [
+   {
+    "id": "run-53",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "breakdown",
+     "account": "Split the approved plan (verdict-44, approve-with-notes) into its two pieces as child tasks: LIN-4471 (piece 1, plan-39: /lib/ serving, bridge and import checks, workspace KPIs as a module; lands first) and LIN-4472 (piece 2, plan-40: task page as a module, its suites as imports; blocked by LIN-4471). Each fits one session. Re-grounded on main: only b708a9815 (merge) and e8e92d50a (LIN-4456) since filing, touching nothing the plan names. Folded the eight review notes into the child each affects (seven and the KPI pin to LIN-4471; the run-control and label-listener text pins to LIN-4472). Cuts to As asked: none. The blind-read Done-when is judged after both land, not built. Next views (finding-43) are follow-up tickets, not created here."
+    },
+    "links": {
+     "on": [
+      "verdict-44@1",
+      "plan-39@1",
+      "plan-40@1"
+     ]
+    },
+    "in": "task-16",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:03:18.000Z",
+    "by": "breakdown"
+   },
+   {
+    "id": "run-53",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "breakdown",
+     "account": "Split the approved plan (verdict-44, approve-with-notes) into its two pieces as child tasks: LIN-4471 (piece 1, plan-39: /lib/ serving, bridge and import checks, workspace KPIs as a module; lands first) and LIN-4472 (piece 2, plan-40: task page as a module, its suites as imports; blocked by LIN-4471). Each fits one session. Re-grounded on main: only b708a9815 (merge) and e8e92d50a (LIN-4456) since filing, touching nothing the plan names. Folded the eight review notes into the child each affects (seven and the KPI pin to LIN-4471; the run-control and label-listener text pins to LIN-4472). Cuts to As asked: none. The blind-read Done-when is judged after both land, not built. Next views (finding-43) are follow-up tickets, not created here."
+    },
+    "links": {
+     "on": [
+      "verdict-44@1",
+      "plan-39@1",
+      "plan-40@1"
+     ]
+    },
+    "in": "task-16",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:03:34.000Z",
+    "by": "breakdown",
+    "ended": {
+     "reason": "breakdown done: two subtasks, review notes placed"
+    }
+   }
+  ],
+  "task-54": [
+   {
+    "id": "task-54",
+    "kind": "task",
+    "state": "open",
+    "fields": {
+     "ref": "LIN-4471",
+     "done-when": "* `SHARED_MODULES` is keyed at `/lib/<name>.js`: `/lib/cost-format.js` serves 200 with a JavaScript type and exact bytes, nothing else under `/lib/` is served, `/shared/` is a real 404, and no `/shared/` string is left in `lib/`, `public/`, `tests/`, `docs/` or `CLAUDE.md`;\n* `public/workspace-kpis.js` is a module importing `formatUsd` from `'../lib/cost-format.js'`, witnessed by a plain-`import()` unit test and the rewritten e2e cost-axis check; `workspace-kpis-cost-order.test.js` and the renderer's bridge entry are gone;\n* the bridge has three classic consumers under the shrink-only inventory check, and the flat-import check, the served-leaf area placement, the `loadWorld` census and the import helper (with its own test) exist, each with its synthetic failures;\n* lesson-4's stale line is rewritten into the new rules, and the bridge Waiting entry and the other-features `lib/cost-format.js` Waiting entry are deleted as settled;\n* the change names what it retired.",
+     "paths": [
+      "lib/vendor-assets.js",
+      "public/workspace-kpis.js",
+      "lib/render-workspace-kpis.js",
+      "public/cost-format-global.js",
+      "public/common.js",
+      "lib/cost-format.js",
+      "tests/unit/helpers/",
+      "tests/unit/shared-modules.test.js",
+      "tests/unit/workspace-kpis-cost-order.test.js",
+      "tests/unit/render-workspace-kpis.test.js",
+      "tests/unit/area-map-placement.test.js",
+      "tests/unit/cost-read-census.test.js",
+      "tests/unit/cost-format.test.js",
+      "tests/fixtures/browser-cost-format.js",
+      "tests/e2e/workspace-kpis.spec.js",
+      "areas.json",
+      "docs/areas/front-end-browser.md",
+      "docs/areas/other-features.md",
+      "docs/areas/platform-and-plumbing.md",
+      "docs/architecture/source-map.md"
+     ]
+    },
+    "links": {
+     "piece": "plan-39"
+    },
+    "in": "task-16",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:03:19.000Z",
+    "by": "breakdown"
+   }
+  ],
+  "task-55": [
+   {
+    "id": "task-55",
+    "kind": "task",
+    "state": "open",
+    "fields": {
+     "ref": "LIN-4472",
+     "done-when": "* `public/task-page.js` is a module with named exports, loaded as `{ module: '/task-page.js' }` from `lib/render-task-page.js`, with no `module.exports` or `typeof module` left;\n* the suites that ran it through `loadWorld` import its exports through piece 1's helper and read shorter than before; the `loadWorld` census does not rise; the golden render changes only for the one script tag;\n* nothing is added to the bridge;\n* the module-capable-loader Waiting entry is deleted as settled, its premise shown wrong;\n* the change names what it retired.",
+     "paths": [
+      "public/task-page.js",
+      "lib/render-task-page.js",
+      "tests/unit/helpers/",
+      "tests/unit/task-page-client.test.js",
+      "tests/unit/task-page-question.test.js",
+      "tests/unit/task-timeline-client.test.js",
+      "tests/unit/render-task-page-golden.test.js",
+      "tests/fixtures/render-task-page-golden.json",
+      "tests/unit/lin-3975-task-run-control.test.js",
+      "tests/unit/no-page-wide-label-listener.test.js",
+      "docs/areas/front-end-browser.md"
+     ]
+    },
+    "links": {
+     "piece": "plan-40"
+    },
+    "in": "task-16",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:03:20.000Z",
+    "by": "breakdown"
+   }
+  ],
+  "finding-56": [
+   {
+    "id": "finding-56",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Pins that read `task-page.js` as text: `lin-3975-task-run-control.test.js:586` and `no-page-wide-label-listener.test.js:247` read `task-page.js` source or the renderer's `SCRIPTS` as text; rerun them after removing the IIFE and update what they assert to what is true of the module."
+    },
+    "links": {
+     "about": [
+      "finding-51",
+      "plan-40"
+     ]
+    },
+    "in": "task-55",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:03:29.000Z",
+    "by": "breakdown"
+   }
+  ],
+  "finding-57": [
+   {
+    "id": "finding-57",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Re-grounded at breakdown (2026-11-13 16:05): since the ticket was filed the only commits on main are `b708a9815` (a merge) and `e8e92d50a` (LIN-4456); neither touches a file or line the plan names (`e8e92d50a` edits `docs/architecture/source-map.md`, but not lines 151 or 347). The `/shared/` references and the four `window.CostFormat` readers still match plan-39 as amended by finding-50. Re-ground from `e8e92d50a` onward."
+    },
+    "links": {
+     "about": [
+      "plan-39",
+      "plan-40",
+      "finding-50"
+     ]
+    },
+    "in": "task-16",
+    "to": "task-54",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:03:32.000Z",
+    "by": "breakdown"
+   }
+  ],
+  "finding-58": [
+   {
+    "id": "finding-58",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The third Done-when (the area reads better in a blind read than before, by more than an untouched area read at the same times) is not a build subtask: judge it on task-16 after both LIN-4471 and LIN-4472 have landed, with the untouched area read at the same times."
+    },
+    "links": {
+     "about": [
+      "task-16",
+      "task-54",
+      "task-55"
+     ]
+    },
+    "in": "task-16",
+    "to": "blind-read",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:03:33.000Z",
+    "by": "breakdown"
    }
   ]
  },
@@ -2898,6 +3300,36 @@
     "run",
     "--state",
     "open",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:32:37.432Z",
+   "by": "breakdown",
+   "cmd": "brief",
+   "args": [
+    "brief",
+    "implementation",
+    "--task",
+    "task-54",
+    "--text",
+    "--by",
+    "breakdown"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:32:37.474Z",
+   "by": "breakdown",
+   "cmd": "brief",
+   "args": [
+    "brief",
+    "implementation",
+    "--task",
+    "task-55",
+    "--text",
     "--by",
     "breakdown"
    ],
