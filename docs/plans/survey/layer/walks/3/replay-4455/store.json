@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 81,
+ "next": 90,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -484,6 +484,20 @@
      },
      "links": {},
      "reason": "Taken on by LIN-4455: decision-65 makes Waiting 2 this task's (plan piece 5); see finding-71 for the five NEVER_RAN spellings."
+    },
+    {
+     "v": 3,
+     "op": "end",
+     "at": "2026-11-13T15:41:17.000Z",
+     "by": "implementation",
+     "to": "task-60",
+     "state": "done",
+     "fields": {
+      "says": "Waiting 2: `lib/dispatch-leftover.js`: restates the follow-up target, halt modes and `NEVER_RAN` (also in `_releaseIfHeld`) beside their homes (`lib/workspace-halt.js`, `HALT_MODES`); a new halt mode would not stop a leftover. (Drift & Coherence Review, 10 Nov; `docs/reviews/drift-coherence-review-2026-11-10.md`.)"
+     },
+     "links": {},
+     "reason": "Waiting 2 settled by PR #2427 and removed from the area note: dispatch-leftover imports NEVER_RAN, HALT_MODES and followUpTarget from their owners; the HALT_MODES iteration test fails if the leftover drops a mode.",
+     "stateReason": "Waiting 2 settled by PR #2427 and removed from the area note: dispatch-leftover imports NEVER_RAN, HALT_MODES and followUpTarget from their owners; the HALT_MODES iteration test fails if the leftover drops a mode."
     }
    ]
   },
@@ -533,6 +547,20 @@
      },
      "links": {},
      "reason": "Taken on by LIN-4455: decision-65 makes Waiting 4 this task's (plan piece 5); finding-66 carries how the release wording must reach releases."
+    },
+    {
+     "v": 3,
+     "op": "end",
+     "at": "2026-11-13T15:41:18.000Z",
+     "by": "implementation",
+     "to": "task-60",
+     "state": "done",
+     "fields": {
+      "says": "Waiting 4: `lib/dispatch-store.js`: `releaseHeldWake` prepends `formatHeldWakeNote({status})`, so release picks leftover wording; `lin-4377` counts the spelling, not the dependency. (Operator, LIN-4377.)"
+     },
+     "links": {},
+     "reason": "Waiting 4 settled by PR #2427 and removed from the area note: the store neither imports nor calls formatHeldWakeNote, and lin-4377 now checks the import by AST (failed on the old store at the import and the call).",
+     "stateReason": "Waiting 4 settled by PR #2427 and removed from the area note: the store neither imports nor calls formatHeldWakeNote, and lin-4377 now checks the import by AST (failed on the old store at the import and the call)."
     }
    ]
   },
@@ -672,6 +700,20 @@
      },
      "links": {},
      "reason": "Taken on by LIN-4455: decision-65 makes Waiting 11 this task's (plan piece 5); finding-68 says findWakeEvent has no skip rule, so it is settled by recording that."
+    },
+    {
+     "v": 3,
+     "op": "end",
+     "at": "2026-11-13T15:41:19.000Z",
+     "by": "implementation",
+     "to": "task-60",
+     "state": "done",
+     "fields": {
+      "says": "Waiting 11: `lib/dispatch-feedback-validation.js`: feedback kinds lack one declaration with their role: `PARKED_WAIT_SKIPPED_KINDS` (`lib/session-telemetry.js`), `FEEDBACK_ENTRY_KINDS`, `findWakeEvent`'s skip rule. (Survey tally: LIN-4240, 4239, 4233.)"
+     },
+     "links": {},
+     "reason": "Waiting 11 settled by PR #2427 and removed from the area note: one FEEDBACK_KINDS table in lib/dispatch-feedback-kinds.js; FEEDBACK_ENTRY_KINDS, PARKED_WAIT_SKIPPED_KINDS and DECISION_LIFECYCLE_STAMP_KINDS derive from it; findWakeEvent met by the mayCarryWake column (decision-86).",
+     "stateReason": "Waiting 11 settled by PR #2427 and removed from the area note: one FEEDBACK_KINDS table in lib/dispatch-feedback-kinds.js; FEEDBACK_ENTRY_KINDS, PARKED_WAIT_SKIPPED_KINDS and DECISION_LIFECYCLE_STAMP_KINDS derive from it; findWakeEvent met by the mayCarryWake column (decision-86)."
     }
    ]
   },
@@ -1084,6 +1126,28 @@
       "order": 2
      },
      "links": {}
+    },
+    {
+     "v": 2,
+     "op": "revise",
+     "at": "2026-11-13T15:41:01.000Z",
+     "by": "implementation",
+     "in": "task-39",
+     "state": "kept",
+     "fields": {
+      "says": "Piece 5 (medium), as built in PR #2427: one declaration for each restated constant. `NEVER_RAN` (cancelled/expired) has one home, `lib/dispatch-terminal.js` (no owner existed; `dispatch-fields` would have made a cycle), and all seven spellings import it; `TERMINAL_HISTORY_STATUSES` and `NO_ATTEMPT_STATUSES` are built from it. `lib/dispatch-leftover.js` takes halt modes from `HALT_MODES` and the follow-up target from `followUpTarget`. `createLeftoverStep` owns the release wording and late-binds it into the store (`setHeldWakeReleaseNote`) for the requestless releases through `_archiveItem` -> `_releaseIfHeld`; the `_applyWakeHook` re-release uses `wakeHook.releaseNote`; an unbound store says a default line that names no feature. The store no longer imports or calls `formatHeldWakeNote`. One `FEEDBACK_KINDS` table in a new import-free leaf, `lib/dispatch-feedback-kinds.js` (not `dispatch-feedback-validation.js`, which sits in import cycles), carries each kind's roles; `FEEDBACK_ENTRY_KINDS` (still re-exported by the store, runner prompt byte-identical), `PARKED_WAIT_SKIPPED_KINDS` and `DECISION_LIFECYCLE_STAMP_KINDS` derive from it; `findWakeEvent` is met by a `mayCarryWake` column, true for every kind, not a filter. *Retires:* the restated constants, the store's ownership of the release wording, the runner allowlist, the parked-wait set and the four `lib/` copies of the stamp set. *Settles Waiting:* 2, 4, 11. *Witness:* `lin-4455-kinds-and-constants-characterization` iterates `HALT_MODES`; `lin-4377-store-knows-no-leftover` adds an AST check that the store neither imports nor names `formatHeldWakeNote`.",
+      "paths": [
+       "lib/dispatch-leftover.js",
+       "lib/dispatch-store.js",
+       "lib/dispatch-feedback-kinds.js",
+       "lib/dispatch-feedback-validation.js",
+       "lib/dispatch-terminal.js",
+       "docs/areas/runs-and-dispatch.md"
+      ],
+      "order": 2
+     },
+     "links": {},
+     "reason": "The build departed from v1 in four ways (leaf kinds module, NEVER_RAN home, late-bound wording, a column not a filter for findWakeEvent) and widened per decision-79; v1 named homes and paths that are no longer true. Recorded on LIN-4447 comments 055a6035 and 2f488272."
     }
    ]
   },
@@ -1571,6 +1635,24 @@
       "on": "plan-45@1",
       "about": "finding-21"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:41:12.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "done",
+     "fields": {
+      "says": "Survey @ cfd152fa4: `wakeHook.releaseNote` cannot reach most releases. The hook is built per request (`leftoverStep.forRequest`, `routes/dispatch.js:1636`, `routes/proxy-runner.js:213`) and only passed into `addFeedback`; most releases come through `_archiveItem` -> `_releaseIfHeld` (`lib/dispatch-store.js:1890`, `:1949`) from `removeItem`, `cleanup()` expiry and the stopped-run cleanup, none of which has a request or hook. Only the `_applyWakeHook` re-release (`:3429`) holds one. So put the wording on `leftoverStep` and late-bind it into the store, as `setWakeCredentialProvisionerFactory` already is (`server.js:1146`), and decide what an unbound store says (`lin-4373-leftover-step.test.js` asserts \"did not run\" five times). This is the second hook surface Waiting 5 (one `wakeHook`) warns about; shape it with that in mind. Do this first: it is the only part that changes the store shape, and it decides what the rewritten lin-4377 witness counts (no `formatHeldWakeNote` import in the store)."
+     },
+     "links": {
+      "on": "plan-45@1",
+      "about": "finding-21"
+     },
+     "reason": "Built as decision-85: wording late-bound by createLeftoverStep, wakeHook.releaseNote on the re-release, feature-free default for an unbound store; lin-4455-release-wording covers all three requestless paths, the re-release and the default.",
+     "stateReason": "Built as decision-85: wording late-bound by createLeftoverStep, wakeHook.releaseNote on the re-release, feature-free default for an unbound store; lin-4455-release-wording covers all three requestless paths, the re-release and the default."
     }
    ]
   },
@@ -1599,6 +1681,30 @@
       "on": "plan-45@1",
       "about": "finding-28"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:41:04.000Z",
+     "by": "layer",
+     "in": "task-60",
+     "to": "design",
+     "state": "answered",
+     "fields": {
+      "asks": "Plan piece 5 puts one `FEEDBACK_KINDS` table in `lib/dispatch-feedback-validation.js`. That file imports `dispatch-validation.js`, which reaches `session-telemetry.js` (via prompt-templates -> ... -> wall-clock-summary) and `dispatch-terminal.js` (via dispatch-fields -> dispatch-wake). If those import the table and build Sets from it at load, load order decides whether they hit a TDZ error. May the table live in a new import-free leaf module instead (e.g. `lib/dispatch-feedback-kinds.js`), imported by validation and the store, with the store still re-exporting `FEEDBACK_ENTRY_KINDS`?",
+      "options": [
+       "leaf module `lib/dispatch-feedback-kinds.js`",
+       "keep it in `lib/dispatch-feedback-validation.js` and break the cycles another way"
+      ],
+      "recommended": "leaf module `lib/dispatch-feedback-kinds.js`",
+      "if-unanswered": "Implementation builds the leaf module (an engineering call) and the PR names the departure from plan piece 5 and comments on LIN-4447."
+     },
+     "links": {
+      "on": "plan-45@1",
+      "about": "finding-28"
+     },
+     "reason": "answered by decision-83",
+     "stateReason": "answered by decision-83"
     }
    ]
   },
@@ -1621,6 +1727,24 @@
       "on": "task-60@1",
       "about": "finding-28"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:41:13.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "done",
+     "fields": {
+      "says": "`findWakeEvent` has no skip rule to derive: it returns the last matching marker of any kind (`lib/dispatch-terminal.js:631`), and `lib/session-telemetry.js:82` calls it \"Deliberately NOT shared\". Deriving a filter would change the mint path (`lib/dispatch-store.js:3696`) and every reader of stored rows (task-page-loader, run-view, digest-feedback, run-loop-state), against the binding \"never recompute pre-cutover history\". Recommend: give the table a wake-role column (\"every kind may carry a wake\") and pin that current behaviour matches it, rather than adding a filter; the PR says this is how the done-when clause on `findWakeEvent` is met."
+     },
+     "links": {
+      "on": "task-60@1",
+      "about": "finding-28"
+     },
+     "reason": "Built as decision-86: a mayCarryWake column true for every kind, no filter; findWakeEvent's behaviour unchanged.",
+     "stateReason": "Built as decision-86: a mayCarryWake column true for every kind, no filter; findWakeEvent's behaviour unchanged."
     }
    ]
   },
@@ -1643,6 +1767,24 @@
       "on": "plan-45@1",
       "about": "finding-28"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:41:14.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "done",
+     "fields": {
+      "says": "Prompt seam (LLM & prompts side is LIN-4448s): `lib/prompts/runner-kickoff.js` renders `FEEDBACK_ENTRY_KINDS` into the runner prompt in its current order, checked by `runner-kickoff.test.js:191`; a derived list must keep that exact order. The table also needs rows for kinds deliberately off the allowlist (`decision-answer`, `decision-withdrawal-reversed`; see `DECISION_LIFECYCLE_STAMP_KINDS`, `lib/session-telemetry.js:60`); without them a roles column quietly widens what the runner may post."
+     },
+     "links": {
+      "on": "plan-45@1",
+      "about": "finding-28"
+     },
+     "reason": "The store re-exports FEEDBACK_ENTRY_KINDS derived in today's order; lib/prompts/ has no diff and the runner prompt is byte-identical (check-70). The table has rows for decision-answer and decision-withdrawal-reversed with no runner role (every row declares every role, lin-4455-feedback-kinds-table).",
+     "stateReason": "The store re-exports FEEDBACK_ENTRY_KINDS derived in today's order; lib/prompts/ has no diff and the runner prompt is byte-identical (check-70). The table has rows for decision-answer and decision-withdrawal-reversed with no runner role (every row declares every role, lin-4455-feedback-kinds-table)."
     }
    ]
   },
@@ -1682,6 +1824,24 @@
       "on": "plan-45@1"
      },
      "reason": "Place survey: the existing runner-kickoff test compares against the same source, so it cannot catch a reorder; the pin must be a literal."
+    },
+    {
+     "v": 3,
+     "op": "end",
+     "at": "2026-11-13T15:41:11.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "done",
+     "fields": {
+      "what": "After deriving from the kinds table, `FEEDBACK_ENTRY_KINDS` equals today's list in the same order, and the runner allowlist does not gain `decision-answer` or `decision-withdrawal-reversed`.",
+      "how": "A unit test pinning `FEEDBACK_ENTRY_KINDS` against an exact literal list (order and membership), not against the derived value: `lib/prompts/runner-kickoff.js:61` renders the list into the runner prompt, and `runner-kickoff.test.js:191` compares against the same source, so a reorder changes prompt bytes and still passes there. It fails if a row is reordered or a non-allowlist kind is admitted."
+     },
+     "links": {
+      "on": "plan-45@1"
+     },
+     "reason": "Witnessed in PR #2427: the rendered runner prompt is byte-identical to main (15,766 bytes, cmp), so FEEDBACK_ENTRY_KINDS kept its order and membership and gained neither decision-answer nor decision-withdrawal-reversed; lin-4455-kinds-and-constants-characterization pins today's lists from outside the declarations and was seen to fail under mutation.",
+     "stateReason": "Witnessed in PR #2427: the rendered runner prompt is byte-identical to main (15,766 bytes, cmp), so FEEDBACK_ENTRY_KINDS kept its order and membership and gained neither decision-answer nor decision-withdrawal-reversed; lin-4455-kinds-and-constants-characterization pins today's lists from outside the declarations and was seen to fail under mutation."
     }
    ]
   },
@@ -1721,6 +1881,24 @@
       "about": "finding-19"
      },
      "reason": "Place survey @ cfd152fa4 found two more NEVER_RAN spellings (observer-sweep, task-page-loader), checked the RESUMABLE_TARGETS equivalence case by case, and named the deliberate single-mode halt checks to leave alone."
+    },
+    {
+     "v": 3,
+     "op": "end",
+     "at": "2026-11-13T15:41:15.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "done",
+     "fields": {
+      "says": "`NEVER_RAN` has nothing to import from, and it is spelled five times, not three: `cancelled`/`expired` at `lib/dispatch-leftover.js:29`, `lib/dispatch-store.js:1906` (`_releaseIfHeld`) and `:1176`, plus `lib/observer-sweep.js:108` and `lib/task-page-loader.js:248`. Rewiring only the two consumers the plan names leaves three copies. One home must be created where neither side learns \"leftover\" (`lin-4377-store-knows-no-leftover`); `lib/dispatch-fields.js` is already imported by both. The other two owners are safe import-free leaves: `HALT_MODES` (`lib/workspace-halt.js`; the check becomes `HALT_MODES.includes`), and `followUpTarget(t) == null` (`lib/dispatch-targets.js`), which gives the same answer as `!RESUMABLE_TARGETS.has(t || \"cli\")` for null, empty string, unknown values and all four targets. `lib/dispatch-store.js:644` and `lib/runner-kit/runner.mjs` handle one halt mode on purpose; leave them. These are mechanical; do them last."
+     },
+     "links": {
+      "on": "plan-45@1",
+      "about": "finding-19"
+     },
+     "reason": "Built as decision-84: all seven NEVER_RAN spellings import it from lib/dispatch-terminal.js; the leftover uses HALT_MODES and followUpTarget; one-mode sites left; lin-4455-constants-owners censuses copies.",
+     "stateReason": "Built as decision-84: all seven NEVER_RAN spellings import it from lib/dispatch-terminal.js; the leftover uses HALT_MODES and followUpTarget; one-mode sites left; lin-4455-constants-owners censuses copies."
     }
    ]
   },
@@ -1799,6 +1977,24 @@
       "on": "plan-45@1",
       "about": "finding-28"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:41:16.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "done",
+     "fields": {
+      "says": "A fourth hand-written kind set the plan does not name: `DECISION_LIFECYCLE_STAMP_KINDS` (`lib/session-telemetry.js:60`) is another role set over feedback kinds, beside `PARKED_WAIT_SKIPPED_KINDS`, `FEEDBACK_ENTRY_KINDS` and the wake rule. Unless the `FEEDBACK_KINDS` table carries a stamp role and this set derives from it, it stays a copy after piece 5 and Waiting 11 is only partly settled. Cheap here: one more column and one more derived Set."
+     },
+     "links": {
+      "on": "plan-45@1",
+      "about": "finding-28"
+     },
+     "reason": "DECISION_LIFECYCLE_STAMP_KINDS derives from the FEEDBACK_KINDS table; the four lib/ copies (session-telemetry, wall-clock-summary, run-view, digest-feedback) import it. Browser copies stay, pinned by the drift test (finding-89).",
+     "stateReason": "DECISION_LIFECYCLE_STAMP_KINDS derives from the FEEDBACK_KINDS table; the four lib/ copies (session-telemetry, wall-clock-summary, run-view, digest-feedback) import it. Browser copies stay, pinned by the drift test (finding-89)."
     }
    ]
   },
@@ -1821,6 +2017,25 @@
       "on": "plan-45@1",
       "about": "lesson-10"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:41:20.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "handed-on",
+     "fields": {
+      "says": "Wording to change with the code, since nothing fails if it goes stale: the area Lesson at `docs/areas/runs-and-dispatch.md:32` (lesson-10: `lin-4377-store-knows-no-leftover` \"counts the word\") and the docblocks at `lib/dispatch-store.js:3481` and `lib/dispatch-leftover.js:10`. Once the `lin-4377` witness forbids the `formatHeldWakeNote` import instead of counting the word, rewrite all three to say so (and revise lesson-10). The area Lessons are 4,269 bytes, so there is room."
+     },
+     "links": {
+      "on": "plan-45@1",
+      "about": "lesson-10"
+     },
+     "reason": "PR #2427 rewrote the docblocks in dispatch-store.js and dispatch-leftover.js and the area Lesson; revising the layer's lesson-10 (refused to implementation) is carried by finding-88.",
+     "stateReason": "PR #2427 rewrote the docblocks in dispatch-store.js and dispatch-leftover.js and the area Lesson; revising the layer's lesson-10 (refused to implementation) is carried by finding-88.",
+     "takeover": "finding-88"
     }
    ]
   },
@@ -1964,6 +2179,245 @@
      "links": {},
      "reason": "size set, decision-79 written",
      "stateReason": "size set, decision-79 written"
+    }
+   ]
+  },
+  "run-81": {
+   "id": "run-81",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:41:00.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "lib/dispatch-feedback-kinds.js",
+       "lib/dispatch-terminal.js",
+       "lib/dispatch-leftover.js",
+       "lib/dispatch-leftover-hook.js",
+       "lib/dispatch-store.js",
+       "lib/dispatch-feedback-validation.js",
+       "lib/session-telemetry.js",
+       "docs/areas/runs-and-dispatch.md"
+      ],
+      "account": "Built piece 5 (LIN-4455) in five beats, 15:09-15:48, and opened PR #2427. Beat 1 pinned today's behaviour from outside the declarations; beat 2 added the leaf FEEDBACK_KINDS table and derived the kind sets; beat 3 homed NEVER_RAN in dispatch-terminal and rewired the leftover to HALT_MODES and followUpTarget; beat 4 moved the release wording out of the store by late binding and removed Waiting 2, 4, 11. Every new test was seen to fail first. 578 touched test files passed locally (14,629/14,629); CI green on all eight checks. Four departures from the plan, recorded on LIN-4447 and in the plan revision. Left: Waiting 5, the browser stamp copies, the remint refusal (census only)."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:41:21.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "state": "done",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "lib/dispatch-feedback-kinds.js",
+       "lib/dispatch-terminal.js",
+       "lib/dispatch-leftover.js",
+       "lib/dispatch-leftover-hook.js",
+       "lib/dispatch-store.js",
+       "lib/dispatch-feedback-validation.js",
+       "lib/session-telemetry.js",
+       "docs/areas/runs-and-dispatch.md"
+      ],
+      "account": "Built piece 5 (LIN-4455) in five beats, 15:09-15:48, and opened PR #2427. Beat 1 pinned today's behaviour from outside the declarations; beat 2 added the leaf FEEDBACK_KINDS table and derived the kind sets; beat 3 homed NEVER_RAN in dispatch-terminal and rewired the leftover to HALT_MODES and followUpTarget; beat 4 moved the release wording out of the store by late binding and removed Waiting 2, 4, 11. Every new test was seen to fail first. 578 touched test files passed locally (14,629/14,629); CI green on all eight checks. Four departures from the plan, recorded on LIN-4447 and in the plan revision. Left: Waiting 5, the browser stamp copies, the remint refusal (census only)."
+     },
+     "links": {},
+     "reason": "PR #2427 open at head c95b9f139, CI green; records written.",
+     "stateReason": "PR #2427 open at head c95b9f139, CI green; records written."
+    }
+   ]
+  },
+  "change-82": {
+   "id": "change-82",
+   "kind": "change",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:41:02.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "ref": "https://github.com/JKershaw/LinearViewer/pull/2427",
+      "head": "c95b9f139"
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "link",
+     "at": "2026-11-13T15:41:03.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "ref": "https://github.com/JKershaw/LinearViewer/pull/2427",
+      "head": "c95b9f139"
+     },
+     "links": {
+      "on": "plan-45@2"
+     }
+    }
+   ]
+  },
+  "decision-83": {
+   "id": "decision-83",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:41:04.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "answer": "`FEEDBACK_KINDS` lives in a new leaf module, `lib/dispatch-feedback-kinds.js`, that imports nothing; validation, the store and the telemetry readers import it, and the store keeps re-exporting `FEEDBACK_ENTRY_KINDS`, so `lib/prompts/` is untouched and the rendered runner prompt is byte-identical.",
+      "why": "An engineering call, taken under question-67's if-unanswered: `dispatch-feedback-validation.js` already imports its kind list from the store and sits in import cycles with telemetry and the terminal reader (finding-73), so homing the table there would make the store and validation import each other. A test checks the leaf imports nothing."
+     },
+     "links": {
+      "on": "finding-73@1",
+      "answers": "question-67"
+     }
+    }
+   ]
+  },
+  "decision-84": {
+   "id": "decision-84",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:41:05.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "answer": "`NEVER_RAN` (cancelled/expired) is homed in `lib/dispatch-terminal.js`, not `lib/dispatch-fields.js`; all seven spellings now import it (`dispatch-leftover`, the store's `_releaseIfHeld` and `listHistoryLineageRows`, `observer-sweep`, `task-page-loader`, `routes/dispatch.js`, `routes/proxy-dispatch.js`), and `TERMINAL_HISTORY_STATUSES` and `NO_ATTEMPT_STATUSES` are built from it.",
+      "why": "`dispatch-terminal` already held both statuses in `TERMINAL_HISTORY_STATUSES`, every consumer already imported it, and it imports only leaves; `dispatch-fields` imports `dispatch-wake`, which imports `dispatch-terminal`, so finding-71's suggested home would have left the terminal set a copy or made a cycle. The survey counted five spellings; the build found seven."
+     },
+     "links": {
+      "on": "finding-71@2",
+      "about": "decision-79"
+     }
+    }
+   ]
+  },
+  "decision-85": {
+   "id": "decision-85",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:41:06.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "answer": "The release wording is owned by `createLeftoverStep`, which binds it into its store once when built in server.js (`setHeldWakeReleaseNote`, the `setWakeCredentialProvisionerFactory` pattern); the `_applyWakeHook` re-release uses `wakeHook.releaseNote`; an unbound store, or a wording that throws, says `The step holding this wake did not run (its row was <status>). The build's own outcome follows.`, which names no feature.",
+      "why": "finding-66: cancel, expiry and the stopped-run cleanup release through `_archiveItem` -> `_releaseIfHeld` with no request and so no hook. The default keeps lin-4373's \"did not run\" assertions unchanged and keeps \"leftover\" out of the store's code. It leaves two held-wake surfaces, which Waiting 5 (finding-22, finding-76) is to unify; the setter's docblock names it."
+     },
+     "links": {
+      "on": "finding-66@1",
+      "about": "finding-76"
+     }
+    }
+   ]
+  },
+  "decision-86": {
+   "id": "decision-86",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:41:07.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "answer": "`findWakeEvent` is met by a `mayCarryWake` column in `FEEDBACK_KINDS`, true for every kind, with unknown kinds passing, not by a derived filter; its behaviour and the stored rows it reads are unchanged.",
+      "why": "finding-68: it had no skip rule to derive; adding a filter would change wake minting and every reader of stored rows, against the binding never to recompute pre-cutover history."
+     },
+     "links": {
+      "on": "finding-68@1"
+     }
+    }
+   ]
+  },
+  "decision-87": {
+   "id": "decision-87",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:41:08.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "answer": "A follow-up target of `0` or `false` is no longer resumable: it is refused like any unknown target.",
+      "why": "`RESUMABLE_TARGETS.has(doc.target || 'cli')` treated falsy non-string targets as `cli`; `followUpTarget` fails closed on anything unknown everywhere else. finding-71's equivalence covered null, empty string, unknown values and the four targets, not `0`/`false`. The PR names this edge."
+     },
+     "links": {
+      "on": "finding-71@2"
+     }
+    }
+   ]
+  },
+  "finding-88": {
+   "id": "finding-88",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:41:09.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "to": "leftover",
+     "state": "open",
+     "fields": {
+      "says": "PR #2427 rewrote the area Lessons in `docs/areas/runs-and-dispatch.md` (4,794 bytes); the layer's lessons lag and implementation may not write them. (1) Revise lesson-10: `lin-4377-store-knows-no-leftover` no longer only counts the word; it adds an AST check that the store neither imports nor names `formatHeldWakeNote`, and the leftover wording is late-bound into the store by `createLeftoverStep` (`setHeldWakeReleaseNote`). (2) Add the new Lesson: feedback-kind roles live in one table, `lib/dispatch-feedback-kinds.js` (imports nothing); kind sets derive from it, and constants (`NEVER_RAN` in `lib/dispatch-terminal.js`, `HALT_MODES`, `followUpTarget`) are imported from their owners, never restated; `lin-4455-feedback-kinds-table` and `lin-4455-constants-owners` census hand-written copies."
+     },
+     "links": {
+      "on": "change-82@1",
+      "about": "lesson-10"
+     }
+    }
+   ]
+  },
+  "finding-89": {
+   "id": "finding-89",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:41:10.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "to": "review",
+     "state": "open",
+     "fields": {
+      "says": "PR #2427, what the tests cover only partly: (a) one existing test re-pointed, `tests/unit/decision-lifecycle-stamp-drift.test.js`: its copy-sync assertions now check against the table (trio still against the exact literal; `lib/` readers must import the set and spell no stamp literal; \"declared once\" = zero literals in `session-telemetry.js`); no assertion dropped. (b) The browser copies of the stamp kinds in `public/dispatch.js` and `public/session.js` stay (browser scripts cannot import `lib/`); the drift test pins both to the table. (c) The remint refusal in `routes/dispatch.js` now asks `NEVER_RAN`, but every refusal there returns the same 403 and the next check refuses such a row as `not-taker`, so only the log reason differs; only the census covers it. (d) The intentional one-mode sites (the store's stopped-run gate, `lib/runner-kit/runner.mjs`) are unchanged and exempt from the census. (e) Behaviour edge: decision-87."
+     },
+     "links": {
+      "on": "change-82@1"
+     }
     }
    ]
   }
@@ -2287,6 +2741,35 @@
     "text": "Waiting 5"
    },
    "returned": 3
+  },
+  {
+   "at": "2026-11-17T13:47:40.300Z",
+   "by": "implementation",
+   "query": "get",
+   "args": {
+    "id": "question-67",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:48:13.770Z",
+   "by": "implementation",
+   "query": "find",
+   "args": {
+    "to": "task-60",
+    "state": "open"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:48:16.654Z",
+   "by": "implementation",
+   "query": "find",
+   "args": {
+    "state": "open"
+   },
+   "returned": 26
   }
  ],
  "hits": []
