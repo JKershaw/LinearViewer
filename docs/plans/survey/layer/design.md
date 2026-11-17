@@ -1,6 +1,6 @@
 # The layer: design (work in progress)
 
-*Started 17 Nov at John's request (log, "17 Nov"). This page is revised in place, never appended to; git keeps its history. Each walk's results live in `walks/`, and the page carries only what they changed. Marks are as on `situation.md`: [checked], [reported], [my reading], [guess]. Lines with no mark are design, which is mine until John corrects it. Round 2 (17 Nov) folds in walk 1; changes cite its breaks as W1.1–W1.7 (`walks/1/results.md`).*
+*Started 17 Nov at John's request (log, "17 Nov"). This page is revised in place, never appended to; git keeps its history. Each walk's results live in `walks/`, and the page carries only what they changed. Marks are as on `situation.md`: [checked], [reported], [my reading], [guess]. Lines with no mark are design, which is mine until John corrects it. Round 2 folded in walk 1 (breaks W1.1–W1.7, `walks/1/results.md`); round 3 folds in walk 2 (W2.1–W2.10, `walks/2/results-4450.md`).*
 
 *Short names. Files on `claude/peaceful-euler-thz7ct` at `fff543172` are cited by name: `picture`, `shapes`, `mapping`, `existing`, `avenues`, `design-plan`, `my-words`. Essays and papers are under `docs/papers/harbour/` on main.*
 
@@ -17,6 +17,8 @@
 **Two guards** (`shapes` §6): declared shapes with checked fields (types), and no shape without its end and its addressee (ownership and a lifetime).
 
 **The pressure it aims at is mental, not prompt length.** John: "I'm less worried about the prompt length, and more the cognitive pressures" [checked, log "17 Nov"]. The papers: people overlook subtraction, and find it "less often under cognitive load" (`steering-text.md:204-206`, citing Adams et al. 2021) [checked]; code understanding collapses past about 32,000 tokens, and agents re-derive instead of reusing (`coherence-as-it-grows.md:182`) [checked wording]. So each reader carries only what is addressed to it, plus the person's words and what is known about the paths it touches.
+
+**Agents reason; the system keeps the books.** John: "ideally the agent is just doing its reasoning … and everything else is held through a sensible deterministic natural feeling system which we've had great success with using the proxy" [checked, log "17 Nov"]. Choosing who must act on something and when it ends is reasoning, and only the writer can do it: walk 1 couldn't recover it from prose (20 of 22 guessed) and walk 2's stages did it unprompted [checked]. Ids, versions, links, counts, staleness and hand-on chains are bookkeeping, and belong to code. In Harbour the agent would meet the layer through the proxy.
 
 **What it is not** (`mapping` §8) [checked]: the work product itself (code, PRs, CI), the engine's rules (the near-deadlock), systems out of reach (John's Jira), and the tracker's single account. Records link to these; they don't hold them. It cures the memory half of the loop. Judgement stays with the models ("Code holds the sequence and watches the seams; models keep the judgement", `between-the-sessions.md:168`) [checked].
 
@@ -44,10 +46,10 @@ John: "a small minimal MVP, and we take it for a walk and see a) if it's better 
 | `id` | Stable, allocated by the layer, never a position |
 | `kind` | One of the declared kinds (3.2); fields are checked against it |
 | `in` | What it belongs to: a task or an area |
-| `by` | Who wrote it (a stage, John, Harbour), and `via` if relayed |
+| `by` | Who wrote it: a declared stage or a declared person (W2.3); `via` if relayed |
 | `at` | When each version was written |
 | `state` | The kind's starting state, or one of its declared ends, with `reason`. `handed-on` and `superseded` name the record that takes over |
-| `to` | The addressee. Only the hand-off kinds (`finding`, `check`, `question`) have one, and they must |
+| `to` | The addressee: a declared stage, a declared person, or a task or area record (W2.3). Only the hand-off kinds (`finding`, `check`, `question`) have one, and they must |
 | `links` | The only relations, each declared once: `about` (its subject), `on` (the exact version it judges or rests on), `answers` (a decision to its question), `piece` (a task to its plan piece), `same-as` |
 | versions | Every write keeps the previous version. A reader may ask for any record as of a time |
 
@@ -55,7 +57,7 @@ John: "a small minimal MVP, and we take it for a walk and see a) if it's better 
 
 ### 3.2 Kinds
 
-*Kinds are data, not code: one generic record plus `kinds.json`.*
+*Kinds are data, not code: one generic record plus `kinds.json`. **Open** means waiting on someone: only hand-off kinds, and runs and changes still in progress, start open. Every other kind starts standing, and briefs never count standing records as open (W1.7, regressed in walk 2 as W2.5).*
 
 | Kind | Holds | Own fields | Starts → ends |
 |---|---|---|---|
@@ -82,10 +84,13 @@ John: "a small minimal MVP, and we take it for a walk and see a) if it's better 
 | survey-task | finding, question, check | |
 | survey-place | finding, question, check, lesson; may re-address an area's finding to the task | place |
 | scoping | decision, finding | |
-| implementation | plan (its piece), decision, finding, change | |
+| implementation | plan (its piece), decision, finding, check, change (W2.8) | |
+| leftover | finding, lesson, change; may end findings in its task's areas that its work settled (W2.9) | |
 | review, blind-read | verdict, finding, check | |
 | close-out | change, finding, check; ends and hand-ons of anything raised in the task | closes |
 | every stage | its run; ends of records addressed to it | |
+
+**People** are declared too (`people.json`): John, and anyone else a project names. Standing rules and how a session ends (stop at a PR, go to staging, deploy) will be configuration later, not now (John, log "17 Nov").
 
 ### 3.3 Rules
 
@@ -96,21 +101,26 @@ Refusals at write time; in a retro fill they are logged as hits and the write go
 4. A hand-off kind needs `to`. `handed-on` and `superseded` need the record that takes over.
 5. Links must resolve; a stage writes only the kinds it declares.
 
-**Stale, computed when read** (W1.3, W1.4, W1.7): a record whose `on` link points to a version that has a newer version, or to a record that has ended, is *resting on a moved version*. Briefs show it flagged; `check` lists them. Nothing is ended or refused for it: someone supersedes or re-affirms it.
+**Stale, computed when read** (W1.3, W1.4): a record whose `on` link points to a version that has a newer version, to a record that has ended, or to a record that is itself stale (W2.6), is *resting on a moved version*. Briefs show it flagged; `check` lists them. Nothing is ended or refused for it: someone supersedes or re-affirms it.
 
-### 3.4 Reading: briefs
+### 3.4 Reading: a brief, then queries
 
-A brief is what a stage of a task is given, computed, never retold:
+John: "previously an agent essentially got the brief, but then the ability to find much more information … we now have this rich data layer for it to find key bits of information, maybe research things if it wants" [checked, log "17 Nov"]. So a brief is small and deterministic, and says what exists; the stage pulls the rest.
+
+**A brief** is what a stage of a task is given, computed, never retold:
 1. **The person's words** (W1.5): the `asked` of the task and of each ancestor, verbatim.
 2. **Its plan piece:** the current version, through the task's `piece` link.
-3. **Addressed to it:** open records whose `to` is this stage or this task.
-4. **Standing judgements and decisions** on the task, its piece, its change and its ancestors, with the stale flag.
-5. **Settings** whose scope covers the task.
-6. **Lessons** whose `paths` overlap the task's or its piece's `paths`: knowledge, not instructions.
-7. **For the stage with the place role only** (W1.6): open findings addressed to the areas the task's paths fall in. No other work enters a task, except by that stage re-addressing a finding to it.
-8. **Raised in this task, still open** (whoever they are addressed to), by state; in full for the stage with the closes role.
+3. **Addressed to it, in full:** open records whose `to` is this stage or this task.
+4. **What stands about this task** (W2.4): judgements and decisions `in` the task or `about`/`on` its piece or its change, with the stale flag. An ancestor's decisions appear only if they are `about` this task's piece or the whole plan, not a sibling's.
+5. **Its areas** (W2.2): each area the task's paths fall in, by id and name, so a stage can address the place.
+6. **For the stage with the place role only** (W1.6): those areas' open findings, in full. No other work enters a task, except by that stage re-addressing a finding to it.
+7. **An index of everything else open** (W2.1): every other open record in the task and its areas, and every lesson for its paths, as one line each: id, kind, to, and the first line of what it says. Enough to know it exists and look it up.
 
-Closed records are left out. Each brief reports what it carries (open things, how many addressed to it) and its size; reported, never a test.
+Closed records are left out. Each brief reports what it carries and its size; reported, never a test.
+
+**Queries** the stage may run (W2.1): `get <id>` (a record in full, with its versions), `find` (by kind, area, path, addressee, state or text), and `show --task`. Every query is logged with who asked, so a walk sees what each stage went looking for.
+
+**An LLM may smooth the brief** for the task at hand, as Harbour's brief does today from ticket text; with records as input it does less of the work (John, log "17 Nov"). The model builds the deterministic part only.
 
 **Harbour's code** reads fields directly; it never parses a brief.
 
@@ -118,32 +128,42 @@ Closed records are left out. Each brief reports what it carries (open things, ho
 
 *A fresh subagent builds the model from §3 and this section only, in `walks/<n>/model/`. Nothing else is given. It is thrown away after its round.*
 
-- **Form.** Node, ES modules, no dependencies. `kinds.json` and `stages.json` (§3.2); `layer.mjs`; one JSON store with every record's versions. As small as it can be.
+- **Form.** Node, ES modules, no dependencies. `kinds.json`, `stages.json` and `people.json` (§3.2); `layer.mjs`; one JSON store with every record's versions. As small as it can be.
 - **Commands** (CLI, JSON in and out):
   - `add <kind>`, `revise <id>` (with a reason), `end <id> <state> <reason> [--to <id>]`, `link <id> <type> <id>`. Every write takes `--by <stage or person>`, and optional `--at` so a finished task can be written in its own order.
   - `brief <stage> --task <id> [--as-of <time>]`: §3.4, as JSON and plain text, with what it carries and its size.
   - `show --task <id> [--as-of <time>]`: everything `in` the task and its runs, with states and stale flags: what the task looks like at that moment.
+  - `get <id>` and `find [--kind] [--area] [--path] [--to] [--state] [--text]`: queries, each logged with `--by`.
   - `check`: validates the store against §3.2–3.3 and lists stale records.
 - **Retro mode.** A store created with `--retro` logs rule hits instead of refusing; `hits` lists them.
-- **Its own test.** A short script exercising each rule once in each mode, each command once, the stale flag, and each of the brief's eight parts, including walk 1's breaks as cases. Run before any walk.
+- **Its own test.** A short script exercising each rule once in each mode, each command once, the stale flag, and each of the brief's seven parts, each query, and walk 1's and walk 2's breaks as cases. Run before any walk.
 
 ## 5. Walks
 
-**Walk 1** (done): LIN-4450 filled in after the fact (`walks/1/results.md`). The shapes held a real task; briefs ran from about the size of the child ticket at the first stage to a third of it at close-out; seven breaks, folded in above.
+**Walk 1** (done): LIN-4450 filled in after the fact (`walks/1/results.md`). The shapes held a real task; seven breaks, folded in.
 
-**Walk 2: stages replayed one at a time.**
-- **Seed.** The parent's part (its ask, plan pieces, plan review, breakdown, the child task) is filled in after the fact by one agent, in retro mode, up to the child's first stage.
-- **Replay.** Each of the child's stages in order is a fresh agent given its brief from the layer as it stands, that stage's real output from the history ("what you did this session"), and the kinds it may write, with one instruction: *write what you found as records, each addressed to whoever must act; end what you closed; link what you built on; put your own account in your run.* It writes its own records, choosing addressees and ends, in motion mode (rules refuse).
-- **After each step,** `show` and the next stage's brief are saved: what the task looks like now. Each stage also notes anything its real output relied on that its brief didn't carry.
-- **Tasks:** LIN-4450 first, the control against walk 1 and the check that walk 1's breaks are fixed; reviewed before the others. Then LIN-4472 (trace 3: a question to John settled by the autopilot 26 seconds later, his answer landing on another ticket) and LIN-4455 (trace 2: a tidy under autopilot).
-- **What it tests that walk 1 couldn't:** routing written by the stage; whether a brief built only from earlier stages' records is enough for the next; what each brief carries at each step.
-- **What would count as a break,** each with why: a stage that can't place what it found; a brief missing what its real output relied on, or carrying what it didn't need; routing that sends a thing nowhere or to the wrong reader; a brief that grows with the task's history rather than with what is open; a rule refusing something that was right.
+**Walk 2** (done): LIN-4450 replayed stage by stage (`walks/2/results-4450.md`). Every hand-off routed by its writer; the live check one thread; stale approvals visible. Briefs grew and retelling returned, from what the brief showed; ten breaks, folded in.
+
+**Walk 3: three tasks and a set of situations,** on the round 3 model. John: "running it through just a bunch of tests and tasks and situations to really see if we are now containing everything" [checked, log "17 Nov"].
+- **Task replays,** as walk 2 (seed the parent's part, then each stage a fresh agent with its brief, its real output and its kinds), now with queries allowed and logged:
+  - LIN-4450, the control against walk 2;
+  - LIN-4472 (trace 3: scoping's question to John settled by the autopilot 26 seconds later, his answer landing on another ticket);
+  - LIN-4455 (trace 2: a tidy under autopilot).
+- **Situations:** short scenes from the traces' leak moments the three tasks don't cover, each played by two or three agents on the model, from its trace's own words:
+  - lanes asking each other and going ahead on silence (trace 6a);
+  - a withdrawn ruling that left a false line behind (trace 6b);
+  - a count copied five ways (trace 6c);
+  - two overlapping sessions claiming the same item (Lighthouse c);
+  - proposals piling with nothing declining them (Lighthouse a);
+  - a small task on a project with neither git nor a tracker (paper walk).
+- **The question for each:** is everything that happened contained, routed to a reader, ended or rightly open; and what did each stage have to go looking for?
+- **What would count as a break,** each with why: something that happened with no home; a hand-off to no reader; a thing retold that should be one record; a stage that needed something it couldn't find by brief or query; a rule refusing something right.
 
 ## 6. Open
 
 - **John's:** the four catalogue choices and the avenue (`avenues` §1, §6). The model takes the choices provisionally and lives in one store with checked calls, roughly avenue A, because a model has to live somewhere and that is the simplest to build. John has not ruled on either; he expects them to settle as we iterate.
-- **From walk 1, not yet answered:** should a task close over checks it raised? (They are addressed to John, so rule 1 lets it.)
-- **Not yet designed:** waking (an addressee finds what is open for it when its brief is computed); views beyond `show` (John's page, counts, who is working); how the tracker shows records.
+- **Later configuration, not now** (John, log "17 Nov"): whether a task may close over checks it raised (rule 1 lets it, since they are addressed to John) or over an approval resting on a moved head (W2.7, shown but not stopped); how a session ends; standing rules now in Harbour's prompts and code (W2.10).
+- **Not yet designed:** waking (an addressee finds what is open for it when its brief is computed); views beyond `show` (John's page, counts, who is working); how the tracker shows records; how the proxy exposes the layer to agents.
 
 ## 7. Sources
 
