@@ -1,5 +1,5 @@
 {
- "next": 165,
+ "next": 167,
  "records": {
   "area-1": [
    {
@@ -864,6 +864,21 @@
     "links": {},
     "fields": {
      "says": "`lib/prompts/leftover-words.js`: the retirement line's words have one home and one checker (`lib/dispatch-leftover-answer.js`), but which entry to settle (the busiest touched area, else another) and the three forms are restated by hand in `docs/areas/README.md`, simple-dispatcher's docs/areas/README.md, `docs/proxy-integration.md` (with the refusal kinds) and `docs/architecture/dispatch-and-proxy.md`, and the verbatim guard reads only `lib/` and `routes/`. simple-dispatcher's README says a waiting entry also leaves when \"a follow-up is filed for it\", where this README says only when the consequence test sends it to a ticket. A cross-repo seam; simple-dispatcher's side is named here, not edited. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)"
+    }
+   },
+   {
+    "id": "finding-42",
+    "kind": "finding",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T23:05:25.936Z",
+    "by": "implementation",
+    "reason": "narrowed by LIN-4469: this repo's restatements point to leftover-words.js; simple-dispatcher's half stays",
+    "to": "area-1",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "says": "The retirement line's words have one home (`lib/prompts/leftover-words.js`, `RETIRES_LABEL` / `RETIRES_NONE`) and one checker (`lib/dispatch-leftover-answer.js`); this repo's `docs/areas/README.md` and `docs/architecture/dispatch-and-proxy.md` now point to it (LIN-4469, PR #2447). What stays: simple-dispatcher's README and its `docs/areas/README.md` still restate the retirement-line forms and the \"a follow-up is filed\" exit, where this README says a waiting entry leaves only when the consequence test sends it to a ticket. A cross-repo seam; simple-dispatcher's side is its owner's, named here, not edited. (Drift & Coherence Review, 13 Nov.; narrowed by LIN-4469.)"
     }
    }
   ],
@@ -3130,6 +3145,27 @@
      "ref": "https://github.com/JKershaw/LinearViewer/pull/2447 (branch feat/lin-4469-prompt-folds)",
      "head": "3533f37c2"
     }
+   },
+   {
+    "id": "change-142",
+    "kind": "change",
+    "v": 3,
+    "op": "revise",
+    "at": "2026-11-13T23:05:18.936Z",
+    "by": "implementation",
+    "reason": "two commits on the branch this pass: 04bb47598 (survey-task, survey-place, blind-read fold, on John's ruling) and 05b592742 (triage fold, retirement-line docs, RETIRED list, re-pin); CI green (run 43525065043)",
+    "in": "task-131",
+    "to": "task-131",
+    "state": "open",
+    "links": {
+     "about": [
+      "plan-117"
+     ]
+    },
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2447 (branch feat/lin-4469-prompt-folds)",
+     "head": "05b592742"
+    }
    }
   ],
   "decision-143": [
@@ -3153,6 +3189,79 @@
     },
     "fields": {
      "answer": "The four mandates in `lib/proxy-preamble.js` (`ONE_COMMENT_MANDATE`, `NONE_MANDATE`, `BLIND_COMMENT_MANDATE`, `TICKET_FIELDS_MANDATE`) drop the tracker clauses the proxy guard refuses. Kept in words, named in the change log: the code, branch and PR prohibitions (no code backstop: the runner's GitHub credential is outside the proxy) and the merge sentences (cut by ruling). Look-into's \"post nothing to Linear unless the person asks\" exception is retired (John's ruling, LIN-4448 comment bdcd3128).",
+     "why": "Review note 1 (verdict-124) and the look-into ruling (decision-137, carried by decision-138). New test `tests/unit/lin-4469-prompt-folds.test.js` checks the guarded clauses are absent from every preamble; a mutation check confirmed it fails when the retired clause is restored."
+    }
+   },
+   {
+    "id": "decision-143",
+    "kind": "decision",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T23:05:21.936Z",
+    "by": "implementation",
+    "reason": "scope widened to the four sibling places on John's ruling (decision-160) and the autopilot settlement (decision-161)",
+    "in": "task-131",
+    "state": "stands",
+    "links": {
+     "on": [
+      "verdict-124@1",
+      "decision-138@1"
+     ],
+     "about": [
+      "change-142"
+     ]
+    },
+    "fields": {
+     "answer": "The four mandates in `lib/proxy-preamble.js` (`ONE_COMMENT_MANDATE`, `NONE_MANDATE`, `BLIND_COMMENT_MANDATE`, `TICKET_FIELDS_MANDATE`) drop the tracker clauses the proxy guard refuses, and so do the sibling places in `lib/prompt-template-defs.js`: survey-task, survey-place and the blind read's read-only line (\"tickets or Linear state\" / \"tickets or tracker state\", commit 04bb47598; the blind read's piloted fixture takes the same one-line change, pilot not re-run) and triage's description-rewrite and subtask clauses (05b592742; its scope rule and \"findings stay observations\" stay). Kept in words, named in the change log: the code, branch and PR prohibitions (no code backstop: the runner's GitHub credential is outside the proxy) and the merge sentences (cut by ruling). Look-into's \"post nothing to Linear unless the person asks\" exception is retired (John's ruling, LIN-4448 comment bdcd3128).",
+     "why": "Review note 1 (verdict-124) and the look-into ruling (decision-137, carried by decision-138). New test `tests/unit/lin-4469-prompt-folds.test.js` checks the guarded clauses are absent from every preamble; a mutation check confirmed it fails when the retired clause is restored."
+    }
+   },
+   {
+    "id": "decision-143",
+    "kind": "decision",
+    "v": 3,
+    "op": "link",
+    "at": "2026-11-13T23:05:22.936Z",
+    "by": "implementation",
+    "in": "task-131",
+    "state": "stands",
+    "links": {
+     "on": [
+      "verdict-124@1",
+      "decision-138@1",
+      "decision-160@1"
+     ],
+     "about": [
+      "change-142"
+     ]
+    },
+    "fields": {
+     "answer": "The four mandates in `lib/proxy-preamble.js` (`ONE_COMMENT_MANDATE`, `NONE_MANDATE`, `BLIND_COMMENT_MANDATE`, `TICKET_FIELDS_MANDATE`) drop the tracker clauses the proxy guard refuses, and so do the sibling places in `lib/prompt-template-defs.js`: survey-task, survey-place and the blind read's read-only line (\"tickets or Linear state\" / \"tickets or tracker state\", commit 04bb47598; the blind read's piloted fixture takes the same one-line change, pilot not re-run) and triage's description-rewrite and subtask clauses (05b592742; its scope rule and \"findings stay observations\" stay). Kept in words, named in the change log: the code, branch and PR prohibitions (no code backstop: the runner's GitHub credential is outside the proxy) and the merge sentences (cut by ruling). Look-into's \"post nothing to Linear unless the person asks\" exception is retired (John's ruling, LIN-4448 comment bdcd3128).",
+     "why": "Review note 1 (verdict-124) and the look-into ruling (decision-137, carried by decision-138). New test `tests/unit/lin-4469-prompt-folds.test.js` checks the guarded clauses are absent from every preamble; a mutation check confirmed it fails when the retired clause is restored."
+    }
+   },
+   {
+    "id": "decision-143",
+    "kind": "decision",
+    "v": 4,
+    "op": "link",
+    "at": "2026-11-13T23:05:23.936Z",
+    "by": "implementation",
+    "in": "task-131",
+    "state": "stands",
+    "links": {
+     "on": [
+      "verdict-124@1",
+      "decision-138@1",
+      "decision-160@1",
+      "decision-161@1"
+     ],
+     "about": [
+      "change-142"
+     ]
+    },
+    "fields": {
+     "answer": "The four mandates in `lib/proxy-preamble.js` (`ONE_COMMENT_MANDATE`, `NONE_MANDATE`, `BLIND_COMMENT_MANDATE`, `TICKET_FIELDS_MANDATE`) drop the tracker clauses the proxy guard refuses, and so do the sibling places in `lib/prompt-template-defs.js`: survey-task, survey-place and the blind read's read-only line (\"tickets or Linear state\" / \"tickets or tracker state\", commit 04bb47598; the blind read's piloted fixture takes the same one-line change, pilot not re-run) and triage's description-rewrite and subtask clauses (05b592742; its scope rule and \"findings stay observations\" stay). Kept in words, named in the change log: the code, branch and PR prohibitions (no code backstop: the runner's GitHub credential is outside the proxy) and the merge sentences (cut by ruling). Look-into's \"post nothing to Linear unless the person asks\" exception is retired (John's ruling, LIN-4448 comment bdcd3128).",
      "why": "Review note 1 (verdict-124) and the look-into ruling (decision-137, carried by decision-138). New test `tests/unit/lin-4469-prompt-folds.test.js` checks the guarded clauses are absent from every preamble; a mutation check confirmed it fails when the retired clause is restored."
     }
    }
@@ -3218,6 +3327,32 @@
     "reason": "review measured the proxy preamble: 4 work kinds byte-identical, not 11",
     "in": "task-131",
     "state": "stands",
+    "links": {
+     "on": [
+      "decision-140@1"
+     ],
+     "about": [
+      "change-142"
+     ]
+    },
+    "fields": {
+     "answer": "Re-pinned once: the 13 Periodical hashes, the LIN-4467 witness, nine template ceilings and two source ceilings. `FROZEN_TOTAL_BYTES` 396884 -> 396559 (the ceilings' sum, below the 396575 condition). The meta-prompt baseline (`scripts/eval/meta-prompt.baseline.txt`) and router snapshots did not change, so they were not re-pinned.",
+     "why": "Rendered prompts carrying a folded rule fall: bug, design, implementation, plan, research, scoping, spike -24 each; review -30; plan-review -6 (rendered ceilings -204). Source ceilings: prompt-template-defs.js -70, prompt-formatters.js +24, stage-kinds.js -12. CI success green on PR #2447 (unit, unit proxy clock +400d, 4 E2E shards, secret scan). Whether the condition’s \"net rendered-byte reduction\" holds across every kind is question-147 to John. In real context (proxy preamble) only the four work kinds (blocked, breakdown, close-out, retrospective-audit) are byte-identical, not 11 (corrected by review)."
+    }
+   },
+   {
+    "id": "decision-145",
+    "kind": "decision",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T23:05:20.936Z",
+    "by": "implementation",
+    "in": "task-131",
+    "state": "superseded",
+    "ended": {
+     "reason": "re-pinned again after the fold: FROZEN_TOTAL_BYTES 396064 at 05b592742",
+     "into": "decision-166"
+    },
     "links": {
      "on": [
       "decision-140@1"
@@ -3562,6 +3697,29 @@
     "fields": {
      "says": "Fix 1 (retirement-line docs; settle before the merge). PR #2447 claims the retirement line’s restatement in this repo’s docs retired, but edits neither file. In `docs/areas/README.md:72-77` replace \"That line has three forms, spelled in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`): the settled entry’s … why it is larger than a fix.\" with \"Its forms are spelled once, in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`).\" In `docs/architecture/dispatch-and-proxy.md:127` replace the three spelled forms with \"carries exactly one `Retires:` line, in one of the forms `lib/prompts/leftover-words.js` spells\". Keep `docs/proxy-integration.md`’s refusal table (API contract). Then make the Waiting entry true (finding-42): drop it, or keep only the simple-dispatcher half. Check: neither file spells \"no waiting entry\" or \"nothing fix-sized\" any more."
     }
+   },
+   {
+    "id": "finding-153",
+    "kind": "finding",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T23:05:24.936Z",
+    "by": "implementation",
+    "in": "task-131",
+    "to": "implementation",
+    "state": "done",
+    "ended": {
+     "reason": "docs/areas/README.md and docs/architecture/dispatch-and-proxy.md now point to RETIRES_LABEL / RETIRES_NONE in leftover-words.js (05b592742); the Waiting entry (finding-42) keeps only simple-dispatcher's half"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-42"
+     ]
+    },
+    "fields": {
+     "says": "Fix 1 (retirement-line docs; settle before the merge). PR #2447 claims the retirement line’s restatement in this repo’s docs retired, but edits neither file. In `docs/areas/README.md:72-77` replace \"That line has three forms, spelled in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`): the settled entry’s … why it is larger than a fix.\" with \"Its forms are spelled once, in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`).\" In `docs/architecture/dispatch-and-proxy.md:127` replace the three spelled forms with \"carries exactly one `Retires:` line, in one of the forms `lib/prompts/leftover-words.js` spells\". Keep `docs/proxy-integration.md`’s refusal table (API contract). Then make the Waiting entry true (finding-42): drop it, or keep only the simple-dispatcher half. Check: neither file spells \"no waiting entry\" or \"nothing fix-sized\" any more."
+    }
    }
   ],
   "finding-154": [
@@ -3648,6 +3806,29 @@
     "fields": {
      "says": "Fix 3: post one line on LIN-4448 recording that the committed-tool clause lives in `lib/periodicals.js` (`committedSearch`), not the leaf `lib/prompts/leftover-words.js`, and why: all four call sites are Periodical bullets. The ask said to record a change of course there."
     }
+   },
+   {
+    "id": "finding-155",
+    "kind": "finding",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T23:05:26.936Z",
+    "by": "implementation",
+    "in": "task-131",
+    "to": "implementation",
+    "state": "done",
+    "ended": {
+     "reason": "posted on LIN-4448 (comment 8933968d): committedSearch lives in lib/periodicals.js beside its Periodical call sites, a deviation from the plan"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-40"
+     ]
+    },
+    "fields": {
+     "says": "Fix 3: post one line on LIN-4448 recording that the committed-tool clause lives in `lib/periodicals.js` (`committedSearch`), not the leaf `lib/prompts/leftover-words.js`, and why: all four call sites are Periodical bullets. The ask said to record a change of course there."
+    }
    }
   ],
   "finding-156": [
@@ -3681,6 +3862,28 @@
     "in": "task-131",
     "to": "implementation",
     "state": "open",
+    "links": {
+     "about": [
+      "change-142"
+     ]
+    },
+    "fields": {
+     "says": "Fix 4: add the old change-coupling spelling `search the repo for a committed change-coupling tool (it reads` to `RETIRED` in `tests/unit/lin-4469-prompt-folds.test.js`. Mutation M3 (restoring it) stays green in the new test; only the lin-4313 hash pin catches it. Check: restoring that spelling turns the new test red."
+    }
+   },
+   {
+    "id": "finding-156",
+    "kind": "finding",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T23:05:27.936Z",
+    "by": "implementation",
+    "in": "task-131",
+    "to": "implementation",
+    "state": "done",
+    "ended": {
+     "reason": "old change-coupling spelling added to RETIRED in tests/unit/lin-4469-prompt-folds.test.js (05b592742), mutation-checked"
+    },
     "links": {
      "about": [
       "change-142"
@@ -3885,6 +4088,29 @@
     "fields": {
      "says": "Next build step (c): post a builder `### Leftovers` answer on LIN-4469 with a `Retires:` line naming an entry the diff removes (settle before the merge), so the gate-format check (check-159) has something to check."
     }
+   },
+   {
+    "id": "finding-163",
+    "kind": "finding",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:05:28.936Z",
+    "by": "implementation",
+    "in": "task-131",
+    "to": "implementation",
+    "state": "done",
+    "ended": {
+     "reason": "builder ### Leftovers answer posted on LIN-4469 (comment bbc2b1c7), Retires: the docs-only notes-PR entry, removed from docs/areas/llm-and-prompts.md on PR #2447"
+    },
+    "links": {
+     "about": [
+      "check-159",
+      "change-142"
+     ]
+    },
+    "fields": {
+     "says": "Next build step (c): post a builder `### Leftovers` answer on LIN-4469 with a `Retires:` line naming an entry the diff removes (settle before the merge), so the gate-format check (check-159) has something to check."
+    }
    }
   ],
   "run-164": [
@@ -3919,6 +4145,60 @@
     "fields": {
      "stage": "autopilot",
      "account": "# What this stage really wrote\n\nWritten in the autopilot's wake 1df3249b (dispatched 23:04:17.401). The ruling's `raisedAt` is null in the material; the comment below says it was raised by 23:05:04.\n\n## Comment on LIN-4469 at 23:05:04 (id fab0cf08)\n\n### Engineering settlement for LIN-4469, and a corrected ruling (autopilot)\n\nThe review (Needs Discussion) found that the open ruling `lin-4469-cuts` states a wrong fact: it says 11 kinds are byte-identical. Measured in real context (preamble included), only the four `work` kinds (blocked, breakdown, close-out, retrospective-audit) are identical; look-into and retro fall 74, context, survey-task and survey-place 23, blind-read 24, triage 67. The ruling is replaced by a one-question version with the corrected figures (`lin-4469-witness`).\n\n**Settled here (engineering, no ruling needed): fold the tracker-write clauses in the four sibling places.** `lib/prompt-template-defs.js` lines 975 (survey-task), 994 (survey-place), 1065 (blind-read) and 268 (triage; its scope rule stays, its write clauses go). They are the same idiom as the class this ticket bounds, tracker-write prose the guard now refuses, and under John's standing rule (LIN-2825, amended by LIN-3006) an item of the same class is inside whether or not the plan listed it. The ask's \"shrink only\" is read as: touch only what the guard backs. So the code, branch and PR prohibitions stay in words (no backstop), as in the four mandates. Both the builder and the reviewer recommend this.\n\n**For the next build step:** (a) the fold above, with ceilings and `FROZEN_TOTAL_BYTES` re-pinned once more and a lower total; (b) the review's Fixes 1 to 5; (c) a `### Leftovers` answer with a `Retires:` line naming an entry the diff removes; (d) the corrected figures in the PR's decision text, the change-log row and the LIN-4350 comment.\n\n**Still John's:** only the witness sentence, \"a net fall across every kind\", which cannot hold for the four `work` kinds because they carry none of the folded text. Merge waits on that answer.\n\n## Ruling raised on LIN-4448 (lin-4469-witness, to John, on_answer resume, record_on LIN-4469)\n\n```json\n{\n \"decision_id\": \"lin-4469-witness\",\n \"question\": \"LIN-4469 asks for a net rendered-byte fall across every kind. Four work kinds (blocked, breakdown, close-out, retrospective-audit) carry none of the folded text, so they stay byte-identical in real context; the other kinds fall. Accept that as meeting the ask?\",\n \"options\": [\n  {\n   \"id\": \"accept\",\n   \"label\": \"Accept: the witness holds for every kind that carries folded text; the four work kinds cannot fall\"\n  },\n  {\n   \"id\": \"require\",\n   \"label\": \"Require a fall for all four: fold more text out of those kinds' prompts\"\n  }\n ],\n \"recommended\": \"accept\",\n \"free_text\": true,\n \"if_unanswered\": {\n  \"summary\": \"The cut stays unagreed: the build fixes continue, but PR #2447 does not merge\"\n },\n \"on_answer\": {\n  \"effect\": \"resume\",\n  \"record_on\": \"LIN-4469\"\n }\n}\n```\n"
+    }
+   }
+  ],
+  "run-165": [
+   {
+    "id": "run-165",
+    "kind": "run",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:05:17.936Z",
+    "by": "implementation",
+    "in": "task-131",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "stage": "implementation",
+     "claims": [
+      "lib/proxy-preamble.js",
+      "lib/prompts/leftover-words.js",
+      "lib/prompt-template-defs.js",
+      "lib/periodicals.js",
+      "tests/unit/prompt-size-budget.test.js",
+      "tests/unit/lin-4469-prompt-folds.test.js",
+      "scripts/prompt-template-change-log.md",
+      "docs/areas/llm-and-prompts.md",
+      "docs/areas/README.md",
+      "docs/architecture/dispatch-and-proxy.md"
+     ],
+     "account": "# What this stage really wrote\n\nDescription: unchanged (snapshots 23:05:33 and 23:17:28 match). Two implementation sessions wrote in this window: this dispatch (c66a3141, 23:05:16.936) and the first implementation's resume on John's answer (custom ac074b22, dispatched 23:03:14.946, a follow-up of b86c4a78), which ran alongside it until 23:16:13 and wrote commit `04bb47598`. Each comment is marked with its writer, inferred from what it says: ec59bd26 disowns commit `05b592742`, which the other three report as this pass's work.\n\n## Comment on LIN-4469 at 23:11:39 (id bbc2b1c7) (this dispatch)\n\n### Leftovers\nRetires: `lib/prompt-template-defs.js`: (retrospective-audit Reporting) and `lib/periodicals.js` (`areaNotesRoutes`) each state the docs-only notes-PR rule in their own words; both now render `NOTES_PR` (`lib/prompts/leftover-words.js`). The entry is removed from `docs/areas/llm-and-prompts.md` on PR #2447.\n\nEdges left, read against the diff:\n- Fix-sized, fixed on the PR branch: the retirement line's restatement in `docs/areas/README.md` and `docs/architecture/dispatch-and-proxy.md` (now `RETIRES_LABEL` / `RETIRES_NONE`); triage's guarded clauses; the committed-tool spelling in the RETIRED test list.\n- Outside this area, a note entry: simple-dispatcher's README and its `docs/areas/README.md` still restate the retirement-line forms and the \"follow-up is filed\" exit. Its owner's; named in the llm-and-prompts entry, not edited.\n- Not a ticket: no find breaks behaviour, blocks work or touches safety.\n\n## Comment on LIN-4448 (the parent) at 23:11:46 (id 8933968d) (this dispatch; it says the ruling `lin-4469-witness` gates merge)\n\n## LIN-4469 (piece 5): course changes and one deviation, PR #2447\n\nHead `05b592742`. Scope and measurement as recorded on the PR.\n\n- **Deviation from the plan:** `committedSearch` lives in `lib/periodicals.js`, not in the shared leaf `lib/prompts/leftover-words.js`. Every call site is a Periodical bullet, so the helper stays beside them. Stability's wording is the one spelling.\n- **Scope taken on:** triage's guard-refused clauses, and the same clause in survey-task, survey-place and the blind read's read-only line (`04bb47598`, on John's ruling). Triage keeps its scope rule and \"findings stay observations\".\n- **Re-pin:** `FROZEN_TOTAL_BYTES` 396064 (396884 on main), exactly the ceilings' sum. Real-context renders with proxy preambles fall 827520 → 825330 bytes (−2190). Exceptions: the four `work` kinds (blocked, breakdown, close-out, retrospective-audit) are byte-identical, and `seams-tangles` rises +24 from the committed-tool wording. Both are on John's replacement witness ruling `lin-4469-witness`, which gates merge.\n- **Not verified:** the post-deploy 403 checks (a look-into token's comment POST, a triage token's description PATCH). Not claimed. Rollback is reverting PR #2447's merge commit.\n\n## Comment on LIN-4469 at 23:15:58 (id a8749d0b) (this dispatch)\n\n## LIN-4469 (piece 5): PR and status\n\nPR: https://github.com/JKershaw/LinearViewer/pull/2447 (branch `feat/lin-4469-prompt-folds`), head `05b592742`.\n\n**CI on the head:** green. Unit tests, Unit tests (proxy, clock +400d), E2E shards 1–4, Secret scan and `ci-success` all pass (run 43525065043).\n\n**Done in this pass:** triage's guard-refused clauses folded; the retirement-line forms in `docs/areas/README.md` and `docs/architecture/dispatch-and-proxy.md` now point to `leftover-words.js`; the old committed change-coupling spelling is on the retired list (mutation-checked); re-pin to `FROZEN_TOTAL_BYTES` 396064 (equal to the ceilings' sum); witness regenerated.\n\n**Measured:** real-context renders with proxy preambles, PR base to head: 827520 → 825330 bytes (−2190). Exceptions: the four `work` kinds are byte-identical, and `seams-tangles` is +24.\n\n**Open before merge:** John's ruling `lin-4469-witness` on the four `work` kinds and the +24 (see the PR's DECISION section).\n\n**Not verified:** the post-deploy 403 checks (look-into comment POST, triage description PATCH). Rollback is reverting the PR's merge commit.\n\n## Comment on LIN-4469 at 23:16:04 (id ec59bd26) (the resumed first implementation, custom ac074b22)\n\n## Follow-up on PR #2447 (John's ruling on the second DECISION)\n\n- Commit 04bb47598: survey-task, survey-place and the blind read's read-only line drop the tracker clause the guard refuses (\"tickets or Linear state\" / \"tickets or tracker state\"). \"code, branches or pull requests\" stays in words. The blind read's piloted fixture takes the same one-line change; the pilot itself was not re-run.\n- Ceilings: survey-task −23, survey-place −23, blind-read −24, prompt-template-defs.js source −70. `FROZEN_TOTAL_BYTES` 396559 → 396419.\n- Another commit is on the branch, 05b592742 (KulchoAI): triage drops the description-rewrite and subtask clauses, the docs point to the retirement-line words, and the test's RETIRED list gains the committed change-coupling spelling. I did not author it; CI covers it.\n- CI on 05b592742: `CI success` green, with unit tests, unit tests (proxy, clock +400d), 4 E2E shards and secret scan all passing.\n- Still open for John: the first DECISION (accept the net fall for the eight kinds with no folded text: blocked, breakdown, close-out, look-into, triage, context, retro, retrospective-audit). They remain byte-identical.\n\n## Not in the material\n\nThe corrected LIN-4350 comment (cited by review as `25b09538`); its text is not in the material.\n"
+    }
+   }
+  ],
+  "decision-166": [
+   {
+    "id": "decision-166",
+    "kind": "decision",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:05:19.936Z",
+    "by": "implementation",
+    "in": "task-131",
+    "state": "stands",
+    "links": {
+     "on": [
+      "decision-140@1"
+     ],
+     "about": [
+      "change-142",
+      "decision-161"
+     ]
+    },
+    "fields": {
+     "answer": "Re-pinned once more at head 05b592742: `FROZEN_TOTAL_BYTES` 396884 (main) -> 396064, exactly the ceilings sum, below the 396575 condition. Real-context renders with proxy preambles, PR base to head: 827520 -> 825330 bytes (-2190). Exceptions: the four `work` kinds (blocked, breakdown, close-out, retrospective-audit) are byte-identical, and `seams-tangles` rises +24 from the committed-tool wording; both sit on John's ruling lin-4469-witness, which gates merge.",
+     "why": "decision-161 step (a): the fold of triage, survey-task, survey-place and the blind read's read-only line, then one re-pin with a lower total, measured on rendered prompts (decision-140). Intermediate pin by the resumed first implementation (04bb47598): 396559 -> 396419. Witness regenerated; CI success green on 05b592742."
     }
    }
   ]
@@ -4628,6 +4908,197 @@
     "in": "task-131",
     "state": "open",
     "by": "autopilot",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:33:22.258Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": {
+    "to": "implementation",
+    "state": "open",
+    "by": "implementation",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:33:22.305Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": {
+    "by": "implementation",
+    "pos": [
+     "finding-42"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:33:22.347Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": {
+    "by": "implementation",
+    "pos": [
+     "finding-24"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:33:22.387Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": {
+    "by": "implementation",
+    "pos": [
+     "finding-37"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:33:22.439Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": {
+    "by": "implementation",
+    "pos": [
+     "finding-38"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:33:22.488Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": {
+    "by": "implementation",
+    "pos": [
+     "finding-40"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:33:22.539Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": {
+    "by": "implementation",
+    "pos": [
+     "check-158"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:33:22.579Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": {
+    "by": "implementation",
+    "pos": [
+     "check-159"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:33:22.619Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": {
+    "by": "implementation",
+    "pos": [
+     "question-162"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:33:22.657Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": {
+    "by": "implementation",
+    "pos": [
+     "finding-146"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:33:22.694Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": {
+    "by": "implementation",
+    "pos": [
+     "question-147"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:33:29.806Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": {
+    "by": "implementation",
+    "pos": [
+     "finding-42"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:33:29.859Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": {
+    "by": "implementation",
+    "pos": [
+     "question-162"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:33:29.915Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": {
+    "by": "implementation",
+    "pos": [
+     "decision-145"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:33:29.975Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": {
+    "text": "4350",
+    "by": "implementation",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:33:30.027Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": {
+    "kind": "run",
+    "in": "task-131",
+    "by": "implementation",
     "pos": []
    },
    "asOf": null
