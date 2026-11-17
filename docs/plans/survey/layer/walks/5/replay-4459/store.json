@@ -1,5 +1,5 @@
 {
- "next": 123,
+ "next": 134,
  "records": {
   "area-1": [
    {
@@ -2691,6 +2691,29 @@
     "op": "add",
     "at": "2026-11-13T14:02:31.309Z",
     "by": "breakdown"
+   },
+   {
+    "id": "decision-114",
+    "kind": "decision",
+    "state": "superseded",
+    "fields": {
+     "answer": "Grounding commit origin/main 4b5001ddf; the plan needs no re-planning, and LIN-4459 carries piece 4's slice as approved.",
+     "why": "Staleness check at breakdown: origin/main still 4b5001ddf, git log 4b5001ddf..origin/main empty, nothing under lib, routes, tests, scripts or docs/areas changed since filing; spot checks hold (dispatch-store.js still 4,530 lines)."
+    },
+    "links": {
+     "on": [
+      "verdict-102@1"
+     ]
+    },
+    "in": "task-113",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:23:21.000Z",
+    "by": "survey-task",
+    "ended": {
+     "reason": "origin/main moved from 4b5001ddf to 0092d8d9e before the survey",
+     "into": "decision-124"
+    }
    }
   ],
   "decision-115": [
@@ -2781,6 +2804,29 @@
     "op": "add",
     "at": "2026-11-13T14:02:31.309Z",
     "by": "breakdown"
+   },
+   {
+    "id": "decision-118",
+    "kind": "decision",
+    "state": "superseded",
+    "fields": {
+     "answer": "Waiting 14 is LIN-4459's to settle.",
+     "why": "Waiting accounting is unchanged from the plan."
+    },
+    "links": {
+     "on": [
+      "verdict-102@1"
+     ]
+    },
+    "in": "task-113",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:23:23.000Z",
+    "by": "survey-task",
+    "ended": {
+     "reason": "\"Waiting 14\" by position no longer names the runFact entry at 0092d8d9e",
+     "into": "decision-125"
+    }
    }
   ],
   "decision-119": [
@@ -2891,6 +2937,263 @@
     "at": "2026-11-13T15:33:41.552Z",
     "by": "John",
     "via": "harbour-ruling"
+   }
+  ],
+  "run-123": [
+   {
+    "id": "run-123",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "survey-task",
+     "account": "Surveyed LIN-4459 at origin/main 0092d8d9e (comment 6dc83aaf). The ground moved 20 commits / 118 files since the 4b5001ddf grounding, so Waiting 14 must be found by text (the runFact entry, runs-and-dispatch.md:89). The hard part is the mechanism, not the move: the named lineage helpers are async store methods that walk up from a follow-up to its root, while stageRuns/recentRuns are pure and synchronous and a parked stage needs its descendants' terminal; the store's own lineage read (deriveLineageFields / withLineage wire outcome) may already answer it, which would be a change of course for LIN-4447. Also flagged: the two meanings of pending for the witness, an isLiveRun import cycle, a wrong importer list, the census wording and its changelog trap, and where the LLM-side notes sit. Recommended order: ask LIN-4448 again, write the failing witness from real store rows, check deriveLineageFields, then the mechanical move. Nothing posted on LIN-4447 or LIN-4448; description unchanged."
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:23:19.000Z",
+    "by": "survey-task"
+   },
+   {
+    "id": "run-123",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "survey-task",
+     "account": "Surveyed LIN-4459 at origin/main 0092d8d9e (comment 6dc83aaf). The ground moved 20 commits / 118 files since the 4b5001ddf grounding, so Waiting 14 must be found by text (the runFact entry, runs-and-dispatch.md:89). The hard part is the mechanism, not the move: the named lineage helpers are async store methods that walk up from a follow-up to its root, while stageRuns/recentRuns are pure and synchronous and a parked stage needs its descendants' terminal; the store's own lineage read (deriveLineageFields / withLineage wire outcome) may already answer it, which would be a change of course for LIN-4447. Also flagged: the two meanings of pending for the witness, an isLiveRun import cycle, a wrong importer list, the census wording and its changelog trap, and where the LLM-side notes sit. Recommended order: ask LIN-4448 again, write the failing witness from real store rows, check deriveLineageFields, then the mechanical move. Nothing posted on LIN-4447 or LIN-4448; description unchanged."
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:23:32.000Z",
+    "by": "survey-task",
+    "ended": {
+     "reason": "survey posted (comment 6dc83aaf)"
+    }
+   }
+  ],
+  "decision-124": [
+   {
+    "id": "decision-124",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "Grounding commit is now origin/main 0092d8d9e, 20 commits and 118 files after 4b5001ddf; the approved slice still stands as the target, but positional references to the area notes no longer hold.",
+     "why": "Survey staleness check at 16:25: origin/main 0092d8d9e, not 4b5001ddf as decision-114 says. \"Waiting 14\" by position is now a close-out entry; Lessons in docs/areas/runs-and-dispatch.md is 5,195 bytes (budget 6,144)."
+    },
+    "links": {
+     "on": [
+      "verdict-102@1"
+     ]
+    },
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:23:20.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "decision-125": [
+   {
+    "id": "decision-125",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "The Waiting entry LIN-4459 settles is the `runFact` row-only-read entry (finding-28), now at `docs/areas/runs-and-dispatch.md:89`; find it by its text, not as \"Waiting 14\".",
+     "why": "At 0092d8d9e the 14th Waiting entry by position is a close-out entry, not the runFact one the plan meant."
+    },
+    "links": {
+     "about": [
+      "finding-28"
+     ],
+     "on": [
+      "verdict-102@1"
+     ]
+    },
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:23:22.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-126": [
+   {
+    "id": "finding-126",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The lineage helpers named in done-when cannot do the job as written. `resolveFollowUpRoot` and `heldWakeHolderOf` are async store methods in `lib/dispatch-store.js` (~3230, ~3437) that do their own history reads; `heldWakeHolderOf` is not in `lib/dispatch-leftover-hook.js`, which only calls it. `stageRuns`/`recentRuns` are pure and synchronous and tests feed them hand-built rows, so \"callers hand the rows over\" cannot reach either helper. Both walk UP from a follow-up to its root, while a parked stage needs the terminal of its DESCENDANTS. Calling them per row would add store reads to `codeRouteOf`, which every recommendation surface goes through."
+    },
+    "links": {
+     "about": [
+      "plan-91",
+      "finding-28"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:23:24.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-127": [
+   {
+    "id": "finding-127",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The store may already answer this. `deriveLineageFields`/`mergeLineageFeedback` merge a lineage's feedback by `rootItemId`, and `listHistory({withLineage})` returns each row's wire `outcome` through `wireStatusOf` (`dispatch-store.js` ~2120); `blocked` already maps to `WAITING_ON_A_PERSON`, which is not live. So the fix may be that `runFact` prefers the lineage outcome. Deeper: `recent-runs` derives its own per-row outcome beside the store's one wire word (LIN-2122), two readers of one fact, which is what LIN-4447 exists to remove. Order: (after asking LIN-4448 again) write the failing witness from real store rows, then check whether `deriveLineageFields` already returns `skipped`/`blocked` for the parked stage; if it does, comment on LIN-4447 to change course to the lineage read; do the mechanical move after."
+    },
+    "links": {
+     "about": [
+      "plan-91",
+      "finding-28"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:23:25.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "question-128": [
+   {
+    "id": "question-128",
+    "kind": "question",
+    "state": "open",
+    "fields": {
+     "asks": "Does a held-wake holder share the parked stage's `rootItemId`? If not, that is the one case that really needs `heldWakeHolderOf`; if so, the lineage read covers every terminal the witness names.",
+     "options": [
+      "Yes: the lineage read by rootItemId covers held-wake holders",
+      "No: held-wake holders need heldWakeHolderOf beside the lineage read"
+     ],
+     "if-unanswered": "Build the witness with a real held-wake holder row (real heldWakeFor) so the answer shows in the test."
+    },
+    "links": {
+     "about": [
+      "plan-91"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:23:26.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-129": [
+   {
+    "id": "finding-129",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "\"Pending\" means two things. In `runFact`, `r.status === 'pending'` is a QUEUE row, which has no lineage; the ticket's `[pending]` is a park marker on a TAKEN row (`derivePendingPark`). The witness in `lin-4392-live-stage-wait.test.js` must be a taken row with `[pending]` feedback, plus a ci-wake `custom` continuation and a held-wake holder with real `rootItemId`/`followUpTo`/`heldWakeFor`, or it can pass for the wrong reason."
+    },
+    "links": {
+     "about": [
+      "task-113"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:23:27.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-130": [
+   {
+    "id": "finding-130",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Moving `isLiveRun` to `lib/run-live-wait.js` creates an import cycle: `formatRecentRuns` uses it, and `QUEUED`/`RUNNING` live in `lib/recent-runs.js`."
+    },
+    "links": {
+     "about": [
+      "plan-91"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:23:28.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-131": [
+   {
+    "id": "finding-131",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The done-when importer list is wrong. `lib/recommendation-blind-read.js` imports `isLiveRun` from `recent-runs`, not the old module; `lib/recommendation-facts.js` and `lib/recommendation-look-first.js` only name it in comments. Three unlisted tests import the old path (lin-4370, lin-4392, lin-4437), and `lin-4392`:432 checks the import line with a regex."
+    },
+    "links": {
+     "about": [
+      "task-113"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:23:29.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-132": [
+   {
+    "id": "finding-132",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The census says \"four names\" but lists five, and importers must spell them, so it probably means the old module path. Even then `scripts/prompt-template-change-log.md:188` names the old path and is recorded changelog text that may not be edited (binding). Limit the census to `lib/`, `routes/`, `tests/` and `docs/areas/`."
+    },
+    "links": {
+     "about": [
+      "plan-91",
+      "task-113"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:23:30.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-133": [
+   {
+    "id": "finding-133",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`docs/areas/llm-and-prompts.md:84-86` holds both the claim compare-and-set note (moves unchanged to the Runs note) and the LLM-side entry on `recommendation-live-wait.js` (settled with A14)."
+    },
+    "links": {
+     "about": [
+      "finding-64",
+      "finding-65"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:23:31.000Z",
+    "by": "survey-task"
    }
   ]
  },

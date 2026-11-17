@@ -2277,6 +2277,279 @@
     "--text"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:47.430Z",
+   "by": "plan-review",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-16",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:51.928Z",
+   "by": "plan-review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "verdict",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:51.960Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-29",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:51.988Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "check-42",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:52.019Z",
+   "by": "plan-review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--area",
+    "area-1",
+    "--state",
+    "open",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:57.162Z",
+   "by": "plan-review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--in",
+    "area-1",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:57.201Z",
+   "by": "plan-review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "catch-all",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:01.481Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-5",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:01.520Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-6",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:01.552Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-7",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:01.585Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-8",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:01.620Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-9",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:01.653Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-10",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:01.687Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-11",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:01.721Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-12",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:01.755Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-13",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:01.792Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-14",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:01.826Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-15",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:06.985Z",
+   "by": "plan-review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "cost-format.js",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:07.025Z",
+   "by": "plan-review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "area",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:07.056Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-28",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:07.083Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-10",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
   }
  ]
 }

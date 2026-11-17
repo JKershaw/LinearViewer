@@ -1,0 +1,170 @@
+[
+ {
+  "at": "2026-11-17T15:27:30.655Z",
+  "by": "survey-place",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-78",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:41.052Z",
+  "by": "survey-place",
+  "cmd": "get",
+  "args": [
+   "get",
+   "run-84",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:41.082Z",
+  "by": "survey-place",
+  "cmd": "get",
+  "args": [
+   "get",
+   "run-93",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:41.110Z",
+  "by": "survey-place",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-85",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:41.136Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "landingPrUrls",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:41.168Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "LIN-4458",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:41.196Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "method-as-run",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:41.224Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "parameteris",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:45.636Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "area-read",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:45.672Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "comment classifier",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:45.711Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "lesson",
+   "--text",
+   "kit",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:45.745Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "e8e92d50a",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:45.779Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "LIN-4453",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ }
+]

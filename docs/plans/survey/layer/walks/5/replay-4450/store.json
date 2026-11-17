@@ -1,5 +1,5 @@
 {
- "next": 109,
+ "next": 110,
  "records": {
   "area-1": [
    {
@@ -1446,6 +1446,36 @@
     "op": "add",
     "at": "2026-11-13T13:43:57.706Z",
     "by": "breakdown"
+   },
+   {
+    "id": "task-60",
+    "kind": "task",
+    "state": "done",
+    "fields": {
+     "ref": "LIN-4450",
+     "asked": "",
+     "done-when": "All of the above pass on `fake-client.js`. Jira's `descriptionRoundTrip` holds sealed words byte-exact, D1's rich-content guard is unchanged, and the PR names what it retires (the \"Jira skipped/unsealed\" seal claims in code headers). Note that once this lands, the first-dispatch seal begins sealing Jira-native tickets on live sites. That is expected: it is logged on failure, and dispatch continues.",
+     "paths": [
+      "lib/providers/jira/",
+      "lib/as-asked-seal.js",
+      "lib/as-asked.js",
+      "tests/unit/as-asked-create-seal.test.js",
+      "tests/unit/as-asked-dispatch-seal.test.js",
+      "tests/unit/as-asked-readers.test.js",
+      "tests/unit/jira-provider.test.js"
+     ]
+    },
+    "links": {
+     "piece": "plan-54"
+    },
+    "in": "task-53",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:22:07.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "change-84 merged (2bf788b6d) and deployed; review's gap analysis stands (verdict-96: items 1-6 and the done-when met, one declared departure, decision-81). Its condition (finding-97) and the blind read's three fixes (finding-105/106/107) made after the approval in 26299c9b0, ci-success green there. The three live checks (check-98/99/100) are post-deploy and stay open with task-62; they do not hold the close. Batch-read split homed in area-1 (finding-91)."
+    }
    }
   ],
   "task-61": [
@@ -3348,6 +3378,41 @@
     "at": "2026-11-13T15:22:05.000Z",
     "by": "close-out"
    }
+  ],
+  "run-109": [
+   {
+    "id": "run-109",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "close-out",
+     "account": "Merged PR #2421 as squash 2bf788b6d, pinned to head 26299c9b0 where CI passed; confirmed deploy from harbour.cat footer (15:39 UTC) and green Tests on main. After the approval I made review's one named fix (oversize test asserts the exact log line; checked it bites) and the blind read's three (audit predicate onto isHermeticTestToken, isTestToken alias dropped with its stale citations in the steps header and source-map line 42, redundant header test deleted); nobody re-reads these. Full unit suite 25,319/25,319 locally. Ledger: the three live checks are not run, no Jira credential in a build session; LIN-4452 owns them and I noted them on the PR. Housekeeping: description archived (snapshot verified) and pruned below the block to the Size record and an Implemented stub; LIN-4451 unblocked, LIN-4452 open, LIN-4445 stays In Progress. No follow-up tickets."
+    },
+    "links": {},
+    "in": "task-60",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:22:08.000Z",
+    "by": "close-out"
+   },
+   {
+    "id": "run-109",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "close-out",
+     "account": "Merged PR #2421 as squash 2bf788b6d, pinned to head 26299c9b0 where CI passed; confirmed deploy from harbour.cat footer (15:39 UTC) and green Tests on main. After the approval I made review's one named fix (oversize test asserts the exact log line; checked it bites) and the blind read's three (audit predicate onto isHermeticTestToken, isTestToken alias dropped with its stale citations in the steps header and source-map line 42, redundant header test deleted); nobody re-reads these. Full unit suite 25,319/25,319 locally. Ledger: the three live checks are not run, no Jira credential in a build session; LIN-4452 owns them and I noted them on the PR. Housekeeping: description archived (snapshot verified) and pruned below the block to the Size record and an Implemented stub; LIN-4451 unblocked, LIN-4452 open, LIN-4445 stays In Progress. No follow-up tickets."
+    },
+    "links": {},
+    "in": "task-60",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:22:09.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "close-out posted on LIN-4450 and PR #2421"
+    }
+   }
   ]
  },
  "log": [
@@ -4871,6 +4936,21 @@
     "find",
     "--in",
     "task-62",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:51.117Z",
+   "by": "close-out",
+   "cmd": "show",
+   "args": [
+    "--by",
+    "close-out",
+    "show",
+    "--task",
+    "task-60",
     "--by",
     "close-out"
    ],

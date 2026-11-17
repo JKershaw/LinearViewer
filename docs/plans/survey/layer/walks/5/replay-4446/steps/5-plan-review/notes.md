@@ -8,7 +8,7 @@
 - Revised finding-24 (v3): six renderers, adding lib/render.js:384.
 - Ended check-30 `done`, with the reason.
 
-**Lookups:** `show task-9`, `find --area area-1`, `get plan-28` (to quote it and pin @12), finding-21 and finding-16 (to check their states), `find --kind verdict` (none existed), `find --text workspace-kpis` (to avoid duplicates).
+**Lookups:** `show task-9`, `find --area area-1`, `get plan-28` (to pin @12), finding-21 and finding-16 (states), `find --kind verdict` (none), `find --text workspace-kpis` (duplicates).
 
 **Refusal:** `{"refused":"a verdict takes no to"}`. I dropped `to` and re-added the verdict. Side effect: revising finding-24 made plan-28@12 stale because it rests on finding-24@2, so the design brief flags finding-34 as "STALE … which is stale". The plan needs revising anyway, but the flag reads as if my finding were outdated.
 
