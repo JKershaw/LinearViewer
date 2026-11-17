@@ -1699,6 +1699,35 @@
     "op": "add",
     "at": "2026-11-13T15:54:40.300Z",
     "by": "breakdown"
+   },
+   {
+    "id": "task-78",
+    "kind": "task",
+    "state": "done",
+    "fields": {
+     "ref": "LIN-4464",
+     "done-when": "LIN-4464 (piece 0, baseline area read): two reports are committed, `llm-and-prompts` and the control `front-end-pages`, both read at one recorded base commit at or after `5dcf5bcda` (so PR #2424's (LIN-4457) two `aria-label`s in `lib/render-proxy.js`, in the control's 14-file sample, sit inside the baseline), made with the LIN-4453 kit (`docs/plans/survey/area-read.md`) and its frozen reader prompt, unchanged, PR #2422 as the model; the kit's fixed table (pinned to `4b5001ddf` and LIN-4447's areas) is not reused. The contamination notes and the open PRs that touch either sample (at breakdown #2427, LIN-4455, and #2426, LIN-4456) are recorded in both reports, with the area's hash sample at the base, which should include `lib/openrouter.js`, `lib/prompt-template-defs.js` and `lib/recommendation-live-wait.js` (pieces 1, 3 and 5 change them). Nothing from pieces 1-6 has landed before it merges. Testing: the kit's own checks; docs-only PR. Retires no Waiting entry; fills the missing-baseline gap the plan names. Binding: follow the parent's approved plan, and where the code shows it wrong change course and say so on LIN-4448; the PR names what it retires, edits the Waiting entries in `docs/areas/llm-and-prompts.md` it settles, respects that note's Lessons and leaves `docs/reviews/` unchanged.",
+     "paths": [
+      "docs/plans/survey/area-read.md",
+      "docs/plans/survey/area-read-reports/",
+      "docs/areas/llm-and-prompts.md",
+      "lib/openrouter.js",
+      "lib/prompt-template-defs.js",
+      "lib/recommendation-live-wait.js",
+      "lib/render-proxy.js"
+     ]
+    },
+    "links": {
+     "piece": "plan-64"
+    },
+    "in": "task-60",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:32:33.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "PR #2430 merged at 2aab32bf0: both baseline reports at e8e92d50a with the frozen kit cbec2d848 and reader prompt ef1c2ca91, contamination notes and open-PR record in both, nothing from pieces 1-6 on main at merge, no Waiting entry retired; LIN-4464 set Done 16:49:08"
+    }
    }
   ],
   "decision-79": [
@@ -2628,6 +2657,48 @@
     "at": "2026-11-13T16:17:31.000Z",
     "by": "leftover",
     "reason": "Leftover tidy commit 444b58246f37ce4796b181e9b0e21843fce29eee (adoption record figures); CI green on it: CI success plus all seven jobs"
+   },
+   {
+    "id": "change-103",
+    "kind": "change",
+    "state": "open",
+    "fields": {
+     "ref": "#2430",
+     "head": "17900065c"
+    },
+    "links": {
+     "about": [
+      "task-78"
+     ]
+    },
+    "in": "task-78",
+    "v": 3,
+    "op": "revise",
+    "at": "2026-11-13T16:32:24.000Z",
+    "by": "close-out",
+    "reason": "Close-out commits: 8237ec317 (review fixes 1 and 2), bc89fb61e (eleven, not twelve, other open PRs), 17900065c (PRs #2429, #2431, #2432 opened after the baseline check recorded); CI success plus all seven jobs green on 17900065c, run 43465388521"
+   },
+   {
+    "id": "change-103",
+    "kind": "change",
+    "state": "merged",
+    "fields": {
+     "ref": "#2430",
+     "head": "17900065c"
+    },
+    "links": {
+     "about": [
+      "task-78"
+     ]
+    },
+    "in": "task-78",
+    "v": 4,
+    "op": "end",
+    "at": "2026-11-13T16:32:32.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Merged at 2aab32bf0, pinned to head 17900065c with --match-head-commit; on origin/main the diff from 0092d8d9e is the three docs/plans/survey/ files only (367 insertions), both review fixes in the text"
+    }
    }
   ],
   "finding-104": [
@@ -2736,6 +2807,26 @@
     "at": "2026-11-13T16:26:06.000Z",
     "by": "review",
     "reason": "#2427 landed after the baseline (review re-check of main, 16:28)"
+   },
+   {
+    "id": "finding-105",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Before the piece-6 repeat read, check open PRs against both samples and notes again. At the #2430 merge (2aab32bf0, 2026-11-13): #2427 (LIN-4455) has merged (`192e1f81f`), adding 5 lines to `docs/areas/llm-and-prompts.md`: the LLM note on main is blob `eb976276d` while the baseline stays `b6b4c726d`; the after-read must report it as note movement not caused by pieces 1-6. #2428 (LIN-4456, `0092d8d9e`) touched neither note nor any sampled file. Three PRs opened after the baseline check are open: #2432 (LIN-4459) touches the sampled `lib/openrouter.js` and the LLM note, so if it merges before the after-read that file blob and the note move and the after-read must account for both; #2429 (LIN-4451) adds 6 lines to the control note `docs/areas/front-end-pages.md`; #2431 (LIN-4471) touches neither note nor a sampled file. All are recorded in the merged reports."
+    },
+    "links": {
+     "about": [
+      "plan-64"
+     ]
+    },
+    "in": "task-78",
+    "to": "task-60",
+    "v": 4,
+    "op": "revise",
+    "at": "2026-11-13T16:32:31.000Z",
+    "by": "close-out",
+    "reason": "Open-PR refresh at merge (close-out, 17900065c): #2429, #2431, #2432 opened after the baseline check"
    }
   ],
   "finding-106": [
@@ -3004,6 +3095,28 @@
     "op": "add",
     "at": "2026-11-13T16:26:02.000Z",
     "by": "review"
+   },
+   {
+    "id": "finding-112",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Fix 1 before merge (acceptance sentence 8, contamination notes in both reports): in `docs/plans/survey/area-read-reports/llm-and-prompts-e8e92d50a.md`, section `## Control and contamination`, bullet \"Control moved.\", name the moves: `lib/render-proxy.js` (#2424, LIN-4457), `lib/render-swipe.js` and `lib/render-task-page.js` (#2423, LIN-4446), and the control note `971d4bf6c` -> `ae9c007e1` (12 Waiting entries, down from 14). Keep the pointer to the addendum. The LLM report now only says the control moved."
+    },
+    "links": {
+     "about": [
+      "change-103"
+     ]
+    },
+    "in": "task-78",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:32:25.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Made in 8237ec317: the LLM report's Control moved bullet names lib/render-proxy.js (#2424, LIN-4457), lib/render-swipe.js and lib/render-task-page.js (#2423, LIN-4446) and the control note 971d4bf6c -> ae9c007e1 (14 to 12 Waiting); addendum pointer kept; landed on main in 2aab32bf0"
+    }
    }
   ],
   "finding-113": [
@@ -3026,6 +3139,29 @@
     "op": "add",
     "at": "2026-11-13T16:26:03.000Z",
     "by": "review"
+   },
+   {
+    "id": "finding-113",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Fix 2 before merge: the \"when checked\" statements in both reports and the addendum (sections 1, 3, 4) are stale. Since then #2427 (LIN-4455, merge `192e1f81f`) and #2428 (LIN-4456, `0092d8d9e`) merged. Leave the \"when checked\" wording; add one dated \"At merge\" line to addendum section 3 and the same line to the `Open PRs` bullet in the LLM report: #2427 has merged, so the LLM note on main is blob `eb976276d` (+5 lines) while the baseline stays `b6b4c726d` (the after-read reports that as note movement); #2428 touched neither note nor any sampled file; no sampled file changed between `e8e92d50a` and the merge commit. Re-check those facts at the moment of merging."
+    },
+    "links": {
+     "about": [
+      "change-103",
+      "finding-105"
+     ]
+    },
+    "in": "task-78",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:32:26.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Made in 8237ec317: a dated At merge (2026-11-13) line in adoption section 3 and the LLM report's Open PRs bullet, when-checked wording untouched: #2427 merged (192e1f81f, LLM note b6b4c726d -> eb976276d, +5 lines), #2428 (0092d8d9e) touches neither note nor a sampled file; facts re-checked right before merging"
+    }
    }
   ],
   "check-114": [
@@ -3049,6 +3185,30 @@
     "op": "add",
     "at": "2026-11-13T16:26:04.000Z",
     "by": "review"
+   },
+   {
+    "id": "check-114",
+    "kind": "check",
+    "state": "done",
+    "fields": {
+     "what": "Pre-merge: nothing from pieces 1-6 (LIN-4465..4470) on main, none of the 28 sampled paths changed since `e8e92d50a`, the open-PR record still true, `ci-success` green on the final commit.",
+     "why-person": "CI cannot see main moving after review; acceptance sentence 9 (nothing from pieces 1-6 lands before this merges) and the open-PR record must hold at the moment of merge, so close-out runs it then.",
+     "how": "`git log origin/main --oneline -E --grep=\"LIN-44(6[5-9]|70)\"` is empty; `git diff --name-only e8e92d50a origin/main` meets none of the 28 sampled paths; `gh pr list --state open` with each PR file list checked against the 28 paths and both notes. Either git check non-empty: the baseline is no longer before; stop and raise it on LIN-4448."
+    },
+    "links": {
+     "about": [
+      "change-103"
+     ]
+    },
+    "in": "task-78",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:32:27.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Run immediately before the merge, main at 0092d8d9e: git log --grep LIN-44(6[5-9]|70) empty; git diff --name-only e8e92d50a origin/main (28 files) meets none of the 28 sampled paths (taken from the reports' rank tables); gh pr list --state open re-run, every file list checked against the 28 paths and both notes, set unchanged from the one recorded in 17900065c; ci-success green on 17900065c (run 43465388521). Merged at 2aab32bf0"
+    }
    }
   ],
   "verdict-115": [
@@ -3137,6 +3297,28 @@
     "op": "add",
     "at": "2026-11-13T16:28:55.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "finding-117",
+    "kind": "finding",
+    "state": "declined",
+    "fields": {
+     "says": "Blind read of #2430 (head `444b58246` vs `0092d8d9e`), fix-sized, runs-and-dispatch: `lib/dispatch-leftover.js` restates two rules that already have an owner. `RESUMABLE_TARGETS = new Set(['cli','web'])` with `doc.target || 'cli'` repeats `followUpTarget` (`lib/dispatch-targets.js`, the one follow-up target rule, LIN-3672); `halt?.mode === 'pause' || halt?.mode === 'stop'` repeats `HALT_MODES` (`lib/workspace-halt.js`). Fix: import `followUpTarget` and `HALT_MODES` again and drop the local copies; two lines in one file, no behaviour change."
+    },
+    "links": {
+     "on": [
+      "change-103@2"
+     ]
+    },
+    "in": "task-78",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:32:28.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Not this PR's (finding-124): the blind read diffed against a later diverged main; #2430 is docs only and a lib/ edit would move what the baseline measures. Not applied"
+    }
    }
   ],
   "finding-118": [
@@ -3158,6 +3340,28 @@
     "op": "add",
     "at": "2026-11-13T16:28:56.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "finding-118",
+    "kind": "finding",
+    "state": "declined",
+    "fields": {
+     "says": "Blind read of #2430, fix-sized, runs-and-dispatch (concerns `lib/digest-feedback.js`): `lib/run-view.js` now carries its own copy of the three stamp kinds (`DECISION_STAMP_KINDS`), which is not in `tests/unit/decision-lifecycle-stamp-drift.test.js`'s `sites` list, and the docblock count (\"4 literal copies across 5 call sites\") leaves it out, so it can drift with no alarm. Fix: add `lib/run-view.js` to `sites` and update the count. Tidy-up: in `lib/run-view.js` the \"A wake marker is a leading prefix…\" comment sits alone between the set and `lastWakeEntry`'s docblock; fold it back into that docblock."
+    },
+    "links": {
+     "on": [
+      "change-103@2"
+     ]
+    },
+    "in": "task-78",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:32:29.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Not this PR's (finding-124): the blind read diffed against a later diverged main; #2430 is docs only and a lib/ or test edit would move what the baseline measures. Not applied"
+    }
    }
   ],
   "finding-119": [
@@ -3300,6 +3504,31 @@
     "op": "add",
     "at": "2026-11-13T16:32:13.000Z",
     "by": "autopilot"
+   },
+   {
+    "id": "finding-124",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Do not apply finding-117 or finding-118 to #2430: they are not fixes to this PR. The blind read (verdict-123) diffed head `444b58246` against `0092d8d9e`, a main commit (16:19) after the branch point `e8e92d50a` (15:59); against it the branch is diverged, behind by 10, so main-only work showed up as removals. Against its own base #2430 is ahead 2, behind 0: 3 files, +358/-0, all under `docs/plans/survey/`. The lib/ edits proposed (`lib/dispatch-leftover.js`, `lib/run-view.js`, the stamp drift test) would make a docs-only baseline touch code and move what it measures; close them as not this PR's. finding-112, finding-113 and check-114 still stand."
+    },
+    "links": {
+     "about": [
+      "verdict-123",
+      "finding-117",
+      "finding-118",
+      "change-103"
+     ]
+    },
+    "in": "task-78",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:32:30.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Followed: no blind-read fix applied to #2430; finding-117 and finding-118 declined; findings 112, 113 and check-114 done"
+    }
    }
   ],
   "finding-125": [
@@ -3383,6 +3612,29 @@
     "op": "add",
     "at": "2026-11-13T16:32:23.000Z",
     "by": "close-out"
+   },
+   {
+    "id": "run-127",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "close-out",
+     "account": "Made review's two fixes on #2430 (8237ec317: the LLM report's Control moved bullet names render-proxy/#2424, render-swipe and render-task-page/#2423 and the control note 971d4bf6c->ae9c007e1; dated At merge lines in adoption section 3 and the LLM report's Open PRs bullet), fixed my own count error (bc89fb61e, twelve->eleven) and recorded two PRs opened after the baseline check (17900065c): #2432 (LIN-4459) is open and touches the sampled lib/openrouter.js and the LLM note; #2429 (LIN-4451) touches the control note; #2431 touches neither. Ran check-114 immediately before merging: no LIN-4465..4470 commit on main, none of the 28 sampled paths in git diff e8e92d50a..origin/main (main 0092d8d9e), open-PR set unchanged. CI success plus all seven jobs green on 17900065c (run 43465388521). Merged #2430 at 2aab32bf0 with --match-head-commit 17900065c; checked on origin/main that the three files and both fixes landed (diff from 0092d8d9e is those three files, 367 insertions). Applied no blind-read fixes: its worse verdict compared against a later diverged main, so its finds are about LIN-4455's merged code, not this docs-only PR; filed nothing from it. No deploy, monitor or rollback (docs only). Set LIN-4464 Done, added an Implemented stub to the description (snapshot 16:32:38 holds the prior one; nothing to prune). The method spread over three files went to John in the close-out comment; it is outside this task and is already carried by finding-97."
+    },
+    "links": {
+     "on": [
+      "verdict-115@1",
+      "finding-124@1"
+     ]
+    },
+    "in": "task-78",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:32:34.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Close-out comment and Implemented stub on LIN-4464; #2430 merged; LIN-4464 Done"
+    }
    }
   ]
  },
@@ -4698,6 +4950,18 @@
     "--by",
     "close-out",
     "--count"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:39:13.532Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "verdict-115",
+    "--by",
+    "close-out"
    ],
    "asOf": null
   }

@@ -4374,6 +4374,45 @@
     "review"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:39:27.609Z",
+   "by": "blind-read",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-9",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:39:27.647Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "area",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:39:27.677Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "verdict",
+    "--by",
+    "blind-read"
+   ],
+   "asOf": null
   }
  ]
 }
