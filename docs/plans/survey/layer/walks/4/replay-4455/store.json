@@ -1,5 +1,5 @@
 {
- "next": 91,
+ "next": 95,
  "records": {
   "area-1": [
    {
@@ -2026,6 +2026,23 @@
     "op": "add",
     "by": "implementation",
     "at": "2026-11-13T15:10:13.000Z"
+   },
+   {
+    "id": "finding-88",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "review",
+    "says": "PR #2427 (head c95b9f139, CI green, run 43455220050). Read closely: (1) `tests/unit/decision-lifecycle-stamp-drift.test.js` was re-pointed at the table; no assertion dropped (trio still against the literal; lib/ readers import the set; \"declared once\" is zero literals in session-telemetry.js). (2) No test is named that pins the literal order of `FEEDBACK_ENTRY_KINDS` (finding-70); byte-identity was shown by `cmp` only. (3) The docblocks at `lib/dispatch-store.js:3481` and `lib/dispatch-leftover.js:10` (finding-73) are not reported as changed. (4) Behaviour edge: target `0`/`false` now refused.",
+    "links": {
+     "about": "change-80"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "review",
+    "at": "2026-11-13T15:48:55.000Z",
+    "stateReason": "read in review (verdict-90): (1) drift test re-pointed holds, and a kind dropped from the browser copy turns it red; (2) the prompt order is pinned by an exact literal, and swapping the status/recap rows turns 2 tests red; (4) target 0/false refused accepted as decision-86, post-deploy watch is check-94. (3) the finding-73 docblocks were not checked by this review",
+    "reason": "read in review (verdict-90): (1) drift test re-pointed holds, and a kind dropped from the browser copy turns it red; (2) the prompt order is pinned by an exact literal, and swapping the status/recap rows turns 2 tests red; (4) target 0/false refused accepted as decision-86, post-deploy watch is check-94. (3) the finding-73 docblocks were not checked by this review"
    }
   ],
   "run-89": [
@@ -2041,6 +2058,21 @@
     "op": "add",
     "by": "review",
     "at": "2026-11-13T15:48:49.000Z"
+   },
+   {
+    "id": "run-89",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "review",
+    "account": "Reviewed PR #2427 at head c95b9f139 (base c205190fd). CI green on the head, all 8 checks; merged locally into origin/main 5dcf5bcda (LIN-4457 landed since) and the full unit suite passed 25,457/25,457. Every done-when clause is met; three departures (NEVER_RAN in dispatch-terminal, the leaf kinds module, findWakeEvent met by a column) are recorded on LIN-4447. Nine mutations each went red, including the prompt-order swap (so the literal order is pinned, finding-88 (2)) and the browser stamp copy (drift test). Regression check on git log -30 clean; no unhandled sibling of the class. Verdict: approve, conditional on close-out discharging four checks: a docblock sentence on the unbound release wording, ci-success on the exact merge commit, the Leftovers comment naming Waiting 2, 4, 11, and a post-deploy watch on target-not-resumable. Did not check the finding-73 docblocks (finding-88 (3)).",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "review",
+    "at": "2026-11-13T15:48:56.000Z",
+    "stateReason": "review posted on LIN-4455: approve, conditional on close-out (checks 91-94)",
+    "reason": "review posted on LIN-4455: approve, conditional on close-out (checks 91-94)"
    }
   ],
   "verdict-90": [
@@ -2059,6 +2091,85 @@
     "op": "add",
     "by": "review",
     "at": "2026-11-13T15:48:50.000Z"
+   }
+  ],
+  "check-91": [
+   {
+    "id": "check-91",
+    "kind": "check",
+    "in": "task-60",
+    "to": "close-out",
+    "links": {
+     "on": "decision-83@1",
+     "about": "change-80"
+    },
+    "what": "Before the merge: add one sentence to the setHeldWakeReleaseNote docblock in lib/dispatch-store.js (the \"Not done here, on purpose\" paragraph): stores built outside server.js (account erasure, scripts/) bind no wording and release with UNBOUND_HELD_WAKE_RELEASE_NOTE, by design. Binding them is not needed.",
+    "why-person": "CI cannot see it: lib/account-erasure.js:590 (cancelRows -> removeItem) builds a bare DispatchQueueStore, so if an erasure cancels a queued leftover holder the released wake opens \"The step holding this wake did not run...\" rather than the leftover wording. That path already runs without a credential provisioner and degrades the same way; only the docblock says so.",
+    "how": "Read the docblock on the merging commit and confirm the sentence is there.",
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T15:48:51.000Z"
+   }
+  ],
+  "check-92": [
+   {
+    "id": "check-92",
+    "kind": "check",
+    "in": "task-60",
+    "to": "close-out",
+    "links": {
+     "on": "change-80@1"
+    },
+    "what": "Before the merge: confirm ci-success is green on the exact commit that merges; update the branch if GitHub requires it.",
+    "why-person": "CI ran on base c205190fd; origin/main is now 5dcf5bcda (LIN-4457 landed). Review merged locally and the unit suite passed 25,457/25,457, but that is not CI and covers no E2E.",
+    "how": "Read the ci-success check on the merge head of PR #2427 before merging.",
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T15:48:52.000Z"
+   }
+  ],
+  "check-93": [
+   {
+    "id": "check-93",
+    "kind": "check",
+    "in": "task-60",
+    "to": "close-out",
+    "links": {
+     "on": "decision-65@1",
+     "about": "change-80"
+    },
+    "what": "Before the merge: confirm the builder's ### Leftovers comment has landed on LIN-4455 and that its Retires: line names the Waiting entries this diff removes (2, 4, 11).",
+    "why-person": "It is not on LIN-4455 yet; only the PR body's \"What this retires\" names Waiting 2, 4 and 11. No test reads a ticket comment.",
+    "how": "Read LIN-4455's comments for ### Leftovers and compare its Retires: line with the entries removed from docs/areas/runs-and-dispatch.md.",
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T15:48:53.000Z"
+   }
+  ],
+  "check-94": [
+   {
+    "id": "check-94",
+    "kind": "check",
+    "in": "task-60",
+    "to": "close-out",
+    "links": {
+     "on": "decision-86@1",
+     "about": "change-80"
+    },
+    "what": "After the deploy: monitor the [leftover] skipped reason=target-not-resumable log line. No rollback is needed.",
+    "why-person": "A follow-up target of 0 or false now fails closed (producingRowIneligibility returns target-not-resumable) where || 'cli' used to make it resumable. Only rows already stored with a non-string target could hit it, and CI cannot see production rows.",
+    "how": "Watch production logs for that line after deploy; any hit is a stored row with a non-string target, and its only effect is that no leftover is queued.",
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T15:48:54.000Z"
    }
   ]
  },

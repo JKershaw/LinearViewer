@@ -2957,6 +2957,134 @@
     "--by",
     "review"
    ]
+  },
+  {
+   "at": "2026-11-17T14:52:34.481Z",
+   "by": "review",
+   "q": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:52:43.712Z",
+   "by": "review",
+   "q": [
+    "get",
+    "change-85",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:52:43.744Z",
+   "by": "review",
+   "q": [
+    "get",
+    "check-90",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:52:43.777Z",
+   "by": "review",
+   "q": [
+    "get",
+    "finding-76",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:52:43.820Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--text",
+    "LIN-4452",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:52:50.063Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--in",
+    "task-62",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:52:50.104Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--to",
+    "task-62",
+    "--state",
+    "open",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:52:50.137Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--text",
+    "dispatch",
+    "--in",
+    "task-60",
+    "--kind",
+    "check",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:52:50.166Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--text",
+    "log line",
+    "--kind",
+    "finding",
+    "--state",
+    "open",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:01.543Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--kind",
+    "task",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:01.580Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--text",
+    "holdAsAsked",
+    "--by",
+    "review"
+   ]
   }
  ]
 }

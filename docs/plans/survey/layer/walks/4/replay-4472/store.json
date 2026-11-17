@@ -2463,6 +2463,28 @@
     "--by",
     "implementation"
    ]
+  },
+  {
+   "at": "2026-11-17T14:53:06.621Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--kind",
+    "question",
+    "--by",
+    "John"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:06.658Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--text",
+    "served leaf",
+    "--by",
+    "John"
+   ]
   }
  ]
 }

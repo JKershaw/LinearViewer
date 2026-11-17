@@ -1,0 +1,2 @@
+# What is open and addressed to John, as of 2026-11-13T17:54:21Z (find --to John --state open)
+[]
