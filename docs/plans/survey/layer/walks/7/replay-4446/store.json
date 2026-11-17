@@ -1,5 +1,5 @@
 {
- "next": 45,
+ "next": 46,
  "records": {
   "area-1": [
    {
@@ -1308,6 +1308,32 @@
      "says": "Plan-review note for the builder (not blocking): `public/observation.js` comment counts in the Waiting entry: keep the plan's stated method (lines starting `*`, `//` or `/*`, out of non-blank lines) and say the other survey's 1,006 used a different method, rather than setting the two figures side by side."
     }
    }
+  ],
+  "verdict-45": [
+   {
+    "id": "verdict-45",
+    "kind": "verdict",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:23:59.941Z",
+    "by": "plan-review",
+    "in": "task-9",
+    "to": "design",
+    "state": "stands",
+    "links": {
+     "on": [
+      "plan-28@1"
+     ],
+     "about": [
+      "finding-36"
+     ]
+    },
+    "fields": {
+     "of": "plan-review",
+     "outcome": "request-changes",
+     "reasoning": "Judges plan-28 v1, reviewed at HEAD 4b5001ddf (still origin/main). The plan meets what was asked: the rule's reading into the notes (step 1), one shared formatter retiring public/cost-format.js and its parity test, every change names what it retires, a stop for John (step 7); the only narrowing (no view reworked) is John's size ruling (decision-26), not the plan's. Sound: the SHARED_MODULES allow-list with statSync at boot, mounted just before express.static('public'); CSP script-src 'self' plus hashes admits a same-origin module (CSP and nosniff only on HTML); lib/cost-format.js has no imports (leaf); renderPage emits <script src> per string (lib/components/page.js:204) and the scripts.includes('/common.js') check is unaffected by object entries; the golden updates with UPDATE_RENDER_TASK_PAGE_GOLDEN=1; area Lessons ~700 bytes; moving the parity file's server-side assertions is right. One blocking finding (finding-36): workspace-kpis.js reads the formatter at load through Chart.js's synchronous ticks.callback. Once that is folded in (deferral, restated constraint, Chart-stub witness) the plan is ready to build; the eight non-blocking notes (finding-37..44) go to the builder and can be handled during the build."
+    }
+   }
   ]
  },
  "log": [
@@ -1961,6 +1987,19 @@
     "text": "render.js",
     "by": "plan-review",
     "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:30:35.157Z",
+   "by": "design",
+   "cmd": "brief",
+   "args": {
+    "task": "task-9",
+    "by": "plan-review",
+    "pos": [
+     "design"
+    ]
    },
    "asOf": null
   }

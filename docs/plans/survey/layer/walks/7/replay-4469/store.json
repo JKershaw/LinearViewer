@@ -4319,6 +4319,42 @@
     ]
    },
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:31:05.825Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": {
+    "by": "autopilot",
+    "pos": [
+     "question-147"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:31:05.860Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": {
+    "to": "autopilot",
+    "state": "open",
+    "by": "autopilot",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:31:05.899Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": {
+    "in": "task-131",
+    "kind": "question",
+    "by": "autopilot",
+    "pos": []
+   },
+   "asOf": null
   }
  ]
 }

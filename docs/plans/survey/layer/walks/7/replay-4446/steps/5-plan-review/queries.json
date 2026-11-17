@@ -1,0 +1,130 @@
+[
+ {
+  "at": "2026-11-17T20:29:28.442Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": {
+   "to": "plan-review",
+   "state": "open",
+   "by": "plan-review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:28.484Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": {
+   "area": "area-1",
+   "state": "open",
+   "by": "plan-review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:28.517Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "check-22"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:28.553Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "plan-28"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:34.059Z",
+  "by": "plan-review",
+  "cmd": "show",
+  "args": {
+   "task": "task-9",
+   "by": "plan-review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:34.097Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": {
+   "text": "workspace-kpis",
+   "by": "plan-review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:48.289Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "check-32"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:48.326Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "check-33"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:48.363Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "check-13"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:48.408Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": {
+   "kind": "verdict",
+   "by": "plan-review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:48.457Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": {
+   "text": "render.js",
+   "by": "plan-review",
+   "pos": []
+  },
+  "asOf": null
+ }
+]

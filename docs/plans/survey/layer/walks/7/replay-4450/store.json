@@ -3077,6 +3077,164 @@
     "pos": []
    },
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:30:33.094Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "to": "leftover",
+    "state": "open",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:30:33.129Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "kind": "lesson",
+    "area": "area-1",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:30:33.170Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "kind": "area",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:30:38.124Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "text": "should-mock-ai",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:30:38.153Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "to": "area-1",
+    "state": "open",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:30:38.182Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "text": "harbour.asAsked",
+    "state": "open",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:30:42.837Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "text": "isHermeticTestToken",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:30:42.875Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "text": "test-token",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:30:42.910Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "text": "isTestToken",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:30:42.951Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "text": "source-map",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:30:42.994Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "text": "adf.js",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:30:43.040Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "text": "fake-client",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:30:43.076Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": {
+    "text": "Who uses",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:30:43.113Z",
+   "by": "leftover",
+   "cmd": "show",
+   "args": {
+    "task": "task-60",
+    "by": "leftover",
+    "pos": []
+   },
+   "asOf": null
   }
  ]
 }

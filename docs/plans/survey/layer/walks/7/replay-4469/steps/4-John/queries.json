@@ -1,0 +1,94 @@
+[
+ {
+  "at": "2026-11-17T20:29:46.443Z",
+  "by": "John",
+  "cmd": "find",
+  "args": {
+   "to": "John",
+   "state": "open",
+   "by": "John",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:46.480Z",
+  "by": "John",
+  "cmd": "find",
+  "args": {
+   "kind": "question",
+   "by": "John",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:46.517Z",
+  "by": "John",
+  "cmd": "find",
+  "args": {
+   "text": "cuts",
+   "by": "John",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:46.549Z",
+  "by": "John",
+  "cmd": "find",
+  "args": {
+   "text": "fold",
+   "by": "John",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:49.414Z",
+  "by": "John",
+  "cmd": "get",
+  "args": {
+   "by": "John",
+   "pos": [
+    "question-147"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:49.451Z",
+  "by": "John",
+  "cmd": "find",
+  "args": {
+   "to": "John",
+   "state": "open",
+   "by": "John",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:57.152Z",
+  "by": "John",
+  "cmd": "show",
+  "args": {
+   "task": "task-131",
+   "by": "John",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:30:13.308Z",
+  "by": "John",
+  "cmd": "get",
+  "args": {
+   "by": "John",
+   "pos": [
+    "question-147"
+   ]
+  },
+  "asOf": null
+ }
+]
