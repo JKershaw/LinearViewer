@@ -1,0 +1,30 @@
+[
+ {
+  "at": "2026-11-17T15:29:09.873Z",
+  "by": "scoping",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-78",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:29:09.899Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "decision",
+   "--text",
+   "Size",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ }
+]

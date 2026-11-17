@@ -1,0 +1,184 @@
+[
+ {
+  "at": "2026-11-17T15:27:57.958Z",
+  "by": "survey-task",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-113",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:57.991Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--to",
+   "survey-task",
+   "--state",
+   "open",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:58.027Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--in",
+   "task-82",
+   "--kind",
+   "question",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:03.633Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "live-wait",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:03.675Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "runFact",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:03.707Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "Waiting 14",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:03.742Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "compare-and-set",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:03.780Z",
+  "by": "survey-task",
+  "cmd": "get",
+  "args": [
+   "get",
+   "task-83",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:03.818Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "task",
+   "--in",
+   "task-82",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:27.580Z",
+  "by": "survey-task",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-28",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:27.610Z",
+  "by": "survey-task",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-65",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:27.640Z",
+  "by": "survey-task",
+  "cmd": "get",
+  "args": [
+   "get",
+   "decision-118",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:27.668Z",
+  "by": "survey-task",
+  "cmd": "get",
+  "args": [
+   "get",
+   "decision-114",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:27.703Z",
+  "by": "survey-task",
+  "cmd": "get",
+  "args": [
+   "get",
+   "lesson-6",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ }
+]

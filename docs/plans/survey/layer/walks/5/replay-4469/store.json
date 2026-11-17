@@ -1,5 +1,5 @@
 {
- "next": 149,
+ "next": 157,
  "records": {
   "area-1": [
    {
@@ -3127,6 +3127,41 @@
     "op": "add",
     "at": "2026-11-13T22:39:27.000Z",
     "by": "implementation"
+   },
+   {
+    "id": "finding-143",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/prompt-template-defs.js` restates tracker clauses the proxy write guard (LIN-4468) now refuses outside the four mandates LIN-4469 names: survey-task ~975, survey-place ~994, blind-read ~1065 (\"Do not change code, branches, pull requests, tickets or Linear/tracker state\") and triage ~268 (\"do not rewrite the task description ... do not create follow-up tasks or subtasks\", which ticket-fields refuses; the scope rule there stays). Lower value: `lib/prompts/stage-kinds.js` 534/559 survey completion criteria. Recommendation: shrink them to the code, branch and PR words; that moves those renders and ceilings. Waits on question-144: on fold, implementation does it; on accept, it becomes a Waiting entry (LIN-4469)."
+    },
+    "links": {},
+    "in": "task-131",
+    "to": "area-1",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T22:59:39.000Z",
+    "by": "review",
+    "reason": "review found triage line 268 in the same class, and the criteria lines"
+   },
+   {
+    "id": "finding-143",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/prompt-template-defs.js` restates tracker clauses the proxy write guard (LIN-4468) now refuses outside the four mandates LIN-4469 names: survey-task ~975, survey-place ~994, blind-read ~1065 (\"Do not change code, branches, pull requests, tickets or Linear/tracker state\") and triage ~268 (\"do not rewrite the task description ... do not create follow-up tasks or subtasks\", which ticket-fields refuses; the scope rule there stays). Lower value: `lib/prompts/stage-kinds.js` 534/559 survey completion criteria. Recommendation: shrink them to the code, branch and PR words; that moves those renders and ceilings. Waits on question-144: on fold, implementation does it; on accept, it becomes a Waiting entry (LIN-4469)."
+    },
+    "links": {
+     "about": [
+      "question-144"
+     ]
+    },
+    "in": "task-131",
+    "to": "area-1",
+    "v": 3,
+    "op": "link",
+    "at": "2026-11-13T22:59:40.000Z",
+    "by": "review"
    }
   ],
   "question-144": [
@@ -3155,6 +3190,33 @@
     "op": "add",
     "at": "2026-11-13T22:39:28.000Z",
     "by": "implementation"
+   },
+   {
+    "id": "question-144",
+    "kind": "question",
+    "state": "open",
+    "fields": {
+     "asks": "LIN-4469 PR #2447: accept two cuts to the ask, or fold? Corrected by review: (1) In real context the dispatched prompt includes the proxy preamble, which falls per writes kind: none -74 (look-into, retro), one-comment -23 (context, survey-task, survey-place), blind-comment -24 (blind-read), ticket-fields -67 (triage), work 0. So only 4 kinds stay byte-identical (blocked, breakdown, close-out, retrospective-audit, all work, carrying no folded text), not 11. (2) The guarded tracker clause is left unfolded in survey-task, survey-place and blind-read (lib/prompt-template-defs.js ~975/994/1065) and also in triage (~268: do not rewrite the description, do not create follow-up tasks or subtasks), which question v1 did not name.",
+     "options": [
+      "accept: the 4 work kinds cannot fall; leave the template clauses unfolded and record them as a Waiting entry in docs/areas/llm-and-prompts.md",
+      "fold: shrink the clauses at ~268/975/994/1065 to the code, branch and PR words too; back to implementation, re-pin ceilings and a lower FROZEN_TOTAL_BYTES"
+     ],
+     "recommended": "fold: it is small and is the parent aim; accept the 4 work kinds as unable to fall",
+     "if-unanswered": "hold the merge; the PR cannot be approved until this is answered"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-143"
+     ]
+    },
+    "in": "task-131",
+    "to": "John",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T22:59:38.000Z",
+    "by": "review",
+    "reason": "review measured buildProxyContextPreamble branch vs main: 7 of the 11 kinds fall; triage line 268 is the same class"
    }
   ],
   "finding-145": [
@@ -3179,6 +3241,31 @@
     "op": "add",
     "at": "2026-11-13T22:39:29.000Z",
     "by": "implementation"
+   },
+   {
+    "id": "finding-145",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "PR #2447 against the plan, for review to check: (a) decision-140's condition: FROZEN_TOTAL_BYTES 396884 -> 396559 (equal to the ceilings' sum, below 396575); rendered template ceilings -204; source ceilings prompt-template-defs.js -70, prompt-formatters.js +24, stage-kinds.js -12. (b) Departures from plan-117: the meta-prompt baseline and router snapshots were not re-pinned because they did not change; the committed-tool helper `committedSearch` lives in `lib/periodicals.js`, not `lib/prompts/leftover-words.js`. (c) Witness: `tests/unit/lin-4469-prompt-folds.test.js` checks retired spellings appear in no rendered prompt and the guarded clauses are absent from every preamble; a mutation check saw it fail with the retired clause restored. CI success green."
+    },
+    "links": {
+     "about": [
+      "change-142"
+     ],
+     "on": [
+      "decision-140@1"
+     ]
+    },
+    "in": "task-131",
+    "to": "review",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T22:59:48.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "review checked each point: decision-140 condition met (396559 < 396575, arithmetic holds); unchanged router snapshots and meta-prompt baseline consistent with no lead sentence changing (lesson-12); committedSearch placement defensible but unrecorded (Fix 3); witness has a gap (Fix 4)"
+    }
    }
   ],
   "run-146": [
@@ -3261,6 +3348,199 @@
     "op": "add",
     "at": "2026-11-13T22:39:51.000Z",
     "by": "autopilot"
+   }
+  ],
+  "finding-149": [
+   {
+    "id": "finding-149",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Fix 1, settle before the merge: the retirement line restatement in this repo docs is claimed retired (PR Retires, rewritten Waiting entry) but not edited. In `docs/areas/README.md:72-77` replace the three-forms prose with \"Its forms are spelled once, in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`).\" In `docs/architecture/dispatch-and-proxy.md:127` replace the listed forms with \"carries exactly one `Retires:` line, in one of the forms `lib/prompts/leftover-words.js` spells\". Keep `docs/proxy-integration.md` refusal table (API contract). Then make the Waiting entry true: drop it or keep only the simple-dispatcher half. Check: neither doc spells \"no waiting entry\" or \"nothing fix-sized\"."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-42"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:59:41.000Z",
+    "by": "review"
+   }
+  ],
+  "finding-150": [
+   {
+    "id": "finding-150",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Fix 2: correct the \"eleven unchanged\" figure in the PR DECISION 1, the change-log row if it repeats it, and a reply on LIN-4350 (comment eeb740b0 repeats it). In real context only 4 work kinds are byte-identical; per-writes preamble deltas are in question-144 v2."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "question-144"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:59:42.000Z",
+    "by": "review"
+   }
+  ],
+  "finding-151": [
+   {
+    "id": "finding-151",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Fix 3: post one line on LIN-4448 recording the change of course the ask requires: the committed-tool clause lives in `lib/periodicals.js` (`committedSearch`, line 14), not `lib/prompts/leftover-words.js`, because all four call sites are Periodical bullets. Defensible, but unrecorded."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "plan-117",
+      "finding-40"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:59:43.000Z",
+    "by": "review"
+   }
+  ],
+  "finding-152": [
+   {
+    "id": "finding-152",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Fix 4: the new witness misses one retired spelling. Restoring the old change-coupling wording (mutation M3) stays green in `tests/unit/lin-4469-prompt-folds.test.js`; only the lin-4313 hash pin catches it. Add `search the repo for a committed change-coupling tool (it reads` to `RETIRED`; check: restoring it turns the new test red. (M1, M2, M4, M5 went red as they should.)"
+    },
+    "links": {
+     "about": [
+      "change-142"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:59:44.000Z",
+    "by": "review"
+   }
+  ],
+  "finding-153": [
+   {
+    "id": "finding-153",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Fix 5: `lib/prompts/leftover-words.js` now imports `area-registry-path.js` mid-file (line 37). Move the import to the top of the module, and on merge revise lesson-10 \"import-free leaf\" to \"a leaf that imports only leaves (`area-registry-path.js`)\". The leaf property holds in substance; the wording goes stale."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "lesson-10"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:59:45.000Z",
+    "by": "review"
+   }
+  ],
+  "finding-154": [
+   {
+    "id": "finding-154",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "No builder `### Leftovers` answer with a `Retires:` line is on LIN-4469, so the gate-format check has nothing to check against. Settle before the merge: post it, with a `Retires:` line naming an entry this diff removes."
+    },
+    "links": {
+     "about": [
+      "change-142"
+     ]
+    },
+    "in": "task-131",
+    "to": "leftover",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:59:46.000Z",
+    "by": "review"
+   }
+  ],
+  "check-155": [
+   {
+    "id": "check-155",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "After deploy, confirm restricted dispatches carry a stamped token so the shrunk mandates are backed: a look-into token comment POST gets 403 from the stage gate; a triage token description PATCH gets 403.",
+     "why-person": "Needs a real dispatch on the deployed proxy; LIN-4468 notes a missing row mints stage-less (unrestricted), and CI cannot show what live rows carry.",
+     "how": "Dispatch a look-into and a triage after deploy and try each write with its token. Rollback: revert the PR #2447 merge commit, which restores the words."
+    },
+    "links": {
+     "about": [
+      "change-142"
+     ],
+     "on": [
+      "lesson-13@1",
+      "lesson-53@1"
+     ]
+    },
+    "in": "task-131",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:59:47.000Z",
+    "by": "review"
+   }
+  ],
+  "run-156": [
+   {
+    "id": "run-156",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "review",
+     "account": "Reviewed PR #2447 at 3533f37c2 against the As asked sentence by sentence; CI green, 468 local prompt tests pass. Most of the ask is met, and decision-140s byte condition holds (396559 < 396575). My verdict was Needs Discussion; the store has no such review outcome, so no verdict record was written. Two things block approval: question-144 is unanswered and its facts were wrong (only 4 work kinds stay byte-identical in real context, not 11; triage line 268 is the same class as finding-143). I revised both and recommend fold. The retirement-line docs are claimed retired but not edited, and no Leftovers answer exists. Fixes 1-5 go to close-out, the Leftovers gap to leftover, and the post-deploy 403 check to John. I left check-148 (move size) open: my review did not judge it."
+    },
+    "links": {},
+    "in": "task-131",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:59:49.000Z",
+    "by": "review"
+   },
+   {
+    "id": "run-156",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "review",
+     "account": "Reviewed PR #2447 at 3533f37c2 against the As asked sentence by sentence; CI green, 468 local prompt tests pass. Most of the ask is met, and decision-140s byte condition holds (396559 < 396575). My verdict was Needs Discussion; the store has no such review outcome, so no verdict record was written. Two things block approval: question-144 is unanswered and its facts were wrong (only 4 work kinds stay byte-identical in real context, not 11; triage line 268 is the same class as finding-143). I revised both and recommend fold. The retirement-line docs are claimed retired but not edited, and no Leftovers answer exists. Fixes 1-5 go to close-out, the Leftovers gap to leftover, and the post-deploy 403 check to John. I left check-148 (move size) open: my review did not judge it."
+    },
+    "links": {},
+    "in": "task-131",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T22:59:50.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "review posted (Needs Discussion), records written"
+    }
    }
   ]
  },
@@ -3692,6 +3972,169 @@
     "look-first",
     "--by",
     "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:48.276Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "question-144",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:48.315Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-143",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:48.347Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-145",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:48.381Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "check-148",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:48.415Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-142",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:48.451Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "lesson-10",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:51.554Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "LIN-4349",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:51.587Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "retirement",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:51.617Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "Retires",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:51.648Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "LIN-4350",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:51.679Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "committed tool",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:51.711Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "Leftovers",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:51.742Z",
+   "by": "review",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-131",
+    "--by",
+    "review"
    ],
    "asOf": null
   }

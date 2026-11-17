@@ -1,5 +1,5 @@
 {
- "next": 44,
+ "next": 45,
  "records": {
   "area-1": [
    {
@@ -1482,6 +1482,32 @@
     "op": "add",
     "at": "2026-11-13T15:51:34.000Z",
     "by": "design"
+   }
+  ],
+  "verdict-44": [
+   {
+    "id": "verdict-44",
+    "kind": "verdict",
+    "state": "stands",
+    "fields": {
+     "of": "plan-review",
+     "outcome": "approve-with-notes",
+     "reasoning": "Approve; no blocking findings. The plan meets the ask: it takes the Done-when's second branch (cost-format-global.js stays the only bridge, under a bridge-inventory check, four consumers to three in piece 1); two views with the next ones listed in order (finding-43) is the ask's own grain, not a narrowing; all ten Waiting entries have a disposition. Retiring cost-format-global.js at this task's cost (finding-29, survey advice, not a ruling) does not need John: four classic consumers across six renderers mean one page cannot retire it, and the Done-when allows 'only one left and shrinking'. Premises checked at 5dcf5bcda (no touched file changed since filing; only merge b708a9815, touching none): SHARED_MODULES is one route per file with no SPA fallback after express.static, so an unlisted /lib/x.js is a real 404; no <base>; CSP script-src 'self' plus hashes; no subdirectory .js under public/, so '../lib/x.js' resolves alike in browser and Node; { module } emits <script type=\"module\"> (lib/components/page.js:207) and cost-format-global.js is public/'s only ESM file; workspace-kpis.js reads only __WORKSPACE_KPI_DATA__, HarbourCharts, Chart, CostFormat, none set by common.js/app.js; task-page.js reads classic globals only behind typeof/truthiness guards, assigns no window.*, is last in SCRIPTS with one DOMContentLoaded listener (:925); four window.CostFormat readers and six renderers match; ten Waiting entries; Lessons 2,122 bytes; CLAUDE.md:43 and common.js:14 as described; Node v25 with type module, so import() with ?v= cache-bust works, and node --test isolates each file in its own process. Corrections for the builder are separate records to implementation."
+    },
+    "links": {
+     "on": [
+      "plan-39@1",
+      "plan-40@1"
+     ],
+     "about": [
+      "task-16"
+     ]
+    },
+    "in": "task-16",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:56:47.000Z",
+    "by": "plan-review"
    }
   ]
  },

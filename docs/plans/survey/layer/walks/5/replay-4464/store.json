@@ -1,5 +1,5 @@
 {
- "next": 98,
+ "next": 108,
  "records": {
   "area-1": [
    {
@@ -1908,6 +1908,28 @@
     "at": "2026-11-13T15:59:42.000Z",
     "by": "survey-place",
     "reason": "Base moved: main is now e8e92d50a (#2426 merged); kit and prompt blobs re-checked unchanged"
+   },
+   {
+    "id": "finding-85",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "The kit cannot be used fully unchanged: `docs/plans/survey/area-read.md` names Runs as the work area, posts to LIN-4447 under `@ 4b5001ddf` headings and writes the verdict as D = Δ(Runs) − Δ(control). The salt and N=14 carry over; the area, base, target ticket and verdict wording do not. Editing the kit breaks its blob pin (kit `cbec2d848`, reader prompt `ef1c2ca91`, both unchanged at `e8e92d50a`) for LIN-4462's after-read, so leave the file alone and record them in each report's header: area, base `e8e92d50a` (origin/main, the #2426/LIN-4456 merge, after `5dcf5bcda`), target LIN-4448, verdict mapping, the byte-imbalance limit, the full contamination list, `areas.json` blob `1dc2ba701` (no change to either sample), the LLM note blob `b6b4c726d` (25 Waiting entries). Order: fix the base at `e8e92d50a` even if main moves, provided none of pieces 1–6 has landed; write the header before running any reader; then four fresh passes."
+    },
+    "links": {
+     "about": [
+      "plan-64"
+     ]
+    },
+    "in": "task-78",
+    "to": "implementation",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T16:06:08.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "Base e8e92d50a fixed (decision-100), kit and reader prompt left unedited, adoption fields recorded in each report header and the adoption record; two fresh passes per area"
+    }
    }
   ],
   "finding-86": [
@@ -1951,6 +1973,29 @@
     "at": "2026-11-13T15:59:43.000Z",
     "by": "survey-place",
     "reason": "Survey-place: confirmed at e8e92d50a; adds the bundle-size comparison and that the kit's Known limits 1-2 invert for this area"
+   },
+   {
+    "id": "finding-86",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "The pairing is not balanced the way the kit claims. The kit chose N=14 for a 3.4% byte gap (Runs vs control); at `e8e92d50a` the samples are 380,459 B for llm-and-prompts (14 of 91 files) and 206,545 B for front-end-pages (14 of 92), 1.84×. `lib/prompt-template-defs.js` (120,531 B) and `lib/openrouter.js` (103,188 B) are 59% of the LLM sample, so K3/K4 will mostly score those two files; each pass takes about 395 KB (sample plus the 14,838 B note), nearly twice the bundle size that forced the kit's file-path delivery, and the noise guard (≥1.0 apart) is more likely to trip. N is frozen: record the gap as a known limit in both reports, don't fix it. The kit's Known limits 1–2 flip here: all three planned files (`openrouter`, `prompt-template-defs`, `recommendation-live-wait`) are sampled (ranks 1, 5, 8), so the read is sensitive to the work but mostly measures two files. Do not copy kit limits 1–2; they would state the opposite of what is true."
+    },
+    "links": {
+     "about": [
+      "plan-64",
+      "plan-70"
+     ]
+    },
+    "in": "task-78",
+    "to": "implementation",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T16:06:09.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "Byte gap and the two-file share recorded as known limits in both reports; N kept at 14 (decision-102)"
+    }
    }
   ],
   "finding-87": [
@@ -1994,6 +2039,29 @@
     "at": "2026-11-13T15:59:44.000Z",
     "by": "survey-place",
     "reason": "Base moved to e8e92d50a; adds the free-midpoint note for LIN-4453"
+   },
+   {
+    "id": "finding-87",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "The control has more contamination than the ticket says. Three of its 14 sample files changed since `4b5001ddf`: `lib/render-proxy.js` (812d9adbb, #2424, as noted), and `lib/render-swipe.js` and `lib/render-task-page.js` from #2423 (LIN-4446), which the ticket does not mention; `render-task-page.js` is also one of LIN-4453's four tracked files. The control's note changed too: `front-end-pages.md` went from 6,404 B to 5,825 B (blob `ae9c007e1`), Waiting entries 14 to 12. All of it falls inside this baseline (base `e8e92d50a`), so the pair holds; record all of it in both reports. This control read's M scores will not match LIN-4453's baseline. Because the salt is unchanged, the control paths match LIN-4453's, so this read is a free midpoint for LIN-4453: note that, don't claim it."
+    },
+    "links": {
+     "about": [
+      "verdict-71@1",
+      "area-44"
+     ]
+    },
+    "in": "task-78",
+    "to": "implementation",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T16:06:10.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "Control's three moved sample files (render-proxy, render-swipe, render-task-page) recorded in both reports and flagged for the after-read"
+    }
    }
   ],
   "finding-88": [
@@ -2035,6 +2103,28 @@
     "at": "2026-11-13T15:59:45.000Z",
     "by": "survey-place",
     "reason": "Re-checked at e8e92d50a: #2426 merged; 13 open PRs, none touch either sample; landingPrUrls reason made exact"
+   },
+   {
+    "id": "finding-88",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Open PRs at `e8e92d50a`: #2426 (LIN-4456) has merged and is the base. #2427 (LIN-4455) and the eleven other open PRs touch neither sample (28 files). Record that in both reports. Write PRs as `#2427`, never full URLs: a report posted as a comment that names a full PR URL joins the ticket's landing, because `landingPrUrls` skips only blind reads and survey reports (Runs Waiting entry, LIN-4453 leftover)."
+    },
+    "links": {
+     "about": [
+      "task-78"
+     ]
+    },
+    "in": "task-78",
+    "to": "implementation",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T16:06:11.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "Open PRs recorded in both reports: none touches a sampled file; PRs written as #NNNN. Follow-up for the repeat read is finding-105"
+    }
    }
   ],
   "finding-89": [
@@ -2076,6 +2166,28 @@
     "at": "2026-11-13T15:59:46.000Z",
     "by": "survey-place",
     "reason": "Report names follow the new base e8e92d50a; K2 note made explicit"
+   },
+   {
+    "id": "finding-89",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Smaller traps: (1) \"frozen prompt\" in the done-when means the kit's reader prompt, not the parent's 378,915 B prompt budget. (2) The reader prompt's K2 examples are about Runs (close-out, PRs per task, dispatch model); they are frozen, so note it in both reports; Δ is still sound, but do not compare absolute scores across areas. (3) Commit the reports as `docs/plans/survey/area-read-reports/{llm-and-prompts,front-end-pages}-e8e92d50a.md`, as in #2422. (4) If you also post them as comments, use the `## Area read:` heading, not `## Blind read` (422)."
+    },
+    "links": {
+     "about": [
+      "plan-64"
+     ]
+    },
+    "in": "task-78",
+    "to": "implementation",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T16:06:12.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "Reports committed under the named paths; frozen reader prompt used unchanged; reports not posted as comments, so no heading trap"
+    }
    }
   ],
   "decision-90": [
@@ -2239,6 +2351,31 @@
     "op": "add",
     "at": "2026-11-13T15:59:47.000Z",
     "by": "survey-place"
+   },
+   {
+    "id": "finding-95",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Where it lands: in `docs/plans/survey/` (the kit, the method-as-run addendum, `area-read-reports/`). The kit is frozen but written as a one-off: its table, its headings (`@ 4b5001ddf`, \"comment on LIN-4447\"), its verdict (Δ Runs − Δ control) and its Known limits all name Runs; only the snippet and the prompt take parameters. This is its second use. Do not copy `area-read-method-as-run.md` and swap Runs for LLM: that leaves a second copy of the method beside a kit whose words do not fit this read. Instead write one short addendum that cites the kit by blob (`cbec2d848`, prompt `ef1c2ca91`) and lists only what differs: base, area, byte gap, flipped limits, the six-file import table and the control's three moved files. Full recorded fields go in each report, as in #2422."
+    },
+    "links": {
+     "about": [
+      "plan-64"
+     ],
+     "on": [
+      "finding-85@2"
+     ]
+    },
+    "in": "task-78",
+    "to": "implementation",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:06:13.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "One short adoption record written, docs/plans/survey/area-read-adoption-e8e92d50a.md, citing the kit by blob; no second copy of the method"
+    }
    }
   ],
   "finding-96": [
@@ -2282,6 +2419,273 @@
     "op": "add",
     "at": "2026-11-13T15:59:49.000Z",
     "by": "survey-place"
+   }
+  ],
+  "run-98": [
+   {
+    "id": "run-98",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "scoping",
+     "account": "Sized LIN-4464 as just the task: the paired baseline read (llm-and-prompts and the control front-end-pages at one recorded base, frozen kit). No Survey finding binds: recording the kit misfits beside it (finding-85, finding-95) is the ask own shape, and a reusable kit is separate work (finding-97, left open to task-60). Cuts none; decided by the standing policy. Written to LIN-4464 description as ## Size of the move. Closed nothing. The ticket moved Todo to In Progress by 16:06:11; the material does not say whether I did that."
+    },
+    "links": {},
+    "in": "task-78",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:03:23.000Z",
+    "by": "scoping"
+   },
+   {
+    "id": "run-98",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "scoping",
+     "account": "Sized LIN-4464 as just the task: the paired baseline read (llm-and-prompts and the control front-end-pages at one recorded base, frozen kit). No Survey finding binds: recording the kit misfits beside it (finding-85, finding-95) is the ask own shape, and a reusable kit is separate work (finding-97, left open to task-60). Cuts none; decided by the standing policy. Written to LIN-4464 description as ## Size of the move. Closed nothing. The ticket moved Todo to In Progress by 16:06:11; the material does not say whether I did that."
+    },
+    "links": {},
+    "in": "task-78",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:03:25.000Z",
+    "by": "scoping",
+    "ended": {
+     "reason": "Sized LIN-4464: just the task, no cuts (decision written)"
+    }
+   }
+  ],
+  "decision-99": [
+   {
+    "id": "decision-99",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "**Size:** just the task\n**Why:** Delivers the paired baseline the ask names, both areas at one recorded commit with the frozen kit; no Survey finding binds, since recording the kit's misfits beside it is the ask's own shape and a reusable kit is separate work.\n**Cuts:** none\n**Decided by:** the standing policy",
+     "why": "Scoping's size record (## Size of the move in LIN-4464's description).",
+     "scope": "task-78"
+    },
+    "links": {
+     "on": [
+      "plan-64@1",
+      "finding-95@1",
+      "finding-97@1"
+     ]
+    },
+    "in": "task-78",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:03:24.000Z",
+    "by": "scoping"
+   }
+  ],
+  "decision-100": [
+   {
+    "id": "decision-100",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "Base fixed at `e8e92d50a` (origin/main, the #2426/LIN-4456 merge) so both area reads share one commit.",
+     "why": "The done-when asks one recorded base at or after `5dcf5bcda`; nothing from pieces 1-6 is on main at it.",
+     "scope": "task-78"
+    },
+    "links": {
+     "on": [
+      "finding-85@2"
+     ]
+    },
+    "in": "task-78",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:06:00.000Z",
+    "by": "implementation"
+   }
+  ],
+  "decision-101": [
+   {
+    "id": "decision-101",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "`{AREA}` in the reader prompt is filled with the `areas.json` names; nothing else in the frozen reader prompt (blob `ef1c2ca91`) changed.",
+     "why": "The kit (blob `cbec2d848`) stays unedited for its blob pin; the area name is the only parameter the read needed.",
+     "scope": "task-78"
+    },
+    "links": {
+     "on": [
+      "finding-85@2"
+     ]
+    },
+    "in": "task-78",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:06:01.000Z",
+    "by": "implementation"
+   }
+  ],
+  "decision-102": [
+   {
+    "id": "decision-102",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "N kept at 14 despite the 1.84x byte imbalance (380,459 B vs 206,545 B); the gap is recorded as a known limit in both reports.",
+     "why": "N is frozen with the kit; changing it would break comparability with the after-read.",
+     "scope": "task-78"
+    },
+    "links": {
+     "on": [
+      "finding-86@2"
+     ]
+    },
+    "in": "task-78",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:06:02.000Z",
+    "by": "implementation"
+   }
+  ],
+  "change-103": [
+   {
+    "id": "change-103",
+    "kind": "change",
+    "state": "open",
+    "fields": {
+     "ref": "#2430",
+     "head": "ce6cb88aa"
+    },
+    "links": {
+     "about": [
+      "task-78"
+     ]
+    },
+    "in": "task-78",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:06:03.000Z",
+    "by": "implementation"
+   }
+  ],
+  "finding-104": [
+   {
+    "id": "finding-104",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Baseline area read at `e8e92d50a` (frozen kit `cbec2d848`, reader prompt `ef1c2ca91`, two fresh passes per area): LLM & prompts code 3.3 (3.3 / 3.3), note 3.25 (3.0 / 3.5); control Front end: server-rendered pages code 3.3 (3.3 / 3.3), note 3.5 (3.5 / 3.5). Noise guard fired on neither. Reports: `docs/plans/survey/area-read-reports/{llm-and-prompts,front-end-pages}-e8e92d50a.md`; adoption record `docs/plans/survey/area-read-adoption-e8e92d50a.md`. These are the before-scores for the piece-6 repeat read; control files `render-proxy`, `render-swipe`, `render-task-page` moved since `4b5001ddf` and are flagged there for the after-read. Retires no Waiting entry; fills the missing-baseline gap."
+    },
+    "links": {
+     "about": [
+      "plan-64"
+     ],
+     "on": [
+      "change-103@1"
+     ]
+    },
+    "in": "task-78",
+    "to": "task-60",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:06:04.000Z",
+    "by": "implementation"
+   }
+  ],
+  "finding-105": [
+   {
+    "id": "finding-105",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Before the piece-6 repeat read, check open PRs against both samples and notes again: at `e8e92d50a` fourteen PRs were open (the survey counted twelve) and none touches a sampled file, but #2427 (LIN-4455) adds 5 lines to `docs/areas/llm-and-prompts.md`, the LLM note the reader scores. It sits outside this baseline; if it lands before the after-read, the LLM note score can move for reasons other than this work."
+    },
+    "links": {
+     "about": [
+      "plan-64"
+     ]
+    },
+    "in": "task-78",
+    "to": "task-60",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:06:05.000Z",
+    "by": "implementation"
+   },
+   {
+    "id": "finding-105",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Before the piece-6 repeat read, check open PRs against both samples and notes again: when #2430 went up, fourteen PRs were open (survey-place counted twelve at `e8e92d50a`) and none touches a sampled file, but #2427 (LIN-4455) adds 5 lines to `docs/areas/llm-and-prompts.md`, the LLM note the reader scores. It sits outside this baseline; if it lands before the after-read, the LLM note score can move for reasons other than this work."
+    },
+    "links": {
+     "about": [
+      "plan-64"
+     ]
+    },
+    "in": "task-78",
+    "to": "task-60",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:06:07.000Z",
+    "by": "implementation",
+    "reason": "the fourteen was counted at PR time, not at the base"
+   }
+  ],
+  "finding-106": [
+   {
+    "id": "finding-106",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Contamination: every counted reader pass read only its own bundle, except one Front-end (control) pass that ran a Bash `grep` of its own header lines. Recorded in the control report; the pass is counted, not discarded. Judge whether that is acceptable."
+    },
+    "links": {
+     "about": [
+      "change-103"
+     ]
+    },
+    "in": "task-78",
+    "to": "review",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:06:06.000Z",
+    "by": "implementation"
+   }
+  ],
+  "run-107": [
+   {
+    "id": "run-107",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "implementation",
+     "account": "Ran the baseline area read for LIN-4464 at e8e92d50a with the frozen kit (cbec2d848) and reader prompt (ef1c2ca91), two fresh passes per area, and opened docs-only PR #2430 (head ce6cb88aa): two reports and one adoption record. LLM code 3.3 / note 3.25, control code 3.3 / note 3.5; noise guard not fired. Recorded the byte gap, the control drift and the open PRs; kept N at 14; filled {AREA} with areas.json names. One control pass grepped its own header lines; counted and recorded. CI green (ci-success and all seven jobs). Nothing from pieces 1-6 on main; retires no Waiting entry. Closed six survey findings; left finding-96 (control import blobs) open because my done comment does not show it was done."
+    },
+    "links": {},
+    "in": "task-78",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:06:14.000Z",
+    "by": "implementation"
+   },
+   {
+    "id": "run-107",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "implementation",
+     "account": "Ran the baseline area read for LIN-4464 at e8e92d50a with the frozen kit (cbec2d848) and reader prompt (ef1c2ca91), two fresh passes per area, and opened docs-only PR #2430 (head ce6cb88aa): two reports and one adoption record. LLM code 3.3 / note 3.25, control code 3.3 / note 3.5; noise guard not fired. Recorded the byte gap, the control drift and the open PRs; kept N at 14; filled {AREA} with areas.json names. One control pass grepped its own header lines; counted and recorded. CI green (ci-success and all seven jobs). Nothing from pieces 1-6 on main; retires no Waiting entry. Closed six survey findings; left finding-96 (control import blobs) open because my done comment does not show it was done."
+    },
+    "links": {},
+    "in": "task-78",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:06:15.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "Baseline read done; PR #2430 up, CI green"
+    }
    }
   ]
  },
@@ -2999,6 +3403,47 @@
     "Size",
     "--by",
     "scoping"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:30:03.900Z",
+   "by": "implementation",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-78",
+    "--by",
+    "implementation"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:30:03.936Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "change",
+    "--by",
+    "implementation"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:30:03.968Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "run",
+    "--in",
+    "task-78",
+    "--by",
+    "implementation"
    ],
    "asOf": null
   }

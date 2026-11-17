@@ -1,5 +1,5 @@
 {
- "next": 134,
+ "next": 140,
  "records": {
   "area-1": [
    {
@@ -3087,6 +3087,32 @@
     "op": "add",
     "at": "2026-11-13T16:23:26.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "question-128",
+    "kind": "question",
+    "state": "open",
+    "fields": {
+     "asks": "Does a held-wake holder share the parked stage's `rootItemId`? If not, that is the one case that really needs `heldWakeHolderOf`; if so, the lineage read covers every terminal the witness names.",
+     "options": [
+      "Yes: the lineage read by rootItemId covers held-wake holders",
+      "No: held-wake holders need heldWakeHolderOf beside the lineage read"
+     ],
+     "if-unanswered": "Build the witness with a real held-wake holder row (real heldWakeFor) so the answer shows in the test.",
+     "recommended": "Yes: the factory's inheritance suggests a ci-wake `custom` continuation carries the holder's `rootItemId`. Not yet witnessed: the new failing test should pin that case before the lineage read relies on it."
+    },
+    "links": {
+     "about": [
+      "plan-91"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:26:32.000Z",
+    "by": "survey-place",
+    "reason": "survey-place: recommends an answer, unwitnessed (comment 1999d0b1)"
    }
   ],
   "finding-129": [
@@ -3129,6 +3155,26 @@
     "op": "add",
     "at": "2026-11-13T16:23:28.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-130",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Moving `isLiveRun` to `lib/run-live-wait.js` creates an import cycle: `formatRecentRuns` (`lib/recent-runs.js:139`) uses it, and `run-live-wait.js` would import `QUEUED`/`RUNNING` from `lib/recent-runs.js`. `lib/recommendation-blind-read.js:47` also imports it from `recent-runs.js`. Two ways out: `QUEUED`/`RUNNING` move with it, or `isLiveRun` stays in `recent-runs.js` (which then departs from done-when and should be said on the PR)."
+    },
+    "links": {
+     "about": [
+      "plan-91"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:26:33.000Z",
+    "by": "survey-place",
+    "reason": "survey-place: adds line refs and the two ways out (comment 1999d0b1)"
    }
   ],
   "finding-131": [
@@ -3172,6 +3218,27 @@
     "op": "add",
     "at": "2026-11-13T16:23:30.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-132",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The census says \"four names\" but lists five, and importers must spell the names they import, so as written it cannot pass. A useful census checks that each name is *defined* only in `lib/run-live-wait.js`, and that `recommendation-live-wait` appears nowhere in code or tests. `scripts/prompt-template-change-log.md:188` names the old path and is recorded changelog text that may not be edited (binding): limit the census to `lib/`, `routes/`, `tests/` and `docs/areas/`."
+    },
+    "links": {
+     "about": [
+      "plan-91",
+      "task-113"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:26:34.000Z",
+    "by": "survey-place",
+    "reason": "survey-place: replaces the guessed meaning with a census that can pass (comment 1999d0b1)"
    }
   ],
   "finding-133": [
@@ -3194,6 +3261,170 @@
     "op": "add",
     "at": "2026-11-13T16:23:31.000Z",
     "by": "survey-task"
+   }
+  ],
+  "run-134": [
+   {
+    "id": "run-134",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "survey-place",
+     "account": "pending"
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:26:28.000Z",
+    "by": "survey-place"
+   },
+   {
+    "id": "run-134",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "survey-place",
+     "account": "Surveyed the place for LIN-4459 at 0092d8d9e (comment 1999d0b1). The code is unchanged since grounding and the move is clean; the risk is the behaviour change. The plan's per-row walks would give lineage a third reading with N+1 reads; the existing `deriveLineageFields`/`withLineage` read already gives the one lineage word, and `lineage-closure` explains why exactly blocked and skipped hold the wait. Built on survey-task's findings: added a recommended answer to question-128 (unwitnessed), the ways out of the import cycle, a census that can pass, and the prose that fails silently. Sent the two-live-predicates tidy to Runs for later. Nothing posted on LIN-4447 or LIN-4448."
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:26:37.000Z",
+    "by": "survey-place",
+    "reason": "account written"
+   },
+   {
+    "id": "run-134",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "survey-place",
+     "account": "Surveyed the place for LIN-4459 at 0092d8d9e (comment 1999d0b1). The code is unchanged since grounding and the move is clean; the risk is the behaviour change. The plan's per-row walks would give lineage a third reading with N+1 reads; the existing `deriveLineageFields`/`withLineage` read already gives the one lineage word, and `lineage-closure` explains why exactly blocked and skipped hold the wait. Built on survey-task's findings: added a recommended answer to question-128 (unwitnessed), the ways out of the import cycle, a census that can pass, and the prose that fails silently. Sent the two-live-predicates tidy to Runs for later. Nothing posted on LIN-4447 or LIN-4448."
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T16:26:38.000Z",
+    "by": "survey-place",
+    "ended": {
+     "reason": "survey global posted (comment 1999d0b1)"
+    }
+   }
+  ],
+  "decision-135": [
+   {
+    "id": "decision-135",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "The place is unchanged since grounding: none of the 20 commits to 0092d8d9e touch `lib/recent-runs.js` or `lib/recommendation-live-wait.js`. The move itself is clean (the old module is 80 lines with a good docblock; its only import is `isLiveRun` from `lib/recent-runs.js`, a 141-line pure module). The risk sits in the behaviour change, not the move.",
+     "why": "Survey global at 0092d8d9e (comment 1999d0b1); only the area notes moved, which decision-125 already covers."
+    },
+    "links": {
+     "on": [
+      "decision-124@1"
+     ],
+     "about": [
+      "task-113"
+     ]
+    },
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:26:29.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-136": [
+   {
+    "id": "finding-136",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Wiring the named walks in gives lineage a third reading. `recentRuns(rows)` has no production caller, so \"callers hand the rows over\" reaches only `loadRecentRuns`, where per-row `resolveFollowUpRoot`/`heldWakeHolderOf` (async, one row at a time; `heldWakeHolderOf` is on `DispatchStore`, `lib/dispatch-store.js:3437`) means N+1 reads and a new definition of \"what ended\". If the plan's walk is kept anyway, say on LIN-4447 why the shared derivation could not serve."
+    },
+    "links": {
+     "about": [
+      "finding-126",
+      "plan-91"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:26:30.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-137": [
+   {
+    "id": "finding-137",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Read the lineage through the one derivation that already exists, and retire `runFact`'s row-only read for good. `deriveLineageFields` (`lib/dispatch-lineage-status.js:91`, \"the one derivation of lineage status\") merges sibling feedback by `rootItemId`; the Dispatch page, the proxy list (`wireStatusOf`) and the duplicate guard (`lineageEndedIds`, `lib/dispatch-store.js:405`) all read it, and `_readHistory` already offers `withLineage` (one batched `_lineageOf` read). Asking `listHistory` for `withLineage: true` lets `runFact` read the lineage outcome, so the wait, the duplicate guard and the Dispatch page agree on one word with no new walk; lineage `blocked` maps to waiting on a person exactly as the row's own `blocked` does today. Why exactly these two outcomes hold the wait: `lib/lineage-closure.js` stamps `closed` (which `runFact` already treats as not live) when a lineage ends done/failed/aborted; `isLineageClosingTerminal` leaves out `skipped`, and `[blocked]` is a pause."
+    },
+    "links": {
+     "about": [
+      "finding-127",
+      "finding-126",
+      "plan-91"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:26:31.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-138": [
+   {
+    "id": "finding-138",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Prose naming the old module fails silently when it moves (tests and imports fail loudly): `docs/architecture/source-map.md:225`, `docs/architecture/prompt-system.md`, `agent-api.md:52`, `docs/areas/llm-and-prompts.md:84-86,154`, and the docblocks at `lib/openrouter.js:2066` and `lib/dispatch-entrance.js:1726`. Update them in the same change; leave `scripts/prompt-template-change-log.md` as it is."
+    },
+    "links": {
+     "about": [
+      "finding-131",
+      "plan-91"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:26:35.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-139": [
+   {
+    "id": "finding-139",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Two pairs of \"live\" rules: `isLiveRun` (run facts) beside `liveOnAnchor` (`lib/live-anchor.js`, enriched loops), and the live-stage wait's read beside the duplicate guard's 5-minute check. Settling each pair into one rule is the claim compare-and-set already noted in Waiting. Runs' work, later; not LIN-4459's."
+    },
+    "links": {
+     "about": [
+      "finding-64",
+      "lesson-6"
+     ]
+    },
+    "in": "area-1",
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:26:36.000Z",
+    "by": "survey-place"
    }
   ]
  },
@@ -3377,6 +3608,201 @@
     "lesson-6",
     "--by",
     "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:33.156Z",
+   "by": "survey-place",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-113",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:49.770Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "liveOnAnchor",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:49.801Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "live-anchor",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:49.833Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "lineage-closure",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:49.864Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "deriveLineageFields",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:49.900Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "compare-and-set",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:49.944Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "source-map",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:49.987Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "two \"live\"",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:50.024Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "recentRuns",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:50.068Z",
+   "by": "survey-place",
+   "cmd": "get",
+   "args": [
+    "get",
+    "run-123",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:29:50.100Z",
+   "by": "survey-place",
+   "cmd": "get",
+   "args": [
+    "get",
+    "question-128",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:30:05.802Z",
+   "by": "survey-place",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-130",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:30:05.836Z",
+   "by": "survey-place",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-132",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:30:05.872Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--in",
+    "area-1",
+    "--kind",
+    "finding",
+    "--text",
+    "live",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:31:25.017Z",
+   "by": "scoping",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-113",
+    "--by",
+    "scoping"
    ],
    "asOf": null
   }

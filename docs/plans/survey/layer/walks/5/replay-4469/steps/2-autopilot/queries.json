@@ -1,0 +1,169 @@
+[
+ {
+  "at": "2026-11-17T15:28:07.045Z",
+  "by": "autopilot",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-131",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:07.073Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "run",
+   "--in",
+   "task-131",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:07.100Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "look-first",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:21.265Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--path",
+   "lib/recommendation-look-first.js",
+   "--kind",
+   "area",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:21.309Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "change-142",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:21.346Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "check",
+   "--in",
+   "task-131",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:21.383Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "look-first",
+   "--kind",
+   "lesson",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:24.406Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "area-1",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:24.444Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "area-65",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:24.484Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "look-first",
+   "--by",
+   "autopilot",
+   "--count"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:24.525Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "survey-task",
+   "--kind",
+   "finding",
+   "--state",
+   "open",
+   "--by",
+   "autopilot",
+   "--count"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:29.057Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "look-first",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ }
+]
